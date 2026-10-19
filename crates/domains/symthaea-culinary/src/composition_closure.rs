@@ -448,7 +448,15 @@ mod tests {
         let mut value = fixture();
         value["components"].as_array_mut().unwrap().pop();
         value["unavailable_components"] = json!([{
-            "component_id":"alcohol","reason":"not_analyzed","detail":"synthetic missingness test"
+            "component_id":"alcohol",
+            "reason":"not_analyzed",
+            "detail":"synthetic missingness test",
+            "evidence":{
+                "source_ref":"urn:synthetic:missing:alcohol",
+                "source_version":"fixture-v1",
+                "known_at":"2026-10-18T00:00:00Z",
+                "evidence_status":"synthetic"
+            }
         }]);
         let result = check_proximate_composition_closure_v1(&value).unwrap();
         assert_eq!(result.disposition, CompositionClosureDispositionV1::Indeterminate);
