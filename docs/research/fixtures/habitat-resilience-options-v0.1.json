@@ -29,7 +29,7 @@
       "Mycelix MFG-EVID-001 issue #3084",
       "Mycelix MFG-PROC-001 issue #3085"
     ],
-    "result_comparison": "Use interval-aware robust-frontier/minimax-regret owners once exact qualified interfaces are available; do not implement a parallel optimizer here."
+    "result_comparison": "Use existing interval-aware robust-frontier/minimax-regret owners once exact qualified interfaces are available; do not implement a parallel optimizer here."
   },
   "metric_definitions": [
     {
