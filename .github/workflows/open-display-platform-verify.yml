@@ -53,6 +53,7 @@ jobs:
           mkdir -p "$artifact_dir"
           cp hardware/open-display-reference/cad/odrh_sensor_interface_plate.scad "$artifact_dir/"
           cp hardware/open-display-reference/validation/odrh_sensor_plate_cad_check-v0.1.json "$artifact_dir/"
+          cp hardware/open-display-reference/validation/odrh-cad-runtime-receipt.schema.json "$artifact_dir/"
           cp hardware/open-display-reference/LICENSE "$artifact_dir/"
           cp hardware/open-display-reference/README.md "$artifact_dir/"
           cp docs/engineering/open-display-reference-platform-v0.1.json "$artifact_dir/"
@@ -233,8 +234,11 @@ jobs:
       - name: Run unit and mutation tests
         run: cargo test --manifest-path tools/open-display-platform-verify/Cargo.toml
 
-      - name: Verify repository manifest
-        run: cargo run --manifest-path tools/open-display-platform-verify/Cargo.toml
+      - name: Verify repository manifest and runtime CAD receipt
+        run: |
+          cargo run --manifest-path tools/open-display-platform-verify/Cargo.toml -- \
+            --cad-receipt target/odrh-validation/odrh-cad-runtime-receipt.json \
+            --cad-receipt-schema hardware/open-display-reference/validation/odrh-cad-runtime-receipt.schema.json
 
       - name: Upload reproducible CAD and validation artifacts
         if: always()
