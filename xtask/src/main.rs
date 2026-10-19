@@ -3,9 +3,9 @@ use std::path::PathBuf;
 
 mod crate_status;
 mod cropfoundry_csv_audit;
+mod cropfoundry_postharvest_audit;
 mod cropfoundry_validate;
 mod cropfoundry_water_policy;
-mod cropfoundry_postharvest_audit;
 mod duplicate_scan;
 mod manifest;
 mod rhn_sweep;
