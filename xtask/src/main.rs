@@ -86,6 +86,9 @@ enum Commands {
         manifest: PathBuf,
         #[arg(long, default_value = "docs/research/data/mobility_telemetry_fault_matrix_v0_1.json")]
         matrix: PathBuf,
+        /// Exact full Git commit ID for the code being benchmarked (40 or 64 hex characters).
+        #[arg(long)]
+        source_commit: String,
         /// Optional path for a JSON report; otherwise report to stdout.
         #[arg(long)]
         out: Option<PathBuf>,
@@ -162,7 +165,7 @@ fn main() -> anyhow::Result<()> {
             let out = out.map(|path| if path.is_absolute() { path } else { root.join(path) });
             mobility_telemetry_manifest::run(&input, out.as_deref())?;
         }
-        Commands::MobilityTelemetryBenchmark { manifest, matrix, out } => {
+        Commands::MobilityTelemetryBenchmark { manifest, matrix, source_commit, out } => {
             let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
                 .parent()
                 .expect("xtask lives one level below the workspace root")
@@ -170,7 +173,7 @@ fn main() -> anyhow::Result<()> {
             let manifest = if manifest.is_absolute() { manifest } else { root.join(manifest) };
             let matrix = if matrix.is_absolute() { matrix } else { root.join(matrix) };
             let out = out.map(|path| if path.is_absolute() { path } else { root.join(path) });
-            mobility_telemetry_manifest::run_benchmark(&manifest, &matrix, out.as_deref())?;
+            mobility_telemetry_manifest::run_benchmark(&manifest, &matrix, &source_commit, out.as_deref())?;
         }
         Commands::MobilityTelemetryTrace { manifest, input, out } => {
             let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
