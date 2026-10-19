@@ -703,7 +703,8 @@ mod tests {
         suite.family_count -= 1;
         assert_eq!(validate_corpus_header(&suite), Err("family_count_mismatch"));
         let mut suite = corpus();
-        suite.families[1].family_id = suite.families[0].family_id.clone();
+        let first_family_id = suite.families[0].family_id.clone();
+        suite.families[1].family_id = first_family_id;
         assert_eq!(validate_corpus_header(&suite), Err("duplicate_or_empty_family_id"));
     }
 }
