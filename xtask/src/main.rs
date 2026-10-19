@@ -3,6 +3,7 @@ use std::path::PathBuf;
 
 mod crate_status;
 mod cropfoundry_csv_audit;
+mod cropfoundry_nutrition_accounting;
 mod cropfoundry_postharvest_audit;
 mod cropfoundry_validate;
 mod cropfoundry_water_policy;
@@ -103,6 +104,15 @@ enum Commands {
         #[arg(long)]
         out: Option<PathBuf>,
     },
+    /// Account for nutrient delivery from explicit, source-backed JSON; no nutrition adequacy claim.
+    CropfoundryNutritionAccounting {
+        /// Path to a JSON input matching cropfoundry-nutrition-accounting-input-v0.
+        #[arg(long)]
+        input: PathBuf,
+        /// Optional path for the JSON accounting receipt.
+        #[arg(long)]
+        out: Option<PathBuf>,
+    },
     RhnSweep {
         #[arg(long, default_value = "1024")]
         dims: String,
@@ -192,6 +202,9 @@ fn main() -> anyhow::Result<()> {
                 expected_sha256,
                 out,
             )?;
+        }
+        Commands::CropfoundryNutritionAccounting { input, out } => {
+            cropfoundry_nutrition_accounting::run(input, out)?;
         }
         Commands::RhnSweep {
             dims,
