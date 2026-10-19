@@ -4,6 +4,7 @@ use std::path::PathBuf;
 mod crate_status;
 mod duplicate_scan;
 mod first_aid;
+mod guideline_change_impact;
 mod manifest;
 mod rhn_sweep;
 
@@ -80,6 +81,16 @@ enum Commands {
         #[arg(long)]
         out: Option<PathBuf>,
     },
+    /// Validate synthetic source-to-requirement change impact; not clinical validation.
+    FirstAidChangeImpactValidate {
+        #[arg(
+            long,
+            default_value = "docs/research/first-aid/guideline-change-impact-v0.json"
+        )]
+        contract: PathBuf,
+        #[arg(long)]
+        out: Option<PathBuf>,
+    },
     GenerateManifest {
         #[arg(long, default_value = ".")]
         root: PathBuf,
@@ -135,6 +146,13 @@ fn main() -> anyhow::Result<()> {
                 .expect("xtask lives one level below the workspace root")
                 .to_path_buf();
             first_aid::run(&root, &corpus, &benchmark, &schema, out.as_deref())?;
+        }
+        Commands::FirstAidChangeImpactValidate { contract, out } => {
+            let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .expect("xtask lives one level below the workspace root")
+                .to_path_buf();
+            guideline_change_impact::run(&root, &contract, out.as_deref())?;
         }
         Commands::GenerateManifest { root } => {
             let files = vec!["Cargo.toml", "src/lib.rs", "symthaea-core/Cargo.toml"];
