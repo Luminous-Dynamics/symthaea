@@ -44,16 +44,8 @@ jobs:
           rustfmt --check --edition 2024 crates/domains/symthaea-fabrication-kernel/src/production_value.rs
           rustfmt --check --edition 2024 crates/domains/symthaea-fabrication-kernel/src/paired_inference.rs
       - name: Production outcome evaluator tests
-        run: cargo test --manifest-path crates/domains/symthaea-fabrication-kernel/Cargo.toml production_value
+        run: cargo test --locked --manifest-path crates/domains/symthaea-fabrication-kernel/Cargo.toml production_value
       - name: Paired cluster inference tests
-        run: cargo test --manifest-path crates/domains/symthaea-fabrication-kernel/Cargo.toml paired_inference
+        run: cargo test --locked --manifest-path crates/domains/symthaea-fabrication-kernel/Cargo.toml paired_inference
       - name: Clippy with warnings denied
-        run: cargo clippy --manifest-path crates/domains/symthaea-fabrication-kernel/Cargo.toml --lib -- -D warnings
-      - name: Report workspace lockfile drift
-        if: always()
-        run: |
-          if ! git diff --quiet -- Cargo.lock; then
-            echo "::error::Cargo.lock changed during focused package qualification; commit the reviewed generated lockfile."
-            git diff -- Cargo.lock
-            exit 1
-          fi
+        run: cargo clippy --locked --manifest-path crates/domains/symthaea-fabrication-kernel/Cargo.toml --lib -- -D warnings
