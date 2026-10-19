@@ -24,6 +24,7 @@ This work is an extension of the existing scientific-discovery architecture, **n
 - **ScientificModel / PhysicsIR** is the intended solver-independent model boundary in [#6879](https://github.com/Luminous-Dynamics/symthaea/issues/6879) and its implementation [PR #6880](https://github.com/Luminous-Dynamics/symthaea/pull/6880). Reuse its model identity, typing, assumptions, provenance, and evidence-requirement semantics when available; do not create a second canonical model IR in this benchmark.
 - **Physics typing** and symbolic-domain hardening are owned by [#6868](https://github.com/Luminous-Dynamics/symthaea/issues/6868), [PR #6869](https://github.com/Luminous-Dynamics/symthaea/pull/6869), and [PR #6865](https://github.com/Luminous-Dynamics/symthaea/pull/6865). Do not create a parallel unit/type or proof framework.
 - The current `integrated_discovery.rs` already composes typed generation, active experiment selection, and observation smoothing with a factorial ablation. Reuse it through a narrow adapter; the evaluator must remain independent of the agent's scoring code.
+- Symtropy's [Physics Experiment Atlas v0.1](https://github.com/Luminous-Dynamics/symtropy/pull/1981) supplies a separate Rust reference/evidence layer for analytic and synthetic experiment cases. Reuse its case/receipt patterns where they fit, but its initial historical-experiment catalog is not itself a generator of hidden altered-law worlds, and synthetic fixtures do not prove historical apparatus reproduction.
 - Robust, uncertainty-aware experiment ranking is also being implemented in [PR #8034](https://github.com/Luminous-Dynamics/symthaea/pull/8034), `symthaea-experiment-design`: maximin standardized separation between rival models, normalized by relative experiment cost. Its documentation explicitly says this is not expected information gain or a posterior, and its runtime handoff is not yet integrated. Reuse it as a candidate selector/baseline after its own qualification; do not reimplement its ranking formula here.
 
 **What is additive here:** a blinded benchmark suite where the governing dynamics can be composed or altered beyond familiar textbook law families, with structural holdouts, rival-mechanism discrimination, adversarial controls, and a fixed-cost experiment budget. It tests the *open-world discovery capability* above the existing interfaces. It does not replace or re-specify the Ramanujan→EUREKA handoff.
@@ -186,6 +187,7 @@ Use the same hidden worlds, initial conditions, budgets, and observation noise f
 
 **Symtropy**
 - Executes the frozen physical/synthetic world and records deterministic experiment inputs and outputs.
+- The Physics Experiment Atlas (#1981) may supply reference-case and evidence-receipt conventions; do not treat its historical/analytic catalog as a hidden-law-world generator or qualified real apparatus model.
 - Keeps engine mechanics and constitutive models explicit and versioned.
 - Does not silently mutate its default physics when a candidate theory is proposed.
 
