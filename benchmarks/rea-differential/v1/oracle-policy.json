@@ -14,7 +14,9 @@
     "accounted_unique_bytes": "Union of valid in-bounds accounting spans, without double counting.",
     "unexplained_bytes": "Uncovered source bytes, including leading, internal and trailing gaps.",
     "unresolved_bytes": "Unknown + unsupported + ambiguous + unexplained + overlapping accounting byte count.",
-    "false_extraction_bytes": "Bytes in wrong or extra extracted payload files; follow-up adapter should expose per-output bytes to compute the exact count."
+    "false_extraction_bytes": "Bytes in wrong or extra extracted payload files; follow-up adapter should expose per-output bytes to compute the exact count.",
+    "coordinate_space_fidelity": "Each transformed byte sequence has its own source hash, length, transform kind, parent coordinate-space ID, and parent byte range. Exact match requires all fields to agree with the oracle.",
+    "coordinate_space_byte_accounting": "Byte-ledger completeness is computed separately in every oracle-declared coordinate space, then aggregated. A child coordinate space cannot shrink the denominator by being omitted."
   },
   "target_gates": {
     "known_file_recall_percent": 100,
@@ -23,7 +25,8 @@
     "overlapping_accounting_bytes": 0,
     "complete_claim_with_unresolved_bytes": 0,
     "mutation_rejection_percent": 100,
-    "repeat_run_semantic_projection_agreement_percent": 100
+    "repeat_run_semantic_projection_agreement_percent": 100,
+    "exact_coordinate_space_lineage_percent": 100
   },
   "caveats": [
     "Targets are proposed acceptance criteria, not achieved measurements.",
