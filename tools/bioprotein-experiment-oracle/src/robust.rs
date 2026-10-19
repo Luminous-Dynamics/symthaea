@@ -709,6 +709,56 @@ mod tests {
     }
 
     #[test]
+    fn candidate_summary_reports_exact_weighted_mean_bounds_and_sign_coverage() {
+        let family = corpus()
+            .families
+            .into_iter()
+            .find(|family| family.family_id == "ROBUST-001")
+            .expect("stable family exists");
+        let result = evaluate_family(&family);
+        let candidate = result
+            .candidates
+            .iter()
+            .find(|candidate| candidate.experiment_id == "assay-a")
+            .expect("assay-a summary exists");
+        assert_eq!(candidate.eligible_scenario_weight, 10_000);
+        assert_eq!(candidate.weighted_net_evsi_numerator, "2800000000000");
+        assert_eq!(
+            candidate.minimum_net_evsi_numerator.as_deref(),
+            Some("226000000")
+        );
+        assert_eq!(
+            candidate.maximum_net_evsi_numerator.as_deref(),
+            Some("334000000")
+        );
+        assert_eq!(candidate.positive_scenario_weight, 10_000);
+        assert_eq!(candidate.nonpositive_scenario_weight, 0);
+        assert!(candidate.eligible_in_all_scenarios);
+        assert!(candidate.positive_in_all_scenarios);
+    }
+
+    #[test]
+    fn gate_exclusion_is_coverage_not_a_silent_zero_value() {
+        let family = corpus()
+            .families
+            .into_iter()
+            .find(|family| family.family_id == "ROBUST-007")
+            .expect("tail-shock family exists");
+        let result = evaluate_family(&family);
+        let candidate = result
+            .candidates
+            .iter()
+            .find(|candidate| candidate.experiment_id == "assay-a")
+            .expect("assay-a summary exists");
+        assert_eq!(candidate.eligible_scenario_count, 1);
+        assert_eq!(candidate.eligible_scenario_weight, 9_000);
+        assert_eq!(candidate.weighted_net_evsi_numerator, "2520000000000");
+        assert_eq!(candidate.positive_scenario_weight, 9_000);
+        assert!(!candidate.eligible_in_all_scenarios);
+        assert!(!candidate.positive_in_all_scenarios);
+    }
+
+    #[test]
     fn corpus_identity_and_family_count_are_checked() {
         let mut suite = corpus();
         suite.family_count -= 1;
