@@ -586,6 +586,10 @@ mod tests {
                 .expect("known-answer geometry fixture must validate");
         assert_eq!(result.record_id, "GEOM-SYNTH-001");
         assert_eq!(result.screen_status, "WITHIN_GUARD_BAND");
+        close(result.horizontal_margin_mm, 15.147_764_779_274_72, 1e-9);
+        close(result.vertical_margin_mm, 2.998_892_499_836_33, 1e-9);
+        close(result.horizontal_utilization_fraction, 0.924_261_176_103_626_4, 1e-9);
+        close(result.vertical_utilization_fraction, 0.970_011_075_001_636_7, 1e-9);
         assert_eq!(input_hash.len(), 64);
         assert_eq!(schema_hash.len(), 64);
     }
