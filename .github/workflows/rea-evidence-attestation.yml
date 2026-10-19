@@ -72,6 +72,9 @@ jobs:
           git checkout --detach "$TARGET_HEAD_SHA"
           test "$(git rev-parse HEAD)" = "$TARGET_HEAD_SHA"
 
+      - name: Set up pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
       - name: Verify artifact offline with Rust receipt verifier
         shell: bash
         env:
