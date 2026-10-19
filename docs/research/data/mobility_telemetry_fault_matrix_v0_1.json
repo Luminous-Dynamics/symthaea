@@ -1,7 +1,7 @@
 {
   "schema_version": "0.1.0",
   "suite_id": "MOBILITY-TELEMETRY-CONFORMANCE-001",
-  "status": "frozen_proposed_matrix_v0_1_with_per_measurand_uncertainty_controls_not_yet_executed",
+  "status": "frozen_proposed_matrix_v0_1_with_receipt_binding_and_per_measurand_controls_not_yet_executed",
   "claim_ceiling": "Software conformance only. No demonstrated hardware reliability, measurement accuracy, vehicle performance, tire qualification, or roadworthiness.",
   "interpretation": {
     "positive_controls_required": true,
@@ -317,6 +317,28 @@
       "rust_test": "single_budget_does_not_cover_all_claim_measurands",
       "required_detail_tokens": [
         "missing_uncertainty_budget:dc_bus_voltage"
+      ]
+    },
+    {
+      "id": "MANIFEST-008",
+      "category": "manifest",
+      "mutation": "calibration_receipt_not_backed_by_artifact",
+      "expected": "reject",
+      "diagnostic": "calibration receipt must reference declared artifact",
+      "rust_test": "calibration_receipt_must_reference_declared_artifact",
+      "required_detail_tokens": [
+        "does not reference a declared calibration_record artifact"
+      ]
+    },
+    {
+      "id": "CLAIM-009",
+      "category": "rights_gate",
+      "mutation": "rights_receipt_id_not_backed_by_artifact",
+      "expected": "ineligible",
+      "diagnostic": "rights receipt ID must refer to the matching artifact",
+      "rust_test": "rights_receipt_id_must_be_backed_by_matching_artifact",
+      "required_detail_tokens": [
+        "rights_receipt_id_not_backed_by_artifact"
       ]
     }
   ],
