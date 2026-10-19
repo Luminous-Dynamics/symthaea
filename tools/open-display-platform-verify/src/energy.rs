@@ -7,6 +7,8 @@
 //! boundary, calibration, IEC procedure, or physical display. The caller must bind
 //! its result to those identities in the measurement-run record.
 
+use serde_json::Value;
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct PowerSample {
     /// Monotonic time in seconds on the declared acquisition clock.
@@ -38,6 +40,51 @@ pub struct EnergyIntegrationReport {
     pub max_intersecting_sample_gap_seconds: f64,
     pub integration_method: &'static str,
     pub claim_ceiling: &'static str,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct EnergyTraceValidationReport {
+    pub trace_id: String,
+    pub trace_sha256: String,
+    pub schema_sha256: String,
+    pub integration: EnergyIntegrationReport,
+    pub attempted_tasks: u64,
+    pub successful_tasks: u64,
+    pub energy_per_successful_task_joules: Option<f64>,
+}
+
+impl EnergyTraceValidationReport {
+    /// Stable report that preserves the synthetic-only claim boundary.
+    #[must_use]
+    pub fn to_json(&self) -> Value {
+        serde_json::json!({
+            "verifier": "open-display-platform-verify",
+            "verifier_version": env!("CARGO_PKG_VERSION"),
+            "trace_id": self.trace_id,
+            "trace_sha256": self.trace_sha256,
+            "schema_sha256": self.schema_sha256,
+            "record_state": "SYNTHETIC_TEST_ONLY",
+            "energy_integration": {
+                "energy_joules": self.integration.energy_joules,
+                "window_start_seconds": self.integration.window_start_seconds,
+                "window_end_seconds": self.integration.window_end_seconds,
+                "window_duration_seconds": self.integration.window_duration_seconds,
+                "accounting_boundary_id": self.integration.accounting_boundary_id,
+                "raw_sample_count": self.integration.raw_sample_count,
+                "integration_point_count": self.integration.integration_point_count,
+                "max_intersecting_sample_gap_seconds": self.integration.max_intersecting_sample_gap_seconds,
+                "integration_method": self.integration.integration_method,
+                "claim_ceiling": self.integration.claim_ceiling
+            },
+            "task_outcomes": {
+                "attempted_tasks": self.attempted_tasks,
+                "successful_tasks": self.successful_tasks,
+                "energy_per_successful_task_joules": self.energy_per_successful_task_joules
+            },
+            "status": "SYNTHETIC_ARITHMETIC_VALID_UNQUALIFIED",
+            "claim_ceiling": "Synthetic power-trace arithmetic only. No wattmeter, calibration, power boundary suitability, IEC compliance, task utility, or physical display result is qualified."
+        })
+    }
 }
 
 /// Integrate a power trace over a bounded task window.
@@ -196,6 +243,142 @@ fn interpolate_power(samples: &[PowerSample], time_seconds: f64) -> f64 {
     f64::NAN
 }
 
+
+/// Validate and integrate a synthetic-only power-trace record against Draft 2020-12.
+///
+/// The input must explicitly remain SYNTHETIC_TEST_ONLY; this version intentionally
+/// does not promote user-supplied physical samples into validated measurements.
+///
+/// # Errors
+///
+/// Returns schema, semantic, trace-integrity, sampling-gap or task-count errors.
+pub fn validate_energy_trace_str(
+    trace_text: &str,
+    schema_text: &str,
+) -> Result<EnergyTraceValidationReport, Vec<String>> {
+    let schema: Value = match serde_json::from_str(schema_text) {
+        Ok(value) => value,
+        Err(error) => return Err(vec![format!("energy schema JSON parse error: {error}")]),
+    };
+    let trace: Value = match serde_json::from_str(trace_text) {
+        Ok(value) => value,
+        Err(error) => return Err(vec![format!("energy trace JSON parse error: {error}")]),
+    };
+
+    let mut errors = Vec::new();
+    if schema.get("$schema").and_then(Value::as_str)
+        != Some("https://json-schema.org/draft/2020-12/schema")
+    {
+        errors.push("energy schema must declare JSON Schema Draft 2020-12".to_owned());
+    }
+    match jsonschema::draft202012::new(&schema) {
+        Ok(validator) => {
+            for error in validator.iter_errors(&trace) {
+                errors.push(format!("energy trace JSON Schema violation: {error}"));
+            }
+        }
+        Err(error) => errors.push(format!("energy schema compilation failed: {error}")),
+    }
+
+    if trace.get("record_state").and_then(Value::as_str) != Some("SYNTHETIC_TEST_ONLY") {
+        errors.push("energy trace v0.1 only accepts SYNTHETIC_TEST_ONLY records".to_owned());
+    }
+    if trace.get("claim_ceiling").and_then(Value::as_str)
+        != Some("SYNTHETIC_POWER_TRACE_ONLY_NOT_PHYSICAL_QUALIFICATION")
+    {
+        errors.push("energy trace claim ceiling is invalid".to_owned());
+    }
+
+    let Some(samples_value) = trace.get("samples").and_then(Value::as_array) else {
+        errors.push("energy trace samples must be an array".to_owned());
+        return Err(errors);
+    };
+    let samples: Vec<PowerSample> = samples_value
+        .iter()
+        .map(|sample| PowerSample {
+            time_seconds: sample
+                .get("time_seconds")
+                .and_then(Value::as_f64)
+                .unwrap_or(f64::NAN),
+            power_watts: sample
+                .get("power_watts")
+                .and_then(Value::as_f64)
+                .unwrap_or(f64::NAN),
+        })
+        .collect();
+
+    let config = EnergyIntegrationConfig {
+        window_start_seconds: trace
+            .get("window_start_seconds")
+            .and_then(Value::as_f64)
+            .unwrap_or(f64::NAN),
+        window_end_seconds: trace
+            .get("window_end_seconds")
+            .and_then(Value::as_f64)
+            .unwrap_or(f64::NAN),
+        max_sample_gap_seconds: trace
+            .get("max_sample_gap_seconds")
+            .and_then(Value::as_f64)
+            .unwrap_or(f64::NAN),
+        accounting_boundary_id: trace
+            .get("accounting_boundary_id")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_owned(),
+    };
+
+    let integration = match integrate_power_trace(&samples, &config) {
+        Ok(report) => Some(report),
+        Err(trace_errors) => {
+            errors.extend(trace_errors);
+            None
+        }
+    };
+    let attempted_tasks = trace
+        .get("attempted_tasks")
+        .and_then(Value::as_u64)
+        .unwrap_or(u64::MAX);
+    let successful_tasks = trace
+        .get("successful_tasks")
+        .and_then(Value::as_u64)
+        .unwrap_or(u64::MAX);
+    let energy_per_successful_task_joules = if let Some(report) = integration.as_ref() {
+        match energy_per_successful_task(
+            report.energy_joules,
+            attempted_tasks,
+            successful_tasks,
+        ) {
+            Ok(value) => value,
+            Err(task_errors) => {
+                errors.extend(task_errors);
+                None
+            }
+        }
+    } else {
+        None
+    };
+
+    errors.sort();
+    errors.dedup();
+    if !errors.is_empty() {
+        return Err(errors);
+    }
+
+    Ok(EnergyTraceValidationReport {
+        trace_id: trace
+            .get("trace_id")
+            .and_then(Value::as_str)
+            .expect("schema validates trace_id")
+            .to_owned(),
+        trace_sha256: super::sha256_hex(trace_text.as_bytes()),
+        schema_sha256: super::sha256_hex(schema_text.as_bytes()),
+        integration: integration.expect("valid energy trace must produce integration"),
+        attempted_tasks,
+        successful_tasks,
+        energy_per_successful_task_joules,
+    })
+}
+
 /// Calculate energy per successful task without inventing a value when none succeed.
 ///
 /// # Errors
@@ -231,6 +414,12 @@ mod tests {
     use super::{
         EnergyIntegrationConfig, PowerSample, energy_per_successful_task, integrate_power_trace,
     };
+    use serde_json::Value;
+
+    const ENERGY_TRACE_TEXT: &str =
+        include_str!("../../../docs/engineering/display-energy-trace-synthetic-v0.1.json");
+    const ENERGY_SCHEMA_TEXT: &str =
+        include_str!("../../../docs/engineering/display-energy-trace.schema.json");
 
     fn sample(time_seconds: f64, power_watts: f64) -> PowerSample {
         PowerSample {
@@ -253,6 +442,46 @@ mod tests {
             (actual - expected).abs() <= tolerance,
             "actual {actual} expected {expected} within {tolerance}"
         );
+    }
+
+    #[test]
+    fn checked_in_synthetic_energy_trace_reports_energy_and_success_normalization() {
+        let report = super::validate_energy_trace_str(ENERGY_TRACE_TEXT, ENERGY_SCHEMA_TEXT)
+            .expect("checked-in synthetic trace should validate");
+        assert_eq!(report.trace_id, "ODRH-ENERGY-TRACE-SYNTHETIC-001");
+        close(report.integration.energy_joules, 35.0, 1e-12);
+        assert_eq!(report.energy_per_successful_task_joules, Some(17.5));
+        assert_eq!(
+            report.to_json()["status"].as_str(),
+            Some("SYNTHETIC_ARITHMETIC_VALID_UNQUALIFIED")
+        );
+        assert_eq!(
+            report.to_json()["claim_ceiling"].as_str(),
+            Some("Synthetic power-trace arithmetic only. No wattmeter, calibration, power boundary suitability, IEC compliance, task utility, or physical display result is qualified.")
+        );
+    }
+
+    #[test]
+    fn synthetic_trace_rejects_a_schedule_gap_above_its_declared_cap() {
+        let mut trace: Value =
+            serde_json::from_str(ENERGY_TRACE_TEXT).expect("energy trace fixture must parse");
+        trace["max_sample_gap_seconds"] = serde_json::json!(0.5);
+        let mutated = serde_json::to_string(&trace).expect("mutated trace must serialize");
+        let errors = super::validate_energy_trace_str(&mutated, ENERGY_SCHEMA_TEXT)
+            .expect_err("one-second samples must fail a half-second cap");
+        assert!(errors.iter().any(|error| error.contains("sample gap exceeds")));
+    }
+
+    #[test]
+    fn synthetic_trace_refuses_physical_record_promotion() {
+        let mut trace: Value =
+            serde_json::from_str(ENERGY_TRACE_TEXT).expect("energy trace fixture must parse");
+        trace["record_state"] = Value::String("ACQUIRED_UNQUALIFIED".to_owned());
+        let mutated = serde_json::to_string(&trace).expect("mutated trace must serialize");
+        assert!(super::validate_energy_trace_str(&mutated, ENERGY_SCHEMA_TEXT)
+            .expect_err("synthetic validator cannot qualify physical data")
+            .iter()
+            .any(|error| error.contains("SYNTHETIC_TEST_ONLY")));
     }
 
     #[test]
