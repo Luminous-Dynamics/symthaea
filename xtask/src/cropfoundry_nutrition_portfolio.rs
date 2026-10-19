@@ -355,7 +355,10 @@ fn aggregate_option(
             .iter()
             .filter(|row| row.nutrient_id == *nutrient_id)
             .collect();
-        let total_delivered = if nutrient_rows.len() == batch_count && nutrient_composition_complete {
+        let total_delivered = if row_accounting_complete
+            && nutrient_rows.len() == batch_count
+            && nutrient_composition_complete
+        {
             let values: Vec<Option<f64>> = nutrient_rows
                 .iter()
                 .map(|row| delivered_nutrient_mass(&row.receipt))
@@ -405,12 +408,18 @@ fn aggregate_option(
                 option.option_id
             ));
         }
-        let total_lower = if intervals_complete && nutrient_rows.len() == batch_count {
+        let total_lower = if row_accounting_complete
+            && intervals_complete
+            && nutrient_rows.len() == batch_count
+        {
             sum_finite(lower.iter().flatten().copied())
         } else {
             None
         };
-        let total_upper = if intervals_complete && nutrient_rows.len() == batch_count {
+        let total_upper = if row_accounting_complete
+            && intervals_complete
+            && nutrient_rows.len() == batch_count
+        {
             sum_finite(upper.iter().flatten().copied())
         } else {
             None
@@ -427,7 +436,10 @@ fn aggregate_option(
             .map(|row| number_field(&row.receipt, "estimated_bioavailable_nutrient_mass_delivered_mg"))
             .collect();
         let bioavailability_coverage = bioavailability_values.iter().filter(|value| value.is_some()).count();
-        let bioavailable_total = if bioavailability_coverage == batch_count && batch_count > 0 {
+        let bioavailable_total = if row_accounting_complete
+            && bioavailability_coverage == batch_count
+            && batch_count > 0
+        {
             let total = sum_finite(bioavailability_values.iter().flatten().copied());
             if total.is_none() {
                 issues.push(format!(
@@ -456,12 +468,18 @@ fn aggregate_option(
             && bio_high.len() == batch_count
             && bio_low.iter().all(Option::is_some)
             && bio_high.iter().all(Option::is_some);
-        let bioavailable_lower = if bio_interval_complete && batch_count > 0 {
+        let bioavailable_lower = if row_accounting_complete
+            && bio_interval_complete
+            && batch_count > 0
+        {
             sum_finite(bio_low.iter().flatten().copied())
         } else {
             None
         };
-        let bioavailable_upper = if bio_interval_complete && batch_count > 0 {
+        let bioavailable_upper = if row_accounting_complete
+            && bio_interval_complete
+            && batch_count > 0
+        {
             sum_finite(bio_high.iter().flatten().copied())
         } else {
             None
@@ -655,7 +673,9 @@ fn reconcile_portfolio(input: PortfolioInput, input_sha256: String) -> Nutrition
     for nutrient_id in &input.expected_nutrient_ids {
         let interval_available = !options.is_empty()
             && options.iter().all(|option| {
-                option
+                option.accounting_pass
+                    && option.nutrient_composition_complete
+                    && option
                     .nutrients
                     .iter()
                     .find(|nutrient| nutrient.nutrient_id == *nutrient_id)
@@ -668,7 +688,9 @@ fn reconcile_portfolio(input: PortfolioInput, input_sha256: String) -> Nutrition
             });
         let bioavailability_available = !options.is_empty()
             && options.iter().all(|option| {
-                option
+                option.accounting_pass
+                    && option.nutrient_composition_complete
+                    && option
                     .nutrients
                     .iter()
                     .find(|nutrient| nutrient.nutrient_id == *nutrient_id)
