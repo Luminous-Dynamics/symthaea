@@ -790,9 +790,16 @@ mod tests {
             Some(3.0)
         );
         assert_eq!(receipt.nutrient_mg_per_liter_water, Some(0.4));
+        assert_eq!(receipt.water_boundary, Some(WaterBoundary::IrrigationApplied));
         assert_eq!(receipt.nutrient_mg_per_square_meter, Some(6.0));
+        assert_eq!(
+            receipt.land_boundary,
+            Some(LandBoundary::AllocatedCultivatedArea)
+        );
         assert_eq!(receipt.nutrient_mg_per_kwh, Some(24.0));
+        assert_eq!(receipt.energy_boundary, Some(EnergyBoundary::OnFarmOperations));
         assert_eq!(receipt.nutrient_mg_per_currency_unit, Some(9.6));
+        assert_eq!(receipt.cost_boundary, Some(CostBoundary::FarmGate));
     }
 
     #[test]
@@ -1056,6 +1063,16 @@ mod tests {
             .iter()
             .any(|issue| issue.contains("water_liters and its resource boundary")));
         assert_eq!(receipt.nutrient_mg_per_liter_water, None);
+        assert_eq!(receipt.measured_nutrient_mass_delivered_mg, None);
+
+        let mut missing_measurement = fixture();
+        missing_measurement.water_liters = None;
+        let receipt = audit_input(missing_measurement);
+        assert!(!receipt.accounting_pass);
+        assert!(receipt
+            .issues
+            .iter()
+            .any(|issue| issue.contains("water_liters and its resource boundary")));
     }
 
     #[test]
@@ -1073,9 +1090,13 @@ mod tests {
         let receipt = audit_input(input);
         assert!(receipt.accounting_pass);
         assert_eq!(receipt.nutrient_mg_per_liter_water, None);
+        assert_eq!(receipt.water_boundary, None);
         assert_eq!(receipt.nutrient_mg_per_square_meter, None);
+        assert_eq!(receipt.land_boundary, None);
         assert_eq!(receipt.nutrient_mg_per_kwh, None);
+        assert_eq!(receipt.energy_boundary, None);
         assert_eq!(receipt.nutrient_mg_per_currency_unit, None);
+        assert_eq!(receipt.cost_boundary, None);
     }
 
     #[test]
