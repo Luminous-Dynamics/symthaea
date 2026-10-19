@@ -23,20 +23,6 @@ fn main() {
     }
 }
 
-fn parse_flag(mut args: impl Iterator<Item = String>, name: &str) -> Result<PathBuf, String> {
-    while let Some(arg) = args.next() {
-        if arg == name {
-            let value = args.next().ok_or_else(|| usage().to_owned())?;
-            return Ok(PathBuf::from(value));
-        }
-        if !arg.starts_with("--") {
-            return Err(format!("unexpected argument: {arg}\n{}", usage()));
-        }
-        let _ignored_value = args.next().ok_or_else(|| usage().to_owned())?;
-    }
-    Err(format!("missing required argument {name}\n{}", usage()))
-}
-
 fn run_score_case(mut args: impl Iterator<Item = String>) -> Result<(), String> {
     let mut oracle_path = None;
     let mut observation_path = None;
