@@ -35,7 +35,7 @@ Policies are:
 2. `soil_threshold`: use held/observed storage to refill the greatest deficit toward a fixed threshold.
 3. `uncertainty_aware_marginal_risk`: allocate in small increments according to estimated marginal reduction of the declared shortfall proxy. It adds a fixed conservative demand margin and raises plot priority when readings are stale; these are explicit heuristics, not statistically calibrated prediction intervals.
 
-The receipt includes applied irrigation, a simple storage-overflow proxy, synthetic stress-exposure proxy, sensor-dropout fraction and daily budget violations. The executable fails if any policy exceeds a daily water cap or emits non-finite core metrics.
+The receipt includes per-scenario applied irrigation, an overflow proxy, synthetic stress-exposure proxy, per-scenario percentage change against equal-share allocation, plus policy-level mean/median proxies and water totals. It also reports sensor-dropout fraction and daily budget violations. The executable fails if any policy exceeds a daily water cap or emits non-finite core metrics.
 
 ## Mathematical scope and claim ceiling
 
