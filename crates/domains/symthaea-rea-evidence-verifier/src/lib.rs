@@ -169,6 +169,11 @@ fn verify_digest_file(path: &Path, expected: &str, label: &str) -> VResult<()> {
 }
 
 fn find_files_named(root: &Path, name: &str, output: &mut Vec<PathBuf>) -> VResult<()> {
+    let root_metadata = fs::symlink_metadata(root)
+        .map_err(|e| err(format!("cannot inspect extraction directory {}: {e}", root.display())))?;
+    if root_metadata.file_type().is_symlink() || !root_metadata.is_dir() {
+        return Err(err(format!("extraction search root must be a real directory: {}", root.display())));
+    }
     let entries = fs::read_dir(root)
         .map_err(|e| err(format!("cannot enumerate evidence directory {}: {e}", root.display())))?;
     for item in entries {
@@ -637,6 +642,26 @@ mod tests {
         changed["source"]["oracle_sha256"] = json!("1234");
         write(&f.artifact.join("receipt.json"), serde_json::to_vec_pretty(&changed).unwrap().as_slice());
         assert!(verify_bundle(&f.artifact, &f.source, &f.expected_head, None).unwrap_err().to_string().contains("lowercase SHA-256"));
+    }
+
+    #[test]
+    fn rejects_provider_script_identity_drift() {
+        let f = create_fixture();
+        write(&f.source.join("provider-smoke.sh"), b"changed provider smoke script\\n");
+        assert!(verify_bundle(&f.artifact, &f.source, &f.expected_head, None)
+            .unwrap_err().to_string().contains("provider smoke script"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn rejects_symlinked_raw_report() {
+        use std::os::unix::fs::symlink;
+        let f = create_fixture();
+        let report = f.artifact.join("run-a/raw-report.json");
+        fs::remove_file(&report).unwrap();
+        symlink(f.artifact.join("run-b/raw-report.json"), &report).unwrap();
+        assert!(verify_bundle(&f.artifact, &f.source, &f.expected_head, None)
+            .unwrap_err().to_string().contains("non-symlink"));
     }
 
     #[test]
