@@ -529,7 +529,7 @@ fn main() {
     let replayed_authorization = PromotionAuthorization {
         authority: Digest("external-authority"),
         evaluation: pass.digest(),
-        independence,
+        independence: independent,
         scope: Digest("bounded-test-scope"),
         expires_at_epoch: 180,
         allowed: true,
@@ -554,7 +554,7 @@ fn main() {
     let forced_pass = PromotionAuthorization {
         authority: Digest("external-authority"),
         evaluation: uncertain.digest(),
-        independence,
+        independence: independent,
         scope: Digest("bounded-test-scope"),
         expires_at_epoch: 180,
         allowed: true,
@@ -568,7 +568,7 @@ fn main() {
     let refused = PromotionAuthorization {
         authority: Digest("external-authority"),
         evaluation: pass.digest(),
-        independence,
+        independence: independent,
         scope: Digest("bounded-test-scope"),
         expires_at_epoch: 180,
         allowed: false,
@@ -609,7 +609,7 @@ fn main() {
     let admitted = PromotionAuthorization {
         authority: Digest("external-authority"),
         evaluation: pass.digest(),
-        independence,
+        independence: independent,
         scope: Digest("bounded-test-scope"),
         expires_at_epoch: 180,
         allowed: true,
