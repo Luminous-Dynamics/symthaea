@@ -223,8 +223,7 @@ fn predicted_zone_risks(
     let forecast_rain = rain_mm(day, scenario);
     std::array::from_fn(|zone| {
         let stale = stale_age[zone].min(4) as f64;
-        let conservative_demand =
-            forecast_demand_mm(day, zone, scenario) * (1.10 + 0.05 * stale);
+        let conservative_demand = forecast_demand_mm(day, zone, scenario) * (1.10 + 0.05 * stale);
         let risk_weight = criticality(day, zone) * (1.0 + 0.12 * stale);
         risk_weight
             * exposure(
@@ -315,8 +314,7 @@ fn allocate_water(
             }
         }
         Policy::GreedyMinimaxStress => {
-            let units =
-                (scenario.daily_water_budget_plot_mm / ALLOCATION_STEP_MM).floor() as usize;
+            let units = (scenario.daily_water_budget_plot_mm / ALLOCATION_STEP_MM).floor() as usize;
             for _ in 0..units {
                 let current_risks =
                     predicted_zone_risks(observed_storage, allocation, stale_age, day, scenario);
@@ -329,25 +327,14 @@ fn allocate_water(
                 let mut best: Option<(usize, f64, f64)> = None;
 
                 for zone in 0..ZONES {
-                    if allocation[zone] + ALLOCATION_STEP_MM
-                        > MAX_IRRIGATION_PER_ZONE_MM + 1e-9
-                    {
+                    if allocation[zone] + ALLOCATION_STEP_MM > MAX_IRRIGATION_PER_ZONE_MM + 1e-9 {
                         continue;
                     }
                     let mut candidate = allocation;
                     candidate[zone] += ALLOCATION_STEP_MM;
-                    let risks = predicted_zone_risks(
-                        observed_storage,
-                        candidate,
-                        stale_age,
-                        day,
-                        scenario,
-                    );
-                    let candidate_max = risks
-                        .iter()
-                        .copied()
-                        .max_by(f64::total_cmp)
-                        .unwrap_or(0.0);
+                    let risks =
+                        predicted_zone_risks(observed_storage, candidate, stale_age, day, scenario);
+                    let candidate_max = risks.iter().copied().max_by(f64::total_cmp).unwrap_or(0.0);
                     let candidate_sum = risks.iter().sum::<f64>();
                     let better = best.is_none_or(|(_, best_max, best_sum)| {
                         candidate_max < best_max - 1e-9
@@ -363,8 +350,8 @@ fn allocate_water(
                     break;
                 };
                 let improves_max = best_max < current_max - 1e-9;
-                let improves_sum = (best_max - current_max).abs() <= 1e-9
-                    && best_sum < current_sum - 1e-9;
+                let improves_sum =
+                    (best_max - current_max).abs() <= 1e-9 && best_sum < current_sum - 1e-9;
                 if !improves_max && !improves_sum {
                     break;
                 }
@@ -523,8 +510,7 @@ fn build_receipt() -> Result<WaterPolicyReceipt> {
         let (soil_threshold_result, _) = simulate_one(scenario, Policy::SoilThreshold, None);
         let (risk_aware_result, risk_daily_totals) =
             simulate_one(scenario, Policy::UncertaintyAware, None);
-        let (minimax_fair_result, _) =
-            simulate_one(scenario, Policy::GreedyMinimaxStress, None);
+        let (minimax_fair_result, _) = simulate_one(scenario, Policy::GreedyMinimaxStress, None);
         let (matched_uniform_result, matched_daily_totals) = simulate_one(
             scenario,
             Policy::EqualShareCalendar,
