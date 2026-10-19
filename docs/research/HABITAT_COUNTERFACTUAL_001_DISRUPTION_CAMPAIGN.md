@@ -56,6 +56,16 @@ The initial research hypothesis is **at least 10% lower lost accepted-unit-hours
 
 The product economics, life-cycle resource accounting, and general baseline/ablation discipline remain owned by MFG-VALUE-001. Process qualification remains with MFG-PROC-000. Mycelix remains authoritative for applicable provenance and operational coordination records. This campaign consumes those contracts rather than creating parallel ledgers or engines.
 
+## Research anchors
+
+- [NIST, 2026 Roadmap on AI and ML for Smart Manufacturing](https://www.nist.gov/publications/2026-roadmap-artificial-intelligence-and-machine-learning-smart-manufacturing) surveys industrial data integration, heterogeneous sensing/control, trustworthy and explainable operation, physics-informed and semantic AI, digital twins, supply-chain optimization, and sustainable manufacturing. The project implication is to benchmark the complete decision loop against conventional baselines, not an abstract model score.
+- [NISTIR 8620, Digital Twins Workshops Summary Report (July 2026)](https://www.nist.gov/publications/digital-twins-workshops-summary-report) identifies interoperability, verification/validation/uncertainty quantification, cybersecurity, and workforce readiness as continuing priorities.
+- [NIST Digital Twins for Advanced Manufacturing](https://www.nist.gov/programs-projects/digital-twins-advanced-manufacturing) describes quantified uncertainty and trustworthy validation as foundational to credible manufacturing twins.
+- [GS1 EPCIS/CBV](https://www.gs1.org/standards/epcis) supplies an existing interoperable vocabulary for supply-chain events, status/location/custody, sensor observations and certification references; it is a mapping target, not a second local traceability ledger.
+- [NIST's 2025 review of disassembly systems for circular product design](https://www.nist.gov/publications/review-disassembly-systems-circular-product-design) supports treating disassembly and circularity as whole-lifecycle system decisions rather than optimizing a detachable joint in isolation.
+
+These sources motivate the design and test boundaries only. They do not validate this code, its synthetic intervention magnitudes, any real policy, or a physical factory.
+
 ## Current status and next gates
 
 - Scenario contract: specified in the synthetic fixture.
