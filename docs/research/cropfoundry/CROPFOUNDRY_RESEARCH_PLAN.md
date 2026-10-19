@@ -105,6 +105,18 @@ The initial acceptance criterion is zero water-budget violations and determinist
 
 The path to a serious irrigation result is layered: (1) synthetic contract and policy tests; (2) versioned, calibrated soil-water balance with uncertainty; (3) retrospective/hindcast comparison against fixed/calendar, threshold, ET-based and established crop-model baselines; (4) independent local calibration and sensitivity analysis; (5) preregistered replicated field trials reporting metered water, crop outcomes, pump energy, labor, full cost and environmental side effects. All policies must use the same weather inputs, resource caps, held-out scenarios and decision horizon. Report every scenario, not merely the average.
 
+## Additional paradigm shift: optimize delivered food, not harvest yield alone
+
+A crop engineer should optimize **safe, marketable edible output delivered**, not just biomass or harvest yield. Harvest maturity, handling damage, storage conditions, transport delay, water loss, sorting decisions, and affordability can dominate whether edible food reaches a household. Report the physical balance and stage-by-stage loss reasons instead of collapsing them into a single unlabeled "loss" scalar.
+
+FAO's Food Loss Index covers losses between production and retail and its current portal reports a 2023 fruit-and-vegetable aggregate estimate of 25.4%. This is a global commodity-basket estimate, not a tomato-specific value or a Gauteng baseline ([FAO Food Loss Index](https://www.fao.org/sustainable-development-goals-data-portal/data/indicators/1231-global-food-losses/en)). FAO's 2026 technical platform also lists dedicated harvest/post-harvest measurement guidance for fruit and vegetables ([FAO measurement platform](https://www.fao.org/platform-food-loss-waste/en)). A 2025 review identifies substantial regional, commodity and supply-chain-stage gaps in available fruit/vegetable loss data ([review](https://doi.org/10.3389/fhort.2025.1529040)).
+
+**CF-023** turns this into a staged benchmark: first reproduce a lot-level mass-balance and loss taxonomy; then evaluate forecasts on lot-disjoint and chronological splits; then test post-harvest interventions using controlled, independently replicated evidence. Mass retention, marketability, quality, measured nutrient retention and food safety are separate endpoints. Appearance is not a safety assay, and an image trajectory from one tomato is not a set of independent biological replicates.
+
+A candidate source is the [passive-cooling-blanket tomato dataset](https://zenodo.org/records/15856413), which lists eight XLSX workbooks associated with a Uganda tomato supply-chain pilot and measurements including weight, firmness, color, soluble solids and acidity. Its visible Zenodo license field is not populated, and the workbooks have not been acquired or audited; DS-014 remains quarantined. Its study context is not proof of local South African efficacy.
+
+The provisional prospective research target is at least 10% lower measured marketable-mass loss with non-inferior predeclared quality, zero additional safety-gate failures, and no increase in fully loaded cost/energy/emissions per marketable kilogram. This target must be reviewed against baseline variability, a power analysis and partner priorities and locked before outcomes are seen. The data contract, leakage controls, study stages and claim ceiling are specified in [CF-023_POSTHARVEST_EDIBLE_OUTPUT_BENCHMARK_V0.md](./CF-023_POSTHARVEST_EDIBLE_OUTPUT_BENCHMARK_V0.md). No intervention result or local loss rate is claimed.
+
 ## System boundaries
 
 - **Symthaea:** evidence-aware reasoning, candidate generation, uncertainty handling, multi-objective ranking, experiment selection, and recommendation receipts.
