@@ -14,7 +14,8 @@
         "content_sha256": "3cd80b86cbac92d171dfa7aa99979a51098fee1f082cdbf8b985effff4a1d5e3",
         "delivered_copies": 1,
         "content_conflict": false,
-        "content_payload": "WATER_REPAIR_EVENT|schema=v1|case=WR-01|event_id=event-WR-01"
+        "content_payload": "WATER_REPAIR_EVENT|schema=v1|case=WR-01|event_id=event-WR-01",
+        "conflicting_content_payload": null
       },
       "authorization_state": "valid",
       "as_found": {
@@ -100,7 +101,8 @@
         "content_sha256": "40928e3c5bd08eba37d3a630fcabf81a7ecd8cc61781e9c8101c04341cc8141e",
         "delivered_copies": 1,
         "content_conflict": false,
-        "content_payload": "WATER_REPAIR_EVENT|schema=v1|case=WR-02|event_id=event-WR-02"
+        "content_payload": "WATER_REPAIR_EVENT|schema=v1|case=WR-02|event_id=event-WR-02",
+        "conflicting_content_payload": null
       },
       "authorization_state": "valid",
       "as_found": {
@@ -186,7 +188,8 @@
         "content_sha256": "eeb971d97dbf51ce62e1d3e1cd7576c62c8c61e2a4417a90571981ef0d0dc1c0",
         "delivered_copies": 1,
         "content_conflict": false,
-        "content_payload": "WATER_REPAIR_EVENT|schema=v1|case=WR-03|event_id=event-WR-03"
+        "content_payload": "WATER_REPAIR_EVENT|schema=v1|case=WR-03|event_id=event-WR-03",
+        "conflicting_content_payload": null
       },
       "authorization_state": "valid",
       "as_found": {
@@ -272,7 +275,8 @@
         "content_sha256": "ff59b4132bff9636cb935428c83a23a0bda5dc7f8ef195d42ea729b2a806e286",
         "delivered_copies": 2,
         "content_conflict": false,
-        "content_payload": "WATER_REPAIR_EVENT|schema=v1|case=WR-04|event_id=event-WR-04"
+        "content_payload": "WATER_REPAIR_EVENT|schema=v1|case=WR-04|event_id=event-WR-04",
+        "conflicting_content_payload": null
       },
       "authorization_state": "valid",
       "as_found": {
@@ -358,7 +362,8 @@
         "content_sha256": "7638be9b6964939088e56f2268effc49b6dec9d4bb5e44a3d220f86397c6d2a8",
         "delivered_copies": 1,
         "content_conflict": true,
-        "content_payload": "WATER_REPAIR_EVENT|schema=v1|case=WR-05|event_id=event-WR-05"
+        "content_payload": "WATER_REPAIR_EVENT|schema=v1|case=WR-05|event_id=event-WR-05",
+        "conflicting_content_payload": "WATER_REPAIR_EVENT|schema=v1|case=WR-05|event_id=event-WR-05|conflicting-retry"
       },
       "authorization_state": "valid",
       "as_found": {
@@ -444,7 +449,8 @@
         "content_sha256": "e359f9e6a2200878851e0e95f3a1371681b98a2cb9af102c90887741dc97b102",
         "delivered_copies": 1,
         "content_conflict": false,
-        "content_payload": "WATER_REPAIR_EVENT|schema=v1|case=WR-06|event_id=event-WR-06"
+        "content_payload": "WATER_REPAIR_EVENT|schema=v1|case=WR-06|event_id=event-WR-06",
+        "conflicting_content_payload": null
       },
       "authorization_state": "valid",
       "as_found": {
@@ -530,7 +536,8 @@
         "content_sha256": "bffe66ed5c7d2abb35cb5ab8170ad598969f21d2a7cbd117f46d58c1a4c7a31f",
         "delivered_copies": 1,
         "content_conflict": false,
-        "content_payload": "WATER_REPAIR_EVENT|schema=v1|case=WR-07|event_id=event-WR-07"
+        "content_payload": "WATER_REPAIR_EVENT|schema=v1|case=WR-07|event_id=event-WR-07",
+        "conflicting_content_payload": null
       },
       "authorization_state": "valid",
       "as_found": {
@@ -616,7 +623,8 @@
         "content_sha256": "31f1e8ecbd6b69087808d5ada6776bf9c208217a8fcad7e4571b6ef964d31711",
         "delivered_copies": 1,
         "content_conflict": false,
-        "content_payload": "WATER_REPAIR_EVENT|schema=v1|case=WR-08|event_id=event-WR-08"
+        "content_payload": "WATER_REPAIR_EVENT|schema=v1|case=WR-08|event_id=event-WR-08",
+        "conflicting_content_payload": null
       },
       "authorization_state": "valid",
       "as_found": {
@@ -702,7 +710,8 @@
         "content_sha256": "d2232f843647b47e8c27a9faaac45e94db1f9c8e95172fd6c376923c0f694ded",
         "delivered_copies": 1,
         "content_conflict": false,
-        "content_payload": "WATER_REPAIR_EVENT|schema=v1|case=WR-09|event_id=event-WR-09"
+        "content_payload": "WATER_REPAIR_EVENT|schema=v1|case=WR-09|event_id=event-WR-09",
+        "conflicting_content_payload": null
       },
       "authorization_state": "valid",
       "as_found": {
@@ -788,7 +797,8 @@
         "content_sha256": "249b895967049e9e395e41dd5746ec14fe5d7cd7889e2f19eaf00f2b8eb496e7",
         "delivered_copies": 1,
         "content_conflict": false,
-        "content_payload": "WATER_REPAIR_EVENT|schema=v1|case=WR-10|event_id=event-WR-10"
+        "content_payload": "WATER_REPAIR_EVENT|schema=v1|case=WR-10|event_id=event-WR-10",
+        "conflicting_content_payload": null
       },
       "authorization_state": "valid",
       "as_found": {
@@ -874,7 +884,8 @@
         "content_sha256": "770ac5ef7978b9d6366189c17f8348a98d556b78c2a6c388467e3774a76c5579",
         "delivered_copies": 1,
         "content_conflict": false,
-        "content_payload": "WATER_REPAIR_EVENT|schema=v1|case=WR-11|event_id=event-WR-11"
+        "content_payload": "WATER_REPAIR_EVENT|schema=v1|case=WR-11|event_id=event-WR-11",
+        "conflicting_content_payload": null
       },
       "authorization_state": "valid",
       "as_found": {
@@ -960,7 +971,8 @@
         "content_sha256": "efcb9f3e3037eb1b231e1382de50540de0b9da879e0bff65b7ca2a823599f287",
         "delivered_copies": 1,
         "content_conflict": false,
-        "content_payload": "WATER_REPAIR_EVENT|schema=v1|case=WR-12|event_id=event-WR-12"
+        "content_payload": "WATER_REPAIR_EVENT|schema=v1|case=WR-12|event_id=event-WR-12",
+        "conflicting_content_payload": null
       },
       "authorization_state": "valid",
       "as_found": {
@@ -1046,7 +1058,8 @@
         "content_sha256": "c3c7b0c737e95cae77431ccc777eff04d78361c46411908a3e8040d0c67ad287",
         "delivered_copies": 1,
         "content_conflict": false,
-        "content_payload": "WATER_REPAIR_EVENT|schema=v1|case=WR-13|event_id=event-WR-13"
+        "content_payload": "WATER_REPAIR_EVENT|schema=v1|case=WR-13|event_id=event-WR-13",
+        "conflicting_content_payload": null
       },
       "authorization_state": "valid",
       "as_found": {
@@ -1132,7 +1145,8 @@
         "content_sha256": "b71cc4b149ca10932bd540dc32c63812a9f7397860c91b90a9b748d8ad39dd51",
         "delivered_copies": 1,
         "content_conflict": false,
-        "content_payload": "WATER_REPAIR_EVENT|schema=v1|case=WR-14|event_id=event-WR-14"
+        "content_payload": "WATER_REPAIR_EVENT|schema=v1|case=WR-14|event_id=event-WR-14",
+        "conflicting_content_payload": null
       },
       "authorization_state": "valid",
       "as_found": {
@@ -1218,7 +1232,8 @@
         "content_sha256": "410c0dd025a1e3ea0cffad5d9dd97b10debf2b7b3d00ccaa22d4c07b9ce12bb9",
         "delivered_copies": 1,
         "content_conflict": false,
-        "content_payload": "WATER_REPAIR_EVENT|schema=v1|case=WR-15|event_id=event-WR-15"
+        "content_payload": "WATER_REPAIR_EVENT|schema=v1|case=WR-15|event_id=event-WR-15",
+        "conflicting_content_payload": null
       },
       "authorization_state": "valid",
       "as_found": {
@@ -1304,7 +1319,8 @@
         "content_sha256": "63447a0d6d931692d27ce3dcbd7b2c170d9d3568973d31fba100d3a999a73ed2",
         "delivered_copies": 1,
         "content_conflict": false,
-        "content_payload": "WATER_REPAIR_EVENT|schema=v1|case=WR-16|event_id=event-WR-16"
+        "content_payload": "WATER_REPAIR_EVENT|schema=v1|case=WR-16|event_id=event-WR-16",
+        "conflicting_content_payload": null
       },
       "authorization_state": "valid",
       "as_found": {
@@ -1390,7 +1406,8 @@
         "content_sha256": "3e4e6407e7c4c417db7ca93e528855b6cae4234df803c26ab4c484ddfdfa4839",
         "delivered_copies": 1,
         "content_conflict": false,
-        "content_payload": "WATER_REPAIR_EVENT|schema=v1|case=WR-17|event_id=event-WR-17"
+        "content_payload": "WATER_REPAIR_EVENT|schema=v1|case=WR-17|event_id=event-WR-17",
+        "conflicting_content_payload": null
       },
       "authorization_state": "valid",
       "as_found": {
@@ -1476,7 +1493,8 @@
         "content_sha256": "0f24154d813540ac82a953b02baeb649652f5f32709946d157ea7895108e47dd",
         "delivered_copies": 1,
         "content_conflict": false,
-        "content_payload": "WATER_REPAIR_EVENT|schema=v1|case=WR-18|event_id=event-WR-18"
+        "content_payload": "WATER_REPAIR_EVENT|schema=v1|case=WR-18|event_id=event-WR-18",
+        "conflicting_content_payload": null
       },
       "authorization_state": "missing",
       "as_found": {
@@ -1562,7 +1580,8 @@
         "content_sha256": "7d73c4a78760f8d19ec77ffeed505cc0f79bee640134f66ae5da4238ab297588",
         "delivered_copies": 1,
         "content_conflict": false,
-        "content_payload": "WATER_REPAIR_EVENT|schema=v1|case=WR-19|event_id=event-WR-19"
+        "content_payload": "WATER_REPAIR_EVENT|schema=v1|case=WR-19|event_id=event-WR-19",
+        "conflicting_content_payload": null
       },
       "authorization_state": "expired",
       "as_found": {
@@ -1648,7 +1667,8 @@
         "content_sha256": "046c22d2906f96655af1a5e82db638431117059d5a30a0027e75c01abd87c935",
         "delivered_copies": 1,
         "content_conflict": false,
-        "content_payload": "WATER_REPAIR_EVENT|schema=v1|case=WR-20|event_id=event-WR-20"
+        "content_payload": "WATER_REPAIR_EVENT|schema=v1|case=WR-20|event_id=event-WR-20",
+        "conflicting_content_payload": null
       },
       "authorization_state": "valid",
       "as_found": {
@@ -1734,7 +1754,8 @@
         "content_sha256": "9e4921b3c8507d6a0baf94e7552d85f15b017111b27ef56a1234ee9fc8f03600",
         "delivered_copies": 1,
         "content_conflict": false,
-        "content_payload": "WATER_REPAIR_EVENT|schema=v1|case=WR-21|event_id=event-WR-21"
+        "content_payload": "WATER_REPAIR_EVENT|schema=v1|case=WR-21|event_id=event-WR-21",
+        "conflicting_content_payload": null
       },
       "authorization_state": "valid",
       "as_found": {
@@ -1820,7 +1841,8 @@
         "content_sha256": "0d38dcb65dc518d1e2bb0c8fe4faa6cf08b00370661a44aee38efdccdc5b1319",
         "delivered_copies": 1,
         "content_conflict": false,
-        "content_payload": "WATER_REPAIR_EVENT|schema=v1|case=WR-22|event_id=event-WR-22"
+        "content_payload": "WATER_REPAIR_EVENT|schema=v1|case=WR-22|event_id=event-WR-22",
+        "conflicting_content_payload": null
       },
       "authorization_state": "valid",
       "as_found": {
