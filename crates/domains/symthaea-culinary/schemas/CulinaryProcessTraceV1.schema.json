@@ -1,0 +1,149 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/CulinaryProcessTraceV1.schema.json",
+  "title": "CulinaryProcessTraceV1",
+  "description": "Evidence-bearing single-batch material trace. Structural export readiness is not a mass-balance or food-safety verdict.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "trace_id", "process_id", "batch_basis", "mass_unit",
+    "food_state_start", "food_state_end", "boundary_inventory_status",
+    "boundary_inventory_evidence", "steps", "streams"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "trace_id": { "type": "string", "minLength": 1 },
+    "process_id": { "type": "string", "minLength": 1 },
+    "batch_basis": { "const": "single_batch" },
+    "mass_unit": { "const": "g" },
+    "food_state_start": { "type": "string", "minLength": 1 },
+    "food_state_end": { "type": "string", "minLength": 1 },
+    "boundary_inventory_status": {
+      "enum": ["claimed_complete", "known_incomplete", "unknown"]
+    },
+    "boundary_inventory_evidence": { "$ref": "#/$defs/evidence" },
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/step" }
+    },
+    "streams": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/stream" }
+    }
+  },
+  "$defs": {
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_ref", "source_version", "known_at", "evidence_status"],
+      "properties": {
+        "source_ref": { "type": "string", "minLength": 1 },
+        "source_version": { "type": "string", "minLength": 1 },
+        "known_at": { "type": "string", "format": "date-time" },
+        "evidence_status": {
+          "enum": ["synthetic", "unreviewed", "reviewed", "qualified"]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "evidence_status": { "const": "qualified" },
+              "source_ref": { "pattern": "^urn:synthetic:" }
+            },
+            "required": ["evidence_status", "source_ref"]
+          },
+          "then": false
+        }
+      ]
+    },
+    "step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["step_id", "operation", "input_stream_ids", "output_stream_ids", "evidence"],
+      "properties": {
+        "step_id": { "type": "string", "minLength": 1 },
+        "operation": {
+          "enum": ["prepare", "wash", "trim", "mix", "heat", "cool", "ferment", "filter", "transfer", "serve", "other"]
+        },
+        "input_stream_ids": {
+          "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 }
+        },
+        "output_stream_ids": {
+          "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 }
+        },
+        "evidence": { "$ref": "#/$defs/evidence" }
+      }
+    },
+    "mass": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "value", "lower", "upper", "unit"],
+      "properties": {
+        "status": { "enum": ["measured", "estimated", "unknown"] },
+        "value": { "type": ["number", "null"], "minimum": 0 },
+        "lower": { "type": ["number", "null"], "minimum": 0 },
+        "upper": { "type": ["number", "null"], "minimum": 0 },
+        "unit": { "const": "g" },
+        "unknown_reason": { "type": "string", "minLength": 1 }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "status": { "enum": ["measured", "estimated"] } },
+            "required": ["status"]
+          },
+          "then": {
+            "properties": {
+              "value": { "type": "number", "minimum": 0 },
+              "lower": { "type": "number", "minimum": 0 },
+              "upper": { "type": "number", "minimum": 0 }
+            },
+            "not": { "required": ["unknown_reason"] }
+          }
+        },
+        {
+          "if": {
+            "properties": { "status": { "const": "unknown" } },
+            "required": ["status"]
+          },
+          "then": {
+            "properties": {
+              "value": { "type": "null" },
+              "lower": { "type": "null" },
+              "upper": { "type": "null" }
+            },
+            "required": ["unknown_reason"]
+          }
+        }
+      ]
+    },
+    "stream": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stream_id", "material_class", "disposition", "from_step_id", "to_step_id", "mass_g", "evidence"
+      ],
+      "properties": {
+        "stream_id": { "type": "string", "minLength": 1 },
+        "material_class": {
+          "enum": [
+            "ingredient", "added_water", "added_oil", "seasoning", "working_fluid",
+            "intermediate_food", "edible_product", "coproduct", "byproduct",
+            "discarded_liquid", "spent_oil", "trim", "utensil_residue",
+            "evaporated_water", "recycled_material", "waste", "unknown"
+          ]
+        },
+        "disposition": {
+          "enum": ["consumed", "transformed", "retained", "coproduct", "byproduct", "discarded", "evaporated", "recycled", "unknown"]
+        },
+        "from_step_id": { "type": "string", "minLength": 1 },
+        "to_step_id": { "type": "string", "minLength": 1 },
+        "mass_g": { "$ref": "#/$defs/mass" },
+        "evidence": { "$ref": "#/$defs/evidence" }
+      }
+    }
+  }
+}

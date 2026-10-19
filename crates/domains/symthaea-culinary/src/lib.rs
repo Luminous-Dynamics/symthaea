@@ -43,6 +43,7 @@ pub mod ingredient;
 pub mod interop;
 pub mod kitchen;
 pub mod nutrient_accounting;
+pub mod process_trace;
 pub mod nutrition;
 pub mod palate;
 pub mod pareto;

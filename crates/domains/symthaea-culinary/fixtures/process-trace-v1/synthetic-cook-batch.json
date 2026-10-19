@@ -1,0 +1,156 @@
+{
+  "schema_version": "1.0.0",
+  "trace_id": "synthetic-cook-batch-process-trace-v1",
+  "process_id": "synthetic-cook-batch-v1",
+  "batch_basis": "single_batch",
+  "mass_unit": "g",
+  "food_state_start": "raw_edible_inputs",
+  "food_state_end": "prepared_serving",
+  "boundary_inventory_status": "claimed_complete",
+  "boundary_inventory_evidence": {
+    "source_ref": "urn:synthetic:boundary-inventory-declaration",
+    "source_version": "fixture-v1",
+    "known_at": "2026-10-19T00:00:00Z",
+    "evidence_status": "synthetic"
+  },
+  "steps": [
+    {
+      "step_id": "prepare",
+      "operation": "prepare",
+      "input_stream_ids": ["raw-staple"],
+      "output_stream_ids": ["prepared-staple", "trim"],
+      "evidence": {
+        "source_ref": "urn:synthetic:step:prepare",
+        "source_version": "fixture-v1",
+        "known_at": "2026-10-19T00:00:00Z",
+        "evidence_status": "synthetic"
+      }
+    },
+    {
+      "step_id": "cook",
+      "operation": "heat",
+      "input_stream_ids": ["prepared-staple", "added-water", "added-oil"],
+      "output_stream_ids": ["product", "evaporated-water", "utensil-residue"],
+      "evidence": {
+        "source_ref": "urn:synthetic:step:cook",
+        "source_version": "fixture-v1",
+        "known_at": "2026-10-19T00:00:00Z",
+        "evidence_status": "synthetic"
+      }
+    }
+  ],
+  "streams": [
+    {
+      "stream_id": "raw-staple",
+      "material_class": "ingredient",
+      "disposition": "consumed",
+      "from_step_id": "external",
+      "to_step_id": "prepare",
+      "mass_g": { "status": "estimated", "value": 100, "lower": 99, "upper": 101, "unit": "g" },
+      "evidence": {
+        "source_ref": "urn:synthetic:mass:raw-staple",
+        "source_version": "fixture-v1",
+        "known_at": "2026-10-19T00:00:00Z",
+        "evidence_status": "synthetic"
+      }
+    },
+    {
+      "stream_id": "prepared-staple",
+      "material_class": "intermediate_food",
+      "disposition": "transformed",
+      "from_step_id": "prepare",
+      "to_step_id": "cook",
+      "mass_g": { "status": "estimated", "value": 98, "lower": 97, "upper": 99, "unit": "g" },
+      "evidence": {
+        "source_ref": "urn:synthetic:mass:prepared-staple",
+        "source_version": "fixture-v1",
+        "known_at": "2026-10-19T00:00:00Z",
+        "evidence_status": "synthetic"
+      }
+    },
+    {
+      "stream_id": "trim",
+      "material_class": "trim",
+      "disposition": "discarded",
+      "from_step_id": "prepare",
+      "to_step_id": "external",
+      "mass_g": { "status": "estimated", "value": 2, "lower": 1, "upper": 3, "unit": "g" },
+      "evidence": {
+        "source_ref": "urn:synthetic:mass:trim",
+        "source_version": "fixture-v1",
+        "known_at": "2026-10-19T00:00:00Z",
+        "evidence_status": "synthetic"
+      }
+    },
+    {
+      "stream_id": "added-water",
+      "material_class": "added_water",
+      "disposition": "consumed",
+      "from_step_id": "external",
+      "to_step_id": "cook",
+      "mass_g": { "status": "estimated", "value": 200, "lower": 198, "upper": 202, "unit": "g" },
+      "evidence": {
+        "source_ref": "urn:synthetic:mass:added-water",
+        "source_version": "fixture-v1",
+        "known_at": "2026-10-19T00:00:00Z",
+        "evidence_status": "synthetic"
+      }
+    },
+    {
+      "stream_id": "added-oil",
+      "material_class": "added_oil",
+      "disposition": "consumed",
+      "from_step_id": "external",
+      "to_step_id": "cook",
+      "mass_g": { "status": "estimated", "value": 8, "lower": 7.8, "upper": 8.2, "unit": "g" },
+      "evidence": {
+        "source_ref": "urn:synthetic:mass:added-oil",
+        "source_version": "fixture-v1",
+        "known_at": "2026-10-19T00:00:00Z",
+        "evidence_status": "synthetic"
+      }
+    },
+    {
+      "stream_id": "product",
+      "material_class": "edible_product",
+      "disposition": "retained",
+      "from_step_id": "cook",
+      "to_step_id": "external",
+      "mass_g": { "status": "estimated", "value": 245, "lower": 243, "upper": 247, "unit": "g" },
+      "evidence": {
+        "source_ref": "urn:synthetic:mass:product",
+        "source_version": "fixture-v1",
+        "known_at": "2026-10-19T00:00:00Z",
+        "evidence_status": "synthetic"
+      }
+    },
+    {
+      "stream_id": "evaporated-water",
+      "material_class": "evaporated_water",
+      "disposition": "evaporated",
+      "from_step_id": "cook",
+      "to_step_id": "external",
+      "mass_g": { "status": "estimated", "value": 53, "lower": 51, "upper": 55, "unit": "g" },
+      "evidence": {
+        "source_ref": "urn:synthetic:mass:evaporated-water",
+        "source_version": "fixture-v1",
+        "known_at": "2026-10-19T00:00:00Z",
+        "evidence_status": "synthetic"
+      }
+    },
+    {
+      "stream_id": "utensil-residue",
+      "material_class": "utensil_residue",
+      "disposition": "discarded",
+      "from_step_id": "cook",
+      "to_step_id": "external",
+      "mass_g": { "status": "estimated", "value": 8, "lower": 6, "upper": 10, "unit": "g" },
+      "evidence": {
+        "source_ref": "urn:synthetic:mass:utensil-residue",
+        "source_version": "fixture-v1",
+        "known_at": "2026-10-19T00:00:00Z",
+        "evidence_status": "synthetic"
+      }
+    }
+  ]
+}
