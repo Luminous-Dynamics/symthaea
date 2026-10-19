@@ -28,6 +28,12 @@ pub struct OperatingEnvelopeSpec {
     /// SHA-256 digest of the frozen profile manifest (format checked, not authenticated).
     pub manifest_sha256: String,
     pub campaign_id: String,
+    /// All cases must use this electrical input boundary (for example, named DC-bus input).
+    pub energy_boundary_id: String,
+    /// Calibration/meter-chain epoch frozen for this comparison profile.
+    pub calibration_epoch_id: String,
+    /// Absolute-bound semantics/method frozen for all cases in this profile.
+    pub uncertainty_method_id: String,
     pub cases: Vec<OperatingCaseSpec>,
 }
 
@@ -41,6 +47,11 @@ pub enum EnvelopeIssue {
     EmptyMissionId { case_id: String },
     InvalidServiceDigest { case_id: String },
     EmptyConditionDigest { case_id: String },
+    EnergyBoundaryMismatch { case_id: String },
+    CalibrationEpochMismatch { case_id: String },
+    UncertaintyMethodMismatch { case_id: String },
+    PairOrderMismatch { case_id: String },
+    PairAssessmentInconsistent { case_id: String },
     MissingCase { case_id: String },
     DuplicateCaseResult { case_id: String, count: usize },
     UnexpectedCase { case_id: String },
@@ -166,6 +177,32 @@ fn fingerprint_issues(
             case_id: spec.case_id.clone(),
         });
     }
+    if pair.baseline_energy.energy_boundary_id != spec.energy_boundary_id
+        || pair.candidate_energy.energy_boundary_id != spec.energy_boundary_id
+    {
+        issues.push(EnvelopeIssue::EnergyBoundaryMismatch {
+            case_id: spec.case_id.clone(),
+        });
+    }
+    if pair.baseline_energy.calibration_epoch_id != spec.calibration_epoch_id
+        || pair.candidate_energy.calibration_epoch_id != spec.calibration_epoch_id
+    {
+        issues.push(EnvelopeIssue::CalibrationEpochMismatch {
+            case_id: spec.case_id.clone(),
+        });
+    }
+    if pair.baseline_energy.uncertainty_method_id != spec.uncertainty_method_id
+        || pair.candidate_energy.uncertainty_method_id != spec.uncertainty_method_id
+    {
+        issues.push(EnvelopeIssue::UncertaintyMethodMismatch {
+            case_id: spec.case_id.clone(),
+        });
+    }
+    if pair.baseline_order == pair.candidate_order {
+        issues.push(EnvelopeIssue::PairOrderMismatch {
+            case_id: spec.case_id.clone(),
+        });
+    }
 
     issues
 }
@@ -190,6 +227,18 @@ pub fn audit_envelope(
     }
     if !is_nonempty(&spec.campaign_id) {
         issues.push(EnvelopeIssue::EmptyIdentity("campaign_id"));
+        invalid_profile = true;
+    }
+    if !is_nonempty(&spec.energy_boundary_id) {
+        issues.push(EnvelopeIssue::EmptyIdentity("energy_boundary_id"));
+        invalid_profile = true;
+    }
+    if !is_nonempty(&spec.calibration_epoch_id) {
+        issues.push(EnvelopeIssue::EmptyIdentity("calibration_epoch_id"));
+        invalid_profile = true;
+    }
+    if !is_nonempty(&spec.uncertainty_method_id) {
+        issues.push(EnvelopeIssue::EmptyIdentity("uncertainty_method_id"));
         invalid_profile = true;
     }
     if !valid_sha256_hex(&spec.manifest_sha256) {
@@ -289,6 +338,13 @@ pub fn audit_envelope(
 
                 if result.campaign_id != spec.campaign_id {
                     case_issues.push(EnvelopeIssue::PairCampaignMismatch {
+                        case_id: case_id.clone(),
+                    });
+                }
+                if result.disposition == PairDisposition::EligibleForEnergyComparison
+                    && (!result.issues.is_empty() || result.run_count != 2)
+                {
+                    case_issues.push(EnvelopeIssue::PairAssessmentInconsistent {
                         case_id: case_id.clone(),
                     });
                 }
@@ -451,6 +507,9 @@ mod tests {
             profile_id: "profile-A".to_owned(),
             manifest_sha256: "f".repeat(64),
             campaign_id: "campaign-A".to_owned(),
+            energy_boundary_id: "dc-input-boundary-A".to_owned(),
+            calibration_epoch_id: "meter-epoch-A".to_owned(),
+            uncertainty_method_id: "absolute-bound-v1".to_owned(),
             cases: vec![
                 case("low-speed", 'b', "condition-low-speed"),
                 case("cruise", 'c', "condition-cruise"),
