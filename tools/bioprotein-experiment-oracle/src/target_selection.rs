@@ -18,23 +18,45 @@ const CLAIM_CEILING: &str = "Synthetic target-selection and interval-Pareto cont
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum GateState { Pass, Fail, Unknown, NotAssessed }
+pub enum GateState {
+    Pass,
+    Fail,
+    Unknown,
+    NotAssessed,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum EvidenceLabel { Measured, Literature, Estimated, Simulated, Synthetic }
+pub enum EvidenceLabel {
+    Measured,
+    Literature,
+    Estimated,
+    Simulated,
+    Synthetic,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum ObjectiveDirection { Maximize, Minimize }
+pub enum ObjectiveDirection {
+    Maximize,
+    Minimize,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum CaseStatus { Valid, Incomparable, InvalidInput }
+pub enum CaseStatus {
+    Valid,
+    Incomparable,
+    InvalidInput,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum TargetDisposition { Eligible, Blocked, Indeterminate }
+pub enum TargetDisposition {
+    Eligible,
+    Blocked,
+    Indeterminate,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -176,12 +198,18 @@ pub struct TargetRunReceipt {
     pub contract_passed: bool,
 }
 
-fn is_nonempty(value: &str) -> bool { !value.trim().is_empty() }
+fn is_nonempty(value: &str) -> bool {
+    !value.trim().is_empty()
+}
 
 fn validate_case(case: &TargetCase) -> Vec<String> {
     let mut errors = BTreeSet::<String>::new();
-    if !is_nonempty(&case.case_id) { errors.insert("case_id_missing".to_owned()); }
-    if case.targets.is_empty() { errors.insert("targets_missing".to_owned()); }
+    if !is_nonempty(&case.case_id) {
+        errors.insert("case_id_missing".to_owned());
+    }
+    if case.targets.is_empty() {
+        errors.insert("targets_missing".to_owned());
+    }
     let mut ids = BTreeSet::<String>::new();
 
     for target in &case.targets {
@@ -190,12 +218,22 @@ fn validate_case(case: &TargetCase) -> Vec<String> {
         }
         let b = &target.brief;
         let required_fields = [
-            b.ingredient_class.as_str(), b.intended_application.as_str(), b.functional_job.as_str(),
-            b.product_spec_digest.as_str(), b.quality_purity_basis.as_str(), b.functional_unit.as_str(),
-            b.volume_unit.as_str(), b.value_basis_id.as_str(), b.evidence_vintage.as_str(),
-            b.biology_endpoint.as_str(), b.process_closure_digest.as_str(), b.scale_transfer_basis.as_str(),
-            b.tea_lca_boundary_digest.as_str(), b.region_scenario_digest.as_str(),
-            b.feedstock_scenario_digest.as_str(), b.electricity_scenario_digest.as_str(),
+            b.ingredient_class.as_str(),
+            b.intended_application.as_str(),
+            b.functional_job.as_str(),
+            b.product_spec_digest.as_str(),
+            b.quality_purity_basis.as_str(),
+            b.functional_unit.as_str(),
+            b.volume_unit.as_str(),
+            b.value_basis_id.as_str(),
+            b.evidence_vintage.as_str(),
+            b.biology_endpoint.as_str(),
+            b.process_closure_digest.as_str(),
+            b.scale_transfer_basis.as_str(),
+            b.tea_lca_boundary_digest.as_str(),
+            b.region_scenario_digest.as_str(),
+            b.feedstock_scenario_digest.as_str(),
+            b.electricity_scenario_digest.as_str(),
         ];
         if required_fields.iter().any(|field| !is_nonempty(field)) {
             errors.insert("target_brief_field_missing".to_owned());
@@ -203,19 +241,29 @@ fn validate_case(case: &TargetCase) -> Vec<String> {
         if b.target_volume_low < 0 || b.target_volume_high < b.target_volume_low {
             errors.insert("invalid_target_volume_interval".to_owned());
         }
-        if target.evidence_label == EvidenceLabel::Synthetic && target.claim_basis == EvidenceLabel::Measured {
+        if target.evidence_label == EvidenceLabel::Synthetic
+            && target.claim_basis == EvidenceLabel::Measured
+        {
             errors.insert("synthetic_as_measured_claim".to_owned());
         } else if target.evidence_label != target.claim_basis {
             errors.insert("claim_basis_evidence_mismatch".to_owned());
         }
-        if target.objectives.is_empty() { errors.insert("objectives_missing".to_owned()); }
+        if target.objectives.is_empty() {
+            errors.insert("objectives_missing".to_owned());
+        }
         let mut objective_ids = BTreeSet::<String>::new();
         for objective in &target.objectives {
-            if !is_nonempty(&objective.objective_id) || !objective_ids.insert(objective.objective_id.clone()) {
+            if !is_nonempty(&objective.objective_id)
+                || !objective_ids.insert(objective.objective_id.clone())
+            {
                 errors.insert("duplicate_or_empty_objective_id".to_owned());
             }
-            if !is_nonempty(&objective.unit) { errors.insert("objective_unit_missing".to_owned()); }
-            if objective.low > objective.high { errors.insert("invalid_objective_interval".to_owned()); }
+            if !is_nonempty(&objective.unit) {
+                errors.insert("objective_unit_missing".to_owned());
+            }
+            if objective.low > objective.high {
+                errors.insert("invalid_objective_interval".to_owned());
+            }
         }
     }
     errors.into_iter().collect()
@@ -248,7 +296,12 @@ fn target_disposition(target: &TargetCandidate) -> ExpectedTargetEvaluation {
     } else {
         TargetDisposition::Eligible
     };
-    ExpectedTargetEvaluation { target_id: target.target_id.clone(), disposition, reason_codes: reasons, dominates: Vec::new() }
+    ExpectedTargetEvaluation {
+        target_id: target.target_id.clone(),
+        disposition,
+        reason_codes: reasons,
+        dominates: Vec::new(),
+    }
 }
 
 fn same_comparison_context(a: &TargetCandidate, b: &TargetCandidate) -> bool {
@@ -269,7 +322,9 @@ fn same_comparison_context(a: &TargetCandidate, b: &TargetCandidate) -> bool {
 }
 
 fn objective_signature(target: &TargetCandidate) -> Vec<(String, ObjectiveDirection, String)> {
-    let mut signature: Vec<(String, ObjectiveDirection, String)> = target.objectives.iter()
+    let mut signature: Vec<(String, ObjectiveDirection, String)> = target
+        .objectives
+        .iter()
         .map(|o| (o.objective_id.clone(), o.direction, o.unit.clone()))
         .collect();
     signature.sort();
@@ -277,19 +332,27 @@ fn objective_signature(target: &TargetCandidate) -> Vec<(String, ObjectiveDirect
 }
 
 fn robustly_dominates(a: &TargetCandidate, b: &TargetCandidate) -> bool {
-    let b_by_id: std::collections::BTreeMap<&str, &ObjectiveInterval> = b.objectives.iter()
+    let b_by_id: std::collections::BTreeMap<&str, &ObjectiveInterval> = b
+        .objectives
+        .iter()
         .map(|objective| (objective.objective_id.as_str(), objective))
         .collect();
     let mut strictly_better = false;
     for objective_a in &a.objectives {
-        let Some(objective_b) = b_by_id.get(objective_a.objective_id.as_str()) else { return false; };
+        let Some(objective_b) = b_by_id.get(objective_a.objective_id.as_str()) else {
+            return false;
+        };
         match objective_a.direction {
             ObjectiveDirection::Maximize => {
-                if objective_a.low < objective_b.high { return false; }
+                if objective_a.low < objective_b.high {
+                    return false;
+                }
                 strictly_better |= objective_a.low > objective_b.high;
             }
             ObjectiveDirection::Minimize => {
-                if objective_a.high > objective_b.low { return false; }
+                if objective_a.high > objective_b.low {
+                    return false;
+                }
                 strictly_better |= objective_a.high < objective_b.low;
             }
         }
@@ -301,42 +364,70 @@ pub fn evaluate_case(case: &TargetCase) -> TargetCaseEvaluation {
     let errors = validate_case(case);
     if !errors.is_empty() {
         return TargetCaseEvaluation {
-            case_id: case.case_id.clone(), status: CaseStatus::InvalidInput, reason_codes: errors,
-            targets: Vec::new(), pareto_frontier_ids: Vec::new(),
+            case_id: case.case_id.clone(),
+            status: CaseStatus::InvalidInput,
+            reason_codes: errors,
+            targets: Vec::new(),
+            pareto_frontier_ids: Vec::new(),
         };
     }
 
-    let mut targets: Vec<ExpectedTargetEvaluation> = case.targets.iter().map(target_disposition).collect();
+    let mut targets: Vec<ExpectedTargetEvaluation> =
+        case.targets.iter().map(target_disposition).collect();
     targets.sort_by(|a, b| a.target_id.cmp(&b.target_id));
 
     let context_mismatch = case.targets.iter().enumerate().any(|(i, a)| {
-        case.targets.iter().skip(i + 1).any(|b| !same_comparison_context(a, b))
+        case.targets
+            .iter()
+            .skip(i + 1)
+            .any(|b| !same_comparison_context(a, b))
     });
     let objective_mismatch = case.targets.iter().enumerate().any(|(i, a)| {
-        case.targets.iter().skip(i + 1).any(|b| objective_signature(a) != objective_signature(b))
+        case.targets
+            .iter()
+            .skip(i + 1)
+            .any(|b| objective_signature(a) != objective_signature(b))
     });
     if context_mismatch || objective_mismatch {
         let mut reasons = Vec::new();
-        if context_mismatch { reasons.push("comparison_context_mismatch".to_owned()); }
-        if objective_mismatch { reasons.push("objective_contract_mismatch".to_owned()); }
+        if context_mismatch {
+            reasons.push("comparison_context_mismatch".to_owned());
+        }
+        if objective_mismatch {
+            reasons.push("objective_contract_mismatch".to_owned());
+        }
         reasons.sort();
         return TargetCaseEvaluation {
-            case_id: case.case_id.clone(), status: CaseStatus::Incomparable, reason_codes: reasons,
-            targets, pareto_frontier_ids: Vec::new(),
+            case_id: case.case_id.clone(),
+            status: CaseStatus::Incomparable,
+            reason_codes: reasons,
+            targets,
+            pareto_frontier_ids: Vec::new(),
         };
     }
 
     for left_index in 0..targets.len() {
-        if targets[left_index].disposition != TargetDisposition::Eligible { continue; }
+        if targets[left_index].disposition != TargetDisposition::Eligible {
+            continue;
+        }
         let left_id = targets[left_index].target_id.clone();
-        let left = case.targets.iter().find(|target| target.target_id == left_id)
+        let left = case
+            .targets
+            .iter()
+            .find(|target| target.target_id == left_id)
             .expect("validated candidate IDs exist");
         let mut dominated = Vec::new();
         for right in &case.targets {
-            if right.target_id == left_id { continue; }
-            let right_eval = targets.iter().find(|evaluation| evaluation.target_id == right.target_id)
+            if right.target_id == left_id {
+                continue;
+            }
+            let right_eval = targets
+                .iter()
+                .find(|evaluation| evaluation.target_id == right.target_id)
                 .expect("all candidates have an evaluation");
-            if right_eval.disposition == TargetDisposition::Eligible && robustly_dominates(left, right) {
+            if right_eval.disposition == TargetDisposition::Eligible
+                && robustly_dominates(left, right)
+            {
                 dominated.push(right.target_id.clone());
             }
         }
@@ -344,14 +435,22 @@ pub fn evaluate_case(case: &TargetCase) -> TargetCaseEvaluation {
         targets[left_index].dominates = dominated;
     }
 
-    let pareto_frontier_ids: Vec<String> = targets.iter()
-        .filter(|target| target.disposition == TargetDisposition::Eligible
-            && !targets.iter().any(|other| other.dominates.contains(&target.target_id)))
+    let pareto_frontier_ids: Vec<String> = targets
+        .iter()
+        .filter(|target| {
+            target.disposition == TargetDisposition::Eligible
+                && !targets
+                    .iter()
+                    .any(|other| other.dominates.contains(&target.target_id))
+        })
         .map(|target| target.target_id.clone())
         .collect();
     TargetCaseEvaluation {
-        case_id: case.case_id.clone(), status: CaseStatus::Valid, reason_codes: Vec::new(),
-        targets, pareto_frontier_ids,
+        case_id: case.case_id.clone(),
+        status: CaseStatus::Valid,
+        reason_codes: Vec::new(),
+        targets,
+        pareto_frontier_ids,
     }
 }
 
@@ -360,7 +459,10 @@ pub fn evaluate_corpus(corpus: &TargetCorpus) -> Vec<TargetCaseEvaluation> {
 }
 
 fn sha256_hex(bytes: &[u8]) -> String {
-    Sha256::digest(bytes).iter().map(|byte| format!("{byte:02x}")).collect()
+    Sha256::digest(bytes)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
 }
 
 pub fn run_cli() -> i32 {
@@ -373,16 +475,33 @@ pub fn run_cli() -> i32 {
             "--expected-head" => expected_head = args.next(),
             "--corpus" => corpus_path = args.next().map(PathBuf::from),
             "--receipt" => receipt_path = args.next().map(PathBuf::from),
-            _ => { eprintln!("unknown argument: {arg}"); return 2; }
+            _ => {
+                eprintln!("unknown argument: {arg}");
+                return 2;
+            }
         }
     }
-    let Some(expected_head) = expected_head else { eprintln!("missing --expected-head"); return 2; };
-    let Some(corpus_path) = corpus_path else { eprintln!("missing --corpus"); return 2; };
-    let Some(receipt_path) = receipt_path else { eprintln!("missing --receipt"); return 2; };
+    let Some(expected_head) = expected_head else {
+        eprintln!("missing --expected-head");
+        return 2;
+    };
+    let Some(corpus_path) = corpus_path else {
+        eprintln!("missing --corpus");
+        return 2;
+    };
+    let Some(receipt_path) = receipt_path else {
+        eprintln!("missing --receipt");
+        return 2;
+    };
 
     let actual_head = match Command::new("git").args(["rev-parse", "HEAD"]).output() {
-        Ok(output) if output.status.success() => String::from_utf8_lossy(&output.stdout).trim().to_owned(),
-        _ => { eprintln!("could not establish actual Git HEAD"); return 2; }
+        Ok(output) if output.status.success() => {
+            String::from_utf8_lossy(&output.stdout).trim().to_owned()
+        }
+        _ => {
+            eprintln!("could not establish actual Git HEAD");
+            return 2;
+        }
     };
     if actual_head != expected_head {
         eprintln!("exact-head mismatch: expected={expected_head} actual={actual_head}");
@@ -390,47 +509,79 @@ pub fn run_cli() -> i32 {
     }
     let corpus_bytes = match fs::read(&corpus_path) {
         Ok(bytes) => bytes,
-        Err(error) => { eprintln!("cannot read corpus {}: {error}", corpus_path.display()); return 2; }
+        Err(error) => {
+            eprintln!("cannot read corpus {}: {error}", corpus_path.display());
+            return 2;
+        }
     };
     let corpus: TargetCorpus = match serde_json::from_slice(&corpus_bytes) {
         Ok(corpus) => corpus,
-        Err(error) => { eprintln!("cannot parse target-selection corpus: {error}"); return 2; }
+        Err(error) => {
+            eprintln!("cannot parse target-selection corpus: {error}");
+            return 2;
+        }
     };
-    if corpus.corpus_id != CORPUS_ID || corpus.schema_version != SCHEMA_VERSION
-        || corpus.case_count != corpus.cases.len() || corpus.cases.is_empty()
+    if corpus.corpus_id != CORPUS_ID
+        || corpus.schema_version != SCHEMA_VERSION
+        || corpus.case_count != corpus.cases.len()
+        || corpus.cases.is_empty()
     {
         eprintln!("unexpected corpus ID/schema or inconsistent case count");
         return 2;
     }
 
     let evaluations = evaluate_corpus(&corpus);
-    let cases: Vec<TargetCaseReceipt> = corpus.cases.iter().zip(evaluations.iter())
+    let cases: Vec<TargetCaseReceipt> = corpus
+        .cases
+        .iter()
+        .zip(evaluations.iter())
         .map(|(case, evaluation)| TargetCaseReceipt {
-            case_id: evaluation.case_id.clone(), status: evaluation.status,
-            reason_codes: evaluation.reason_codes.clone(), targets: evaluation.targets.clone(),
+            case_id: evaluation.case_id.clone(),
+            status: evaluation.status,
+            reason_codes: evaluation.reason_codes.clone(),
+            targets: evaluation.targets.clone(),
             pareto_frontier_ids: evaluation.pareto_frontier_ids.clone(),
             expected_contract_match: evaluation.matches_expected(&case.expected),
-        }).collect();
-    let failed_case_ids: Vec<String> = cases.iter().filter(|receipt| !receipt.expected_contract_match)
-        .map(|receipt| receipt.case_id.clone()).collect();
+        })
+        .collect();
+    let failed_case_ids: Vec<String> = cases
+        .iter()
+        .filter(|receipt| !receipt.expected_contract_match)
+        .map(|receipt| receipt.case_id.clone())
+        .collect();
     let matched_case_count = cases.len() - failed_case_ids.len();
     let contract_passed = failed_case_ids.is_empty();
     let receipt = TargetRunReceipt {
-        runner_version: RUNNER_VERSION.to_owned(), corpus_id: corpus.corpus_id,
-        schema_version: corpus.schema_version, corpus_sha256: sha256_hex(&corpus_bytes),
-        declared_head: expected_head, exact_head_match: actual_head == expected_head, actual_head,
-        case_count: cases.len(), matched_case_count, failed_case_ids, cases,
-        synthetic_only_claim_ceiling: CLAIM_CEILING.to_owned(), contract_passed,
+        runner_version: RUNNER_VERSION.to_owned(),
+        corpus_id: corpus.corpus_id,
+        schema_version: corpus.schema_version,
+        corpus_sha256: sha256_hex(&corpus_bytes),
+        declared_head: expected_head,
+        exact_head_match: actual_head == expected_head,
+        actual_head,
+        case_count: cases.len(),
+        matched_case_count,
+        failed_case_ids,
+        cases,
+        synthetic_only_claim_ceiling: CLAIM_CEILING.to_owned(),
+        contract_passed,
     };
-    if let Some(parent) = receipt_path.parent() && let Err(error) = fs::create_dir_all(parent) {
-        eprintln!("cannot create receipt directory: {error}"); return 2;
+    if let Some(parent) = receipt_path.parent()
+        && let Err(error) = fs::create_dir_all(parent)
+    {
+        eprintln!("cannot create receipt directory: {error}");
+        return 2;
     }
     let receipt_bytes = match serde_json::to_vec_pretty(&receipt) {
         Ok(bytes) => bytes,
-        Err(error) => { eprintln!("cannot serialize receipt: {error}"); return 2; }
+        Err(error) => {
+            eprintln!("cannot serialize receipt: {error}");
+            return 2;
+        }
     };
     if let Err(error) = fs::write(&receipt_path, &receipt_bytes) {
-        eprintln!("cannot write receipt {}: {error}", receipt_path.display()); return 2;
+        eprintln!("cannot write receipt {}: {error}", receipt_path.display());
+        return 2;
     }
     println!("{}", String::from_utf8_lossy(&receipt_bytes));
     if contract_passed { 0 } else { 1 }
@@ -453,8 +604,13 @@ mod tests {
         assert_eq!(corpus.schema_version, SCHEMA_VERSION);
         assert_eq!(corpus.case_count, corpus.cases.len());
         for (case, actual) in corpus.cases.iter().zip(evaluate_corpus(&corpus)) {
-            assert!(actual.matches_expected(&case.expected),
-                "case {} mismatch: expected {:?}, actual {:?}", case.case_id, case.expected, actual);
+            assert!(
+                actual.matches_expected(&case.expected),
+                "case {} mismatch: expected {:?}, actual {:?}",
+                case.case_id,
+                case.expected,
+                actual
+            );
         }
     }
 
@@ -468,10 +624,21 @@ mod tests {
 
     #[test]
     fn overlapping_intervals_do_not_create_robust_dominance() {
-        let case = fixture().cases.iter()
-            .find(|case| case.case_id == "MVP-008-overlapping-intervals").unwrap();
-        let a = case.targets.iter().find(|t| t.target_id == "interval-a").unwrap();
-        let b = case.targets.iter().find(|t| t.target_id == "interval-b").unwrap();
+        let case = fixture()
+            .cases
+            .iter()
+            .find(|case| case.case_id == "MVP-008-overlapping-intervals")
+            .unwrap();
+        let a = case
+            .targets
+            .iter()
+            .find(|t| t.target_id == "interval-a")
+            .unwrap();
+        let b = case
+            .targets
+            .iter()
+            .find(|t| t.target_id == "interval-b")
+            .unwrap();
         assert!(!robustly_dominates(a, b));
         assert!(!robustly_dominates(b, a));
     }
@@ -480,62 +647,113 @@ mod tests {
     fn identical_intervals_are_not_strict_dominance() {
         let case = fixture().cases[0].clone();
         let mut a = case.targets[0].clone();
-        let mut b = case.targets[1].clone();
+        let b = case.targets[1].clone();
         a.objectives = b.objectives.clone();
         assert!(!robustly_dominates(&a, &b));
     }
 
     #[test]
     fn failed_authorization_cannot_be_compensated_by_metrics() {
-        let case = fixture().cases.iter()
-            .find(|case| case.case_id == "MVP-002-hard-gate-over-market").unwrap();
-        let target = case.targets.iter().find(|t| t.target_id == "market-winner").unwrap();
+        let case = fixture()
+            .cases
+            .iter()
+            .find(|case| case.case_id == "MVP-002-hard-gate-over-market")
+            .unwrap();
+        let target = case
+            .targets
+            .iter()
+            .find(|t| t.target_id == "market-winner")
+            .unwrap();
         let result = target_disposition(target);
         assert_eq!(result.disposition, TargetDisposition::Blocked);
-        assert!(result.reason_codes.contains(&"authorization_failed".to_owned()));
+        assert!(
+            result
+                .reason_codes
+                .contains(&"authorization_failed".to_owned())
+        );
     }
 
     #[test]
     fn unknown_scale_transfer_is_indeterminate_and_not_frontier_eligible() {
-        let case = fixture().cases.iter()
-            .find(|case| case.case_id == "MVP-006-scale-transfer-unknown").unwrap();
+        let case = fixture()
+            .cases
+            .iter()
+            .find(|case| case.case_id == "MVP-006-scale-transfer-unknown")
+            .unwrap();
         let actual = evaluate_case(case);
-        let uncertain = actual.targets.iter().find(|t| t.target_id == "scale-unknown").unwrap();
+        let uncertain = actual
+            .targets
+            .iter()
+            .find(|t| t.target_id == "scale-unknown")
+            .unwrap();
         assert_eq!(uncertain.disposition, TargetDisposition::Indeterminate);
-        assert!(!actual.pareto_frontier_ids.contains(&"scale-unknown".to_owned()));
+        assert!(
+            !actual
+                .pareto_frontier_ids
+                .contains(&"scale-unknown".to_owned())
+        );
     }
 
     #[test]
     fn scenario_and_scope_mismatch_prevent_any_pareto_claim() {
         let corpus = fixture();
-        for id in ["MVP-004-functional-unit-mismatch", "MVP-007-region-feedstock-scenario-shift",
-                   "MVP-011-objective-unit-mismatch"] {
+        for id in [
+            "MVP-004-functional-unit-mismatch",
+            "MVP-007-region-feedstock-scenario-shift",
+            "MVP-011-objective-unit-mismatch",
+        ] {
             let case = corpus.cases.iter().find(|case| case.case_id == id).unwrap();
             let actual = evaluate_case(case);
             assert_eq!(actual.status, CaseStatus::Incomparable, "{id}");
             assert!(actual.pareto_frontier_ids.is_empty(), "{id}");
-            assert!(actual.targets.iter().all(|target| target.dominates.is_empty()), "{id}");
+            assert!(
+                actual
+                    .targets
+                    .iter()
+                    .all(|target| target.dominates.is_empty()),
+                "{id}"
+            );
         }
     }
 
     #[test]
     fn synthetic_data_cannot_be_promoted_to_measured_claims() {
-        let case = fixture().cases.iter()
-            .find(|case| case.case_id == "MVP-009-synthetic-as-measured-negative-control").unwrap();
+        let case = fixture()
+            .cases
+            .iter()
+            .find(|case| case.case_id == "MVP-009-synthetic-as-measured-negative-control")
+            .unwrap();
         let actual = evaluate_case(case);
         assert_eq!(actual.status, CaseStatus::InvalidInput);
-        assert!(actual.reason_codes.contains(&"synthetic_as_measured_claim".to_owned()));
+        assert!(
+            actual
+                .reason_codes
+                .contains(&"synthetic_as_measured_claim".to_owned())
+        );
         assert!(actual.targets.is_empty());
     }
 
     #[test]
     fn downstream_usable_capacity_not_nominal_titer_drives_frontier() {
-        let case = fixture().cases.iter()
-            .find(|case| case.case_id == "MVP-003-usable-output-over-titer").unwrap();
+        let case = fixture()
+            .cases
+            .iter()
+            .find(|case| case.case_id == "MVP-003-usable-output-over-titer")
+            .unwrap();
         let actual = evaluate_case(case);
-        assert_eq!(actual.pareto_frontier_ids, vec!["lower-titer-high-recovery".to_owned()]);
-        let recovered = actual.targets.iter()
-            .find(|t| t.target_id == "lower-titer-high-recovery").unwrap();
-        assert!(recovered.dominates.contains(&"high-titer-low-recovery".to_owned()));
+        assert_eq!(
+            actual.pareto_frontier_ids,
+            vec!["lower-titer-high-recovery".to_owned()]
+        );
+        let recovered = actual
+            .targets
+            .iter()
+            .find(|t| t.target_id == "lower-titer-high-recovery")
+            .unwrap();
+        assert!(
+            recovered
+                .dominates
+                .contains(&"high-titer-low-recovery".to_owned())
+        );
     }
 }
