@@ -264,7 +264,7 @@ fn read_blocks(manifest: &Value, audio_root: &Path) -> Result<(Vec<SourceBlock>,
         let style = required_string(record, "style", &context)?.to_owned();
         let expected_dialect = STYLE_DIALECTS
             .iter()
-            .find(|(expected_style, _)| *expected_style == style)
+            .find(|(expected_style, _)| *expected_style == style.as_str())
             .map(|(_, dialect)| *dialect)
             .ok_or_else(|| format!("{context} has unexpected style {style:?}"))?;
         let declared_dialect = required_string(record, "grammar_performance_dialect", &context)?;
@@ -736,6 +736,18 @@ mod tests {
         let result = read_blocks(&manifest, &root);
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("disagrees with WAV header"));
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn style_to_dialect_mismatch_fails_closed() {
+        let root = fixture_root("style-dialect-mismatch");
+        let (manifest_path, _) = make_fixture(&root);
+        let mut manifest: Value = serde_json::from_slice(&fs::read(&manifest_path).unwrap()).unwrap();
+        manifest["records"][0]["grammar_performance_dialect"] = Value::String("WrongDialect".to_owned());
+        let result = read_blocks(&manifest, &root);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("maps to"));
         fs::remove_dir_all(root).ok();
     }
 
