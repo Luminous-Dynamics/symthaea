@@ -163,11 +163,24 @@ impl ProductionRun {
 pub enum EvaluationError {
     EmptyPolicyId,
     SamePolicy,
-    EmptyRuns { policy_id: String },
-    MixedPolicy { expected: String, found: String },
-    DuplicateScenario { scenario_id: String },
-    InvalidRun { scenario_id: String, reason: &'static str },
-    InvalidDigest { scenario_id: String, field: &'static str },
+    EmptyRuns {
+        policy_id: String,
+    },
+    MixedPolicy {
+        expected: String,
+        found: String,
+    },
+    DuplicateScenario {
+        scenario_id: String,
+    },
+    InvalidRun {
+        scenario_id: String,
+        reason: &'static str,
+    },
+    InvalidDigest {
+        scenario_id: String,
+        field: &'static str,
+    },
     MixedEvidenceClass {
         policy_id: String,
         expected: EvidenceClass,
@@ -181,7 +194,9 @@ pub enum EvaluationError {
         missing_in_candidate: Vec<String>,
         extra_in_candidate: Vec<String>,
     },
-    WorkloadMismatch { scenario_id: String },
+    WorkloadMismatch {
+        scenario_id: String,
+    },
     ArithmeticOverflow,
     NonFiniteAggregate,
 }
@@ -195,26 +210,48 @@ impl fmt::Display for EvaluationError {
             Self::MixedPolicy { expected, found } => {
                 write!(f, "expected policy {expected}, found policy {found}")
             }
-            Self::DuplicateScenario { scenario_id } => write!(f, "duplicate scenario ID: {scenario_id}"),
-            Self::InvalidRun { scenario_id, reason } => {
+            Self::DuplicateScenario { scenario_id } => {
+                write!(f, "duplicate scenario ID: {scenario_id}")
+            }
+            Self::InvalidRun {
+                scenario_id,
+                reason,
+            } => {
                 write!(f, "invalid run {scenario_id}: {reason}")
             }
-            Self::InvalidDigest { scenario_id, field } => {
-                write!(f, "invalid lowercase SHA-256 syntax for {field} in run {scenario_id}")
-            }
-            Self::MixedEvidenceClass { policy_id, expected, found } => write!(
-                f, "policy {policy_id} mixes evidence classes ({expected:?} and {found:?})"
+            Self::InvalidDigest {
+                scenario_id,
+                field,
+            } => write!(
+                f,
+                "invalid lowercase SHA-256 syntax for {field} in run {scenario_id}"
             ),
-            Self::EvidenceClassMismatch { baseline, candidate } => write!(
-                f, "baseline evidence class {baseline:?} differs from candidate class {candidate:?}"
+            Self::MixedEvidenceClass {
+                policy_id,
+                expected,
+                found,
+            } => write!(
+                f,
+                "policy {policy_id} mixes evidence classes ({expected:?} and {found:?})"
             ),
-            Self::PairSetMismatch { missing_in_candidate, extra_in_candidate } => write!(
+            Self::EvidenceClassMismatch {
+                baseline,
+                candidate,
+            } => write!(
+                f,
+                "baseline evidence class {baseline:?} differs from candidate class {candidate:?}"
+            ),
+            Self::PairSetMismatch {
+                missing_in_candidate,
+                extra_in_candidate,
+            } => write!(
                 f,
                 "paired scenario sets differ (missing in candidate: {missing_in_candidate:?}; extra in candidate: {extra_in_candidate:?})"
             ),
-            Self::WorkloadMismatch { scenario_id } => {
-                write!(f, "workload identity or fixed input quantities differ for {scenario_id}")
-            }
+            Self::WorkloadMismatch { scenario_id } => write!(
+                f,
+                "workload identity or fixed input quantities differ for {scenario_id}"
+            ),
             Self::ArithmeticOverflow => write!(f, "integer accounting overflow"),
             Self::NonFiniteAggregate => write!(f, "aggregate energy/time is non-finite"),
         }
@@ -327,11 +364,13 @@ pub fn compare_production_outcomes(
         });
     }
 
-    let missing: Vec<String> = baseline.keys()
+    let missing: Vec<String> = baseline
+        .keys()
         .filter(|id| !candidate.contains_key(**id))
         .map(|id| (*id).to_owned())
         .collect();
-    let extra: Vec<String> = candidate.keys()
+    let extra: Vec<String> = candidate
+        .keys()
         .filter(|id| !baseline.contains_key(**id))
         .map(|id| (*id).to_owned())
         .collect();
@@ -372,7 +411,9 @@ fn index_runs<'a>(
     runs: &'a [ProductionRun],
 ) -> Result<BTreeMap<&'a str, &'a ProductionRun>, EvaluationError> {
     if runs.is_empty() {
-        return Err(EvaluationError::EmptyRuns { policy_id: policy_id.to_owned() });
+        return Err(EvaluationError::EmptyRuns {
+            policy_id: policy_id.to_owned(),
+        });
     }
     let mut indexed = BTreeMap::new();
     for run in runs {
@@ -397,9 +438,12 @@ fn common_evidence_class(
     runs: &BTreeMap<&str, &ProductionRun>,
 ) -> Result<EvidenceClass, EvaluationError> {
     let mut iter = runs.values();
-    let first = iter.next().ok_or_else(|| EvaluationError::EmptyRuns {
-        policy_id: policy_id.to_owned(),
-    })?.evidence_class;
+    let first = iter
+        .next()
+        .ok_or_else(|| EvaluationError::EmptyRuns {
+            policy_id: policy_id.to_owned(),
+        })?
+        .evidence_class;
     for run in iter {
         if run.evidence_class != first {
             return Err(EvaluationError::MixedEvidenceClass {
@@ -442,18 +486,29 @@ fn summarize(runs: &BTreeMap<&str, &ProductionRun>) -> Result<OutcomeSummary, Ev
     })
 }
 fn sum_field<F>(runs: &BTreeMap<&str, &ProductionRun>, field: F) -> Result<u64, EvaluationError>
-where F: Fn(&ProductionRun) -> u64 {
+where
+    F: Fn(&ProductionRun) -> u64,
+{
     runs.values().try_fold(0_u64, |sum, run| {
-        sum.checked_add(field(run)).ok_or(EvaluationError::ArithmeticOverflow)
+        sum.checked_add(field(run))
+            .ok_or(EvaluationError::ArithmeticOverflow)
     })
 }
 fn sum_f64<F>(runs: &BTreeMap<&str, &ProductionRun>, field: F) -> Result<f64, EvaluationError>
-where F: Fn(&ProductionRun) -> f64 {
+where
+    F: Fn(&ProductionRun) -> f64,
+{
     let value = runs.values().map(|run| field(run)).sum::<f64>();
-    if value.is_finite() { Ok(value) } else { Err(EvaluationError::NonFiniteAggregate) }
+    if value.is_finite() {
+        Ok(value)
+    } else {
+        Err(EvaluationError::NonFiniteAggregate)
+    }
 }
 fn checked_sum(values: &[u64]) -> Option<u64> {
-    values.iter().try_fold(0_u64, |sum, value| sum.checked_add(*value))
+    values
+        .iter()
+        .try_fold(0_u64, |sum, value| sum.checked_add(*value))
 }
 
 #[cfg(test)]
@@ -506,7 +561,10 @@ mod tests {
         c[0].source_record_sha256 = "not-a-digest".to_owned();
         assert!(matches!(
             compare_production_outcomes("baseline", &b, "candidate", &c),
-            Err(EvaluationError::InvalidDigest { field: "source_record_sha256", .. })
+            Err(EvaluationError::InvalidDigest {
+                field: "source_record_sha256",
+                ..
+            })
         ));
     }
 
@@ -531,11 +589,15 @@ mod tests {
     #[test]
     fn report_json_round_trip_preserves_schema_and_evidence_class() {
         let (baseline, candidate) = pair();
-        let report = compare_production_outcomes("baseline", &baseline, "candidate", &candidate).unwrap();
+        let report =
+            compare_production_outcomes("baseline", &baseline, "candidate", &candidate).unwrap();
         let json = serde_json::to_string(&report).unwrap();
         let decoded: ProductionValueReport = serde_json::from_str(&json).unwrap();
         assert_eq!(report, decoded);
-        assert_eq!(decoded.schema_version, PRODUCTION_VALUE_REPORT_SCHEMA_VERSION);
+        assert_eq!(
+            decoded.schema_version,
+            PRODUCTION_VALUE_REPORT_SCHEMA_VERSION
+        );
         assert_eq!(decoded.evidence_class, EvidenceClass::InstrumentObserved);
         let mut run_json = serde_json::to_value(&baseline[0]).unwrap();
         run_json
@@ -563,82 +625,111 @@ mod tests {
         let mut b = vec![run("baseline", "b", 8), run("baseline", "a", 7)];
         let mut c = vec![run("candidate", "b", 9), run("candidate", "a", 8)];
         let first = compare_production_outcomes("baseline", &b, "candidate", &c).unwrap();
-        b.reverse(); c.reverse();
+        b.reverse();
+        c.reverse();
         let second = compare_production_outcomes("baseline", &b, "candidate", &c).unwrap();
         assert_eq!(first, second);
     }
     #[test]
     fn rejects_empty_sides_and_policy_ids() {
         let (_, c) = pair();
-        assert!(matches!(compare_production_outcomes("baseline", &[], "candidate", &c),
-            Err(EvaluationError::EmptyRuns { .. })));
+        assert!(matches!(
+            compare_production_outcomes("baseline", &[], "candidate", &c),
+            Err(EvaluationError::EmptyRuns { .. })
+        ));
         let (b, c) = pair();
-        assert!(matches!(compare_production_outcomes("", &b, "candidate", &c),
-            Err(EvaluationError::EmptyPolicyId)));
-        assert!(matches!(compare_production_outcomes("baseline", &b, "baseline", &c),
-            Err(EvaluationError::SamePolicy)));
+        assert!(matches!(
+            compare_production_outcomes("", &b, "candidate", &c),
+            Err(EvaluationError::EmptyPolicyId)
+        ));
+        assert!(matches!(
+            compare_production_outcomes("baseline", &b, "baseline", &c),
+            Err(EvaluationError::SamePolicy)
+        ));
     }
     #[test]
     fn rejects_duplicate_scenarios_and_mixed_policy_labels() {
         let (mut b, c) = pair();
         b.push(b[0].clone());
-        assert!(matches!(compare_production_outcomes("baseline", &b, "candidate", &c),
-            Err(EvaluationError::DuplicateScenario { .. })));
+        assert!(matches!(
+            compare_production_outcomes("baseline", &b, "candidate", &c),
+            Err(EvaluationError::DuplicateScenario { .. })
+        ));
         let (b, mut c) = pair();
         c[0].policy_id = "other".to_owned();
-        assert!(matches!(compare_production_outcomes("baseline", &b, "candidate", &c),
-            Err(EvaluationError::MixedPolicy { .. })));
+        assert!(matches!(
+            compare_production_outcomes("baseline", &b, "candidate", &c),
+            Err(EvaluationError::MixedPolicy { .. })
+        ));
     }
     #[test]
     fn rejects_missing_extra_and_mismatched_workloads() {
         let (b, mut c) = pair();
         c[0].scenario_id = "other".to_owned();
         c[0].workload_digest = "workload-other".to_owned();
-        assert!(matches!(compare_production_outcomes("baseline", &b, "candidate", &c),
-            Err(EvaluationError::PairSetMismatch { .. })));
+        assert!(matches!(
+            compare_production_outcomes("baseline", &b, "candidate", &c),
+            Err(EvaluationError::PairSetMismatch { .. })
+        ));
 
         let (b, mut c) = pair();
         c[0].workload_digest = "different".to_owned();
-        assert!(matches!(compare_production_outcomes("baseline", &b, "candidate", &c),
-            Err(EvaluationError::WorkloadMismatch { .. })));
+        assert!(matches!(
+            compare_production_outcomes("baseline", &b, "candidate", &c),
+            Err(EvaluationError::WorkloadMismatch { .. })
+        ));
 
         let (b, mut c) = pair();
         c[0].material_input_mg = 1100;
         c[0].material_scrap_mg = 200;
-        assert!(matches!(compare_production_outcomes("baseline", &b, "candidate", &c),
-            Err(EvaluationError::WorkloadMismatch { .. })));
+        assert!(matches!(
+            compare_production_outcomes("baseline", &b, "candidate", &c),
+            Err(EvaluationError::WorkloadMismatch { .. })
+        ));
     }
     #[test]
     fn rejects_unit_and_material_imbalances() {
         let (b, mut c) = pair();
         c[0].scrapped_units -= 1;
-        assert!(matches!(compare_production_outcomes("baseline", &b, "candidate", &c),
-            Err(EvaluationError::InvalidRun { .. })));
+        assert!(matches!(
+            compare_production_outcomes("baseline", &b, "candidate", &c),
+            Err(EvaluationError::InvalidRun { .. })
+        ));
 
         let (b, mut c) = pair();
         c[0].material_residual_mg = 1;
-        assert!(matches!(compare_production_outcomes("baseline", &b, "candidate", &c),
-            Err(EvaluationError::InvalidRun { .. })));
+        assert!(matches!(
+            compare_production_outcomes("baseline", &b, "candidate", &c),
+            Err(EvaluationError::InvalidRun { .. })
+        ));
     }
     #[test]
     fn rejects_bad_energy_or_duration() {
         let (b, mut c) = pair();
         c[0].energy_wh = f64::NAN;
-        assert!(matches!(compare_production_outcomes("baseline", &b, "candidate", &c),
-            Err(EvaluationError::InvalidRun { .. })));
+        assert!(matches!(
+            compare_production_outcomes("baseline", &b, "candidate", &c),
+            Err(EvaluationError::InvalidRun { .. })
+        ));
         let (b, mut c) = pair();
         c[0].energy_wh = -0.1;
-        assert!(matches!(compare_production_outcomes("baseline", &b, "candidate", &c),
-            Err(EvaluationError::InvalidRun { .. })));
+        assert!(matches!(
+            compare_production_outcomes("baseline", &b, "candidate", &c),
+            Err(EvaluationError::InvalidRun { .. })
+        ));
         let (b, mut c) = pair();
         c[0].elapsed_seconds = 0.0;
-        assert!(matches!(compare_production_outcomes("baseline", &b, "candidate", &c),
-            Err(EvaluationError::InvalidRun { .. })));
+        assert!(matches!(
+            compare_production_outcomes("baseline", &b, "candidate", &c),
+            Err(EvaluationError::InvalidRun { .. })
+        ));
     }
     #[test]
     fn zero_accepted_units_never_divides_by_zero() {
-        let (b, c) = (vec![run("baseline", "scenario-001", 0)],
-                      vec![run("candidate", "scenario-001", 0)]);
+        let (b, c) = (
+            vec![run("baseline", "scenario-001", 0)],
+            vec![run("candidate", "scenario-001", 0)],
+        );
         let r = compare_production_outcomes("baseline", &b, "candidate", &c).unwrap();
         assert_eq!(r.baseline.energy_wh_per_accepted_unit(), None);
         assert_eq!(r.candidate.energy_wh_per_accepted_unit(), None);
