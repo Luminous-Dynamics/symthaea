@@ -65,7 +65,7 @@ Physical eligibility also requires a claim-specific uncertainty budget (measuran
 
 ## Fault injection matrix and conformance
 
-The machine-readable matrix lists 32 required positive and negative controls, including clock-method spoofing, missing claim-specific uncertainty budgets, an expanded-uncertainty value that exceeds its pre-registered tolerance, a calculated-but-not-characterized budget, calibration/rights receipt references that do not match the declared artifacts, zero-width uncertainty budgets, and uncertainty receipt contents that disagree with the manifest. Include positive controls so a validator that rejects everything does not pass. At minimum, exercise:
+The machine-readable matrix lists 33 required positive and negative controls, including clock-method spoofing, missing claim-specific uncertainty budgets, an expanded-uncertainty value that exceeds its pre-registered tolerance, a calculated-but-not-characterized budget, calibration/rights receipt references that do not match the declared artifacts, zero-width uncertainty budgets, uncertainty receipt contents that disagree with the manifest, and a gap-ledger case that checks exact timestamps plus estimated missing samples. Include positive controls so a validator that rejects everything does not pass. At minimum, exercise:
 - malformed or reordered headers, empty traces and unknown channels/statuses;
 - VALID samples with missing values, non-finite numbers, sequence gaps, timestamp regression and repeated timestamps for a channel;
 - repeated timestamps across different channels where simultaneous sampling is permitted;
@@ -86,6 +86,10 @@ For predictive tire/vehicle models, partition at the independent unit that can l
 - powertrain: hold out drive cycles, ambient conditions and test sessions.
 
 Report per-group metrics, worst-group behavior, uncertainty calibration and out-of-distribution cases. A shuffled row split is a smoke test, not evidence of generalization. Fit normalizers and feature-selection only on training data.
+
+### Per-channel loss ledger
+
+The raw-trace report now includes all declared channels, including channels with no rows. For observed channels it records the first/last timestamps, observed span, nominal sample period, estimated expected samples, estimated missing samples and each suspected gap's exact adjacent timestamps. The estimate assumes periodic sampling across the observed first-to-last span; it is not proof of physical logger loss or an actual hardware counter. Do not use it as a physical acceptance metric until compared with independently recorded sensor/logger sequence or overflow counters.
 
 ### Per-claim uncertainty completeness
 
@@ -115,5 +119,5 @@ Next:
 1. Execute the Rust tests and matrix on a host with the workspace toolchain; retain the exact-head report and build identity, then run `mobility-telemetry-verify-report` before sharing/archive.
 2. Run the full suite 100 times on the same build to measure replay determinism; a unit test checks 100 repeated canonical digest computations and content-tamper detection.
 3. Build a host recorder/replayer before MCU firmware; add SocketCAN only as a receive-only, fail-closed adapter and test unavailable timestamp modes.
-4. Build a known-signal bench: pulse/step signal generator, synchronized voltage/current reference and independent sample counter.
+4. Build a known-signal bench: pulse/step signal generator, synchronized voltage/current reference and independent sample counter; reconcile the generated missing pulses with the new gap ledger.
 5. Validate the physical sensor chain and uncertainty before any real-world efficiency, handling, tire-force or safety claim.
