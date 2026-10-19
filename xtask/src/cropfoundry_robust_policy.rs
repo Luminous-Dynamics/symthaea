@@ -66,6 +66,7 @@ struct PolicyRobustnessScore {
     scenario_count: usize,
     tail_fraction: f64,
     tail_sample_count: usize,
+    upper_tail_scenario_ids: Vec<String>,
     mean_stress_exposure_proxy: f64,
     median_stress_exposure_proxy: f64,
     p95_stress_exposure_proxy_nearest_rank: f64,
@@ -80,6 +81,18 @@ struct PolicyRobustnessScore {
     total_per_plot_limit_violation_days: usize,
     pareto_front_member: bool,
     dominated_by_policies: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct ScenarioPolicyDiagnostic {
+    scenario_id: String,
+    policy: String,
+    stress_exposure_proxy: f64,
+    max_zone_stress_exposure_proxy: f64,
+    water_applied_plot_mm: f64,
+    plot_allocation_dispersion_plot_mm: f64,
+    water_budget_violation_days: usize,
+    per_plot_limit_violation_days: usize,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -114,6 +127,8 @@ struct RobustPolicyReceipt {
     preference_count: usize,
     distinct_top_ranked_policy_count: usize,
     hard_constraint_summary: String,
+    scenario_policy_diagnostics_count: usize,
+    scenario_policy_diagnostics: Vec<ScenarioPolicyDiagnostic>,
     policies: Vec<PolicyRobustnessScore>,
     preference_sweep: Vec<PreferenceRanking>,
     caveats: Vec<String>,
@@ -216,12 +231,26 @@ fn build_policy_scores(results: &[ScenarioResult]) -> Result<Vec<PolicyRobustnes
             ));
         }
 
-        let mut stress = items
+        let mut stress_by_scenario = items
             .iter()
-            .map(|item| item.stress_exposure_proxy)
+            .map(|item| (item.scenario_id.clone(), item.stress_exposure_proxy))
             .collect::<Vec<_>>();
-        stress.sort_by(f64::total_cmp);
+        stress_by_scenario.sort_by(|left, right| {
+            left.1
+                .total_cmp(&right.1)
+                .then_with(|| left.0.cmp(&right.0))
+        });
+        let stress = stress_by_scenario
+            .iter()
+            .map(|(_, value)| *value)
+            .collect::<Vec<_>>();
         let (cvar95, tail_count) = cvar_upper_tail(&stress, TAIL_FRACTION_95);
+        let tail_start = stress_by_scenario.len().saturating_sub(tail_count);
+        let mut upper_tail_scenario_ids = stress_by_scenario[tail_start..]
+            .iter()
+            .map(|(scenario_id, _)| scenario_id.clone())
+            .collect::<Vec<_>>();
+        upper_tail_scenario_ids.sort();
         let worst_zone = items
             .iter()
             .map(|item| item.max_zone_stress_exposure_proxy)
@@ -262,6 +291,7 @@ fn build_policy_scores(results: &[ScenarioResult]) -> Result<Vec<PolicyRobustnes
             scenario_count: items.len(),
             tail_fraction: TAIL_FRACTION_95,
             tail_sample_count: tail_count,
+            upper_tail_scenario_ids,
             mean_stress_exposure_proxy: mean(&stress),
             median_stress_exposure_proxy: median(&stress),
             p95_stress_exposure_proxy_nearest_rank: nearest_rank(&stress, 0.95),
@@ -402,6 +432,31 @@ fn build_receipt() -> Result<RobustPolicyReceipt> {
             "robust-policy aggregation did not preserve the sensitivity-suite cardinalities"
         ));
     }
+    let mut scenario_policy_diagnostics = results
+        .iter()
+        .map(|result| ScenarioPolicyDiagnostic {
+            scenario_id: result.scenario_id.clone(),
+            policy: result.policy.clone(),
+            stress_exposure_proxy: result.stress_exposure_proxy,
+            max_zone_stress_exposure_proxy: result.max_zone_stress_exposure_proxy,
+            water_applied_plot_mm: result.total_irrigation_applied_plot_mm,
+            plot_allocation_dispersion_plot_mm: result.plot_allocation_dispersion_plot_mm,
+            water_budget_violation_days: result.water_budget_violation_days,
+            per_plot_limit_violation_days: result.per_plot_limit_violation_days,
+        })
+        .collect::<Vec<_>>();
+    scenario_policy_diagnostics.sort_by(|left, right| {
+        left.scenario_id
+            .cmp(&right.scenario_id)
+            .then_with(|| left.policy.cmp(&right.policy))
+    });
+    if scenario_policy_diagnostics.len() != scenarios.len() * policy_count {
+        return Err(anyhow!(
+            "scenario-policy diagnostics are incomplete: expected {}, got {}",
+            scenarios.len() * policy_count,
+            scenario_policy_diagnostics.len()
+        ));
+    }
     let preference_sweep = build_preference_sweep(&scores);
     let distinct_top_ranked_policy_count = preference_sweep
         .iter()
@@ -446,6 +501,8 @@ fn build_receipt() -> Result<RobustPolicyReceipt> {
         preference_count: preference_sweep.len(),
         distinct_top_ranked_policy_count,
         hard_constraint_summary: "All 30 sensitivity scenarios x 5 policies were re-simulated; every result has zero daily water-budget and per-plot actuator-limit violations. This is a code-level synthetic invariant only.".to_owned(),
+        scenario_policy_diagnostics_count: scenario_policy_diagnostics.len(),
+        scenario_policy_diagnostics,
         policies: scores,
         preference_sweep,
         caveats: vec![
@@ -551,6 +608,43 @@ mod tests {
         let row = results.iter_mut().find(|row| row.policy == policy).unwrap();
         row.scenario_id = "unexpected-replacement-scenario".to_owned();
         assert!(build_policy_scores(&results).is_err());
+    }
+
+    #[test]
+    fn robust_policy_receipt_exposes_each_case_and_exact_cvar_tail() {
+        let receipt = build_receipt().unwrap();
+        assert_eq!(receipt.scenario_policy_diagnostics_count, 150);
+        assert_eq!(receipt.scenario_policy_diagnostics.len(), 150);
+        let keys = receipt
+            .scenario_policy_diagnostics
+            .iter()
+            .map(|row| (row.policy.clone(), row.scenario_id.clone()))
+            .collect::<std::collections::BTreeSet<_>>();
+        assert_eq!(keys.len(), 150);
+        for score in &receipt.policies {
+            let mut values = receipt
+                .scenario_policy_diagnostics
+                .iter()
+                .filter(|row| row.policy == score.policy)
+                .map(|row| (row.stress_exposure_proxy, row.scenario_id.clone()))
+                .collect::<Vec<_>>();
+            values.sort_by(|left, right| {
+                left.0.total_cmp(&right.0).then_with(|| left.1.cmp(&right.1))
+            });
+            let tail = &values[values.len() - 2..];
+            let expected_ids = tail
+                .iter()
+                .map(|(_, id)| id.clone())
+                .collect::<std::collections::BTreeSet<_>>();
+            let actual_ids = score
+                .upper_tail_scenario_ids
+                .iter()
+                .cloned()
+                .collect::<std::collections::BTreeSet<_>>();
+            assert_eq!(actual_ids, expected_ids);
+            let expected_cvar = (tail[0].0 + tail[1].0) / 2.0;
+            assert!((score.cvar95_stress_exposure_proxy - expected_cvar).abs() <= 1e-9);
+        }
     }
 
     #[test]
