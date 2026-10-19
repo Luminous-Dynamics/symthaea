@@ -12,6 +12,7 @@ use symthaea_habitat_vertical_bench::resilience_options::{
 use symthaea_habitat_vertical_bench::assumption_falsification::{
     validate_assumption_falsification_str, EMBEDDED_HABITAT_ASSUMPTIONS,
 };
+use symthaea_habitat_vertical_bench::event_replay::{validate_event_log_str, EMBEDDED_EVENT_LOG};
 use symthaea_habitat_vertical_bench::{validate_fixture_str, EMBEDDED_FIXTURE};
 
 fn main() {
@@ -143,6 +144,25 @@ fn main() {
                 assumptions.assumption_count,
                 assumptions.experiment_count,
                 assumptions.critical_assumption_count
+            );
+            let event_replay = match validate_event_log_str(EMBEDDED_EVENT_LOG, EMBEDDED_FIXTURE) {
+                Ok(report) => report,
+                Err(error) => {
+                    eprintln!("invalid embedded event-replay JSON: {error}");
+                    process::exit(2);
+                }
+            };
+            if !event_replay.is_valid() {
+                eprintln!("EVENT REPLAY DEFINITION: FAIL ({} findings)", event_replay.issues.len());
+                for issue in event_replay.issues {
+                    eprintln!("{} {}: {}", issue.code, issue.path, issue.message);
+                }
+                process::exit(1);
+            }
+            println!(
+                "synthetic event replay contract: PASS ({} unique events; {} exact redeliveries; digest=NOT COMPUTED; physical evidence=NOT ESTABLISHED)",
+                event_replay.unique_event_count,
+                event_replay.duplicate_delivery_count
             );
         } else {
             println!("embedded disruption campaign: not checked against the alternate fixture");
