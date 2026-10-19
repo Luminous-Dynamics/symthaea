@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Water Repair Closure Benchmark v0.1 corpus",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "qualification_status",
+    "evaluation_mode",
+    "claim_ceiling",
+    "exact_implementation_sha",
+    "cases"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "water-repair-closure-001-corpus-v1"
+    },
+    "qualification_status": {
+      "enum": [
+        "NotRun",
+        "InProgress",
+        "PassedExactHead",
+        "Failed",
+        "Blocked"
+      ]
+    },
+    "evaluation_mode": {
+      "const": "synthetic_contract_only"
+    },
+    "claim_ceiling": {
+      "const": "SyntheticFieldRepairLifecycleOnly"
+    },
+    "exact_implementation_sha": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 22,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "title",
+          "profile",
+          "class",
+          "expected_disposition",
+          "reason_codes",
+          "assertions",
+          "forbidden_claims"
+        ],
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "pattern": "^WR-[0-9]{2}$"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "profile": {
+            "enum": [
+              "non_potable_module",
+              "municipal_distribution",
+              "building_plumbing"
+            ]
+          },
+          "class": {
+            "enum": [
+              "positive_control",
+              "adversarial"
+            ]
+          },
+          "expected_disposition": {
+            "enum": [
+              "Blocked",
+              "Incomplete",
+              "Indeterminate",
+              "ReadyForReview",
+              "VerifiedWithinProfile",
+              "Rejected"
+            ]
+          },
+          "reason_codes": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Z0-9_]+$"
+            },
+            "uniqueItems": true
+          },
+          "assertions": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "uniqueItems": true
+          },
+          "forbidden_claims": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "uniqueItems": true
+          }
+        }
+      }
+    }
+  }
+}
