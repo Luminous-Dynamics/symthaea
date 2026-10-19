@@ -4,6 +4,9 @@ use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::PathBuf;
 
+const INPUT_SCHEMA_V0: &str = "cropfoundry-nutrition-accounting-input-v0";
+const INPUT_SCHEMA_V1: &str = "cropfoundry-nutrition-accounting-input-v1";
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 enum MassBasis {
@@ -188,7 +191,7 @@ fn audit_input(input: NutritionAccountingInput) -> NutritionAccountingReceipt {
     let concentration = input.concentration_mg_per_kg;
     let stage_mass = input.edible_mass_kg_at_concentration_stage;
 
-    if input.schema_version != "cropfoundry-nutrition-accounting-input-v0" {
+    if input.schema_version != INPUT_SCHEMA_V0 && input.schema_version != INPUT_SCHEMA_V1 {
         issues.push("unsupported input schema_version".to_owned());
     }
     if input.batch_id.trim().is_empty() {
@@ -302,6 +305,13 @@ fn audit_input(input: NutritionAccountingInput) -> NutritionAccountingReceipt {
         || edible_mass_bounds
         || retention_bounds
         || bioavailability_bounds;
+    if input.schema_version == INPUT_SCHEMA_V0
+        && (any_intervals
+            || input.uncertainty_interval_kind.is_some()
+            || has_nonblank(input.uncertainty_evidence_uri.as_deref()))
+    {
+        issues.push("input schema v0 does not support uncertainty interval fields; use schema v1".to_owned());
+    }
     if any_intervals {
         if input.uncertainty_interval_kind.is_none()
             || !has_nonblank(input.uncertainty_evidence_uri.as_deref())
@@ -486,7 +496,7 @@ fn audit_input(input: NutritionAccountingInput) -> NutritionAccountingReceipt {
         .map(|(mass, count)| mass / count as f64);
 
     NutritionAccountingReceipt {
-        receipt_schema: "cropfoundry-nutrition-accounting-receipt-v0".to_owned(),
+        receipt_schema: "cropfoundry-nutrition-accounting-receipt-v1".to_owned(),
         input_sha256: None,
         input_snapshot,
         batch_id: input.batch_id,
@@ -575,7 +585,7 @@ mod tests {
 
     fn fixture() -> NutritionAccountingInput {
         NutritionAccountingInput {
-            schema_version: "cropfoundry-nutrition-accounting-input-v0".to_owned(),
+            schema_version: INPUT_SCHEMA_V1.to_owned(),
             batch_id: "batch-1".to_owned(),
             nutrient_id: "iron".to_owned(),
             concentration_mg_per_kg: Some(80.0),
@@ -798,6 +808,33 @@ mod tests {
                 .iter()
                 .any(|issue| issue.contains("overflowed the finite numeric range"))
         );
+    }
+
+    #[test]
+    fn v0_input_remains_supported_without_interval_fields() {
+        let mut input = fixture();
+        input.schema_version = INPUT_SCHEMA_V0.to_owned();
+        let receipt = audit_input(input);
+        assert!(receipt.accounting_pass);
+        assert_eq!(receipt.nutrient_mass_delivered_interval_lower_mg, None);
+    }
+
+    #[test]
+    fn v0_input_cannot_smuggle_v1_interval_fields() {
+        let mut input = fixture();
+        input.schema_version = INPUT_SCHEMA_V0.to_owned();
+        input.concentration_lower_mg_per_kg = Some(70.0);
+        input.concentration_upper_mg_per_kg = Some(90.0);
+        input.edible_mass_lower_kg_at_concentration_stage = Some(0.14);
+        input.edible_mass_upper_kg_at_concentration_stage = Some(0.16);
+        input.uncertainty_interval_kind = Some(UncertaintyIntervalKind::SensitivityBounds);
+        input.uncertainty_evidence_uri = Some("urn:uncertainty:v1-only".to_owned());
+        let receipt = audit_input(input);
+        assert!(!receipt.accounting_pass);
+        assert!(receipt
+            .issues
+            .iter()
+            .any(|issue| issue.contains("use schema v1")));
     }
 
     #[test]
