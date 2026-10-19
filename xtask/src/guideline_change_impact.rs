@@ -27,6 +27,9 @@ struct ChangeImpactContract {
     from_revision_id: String,
     to_revision_id: String,
     source_revisions: Vec<SourceRevision>,
+    oracle_fixture_path: String,
+    oracle_fixture_sha256: String,
+    oracle_class: String,
     requirements: Vec<RequirementMapping>,
     change_records: Vec<ChangeRecord>,
     notes: Option<String>,
@@ -68,6 +71,30 @@ struct ChangeRecord {
     rationale: Option<String>,
 }
 
+#[derive(Debug, Deserialize, Clone)]
+#[serde(deny_unknown_fields)]
+struct IndependentOracle {
+    schema_version: String,
+    status: String,
+    clinical_use_authorized: bool,
+    oracle_class: String,
+    note: String,
+    cases: Vec<OracleCase>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+#[serde(deny_unknown_fields)]
+struct OracleCase {
+    case_id: String,
+    requirement_id: String,
+    case_kind: String,
+    input_condition: String,
+    expected_predicate: String,
+    expected_outcome: String,
+    fault_injection: Option<String>,
+    oracle_review_record_id: String,
+}
+
 #[derive(Debug, Serialize)]
 struct ChangeImpactReceipt {
     receipt_version: &'static str,
@@ -75,6 +102,10 @@ struct ChangeImpactReceipt {
     contract_sha256: String,
     source_revision_sha: String,
     source_artifact_sha256: BTreeMap<String, String>,
+    oracle_sha256: String,
+    oracle_case_count: usize,
+    known_answer_case_count: usize,
+    fault_mutation_case_count: usize,
     validator_source_sha256: String,
     entrypoint_source_sha256: String,
     executable_sha256: String,
@@ -86,6 +117,10 @@ struct ChangeImpactReceipt {
     candidate_requirement_count: usize,
     mapped_requirement_count: usize,
     change_record_count: usize,
+    oracle_sha256: String,
+    oracle_case_count: usize,
+    known_answer_case_count: usize,
+    fault_mutation_case_count: usize,
     claim_ceiling: &'static str,
 }
 
@@ -98,6 +133,10 @@ struct ValidatedChangeImpact {
     candidate_requirement_count: usize,
     mapped_requirement_count: usize,
     change_record_count: usize,
+    oracle_sha256: String,
+    oracle_case_count: usize,
+    known_answer_case_count: usize,
+    fault_mutation_case_count: usize,
 }
 
 pub fn run(root: &Path, contract_arg: &Path, out_arg: Option<&Path>) -> Result<()> {
@@ -123,6 +162,10 @@ pub fn run(root: &Path, contract_arg: &Path, out_arg: Option<&Path>) -> Result<(
         source_revision_sha: std::env::var("FIRST_AID_SOURCE_REVISION")
             .unwrap_or_else(|_| "not-provided".to_string()),
         source_artifact_sha256: validated.source_artifact_sha256,
+        oracle_sha256: validated.oracle_sha256,
+        oracle_case_count: validated.oracle_case_count,
+        known_answer_case_count: validated.known_answer_case_count,
+        fault_mutation_case_count: validated.fault_mutation_case_count,
         validator_source_sha256: sha256_hex(&validator_source),
         entrypoint_source_sha256: sha256_hex(&entrypoint_source),
         executable_sha256: sha256_hex(&executable_bytes),
@@ -167,11 +210,15 @@ fn sha256_hex(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
 }
 
-fn is_requirement_id(id: &str) -> bool {
-    let Some(suffix) = id.strip_prefix("REQ-") else {
+fn is_numbered_id(id: &str, prefix: &str) -> bool {
+    let Some(suffix) = id.strip_prefix(prefix) else {
         return false;
     };
     suffix.len() == 3 && suffix.bytes().all(|byte| byte.is_ascii_digit())
+}
+
+fn is_requirement_id(id: &str) -> bool {
+    is_numbered_id(id, "REQ-")
 }
 
 fn unique_nonempty(values: &[String], field: &str, owner: &str) -> Result<()> {
