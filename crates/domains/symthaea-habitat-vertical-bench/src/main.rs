@@ -17,6 +17,7 @@ use symthaea_habitat_vertical_bench::material_ledger::{validate_material_ledger_
 use symthaea_habitat_vertical_bench::measurement_gate::{validate_measurement_gate_str, EMBEDDED_MEASUREMENT_GATE};
 use symthaea_habitat_vertical_bench::audit_bundle::{validate_audit_bundle_str, EMBEDDED_AUDIT_BUNDLE};
 use symthaea_habitat_vertical_bench::recall_drill::{validate_recall_drill_str, EMBEDDED_RECALL_DRILL};
+use symthaea_habitat_vertical_bench::quantity_genealogy::{validate_quantity_genealogy_str, EMBEDDED_QUANTITY_GENEALOGY};
 use symthaea_habitat_vertical_bench::{validate_fixture_str, EMBEDDED_FIXTURE};
 
 fn main() {
@@ -219,6 +220,27 @@ fn main() {
                 count_disposition("Indeterminate"),
                 count_disposition("Blocked"),
                 count_disposition("NotEvaluable")
+            );
+            let quantity_genealogy = match validate_quantity_genealogy_str(EMBEDDED_QUANTITY_GENEALOGY) {
+                Ok(report) => report,
+                Err(error) => {
+                    eprintln!("invalid embedded quantity-genealogy JSON: {error}");
+                    process::exit(2);
+                }
+            };
+            if !quantity_genealogy.is_valid() {
+                eprintln!("QUANTITY GENEALOGY: FAIL ({} findings)", quantity_genealogy.issues.len());
+                for issue in quantity_genealogy.issues {
+                    eprintln!("{} {}: {}", issue.code, issue.path, issue.message);
+                }
+                process::exit(1);
+            }
+            println!(
+                "synthetic quantity genealogy definition: VALID ({} operations; opening={} mg; ending={} mg; affected terminals={}; physical evidence=NOT ESTABLISHED)",
+                quantity_genealogy.operation_count,
+                quantity_genealogy.initial_mass_mg,
+                quantity_genealogy.ending_mass_mg,
+                quantity_genealogy.affected_terminal_ids.len()
             );
             let audit_bundle = match validate_audit_bundle_str(
                 EMBEDDED_AUDIT_BUNDLE,
