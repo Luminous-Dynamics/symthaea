@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 use open_display_platform_verify::{
-    validate_cad_runtime_receipt_str, validate_measurement_run_str, validate_platform_str,
+    validate_cad_runtime_receipt_str, validate_drift_control_plan_str,
+    validate_measurement_run_str, validate_platform_str,
 };
 use std::env;
 use std::fs;
@@ -16,6 +17,7 @@ const DEFAULT_CAD_RECEIPT_SCHEMA: &str =
     "hardware/open-display-reference/validation/odrh-cad-runtime-receipt.schema.json";
 const DEFAULT_CAD_SOURCE: &str =
     "hardware/open-display-reference/cad/odrh_sensor_interface_plate.scad";
+const DEFAULT_DRIFT_SCHEMA: &str = "docs/engineering/display-drift-control-plan.schema.json";
 
 fn main() {
     let mut manifest_path = PathBuf::from(DEFAULT_MANIFEST);
@@ -24,6 +26,8 @@ fn main() {
     let mut run_schema_path = PathBuf::from(DEFAULT_RUN_SCHEMA);
     let mut cad_receipt_path: Option<PathBuf> = None;
     let mut cad_receipt_schema_path = PathBuf::from(DEFAULT_CAD_RECEIPT_SCHEMA);
+    let mut drift_plan_path: Option<PathBuf> = None;
+    let mut drift_schema_path = PathBuf::from(DEFAULT_DRIFT_SCHEMA);
     let mut args = env::args().skip(1);
 
     while let Some(arg) = args.next() {
@@ -52,6 +56,14 @@ fn main() {
                 Some(path) => cad_receipt_schema_path = PathBuf::from(path),
                 None => fail("--cad-receipt-schema requires a path"),
             },
+            "--drift-plan" => match args.next() {
+                Some(path) => drift_plan_path = Some(PathBuf::from(path)),
+                None => fail("--drift-plan requires a path"),
+            },
+            "--drift-schema" => match args.next() {
+                Some(path) => drift_schema_path = PathBuf::from(path),
+                None => fail("--drift-schema requires a path"),
+            },
             "--help" | "-h" => {
                 print_help();
                 return;
@@ -74,6 +86,15 @@ fn main() {
         Err(errors) => fail_with_errors("MEASUREMENT_RUN_CONTRACT_INVALID", errors),
     };
 
+    let drift_control_report = drift_plan_path.as_ref().map(|path| {
+        let plan_text = read_file(path);
+        let drift_schema_text = read_file(&drift_schema_path);
+        match validate_drift_control_plan_str(&plan_text, &drift_schema_text) {
+            Ok(report) => report,
+            Err(errors) => fail_with_errors("DRIFT_CONTROL_PLAN_INVALID", errors),
+        }
+    });
+
     let cad_receipt_report = cad_receipt_path.as_ref().map(|path| {
         let receipt_text = read_file(path);
         let receipt_schema_text = read_file(&cad_receipt_schema_path);
@@ -92,6 +113,7 @@ fn main() {
         "platform": platform_report.to_json(),
         "measurement_run": run_report.to_json(),
         "cad_runtime_receipt": cad_receipt_report.map(|report| report.to_json()),
+        "drift_control_screening": drift_control_report.map(|report| report.to_json()),
     });
     println!(
         "{}",
@@ -122,14 +144,16 @@ fn fail_with_errors(prefix: &str, errors: Vec<String>) -> ! {
 fn print_help() {
     println!(
         "Validate the ODRH-001 design and run-record contracts without claiming physical qualification.\n\
-         Usage: open-display-platform-verify [--manifest PATH] [--schema PATH] [--run-record PATH] [--run-schema PATH] [--cad-receipt PATH] [--cad-receipt-schema PATH]\n\
+         Usage: open-display-platform-verify [--manifest PATH] [--schema PATH] [--run-record PATH] [--run-schema PATH] [--cad-receipt PATH] [--cad-receipt-schema PATH] [--drift-plan PATH] [--drift-schema PATH]\n\
          Defaults:\n\
            --manifest          {DEFAULT_MANIFEST}\n\
            --schema            {DEFAULT_SCHEMA}\n\
            --run-record        {DEFAULT_RUN_RECORD}\n\
            --run-schema        {DEFAULT_RUN_SCHEMA}\n\
            --cad-receipt-schema {DEFAULT_CAD_RECEIPT_SCHEMA}\n\
+           --drift-schema      {DEFAULT_DRIFT_SCHEMA}\n\
          Optional:\n\
-           --cad-receipt PATH validates a runtime CAD receipt against the exact native CAD source."
+           --cad-receipt PATH validates a runtime CAD receipt against the native CAD source.\n\
+           --drift-plan PATH validates and screens a synthetic-only control-drift plan."
     );
 }
