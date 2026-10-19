@@ -136,7 +136,7 @@ provider_metamorphic_sem=$(jq -er '.semantic_projection_sha256' "$provider_metam
 [ "$provider_metamorphic_count" -eq 64 ] || fail "actual-provider metamorphic sweep did not execute 64 variants"
 [ "$provider_metamorphic_sem" = "$sem_a" ] || fail "actual-provider metamorphic digest diverged from run-a"
 
-manifest_tmp="${TMPDIR:-/tmp}/rea-evidence-bundle-manifest.$"
+manifest_tmp=$(mktemp "${TMPDIR:-/tmp}/rea-evidence-bundle-manifest.XXXXXX") || fail "could not allocate bundle manifest staging file"
 (
   cd "$OUT"
   find . -type f ! -path './receipt.json' ! -path './bundle-manifest.json' -print |
