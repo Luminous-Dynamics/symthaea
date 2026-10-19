@@ -538,8 +538,7 @@ mod tests {
         let result = check_proximate_composition_closure_v1(&value).unwrap();
         assert_eq!(result.disposition, CompositionClosureDispositionV1::WithinPreferred);
     }
-}
- 
+
     #[test]
     fn widening_a_component_interval_never_strengthens_closure() {
         let mut value = fixture();
@@ -568,3 +567,5 @@ mod tests {
             }
         }
     }
+
+}
