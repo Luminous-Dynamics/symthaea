@@ -122,9 +122,7 @@ pub struct DriftScreeningReport {
 ///
 /// Rejects invalid run bounds/configuration, duplicate/empty IDs, unordered control
 /// slots, out-of-run timestamps, and invalid DUT-observation timestamps.
-pub fn screen_drift_controls(
-    plan: &DriftControlPlan,
-) -> Result<DriftScreeningReport, Vec<String>> {
+pub fn screen_drift_controls(plan: &DriftControlPlan) -> Result<DriftScreeningReport, Vec<String>> {
     let mut errors = Vec::new();
 
     if !plan.run_start_seconds.is_finite()
@@ -237,9 +235,7 @@ pub fn screen_drift_controls(
                 .find(|control| control.disposition.is_acceptable())
                 .map_or(plan.run_end_seconds, |control| control.time_seconds);
 
-            if observation.time_seconds >= previous_good
-                && observation.time_seconds <= next_good
-            {
+            if observation.time_seconds >= previous_good && observation.time_seconds <= next_good {
                 responsible.push(decision.control_id.clone());
             }
         }
@@ -345,18 +341,25 @@ pub fn validate_drift_control_plan_str(
         Err(error) => errors.push(format!("drift schema compilation failed: {error}")),
     }
 
-    if plan_value.get("record_state").and_then(serde_json::Value::as_str)
+    if plan_value
+        .get("record_state")
+        .and_then(serde_json::Value::as_str)
         != Some("SYNTHETIC_TEST_ONLY")
     {
         errors.push("drift screening v0.1 only accepts SYNTHETIC_TEST_ONLY plans".to_owned());
     }
-    if plan_value.get("claim_ceiling").and_then(serde_json::Value::as_str)
+    if plan_value
+        .get("claim_ceiling")
+        .and_then(serde_json::Value::as_str)
         != Some("SYNTHETIC_OR_CONTROL_SCREENING_ONLY_NOT_PHYSICAL_QUALIFICATION")
     {
         errors.push("drift plan claim ceiling is invalid".to_owned());
     }
 
-    let Some(controls_value) = plan_value.get("controls").and_then(serde_json::Value::as_array) else {
+    let Some(controls_value) = plan_value
+        .get("controls")
+        .and_then(serde_json::Value::as_array)
+    else {
         errors.push("drift plan controls must be an array".to_owned());
         return Err(errors);
     };
@@ -490,7 +493,10 @@ mod tests {
         }
     }
 
-    fn plan(controls: Vec<ScheduledControl>, dut_observations: Vec<DutObservation>) -> DriftControlPlan {
+    fn plan(
+        controls: Vec<ScheduledControl>,
+        dut_observations: Vec<DutObservation>,
+    ) -> DriftControlPlan {
         DriftControlPlan {
             run_start_seconds: 0.0,
             run_end_seconds: 100.0,
@@ -509,11 +515,27 @@ mod tests {
         assert_eq!(report.measurand, "synthetic check-standard response");
         assert_eq!(report.unit, "arbitrary_units");
         assert_eq!(report.screening.controls.len(), 3);
-        assert_eq!(report.screening.observations[0].disposition, ObservationDisposition::NoOutOfBandControlDetected);
-        assert_eq!(report.screening.observations[1].disposition, ObservationDisposition::QuarantinedByControlExcursion);
-        assert_eq!(report.screening.observations[1].responsible_control_ids, ["CONTROL-EXCURSION"]);
-        assert_eq!(report.screening.observations[2].disposition, ObservationDisposition::NoOutOfBandControlDetected);
-        assert!(report.to_json()["claim_ceiling"].as_str().is_some_and(|text| text.contains("No physical instrument")));
+        assert_eq!(
+            report.screening.observations[0].disposition,
+            ObservationDisposition::NoOutOfBandControlDetected
+        );
+        assert_eq!(
+            report.screening.observations[1].disposition,
+            ObservationDisposition::QuarantinedByControlExcursion
+        );
+        assert_eq!(
+            report.screening.observations[1].responsible_control_ids,
+            ["CONTROL-EXCURSION"]
+        );
+        assert_eq!(
+            report.screening.observations[2].disposition,
+            ObservationDisposition::NoOutOfBandControlDetected
+        );
+        assert!(
+            report.to_json()["claim_ceiling"]
+                .as_str()
+                .is_some_and(|text| text.contains("No physical instrument"))
+        );
     }
 
     #[test]
@@ -524,19 +546,31 @@ mod tests {
         let mutated = serde_json::to_string(&plan).expect("mutated plan must serialize");
         let errors = validate_drift_control_plan_str(&mutated, DRIFT_SCHEMA_TEXT)
             .expect_err("synthetic drift algorithm must not qualify physical runs");
-        assert!(errors.iter().any(|error| error.contains("SYNTHETIC_TEST_ONLY")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("SYNTHETIC_TEST_ONLY"))
+        );
     }
 
     #[test]
     fn guard_band_boundaries_are_inclusive() {
         let report = screen_drift_controls(&plan(
-            vec![control("lower", 10.0, Some(9.0)), control("upper", 90.0, Some(11.0))],
+            vec![
+                control("lower", 10.0, Some(9.0)),
+                control("upper", 90.0, Some(11.0)),
+            ],
             vec![sample("inside", 50.0)],
         ))
         .expect("boundary values are valid controls");
         assert_eq!(report.guard_lower, 9.0);
         assert_eq!(report.guard_upper, 11.0);
-        assert!(report.controls.iter().all(|c| c.disposition == ControlDisposition::InBand));
+        assert!(
+            report
+                .controls
+                .iter()
+                .all(|c| c.disposition == ControlDisposition::InBand)
+        );
         assert_eq!(
             report.observations[0].disposition,
             ObservationDisposition::NoOutOfBandControlDetected
@@ -551,10 +585,17 @@ mod tests {
                 control("excursion", 50.0, Some(12.0)),
                 control("post", 80.0, Some(10.0)),
             ],
-            vec![sample("before", 5.0), sample("affected", 60.0), sample("after", 90.0)],
+            vec![
+                sample("before", 5.0),
+                sample("affected", 60.0),
+                sample("after", 90.0),
+            ],
         ))
         .expect("control schedule should validate");
-        assert_eq!(report.controls[1].disposition, ControlDisposition::OutOfBand);
+        assert_eq!(
+            report.controls[1].disposition,
+            ControlDisposition::OutOfBand
+        );
         assert_eq!(
             report.observations[0].disposition,
             ObservationDisposition::NoOutOfBandControlDetected
@@ -564,7 +605,10 @@ mod tests {
             ObservationDisposition::QuarantinedByControlExcursion
         );
         assert_eq!(report.observations[1].responsible_control_ids.len(), 1);
-        assert_eq!(report.observations[1].responsible_control_ids[0], "excursion");
+        assert_eq!(
+            report.observations[1].responsible_control_ids[0],
+            "excursion"
+        );
         assert_eq!(
             report.observations[2].disposition,
             ObservationDisposition::NoOutOfBandControlDetected
@@ -639,22 +683,41 @@ mod tests {
     #[test]
     fn duplicate_ids_unordered_controls_and_out_of_run_times_reject() {
         let duplicate = screen_drift_controls(&plan(
-            vec![control("x", 10.0, Some(10.0)), control("x", 20.0, Some(10.0))],
+            vec![
+                control("x", 10.0, Some(10.0)),
+                control("x", 20.0, Some(10.0)),
+            ],
             vec![],
         ));
-        assert!(duplicate.expect_err("duplicate IDs must fail").iter().any(|e| e.contains("duplicate control")));
+        assert!(
+            duplicate
+                .expect_err("duplicate IDs must fail")
+                .iter()
+                .any(|e| e.contains("duplicate control"))
+        );
 
         let unordered = screen_drift_controls(&plan(
-            vec![control("later", 20.0, Some(10.0)), control("earlier", 10.0, Some(10.0))],
+            vec![
+                control("later", 20.0, Some(10.0)),
+                control("earlier", 10.0, Some(10.0)),
+            ],
             vec![],
         ));
-        assert!(unordered.expect_err("out-of-order controls must fail").iter().any(|e| e.contains("time-ordered")));
+        assert!(
+            unordered
+                .expect_err("out-of-order controls must fail")
+                .iter()
+                .any(|e| e.contains("time-ordered"))
+        );
 
-        let outside = screen_drift_controls(&plan(
-            vec![control("outside", 110.0, Some(10.0))],
-            vec![],
-        ));
-        assert!(outside.expect_err("out-of-run control must fail").iter().any(|e| e.contains("outside the run")));
+        let outside =
+            screen_drift_controls(&plan(vec![control("outside", 110.0, Some(10.0))], vec![]));
+        assert!(
+            outside
+                .expect_err("out-of-run control must fail")
+                .iter()
+                .any(|e| e.contains("outside the run"))
+        );
     }
 
     #[test]
@@ -671,7 +734,10 @@ mod tests {
         ))
         .expect("finite values around both guard boundaries should validate");
         assert_eq!(report.controls[0].disposition, ControlDisposition::InBand);
-        assert_eq!(report.controls[1].disposition, ControlDisposition::OutOfBand);
+        assert_eq!(
+            report.controls[1].disposition,
+            ControlDisposition::OutOfBand
+        );
         assert_eq!(report.controls[2].disposition, ControlDisposition::InBand);
         assert_eq!(report.controls[3].disposition, ControlDisposition::OutOfBand);
     }
@@ -700,7 +766,10 @@ mod tests {
     #[test]
     fn no_detected_excursion_is_not_labeled_physical_pass() {
         let report = screen_drift_controls(&plan(
-            vec![control("a", 10.0, Some(10.0)), control("b", 90.0, Some(10.0))],
+            vec![
+                control("a", 10.0, Some(10.0)),
+                control("b", 90.0, Some(10.0)),
+            ],
             vec![sample("d", 50.0)],
         ))
         .expect("screening should be valid");
