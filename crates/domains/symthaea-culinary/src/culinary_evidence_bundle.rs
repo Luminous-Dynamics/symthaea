@@ -65,15 +65,24 @@ impl<'de> Deserialize<'de> for StrictJsonValue {
                 formatter.write_str("a JSON value without duplicate object keys")
             }
 
-            fn visit_bool<E>(self, value: bool) -> Result<Self::Value, E> {
+            fn visit_bool<E>(self, value: bool) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
                 Ok(Value::Bool(value))
             }
 
-            fn visit_i64<E>(self, value: i64) -> Result<Self::Value, E> {
+            fn visit_i64<E>(self, value: i64) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
                 Ok(Value::Number(value.into()))
             }
 
-            fn visit_u64<E>(self, value: u64) -> Result<Self::Value, E> {
+            fn visit_u64<E>(self, value: u64) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
                 Ok(Value::Number(value.into()))
             }
 
@@ -86,19 +95,31 @@ impl<'de> Deserialize<'de> for StrictJsonValue {
                     .ok_or_else(|| E::custom("non-finite JSON number"))
             }
 
-            fn visit_str<E>(self, value: &str) -> Result<Self::Value, E> {
+            fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
                 Ok(Value::String(value.to_owned()))
             }
 
-            fn visit_string<E>(self, value: String) -> Result<Self::Value, E> {
+            fn visit_string<E>(self, value: String) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
                 Ok(Value::String(value))
             }
 
-            fn visit_unit<E>(self) -> Result<Self::Value, E> {
+            fn visit_unit<E>(self) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
                 Ok(Value::Null)
             }
 
-            fn visit_none<E>(self) -> Result<Self::Value, E> {
+            fn visit_none<E>(self) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
                 Ok(Value::Null)
             }
 
