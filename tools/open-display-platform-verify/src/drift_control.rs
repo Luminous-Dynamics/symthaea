@@ -429,6 +429,47 @@ mod tests {
     }
 
     #[test]
+    fn immediately_outside_both_guard_boundaries_is_out_of_band() {
+        let delta = f64::EPSILON * 16.0;
+        let report = screen_drift_controls(&plan(
+            vec![
+                control("lower_inside", 10.0, Some(9.0)),
+                control("lower_outside", 20.0, Some(9.0 - delta)),
+                control("upper_inside", 30.0, Some(11.0)),
+                control("upper_outside", 40.0, Some(11.0 + delta)),
+            ],
+            vec![],
+        ))
+        .expect("finite values around both guard boundaries should validate");
+        assert_eq!(report.controls[0].disposition, ControlDisposition::InBand);
+        assert_eq!(report.controls[1].disposition, ControlDisposition::OutOfBand);
+        assert_eq!(report.controls[2].disposition, ControlDisposition::InBand);
+        assert_eq!(report.controls[3].disposition, ControlDisposition::OutOfBand);
+    }
+
+    #[test]
+    fn adjacent_excursions_preserve_each_control_identity() {
+        let report = screen_drift_controls(&plan(
+            vec![
+                control("pre", 10.0, Some(10.0)),
+                control("bad_a", 30.0, Some(12.0)),
+                control("bad_b", 50.0, None),
+                control("post", 80.0, Some(10.0)),
+            ],
+            vec![sample("during", 40.0)],
+        ))
+        .expect("adjacent bad controls should be preserved");
+        assert_eq!(
+            report.observations[0].disposition,
+            ObservationDisposition::QuarantinedByControlExcursion
+        );
+        assert_eq!(
+            report.observations[0].responsible_control_ids,
+            ["bad_a", "bad_b"]
+        );
+    }
+
+    #[test]
     fn no_detected_excursion_is_not_labeled_physical_pass() {
         let report = screen_drift_controls(&plan(
             vec![control("a", 10.0, Some(10.0)), control("b", 90.0, Some(10.0))],
