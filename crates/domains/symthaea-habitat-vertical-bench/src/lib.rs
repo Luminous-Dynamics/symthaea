@@ -11,6 +11,7 @@ use std::collections::{HashMap, HashSet};
 
 pub mod accounting;
 pub mod scenario_campaign;
+pub mod resilience_options;
 
 use serde_json::Value;
 use symthaea_graph_theory::Graph;
