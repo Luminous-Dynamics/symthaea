@@ -42,7 +42,6 @@ impl MaterialLedgerReport {
 struct AccountSpec {
     account_class: String,
     unit: String,
-    traceability_node_id: Option<String>,
     opening: u64,
     expected_closing: u64,
 }
@@ -51,7 +50,6 @@ struct AccountSpec {
 struct QuantityLine {
     account_id: String,
     quantity: u64,
-    unit: String,
 }
 
 pub fn validate_material_ledger_str(
@@ -171,7 +169,6 @@ pub fn validate_material_ledger(
         let spec = AccountSpec {
             account_class,
             unit,
-            traceability_node_id,
             opening: opening.unwrap_or(0),
             expected_closing: expected_closing.unwrap_or(0),
         };
@@ -462,7 +459,7 @@ fn read_lines(
             Some(spec) if spec.unit != unit => push(issues, "UNIT_MISMATCH", format!("{line_path}.unit"), "line unit differs from account unit"),
             Some(_) => {}
         }
-        result.push(QuantityLine { account_id: account_id.to_owned(), quantity, unit });
+        result.push(QuantityLine { account_id: account_id.to_owned(), quantity });
     }
     result
 }
@@ -629,7 +626,8 @@ mod tests {
     #[test]
     fn duplicate_transaction_sequence_is_rejected() {
         let (mut root, base, events) = fixture_pair();
-        root["transactions"][1]["sequence"] = root["transactions"][0]["sequence"].clone();
+        let first_sequence = root["transactions"][0]["sequence"].clone();
+        root["transactions"][1]["sequence"] = first_sequence;
         let report = validate_material_ledger(&root, &base, &events);
         assert!(has_code(&report, "DUPLICATE_SEQUENCE"));
     }
