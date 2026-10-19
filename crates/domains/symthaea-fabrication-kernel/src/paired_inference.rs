@@ -316,7 +316,12 @@ mod tests {
         let decoded: PairedBootstrapReport = serde_json::from_str(&json).unwrap();
         assert_eq!(report, decoded);
         assert_eq!(decoded.schema_version, PAIRED_INFERENCE_REPORT_SCHEMA_VERSION);
-        assert!(serde_json::from_str::<PairedClusterObservation>(r#"{"unexpected":true}"#).is_err());
+        let mut observation_json = serde_json::to_value(&data[0]).unwrap();
+        observation_json
+            .as_object_mut()
+            .unwrap()
+            .insert("unexpected".to_owned(), serde_json::Value::Bool(true));
+        assert!(serde_json::from_value::<PairedClusterObservation>(observation_json).is_err());
     }
 
     #[test]
