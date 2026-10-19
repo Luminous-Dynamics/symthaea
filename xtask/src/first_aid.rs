@@ -88,6 +88,11 @@ struct ValidationReceipt {
     corpus_sha256: String,
     benchmark_sha256: String,
     schema_sha256: String,
+    validator_source_sha256: String,
+    entrypoint_source_sha256: String,
+    executable_sha256: String,
+    runtime_os: String,
+    runtime_arch: String,
     scenario_count: usize,
     benchmark_count: usize,
     baseline_count: usize,
@@ -118,12 +123,25 @@ pub fn run(
         std::str::from_utf8(&schema_bytes).context("scenario schema must be UTF-8")?,
     )?;
 
+    let validator_source = fs::read(root.join("xtask/src/first_aid.rs"))
+        .context("read first-aid validator source for receipt identity")?;
+    let entrypoint_source = fs::read(root.join("xtask/src/main.rs"))
+        .context("read xtask entrypoint source for receipt identity")?;
+    let executable_path = std::env::current_exe().context("resolve validator executable")?;
+    let executable_bytes = fs::read(&executable_path)
+        .with_context(|| format!("read validator executable {}", executable_path.display()))?;
+
     let receipt = ValidationReceipt {
         receipt_version: "first-aid-contract-receipt-v0",
         status: "contract_validation_passed",
         corpus_sha256: sha256_hex(&corpus_bytes),
         benchmark_sha256: sha256_hex(&benchmark_bytes),
         schema_sha256: sha256_hex(&schema_bytes),
+        validator_source_sha256: sha256_hex(&validator_source),
+        entrypoint_source_sha256: sha256_hex(&entrypoint_source),
+        executable_sha256: sha256_hex(&executable_bytes),
+        runtime_os: std::env::consts::OS.to_string(),
+        runtime_arch: std::env::consts::ARCH.to_string(),
         scenario_count: corpus.scenarios.len(),
         benchmark_count: benchmark.benchmarks.len(),
         baseline_count: benchmark.baselines.len(),
@@ -210,6 +228,32 @@ fn validate_schema_contract(schema: &Value, corpus: &ScenarioCorpus) -> Result<(
         if !top_required.iter().any(|v| v.as_str() == Some(field)) {
             bail!("schema top-level required list omits {field}");
         }
+    }
+
+    if schema
+        .pointer("/properties/scenarios/items/additionalProperties")
+        .and_then(Value::as_bool)
+        != Some(false)
+    {
+        bail!("scenario schema must reject unknown scenario fields");
+    }
+    if schema
+        .pointer("/properties/scenarios/items/properties/synthetic_only/const")
+        .and_then(Value::as_bool)
+        != Some(true)
+        || schema
+            .pointer("/properties/scenarios/items/properties/clinical_content_required/const")
+            .and_then(Value::as_bool)
+            != Some(true)
+    {
+        bail!("scenario schema must keep fixtures synthetic and clinical content separately required");
+    }
+    if schema
+        .pointer("/properties/scenarios/items/properties/scenario_id/pattern")
+        .and_then(Value::as_str)
+        != Some("^FA-[0-9]{3}$")
+    {
+        bail!("scenario schema must pin the FA-### scenario ID format");
     }
 
     let scenario_required = schema
