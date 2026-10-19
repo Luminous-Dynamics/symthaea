@@ -841,6 +841,7 @@ struct FaultMatrixReport {
     suite_id: String,
     status: String,
     source_commit: String,
+    toolchain_id: String,
     build_identity: String,
     matrix_sha256: String,
     manifest_sha256: String,
@@ -1177,11 +1178,15 @@ pub fn run_benchmark(
     manifest_path: &Path,
     matrix_path: &Path,
     source_commit: &str,
+    toolchain_id: &str,
     output_path: Option<&Path>,
 ) -> Result<()> {
     let valid_commit_length = source_commit.len() == 40 || source_commit.len() == 64;
     if !valid_commit_length || !source_commit.bytes().all(|byte| byte.is_ascii_hexdigit()) {
         bail!("--source-commit must be a full 40- or 64-character hexadecimal commit ID");
+    }
+    if toolchain_id.trim().is_empty() {
+        bail!("--toolchain-id must contain the exact rustc/cargo toolchain identity");
     }
     let manifest_raw = fs::read(manifest_path)
         .with_context(|| format!("reading telemetry manifest {}", manifest_path.display()))?;
@@ -1234,12 +1239,12 @@ pub fn run_benchmark(
         suite_id,
         status: if failed_count == 0 { "pass" } else { "fail" }.to_owned(),
         source_commit: source_commit.to_owned(),
+        toolchain_id: toolchain_id.trim().to_owned(),
         build_identity: format!(
-            "xtask_package_version={};target={}-{};rustc_version={}",
+            "xtask_package_version={};target={}-{}",
             env!("CARGO_PKG_VERSION"),
             std::env::consts::ARCH,
-            std::env::consts::OS,
-            option_env!("RUSTC_VERSION").unwrap_or("not_embedded")
+            std::env::consts::OS
         ),
         matrix_sha256: format!("sha256:{:x}", Sha256::digest(&matrix_raw)),
         manifest_sha256: format!("sha256:{:x}", Sha256::digest(&manifest_raw)),
