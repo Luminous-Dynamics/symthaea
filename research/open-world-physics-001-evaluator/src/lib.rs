@@ -656,6 +656,16 @@ mod tests {
         assert!(law.predict(f64::INFINITY).is_none());
         assert!(Law { amplitude: f64::NAN, ..law }.predict(1.0).is_none());
         assert!(Law { exponent: 0.0, ..law }.predict(1.0).is_none());
+        assert!(Law { scale: f64::NAN, ..law }.predict(1.0).is_some());
+        assert!(
+            Law {
+                family: LawFamily::ScreenedInversePower,
+                scale: f64::NAN,
+                ..law
+            }
+            .predict(1.0)
+            .is_none()
+        );
     }
 
     #[test]
