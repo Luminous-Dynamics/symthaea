@@ -540,7 +540,7 @@ mod tests {
         fixture["sources"][0]["permitted_current_use"] =
             json!(["public_metadata_review", "schema_audit"]);
         fixture["sources"][0]["training_authorized"] = json!(false);
-        assert_eq!(validate_source_manifest(&fixture).unwrap(), 13);
+        assert_eq!(validate_source_manifest(&fixture).unwrap(), 14);
     }
 
     #[test]
