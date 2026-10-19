@@ -23,8 +23,10 @@ jobs:
     name: MUS-DOE schema, leakage tests and fixture audit
     runs-on: ubuntu-latest
     steps:
-      - name: Check out repository
+      - name: Check out exact PR head (or pushed commit)
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Install stable Rust
         uses: dtolnay/rust-toolchain@stable
       - name: Check formatting
@@ -44,7 +46,7 @@ jobs:
       - name: Upload synthetic DOE receipts
         uses: actions/upload-artifact@v4
         with:
-          name: mus-doe-receipts-${{ github.sha }}
+          name: mus-doe-receipts-${{ github.event.pull_request.head.sha || github.sha }}
           path: artifacts/mus-doe/
           if-no-files-found: error
           retention-days: 90
