@@ -3,7 +3,7 @@
 set -eu
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 CHECKER="$ROOT/verify-attestation-predicate.sh"
-SCHEMA="$ROOT/../../../../schemas/rea-provider-smoke-attestation-v1.schema.json"
+SCHEMA="$ROOT/../../../schemas/rea-provider-smoke-attestation-v1.schema.json"
 fail(){ printf 'FAIL: %s\n' "$*" >&2; exit 1; }
 command -v jq >/dev/null 2>&1 || fail "jq required"
 command -v sha256sum >/dev/null 2>&1 || fail "sha256sum required"
