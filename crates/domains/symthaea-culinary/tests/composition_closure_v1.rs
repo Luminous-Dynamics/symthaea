@@ -97,3 +97,18 @@ fn broad_uncertainty_must_not_strengthen_closure_disposition() {
     let result = check_proximate_composition_closure_v1(&value).unwrap();
     assert_eq!(result.disposition, D::Indeterminate);
 }
+
+#[test]
+fn known_lower_bound_above_acceptance_band_stays_outside_with_missing_data() {
+    let mut value = fixture();
+    value["components"][0]["value"] = json!(70.0);
+    value["components"][0]["lower"] = json!(70.0);
+    value["components"][0]["upper"] = json!(70.0);
+    value["components"].as_array_mut().unwrap().pop();
+    value["unavailable_components"] = json!([{
+        "component_id":"alcohol","reason":"not_analyzed","detail":"synthetic missingness case"
+    }]);
+    let result = check_proximate_composition_closure_v1(&value).unwrap();
+    assert_eq!(result.disposition, D::OutsideAcceptable);
+    assert!(result.upper_sum_g_per_100g.is_none());
+}
