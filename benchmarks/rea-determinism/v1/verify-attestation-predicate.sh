@@ -59,7 +59,8 @@ jq -e \
     $receipt[0].qualification=={tier:"unblob-provider-smoke",rea_cli_mcp_parity:false,firmware_execution:false,emulation:false,device_qualification:false} and
     (.providerRun|type)=="object" and
     (keys|sort)==["attestationRun","evidenceTier","limitations","predicateType","providerRun","qualification","repository","schemaVersion","subject"] and
-    (.providerRun|keys|sort)==["checkoutCommitSha","event","providerMetamorphicVariants","providerVersion","ref","runId","semanticMutationProjectionSha256","semanticProjectionSha256","sourceHeadSha","url","workflow"] and
+    (.providerRun|keys|sort)==["checkoutCommitSha","event","providerMetamorphicVariants","providerVersion","ref","runId","semanticMutationProjectionSha256","semanticProjectionSha256","sourceHeadSha","url","workflow","workflowDatabaseId"] and
+    .providerRun.workflowDatabaseId==389295795 and
     .providerRun.runId==$provider_run and .providerRun.url==$provider_url and
     .providerRun.workflow=="REA Pinned Provider Smoke" and .providerRun.event=="push" and .providerRun.ref=="refs/heads/main" and
     .providerRun.sourceHeadSha==$source and .providerRun.checkoutCommitSha==$source and .providerRun.providerVersion=="26.6.4" and
