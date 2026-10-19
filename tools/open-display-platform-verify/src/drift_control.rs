@@ -467,8 +467,13 @@ pub fn validate_drift_control_plan_str(
 mod tests {
     use super::{
         ControlDisposition, DriftControlPlan, DutObservation, ObservationDisposition,
-        ScheduledControl, screen_drift_controls,
+        ScheduledControl, screen_drift_controls, validate_drift_control_plan_str,
     };
+
+    const DRIFT_PLAN_TEXT: &str =
+        include_str!("../../../docs/engineering/display-drift-control-plan-v0.1.json");
+    const DRIFT_SCHEMA_TEXT: &str =
+        include_str!("../../../docs/engineering/display-drift-control-plan.schema.json");
 
     fn control(id: &str, time_seconds: f64, value: Option<f64>) -> ScheduledControl {
         ScheduledControl {
@@ -494,6 +499,32 @@ mod tests {
             controls,
             dut_observations,
         }
+    }
+
+    #[test]
+    fn checked_in_synthetic_plan_produces_expected_quarantine_report() {
+        let report = validate_drift_control_plan_str(DRIFT_PLAN_TEXT, DRIFT_SCHEMA_TEXT)
+            .expect("the checked-in synthetic plan must validate");
+        assert_eq!(report.plan_id, "ODRH-DRIFT-PLAN-SYNTHETIC-001");
+        assert_eq!(report.measurand, "synthetic check-standard response");
+        assert_eq!(report.unit, "arbitrary_units");
+        assert_eq!(report.screening.controls.len(), 3);
+        assert_eq!(report.screening.observations[0].disposition, ObservationDisposition::NoOutOfBandControlDetected);
+        assert_eq!(report.screening.observations[1].disposition, ObservationDisposition::QuarantinedByControlExcursion);
+        assert_eq!(report.screening.observations[1].responsible_control_ids, ["CONTROL-EXCURSION"]);
+        assert_eq!(report.screening.observations[2].disposition, ObservationDisposition::NoOutOfBandControlDetected);
+        assert!(report.to_json()["claim_ceiling"].as_str().is_some_and(|text| text.contains("No physical instrument")));
+    }
+
+    #[test]
+    fn drift_plan_refuses_promotion_to_a_physical_run() {
+        let mut plan: serde_json::Value =
+            serde_json::from_str(DRIFT_PLAN_TEXT).expect("plan fixture must parse");
+        plan["record_state"] = serde_json::Value::String("ACQUIRED_UNQUALIFIED".to_owned());
+        let mutated = serde_json::to_string(&plan).expect("mutated plan must serialize");
+        let errors = validate_drift_control_plan_str(&mutated, DRIFT_SCHEMA_TEXT)
+            .expect_err("synthetic drift algorithm must not qualify physical runs");
+        assert!(errors.iter().any(|error| error.contains("SYNTHETIC_TEST_ONLY")));
     }
 
     #[test]
