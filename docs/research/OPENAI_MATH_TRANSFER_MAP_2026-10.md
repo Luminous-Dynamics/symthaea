@@ -88,6 +88,16 @@ Extend existing interval/certificate work (including the exp-related direction i
 
 **Benchmarks:** sound enclosure on a frozen input grid; zero false-separated rankings; seeded near-ties; underflow/overflow and extreme-domain rejection; certificate replay with exact source/rounding identities. Keep the interval algorithm itself under test and do not use approximate agreement as proof authority.
 
+## Second-pass scan: additional formalized upstream families
+
+The pinned upstream formalization catalogue at [`lean/formalization.yaml`](https://github.com/openai/math/blob/1581d4cbdd69a0faf34b2089614fe2a814316a6/lean/formalization.yaml) lists further candidates beyond entropy:
+
+- **Memory–sample lower bounds for noiseless Gaussian regression** ([formalization scope](https://github.com/openai/math/blob/1581d4cbdd69a0faf34b2089614fe2a814316a6/lean/docs/140.md), blob `dbabe31e00bf52ef24a4633980ff3794fb1e8127`). The formalized model studies exact noiseless Gaussian observations and bounds how many observations are required at a given memory budget and angular accuracy. Potential use: an impossibility/feasibility lens for memory-constrained inference and representation compression. Its assumptions are too specific to directly establish lower bounds for Symthaea's HDC encodings or learned, noisy, non-Gaussian inputs. First task: translate a narrowly matched synthetic observation model and test whether our memory accounting matches the theorem's bit model.
+- **Subpolynomial query complexity for well-conditioned log-concave sampling** ([formalization scope](https://github.com/openai/math/blob/1581d4cbdd69a0faf34b2089614fe2a814316a6/lean/docs/139.md), blob `323bb69fdd61aaa00418330c794a19f6b2efc368`). Its conditions include a potential with `V(0)=0`, `grad V(0)=0`, and `I <= Hessian(V) <= 2I`; the stated result concerns value/gradient query complexity and total-variation accuracy, not wall-clock cost or bit complexity. Potential use: study sampling-based inference only for explicitly convex/well-conditioned synthetic models. First task: check whether a target distribution actually satisfies those assumptions before comparing query budgets.
+- **Posterior replicas and conditional information in Gaussian regression** (catalogued with the same family as the memory–sample lower bounds) may inform independent-sample and information-accounting tests. It does not establish posterior calibration for an arbitrary production agent.
+
+These are useful because they expose resource limits and model assumptions—not because their conclusions automatically transfer. They remain lower priority than fixing #6216's already-characterized action-invariant epistemic score.
+
 ## Broader math-transfer opportunities
 
 | Priority | Candidate mathematics | Symthaea capability | First falsifiable result |
