@@ -1,6 +1,6 @@
 # CropFoundry dataset discovery inventory v0
 
-**Snapshot date:** 2026-10-18  
+**Snapshot date:** 2026-10-19  
 **Status:** discovery shortlist only; no external dataset files have been downloaded, parsed, normalized, or scored for this PR.  
 **Purpose:** make the first data-ingestion decision auditable, rights-aware, and matched to a real benchmark question.
 
