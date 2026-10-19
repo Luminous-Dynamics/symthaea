@@ -805,7 +805,8 @@ mod tests {
                 for (index, left_value) in &left {
                     if let Some(right_value) = right.get(index) {
                         assert_eq!(
-                            left_value, right_value,
+                            left_value,
+                            right_value,
                             "shared observation differs for surface {}, index {index}, policies {} and {}",
                             surface.name(),
                             pair[0].name(),
