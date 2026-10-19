@@ -1,0 +1,29 @@
+{
+  "schema_version": "symthaea.rea-differential-oracle.v1",
+  "corpus_id": "rea-differential-v1",
+  "case_id": "contract-example-001",
+  "source": {
+    "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "byte_length": 10
+  },
+  "expected_regions": [
+    {
+      "kind": "container",
+      "start": 0,
+      "end": 7
+    },
+    {
+      "kind": "trailing-padding",
+      "start": 7,
+      "end": 10
+    }
+  ],
+  "expected_files": [
+    {
+      "path": "root/payload.txt",
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "byte_length": 4,
+      "logical_id": "payload-001"
+    }
+  ]
+}
