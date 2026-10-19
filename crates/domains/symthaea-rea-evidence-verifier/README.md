@@ -6,11 +6,13 @@ A small Rust CLI for independently checking a downloaded Unblob provider-smoke e
 
 - The independently supplied source-head SHA matches the receipt's source head.
 - The receipt schema and qualification ceiling are exactly the supported Unblob 26.6.4 provider-smoke tier; provider-only evidence cannot claim REA CLI/MCP parity, firmware execution, emulation, or device qualification.
-- SHA-256 identities of the checked-out normalizer, fixture manifest, oracle, provider-smoke script, and provider-metamorphic script match the source receipt.
+- SHA-256 identities of the checked-out normalizer, fixture manifest, oracle, exact Python dependency lock, provider-smoke script, and provider-metamorphic script match the source receipt.
+- The resolved `pip freeze` matches the checked-in version lock byte-for-byte; original and mutated gzip sources match their expected input digests.
 - Baseline and mutated input/payload manifests match the actual input and source payload files.
 - Raw provider report files and semantic projection files match their receipt digests; equivalent runs have equal projection digests, while the controlled semantic change has a different digest.
 - Extracted payload files match independent expected hashes.
 - The provider-metamorphic sub-receipt is byte-bound to the outer receipt and agrees on report, normalizer, projection, and variant-count identities.
+- A sorted bundle manifest covers every produced artifact file except the outer receipt and the manifest itself; missing, extra, symlinked, malformed, or digest-mismatched files are rejected.
 - Receipt and digest-manifest inputs are bounded; symlinked files and extraction-search roots are rejected.
 
 ## Build and test
@@ -37,4 +39,4 @@ That produces verification_mode set to receipt-digest-anchored only when the dig
 
 ## Claims ceiling
 
-This checks internal consistency and file digests, not authorship or a digital signature. A malicious party able to rewrite every artifact file and the receipt can construct a new self-consistent bundle; an independent receipt digest or signed CI attestation is needed to anchor it. Even anchored, the evidence only qualifies one pinned Unblob CLI smoke on inert generated fixtures. It does not establish extraction completeness for arbitrary firmware, content safety, REA CLI/MCP parity, firmware behavior, or device qualification.
+The provider dependency lock pins the observed Linux/Python 3.12 package set by version, not by wheel hash; it reduces resolver drift but is not a supply-chain signature or hermetic build proof. This checks internal consistency and file digests, not authorship or a digital signature. A malicious party able to rewrite every artifact file and the receipt can construct a new self-consistent bundle; an independent receipt digest or signed CI attestation is needed to anchor it. Even anchored, the evidence only qualifies one pinned Unblob CLI smoke on inert generated fixtures. It does not establish extraction completeness for arbitrary firmware, content safety, REA CLI/MCP parity, firmware behavior, or device qualification.
