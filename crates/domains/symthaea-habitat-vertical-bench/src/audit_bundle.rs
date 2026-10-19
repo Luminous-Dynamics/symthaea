@@ -140,7 +140,7 @@ pub fn validate_audit_bundle(
     let known_ids: HashSet<&str> = artifacts.iter().map(|(id, _, _, _)| *id).collect();
     let Some(rows) = manifest.get("artifacts").and_then(Value::as_array) else {
         push(&mut issues, "ARTIFACTS_ARRAY_MISSING", "artifacts", "artifacts must be a JSON array");
-        return report(issues, 0, 0, 0, 0, BTreeMap::new(), BTreeMap::new());
+        return report(issues, BTreeMap::new(), 0, 0, 0, BTreeMap::new());
     };
 
     let mut manifest_by_id: HashMap<String, &Value> = HashMap::new();
@@ -199,28 +199,28 @@ pub fn validate_audit_bundle(
     // Re-run all component validators; the manifest cannot override their findings.
     let structural = crate::validate_fixture(base);
     if !structural.is_valid() {
-        for finding in structural.issues {
+        for finding in &structural.issues {
             push(&mut issues, "STRUCTURAL_COMPONENT_INVALID", format!("base.{}", finding.path), format!("{}: {}", finding.code, finding.message));
         }
     }
 
     let event_report = crate::event_replay::validate_event_log(events, base);
     if !event_report.is_valid() {
-        for finding in event_report.issues {
+        for finding in &event_report.issues {
             push(&mut issues, "EVENT_COMPONENT_INVALID", format!("events.{}", finding.path), format!("{}: {}", finding.code, finding.message));
         }
     }
 
     let ledger_report = crate::material_ledger::validate_material_ledger(ledger, base, events);
     if !ledger_report.is_valid() {
-        for finding in ledger_report.issues {
+        for finding in &ledger_report.issues {
             push(&mut issues, "LEDGER_COMPONENT_INVALID", format!("ledger.{}", finding.path), format!("{}: {}", finding.code, finding.message));
         }
     }
 
     let measurement_report = crate::measurement_gate::validate_measurement_gate(measurements);
     if !measurement_report.is_valid() {
-        for finding in measurement_report.issues {
+        for finding in &measurement_report.issues {
             push(&mut issues, "MEASUREMENT_COMPONENT_INVALID", format!("measurements.{}", finding.path), format!("{}: {}", finding.code, finding.message));
         }
     }
