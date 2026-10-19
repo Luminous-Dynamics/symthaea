@@ -217,6 +217,14 @@
       "expected": "ineligible",
       "diagnostic": "uncertainty_budget_exceeds_tolerance",
       "rust_test": "budget_above_tolerance_blocks_physical_claim"
+    },
+    {
+      "id": "CLAIM-007",
+      "category": "uncertainty_gate",
+      "mutation": "calculated_but_unverified_uncertainty_budget",
+      "expected": "ineligible",
+      "diagnostic": "uncertainty_budget_not_verified",
+      "rust_test": "calculated_uncertainty_budget_is_not_physical_evidence"
     }
   ],
   "hardware_targets": [
