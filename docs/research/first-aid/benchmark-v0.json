@@ -170,6 +170,15 @@
       "target": "100% of injected revocation/rollback cases handled per approved lifecycle policy.",
       "gate": "No downgrade or expiry bypass.",
       "claim_ceiling": "Publisher/governance processes require separate qualification."
+    },
+    {
+      "id": "FA-BM-016",
+      "name": "Guideline-to-runtime semantic fidelity",
+      "category": "content-compiler",
+      "measure": "Fraction of independently adjudicated source-requirement and boundary test cases whose compiled bundle interpretation and runtime disposition match a frozen source-to-requirement mapping; report every critical divergence.",
+      "target": "100% of locked known-answer cases pass and 100% of source requirements in scope have an explicit mapping or documented exclusion.",
+      "gate": "Any critical semantics-changing divergence blocks the bundle; unknown/ambiguous source requirements remain unresolved and cannot be silently compiled into a clinical action.",
+      "claim_ceiling": "Conformance to a reviewed mapping/test set only; does not establish the source guideline's clinical correctness or patient benefit."
     }
   ],
   "split_policy": {
