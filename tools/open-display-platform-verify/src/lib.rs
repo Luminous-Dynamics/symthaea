@@ -1424,16 +1424,38 @@ mod tests {
             "calibration_state":"VALID",
             "calibration_record_digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             "calibration_valid_through":"2026-12-31",
+            "calibration_record_artifact_id":"ODRH-ART-CAL-POWER-001",
+            "capability_profile_artifact_id":"ODRH-ART-CAP-POWER-001",
+            "capability_profile_sha256":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "capability_profile_status":"DECLARED_UNREVIEWED",
             "supported_measurands":["task-window input energy"]
         }]);
-        record["raw_artifacts"] = serde_json::json!([{
-            "artifact_id":"ODRH-ART-POWER-TRACE-001",
-            "sha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-            "media_type":"text/csv",
-            "storage_uri":"https://example.invalid/synthetic-trace.csv",
-            "byte_length":100,
-            "role":"POWER_TRACE"
-        }]);
+        record["raw_artifacts"] = serde_json::json!([
+            {
+                "artifact_id":"ODRH-ART-POWER-TRACE-001",
+                "sha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "media_type":"text/csv",
+                "storage_uri":"https://example.invalid/synthetic-trace.csv",
+                "byte_length":100,
+                "role":"POWER_TRACE"
+            },
+            {
+                "artifact_id":"ODRH-ART-CAL-POWER-001",
+                "sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "media_type":"application/pdf",
+                "storage_uri":"https://example.invalid/power-calibration.pdf",
+                "byte_length":300,
+                "role":"INSTRUMENT_CALIBRATION"
+            },
+            {
+                "artifact_id":"ODRH-ART-CAP-POWER-001",
+                "sha256":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+                "media_type":"application/json",
+                "storage_uri":"https://example.invalid/power-capability.json",
+                "byte_length":200,
+                "role":"INSTRUMENT_CAPABILITY_PROFILE"
+            }
+        ]);
         record["observations"][0]["status"] = Value::String("MEASURED_UNQUALIFIED".to_owned());
         record["observations"][0]["value"] = serde_json::json!(10.0);
         record["observations"][0]["expanded_uncertainty"] = serde_json::json!(1.1);
@@ -1485,16 +1507,38 @@ mod tests {
             "calibration_state":"VALID",
             "calibration_record_digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             "calibration_valid_through":"2026-12-31",
+            "calibration_record_artifact_id":"ODRH-ART-CAL-POWER-001",
+            "capability_profile_artifact_id":"ODRH-ART-CAP-POWER-001",
+            "capability_profile_sha256":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "capability_profile_status":"DECLARED_UNREVIEWED",
             "supported_measurands":["task-window input energy"]
         }]);
-        record["raw_artifacts"] = serde_json::json!([{
-            "artifact_id":"ODRH-ART-POWER-TRACE-001",
-            "sha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-            "media_type":"text/csv",
-            "storage_uri":"https://example.invalid/uncertainty-power.csv",
-            "byte_length":100,
-            "role":"POWER_TRACE"
-        }]);
+        record["raw_artifacts"] = serde_json::json!([
+            {
+                "artifact_id":"ODRH-ART-POWER-TRACE-001",
+                "sha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "media_type":"text/csv",
+                "storage_uri":"https://example.invalid/uncertainty-power.csv",
+                "byte_length":100,
+                "role":"POWER_TRACE"
+            },
+            {
+                "artifact_id":"ODRH-ART-CAL-POWER-001",
+                "sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "media_type":"application/pdf",
+                "storage_uri":"https://example.invalid/power-calibration.pdf",
+                "byte_length":300,
+                "role":"INSTRUMENT_CALIBRATION"
+            },
+            {
+                "artifact_id":"ODRH-ART-CAP-POWER-001",
+                "sha256":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+                "media_type":"application/json",
+                "storage_uri":"https://example.invalid/power-capability.json",
+                "byte_length":200,
+                "role":"INSTRUMENT_CAPABILITY_PROFILE"
+            }
+        ]);
         record["observations"][0]["status"] = Value::String("MEASURED_UNQUALIFIED".to_owned());
         record["observations"][0]["value"] = serde_json::json!(10.0);
         record["observations"][0]["expanded_uncertainty"] = serde_json::json!(expanded);
@@ -1565,6 +1609,10 @@ mod tests {
                 "calibration_state":"VALID",
                 "calibration_record_digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
                 "calibration_valid_through":"2026-12-31",
+                "calibration_record_artifact_id":"ODRH-ART-CAL-POWER-001",
+                "capability_profile_artifact_id":"ODRH-ART-CAP-POWER-001",
+                "capability_profile_sha256":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+                "capability_profile_status":"DECLARED_UNREVIEWED",
                 "supported_measurands":["task-window input energy"]
             },
             {
@@ -1595,6 +1643,22 @@ mod tests {
                 "storage_uri":"https://example.invalid/camera.png",
                 "byte_length":200,
                 "role":"OPTICAL_TRACE"
+            },
+            {
+                "artifact_id":"ODRH-ART-CAL-POWER-001",
+                "sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "media_type":"application/pdf",
+                "storage_uri":"https://example.invalid/power-calibration.pdf",
+                "byte_length":300,
+                "role":"INSTRUMENT_CALIBRATION"
+            },
+            {
+                "artifact_id":"ODRH-ART-CAP-POWER-001",
+                "sha256":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+                "media_type":"application/json",
+                "storage_uri":"https://example.invalid/power-capability.json",
+                "byte_length":200,
+                "role":"INSTRUMENT_CAPABILITY_PROFILE"
             }
         ]);
         record["observations"][0]["status"] = Value::String("MEASURED_UNQUALIFIED".to_owned());
@@ -1627,7 +1691,7 @@ mod tests {
         let report = validate_measurement_run_str(&encoded(&record), RUN_SCHEMA_TEXT)
             .expect("unsupported metric may retain raw evidence without claiming a result");
         assert_eq!(report.record_state, "ACQUIRED_UNQUALIFIED");
-        assert_eq!(report.raw_artifact_count, 2);
+        assert_eq!(report.raw_artifact_count, 4);
     }
 
     #[test]
