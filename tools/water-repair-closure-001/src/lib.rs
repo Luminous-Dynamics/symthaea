@@ -49,6 +49,7 @@ pub enum Profile {
 #[serde(deny_unknown_fields)]
 pub struct EventEvidence {
     pub event_id: String,
+    pub content_payload: String,
     pub content_sha256: String,
     pub delivered_copies: u32,
     pub content_conflict: bool,
@@ -260,6 +261,9 @@ pub fn validate_input_corpus(corpus: &InputCorpus) -> Result<(), String> {
         if !is_sha256_hex(&case.event.content_sha256) {
             return Err(format!("invalid event content SHA-256 in {}", case.case_id));
         }
+        if sha256_hex(case.event.content_payload.as_bytes()) != case.event.content_sha256 {
+            return Err(format!("event content SHA-256 does not match payload in {}", case.case_id));
+        }
     }
     Ok(())
 }
@@ -308,13 +312,13 @@ pub fn evaluate_all(corpus: &InputCorpus) -> Result<Vec<CaseResult>, String> {
 pub fn evaluate_case(case: &RepairCase) -> CaseResult {
     let duplicate_delivery_idempotent =
         case.event.delivered_copies > 1 && !case.event.content_conflict;
-    let semantic_effect_count = if case.event.content_conflict { 0 } else { 1 };
-
     let finish = |disposition, reason: &str| CaseResult {
         case_id: case.case_id.clone(),
         disposition,
         reason_codes: vec![reason.to_owned()],
-        semantic_effect_count,
+        // Only an accepted profile-scoped completion may have a domain effect.
+        // Blocked, incomplete, indeterminate and rejected inputs are non-mutating.
+        semantic_effect_count: if disposition == Disposition::VerifiedWithinProfile { 1 } else { 0 },
         duplicate_delivery_idempotent,
     };
 
@@ -550,6 +554,21 @@ mod tests {
         let result = evaluate_case(&case);
         assert_eq!(result.disposition, Disposition::Rejected);
         assert_eq!(result.semantic_effect_count, 0);
+    }
+
+    #[test]
+    fn missing_authorization_cannot_create_a_domain_effect() {
+        let case = frozen_inputs().cases.into_iter().find(|c| c.case_id == "WR-18").unwrap();
+        let result = evaluate_case(&case);
+        assert_eq!(result.disposition, Disposition::Rejected);
+        assert_eq!(result.semantic_effect_count, 0);
+    }
+
+    #[test]
+    fn event_payload_digest_is_actually_verified() {
+        let mut corpus = frozen_inputs();
+        corpus.cases[0].event.content_payload.push_str("|tampered");
+        assert!(validate_input_corpus(&corpus).is_err());
     }
 
     #[test]
