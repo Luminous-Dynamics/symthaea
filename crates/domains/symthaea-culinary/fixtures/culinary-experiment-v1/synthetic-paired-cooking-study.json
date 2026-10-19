@@ -155,7 +155,8 @@
             }
           ]
         }
-      ]
+      ],
+      "randomization_method": "synthetic-counterbalanced-order-v1"
     },
     {
       "block_id": "synthetic-block-002",
@@ -281,7 +282,8 @@
             }
           ]
         }
-      ]
+      ],
+      "randomization_method": "synthetic-counterbalanced-order-v1"
     }
   ]
 }
