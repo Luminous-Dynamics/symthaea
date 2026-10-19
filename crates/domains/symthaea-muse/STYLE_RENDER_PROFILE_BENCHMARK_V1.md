@@ -204,6 +204,54 @@ Targets for the first pilot (proposed, not existing results):
   positive/negative gesture tests, non-silence checks, and blinded human review.
   Do not count unavailable or untested notes as successful proficiency.
 
+## Next paradigm: compositional-control contract tests
+
+A style preset should become a **testable set of counterfactual promises**, not a
+bag of correlated style labels. The factorial profile probe is the first step:
+it estimates room-only and mastering-only changes on fixed MIDI, then exposes
+their interaction. The next benchmark should generalize that design to declared
+control axes—dialect, room, mastering, ensemble, articulation, timing, dynamics,
+and structure—without letting one metric stand in for all of them.
+
+For each control, freeze the input and perturb only that control. Record (a) the
+intended target change, (b) non-target attributes that should remain invariant,
+(c) pairwise interaction effects, and (d) failure/unsupported combinations.
+Then run selected combined-control cases to measure whether the system composes
+requests or silently drops / entangles them. Keep renderer-level tests on the
+same symbolic input separate from generation-level tests where changing a style
+is expected to change the score. A style change is not a clean room-control
+ablation.
+
+Proposed starting gates, explicitly engineering targets rather than established
+field standards:
+
+- **Contract completeness:** 100% of shipped controls have a versioned definition
+  of the intended effect, allowed range, invariants, and explicit unsupported
+  states.
+- **Execution fidelity:** 100% of requested render-profile settings are recorded
+  in the receipt and the executed settings match them; zero silent fallback.
+- **Counterfactual isolation:** in a same-MIDI single-control sweep, the intended
+  channel changes by a preregistered detectable amount in 8/8 dialect cases,
+  while declared invariant channels remain inside preregistered tolerance bands.
+  Establish practical tolerances from repeated-render noise first; do not invent
+  a universal threshold for every audio metric.
+- **Composition:** all preregistered supported pairwise control combinations
+  complete, with interaction terms and failed combinations reported rather than
+  averaged away.
+- **Human validation:** pre-register one primary style-fit / preference endpoint
+  and one non-inferiority endpoint for overall quality. Use listener-clustered
+  uncertainty and randomized presentation; metric gains alone do not accept a
+  profile.
+
+A closely related external frontier is compositional instruction evaluation:
+CMI-RewardBench (ICML 2026) evaluates music reward models on musicality,
+text–music alignment, and compositional-instruction alignment, with both
+pseudo-labelled and human-annotated preference resources. It is a useful external
+reference for instruction-compliance evaluation, but it is not ground truth for
+our symbolic music grammar or for instrument proficiency. See
+https://proceedings.mlr.press/v306/ma26am.html and the official evaluation
+toolkit at https://github.com/Haiwen-Xia/CMI-RewardBench.
+
 ## Dataset and metric boundary
 
 MTG-Jamendo provides a large multi-label reference for instrument, genre, and
