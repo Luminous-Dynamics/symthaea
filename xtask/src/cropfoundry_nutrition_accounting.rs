@@ -26,6 +26,16 @@ enum ConcentrationProvenance {
     ModelEstimate,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum UncertaintyIntervalKind {
+    ConfidenceInterval95,
+    CredibleInterval95,
+    MeasurementTolerance,
+    SensitivityBounds,
+    ObservedRange,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct NutritionAccountingInput {
     schema_version: String,
@@ -37,13 +47,23 @@ struct NutritionAccountingInput {
     concentration_provenance: ConcentrationProvenance,
     concentration_evidence_uri: Option<String>,
     assay_method: Option<String>,
+    concentration_lower_mg_per_kg: Option<f64>,
+    concentration_upper_mg_per_kg: Option<f64>,
     edible_mass_kg_at_concentration_stage: Option<f64>,
     edible_mass_basis_at_concentration_stage: Option<MassBasis>,
+    edible_mass_lower_kg_at_concentration_stage: Option<f64>,
+    edible_mass_upper_kg_at_concentration_stage: Option<f64>,
     servings_in_batch: Option<u64>,
     retention_fraction: Option<f64>,
     retention_evidence_uri: Option<String>,
+    retention_lower_fraction: Option<f64>,
+    retention_upper_fraction: Option<f64>,
     bioavailability_fraction: Option<f64>,
     bioavailability_evidence_uri: Option<String>,
+    bioavailability_lower_fraction: Option<f64>,
+    bioavailability_upper_fraction: Option<f64>,
+    uncertainty_interval_kind: Option<UncertaintyIntervalKind>,
+    uncertainty_evidence_uri: Option<String>,
     water_liters: Option<f64>,
     land_square_meters: Option<f64>,
     energy_kwh: Option<f64>,
@@ -65,6 +85,11 @@ struct NutritionAccountingReceipt {
     measured_nutrient_mass_delivered_mg: Option<f64>,
     modeled_nutrient_mass_delivered_mg: Option<f64>,
     estimated_bioavailable_nutrient_mass_delivered_mg: Option<f64>,
+    nutrient_mass_delivered_interval_lower_mg: Option<f64>,
+    nutrient_mass_delivered_interval_upper_mg: Option<f64>,
+    bioavailable_nutrient_mass_delivered_interval_lower_mg: Option<f64>,
+    bioavailable_nutrient_mass_delivered_interval_upper_mg: Option<f64>,
+    uncertainty_interval_kind: Option<UncertaintyIntervalKind>,
     nutrient_mg_per_serving: Option<f64>,
     estimated_bioavailable_nutrient_mg_per_serving: Option<f64>,
     nutrient_mg_per_liter_water: Option<f64>,
@@ -88,6 +113,44 @@ fn ratio(numerator: Option<f64>, denominator: Option<f64>) -> Option<f64> {
     numerator
         .zip(denominator)
         .and_then(|(n, d)| (n.is_finite() && d.is_finite() && n >= 0.0 && d > 0.0).then_some(n / d))
+}
+
+fn validate_bound_pair(
+    label: &str,
+    lower: Option<f64>,
+    upper: Option<f64>,
+    point: Option<f64>,
+    fraction: bool,
+    issues: &mut Vec<String>,
+) -> bool {
+    match (lower, upper) {
+        (None, None) => false,
+        (Some(low), Some(high)) => {
+            let valid = if fraction {
+                valid_fraction(low) && valid_fraction(high)
+            } else {
+                valid_nonnegative(low) && valid_nonnegative(high)
+            };
+            if !valid {
+                issues.push(format!("{label} bounds must be finite and in the permitted range"));
+            }
+            if low > high {
+                issues.push(format!("{label} lower bound exceeds upper bound"));
+            }
+            if let Some(value) = point {
+                if value.is_finite() && (value < low || value > high) {
+                    issues.push(format!("{label} point estimate is outside the declared bounds"));
+                }
+            } else {
+                issues.push(format!("{label} bounds require a point estimate"));
+            }
+            true
+        }
+        _ => {
+            issues.push(format!("{label} lower and upper bounds must be provided together"));
+            true
+        }
+    }
 }
 
 fn has_nonblank(value: Option<&str>) -> bool {
@@ -181,6 +244,78 @@ fn audit_input(input: NutritionAccountingInput) -> NutritionAccountingReceipt {
     if input.servings_in_batch == Some(0) {
         issues.push("servings_in_batch must be greater than zero when supplied".to_owned());
     }
+
+    let concentration_bounds = validate_bound_pair(
+        "concentration",
+        input.concentration_lower_mg_per_kg,
+        input.concentration_upper_mg_per_kg,
+        concentration,
+        false,
+        &mut issues,
+    );
+    let edible_mass_bounds = validate_bound_pair(
+        "edible mass",
+        input.edible_mass_lower_kg_at_concentration_stage,
+        input.edible_mass_upper_kg_at_concentration_stage,
+        stage_mass,
+        false,
+        &mut issues,
+    );
+    let retention_bounds = validate_bound_pair(
+        "retention_fraction",
+        input.retention_lower_fraction,
+        input.retention_upper_fraction,
+        input.retention_fraction,
+        true,
+        &mut issues,
+    );
+    let bioavailability_bounds = validate_bound_pair(
+        "bioavailability_fraction",
+        input.bioavailability_lower_fraction,
+        input.bioavailability_upper_fraction,
+        input.bioavailability_fraction,
+        true,
+        &mut issues,
+    );
+    let any_intervals = concentration_bounds
+        || edible_mass_bounds
+        || retention_bounds
+        || bioavailability_bounds;
+    if any_intervals {
+        if input.uncertainty_interval_kind.is_none()
+            || !has_nonblank(input.uncertainty_evidence_uri.as_deref())
+        {
+            issues.push(
+                "uncertainty bounds require an explicit interval kind and evidence URI".to_owned(),
+            );
+        }
+        if !concentration_bounds || !edible_mass_bounds {
+            issues.push(
+                "nutrient-mass intervals require paired concentration and edible-mass bounds"
+                    .to_owned(),
+            );
+        }
+        match input.concentration_stage {
+            Some(ConcentrationStage::MeasuredAtServing) if retention_bounds => {
+                issues.push(
+                    "retention bounds must be absent when concentration was measured at serving"
+                        .to_owned(),
+                );
+            }
+            Some(ConcentrationStage::MeasuredBeforePreparation) if !retention_bounds => {
+                issues.push(
+                    "pre-preparation nutrient-mass intervals require retention bounds".to_owned(),
+                );
+            }
+            _ => {}
+        }
+    } else if input.uncertainty_interval_kind.is_some()
+        || has_nonblank(input.uncertainty_evidence_uri.as_deref())
+    {
+        issues.push(
+            "uncertainty interval metadata was provided without any numeric bounds".to_owned(),
+        );
+    }
     if input.retention_fraction.is_some() && !has_nonblank(input.retention_evidence_uri.as_deref())
     {
         issues.push("retention_fraction requires its own evidence URI".to_owned());
@@ -238,6 +373,41 @@ fn audit_input(input: NutritionAccountingInput) -> NutritionAccountingReceipt {
     let bioavailable_mass = delivered_nutrient_mass
         .zip(input.bioavailability_fraction)
         .map(|(mass, fraction)| mass * fraction);
+
+    let delivered_interval = if accounting_pass {
+        match (
+            input.concentration_lower_mg_per_kg,
+            input.concentration_upper_mg_per_kg,
+            input.edible_mass_lower_kg_at_concentration_stage,
+            input.edible_mass_upper_kg_at_concentration_stage,
+        ) {
+            (Some(concentration_low), Some(concentration_high), Some(mass_low), Some(mass_high)) => {
+                match input.concentration_stage {
+                    Some(ConcentrationStage::MeasuredAtServing) => {
+                        Some((concentration_low * mass_low, concentration_high * mass_high))
+                    }
+                    Some(ConcentrationStage::MeasuredBeforePreparation) => {
+                        input.retention_lower_fraction.zip(input.retention_upper_fraction).map(
+                            |(retention_low, retention_high)| (
+                                concentration_low * mass_low * retention_low,
+                                concentration_high * mass_high * retention_high,
+                            ),
+                        )
+                    }
+                    None => None,
+                }
+            }
+            _ => None,
+        }
+    } else {
+        None
+    };
+    let bioavailable_interval = delivered_interval.and_then(|(low, high)| {
+        input
+            .bioavailability_lower_fraction
+            .zip(input.bioavailability_upper_fraction)
+            .map(|(factor_low, factor_high)| (low * factor_low, high * factor_high))
+    });
     let nutrient_per_serving = delivered_nutrient_mass
         .zip(input.servings_in_batch)
         .map(|(mass, count)| mass / count as f64);
@@ -267,6 +437,11 @@ fn audit_input(input: NutritionAccountingInput) -> NutritionAccountingReceipt {
             None
         },
         estimated_bioavailable_nutrient_mass_delivered_mg: bioavailable_mass,
+        nutrient_mass_delivered_interval_lower_mg: delivered_interval.map(|(low, _)| low),
+        nutrient_mass_delivered_interval_upper_mg: delivered_interval.map(|(_, high)| high),
+        bioavailable_nutrient_mass_delivered_interval_lower_mg: bioavailable_interval.map(|(low, _)| low),
+        bioavailable_nutrient_mass_delivered_interval_upper_mg: bioavailable_interval.map(|(_, high)| high),
+        uncertainty_interval_kind: input.uncertainty_interval_kind,
         nutrient_mg_per_serving: nutrient_per_serving,
         estimated_bioavailable_nutrient_mg_per_serving: bioavailable_per_serving,
         nutrient_mg_per_liter_water: ratio(delivered_nutrient_mass, input.water_liters),
@@ -282,6 +457,8 @@ fn audit_input(input: NutritionAccountingInput) -> NutritionAccountingReceipt {
             "Bioavailability-adjusted mass is always an estimate in this prototype, not a direct assay result.".to_owned(),
             "Missing bioavailability evidence yields no estimate; it is not assumed to equal nutrient mass.".to_owned(),
             "Resource ratios are only comparable with matching system boundaries, units, crop stage and allocation rules.".to_owned(),
+            "Uncertainty intervals are emitted only when lower/upper bounds and their evidence are supplied; point-only inputs are not treated as zero-uncertainty.".to_owned(),
+            "Interval arithmetic multiplies declared non-negative bounds conservatively; it does not certify statistical coverage unless the source interval definition supports that claim.".to_owned(),
             "Food safety, dietary requirements, upper limits and population suitability are not evaluated.".to_owned(),
             "This receipt does not authorize model training or farm recommendations.".to_owned(),
         ],
@@ -337,13 +514,23 @@ mod tests {
             concentration_provenance: ConcentrationProvenance::DirectAssay,
             concentration_evidence_uri: Some("urn:assay:iron:batch-1".to_owned()),
             assay_method: Some("validated-lab-method-v1".to_owned()),
+            concentration_lower_mg_per_kg: None,
+            concentration_upper_mg_per_kg: None,
             edible_mass_kg_at_concentration_stage: Some(0.15),
             edible_mass_basis_at_concentration_stage: Some(MassBasis::FreshEdibleMass),
+            edible_mass_lower_kg_at_concentration_stage: None,
+            edible_mass_upper_kg_at_concentration_stage: None,
             servings_in_batch: Some(1),
             retention_fraction: None,
             retention_evidence_uri: None,
+            retention_lower_fraction: None,
+            retention_upper_fraction: None,
             bioavailability_fraction: Some(0.25),
             bioavailability_evidence_uri: Some("urn:literature:iron-bioavailability".to_owned()),
+            bioavailability_lower_fraction: None,
+            bioavailability_upper_fraction: None,
+            uncertainty_interval_kind: None,
+            uncertainty_evidence_uri: None,
             water_liters: Some(30.0),
             land_square_meters: Some(2.0),
             energy_kwh: Some(0.5),
@@ -433,6 +620,98 @@ mod tests {
         assert!(receipt.accounting_pass);
         assert_eq!(receipt.measured_nutrient_mass_delivered_mg, None);
         assert_eq!(receipt.modeled_nutrient_mass_delivered_mg, Some(9.0));
+    }
+
+    #[test]
+    fn nutrient_delivery_bounds_propagate_without_zero_uncertainty_assumptions() {
+        let mut input = fixture();
+        input.concentration_lower_mg_per_kg = Some(70.0);
+        input.concentration_upper_mg_per_kg = Some(90.0);
+        input.edible_mass_lower_kg_at_concentration_stage = Some(0.14);
+        input.edible_mass_upper_kg_at_concentration_stage = Some(0.16);
+        input.bioavailability_lower_fraction = Some(0.20);
+        input.bioavailability_upper_fraction = Some(0.30);
+        input.uncertainty_interval_kind = Some(UncertaintyIntervalKind::SensitivityBounds);
+        input.uncertainty_evidence_uri = Some("urn:uncertainty:iron:batch-1".to_owned());
+
+        let receipt = audit_input(input);
+        assert!(receipt.accounting_pass);
+        assert_eq!(receipt.nutrient_mass_delivered_interval_lower_mg, Some(9.8));
+        assert_eq!(receipt.nutrient_mass_delivered_interval_upper_mg, Some(14.4));
+        assert_eq!(
+            receipt.bioavailable_nutrient_mass_delivered_interval_lower_mg,
+            Some(1.96)
+        );
+        assert_eq!(
+            receipt.bioavailable_nutrient_mass_delivered_interval_upper_mg,
+            Some(4.32)
+        );
+        assert_eq!(
+            receipt.uncertainty_interval_kind,
+            Some(UncertaintyIntervalKind::SensitivityBounds)
+        );
+    }
+
+    #[test]
+    fn interval_bounds_without_evidence_fail_closed() {
+        let mut input = fixture();
+        input.concentration_lower_mg_per_kg = Some(70.0);
+        input.concentration_upper_mg_per_kg = Some(90.0);
+        input.edible_mass_lower_kg_at_concentration_stage = Some(0.14);
+        input.edible_mass_upper_kg_at_concentration_stage = Some(0.16);
+        let receipt = audit_input(input);
+        assert!(!receipt.accounting_pass);
+        assert!(receipt
+            .issues
+            .iter()
+            .any(|issue| issue.contains("interval kind and evidence URI")));
+        assert_eq!(receipt.nutrient_mass_delivered_interval_lower_mg, None);
+    }
+
+    #[test]
+    fn partial_or_inconsistent_intervals_fail_closed() {
+        let mut partial = fixture();
+        partial.concentration_lower_mg_per_kg = Some(70.0);
+        partial.edible_mass_lower_kg_at_concentration_stage = Some(0.14);
+        let receipt = audit_input(partial);
+        assert!(!receipt.accounting_pass);
+        assert!(receipt
+            .issues
+            .iter()
+            .any(|issue| issue.contains("lower and upper bounds")));
+
+        let mut inconsistent = fixture();
+        inconsistent.concentration_lower_mg_per_kg = Some(90.0);
+        inconsistent.concentration_upper_mg_per_kg = Some(100.0);
+        inconsistent.edible_mass_lower_kg_at_concentration_stage = Some(0.14);
+        inconsistent.edible_mass_upper_kg_at_concentration_stage = Some(0.16);
+        let receipt = audit_input(inconsistent);
+        assert!(!receipt.accounting_pass);
+        assert!(receipt
+            .issues
+            .iter()
+            .any(|issue| issue.contains("point estimate is outside")));
+    }
+
+    #[test]
+    fn pre_preparation_delivery_interval_requires_and_uses_retention_bounds() {
+        let mut input = fixture();
+        input.concentration_stage = Some(ConcentrationStage::MeasuredBeforePreparation);
+        input.retention_fraction = Some(0.75);
+        input.retention_evidence_uri = Some("urn:retention:study-v1".to_owned());
+        input.concentration_lower_mg_per_kg = Some(70.0);
+        input.concentration_upper_mg_per_kg = Some(90.0);
+        input.edible_mass_lower_kg_at_concentration_stage = Some(0.14);
+        input.edible_mass_upper_kg_at_concentration_stage = Some(0.16);
+        input.retention_lower_fraction = Some(0.65);
+        input.retention_upper_fraction = Some(0.85);
+        input.uncertainty_interval_kind = Some(UncertaintyIntervalKind::SensitivityBounds);
+        input.uncertainty_evidence_uri = Some("urn:uncertainty:processing:batch-1".to_owned());
+
+        let receipt = audit_input(input);
+        assert!(receipt.accounting_pass);
+        assert_eq!(receipt.nutrient_mass_delivered_interval_lower_mg, Some(6.37));
+        assert_eq!(receipt.nutrient_mass_delivered_interval_upper_mg, Some(12.24));
     }
 
     #[test]
