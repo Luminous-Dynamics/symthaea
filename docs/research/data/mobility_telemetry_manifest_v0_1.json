@@ -358,5 +358,6 @@
     "Voltage/current probes require suitable isolation, ratings, fusing, creepage and qualified electrical review before physical use.",
     "A 200 Hz IMU sample-rate target is not a validated bandwidth or accuracy claim.",
     "No control commands may be sent to the vehicle by this logger."
-  ]
+  ],
+  "uncertainty_budgets": []
 }
