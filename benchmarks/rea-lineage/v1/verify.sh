@@ -8,8 +8,8 @@ ORACLE="$ROOT/oracle.json"
 fail(){ printf 'FAIL: %s\n' "$*" >&2; exit 1; }
 command -v jq >/dev/null 2>&1 || fail "jq required"
 [ -f "$CASES" ] && [ -f "$ORACLE" ] || fail "manifest/oracle missing"
-jq -e '.schema_version=="symthaea.rea-lineage-manifest.v1" and .benchmark_id=="ENG-REA-004" and (.cases|length)==18' "$CASES" >/dev/null || fail "manifest schema/count mismatch"
-jq -e '.schema_version=="symthaea.rea-lineage-oracle.v1" and .benchmark_id=="ENG-REA-004" and (.expected_dispositions|length)==18' "$ORACLE" >/dev/null || fail "oracle schema/count mismatch"
+jq -e '.schema_version=="symthaea.rea-lineage-manifest.v1" and .benchmark_id=="ENG-REA-004" and (.cases|length)==20' "$CASES" >/dev/null || fail "manifest schema/count mismatch"
+jq -e '.schema_version=="symthaea.rea-lineage-oracle.v1" and .benchmark_id=="ENG-REA-004" and (.expected_dispositions|length)==20' "$ORACLE" >/dev/null || fail "oracle schema/count mismatch"
 case_ids=$(jq -er '[.cases[].id] | sort | join(",")' "$CASES")
 oracle_ids=$(jq -er '.expected_dispositions|keys|sort|join(",")' "$ORACLE")
 [ "$case_ids" = "$oracle_ids" ] || fail "case IDs differ or are duplicated"
@@ -20,14 +20,15 @@ assess(){
     def validrange($r;$limit):
       $r!=null and uint($r.offset) and uint($r.length) and $r.length>0 and ($r.offset+$r.length)<=$limit;
     def badtask($t):
-      ($t.path|type)!="string" or ($t.blob_id|type)!="string" or
+      ($t.path|type)!="string" or ($t.path|length)==0 or ($t.blob_id|type)!="string" or
       ($t.blob_id|length)==0 or ((uint($t.size))|not);
     def badedge($e;$c;$tasks):
       ($tasks|map(select(.path==$e.parent_path))) as $parents |
       ($tasks|map(select(.path==$e.child_path))) as $children |
       if ($parents|length)!=1 or ($children|length)!=1 or
          $e.parent_path==$e.child_path or $e.child_path=="$input" or
-         ($e.provider_blob_id|type)!="string" or ($e.provider_blob_id|length)==0 then
+         ($e.provider_blob_id|type)!="string" or ($e.provider_blob_id|length)==0 or
+         ($e.stage_kind|type)!="string" or ($e.stage_kind|length)==0 then
         true
       elif $children[0].blob_id!=$e.provider_blob_id then true
       elif $e.stage_kind=="multi-file" then $e.parent_file_range!=null
@@ -46,6 +47,7 @@ assess(){
     def badchunk($ch;$c;$tasks):
       ($tasks|map(select(.path==$ch.input_path))) as $matches |
       if ($matches|length)!=1 then true
+      elif ($ch.provider_id|type)!="string" or ($ch.provider_id|length)==0 then true
       elif (validrange($ch.range;$matches[0].size)|not) then true
       elif $ch.input_path=="$input" then
         if $ch.root_file_range==null then true
@@ -98,6 +100,6 @@ while IFS= read -r case_json; do
 done <<EOF_CASES
 $(jq -c '.cases[]' "$CASES")
 EOF_CASES
-printf '\nPASS ENG-REA-004: 18/18 dispositions matched; task/edge/chunk order invariance checked.\n'
+printf '\nPASS ENG-REA-004: 20/20 dispositions matched; task/edge/chunk order invariance checked.\n'
 printf 'Accepted valid lineage: %s\nRejected invalid or misleading lineage: %s\n' "$accepted" "$rejected"
 printf 'NOTE: synthetic contract only; no real REA provider or hardware was executed.\n'
