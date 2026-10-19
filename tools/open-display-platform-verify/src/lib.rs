@@ -1091,7 +1091,7 @@ fn sha256_hex(bytes: &[u8]) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{sha256_hex, validate_measurement_run_str, validate_platform_str};
+    use super::{is_valid_iso_date, is_valid_rfc3339_datetime, sha256_hex, validate_measurement_run_str, validate_platform_str};
     use serde_json::Value;
 
     const MANIFEST_TEXT: &str =
@@ -1186,6 +1186,90 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn timestamp_and_calendar_parsers_accept_valid_rfc3339_cases() {
+        assert!(is_valid_iso_date("2000-02-29"));
+        assert!(is_valid_iso_date("2026-10-19"));
+        assert!(!is_valid_iso_date("1900-02-29"));
+        assert!(!is_valid_iso_date("2026-04-31"));
+
+        assert!(is_valid_rfc3339_datetime("2026-10-18T10:00:00Z"));
+        assert!(is_valid_rfc3339_datetime("2026-10-18t10:00:00.125+02:30"));
+        assert!(is_valid_rfc3339_datetime("2000-02-29T23:59:60-00:00"));
+    }
+
+    #[test]
+    fn timestamp_and_calendar_parsers_reject_malformed_values() {
+        for value in [
+            "2026-02-29T10:00:00Z",
+            "2026-10-18T24:00:00Z",
+            "2026-10-18T10:60:00Z",
+            "2026-10-18T10:00:61Z",
+            "2026-10-18T10:00:00",
+            "2026-10-18T10:00:00+24:00",
+            "2026-10-18T10:00:00+02:60",
+            "2026-10-18T10:00:00.Z",
+            "2026/10/18T10:00:00Z",
+        ] {
+            assert!(
+                !is_valid_rfc3339_datetime(value),
+                "malformed timestamp accepted: {value}"
+            );
+        }
+        for value in ["2026-2-03", "2026-02-30", "2026-13-01", "not-a-date"] {
+            assert!(!is_valid_iso_date(value), "malformed date accepted: {value}");
+        }
+    }
+
+    #[test]
+    fn run_semantics_reject_invalid_acquisition_and_review_timestamps() {
+        let mut bad_acquisition = parse_run();
+        bad_acquisition["acquired_at"] =
+            Value::String("2026-02-29T10:00:00Z".to_owned());
+        assert!(
+            validate_measurement_run_str(&encoded(&bad_acquisition), RUN_SCHEMA_TEXT)
+                .expect_err("invalid acquisition date must fail")
+                .iter()
+                .any(|error| error.contains("acquired_at must be a valid RFC 3339"))
+        );
+
+        let mut bad_review = parse_run();
+        bad_review["review"] = serde_json::json!({
+            "reviewer_id":"synthetic reviewer",
+            "review_method":"negative-control fixture",
+            "reviewed_at":"2026-10-19T25:00:00Z",
+            "decision":"NEEDS_MORE_EVIDENCE"
+        });
+        assert!(
+            validate_measurement_run_str(&encoded(&bad_review), RUN_SCHEMA_TEXT)
+                .expect_err("invalid review timestamp must fail")
+                .iter()
+                .any(|error| error.contains("review.reviewed_at must be a valid RFC 3339"))
+        );
+    }
+
+    #[test]
+    fn calibration_expiry_requires_a_real_calendar_date() {
+        let mut record = parse_run();
+        record["instruments"] = serde_json::json!([{
+            "instrument_id":"ODRH-RUN-INS-POWER-001",
+            "instrument_class":"POWER_METER",
+            "manufacturer":"Example",
+            "model":"Synthetic test-only instrument",
+            "serial_or_stable_id":"NOT_A_PHYSICAL_INSTRUMENT",
+            "calibration_state":"VALID",
+            "calibration_record_digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "calibration_valid_through":"2026-02-30",
+            "supported_measurands":["task-window input energy"]
+        }]);
+        assert!(
+            validate_measurement_run_str(&encoded(&record), RUN_SCHEMA_TEXT)
+                .expect_err("impossible calibration date must fail")
+                .iter()
+                .any(|error| error.contains("invalid calibration_valid_through date"))
+        );
     }
 
     #[test]
