@@ -149,6 +149,12 @@ The accompanying machine-readable fixture is synthetic protocol data, not operat
 
 Every case has a required disposition and invariant in the JSON fixture. A qualifier must preserve unresolved states such as not-evaluable, blocked and synthetic-only instead of coercing uncertainty to pass.
 
+### Paired counterfactual campaign
+
+The follow-on [HABITAT-COUNTERFACTUAL-001 campaign contract](./HABITAT_COUNTERFACTUAL_001_DISRUPTION_CAMPAIGN.md) and [machine-readable fixture](./fixtures/habitat-vertical-scenarios-v0.1.json) expand these eight named disruptions into paired experiment definitions. Each case now declares a synthetic intervention, expected fail-closed disposition, hard invariants, required outputs, metric references, and specific blockers that prevent execution today.
+
+The campaign validator checks exact ID coverage against the source disruption list, prevents numeric outputs from being embedded in a definition-only fixture, and refuses implicit baseline/candidate policy revisions. It is not a scheduler or simulator. Baseline/candidate scoring remains blocked until the canonical policy revisions and a household-goods adapter are inspected, bound, and independently verified. Thirteen new Rust tests are authored for these contract invariants; none has been compiled or executed in this environment.
+
 ## Synthetic arithmetic known answers now included
 
 The fixture includes explicit arithmetic-control data so the first qualifier tests more than graph shape:
