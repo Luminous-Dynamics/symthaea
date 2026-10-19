@@ -113,12 +113,15 @@ fn valid_git_revision(value: &str) -> bool {
 
 fn fluidsynth_version(binary: &Path) -> Option<String> {
     let output = std::process::Command::new(binary).arg("--version").output().ok()?;
-    Some(format!(
-        "status={}; stdout={}; stderr={}",
-        output.status,
-        String::from_utf8_lossy(&output.stdout).trim(),
-        String::from_utf8_lossy(&output.stderr).trim()
-    ))
+    if !output.status.success() {
+        return None;
+    }
+    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_owned();
+    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_owned();
+    if stdout.is_empty() && stderr.is_empty() {
+        return None;
+    }
+    Some(format!("stdout={stdout}; stderr={stderr}"))
 }
 
 fn arm_metrics(arm: &Arm) -> serde_json::Value {
