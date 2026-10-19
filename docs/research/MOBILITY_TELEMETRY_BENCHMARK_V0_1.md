@@ -99,10 +99,11 @@ Run from the workspace root once Cargo/Rust are available:
 cargo test -p xtask frozen_fault_matrix_cases_match_expected_outcomes
 cargo run -p xtask -- mobility-telemetry-benchmark \
   --source-commit "$(git rev-parse HEAD)" \
+  --toolchain-id "$(rustc -Vv | tr '\n' ';') | $(cargo --version)" \
   --out reports/mobility_telemetry_benchmark.json
 ```
 
-The command reads the frozen JSON matrix, applies the specified mutation for each case, compares observed and expected decisions (including required gap/invalid-row diagnostics), emits a hash-bound JSON report, and exits nonzero on any mismatch. It does not measure hardware. It has been authored but not compiled or run in this environment.
+The command verifies that `--source-commit` exactly matches `git rev-parse HEAD`, requires an explicit `rustc -Vv` plus `cargo --version` toolchain identity, reads the frozen JSON matrix, applies each specified mutation, compares observed and expected decisions (including required gap/invalid-row diagnostics), emits a hash-bound JSON report, and exits nonzero on any mismatch. It does not measure hardware. It has been authored but not compiled or run in this environment.
 
 Next:
 
