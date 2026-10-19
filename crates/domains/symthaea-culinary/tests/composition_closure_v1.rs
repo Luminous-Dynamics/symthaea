@@ -24,7 +24,13 @@ fn unavailable_component_cannot_be_treated_as_zero() {
     let mut value = fixture();
     value["components"].as_array_mut().unwrap().pop();
     value["unavailable_components"] = json!([{
-        "component_id":"alcohol","reason":"not_analyzed","detail":"test missingness"
+        "component_id":"alcohol","reason":"not_analyzed","detail":"test missingness",
+        "evidence":{
+            "source_ref":"urn:synthetic:missing:alcohol",
+            "source_version":"fixture-v1",
+            "known_at":"2026-10-18T00:00:00Z",
+            "evidence_status":"synthetic"
+        }
     }]);
     let result = check_proximate_composition_closure_v1(&value).unwrap();
     assert_eq!(result.disposition, D::Indeterminate);
@@ -106,7 +112,13 @@ fn known_lower_bound_above_acceptance_band_stays_outside_with_missing_data() {
     value["components"][0]["upper"] = json!(70.0);
     value["components"].as_array_mut().unwrap().pop();
     value["unavailable_components"] = json!([{
-        "component_id":"alcohol","reason":"not_analyzed","detail":"synthetic missingness case"
+        "component_id":"alcohol","reason":"not_analyzed","detail":"synthetic missingness case",
+        "evidence":{
+            "source_ref":"urn:synthetic:missing:alcohol",
+            "source_version":"fixture-v1",
+            "known_at":"2026-10-18T00:00:00Z",
+            "evidence_status":"synthetic"
+        }
     }]);
     let result = check_proximate_composition_closure_v1(&value).unwrap();
     assert_eq!(result.disposition, D::OutsideAcceptable);
