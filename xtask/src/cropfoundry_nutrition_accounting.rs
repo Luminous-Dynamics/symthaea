@@ -622,6 +622,27 @@ mod tests {
     }
 
     #[test]
+    fn checked_in_synthetic_v1_example_has_reproducible_interval_outputs() {
+        let input: NutritionAccountingInput = serde_json::from_str(include_str!(
+            "../../docs/research/cropfoundry/nutrition-accounting-example-v1.json"
+        ))
+        .unwrap();
+        let receipt = audit_input(input);
+        assert!(receipt.accounting_pass);
+        assert_eq!(receipt.measured_nutrient_mass_delivered_mg, Some(12.0));
+        assert_eq!(receipt.nutrient_mass_delivered_interval_lower_mg, Some(10.5));
+        assert_eq!(receipt.nutrient_mass_delivered_interval_upper_mg, Some(13.6));
+        assert_eq!(
+            receipt.bioavailable_nutrient_mass_delivered_interval_lower_mg,
+            Some(2.1)
+        );
+        assert_eq!(
+            receipt.bioavailable_nutrient_mass_delivered_interval_upper_mg,
+            Some(4.08)
+        );
+    }
+
+    #[test]
     fn v1_json_schema_is_parseable_and_unknown_fields_are_rejected() {
         let schema: serde_json::Value = serde_json::from_str(include_str!(
             "../../docs/research/cropfoundry/nutrition-accounting-input-v1.schema.json"
