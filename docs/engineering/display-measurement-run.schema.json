@@ -296,6 +296,40 @@
               "minLength": 1
             },
             "uniqueItems": true
+          },
+          "calibration_record_artifact_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^ODRH-ART-[A-Z0-9-]+$",
+            "description": "Raw artifact ID of the calibration record when that evidence is retained."
+          },
+          "capability_profile_artifact_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^ODRH-ART-[A-Z0-9-]+$",
+            "description": "Raw artifact ID for the instrument's declared range/response capability profile."
+          },
+          "capability_profile_sha256": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[a-f0-9]{64}$",
+            "description": "SHA-256 of the exact capability-profile artifact."
+          },
+          "capability_profile_status": {
+            "type": "string",
+            "enum": [
+              "UNASSESSED",
+              "DECLARED_UNREVIEWED",
+              "INDEPENDENTLY_REVIEWED",
+              "INADEQUATE"
+            ],
+            "description": "Review state of capability-profile evidence, not a certificate of measurement accuracy."
           }
         }
       }
@@ -568,7 +602,8 @@
               "PATTERN_IDENTITY",
               "INSTRUMENT_CALIBRATION",
               "SETUP_PHOTO",
-              "OTHER"
+              "OTHER",
+              "INSTRUMENT_CAPABILITY_PROFILE"
             ]
           }
         }
