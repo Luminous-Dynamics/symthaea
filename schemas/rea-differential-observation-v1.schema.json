@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/schemas/rea-differential-observation-v1.schema.json",
+  "title": "Provider-neutral extraction observation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "case_id",
+    "provider_id",
+    "provider_version",
+    "capability",
+    "source",
+    "accounting",
+    "regions",
+    "files",
+    "complete_extraction_claim"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "symthaea.rea-differential-observation.v1"
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "provider_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "provider_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "capability": {
+      "enum": [
+        "supported",
+        "unsupported",
+        "unknown"
+      ]
+    },
+    "source": {
+      "$ref": "rea-differential-oracle-v1.schema.json#/$defs/source"
+    },
+    "accounting": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "start",
+          "end",
+          "disposition"
+        ],
+        "properties": {
+          "start": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "end": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "disposition": {
+            "enum": [
+              "identified",
+              "padding",
+              "unknown",
+              "unsupported",
+              "ambiguous"
+            ]
+          }
+        }
+      }
+    },
+    "regions": {
+      "type": "array",
+      "items": {
+        "$ref": "rea-differential-oracle-v1.schema.json#/$defs/region"
+      }
+    },
+    "files": {
+      "type": "array",
+      "items": {
+        "$ref": "rea-differential-oracle-v1.schema.json#/$defs/file"
+      }
+    },
+    "complete_extraction_claim": {
+      "type": "boolean"
+    }
+  }
+}
