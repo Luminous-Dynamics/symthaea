@@ -18,7 +18,7 @@ Reference: [ICDM — IDMS and current editions](https://www.sid.org/Standards/IC
 
 Each metric must declare:
 
-- physical quantity / measurand and unit;
+- physical quantity / measurand and unit; the capability profile for every instrument used by that observation must declare the same measurand and unit, not merely a matching label;
 - exact method identifier and method edition, or public method reference;
 - DUT model, hardware revision and firmware where available;
 - video input/host, resolution, refresh, color encoding/range, bit depth, SDR/HDR mode, display OSD and dynamic-feature states;
