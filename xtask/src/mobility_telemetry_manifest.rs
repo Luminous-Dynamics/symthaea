@@ -1408,23 +1408,47 @@ pub fn run_benchmark(
         .with_context(|| format!("reading telemetry fault matrix {}", matrix_path.display()))?;
     let matrix: serde_json::Value = serde_json::from_slice(&matrix_raw)
         .with_context(|| format!("parsing telemetry fault matrix {}", matrix_path.display()))?;
+    let matrix_version = matrix.get("schema_version").and_then(serde_json::Value::as_str)
+        .context("fault matrix has no string schema_version")?;
+    if matrix_version != SCHEMA_VERSION {
+        bail!("unsupported telemetry fault matrix schema version: {matrix_version}");
+    }
+    if matrix.get("interpretation")
+        .and_then(|value| value.get("positive_controls_required"))
+        .and_then(serde_json::Value::as_bool) != Some(true) {
+        bail!("fault matrix must explicitly require positive controls");
+    }
     let suite_id = matrix.get("suite_id").and_then(serde_json::Value::as_str)
-        .context("fault matrix has no string suite_id")?.to_owned();
+        .filter(|value| !value.trim().is_empty())
+        .context("fault matrix has no non-empty string suite_id")?.to_owned();
     let cases = matrix.get("cases").and_then(serde_json::Value::as_array)
         .context("fault matrix has no cases array")?;
     if cases.is_empty() {
         bail!("fault matrix contains no cases");
     }
+    const EXPECTED_OUTCOMES: &[&str] = &[
+        "accept", "reject", "accept_with_diagnostic",
+        "structurally_valid_but_ineligible", "ineligible",
+    ];
 
     let mut seen_ids = BTreeSet::<String>::new();
     let mut results = Vec::with_capacity(cases.len());
+    let mut expected_positive_control = false;
+    let mut expected_diagnostic_control = false;
+    let mut expected_negative_control = false;
     for case in cases {
         let case_id = case.get("id").and_then(serde_json::Value::as_str)
-            .context("fault-matrix case has no string id")?.to_owned();
+            .filter(|value| !value.trim().is_empty())
+            .context("fault-matrix case has no non-empty string id")?.to_owned();
         let mutation = case.get("mutation").and_then(serde_json::Value::as_str)
-            .context("fault-matrix case has no string mutation")?.to_owned();
+            .filter(|value| !value.trim().is_empty())
+            .context("fault-matrix case has no non-empty string mutation")?.to_owned();
         let expected = case.get("expected").and_then(serde_json::Value::as_str)
-            .context("fault-matrix case has no string expected outcome")?.to_owned();
+            .filter(|value| EXPECTED_OUTCOMES.contains(value))
+            .context("fault-matrix case has an unsupported expected outcome")?.to_owned();
+        expected_positive_control |= expected == "accept";
+        expected_diagnostic_control |= expected == "accept_with_diagnostic";
+        expected_negative_control |= ["reject", "structurally_valid_but_ineligible", "ineligible"].contains(&expected.as_str());
         let required_detail_tokens = case.get("required_detail_tokens")
             .and_then(serde_json::Value::as_array)
             .context("fault-matrix case has no required_detail_tokens array")?
@@ -1441,6 +1465,9 @@ pub fn run_benchmark(
         }
 
         let (observed, detail) = evaluate_fault_case(&mutation, &manifest);
+        if observed == "unimplemented" {
+            bail!("fault-matrix case {case_id} uses an unimplemented mutation {mutation}: {detail}");
+        }
         let detail_lower = detail.to_lowercase();
         let missing_detail_tokens: Vec<String> = required_detail_tokens.iter()
             .filter(|token| !detail_lower.contains(&token.to_lowercase()))
@@ -1457,6 +1484,9 @@ pub fn run_benchmark(
             passed,
             detail,
         });
+    }
+    if !expected_positive_control || !expected_diagnostic_control || !expected_negative_control {
+        bail!("fault matrix must include positive, diagnostic-positive and negative controls");
     }
 
     let case_count = results.len();
