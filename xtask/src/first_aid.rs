@@ -627,6 +627,39 @@ mod tests {
     }
 
     #[test]
+    fn unknown_top_level_corpus_fields_are_rejected() {
+        let mut value: Value =
+            serde_json::from_str(CORPUS_JSON).expect("checked-in corpus parses");
+        value["unexpected_authority"] = serde_json::json!(true);
+        assert!(serde_json::from_value::<ScenarioCorpus>(value).is_err());
+    }
+
+    #[test]
+    fn unknown_benchmark_fields_are_rejected() {
+        let mut value: Value =
+            serde_json::from_str(BENCHMARK_JSON).expect("checked-in benchmark parses");
+        value["clinically_validated"] = serde_json::json!(true);
+        assert!(serde_json::from_value::<BenchmarkSpec>(value).is_err());
+    }
+
+    #[test]
+    fn removing_the_positive_control_is_rejected() {
+        let (mut corpus, _, schema) = fixtures();
+        corpus
+            .scenarios
+            .retain(|scenario| scenario.scenario_type != "valid_bundle");
+        assert!(validate_corpus(&corpus, &schema).is_err());
+    }
+
+    #[test]
+    fn schema_cannot_enable_clinical_use() {
+        let (corpus, _, mut schema) = fixtures();
+        schema["properties"]["clinical_use_authorized"]["const"] =
+            serde_json::json!(true);
+        assert!(validate_schema_contract(&schema, &corpus).is_err());
+    }
+
+    #[test]
     fn source_revision_is_recorded_as_an_explicit_receipt_field() {
         let value = serde_json::to_value(ValidationReceipt {
             receipt_version: "first-aid-contract-receipt-v0",
@@ -642,7 +675,7 @@ mod tests {
             runtime_arch: "test-arch".to_string(),
             scenario_count: 24,
             benchmark_count: 16,
-            baseline_count: 5,
+            baseline_count: 6,
             claim_ceiling: "synthetic contract integrity only; no clinical validation",
         })
         .expect("receipt must serialize");
