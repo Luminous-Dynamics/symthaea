@@ -37,6 +37,9 @@ Policies are:
 
 The receipt includes per-scenario applied irrigation, an overflow proxy, synthetic stress-exposure proxy, per-scenario percentage change against equal-share allocation, plus policy-level mean/median proxies and water totals. It also reports sensor-dropout fraction and daily budget violations. The executable fails if any policy exceeds a daily water cap or emits non-finite core metrics.
 
+
+**Unit note:** per-plot storage/demand values are synthetic depth-like values. Global irrigation totals add depths over equally weighted toy plots and are labelled `plot-mm`; without plot areas, flow rates and hydraulics, these sums are not volumetric water use and must not be compared with farm meter readings.
+
 ## Mathematical scope and claim ceiling
 
 This is an intentionally small decision-policy harness, **not a crop model**. It defines artificial plot storage, demand traces, critical windows, weather transitions, sensor error, forecast bias, and a squared shortfall score. Those quantities are transparent test fixtures, not calibrated water balance, evapotranspiration, root-zone dynamics, yield response, nutritional outcomes, or field biology.
