@@ -1968,6 +1968,21 @@ mod tests {
         let cases = matrix.get("cases").and_then(serde_json::Value::as_array)
             .expect("fault matrix has a case array");
         assert_eq!(cases.len(), 32, "matrix size changes require deliberate review");
+        assert_eq!(
+            matrix.get("schema_version").and_then(serde_json::Value::as_str),
+            Some(SCHEMA_VERSION),
+            "fault matrix schema version must match validator"
+        );
+        assert_eq!(
+            matrix.get("interpretation")
+                .and_then(|value| value.get("positive_controls_required"))
+                .and_then(serde_json::Value::as_bool),
+            Some(true),
+            "fault matrix must explicitly require positive controls"
+        );
+        let mut saw_accept = false;
+        let mut saw_diagnostic_accept = false;
+        let mut saw_negative = false;
         let mut ids = BTreeSet::new();
         for case in cases {
             let id = case.get("id").and_then(serde_json::Value::as_str)
@@ -1977,6 +1992,9 @@ mod tests {
             let expected = case.get("expected").and_then(serde_json::Value::as_str)
                 .expect("case has expected outcome");
             assert!(ids.insert(id), "duplicate case ID {id}");
+            saw_accept |= expected == "accept";
+            saw_diagnostic_accept |= expected == "accept_with_diagnostic";
+            saw_negative |= ["reject", "structurally_valid_but_ineligible", "ineligible"].contains(&expected);
             let (observed, detail) = evaluate_fault_case(mutation, &fixture);
             assert_eq!(observed, expected, "fault case {id} ({mutation}): {detail}");
             let tokens = case.get("required_detail_tokens").and_then(serde_json::Value::as_array)
@@ -1990,6 +2008,9 @@ mod tests {
                 );
             }
         }
+        assert!(saw_accept, "matrix must include a valid positive control");
+        assert!(saw_diagnostic_accept, "matrix must include a positive control that requires diagnostics");
+        assert!(saw_negative, "matrix must include negative controls");
     }
 
     #[test]
