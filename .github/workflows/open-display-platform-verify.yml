@@ -91,6 +91,9 @@ jobs:
           cp docs/engineering/display-energy-trace-synthetic-v0.1.json "$artifact_dir/"
           cp docs/engineering/display-energy-trace.schema.json "$artifact_dir/"
           cp tools/open-display-platform-verify/src/energy.rs "$artifact_dir/"
+          cp tools/open-display-platform-verify/src/geometry.rs "$artifact_dir/"
+          cp docs/engineering/display-measurement-geometry-synthetic-v0.1.json "$artifact_dir/"
+          cp docs/engineering/display-measurement-geometry.schema.json "$artifact_dir/"
           sha256sum "$artifact_dir"/* > "$artifact_dir/input-sha256sums.txt"
 
       - name: Install pinned Rust toolchain
@@ -104,8 +107,9 @@ jobs:
       - name: Install OpenSCAD for native CAD validation
         run: |
           sudo apt-get update
-          sudo apt-get install --no-install-recommends -y openscad
+          sudo apt-get install --no-install-recommends -y openscad xvfb
           openscad --version
+          command -v xvfb-run
 
       - name: Export default and alternate sensor-plate geometry
         shell: bash
@@ -127,6 +131,24 @@ jobs:
           fi
           sha256sum "$artifact_dir/odrh-default.stl" "$artifact_dir/odrh-alternate.stl" \
             | tee "$artifact_dir/mesh-sha256sums.txt"
+
+      - name: Render non-qualifying source preview
+        shell: bash
+        run: |
+          set -euo pipefail
+          artifact_dir="target/odrh-validation"
+          cad="hardware/open-display-reference/cad/odrh_sensor_interface_plate.scad"
+          preview="$artifact_dir/odrh-sensor-plate-preview.png"
+          log="$artifact_dir/odrh-preview-render.log"
+          if ! xvfb-run -a openscad --imgsize=1200,900 --viewall --autocenter \
+            --projection=o -o "$preview" "$cad" > "$log" 2>&1; then
+            cat "$log"
+            exit 1
+          fi
+          file "$preview" | tee "$artifact_dir/odrh-preview-file-info.txt"
+          grep -F "PNG image data, 1200 x 900" "$artifact_dir/odrh-preview-file-info.txt"
+          sha256sum "$preview" | tee "$artifact_dir/preview-sha256sums.txt"
+          # This rendering is a source-review aid, not physical validation.
 
       - name: Check exported mesh bounds and parameter rejection
         shell: bash
