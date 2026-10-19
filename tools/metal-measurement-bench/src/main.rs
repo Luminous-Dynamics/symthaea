@@ -1801,8 +1801,8 @@ mod tests {
     #[test]
     fn csv_inventory_rejects_quotes_in_unquoted_fields_and_trailing_quote_junk() {
         for input in [
-            &b"id,note\n1,un"escaped\n"[..],
-            &b"id,note\n1,"quoted" junk\n"[..],
+            &b"id,note\n1,un\"escaped\n"[..],
+            &b"id,note\n1,\"quoted\" junk\n"[..],
         ] {
             assert!(inspect_csv_bytes(input, "fixture.csv").is_err());
         }
