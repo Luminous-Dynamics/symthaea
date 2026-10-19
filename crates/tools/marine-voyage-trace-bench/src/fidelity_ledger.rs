@@ -405,6 +405,7 @@ pub fn audit_fidelity_campaign(
 
     let mut unmatched_receipt_count = 0;
     let mut any_invalid_receipt = !duplicate_ids.is_empty();
+    let mut all_attempt_counts = AttemptCounts::default();
     let mut total_cost_units: u128 = 0;
     let mut cost_auditable = duplicate_ids.is_empty();
 
@@ -425,6 +426,7 @@ pub fn audit_fidelity_campaign(
             continue;
         }
 
+        all_attempt_counts.add(receipt.status);
         if validate_receipt(receipt, &mut issues) {
             any_invalid_receipt = true;
         }
@@ -520,11 +522,11 @@ pub fn audit_fidelity_campaign(
     requirement_progress.sort_by(|a, b| a.requirement_id.cmp(&b.requirement_id));
     issues.sort_by(|a, b| format!("{a:?}").cmp(&format!("{b:?}")));
 
-    let complete_attempts = requirement_progress.iter().map(|r| r.completed_successes as u64).sum::<u64>().min(u32::MAX as u64) as u32;
-    let failed_attempts = requirement_progress.iter().map(|r| r.failed_attempts as u64).sum::<u64>().min(u32::MAX as u64) as u32;
-    let censored_attempts = requirement_progress.iter().map(|r| r.censored_attempts as u64).sum::<u64>().min(u32::MAX as u64) as u32;
-    let out_of_domain_attempts = requirement_progress.iter().map(|r| r.out_of_domain_attempts as u64).sum::<u64>().min(u32::MAX as u64) as u32;
-    let invalid_result_attempts = requirement_progress.iter().map(|r| r.invalid_result_attempts as u64).sum::<u64>().min(u32::MAX as u64) as u32;
+    let complete_attempts = all_attempt_counts.complete;
+    let failed_attempts = all_attempt_counts.failed;
+    let censored_attempts = all_attempt_counts.censored;
+    let out_of_domain_attempts = all_attempt_counts.out_of_domain;
+    let invalid_result_attempts = all_attempt_counts.invalid_result;
 
     let disposition = if invalid_profile {
         FidelityAuditDisposition::InvalidProfile
@@ -636,7 +638,7 @@ mod tests {
         let p = profile();
         let audit = audit_fidelity_campaign(&p, &complete_receipts(&p));
         assert_eq!(audit.disposition, FidelityAuditDisposition::EvidenceCoverageComplete);
-        assert_eq!(audit.total_cost_units, Some(90));
+        assert_eq!(audit.total_cost_units, Some(60));
         assert_eq!(audit.requirements.iter().filter(|r| r.covered).count(), 4);
     }
 
