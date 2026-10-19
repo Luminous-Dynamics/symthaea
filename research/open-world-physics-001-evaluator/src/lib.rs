@@ -22,6 +22,8 @@ pub const TRAIN_QUERY_BUDGET: usize = 12;
 pub const HOLDOUT_POINT_COUNT: usize = 31;
 const RELATIVE_NOISE: f64 = 0.005;
 const FIT_FLOOR: f64 = 1.0e-16;
+/// A BIC difference below this value is reported as indeterminate, not a unique recovery.
+const BIC_DECISIVE_DELTA: f64 = 2.0;
 
 const AMPLITUDES: &[f64] = &[0.5, 1.0, 1.5, 2.0, 2.5, 3.0];
 const EXPONENTS: &[f64] = &[1.0, 1.5, 2.0, 2.5, 3.0];
@@ -106,6 +108,13 @@ impl QueryPolicy {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SelectionDisposition {
+    DecisiveWithinReferenceGrammar,
+    Indeterminate,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct CaseResult {
     pub world_id: String,
@@ -113,6 +122,9 @@ pub struct CaseResult {
     pub expected_family: LawFamily,
     pub selected_family: LawFamily,
     pub family_recovered: bool,
+    pub selection_disposition: SelectionDisposition,
+    /// BIC-like score gap between the best and second-best family; heuristic only.
+    pub delta_bic_to_runner_up: f64,
     pub query_count: usize,
     pub selected_law: Law,
     /// Normalized RMSE against noisy discovery observations.
@@ -125,7 +137,10 @@ pub struct CaseResult {
 pub struct PolicySummary {
     pub policy: QueryPolicy,
     pub case_count: usize,
+    /// Selected family matches the hidden reference family, regardless of ambiguity label.
     pub family_recovery_rate: f64,
+    /// Fraction of cases both correctly matched and decisive under the declared BIC heuristic.
+    pub decisive_family_recovery_rate: f64,
     pub mean_heldout_nrmse: f64,
     pub median_heldout_nrmse: f64,
 }
@@ -413,29 +428,54 @@ fn bic_for(law: Law, observations: &[Observation]) -> Option<f64> {
     score.is_finite().then_some(score)
 }
 
+#[derive(Debug, Clone, Copy)]
+struct FitOutcome {
+    selected: Law,
+    delta_bic_to_runner_up: f64,
+    disposition: SelectionDisposition,
+}
+
 /// Exhaustive, deterministic grid-search baseline using BIC-like complexity
-/// penalization. This is a baseline, not the proposed open-ended discovery
-/// agent; its parameter/family grid is explicitly bounded.
-fn fit_grid_baseline(observations: &[Observation]) -> Option<Law> {
+/// penalization. The best candidate is found separately per family so the
+/// ambiguity margin is between structural families, not neighbouring
+/// parameter-grid points. This remains a bounded baseline, not Ramanujan or
+/// open-ended theory generation.
+fn fit_grid_baseline(observations: &[Observation]) -> Option<FitOutcome> {
     if observations.len() < 3 {
         return None;
     }
-    let mut best: Option<(f64, Law)> = None;
+    let mut family_best: Vec<(f64, Law)> = Vec::new();
     for family in [
         LawFamily::InversePower,
         LawFamily::ScreenedInversePower,
         LawFamily::Saturating,
     ] {
+        let mut best_for_family: Option<(f64, Law)> = None;
         for law in candidate_grid(family) {
             let Some(score) = bic_for(law, observations) else {
                 continue;
             };
-            if best.as_ref().is_none_or(|(best_score, _)| score < *best_score) {
-                best = Some((score, law));
+            if best_for_family
+                .as_ref()
+                .is_none_or(|(best_score, _)| score < *best_score)
+            {
+                best_for_family = Some((score, law));
             }
         }
+        family_best.push(best_for_family?);
     }
-    best.map(|(_, law)| law)
+    family_best.sort_by(|a, b| a.0.total_cmp(&b.0));
+    let delta = (family_best[1].0 - family_best[0].0).max(0.0);
+    let disposition = if delta >= BIC_DECISIVE_DELTA {
+        SelectionDisposition::DecisiveWithinReferenceGrammar
+    } else {
+        SelectionDisposition::Indeterminate
+    };
+    Some(FitOutcome {
+        selected: family_best[0].1,
+        delta_bic_to_runner_up: delta,
+        disposition,
+    })
 }
 
 fn evaluate_case(world: &ReferenceWorld, policy: QueryPolicy) -> Option<CaseResult> {
@@ -446,7 +486,8 @@ fn evaluate_case(world: &ReferenceWorld, policy: QueryPolicy) -> Option<CaseResu
         .map(|(i, x)| world.query(*x, i as u64))
         .collect::<Result<Vec<_>, _>>()
         .ok()?;
-    let selected = fit_grid_baseline(&observations)?;
+    let fit = fit_grid_baseline(&observations)?;
+    let selected = fit.selected;
 
     let discovery_prediction = observations
         .iter()
@@ -475,6 +516,8 @@ fn evaluate_case(world: &ReferenceWorld, policy: QueryPolicy) -> Option<CaseResu
         expected_family: world.truth.family,
         selected_family: selected.family,
         family_recovered: selected.family == world.truth.family,
+        selection_disposition: fit.disposition,
+        delta_bic_to_runner_up: fit.delta_bic_to_runner_up,
         query_count: observations.len(),
         selected_law: selected,
         discovery_nrmse,
@@ -504,6 +547,13 @@ fn summarize(policy: QueryPolicy, rows: &[CaseResult]) -> Option<PolicySummary> 
         return None;
     }
     let recovered = selected.iter().filter(|row| row.family_recovered).count();
+    let decisive_recovered = selected
+        .iter()
+        .filter(|row| {
+            row.family_recovered
+                && row.selection_disposition == SelectionDisposition::DecisiveWithinReferenceGrammar
+        })
+        .count();
     let mut errors = selected
         .iter()
         .map(|row| row.heldout_nrmse)
@@ -514,6 +564,7 @@ fn summarize(policy: QueryPolicy, rows: &[CaseResult]) -> Option<PolicySummary> 
         policy,
         case_count: selected.len(),
         family_recovery_rate: recovered as f64 / selected.len() as f64,
+        decisive_family_recovery_rate: decisive_recovered as f64 / selected.len() as f64,
         mean_heldout_nrmse: mean,
         median_heldout_nrmse: median,
     })
@@ -627,7 +678,7 @@ mod tests {
                 .collect::<Vec<_>>();
             let fitted = fit_grid_baseline(&observations).unwrap();
             assert_eq!(
-                fitted.family, world.truth.family,
+                fitted.selected.family, world.truth.family,
                 "failed to recover reference family for {}",
                 world.id
             );
@@ -656,6 +707,12 @@ mod tests {
             assert!(row.heldout_nrmse.is_finite());
             assert!(row.discovery_nrmse >= 0.0);
             assert!(row.heldout_nrmse >= 0.0);
+            assert!(row.delta_bic_to_runner_up.is_finite());
+            assert!(row.delta_bic_to_runner_up >= 0.0);
+            assert_eq!(
+                row.selection_disposition == SelectionDisposition::DecisiveWithinReferenceGrammar,
+                row.delta_bic_to_runner_up >= BIC_DECISIVE_DELTA
+            );
         }
     }
 
