@@ -62,7 +62,7 @@ struct NutritionAccountingReceipt {
     accounting_pass: bool,
     concentration_is_direct_assay: bool,
     measured_nutrient_mass_delivered_mg: Option<f64>,
-    modeled_measured_nutrient_mass_delivered_mg: Option<f64>,
+    modeled_nutrient_mass_delivered_mg: Option<f64>,
     bioavailable_nutrient_mass_delivered_mg: Option<f64>,
     nutrient_mg_per_serving: Option<f64>,
     bioavailable_nutrient_mg_per_serving: Option<f64>,
@@ -251,7 +251,7 @@ fn audit_input(input: NutritionAccountingInput) -> NutritionAccountingReceipt {
         } else {
             None
         },
-        modeled_measured_nutrient_mass_delivered_mg: if !direct_assay || input.concentration_stage == Some(ConcentrationStage::MeasuredBeforePreparation) {
+        modeled_nutrient_mass_delivered_mg: if !direct_assay || input.concentration_stage == Some(ConcentrationStage::MeasuredBeforePreparation) {
             measured_or_modeled_mass
         } else {
             None
@@ -390,7 +390,7 @@ mod tests {
         let receipt = audit_input(input);
         assert!(receipt.accounting_pass);
         assert_eq!(receipt.measured_nutrient_mass_delivered_mg, None);
-        assert_eq!(receipt.modeled_measured_nutrient_mass_delivered_mg, Some(9.0));
+        assert_eq!(receipt.modeled_nutrient_mass_delivered_mg, Some(9.0));
     }
 
     #[test]
@@ -406,7 +406,7 @@ mod tests {
                 .any(|issue| issue.contains("concentration_stage"))
         );
         assert_eq!(receipt.measured_nutrient_mass_delivered_mg, None);
-        assert_eq!(receipt.modeled_measured_nutrient_mass_delivered_mg, None);
+        assert_eq!(receipt.modeled_nutrient_mass_delivered_mg, None);
     }
 
     #[test]
@@ -496,6 +496,6 @@ mod tests {
         assert!(receipt.accounting_pass);
         assert!(!receipt.concentration_is_direct_assay);
         assert_eq!(receipt.measured_nutrient_mass_delivered_mg, None);
-        assert_eq!(receipt.modeled_measured_nutrient_mass_delivered_mg, Some(12.0));
+        assert_eq!(receipt.modeled_nutrient_mass_delivered_mg, Some(12.0));
     }
 }
