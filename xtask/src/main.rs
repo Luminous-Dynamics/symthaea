@@ -185,6 +185,15 @@ fn main() -> anyhow::Result<()> {
                     actual_head
                 );
             }
+            let tracked_diff = std::process::Command::new("git")
+                .args(["diff", "--quiet", "HEAD", "--"])
+                .current_dir(&root)
+                .status()?;
+            if !tracked_diff.success() {
+                anyhow::bail!(
+                    "refusing benchmark on a dirty tracked worktree/index; commit the source and rerun"
+                );
+            }
 
             // Capture the executing environment rather than trusting a caller-supplied
             // string that could falsely label the toolchain used for this report.
