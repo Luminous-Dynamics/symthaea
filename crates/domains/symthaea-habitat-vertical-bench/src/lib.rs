@@ -15,6 +15,7 @@ pub mod resilience_options;
 pub mod assumption_falsification;
 pub mod event_replay;
 pub mod material_ledger;
+pub mod measurement_gate;
 
 use serde_json::Value;
 use symthaea_graph_theory::Graph;
