@@ -98,7 +98,7 @@ fn factorial_contrasts(
 ) -> ProfileFactorial {
     let room_effect_at_default_master = subtract_metrics(room_only, baseline);
     let master_effect_at_default_room = subtract_metrics(master_only, baseline);
-    let room_master_interaction = std::array::from_fn(|i| {
+    let room_master_interaction: [f32; 4] = std::array::from_fn(|i| {
         combined_metric(combined, i) - combined_metric(room_only, i)
             - combined_metric(master_only, i)
             + combined_metric(baseline, i)
@@ -575,6 +575,22 @@ fn main() {
             }));
             continue;
         }
+        if [neutral_sr, room_sr, master_sr, fsr].iter().any(|&rate| rate != SR) {
+            let reason = format!(
+                "{style:?}/{seed}: a FluidSynth arm returned an unexpected sample rate"
+            );
+            eprintln!("{reason}; skipping");
+            failures.push(reason);
+            rows.push(serde_json::json!({
+                "style": format!("{style:?}"), "seed": seed, "status": "failed",
+                "failure_code": "unexpected_sample_rate",
+                "expected_sample_rate_hz": SR,
+                "observed_sample_rates_hz": [neutral_sr, room_sr, master_sr, fsr],
+                "midi_sha256": midi_sha256
+            }));
+            continue;
+        }
+
         if ![
             a.lufs, a.peak_db, a.crest_db, a.low, a.mid, a.high,
             neutral.lufs, neutral.peak_db, neutral.crest_db, neutral.low, neutral.mid, neutral.high,
