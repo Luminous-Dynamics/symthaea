@@ -40,6 +40,7 @@ jobs:
         shell: bash
         env:
           REA_PROVIDER_ARTIFACT_DIR: ${{ runner.temp }}/rea-provider-evidence
+          REA_TEST_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: sh benchmarks/rea-determinism/v1/provider-smoke.sh
       - name: Preserve raw provider evidence and receipt
         if: always()
