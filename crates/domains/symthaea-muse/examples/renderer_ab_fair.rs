@@ -73,6 +73,62 @@ struct Arm {
     pcm_sha256: String,
 }
 
+/// Per-cell factorial contrasts. Metric order is LUFS, crest, low-band ratio,
+/// high-band ratio. Interaction is full - room-only - mastering-only + default.
+struct ProfileFactorial {
+    room_effect_at_default_master: [f32; 4],
+    master_effect_at_default_room: [f32; 4],
+    room_master_interaction: [f32; 4],
+}
+
+fn subtract_metrics(left: &Arm, right: &Arm) -> [f32; 4] {
+    [
+        left.lufs - right.lufs,
+        left.crest_db - right.crest_db,
+        left.low - right.low,
+        left.high - right.high,
+    ]
+}
+
+fn factorial_contrasts(
+    baseline: &Arm,
+    room_only: &Arm,
+    master_only: &Arm,
+    combined: &Arm,
+) -> ProfileFactorial {
+    let room_effect_at_default_master = subtract_metrics(room_only, baseline);
+    let master_effect_at_default_room = subtract_metrics(master_only, baseline);
+    let room_master_interaction = std::array::from_fn(|i| {
+        combined_metric(combined, i) - combined_metric(room_only, i)
+            - combined_metric(master_only, i)
+            + combined_metric(baseline, i)
+    });
+    ProfileFactorial {
+        room_effect_at_default_master,
+        master_effect_at_default_room,
+        room_master_interaction,
+    }
+}
+
+fn combined_metric(arm: &Arm, index: usize) -> f32 {
+    match index {
+        0 => arm.lufs,
+        1 => arm.crest_db,
+        2 => arm.low,
+        3 => arm.high,
+        _ => unreachable!("factorial metric index is bounded by the four-element array"),
+    }
+}
+
+fn factorial_json(value: [f32; 4]) -> serde_json::Value {
+    serde_json::json!({
+        "integrated_lufs": value[0],
+        "crest_factor_db": value[1],
+        "spectral_balance_low": value[2],
+        "spectral_balance_high": value[3]
+    })
+}
+
 fn sha256_bytes(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
 }
@@ -398,8 +454,90 @@ fn main() {
             continue;
         }
 
+        // Factor 1: change only room controls; keep default mastering.
         let color = fluid_render::room_for_dialect(base_color, renderer_dialect);
+        let Some(room_wav) = fluid_render::render_midi_to_wav_with_mastering(
+            &mid, SR, Some(color), &neutral_mastering,
+        ) else {
+            let reason = format!("{style:?}/{seed}: room-only FluidSynth render failed");
+            eprintln!("{reason}; skipping");
+            failures.push(reason);
+            rows.push(serde_json::json!({
+                "style": format!("{style:?}"), "seed": seed, "status": "failed",
+                "failure_code": "fluidsynth_room_only_render_failed",
+                "midi_sha256": midi_sha256
+            }));
+            continue;
+        };
+        let Some((room_frames, room_sr)) = wav_to_frames(&room_wav) else {
+            let reason = format!("{style:?}/{seed}: cannot decode room-only WAV");
+            eprintln!("{reason}; skipping");
+            failures.push(reason);
+            rows.push(serde_json::json!({
+                "style": format!("{style:?}"), "seed": seed, "status": "failed",
+                "failure_code": "fluidsynth_room_only_decode_failed",
+                "midi_sha256": midi_sha256
+            }));
+            continue;
+        };
+        let room_only = measure("fluidsynth-room-only", &room_frames, room_sr);
+        let room_wav_sha256 = sha256_bytes(&room_wav);
+        let room_wav_path = out_dir.join(format!("{style:?}_{seed}_fluidsynth-room-only.wav"));
+        if let Err(error) = std::fs::write(&room_wav_path, &room_wav) {
+            let reason = format!("{style:?}/{seed}: cannot preserve room-only WAV: {error}");
+            eprintln!("{reason}; skipping");
+            failures.push(reason);
+            rows.push(serde_json::json!({
+                "style": format!("{style:?}"), "seed": seed, "status": "failed",
+                "failure_code": "fluidsynth_room_only_write_failed",
+                "midi_sha256": midi_sha256, "wav_sha256": room_wav_sha256
+            }));
+            continue;
+        }
+
+        // Factor 2: change only mastering; keep slider-driven base room.
         let mastering = auto_master::MasteringConfig::for_dialect(renderer_dialect);
+        let Some(master_wav) = fluid_render::render_midi_to_wav_with_mastering(
+            &mid, SR, Some(base_color), &mastering,
+        ) else {
+            let reason = format!("{style:?}/{seed}: mastering-only FluidSynth render failed");
+            eprintln!("{reason}; skipping");
+            failures.push(reason);
+            rows.push(serde_json::json!({
+                "style": format!("{style:?}"), "seed": seed, "status": "failed",
+                "failure_code": "fluidsynth_mastering_only_render_failed",
+                "midi_sha256": midi_sha256, "room_wav_sha256": room_wav_sha256
+            }));
+            continue;
+        };
+        let Some((master_frames, master_sr)) = wav_to_frames(&master_wav) else {
+            let reason = format!("{style:?}/{seed}: cannot decode mastering-only WAV");
+            eprintln!("{reason}; skipping");
+            failures.push(reason);
+            rows.push(serde_json::json!({
+                "style": format!("{style:?}"), "seed": seed, "status": "failed",
+                "failure_code": "fluidsynth_mastering_only_decode_failed",
+                "midi_sha256": midi_sha256, "room_wav_sha256": room_wav_sha256
+            }));
+            continue;
+        };
+        let master_only = measure("fluidsynth-mastering-only", &master_frames, master_sr);
+        let master_wav_sha256 = sha256_bytes(&master_wav);
+        let master_wav_path = out_dir.join(format!("{style:?}_{seed}_fluidsynth-master-only.wav"));
+        if let Err(error) = std::fs::write(&master_wav_path, &master_wav) {
+            let reason = format!("{style:?}/{seed}: cannot preserve mastering-only WAV: {error}");
+            eprintln!("{reason}; skipping");
+            failures.push(reason);
+            rows.push(serde_json::json!({
+                "style": format!("{style:?}"), "seed": seed, "status": "failed",
+                "failure_code": "fluidsynth_mastering_only_write_failed",
+                "midi_sha256": midi_sha256, "wav_sha256": master_wav_sha256
+            }));
+            continue;
+        }
+
+        let Some(wav) = fluid_render::render_midi_to_wav_with_mastering(
+            &mid, SR, Some(color), &mastering,
         let Some(wav) = fluid_render::render_midi_to_wav_with_mastering(
             &mid, SR, Some(color), &mastering,
         ) else {
@@ -442,6 +580,8 @@ fn main() {
         if ![
             a.lufs, a.peak_db, a.crest_db, a.low, a.mid, a.high,
             neutral.lufs, neutral.peak_db, neutral.crest_db, neutral.low, neutral.mid, neutral.high,
+            room_only.lufs, room_only.peak_db, room_only.crest_db, room_only.low, room_only.mid, room_only.high,
+            master_only.lufs, master_only.peak_db, master_only.crest_db, master_only.low, master_only.mid, master_only.high,
             b.lufs, b.peak_db, b.crest_db, b.low, b.mid, b.high,
         ].iter().all(|value| value.is_finite()) {
             let reason = format!("{style:?}/{seed}: non-finite metric; row invalid");
@@ -459,7 +599,7 @@ fn main() {
             "── {style:?} seed={seed} dialect={:?} ──",
             symthaea_music_theory::Style::grammar_profile(style).performance
         );
-        for arm in [&a, &neutral, &b] {
+        for arm in [&a, &neutral, &room_only, &master_only, &b] {
             println!(
                 "  {:<11} LUFS {:>7.2}  peak {:>6.2} dB  crest {:>5.2} dB  \
                  balance L/M/H {:.3}/{:.3}/{:.3}  frames {}",
@@ -484,6 +624,7 @@ fn main() {
         let profile_high_delta = b.high - neutral.high;
         let profile_low_delta = b.low - neutral.low;
         let profile_lufs_delta = b.lufs - neutral.lufs;
+        let factorial = factorial_contrasts(&neutral, &room_only, &master_only, &b);
         println!(
             "  Δ(dialect−default FluidSynth): LUFS {profile_lufs_delta:+.2}  crest {profile_crest_delta:+.2} dB  \
              high-band {profile_high_delta:+.3}  low-band {profile_low_delta:+.3}"
@@ -531,6 +672,12 @@ fn main() {
                 "crest_factor_db": profile_crest_delta,
                 "spectral_balance_low": profile_low_delta,
                 "spectral_balance_high": profile_high_delta
+            },
+            "factorial_contrasts": {
+                "metric_order": ["integrated_lufs", "crest_factor_db", "spectral_balance_low", "spectral_balance_high"],
+                "room_effect_at_default_master": factorial_json(factorial.room_effect_at_default_master),
+                "mastering_effect_at_default_room": factorial_json(factorial.master_effect_at_default_room),
+                "room_master_interaction": factorial_json(factorial.room_master_interaction)
             },
             "input_midi": {
                 "path": mid.display().to_string(),
@@ -584,6 +731,22 @@ fn main() {
                         "section_leveling_db": neutral_mastering.section_leveling_db
                     },
                     "metrics": arm_metrics(&neutral)
+                },
+                "fluidsynth_room_only": {
+                    "renderer": room_only.name,
+                    "sample_rate_hz": room_sr,
+                    "wav_path": room_wav_path.display().to_string(),
+                    "wav_sha256": room_wav_sha256,
+                    "wav_bytes": room_wav.len(),
+                    "metrics": arm_metrics(&room_only)
+                },
+                "fluidsynth_mastering_only": {
+                    "renderer": master_only.name,
+                    "sample_rate_hz": master_sr,
+                    "wav_path": master_wav_path.display().to_string(),
+                    "wav_sha256": master_wav_sha256,
+                    "wav_bytes": master_wav.len(),
+                    "metrics": arm_metrics(&master_only)
                 },
                 "fluidsynth_dialect_profile": {
                     "renderer": b.name,
@@ -705,7 +868,7 @@ fn main() {
             "Native PCM hashes canonical f32 samples; FluidSynth WAV hashes include container bytes.",
             "Sample peak is not true peak.",
             "Audio metrics diagnose signal and render differences; they do not establish style authenticity or listener preference.",
-            "The two FluidSynth arms use the same MIDI, SoundFont, binary, and sample rate; their difference isolates the combined dialect room/mastering settings, not each control independently or perceptual benefit.",
+            "The four FluidSynth arms use the same MIDI, SoundFont, binary, and sample rate. The 2x2 default/room-only/mastering-only/combined design reports simple effects at the default setting and the room-by-mastering interaction; it does not establish perceptual benefit.",
             "A caller-supplied source revision plus file digests is not a signed build attestation."
         ]
     });
