@@ -42,6 +42,14 @@
       "byte_length": 12546,
       "schema_version": "0.1.0",
       "evidence_status": "synthetic_decision_rule_challenge_only"
+    },
+    {
+      "artifact_id": "recall_response_fixture",
+      "path": "docs/research/fixtures/habitat-recall-closure-v0.1.json",
+      "sha256": "6c9ec229b6c73856dc4334f6f26077a0918c3bb9e6f102d66cd8224613aa83b8",
+      "byte_length": 3119,
+      "schema_version": "0.1.0",
+      "evidence_status": "synthetic_rehearsal_contract_only_not_executed"
     }
   ],
   "expected_results": {
@@ -72,6 +80,16 @@
         "NotEvaluable": 5
       },
       "evidence_status": "synthetic_decision_rule_challenge_only"
+    },
+    "recall_closure": {
+      "affected_terminal_count": 2,
+      "target_count": 3,
+      "response_record_count": 3,
+      "confirmed_contained_count": 1,
+      "unresolved_affected_count": 1,
+      "false_positive_control_count": 0,
+      "closure_status": "OPEN_UNRESOLVED",
+      "evidence_status": "synthetic_rehearsal_contract_only_not_executed"
     }
   },
   "required_cross_layer_invariants": [
@@ -81,11 +99,13 @@
     "Every ledger transaction conserves the declared component stream and replays to the frozen account balances.",
     "Every measurement case matches the expected interval/certificate/unit disposition.",
     "The four component validators' summaries match this manifest's expected results.",
-    "A fingerprint match does not upgrade synthetic evidence to physically observed evidence."
+    "A fingerprint match does not upgrade synthetic evidence to physically observed evidence.",
+    "The recall-response drill derives the affected terminal set from the validated event stream, reconciles one response per terminal target, and does not call an unresolved drill closed."
   ],
   "known_limitations": [
     "No digital signature, key management, source authentication, trusted timestamp or transparency log is implemented.",
     "No physical measurements, supplier attestations, calibrated conversion from piece_equivalent to mg or actual product BOM are present.",
-    "The event log, quantity ledger and measurement records are synthetic challenge inputs, not production records."
+    "The event log, quantity ledger and measurement records are synthetic challenge inputs, not production records.",
+    "Recall target and response records are synthetic; closure status is an oracle result and not evidence of a real recall, containment, or customer notification."
   ]
 }

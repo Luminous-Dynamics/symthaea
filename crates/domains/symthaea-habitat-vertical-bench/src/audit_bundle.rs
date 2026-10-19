@@ -34,6 +34,9 @@ pub struct AuditBundleReport {
     pub material_transaction_count: usize,
     pub measurement_case_count: usize,
     pub measurement_dispositions: BTreeMap<String, usize>,
+    pub recall_affected_terminal_count: usize,
+    pub recall_unresolved_affected_count: usize,
+    pub recall_closure_status: String,
     pub verified_sha256_by_artifact: BTreeMap<String, String>,
 }
 
@@ -51,22 +54,26 @@ pub fn validate_audit_bundle_str(
     event_input: &str,
     ledger_input: &str,
     measurement_input: &str,
+    recall_input: &str,
 ) -> Result<AuditBundleReport, serde_json::Error> {
     let manifest: Value = serde_json::from_str(manifest_input)?;
     let base: Value = serde_json::from_str(base_input)?;
     let events: Value = serde_json::from_str(event_input)?;
     let ledger: Value = serde_json::from_str(ledger_input)?;
     let measurements: Value = serde_json::from_str(measurement_input)?;
+    let recall: Value = serde_json::from_str(recall_input)?;
     Ok(validate_audit_bundle(
         &manifest,
         &base,
         &events,
         &ledger,
         &measurements,
+        &recall,
         base_input,
         event_input,
         ledger_input,
         measurement_input,
+        recall_input,
     ))
 }
 
@@ -77,6 +84,7 @@ pub fn validate_embedded_audit_bundle() -> Result<AuditBundleReport, serde_json:
         crate::event_replay::EMBEDDED_EVENT_LOG,
         crate::material_ledger::EMBEDDED_MATERIAL_LEDGER,
         crate::measurement_gate::EMBEDDED_MEASUREMENT_GATE,
+        crate::recall_drill::EMBEDDED_RECALL_DRILL,
     )
 }
 
@@ -87,10 +95,12 @@ pub fn validate_audit_bundle(
     events: &Value,
     ledger: &Value,
     measurements: &Value,
+    recall: &Value,
     base_bytes: &str,
     event_bytes: &str,
     ledger_bytes: &str,
     measurement_bytes: &str,
+    recall_bytes: &str,
 ) -> AuditBundleReport {
     let mut issues = Vec::new();
     expect_string(manifest, "schema_version", "0.1.0", &mut issues);
@@ -136,11 +146,12 @@ pub fn validate_audit_bundle(
         ("event_replay_fixture", "docs/research/fixtures/habitat-event-replay-v0.1.json", event_bytes, events),
         ("material_ledger_fixture", "docs/research/fixtures/habitat-material-ledger-v0.1.json", ledger_bytes, ledger),
         ("measurement_gate_fixture", "docs/research/fixtures/habitat-measurement-gate-v0.1.json", measurement_bytes, measurements),
+        ("recall_response_fixture", "docs/research/fixtures/habitat-recall-closure-v0.1.json", recall_bytes, recall),
     ];
     let known_ids: HashSet<&str> = artifacts.iter().map(|(id, _, _, _)| *id).collect();
     let Some(rows) = manifest.get("artifacts").and_then(Value::as_array) else {
         push(&mut issues, "ARTIFACTS_ARRAY_MISSING", "artifacts", "artifacts must be a JSON array");
-        return report(issues, BTreeMap::new(), 0, 0, 0, BTreeMap::new());
+        return report(issues, BTreeMap::new(), 0, 0, 0, BTreeMap::new(), 0, 0, "NOT_EVALUATED".to_owned());
     };
 
     let mut manifest_by_id: HashMap<String, &Value> = HashMap::new();
@@ -153,7 +164,7 @@ pub fn validate_audit_bundle(
             continue;
         };
         if !known_ids.contains(id) {
-            push(&mut issues, "UNEXPECTED_ARTIFACT", format!("{path}.artifact_id"), format!("artifact {id:?} is not part of this four-fixture bundle"));
+            push(&mut issues, "UNEXPECTED_ARTIFACT", format!("{path}.artifact_id"), format!("artifact {id:?} is not part of this five-fixture bundle"));
             continue;
         }
         if manifest_by_id.insert(id.to_owned(), row).is_some() {
@@ -232,6 +243,13 @@ pub fn validate_audit_bundle(
         }
     }
 
+    let recall_report = crate::recall_drill::validate_recall_drill(recall, base, events);
+    if !recall_report.is_valid() {
+        for finding in &recall_report.issues {
+            push(&mut issues, "RECALL_COMPONENT_INVALID", format!("recall.{}", finding.path), format!("{}: {}", finding.code, finding.message));
+        }
+    }
+
     // Compare component outputs with the manifest's independent known answers.
     compare_u64(
         manifest,
@@ -301,7 +319,17 @@ pub fn validate_audit_bundle(
         }
     }
 
-    // Cross-layer invariants that make this a bundle rather than four independent passes.
+    compare_u64(manifest, "/expected_results/recall_closure/affected_terminal_count", recall_report.affected_terminal_ids.len() as u64, &mut issues);
+    compare_u64(manifest, "/expected_results/recall_closure/target_count", recall_report.target_count as u64, &mut issues);
+    compare_u64(manifest, "/expected_results/recall_closure/response_record_count", recall_report.response_record_count as u64, &mut issues);
+    compare_u64(manifest, "/expected_results/recall_closure/confirmed_contained_count", recall_report.confirmed_contained_count as u64, &mut issues);
+    compare_u64(manifest, "/expected_results/recall_closure/unresolved_affected_count", recall_report.unresolved_affected_count as u64, &mut issues);
+    compare_u64(manifest, "/expected_results/recall_closure/false_positive_control_count", recall_report.false_positive_control_count as u64, &mut issues);
+    if manifest.pointer("/expected_results/recall_closure/closure_status").and_then(Value::as_str) != Some(recall_report.closure_status.as_str()) {
+        push(&mut issues, "EXPECTED_RESULT_MISMATCH", "expected_results.recall_closure.closure_status", format!("manifest expected {:?}; re-evaluated recall status is {}", manifest.pointer("/expected_results/recall_closure/closure_status").and_then(Value::as_str), recall_report.closure_status));
+    }
+
+    // Cross-layer invariants that make this a bundle rather than five independent passes.
     let actual_measurement_evidence = measurements.get("evidence_status").and_then(Value::as_str);
     if actual_measurement_evidence != Some("synthetic_decision_rule_challenge_only") {
         push(&mut issues, "CROSS_LAYER_EVIDENCE_STATUS_MISMATCH", "measurements.evidence_status", "measurement fixture evidence status is outside the declared synthetic boundary");
@@ -315,6 +343,9 @@ pub fn validate_audit_bundle(
     if ledger.get("evidence_status").and_then(Value::as_str) != Some("synthetic_contract_only_not_executed") {
         push(&mut issues, "CROSS_LAYER_EVIDENCE_STATUS_MISMATCH", "ledger.evidence_status", "material ledger fixture is not a not-executed synthetic contract");
     }
+    if recall.get("evidence_status").and_then(Value::as_str) != Some("synthetic_rehearsal_contract_only_not_executed") {
+        push(&mut issues, "CROSS_LAYER_EVIDENCE_STATUS_MISMATCH", "recall.evidence_status", "recall-response fixture is not explicitly synthetic and not executed");
+    }
     if manifest.pointer("/expected_results/structural_fixture/valid").and_then(Value::as_bool) != Some(structural.is_valid()) {
         push(&mut issues, "EXPECTED_RESULT_MISMATCH", "expected_results.structural_fixture.valid", "structural validation result differs from the manifest");
     }
@@ -326,6 +357,9 @@ pub fn validate_audit_bundle(
         ledger_report.transaction_count,
         measurement_report.case_count,
         measurement_dispositions,
+        recall_report.affected_terminal_ids.len(),
+        recall_report.unresolved_affected_count,
+        recall_report.closure_status.clone(),
     )
 }
 
@@ -371,6 +405,9 @@ fn report(
     material_transaction_count: usize,
     measurement_case_count: usize,
     measurement_dispositions: BTreeMap<String, usize>,
+    recall_affected_terminal_count: usize,
+    recall_unresolved_affected_count: usize,
+    recall_closure_status: String,
 ) -> AuditBundleReport {
     issues.sort_by(|a, b| a.code.cmp(b.code).then_with(|| a.path.cmp(&b.path)).then_with(|| a.message.cmp(&b.message)));
     AuditBundleReport {
@@ -380,6 +417,9 @@ fn report(
         material_transaction_count,
         measurement_case_count,
         measurement_dispositions,
+        recall_affected_terminal_count,
+        recall_unresolved_affected_count,
+        recall_closure_status,
         verified_sha256_by_artifact,
     }
 }
@@ -394,17 +434,19 @@ mod tests {
         events: &str,
         ledger: &str,
         measurements: &str,
+        recall: &str,
     ) -> AuditBundleReport {
-        validate_audit_bundle_str(manifest, base, events, ledger, measurements).expect("all input fixtures are JSON")
+        validate_audit_bundle_str(manifest, base, events, ledger, measurements, recall).expect("all input fixtures are JSON")
     }
 
-    fn texts() -> (&'static str, &'static str, &'static str, &'static str, &'static str) {
+    fn texts() -> (&'static str, &'static str, &'static str, &'static str, &'static str, &'static str) {
         (
             EMBEDDED_AUDIT_BUNDLE,
             crate::EMBEDDED_FIXTURE,
             crate::event_replay::EMBEDDED_EVENT_LOG,
             crate::material_ledger::EMBEDDED_MATERIAL_LEDGER,
             crate::measurement_gate::EMBEDDED_MEASUREMENT_GATE,
+            crate::recall_drill::EMBEDDED_RECALL_DRILL,
         )
     }
 
@@ -414,100 +456,103 @@ mod tests {
 
     #[test]
     fn embedded_bundle_replays_every_layer_and_hash() {
-        let (m, b, e, l, q) = texts();
-        let report = validate(m, b, e, l, q);
+        let (m, b, e, l, q, r) = texts();
+        let report = validate(m, b, e, l, q, r);
         assert!(report.is_valid(), "{:?}", report.issues);
-        assert_eq!(report.artifact_count, 4);
+        assert_eq!(report.artifact_count, 5);
         assert_eq!(report.event_count, 22);
         assert_eq!(report.material_transaction_count, 9);
         assert_eq!(report.measurement_case_count, 13);
+        assert_eq!(report.recall_affected_terminal_count, 2);
+        assert_eq!(report.recall_unresolved_affected_count, 1);
+        assert_eq!(report.recall_closure_status, "OPEN_UNRESOLVED");
     }
 
     #[test]
     fn stale_event_fingerprint_fails_closed() {
-        let (m, b, e, l, q) = texts();
+        let (m, b, e, l, q, r) = texts();
         let altered = e.replacen("EV-22-UNRELATED-DISPATCH", "EV-99-ALTERED-DISPATCH", 1);
-        let report = validate(m, b, &altered, l, q);
+        let report = validate(m, b, &altered, l, q, r);
         assert!(has_code(&report, "ARTIFACT_DIGEST_MISMATCH"));
     }
 
     #[test]
     fn incorrect_byte_length_fails_closed() {
-        let (m, b, e, l, q) = texts();
+        let (m, b, e, l, q, r) = texts();
         let mut manifest: Value = serde_json::from_str(m).expect("manifest JSON");
         manifest["artifacts"][0]["byte_length"] = Value::from(1);
         let serialized = serde_json::to_string(&manifest).expect("manifest serialization");
-        let report = validate(&serialized, b, e, l, q);
+        let report = validate(&serialized, b, e, l, q, r);
         assert!(has_code(&report, "ARTIFACT_LENGTH_MISMATCH"));
     }
 
     #[test]
     fn omitted_artifact_is_rejected() {
-        let (m, b, e, l, q) = texts();
+        let (m, b, e, l, q, r) = texts();
         let mut manifest: Value = serde_json::from_str(m).expect("manifest JSON");
         manifest["artifacts"].as_array_mut().expect("artifacts").remove(0);
         let serialized = serde_json::to_string(&manifest).expect("manifest serialization");
-        let report = validate(&serialized, b, e, l, q);
+        let report = validate(&serialized, b, e, l, q, r);
         assert!(has_code(&report, "ARTIFACT_SET_MISMATCH"));
     }
 
     #[test]
     fn duplicated_artifact_identity_is_rejected() {
-        let (m, b, e, l, q) = texts();
+        let (m, b, e, l, q, r) = texts();
         let mut manifest: Value = serde_json::from_str(m).expect("manifest JSON");
         let first = manifest["artifacts"][0].clone();
         manifest["artifacts"].as_array_mut().expect("artifacts").push(first);
         let serialized = serde_json::to_string(&manifest).expect("manifest serialization");
-        let report = validate(&serialized, b, e, l, q);
+        let report = validate(&serialized, b, e, l, q, r);
         assert!(has_code(&report, "DUPLICATE_ARTIFACT_ID"));
     }
 
     #[test]
     fn unsupported_hash_policy_is_rejected() {
-        let (m, b, e, l, q) = texts();
+        let (m, b, e, l, q, r) = texts();
         let mut manifest: Value = serde_json::from_str(m).expect("manifest JSON");
         manifest["fingerprint_policy"]["algorithm"] = Value::String("MD5".to_owned());
         let serialized = serde_json::to_string(&manifest).expect("manifest serialization");
-        let report = validate(&serialized, b, e, l, q);
+        let report = validate(&serialized, b, e, l, q, r);
         assert!(has_code(&report, "FINGERPRINT_POLICY_UNSUPPORTED"));
     }
 
     #[test]
     fn component_known_answer_cannot_be_overridden() {
-        let (m, b, e, l, q) = texts();
+        let (m, b, e, l, q, r) = texts();
         let mut manifest: Value = serde_json::from_str(m).expect("manifest JSON");
         manifest["expected_results"]["event_replay"]["unique_event_count"] = Value::from(21);
         let serialized = serde_json::to_string(&manifest).expect("manifest serialization");
-        let report = validate(&serialized, b, e, l, q);
+        let report = validate(&serialized, b, e, l, q, r);
         assert!(has_code(&report, "EXPECTED_RESULT_MISMATCH"));
     }
 
     #[test]
     fn ledger_mutation_is_not_hidden_by_manifest() {
-        let (m, b, e, l, q) = texts();
+        let (m, b, e, l, q, r) = texts();
         let altered = l.replacen("\"quantity_mg\": 480000", "\"quantity_mg\": 479999", 1);
-        let report = validate(m, b, e, &altered, q);
+        let report = validate(m, b, e, &altered, q, r);
         assert!(has_code(&report, "ARTIFACT_DIGEST_MISMATCH"));
         assert!(has_code(&report, "LEDGER_COMPONENT_INVALID"));
     }
 
     #[test]
     fn measurement_mutation_is_not_hidden_by_manifest() {
-        let (m, b, e, l, q) = texts();
+        let (m, b, e, l, q, r) = texts();
         let altered = q.replacen("\"expected_disposition\": \"Conforming\"", "\"expected_disposition\": \"Indeterminate\"", 1);
-        let report = validate(m, b, e, l, &altered);
+        let report = validate(m, b, e, l, &altered, r);
         assert!(has_code(&report, "ARTIFACT_DIGEST_MISMATCH"));
         assert!(has_code(&report, "MEASUREMENT_COMPONENT_INVALID"));
     }
 
     #[test]
     fn artifact_order_does_not_change_audit_outcome() {
-        let (m, b, e, l, q) = texts();
-        let baseline = validate(m, b, e, l, q);
+        let (m, b, e, l, q, r) = texts();
+        let baseline = validate(m, b, e, l, q, r);
         let mut manifest: Value = serde_json::from_str(m).expect("manifest JSON");
         manifest["artifacts"].as_array_mut().expect("artifacts").reverse();
         let serialized = serde_json::to_string(&manifest).expect("manifest serialization");
-        let reordered = validate(&serialized, b, e, l, q);
+        let reordered = validate(&serialized, b, e, l, q, r);
         assert!(baseline.is_valid(), "{:?}", baseline.issues);
         assert!(reordered.is_valid(), "{:?}", reordered.issues);
         assert_eq!(baseline.verified_sha256_by_artifact, reordered.verified_sha256_by_artifact);
@@ -515,29 +560,57 @@ mod tests {
 
     #[test]
     fn source_evidence_status_remains_synthetic_only() {
-        let (m, b, e, l, q) = texts();
+        let (m, b, e, l, q, r) = texts();
         let altered = b.replacen("\"evidence_status\": \"synthetic_only\"", "\"evidence_status\": \"observed_physical\"", 1);
-        let report = validate(m, &altered, e, l, q);
+        let report = validate(m, &altered, e, l, q, r);
         assert!(has_code(&report, "ARTIFACT_DIGEST_MISMATCH"));
         assert!(has_code(&report, "STRUCTURAL_COMPONENT_INVALID"));
     }
 
     #[test]
     fn manifest_cannot_claim_authenticity_from_fingerprints() {
-        let (m, b, e, l, q) = texts();
+        let (m, b, e, l, q, r) = texts();
         let mut manifest: Value = serde_json::from_str(m).expect("manifest JSON");
         manifest["fingerprint_policy"]["interpretation"] = Value::String("a signature and proof that the records are true".to_owned());
         let serialized = serde_json::to_string(&manifest).expect("manifest serialization");
-        let report = validate(&serialized, b, e, l, q);
+        let report = validate(&serialized, b, e, l, q, r);
         assert!(has_code(&report, "FINGERPRINT_CLAIM_OVERREACH"));
     }
 
     #[test]
     fn measurement_disposition_counts_remain_separate() {
-        let (m, b, e, l, q) = texts();
-        let report = validate(m, b, e, l, q);
+        let (m, b, e, l, q, r) = texts();
+        let report = validate(m, b, e, l, q, r);
         assert_eq!(report.measurement_dispositions["Conforming"], 1);
         assert_eq!(report.measurement_dispositions["Indeterminate"], 1);
         assert_eq!(report.measurement_dispositions["NotEvaluable"], 5);
+    }
+
+
+    #[test]
+    fn stale_recall_fixture_fingerprint_fails_closed() {
+        let (m, b, e, l, q, r) = texts();
+        let altered = r.replacen("SYN-RESPONSE-RECORD-A", "SYN-RESPONSE-RECORD-X", 1);
+        let report = validate(m, b, e, l, q, &altered);
+        assert!(has_code(&report, "ARTIFACT_DIGEST_MISMATCH"));
+    }
+
+    #[test]
+    fn recall_known_answer_cannot_be_overridden_by_manifest() {
+        let (m, b, e, l, q, r) = texts();
+        let mut manifest: Value = serde_json::from_str(m).expect("manifest JSON");
+        manifest["expected_results"]["recall_closure"]["unresolved_affected_count"] = Value::from(0);
+        let serialized = serde_json::to_string(&manifest).expect("manifest serialization");
+        let report = validate(&serialized, b, e, l, q, r);
+        assert!(has_code(&report, "EXPECTED_RESULT_MISMATCH"));
+    }
+
+    #[test]
+    fn recall_component_failure_is_not_hidden_by_a_valid_manifest() {
+        let (m, b, e, l, q, r) = texts();
+        let altered = r.replacen("\"evidence_status\": \"synthetic_only\"", "\"evidence_status\": \"observed_physical\"", 1);
+        let report = validate(m, b, e, l, q, &altered);
+        assert!(has_code(&report, "ARTIFACT_DIGEST_MISMATCH"));
+        assert!(has_code(&report, "RECALL_COMPONENT_INVALID"));
     }
 }
