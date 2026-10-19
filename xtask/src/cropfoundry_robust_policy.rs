@@ -382,6 +382,15 @@ fn build_receipt() -> Result<RobustPolicyReceipt> {
         ));
     }
     let scores = build_policy_scores(&base.results)?;
+    if scores.len() != base.policy_count
+        || scores
+            .iter()
+            .any(|score| score.scenario_count != base.scenario_count)
+    {
+        return Err(anyhow!(
+            "robust-policy aggregation did not preserve the base policy/scenario cardinalities"
+        ));
+    }
     let preference_sweep = build_preference_sweep(&scores);
     let distinct_top_ranked_policy_count = preference_sweep
         .iter()
