@@ -1,0 +1,33 @@
+{
+  "schema_version": "symthaea.rea-differential-oracle-policy.v1",
+  "corpus_id": "rea-differential-v1",
+  "oracle_authority": "Fixture recipes and generated expected file bytes are maintained separately from provider adapters. A provider report never defines its own expected output.",
+  "statuses": {
+    "pass": "Supported case, source identity exact, every expected output exact, no extra outputs, regions exact, byte accounting gap-free/non-overlapping, no unknown/unsupported/ambiguous bytes, explicit completeness claim truthful.",
+    "partial": "No detected false output or source mismatch, but at least one byte is unexplained, unknown, ambiguous, unsupported, or the provider abstains from claiming completeness.",
+    "fail": "Wrong source identity, missing/extra/wrong-content output, path collision, missed/false region, invalid range/accounting overlap, malformed path/hash, or complete-extraction claim that conceals unresolved bytes.",
+    "abstain": "Provider explicitly declares unsupported/unknown capability and does not emit a purported result or claim completeness; abstention earns no extraction-recall credit."
+  },
+  "metrics": {
+    "known_file_recall_percent": "100 * exact expected path+logical ID+SHA-256+length matches / expected file count; empty expected set scores 100 only when no outputs are observed.",
+    "region_precision_recall": "Exact expected region tuples (kind,start,end); unmatched expected or observed tuples count as misses/false positives.",
+    "accounted_unique_bytes": "Union of valid in-bounds accounting spans, without double counting.",
+    "unexplained_bytes": "Uncovered source bytes, including leading, internal and trailing gaps.",
+    "unresolved_bytes": "Unknown + unsupported + ambiguous + unexplained + overlapping accounting byte count.",
+    "false_extraction_bytes": "Bytes in wrong or extra extracted payload files; follow-up adapter should expose per-output bytes to compute the exact count."
+  },
+  "target_gates": {
+    "known_file_recall_percent": 100,
+    "false_positive_known_answer_files": 0,
+    "unexplained_bytes": 0,
+    "overlapping_accounting_bytes": 0,
+    "complete_claim_with_unresolved_bytes": 0,
+    "mutation_rejection_percent": 100,
+    "repeat_run_semantic_projection_agreement_percent": 100
+  },
+  "caveats": [
+    "Targets are proposed acceptance criteria, not achieved measurements.",
+    "Synthetic known-answer corpus must be reported separately from a held-out, authorized real-firmware corpus.",
+    "Provider-specific unsupported cases must be reported separately; they are neither passes nor misses in the supported-case denominator."
+  ]
+}
