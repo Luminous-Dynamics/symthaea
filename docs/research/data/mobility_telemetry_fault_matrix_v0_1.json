@@ -1,7 +1,7 @@
 {
   "schema_version": "0.1.0",
   "suite_id": "MOBILITY-TELEMETRY-CONFORMANCE-001",
-  "status": "frozen_proposed_matrix_v0_1_includes_clock_sync_and_uncertainty_negative_controls_not_yet_executed",
+  "status": "frozen_proposed_matrix_v0_1_with_expected_outcomes_and_detail_tokens_not_yet_executed",
   "claim_ceiling": "Software conformance only. No demonstrated hardware reliability, measurement accuracy, vehicle performance, tire qualification, or roadworthiness.",
   "interpretation": {
     "positive_controls_required": true,
@@ -16,7 +16,10 @@
       "mutation": "known_valid_multi_rate_fixture",
       "expected": "accept",
       "diagnostic": "row counts and SHA-256 are reported",
-      "rust_test": "synthetic_trace_parses_without_claiming_physical_validity"
+      "rust_test": "synthetic_trace_parses_without_claiming_physical_validity",
+      "required_detail_tokens": [
+        "expected counters match"
+      ]
     },
     {
       "id": "TRACE-002",
@@ -24,7 +27,10 @@
       "mutation": "header_only_empty_trace",
       "expected": "reject",
       "diagnostic": "raw telemetry trace contains no rows",
-      "rust_test": "empty_trace_is_rejected"
+      "rust_test": "empty_trace_is_rejected",
+      "required_detail_tokens": [
+        "contains no rows"
+      ]
     },
     {
       "id": "TRACE-003",
@@ -32,7 +38,10 @@
       "mutation": "reordered_header",
       "expected": "reject",
       "diagnostic": "header mismatch",
-      "rust_test": "wrong_header_is_rejected"
+      "rust_test": "wrong_header_is_rejected",
+      "required_detail_tokens": [
+        "header does not match"
+      ]
     },
     {
       "id": "TRACE-004",
@@ -40,7 +49,10 @@
       "mutation": "undeclared_channel",
       "expected": "reject",
       "diagnostic": "undeclared channel",
-      "rust_test": "unknown_channel_is_rejected"
+      "rust_test": "unknown_channel_is_rejected",
+      "required_detail_tokens": [
+        "undeclared channel"
+      ]
     },
     {
       "id": "TRACE-005",
@@ -48,7 +60,10 @@
       "mutation": "valid_status_with_empty_raw_value",
       "expected": "reject",
       "diagnostic": "VALID sample may not be empty",
-      "rust_test": "valid_sample_may_not_have_an_empty_value"
+      "rust_test": "valid_sample_may_not_have_an_empty_value",
+      "required_detail_tokens": [
+        "empty raw_value"
+      ]
     },
     {
       "id": "TRACE-006",
@@ -56,7 +71,11 @@
       "mutation": "NaN_or_infinity_raw_value",
       "expected": "reject",
       "diagnostic": "non-finite raw value",
-      "rust_test": "non_finite_raw_value_is_rejected"
+      "rust_test": "non_finite_raw_value_is_rejected",
+      "required_detail_tokens": [
+        "NaN rejected",
+        "infinity rejected"
+      ]
     },
     {
       "id": "TRACE-007",
@@ -64,7 +83,10 @@
       "mutation": "unknown_sample_status",
       "expected": "reject",
       "diagnostic": "unsupported status",
-      "rust_test": "unsupported_sample_status_is_rejected"
+      "rust_test": "unsupported_sample_status_is_rejected",
+      "required_detail_tokens": [
+        "unsupported sample_status"
+      ]
     },
     {
       "id": "TRACE-008",
@@ -72,7 +94,10 @@
       "mutation": "global_sequence_gap",
       "expected": "reject",
       "diagnostic": "sequence mismatch",
-      "rust_test": "sequence_gap_is_rejected_instead_of_hidden"
+      "rust_test": "sequence_gap_is_rejected_instead_of_hidden",
+      "required_detail_tokens": [
+        "contiguous sequence"
+      ]
     },
     {
       "id": "TRACE-009",
@@ -80,7 +105,10 @@
       "mutation": "logger_timestamp_regression",
       "expected": "reject",
       "diagnostic": "logger-monotonic regression",
-      "rust_test": "timestamp_regression_is_rejected"
+      "rust_test": "timestamp_regression_is_rejected",
+      "required_detail_tokens": [
+        "timestamp regressed"
+      ]
     },
     {
       "id": "TRACE-010",
@@ -88,7 +116,10 @@
       "mutation": "repeated_timestamp_same_channel",
       "expected": "reject",
       "diagnostic": "per-channel timestamps must increase",
-      "rust_test": "repeated_timestamp_for_same_channel_is_rejected"
+      "rust_test": "repeated_timestamp_for_same_channel_is_rejected",
+      "required_detail_tokens": [
+        "repeats or regresses the timestamp for channel"
+      ]
     },
     {
       "id": "TRACE-011",
@@ -96,7 +127,10 @@
       "mutation": "same_timestamp_on_distinct_channels",
       "expected": "accept",
       "diagnostic": "simultaneous multi-channel observations remain valid",
-      "rust_test": "equal_timestamps_across_distinct_channels_are_accepted"
+      "rust_test": "equal_timestamps_across_distinct_channels_are_accepted",
+      "required_detail_tokens": [
+        "simultaneous observations"
+      ]
     },
     {
       "id": "TRACE-012",
@@ -104,7 +138,10 @@
       "mutation": "sensor_fault_with_missing_value",
       "expected": "accept_with_diagnostic",
       "diagnostic": "row retained and both invalid and missing counters increment",
-      "rust_test": "fault_rows_remain_explicit_and_missing"
+      "rust_test": "fault_rows_remain_explicit_and_missing",
+      "required_detail_tokens": [
+        "fault row and missing-value counters preserved"
+      ]
     },
     {
       "id": "TRACE-013",
@@ -112,7 +149,10 @@
       "mutation": "inter_sample_gap_above_diagnostic_threshold",
       "expected": "accept_with_diagnostic",
       "diagnostic": "rows remain intact and suspected gap counter increments",
-      "rust_test": "large_gap_is_reported_without_filling"
+      "rust_test": "large_gap_is_reported_without_filling",
+      "required_detail_tokens": [
+        "suspected gap reported"
+      ]
     },
     {
       "id": "MANIFEST-001",
@@ -120,7 +160,10 @@
       "mutation": "duplicate_sensor_id",
       "expected": "reject",
       "diagnostic": "duplicate sensor IDs",
-      "rust_test": "duplicate_sensor_ids_are_rejected"
+      "rust_test": "duplicate_sensor_ids_are_rejected",
+      "required_detail_tokens": [
+        "duplicate sensor ID"
+      ]
     },
     {
       "id": "MANIFEST-002",
@@ -128,7 +171,10 @@
       "mutation": "duplicate_channel_id",
       "expected": "reject",
       "diagnostic": "duplicate channel IDs",
-      "rust_test": "duplicate_channel_ids_are_rejected"
+      "rust_test": "duplicate_channel_ids_are_rejected",
+      "required_detail_tokens": [
+        "duplicate channel ID"
+      ]
     },
     {
       "id": "MANIFEST-003",
@@ -136,7 +182,10 @@
       "mutation": "unresolved_sensor_reference",
       "expected": "reject",
       "diagnostic": "unknown sensor ref",
-      "rust_test": "unknown_channel_sensor_reference_is_rejected"
+      "rust_test": "unknown_channel_sensor_reference_is_rejected",
+      "required_detail_tokens": [
+        "references unknown sensor"
+      ]
     },
     {
       "id": "MANIFEST-004",
@@ -144,7 +193,10 @@
       "mutation": "zero_negative_or_nonfinite_sample_rate",
       "expected": "reject",
       "diagnostic": "rate must be finite and positive",
-      "rust_test": "non_finite_or_nonpositive_sample_rate_is_rejected"
+      "rust_test": "non_finite_or_nonpositive_sample_rate_is_rejected",
+      "required_detail_tokens": [
+        "zero, negative and NaN sample rates all rejected"
+      ]
     },
     {
       "id": "MANIFEST-005",
@@ -152,7 +204,10 @@
       "mutation": "calibrated_sensor_without_receipt",
       "expected": "reject",
       "diagnostic": "calibration receipt required",
-      "rust_test": "calibrated_sensor_requires_a_receipt"
+      "rust_test": "calibrated_sensor_requires_a_receipt",
+      "required_detail_tokens": [
+        "claims calibrated without a calibration receipt"
+      ]
     },
     {
       "id": "MANIFEST-006",
@@ -160,7 +215,10 @@
       "mutation": "absolute_or_traversal_artifact_path",
       "expected": "reject",
       "diagnostic": "all artifact paths remain within session root",
-      "rust_test": "artifact_paths_must_not_escape_the_manifest_directory"
+      "rust_test": "artifact_paths_must_not_escape_the_manifest_directory",
+      "required_detail_tokens": [
+        "absolute and traversal paths rejected"
+      ]
     },
     {
       "id": "MANIFEST-007",
@@ -168,7 +226,10 @@
       "mutation": "malformed_or_unprefixed_sha256",
       "expected": "reject",
       "diagnostic": "strict SHA-256 syntax",
-      "rust_test": "artifact_digest_must_be_sha256_prefixed_and_well_formed"
+      "rust_test": "artifact_digest_must_be_sha256_prefixed_and_well_formed",
+      "required_detail_tokens": [
+        "unprefixed and invalid-hex digests rejected"
+      ]
     },
     {
       "id": "CLAIM-001",
@@ -176,7 +237,10 @@
       "mutation": "claim_required_channel_removed",
       "expected": "structurally_valid_but_ineligible",
       "diagnostic": "claim_required_channels_missing",
-      "rust_test": "missing_claim_channels_make_only_that_claim_ineligible"
+      "rust_test": "missing_claim_channels_make_only_that_claim_ineligible",
+      "required_detail_tokens": [
+        "missing required channel"
+      ]
     },
     {
       "id": "CLAIM-002",
@@ -184,7 +248,10 @@
       "mutation": "physical_claim_with_uncalibrated_sensor",
       "expected": "ineligible",
       "diagnostic": "sensor_not_calibrated reason emitted",
-      "rust_test": "uncalibrated_sensor_blocks_physical_claim_eligibility"
+      "rust_test": "uncalibrated_sensor_blocks_physical_claim_eligibility",
+      "required_detail_tokens": [
+        "both uncalibrated electrical sensors block"
+      ]
     },
     {
       "id": "CLAIM-003",
@@ -192,7 +259,10 @@
       "mutation": "planned_or_synthetic_fixture_claimed_as_physical",
       "expected": "ineligible",
       "diagnostic": "structural validity does not promote evidence class",
-      "rust_test": "planned_fixture_is_structurally_valid_but_not_physical_evidence"
+      "rust_test": "planned_fixture_is_structurally_valid_but_not_physical_evidence",
+      "required_detail_tokens": [
+        "planned DesignOnly fixture cannot support physical claims"
+      ]
     },
     {
       "id": "CLAIM-004",
@@ -200,7 +270,10 @@
       "mutation": "unrecognized_sync_method_with_verified_word",
       "expected": "ineligible",
       "diagnostic": "clock_sync_method_not_verified",
-      "rust_test": "unrecognized_sync_method_blocks_physical_claim"
+      "rust_test": "unrecognized_sync_method_blocks_physical_claim",
+      "required_detail_tokens": [
+        "free-form verified-looking text does not pass"
+      ]
     },
     {
       "id": "CLAIM-005",
@@ -208,7 +281,10 @@
       "mutation": "physical_claim_without_claim_specific_uncertainty_budget",
       "expected": "ineligible",
       "diagnostic": "missing_claim_uncertainty_budget",
-      "rust_test": "missing_claim_uncertainty_budget_blocks_physical_claim"
+      "rust_test": "missing_claim_uncertainty_budget_blocks_physical_claim",
+      "required_detail_tokens": [
+        "uncertainty budget is absent"
+      ]
     },
     {
       "id": "CLAIM-006",
@@ -216,7 +292,10 @@
       "mutation": "expanded_uncertainty_exceeds_acceptance_tolerance",
       "expected": "ineligible",
       "diagnostic": "uncertainty_budget_exceeds_tolerance",
-      "rust_test": "budget_above_tolerance_blocks_physical_claim"
+      "rust_test": "budget_above_tolerance_blocks_physical_claim",
+      "required_detail_tokens": [
+        "expanded uncertainty exceeds pre-registered tolerance"
+      ]
     },
     {
       "id": "CLAIM-007",
@@ -224,7 +303,10 @@
       "mutation": "calculated_but_unverified_uncertainty_budget",
       "expected": "ineligible",
       "diagnostic": "uncertainty_budget_not_verified",
-      "rust_test": "calculated_uncertainty_budget_is_not_physical_evidence"
+      "rust_test": "calculated_uncertainty_budget_is_not_physical_evidence",
+      "required_detail_tokens": [
+        "calculated-only uncertainty remains below the evidence threshold"
+      ]
     }
   ],
   "hardware_targets": [
