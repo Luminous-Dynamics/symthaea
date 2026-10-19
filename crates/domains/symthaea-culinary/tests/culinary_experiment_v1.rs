@@ -122,3 +122,19 @@ fn non_string_entry_in_randomized_order_is_rejected() {
     value["blocks"][0]["randomized_order"] = serde_json::json!(["baseline", 7]);
     assert!(validate_culinary_experiment_v1(&value).is_err());
 }
+
+
+#[test]
+fn unsupported_subnanosecond_timestamp_precision_is_rejected() {
+    let mut value = fixture();
+    value["preregistered_at"] =
+        Value::String("2026-10-19T00:00:00.1234567891Z".into());
+    assert!(validate_culinary_experiment_v1(&value).is_err());
+}
+
+#[test]
+fn target_outcome_requires_an_explicit_target_value() {
+    let mut value = fixture();
+    value["outcome_definitions"][0]["direction"] = Value::String("target".into());
+    assert!(validate_culinary_experiment_v1(&value).is_err());
+}
