@@ -1233,6 +1233,41 @@ pub fn map_grammar_dialect(
     }
 }
 
+/// Apply the same directional room hypothesis to the native DSP room as the
+/// FluidSynth backend receives through `room_for_dialect`. The algorithms are
+/// different, so these settings are not acoustically equivalent; the invariant
+/// is that a declared style does not get a style-specific room in only one arm
+/// of a renderer comparison.
+fn native_reverb_for_dialect(
+    mut base: crate::ReverbConfig,
+    dialect: PerformanceDialect,
+) -> crate::ReverbConfig {
+    match dialect {
+        PerformanceDialect::ClassicalRubato | PerformanceDialect::FolkLift => {}
+        PerformanceDialect::ProcessExact => {
+            base.room_size = (base.room_size + 0.18).clamp(0.0, 1.0);
+            base.wet_floor = (base.wet_floor + 0.12).clamp(0.0, 1.0);
+        }
+        PerformanceDialect::DroneElastic => {
+            base.room_size = (base.room_size + 0.25).clamp(0.0, 1.0);
+            base.wet_floor = (base.wet_floor + 0.16).clamp(0.0, 1.0);
+        }
+        PerformanceDialect::DramaticTiming => {
+            base.room_size = (base.room_size + 0.12).clamp(0.0, 1.0);
+            base.wet_floor = (base.wet_floor + 0.08).clamp(0.0, 1.0);
+        }
+        PerformanceDialect::ChoralBlend => {
+            base.room_size = (base.room_size + 0.22).clamp(0.0, 1.0);
+            base.wet_floor = (base.wet_floor + 0.14).clamp(0.0, 1.0);
+        }
+        PerformanceDialect::DanceLocked | PerformanceDialect::JazzLaidBack => {
+            base.room_size = (base.room_size - 0.12).max(0.0);
+            base.wet_floor = (base.wet_floor * 0.75).clamp(0.0, 1.0);
+        }
+    }
+    base
+}
+
 /// Compose from a user spec AND realize it — the full user-owned pipeline.
 /// Validate the spec first when it came from user input.
 pub fn compose_and_realize_spec(
@@ -1661,12 +1696,15 @@ fn realize_core(
         // read as synthetic ("dry GM violin is brutal" — listening
         // review). Bigger room + higher wet floor than the default
         // streaming path; state still adds its share of wet on top.
-        reverb: crate::ReverbConfig {
-            room_size: 0.68,
-            damping: 0.45,
-            width: 0.9,
-            wet_floor: 0.2,
-        },
+        reverb: native_reverb_for_dialect(
+            crate::ReverbConfig {
+                room_size: 0.68,
+                damping: 0.45,
+                width: 0.9,
+                wet_floor: 0.2,
+            },
+            dialect,
+        ),
         ..Default::default()
     };
     let mut audio =
@@ -2867,6 +2905,45 @@ mod tests {
                 scales.iter().all(|scale| scale.is_finite() && *scale >= 0.0 && *scale <= 1.5),
                 "{dialect:?}: {scales:?}"
             );
+        }
+    }
+
+ 
+    #[test]
+    fn native_room_profiles_follow_all_eight_dialects() {
+        use PerformanceDialect as D;
+
+        let base = crate::ReverbConfig {
+            room_size: 0.68,
+            damping: 0.45,
+            width: 0.9,
+            wet_floor: 0.2,
+        };
+        let room = |dialect| native_reverb_for_dialect(base, dialect);
+        for dialect in [D::ClassicalRubato, D::FolkLift] {
+            assert_eq!(room(dialect).room_size, base.room_size);
+            assert_eq!(room(dialect).wet_floor, base.wet_floor);
+        }
+        assert!(room(D::ProcessExact).room_size > base.room_size);
+        assert!(room(D::DroneElastic).room_size > room(D::ProcessExact).room_size);
+        assert!(room(D::DramaticTiming).room_size > base.room_size);
+        assert!(room(D::ChoralBlend).room_size > base.room_size);
+        assert!(room(D::DanceLocked).room_size < base.room_size);
+        assert!(room(D::JazzLaidBack).wet_floor < base.wet_floor);
+
+        for dialect in [
+            D::ClassicalRubato,
+            D::DanceLocked,
+            D::JazzLaidBack,
+            D::FolkLift,
+            D::ProcessExact,
+            D::DroneElastic,
+            D::DramaticTiming,
+            D::ChoralBlend,
+        ] {
+            let profile = room(dialect);
+            assert!((0.0..=1.0).contains(&profile.room_size), "{dialect:?}");
+            assert!((0.0..=1.0).contains(&profile.wet_floor), "{dialect:?}");
         }
     }
 
