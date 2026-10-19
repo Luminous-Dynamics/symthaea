@@ -285,5 +285,14 @@
       ],
       "randomization_method": "synthetic-counterbalanced-order-v1"
     }
-  ]
+  ],
+  "analysis_plan": {
+    "primary_outcome_id": "prepared_yield_g",
+    "paired_estimand": "variant_minus_control",
+    "summary_method": "mean_paired_difference",
+    "uncertainty_semantics": "measurement_bounds_only",
+    "missing_data_policy": "fail_closed",
+    "population_inference": "not_estimated",
+    "report_all_declared_outcomes": true
+  }
 }
