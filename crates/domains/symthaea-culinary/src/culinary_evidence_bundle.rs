@@ -18,6 +18,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use serde::de::{self, Deserializer, MapAccess, SeqAccess, Visitor};
 use serde::Deserialize;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -32,6 +33,119 @@ const ARTIFACT_KINDS: &[&str] = &[
     "process_trace",
     "measurement_record",
 ];
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct MeasurementRecordWireV1 {
+    schema_version: String,
+    run_id: String,
+    outcome_id: String,
+    status: String,
+    value: Value,
+    lower: Value,
+    upper: Value,
+    unit: String,
+    method: String,
+    unknown_reason: Value,
+}
+
+struct StrictJsonValue(Value);
+
+impl<'de> Deserialize<'de> for StrictJsonValue {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct StrictValueVisitor;
+
+        impl<'de> Visitor<'de> for StrictValueVisitor {
+            type Value = Value;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str("a JSON value without duplicate object keys")
+            }
+
+            fn visit_bool<E>(self, value: bool) -> Result<Self::Value, E> {
+                Ok(Value::Bool(value))
+            }
+
+            fn visit_i64<E>(self, value: i64) -> Result<Self::Value, E> {
+                Ok(Value::Number(value.into()))
+            }
+
+            fn visit_u64<E>(self, value: u64) -> Result<Self::Value, E> {
+                Ok(Value::Number(value.into()))
+            }
+
+            fn visit_f64<E>(self, value: f64) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                serde_json::Number::from_f64(value)
+                    .map(Value::Number)
+                    .ok_or_else(|| E::custom("non-finite JSON number"))
+            }
+
+            fn visit_str<E>(self, value: &str) -> Result<Self::Value, E> {
+                Ok(Value::String(value.to_owned()))
+            }
+
+            fn visit_string<E>(self, value: String) -> Result<Self::Value, E> {
+                Ok(Value::String(value))
+            }
+
+            fn visit_unit<E>(self) -> Result<Self::Value, E> {
+                Ok(Value::Null)
+            }
+
+            fn visit_none<E>(self) -> Result<Self::Value, E> {
+                Ok(Value::Null)
+            }
+
+            fn visit_some<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+            where
+                D: Deserializer<'de>,
+            {
+                StrictJsonValue::deserialize(deserializer).map(|value| value.0)
+            }
+
+            fn visit_seq<A>(self, mut sequence: A) -> Result<Self::Value, A::Error>
+            where
+                A: SeqAccess<'de>,
+            {
+                let mut values = Vec::new();
+                while let Some(value) = sequence.next_element::<StrictJsonValue>()? {
+                    values.push(value.0);
+                }
+                Ok(Value::Array(values))
+            }
+
+            fn visit_map<A>(self, mut object: A) -> Result<Self::Value, A::Error>
+            where
+                A: MapAccess<'de>,
+            {
+                let mut values = serde_json::Map::new();
+                while let Some(key) = object.next_key::<String>()? {
+                    if values.contains_key(&key) {
+                        return Err(de::Error::custom(format!("duplicate JSON object key {key:?}")));
+                    }
+                    let value = object.next_value::<StrictJsonValue>()?;
+                    values.insert(key, value.0);
+                }
+                Ok(Value::Object(values))
+            }
+        }
+
+        deserializer.deserialize_any(StrictValueVisitor).map(StrictJsonValue)
+    }
+}
+
+fn parse_strict_json_value(bytes: &[u8]) -> Result<Value, serde_json::Error> {
+    let mut deserializer = serde_json::Deserializer::from_slice(bytes);
+    let value = StrictJsonValue::deserialize(&mut deserializer)?.0;
+    deserializer.end()?;
+    Ok(value)
+}
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -280,7 +394,7 @@ pub fn verify_culinary_evidence_bundle_v1(
             errors.push(format!("artifact {artifact_id:?} payload SHA-256 mismatch"));
         }
         if artifact.artifact_kind == "process_trace" {
-            match serde_json::from_slice::<Value>(bytes) {
+            match parse_strict_json_value(bytes) {
                 Ok(trace) => {
                     if non_empty(&trace, "trace_id") != Some(artifact_id.as_str()) {
                         errors.push(format!("process trace artifact {artifact_id:?} internal trace_id does not match artifact_id"));
@@ -375,25 +489,31 @@ pub fn verify_culinary_evidence_bundle_v1(
                                 artifact.artifact_kind
                             ));
                         } else if let Some(bytes) = artifact_bytes.get(&artifact.artifact_id) {
-                            match serde_json::from_slice::<Value>(bytes) {
+                            match serde_json::from_slice::<MeasurementRecordWireV1>(bytes) {
                                 Ok(record) => {
-                                    let expected_string_fields = [
-                                        ("schema_version", "1.0.0"),
-                                        ("run_id", non_empty(run, "run_id").unwrap_or("")),
-                                        ("outcome_id", non_empty(outcome, "outcome_id").unwrap_or("")),
-                                        ("status", non_empty(outcome, "status").unwrap_or("")),
-                                        ("unit", non_empty(outcome, "unit").unwrap_or("")),
-                                        ("method", non_empty(outcome, "method").unwrap_or("")),
-                                    ];
-                                    for (field, expected) in expected_string_fields {
-                                        if non_empty(&record, field) != Some(expected) {
-                                            errors.push(format!(
-                                                "{outcome_label} measurement payload field {field:?} does not match experiment outcome"
-                                            ));
-                                        }
+                                    let expected_run = non_empty(run, "run_id").unwrap_or("");
+                                    let expected_outcome = non_empty(outcome, "outcome_id").unwrap_or("");
+                                    let expected_status = non_empty(outcome, "status").unwrap_or("");
+                                    let expected_unit = non_empty(outcome, "unit").unwrap_or("");
+                                    let expected_method = non_empty(outcome, "method").unwrap_or("");
+                                    if record.schema_version != "1.0.0"
+                                        || record.run_id != expected_run
+                                        || record.outcome_id != expected_outcome
+                                        || record.status != expected_status
+                                        || record.unit != expected_unit
+                                        || record.method != expected_method
+                                    {
+                                        errors.push(format!(
+                                            "{outcome_label} measurement payload identity/status/unit/method does not match experiment outcome"
+                                        ));
                                     }
-                                    for field in ["value", "lower", "upper", "unknown_reason"] {
-                                        match (outcome.get(field), record.get(field)) {
+                                    for (field, expected, actual) in [
+                                        ("value", outcome.get("value"), Some(&record.value)),
+                                        ("lower", outcome.get("lower"), Some(&record.lower)),
+                                        ("upper", outcome.get("upper"), Some(&record.upper)),
+                                        ("unknown_reason", outcome.get("unknown_reason"), Some(&record.unknown_reason)),
+                                    ] {
+                                        match (expected, actual) {
                                             (Some(expected), Some(actual)) if expected == actual => {}
                                             _ => errors.push(format!(
                                                 "{outcome_label} measurement payload field {field:?} does not exactly match experiment outcome"
@@ -402,7 +522,7 @@ pub fn verify_culinary_evidence_bundle_v1(
                                     }
                                 }
                                 Err(error) => errors.push(format!(
-                                    "{outcome_label} measurement artifact is not valid JSON: {error}"
+                                    "{outcome_label} measurement artifact is not valid strict JSON: {error}"
                                 )),
                             }
                         }
