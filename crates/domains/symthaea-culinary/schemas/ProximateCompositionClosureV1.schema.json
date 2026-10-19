@@ -219,7 +219,8 @@
       "required": [
         "component_id",
         "reason",
-        "detail"
+        "detail",
+        "evidence"
       ],
       "properties": {
         "component_id": {
@@ -246,6 +247,9 @@
         "detail": {
           "type": "string",
           "minLength": 1
+        },
+        "evidence": {
+          "$ref": "#/$defs/evidence"
         }
       }
     }
