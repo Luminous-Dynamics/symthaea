@@ -168,4 +168,4 @@ A reviewer should block progression if:
 
 ## First concrete deliverable
 
-The accompanying `benchmark-v0.json`, `scenario-corpus-v0.json`, and `scenario-corpus-v0.schema.json` define a reviewable research contract. They deliberately contain no approved treatment steps. The next coding change should implement a small Rust validator against those data contracts, with negative tests for unknown fields, duplicate IDs, corrupted digests, stale bundles, and unsupported protocol states, then publish a reproducible receipt bound to exact source/runtime digests.
+The accompanying `benchmark-v0.json`, `scenario-corpus-v0.json`, and `scenario-corpus-v0.schema.json` define a reviewable research contract. The Rust `xtask first-aid-validate` path now validates their typed contract and emits a digest-bound receipt; twelve unit tests are authored, but have not yet been verified as passing. The change-impact direction is specified separately in [Guideline Change-Impact and Runtime Conformance v0](GUIDELINE_CHANGE_IMPACT_V0.md). None of these artifacts contains approved treatment steps.
