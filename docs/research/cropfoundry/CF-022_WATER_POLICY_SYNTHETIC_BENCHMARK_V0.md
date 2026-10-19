@@ -37,7 +37,7 @@ Policies are:
 2. `soil_threshold`: use held/observed storage to refill the greatest deficit toward a fixed threshold.
 3. `uncertainty_aware_marginal_risk`: allocate in small increments according to estimated marginal reduction of the declared shortfall proxy. It adds a fixed conservative demand margin and raises plot priority when readings are stale; these are explicit heuristics, not statistically calibrated prediction intervals.
 
-The receipt records the scenario parameters, per-scenario applied irrigation, overflow proxy, synthetic stress-exposure proxy, cumulative allocation dispersion, percentage change against equal-share allocation, and absolute/relative stress change versus the same policy in the reference scenario, plus policy-level mean/median proxies and water totals. It also reports sensor-dropout fraction and daily budget violations. The executable fails if any policy exceeds a daily water cap or emits non-finite core metrics.
+The v1 receipt records scenario parameters, per-scenario and per-zone irrigation, overflow proxy, aggregate and per-zone stress-exposure proxies, worst/best zone burden, worst-to-best ratio, cumulative allocation dispersion, percentage change against equal-share allocation, and absolute/relative stress change versus the same policy in the reference scenario, plus policy-level mean/median aggregate and worst-zone proxies and water totals. It also reports sensor-dropout fraction and daily budget violations. The executable fails if any policy exceeds a daily water cap or emits non-finite core metrics.
 
 
 **Unit note:** per-plot storage/demand values are synthetic depth-like values. Global irrigation totals add depths over equally weighted toy plots and are labelled `plot-mm`; without plot areas, flow rates and hydraulics, these sums are not volumetric water use and must not be compared with farm meter readings.
@@ -65,12 +65,21 @@ The initial hard acceptance condition is zero daily water-budget violations and 
 
 A policy that wins this synthetic score has only passed an algorithmic test. A defensible agricultural claim requires, in order: a versioned crop/soil water-balance model and its calibration record; comparison with fixed-calendar, soil-threshold, ET-based and a suitable established crop-model baseline; leakage-resistant retrospective or hindcast evaluation; local sensitivity and uncertainty analysis; then preregistered, replicated field trials with metered water, crop outcomes, energy, labor, cost and environmental measurements. Safety, water-allocation rights and any local water constraints remain hard limits rather than soft optimization rewards.
 
-## ## What this benchmark is designed to reveal
+## ## Per-zone safety and distributional reporting — receipt schema v1
+
+The first working receipt made an important weakness visible: the uncertainty-aware policy concentrated more water on a subset of plots than equal-share allocation. In the earlier exploratory synthetic receipt, equal-share had median aggregate stress proxy 861.376 and total irrigation 1,386 plot-mm; the uncertainty-aware policy had median proxy 562.967 and total irrigation 909.7 plot-mm. Its mean plot-allocation dispersion was 33.4 plot-mm versus 0 for equal share, although all tested policy/scenario combinations had zero water-cap violations. These are outputs from an artificial fixture, not crop observations or physical water volume.
+
+That uneven allocation is why the harness now emits **per-zone cumulative irrigation, per-zone stress exposure, worst-zone and best-zone stress, and worst-to-best stress ratio** in receipt schema v1. Policy-level summaries also report the median and maximum worst-zone stress across scenarios. Inspect these beside total stress and allocation dispersion. A reduction in aggregate proxy must not be considered sufficient if the burden is shifted to one plot or a crop/household subgroup.
+
+The earlier receipt was an **exploratory implementation smoke run under the aggregate-only schema**. It is not a completed evaluation of the expanded reporting contract. Rerun the current harness and preserve the new per-zone metrics before evaluating CF-022 further. The provisional 10% aggregate target is unchanged; no permissible worst-zone burden or fairness bound has been locked, so this synthetic benchmark cannot authorize operational deployment.
+
+## What this benchmark is designed to reveal
 
 - Whether the policy accounts for the cost of scarce water instead of always filling all plots equally.
 - Whether decisions degrade gracefully with biased forecasts and intermittent/stale observations. The `water_rationing_only`, `forecast_bias_only` and `sensor_dropout_only` profiles are paired with the reference profile, changing only the designated factor. Their deltas can isolate each synthetic effect; heat/drought and compound-scenario deltas must not be attributed to one cause.
 - Whether hard resource caps remain satisfied under all tested conditions.
 - Whether the more complicated policy gives measurable decision value over simple baselines.
+- Whether aggregate improvement concentrates stress or irrigation burden on only a subset of plots; report worst-zone burden and disparity, not only the mean.
 - Whether the answer changes under stress weights, storage thresholds, forecast error, dropout patterns and scenario mix.
 
 ## Candidate field-stage benchmark (not enabled by the synthetic harness)
