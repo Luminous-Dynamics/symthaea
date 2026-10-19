@@ -129,7 +129,10 @@ impl fmt::Display for MetricValueInputError {
                 write!(f, "sample at index {index} is not finite")
             }
             Self::NonFiniteAggregate => {
-                write!(f, "sample summary produced a non-finite or invalid statistic")
+                write!(
+                    f,
+                    "sample summary produced a non-finite or invalid statistic"
+                )
             }
         }
     }
@@ -217,8 +220,7 @@ impl MetricValue {
     ) -> Result<Self, MetricValueInputError> {
         Self::validate_samples(samples)?;
         let summary = Self::from_valid_samples(samples)?;
-        let (ci_lower, ci_upper) =
-            super::analysis::bootstrap_ci_bca(samples, 2000, 0.05, seed);
+        let (ci_lower, ci_upper) = super::analysis::bootstrap_ci_bca(samples, 2000, 0.05, seed);
         if !ci_lower.is_finite() || !ci_upper.is_finite() || ci_lower > ci_upper {
             return Err(MetricValueInputError::NonFiniteAggregate);
         }

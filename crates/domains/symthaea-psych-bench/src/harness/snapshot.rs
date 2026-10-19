@@ -254,7 +254,6 @@ impl RegressionSnapshot {
     }
 }
 
-
 /// Errors that disqualify a strict regression comparison before any metric
 /// deltas are interpreted. These describe comparison integrity, not scientific
 /// findings such as an indicator being NotDemonstrated or Contradicted.
@@ -292,7 +291,11 @@ impl std::fmt::Display for SnapshotComparisonError {
             Self::InvalidSnapshot { side, errors } => {
                 write!(f, "{side} snapshot is invalid: {}", errors.join("; "))
             }
-            Self::UnsupportedSchemaVersion { side, found, expected } => write!(
+            Self::UnsupportedSchemaVersion {
+                side,
+                found,
+                expected,
+            } => write!(
                 f,
                 "{side} snapshot schema {found:?} is not supported for strict comparison; expected {expected:?}"
             ),
@@ -476,7 +479,9 @@ impl RegressionReport {
         }
         for benchmark in current.metrics.keys() {
             if !baseline.metrics.contains_key(benchmark) {
-                return Err(SnapshotComparisonError::UnexpectedBenchmark(benchmark.clone()));
+                return Err(SnapshotComparisonError::UnexpectedBenchmark(
+                    benchmark.clone(),
+                ));
             }
         }
 
@@ -594,10 +599,7 @@ mod strict_population_tests {
     use super::*;
     use crate::harness::report::MetricValue;
 
-    fn snapshot(
-        name: &str,
-        values: &[(&str, &[(&str, f64)])],
-    ) -> RegressionSnapshot {
+    fn snapshot(name: &str, values: &[(&str, &[(&str, f64)])]) -> RegressionSnapshot {
         let mut metrics = BTreeMap::new();
         for (benchmark, benchmark_metrics) in values {
             let mut per_benchmark = BTreeMap::new();
@@ -639,7 +641,13 @@ mod strict_population_tests {
     #[test]
     fn snapshot_validation_rejects_zero_sample_count() {
         let mut invalid = snapshot("zero-n", &[("NBack", &[("accuracy", 0.8)])]);
-        invalid.metrics.get_mut("NBack").unwrap().get_mut("accuracy").unwrap().n = 0;
+        invalid
+            .metrics
+            .get_mut("NBack")
+            .unwrap()
+            .get_mut("accuracy")
+            .unwrap()
+            .n = 0;
         let errors = invalid.validate().unwrap_err();
         assert!(errors.iter().any(|error| error.contains("sample count n")));
     }
@@ -647,29 +655,53 @@ mod strict_population_tests {
     #[test]
     fn snapshot_validation_rejects_negative_dispersion() {
         let mut invalid = snapshot("negative-sd", &[("NBack", &[("accuracy", 0.8)])]);
-        invalid.metrics.get_mut("NBack").unwrap().get_mut("accuracy").unwrap().std_dev = -0.1;
+        invalid
+            .metrics
+            .get_mut("NBack")
+            .unwrap()
+            .get_mut("accuracy")
+            .unwrap()
+            .std_dev = -0.1;
         let errors = invalid.validate().unwrap_err();
-        assert!(errors.iter().any(|error| error.contains("finite and non-negative")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("finite and non-negative"))
+        );
     }
 
     #[test]
     fn snapshot_validation_rejects_nonfinite_or_reversed_confidence_bounds() {
         let mut nonfinite = snapshot("nonfinite-ci", &[("NBack", &[("accuracy", 0.8)])]);
-        let metric = nonfinite.metrics.get_mut("NBack").unwrap().get_mut("accuracy").unwrap();
+        let metric = nonfinite
+            .metrics
+            .get_mut("NBack")
+            .unwrap()
+            .get_mut("accuracy")
+            .unwrap();
         metric.ci_lower = f64::INFINITY;
         let errors = nonfinite.validate().unwrap_err();
-        assert!(errors
-            .iter()
-            .any(|error| error.contains("ci_lower is not finite")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("ci_lower is not finite"))
+        );
 
         let mut reversed = snapshot("reversed-ci", &[("NBack", &[("accuracy", 0.8)])]);
-        let metric = reversed.metrics.get_mut("NBack").unwrap().get_mut("accuracy").unwrap();
+        let metric = reversed
+            .metrics
+            .get_mut("NBack")
+            .unwrap()
+            .get_mut("accuracy")
+            .unwrap();
         metric.ci_lower = 0.9;
         metric.ci_upper = 0.7;
         let errors = reversed.validate().unwrap_err();
-        assert!(errors
-            .iter()
-            .any(|error| error.contains("ci_lower exceeds ci_upper")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("ci_lower exceeds ci_upper"))
+        );
     }
 
     #[test]
@@ -677,8 +709,16 @@ mod strict_population_tests {
         let mut invalid = snapshot("empty-inner", &[]);
         invalid.metrics.insert("NBack".to_string(), BTreeMap::new());
         let errors = invalid.validate().unwrap_err();
-        assert!(errors.iter().any(|error| error.contains("no benchmark metrics")));
-        assert!(errors.iter().any(|error| error.contains("benchmark contains no metrics")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("no benchmark metrics"))
+        );
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("benchmark contains no metrics"))
+        );
     }
 
     #[test]
@@ -732,7 +772,10 @@ mod strict_population_tests {
         let current = snapshot("current", &[]);
         assert!(matches!(
             RegressionReport::compare_strict_metric_population(&baseline, &current, 0.05, 0.10),
-            Err(SnapshotComparisonError::InvalidSnapshot { side: "current", .. })
+            Err(SnapshotComparisonError::InvalidSnapshot {
+                side: "current",
+                ..
+            })
         ));
     }
 
@@ -763,10 +806,9 @@ mod strict_population_tests {
             "current",
             &[("NBack", &[("accuracy", 0.81), ("latency", 4.1)])],
         );
-        let report = RegressionReport::compare_strict_metric_population(
-            &baseline, &current, 0.05, 0.10,
-        )
-        .unwrap();
+        let report =
+            RegressionReport::compare_strict_metric_population(&baseline, &current, 0.05, 0.10)
+                .unwrap();
         assert_eq!(report.summary.total_metrics, 2);
         assert_eq!(report.results.len(), 2);
     }
@@ -809,7 +851,8 @@ mod strict_population_tests {
             assert_eq!(
                 RegressionReport::compare_strict_metric_population(
                     &baseline, &current, warning, critical
-                ).unwrap_err(),
+                )
+                .unwrap_err(),
                 SnapshotComparisonError::InvalidThresholdPolicy
             );
         }

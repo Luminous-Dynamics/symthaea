@@ -38,12 +38,13 @@ pub use reliability_analysis::{
 };
 pub use report::{
     BaselineComparison, BenchmarkReport, BenchmarkResult, CompositeScore, ForestPlotRow,
-    LearningCurveRow, MetricValue, MetricValueInputError, RtSummary, key_metric_for_benchmark, provenance_table,
+    LearningCurveRow, MetricValue, MetricValueInputError, RtSummary, key_metric_for_benchmark,
+    provenance_table,
 };
 pub use sat_curves::{SatBattery, SatCurve, SatFit, SatPoint, run_sat_curve};
 pub use snapshot::{
     RegressionReport, RegressionResult, RegressionSeverity, RegressionSnapshot, RegressionSummary,
-    SnapshotComparisonError, SNAPSHOT_SCHEMA_VERSION,
+    SNAPSHOT_SCHEMA_VERSION, SnapshotComparisonError,
 };
 pub use staircase::{StaircaseConfig, StaircaseResult, StaircaseRule, run_staircase};
 pub use trial_analysis::{
