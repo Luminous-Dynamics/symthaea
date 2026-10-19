@@ -37,7 +37,7 @@ Policies are:
 2. `soil_threshold`: use held/observed storage to refill the greatest deficit toward a fixed threshold.
 3. `uncertainty_aware_marginal_risk`: allocate in small increments according to estimated marginal reduction of the declared shortfall proxy. It adds a fixed conservative demand margin and raises plot priority when readings are stale; these are explicit heuristics, not statistically calibrated prediction intervals.
 
-The receipt records the scenario parameters, per-scenario applied irrigation, overflow proxy, synthetic stress-exposure proxy, cumulative allocation dispersion and percentage change against equal-share allocation, plus policy-level mean/median proxies and water totals. It also reports sensor-dropout fraction and daily budget violations. The executable fails if any policy exceeds a daily water cap or emits non-finite core metrics.
+The receipt records the scenario parameters, per-scenario applied irrigation, overflow proxy, synthetic stress-exposure proxy, cumulative allocation dispersion, percentage change against equal-share allocation, and absolute/relative stress change versus the same policy in the reference scenario, plus policy-level mean/median proxies and water totals. It also reports sensor-dropout fraction and daily budget violations. The executable fails if any policy exceeds a daily water cap or emits non-finite core metrics.
 
 
 **Unit note:** per-plot storage/demand values are synthetic depth-like values. Global irrigation totals add depths over equally weighted toy plots and are labelled `plot-mm`; without plot areas, flow rates and hydraulics, these sums are not volumetric water use and must not be compared with farm meter readings.
@@ -53,7 +53,7 @@ A policy that wins this synthetic score has only passed an algorithmic test. A d
 ## ## What this benchmark is designed to reveal
 
 - Whether the policy accounts for the cost of scarce water instead of always filling all plots equally.
-- Whether decisions degrade gracefully with biased forecasts and intermittent/stale observations. The `forecast_bias_only` and `sensor_dropout_only` profiles are paired with the reference profile to help isolate each factor before interpreting the compound scenario.
+- Whether decisions degrade gracefully with biased forecasts and intermittent/stale observations. The `forecast_bias_only` and `sensor_dropout_only` profiles are paired with the reference profile. Their deltas can isolate these synthetic factors; water-rationing and compound-scenario deltas confound multiple changes and must not be attributed to one cause.
 - Whether hard resource caps remain satisfied under all tested conditions.
 - Whether the more complicated policy gives measurable decision value over simple baselines.
 - Whether the answer changes under stress weights, storage thresholds, forecast error, dropout patterns and scenario mix.
