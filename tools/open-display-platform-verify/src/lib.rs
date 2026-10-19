@@ -17,6 +17,7 @@ pub const EXPECTED_SCHEMA_DRAFT: &str = "https://json-schema.org/draft/2020-12/s
 
 mod cad_receipt;
 pub use cad_receipt::{CadRuntimeReceiptValidationReport, validate_cad_runtime_receipt_str};
+pub mod drift_control;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ValidationReport {
