@@ -1,17 +1,19 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Controlled FluidSynth-vs-native A/B across all eight performance dialects.
+//! Controlled renderer comparison plus same-MIDI profile ablation across all eight dialects.
 //!
-//! Both arms receive the same score, seed, declared style dialect, loudness
-//! target, limiter ceiling, and dialect-derived mastering profile. The renderer
-//! is not isolated from its instrument backend (native synthesis/VCSL versus
-//! SoundFont), but no arm gets a different mastering target. The style's room
-//! and EQ hypotheses are applied symmetrically as well.
+//! Three arms are emitted per style: native with the dialect profile, FluidSynth
+//! with its default/no-dialect profile, and FluidSynth with the dialect profile.
+//! The two FluidSynth arms consume the exact same performed MIDI and SoundFont;
+//! their contrast isolates the combined dialect room/mastering settings. The
+//! native-versus-FluidSynth comparison remains a backend comparison, not a pure
+//! profile test. All arms share the loudness target and limiter ceiling.
 //!
 //! # What this measures
 //!
-//! It prints objective per-arm loudness, sample peak, crest factor, and broad
-//! spectral balance. These identify gross differences and catch failed or
+//! It records objective per-arm loudness, sample peak, crest factor, and broad
+//! spectral balance, plus hashes for source/build/assets/MIDI/audio and the
+//! applied profile. These identify gross differences and catch failed or
 //! imbalanced renders; none alone is a musical-quality metric. The first
 //! profile A/B predates the eight-dialect mapping and is historical context only.
 //! Re-run this harness for any new profile revision, then use the separate
@@ -510,6 +512,8 @@ fn main() {
             "profile_version": "melothaea-style-render-profile-v1",
             "profile_fingerprint_sha256": profile_fingerprint_sha256,
             "profile_controls_differ_from_default": profile_controls_differ_from_default,
+            "default_vs_profile_pcm_hash_equal": neutral.pcm_sha256 == b.pcm_sha256,
+            "default_vs_profile_wav_hash_equal": neutral_wav_sha256 == wav_sha256,
             "profile_vs_default_signal_delta": {
                 "integrated_lufs": profile_lufs_delta,
                 "crest_factor_db": profile_crest_delta,
@@ -634,6 +638,7 @@ fn main() {
     let vcsl_provenance_complete = !vcsl_enabled || vcsl_manifest_valid;
     let run_complete = deltas.len() == cohort.len()
         && failures.is_empty()
+        && profile_deltas.len() == cohort.len()
         && source_revision_valid
         && vcsl_provenance_complete
         && fluidsynth_version.is_some();
