@@ -562,6 +562,8 @@ fn reject_ungrounded_quantitative_claims(
                         "scenario_probability",
                         "failure_probability",
                         "outcome_probability",
+                        "outcome_probabilities",
+                        "quantitative_experiment_costs",
                         "expected_value",
                         "expected_roi",
                         "expected_annual_loss",
