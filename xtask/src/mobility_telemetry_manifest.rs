@@ -1737,6 +1737,8 @@ mod tests {
                 mutation: "positive_control".to_owned(),
                 expected: "accept".to_owned(),
                 observed: "accept".to_owned(),
+                required_detail_tokens: vec!["expected counters match".to_owned()],
+                missing_detail_tokens: Vec::new(),
                 passed: true,
                 detail: "expected counters match".to_owned(),
             }],
