@@ -78,7 +78,7 @@ jobs:
         run: |
           cat > "$RUNNER_TEMP/cropfoundry-nutrition-input.json" <<'JSON'
           {
-            "schema_version": "cropfoundry-nutrition-accounting-input-v0",
+            "schema_version": "cropfoundry-nutrition-accounting-input-v1",
             "batch_id": "synthetic-nutrition-lot",
             "nutrient_id": "iron",
             "concentration_mg_per_kg": 80.0,
