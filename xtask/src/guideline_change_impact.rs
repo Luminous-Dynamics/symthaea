@@ -489,8 +489,7 @@ fn validate_contract(
         })?;
         let expected_locator = format!(
             "synthetic://{}/{}",
-            contract.to_revision_id,
-            mapping.requirement_id
+            contract.to_revision_id, mapping.requirement_id
         );
         if mapping.source_locator != expected_locator {
             bail!(
