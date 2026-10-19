@@ -557,6 +557,15 @@ mod tests {
         assert_eq!(report.screening.controls.len(), 3);
         assert_eq!(report.screening.maximum_control_gap_seconds, 40.0);
         assert_eq!(report.screening.observed_max_control_gap_seconds, 40.0);
+        let report_json = report.to_json();
+        assert_eq!(
+            report_json["control_schedule"]["maximum_allowed_gap_seconds"].as_f64(),
+            Some(40.0)
+        );
+        assert_eq!(
+            report_json["control_schedule"]["observed_max_gap_seconds"].as_f64(),
+            Some(40.0)
+        );
         assert_eq!(
             report.screening.observations[0].disposition,
             ObservationDisposition::NoOutOfBandControlDetected
@@ -578,6 +587,19 @@ mod tests {
                 .as_str()
                 .is_some_and(|text| text.contains("No physical instrument"))
         );
+    }
+
+    #[test]
+    fn drift_plan_rejects_maximum_gap_smaller_than_scheduled_gap() {
+        let mut plan: serde_json::Value =
+            serde_json::from_str(DRIFT_PLAN_TEXT).expect("plan fixture must parse");
+        plan["maximum_control_gap_seconds"] = serde_json::json!(30.0);
+        let mutated = serde_json::to_string(&plan).expect("mutated plan must serialize");
+        let errors = validate_drift_control_plan_str(&mutated, DRIFT_SCHEMA_TEXT)
+            .expect_err("the 40-second planned gap must not pass a 30-second cap");
+        assert!(errors
+            .iter()
+            .any(|error| error.contains("scheduled control gap exceeds")));
     }
 
     #[test]
