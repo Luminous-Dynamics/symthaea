@@ -14,12 +14,12 @@ A reproducible analysis needs two different records, not one overloaded digest:
 
 The semantic projection must not erase meaningful differences merely to make outputs match. It preserves file hashes, handlers, chunk intervals, report values, relative extracted paths, errors, and parent-child edges. It removes only explicitly recognized provider-generated IDs from ChunkReport, UnknownChunkReport, and MultiFileReport, and strips the caller-declared disposable extraction root from path fields. The raw report is not rewritten or discarded.
 
-Unblob's documented JSON report is a list of task results containing task, reports, and subtasks. Reports include producer IDs and path values, while subtasks refer back to IDs. This makes careless JSON sorting or blanket ID deletion unsafe: the references must be remapped to the corresponding semantic producer record, and unknown report types must not disappear. The projection also handles multi-file producer reports without fabricating byte ranges where the provider gives none.
+Unblob 26.6.4's actual serialized Task fields are `path`, `depth`, `blob_id`, and `is_multi_file`; each TaskResult contains `task`, `reports`, and `subtasks`. A descendant Task's `blob_id` normally references a producer ID (`ChunkReport` or `MultiFileReport`) on its parent task. Directory expansion also produces same-depth child tasks that inherit the directory task's `blob_id`; the projection represents these as a distinct `directory-expansion` edge only when the parent has a directory StatReport. This matters for multi-file output: two children can legitimately inherit one MultiFileReport ID through an intermediate extraction-directory Task. This prototype uses the real Task field names and models that directory-expansion case instead of flattening it into a fictional direct edge. Producer IDs are generated from worker PID plus a counter in the pinned upstream identifier implementation; path/order and known ID variation are therefore explicit test dimensions. The reports' parent references must be remapped to their semantic producer records, and unknown report types must not disappear.
 
 ## Invariants
 
 - Exactly one depth-zero root task; task paths are unique after removing the configured root prefix.
-- Every child is named exactly once by its parent and refers to one producer report on that parent. Parent, child, depth, and provider reference must agree.
+- The root Task has empty `blob_id` at depth 0. Every non-root Task is named exactly once by a parent subtask entry, with exact path, `blob_id`, `depth`, and `is_multi_file` agreement. A depth+1 child must refer to exactly one local parent `ChunkReport` or `MultiFileReport`. A same-depth child is accepted only as directory expansion, where its `blob_id` is inherited and the parent has a directory StatReport.
 - Chunk intervals use nonnegative integer, half-open ranges; size = end_offset - start_offset; when StatReport.size is present, the chunk must be in bounds.
 - Only the declared temporary root is stripped. Absolute paths outside that root and relative parent traversal are rejected rather than silently rewritten.
 - Report/task/subtask ordering is canonicalized, while semantic arrays such as MultiFileReport.paths remain in source order conservatively.
@@ -30,7 +30,7 @@ Unblob's documented JSON report is a list of task results containing task, repor
 
 ## Benchmark corpus
 
-cases.json contains two independently-rooted report fixtures: a nested compressed child with an explicit unknown byte region, and a multi-file extraction with two child tasks. The paired fixtures deliberately vary the extraction root, provider IDs, task order, report order, and subtask order while preserving the semantic graph.
+cases.json contains four synthetic TaskResult fixtures: a nested compressed child with an explicit unknown byte region; a relocated/permuted equivalent; a MultiFileReport with an intermediate extraction-directory task and two same-depth file tasks; and a relocated/permuted equivalent. The field shape follows Unblob 26.6.4's model, but fixtures are handcrafted and not captured provider output. Paired fixtures vary extraction root, provider IDs, task order, report order, and subtask order while preserving the semantic graph.
 
 oracle.json is separate and lists 24 expected relations:
 
@@ -63,6 +63,6 @@ For a real-provider lane, retain separate measurements for (a) input-byte identi
 
 ## Claims ceiling and next evidence gate
 
-This is a **synthetic Unblob-shaped report contract**. It does not execute Unblob or REA, parse a real upstream report, execute recovered code, emulate a target, or touch hardware. Its shape is informed by the public Unblob docs and model definitions; the JSON values are handcrafted fixtures, not outputs from a real extraction run.
+This is a **synthetic report contract using Unblob 26.6.4's Task and TaskResult field schema**. It does not execute Unblob or REA or parse a report emitted by a real upstream process. The schema was checked against upstream commit `1fcc7a0`; fixtures remain handcrafted. No recovered code, emulator, or hardware is used.
 
 Next decisive gate: run a pinned Unblob release against an owned synthetic archive/compression fixture, capture the exact raw --report JSON and its digest, compare the real report against this projection, and separately verify CLI/MCP normalization once REA provides the same report through both surfaces. Only after that should a Rust-native Symthaea importer consume the contract. A semantic projection match is reproducibility evidence, not proof that extracted files are complete, safe, equivalent, or behaviorally correct.
