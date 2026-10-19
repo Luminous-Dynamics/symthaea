@@ -40,5 +40,6 @@
       "observation_id": "SAMPLE-LATE",
       "time_seconds": 90
     }
-  ]
+  ],
+  "maximum_control_gap_seconds": 40
 }
