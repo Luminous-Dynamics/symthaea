@@ -1,0 +1,89 @@
+{
+  "schema_version": "1.0.0",
+  "log_id": "synthetic-rice-pea-boil-temperature-log-v1",
+  "trace_id": "synthetic-rice-pea-process-trace-v1",
+  "process_id": "synthetic-boil-with-water-v1",
+  "sensors": [
+    {
+      "sensor_id": "synthetic-pot-probe",
+      "sensor_kind": "thermocouple",
+      "calibration_status": "unverified",
+      "stated_accuracy_c": 1,
+      "last_calibrated_at": null,
+      "calibration_evidence": {
+        "source_ref": "urn:synthetic:sensor-documentation",
+        "source_version": "fixture-v1",
+        "known_at": "2026-10-19T00:00:00Z",
+        "evidence_status": "synthetic"
+      }
+    }
+  ],
+  "observations": [
+    {
+      "observation_id": "temp-000",
+      "step_id": "boil",
+      "sensor_id": "synthetic-pot-probe",
+      "sequence_index": 0,
+      "measured_at": "2026-10-19T00:00:00Z",
+      "measurement_kind": "process_medium_temperature",
+      "location_description": "synthetic fixture; center of liquid in cooking vessel",
+      "temperature_c": {
+        "status": "estimated",
+        "value_c": 22,
+        "lower_c": 20,
+        "upper_c": 24,
+        "unit": "degC"
+      },
+      "evidence": {
+        "source_ref": "urn:synthetic:temperature:000",
+        "source_version": "fixture-v1",
+        "known_at": "2026-10-19T00:00:00Z",
+        "evidence_status": "synthetic"
+      }
+    },
+    {
+      "observation_id": "temp-001",
+      "step_id": "boil",
+      "sensor_id": "synthetic-pot-probe",
+      "sequence_index": 1,
+      "measured_at": "2026-10-19T00:05:00Z",
+      "measurement_kind": "process_medium_temperature",
+      "location_description": "synthetic fixture; center of liquid in cooking vessel",
+      "temperature_c": {
+        "status": "estimated",
+        "value_c": 75,
+        "lower_c": 72,
+        "upper_c": 78,
+        "unit": "degC"
+      },
+      "evidence": {
+        "source_ref": "urn:synthetic:temperature:001",
+        "source_version": "fixture-v1",
+        "known_at": "2026-10-19T00:00:00Z",
+        "evidence_status": "synthetic"
+      }
+    },
+    {
+      "observation_id": "temp-002",
+      "step_id": "boil",
+      "sensor_id": "synthetic-pot-probe",
+      "sequence_index": 2,
+      "measured_at": "2026-10-19T00:10:00Z",
+      "measurement_kind": "process_medium_temperature",
+      "location_description": "synthetic fixture; center of liquid in cooking vessel",
+      "temperature_c": {
+        "status": "estimated",
+        "value_c": 95,
+        "lower_c": 92,
+        "upper_c": 98,
+        "unit": "degC"
+      },
+      "evidence": {
+        "source_ref": "urn:synthetic:temperature:002",
+        "source_version": "fixture-v1",
+        "known_at": "2026-10-19T00:00:00Z",
+        "evidence_status": "synthetic"
+      }
+    }
+  ]
+}

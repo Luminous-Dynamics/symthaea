@@ -55,6 +55,7 @@ pub mod reaction;
 pub mod rng;
 pub mod spec;
 pub mod thermal;
+pub mod thermal_observation;
 pub mod thresholds;
 pub mod validate;
 
