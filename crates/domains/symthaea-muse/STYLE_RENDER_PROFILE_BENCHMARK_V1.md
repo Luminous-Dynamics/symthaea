@@ -61,10 +61,12 @@ revision is absent/ill-formed, FluidSynth version probing fails, or VCSL is acti
 without a syntactically valid manifest digest.
 
 The emitted profile fingerprint covers grammar/renderer dialect, mastering
-targets/caps, and FluidSynth room controls. It deliberately does not fold asset
-identity into the profile hash: tool, SoundFont, source revision, input MIDI,
-and rendered output hashes remain separate fields so a difference can be
-localized instead of being hidden in a single composite digest.
+targets/caps, and FluidSynth room controls. Each row also reports whether the
+profile's controls differ from defaults, profile-minus-default signal deltas,
+and exact PCM/WAV hash equality for the no-op control. It deliberately does not
+fold asset identity into the profile hash: tool, SoundFont, source revision,
+input MIDI, and rendered output hashes remain separate fields so a difference
+can be localized instead of being hidden in a single composite digest.
 
 The preset mapping is now explicit in Style::grammar_profile; dialect_for_spec
 remains the fallback for custom specs only. RendererRecipe schema v4 records the
@@ -104,15 +106,25 @@ Run the paired renderer probe on fixed seeds and a qualified asset environment:
       cargo run --release -p symthaea-muse --features theory --example renderer_ab_fair
     '
 
-The probe now writes
+The probe now renders three arms per style and writes
 `audio_output/renderer-ab-fair-{synth|vcsl}/renderer-ab-fair-manifest.json`
-alongside the WAV/MIDI cohort. The JSON receipt records the caller-supplied
-source revision, executable SHA-256 and byte length, FluidSynth executable hash
-and version output, SoundFont SHA-256 and byte length, MIDI SHA-256 per cell,
-canonical native/FluidSynth PCM hashes, FluidSynth WAV hashes, profile
-fingerprints, exact mastering values, room settings, signal measurements, and
-per-cell failure codes. Native PCM hashes use interleaved little-endian f32
-stereo samples; FluidSynth WAV hashes include the file container.
+alongside the WAV/MIDI cohort: native with the dialect profile, FluidSynth with
+the default/no-dialect profile, and FluidSynth with the dialect profile. The two
+FluidSynth arms use the same exact MIDI file, SoundFont, binary, and requested
+sample rate. This gives a paired signal-level ablation of the *combined*
+dialect-specific room/mastering settings, alongside the separate cross-backend
+native-versus-FluidSynth diagnostic. It does not isolate room from mastering or
+establish a perceptual benefit.
+
+The JSON receipt records the caller-supplied source revision, executable
+SHA-256 and byte length, FluidSynth executable hash and version output, SoundFont
+SHA-256 and byte length, per-cell MIDI SHA-256, canonical PCM hashes for all
+three arms, both FluidSynth WAV hashes, profile fingerprints, exact mastering
+values, room settings, signal measurements, default-versus-profile deltas, and
+per-cell failure codes. Native/FluidSynth PCM hashes use interleaved little-endian
+f32 stereo samples; FluidSynth WAV hashes include the file container. Both
+FluidSynth WAVs are kept for a later randomized blind listening study; the probe
+does not itself create or score a blinded listening pack.
 
 Set `SYMTHAEA_GIT_REVISION` to the exact checkout SHA before the run. A complete
 status requires all eight cohort rows, a valid 40- or 64-character hexadecimal
@@ -135,10 +147,13 @@ musical quality.
 
 ### Perceptual gate
 
-Use fixed symbolic scores and a preregistered, randomized blind A/B or ABX:
-neutral profile versus dialect profile, level matched, identical MIDI, identical
-SoundFont, same sample rate and mastering chain. Keep the composition and
-instrument ensemble constant for the renderer-profile ablation. For a separate
+Use the two FluidSynth WAVs from the same cell for a preregistered, randomized
+blind A/B or ABX: default/no-dialect profile versus dialect profile, level matched
+for presentation, with the exact same MIDI SHA-256, SoundFont SHA-256, renderer
+binary SHA-256, and requested sample rate. The tested treatment is the *combined*
+room-and-mastering profile, so do not claim the experiment isolates individual
+EQ, room, or mastering controls. Keep the composition and instrument ensemble
+constant for the profile ablation. For a separate
 style-identity trial, allow the score, ensemble and dialect to vary, and balance
 listener familiarity. Randomize presentation order and hide renderer/model
 identity until debrief; if AI-versus-human labelling is of interest, test that in
@@ -159,6 +174,16 @@ Targets for the first pilot (proposed, not existing results):
   fit or preference over the neutral profile without reducing audio-quality
   ratings. If not, revert or revise the profile; objective spectral movement is
   not sufficient.
+- **Profile-control fidelity:** each successful cell records one MIDI digest
+  reused by both FluidSynth arms; the tool and SoundFont hashes, sample rate,
+  and control settings are explicitly reported. Require 8/8 completed cells and
+  a complete receipt before aggregating results. As a positive control, the
+  ClassicalRubato/default profile has no declared room or mastering changes:
+  compare its default-versus-profile PCM/WAV hashes. Exact equality is the
+  target if the backend is deterministic; any divergence must be investigated
+  as possible DSP randomness, hidden defaults, or a parity defect before the
+  control is treated as passed. The current probe reports these hash equalities
+  but does not yet fail the run solely on mismatch.
 - **Level fairness:** both arms stay within 1.0 LU of the intended integrated
   loudness target and below the configured peak ceiling, or the comparison is
   invalid. (The current WAV peak check is sample peak; a true-peak meter is
