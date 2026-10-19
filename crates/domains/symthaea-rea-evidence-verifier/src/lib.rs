@@ -345,6 +345,9 @@ pub fn verify_bundle(
     if !is_git_sha(&workflow_event_sha) {
         return Err(err("receipt workflow event SHA is not a lowercase 40-character Git SHA"));
     }
+    if checkout_commit_sha != workflow_event_sha {
+        return Err(err("receipt checkout commit does not match the workflow event SHA"));
+    }
 
     let executable_path = text_field(&receipt, "executable_path")?;
     if !Path::new(&executable_path).is_absolute() {
@@ -545,7 +548,7 @@ mod tests {
 
         let head = "1234567890abcdef1234567890abcdef12345678".to_owned();
         let checkout = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_owned();
-        let event = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_owned();
+        let event = checkout.clone();
         let input = b"gzip-input-v1";
         let input_mutated = b"gzip-input-v2";
         let payload = b"inert payload v1\n";
@@ -682,6 +685,17 @@ mod tests {
         let f = create_fixture();
         let other = "9999999999999999999999999999999999999999";
         assert!(verify_bundle(&f.artifact, &f.source, other, None).unwrap_err().to_string().contains("expected head"));
+    }
+
+    #[test]
+    fn rejects_checkout_and_workflow_event_sha_disagreement() {
+        let f = create_fixture();
+        let raw: Value = serde_json::from_slice(&fs::read(f.artifact.join("receipt.json")).unwrap()).unwrap();
+        let mut changed = raw;
+        changed["source"]["workflow_event_sha"] = json!("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
+        write(&f.artifact.join("receipt.json"), serde_json::to_vec_pretty(&changed).unwrap().as_slice());
+        assert!(verify_bundle(&f.artifact, &f.source, &f.expected_head, None)
+            .unwrap_err().to_string().contains("workflow event SHA"));
     }
 
     #[test]
