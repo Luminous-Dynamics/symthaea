@@ -37,7 +37,8 @@
         "verify-artifacts",
         "inspect-csv",
         "validate-records",
-        "reconcile-csv"
+        "reconcile-csv",
+        "inspect-zip"
       ]
     },
     "status": {
@@ -327,6 +328,89 @@
           }
         }
       }
+    },
+    "zip_inventory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact_relative_path",
+        "archive_sha256",
+        "member_count",
+        "total_uncompressed_bytes",
+        "members",
+        "inventory_note",
+        "claim_ceiling"
+      ],
+      "properties": {
+        "artifact_relative_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "archive_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "member_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total_uncompressed_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "members": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "member_path",
+              "compressed_size_bytes",
+              "uncompressed_size_bytes",
+              "crc32_hex",
+              "is_directory",
+              "unix_mode"
+            ],
+            "properties": {
+              "member_path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "compressed_size_bytes": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "uncompressed_size_bytes": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "crc32_hex": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{8}$"
+              },
+              "is_directory": {
+                "type": "boolean"
+              },
+              "unix_mode": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 4294967295
+              }
+            }
+          }
+        },
+        "inventory_note": {
+          "type": "string",
+          "minLength": 1
+        },
+        "claim_ceiling": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
     }
   },
   "allOf": [
@@ -374,6 +458,30 @@
         "not": {
           "required": [
             "csv_reconciliation"
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "operation": {
+            "const": "inspect-zip"
+          }
+        },
+        "required": [
+          "operation"
+        ]
+      },
+      "then": {
+        "required": [
+          "zip_inventory"
+        ]
+      },
+      "else": {
+        "not": {
+          "required": [
+            "zip_inventory"
           ]
         }
       }
