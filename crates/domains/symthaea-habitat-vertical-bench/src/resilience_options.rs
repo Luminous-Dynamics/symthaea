@@ -343,8 +343,8 @@ pub fn validate_resilience_options(root: &Value) -> ResilienceOptionReport {
         );
     }
 
-    if let (Some(options), Some(scenarios)) = (options_by_id.keys().cloned().collect::<Vec<_>>().into_iter().collect::<HashSet<_>>().checked_for_set(), scenario_ids.as_ref()) {
-        let expected_count = options.len().saturating_mul(scenarios.len());
+    if let Some(scenarios) = scenario_ids.as_ref() {
+        let expected_count = options_by_id.len().saturating_mul(scenarios.len());
         if outcome_count != expected_count {
             push(
                 &mut issues,
@@ -356,7 +356,7 @@ pub fn validate_resilience_options(root: &Value) -> ResilienceOptionReport {
                 ),
             );
         }
-        for option_id in options.iter() {
+        for option_id in options_by_id.keys() {
             for scenario_id in scenarios {
                 if !outcomes_by_key.contains_key(&(option_id.clone(), scenario_id.clone())) {
                     push(
@@ -370,13 +370,6 @@ pub fn validate_resilience_options(root: &Value) -> ResilienceOptionReport {
                 }
             }
         }
-    }
-
-    if let (Some(baseline), Some(scenarios)) = (
-        outcomes_by_key.get(&("LEAN_BASELINE".to_owned(), String::new())),
-        scenario_ids.as_ref(),
-    ) {
-        let _ = (baseline, scenarios);
     }
 
     validate_conditional_oracle(
@@ -793,7 +786,7 @@ mod tests {
     #[test]
     fn unmitigated_scenario_must_match_baseline_bounds() {
         let mut value = fixture();
-        value["scenario_outcomes"][8]["lost_accepted_unit_hours_bounds"]["upper"] =
+        value["scenario_outcomes"][16]["lost_accepted_unit_hours_bounds"]["upper"] =
             json!(1);
         assert!(has_code(
             &validate_resilience_options(&value),
