@@ -147,6 +147,14 @@ The executable `cropfoundry-robust-policy-demo` now re-simulates the same five p
 
 This is more auditable than a six-case single-worst-point summary, but it is still a fixed sensitivity suite, not a random sample from a climate distribution. Equal-weight sensitivity cases do not define real-world probabilities. CF-025 remains blocked until joint uncertainty sets, evidence-backed dependence assumptions, empirical/site-year holdouts, calibration and the preference protocol are pinned. A robust synthetic algorithm run does not establish crop efficacy, calibrated risk, field transfer, food safety or affordability; see [CF-025_ROBUST_DECISION_UNCERTAINTY_BENCHMARK_V0.md](./CF-025_ROBUST_DECISION_UNCERTAINTY_BENCHMARK_V0.md).
 
+## Additional paradigm shift: design experiments to maximize decision value per farm burden
+
+Before spending scarce field-season, seed, labor, fertilizer and water budgets, estimate whether the proposed trial can distinguish a practically meaningful treatment effect. New work is being added as **CF-027**, a Rust trial-power preflight that records the exact input digest and reports a two-arm normal-approximation sample size with Bonferroni correction for co-primary endpoints, a simple cluster design effect and an attrition allowance.
+
+This direction is supported by on-farm trial-design research. Lark et al. (2025) showed the importance of farm-scale block replication and regional site coverage for micronutrient interventions ([npj Sustainable Agriculture](https://www.nature.com/articles/s44264-025-00101-0)). Responsible agricultural research guidance emphasizes random allocation, replication, blocking, and matching the statistical analysis to the experimental design ([Sichinga-Ligowe et al., 2024](https://doi.org/10.1079/cabireviews.2024.0058)). The preflight is deliberately not a substitute for a mixed-model, spatial, repeated-measures or cluster-aware power simulation.
+
+The next standard should be: *no confirmatory biological claim without a pre-registered endpoint and estimand, independent variance basis, minimum practically important effect, allocation unit, randomization/blocking scheme, power/alpha, expected attrition and a design-specific analysis plan*. Underpowered trials should be identified before planting, not defended afterward by post-hoc observed power. The runnable method and its limitations are specified in [CF-027_TRIAL_POWER_PREFLIGHT_V0.md](./CF-027_TRIAL_POWER_PREFLIGHT_V0.md).
+
 ## System boundaries
 
 - **Symthaea:** evidence-aware reasoning, candidate generation, uncertainty handling, multi-objective ranking, experiment selection, and recommendation receipts.
