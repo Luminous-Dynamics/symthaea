@@ -17,6 +17,7 @@ pub mod event_replay;
 pub mod material_ledger;
 pub mod measurement_gate;
 pub mod audit_bundle;
+pub mod recall_drill;
 
 use serde_json::Value;
 use symthaea_graph_theory::Graph;

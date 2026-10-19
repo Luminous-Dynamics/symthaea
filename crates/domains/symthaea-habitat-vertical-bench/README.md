@@ -17,7 +17,7 @@ Validate an alternate fixture by passing its path:
 cargo run -p symthaea-habitat-vertical-bench --bin validate-habitat-vertical -- path/to/fixture.json
 ```
 
-The default fixture is embedded at compile time from `docs/research/fixtures/habitat-vertical-v0.1.json`. The CLI also validates the definition-only campaign, event replay, quantity-aware material ledger, interval-aware measurement gate, and cross-layer audit bundle fixtures. A successful run means only that fixture structure, synthetic arithmetic controls, scenario definitions, event identity/causal replay, the synthetic quantity ledger, measurement-decision known answers, and exact fixture-byte fingerprints are internally consistent. It does not run a scheduler or simulate a disruption. The CLI prints the synthetic cost ratio and mass-balance known answers; negative controls are declared and only the mutations covered by unit tests are exercised by the test suite.
+The default fixture is embedded at compile time from `docs/research/fixtures/habitat-vertical-v0.1.json`. The CLI also validates the definition-only campaign, event replay, quantity-aware material ledger, interval-aware measurement gate, cross-layer audit bundle, and recall-response drill fixtures. A successful run means only that fixture structure, synthetic arithmetic controls, scenario definitions, event identity/causal replay, the synthetic quantity ledger, measurement-decision known answers, and exact fixture-byte fingerprints are internally consistent. It does not run a scheduler or simulate a disruption. The CLI prints the synthetic cost ratio and mass-balance known answers; negative controls are declared and only the mutations covered by unit tests are exercised by the test suite.
 
 ## Checks
 
@@ -47,7 +47,7 @@ The default fixture is embedded at compile time from `docs/research/fixtures/hab
 
 ## Tests and verification status
 
-The source currently contains 130 authored Rust unit tests across eight modules (31 structural/accounting + 13 scenario-campaign + 13 resilience-option + 13 assumption-falsification + 15 event-replay + 15 material-ledger + 17 measurement-gate + 13 audit-bundle tests). They have not been compiled or executed in the current environment; do not describe them as passing. Run the commands above against the exact branch head before treating the qualifier as an executed test result. The scenario, resilience-option and assumption-falsification suites qualify definitions only, not scheduling, experiment selection, or resilience outcomes.
+The source currently contains 146 authored Rust unit tests across nine modules (31 structural/accounting + 13 scenario-campaign + 13 resilience-option + 13 assumption-falsification + 15 event-replay + 15 material-ledger + 17 measurement-gate + 13 audit-bundle + 16 recall-drill tests). They have not been compiled or executed in the current environment; do not describe them as passing. Run the commands above against the exact branch head before treating the qualifier as an executed test result. The scenario, resilience-option and assumption-falsification suites qualify definitions only, not scheduling, experiment selection, or resilience outcomes.
 
 ## Deliberate limits
 
@@ -71,3 +71,8 @@ The default embedded-fixture CLI also validates `docs/research/fixtures/habitat-
 ## Cross-layer audit bundle (synthetic only)
 
 The default CLI validates `docs/research/fixtures/habitat-audit-bundle-v0.1.json`. It checks exact UTF-8 byte lengths and SHA-256 fingerprints of the base, event-replay, material-ledger, and measurement-gate fixtures, reruns each existing validator, and compares component summaries against the manifest. Hash matches establish byte identity only: there is no signature, trusted timestamp, source authentication, or proof of physical truth. These tests are authored, not compiled or executed.
+
+
+## Recall-response closure drill (synthetic only)
+
+The default CLI validates `docs/research/fixtures/habitat-recall-closure-v0.1.json` against the base traceability graph and the event-replay fixture. It derives affected packaged-unit IDs from causal event inputs and outputs; verifies the complete packaged/control target universe; requires exactly one explicit response record per target; rejects affected-as-unaffected outcomes and containment actions on unrelated controls; and refuses to derive a result when the event source is invalid. The known-answer drill is structurally valid but deliberately remains **OPEN_UNRESOLVED** because one affected packaged unit is not located. This is a synthetic oracle status, not a real recall, physical quarantine, customer contact or legal-compliance result. Sixteen new tests are authored but have not been compiled or executed.

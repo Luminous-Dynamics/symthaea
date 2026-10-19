@@ -16,6 +16,7 @@ use symthaea_habitat_vertical_bench::event_replay::{validate_event_log_str, EMBE
 use symthaea_habitat_vertical_bench::material_ledger::{validate_material_ledger_str, EMBEDDED_MATERIAL_LEDGER};
 use symthaea_habitat_vertical_bench::measurement_gate::{validate_measurement_gate_str, EMBEDDED_MEASUREMENT_GATE};
 use symthaea_habitat_vertical_bench::audit_bundle::{validate_audit_bundle_str, EMBEDDED_AUDIT_BUNDLE};
+use symthaea_habitat_vertical_bench::recall_drill::{validate_recall_drill_str, EMBEDDED_RECALL_DRILL};
 use symthaea_habitat_vertical_bench::{validate_fixture_str, EMBEDDED_FIXTURE};
 
 fn main() {
@@ -245,6 +246,33 @@ fn main() {
                 audit_bundle.event_count,
                 audit_bundle.material_transaction_count,
                 audit_bundle.measurement_case_count
+            );
+            let recall_drill = match validate_recall_drill_str(
+                EMBEDDED_RECALL_DRILL,
+                EMBEDDED_FIXTURE,
+                EMBEDDED_EVENT_LOG,
+            ) {
+                Ok(report) => report,
+                Err(error) => {
+                    eprintln!("invalid embedded recall-closure drill JSON: {error}");
+                    process::exit(2);
+                }
+            };
+            if !recall_drill.is_valid() {
+                eprintln!("RECALL RESPONSE DRILL: FAIL ({} findings)", recall_drill.issues.len());
+                for issue in recall_drill.issues {
+                    eprintln!("{} {}: {}", issue.code, issue.path, issue.message);
+                }
+                process::exit(1);
+            }
+            println!(
+                "synthetic recall response drill: PASS ({} targets; affected={}; contained={}; unresolved={}; false-positive controls={}; closure={}; real recall=NOT PERFORMED)",
+                recall_drill.target_count,
+                recall_drill.affected_terminal_ids.len(),
+                recall_drill.confirmed_contained_count,
+                recall_drill.unresolved_affected_count,
+                recall_drill.false_positive_control_count,
+                recall_drill.closure_status
             );
         } else {
             println!("embedded disruption campaign: not checked against the alternate fixture");
