@@ -73,7 +73,7 @@ For a **physical claim**, v0.1 clock eligibility is fail-closed: `sync_method` m
 
 NIST’s [metrological-traceability policy](https://www.nist.gov/calibrations/traceability) is the rationale for the uncertainty gate: traceability concerns the measurement result and documented calibration chain, with each link contributing uncertainty; traceability alone does not establish fitness for purpose.
 
-For v0.1, a single aggregate uncertainty number cannot cover an entire claim. Each required measurand needs its own unit-compatible uncertainty budget; the schema rejects unknown claim/measurand/unit combinations, and eligibility remains blocked if even one required budget is missing.
+Required uncertainty measurands for each claim in v0.1:
 
 | Claim target | Required uncertainty measurands (v0.1) |
 |---|---|
@@ -146,7 +146,7 @@ Targets for the first software tranche: zero false accepts across missing-channe
 
 ### Current implementation
 
-The first implementation is the **manifest, raw-trace validator and fault-matrix runner**, not pretend firmware. All three commands are wired into the existing `xtask` binary and introduce no new dependencies. The telemetry module has 39 authored unit tests covering schema/claim gates, trace failure modes, report-digest determinism, and all 32 frozen matrix cases; five further tests cover the vendored tire-monitoring intake. These tests have not been compiled or run in this environment.
+The first implementation is the **manifest, raw-trace validator and fault-matrix runner**, not pretend firmware. All three commands are wired into the existing `xtask` binary and introduce no new dependencies. The telemetry module has 40 authored unit tests covering schema/claim gates, trace failure modes, report-digest determinism, and all 32 frozen matrix cases; five further tests cover the vendored tire-monitoring intake. These tests have not been compiled or run in this environment.
 
 From the workspace root:
 
