@@ -101,6 +101,9 @@ impl PerformanceDialect {
             | PerformanceDialect::JazzLaidBack => 1.0,
             PerformanceDialect::DanceLocked => 0.25,
             PerformanceDialect::ProcessExact => 0.1,
+            PerformanceDialect::DroneElastic => 1.4,
+            PerformanceDialect::DramaticTiming => 1.5,
+            PerformanceDialect::ChoralBlend => 0.8,
         }
     }
 
