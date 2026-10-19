@@ -813,12 +813,31 @@ struct RawTraceRow {
 #[derive(Debug, Serialize)]
 struct TraceChannelSummary {
     channel_id: String,
+    declared_sample_rate_hz: f64,
+    expected_period_ns: Option<u64>,
+    first_timestamp_ns: Option<u64>,
+    last_timestamp_ns: Option<u64>,
+    observed_span_ns: Option<u64>,
     sample_count: usize,
     valid_count: usize,
     invalid_or_saturated_count: usize,
     missing_value_count: usize,
     suspected_gap_count: usize,
     maximum_inter_sample_gap_ns: Option<u64>,
+    estimated_expected_sample_count: Option<u64>,
+    estimated_missing_sample_count: Option<u64>,
+    loss_estimate_basis: String,
+}
+
+#[derive(Debug, Serialize)]
+struct TraceGapEvent {
+    channel_id: String,
+    previous_timestamp_ns: u64,
+    current_timestamp_ns: u64,
+    observed_gap_ns: u64,
+    expected_period_ns: u64,
+    estimated_missing_samples: u64,
+    detection_rule: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -832,6 +851,8 @@ struct TraceReport {
     missing_value_count: usize,
     suspected_gap_count: usize,
     channels: Vec<TraceChannelSummary>,
+    gaps: Vec<TraceGapEvent>,
+    loss_ledger_claim_ceiling: String,
     claim_ceiling: String,
 }
 
@@ -843,6 +864,7 @@ struct MutableChannelSummary {
     missing_value_count: usize,
     suspected_gap_count: usize,
     maximum_inter_sample_gap_ns: Option<u64>,
+    first_timestamp_ns: Option<u64>,
     last_timestamp_ns: Option<u64>,
 }
 
@@ -870,7 +892,13 @@ fn validate_trace_bytes(raw: &[u8], manifest: &Manifest) -> Result<TraceReport> 
         .iter()
         .map(|channel| (channel.channel_id.as_str(), channel))
         .collect();
+    // Include every declared channel, including channels absent from the trace.
+    // Absence is a coverage finding, not a missing numeric sample and never zero.
     let mut channel_stats = std::collections::BTreeMap::<String, MutableChannelSummary>::new();
+    for channel in &manifest.channels {
+        channel_stats.entry(channel.channel_id.clone()).or_default();
+    }
+    let mut gap_events = Vec::<TraceGapEvent>::new();
     let mut previous_global_timestamp: Option<u64> = None;
     let mut row_count = 0usize;
     let mut valid_sample_count = 0usize;
@@ -917,15 +945,28 @@ fn validate_trace_bytes(raw: &[u8], manifest: &Manifest) -> Result<TraceReport> 
         if summary.last_timestamp_ns.is_some_and(|last| row.timestamp_ns <= last) {
             bail!("row {row_number} repeats or regresses the timestamp for channel {}", row.channel_id);
         }
+        if summary.first_timestamp_ns.is_none() {
+            summary.first_timestamp_ns = Some(row.timestamp_ns);
+        }
         if let Some(last) = summary.last_timestamp_ns {
             let gap_ns = row.timestamp_ns - last;
             summary.maximum_inter_sample_gap_ns = Some(
                 summary.maximum_inter_sample_gap_ns.map_or(gap_ns, |prior| prior.max(gap_ns))
             );
             let expected_period_ns = (1_000_000_000.0 / channel.sample_rate_hz).round() as u64;
-            // This is a diagnostic only, not a data deletion or acceptance rule.
-            // Gaps remain visible via timestamps and explicit logger event records.
+            // Diagnostic only. The ledger preserves the exact adjacent timestamps;
+            // the count of presumed missing samples is explicitly an estimate.
             if expected_period_ns > 0 && gap_ns as f64 > expected_period_ns as f64 * 2.5 {
+                let estimated_periods = (gap_ns as f64 / expected_period_ns as f64).round() as u64;
+                gap_events.push(TraceGapEvent {
+                    channel_id: row.channel_id.clone(),
+                    previous_timestamp_ns: last,
+                    current_timestamp_ns: row.timestamp_ns,
+                    observed_gap_ns: gap_ns,
+                    expected_period_ns,
+                    estimated_missing_samples: estimated_periods.saturating_sub(1),
+                    detection_rule: "gap > 2.5 × declared nominal sample period; estimate is not an independent loss counter".to_owned(),
+                });
                 summary.suspected_gap_count += 1;
                 suspected_gap_count += 1;
             }
@@ -949,14 +990,41 @@ fn validate_trace_bytes(raw: &[u8], manifest: &Manifest) -> Result<TraceReport> 
         bail!("raw telemetry trace contains no rows");
     }
 
-    let channels = channel_stats.into_iter().map(|(channel_id, summary)| TraceChannelSummary {
-        channel_id,
-        sample_count: summary.sample_count,
-        valid_count: summary.valid_count,
-        invalid_or_saturated_count: summary.invalid_or_saturated_count,
-        missing_value_count: summary.missing_value_count,
-        suspected_gap_count: summary.suspected_gap_count,
-        maximum_inter_sample_gap_ns: summary.maximum_inter_sample_gap_ns,
+    let channels_by_id: std::collections::BTreeMap<&str, &Channel> = manifest.channels.iter()
+        .map(|channel| (channel.channel_id.as_str(), channel))
+        .collect();
+    let channels = channel_stats.into_iter().map(|(channel_id, summary)| {
+        let channel = channels_by_id.get(channel_id.as_str())
+            .expect("summary was initialized only from a declared channel");
+        let expected_period_ns = (1_000_000_000.0 / channel.sample_rate_hz).round() as u64;
+        let observed_span_ns = match (summary.first_timestamp_ns, summary.last_timestamp_ns) {
+            (Some(first), Some(last)) => Some(last - first),
+            _ => None,
+        };
+        // This estimates the periodic sample count over the observed span only;
+        // it does not know the logger's intended start/stop trigger or hardware counters.
+        let estimated_expected_sample_count = observed_span_ns.and_then(|span| {
+            (expected_period_ns > 0).then_some(span / expected_period_ns + 1)
+        });
+        let estimated_missing_sample_count = estimated_expected_sample_count
+            .map(|expected| expected.saturating_sub(summary.sample_count as u64));
+        TraceChannelSummary {
+            channel_id,
+            declared_sample_rate_hz: channel.sample_rate_hz,
+            expected_period_ns: (expected_period_ns > 0).then_some(expected_period_ns),
+            first_timestamp_ns: summary.first_timestamp_ns,
+            last_timestamp_ns: summary.last_timestamp_ns,
+            observed_span_ns,
+            sample_count: summary.sample_count,
+            valid_count: summary.valid_count,
+            invalid_or_saturated_count: summary.invalid_or_saturated_count,
+            missing_value_count: summary.missing_value_count,
+            suspected_gap_count: summary.suspected_gap_count,
+            maximum_inter_sample_gap_ns: summary.maximum_inter_sample_gap_ns,
+            estimated_expected_sample_count,
+            estimated_missing_sample_count,
+            loss_estimate_basis: "nominal declared sample rate over first-to-last observed timestamp span; estimate only, not hardware counter or proof of logger loss".to_owned(),
+        }
     }).collect();
 
     Ok(TraceReport {
@@ -969,6 +1037,8 @@ fn validate_trace_bytes(raw: &[u8], manifest: &Manifest) -> Result<TraceReport> 
         missing_value_count,
         suspected_gap_count,
         channels,
+        gaps: gap_events,
+        loss_ledger_claim_ceiling: "Gap and missing-sample counts are diagnostics estimated from declared rate and adjacent timestamps. Only an independently collected hardware sample/overflow counter can establish actual logger capture loss.".into(),
         claim_ceiling: "CSV structure, declared channel membership, monotonic timestamps, raw-value validity and likely sample-gap diagnostics only. No physical accuracy, energy-efficiency, tire-grip, safety, roadworthiness or approval claim.".into(),
     })
 }
