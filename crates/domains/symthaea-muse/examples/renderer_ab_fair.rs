@@ -903,3 +903,65 @@ fn main() {
         std::process::exit(1);
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn arm(name: &'static str, metrics: [f32; 4]) -> Arm {
+        Arm {
+            name,
+            lufs: metrics[0],
+            peak_db: -3.0,
+            crest_db: metrics[1],
+            low: metrics[2],
+            mid: 1.0 - metrics[2] - metrics[3],
+            high: metrics[3],
+            frames: 1,
+            pcm_sha256: String::new(),
+        }
+    }
+
+    fn assert_metrics_close(actual: [f32; 4], expected: [f32; 4]) {
+        for (index, (got, want)) in actual.iter().zip(expected).enumerate() {
+            assert!(
+                (got - want).abs() < 1e-5,
+                "metric {index}: got {got}, expected {want}"
+            );
+        }
+    }
+
+    #[test]
+    fn factorial_contrasts_recover_room_mastering_and_interaction() {
+        let baseline_metrics = [-16.0, 8.0, 0.30, 0.25];
+        let room_effect = [0.5, 2.0, 0.02, -0.01];
+        let master_effect = [0.4, -0.5, -0.01, 0.03];
+        let interaction = [0.2, 0.25, 0.005, -0.004];
+        let add = |a: [f32; 4], b: [f32; 4]| {
+            std::array::from_fn(|i| a[i] + b[i])
+        };
+        let baseline = arm("default", baseline_metrics);
+        let room = arm("room-only", add(baseline_metrics, room_effect));
+        let master = arm("master-only", add(baseline_metrics, master_effect));
+        let combined = arm(
+            "combined",
+            add(add(add(baseline_metrics, room_effect), master_effect), interaction),
+        );
+
+        let result = factorial_contrasts(&baseline, &room, &master, &combined);
+        assert_metrics_close(result.room_effect_at_default_master, room_effect);
+        assert_metrics_close(result.master_effect_at_default_room, master_effect);
+        assert_metrics_close(result.room_master_interaction, interaction);
+    }
+
+    #[test]
+    fn factorial_interaction_is_zero_for_additive_effects() {
+        let baseline = arm("default", [-16.0, 8.0, 0.30, 0.25]);
+        let room = arm("room-only", [-15.5, 9.0, 0.32, 0.24]);
+        let master = arm("master-only", [-15.7, 7.5, 0.29, 0.28]);
+        let combined = arm("combined", [-15.2, 8.5, 0.31, 0.27]);
+        let result = factorial_contrasts(&baseline, &room, &master, &combined);
+        assert_metrics_close(result.room_master_interaction, [0.0, 0.0, 0.0, 0.0]);
+    }
+}
