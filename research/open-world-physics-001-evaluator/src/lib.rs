@@ -457,6 +457,14 @@ struct FitOutcome {
 /// ambiguity margin is between structural families, not neighbouring
 /// parameter-grid points. This remains a bounded baseline, not Ramanujan or
 /// open-ended theory generation.
+fn disposition_from_delta_bic(delta: f64) -> SelectionDisposition {
+    if delta.is_finite() && delta >= BIC_DECISIVE_DELTA {
+        SelectionDisposition::DecisiveWithinReferenceGrammar
+    } else {
+        SelectionDisposition::Indeterminate
+    }
+}
+
 fn fit_grid_baseline(observations: &[Observation]) -> Option<FitOutcome> {
     if observations.len() < 3 {
         return None;
@@ -483,11 +491,7 @@ fn fit_grid_baseline(observations: &[Observation]) -> Option<FitOutcome> {
     }
     family_best.sort_by(|a, b| a.0.total_cmp(&b.0));
     let delta = (family_best[1].0 - family_best[0].0).max(0.0);
-    let disposition = if delta >= BIC_DECISIVE_DELTA {
-        SelectionDisposition::DecisiveWithinReferenceGrammar
-    } else {
-        SelectionDisposition::Indeterminate
-    };
+    let disposition = disposition_from_delta_bic(delta);
     Some(FitOutcome {
         selected: family_best[0].1,
         delta_bic_to_runner_up: delta,
@@ -738,6 +742,49 @@ mod tests {
                 world.id
             );
         }
+    }
+
+    #[test]
+    fn ambiguity_gate_fails_closed_at_nonfinite_or_small_score_gaps() {
+        assert_eq!(
+            disposition_from_delta_bic(BIC_DECISIVE_DELTA - f64::EPSILON),
+            SelectionDisposition::Indeterminate
+        );
+        assert_eq!(
+            disposition_from_delta_bic(BIC_DECISIVE_DELTA),
+            SelectionDisposition::DecisiveWithinReferenceGrammar
+        );
+        assert_eq!(
+            disposition_from_delta_bic(f64::NAN),
+            SelectionDisposition::Indeterminate
+        );
+        assert_eq!(
+            disposition_from_delta_bic(f64::INFINITY),
+            SelectionDisposition::Indeterminate
+        );
+    }
+
+    #[test]
+    fn model_selection_rejects_malformed_observation_contracts() {
+        let valid = Observation {
+            x: 1.0,
+            response: 1.0,
+            declared_sigma: 0.1,
+        };
+        let valid_observations = vec![valid; 12];
+        assert!(fit_grid_baseline(&valid_observations).is_some());
+
+        let mut zero_sigma = valid_observations.clone();
+        zero_sigma[0].declared_sigma = 0.0;
+        assert!(fit_grid_baseline(&zero_sigma).is_none());
+
+        let mut nonfinite_response = valid_observations.clone();
+        nonfinite_response[0].response = f64::NAN;
+        assert!(fit_grid_baseline(&nonfinite_response).is_none());
+
+        let mut invalid_domain = valid_observations;
+        invalid_domain[0].x = 0.0;
+        assert!(fit_grid_baseline(&invalid_domain).is_none());
     }
 
     #[test]
