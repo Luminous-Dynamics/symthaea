@@ -1,7 +1,7 @@
 {
   "schema_version": "0.1.0",
   "suite_id": "MOBILITY-TELEMETRY-CONFORMANCE-001",
-  "status": "frozen_proposed_matrix_v0_1_with_zero_uncertainty_negative_control_not_yet_executed",
+  "status": "frozen_proposed_matrix_v0_1_with_receipt_content_binding_not_yet_executed",
   "claim_ceiling": "Software conformance only. No demonstrated hardware reliability, measurement accuracy, vehicle performance, tire qualification, or roadworthiness.",
   "interpretation": {
     "positive_controls_required": true,
@@ -350,6 +350,17 @@
       "rust_test": "zero_uncertainty_is_rejected_as_unphysical_overconfidence",
       "required_detail_tokens": [
         "standard and expanded uncertainty must be positive"
+      ]
+    },
+    {
+      "id": "MANIFEST-010",
+      "category": "provenance_gate",
+      "mutation": "uncertainty_record_contents_disagree_with_manifest",
+      "expected": "reject",
+      "diagnostic": "uncertainty budget receipt content must exactly match manifest budget",
+      "rust_test": "uncertainty_budget_receipt_must_match_manifest_content",
+      "required_detail_tokens": [
+        "does not match manifest budget"
       ]
     }
   ],
