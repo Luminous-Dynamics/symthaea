@@ -712,6 +712,33 @@ mod tests {
     }
 
     #[test]
+    fn noisy_reference_suite_recovers_all_identifiable_families_decisively() {
+        let report = run_reference_benchmark();
+        assert_eq!(report.body.cases.len(), 6);
+        for row in &report.body.cases {
+            assert!(
+                row.family_recovered,
+                "wrong family for {} under {:?}: selected {:?}, expected {:?}",
+                row.world_id, row.policy, row.selected_family, row.expected_family
+            );
+            assert_eq!(
+                row.selection_disposition,
+                SelectionDisposition::DecisiveWithinReferenceGrammar,
+                "ambiguous model selection for {} under {:?}",
+                row.world_id,
+                row.policy
+            );
+            assert!(
+                row.heldout_nrmse < 1.0e-12,
+                "held-out fit drift for {} under {:?}: {}",
+                row.world_id,
+                row.policy,
+                row.heldout_nrmse
+            );
+        }
+    }
+
+    #[test]
     fn report_is_deterministic_and_receipt_verifies() {
         let first = run_reference_benchmark();
         let second = run_reference_benchmark();
