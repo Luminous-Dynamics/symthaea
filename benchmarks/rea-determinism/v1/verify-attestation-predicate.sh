@@ -41,7 +41,7 @@ jq -e \
     (keys|length)==9 and
     (keys==["attestationRun","evidenceTier","limitations","predicateType","providerRun","qualification","repository","schemaVersion","subject"]) and
     (.subject|type)=="object" and
-    (keys as $root | .subject|keys|sort)==["bundleManifestSha256","receiptSha256"] and
+    (.subject|keys|sort)==["bundleManifestSha256","receiptSha256"] and
     .subject.bundleManifestSha256==$manifest_sha and .subject.receiptSha256==$receipt_sha and
     (.subject.bundleManifestSha256|test("^[0-9a-f]{64}$")) and (.subject.receiptSha256|test("^[0-9a-f]{64}$")) and
     $receipt[0].bundle_manifest_sha256==$manifest_sha and
