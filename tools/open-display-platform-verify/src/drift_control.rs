@@ -739,7 +739,10 @@ mod tests {
             ControlDisposition::OutOfBand
         );
         assert_eq!(report.controls[2].disposition, ControlDisposition::InBand);
-        assert_eq!(report.controls[3].disposition, ControlDisposition::OutOfBand);
+        assert_eq!(
+            report.controls[3].disposition,
+            ControlDisposition::OutOfBand
+        );
     }
 
     #[test]
