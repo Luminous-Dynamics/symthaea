@@ -732,7 +732,7 @@ struct CandidateMeta {
     /// it) or "native" (the in-crate synthesizer fallback).
     renderer: &'static str,
     /// Declared performance profile; absent only for a custom spec's fallback.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     performance_dialect: Option<symthaea_music_theory::PerformanceDialect>,
     /// Musical Φ: integration of the score-as-system (spectral MIP over
     /// the voice×segment dependency graph — see
