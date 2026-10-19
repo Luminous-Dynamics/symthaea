@@ -13,6 +13,8 @@
 //! D/z applicability to a particular organism and food matrix requires separate
 //! evidence and validation. Source labels are declarations, not authentication.
 
+use std::cmp::Ordering;
+
 use serde_json::Value;
 
 use crate::thermal_observation::validate_thermal_observation_log_v1;
@@ -72,9 +74,28 @@ pub struct ThermalIntervalEnvelopeV1 {
     pub assumptions: Vec<String>,
 }
 
+#[derive(Debug, Clone, Copy)]
+struct UtcTimestamp {
+    whole_seconds: i64,
+    fractional_seconds: f64,
+}
+
+impl UtcTimestamp {
+    fn compare(&self, other: &Self) -> Ordering {
+        self.whole_seconds.cmp(&other.whole_seconds)
+            .then_with(|| self.fractional_seconds.total_cmp(&other.fractional_seconds))
+    }
+
+    fn seconds_since(&self, earlier: &Self) -> f64 {
+        (self.whole_seconds - earlier.whole_seconds) as f64
+            + self.fractional_seconds
+            - earlier.fractional_seconds
+    }
+}
+
 #[derive(Debug, Clone)]
 struct Sample {
-    timestamp_seconds: f64,
+    timestamp: UtcTimestamp,
     measured_at: String,
     step_id: String,
     location_description: String,
@@ -139,7 +160,7 @@ fn days_from_civil(year: u32, month: u32, day: u32) -> i64 {
 /// Leap seconds are rejected rather than silently normalized. Date, clock and
 /// fractional-second fields are checked; a timestamp that merely looks shaped
 /// correctly is not enough to calculate elapsed time.
-fn parse_utc_seconds(value: &str) -> Option<f64> {
+fn parse_utc_timestamp(value: &str) -> Option<UtcTimestamp> {
     if !value.is_ascii() || !value.ends_with('Z') {
         return None;
     }
@@ -184,12 +205,16 @@ fn parse_utc_seconds(value: &str) -> Option<f64> {
         Some(digits) => format!("0.{digits}").parse::<f64>().ok()?,
         None => 0.0,
     };
-    let whole_seconds = days_from_civil(year, month, day) as f64 * 86_400.0
-        + f64::from(hour) * 3_600.0
-        + f64::from(minute) * 60.0
-        + f64::from(second);
-    let result = whole_seconds + fractional_seconds;
-    result.is_finite().then_some(result)
+    let whole_seconds = days_from_civil(year, month, day) * 86_400
+        + i64::from(hour) * 3_600
+        + i64::from(minute) * 60
+        + i64::from(second);
+    (fractional_seconds.is_finite() && (0.0..1.0).contains(&fractional_seconds)).then_some(
+        UtcTimestamp {
+            whole_seconds,
+            fractional_seconds,
+        },
+    )
 }
 
 fn validate_kinetics_model(
@@ -226,7 +251,7 @@ fn validate_kinetics_model(
     if version.is_none() {
         errors.push("kinetics evidence.source_version is required".to_owned());
     }
-    if !known_at.is_some_and(|timestamp| parse_utc_seconds(timestamp).is_some()) {
+    if !known_at.is_some_and(|timestamp| parse_utc_timestamp(timestamp).is_some()) {
         errors.push("kinetics evidence.known_at must be a valid UTC timestamp ending in Z".to_owned());
     }
     if !status.is_some_and(|value| EVIDENCE_STATUSES.contains(&value)) {
@@ -332,17 +357,20 @@ pub fn evaluate_thermal_interval_envelope_v1(
         return Err(errors);
     }
 
-    let report = log_report.expect("errors were returned above when log validation failed");
+    let Some(report) = log_report else {
+        errors.sort();
+        errors.dedup();
+        return Err(errors);
+    };
     blockers.extend(report.blockers);
 
     let log_id = non_empty(log, "log_id").unwrap_or_default().to_owned();
     let trace_id = non_empty(trace, "trace_id").unwrap_or_default().to_owned();
     let process_id = non_empty(trace, "process_id").unwrap_or_default().to_owned();
 
-    let observations = log
-        .get("observations")
-        .and_then(Value::as_array)
-        .expect("validated observation log has an observations array");
+    let Some(observations) = log.get("observations").and_then(Value::as_array) else {
+        return Err(vec!["validated observation log has no observations array".to_owned()]);
+    };
     let mut samples = Vec::new();
     for observation in observations.iter().filter(|observation| {
         non_empty(observation, "sensor_id") == Some(sensor_id)
@@ -369,7 +397,7 @@ pub fn evaluate_thermal_interval_envelope_v1(
             errors.push(format!("selected observation {observation_id:?} is missing measured_at"));
             continue;
         };
-        let Some(timestamp_seconds) = parse_utc_seconds(measured_at) else {
+        let Some(timestamp) = parse_utc_timestamp(measured_at) else {
             errors.push(format!(
                 "selected observation {observation_id:?} has an invalid UTC timestamp"
             ));
@@ -394,7 +422,7 @@ pub fn evaluate_thermal_interval_envelope_v1(
             continue;
         }
         samples.push(Sample {
-            timestamp_seconds,
+            timestamp,
             measured_at: measured_at.to_owned(),
             step_id: non_empty(observation, "step_id").unwrap_or_default().to_owned(),
             location_description: non_empty(observation, "location_description")
@@ -416,9 +444,9 @@ pub fn evaluate_thermal_interval_envelope_v1(
         return Err(errors);
     }
 
-    samples.sort_by(|left, right| left.timestamp_seconds.total_cmp(&right.timestamp_seconds));
+    samples.sort_by(|left, right| left.timestamp.compare(&right.timestamp));
     for pair in samples.windows(2) {
-        if pair[0].timestamp_seconds >= pair[1].timestamp_seconds {
+        if pair[0].timestamp.compare(&pair[1].timestamp) != Ordering::Less {
             errors.push("selected observations must have unique, strictly increasing timestamps".to_owned());
         }
     }
@@ -432,8 +460,9 @@ pub fn evaluate_thermal_interval_envelope_v1(
                 .to_owned(),
         );
     }
-    let start_seconds = samples[0].timestamp_seconds;
-    let elapsed_minutes = (samples[samples.len() - 1].timestamp_seconds - start_seconds) / 60.0;
+    let start_timestamp = samples[0].timestamp;
+    let elapsed_minutes =
+        samples[samples.len() - 1].timestamp.seconds_since(&start_timestamp) / 60.0;
     if !elapsed_minutes.is_finite() || elapsed_minutes <= 0.0 {
         errors.push("selected observations do not span a positive finite duration".to_owned());
     }
@@ -460,7 +489,7 @@ pub fn evaluate_thermal_interval_envelope_v1(
             "estimated" => estimated_count += 1,
             _ => {}
         }
-        let time_minutes = (sample.timestamp_seconds - start_seconds) / 60.0;
+        let time_minutes = sample.timestamp.seconds_since(&start_timestamp) / 60.0;
         lower_curve.push(CurvePoint { time_minutes, temperature_c: sample.lower_c });
         nominal_curve.push(CurvePoint { time_minutes, temperature_c: sample.value_c });
         upper_curve.push(CurvePoint { time_minutes, temperature_c: sample.upper_c });
