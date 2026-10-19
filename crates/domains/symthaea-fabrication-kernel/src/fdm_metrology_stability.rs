@@ -678,7 +678,7 @@ mod tests {
             TrustDisposition::Warning
         );
         assert_eq!(report.metrics.first_quarantine_step, None);
-        assert!(report.metrics.quarantine_on_single_transient_outlier == false);
+        assert!(!report.metrics.quarantine_on_single_transient_outlier);
     }
 
     #[test]
