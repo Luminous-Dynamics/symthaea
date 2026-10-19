@@ -1033,7 +1033,9 @@ mod tests {
     fn cropfoundry_disparity_ratio_denominator_is_explicit() {
         let receipt = build_receipt().unwrap();
         for aggregate in &receipt.aggregates {
-            assert!(aggregate.worst_to_best_ratio_defined_scenario_count <= aggregate.scenario_count);
+            assert!(
+                aggregate.worst_to_best_ratio_defined_scenario_count <= aggregate.scenario_count
+            );
             assert_eq!(
                 aggregate.mean_worst_to_best_zone_stress_ratio.is_some(),
                 aggregate.worst_to_best_ratio_defined_scenario_count > 0
