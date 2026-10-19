@@ -54,7 +54,7 @@ for lane in run-a run-b; do
   cp_sha=$(sha256sum "$run/input.bin" | awk '{print $1}')
   [ "$cp_sha" = "$fixture_sha" ] || fail "$lane input copy changed bytes"
   if ! unblob --report "$run/raw-report.json" --extract-dir "$run/extracted" \
-      --process-num 1 --entropy-depth 0 --depth 4 "$run/input.bin" \
+      --process-num 1 --randomness-depth 0 --depth 4 "$run/input.bin" \
       > "$run/stdout.txt" 2> "$run/stderr.txt"; then
     cat "$run/stdout.txt" "$run/stderr.txt" >&2
     fail "Unblob extraction failed in $lane"
