@@ -3,7 +3,7 @@
 
 use open_display_platform_verify::{
     validate_cad_runtime_receipt_str, validate_drift_control_plan_str,
-    validate_measurement_run_str, validate_platform_str,
+    validate_energy_trace_str, validate_measurement_run_str, validate_platform_str,
 };
 use std::env;
 use std::fs;
@@ -18,6 +18,7 @@ const DEFAULT_CAD_RECEIPT_SCHEMA: &str =
 const DEFAULT_CAD_SOURCE: &str =
     "hardware/open-display-reference/cad/odrh_sensor_interface_plate.scad";
 const DEFAULT_DRIFT_SCHEMA: &str = "docs/engineering/display-drift-control-plan.schema.json";
+const DEFAULT_ENERGY_SCHEMA: &str = "docs/engineering/display-energy-trace.schema.json";
 
 fn main() {
     let mut manifest_path = PathBuf::from(DEFAULT_MANIFEST);
@@ -28,6 +29,8 @@ fn main() {
     let mut cad_receipt_schema_path = PathBuf::from(DEFAULT_CAD_RECEIPT_SCHEMA);
     let mut drift_plan_path: Option<PathBuf> = None;
     let mut drift_schema_path = PathBuf::from(DEFAULT_DRIFT_SCHEMA);
+    let mut energy_trace_path: Option<PathBuf> = None;
+    let mut energy_schema_path = PathBuf::from(DEFAULT_ENERGY_SCHEMA);
     let mut args = env::args().skip(1);
 
     while let Some(arg) = args.next() {
@@ -64,6 +67,14 @@ fn main() {
                 Some(path) => drift_schema_path = PathBuf::from(path),
                 None => fail("--drift-schema requires a path"),
             },
+            "--energy-trace" => match args.next() {
+                Some(path) => energy_trace_path = Some(PathBuf::from(path)),
+                None => fail("--energy-trace requires a path"),
+            },
+            "--energy-schema" => match args.next() {
+                Some(path) => energy_schema_path = PathBuf::from(path),
+                None => fail("--energy-schema requires a path"),
+            },
             "--help" | "-h" => {
                 print_help();
                 return;
@@ -95,6 +106,15 @@ fn main() {
         }
     });
 
+    let energy_trace_report = energy_trace_path.as_ref().map(|path| {
+        let trace_text = read_file(path);
+        let energy_schema_text = read_file(&energy_schema_path);
+        match validate_energy_trace_str(&trace_text, &energy_schema_text) {
+            Ok(report) => report,
+            Err(errors) => fail_with_errors("ENERGY_TRACE_INVALID", errors),
+        }
+    });
+
     let cad_receipt_report = cad_receipt_path.as_ref().map(|path| {
         let receipt_text = read_file(path);
         let receipt_schema_text = read_file(&cad_receipt_schema_path);
@@ -114,6 +134,7 @@ fn main() {
         "measurement_run": run_report.to_json(),
         "cad_runtime_receipt": cad_receipt_report.map(|report| report.to_json()),
         "drift_control_screening": drift_control_report.map(|report| report.to_json()),
+        "energy_trace": energy_trace_report.map(|report| report.to_json()),
     });
     println!(
         "{}",
@@ -144,7 +165,7 @@ fn fail_with_errors(prefix: &str, errors: Vec<String>) -> ! {
 fn print_help() {
     println!(
         "Validate the ODRH-001 design and run-record contracts without claiming physical qualification.\n\
-         Usage: open-display-platform-verify [--manifest PATH] [--schema PATH] [--run-record PATH] [--run-schema PATH] [--cad-receipt PATH] [--cad-receipt-schema PATH] [--drift-plan PATH] [--drift-schema PATH]\n\
+         Usage: open-display-platform-verify [--manifest PATH] [--schema PATH] [--run-record PATH] [--run-schema PATH] [--cad-receipt PATH] [--cad-receipt-schema PATH] [--drift-plan PATH] [--drift-schema PATH] [--energy-trace PATH] [--energy-schema PATH]\n\
          Defaults:\n\
            --manifest          {DEFAULT_MANIFEST}\n\
            --schema            {DEFAULT_SCHEMA}\n\
@@ -152,8 +173,10 @@ fn print_help() {
            --run-schema        {DEFAULT_RUN_SCHEMA}\n\
            --cad-receipt-schema {DEFAULT_CAD_RECEIPT_SCHEMA}\n\
            --drift-schema      {DEFAULT_DRIFT_SCHEMA}\n\
+           --energy-schema     {DEFAULT_ENERGY_SCHEMA}\n\
          Optional:\n\
            --cad-receipt PATH validates a runtime CAD receipt against the native CAD source.\n\
-           --drift-plan PATH validates and screens a synthetic-only control-drift plan."
+           --drift-plan PATH validates and screens a synthetic-only control-drift plan.\n\
+           --energy-trace PATH validates and integrates a synthetic-only power trace."
     );
 }
