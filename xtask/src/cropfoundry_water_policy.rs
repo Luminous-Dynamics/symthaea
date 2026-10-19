@@ -805,7 +805,7 @@ mod tests {
         let receipt = build_receipt().unwrap();
         assert_eq!(
             receipt.schema_version,
-            "cropfoundry-water-policy-receipt-v1"
+            "cropfoundry-water-policy-receipt-v2"
         );
         assert_eq!(receipt.benchmark_id, "CF-022");
         assert_eq!(receipt.scenario_count, 6);
