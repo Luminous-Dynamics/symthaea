@@ -237,6 +237,19 @@ pub fn evaluate_geometry_screen(
     let vertical_margin = input.uniform_patch_height_mm - required_height;
     let horizontal_utilization = required_width / input.uniform_patch_width_mm;
     let vertical_utilization = required_height / input.uniform_patch_height_mm;
+    if [
+        horizontal_margin,
+        vertical_margin,
+        horizontal_utilization,
+        vertical_utilization,
+    ]
+    .iter()
+    .any(|value| !value.is_finite())
+    {
+        return Err(vec![
+            "patch margin or utilization produced a non-finite result".to_owned(),
+        ]);
+    }
     let horizontal_fits = horizontal_margin >= 0.0;
     let vertical_fits = vertical_margin >= 0.0;
     let screen_status = if horizontal_fits && vertical_fits {
