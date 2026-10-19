@@ -24,6 +24,13 @@ pub enum EvidenceOrigin {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum EvidenceUseStatus {
+    PermittedForDeclaredUse,
+    Restricted,
+    Unknown,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum AttemptStatus {
     Complete,
     Failed,
@@ -73,7 +80,9 @@ pub struct EvaluationReceipt {
     pub method_id: String,
     pub method_revision: String,
     /// Digest/identifier of the input data, reference corpus or test protocol.
+    pub source_id: String,
     pub source_reference_sha256: String,
+    pub evidence_use_status: EvidenceUseStatus,
     pub cost_basis_id: String,
     /// Missing cost is not zero; zero is rejected to block fabricated free information.
     pub cost_units: Option<u64>,
@@ -110,6 +119,10 @@ pub enum FidelityIssue {
     },
     EmptyReceiptIdentity { receipt_id: String, field: &'static str },
     InvalidReceiptDigest { receipt_id: String, field: &'static str },
+    EvidenceRightsNotPermitted {
+        receipt_id: String,
+        status: EvidenceUseStatus,
+    },
     MissingOutputDigest { receipt_id: String },
     DuplicateReceiptId { receipt_id: String, count: usize },
     MissingCost { receipt_id: String },
@@ -287,6 +300,7 @@ fn validate_receipt(receipt: &EvaluationReceipt, issues: &mut Vec<FidelityIssue>
         (receipt.operating_case_id.as_str(), "operating_case_id"),
         (receipt.method_id.as_str(), "method_id"),
         (receipt.method_revision.as_str(), "method_revision"),
+        (receipt.source_id.as_str(), "source_id"),
         (receipt.cost_basis_id.as_str(), "cost_basis_id"),
     ] {
         if !is_nonempty(value) {
@@ -501,6 +515,15 @@ pub fn audit_fidelity_campaign(
             continue;
         }
 
+        if receipt.evidence_use_status != EvidenceUseStatus::PermittedForDeclaredUse {
+            issues.push(FidelityIssue::EvidenceRightsNotPermitted {
+                receipt_id: receipt.receipt_id.clone(),
+                status: receipt.evidence_use_status,
+            });
+            unmatched_receipt_count += 1;
+            continue;
+        }
+
         progress
             .entry(requirement.requirement_id.clone())
             .or_default()
@@ -634,7 +657,9 @@ mod tests {
             evidence_origin: req.evidence_origin,
             method_id: req.method_id.clone(),
             method_revision: req.method_revision.clone(),
+            source_id: "synthetic-source-permitted-for-benchmark".to_owned(),
             source_reference_sha256: "c".repeat(64),
+            evidence_use_status: EvidenceUseStatus::PermittedForDeclaredUse,
             cost_basis_id: "cost-units-v1".to_owned(),
             cost_units: cost,
             status,
@@ -795,6 +820,21 @@ mod tests {
         let audit = audit_fidelity_campaign(&p, &[record]);
         assert_eq!(audit.disposition, FidelityAuditDisposition::InvalidReceipts);
         assert!(has_issue(&audit, &FidelityIssue::MissingOutputDigest { receipt_id: "missing-output-digest".to_owned() }));
+    }
+
+    #[test]
+    fn unknown_source_rights_cannot_satisfy_a_release_requirement() {
+        let p = profile();
+        let requirement = &p.requirements[1];
+        let mut record = receipt(requirement, "unknown-rights", AttemptStatus::Complete, Some(20));
+        record.evidence_use_status = EvidenceUseStatus::Unknown;
+        let audit = audit_fidelity_campaign(&p, &[record]);
+        assert_ne!(audit.disposition, FidelityAuditDisposition::EvidenceCoverageComplete);
+        assert!(has_issue(&audit, &FidelityIssue::EvidenceRightsNotPermitted {
+            receipt_id: "unknown-rights".to_owned(),
+            status: EvidenceUseStatus::Unknown,
+        }));
+        assert_eq!(audit.total_cost_units, Some(20));
     }
 
     #[test]
