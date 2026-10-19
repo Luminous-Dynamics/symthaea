@@ -7,3 +7,6 @@ The profile contains a complete seven-component proximate set under the availabl
 Every component records a source locator, source version, known-at timestamp and evidence status. All evidence is synthetic and must not be promoted to qualified.
 
 The alternative total-carbohydrate-includes-fibre convention uses total_carbohydrate and omits the separate dietary_fibre row from the closure sum. Mixing these conventions would double count fibre and is rejected.
+
+
+Unavailable-component declarations also carry source/version/time/evidence metadata: a source can document that a component was not analysed or not reported, rather than relying on an untraceable omission. The absence of a measured value remains distinct from a zero.
