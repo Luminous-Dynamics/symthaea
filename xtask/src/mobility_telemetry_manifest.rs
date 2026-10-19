@@ -1076,6 +1076,48 @@ fn evaluate_fault_case(mutation: &str, manifest: &Manifest) -> (String, String) 
                 ("eligible_or_unexplained".to_owned(), format!("eligibility report: {claim:?}"))
             }
         }
+        "physical_claim_without_claim_specific_uncertainty_budget" => {
+            let claim = claim_eligibility(manifest, "ride_energy");
+            if !claim.physical_eligible
+                && claim.reasons.iter().any(|reason| reason == "missing_claim_uncertainty_budget") {
+                ("ineligible".to_owned(), "claim-specific uncertainty budget is absent".to_owned())
+            } else {
+                ("eligible_or_unexplained".to_owned(), format!("uncertainty budget gate failed open: {claim:?}"))
+            }
+        }
+        "expanded_uncertainty_exceeds_acceptance_tolerance" => {
+            let mut candidate = manifest.clone();
+            let artifact_path = "uncertainty/ride-energy.json".to_owned();
+            candidate.artifacts.push(Artifact {
+                relative_path: artifact_path.clone(),
+                kind: "uncertainty_budget_record".to_owned(),
+                byte_len: 1,
+                sha256: format!("sha256:{}", "a".repeat(64)),
+            });
+            candidate.uncertainty_budgets.push(ClaimUncertaintyBudget {
+                claim_target: "ride_energy".to_owned(),
+                measurand: "net_dc_bus_energy".to_owned(),
+                unit: "Wh".to_owned(),
+                standard_uncertainty: 0.5,
+                expanded_uncertainty: 1.0,
+                coverage_factor: 2.0,
+                acceptance_tolerance: 0.75,
+                evidence_state: "bench_characterized".to_owned(),
+                artifact_path,
+            });
+            match validate_structure(&candidate) {
+                Err(error) => ("reject".to_owned(), error.to_string()),
+                Ok(()) => {
+                    let claim = claim_eligibility(&candidate, "ride_energy");
+                    if !claim.physical_eligible
+                        && claim.reasons.iter().any(|reason| reason == "uncertainty_budget_exceeds_tolerance") {
+                        ("ineligible".to_owned(), "expanded uncertainty exceeds pre-registered tolerance".to_owned())
+                    } else {
+                        ("eligible_or_unexplained".to_owned(), format!("uncertainty tolerance gate failed open: {claim:?}"))
+                    }
+                }
+            }
+        }
         "unrecognized_sync_method_with_verified_word" => {
             let mut candidate = manifest.clone();
             candidate.timebase.sync_method = "operator_claims_verified".to_owned();
@@ -1481,7 +1523,7 @@ mod tests {
         )).expect("frozen telemetry fault matrix parses");
         let cases = matrix.get("cases").and_then(serde_json::Value::as_array)
             .expect("fault matrix has a case array");
-        assert_eq!(cases.len(), 24, "matrix size changes require deliberate review");
+        assert_eq!(cases.len(), 26, "matrix size changes require deliberate review");
         let mut ids = BTreeSet::new();
         for case in cases {
             let id = case.get("id").and_then(serde_json::Value::as_str)
@@ -1531,5 +1573,40 @@ mod tests {
         let claim = claim_eligibility(&fixture, "ride_energy");
         assert!(!claim.physical_eligible);
         assert!(claim.reasons.iter().any(|reason| reason == "clock_alignment_uncertainty_exceeds_v0_1_limit"));
+    }
+
+    #[test]
+    fn missing_claim_uncertainty_budget_blocks_physical_claim() {
+        let fixture = manifest();
+        let claim = claim_eligibility(&fixture, "ride_energy");
+        assert!(!claim.physical_eligible);
+        assert!(claim.reasons.iter().any(|reason| reason == "missing_claim_uncertainty_budget"));
+    }
+
+    #[test]
+    fn budget_above_tolerance_blocks_physical_claim() {
+        let mut fixture = manifest();
+        let artifact_path = "uncertainty/ride-energy.json".to_owned();
+        fixture.artifacts.push(Artifact {
+            relative_path: artifact_path.clone(),
+            kind: "uncertainty_budget_record".to_owned(),
+            byte_len: 1,
+            sha256: format!("sha256:{}", "a".repeat(64)),
+        });
+        fixture.uncertainty_budgets.push(ClaimUncertaintyBudget {
+            claim_target: "ride_energy".to_owned(),
+            measurand: "net_dc_bus_energy".to_owned(),
+            unit: "Wh".to_owned(),
+            standard_uncertainty: 0.5,
+            expanded_uncertainty: 1.0,
+            coverage_factor: 2.0,
+            acceptance_tolerance: 0.75,
+            evidence_state: "bench_characterized".to_owned(),
+            artifact_path,
+        });
+        validate_structure(&fixture).expect("well-formed over-tolerance budget remains structurally valid");
+        let claim = claim_eligibility(&fixture, "ride_energy");
+        assert!(!claim.physical_eligible);
+        assert!(claim.reasons.iter().any(|reason| reason == "uncertainty_budget_exceeds_tolerance"));
     }
 }
