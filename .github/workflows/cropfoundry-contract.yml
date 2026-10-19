@@ -122,6 +122,7 @@ jobs:
         run: |
           cargo run -q -p xtask -- cropfoundry-robust-policy-demo \
             --out "$RUNNER_TEMP/cropfoundry-robust-policy-receipt.json"
+          grep -q '"receipt_schema": "cropfoundry-robust-policy-receipt-v1"' "$RUNNER_TEMP/cropfoundry-robust-policy-receipt.json"
           grep -q '"benchmark_id": "CF-025"' "$RUNNER_TEMP/cropfoundry-robust-policy-receipt.json"
           grep -q '"scenario_count": 30' "$RUNNER_TEMP/cropfoundry-robust-policy-receipt.json"
           grep -q '"policy_count": 5' "$RUNNER_TEMP/cropfoundry-robust-policy-receipt.json"
