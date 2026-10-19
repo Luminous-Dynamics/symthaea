@@ -142,7 +142,6 @@ cargo test -p xtask mobility_telemetry_manifest
 cargo test -p xtask frozen_fault_matrix_cases_match_expected_outcomes
 cargo run -p xtask -- mobility-telemetry-benchmark \
   --source-commit "$(git rev-parse HEAD)" \
-  --toolchain-id "$(rustc -Vv | tr '\n' ';') | $(cargo --version)" \
   --out reports/mobility_telemetry_benchmark.json
 cargo run -p xtask -- mobility-telemetry-manifest \
   --input docs/research/data/mobility_telemetry_manifest_v0_1.json \
