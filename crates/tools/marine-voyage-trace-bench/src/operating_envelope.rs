@@ -729,6 +729,69 @@ mod tests {
     }
 
     #[test]
+    fn measurement_boundary_mismatch_is_rejected() {
+        let p = profile();
+        let mut results = complete_results(&p);
+        if let Some(pair) = results[0].eligible_pair.as_mut() {
+            pair.candidate_energy.energy_boundary_id = "shaft-power".to_owned();
+        }
+        let audit = audit_envelope(&p, &results);
+        assert!(has_issue(&audit, &EnvelopeIssue::EnergyBoundaryMismatch { case_id: "low-speed".to_owned() }));
+    }
+
+    #[test]
+    fn calibration_epoch_mismatch_is_rejected() {
+        let p = profile();
+        let mut results = complete_results(&p);
+        if let Some(pair) = results[0].eligible_pair.as_mut() {
+            pair.candidate_energy.calibration_epoch_id = "meter-epoch-B".to_owned();
+        }
+        let audit = audit_envelope(&p, &results);
+        assert!(has_issue(&audit, &EnvelopeIssue::CalibrationEpochMismatch { case_id: "low-speed".to_owned() }));
+    }
+
+    #[test]
+    fn uncertainty_method_mismatch_is_rejected() {
+        let p = profile();
+        let mut results = complete_results(&p);
+        if let Some(pair) = results[0].eligible_pair.as_mut() {
+            pair.candidate_energy.uncertainty_method_id = "statistical-ci".to_owned();
+        }
+        let audit = audit_envelope(&p, &results);
+        assert!(has_issue(&audit, &EnvelopeIssue::UncertaintyMethodMismatch { case_id: "low-speed".to_owned() }));
+    }
+
+    #[test]
+    fn same_trial_order_is_rejected_again_at_envelope_boundary() {
+        let p = profile();
+        let mut results = complete_results(&p);
+        if let Some(pair) = results[0].eligible_pair.as_mut() {
+            pair.candidate_order = pair.baseline_order;
+        }
+        let audit = audit_envelope(&p, &results);
+        assert!(has_issue(&audit, &EnvelopeIssue::PairOrderMismatch { case_id: "low-speed".to_owned() }));
+    }
+
+    #[test]
+    fn eligible_pair_with_existing_issues_or_wrong_run_count_is_rejected() {
+        let p = profile();
+        let mut results = complete_results(&p);
+        results[0].issues = vec![crate::paired_trial::PairingIssue::ConditionMismatch];
+        results[0].run_count = 3;
+        let audit = audit_envelope(&p, &results);
+        assert!(has_issue(&audit, &EnvelopeIssue::PairAssessmentInconsistent { case_id: "low-speed".to_owned() }));
+    }
+
+    #[test]
+    fn empty_measurement_contract_identity_invalidates_profile() {
+        let mut p = profile();
+        p.energy_boundary_id.clear();
+        let audit = audit_envelope(&p, &complete_results(&p));
+        assert_eq!(audit.disposition, EnvelopeDisposition::InvalidProfile);
+        assert!(has_issue(&audit, &EnvelopeIssue::EmptyIdentity("energy_boundary_id")));
+    }
+
+    #[test]
     fn eligible_disposition_without_pair_payload_is_rejected() {
         let p = profile();
         let mut results = complete_results(&p);
