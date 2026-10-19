@@ -422,12 +422,32 @@ pub fn verify_bundle(
     }
     let provider_smoke_sha = digest_field(&receipt, "source.provider_smoke_script_sha256")?;
     let provider_meta_script_sha = digest_field(&receipt, "source.provider_metamorphic_script_sha256")?;
+    let differential_cases_sha = digest_field(&receipt, "source.differential_cases_sha256")?;
+    let differential_policy_sha = digest_field(&receipt, "source.differential_policy_sha256")?;
+    let differential_oracle_builder_sha = digest_field(&receipt, "source.differential_oracle_builder_sha256")?;
+    let unblob_differential_adapter_sha = digest_field(&receipt, "source.unblob_differential_adapter_sha256")?;
+    let differential_oracle_schema_sha = digest_field(&receipt, "source.differential_oracle_schema_sha256")?;
+    let differential_observation_schema_sha = digest_field(&receipt, "source.differential_observation_schema_sha256")?;
+    let differential_scorecard_schema_sha = digest_field(&receipt, "source.differential_scorecard_schema_sha256")?;
+    let differential_scorer_sha = digest_field(&receipt, "source.differential_scorer_sha256")?;
+    let differential_cli_sha = digest_field(&receipt, "source.differential_cli_sha256")?;
     verify_digest_at(&source_root.join("normalize.jq"), &normalizer_sha, "normalizer")?;
     verify_digest_at(&source_root.join("cases.json"), &cases_sha, "cases manifest")?;
     verify_digest_at(&source_root.join("oracle.json"), &oracle_sha, "oracle")?;
     verify_digest_at(&source_root.join("requirements-unblob-26.6.4.lock"), &requirements_lock_sha, "provider dependency lock")?;
     verify_digest_at(&source_root.join("provider-smoke.sh"), &provider_smoke_sha, "provider smoke script")?;
     verify_digest_at(&source_root.join("provider-metamorphic-sweep.sh"), &provider_meta_script_sha, "provider metamorphic script")?;
+
+    let differential_root = source_root.join("../../rea-differential/v1");
+    verify_digest_at(&differential_root.join("cases.json"), &differential_cases_sha, "differential case catalog")?;
+    verify_digest_at(&differential_root.join("oracle-policy.json"), &differential_policy_sha, "differential oracle policy")?;
+    verify_digest_at(&differential_root.join("build-oracle.sh"), &differential_oracle_builder_sha, "differential oracle builder")?;
+    verify_digest_at(&differential_root.join("unblob-smoke-adapter.sh"), &unblob_differential_adapter_sha, "Unblob differential adapter")?;
+    verify_digest_at(&source_root.join("../../../schemas/rea-differential-oracle-v1.schema.json"), &differential_oracle_schema_sha, "differential oracle schema")?;
+    verify_digest_at(&source_root.join("../../../schemas/rea-differential-observation-v1.schema.json"), &differential_observation_schema_sha, "differential observation schema")?;
+    verify_digest_at(&source_root.join("../../../schemas/rea-differential-scorecard-v1.schema.json"), &differential_scorecard_schema_sha, "differential scorecard schema")?;
+    verify_digest_at(&source_root.join("../../../crates/domains/symthaea-rea-evidence-verifier/src/differential.rs"), &differential_scorer_sha, "differential scorer source")?;
+    verify_digest_at(&source_root.join("../../../crates/domains/symthaea-rea-evidence-verifier/src/main.rs"), &differential_cli_sha, "differential scorer CLI source")?;
 
     let input_sha = digest_field(&receipt, "fixture_input_sha256")?;
     let mutated_input_sha = digest_field(&receipt, "mutated_fixture_input_sha256")?;
