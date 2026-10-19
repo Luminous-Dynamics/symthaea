@@ -1,6 +1,6 @@
 {
   "suite": "CropFoundry",
-  "suite_version": "0.3.0-proposal",
+  "suite_version": "0.4.0-proposal",
   "created": "2026-10-18",
   "status": "proposed_not_run",
   "owner_project": "Luminous-Dynamics/symthaea",
@@ -373,6 +373,16 @@
       "proposed_target": "Stage 0: reproduce nutrient totals and shared-resource accounting from synthetic fixtures with zero duplicate resource counting and fail-closed missing-nutrient behavior. Stage 1: on a pinned, authorized, batch-complete dataset, compare options only on matched site/season or declared production basis and equal/explicit resource constraints. A later trial may target at least 10% higher delivered mass per predeclared limiting nutrient per scarce resource versus a documented baseline, but only with uncertainty bounds and no violation of predeclared floors for other priority nutrients, food safety, affordability and environmental constraints. The threshold and nutrient floors must be chosen by local agronomists, nutrition scientists, affected communities and a power analysis before viewing outcomes. This benchmark does not by itself estimate dietary adequacy, bioavailability, health effects or an optimal crop recommendation.",
       "split_protocol": "Use the row-level CF-024 accounting contract for every batch × nutrient record inside each option. Require identical predeclared nutrient sets for every batch, unique option/batch/nutrient keys, and resource measurements to be recorded once per batch in duplicated rows then counted only once. Reject within-batch resource inconsistencies; require comparable resource boundary labels and cost currency across options. Keep unknown concentrations, nutrient absences, unknown bioavailability, missing intervals and unmeasured resources distinct from true zero. All measurements must refer to the same declared comparison basis, site/season, resource allocation rules and edible mass stage. Hold out complete sites/seasons or production cycles for any predictive policy evaluation; do not random-split nutrient rows from one batch. Preserve per-nutrient metrics and uncertainty rather than collapsing them into one scalar without an explicit, externally reviewed set of weights/constraints.",
       "status": "not_evaluable_until_complete_multi_nutrient_batch_and_matched_resource_ledger"
+    },
+    {
+      "id": "CF-027",
+      "category": "field_trial_design_power",
+      "name": "Pre-registered field-trial power and replication adequacy",
+      "question": "Before a crop, irrigation or nutrition intervention is tested, does its design contain enough independent plots/farms and site-season coverage to detect the smallest practically important effect while accounting for clustering, attrition and multiple co-primary endpoints?",
+      "primary_metric": "Reproducible sample-size calculation from cited baseline variance and minimum effect; target power and family-wise significance; design-effect/ICC sensitivity; planned and retained plots/clusters per arm; site-season coverage; protocol completeness; divergence between simple planning approximation and final design-specific statistical analysis",
+      "proposed_target": "Require a pre-registered endpoint, estimand, minimum practically important effect, variance source, alpha, power, allocation unit, randomization/blocking protocol, attrition assumption and clustering assumptions before any confirmatory field claim. Provisional baseline: power >= 0.80, report 0.90 sensitivity, family-wise alpha <= 0.05 across co-primary endpoints, and at least two site-seasons for any stated transfer claim. Final sample size must be confirmed by a statistician using the actual blocked/clustered analysis model; the included normal-approximation planner is a screening/preflight calculation only.",
+      "split_protocol": "Use historical/pilot variance independent of confirmatory outcomes. Keep the unit of randomization as the inferential unit; model plots nested within farms/sites/seasons and use design-specific power simulation when blocking, repeated measurements, unequal cluster sizes, spatial correlation, non-normal outcomes, noninferiority or interaction effects materially affect power. Freeze analysis plan and exclusions before allocation/outcome inspection. Report planned/actual counts, attrition by arm, protocol deviations, power assumptions and null/inconclusive outcomes; do not use observed post-hoc power to justify the trial.",
+      "status": "not_evaluable_until_trial_protocol_variance_and_cluster_metadata_pinned"
     }
   ],
   "first_milestone_exit_criteria": [
