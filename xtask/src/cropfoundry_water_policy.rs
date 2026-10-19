@@ -22,7 +22,7 @@ struct Scenario {
     sensor_dropout_period: Option<usize>,
 }
 
-fn scenarios() -> [Scenario; 4] {
+fn scenarios() -> [Scenario; 6] {
     [
         Scenario {
             id: "reference",
@@ -49,7 +49,23 @@ fn scenarios() -> [Scenario; 4] {
             sensor_dropout_period: None,
         },
         Scenario {
-            id: "forecast_bias_and_sensor_dropout",
+            id: "forecast_bias_only",
+            daily_water_budget_plot_mm: 6.0,
+            drought_start_day: None,
+            heat_start_day: None,
+            forecast_bias: -0.15,
+            sensor_dropout_period: None,
+        },
+        Scenario {
+            id: "sensor_dropout_only",
+            daily_water_budget_plot_mm: 6.0,
+            drought_start_day: None,
+            heat_start_day: None,
+            forecast_bias: 0.0,
+            sensor_dropout_period: Some(7),
+        },
+        Scenario {
+            id: "combined_heat_drought_forecast_bias_and_sensor_dropout",
             daily_water_budget_plot_mm: 5.5,
             drought_start_day: Some(12),
             heat_start_day: Some(24),
@@ -58,7 +74,6 @@ fn scenarios() -> [Scenario; 4] {
         },
     ]
 }
-
 #[derive(Clone, Copy)]
 enum Policy {
     EqualShareCalendar,
@@ -80,6 +95,10 @@ impl Policy {
 struct ScenarioResult {
     scenario_id: String,
     policy: String,
+    drought_start_day: Option<usize>,
+    heat_start_day: Option<usize>,
+    forecast_bias_fraction: f64,
+    sensor_dropout_period_days: Option<usize>,
     simulated_days: usize,
     daily_water_budget_plot_mm: f64,
     total_irrigation_applied_plot_mm: f64,
@@ -314,6 +333,10 @@ fn simulate_one(scenario: Scenario, policy: Policy) -> ScenarioResult {
     ScenarioResult {
         scenario_id: scenario.id.to_owned(),
         policy: policy.name().to_owned(),
+        drought_start_day: scenario.drought_start_day,
+        heat_start_day: scenario.heat_start_day,
+        forecast_bias_fraction: scenario.forecast_bias,
+        sensor_dropout_period_days: scenario.sensor_dropout_period,
         simulated_days: DAYS,
         daily_water_budget_plot_mm: scenario.daily_water_budget_plot_mm,
         total_irrigation_applied_plot_mm: round3(irrigation_total),
@@ -497,15 +520,28 @@ mod tests {
     fn cropfoundry_water_policy_has_all_expected_scenarios_and_baselines() {
         let receipt = build_receipt().unwrap();
         assert_eq!(receipt.benchmark_id, "CF-022");
-        assert_eq!(receipt.scenario_count, 4);
+        assert_eq!(receipt.scenario_count, 6);
         assert_eq!(receipt.policy_count, 3);
-        assert_eq!(receipt.results.len(), 12);
+        assert_eq!(receipt.results.len(), 18);
+        assert!(receipt.results.iter().any(|result| {
+            result.scenario_id == "forecast_bias_only"
+                && result.forecast_bias_fraction < 0.0
+                && result.sensor_dropout_period_days.is_none()
+                && result.drought_start_day.is_none()
+                && result.heat_start_day.is_none()
+        }));
+        assert!(receipt.results.iter().any(|result| {
+            result.scenario_id == "sensor_dropout_only"
+                && result.sensor_dropout_period_days == Some(7)
+                && result.forecast_bias_fraction == 0.0
+                && result.sensor_dropout_fraction > 0.0
+        }));
         assert_eq!(receipt.aggregates.len(), 3);
         assert!(
             receipt
                 .aggregates
                 .iter()
-                .all(|aggregate| aggregate.scenario_count == 4)
+                .all(|aggregate| aggregate.scenario_count == 6)
         );
         assert!(
             receipt
@@ -533,7 +569,7 @@ mod tests {
             .iter()
             .filter(|result| result.policy == Policy::EqualShareCalendar.name())
             .collect::<Vec<_>>();
-        assert_eq!(baseline.len(), 4);
+        assert_eq!(baseline.len(), 6);
         assert!(
             baseline
                 .iter()
