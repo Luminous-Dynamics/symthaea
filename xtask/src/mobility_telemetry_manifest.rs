@@ -1370,4 +1370,27 @@ mod tests {
         assert_eq!(report.channels[0].sample_count, 3);
         assert_eq!(report.channels[0].suspected_gap_count, 1);
     }
+
+    #[test]
+    fn frozen_fault_matrix_cases_match_expected_outcomes() {
+        let fixture = manifest();
+        let matrix: serde_json::Value = serde_json::from_str(include_str!(
+            "../../docs/research/data/mobility_telemetry_fault_matrix_v0_1.json"
+        )).expect("frozen telemetry fault matrix parses");
+        let cases = matrix.get("cases").and_then(serde_json::Value::as_array)
+            .expect("fault matrix has a case array");
+        assert_eq!(cases.len(), 23, "matrix size changes require deliberate review");
+        let mut ids = BTreeSet::new();
+        for case in cases {
+            let id = case.get("id").and_then(serde_json::Value::as_str)
+                .expect("case has ID");
+            let mutation = case.get("mutation").and_then(serde_json::Value::as_str)
+                .expect("case has mutation");
+            let expected = case.get("expected").and_then(serde_json::Value::as_str)
+                .expect("case has expected outcome");
+            assert!(ids.insert(id), "duplicate case ID {id}");
+            let (observed, detail) = evaluate_fault_case(mutation, &fixture);
+            assert_eq!(observed, expected, "fault case {id} ({mutation}): {detail}");
+        }
+    }
 }
