@@ -36,6 +36,7 @@ Policies are:
 1. `equal_share_calendar`: apply the same irrigation amount to each plot, capped by the per-plot limit.
 2. `soil_threshold`: use held/observed storage to refill the greatest deficit toward a fixed threshold.
 3. `uncertainty_aware_marginal_risk`: allocate in small increments according to estimated marginal reduction of the declared shortfall proxy. It adds a fixed conservative demand margin and raises plot priority when readings are stale; these are explicit heuristics, not statistically calibrated prediction intervals.
+4. `water_matched_rotating_equal_share`: a hindsight counterfactual that reallocates the risk-aware policy's exact daily total water uniformly across zones, rotating discrete rounding remainders. It isolates water-placement effects but is not a deployable policy.
 
 The v1 receipt records scenario parameters, per-scenario and per-zone irrigation, overflow proxy, aggregate and per-zone stress-exposure proxies, worst/best zone burden, worst-to-best ratio, cumulative allocation dispersion, percentage change against equal-share allocation, and absolute/relative stress change versus the same policy in the reference scenario, plus policy-level mean/median aggregate and worst-zone proxies and water totals. It also reports sensor-dropout fraction and daily budget violations. The executable fails if any policy exceeds a daily water cap or emits non-finite core metrics.
 
@@ -65,7 +66,19 @@ The initial hard acceptance condition is zero daily water-budget violations and 
 
 A policy that wins this synthetic score has only passed an algorithmic test. A defensible agricultural claim requires, in order: a versioned crop/soil water-balance model and its calibration record; comparison with fixed-calendar, soil-threshold, ET-based and a suitable established crop-model baseline; leakage-resistant retrospective or hindcast evaluation; local sensitivity and uncertainty analysis; then preregistered, replicated field trials with metered water, crop outcomes, energy, labor, cost and environmental measurements. Safety, water-allocation rights and any local water constraints remain hard limits rather than soft optimization rewards.
 
-## ## Per-zone safety and distributional reporting — receipt schema v1
+## ## New counterfactual: same daily water, different allocation
+
+The harness now adds a fourth trace for each scenario: `water_matched_rotating_equal_share`. It reuses the risk-aware policy's exact daily total irrigation dose, but redistributes the discrete 0.05-unit increments as evenly as possible across the three synthetic plots, rotating any remainder between plots. The implementation asserts that each day's total dose matches the risk-aware trace and reports stress, per-zone allocation, worst-zone burden, disparity and dose-matched relative stress change.
+
+This is a **counterfactual analysis baseline**, not a directly deployable controller: the matched baseline receives the risk-aware policy's realized daily dose trace, so it uses hindsight to isolate the spatial allocation question. That is deliberate and must be labelled as such. It answers: *given the same water on every day, does the placement of that water change the toy objective?* It does not answer whether the policy can forecast or achieve that water trace in a real field.
+
+Keep the two comparisons separate:
+- **Equal-budget-cap comparison:** policies may choose to use less than the permitted daily cap; this reflects both allocation and the decision to withhold water.
+- **Dose-matched comparison:** the per-day total water is fixed to the risk-aware trace; differences in the synthetic score then come from spatial allocation, state feedback and the fixture's plot dynamics, not the total daily dose.
+
+The second counterfactual is intended to diagnose whether the risk-aware score gain comes from allocating water to particular plots rather than simply using less water. It is still possible to hide burden by sacrificing one plot, so inspect zone-level stress and distributional metrics alongside aggregate stress. No agronomic or biological claim follows from either comparison.
+
+## Per-zone safety and distributional reporting — receipt schema v1
 
 The first working receipt made an important weakness visible: the uncertainty-aware policy concentrated more water on a subset of plots than equal-share allocation. In the earlier exploratory synthetic receipt, equal-share had median aggregate stress proxy 861.376 and total irrigation 1,386 plot-mm; the uncertainty-aware policy had median proxy 562.967 and total irrigation 909.7 plot-mm. Its mean plot-allocation dispersion was 33.4 plot-mm versus 0 for equal share, although all tested policy/scenario combinations had zero water-cap violations. These are outputs from an artificial fixture, not crop observations or physical water volume.
 
