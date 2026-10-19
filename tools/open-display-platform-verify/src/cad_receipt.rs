@@ -169,9 +169,11 @@ fn validate_outputs(receipt: &Value, errors: &mut Vec<String>) {
             output.get("expected_bounds_mm").and_then(Value::as_array),
         ) {
             (Some(expected), Some(actual)) if actual.len() == 3 => {
-                for index in 0..3 {
-                    if actual[index].as_f64().is_none_or(|value| {
-                        !approximately_equal(value, expected[index])
+                for (index, (actual_value, expected_value)) in
+                    actual.iter().zip(expected.iter()).enumerate()
+                {
+                    if actual_value.as_f64().is_none_or(|value| {
+                        !approximately_equal(value, *expected_value)
                     }) {
                         errors.push(format!(
                             "CAD runtime receipt output {name} has incorrect expected bound on axis {index}"
