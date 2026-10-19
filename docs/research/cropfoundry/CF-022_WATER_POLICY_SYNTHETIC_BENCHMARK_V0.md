@@ -46,16 +46,16 @@ The receipt records the scenario parameters, per-scenario applied irrigation, ov
 
 These equations describe test fixtures, not agronomy.
 
-- Initial storage is 6.0 synthetic depth units per plot; storage is capped at 10.0. Each plot can receive at most 3.5 units/day. Allocations for threshold/risk-aware policies are in 0.05-unit increments.
-- For day (d) and zone (z), the illustrative base demand is ([2.2, 2.7, 1.8]). The demand phase factor is (0.88 + 0.22(\sin(\pi d/42 + 0.7z)+1)/2). After the scenario's heat-onset day, demand is multiplied by 1.30.
-- The exposed demand forecast is (max(0.1, D(d,z)(1+b+0.04\sin(3d+5z)))), where (b) is the scenario's declared multiplicative forecast bias. The simulator retains the true demand only to score the resulting trace; the policy receives the generated forecast.
-- Rain is 1.1 units when (d \bmod 7=4) before drought onset and zero otherwise. The fixed synthetic schedule is visible in the scenario ID and onset fields.
-- The per-zone criticality weight is 1.5 in zone 0 on days 10–25, zone 1 on days 17–34, and zone 2 on days 4–19; it is 0.8 outside those windows. The minimum-storage threshold is (2.6+0.9c(d,z)), where (c) is the criticality weight.
-- After irrigation, overflow proxy is (max(0,S+A-10)), post-use storage is (max(0,\min(10,S+A)-D)), and end storage is (min(10,\text{post-use}+R)). Daily synthetic stress exposure is (c(d,z)\max(0,\text{minimum-storage}-\text{end-storage})^2); the run score is its sum over all days and zones.
-- Sensor error is a deterministic (0.18\sin(11d+7z)). On dropout days the controller holds the latest observed reading and increments stale age. The risk-aware policy applies a heuristic demand margin (1.10+0.05\min(\text{stale-age},4)) and criticality multiplier (1+0.12\min(\text{stale-age},4)). These are uncalibrated heuristics, not probabilistic coverage guarantees.
-- Plot-allocation dispersion is the population standard deviation of each plot's cumulative applied irrigation across the 42-day run. Equal-share should therefore report zero dispersion apart from numerical-rounding tolerance.
+- Initial storage is 6.0 synthetic depth units per plot; storage is capped at 10.0. Each plot can receive at most 3.5 units/day. Threshold/risk-aware policies allocate in 0.05-unit increments.
+- For day `d` and zone `z`, base demand is `[2.2, 2.7, 1.8][z]`. The phase factor is `0.88 + 0.22 * (sin(PI*d/42 + 0.7*z) + 1)/2`. After the scenario's heat-onset day, demand is multiplied by 1.30.
+- The exposed demand forecast is `max(0.1, actual_demand * (1 + bias + 0.04*sin(3*d + 5*z)))`, where `bias` is the scenario's declared forecast bias. The simulator retains true demand only to score the trace; the policy receives the generated forecast.
+- Rain is 1.1 units when `d % 7 == 4` before drought onset, and zero otherwise.
+- Per-zone criticality is 1.5 in zone 0 on days 10–25, zone 1 on days 17–34, and zone 2 on days 4–19; it is 0.8 outside those windows. The minimum-storage threshold is `2.6 + 0.9*criticality`.
+- After irrigation, overflow proxy is `max(0, storage + allocation - 10)`, post-use storage is `max(0, min(10, storage + allocation) - actual_demand)`, and end storage is `min(10, post_use + rain)`. Daily synthetic stress exposure is `criticality * max(0, minimum_storage - end_storage)^2`; the run score sums this over days and zones.
+- Sensor error is the deterministic term `0.18*sin(11*d + 7*z)`. On dropout days, the controller holds the latest observed reading and increments stale age. The risk-aware policy applies a heuristic demand margin `1.10 + 0.05*min(stale_age, 4)` and criticality multiplier `1 + 0.12*min(stale_age, 4)`. These are uncalibrated heuristics, not probabilistic coverage guarantees.
+- Plot-allocation dispersion is the population standard deviation of each plot's cumulative irrigation across the 42-day run. Equal-share should therefore report zero dispersion apart from numerical-rounding tolerance.
 
-The six named scenario profiles in the source make factor isolation explicit: reference, water-cap-only, forecast-bias-only, sensor-dropout-only, heat/drought, and compound stress/failure. The water-cap-only and single-failure profiles match the reference on all other declared parameters. Scenario comparisons can be interpreted only at this fixture level.
+The six named scenario profiles are reference, water-cap-only, forecast-bias-only, sensor-dropout-only, heat/drought, and compound stress/failure. The water-cap-only and single-failure profiles match the reference on all other declared parameters. Scenario comparisons can be interpreted only at this fixture level.
 
 ## Mathematical scope and claim ceiling
 
