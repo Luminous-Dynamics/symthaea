@@ -156,7 +156,11 @@ fn validate_measurement(
                     "{label} must satisfy finite lower_c <= value_c <= upper_c"
                 )),
             }
-            non_empty(value, "status")
+            if non_empty(value, "status") == Some("observed") {
+                Some("observed")
+            } else {
+                Some("estimated")
+            }
         }
         Some("unknown") => {
             let all_null = ["value_c", "lower_c", "upper_c"]
