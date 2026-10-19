@@ -29,7 +29,7 @@ For each candidate it also returns the exact weighted sum of net-EVSI numerators
 
 ## Frozen synthetic families
 
-Eight families contain 22 scenario records:
+Eight families contain 21 scenario records:
 1. **ROBUST-001:** stable winner under prior shifts and coupled resource tags.
 2. **ROBUST-002:** recommendation flips when prior and candidate test costs shift together.
 3. **ROBUST-003:** nominal winner fails under recovery degradation and cost shock.
