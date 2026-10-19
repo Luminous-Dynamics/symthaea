@@ -1,5 +1,6 @@
 use anyhow::{Result, anyhow};
 use serde::Serialize;
+use std::collections::BTreeMap;
 use std::f64::consts::PI;
 use std::fs;
 use std::path::PathBuf;
@@ -84,8 +85,20 @@ struct ScenarioResult {
     total_irrigation_applied_mm: f64,
     total_overflow_proxy_mm: f64,
     stress_exposure_proxy: f64,
+    relative_stress_change_vs_equal_share_pct: Option<f64>,
     sensor_dropout_fraction: f64,
     water_budget_violation_days: usize,
+}
+
+#[derive(Debug, Serialize)]
+struct PolicyAggregate {
+    policy: String,
+    scenario_count: usize,
+    mean_stress_exposure_proxy: f64,
+    median_stress_exposure_proxy: f64,
+    total_irrigation_applied_mm: f64,
+    mean_relative_stress_change_vs_equal_share_pct: Option<f64>,
+    total_water_budget_violation_days: usize,
 }
 
 #[derive(Debug, Serialize)]
@@ -99,6 +112,7 @@ struct WaterPolicyReceipt {
     scenario_count: usize,
     policy_count: usize,
     invariant_summary: String,
+    aggregates: Vec<PolicyAggregate>,
     results: Vec<ScenarioResult>,
     caveats: Vec<String>,
 }
@@ -294,6 +308,7 @@ fn simulate_one(scenario: Scenario, policy: Policy) -> ScenarioResult {
         total_irrigation_applied_mm: round3(irrigation_total),
         total_overflow_proxy_mm: round3(overflow_total),
         stress_exposure_proxy: round3(stress_exposure),
+        relative_stress_change_vs_equal_share_pct: None,
         sensor_dropout_fraction: if total_reads == 0 {
             0.0
         } else {
@@ -319,6 +334,67 @@ fn build_receipt() -> Result<WaterPolicyReceipt> {
         for policy in policies {
             results.push(simulate_one(scenario, policy));
         }
+    }
+    let baseline_scores: BTreeMap<String, f64> = results
+        .iter()
+        .filter(|result| result.policy == Policy::EqualShareCalendar.name())
+        .map(|result| (result.scenario_id.clone(), result.stress_exposure_proxy))
+        .collect();
+    for result in &mut results {
+        if result.policy != Policy::EqualShareCalendar.name() {
+            if let Some(baseline) = baseline_scores.get(&result.scenario_id).copied() {
+                if baseline > 1e-9 {
+                    result.relative_stress_change_vs_equal_share_pct =
+                        Some(round3((result.stress_exposure_proxy - baseline) / baseline * 100.0));
+                }
+            }
+        }
+    }
+    let mut aggregates = Vec::new();
+    for policy in [
+        Policy::EqualShareCalendar,
+        Policy::SoilThreshold,
+        Policy::UncertaintyAware,
+    ] {
+        let policy_results: Vec<&ScenarioResult> = results
+            .iter()
+            .filter(|result| result.policy == policy.name())
+            .collect();
+        let mut scores: Vec<f64> = policy_results
+            .iter()
+            .map(|result| result.stress_exposure_proxy)
+            .collect();
+        scores.sort_by(f64::total_cmp);
+        let mean_stress = scores.iter().sum::<f64>() / scores.len() as f64;
+        let median_stress = (scores[(scores.len() - 1) / 2] + scores[scores.len() / 2]) / 2.0;
+        let relative_changes: Vec<f64> = policy_results
+            .iter()
+            .filter_map(|result| result.relative_stress_change_vs_equal_share_pct)
+            .collect();
+        let mean_relative_change = if relative_changes.is_empty() {
+            None
+        } else {
+            Some(round3(
+                relative_changes.iter().sum::<f64>() / relative_changes.len() as f64,
+            ))
+        };
+        aggregates.push(PolicyAggregate {
+            policy: policy.name().to_owned(),
+            scenario_count: policy_results.len(),
+            mean_stress_exposure_proxy: round3(mean_stress),
+            median_stress_exposure_proxy: round3(median_stress),
+            total_irrigation_applied_mm: round3(
+                policy_results
+                    .iter()
+                    .map(|result| result.total_irrigation_applied_mm)
+                    .sum(),
+            ),
+            mean_relative_stress_change_vs_equal_share_pct: mean_relative_change,
+            total_water_budget_violation_days: policy_results
+                .iter()
+                .map(|result| result.water_budget_violation_days)
+                .sum(),
+        });
     }
     let violations = results
         .iter()
@@ -349,6 +425,7 @@ fn build_receipt() -> Result<WaterPolicyReceipt> {
         scenario_count: all_scenarios.len(),
         policy_count: policies.len(),
         invariant_summary: "Zero cap violations; synthetic proxy, not a plant model.".to_owned(),
+        aggregates,
         results,
         caveats: vec![
             "Scenario traces and parameters are illustrative synthetic assumptions.".to_owned(),
@@ -401,6 +478,8 @@ mod tests {
         assert_eq!(receipt.scenario_count, 4);
         assert_eq!(receipt.policy_count, 3);
         assert_eq!(receipt.results.len(), 12);
+        assert_eq!(receipt.aggregates.len(), 3);
+        assert!(receipt.aggregates.iter().all(|aggregate| aggregate.scenario_count == 4));
         assert!(
             receipt
                 .results
