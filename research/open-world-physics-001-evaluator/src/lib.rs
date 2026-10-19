@@ -657,7 +657,7 @@ mod tests {
 
     #[test]
     fn query_api_rejects_nonfinite_and_holdout_domain_inputs() {
-        let world = reference_worlds().remove(0);
+        let world = open_reference_worlds().remove(0);
         assert_eq!(world.query(f64::NAN, 0), Err(QueryError::NonFiniteInput));
         assert_eq!(
             world.query(HOLDOUT_X_MIN, 1),
@@ -667,6 +667,12 @@ mod tests {
             world.query(TRAIN_X_MIN - 0.1, 2),
             Err(QueryError::OutsideDiscoveryDomain)
         );
+
+        let first = world.query(1.5, 99).unwrap();
+        let repeated = world.query(1.5, 99).unwrap();
+        assert_eq!(first, repeated);
+        assert!(first.response.is_finite());
+        assert!(first.declared_sigma.is_finite() && first.declared_sigma > 0.0);
     }
 
     #[test]
