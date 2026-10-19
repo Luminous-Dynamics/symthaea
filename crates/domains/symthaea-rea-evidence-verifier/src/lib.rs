@@ -13,6 +13,7 @@ const BENCHMARK: &str = "ENG-REA-005-REAL-PROVIDER";
 const PROVIDER_VERSION: &str = "26.6.4";
 const RECEIPT_SCOPE: &str =
     "Pinned Unblob CLI on owned inert nested gzip/tar/text fixtures only; no REA, recovered firmware execution, emulator, or hardware qualification.";
+const RECEIPT_SCHEMA: &str = "symthaea.rea-provider-smoke-receipt.v1";
 const PROVIDER_META_SCHEMA: &str = "symthaea.rea-provider-metamorphic-receipt.v1";
 
 #[derive(Debug, Serialize, PartialEq, Eq)]
@@ -191,6 +192,9 @@ pub fn verify_bundle(
     let receipt: Value = serde_json::from_slice(&raw_receipt)
         .map_err(|e| err(format!("receipt is not valid JSON: {e}")))?;
 
+    if text_field(&receipt, "schema_version")? != RECEIPT_SCHEMA {
+        return Err(err("provider-smoke receipt schema version mismatch"));
+    }
     if text_field(&receipt, "benchmark")? != BENCHMARK {
         return Err(err("receipt benchmark is not the supported Unblob provider-smoke contract"));
     }
@@ -199,6 +203,15 @@ pub fn verify_bundle(
     }
     if text_field(&receipt, "claims_ceiling")? != RECEIPT_SCOPE {
         return Err(err("receipt claim scope is missing, broader than, or different from provider-smoke-only"));
+    }
+
+    if text_field(&receipt, "qualification.tier")? != "unblob-provider-smoke"
+        || required(&receipt, "qualification.rea_cli_mcp_parity")?.as_bool() != Some(false)
+        || required(&receipt, "qualification.firmware_execution")?.as_bool() != Some(false)
+        || required(&receipt, "qualification.emulation")?.as_bool() != Some(false)
+        || required(&receipt, "qualification.device_qualification")?.as_bool() != Some(false)
+    {
+        return Err(err("provider-smoke qualification scope is missing or escalated"));
     }
 
     let source_head_sha = text_field(&receipt, "source.head_sha")?;
@@ -225,9 +238,13 @@ pub fn verify_bundle(
     let normalizer_sha = digest_field(&receipt, "source.normalizer_sha256")?;
     let cases_sha = digest_field(&receipt, "source.cases_manifest_sha256")?;
     let oracle_sha = digest_field(&receipt, "source.oracle_sha256")?;
+    let provider_smoke_sha = digest_field(&receipt, "source.provider_smoke_script_sha256")?;
+    let provider_meta_script_sha = digest_field(&receipt, "source.provider_metamorphic_script_sha256")?;
     verify_digest_at(&source_root.join("normalize.jq"), &normalizer_sha, "normalizer")?;
     verify_digest_at(&source_root.join("cases.json"), &cases_sha, "cases manifest")?;
     verify_digest_at(&source_root.join("oracle.json"), &oracle_sha, "oracle")?;
+    verify_digest_at(&source_root.join("provider-smoke.sh"), &provider_smoke_sha, "provider smoke script")?;
+    verify_digest_at(&source_root.join("provider-metamorphic-sweep.sh"), &provider_meta_script_sha, "provider metamorphic script")?;
 
     let input_sha = digest_field(&receipt, "fixture_input_sha256")?;
     let mutated_input_sha = digest_field(&receipt, "mutated_fixture_input_sha256")?;
@@ -384,6 +401,8 @@ mod tests {
         write(&source.join("normalize.jq"), normalizer);
         write(&source.join("cases.json"), cases);
         write(&source.join("oracle.json"), oracle);
+        write(&source.join("provider-smoke.sh"), b"provider smoke script v1\n");
+        write(&source.join("provider-metamorphic-sweep.sh"), b"provider metamorphic script v1\n");
 
         let head = "1234567890abcdef1234567890abcdef12345678".to_owned();
         let checkout = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_owned();
@@ -446,7 +465,15 @@ mod tests {
         write(&artifact.join("provider-metamorphic-receipt.json"), &meta_bytes);
 
         let receipt = json!({
+            "schema_version": RECEIPT_SCHEMA,
             "benchmark": BENCHMARK,
+            "qualification": {
+                "tier": "unblob-provider-smoke",
+                "rea_cli_mcp_parity": false,
+                "firmware_execution": false,
+                "emulation": false,
+                "device_qualification": false,
+            },
             "source": {
                 "head_sha": head,
                 "checkout_commit_sha": checkout,
@@ -454,6 +481,8 @@ mod tests {
                 "normalizer_sha256": normalizer_sha,
                 "cases_manifest_sha256": cases_sha,
                 "oracle_sha256": oracle_sha,
+                "provider_smoke_script_sha256": sha(b"provider smoke script v1\n"),
+                "provider_metamorphic_script_sha256": sha(b"provider metamorphic script v1\n"),
             },
             "provider_version": PROVIDER_VERSION,
             "executable_path": "/usr/local/bin/unblob",
@@ -513,9 +542,13 @@ mod tests {
         let raw: Value = serde_json::from_slice(&fs::read(f.artifact.join("receipt.json")).unwrap()).unwrap();
         let mut changed = raw;
         let semantic_mutation = changed["semantic_projection_sha256"]["semantic_mutation"].clone();
-        changed["semantic_projection_sha256"]["semantic_mutation"] =
-            changed["semantic_projection_sha256"]["equivalent_runs"].clone();
+        let equivalent_digest = changed["semantic_projection_sha256"]["equivalent_runs"].clone();
+        changed["semantic_projection_sha256"]["semantic_mutation"] = equivalent_digest;
         assert_ne!(semantic_mutation, changed["semantic_projection_sha256"]["semantic_mutation"]);
+        write(
+            &f.artifact.join("run-mutated/semantic-projection.json"),
+            b"{\"projection\":\"same\"}\n",
+        );
         write(&f.artifact.join("receipt.json"), serde_json::to_vec_pretty(&changed).unwrap().as_slice());
         assert!(verify_bundle(&f.artifact, &f.source, &f.expected_head).unwrap_err().to_string().contains("did not change"));
     }
