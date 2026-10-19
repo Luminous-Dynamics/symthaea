@@ -73,6 +73,19 @@ For a **physical claim**, v0.1 clock eligibility is fail-closed: `sync_method` m
 
 NIST’s [metrological-traceability policy](https://www.nist.gov/calibrations/traceability) is the rationale for the uncertainty gate: traceability concerns the measurement result and documented calibration chain, with each link contributing uncertainty; traceability alone does not establish fitness for purpose.
 
+For v0.1, a single aggregate uncertainty number cannot cover an entire claim. Each required measurand needs its own unit-compatible uncertainty budget; the schema rejects unknown claim/measurand/unit combinations, and eligibility remains blocked if even one required budget is missing.
+
+| Claim target | Required uncertainty measurands (v0.1) |
+|---|---|
+| `ride_energy` | DC bus voltage (V), DC bus current (A), net DC bus energy (J or Wh), ground speed (m/s) |
+| `longitudinal_dynamics` | Ground speed (m/s), longitudinal acceleration (m/s²), front/rear wheel angular speed (rad/s), stopping distance (m) |
+| `tire_health` | Front/rear tire pressure (Pa or kPa) and front/rear tire temperature (°C) |
+| `motor_map` | Motor torque (N·m), motor angular speed (rad/s), DC voltage/current (V/A), motor/inverter temperature (°C), efficiency (unitless) |
+| `tire_force_characterization` | Normal/longitudinal/lateral force (N), slip ratio (unitless), slip and camber angles (rad) |
+| `ice_fuel_energy` | Fuel mass flow (kg/s), engine angular speed (rad/s), wheel torque (N·m), wheel angular speed (rad/s), fuel energy (J or Wh) |
+
+These are completeness gates for evidence bookkeeping, not evidence that the stated quantities have been measured or that the proposed quantity set is sufficient for regulatory qualification.
+
 ## Open manifest contract
 
 The planned example is [mobility_telemetry_manifest_v0_1.json](data/mobility_telemetry_manifest_v0_1.json). It declares vehicle identity, session state and evidence class; clock/synchronization plan; sensor IDs and calibration receipts; semantic channel IDs, SI units, rates, axes/sign conventions and sensor assignments; data rights; raw artifact hashes; and claim targets for ride energy, longitudinal dynamics, tire health, motor maps, tire-force rigs or combustion energy.
@@ -133,7 +146,7 @@ Targets for the first software tranche: zero false accepts across missing-channe
 
 ### Current implementation
 
-The first implementation is the **manifest, raw-trace validator and fault-matrix runner**, not pretend firmware. All three commands are wired into the existing `xtask` binary and introduce no new dependencies. The telemetry module has 31 authored unit tests covering schema/claim gates, trace failure modes and all 27 frozen matrix cases; five further tests cover the vendored tire-monitoring intake. These tests have not been compiled or run in this environment.
+The first implementation is the **manifest, raw-trace validator and fault-matrix runner**, not pretend firmware. All three commands are wired into the existing `xtask` binary and introduce no new dependencies. The telemetry module has 34 authored unit tests covering schema/claim gates, trace failure modes, report-digest determinism, and all 28 frozen matrix cases; five further tests cover the vendored tire-monitoring intake. These tests have not been compiled or run in this environment.
 
 From the workspace root:
 
