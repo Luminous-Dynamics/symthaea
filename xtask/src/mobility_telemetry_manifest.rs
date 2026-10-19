@@ -1003,9 +1003,11 @@ fn validate_trace_bytes(raw: &[u8], manifest: &Manifest) -> Result<TraceReport> 
         };
         // This estimates the periodic sample count over the observed span only;
         // it does not know the logger's intended start/stop trigger or hardware counters.
-        let estimated_expected_sample_count = observed_span_ns.and_then(|span| {
-            (expected_period_ns > 0).then_some(span / expected_period_ns + 1)
-        });
+        let estimated_expected_sample_count = if expected_period_ns > 0 {
+            observed_span_ns.map(|span| span / expected_period_ns + 1)
+        } else {
+            None
+        };
         let estimated_missing_sample_count = estimated_expected_sample_count
             .map(|expected| expected.saturating_sub(summary.sample_count as u64));
         TraceChannelSummary {
@@ -2531,5 +2533,22 @@ mod tests {
         assert_eq!(report.gaps[0].current_timestamp_ns, 600_000_001);
         assert_eq!(report.gaps[0].estimated_missing_samples, 4);
         assert_eq!(report.channels.iter().map(|channel| channel.sample_count).sum::<usize>(), 3);
+    }
+
+    #[test]
+    fn sub_nanosecond_nominal_period_yields_unknown_estimate_not_panic() {
+        let mut fixture = manifest();
+        let channel = fixture.channels.iter_mut()
+            .find(|channel| channel.channel_id == "gnss.speed_mps")
+            .expect("fixture declares GNSS speed");
+        channel.sample_rate_hz = 3_000_000_000.0;
+        let raw = b"timestamp_ns,channel_id,raw_value,sample_status,sequence\n1,gnss.speed_mps,1,VALID,0\n2,gnss.speed_mps,2,VALID,1\n";
+        let report = validate_trace_bytes(raw, &fixture)
+            .expect("sub-nanosecond nominal period cannot be represented but must not panic");
+        let speed = report.channels.iter().find(|channel| channel.channel_id == "gnss.speed_mps")
+            .expect("speed channel present");
+        assert_eq!(speed.expected_period_ns, None);
+        assert_eq!(speed.estimated_expected_sample_count, None);
+        assert_eq!(speed.estimated_missing_sample_count, None);
     }
 }
