@@ -5,6 +5,7 @@ mod crate_status;
 mod cropfoundry_csv_audit;
 mod cropfoundry_validate;
 mod cropfoundry_water_policy;
+mod cropfoundry_postharvest_audit;
 mod duplicate_scan;
 mod manifest;
 mod rhn_sweep;
@@ -72,6 +73,33 @@ enum Commands {
     /// Run the deterministic synthetic irrigation-policy harness; no crop-performance claim.
     CropfoundryWaterPolicyDemo {
         /// Optional path to write the JSON scenario receipt.
+        #[arg(long)]
+        out: Option<PathBuf>,
+    },
+    /// Audit local lot/stage mass-balance data; does not validate food safety or authorize training.
+    CropfoundryPostharvestAudit {
+        /// Path to a local CSV; no network request is made.
+        #[arg(long)]
+        input: PathBuf,
+        /// Explicit source/dataset identifier for provenance in the receipt.
+        #[arg(long)]
+        source_id: String,
+        /// Canonical URL or URI for the specific source/artifact.
+        #[arg(long)]
+        source_uri: String,
+        /// Single-byte CSV delimiter.
+        #[arg(long, default_value = ";")]
+        delimiter: char,
+        /// Absolute mass-balance tolerance in kg.
+        #[arg(long, default_value = "0.02")]
+        absolute_tolerance_kg: f64,
+        /// Relative mass-balance tolerance as a fraction of input mass.
+        #[arg(long, default_value = "0.01")]
+        relative_tolerance: f64,
+        /// Optional expected SHA-256 from an independent trusted source.
+        #[arg(long)]
+        expected_sha256: Option<String>,
+        /// Optional path for the JSON audit receipt.
         #[arg(long)]
         out: Option<PathBuf>,
     },
@@ -143,6 +171,27 @@ fn main() -> anyhow::Result<()> {
         }
         Commands::CropfoundryWaterPolicyDemo { out } => {
             cropfoundry_water_policy::run(out)?;
+        }
+        Commands::CropfoundryPostharvestAudit {
+            input,
+            source_id,
+            source_uri,
+            delimiter,
+            absolute_tolerance_kg,
+            relative_tolerance,
+            expected_sha256,
+            out,
+        } => {
+            cropfoundry_postharvest_audit::run(
+                input,
+                source_id,
+                source_uri,
+                delimiter,
+                absolute_tolerance_kg,
+                relative_tolerance,
+                expected_sha256,
+                out,
+            )?;
         }
         Commands::RhnSweep {
             dims,
