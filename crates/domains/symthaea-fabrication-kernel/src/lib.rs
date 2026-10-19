@@ -136,6 +136,7 @@ pub mod operational_replay;
 pub mod operator_command;
 pub mod operator_command_tracker;
 pub mod package;
+pub mod paired_inference;
 pub mod step_import;
 
 pub use automatic_rollback::{
