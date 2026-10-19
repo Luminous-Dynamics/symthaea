@@ -1,7 +1,7 @@
 {
   "schema_version": "0.1.0",
   "suite_id": "MOBILITY-TELEMETRY-CONFORMANCE-001",
-  "status": "frozen_proposed_matrix_v0_1_with_receipt_binding_and_per_measurand_controls_not_yet_executed",
+  "status": "frozen_proposed_matrix_v0_1_with_zero_uncertainty_negative_control_not_yet_executed",
   "claim_ceiling": "Software conformance only. No demonstrated hardware reliability, measurement accuracy, vehicle performance, tire qualification, or roadworthiness.",
   "interpretation": {
     "positive_controls_required": true,
@@ -339,6 +339,17 @@
       "rust_test": "rights_receipt_id_must_be_backed_by_matching_artifact",
       "required_detail_tokens": [
         "rights_receipt_id_not_backed_by_artifact"
+      ]
+    },
+    {
+      "id": "MANIFEST-009",
+      "category": "uncertainty_gate",
+      "mutation": "zero_width_uncertainty_budget",
+      "expected": "reject",
+      "diagnostic": "standard and expanded uncertainty must be positive",
+      "rust_test": "zero_uncertainty_is_rejected_as_unphysical_overconfidence",
+      "required_detail_tokens": [
+        "standard and expanded uncertainty must be positive"
       ]
     }
   ],
