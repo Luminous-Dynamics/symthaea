@@ -261,14 +261,6 @@ fn experiment_signature(case: &Case) -> BTreeSet<String> {
         .collect()
 }
 
-fn baseline_score_signature(scenario: &RegretScenario) -> BTreeSet<String> {
-    scenario
-        .baseline_scores
-        .iter()
-        .map(|score| score.experiment_id.clone())
-        .collect()
-}
-
 fn validate_family(family: &RegretFamily) -> Vec<String> {
     let mut errors = Vec::new();
     if family.family_id.trim().is_empty() || family.scenarios.len() < 2 {
