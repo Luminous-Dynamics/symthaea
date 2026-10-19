@@ -40,6 +40,7 @@ enum UncertaintyIntervalKind {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct NutritionAccountingInput {
     schema_version: String,
     batch_id: String,
@@ -618,6 +619,24 @@ mod tests {
             currency_code: Some("ZAR".to_owned()),
             source_sha256: Some("a".repeat(64)),
         }
+    }
+
+    #[test]
+    fn v1_json_schema_is_parseable_and_unknown_fields_are_rejected() {
+        let schema: serde_json::Value = serde_json::from_str(include_str!(
+            "../../docs/research/cropfoundry/nutrition-accounting-input-v1.schema.json"
+        ))
+        .unwrap();
+        assert_eq!(
+            schema["$schema"],
+            "https://json-schema.org/draft/2020-12/schema"
+        );
+        assert_eq!(schema["additionalProperties"], false);
+        assert_eq!(schema["properties"]["schema_version"]["const"], INPUT_SCHEMA_V1);
+
+        let mut input = serde_json::to_value(fixture()).unwrap();
+        input["unexpected_extra_field"] = serde_json::json!(true);
+        assert!(serde_json::from_value::<NutritionAccountingInput>(input).is_err());
     }
 
     #[test]
