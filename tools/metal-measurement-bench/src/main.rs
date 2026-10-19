@@ -438,6 +438,25 @@ fn validate_csv_quote_syntax(bytes: &[u8]) -> Result<()> {
     Ok(())
 }
 
+fn is_portable_zip_component(component: &str) -> bool {
+    if component.is_empty()
+        || component == "."
+        || component == ".."
+        || component.ends_with('.')
+        || component.ends_with(' ')
+    {
+        return false;
+    }
+    let stem = component.split('.').next().unwrap_or_default();
+    let upper = stem.to_ascii_uppercase();
+    let reserved = matches!(upper.as_str(), "CON" | "PRN" | "AUX" | "NUL")
+        || (upper.len() == 4
+            && (upper.starts_with("COM") || upper.starts_with("LPT"))
+            && upper.as_bytes()[3].is_ascii_digit()
+            && (b'1'..=b'9').contains(&upper.as_bytes()[3]));
+    !reserved
+}
+
 fn inspect_zip_bytes(bytes: &[u8], relative_path: &str) -> Result<ZipInventory> {
     const MAX_MEMBERS: usize = 100_000;
 
@@ -473,6 +492,16 @@ fn inspect_zip_bytes(bytes: &[u8], relative_path: &str) -> Result<ZipInventory> 
             )));
         }
 
+        let path_without_directory_suffix = raw_name.strip_suffix('/').unwrap_or(raw_name);
+        if path_without_directory_suffix.is_empty()
+            || path_without_directory_suffix
+                .split('/')
+                .any(|component| !is_portable_zip_component(component))
+        {
+            return Err(AdapterError::Validation(format!(
+                "ZIP member path {raw_name:?} contains empty, traversal, normalized, or non-portable components"
+            )));
+        }
         let member_path = Path::new(raw_name);
         if member_path.components().any(|component| {
             !matches!(component, Component::Normal(_))
@@ -2261,7 +2290,19 @@ mod tests {
 
     #[test]
     fn zip_inventory_rejects_traversal_absolute_and_backslash_paths() {
-        for member in ["../escape.csv", "/absolute.csv", "nested/../../escape.csv", r"nested\escape.csv", "C:/drive.csv"] {
+        for member in [
+            "../escape.csv",
+            "/absolute.csv",
+            "nested/../../escape.csv",
+            r"nested\escape.csv",
+            "C:/drive.csv",
+            "nested//file.csv",
+            "nested/./file.csv",
+            "CON.txt",
+            "trailing./file.csv",
+            "folder /bad.csv",
+            "LPT1.csv",
+        ] {
             let bytes = zip_fixture(&[(member, b"x", 0o100644)]);
             assert!(inspect_zip_bytes(&bytes, "source.zip").is_err(), "accepted unsafe member {member:?}");
         }
