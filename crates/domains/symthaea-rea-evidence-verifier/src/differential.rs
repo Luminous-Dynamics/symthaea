@@ -263,6 +263,11 @@ pub fn score_case(oracle: &OracleCase, observed: &Observation) -> Result<Scoreca
         return Err(ScoreError("source SHA-256 must be 64 lowercase hexadecimal characters".into()));
     }
 
+    let capability_supported = observed.capability == "supported";
+    if !["supported", "unsupported", "unknown"].contains(&observed.capability.as_str()) {
+        return Err(ScoreError(format!("invalid capability value: {}", observed.capability)));
+    }
+
     let mut reasons = Vec::new();
     let source_identity_match = oracle.source == observed.source;
     if !source_identity_match {
@@ -301,15 +306,31 @@ pub fn score_case(oracle: &OracleCase, observed: &Observation) -> Result<Scoreca
             reasons.push(format!("detected region is out of bounds or empty: {} {}..{}", region.kind, region.start, region.end));
         }
     }
-    let exact_regions = exact_region_overlap(&oracle.expected_regions, &observed.regions);
-    let missed_or_false_regions = oracle.expected_regions.len() + observed.regions.len() - 2 * exact_regions;
-    if missed_or_false_regions > 0 {
+    let exact_regions = if capability_supported {
+        exact_region_overlap(&oracle.expected_regions, &observed.regions)
+    } else {
+        0
+    };
+    let missed_or_false_regions = if capability_supported {
+        oracle.expected_regions.len() + observed.regions.len() - 2 * exact_regions
+    } else {
+        0
+    };
+    if capability_supported && missed_or_false_regions > 0 {
         reasons.push(format!("{missed_or_false_regions} missed or false-positive region(s)"));
     }
 
-    let known_files_exact = exact_file_overlap(&oracle.expected_files, &observed.files);
-    let extra_or_wrong_files = oracle.expected_files.len() + observed.files.len() - 2 * known_files_exact;
-    if known_files_exact != oracle.expected_files.len() || observed.files.len() != oracle.expected_files.len() {
+    let known_files_exact = if capability_supported {
+        exact_file_overlap(&oracle.expected_files, &observed.files)
+    } else {
+        0
+    };
+    let extra_or_wrong_files = if capability_supported {
+        oracle.expected_files.len() + observed.files.len() - 2 * known_files_exact
+    } else {
+        0
+    };
+    if capability_supported && (known_files_exact != oracle.expected_files.len() || observed.files.len() != oracle.expected_files.len()) {
         reasons.push(format!(
             "known-answer output tree differs: expected {}, exact matches {}, observed {}",
             oracle.expected_files.len(),
@@ -343,10 +364,6 @@ pub fn score_case(oracle: &OracleCase, observed: &Observation) -> Result<Scoreca
         ));
     }
 
-    let capability_supported = observed.capability == "supported";
-    if !["supported", "unsupported", "unknown"].contains(&observed.capability.as_str()) {
-        return Err(ScoreError(format!("invalid capability value: {}", observed.capability)));
-    }
     if !capability_supported {
         if observed.complete_extraction_claim {
             reasons.push("unsupported/unknown provider capability cannot claim completeness".into());
