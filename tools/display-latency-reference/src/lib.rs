@@ -477,20 +477,26 @@ impl FrameprobeHeader {
         if names.iter().filter(|field| field.as_str() == "deliveryTime").count() > 1 {
             return Err("header contains duplicate deliveryTime columns".to_owned());
         }
+        let delivery_time = names.iter().position(|field| field == "deliveryTime");
+        if delivery_time.is_some_and(|index| index + 1 != names.len()) {
+            return Err("deliveryTime must be the last column when present".to_owned());
+        }
         Ok(Self {
             click_time: find_column(&names, "clickTime")?,
             total_time: find_column(&names, "timeTaken")?,
             sample_count: find_column(&names, "sampleCount")?,
             pre_click_samples: find_column(&names, "preClickSamples")?,
             samples: find_column(&names, "samples")?,
-            delivery_time: names.iter().position(|field| field == "deliveryTime"),
+            delivery_time,
             names,
         })
     }
 
     pub fn parse_row(&self, line: &str) -> Result<CaptureRow, String> {
         let fields: Vec<&str> = line.trim_end_matches('\r').split(',').collect();
-        let legacy_appended_delivery = self.delivery_time.is_none() && fields.len() == self.names.len() + 1;
+        let legacy_appended_delivery = self.delivery_time.is_none()
+            && self.names.len() == 5
+            && fields.len() == self.names.len() + 1;
         let missing_optional_delivery = self.delivery_time.is_some() && fields.len() + 1 == self.names.len();
         if fields.len() != self.names.len() && !legacy_appended_delivery && !missing_optional_delivery {
             return Err("row field count does not match the header".to_owned());
@@ -789,6 +795,12 @@ mod tests {
         assert!(header.parse_row("80,44200,6,2,1000;bad;1100").is_err());
         assert!(header.parse_row("80,44200,6,2,1000;;1100").is_err());
         assert!(FrameprobeHeader::parse("clickTime,timeTaken,clickTime,samples").is_err());
+        assert!(
+            FrameprobeHeader::parse(
+                "clickTime,timeTaken,sampleCount,preClickSamples,deliveryTime,samples"
+            )
+            .is_err()
+        );
     }
 
     #[test]
