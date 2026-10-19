@@ -437,7 +437,39 @@
             "type": "string",
             "minLength": 1
           }
-        }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "concentration_stage": {
+                  "const": "measured_before_preparation"
+                }
+              },
+              "required": [
+                "concentration_stage"
+              ]
+            },
+            "then": {
+              "required": [
+                "retention_lower_fraction",
+                "retention_upper_fraction"
+              ],
+              "properties": {
+                "retention_lower_fraction": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "retention_upper_fraction": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              }
+            }
+          }
+        ]
       }
     },
     {
@@ -529,6 +561,96 @@
           "currency_code": {
             "type": "string",
             "pattern": "^[A-Za-z]{3}$"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "bioavailability_fraction": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "bioavailability_fraction"
+        ]
+      },
+      "then": {
+        "required": [
+          "bioavailability_evidence_uri"
+        ],
+        "properties": {
+          "bioavailability_evidence_uri": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "anyOf": [
+          {
+            "properties": {
+              "uncertainty_interval_kind": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "uncertainty_interval_kind"
+            ]
+          },
+          {
+            "properties": {
+              "uncertainty_evidence_uri": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "uncertainty_evidence_uri"
+            ]
+          }
+        ]
+      },
+      "then": {
+        "required": [
+          "concentration_lower_mg_per_kg",
+          "concentration_upper_mg_per_kg",
+          "edible_mass_lower_kg_at_concentration_stage",
+          "edible_mass_upper_kg_at_concentration_stage",
+          "uncertainty_interval_kind",
+          "uncertainty_evidence_uri"
+        ],
+        "properties": {
+          "concentration_lower_mg_per_kg": {
+            "type": "number",
+            "minimum": 0
+          },
+          "concentration_upper_mg_per_kg": {
+            "type": "number",
+            "minimum": 0
+          },
+          "edible_mass_lower_kg_at_concentration_stage": {
+            "type": "number",
+            "minimum": 0
+          },
+          "edible_mass_upper_kg_at_concentration_stage": {
+            "type": "number",
+            "minimum": 0
+          },
+          "uncertainty_interval_kind": {
+            "enum": [
+              "confidence_interval95",
+              "credible_interval95",
+              "measurement_tolerance",
+              "sensitivity_bounds",
+              "observed_range"
+            ]
+          },
+          "uncertainty_evidence_uri": {
+            "type": "string",
+            "minLength": 1
           }
         }
       }
