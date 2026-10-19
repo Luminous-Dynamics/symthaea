@@ -19,8 +19,9 @@ This implements a narrow, concrete slice of provenance interoperability inspired
 - exactly one protocol artifact exists, and its declared/verified SHA-256 matches the experiment's protocol digest;
 - every artifact has unique ID, source reference and path, safe normalized relative path, positive byte length and canonical lowercase SHA-256;
 - exactly the manifest-declared payload IDs are supplied, with no missing/extraneous bytes, and every byte length and SHA-256 matches;
-- each run's process trace ID resolves to its own unique process-trace artifact;
-- each outcome evidence source reference and version resolves to an artifact of an appropriate measurement/outcome kind;
+- each run's process-trace ID resolves to its own unique process-trace artifact; the payload is parsed with duplicate-key rejection, passes the existing process-trace validator, and its embedded `trace_id` matches the artifact ID;
+- each outcome evidence source reference and version resolves to a unique `measurement_record` artifact;
+- the measurement-record payload's run ID, outcome ID, status, unit, method, point value, lower/upper bounds and unknown reason exactly match the outcome record consumed by the analysis;
 - all artifacts are reachable from the protocol, run trace or outcome evidence; unreferenced artifacts fail closed.
 
 `analyze_paired_outcomes_with_verified_bundle_v1` additionally fingerprints the in-memory experiment value and rejects a changed object before running the existing paired-outcome analysis.
@@ -30,7 +31,7 @@ This implements a narrow, concrete slice of provenance interoperability inspired
 1. 100% of one-byte payload changes rejected by hash or byte-length check.
 2. 100% of manifest-byte changes rejected when the expected digest is frozen separately.
 3. 100% of missing and undeclared payload entries rejected.
-4. 100% of duplicate artifact IDs, paths, source references, duplicate JSON fields and unsafe paths rejected.
+4. 100% of duplicate artifact IDs, paths, source references, duplicate JSON fields in manifests/trace/measurement payloads, and unsafe paths rejected.
 5. 100% of process-trace IDs and outcome source/version pairs resolve to the exact declared artifact kind.
 6. Zero unreferenced manifest artifacts accepted.
 7. Any mutation of the experiment after verification invalidates the opaque verified-bundle capability.
@@ -47,7 +48,7 @@ This implements a narrow, concrete slice of provenance interoperability inspired
 
 ## Synthetic negative controls
 
-The test module creates 1 protocol, 4 process-trace and 12 outcome payloads in memory. These bytes are synthetic and authored only to test exact-byte plumbing. The 15 Rust tests cover successful binding, byte tampering, manifest digest mismatch, protocol digest mismatch, missing/extra payloads, unsafe paths, missing process traces, source-version drift, stale verified capabilities, duplicate manifest fields, synthetic-source spoofing, duplicate paths and unreferenced artifacts.
+The test module creates 1 protocol, 4 process-trace and 12 measurement-record payloads in memory. These bytes are synthetic and authored only to test exact-byte plumbing. The 18 Rust tests cover successful binding, byte tampering, manifest digest mismatch, protocol digest mismatch, missing/extra payloads, unsafe paths, missing process traces, source-version drift, stale verified capabilities, duplicate fields, synthetic-source spoofing, duplicate paths/unreferenced artifacts, and mismatches between hashed measurement/trace payloads and the consumed experiment.
 
 ## Relationship to experimental reporting
 
