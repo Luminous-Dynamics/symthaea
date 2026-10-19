@@ -1288,11 +1288,45 @@ mod tests {
             Some("c417ef92a60309c7f4647b524c4f00a6fd91bfd1")
         );
 
+        assert_eq!(
+            receipt.pointer("/claim_boundaries/preview_rendered").and_then(Value::as_bool),
+            Some(false),
+            "the historical workflow did not render a preview"
+        );
+        assert!(
+            receipt
+                .get("correction_notes")
+                .and_then(Value::as_array)
+                .is_some_and(|notes| notes.iter().any(|note| {
+                    note.as_str()
+                        .is_some_and(|text| text.contains("did not include a preview-render step"))
+                })),
+            "the unsupported historical preview claim must remain explicitly corrected"
+        );
+
         let checks = receipt
             .get("checks")
             .and_then(Value::as_array)
             .expect("CAD receipt must declare checks");
         assert!(!checks.is_empty());
+        assert!(
+            !checks.iter().any(|check| {
+                check.get("id").and_then(Value::as_str) == Some("ODRH-CAD-PREVIEW-DEFAULT")
+            }),
+            "an unexecuted preview may not appear as a PASS"
+        );
+        for required_id in [
+            "ODRH-CAD-NEGATIVE-APERTURE-ASSERTION",
+            "ODRH-CAD-NEGATIVE-MOUNT-PITCH",
+            "ODRH-CAD-NEGATIVE-PLATE-THICKNESS",
+        ] {
+            assert!(
+                checks.iter().any(|check| {
+                    check.get("id").and_then(Value::as_str) == Some(required_id)
+                }),
+                "historical CAD receipt omits evidenced negative control {required_id}"
+            );
+        }
         assert!(
             checks
                 .iter()
