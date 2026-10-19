@@ -45,6 +45,8 @@ pub struct TraceSpec {
     /// SHA-256 hex digest of the raw trace; format is checked, provenance is not authenticated.
     pub raw_trace_sha256: String,
     pub mission_id: String,
+    /// Externally assessed condition-profile / stratum digest. Equality is checked only;
+    /// this crate does not validate raw environmental measurements or apply corrections.
     pub condition_digest: String,
     /// SHA-256 digest of the required delivered-service contract (route, distance, payload, speed policy).
     pub service_digest: String,
