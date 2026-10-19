@@ -674,11 +674,13 @@ mod tests {
     #[test]
     fn cropfoundry_equal_share_baseline_has_zero_allocation_dispersion() {
         let receipt = build_receipt().unwrap();
-        assert!(receipt
-            .results
-            .iter()
-            .filter(|result| result.policy == Policy::EqualShareCalendar.name())
-            .all(|result| result.plot_allocation_dispersion_plot_mm <= 1e-6));
+        assert!(
+            receipt
+                .results
+                .iter()
+                .filter(|result| result.policy == Policy::EqualShareCalendar.name())
+                .all(|result| result.plot_allocation_dispersion_plot_mm <= 1e-6)
+        );
     }
 
     #[test]
