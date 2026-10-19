@@ -318,10 +318,10 @@ fn validate_family(family: &RegretFamily) -> Vec<String> {
         }
 
         let candidate_ids = experiment_signature(&scenario.case);
-        let mut score_ids = BTreeSet::new();
+        let mut score_ids = BTreeSet::<String>::new();
         for score in &scenario.baseline_scores {
             if score.experiment_id.trim().is_empty()
-                || !score_ids.insert(score.experiment_id.as_str())
+                || !score_ids.insert(score.experiment_id.clone())
             {
                 errors.push("duplicate_or_empty_baseline_score_id".to_owned());
             }
