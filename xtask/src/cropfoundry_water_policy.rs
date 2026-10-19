@@ -431,13 +431,15 @@ fn build_receipt() -> Result<WaterPolicyReceipt> {
     ];
     let mut results = Vec::new();
     for scenario in all_scenarios {
-        let (equal_share_result, _) =
-            simulate_one(scenario, Policy::EqualShareCalendar, None);
+        let (equal_share_result, _) = simulate_one(scenario, Policy::EqualShareCalendar, None);
         let (soil_threshold_result, _) = simulate_one(scenario, Policy::SoilThreshold, None);
         let (risk_aware_result, risk_daily_totals) =
             simulate_one(scenario, Policy::UncertaintyAware, None);
-        let (matched_uniform_result, matched_daily_totals) =
-            simulate_one(scenario, Policy::EqualShareCalendar, Some(&risk_daily_totals));
+        let (matched_uniform_result, matched_daily_totals) = simulate_one(
+            scenario,
+            Policy::EqualShareCalendar,
+            Some(&risk_daily_totals),
+        );
         let dose_diff = risk_aware_result.total_irrigation_applied_plot_mm
             - matched_uniform_result.total_irrigation_applied_plot_mm;
         if dose_diff.abs() > 1e-3 {
@@ -487,10 +489,9 @@ fn build_receipt() -> Result<WaterPolicyReceipt> {
         if result.policy == Policy::UncertaintyAware.name() {
             if let Some(matched) = matched_uniform_scores.get(&result.scenario_id).copied() {
                 if matched > 1e-9 {
-                    result.relative_stress_change_vs_matched_water_equal_share_pct =
-                        Some(round3(
-                            (result.stress_exposure_proxy - matched) / matched * 100.0,
-                        ));
+                    result.relative_stress_change_vs_matched_water_equal_share_pct = Some(round3(
+                        (result.stress_exposure_proxy - matched) / matched * 100.0,
+                    ));
                 }
             }
         }
@@ -566,9 +567,7 @@ fn build_receipt() -> Result<WaterPolicyReceipt> {
         };
         let relative_matched_changes: Vec<f64> = policy_results
             .iter()
-            .filter_map(|result| {
-                result.relative_stress_change_vs_matched_water_equal_share_pct
-            })
+            .filter_map(|result| result.relative_stress_change_vs_matched_water_equal_share_pct)
             .collect();
         let mean_relative_matched_change = if relative_matched_changes.is_empty() {
             None
@@ -605,7 +604,8 @@ fn build_receipt() -> Result<WaterPolicyReceipt> {
                 .unwrap_or(0.0),
             mean_worst_to_best_zone_stress_ratio: mean_worst_to_best_ratio,
             mean_relative_stress_change_vs_equal_share_pct: mean_relative_change,
-            mean_relative_stress_change_vs_matched_water_equal_share_pct: mean_relative_matched_change,
+            mean_relative_stress_change_vs_matched_water_equal_share_pct:
+                mean_relative_matched_change,
             total_water_budget_violation_days: policy_results
                 .iter()
                 .map(|result| result.water_budget_violation_days)
