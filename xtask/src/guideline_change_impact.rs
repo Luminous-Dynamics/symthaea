@@ -313,6 +313,63 @@ fn validate_contract(
     if contract.source_revisions.len() < 2 {
         bail!("change-impact validation requires two distinct source revisions");
     }
+    if contract.oracle_class != "separate_synthetic_expected_outcomes" {
+        bail!("change-impact fixture must declare a separate synthetic expected-outcome oracle");
+    }
+    if !source_path_is_allowed(&contract.oracle_fixture_path) {
+        bail!("oracle fixture path is outside the allowed synthetic fixture directory");
+    }
+    let oracle_bytes = fs::read(root.join(&contract.oracle_fixture_path))
+        .with_context(|| format!("read synthetic oracle {}", contract.oracle_fixture_path))?;
+    let oracle_sha256 = sha256_hex(&oracle_bytes);
+    if oracle_sha256 != contract.oracle_fixture_sha256 {
+        bail!(
+            "oracle digest mismatch (declared {}, actual {})",
+            contract.oracle_fixture_sha256,
+            oracle_sha256
+        );
+    }
+    let oracle: IndependentOracle =
+        serde_json::from_slice(&oracle_bytes).context("parse independent synthetic oracle")?;
+    if oracle.schema_version != "synthetic-first-aid-change-oracle-v0"
+        || oracle.status != SYNTHETIC_STATUS
+        || oracle.clinical_use_authorized
+        || oracle.oracle_class != contract.oracle_class
+        || oracle.note.trim().is_empty()
+    {
+        bail!("oracle metadata is unsupported or attempts to authorize clinical use");
+    }
+    if oracle.cases.is_empty() {
+        bail!("independent synthetic oracle must contain cases");
+    }
+    let mut oracle_cases: HashMap<String, OracleCase> = HashMap::new();
+    for case in &oracle.cases {
+        let prefix = match case.case_kind.as_str() {
+            "known_answer" => "KAT-",
+            "fault_mutation" => "MUT-",
+            other => bail!("{}: unsupported oracle case kind {other}", case.case_id),
+        };
+        if !is_numbered_id(&case.case_id, prefix)
+            || !is_requirement_id(&case.requirement_id)
+            || case.input_condition.trim().is_empty()
+            || case.expected_predicate.trim().is_empty()
+            || case.expected_outcome.trim().is_empty()
+            || case.oracle_review_record_id.trim().is_empty()
+        {
+            bail!("{}: incomplete or malformed oracle case", case.case_id);
+        }
+        if case.case_kind == "known_answer" && case.fault_injection.is_some() {
+            bail!("{}: known-answer case must not declare a fault injection", case.case_id);
+        }
+        if case.case_kind == "fault_mutation"
+            && case.fault_injection.as_deref().unwrap_or("").trim().is_empty()
+        {
+            bail!("{}: mutation case must declare a fault injection", case.case_id);
+        }
+        if oracle_cases.insert(case.case_id.clone(), case.clone()).is_some() {
+            bail!("duplicate oracle case ID: {}", case.case_id);
+        }
+    }
 
     let mut revisions = HashMap::new();
     let mut source_artifact_sha256 = BTreeMap::new();
