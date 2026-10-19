@@ -105,6 +105,8 @@ struct ScenarioResult {
     plot_allocation_dispersion_plot_mm: f64,
     total_overflow_proxy_plot_mm: f64,
     stress_exposure_proxy: f64,
+    stress_delta_vs_reference_proxy: Option<f64>,
+    relative_stress_change_vs_reference_pct: Option<f64>,
     relative_stress_change_vs_equal_share_pct: Option<f64>,
     sensor_dropout_fraction: f64,
     water_budget_violation_days: usize,
@@ -343,6 +345,8 @@ fn simulate_one(scenario: Scenario, policy: Policy) -> ScenarioResult {
         plot_allocation_dispersion_plot_mm: round3(variance_zone_irrigation.sqrt()),
         total_overflow_proxy_plot_mm: round3(overflow_total),
         stress_exposure_proxy: round3(stress_exposure),
+        stress_delta_vs_reference_proxy: None,
+        relative_stress_change_vs_reference_pct: None,
         relative_stress_change_vs_equal_share_pct: None,
         sensor_dropout_fraction: if total_reads == 0 {
             0.0
@@ -382,6 +386,23 @@ fn build_receipt() -> Result<WaterPolicyReceipt> {
                     result.relative_stress_change_vs_equal_share_pct = Some(round3(
                         (result.stress_exposure_proxy - baseline) / baseline * 100.0,
                     ));
+                }
+            }
+        }
+    }
+    let reference_scores: BTreeMap<String, f64> = results
+        .iter()
+        .filter(|result| result.scenario_id == "reference")
+        .map(|result| (result.policy.clone(), result.stress_exposure_proxy))
+        .collect();
+    for result in &mut results {
+        if result.scenario_id != "reference" {
+            if let Some(reference) = reference_scores.get(&result.policy).copied() {
+                let delta = result.stress_exposure_proxy - reference;
+                result.stress_delta_vs_reference_proxy = Some(round3(delta));
+                if reference > 1e-9 {
+                    result.relative_stress_change_vs_reference_pct =
+                        Some(round3(delta / reference * 100.0));
                 }
             }
         }
@@ -549,6 +570,19 @@ mod tests {
                 .iter()
                 .all(|result| result.water_budget_violation_days == 0)
         );
+    }
+
+    #[test]
+    fn cropfoundry_policy_results_include_paired_reference_deltas() {
+        let receipt = build_receipt().unwrap();
+        assert!(receipt.results.iter().all(|result| {
+            if result.scenario_id == "reference" {
+                result.stress_delta_vs_reference_proxy.is_none()
+                    && result.relative_stress_change_vs_reference_pct.is_none()
+            } else {
+                result.stress_delta_vs_reference_proxy.is_some()
+            }
+        }));
     }
 
     #[test]
