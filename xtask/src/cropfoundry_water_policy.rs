@@ -126,6 +126,7 @@ struct ScenarioResult {
 struct PolicyAggregate {
     policy: String,
     scenario_count: usize,
+    worst_to_best_ratio_defined_scenario_count: usize,
     mean_stress_exposure_proxy: f64,
     median_stress_exposure_proxy: f64,
     total_irrigation_applied_plot_mm: f64,
@@ -628,16 +629,17 @@ fn build_receipt() -> Result<WaterPolicyReceipt> {
         let median_worst_zone = (worst_zone_scores[(worst_zone_scores.len() - 1) / 2]
             + worst_zone_scores[worst_zone_scores.len() / 2])
             / 2.0;
-        let mean_worst_to_best_ratio: Vec<f64> = policy_results
+        let defined_worst_to_best_ratios: Vec<f64> = policy_results
             .iter()
             .filter_map(|result| result.worst_to_best_zone_stress_ratio)
             .collect();
-        let mean_worst_to_best_ratio = if mean_worst_to_best_ratio.is_empty() {
+        let worst_to_best_ratio_defined_scenario_count = defined_worst_to_best_ratios.len();
+        let mean_worst_to_best_ratio = if defined_worst_to_best_ratios.is_empty() {
             None
         } else {
             Some(round3(
-                mean_worst_to_best_ratio.iter().sum::<f64>()
-                    / mean_worst_to_best_ratio.len() as f64,
+                defined_worst_to_best_ratios.iter().sum::<f64>()
+                    / defined_worst_to_best_ratios.len() as f64,
             ))
         };
         let relative_changes: Vec<f64> = policy_results
@@ -666,6 +668,7 @@ fn build_receipt() -> Result<WaterPolicyReceipt> {
         aggregates.push(PolicyAggregate {
             policy: policy_name.to_owned(),
             scenario_count: policy_results.len(),
+            worst_to_best_ratio_defined_scenario_count,
             mean_stress_exposure_proxy: round3(mean_stress),
             median_stress_exposure_proxy: round3(median_stress),
             total_irrigation_applied_plot_mm: round3(
@@ -1082,6 +1085,10 @@ mod tests {
             aggregate.max_worst_zone_stress_exposure_proxy
                 >= aggregate.median_worst_zone_stress_exposure_proxy
                 && aggregate.total_per_plot_limit_violation_days == 0
+                && aggregate.worst_to_best_ratio_defined_scenario_count
+                    <= aggregate.scenario_count
+                && (aggregate.mean_worst_to_best_zone_stress_ratio.is_some()
+                    == (aggregate.worst_to_best_ratio_defined_scenario_count > 0))
         }));
     }
 
