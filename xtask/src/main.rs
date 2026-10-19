@@ -3,6 +3,7 @@ use std::path::PathBuf;
 
 mod crate_status;
 mod duplicate_scan;
+mod first_aid;
 mod manifest;
 mod rhn_sweep;
 
@@ -62,6 +63,17 @@ enum Commands {
         #[arg(long)]
         out: PathBuf,
     },
+    /// Validate the synthetic first-aid benchmark contract; this is not clinical validation.
+    FirstAidValidate {
+        #[arg(long, default_value = "docs/research/first-aid/scenario-corpus-v0.json")]
+        corpus: PathBuf,
+        #[arg(long, default_value = "docs/research/first-aid/benchmark-v0.json")]
+        benchmark: PathBuf,
+        #[arg(long, default_value = "docs/research/first-aid/scenario-corpus-v0.schema.json")]
+        schema: PathBuf,
+        #[arg(long)]
+        out: Option<PathBuf>,
+    },
     GenerateManifest {
         #[arg(long, default_value = ".")]
         root: PathBuf,
@@ -105,6 +117,18 @@ fn main() -> anyhow::Result<()> {
         }
         Commands::RhnFinalize { input, out } => {
             rhn_sweep::run_finalize(input, out)?;
+        }
+        Commands::FirstAidValidate {
+            corpus,
+            benchmark,
+            schema,
+            out,
+        } => {
+            let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .expect("xtask lives one level below the workspace root")
+                .to_path_buf();
+            first_aid::run(&root, &corpus, &benchmark, &schema, out.as_deref())?;
         }
         Commands::GenerateManifest { root } => {
             let files = vec!["Cargo.toml", "src/lib.rs", "symthaea-core/Cargo.toml"];
