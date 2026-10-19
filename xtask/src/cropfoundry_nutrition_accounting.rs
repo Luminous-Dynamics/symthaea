@@ -383,6 +383,17 @@ mod tests {
     }
 
     #[test]
+    fn missing_concentration_stage_is_not_inferred() {
+        let mut input = fixture();
+        input.concentration_stage = None;
+        let receipt = audit_input(input);
+        assert!(!receipt.accounting_pass);
+        assert!(receipt.issues.iter().any(|issue| issue.contains("concentration_stage")));
+        assert_eq!(receipt.nutrient_mass_at_serving_mg, None);
+        assert_eq!(receipt.modeled_nutrient_mass_at_serving_mg, None);
+    }
+
+    #[test]
     fn mismatched_fresh_and_dry_mass_basis_fails_closed() {
         let mut input = fixture();
         input.concentration_mass_basis = Some(MassBasis::DryEdibleMass);
@@ -446,7 +457,7 @@ mod tests {
         input.concentration_provenance = ConcentrationProvenance::LiteratureValue;
         let receipt = audit_input(input);
         assert!(receipt.accounting_pass);
-        assert!(!receipt.direct_assay);
+        assert!(!receipt.concentration_is_direct_assay);
         assert_eq!(receipt.nutrient_mass_at_serving_mg, None);
         assert_eq!(receipt.modeled_nutrient_mass_at_serving_mg, Some(12.0));
     }
