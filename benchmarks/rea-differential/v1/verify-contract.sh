@@ -2,7 +2,7 @@
 # Offline checks for the provider-neutral extraction-fidelity contract.
 set -eu
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-REPO_ROOT=$(CDPATH= cd -- "$ROOT/../../../../" && pwd)
+REPO_ROOT=$(CDPATH= cd -- "$ROOT/../../../" && pwd)
 CASES="$ROOT/cases.json"
 ORACLE="$ROOT/example-oracle.json"
 OBSERVATION="$ROOT/example-observation.json"
@@ -31,6 +31,7 @@ jq -e '
   (.source.sha256|test("^[0-9a-f]{64}$"))
 ' "$OBSERVATION" >/dev/null || fail "known-answer provider observation fixture is malformed"
 
+cd "$REPO_ROOT"
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT HUP INT TERM
 run_score(){
