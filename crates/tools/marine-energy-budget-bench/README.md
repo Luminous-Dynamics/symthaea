@@ -10,7 +10,13 @@ It answers: **do two candidate cases declare the same mission and evidence basis
 cargo test --locked --offline --manifest-path crates/tools/marine-energy-budget-bench/Cargo.toml
 ```
 
-No third-party crates are required.
+No third-party crates are required. Print a reproducible synthetic CSV report with:
+
+```sh
+cargo run --locked --offline --manifest-path crates/tools/marine-energy-budget-bench/Cargo.toml --example synthetic
+```
+
+The example's values are synthetic; it is an accounting smoke test, not physical evidence.
 
 ## V0 boundary
 
