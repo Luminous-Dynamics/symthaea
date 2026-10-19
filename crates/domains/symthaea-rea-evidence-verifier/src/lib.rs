@@ -268,7 +268,7 @@ fn verify_bundle_manifest(root: &Path, expected_digest: &str) -> VResult<()> {
         let digest = digest_field(entry, "sha256")?;
         let parsed = Path::new(&relative);
         if parsed.is_absolute()
-            || relative.contains('\\\\')
+            || relative.contains('\\')
             || relative.contains(':')
             || relative.split('/').any(|part| part == "." || part == ".." || part.is_empty())
             || parsed.components().any(|component| !matches!(component, std::path::Component::Normal(_)))
