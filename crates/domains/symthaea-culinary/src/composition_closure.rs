@@ -304,6 +304,13 @@ pub fn check_proximate_composition_closure_v1(
         if non_empty(item, "detail").is_none() {
             errors.push(format!("{label}.detail is required"));
         }
+        if !validate_evidence(
+            item.get("evidence").unwrap_or(&Value::Null),
+            &format!("{label}.evidence"),
+            &mut errors,
+        ) {
+            all_qualified = false;
+        }
         unavailable_ids.push(id.to_owned());
         point_complete = false;
     }
@@ -396,7 +403,13 @@ mod tests {
         value["unavailable_components"] = serde_json::json!([{
             "component_id": "alcohol",
             "reason": "not_analyzed",
-            "detail": "synthetic missingness test"
+            "detail": "synthetic missingness test",
+            "evidence": {
+                "source_ref": "urn:synthetic:missing:alcohol",
+                "source_version": "fixture-v1",
+                "known_at": "2026-10-18T00:00:00Z",
+                "evidence_status": "synthetic"
+            }
         }]);
         let result = check_proximate_composition_closure_v1(&value).unwrap();
         assert_eq!(result.disposition, CompositionClosureDispositionV1::OutsideAcceptable);
