@@ -600,6 +600,18 @@ fn validate_measurement_run_semantics(record: &Value) -> Vec<String> {
         .filter_map(|item| item.get("observation_id").and_then(Value::as_str))
         .map(str::to_owned)
         .collect();
+    let mut measured_instrument_ids = BTreeSet::new();
+    for observation in observations {
+        if observation.get("status").and_then(Value::as_str) != Some("NOT_EVALUATED") {
+            if let Some(ids) = observation.get("instrument_ids").and_then(Value::as_array) {
+                measured_instrument_ids.extend(
+                    ids.iter()
+                        .filter_map(Value::as_str)
+                        .map(str::to_owned),
+                );
+            }
+        }
+    }
 
     for instrument in instruments {
         let instrument_id = instrument
@@ -628,6 +640,95 @@ fn validate_measurement_run_semantics(record: &Value) -> Vec<String> {
             errors.push(format!(
                 "instrument {instrument_id} cannot claim VALID calibration without record digest and expiry"
             ));
+        }
+
+        if measured_instrument_ids.contains(instrument_id) {
+            let calibration_digest = instrument
+                .get("calibration_record_digest")
+                .and_then(Value::as_str);
+            let calibration_artifact_id = instrument
+                .get("calibration_record_artifact_id")
+                .and_then(Value::as_str);
+            match (calibration_digest, calibration_artifact_id) {
+                (Some(expected_digest), Some(artifact_id)) => {
+                    match artifacts.iter().find(|artifact| {
+                        artifact.get("artifact_id").and_then(Value::as_str) == Some(artifact_id)
+                    }) {
+                        Some(artifact) => {
+                            if artifact.get("role").and_then(Value::as_str)
+                                != Some("INSTRUMENT_CALIBRATION")
+                            {
+                                errors.push(format!(
+                                    "instrument {instrument_id} calibration artifact {artifact_id} has the wrong role"
+                                ));
+                            }
+                            if artifact.get("sha256").and_then(Value::as_str)
+                                != Some(expected_digest)
+                            {
+                                errors.push(format!(
+                                    "instrument {instrument_id} calibration digest does not match artifact {artifact_id}"
+                                ));
+                            }
+                        }
+                        None => errors.push(format!(
+                            "instrument {instrument_id} references unresolved calibration artifact {artifact_id}"
+                        )),
+                    }
+                }
+                _ => errors.push(format!(
+                    "measured instrument {instrument_id} must bind its calibration record to a raw artifact and digest"
+                )),
+            }
+
+            let profile_status = instrument
+                .get("capability_profile_status")
+                .and_then(Value::as_str)
+                .unwrap_or("UNASSESSED");
+            if !matches!(
+                profile_status,
+                "DECLARED_UNREVIEWED" | "INDEPENDENTLY_REVIEWED"
+            ) {
+                errors.push(format!(
+                    "measured instrument {instrument_id} has no decision-usable capability profile"
+                ));
+            }
+
+            let profile_digest = instrument
+                .get("capability_profile_sha256")
+                .and_then(Value::as_str);
+            let profile_artifact_id = instrument
+                .get("capability_profile_artifact_id")
+                .and_then(Value::as_str);
+            match (profile_digest, profile_artifact_id) {
+                (Some(expected_digest), Some(artifact_id)) => {
+                    match artifacts.iter().find(|artifact| {
+                        artifact.get("artifact_id").and_then(Value::as_str) == Some(artifact_id)
+                    }) {
+                        Some(artifact) => {
+                            if artifact.get("role").and_then(Value::as_str)
+                                != Some("INSTRUMENT_CAPABILITY_PROFILE")
+                            {
+                                errors.push(format!(
+                                    "instrument {instrument_id} capability artifact {artifact_id} has the wrong role"
+                                ));
+                            }
+                            if artifact.get("sha256").and_then(Value::as_str)
+                                != Some(expected_digest)
+                            {
+                                errors.push(format!(
+                                    "instrument {instrument_id} capability-profile digest does not match artifact {artifact_id}"
+                                ));
+                            }
+                        }
+                        None => errors.push(format!(
+                            "instrument {instrument_id} references unresolved capability-profile artifact {artifact_id}"
+                        )),
+                    }
+                }
+                _ => errors.push(format!(
+                    "measured instrument {instrument_id} must bind its capability profile to a raw artifact and digest"
+                )),
+            }
         }
     }
 
