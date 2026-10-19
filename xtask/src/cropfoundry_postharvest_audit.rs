@@ -82,7 +82,9 @@ fn parse_nonnegative_mass(value: &str, field: &str, issues: &mut Vec<String>) ->
     match value.trim().parse::<f64>() {
         Ok(number) if number.is_finite() && number >= 0.0 => Some(number),
         _ => {
-            issues.push(format!("{field} must be a finite non-negative number in kg"));
+            issues.push(format!(
+                "{field} must be a finite non-negative number in kg"
+            ));
             None
         }
     }
@@ -117,11 +119,15 @@ fn audit_bytes(
         || !relative_tolerance.is_finite()
         || relative_tolerance < 0.0
     {
-        return Err(anyhow!("mass-balance tolerances must be finite and non-negative"));
+        return Err(anyhow!(
+            "mass-balance tolerances must be finite and non-negative"
+        ));
     }
     if let Some(expected) = expected_sha256 {
         if expected.len() != 64 || !expected.bytes().all(|byte| byte.is_ascii_hexdigit()) {
-            return Err(anyhow!("expected SHA-256 must be exactly 64 hexadecimal characters"));
+            return Err(anyhow!(
+                "expected SHA-256 must be exactly 64 hexadecimal characters"
+            ));
         }
     }
 
@@ -162,7 +168,9 @@ fn audit_bytes(
         .collect::<Vec<_>>();
 
     if !duplicate_header_names.is_empty() {
-        global_issues.push(format!("duplicate header names: {duplicate_header_names:?}"));
+        global_issues.push(format!(
+            "duplicate header names: {duplicate_header_names:?}"
+        ));
     }
     if !blank_header_positions.is_empty() {
         global_issues.push(format!(
@@ -193,9 +201,8 @@ fn audit_bytes(
     let mut duplicate_lot_stage_replicate_time_keys = 0usize;
 
     for (record_index, record_result) in reader.records().enumerate() {
-        let record = record_result.with_context(|| {
-            format!("invalid postharvest CSV record {}", record_index + 1)
-        })?;
+        let record = record_result
+            .with_context(|| format!("invalid postharvest CSV record {}", record_index + 1))?;
         if record.len() != headers.len() {
             rows_with_width_mismatch += 1;
         }
@@ -224,7 +231,9 @@ fn audit_bytes(
             }
         }
         if !record_field(&record, unit_index).eq_ignore_ascii_case("kg") {
-            issues.push("mass_unit must be exactly kg for all mass columns in this v0 profile".to_owned());
+            issues.push(
+                "mass_unit must be exactly kg for all mass columns in this v0 profile".to_owned(),
+            );
         }
 
         if !lot_id.is_empty()
@@ -243,7 +252,11 @@ fn audit_bytes(
         }
 
         let input_mass = input_index.and_then(|index| {
-            parse_nonnegative_mass(record_field(&record, Some(index)), "input_mass_kg", &mut issues)
+            parse_nonnegative_mass(
+                record_field(&record, Some(index)),
+                "input_mass_kg",
+                &mut issues,
+            )
         });
         if input_mass.is_some_and(|mass| mass <= 0.0) {
             issues.push("input_mass_kg must be greater than zero".to_owned());
@@ -263,8 +276,11 @@ fn audit_bytes(
             parsed_outflows.push(parsed);
         }
         let accounted_outflow_mass = all_outflows_valid.then_some(outflow_total);
-        let residual = input_mass.zip(accounted_outflow_mass).map(|(input, output)| input - output);
-        let tolerance = input_mass.map(|input| absolute_tolerance_kg.max(input * relative_tolerance));
+        let residual = input_mass
+            .zip(accounted_outflow_mass)
+            .map(|(input, output)| input - output);
+        let tolerance =
+            input_mass.map(|input| absolute_tolerance_kg.max(input * relative_tolerance));
         let within_tolerance = residual
             .zip(tolerance)
             .is_some_and(|(delta, tolerance)| delta.abs() <= tolerance)
@@ -274,18 +290,20 @@ fn audit_bytes(
                     || issue.contains("duplicate lot/")
                     || issue.contains("row has")
             });
-        if residual.zip(tolerance).is_some_and(|(delta, tolerance)| delta.abs() > tolerance) {
+        if residual
+            .zip(tolerance)
+            .is_some_and(|(delta, tolerance)| delta.abs() > tolerance)
+        {
             issues.push("mass-balance residual exceeds declared tolerance".to_owned());
         }
 
-        let residual_fraction = residual.zip(input_mass).and_then(|(delta, input)| {
-            (input > 0.0).then_some(delta / input)
-        });
+        let residual_fraction = residual
+            .zip(input_mass)
+            .and_then(|(delta, input)| (input > 0.0).then_some(delta / input));
         let marketable_mass = parsed_outflows.first().copied().flatten();
-        let marketable_fraction =
-            marketable_mass.zip(input_mass).and_then(|(marketable, input)| {
-                (input > 0.0).then_some(marketable / input)
-            });
+        let marketable_fraction = marketable_mass
+            .zip(input_mass)
+            .and_then(|(marketable, input)| (input > 0.0).then_some(marketable / input));
 
         records.push(RowMassAudit {
             csv_record_number: record_index + 1,
@@ -319,13 +337,17 @@ fn audit_bytes(
     let digest_matches_expected =
         expected_sha256.map(|expected| expected.eq_ignore_ascii_case(&content_sha256));
     if digest_matches_expected == Some(false) {
-        global_issues.push("local byte SHA-256 mismatches the separately supplied expected digest".to_owned());
+        global_issues.push(
+            "local byte SHA-256 mismatches the separately supplied expected digest".to_owned(),
+        );
     }
     if records.is_empty() {
         global_issues.push("CSV has no data records".to_owned());
     }
     let row_checks_pass = global_issues.is_empty()
-        && records.iter().all(|row| row.within_mass_balance_tolerance && row.issues.is_empty());
+        && records
+            .iter()
+            .all(|row| row.within_mass_balance_tolerance && row.issues.is_empty());
 
     Ok(PostharvestAuditReceipt {
         receipt_schema: "cropfoundry-postharvest-mass-balance-receipt-v0".to_owned(),
@@ -395,7 +417,10 @@ pub fn run(
     let rendered = serde_json::to_string_pretty(&receipt)?;
     println!("{rendered}");
     if let Some(path) = out {
-        if let Some(parent) = path.parent().filter(|parent| !parent.as_os_str().is_empty()) {
+        if let Some(parent) = path
+            .parent()
+            .filter(|parent| !parent.as_os_str().is_empty())
+        {
             fs::create_dir_all(parent)
                 .with_context(|| format!("cannot create output directory {}", parent.display()))?;
         }
@@ -454,17 +479,25 @@ mod tests {
         );
         let receipt = audit(&input);
         assert!(!receipt.row_checks_pass);
-        assert!(receipt.rows[0].issues.iter().any(|issue| issue.contains("residual exceeds")));
+        assert!(
+            receipt.rows[0]
+                .issues
+                .iter()
+                .any(|issue| issue.contains("residual exceeds"))
+        );
     }
 
     #[test]
     fn cropfoundry_postharvest_negative_mass_is_rejected() {
-        let input = format!(
-            "{HEADER}\nlot-1;harvest;rep-1;2026-01-01;kg;scale;-1;0;0;0;0;0\n"
-        );
+        let input = format!("{HEADER}\nlot-1;harvest;rep-1;2026-01-01;kg;scale;-1;0;0;0;0;0\n");
         let receipt = audit(&input);
         assert!(!receipt.row_checks_pass);
-        assert!(receipt.rows[0].issues.iter().any(|issue| issue.contains("input_mass_kg")));
+        assert!(
+            receipt.rows[0]
+                .issues
+                .iter()
+                .any(|issue| issue.contains("input_mass_kg"))
+        );
     }
 
     #[test]
@@ -474,7 +507,12 @@ mod tests {
         );
         let receipt = audit(&input);
         assert!(!receipt.row_checks_pass);
-        assert!(receipt.rows[0].issues.iter().any(|issue| issue.contains("mass_unit")));
+        assert!(
+            receipt.rows[0]
+                .issues
+                .iter()
+                .any(|issue| issue.contains("mass_unit"))
+        );
     }
 
     #[test]
@@ -491,9 +529,11 @@ mod tests {
         let input = "lot_id;stage_id;input_mass_kg\nlot-1;harvest;10\n";
         let receipt = audit(&input);
         assert!(!receipt.row_checks_pass);
-        assert!(receipt
-            .missing_required_columns
-            .contains(&"marketable_output_mass_kg".to_owned()));
+        assert!(
+            receipt
+                .missing_required_columns
+                .contains(&"marketable_output_mass_kg".to_owned())
+        );
     }
 
     #[test]
@@ -518,9 +558,8 @@ mod tests {
 
     #[test]
     fn cropfoundry_postharvest_source_identity_is_preserved_not_authorized() {
-        let input = format!(
-            "{HEADER}\nlot-1;harvest;rep-1;2026-01-01;kg;scale;10;8;1;0.5;0.4;0.1\n"
-        );
+        let input =
+            format!("{HEADER}\nlot-1;harvest;rep-1;2026-01-01;kg;scale;10;8;1;0.5;0.4;0.1\n");
         let receipt = audit(&input);
         assert_eq!(receipt.source_id, SOURCE_ID);
         assert_eq!(receipt.source_uri, SOURCE_URI);
