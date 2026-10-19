@@ -20,3 +20,7 @@ path = "src/robust_main.rs"
 [[bin]]
 name = "bioprotein-evsi-regret"
 path = "src/regret_main.rs"
+
+[[bin]]
+name = "bioprotein-target-selection"
+path = "src/target_selection_main.rs"
