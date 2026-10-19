@@ -13,6 +13,7 @@ use symthaea_habitat_vertical_bench::assumption_falsification::{
     validate_assumption_falsification_str, EMBEDDED_HABITAT_ASSUMPTIONS,
 };
 use symthaea_habitat_vertical_bench::event_replay::{validate_event_log_str, EMBEDDED_EVENT_LOG};
+use symthaea_habitat_vertical_bench::material_ledger::{validate_material_ledger_str, EMBEDDED_MATERIAL_LEDGER};
 use symthaea_habitat_vertical_bench::{validate_fixture_str, EMBEDDED_FIXTURE};
 
 fn main() {
@@ -164,10 +165,38 @@ fn main() {
                 event_replay.unique_event_count,
                 event_replay.duplicate_delivery_count
             );
+            let material_ledger = match validate_material_ledger_str(
+                EMBEDDED_MATERIAL_LEDGER,
+                EMBEDDED_FIXTURE,
+                EMBEDDED_EVENT_LOG,
+            ) {
+                Ok(report) => report,
+                Err(error) => {
+                    eprintln!("invalid embedded material-ledger JSON: {error}");
+                    process::exit(2);
+                }
+            };
+            if !material_ledger.is_valid() {
+                eprintln!("MATERIAL LEDGER DEFINITION: FAIL ({} findings)", material_ledger.issues.len());
+                for issue in material_ledger.issues {
+                    eprintln!("{} {}: {}", issue.code, issue.path, issue.message);
+                }
+                process::exit(1);
+            }
+            println!(
+                "synthetic material ledger: PASS ({} accounts; {} transactions; {} mg opening / {} mg closing; nonzero accounts={}; unit conversion=BLOCKED; physical evidence=NOT ESTABLISHED)",
+                material_ledger.account_count,
+                material_ledger.transaction_count,
+                material_ledger.opening_mass_mg,
+                material_ledger.closing_mass_mg,
+                material_ledger.nonzero_closing_account_count
+            );
         } else {
             println!("embedded disruption campaign: not checked against the alternate fixture");
             println!("embedded resilience option matrix: not checked against the alternate fixture");
             println!("embedded assumption/test definitions: not checked against the alternate fixture");
+            println!("embedded event replay contract: not checked against the alternate fixture");
+            println!("embedded material ledger: not checked against the alternate fixture");
         }
 
         println!("STRUCTURAL FIXTURE VALIDATION: PASS");
