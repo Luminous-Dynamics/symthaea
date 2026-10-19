@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "schema_version": "0.1.0",
+  "trace_id": "ODRH-ENERGY-TRACE-SYNTHETIC-001",
+  "title": "Known-answer power-trace integration",
+  "record_state": "SYNTHETIC_TEST_ONLY",
+  "claim_ceiling": "SYNTHETIC_POWER_TRACE_ONLY_NOT_PHYSICAL_QUALIFICATION",
+  "measurand": "synthetic input power over a task window",
+  "power_unit": "W",
+  "time_unit": "s",
+  "energy_unit": "J",
+  "accounting_boundary_id": "MONITOR-AC-WALL-001",
+  "window_start_seconds": 0,
+  "window_end_seconds": 2,
+  "max_sample_gap_seconds": 1,
+  "samples": [
+    {
+      "time_seconds": 0,
+      "power_watts": 10
+    },
+    {
+      "time_seconds": 1,
+      "power_watts": 20
+    },
+    {
+      "time_seconds": 2,
+      "power_watts": 20
+    }
+  ],
+  "attempted_tasks": 3,
+  "successful_tasks": 2,
+  "notes": "Synthetic known-answer trace: trapezoidal energy is 35 J; normalized arithmetic is 17.5 J per successful task. Not a measured monitor result."
+}
