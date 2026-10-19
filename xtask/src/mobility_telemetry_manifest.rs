@@ -1076,6 +1076,39 @@ fn evaluate_fault_case(mutation: &str, manifest: &Manifest) -> (String, String) 
                 ("eligible_or_unexplained".to_owned(), format!("eligibility report: {claim:?}"))
             }
         }
+        "calculated_but_unverified_uncertainty_budget" => {
+            let mut candidate = manifest.clone();
+            let artifact_path = "uncertainty/ride-energy.json".to_owned();
+            candidate.artifacts.push(Artifact {
+                relative_path: artifact_path.clone(),
+                kind: "uncertainty_budget_record".to_owned(),
+                byte_len: 1,
+                sha256: format!("sha256:{}", "b".repeat(64)),
+            });
+            candidate.uncertainty_budgets.push(ClaimUncertaintyBudget {
+                claim_target: "ride_energy".to_owned(),
+                measurand: "net_dc_bus_energy".to_owned(),
+                unit: "Wh".to_owned(),
+                standard_uncertainty: 0.05,
+                expanded_uncertainty: 0.1,
+                coverage_factor: 2.0,
+                acceptance_tolerance: 0.5,
+                evidence_state: "calculated".to_owned(),
+                artifact_path,
+            });
+            match validate_structure(&candidate) {
+                Err(error) => ("reject".to_owned(), error.to_string()),
+                Ok(()) => {
+                    let claim = claim_eligibility(&candidate, "ride_energy");
+                    if !claim.physical_eligible
+                        && claim.reasons.iter().any(|reason| reason == "uncertainty_budget_not_verified") {
+                        ("ineligible".to_owned(), "calculated-only uncertainty remains below the evidence threshold".to_owned())
+                    } else {
+                        ("eligible_or_unexplained".to_owned(), format!("uncertainty evidence-state gate failed open: {claim:?}"))
+                    }
+                }
+            }
+        }
         "physical_claim_without_claim_specific_uncertainty_budget" => {
             let claim = claim_eligibility(manifest, "ride_energy");
             if !claim.physical_eligible
@@ -1523,7 +1556,7 @@ mod tests {
         )).expect("frozen telemetry fault matrix parses");
         let cases = matrix.get("cases").and_then(serde_json::Value::as_array)
             .expect("fault matrix has a case array");
-        assert_eq!(cases.len(), 26, "matrix size changes require deliberate review");
+        assert_eq!(cases.len(), 27, "matrix size changes require deliberate review");
         let mut ids = BTreeSet::new();
         for case in cases {
             let id = case.get("id").and_then(serde_json::Value::as_str)
@@ -1608,5 +1641,32 @@ mod tests {
         let claim = claim_eligibility(&fixture, "ride_energy");
         assert!(!claim.physical_eligible);
         assert!(claim.reasons.iter().any(|reason| reason == "uncertainty_budget_exceeds_tolerance"));
+    }
+
+    #[test]
+    fn calculated_uncertainty_budget_is_not_physical_evidence() {
+        let mut fixture = manifest();
+        let artifact_path = "uncertainty/ride-energy.json".to_owned();
+        fixture.artifacts.push(Artifact {
+            relative_path: artifact_path.clone(),
+            kind: "uncertainty_budget_record".to_owned(),
+            byte_len: 1,
+            sha256: format!("sha256:{}", "b".repeat(64)),
+        });
+        fixture.uncertainty_budgets.push(ClaimUncertaintyBudget {
+            claim_target: "ride_energy".to_owned(),
+            measurand: "net_dc_bus_energy".to_owned(),
+            unit: "Wh".to_owned(),
+            standard_uncertainty: 0.05,
+            expanded_uncertainty: 0.1,
+            coverage_factor: 2.0,
+            acceptance_tolerance: 0.5,
+            evidence_state: "calculated".to_owned(),
+            artifact_path,
+        });
+        validate_structure(&fixture).expect("calculated budget may be structurally well formed");
+        let claim = claim_eligibility(&fixture, "ride_energy");
+        assert!(!claim.physical_eligible);
+        assert!(claim.reasons.iter().any(|reason| reason == "uncertainty_budget_not_verified"));
     }
 }
