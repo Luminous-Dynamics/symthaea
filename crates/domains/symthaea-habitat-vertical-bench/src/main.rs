@@ -249,6 +249,7 @@ fn main() {
                 EMBEDDED_MATERIAL_LEDGER,
                 EMBEDDED_MEASUREMENT_GATE,
                 EMBEDDED_RECALL_DRILL,
+                EMBEDDED_QUANTITY_GENEALOGY,
             ) {
                 Ok(report) => report,
                 Err(error) => {
@@ -264,13 +265,17 @@ fn main() {
                 process::exit(1);
             }
             println!(
-                "synthetic cross-layer audit bundle definition: VALID ({} fixture fingerprints; {} events; {} material transactions; {} measurement cases; recall closure={}; unresolved affected={}; source authenticity=NOT ESTABLISHED)",
+                "synthetic cross-layer audit bundle definition: VALID ({} fixture fingerprints; {} events; {} material transactions; {} measurement cases; recall closure={}; unresolved affected={}; quantity operations={}; mass={}/{} mg; quantity-affected terminals={}; source authenticity=NOT ESTABLISHED)",
                 audit_bundle.artifact_count,
                 audit_bundle.event_count,
                 audit_bundle.material_transaction_count,
                 audit_bundle.measurement_case_count,
                 audit_bundle.recall_closure_status,
-                audit_bundle.recall_unresolved_affected_count
+                audit_bundle.recall_unresolved_affected_count,
+                audit_bundle.quantity_genealogy_operation_count,
+                audit_bundle.quantity_genealogy_initial_mass_mg,
+                audit_bundle.quantity_genealogy_ending_mass_mg,
+                audit_bundle.quantity_genealogy_affected_terminal_count
             );
             let recall_drill = match validate_recall_drill_str(
                 EMBEDDED_RECALL_DRILL,

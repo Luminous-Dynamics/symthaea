@@ -47,7 +47,7 @@ The default fixture is embedded at compile time from `docs/research/fixtures/hab
 
 ## Tests and verification status
 
-The source currently contains 167 authored Rust unit tests across ten modules (31 structural/accounting + 13 scenario-campaign + 13 resilience-option + 13 assumption-falsification + 15 event-replay + 15 material-ledger + 17 measurement-gate + 16 audit-bundle + 17 recall-drill + 17 quantity-genealogy tests). They have not been compiled or executed in the current environment; do not describe them as passing. Run the commands above against the exact branch head before treating the qualifier as an executed test result. The scenario, resilience-option and assumption-falsification suites qualify definitions only, not scheduling, experiment selection, or resilience outcomes.
+The source currently contains 170 authored Rust unit tests across ten modules (31 structural/accounting + 13 scenario-campaign + 13 resilience-option + 13 assumption-falsification + 15 event-replay + 15 material-ledger + 17 measurement-gate + 19 audit-bundle + 17 recall-drill + 17 quantity-genealogy tests). They have not been compiled or executed in the current environment; do not describe them as passing. Run the commands above against the exact branch head before treating the qualifier as an executed test result. The scenario, resilience-option and assumption-falsification suites qualify definitions only, not scheduling, experiment selection, or resilience outcomes.
 
 ## Deliberate limits
 
@@ -81,9 +81,12 @@ The default CLI validates `docs/research/fixtures/habitat-recall-closure-v0.1.js
 The cross-layer audit bundle now fingerprints the recall-response fixture as a fifth source, reruns its causal recall qualifier, and independently checks the derived affected set and response closure state. A bundle may be internally valid while its recall state remains `OPEN_UNRESOLVED`; audit consistency must never be confused with physical recall closure. Three additional audit-bundle tests challenge stale recall bytes, tampered summary outcomes and component failures. They are authored, not yet compiled or executed.
 
 
-The cross-layer audit bundle now fingerprints five inputs (base product/process, event replay, material ledger, measurement gate, and recall response) by exact byte length and SHA-256. It reruns all five relevant validators and independently compares the response closure counts/status. The expected recall state intentionally remains `OPEN_UNRESOLVED`; bundle validity means the synthetic sources and expected results agree, not that a real recall is closed.
+The cross-layer audit bundle now fingerprints six inputs (base product/process, event replay, material ledger, measurement gate, recall response, and quantity genealogy) by exact byte length and SHA-256. It reruns all five relevant validators and independently compares the response closure counts/status. The expected recall state intentionally remains `OPEN_UNRESOLVED`; bundle validity means the synthetic sources and expected results agree, not that a real recall is closed.
 
 
 ## Quantity-aware genealogy challenge (synthetic only)
 
 The default CLI also validates `docs/research/fixtures/habitat-quantity-genealogy-v0.1.json`. Its eight operations model splitting one suspect source lot into separate offcuts and scrap, partially consuming one offcut into a merge with a clean source, then assembling and packaging affected products alongside an unrelated clean control. Each input-to-output allocation includes explicit source quantities; the qualifier does not infer a mixing ratio. It checks input availability, allocation completeness, output quantities, same-unit mass conservation, source-attribution availability, remaining stock and the terminal affected set. The known answer preserves 2,700 mg across opening and final inventories and identifies two affected synthetic terminals. This is not physical genealogy or EPCIS conformance. Seventeen Rust tests are authored but not compiled or executed.
+
+
+The six-source cross-layer audit bundle reruns both recall-response and quantity-genealogy validators. It checks exact source-byte fingerprints, source-attribution and mass known answers, the affected terminal set and the intentionally OPEN_UNRESOLVED recall status. Three audit mutation tests cover stale genealogy bytes, tampered mass known answers and a component-level unit mutation. Total documented authored tests: 170; none have been compiled or executed.

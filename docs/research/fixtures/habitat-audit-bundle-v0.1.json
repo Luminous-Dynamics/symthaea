@@ -50,6 +50,14 @@
       "byte_length": 3119,
       "schema_version": "0.1.0",
       "evidence_status": "synthetic_rehearsal_contract_only_not_executed"
+    },
+    {
+      "artifact_id": "quantity_genealogy_fixture",
+      "path": "docs/research/fixtures/habitat-quantity-genealogy-v0.1.json",
+      "sha256": "f57b9fd0e00fe0633b8cece7e9ef0e84be6e6d0465bcc5c9e64f2930e2827c57",
+      "byte_length": 10935,
+      "schema_version": "0.1.0",
+      "evidence_status": "synthetic_quantity_genealogy_challenge_only_not_executed"
     }
   ],
   "expected_results": {
@@ -90,6 +98,18 @@
       "false_positive_control_count": 0,
       "closure_status": "OPEN_UNRESOLVED",
       "evidence_status": "synthetic_rehearsal_contract_only_not_executed"
+    },
+    "quantity_genealogy": {
+      "operation_count": 8,
+      "initial_mass_mg": 2700,
+      "ending_mass_mg": 2700,
+      "terminal_count": 3,
+      "affected_terminal_count": 2,
+      "affected_terminal_ids": [
+        "PACKED-ARTICLE-A",
+        "PACKED-ARTICLE-B"
+      ],
+      "evidence_status": "synthetic_quantity_genealogy_challenge_only_not_executed"
     }
   },
   "required_cross_layer_invariants": [
@@ -100,12 +120,14 @@
     "Every measurement case matches the expected interval/certificate/unit disposition.",
     "The four component validators' summaries match this manifest's expected results.",
     "A fingerprint match does not upgrade synthetic evidence to physically observed evidence.",
-    "The recall-response drill derives the affected terminal set from the validated event stream, reconciles one response per terminal target, and does not call an unresolved drill closed."
+    "The recall-response drill derives the affected terminal set from the validated event stream, reconciles one response per terminal target, and does not call an unresolved drill closed.",
+    "The quantity-genealogy fixture explicitly allocates source quantities across split, partial-consumption, merge and terminal-product steps; operation quantities and opening-source lineage totals reconcile."
   ],
   "known_limitations": [
     "No digital signature, key management, source authentication, trusted timestamp or transparency log is implemented.",
     "No physical measurements, supplier attestations, calibrated conversion from piece_equivalent to mg or actual product BOM are present.",
     "The event log, quantity ledger and measurement records are synthetic challenge inputs, not production records.",
-    "Recall target and response records are synthetic; closure status is an oracle result and not evidence of a real recall, containment, or customer notification."
+    "Recall target and response records are synthetic; closure status is an oracle result and not evidence of a real recall, containment, or customer notification.",
+    "Quantity genealogy remains a synthetic same-unit stream; explicit source allocations do not authenticate actual material transfers or infer unmeasured mixing ratios."
   ]
 }
