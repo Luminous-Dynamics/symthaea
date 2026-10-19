@@ -19,7 +19,7 @@ OpenAI's public collection itself warns that its manuscripts have different veri
 
 ### P0 — Action-conditioned Gaussian entropy (extend the active pilot)
 
-**Target:** #6210/#6216 and the existing proof-corpus proposal.
+**Target:** #6210/#6211/#6212/#6214/#6216 and the existing proof-corpus proposal. Extend the current work; do not create a second oracle or proof lineage.
 
 For a positive finite diagonal precision vector `pi` of dimension `d`, freeze the software reference profile:
 
@@ -27,7 +27,9 @@ For a positive finite diagonal precision vector `pi` of dimension `d`, freeze th
 
 `E(a) = H(pi_pred[a]) - H(pi_current)`
 
-Under the declared minimization convention, more uncertainty reduction gives a more negative `E(a)`. This is a reference-model convention, not a universal definition of epistemic value.
+Under the declared minimization convention, more predicted-entropy reduction gives a more negative `E(a)`. The source profile must be named `DiagonalGaussianPredictedEntropyDeltaV1`, not expected information gain. This is a reference-model proxy, not a universal definition of epistemic value.
+
+The existing [source PR #6211](https://github.com/Luminous-Dynamics/symthaea/pull/6211) correctly distinguishes predicted hidden-state entropy change from expected information gain / mutual information and uses `CommittedAction` for generic-FEP novelty. The independent qualifier lineage [#6214](https://github.com/Luminous-Dynamics/symthaea/pull/6214) and hardening follow-up [#7367](https://github.com/Luminous-Dynamics/symthaea/pull/7367) already cover the reference semantics and hostile controls. They remain qualification work: an authored validator or queued workflow is not a hosted PASS.
 
 Candidate source files at the immutable upstream revision:
 
@@ -39,6 +41,24 @@ Adapt only the lemmas that match the exact assumptions and the already-approved 
 **Falsification fixtures:** wrong sign; omitted positivity; zero/negative/non-finite precision; equality incorrectly accepted as strict decrease; wrong EFE orientation; accidental generalization to arbitrary covariance; altered theorem statement; stale environment. Test the real-number theorem and f64 implementation separately.
 
 **Gate:** zero accepted proof holes/unauthorized axioms; every artifact binds theorem/source/environment/checker identities; all reference cases and mutation controls checked. A Lean PASS alone does not show uncertainty calibration or action optimality.
+
+### P1 — True finite categorical expected information gain (research-only)
+
+**Target:** [FEP-EFE-ACTION-002 / #6223](https://github.com/Luminous-Dynamics/symthaea/issues/6223). This is a distinct model profile—not a rename or silent upgrade of the P0 entropy proxy.
+
+For latent state S, future observation O, and candidate action a, freeze both equivalent finite-model definitions:
+
+`EIG(a) = sum_o q(o|a) * KL(q(s|o,a) || q(s))`
+
+`EIG(a) = H(q(s)) - sum_o q(o|a) * H(q(s|o,a))`
+
+where `q(o|a)=sum_s q(s)q(o|s,a)` and a posterior is formed only when `q(o|a)>0`. In the EFE minimization convention, an information contribution can be `E_info(a)=-EIG(a)`, which must be explicitly recorded rather than inferred from the name “epistemic”.
+
+**Candidate corpus:** [`fep-efe-action-002a-reference-candidate-v1.json`](./data/fep-efe-action-002a-reference-candidate-v1.json), with 34 cases (22 valid models, 12 invalid-domain/shape cases) and 10 explicit semantic mutation controls. It covers uninformative and revealing observations, noisy sensors, skewed priors, many-to-one partitions, impossible branches, alphabet relabeling, normalized-distribution failures, non-finite values, and dimensional mismatch.
+
+**Exploratory arithmetic check:** on the fetched branch bytes, an independent transient JavaScript check evaluated EIG through both expected-KL and entropy-reduction forms. Their maximum absolute difference was approximately 1.12e-16; the maximum discrepancy from the authored simple symbolic expressions was approximately 2.23e-16. All six encoded metamorphic comparisons held, and all 12 invalid fixtures exposed a domain/shape rejection. This is only an exploratory arithmetic/source check—not the #6223 independent stdlib oracle, Lean proof, hosted qualification, Rust execution, or production result.
+
+**Qualification boundary:** follow #6223's existing order. Freeze/review the candidate profile and corpus; qualify it with an independent oracle that computes both forms without case-ID answer lookup; add hostile semantic mutations; then formalize theorem-sized properties in the approved SYM-FV environment. Do not begin production integration merely because the fixtures look right. Hypothetical posterior branches must not mutate live beliefs or become evidence, and model calibration / physical information gain remain separate.
 
 ### P1 — Relative entropy as a discrepancy contract for beliefs
 
