@@ -65,11 +65,17 @@ enum Commands {
     },
     /// Validate the synthetic first-aid benchmark contract; this is not clinical validation.
     FirstAidValidate {
-        #[arg(long, default_value = "docs/research/first-aid/scenario-corpus-v0.json")]
+        #[arg(
+            long,
+            default_value = "docs/research/first-aid/scenario-corpus-v0.json"
+        )]
         corpus: PathBuf,
         #[arg(long, default_value = "docs/research/first-aid/benchmark-v0.json")]
         benchmark: PathBuf,
-        #[arg(long, default_value = "docs/research/first-aid/scenario-corpus-v0.schema.json")]
+        #[arg(
+            long,
+            default_value = "docs/research/first-aid/scenario-corpus-v0.schema.json"
+        )]
         schema: PathBuf,
         #[arg(long)]
         out: Option<PathBuf>,
