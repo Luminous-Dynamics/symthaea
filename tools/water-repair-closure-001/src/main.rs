@@ -1,11 +1,20 @@
 use std::env;
 use std::error::Error;
 use std::fs;
+use std::io;
 use std::path::PathBuf;
 use water_repair_closure_001::{
     evaluate_all, sha256_hex, validate_input_corpus, validate_oracle, CaseResult, InputCorpus,
     OracleCorpus, RunReceipt, CLAIM_CEILING, INPUT_SCHEMA_VERSION, ORACLE_SCHEMA_VERSION,
 };
+
+fn invalid_input(message: impl Into<String>) -> io::Error {
+    io::Error::new(io::ErrorKind::InvalidInput, message.into())
+}
+
+fn invalid_data(message: impl Into<String>) -> io::Error {
+    io::Error::new(io::ErrorKind::InvalidData, message.into())
+}
 
 fn main() {
     if let Err(error) = run() {
@@ -22,30 +31,35 @@ fn run() -> Result<(), Box<dyn Error>> {
 
     let mut args = env::args().skip(1);
     while let Some(arg) = args.next() {
-        let value = args.next().ok_or_else(|| format!("missing value after {arg}"))?;
+        let value = args
+            .next()
+            .ok_or_else(|| invalid_input(format!("missing value after {arg}")))?;
         match arg.as_str() {
             "--inputs" => inputs_path = Some(PathBuf::from(value)),
             "--oracle" => oracle_path = Some(PathBuf::from(value)),
             "--receipt" => receipt_path = Some(PathBuf::from(value)),
             "--implementation-sha" => implementation_sha = value,
-            _ => return Err(format!("unknown argument: {arg}").into()),
+            _ => return Err(invalid_input(format!("unknown argument: {arg}")).into()),
         }
     }
 
-    let inputs_path = inputs_path.ok_or("required argument --inputs is missing")?;
-    let oracle_path = oracle_path.ok_or("required argument --oracle is missing")?;
-    let receipt_path = receipt_path.ok_or("required argument --receipt is missing")?;
+    let inputs_path =
+        inputs_path.ok_or_else(|| invalid_input("required argument --inputs is missing"))?;
+    let oracle_path =
+        oracle_path.ok_or_else(|| invalid_input("required argument --oracle is missing"))?;
+    let receipt_path =
+        receipt_path.ok_or_else(|| invalid_input("required argument --receipt is missing"))?;
 
     let input_bytes = fs::read(&inputs_path)?;
     let oracle_bytes = fs::read(&oracle_path)?;
     let input_corpus: InputCorpus = serde_json::from_slice(&input_bytes)?;
     let oracle: OracleCorpus = serde_json::from_slice(&oracle_bytes)?;
-    validate_input_corpus(&input_corpus).map_err(|e| format!("input validation failed: {e}"))?;
-    validate_oracle(&oracle).map_err(|e| format!("oracle validation failed: {e}"))?;
+    validate_input_corpus(&input_corpus).map_err(invalid_data)?;
+    validate_oracle(&oracle).map_err(invalid_data)?;
     let oracle_schema_version = oracle.schema_version.clone();
 
     let results: Vec<CaseResult> =
-        evaluate_all(&input_corpus).map_err(|e| format!("evaluation failed: {e}"))?;
+        evaluate_all(&input_corpus).map_err(invalid_data)?;
     let mut expected = oracle.results;
     expected.sort_by(|left, right| left.case_id.cmp(&right.case_id));
 
@@ -111,18 +125,18 @@ fn run() -> Result<(), Box<dyn Error>> {
     );
 
     if receipt.qualification_status == "Failed" {
-        return Err(format!(
+        return Err(invalid_data(format!(
             "{} oracle mismatch(es); receipt written to {}",
             receipt.mismatches.len(),
             receipt_path.display()
-        )
+        ))
         .into());
     }
     if receipt.schema_version != "water-repair-closure-001-receipt-v1"
         || input_corpus.schema_version != INPUT_SCHEMA_VERSION
         || oracle_schema_version != ORACLE_SCHEMA_VERSION
     {
-        return Err("internal receipt schema identity mismatch".into());
+        return Err(invalid_data("internal receipt schema identity mismatch").into());
     }
     Ok(())
 }
