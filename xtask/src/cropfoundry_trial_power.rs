@@ -566,6 +566,16 @@ mod tests {
     }
 
     #[test]
+    fn weak_confirmatory_alpha_or_power_is_flagged() {
+        let mut input = fixture();
+        input.endpoint.familywise_alpha = 0.1;
+        input.endpoint.target_power = 0.7;
+        let plan = calculate(&input, "g".repeat(64)).unwrap();
+        assert!(plan.warnings.iter().any(|warning| warning.contains("alpha exceeds")));
+        assert!(plan.warnings.iter().any(|warning| warning.contains("below the provisional CF-027 target")));
+    }
+
+    #[test]
     fn invalid_icc_and_invalid_alpha_fail_closed() {
         let mut input = fixture();
         input.design.intracluster_correlation = 1.2;
