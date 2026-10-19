@@ -50,3 +50,14 @@ The output is a deterministic JSON report. The current tournament holds the numb
 For the corpus auditor: 0 = internally consistent synthetic policy corpus only; 1 = schema/policy rejection; 2 = I/O, parse, schema-compilation or CLI error. The tournament exits 0 on a valid run and 2 for invalid CLI arguments.
 
 Neither binary proves that a group ID reflects a real independent physical build, that an observation is physically authentic, that calibration is current, or that a model transfers to actual instruments. Real campaigns must bind authoritative unit/build/session identities through existing observation/metrology and artifact-provenance owners.
+
+
+## CI receipts
+
+The path-scoped MUS-DOE workflow publishes an artifact named `mus-doe-receipts-<commit-sha>` containing:
+- `split-audit.json`: the fail-closed corpus audit report;
+- `policy-tournament.json`: all trial selections and per-trial outcomes plus aggregated summaries;
+- `commit.txt`: the exact tested Git commit;
+- `SHA256SUMS`: digests for the schema, fixture, Cargo manifest and both Rust source files.
+
+The reports preserve the synthetic-only claim ceiling. A digest proves byte identity, not physical provenance or experimental validity.
