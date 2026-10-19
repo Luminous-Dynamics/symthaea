@@ -1,0 +1,12 @@
+[package]
+name = "display-latency-reference"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.96"
+license = "AGPL-3.0-or-later"
+description = "Fail-closed reference analysis for photodiode input-to-photon latency captures"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+publish = false
+
+[workspace]
+resolver = "3"
