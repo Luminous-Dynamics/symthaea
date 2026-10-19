@@ -1,0 +1,176 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/attestations/rea-provider-smoke/v1/schema.json",
+  "title": "Symthaea REA provider-smoke attestation predicate v1",
+  "description": "Domain predicate bound to a signed in-toto attestation whose subject is bundle-manifest.json. It records one provider-smoke result and explicitly excludes stronger firmware qualifications.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "evidenceTier",
+    "repository",
+    "predicateType",
+    "subject",
+    "providerRun",
+    "attestationRun",
+    "qualification",
+    "limitations"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "symthaea.rea-provider-smoke-attestation.v1"
+    },
+    "evidenceTier": {
+      "const": "unblob-provider-smoke"
+    },
+    "repository": {
+      "const": "Luminous-Dynamics/symthaea"
+    },
+    "predicateType": {
+      "const": "https://github.com/Luminous-Dynamics/symthaea/attestations/rea-provider-smoke/v1"
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bundleManifestSha256", "receiptSha256"],
+      "properties": {
+        "bundleManifestSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "receiptSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "providerRun": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "runId",
+        "url",
+        "workflow",
+        "event",
+        "ref",
+        "sourceHeadSha",
+        "checkoutCommitSha",
+        "providerVersion",
+        "semanticProjectionSha256",
+        "semanticMutationProjectionSha256",
+        "providerMetamorphicVariants"
+      ],
+      "properties": {
+        "runId": {
+          "type": "string",
+          "pattern": "^[0-9]+$"
+        },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://github[.]com/Luminous-Dynamics/symthaea/actions/runs/[0-9]+$"
+        },
+        "workflow": {
+          "const": "REA Pinned Provider Smoke"
+        },
+        "event": {
+          "const": "push"
+        },
+        "ref": {
+          "const": "refs/heads/main"
+        },
+        "sourceHeadSha": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "checkoutCommitSha": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "providerVersion": {
+          "const": "26.6.4"
+        },
+        "semanticProjectionSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "semanticMutationProjectionSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "providerMetamorphicVariants": {
+          "const": 64
+        }
+      }
+    },
+    "attestationRun": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workflowRef",
+        "sourceCommitSha",
+        "runId",
+        "event",
+        "ref"
+      ],
+      "properties": {
+        "workflowRef": {
+          "type": "string",
+          "pattern": "^Luminous-Dynamics/symthaea/[.]github/workflows/rea-evidence-attestation[.]yml@refs/heads/main$"
+        },
+        "sourceCommitSha": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "runId": {
+          "type": "string",
+          "pattern": "^[0-9]+$"
+        },
+        "event": {
+          "const": "workflow_dispatch"
+        },
+        "ref": {
+          "const": "refs/heads/main"
+        }
+      }
+    },
+    "qualification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reaCliMcpParity",
+        "firmwareExecution",
+        "emulation",
+        "deviceQualification"
+      ],
+      "properties": {
+        "reaCliMcpParity": {
+          "const": false
+        },
+        "firmwareExecution": {
+          "const": false
+        },
+        "emulation": {
+          "const": false
+        },
+        "deviceQualification": {
+          "const": false
+        }
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "Unblob provider smoke on generated inert gzip/tar/text fixtures only",
+          "No REA CLI/MCP parity claim",
+          "No recovered firmware execution or emulation",
+          "No physical-device qualification"
+        ]
+      }
+    }
+  }
+}
