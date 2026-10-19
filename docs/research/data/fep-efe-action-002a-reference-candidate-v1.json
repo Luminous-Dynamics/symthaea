@@ -784,6 +784,38 @@
       }
     },
     {
+      "id": "I35-asymmetric-observation-branches",
+      "kind": "valid_model",
+      "state_ids": [
+        "s0",
+        "s1"
+      ],
+      "prior": [
+        "0.5",
+        "0.5"
+      ],
+      "observation_ids": [
+        "o0",
+        "o1"
+      ],
+      "likelihood_by_state": [
+        [
+          "0.8",
+          "0.2"
+        ],
+        [
+          "0.3",
+          "0.7"
+        ]
+      ],
+      "expected": {
+        "valid": true,
+        "eig_expression": "H(0.55)-0.5*H(0.8)-0.5*H(0.3)",
+        "relation_to_zero": "strictly_positive",
+        "asymmetric_branch_contributions": true
+      }
+    },
+    {
       "id": "I23-negative-prior",
       "kind": "invalid_model",
       "state_ids": [
@@ -1135,7 +1167,7 @@
     {
       "id": "EIG-MUT-02",
       "mutation": "Omit the expectation over future observations and use one selected/realized observation.",
-      "witness_case": "I03-binary-symmetric-error-quarter",
+      "witness_case": "I35-asymmetric-observation-branches",
       "expected_detection": "Candidate-time EIG must average over every positive-mass observation branch."
     },
     {
