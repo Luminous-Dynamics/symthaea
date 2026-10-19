@@ -15,7 +15,7 @@ const BASE_DEMAND_MM: [f64; ZONES] = [2.2, 2.7, 1.8];
 #[derive(Clone, Copy)]
 struct Scenario {
     id: &'static str,
-    daily_water_cap_mm: f64,
+    daily_water_budget_plot_mm: f64,
     drought_start_day: Option<usize>,
     heat_start_day: Option<usize>,
     forecast_bias: f64,
@@ -26,7 +26,7 @@ fn scenarios() -> [Scenario; 4] {
     [
         Scenario {
             id: "reference",
-            daily_water_cap_mm: 6.0,
+            daily_water_budget_plot_mm: 6.0,
             drought_start_day: None,
             heat_start_day: None,
             forecast_bias: 0.0,
@@ -34,7 +34,7 @@ fn scenarios() -> [Scenario; 4] {
         },
         Scenario {
             id: "water_rationing",
-            daily_water_cap_mm: 4.5,
+            daily_water_budget_plot_mm: 4.5,
             drought_start_day: Some(10),
             heat_start_day: None,
             forecast_bias: -0.10,
@@ -42,7 +42,7 @@ fn scenarios() -> [Scenario; 4] {
         },
         Scenario {
             id: "heat_and_drought",
-            daily_water_cap_mm: 5.0,
+            daily_water_budget_plot_mm: 5.0,
             drought_start_day: Some(8),
             heat_start_day: Some(18),
             forecast_bias: -0.20,
@@ -50,7 +50,7 @@ fn scenarios() -> [Scenario; 4] {
         },
         Scenario {
             id: "forecast_bias_and_sensor_dropout",
-            daily_water_cap_mm: 5.5,
+            daily_water_budget_plot_mm: 5.5,
             drought_start_day: Some(12),
             heat_start_day: Some(24),
             forecast_bias: -0.15,
@@ -81,9 +81,9 @@ struct ScenarioResult {
     scenario_id: String,
     policy: String,
     simulated_days: usize,
-    daily_water_cap_mm: f64,
-    total_irrigation_applied_mm: f64,
-    total_overflow_proxy_mm: f64,
+    daily_water_budget_plot_mm: f64,
+    total_irrigation_applied_plot_mm: f64,
+    total_overflow_proxy_plot_mm: f64,
     stress_exposure_proxy: f64,
     relative_stress_change_vs_equal_share_pct: Option<f64>,
     sensor_dropout_fraction: f64,
@@ -96,7 +96,7 @@ struct PolicyAggregate {
     scenario_count: usize,
     mean_stress_exposure_proxy: f64,
     median_stress_exposure_proxy: f64,
-    total_irrigation_applied_mm: f64,
+    total_irrigation_applied_plot_mm: f64,
     mean_relative_stress_change_vs_equal_share_pct: Option<f64>,
     total_water_budget_violation_days: usize,
 }
@@ -106,6 +106,7 @@ struct WaterPolicyReceipt {
     schema_version: String,
     benchmark_id: String,
     execution_mode: String,
+    budget_measurement_unit: String,
     synthetic_only: bool,
     biological_performance_claim: bool,
     training_authorized: bool,
@@ -185,11 +186,11 @@ fn allocate_water(
     match policy {
         Policy::EqualShareCalendar => {
             let share =
-                (scenario.daily_water_cap_mm / ZONES as f64).min(MAX_IRRIGATION_PER_ZONE_MM);
+                (scenario.daily_water_budget_plot_mm / ZONES as f64).min(MAX_IRRIGATION_PER_ZONE_MM);
             allocation.fill(share);
         }
         Policy::SoilThreshold => {
-            let units = (scenario.daily_water_cap_mm / ALLOCATION_STEP_MM).floor() as usize;
+            let units = (scenario.daily_water_budget_plot_mm / ALLOCATION_STEP_MM).floor() as usize;
             for _ in 0..units {
                 let next = (0..ZONES)
                     .filter(|zone| {
@@ -210,7 +211,7 @@ fn allocate_water(
             }
         }
         Policy::UncertaintyAware => {
-            let units = (scenario.daily_water_cap_mm / ALLOCATION_STEP_MM).floor() as usize;
+            let units = (scenario.daily_water_budget_plot_mm / ALLOCATION_STEP_MM).floor() as usize;
             for _ in 0..units {
                 let mut best: Option<(usize, f64)> = None;
                 for zone in 0..ZONES {
@@ -283,7 +284,7 @@ fn simulate_one(scenario: Scenario, policy: Policy) -> ScenarioResult {
         let allocation = allocate_water(policy, observed, stale_age, day, scenario);
         let applied: f64 = allocation.iter().sum();
         irrigation_total += applied;
-        if applied > scenario.daily_water_cap_mm + 1e-8 {
+        if applied > scenario.daily_water_budget_plot_mm + 1e-8 {
             violation_days += 1;
         }
 
@@ -304,9 +305,9 @@ fn simulate_one(scenario: Scenario, policy: Policy) -> ScenarioResult {
         scenario_id: scenario.id.to_owned(),
         policy: policy.name().to_owned(),
         simulated_days: DAYS,
-        daily_water_cap_mm: scenario.daily_water_cap_mm,
-        total_irrigation_applied_mm: round3(irrigation_total),
-        total_overflow_proxy_mm: round3(overflow_total),
+        daily_water_budget_plot_mm: scenario.daily_water_budget_plot_mm,
+        total_irrigation_applied_plot_mm: round3(irrigation_total),
+        total_overflow_proxy_plot_mm: round3(overflow_total),
         stress_exposure_proxy: round3(stress_exposure),
         relative_stress_change_vs_equal_share_pct: None,
         sensor_dropout_fraction: if total_reads == 0 {
@@ -383,10 +384,10 @@ fn build_receipt() -> Result<WaterPolicyReceipt> {
             scenario_count: policy_results.len(),
             mean_stress_exposure_proxy: round3(mean_stress),
             median_stress_exposure_proxy: round3(median_stress),
-            total_irrigation_applied_mm: round3(
+            total_irrigation_applied_plot_mm: round3(
                 policy_results
                     .iter()
-                    .map(|result| result.total_irrigation_applied_mm)
+                    .map(|result| result.total_irrigation_applied_plot_mm)
                     .sum(),
             ),
             mean_relative_stress_change_vs_equal_share_pct: mean_relative_change,
@@ -407,7 +408,7 @@ fn build_receipt() -> Result<WaterPolicyReceipt> {
     }
     if results.iter().any(|result| {
         !result.stress_exposure_proxy.is_finite()
-            || !result.total_irrigation_applied_mm.is_finite()
+            || !result.total_irrigation_applied_plot_mm.is_finite()
             || !result.sensor_dropout_fraction.is_finite()
     }) {
         return Err(anyhow!(
@@ -419,6 +420,7 @@ fn build_receipt() -> Result<WaterPolicyReceipt> {
         schema_version: "cropfoundry-water-policy-receipt-v0".to_owned(),
         benchmark_id: "CF-022".to_owned(),
         execution_mode: "deterministic_synthetic_algorithm_harness".to_owned(),
+        budget_measurement_unit: "plot-mm: summed depth across equally weighted synthetic plots; not a calibrated volumetric water budget".to_owned(),
         synthetic_only: true,
         biological_performance_claim: false,
         training_authorized: false,
@@ -526,11 +528,11 @@ mod tests {
         let receipt = build_receipt().unwrap();
         for result in receipt.results {
             assert!(result.stress_exposure_proxy.is_finite());
-            assert!(result.total_irrigation_applied_mm.is_finite());
+            assert!(result.total_irrigation_applied_plot_mm.is_finite());
             assert!((0.0..=1.0).contains(&result.sensor_dropout_fraction));
             assert!(
-                result.total_irrigation_applied_mm
-                    <= result.simulated_days as f64 * result.daily_water_cap_mm + 1e-6
+                result.total_irrigation_applied_plot_mm
+                    <= result.simulated_days as f64 * result.daily_water_budget_plot_mm + 1e-6
             );
         }
     }
