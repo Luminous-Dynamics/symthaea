@@ -33,11 +33,11 @@ fn scenarios() -> [Scenario; 6] {
             sensor_dropout_period: None,
         },
         Scenario {
-            id: "water_rationing",
+            id: "water_rationing_only",
             daily_water_budget_plot_mm: 4.5,
-            drought_start_day: Some(10),
+            drought_start_day: None,
             heat_start_day: None,
-            forecast_bias: -0.10,
+            forecast_bias: 0.0,
             sensor_dropout_period: None,
         },
         Scenario {
@@ -45,7 +45,7 @@ fn scenarios() -> [Scenario; 6] {
             daily_water_budget_plot_mm: 5.0,
             drought_start_day: Some(8),
             heat_start_day: Some(18),
-            forecast_bias: -0.20,
+            forecast_bias: 0.0,
             sensor_dropout_period: None,
         },
         Scenario {
@@ -575,6 +575,33 @@ mod tests {
     #[test]
     fn cropfoundry_failure_ablation_scenarios_change_only_the_declared_factor() {
         let receipt = build_receipt().unwrap();
+        for policy_result in receipt
+            .results
+            .iter()
+            .filter(|result| result.scenario_id == "water_rationing_only")
+        {
+            let reference = receipt
+                .results
+                .iter()
+                .find(|result| {
+                    result.scenario_id == "reference" && result.policy == policy_result.policy
+                })
+                .unwrap();
+            assert_ne!(
+                policy_result.daily_water_budget_plot_mm,
+                reference.daily_water_budget_plot_mm
+            );
+            assert_eq!(policy_result.drought_start_day, reference.drought_start_day);
+            assert_eq!(policy_result.heat_start_day, reference.heat_start_day);
+            assert_eq!(
+                policy_result.forecast_bias_fraction,
+                reference.forecast_bias_fraction
+            );
+            assert_eq!(
+                policy_result.sensor_dropout_period_days,
+                reference.sensor_dropout_period_days
+            );
+        }
         for policy_result in receipt
             .results
             .iter()
