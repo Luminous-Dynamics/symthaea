@@ -66,6 +66,10 @@ This is a percentile bootstrap description of uncertainty, not a causal identifi
 
 `PairedBootstrapConfig::default()` uses 10,000 bootstrap replicates and a fixed reproducible seed. Always report the exact configuration and cluster definition.
 
+## Machine-readable report artifacts
+
+The production-outcome and paired-inference reports are serializable via Serde and include explicit `schema_version` fields. Structured inputs reject unknown fields where strict record deserialization is defined. JSON round-trip unit tests check the stability of report structures, not authenticity. Consumers should archive the serialized report with the exact source-code revision, input manifest, configuration, and an independently computed digest of the emitted bytes. Schema version changes must be deliberate and tested before Mycelix or another downstream evidence ledger consumes the format.
+
 ## Research anchors
 
 - [NIST Smart Manufacturing Systems Test Bed](https://www.nist.gov/laboratories/tools-instruments/smart-manufacturing-systems-sms-test-bed): integrated CAD/CAM, machine tools, inspection, MTConnect data, and lifecycle information for manufacturing evaluation.
