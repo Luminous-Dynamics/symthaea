@@ -25,7 +25,10 @@
       "minLength": 1
     },
     "source_commit": {
-      "type": ["string", "null"],
+      "type": [
+        "string",
+        "null"
+      ],
       "pattern": "^[0-9a-f]{40,64}$"
     },
     "operation": {
@@ -33,7 +36,8 @@
         "validate-manifest",
         "verify-artifacts",
         "inspect-csv",
-        "validate-records"
+        "validate-records",
+        "reconcile-csv"
       ]
     },
     "status": {
@@ -45,7 +49,10 @@
       "pattern": "^[0-9a-f]{64}$"
     },
     "evidence_input_sha256": {
-      "type": ["string", "null"],
+      "type": [
+        "string",
+        "null"
+      ],
       "pattern": "^[0-9a-f]{64}$"
     },
     "artifact_count": {
@@ -133,6 +140,122 @@
     "claim_ceiling": {
       "type": "string",
       "minLength": 1
+    },
+    "csv_reconciliation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact_relative_path",
+        "artifact_sha256",
+        "mapping_sha256",
+        "headers_sha256",
+        "source_row_id_header",
+        "ordered_source_row_ids_sha256",
+        "data_row_count",
+        "unique_source_row_ids",
+        "mapped_column_count",
+        "columns",
+        "reconciliation_note",
+        "claim_ceiling"
+      ],
+      "properties": {
+        "artifact_relative_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "artifact_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "mapping_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "headers_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "source_row_id_header": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ordered_source_row_ids_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "data_row_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unique_source_row_ids": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "mapped_column_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "columns": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "source_header",
+              "canonical_field_id",
+              "raw_unit",
+              "role",
+              "missing_policy",
+              "nonempty_cells",
+              "preserved_missing_cells"
+            ],
+            "properties": {
+              "source_header": {
+                "type": "string",
+                "minLength": 1
+              },
+              "canonical_field_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "raw_unit": {
+                "type": "string",
+                "minLength": 1
+              },
+              "role": {
+                "enum": [
+                  "metadata",
+                  "predictor",
+                  "target_outcome"
+                ]
+              },
+              "missing_policy": {
+                "enum": [
+                  "reject",
+                  "preserve_missing"
+                ]
+              },
+              "nonempty_cells": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "preserved_missing_cells": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        },
+        "reconciliation_note": {
+          "type": "string",
+          "minLength": 1
+        },
+        "claim_ceiling": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
     }
   },
   "allOf": [
@@ -143,14 +266,44 @@
             "const": "inspect-csv"
           }
         },
-        "required": ["operation"]
+        "required": [
+          "operation"
+        ]
       },
       "then": {
-        "required": ["csv_inventory"]
+        "required": [
+          "csv_inventory"
+        ]
       },
       "else": {
         "not": {
-          "required": ["csv_inventory"]
+          "required": [
+            "csv_inventory"
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "operation": {
+            "const": "reconcile-csv"
+          }
+        },
+        "required": [
+          "operation"
+        ]
+      },
+      "then": {
+        "required": [
+          "csv_reconciliation"
+        ]
+      },
+      "else": {
+        "not": {
+          "required": [
+            "csv_reconciliation"
+          ]
         }
       }
     }
