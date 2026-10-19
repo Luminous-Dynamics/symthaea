@@ -106,6 +106,12 @@ If a control exceeds the guard band, mark the affected interval NOT_EVALUATED ac
 
 Synthetic validation cases should cover no drift, drift within the guard band, drift just beyond it, gradual drift crossing between controls, a single outlier, a remount shift, and a control/reference mismatch. Report false-alarm and missed-drift behavior. Passing synthetic cases does not prove that a physical control artifact is stable.
 
+## 4A. Control-schedule coverage
+
+A fixed guard band is not enough if controls are too sparse. Each experimental run must preregister a maximum allowed **planned** control gap, including run-start-to-first-control and last-control-to-run-end. A schedule that exceeds that cap is invalid before comparing DUT results. A missing, invalid or out-of-band control remains explicit and quarantines affected observations under the declared screening algorithm.
+
+The maximum gap is a bound on the schedule, not a claim about drift-detection power. Pick it only after selecting the measurand, reference artifact, expected environmental dynamics, minimum decision effect, and feasible sampling cost. Test false-alarm and missed-excursion performance using synthetic and physical repeat studies before using the algorithm for qualification. Sparse in-band endpoints cannot prove stability between them.
+
 ## 5. Pattern/context robustness
 
 A display result must not silently depend on a single conveniently chosen patch. Reuse the existing [pattern robustness and uncertainty protocol](DISPLAY_PATTERN_ROBUSTNESS_AND_UNCERTAINTY.md) and frozen conventional-display workload.
@@ -139,7 +145,7 @@ Use the existing [visual utility-per-joule protocol](VISUAL_UTILITY_PER_JOULE_PR
 - 100% of unsupported mandatory metrics explicitly remain NOT_EVALUATED.
 - Zero silent drops of failed, aborted, excluded or out-of-tolerance observations.
 - An independent checker recomputes deterministic arithmetic outputs for all frozen known-answer cases.
-- Mutation tests reject stale calibration, mode/pattern mismatch, incomplete samples, wrong units, missing raw data and false pass claims.
+- Mutation tests reject stale calibration, mode/pattern mismatch, incomplete samples, wrong units, missing raw data, control schedules exceeding a preregistered maximum gap, and false pass claims.
 
 ### G1 — decision capability
 
