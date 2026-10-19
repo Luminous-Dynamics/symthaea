@@ -396,7 +396,14 @@ fn aggregate_option(
             .iter()
             .filter(|row| field(&row.receipt, "concentration_is_direct_assay").and_then(Value::as_bool) == Some(true))
             .count();
-        let resource_coverage_count = |key: &str| resource_measured_counts.get(key).copied().unwrap_or(0);
+        let estimated_delivery_count = nutrient_rows
+            .iter()
+            .filter(|row| {
+                field(&row.receipt, "delivery_mass_is_estimated")
+                    .and_then(Value::as_bool)
+                    .unwrap_or(true)
+            })
+            .count();
         let water_total = resource_totals.get("water_liters").copied().flatten();
         let land_total = resource_totals.get("land_square_meters").copied().flatten();
         let energy_total = resource_totals.get("energy_kwh").copied().flatten();
@@ -409,13 +416,11 @@ fn aggregate_option(
             ("energy".to_owned(), resource_boundaries.get("energy_boundary").cloned().flatten()),
             ("cost".to_owned(), resource_boundaries.get("cost_boundary").cloned().flatten()),
         ]);
-        let _ = resource_coverage_count;
-
         nutrients.push(NutrientPortfolioTotal {
             nutrient_id: nutrient_id.clone(),
             batch_count: nutrient_rows.len(),
-            direct_assay_batch_count: direct_assay_count,
-            estimated_batch_count: nutrient_rows.len().saturating_sub(direct_assay_count),
+            direct_assay_concentration_batch_count: direct_assay_count,
+            estimated_delivery_batch_count: estimated_delivery_count,
             total_delivered_mg: total_delivered,
             total_delivered_interval_lower_mg: total_lower,
             total_delivered_interval_upper_mg: total_upper,
