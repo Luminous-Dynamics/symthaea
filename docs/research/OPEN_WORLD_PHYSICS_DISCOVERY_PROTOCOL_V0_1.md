@@ -15,6 +15,20 @@ The system needs two separate capabilities:
 
 A law that correctly explains a hidden simulator is evidence that the method recovered that simulator's rule. It is *not* evidence that the law describes our universe. A fit to observed data is not, by itself, evidence of uniqueness, identifiability, causal mechanism, or novelty.
 
+## Relationship to existing Ramanujan × EUREKA architecture
+
+This work is an extension of the existing scientific-discovery architecture, **not a competing implementation**.
+
+- **Ramanujan Protocol v2** (#6862; cold invariant discovery and provenance-bound holdouts in [PR #7372](https://github.com/Luminous-Dynamics/symthaea/pull/7372)) owns candidate mathematical/invariant discovery and its discovery provenance. Invariant rediscovery is a necessary foundation, but does not by itself benchmark open-world law invention.
+- **EUREKA** (#2045) owns independent qualification. The explicit dual-loop architecture is already described in [#6874](https://github.com/Luminous-Dynamics/symthaea/issues/6874); the canonical hypothesis handoff is specified in [#6875](https://github.com/Luminous-Dynamics/symthaea/issues/6875). A Ramanujan candidate is a hypothesis envelope, never an EUREKA result.
+- **ScientificModel / PhysicsIR** is the intended solver-independent model boundary in [#6879](https://github.com/Luminous-Dynamics/symthaea/issues/6879) and its implementation [PR #6880](https://github.com/Luminous-Dynamics/symthaea/pull/6880). Reuse its model identity, typing, assumptions, provenance, and evidence-requirement semantics when available; do not create a second canonical model IR in this benchmark.
+- **Physics typing** and symbolic-domain hardening are owned by [#6868](https://github.com/Luminous-Dynamics/symthaea/issues/6868), [PR #6869](https://github.com/Luminous-Dynamics/symthaea/pull/6869), and [PR #6865](https://github.com/Luminous-Dynamics/symthaea/pull/6865). Do not create a parallel unit/type or proof framework.
+- The current `integrated_discovery.rs` already composes typed generation, active experiment selection, and observation smoothing with a factorial ablation. Reuse it through a narrow adapter; the evaluator must remain independent of the agent's scoring code.
+
+**What is additive here:** a blinded benchmark suite where the governing dynamics can be composed or altered beyond familiar textbook law families, with structural holdouts, rival-mechanism discrimination, adversarial controls, and a fixed-cost experiment budget. It tests the *open-world discovery capability* above the existing interfaces. It does not replace or re-specify the Ramanujan→EUREKA handoff.
+
+Parent work is presently tracked in open issues/PRs; before integrating code, inspect each exact current head and dependency. If a parent interface is not available on the chosen base, use a narrow adapter at the benchmark boundary and document the dependency—do not fork the semantic contract.
+
 ## Why this work is distinct from current physics work
 
 Symthaea already has useful foundations to compose rather than duplicate:
