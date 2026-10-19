@@ -30,5 +30,9 @@
   "energy_kwh": 0.5,
   "cost_amount": 1.25,
   "currency_code": "ZAR",
-  "source_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  "source_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "water_boundary": "irrigation_applied",
+  "land_boundary": "allocated_cultivated_area",
+  "energy_boundary": "on_farm_operations",
+  "cost_boundary": "farm_gate"
 }
