@@ -12,6 +12,19 @@ use std::collections::BTreeMap;
 use std::error::Error;
 use std::fmt;
 
+/// Claimed evidence class for this outcome record. This is a declaration, not
+/// an authenticated attestation; the evaluator prevents cross-class comparisons
+/// but cannot prove that a record really belongs to the declared class.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EvidenceClass {
+    /// Known-answer fixtures or generated synthetic outcomes.
+    SyntheticFixture,
+    /// Output from a simulation/digital twin, not direct physical measurement.
+    SimulationOutput,
+    /// Outcomes recorded by an instrumented physical process.
+    InstrumentObserved,
+}
+
 /// One completed-workload outcome at a declared measurement cutoff.
 ///
 /// Unit dispositions are mutually exclusive and must sum to `input_units`.
@@ -21,8 +34,14 @@ use std::fmt;
 pub struct ProductionRun {
     pub scenario_id: String,
     pub policy_id: String,
-    /// Identity of the frozen workload/configuration shared by a paired run.
+    /// SHA-256 identity of the frozen workload/configuration shared by a pair.
+    /// The evaluator checks syntax only and does not recompute this digest.
     pub workload_digest: String,
+    /// Declared origin class; baseline/candidate classes must match.
+    pub evidence_class: EvidenceClass,
+    /// SHA-256 of the retained raw source record or immutable record envelope.
+    /// Syntax is checked; hashing/authentication and source retrieval are external.
+    pub source_record_sha256: String,
     pub input_units: u64,
     pub accepted_units: u64,
     pub scrapped_units: u64,
@@ -51,6 +70,18 @@ impl ProductionRun {
             return Err(EvaluationError::InvalidRun {
                 scenario_id: id.to_owned(),
                 reason: "scenario, policy, and workload identities must be non-empty",
+            });
+        }
+        if !is_lowercase_sha256(&self.workload_digest) {
+            return Err(EvaluationError::InvalidDigest {
+                scenario_id: id.to_owned(),
+                field: "workload_digest",
+            });
+        }
+        if !is_lowercase_sha256(&self.source_record_sha256) {
+            return Err(EvaluationError::InvalidDigest {
+                scenario_id: id.to_owned(),
+                field: "source_record_sha256",
             });
         }
         if self.input_units == 0 {
@@ -130,6 +161,16 @@ pub enum EvaluationError {
     MixedPolicy { expected: String, found: String },
     DuplicateScenario { scenario_id: String },
     InvalidRun { scenario_id: String, reason: &'static str },
+    InvalidDigest { scenario_id: String, field: &'static str },
+    MixedEvidenceClass {
+        policy_id: String,
+        expected: EvidenceClass,
+        found: EvidenceClass,
+    },
+    EvidenceClassMismatch {
+        baseline: EvidenceClass,
+        candidate: EvidenceClass,
+    },
     PairSetMismatch {
         missing_in_candidate: Vec<String>,
         extra_in_candidate: Vec<String>,
@@ -152,6 +193,15 @@ impl fmt::Display for EvaluationError {
             Self::InvalidRun { scenario_id, reason } => {
                 write!(f, "invalid run {scenario_id}: {reason}")
             }
+            Self::InvalidDigest { scenario_id, field } => {
+                write!(f, "invalid lowercase SHA-256 syntax for {field} in run {scenario_id}")
+            }
+            Self::MixedEvidenceClass { policy_id, expected, found } => write!(
+                f, "policy {policy_id} mixes evidence classes ({expected:?} and {found:?})"
+            ),
+            Self::EvidenceClassMismatch { baseline, candidate } => write!(
+                f, "baseline evidence class {baseline:?} differs from candidate class {candidate:?}"
+            ),
             Self::PairSetMismatch { missing_in_candidate, extra_in_candidate } => write!(
                 f,
                 "paired scenario sets differ (missing in candidate: {missing_in_candidate:?}; extra in candidate: {extra_in_candidate:?})"
@@ -213,6 +263,8 @@ impl OutcomeSummary {
 pub struct ProductionValueReport {
     pub baseline_policy_id: String,
     pub candidate_policy_id: String,
+    /// Declared evidence class shared by every compared run.
+    pub evidence_class: EvidenceClass,
     /// Sorted by scenario ID, independent of input iteration order.
     pub paired_scenario_ids: Vec<String>,
     pub baseline: OutcomeSummary,
@@ -256,6 +308,15 @@ pub fn compare_production_outcomes(
 
     let baseline = index_runs(baseline_policy_id, baseline_runs)?;
     let candidate = index_runs(candidate_policy_id, candidate_runs)?;
+    let baseline_evidence = common_evidence_class(baseline_policy_id, &baseline)?;
+    let candidate_evidence = common_evidence_class(candidate_policy_id, &candidate)?;
+    if baseline_evidence != candidate_evidence {
+        return Err(EvaluationError::EvidenceClassMismatch {
+            baseline: baseline_evidence,
+            candidate: candidate_evidence,
+        });
+    }
+
     let missing: Vec<String> = baseline.keys()
         .filter(|id| !candidate.contains_key(**id))
         .map(|id| (*id).to_owned())
@@ -288,6 +349,7 @@ pub fn compare_production_outcomes(
     Ok(ProductionValueReport {
         baseline_policy_id: baseline_policy_id.to_owned(),
         candidate_policy_id: candidate_policy_id.to_owned(),
+        evidence_class: baseline_evidence,
         paired_scenario_ids: paired_ids,
         baseline: summarize(&baseline)?,
         candidate: summarize(&candidate)?,
@@ -317,6 +379,33 @@ fn index_runs<'a>(
         }
     }
     Ok(indexed)
+}
+
+fn common_evidence_class(
+    policy_id: &str,
+    runs: &BTreeMap<&str, &ProductionRun>,
+) -> Result<EvidenceClass, EvaluationError> {
+    let mut iter = runs.values();
+    let first = iter.next().ok_or_else(|| EvaluationError::EmptyRuns {
+        policy_id: policy_id.to_owned(),
+    })?.evidence_class;
+    for run in iter {
+        if run.evidence_class != first {
+            return Err(EvaluationError::MixedEvidenceClass {
+                policy_id: policy_id.to_owned(),
+                expected: first,
+                found: run.evidence_class,
+            });
+        }
+    }
+    Ok(first)
+}
+
+fn is_lowercase_sha256(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
 fn summarize(runs: &BTreeMap<&str, &ProductionRun>) -> Result<OutcomeSummary, EvaluationError> {
@@ -360,12 +449,22 @@ fn checked_sum(values: &[u64]) -> Option<u64> {
 mod tests {
     use super::*;
 
+    fn test_digest(value: &str) -> String {
+        // Test-only digest-shaped identifier; not a hash of the supplied value.
+        let reduced = value.bytes().fold(0_u64, |acc, byte| {
+            acc.wrapping_mul(257).wrapping_add(byte as u64)
+        });
+        format!("{reduced:064x}")
+    }
+
     fn run(policy: &str, scenario: &str, accepted: u64) -> ProductionRun {
         let scrapped = 10 - accepted;
         ProductionRun {
             scenario_id: scenario.to_owned(),
             policy_id: policy.to_owned(),
-            workload_digest: format!("workload-{scenario}"),
+            workload_digest: test_digest(&format!("workload-{scenario}")),
+            evidence_class: EvidenceClass::InstrumentObserved,
+            source_record_sha256: test_digest(&format!("source-{policy}-{scenario}")),
             input_units: 10,
             accepted_units: accepted,
             scrapped_units: scrapped,
@@ -388,6 +487,34 @@ mod tests {
             vec![run("baseline", "scenario-001", 8)],
             vec![run("candidate", "scenario-001", 9)],
         )
+    }
+
+    #[test]
+    fn rejects_non_sha256_digest_syntax() {
+        let (b, mut c) = pair();
+        c[0].source_record_sha256 = "not-a-digest".to_owned();
+        assert!(matches!(
+            compare_production_outcomes("baseline", &b, "candidate", &c),
+            Err(EvaluationError::InvalidDigest { field: "source_record_sha256", .. })
+        ));
+    }
+
+    #[test]
+    fn rejects_mixed_evidence_classes_within_a_policy_or_between_policies() {
+        let mut b = vec![run("baseline", "a", 8), run("baseline", "b", 8)];
+        let c = vec![run("candidate", "a", 9), run("candidate", "b", 9)];
+        b[1].evidence_class = EvidenceClass::SimulationOutput;
+        assert!(matches!(
+            compare_production_outcomes("baseline", &b, "candidate", &c),
+            Err(EvaluationError::MixedEvidenceClass { .. })
+        ));
+
+        let (b, mut c) = pair();
+        c[0].evidence_class = EvidenceClass::SimulationOutput;
+        assert!(matches!(
+            compare_production_outcomes("baseline", &b, "candidate", &c),
+            Err(EvaluationError::EvidenceClassMismatch { .. })
+        ));
     }
 
     #[test]
