@@ -1199,6 +1199,29 @@ fn evaluate_fault_case(mutation: &str, manifest: &Manifest) -> (String, String) 
                 Err(error) => ("reject".to_owned(), error.to_string()),
             }
         }
+        "uncertainty_record_contents_disagree_with_manifest" => {
+            let declared = ClaimUncertaintyBudget {
+                claim_target: "ride_energy".to_owned(),
+                measurand: "net_dc_bus_energy".to_owned(),
+                unit: "Wh".to_owned(),
+                standard_uncertainty: 0.05,
+                expanded_uncertainty: 0.1,
+                coverage_factor: 2.0,
+                acceptance_tolerance: 0.5,
+                evidence_state: "bench_characterized".to_owned(),
+                artifact_path: "uncertainty/ride-energy.json".to_owned(),
+            };
+            let mut tampered = declared.clone();
+            tampered.acceptance_tolerance = 50.0;
+            let raw = match serde_json::to_vec(&tampered) {
+                Ok(raw) => raw,
+                Err(error) => return ("reject".to_owned(), error.to_string()),
+            };
+            match verify_uncertainty_budget_receipt_bytes(&raw, &declared) {
+                Ok(()) => ("accept".to_owned(), "mismatched receipt unexpectedly matched".to_owned()),
+                Err(error) => ("reject".to_owned(), error.to_string()),
+            }
+        }
         "zero_width_uncertainty_budget" => {
             let mut candidate = manifest.clone();
             let artifact_path = "uncertainty/zero.json".to_owned();
@@ -1911,7 +1934,7 @@ mod tests {
         )).expect("frozen telemetry fault matrix parses");
         let cases = matrix.get("cases").and_then(serde_json::Value::as_array)
             .expect("fault matrix has a case array");
-        assert_eq!(cases.len(), 31, "matrix size changes require deliberate review");
+        assert_eq!(cases.len(), 32, "matrix size changes require deliberate review");
         let mut ids = BTreeSet::new();
         for case in cases {
             let id = case.get("id").and_then(serde_json::Value::as_str)
