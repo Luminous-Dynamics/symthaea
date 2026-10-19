@@ -539,3 +539,32 @@ mod tests {
         assert_eq!(result.disposition, CompositionClosureDispositionV1::WithinPreferred);
     }
 }
+ 
+    #[test]
+    fn widening_a_component_interval_never_strengthens_closure() {
+        let mut value = fixture();
+        let center = value["components"][0]["value"].as_f64().unwrap();
+        let mut seen_acceptable = false;
+        let mut seen_indeterminate = false;
+        for spread in 0..=8 {
+            let spread = spread as f64;
+            value["components"][0]["lower"] = json!((center - spread).max(0.0));
+            value["components"][0]["upper"] = json!(center + spread);
+            let result = check_proximate_composition_closure_v1(&value).unwrap();
+            match result.disposition {
+                CompositionClosureDispositionV1::WithinPreferred => {
+                    assert!(!seen_acceptable && !seen_indeterminate);
+                }
+                CompositionClosureDispositionV1::WithinAcceptable => {
+                    seen_acceptable = true;
+                    assert!(!seen_indeterminate);
+                }
+                CompositionClosureDispositionV1::Indeterminate => {
+                    seen_indeterminate = true;
+                }
+                CompositionClosureDispositionV1::OutsideAcceptable => {
+                    panic!("widening an interval around a valid point sum must not manufacture outside evidence");
+                }
+            }
+        }
+    }
