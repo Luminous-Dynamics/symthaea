@@ -778,4 +778,36 @@ mod tests {
             Some("literal-register")
         );
     }
+
+    #[test]
+    fn renderer_recipe_roundtrips_dialect_and_accepts_legacy_absence() {
+        let mut recipe = PieceRecipe::new(
+            MusicalIntent::default(),
+            Style::Tango.spec(),
+            RendererRecipe::new("native", 48_000, "0.1.0", "0.1.0"),
+        );
+        recipe.renderer.performance_dialect =
+            Some(Style::Tango.grammar_profile().performance);
+
+        let encoded = serde_json::to_value(&recipe).unwrap();
+        assert_eq!(encoded["schema_version"], PIECE_RECIPE_SCHEMA_VERSION);
+        assert_eq!(encoded["renderer"]["performance_dialect"], "dance_locked");
+        let restored: PieceRecipe = serde_json::from_value(encoded.clone()).unwrap();
+        assert_eq!(
+            restored.renderer.performance_dialect,
+            Some(Style::Tango.grammar_profile().performance)
+        );
+
+        // Schema-v3 recipes predate the optional field and remain readable.
+        let mut legacy = encoded;
+        legacy["schema_version"] = serde_json::Value::from(3);
+        legacy["renderer"]
+            .as_object_mut()
+            .unwrap()
+            .remove("performance_dialect");
+        let restored_legacy: PieceRecipe = serde_json::from_value(legacy).unwrap();
+        assert_eq!(restored_legacy.schema_version, 3);
+        assert_eq!(restored_legacy.renderer.performance_dialect, None);
+    }
+
 }
