@@ -525,13 +525,14 @@ pub fn run_cli() -> i32 {
         .collect();
     let matched_case_count = cases.len() - failed_case_ids.len();
     let contract_passed = failed_case_ids.is_empty();
+    let exact_head_match = actual_head == expected_head;
     let receipt = RunReceipt {
         runner_version: RUNNER_VERSION.to_owned(),
         corpus_id: corpus.corpus_id,
         schema_version: corpus.schema_version,
         corpus_sha256: sha256_hex(&corpus_bytes),
         declared_head: expected_head,
-        exact_head_match: actual_head == expected_head,
+        exact_head_match,
         actual_head,
         case_count: cases.len(),
         matched_case_count,
