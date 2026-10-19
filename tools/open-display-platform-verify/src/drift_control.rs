@@ -105,7 +105,7 @@ pub struct DriftScreeningReport {
     pub guard_lower: f64,
     pub guard_upper: f64,
     pub maximum_control_gap_seconds: f64,
-    pub observed_max_control_gap_seconds: f64,
+    pub scheduled_max_control_gap_seconds: f64,
     pub controls: Vec<ControlDecision>,
     pub observations: Vec<ObservationDecision>,
     /// Hard boundary for interpretation: this report is not a physical qualification.
@@ -215,13 +215,14 @@ pub fn screen_drift_controls(plan: &DriftControlPlan) -> Result<DriftScreeningRe
     scheduled_times.push(plan.run_start_seconds);
     scheduled_times.extend(plan.controls.iter().map(|control| control.time_seconds));
     scheduled_times.push(plan.run_end_seconds);
-    let observed_max_control_gap_seconds = scheduled_times
+    let scheduled_max_control_gap_seconds = scheduled_times
         .windows(2)
         .map(|pair| pair[1] - pair[0])
         .fold(0.0_f64, f64::max);
-    if observed_max_control_gap_seconds > plan.maximum_control_gap_seconds {
+    if scheduled_max_control_gap_seconds > plan.maximum_control_gap_seconds {
         return Err(vec![format!(
-            "scheduled control gap exceeds predeclared maximum: observed {observed_max_control_gap_seconds}, allowed {}",
+            "scheduled control gap exceeds predeclared maximum: {} seconds, allowed {}",
+            scheduled_max_control_gap_seconds,
             plan.maximum_control_gap_seconds
         )]);
     }
@@ -284,7 +285,7 @@ pub fn screen_drift_controls(plan: &DriftControlPlan) -> Result<DriftScreeningRe
         guard_lower: lower,
         guard_upper: upper,
         maximum_control_gap_seconds: plan.maximum_control_gap_seconds,
-        observed_max_control_gap_seconds,
+        scheduled_max_control_gap_seconds,
         controls,
         observations,
         qualification: "SYNTHETIC_OR_CONTROL_SCREENING_ONLY_NOT_PHYSICAL_QUALIFICATION",
@@ -320,7 +321,7 @@ impl DriftPlanValidationReport {
             },
             "control_schedule": {
                 "maximum_allowed_gap_seconds": self.screening.maximum_control_gap_seconds,
-                "observed_max_gap_seconds": self.screening.observed_max_control_gap_seconds,
+                "scheduled_max_gap_seconds": self.screening.scheduled_max_control_gap_seconds,
                 "gap_scope": "run_start_to_first_control_between_control_slots_and_last_control_to_run_end",
                 "claim_limit": "Planned spacing only; does not establish drift-detection power or physical stability."
             },
@@ -556,14 +557,14 @@ mod tests {
         assert_eq!(report.unit, "arbitrary_units");
         assert_eq!(report.screening.controls.len(), 3);
         assert_eq!(report.screening.maximum_control_gap_seconds, 40.0);
-        assert_eq!(report.screening.observed_max_control_gap_seconds, 40.0);
+        assert_eq!(report.screening.scheduled_max_control_gap_seconds, 40.0);
         let report_json = report.to_json();
         assert_eq!(
             report_json["control_schedule"]["maximum_allowed_gap_seconds"].as_f64(),
             Some(40.0)
         );
         assert_eq!(
-            report_json["control_schedule"]["observed_max_gap_seconds"].as_f64(),
+            report_json["control_schedule"]["scheduled_max_gap_seconds"].as_f64(),
             Some(40.0)
         );
         assert_eq!(
