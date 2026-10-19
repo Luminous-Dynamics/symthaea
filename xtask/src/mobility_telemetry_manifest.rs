@@ -191,7 +191,7 @@ struct Artifact {
     sha256: String,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 struct ClaimUncertaintyBudget {
     claim_target: String,
     measurand: String,
@@ -535,6 +535,43 @@ fn validate_structure(manifest: &Manifest) -> Result<()> {
     Ok(())
 }
 
+
+fn verify_uncertainty_budget_receipt_bytes(
+    raw: &[u8],
+    declared_budget: &ClaimUncertaintyBudget,
+) -> Result<()> {
+    let receipt: ClaimUncertaintyBudget = serde_json::from_slice(raw)
+        .context("parsing uncertainty-budget receipt as the declared v0.1 budget schema")?;
+    if &receipt != declared_budget {
+        bail!("uncertainty budget receipt content does not match manifest budget");
+    }
+    Ok(())
+}
+
+fn verify_uncertainty_budget_artifacts(manifest_path: &Path, manifest: &Manifest) -> Result<()> {
+    let root = manifest_path.parent().context("manifest has no parent directory")?
+        .canonicalize()
+        .with_context(|| format!("canonicalizing manifest directory for {}", manifest_path.display()))?;
+    for budget in &manifest.uncertainty_budgets {
+        let artifact = manifest.artifacts.iter().find(|artifact| {
+            artifact.relative_path == budget.artifact_path && artifact.kind == "uncertainty_budget_record"
+        }).context("validated uncertainty budget lost its declared artifact")?;
+        if !valid_relative_path(&artifact.relative_path) {
+            bail!("unsafe uncertainty budget artifact path: {}", artifact.relative_path);
+        }
+        let candidate = root.join(&artifact.relative_path).canonicalize()
+            .with_context(|| format!("resolving uncertainty budget receipt {}", artifact.relative_path))?;
+        if !candidate.starts_with(&root) {
+            bail!("uncertainty budget receipt escapes manifest root: {}", artifact.relative_path);
+        }
+        let raw = fs::read(&candidate)
+            .with_context(|| format!("reading uncertainty budget receipt {}", artifact.relative_path))?;
+        verify_uncertainty_budget_receipt_bytes(&raw, budget)
+            .with_context(|| format!("verifying uncertainty budget receipt {}", artifact.relative_path))?;
+    }
+    Ok(())
+}
+
 fn verify_artifacts(manifest_path: &Path, artifacts: &[Artifact]) -> Result<()> {
     let manifest_dir = manifest_path
         .parent()
@@ -727,7 +764,8 @@ pub fn run(input_path: &Path, output_path: Option<&Path>) -> Result<()> {
         "not_applicable_planned_session".to_owned()
     } else {
         verify_artifacts(input_path, &manifest.artifacts)?;
-        "all_declared_artifacts_verified".to_owned()
+        verify_uncertainty_budget_artifacts(input_path, &manifest)?;
+        "all_declared_artifacts_and_uncertainty_receipts_verified".to_owned()
     };
 
     let claims: Vec<ClaimEligibility> = manifest
@@ -2151,5 +2189,30 @@ mod tests {
         });
         let error = validate_structure(&fixture).expect_err("zero uncertainty must not manufacture perfect confidence");
         assert!(error.to_string().contains("standard and expanded uncertainty must be positive"));
+    }
+
+    #[test]
+    fn uncertainty_budget_receipt_must_match_manifest_content() {
+        let budget = ClaimUncertaintyBudget {
+            claim_target: "ride_energy".to_owned(),
+            measurand: "net_dc_bus_energy".to_owned(),
+            unit: "Wh".to_owned(),
+            standard_uncertainty: 0.05,
+            expanded_uncertainty: 0.1,
+            coverage_factor: 2.0,
+            acceptance_tolerance: 0.5,
+            evidence_state: "bench_characterized".to_owned(),
+            artifact_path: "uncertainty/ride-energy.json".to_owned(),
+        };
+        let exact = serde_json::to_vec(&budget).expect("budget serializes");
+        verify_uncertainty_budget_receipt_bytes(&exact, &budget)
+            .expect("exact receipt matches the declared budget");
+
+        let mut tampered = budget.clone();
+        tampered.acceptance_tolerance = 50.0;
+        let tampered_bytes = serde_json::to_vec(&tampered).expect("tampered budget serializes");
+        let error = verify_uncertainty_budget_receipt_bytes(&tampered_bytes, &budget)
+            .expect_err("a receipt that disagrees with the manifest must fail");
+        assert!(error.to_string().contains("does not match manifest budget"));
     }
 }
