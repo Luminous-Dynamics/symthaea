@@ -670,7 +670,7 @@ mod tests {
         ));
 
         let (b, mut c) = pair();
-        c[0].workload_digest = "different".to_owned();
+        c[0].workload_digest = test_digest("different");
         assert!(matches!(
             compare_production_outcomes("baseline", &b, "candidate", &c),
             Err(EvaluationError::WorkloadMismatch { .. })
