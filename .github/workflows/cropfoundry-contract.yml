@@ -148,3 +148,6 @@ jobs:
           grep -q '"total_planned_plots_two_arms": 270' "$RUNNER_TEMP/cropfoundry-trial-power-receipt.json"
           grep -q '"field_efficacy_claim": false' "$RUNNER_TEMP/cropfoundry-trial-power-receipt.json"
           grep -q '"training_authorized": false' "$RUNNER_TEMP/cropfoundry-trial-power-receipt.json"
+          grep -q '"randomization_method": "cluster_randomized"' "$RUNNER_TEMP/cropfoundry-trial-power-receipt.json"
+          grep -q '"blocking_unit": "farm"' "$RUNNER_TEMP/cropfoundry-trial-power-receipt.json"
+          grep -q '"power_sensitivity": \[' "$RUNNER_TEMP/cropfoundry-trial-power-receipt.json"
