@@ -102,9 +102,14 @@ struct ScenarioResult {
     simulated_days: usize,
     daily_water_budget_plot_mm: f64,
     total_irrigation_applied_plot_mm: f64,
+    zone_irrigation_applied_plot_mm: [f64; ZONES],
     plot_allocation_dispersion_plot_mm: f64,
     total_overflow_proxy_plot_mm: f64,
     stress_exposure_proxy: f64,
+    zone_stress_exposure_proxy: [f64; ZONES],
+    max_zone_stress_exposure_proxy: f64,
+    min_zone_stress_exposure_proxy: f64,
+    worst_to_best_zone_stress_ratio: Option<f64>,
     stress_delta_vs_reference_proxy: Option<f64>,
     relative_stress_change_vs_reference_pct: Option<f64>,
     relative_stress_change_vs_equal_share_pct: Option<f64>,
@@ -120,6 +125,9 @@ struct PolicyAggregate {
     median_stress_exposure_proxy: f64,
     total_irrigation_applied_plot_mm: f64,
     mean_plot_allocation_dispersion_plot_mm: f64,
+    median_worst_zone_stress_exposure_proxy: f64,
+    max_worst_zone_stress_exposure_proxy: f64,
+    mean_worst_to_best_zone_stress_ratio: Option<f64>,
     mean_relative_stress_change_vs_equal_share_pct: Option<f64>,
     total_water_budget_violation_days: usize,
 }
@@ -287,6 +295,7 @@ fn simulate_one(scenario: Scenario, policy: Policy) -> ScenarioResult {
     let mut irrigation_by_zone = [0.0; ZONES];
     let mut overflow_total = 0.0;
     let mut stress_exposure = 0.0;
+    let mut zone_stress_exposure = [0.0; ZONES];
     let mut sensor_reads = 0_usize;
     let mut missing_reads = 0_usize;
     let mut violation_days = 0_usize;
@@ -321,7 +330,9 @@ fn simulate_one(scenario: Scenario, policy: Policy) -> ScenarioResult {
             .max(0.0);
             let after_rain = (after_use + rain_mm(day, scenario)).clamp(0.0, STORAGE_CAP_MM);
             storage[zone] = after_rain;
-            stress_exposure += exposure(after_rain, 0.0, 0.0, day, zone);
+            let zone_exposure = exposure(after_rain, 0.0, 0.0, day, zone);
+            stress_exposure += zone_exposure;
+            zone_stress_exposure[zone] += zone_exposure;
         }
     }
 
@@ -332,6 +343,18 @@ fn simulate_one(scenario: Scenario, policy: Policy) -> ScenarioResult {
         .map(|value| (value - mean_zone_irrigation).powi(2))
         .sum::<f64>()
         / ZONES as f64;
+    let max_zone_stress = zone_stress_exposure
+        .iter()
+        .copied()
+        .max_by(f64::total_cmp)
+        .unwrap_or(0.0);
+    let min_zone_stress = zone_stress_exposure
+        .iter()
+        .copied()
+        .min_by(f64::total_cmp)
+        .unwrap_or(0.0);
+    let worst_to_best_zone_stress_ratio =
+        (min_zone_stress > 1e-9).then_some(max_zone_stress / min_zone_stress);
     ScenarioResult {
         scenario_id: scenario.id.to_owned(),
         policy: policy.name().to_owned(),
@@ -342,9 +365,14 @@ fn simulate_one(scenario: Scenario, policy: Policy) -> ScenarioResult {
         simulated_days: DAYS,
         daily_water_budget_plot_mm: scenario.daily_water_budget_plot_mm,
         total_irrigation_applied_plot_mm: round3(irrigation_total),
+        zone_irrigation_applied_plot_mm: irrigation_by_zone.map(round3),
         plot_allocation_dispersion_plot_mm: round3(variance_zone_irrigation.sqrt()),
         total_overflow_proxy_plot_mm: round3(overflow_total),
         stress_exposure_proxy: round3(stress_exposure),
+        zone_stress_exposure_proxy: zone_stress_exposure.map(round3),
+        max_zone_stress_exposure_proxy: round3(max_zone_stress),
+        min_zone_stress_exposure_proxy: round3(min_zone_stress),
+        worst_to_best_zone_stress_ratio: worst_to_best_zone_stress_ratio.map(round3),
         stress_delta_vs_reference_proxy: None,
         relative_stress_change_vs_reference_pct: None,
         relative_stress_change_vs_equal_share_pct: None,
@@ -424,6 +452,26 @@ fn build_receipt() -> Result<WaterPolicyReceipt> {
         scores.sort_by(f64::total_cmp);
         let mean_stress = scores.iter().sum::<f64>() / scores.len() as f64;
         let median_stress = (scores[(scores.len() - 1) / 2] + scores[scores.len() / 2]) / 2.0;
+        let mut worst_zone_scores: Vec<f64> = policy_results
+            .iter()
+            .map(|result| result.max_zone_stress_exposure_proxy)
+            .collect();
+        worst_zone_scores.sort_by(f64::total_cmp);
+        let median_worst_zone = (worst_zone_scores[(worst_zone_scores.len() - 1) / 2]
+            + worst_zone_scores[worst_zone_scores.len() / 2])
+            / 2.0;
+        let mean_worst_to_best_ratio: Vec<f64> = policy_results
+            .iter()
+            .filter_map(|result| result.worst_to_best_zone_stress_ratio)
+            .collect();
+        let mean_worst_to_best_ratio = if mean_worst_to_best_ratio.is_empty() {
+            None
+        } else {
+            Some(round3(
+                mean_worst_to_best_ratio.iter().sum::<f64>()
+                    / mean_worst_to_best_ratio.len() as f64,
+            ))
+        };
         let relative_changes: Vec<f64> = policy_results
             .iter()
             .filter_map(|result| result.relative_stress_change_vs_equal_share_pct)
@@ -453,6 +501,14 @@ fn build_receipt() -> Result<WaterPolicyReceipt> {
                     .sum::<f64>()
                     / policy_results.len() as f64,
             ),
+            median_worst_zone_stress_exposure_proxy: round3(median_worst_zone),
+            max_worst_zone_stress_exposure_proxy: worst_zone_scores
+                .iter()
+                .copied()
+                .max_by(f64::total_cmp)
+                .map(round3)
+                .unwrap_or(0.0),
+            mean_worst_to_best_zone_stress_ratio: mean_worst_to_best_ratio,
             mean_relative_stress_change_vs_equal_share_pct: mean_relative_change,
             total_water_budget_violation_days: policy_results
                 .iter()
@@ -473,6 +529,10 @@ fn build_receipt() -> Result<WaterPolicyReceipt> {
         !result.stress_exposure_proxy.is_finite()
             || !result.total_irrigation_applied_plot_mm.is_finite()
             || !result.plot_allocation_dispersion_plot_mm.is_finite()
+            || !result.zone_stress_exposure_proxy.iter().all(|value| value.is_finite())
+            || !result.zone_irrigation_applied_plot_mm.iter().all(|value| value.is_finite())
+            || !result.max_zone_stress_exposure_proxy.is_finite()
+            || !result.min_zone_stress_exposure_proxy.is_finite()
             || !result.sensor_dropout_fraction.is_finite()
     }) {
         return Err(anyhow!(
@@ -496,6 +556,7 @@ fn build_receipt() -> Result<WaterPolicyReceipt> {
         caveats: vec![
             "Scenario traces and parameters are illustrative synthetic assumptions.".to_owned(),
             "The stress proxy is not calibrated to a crop or farm economics.".to_owned(),
+            "Aggregate scores can hide uneven burdens; inspect per-plot stress and irrigation before interpretation.".to_owned(),
             "Lower scores do not establish field water savings or yield gains.".to_owned(),
             "This tests deterministic execution and hard water accounting only.".to_owned(),
             "Field use requires calibration, farmer review, and replicated trials.".to_owned(),
@@ -701,6 +762,35 @@ mod tests {
             result
                 .relative_stress_change_vs_equal_share_pct
                 .is_none_or(f64::is_finite)
+        }));
+    }
+
+    #[test]
+    fn cropfoundry_policy_receipt_exposes_worst_plot_stress_and_allocation() {
+        let receipt = build_receipt().unwrap();
+        for result in &receipt.results {
+            let zone_stress_sum = result.zone_stress_exposure_proxy.iter().sum::<f64>();
+            let zone_irrigation_sum = result.zone_irrigation_applied_plot_mm.iter().sum::<f64>();
+            assert!((zone_stress_sum - result.stress_exposure_proxy).abs() <= 0.01);
+            assert!((zone_irrigation_sum - result.total_irrigation_applied_plot_mm).abs() <= 0.01);
+            assert!(result.zone_stress_exposure_proxy.iter().all(|value| *value >= 0.0));
+            assert!(result.zone_irrigation_applied_plot_mm.iter().all(|value| *value >= 0.0));
+            assert!(
+                result.max_zone_stress_exposure_proxy
+                    >= result.min_zone_stress_exposure_proxy
+            );
+            assert_eq!(
+                result.max_zone_stress_exposure_proxy,
+                result.zone_stress_exposure_proxy
+                    .iter()
+                    .copied()
+                    .max_by(f64::total_cmp)
+                    .unwrap()
+            );
+        }
+        assert!(receipt.aggregates.iter().all(|aggregate| {
+            aggregate.max_worst_zone_stress_exposure_proxy
+                >= aggregate.median_worst_zone_stress_exposure_proxy
         }));
     }
 
