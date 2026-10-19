@@ -54,11 +54,19 @@ pub fn validate_cad_runtime_receipt_str(
 ) -> Result<CadRuntimeReceiptValidationReport, Vec<String>> {
     let schema: Value = match serde_json::from_str(schema_text) {
         Ok(value) => value,
-        Err(error) => return Err(vec![format!("CAD receipt schema JSON parse error: {error}")]),
+        Err(error) => {
+            return Err(vec![format!(
+                "CAD receipt schema JSON parse error: {error}"
+            )]);
+        }
     };
     let receipt: Value = match serde_json::from_str(receipt_text) {
         Ok(value) => value,
-        Err(error) => return Err(vec![format!("CAD runtime receipt JSON parse error: {error}")]),
+        Err(error) => {
+            return Err(vec![format!(
+                "CAD runtime receipt JSON parse error: {error}"
+            )]);
+        }
     };
 
     let mut errors = Vec::new();
@@ -102,7 +110,8 @@ fn validate_semantics(receipt: &Value, cad_source_text: &str) -> Vec<String> {
     if receipt.pointer("/source/sha256").and_then(Value::as_str)
         != Some(expected_source_sha256.as_str())
     {
-        errors.push("CAD runtime receipt source SHA-256 does not match the native source".to_owned());
+        errors
+            .push("CAD runtime receipt source SHA-256 does not match the native source".to_owned());
     }
 
     let repository = receipt
@@ -154,7 +163,10 @@ fn validate_outputs(receipt: &Value, errors: &mut Vec<String>) {
 
     let mut names = BTreeSet::new();
     for output in outputs {
-        let name = output.get("name").and_then(Value::as_str).unwrap_or("<missing>");
+        let name = output
+            .get("name")
+            .and_then(Value::as_str)
+            .unwrap_or("<missing>");
         if !names.insert(name.to_owned()) {
             errors.push(format!("CAD runtime receipt repeats output {name}"));
         }
@@ -172,9 +184,10 @@ fn validate_outputs(receipt: &Value, errors: &mut Vec<String>) {
                 for (index, (actual_value, expected_value)) in
                     actual.iter().zip(expected.iter()).enumerate()
                 {
-                    if actual_value.as_f64().is_none_or(|value| {
-                        !approximately_equal(value, *expected_value)
-                    }) {
+                    if actual_value
+                        .as_f64()
+                        .is_none_or(|value| !approximately_equal(value, *expected_value))
+                    {
                         errors.push(format!(
                             "CAD runtime receipt output {name} has incorrect expected bound on axis {index}"
                         ));
@@ -190,17 +203,23 @@ fn validate_outputs(receipt: &Value, errors: &mut Vec<String>) {
         }
 
         if name == "odrh-alternate.stl" {
-            let width = output.pointer("/override/plate_width_mm").and_then(Value::as_f64);
+            let width = output
+                .pointer("/override/plate_width_mm")
+                .and_then(Value::as_f64);
             let height = output
                 .pointer("/override/plate_height_mm")
                 .and_then(Value::as_f64);
             if width.is_none_or(|value| !approximately_equal(value, 100.0))
                 || height.is_none_or(|value| !approximately_equal(value, 60.0))
             {
-                errors.push("alternate CAD output must bind the declared 100 x 60 mm override".to_owned());
+                errors.push(
+                    "alternate CAD output must bind the declared 100 x 60 mm override".to_owned(),
+                );
             }
         } else if output.get("override").is_some() {
-            errors.push(format!("default CAD output {name} must not declare an override"));
+            errors.push(format!(
+                "default CAD output {name} must not declare an override"
+            ));
         }
     }
 
@@ -209,7 +228,10 @@ fn validate_outputs(receipt: &Value, errors: &mut Vec<String>) {
         "odrh-alternate.stl".to_owned(),
     ]);
     if names != expected_names {
-        errors.push("CAD runtime receipt must contain exactly the default and alternate STL outputs".to_owned());
+        errors.push(
+            "CAD runtime receipt must contain exactly the default and alternate STL outputs"
+                .to_owned(),
+        );
     }
 }
 
@@ -239,34 +261,42 @@ fn validate_negative_controls(receipt: &Value, errors: &mut Vec<String>) {
 
     let mut parameters = BTreeSet::new();
     for control in controls {
-        let parameter = control.get("parameter").and_then(Value::as_str).unwrap_or("<missing>");
+        let parameter = control
+            .get("parameter")
+            .and_then(Value::as_str)
+            .unwrap_or("<missing>");
         if !parameters.insert(parameter.to_owned()) {
-            errors.push(format!("CAD receipt repeats negative-control parameter {parameter}"));
+            errors.push(format!(
+                "CAD receipt repeats negative-control parameter {parameter}"
+            ));
         }
     }
 
     for (parameter, expected_override, expected_failure) in EXPECTED {
-        let matching = controls.iter().find(|control| {
-            control.get("parameter").and_then(Value::as_str) == Some(parameter)
-        });
+        let matching = controls
+            .iter()
+            .find(|control| control.get("parameter").and_then(Value::as_str) == Some(parameter));
         match matching {
             Some(control) => {
-                if control.get("override").and_then(Value::as_f64).is_none_or(|value| {
-                    !approximately_equal(value, expected_override)
-                }) {
+                if control
+                    .get("override")
+                    .and_then(Value::as_f64)
+                    .is_none_or(|value| !approximately_equal(value, expected_override))
+                {
                     errors.push(format!(
                         "CAD negative control {parameter} has an incorrect override"
                     ));
                 }
-                if control.get("expected_failure").and_then(Value::as_str)
-                    != Some(expected_failure)
+                if control.get("expected_failure").and_then(Value::as_str) != Some(expected_failure)
                 {
                     errors.push(format!(
                         "CAD negative control {parameter} has an unexpected failure condition"
                     ));
                 }
             }
-            None => errors.push(format!("CAD runtime receipt omits negative control {parameter}")),
+            None => errors.push(format!(
+                "CAD runtime receipt omits negative control {parameter}"
+            )),
         }
     }
 }
@@ -351,7 +381,12 @@ mod tests {
         assert_eq!(report.output_count, 2);
         assert_eq!(report.negative_control_count, 3);
         assert_eq!(report.source_sha256, sha256_hex(CAD_SOURCE.as_bytes()));
-        assert!(report.to_json()["claim_ceiling"].as_str().unwrap().contains("not a physical print"));
+        assert!(
+            report.to_json()["claim_ceiling"]
+                .as_str()
+                .unwrap()
+                .contains("not a physical print")
+        );
     }
 
     #[test]
@@ -377,7 +412,11 @@ mod tests {
         let errors = validate_cad_runtime_receipt_str(&encoded(&receipt), SCHEMA_TEXT, CAD_SOURCE)
             .expect_err("wrong execution URL and geometry bounds must fail");
         assert!(errors.iter().any(|error| error.contains("workflow URL")));
-        assert!(errors.iter().any(|error| error.contains("incorrect expected bound")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("incorrect expected bound"))
+        );
     }
 
     #[test]
@@ -390,7 +429,15 @@ mod tests {
             .remove(0);
         let errors = validate_cad_runtime_receipt_str(&encoded(&receipt), SCHEMA_TEXT, CAD_SOURCE)
             .expect_err("receipt cannot omit controls or promote physical status");
-        assert!(errors.iter().any(|error| error.contains("physical_validation")));
-        assert!(errors.iter().any(|error| error.contains("negative_controls")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("physical_validation"))
+        );
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("negative_controls"))
+        );
     }
 }
