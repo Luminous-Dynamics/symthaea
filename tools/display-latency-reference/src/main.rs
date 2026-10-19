@@ -37,9 +37,6 @@ fn main() {
 
     let stdout = io::stdout();
     let mut output = stdout.lock();
-    if writeln!(output, "{OUTPUT_HEADER}").is_err() {
-        fail("cannot write output header", 2);
-    }
     if let Err(error) = process(input, &mut output, options.reference) {
         fail(&error, 2);
     }
@@ -91,6 +88,7 @@ fn process<R: BufRead, W: Write>(
 ) -> Result<(), String> {
     let config = LatencyConfig::default();
     config.validate().map_err(|error| error.to_string())?;
+    writeln!(output, "{OUTPUT_HEADER}").map_err(|error| error.to_string())?;
     let mut header: Option<FrameprobeHeader> = None;
     let mut row_index = 0_usize;
     for line in reader.lines() {
@@ -111,7 +109,7 @@ fn process<R: BufRead, W: Write>(
             Err(reason) => LatencyResult {
                 status: display_latency_reference::LatencyStatus::MalformedRow,
                 reference,
-                reason: Some("capture row could not be parsed"),
+                reason: Some(reason),
                 baseline_adc: None,
                 settled_adc: None,
                 swing_adc: None,
@@ -122,8 +120,7 @@ fn process<R: BufRead, W: Write>(
                 t50_us: None,
                 t90_us: None,
                 response_t10_t90_us: None,
-            }
-            .with_parser_reason(reason),
+            },
         };
         write_result(output, row_index, &result)
             .map_err(|error| format!("cannot write row {row_index}: {error}"))?;
@@ -134,26 +131,12 @@ fn process<R: BufRead, W: Write>(
     Ok(())
 }
 
-trait ParserReason {
-    fn with_parser_reason(self, reason: String) -> Self;
-}
-
-impl ParserReason for LatencyResult {
-    fn with_parser_reason(mut self, reason: String) -> Self {
-        // Parser details are retained in the output field; keep the typed status
-        // separate so downstream aggregation does not parse prose.
-        let _ = reason;
-        self.reason = Some("malformed capture fields; see stderr for row diagnostics");
-        self
-    }
-}
-
 fn write_result<W: Write>(
     output: &mut W,
     row_index: usize,
     result: &LatencyResult,
 ) -> io::Result<()> {
-    let reason = result.reason.unwrap_or("");
+    let reason = result.reason.as_deref().unwrap_or("");
     writeln!(
         output,
         "{row_index},{},{},{},{},{},{},{},{},{},{},{},{},{}",
@@ -213,7 +196,7 @@ mod tests {
         samples.extend((0..100).map(|value| 1_000 + value as u16));
         samples.extend(vec![1_100; 500]);
         let row = format!(
-            "80,44200,1800,1200,{};,200\n",
+            "80,43400,1800,1200,{};,200\n",
             samples
                 .iter()
                 .map(u16::to_string)
