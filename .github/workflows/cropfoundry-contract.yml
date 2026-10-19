@@ -144,5 +144,7 @@ jobs:
           grep -q '"receipt_schema": "cropfoundry-trial-power-receipt-v0"' "$RUNNER_TEMP/cropfoundry-trial-power-receipt.json"
           grep -q '"clusters_required_per_arm": 20' "$RUNNER_TEMP/cropfoundry-trial-power-receipt.json"
           grep -q '"total_planned_plots_two_arms": 200' "$RUNNER_TEMP/cropfoundry-trial-power-receipt.json"
+          grep -q '"target_power": 0.9' "$RUNNER_TEMP/cropfoundry-trial-power-receipt.json"
+          grep -q '"total_planned_plots_two_arms": 270' "$RUNNER_TEMP/cropfoundry-trial-power-receipt.json"
           grep -q '"field_efficacy_claim": false' "$RUNNER_TEMP/cropfoundry-trial-power-receipt.json"
           grep -q '"training_authorized": false' "$RUNNER_TEMP/cropfoundry-trial-power-receipt.json"
