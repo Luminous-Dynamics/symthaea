@@ -65,8 +65,11 @@ impl Law {
             || self.amplitude <= 0.0
             || !self.exponent.is_finite()
             || self.exponent <= 0.0
-            || !self.scale.is_finite()
-            || self.scale <= 0.0
+        {
+            return None;
+        }
+        if self.family != LawFamily::InversePower
+            && (!self.scale.is_finite() || self.scale <= 0.0)
         {
             return None;
         }
