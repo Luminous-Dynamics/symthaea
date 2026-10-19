@@ -751,7 +751,10 @@ mod tests {
             D::DramaticTiming,
             D::ChoralBlend,
         ];
-        let profiles: Vec<_> = dialects.iter().map(|d| MasteringConfig::for_dialect(*d)).collect();
+        let profiles: Vec<_> = dialects
+            .iter()
+            .map(|d| MasteringConfig::for_dialect(*d))
+            .collect();
 
         for profile in &profiles {
             assert_eq!(profile.target_lufs, default.target_lufs);
@@ -761,10 +764,18 @@ mod tests {
                 profile.target_mid_ratio,
                 profile.target_high_ratio,
             ];
-            assert!(ratios.iter().all(|x| x.is_finite() && *x > 0.0 && *x < 1.0));
+            assert!(
+                ratios.iter().all(|x| x.is_finite() && *x > 0.0 && *x < 1.0)
+            );
             assert!((ratios.iter().sum::<f32>() - 1.0).abs() < 1e-6);
-            assert!(profile.eq_max_correction_db.is_finite() && profile.eq_max_correction_db > 0.0);
-            assert!(profile.eq_max_high_boost_db.is_finite() && profile.eq_max_high_boost_db > 0.0);
+            assert!(
+                profile.eq_max_correction_db.is_finite()
+                    && profile.eq_max_correction_db > 0.0
+            );
+            assert!(
+                profile.eq_max_high_boost_db.is_finite()
+                    && profile.eq_max_high_boost_db > 0.0
+            );
         }
 
         let classical = MasteringConfig::for_dialect(D::ClassicalRubato);
@@ -774,11 +785,26 @@ mod tests {
         assert_eq!(classical.eq_max_correction_db, default.eq_max_correction_db);
         assert_eq!(classical.eq_max_high_boost_db, default.eq_max_high_boost_db);
 
-        assert_ne!(profiles[0].target_low_ratio, profiles[1].target_low_ratio);
-        assert_ne!(profiles[1].target_high_ratio, profiles[2].target_high_ratio);
-        assert_ne!(profiles[2].target_mid_ratio, profiles[4].target_mid_ratio);
-        assert_ne!(profiles[5].eq_max_correction_db, profiles[6].eq_max_correction_db);
-        assert_ne!(profiles[6].target_mid_ratio, profiles[7].target_mid_ratio);
+        assert_ne!(
+            profiles[0].target_low_ratio,
+            profiles[1].target_low_ratio
+        );
+        assert_ne!(
+            profiles[1].target_high_ratio,
+            profiles[2].target_high_ratio
+        );
+        assert_ne!(
+            profiles[2].target_mid_ratio,
+            profiles[4].target_mid_ratio
+        );
+        assert_ne!(
+            profiles[5].eq_max_correction_db,
+            profiles[6].eq_max_correction_db
+        );
+        assert_ne!(
+            profiles[6].target_mid_ratio,
+            profiles[7].target_mid_ratio
+        );
     }
 
 }
