@@ -69,7 +69,9 @@ A ride logger does not produce motor efficiency maps or tire-force curves by its
 
 Use a logger-wide monotonic nanosecond clock for every sample and record GNSS UTC/PPS anchors separately. Record measured clock skew and synchronization uncertainty rather than treating GNSS time as exact. Keep original sensor timestamps when available. Never silently interpolate through data loss; emit an explicit gap/overflow event with duration/count. Record raw values before filtering; derived/filter outputs get separate channel IDs and transform versions.
 
-For a **physical claim**, v0.1 clock eligibility is fail-closed: `sync_method` must exactly match `gnss_pps_verified`, `hardware_timestamp_verified`, `ptp_verified` or `shared_clock_verified`; a `clock_sync_record` must be declared as a content-addressed artifact and pass normal artifact verification; and `max_alignment_uncertainty_ns` must be at most 2,000,000 ns. A word like `verified` in an arbitrary method label is not evidence. The 2 ms ceiling is the v0.1 proposal tied to the revision-A electrical capture target, not a universal timing tolerance; tighter claim-specific budgets may be required.
+For a **physical claim**, v0.1 clock eligibility is fail-closed: `sync_method` must exactly match `gnss_pps_verified`, `hardware_timestamp_verified`, `ptp_verified` or `shared_clock_verified`; a `clock_sync_record` must be declared as a content-addressed artifact and pass normal artifact verification; and `max_alignment_uncertainty_ns` must be at most 2,000,000 ns. A word like `verified` in an arbitrary method label is not evidence. The 2 ms ceiling is the v0.1 proposal tied to the revision-A electrical capture target, not a universal timing tolerance; tighter claim-specific budgets may be required. For every physical claim, the manifest must also declare a claim-specific uncertainty budget with measurand/unit, standard and expanded uncertainty, coverage factor, an acceptance tolerance, an explicit evidence state, and a content-addressed uncertainty-budget record. The expanded uncertainty must be consistent with the stated coverage factor and must not exceed the pre-registered tolerance; `calibrated` plus a receipt ID alone is insufficient.
+
+NIST’s [metrological-traceability policy](https://www.nist.gov/calibrations/traceability) is the rationale for the uncertainty gate: traceability concerns the measurement result and documented calibration chain, with each link contributing uncertainty; traceability alone does not establish fitness for purpose.
 
 ## Open manifest contract
 
@@ -131,7 +133,7 @@ Targets for the first software tranche: zero false accepts across missing-channe
 
 ### Current implementation
 
-The first implementation is the **manifest, raw-trace validator and fault-matrix runner**, not pretend firmware. All three commands are wired into the existing `xtask` binary and introduce no new dependencies. The telemetry module has 25 authored unit tests covering schema/claim gates, trace failure modes and all 23 frozen matrix cases; five further tests cover the vendored tire-monitoring intake. These tests have not been compiled or run in this environment.
+The first implementation is the **manifest, raw-trace validator and fault-matrix runner**, not pretend firmware. All three commands are wired into the existing `xtask` binary and introduce no new dependencies. The telemetry module has 30 authored unit tests covering schema/claim gates, trace failure modes and all 26 frozen matrix cases; five further tests cover the vendored tire-monitoring intake. These tests have not been compiled or run in this environment.
 
 From the workspace root:
 
