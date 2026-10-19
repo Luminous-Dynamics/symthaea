@@ -32,7 +32,7 @@ apply_mutation(){
     child-path) jq 'walk(if type=="string" then gsub("rootfs[.]squashfs";"rootfs2.squashfs") else . end)' "$input" > "$output" ;;
     dangling-subtask) jq 'map(if .task.depth==0 then .subtasks[0].blob_id="missing:1" else . end)' "$input" > "$output" ;;
     duplicate-producer-id) jq 'map(if .task.depth==1 then .reports |= map(if .__typename__=="ChunkReport" then .id="231:7" else . end) else . end)' "$input" > "$output" ;;
-    unknown-report) jq 'map(if .task.depth==0 then .reports += [{"payload":"future schema"}] else . end)' "$input" > "$output" ;;
+    unknown-report) jq 'map(if .task.depth==0 then .reports += [{"__typename__":"EncryptionMetadataReport","payload":"unsupported in Unblob 26.6.4"}] else . end)' "$input" > "$output" ;;
     outside-root-path) jq 'map(if .task.depth==1 then .reports |= map(if .__typename__=="StatReport" then .path="/etc/passwd" else . end) else . end)' "$input" > "$output" ;;
     mismatched-child-chunk) jq 'map(if .task.depth==1 then .task.blob_id="231:8" else . end)' "$input" > "$output" ;;
     duplicate-task-path) jq 'map(if .task.depth==1 then .task.path="/tmp/rea-run-a/firmware.bin" else . end)' "$input" > "$output" ;;
