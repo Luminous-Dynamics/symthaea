@@ -7,7 +7,8 @@ description = "Evidence-bearing mathematical research specifications and trusted
 
 [dependencies]
 serde = { workspace = true }
-sha2 = { workspace = true }
+# Keep the research crate's lock delta minimal; the workspace sha2 entry also enables `oid`.
+sha2 = { version = "0.10", default-features = false, features = ["std"] }
 
 [dev-dependencies]
 serde_json = { workspace = true }

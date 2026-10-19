@@ -87,9 +87,7 @@ pub struct SourceReference {
     pub retrieved_at_utc: String,
 }
 
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum FormalizationReviewKind {
     DefinitionsAudit,
     SemanticReview,
@@ -97,9 +95,7 @@ pub enum FormalizationReviewKind {
     EquivalenceCheck,
 }
 
-#[derive(
-    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
-)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct FormalizationReview {
     /// Attribution only; reviewer labels do not prove independence.
     pub reviewer_id: String,
@@ -113,9 +109,7 @@ pub struct FormalizationReview {
     pub notes: String,
 }
 
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum SpecificationStatus {
     Imported,
     SyntaxValidated,
@@ -141,12 +135,24 @@ pub struct MathematicalSpecification {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SpecificationIssue {
-    WrongSchemaVersion { found: String },
-    EmptyField { field: &'static str },
-    EmptyReviewIdentity { index: usize },
-    EmptyReviewNotes { reviewer_id: String },
-    ReviewStatementMismatch { reviewer_id: String },
-    ReviewDefinitionsMismatch { reviewer_id: String },
+    WrongSchemaVersion {
+        found: String,
+    },
+    EmptyField {
+        field: &'static str,
+    },
+    EmptyReviewIdentity {
+        index: usize,
+    },
+    EmptyReviewNotes {
+        reviewer_id: String,
+    },
+    ReviewStatementMismatch {
+        reviewer_id: String,
+    },
+    ReviewDefinitionsMismatch {
+        reviewer_id: String,
+    },
     DuplicateReview {
         reviewer_id: String,
         kind: FormalizationReviewKind,
@@ -155,12 +161,17 @@ pub enum SpecificationIssue {
     MissingSemanticReview,
     MissingIndependentConfirmation,
     IndependentConfirmationNotCrossLineage,
-    TooFewIndependentLineages { found: usize, required: usize },
+    TooFewIndependentLineages {
+        found: usize,
+        required: usize,
+    },
     StatusRegression {
         from: SpecificationStatus,
         to: SpecificationStatus,
     },
-    NotFrozenChallenge { found: SpecificationStatus },
+    NotFrozenChallenge {
+        found: SpecificationStatus,
+    },
 }
 
 impl MathematicalSpecification {
@@ -194,10 +205,7 @@ impl MathematicalSpecification {
 
     /// Advance specification qualification monotonically. The proposed state is
     /// validated before it becomes durable.
-    pub fn advance_to(
-        &mut self,
-        next: SpecificationStatus,
-    ) -> Result<(), Vec<SpecificationIssue>> {
+    pub fn advance_to(&mut self, next: SpecificationStatus) -> Result<(), Vec<SpecificationIssue>> {
         if next < self.status {
             return Err(vec![SpecificationIssue::StatusRegression {
                 from: self.status,
@@ -226,7 +234,10 @@ impl MathematicalSpecification {
             ("specification_id", self.specification_id.as_str()),
             ("source.locator", self.source.locator.as_str()),
             ("source.revision", self.source.revision.as_str()),
-            ("source.retrieved_at_utc", self.source.retrieved_at_utc.as_str()),
+            (
+                "source.retrieved_at_utc",
+                self.source.retrieved_at_utc.as_str(),
+            ),
             ("lean_toolchain", self.lean_toolchain.as_str()),
             ("mathlib_revision", self.mathlib_revision.as_str()),
         ] {
@@ -487,8 +498,18 @@ mod tests {
     }
 
     fn add_full_review_set(spec: &mut MathematicalSpecification) {
-        add_review(spec, "reviewer-a", "lineage-a", FormalizationReviewKind::DefinitionsAudit);
-        add_review(spec, "reviewer-a", "lineage-a", FormalizationReviewKind::SemanticReview);
+        add_review(
+            spec,
+            "reviewer-a",
+            "lineage-a",
+            FormalizationReviewKind::DefinitionsAudit,
+        );
+        add_review(
+            spec,
+            "reviewer-a",
+            "lineage-a",
+            FormalizationReviewKind::SemanticReview,
+        );
         add_review(
             spec,
             "reviewer-b",
@@ -498,7 +519,8 @@ mod tests {
     }
 
     fn freeze(mut spec: MathematicalSpecification) -> FrozenChallenge {
-        spec.advance_to(SpecificationStatus::FrozenChallenge).unwrap();
+        spec.advance_to(SpecificationStatus::FrozenChallenge)
+            .unwrap();
         spec.freeze().unwrap()
     }
 
@@ -513,8 +535,18 @@ mod tests {
     #[test]
     fn same_lineage_labels_are_not_independent() {
         let mut spec = spec();
-        add_review(&mut spec, "a", "shared", FormalizationReviewKind::DefinitionsAudit);
-        add_review(&mut spec, "a", "shared", FormalizationReviewKind::SemanticReview);
+        add_review(
+            &mut spec,
+            "a",
+            "shared",
+            FormalizationReviewKind::DefinitionsAudit,
+        );
+        add_review(
+            &mut spec,
+            "a",
+            "shared",
+            FormalizationReviewKind::SemanticReview,
+        );
         add_review(
             &mut spec,
             "b",
@@ -526,15 +558,28 @@ mod tests {
             .unwrap_err();
         assert!(issues.iter().any(|issue| matches!(
             issue,
-            SpecificationIssue::TooFewIndependentLineages { found: 1, required: 2 }
+            SpecificationIssue::TooFewIndependentLineages {
+                found: 1,
+                required: 2
+            }
         )));
     }
 
     #[test]
     fn independent_confirmation_must_cross_semantic_lineage() {
         let mut spec = spec();
-        add_review(&mut spec, "defs", "lineage-b", FormalizationReviewKind::DefinitionsAudit);
-        add_review(&mut spec, "semantic", "lineage-a", FormalizationReviewKind::SemanticReview);
+        add_review(
+            &mut spec,
+            "defs",
+            "lineage-b",
+            FormalizationReviewKind::DefinitionsAudit,
+        );
+        add_review(
+            &mut spec,
+            "semantic",
+            "lineage-a",
+            FormalizationReviewKind::SemanticReview,
+        );
         add_review(
             &mut spec,
             "independent",
@@ -561,10 +606,11 @@ mod tests {
         };
         spec.add_review(review.clone());
         spec.add_review(review);
-        assert!(spec.validate().iter().any(|issue| matches!(
-            issue,
-            SpecificationIssue::DuplicateReview { .. }
-        )));
+        assert!(
+            spec.validate()
+                .iter()
+                .any(|issue| matches!(issue, SpecificationIssue::DuplicateReview { .. }))
+        );
     }
 
     #[test]
@@ -594,7 +640,10 @@ mod tests {
         );
         let reordered = freeze(reordered);
         assert_eq!(left.challenge_sha256(), reordered.challenge_sha256());
-        assert_eq!(left.qualification_sha256(), reordered.qualification_sha256());
+        assert_eq!(
+            left.qualification_sha256(),
+            reordered.qualification_sha256()
+        );
 
         let mut independently_requalified = spec();
         add_review(
@@ -616,8 +665,14 @@ mod tests {
             FormalizationReviewKind::EquivalenceCheck,
         );
         let independently_requalified = freeze(independently_requalified);
-        assert_eq!(left.challenge_sha256(), independently_requalified.challenge_sha256());
-        assert_ne!(left.qualification_sha256(), independently_requalified.qualification_sha256());
+        assert_eq!(
+            left.challenge_sha256(),
+            independently_requalified.challenge_sha256()
+        );
+        assert_ne!(
+            left.qualification_sha256(),
+            independently_requalified.qualification_sha256()
+        );
     }
 
     #[test]
@@ -625,7 +680,9 @@ mod tests {
         let issues = spec().freeze().unwrap_err();
         assert!(issues.iter().any(|issue| matches!(
             issue,
-            SpecificationIssue::NotFrozenChallenge { found: SpecificationStatus::Imported }
+            SpecificationIssue::NotFrozenChallenge {
+                found: SpecificationStatus::Imported
+            }
         )));
     }
 }
