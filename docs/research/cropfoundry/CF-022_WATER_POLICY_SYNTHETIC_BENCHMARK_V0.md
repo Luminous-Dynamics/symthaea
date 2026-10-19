@@ -22,12 +22,14 @@ cargo run -q -p xtask -- cropfoundry-water-policy-demo \
 cargo test -p xtask cropfoundry_water_policy
 ```
 
-The harness runs 4 fixed scenario profiles × 3 policies × 42 time steps:
+The harness runs 6 fixed scenario profiles × 3 policies × 42 time steps:
 
 - `reference`: nominal sensor/forecast assumptions and a fixed water cap.
 - `water_rationing`: tighter cap, drought onset and mild under-forecast.
 - `heat_and_drought`: heat/drought interaction, tighter cap and larger demand under-forecast.
-- `forecast_bias_and_sensor_dropout`: biased forecasts, drought/heat onset and periodic missing sensor observations.
+- `forecast_bias_only`: negative demand-forecast bias with reference water/weather/sensor settings.
+- `sensor_dropout_only`: periodic missing soil observations with reference water/weather/forecast settings.
+- `combined_heat_drought_forecast_bias_and_sensor_dropout`: compound stress, biased forecasts and periodic sensor dropouts.
 
 Policies are:
 
@@ -35,7 +37,7 @@ Policies are:
 2. `soil_threshold`: use held/observed storage to refill the greatest deficit toward a fixed threshold.
 3. `uncertainty_aware_marginal_risk`: allocate in small increments according to estimated marginal reduction of the declared shortfall proxy. It adds a fixed conservative demand margin and raises plot priority when readings are stale; these are explicit heuristics, not statistically calibrated prediction intervals.
 
-The receipt includes per-scenario applied irrigation, an overflow proxy, synthetic stress-exposure proxy, per-scenario percentage change against equal-share allocation, plus policy-level mean/median proxies and water totals. It also reports sensor-dropout fraction and daily budget violations. The executable fails if any policy exceeds a daily water cap or emits non-finite core metrics.
+The receipt records the scenario parameters, per-scenario applied irrigation, overflow proxy, synthetic stress-exposure proxy, cumulative allocation dispersion and percentage change against equal-share allocation, plus policy-level mean/median proxies and water totals. It also reports sensor-dropout fraction and daily budget violations. The executable fails if any policy exceeds a daily water cap or emits non-finite core metrics.
 
 
 **Unit note:** per-plot storage/demand values are synthetic depth-like values. Global irrigation totals add depths over equally weighted toy plots and are labelled `plot-mm`; without plot areas, flow rates and hydraulics, these sums are not volumetric water use and must not be compared with farm meter readings.
@@ -48,10 +50,10 @@ The initial hard acceptance condition is zero daily water-budget violations and 
 
 A policy that wins this synthetic score has only passed an algorithmic test. A defensible agricultural claim requires, in order: a versioned crop/soil water-balance model and its calibration record; comparison with fixed-calendar, soil-threshold, ET-based and a suitable established crop-model baseline; leakage-resistant retrospective or hindcast evaluation; local sensitivity and uncertainty analysis; then preregistered, replicated field trials with metered water, crop outcomes, energy, labor, cost and environmental measurements. Safety, water-allocation rights and any local water constraints remain hard limits rather than soft optimization rewards.
 
-## What this benchmark is designed to reveal
+## ## What this benchmark is designed to reveal
 
 - Whether the policy accounts for the cost of scarce water instead of always filling all plots equally.
-- Whether decisions degrade gracefully with biased forecasts and intermittent/stale observations.
+- Whether decisions degrade gracefully with biased forecasts and intermittent/stale observations. The `forecast_bias_only` and `sensor_dropout_only` profiles are paired with the reference profile to help isolate each factor before interpreting the compound scenario.
 - Whether hard resource caps remain satisfied under all tested conditions.
 - Whether the more complicated policy gives measurable decision value over simple baselines.
 - Whether the answer changes under stress weights, storage thresholds, forecast error, dropout patterns and scenario mix.
