@@ -230,14 +230,7 @@ fn execute_from_args() -> Result<()> {
     let catalogue_claims = parse_catalogue_claims(&upstream_readme, families.len())?;
     let family_split_plan = assign_family_splits(&mut families)?;
 
-    let mut source_path_to_family: BTreeMap<String, String> = BTreeMap::new();
-    for family in &families {
-        for linked_path in &family.linked_paths {
-            source_path_to_family
-                .entry(linked_path.clone())
-                .or_insert_with(|| family.family_id.clone());
-        }
-    }
+    let source_path_to_family = map_source_paths_to_families(&families)?;
 
     let mut indexed_sources = Vec::with_capacity(manifest.sources.len());
     let mut unmapped_source_ids = Vec::new();
@@ -495,6 +488,32 @@ fn extract_families(contents: &str) -> Result<Vec<FamilyRecord>> {
     Ok(families)
 }
 
+fn map_source_paths_to_families(
+    families: &[FamilyRecord],
+) -> Result<BTreeMap<String, String>> {
+    let mut source_path_to_family: BTreeMap<String, String> = BTreeMap::new();
+    for family in families {
+        for linked_path in &family.linked_paths {
+            match source_path_to_family.get(linked_path) {
+                Some(previous_family_id) if previous_family_id != &family.family_id => {
+                    bail!(
+                        "catalogue path {} is linked from multiple result families: {} and {}",
+                        linked_path,
+                        previous_family_id,
+                        family.family_id
+                    );
+                }
+                Some(_) => {}
+                None => {
+                    source_path_to_family
+                        .insert(linked_path.clone(), family.family_id.clone());
+                }
+            }
+        }
+    }
+    Ok(source_path_to_family)
+}
+
 fn parse_catalogue_claims(readme: &str, parsed_family_count: usize) -> Result<CatalogueClaims> {
     let expression = Regex::new(
         r"(?i)current catalogue contains ([0-9,]+) manuscripts organized into ([0-9,]+) families",
@@ -671,6 +690,39 @@ mod tests {
     fn duplicate_family_identifiers_fail_closed() {
         let contents = "**001. First.**\n[a](one.pdf)\n**001. Duplicate.**\n[b](two.pdf)";
         assert!(extract_families(contents).is_err());
+    }
+
+    #[test]
+    fn shared_source_path_across_families_is_rejected_to_prevent_split_leakage() {
+        let contents = r#"
+**001. First family.**
+[shared manuscript](preprints/shared/paper.pdf)
+**002. Second family.**
+[shared manuscript](preprints/shared/paper.pdf)
+"#;
+        let families = extract_families(contents).expect("parse catalogue");
+        let error = map_source_paths_to_families(&families)
+            .expect_err("same source path across families must not be silently assigned");
+        let message = format!("{error:#}");
+        assert!(message.contains("preprints/shared/paper.pdf"));
+        assert!(message.contains("001"));
+        assert!(message.contains("002"));
+    }
+
+    #[test]
+    fn source_paths_within_one_family_map_deterministically() {
+        let contents = r#"
+**001. First family.**
+[manuscript](preprints/first/paper.pdf)
+[Lean note](lean/docs/001.md)
+**002. Second family.**
+[manuscript](preprints/second/paper.pdf)
+"#;
+        let families = extract_families(contents).expect("parse catalogue");
+        let map = map_source_paths_to_families(&families).expect("map distinct paths");
+        assert_eq!(map.get("preprints/first/paper.pdf").map(String::as_str), Some("001"));
+        assert_eq!(map.get("lean/docs/001.md").map(String::as_str), Some("001"));
+        assert_eq!(map.get("preprints/second/paper.pdf").map(String::as_str), Some("002"));
     }
 
     #[test]
