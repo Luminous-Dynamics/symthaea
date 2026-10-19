@@ -1,7 +1,7 @@
 use anyhow::{Result, anyhow};
 use serde::Serialize;
-use std::fs;
 use std::f64::consts::PI;
+use std::fs;
 use std::path::PathBuf;
 
 const DAYS: usize = 42;
@@ -186,7 +186,8 @@ fn allocate_water(
                         <= MAX_IRRIGATION_PER_ZONE_MM + 1e-9)
                     .max_by(|left, right| {
                         let left_gap = (7.2 - observed_storage[*left] - allocation[*left]).max(0.0);
-                        let right_gap = (7.2 - observed_storage[*right] - allocation[*right]).max(0.0);
+                        let right_gap =
+                            (7.2 - observed_storage[*right] - allocation[*right]).max(0.0);
                         left_gap.total_cmp(&right_gap)
                     });
                 let Some(zone) = next else { break };
@@ -355,14 +356,14 @@ fn build_receipt() -> Result<WaterPolicyReceipt> {
         training_authorized: false,
         scenario_count: all_scenarios.len(),
         policy_count: policies.len(),
-        invariant_summary: "zero daily water-budget violations across every policy/scenario; numerical objective is a synthetic stress-exposure proxy, not a plant model".to_owned(),
+        invariant_summary: "Zero daily cap violations; the objective is synthetic, not a plant model.".to_owned(),
         results,
         caveats: vec![
-            "All traces, plot weights, critical windows, storage capacities, demand equations, and forecast errors are illustrative synthetic assumptions.".to_owned(),
-            "The stress-exposure proxy is not calibrated to a crop, soil, site, yield, nutrition, or farm economics.".to_owned(),
-            "Lower proxy values do not establish field water savings, yield gains, or biological superiority.".to_owned(),
-            "This harness validates deterministic policy execution and hard water-budget accounting only.".to_owned(),
-            "Prospective use requires crop/soil calibration, external validation, farmer review, and replicated field trials.".to_owned(),
+            "Scenario traces and parameters are illustrative synthetic assumptions.".to_owned(),
+            "The stress proxy is not calibrated to crop, soil, yield, nutrition, or farm economics.".to_owned(),
+            "Lower scores do not establish field water savings or yield gains.".to_owned(),
+            "This tests deterministic execution and hard water accounting only.".to_owned(),
+            "Field use requires calibration, external validation, farmer review, and replicated trials.".to_owned(),
         ],
     })
 }
@@ -375,7 +376,9 @@ pub fn run(out: Option<PathBuf>) -> Result<()> {
     if let Some(path) = out {
         if let Some(parent) = path.parent().filter(|parent| !parent.as_os_str().is_empty()) {
             fs::create_dir_all(parent)
-                .map_err(|error| anyhow!("cannot create output directory {}: {error}", parent.display()))?;
+                .map_err(|error| {
+                    anyhow!("cannot create output directory {}: {error}", parent.display())
+                })?;
         }
         fs::write(&path, format!("{rendered}\n"))
             .map_err(|error| anyhow!("cannot write receipt {}: {error}", path.display()))?;
