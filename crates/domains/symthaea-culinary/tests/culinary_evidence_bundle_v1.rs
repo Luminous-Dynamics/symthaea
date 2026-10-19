@@ -332,3 +332,26 @@ fn process_trace_payload_identity_must_match_manifest_artifact_id() {
     let error = verify_culinary_evidence_bundle_v1(&experiment,&bytes,&digest,&payloads).unwrap_err();
     assert!(error.iter().any(|item| item.contains("internal trace_id does not match artifact_id")));
 }
+
+
+#[test]
+fn duplicate_measurement_record_fields_are_rejected() {
+    let (experiment, manifest_bytes, _, mut payloads) = test_only_bundle();
+    let artifact_id = "measurement-synthetic-run-001-prepared_yield_g";
+    let original = String::from_utf8(payloads.get(artifact_id).unwrap().clone()).unwrap();
+    let injected = original.replacen("\"value\":246", "\"value\":246,\"value\":246", 1);
+    assert_ne!(original, injected);
+    let payload = injected.into_bytes();
+    payloads.insert(artifact_id.into(), payload.clone());
+
+    let mut manifest: Value = serde_json::from_slice(&manifest_bytes).unwrap();
+    let item = manifest["artifacts"].as_array_mut().unwrap().iter_mut()
+        .find(|artifact| artifact["artifact_id"] == artifact_id)
+        .unwrap();
+    item["sha256"] = Value::String(sha256_hex(&payload));
+    item["byte_length"] = json!(payload.len());
+    let bytes = serde_json::to_vec(&manifest).unwrap();
+    let digest = sha256_hex(&bytes);
+    let error = verify_culinary_evidence_bundle_v1(&experiment,&bytes,&digest,&payloads).unwrap_err();
+    assert!(error.iter().any(|item| item.contains("duplicate field")));
+}
