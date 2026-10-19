@@ -9,6 +9,8 @@ on:
       - "docs/engineering/DISPLAY_METROLOGY_REPRODUCIBILITY_PROTOCOL.md"
       - "docs/engineering/DISPLAY_PATTERN_ROBUSTNESS_AND_UNCERTAINTY.md"
       - "docs/engineering/VISUAL_UTILITY_PER_JOULE_PROTOCOL.md"
+      - "docs/engineering/display-energy-trace-synthetic-v0.1.json"
+      - "docs/engineering/display-energy-trace.schema.json"
       - "docs/engineering/OPEN_DISPLAY_HARDWARE_REUSE_CANDIDATES.md"
       - "docs/engineering/OPEN_DISPLAY_REFERENCE_HARDWARE.md"
       - "docs/engineering/display-measurement-run-template-v0.1.json"
@@ -28,6 +30,8 @@ on:
       - "docs/engineering/DISPLAY_METROLOGY_REPRODUCIBILITY_PROTOCOL.md"
       - "docs/engineering/DISPLAY_PATTERN_ROBUSTNESS_AND_UNCERTAINTY.md"
       - "docs/engineering/VISUAL_UTILITY_PER_JOULE_PROTOCOL.md"
+      - "docs/engineering/display-energy-trace-synthetic-v0.1.json"
+      - "docs/engineering/display-energy-trace.schema.json"
       - "docs/engineering/OPEN_DISPLAY_HARDWARE_REUSE_CANDIDATES.md"
       - "docs/engineering/OPEN_DISPLAY_REFERENCE_HARDWARE.md"
       - "docs/engineering/display-measurement-run-template-v0.1.json"
@@ -76,6 +80,11 @@ jobs:
           cp docs/engineering/display-drift-control-plan.schema.json "$artifact_dir/"
           cp docs/engineering/ODRH_DRIFT_SCREENING_ALGORITHM.md "$artifact_dir/"
           cp docs/engineering/DISPLAY_METROLOGY_REPRODUCIBILITY_PROTOCOL.md "$artifact_dir/"
+          cp docs/engineering/DISPLAY_PATTERN_ROBUSTNESS_AND_UNCERTAINTY.md "$artifact_dir/"
+          cp docs/engineering/VISUAL_UTILITY_PER_JOULE_PROTOCOL.md "$artifact_dir/"
+          cp docs/engineering/display-energy-trace-synthetic-v0.1.json "$artifact_dir/"
+          cp docs/engineering/display-energy-trace.schema.json "$artifact_dir/"
+          cp tools/open-display-platform-verify/src/energy.rs "$artifact_dir/"
           sha256sum "$artifact_dir"/* > "$artifact_dir/input-sha256sums.txt"
 
       - name: Install pinned Rust toolchain
@@ -258,6 +267,8 @@ jobs:
             --cad-receipt-schema hardware/open-display-reference/validation/odrh-cad-runtime-receipt.schema.json \
             --drift-plan docs/engineering/display-drift-control-plan-v0.1.json \
             --drift-schema docs/engineering/display-drift-control-plan.schema.json \
+            --energy-trace docs/engineering/display-energy-trace-synthetic-v0.1.json \
+            --energy-schema docs/engineering/display-energy-trace.schema.json \
             | tee target/odrh-validation/verification-report.json
           sha256sum target/odrh-validation/verification-report.json \
             >> target/odrh-validation/final-artifact-sha256sums.txt
