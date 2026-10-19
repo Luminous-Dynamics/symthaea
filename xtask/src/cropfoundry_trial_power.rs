@@ -35,6 +35,8 @@ struct EndpointInput {
 struct DesignInput {
     design_type: String,
     allocation_unit: String,
+    randomization_method: String,
+    blocking_unit: String,
     plots_per_cluster: usize,
     intracluster_correlation: f64,
     attrition_fraction: f64,
@@ -59,6 +61,8 @@ struct TrialPowerPlan {
     target_power: f64,
     design_type: String,
     allocation_unit: String,
+    randomization_method: String,
+    blocking_unit: String,
     intracluster_correlation: f64,
     z_critical_two_sided: f64,
     z_power: f64,
@@ -165,6 +169,8 @@ fn validate(input: &PowerInput) -> Result<()> {
         ("variance_evidence_uri", input.variance_evidence_uri.as_str()),
         ("endpoint.name", input.endpoint.name.as_str()),
         ("endpoint.unit", input.endpoint.unit.as_str()),
+        ("design.randomization_method", input.design.randomization_method.as_str()),
+        ("design.blocking_unit", input.design.blocking_unit.as_str()),
     ] {
         if value.trim().is_empty() {
             return Err(anyhow!("{name} must be non-empty"));
@@ -182,6 +188,33 @@ fn validate(input: &PowerInput) -> Result<()> {
     }
     if input.design.plots_per_cluster == 0 {
         return Err(anyhow!("plots_per_cluster must be at least one"));
+    }
+    if !matches!(
+        input.design.randomization_method.as_str(),
+        "completely_randomized"
+            | "randomized_complete_block"
+            | "stratified_randomized"
+            | "cluster_randomized"
+            | "other_preregistered"
+    ) {
+        return Err(anyhow!("unsupported randomization_method"));
+    }
+    if input.design.allocation_unit == "plot"
+        && input.design.randomization_method == "cluster_randomized"
+    {
+        return Err(anyhow!(
+            "plot-level allocation cannot use randomization_method=cluster_randomized"
+        ));
+    }
+    if input.design.allocation_unit != "plot"
+        && !matches!(
+            input.design.randomization_method.as_str(),
+            "cluster_randomized" | "other_preregistered"
+        )
+    {
+        return Err(anyhow!(
+            "farm/greenhouse allocation must declare cluster_randomized or other_preregistered"
+        ));
     }
     if input.design.allocation_unit == "plot" && input.design.plots_per_cluster != 1 {
         return Err(anyhow!(
@@ -354,6 +387,8 @@ fn calculate(input: &PowerInput, input_sha256: String) -> Result<TrialPowerPlan>
         target_power: endpoint.target_power,
         design_type: design.design_type.clone(),
         allocation_unit: design.allocation_unit.clone(),
+        randomization_method: design.randomization_method.clone(),
+        blocking_unit: design.blocking_unit.clone(),
         intracluster_correlation: design.intracluster_correlation,
         z_critical_two_sided: z_critical,
         z_power: primary.z_power,
@@ -427,6 +462,8 @@ mod tests {
             design: DesignInput {
                 design_type: "parallel_two_arm_clustered".to_owned(),
                 allocation_unit: "plot".to_owned(),
+                randomization_method: "completely_randomized".to_owned(),
+                blocking_unit: "none".to_owned(),
                 plots_per_cluster: 1,
                 intracluster_correlation: 0.0,
                 attrition_fraction: 0.0,
@@ -489,6 +526,8 @@ mod tests {
     fn cluster_size_icc_and_attrition_increase_planned_enrollment() {
         let mut input = fixture();
         input.design.allocation_unit = "farm".to_owned();
+        input.design.randomization_method = "cluster_randomized".to_owned();
+        input.design.blocking_unit = "farm".to_owned();
         input.design.plots_per_cluster = 5;
         input.design.intracluster_correlation = 0.1;
         input.design.attrition_fraction = 0.1;
@@ -525,6 +564,16 @@ mod tests {
     }
 
     #[test]
+    fn allocation_unit_and_randomization_method_must_agree() {
+        let mut input = fixture();
+        input.design.randomization_method = "cluster_randomized".to_owned();
+        assert!(validate(&input).is_err());
+        input.design.allocation_unit = "farm".to_owned();
+        input.design.plots_per_cluster = 5;
+        assert!(validate(&input).is_ok());
+    }
+
+    #[test]
     fn cluster_randomization_requires_multiple_plots_per_cluster() {
         let mut input = fixture();
         input.design.allocation_unit = "farm".to_owned();
@@ -536,6 +585,8 @@ mod tests {
     fn integer_overflow_in_cluster_rounding_fails_closed() {
         let mut input = fixture();
         input.design.allocation_unit = "farm".to_owned();
+        input.design.randomization_method = "cluster_randomized".to_owned();
+        input.design.blocking_unit = "farm".to_owned();
         input.design.plots_per_cluster = usize::MAX;
         input.design.intracluster_correlation = 0.0;
         assert!(calculate(&input, "f".repeat(64)).is_err());
