@@ -261,6 +261,7 @@ fn main() {
     let manifest_path = out_dir.join("renderer-ab-fair-manifest.json");
 
     let mut deltas: Vec<(String, f32, f32, f32)> = Vec::new();
+    let mut profile_deltas: Vec<(String, f32, f32, f32, f32)> = Vec::new();
     let mut rows: Vec<serde_json::Value> = Vec::new();
     let mut failures: Vec<String> = Vec::new();
 
@@ -339,55 +340,94 @@ fn main() {
                 continue;
             }
         };
-        let color = fluid_render::room_for_dialect(
-            fluid_render::RenderColor::from_state(&state),
-            renderer_dialect,
-        );
-        let mastering = auto_master::MasteringConfig::for_dialect(renderer_dialect);
-        let Some(wav) = fluid_render::render_midi_to_wav_with_mastering(
-            &mid,
-            SR,
-            Some(color),
-            &mastering,
+        let base_color = fluid_render::RenderColor::from_state(&state);
+        let neutral_mastering = auto_master::MasteringConfig::default();
+
+        // Same MIDI, same SoundFont, same FluidSynth binary/sample rate: this
+        // arm is the no-dialect baseline for the profile ablation.
+        let Some(neutral_wav) = fluid_render::render_midi_to_wav_with_mastering(
+            &mid, SR, Some(base_color), &neutral_mastering,
         ) else {
-            let reason = format!("{style:?}/{seed}: FluidSynth render failed");
+            let reason = format!("{style:?}/{seed}: default-profile FluidSynth render failed");
             eprintln!("{reason}; skipping");
             failures.push(reason);
             rows.push(serde_json::json!({
                 "style": format!("{style:?}"), "seed": seed, "status": "failed",
-                "failure_code": "fluidsynth_render_failed"
-            }));
-            continue;
-        };
-        let Some((fluid_frames, fsr)) = wav_to_frames(&wav) else {
-            let reason = format!("{style:?}/{seed}: could not decode FluidSynth WAV");
-            eprintln!("{reason}; skipping");
-            failures.push(reason);
-            rows.push(serde_json::json!({
-                "style": format!("{style:?}"), "seed": seed, "status": "failed",
-                "failure_code": "fluidsynth_wav_decode_failed",
+                "failure_code": "fluidsynth_default_profile_render_failed",
                 "midi_sha256": midi_sha256
             }));
             continue;
         };
-        let b = measure("fluidsynth", &fluid_frames, fsr);
-        let wav_sha256 = sha256_bytes(&wav);
-        let wav_path = out_dir.join(format!("{style:?}_{seed}_fluidsynth.wav"));
-
-        // Keep both renders for a possible later listening escalation.
-        if let Err(error) = std::fs::write(&wav_path, &wav) {
-            let reason = format!("{style:?}/{seed}: cannot preserve FluidSynth WAV: {error}");
+        let Some((neutral_frames, neutral_sr)) = wav_to_frames(&neutral_wav) else {
+            let reason = format!("{style:?}/{seed}: cannot decode default-profile WAV");
             eprintln!("{reason}; skipping");
             failures.push(reason);
             rows.push(serde_json::json!({
                 "style": format!("{style:?}"), "seed": seed, "status": "failed",
-                "failure_code": "fluidsynth_wav_write_failed",
-                "midi_sha256": midi_sha256, "wav_sha256": wav_sha256
+                "failure_code": "fluidsynth_default_profile_decode_failed",
+                "midi_sha256": midi_sha256
+            }));
+            continue;
+        };
+        let neutral = measure("fluidsynth-default-profile", &neutral_frames, neutral_sr);
+        let neutral_wav_sha256 = sha256_bytes(&neutral_wav);
+        let neutral_wav_path = out_dir.join(format!("{style:?}_{seed}_fluidsynth-default.wav"));
+        if let Err(error) = std::fs::write(&neutral_wav_path, &neutral_wav) {
+            let reason = format!("{style:?}/{seed}: cannot preserve default-profile WAV: {error}");
+            eprintln!("{reason}; skipping");
+            failures.push(reason);
+            rows.push(serde_json::json!({
+                "style": format!("{style:?}"), "seed": seed, "status": "failed",
+                "failure_code": "fluidsynth_default_profile_write_failed",
+                "midi_sha256": midi_sha256, "wav_sha256": neutral_wav_sha256
+            }));
+            continue;
+        }
+
+        let color = fluid_render::room_for_dialect(base_color, renderer_dialect);
+        let mastering = auto_master::MasteringConfig::for_dialect(renderer_dialect);
+        let Some(wav) = fluid_render::render_midi_to_wav_with_mastering(
+            &mid, SR, Some(color), &mastering,
+        ) else {
+            let reason = format!("{style:?}/{seed}: dialect-profile FluidSynth render failed");
+            eprintln!("{reason}; skipping");
+            failures.push(reason);
+            rows.push(serde_json::json!({
+                "style": format!("{style:?}"), "seed": seed, "status": "failed",
+                "failure_code": "fluidsynth_profile_render_failed",
+                "midi_sha256": midi_sha256, "default_wav_sha256": neutral_wav_sha256
+            }));
+            continue;
+        };
+        let Some((fluid_frames, fsr)) = wav_to_frames(&wav) else {
+            let reason = format!("{style:?}/{seed}: could not decode dialect-profile WAV");
+            eprintln!("{reason}; skipping");
+            failures.push(reason);
+            rows.push(serde_json::json!({
+                "style": format!("{style:?}"), "seed": seed, "status": "failed",
+                "failure_code": "fluidsynth_profile_decode_failed",
+                "midi_sha256": midi_sha256, "default_wav_sha256": neutral_wav_sha256
+            }));
+            continue;
+        };
+        let b = measure("fluidsynth-dialect-profile", &fluid_frames, fsr);
+        let wav_sha256 = sha256_bytes(&wav);
+        let wav_path = out_dir.join(format!("{style:?}_{seed}_fluidsynth-profile.wav"));
+        if let Err(error) = std::fs::write(&wav_path, &wav) {
+            let reason = format!("{style:?}/{seed}: cannot preserve dialect-profile WAV: {error}");
+            eprintln!("{reason}; skipping");
+            failures.push(reason);
+            rows.push(serde_json::json!({
+                "style": format!("{style:?}"), "seed": seed, "status": "failed",
+                "failure_code": "fluidsynth_profile_write_failed",
+                "midi_sha256": midi_sha256, "default_wav_sha256": neutral_wav_sha256,
+                "wav_sha256": wav_sha256
             }));
             continue;
         }
         if ![
             a.lufs, a.peak_db, a.crest_db, a.low, a.mid, a.high,
+            neutral.lufs, neutral.peak_db, neutral.crest_db, neutral.low, neutral.mid, neutral.high,
             b.lufs, b.peak_db, b.crest_db, b.low, b.mid, b.high,
         ].iter().all(|value| value.is_finite()) {
             let reason = format!("{style:?}/{seed}: non-finite metric; row invalid");
@@ -405,7 +445,7 @@ fn main() {
             "── {style:?} seed={seed} dialect={:?} ──",
             symthaea_music_theory::Style::grammar_profile(style).performance
         );
-        for arm in [&a, &b] {
+        for arm in [&a, &neutral, &b] {
             println!(
                 "  {:<11} LUFS {:>7.2}  peak {:>6.2} dB  crest {:>5.2} dB  \
                  balance L/M/H {:.3}/{:.3}/{:.3}  frames {}",
@@ -423,9 +463,18 @@ fn main() {
         let d_high = b.high - a.high;
         let d_low = b.low - a.low;
         println!(
-            "  Δ(fluid−native): crest {d_crest:+.2} dB   high-band {d_high:+.3}   \
+            "  Δ(profile−native): crest {d_crest:+.2} dB   high-band {d_high:+.3}   \\
              low-band {d_low:+.3}"
         );
+        let profile_crest_delta = b.crest_db - neutral.crest_db;
+        let profile_high_delta = b.high - neutral.high;
+        let profile_low_delta = b.low - neutral.low;
+        let profile_lufs_delta = b.lufs - neutral.lufs;
+        println!(
+            "  Δ(dialect−default FluidSynth): LUFS {profile_lufs_delta:+.2}  crest {profile_crest_delta:+.2} dB  \\
+             high-band {profile_high_delta:+.3}  low-band {profile_low_delta:+.3}"
+        );
+
         let profile_material = format!(
             "melothaea-style-render-profile-v1|grammar={grammar_dialect:?}|renderer={renderer_dialect:?}|target_lufs={:.6}|limiter_ceiling_db={:.6}|low={:.6}|mid={:.6}|high={:.6}|eq_cap={:.6}|high_boost_cap={:.6}|section_leveling={:.6}|room_size={:.6}|room_level={:.6}|room_damp={:.6}|chorus={:.6}",
             mastering.target_lufs,
@@ -442,6 +491,16 @@ fn main() {
             color.chorus_level
         );
         let profile_fingerprint_sha256 = sha256_bytes(profile_material.as_bytes());
+        let profile_controls_differ_from_default =
+            color.reverb_room != base_color.reverb_room
+                || color.reverb_level != base_color.reverb_level
+                || color.reverb_damp != base_color.reverb_damp
+                || color.chorus_level != base_color.chorus_level
+                || mastering.target_low_ratio != neutral_mastering.target_low_ratio
+                || mastering.target_mid_ratio != neutral_mastering.target_mid_ratio
+                || mastering.target_high_ratio != neutral_mastering.target_high_ratio
+                || mastering.eq_max_correction_db != neutral_mastering.eq_max_correction_db
+                || mastering.eq_max_high_boost_db != neutral_mastering.eq_max_high_boost_db;
         rows.push(serde_json::json!({
             "style": format!("{style:?}"),
             "seed": seed,
@@ -450,6 +509,13 @@ fn main() {
             "renderer_dialect": format!("{renderer_dialect:?}"),
             "profile_version": "melothaea-style-render-profile-v1",
             "profile_fingerprint_sha256": profile_fingerprint_sha256,
+            "profile_controls_differ_from_default": profile_controls_differ_from_default,
+            "profile_vs_default_signal_delta": {
+                "integrated_lufs": profile_lufs_delta,
+                "crest_factor_db": profile_crest_delta,
+                "spectral_balance_low": profile_low_delta,
+                "spectral_balance_high": profile_high_delta
+            },
             "input_midi": {
                 "path": mid.display().to_string(),
                 "sha256": midi_sha256,
@@ -473,12 +539,37 @@ fn main() {
                 "section_leveling_db": mastering.section_leveling_db
             },
             "arms": {
-                "native": {
+                "native_dialect_profile": {
                     "renderer": a.name,
                     "sample_rate_hz": SR,
                     "metrics": arm_metrics(&a)
                 },
-                "fluidsynth": {
+                "fluidsynth_default_profile": {
+                    "renderer": neutral.name,
+                    "sample_rate_hz": neutral_sr,
+                    "wav_path": neutral_wav_path.display().to_string(),
+                    "wav_sha256": neutral_wav_sha256,
+                    "wav_bytes": neutral_wav.len(),
+                    "room": {
+                        "room_size": base_color.reverb_room,
+                        "level": base_color.reverb_level,
+                        "damp": base_color.reverb_damp,
+                        "chorus_level": base_color.chorus_level
+                    },
+                    "mastering": {
+                        "target_lufs": neutral_mastering.target_lufs,
+                        "limiter_ceiling_db": neutral_mastering.limiter_ceiling_db,
+                        "target_low_mid_high": [
+                            neutral_mastering.target_low_ratio, neutral_mastering.target_mid_ratio,
+                            neutral_mastering.target_high_ratio
+                        ],
+                        "eq_max_correction_db": neutral_mastering.eq_max_correction_db,
+                        "eq_max_high_boost_db": neutral_mastering.eq_max_high_boost_db,
+                        "section_leveling_db": neutral_mastering.section_leveling_db
+                    },
+                    "metrics": arm_metrics(&neutral)
+                },
+                "fluidsynth_dialect_profile": {
                     "renderer": b.name,
                     "sample_rate_hz": fsr,
                     "wav_path": wav_path.display().to_string(),
@@ -489,6 +580,13 @@ fn main() {
             }
         }));
         deltas.push((format!("{style:?}/{seed}"), d_crest, d_high, d_low));
+        profile_deltas.push((
+            format!("{style:?}/{seed}"),
+            profile_lufs_delta,
+            profile_crest_delta,
+            profile_high_delta,
+            profile_low_delta,
+        ));
         println!();
     }
 
@@ -503,6 +601,16 @@ fn main() {
         println!("mean Δcrest      {mc:+.2} dB   (higher = more dynamic range preserved)");
         println!("mean Δhigh-band  {mh:+.3}      (higher = brighter)");
         println!("mean Δlow-band   {ml:+.3}      (higher = more low-end weight)");
+        if !profile_deltas.is_empty() {
+            let pn = profile_deltas.len() as f32;
+            let mean_profile_lufs = profile_deltas.iter().map(|d| d.1).sum::<f32>() / pn;
+            let mean_profile_crest = profile_deltas.iter().map(|d| d.2).sum::<f32>() / pn;
+            let mean_profile_high = profile_deltas.iter().map(|d| d.3).sum::<f32>() / pn;
+            let mean_profile_low = profile_deltas.iter().map(|d| d.4).sum::<f32>() / pn;
+            println!(
+                "mean profile−default FluidSynth: ΔLUFS {mean_profile_lufs:+.2}, Δcrest {mean_profile_crest:+.2} dB, Δhigh {mean_profile_high:+.3}, Δlow {mean_profile_low:+.3}"
+            );
+        }
         let consistent_crest =
             deltas.iter().all(|d| d.1 > 0.0) || deltas.iter().all(|d| d.1 < 0.0);
         println!(
@@ -580,7 +688,7 @@ fn main() {
             "Native PCM hashes canonical f32 samples; FluidSynth WAV hashes include container bytes.",
             "Sample peak is not true peak.",
             "Audio metrics diagnose signal and render differences; they do not establish style authenticity or listener preference.",
-            "This run compares different renderer backends; it is not the neutral-versus-profile causal ablation.",
+            "The two FluidSynth arms use the same MIDI, SoundFont, binary, and sample rate; their difference isolates the combined dialect room/mastering settings, not each control independently or perceptual benefit.",
             "A caller-supplied source revision plus file digests is not a signed build attestation."
         ]
     });
