@@ -54,6 +54,23 @@ The audit rechecks that each energy pair matches the frozen mission/service/cond
 
 Suggested operating cases depend on the vessel class and mission. A profile may include low-speed control, transit/cruise, required maximum service speed and relevant environmental/loading corners, but it must not blindly impose every regime on every craft. Freeze the required cases before reviewing candidate outcomes. Digests are caller-provided identifiers; they are not proof that a source, geometry or environmental measurement is authentic.
 
+
+## Fidelity-aware experiment ledger
+
+The `fidelity_ledger` module accounts for analytical, low-fidelity simulation, high-fidelity simulation and physical-test attempts as distinct **declared evaluation classes**. It does not assert that one class is universally more accurate: the frozen profile states the required class, evidence origin, method ID and exact revision for each candidate / operating case. A low-cost result cannot satisfy a profile requirement for another class or method.
+
+Every attempt is a separate receipt. Costs use positive integer units from one frozen `cost_basis_id`; unknown cost is not zero, and failed / censored / out-of-domain attempts still count toward campaign cost if their cost is known and comparable. Missing/zero/mismatched costs make the total campaign cost unauditable. Configuration digests must remain identical for a candidate across its required operating cases. A complete evaluation also requires an output digest.
+
+Source ID, source-reference digest and explicit rights status are recorded. Only evidence marked permitted for the declared use can satisfy a release requirement; restricted or unknown rights do not become usable merely because a simulation or experiment succeeded. Hashes are identifiers, not proof of origin/authenticity or a license.
+
+A requirement with `required_successes = 0` declares an allowed/ledgered screening tier that is not itself a release gate. A positive count is the number of distinct complete receipts required for that exact candidate/configuration/case/class/origin/method revision. No inferred fidelity hierarchy, posterior probability, value-of-information score, design ranking or physical qualification is produced.
+
+This ledger composes with [MARINE-EXP-001 #7641](https://github.com/Luminous-Dynamics/symthaea/issues/7641) and shared [SE-OPT-BENCH-001 #7803](https://github.com/Luminous-Dynamics/symthaea/issues/7803). When evaluating policies, compare at the same end-to-end budget and include failed calls plus the later high-fidelity or physical-validation cost needed to release a low-fidelity-selected candidate. This is motivated by the 2026 multi-fidelity consequential-improvement study, which explicitly treats accuracy, validity, cost, and deferred high-fidelity validation cost as part of evaluation selection: https://link.springer.com/article/10.1007/s11081-026-10078-5. The 2026 constrained-multi-fidelity study is methodological prior art only; its aircraft examples do not establish marine benefit: https://arxiv.org/abs/2603.28987.
+
+## Marine reference-data boundaries
+
+The official [ITTC benchmark repository](https://www.ittc.info/benchmark-repository/) lists separate reference families for ship resistance/propulsion, manoeuvring predictions, and cavitation/noise round-robin work. A fidelity receipt must bind its specific source/method/revision and relevant operating case; a generic label such as "CFD" does not qualify a result across those different physical questions. The ITTC resistance/propulsion benchmark procedure is [7.5-03-02-02, 2024 Revision 03](https://www.ittc.info/search/?q=Self-Propulsion).
+
 ## Claim ceiling
 
 A Complete result means only that the canonical trace passed this crate's metadata, time-coverage, numeric and integration gates. It does not validate the measurement system, prove a hydrodynamic improvement, show corrected speed-power performance, establish lifecycle emissions, demonstrate vessel safety, or certify compliance.
