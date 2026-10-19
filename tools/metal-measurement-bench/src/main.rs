@@ -1905,11 +1905,16 @@ mod tests {
         }
         assert!(mapping_schema["properties"]["columns"]["items"]["properties"]["missing_policy"]["enum"]
             .as_array().unwrap().iter().any(|value| value == "preserve_missing"));
+        assert!(mapping_schema["properties"]["columns"]["items"]["required"].as_array().unwrap()
+            .iter().any(|value| value == "value_kind"));
+        assert!(mapping_schema["properties"]["columns"]["items"]["properties"]["missing_tokens"]["uniqueItems"] == true);
 
         let receipt_schema: serde_json::Value = serde_json::from_str(
             include_str!("../schemas/audit-receipt-v0.1.schema.json")
         ).unwrap();
         assert!(receipt_schema["properties"]["csv_reconciliation"]["properties"]["mapping_sha256"].is_object());
+        assert!(receipt_schema["properties"]["csv_reconciliation"]["properties"]["columns"]["items"]["properties"]["numeric_values_validated"].is_object());
+        assert!(receipt_schema["properties"]["csv_reconciliation"]["properties"]["excluded_columns"].is_object());
         assert!(receipt_schema["allOf"].as_array().unwrap().iter().any(|condition| {
             condition["if"]["properties"]["operation"]["const"] == "reconcile-csv"
                 && condition["then"]["required"].as_array().unwrap()
@@ -1997,6 +2002,56 @@ mod tests {
         });
         let bytes_for_mapping = serde_json::to_vec(&missing_reason).unwrap();
         assert!(reconcile_csv_bytes(bytes, &missing_reason, &bytes_for_mapping, "fixture.csv").is_err());
+    }
+
+    #[test]
+    fn csv_reconciliation_rejects_malformed_and_non_finite_numeric_cells() {
+        for value in ["NaN", "inf", "-inf", "not-a-number", "1.2.3"] {
+            let input = format!(
+                "source_row_id,stress_mpa,specimen_note\nR-001,{value},note\n"
+            );
+            let mapping = fixture_csv_mapping();
+            let mapping_bytes = serde_json::to_vec(&mapping).unwrap();
+            assert!(
+                reconcile_csv_bytes(input.as_bytes(), &mapping, &mapping_bytes, "fixture.csv").is_err(),
+                "accepted invalid finite-number cell {value:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn csv_reconciliation_preserves_declared_missing_tokens_without_imputation() {
+        let bytes = b"source_row_id,stress_mpa,specimen_note\nR-001,920,as-built\nR-002,NA,repeat\n";
+        let mut mapping = fixture_csv_mapping();
+        mapping.columns[0].missing_tokens.push("NA".into());
+        let mapping_bytes = serde_json::to_vec(&mapping).unwrap();
+        let result = reconcile_csv_bytes(bytes, &mapping, &mapping_bytes, "fixture.csv").unwrap();
+        assert_eq!(result.columns[0].numeric_values_validated, 1);
+        assert_eq!(result.columns[0].nonempty_cells, 1);
+        assert_eq!(result.columns[0].preserved_missing_token_cells, 1);
+        assert_eq!(result.columns[0].missing_token_counts.get("NA"), Some(&1));
+
+        mapping.columns[0].missing_policy = CsvMissingPolicy::Reject;
+        let mapping_bytes = serde_json::to_vec(&mapping).unwrap();
+        assert!(reconcile_csv_bytes(bytes, &mapping, &mapping_bytes, "fixture.csv").is_err());
+    }
+
+    #[test]
+    fn csv_reconciliation_rejects_undeclared_numeric_sentinels_and_bad_token_contracts() {
+        let bytes = b"source_row_id,stress_mpa,specimen_note\nR-001,NA,note\n";
+        let mapping = fixture_csv_mapping();
+        let mapping_bytes = serde_json::to_vec(&mapping).unwrap();
+        assert!(reconcile_csv_bytes(bytes, &mapping, &mapping_bytes, "fixture.csv").is_err());
+
+        let mut duplicate_tokens = fixture_csv_mapping();
+        duplicate_tokens.columns[0].missing_tokens = vec!["NA".into(), "NA".into()];
+        let mapping_bytes = serde_json::to_vec(&duplicate_tokens).unwrap();
+        assert!(reconcile_csv_bytes(bytes, &duplicate_tokens, &mapping_bytes, "fixture.csv").is_err());
+
+        let mut whitespace_token = fixture_csv_mapping();
+        whitespace_token.columns[0].missing_tokens = vec![" NA ".into()];
+        let mapping_bytes = serde_json::to_vec(&whitespace_token).unwrap();
+        assert!(reconcile_csv_bytes(bytes, &whitespace_token, &mapping_bytes, "fixture.csv").is_err());
     }
 
     #[test]
