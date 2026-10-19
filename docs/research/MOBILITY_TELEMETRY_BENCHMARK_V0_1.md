@@ -65,7 +65,7 @@ Physical eligibility also requires a claim-specific uncertainty budget (measuran
 
 ## Fault injection matrix and conformance
 
-The machine-readable matrix lists 30 required positive and negative controls, including clock-method spoofing, missing claim-specific uncertainty budgets, an expanded-uncertainty value that exceeds its pre-registered tolerance, a calculated-but-not-characterized budget, and calibration/rights receipt references that do not match the declared artifacts. Include positive controls so a validator that rejects everything does not pass. At minimum, exercise:
+The machine-readable matrix lists 31 required positive and negative controls, including clock-method spoofing, missing claim-specific uncertainty budgets, an expanded-uncertainty value that exceeds its pre-registered tolerance, a calculated-but-not-characterized budget, calibration/rights receipt references that do not match the declared artifacts, and zero-width uncertainty budgets. Include positive controls so a validator that rejects everything does not pass. At minimum, exercise:
 - malformed or reordered headers, empty traces and unknown channels/statuses;
 - VALID samples with missing values, non-finite numbers, sequence gaps, timestamp regression and repeated timestamps for a channel;
 - repeated timestamps across different channels where simultaneous sampling is permitted;
@@ -89,7 +89,7 @@ Report per-group metrics, worst-group behavior, uncertainty calibration and out-
 
 ### Per-claim uncertainty completeness
 
-Every physical claim needs a separate uncertainty budget for every required measurand—not one budget for the headline score. For example, `ride_energy` needs budgets for bus voltage, bus current, net DC bus energy and ground speed; tire-force characterization needs separate budgets for normal/longitudinal/lateral forces plus slip ratio, slip angle and camber. The Rust schema checks claim/measurand/unit pairs, duplicate pairs, numeric consistency, evidence state and content-addressed budget records. It also requires sensor calibration receipt IDs to refer to the corresponding declared `calibration_record`, and data-rights receipt IDs to refer to a declared `rights_receipt` or `collection_authorization` of the expected kind. Missing even one required measurand keeps the claim ineligible.
+Every physical claim needs a separate uncertainty budget for every required measurand—not one budget for the headline score. For example, `ride_energy` needs budgets for bus voltage, bus current, net DC bus energy and ground speed; tire-force characterization needs separate budgets for normal/longitudinal/lateral forces plus slip ratio, slip angle and camber. The Rust schema checks claim/measurand/unit pairs, duplicate pairs, numeric consistency, positive nonzero uncertainty, evidence state and content-addressed budget records. It also requires sensor calibration receipt IDs to refer to the corresponding declared `calibration_record`, and data-rights receipt IDs to refer to a declared `rights_receipt` or `collection_authorization` of the expected kind. Missing even one required measurand keeps the claim ineligible.
 
 ## Output contract
 
