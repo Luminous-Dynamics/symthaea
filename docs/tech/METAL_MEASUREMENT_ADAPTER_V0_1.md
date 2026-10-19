@@ -56,7 +56,9 @@ Unknown metadata must remain explicit. The validator rejects placeholder IDs suc
 
 ## Benchmark protocol and proposed gates
 
-The first stage is data integrity—not model competition. CLI record validation verifies artifact bytes before accepting observation rows. The new `inspect-csv` command inventories the exact hashed CSV's parsed record count, headers and per-column empty/nonempty counts, and rejects duplicate/ambiguous headers and inconsistent record widths. It parses the already rechecked byte buffer and binds the inventory to the exact SHA-256 to avoid a verify-then-reopen time-of-check/time-of-use gap. This is a structural inventory only: it does not infer units, row identities or variable semantics. The next mapper must prove each declared source row/field is actually present in the exact artifact bytes and produce explicit counts/reasons for exclusions.
+The first stage is data integrity—not model competition. CLI record validation verifies artifact bytes before accepting observation rows. The `inspect-csv` command inventories the exact hashed CSV's parsed record count, headers and per-column empty/nonempty counts. A strict quote-syntax guard rejects unterminated quoted fields, quotes inside unquoted fields and junk after a closing quote; row widths and ambiguous headers are checked by the CSV parser/inventory. Inspection parses the rechecked byte buffer and binds the inventory to its exact SHA-256 to avoid a verify-then-reopen time-of-check/time-of-use gap.
+
+The new `reconcile-csv` operation adds an explicit source mapping rather than guessing semantics from header names. Its mapping contract declares the exact source-native row-ID header, exact source header, canonical field ID, source unit/type label, metadata/predictor/target role and missing-cell policy. Reconciliation requires unique nonblank source-native row IDs, exact matching headers, unique canonical field IDs, and a declared missing-value policy. The receipt binds the source artifact digest, mapping digest, header digest, ordered source-row-ID digest, parsed row count and per-mapped-field nonempty/missing counts. This establishes structural row/field identity only: the tool does not parse numeric values, validate unit physics, infer lineage, apply conversions, define row exclusions, or prove model accuracy.
 
 **Source integrity**
 - 100% of declared local artifacts match byte count and SHA-256.
@@ -64,7 +66,8 @@ The first stage is data integrity—not model competition. CLI record validation
 - No artifact is imported before artifact-specific terms and local-use permissions are reviewed.
 
 **Parser integrity**
-- The structural CSV inventory rejects blank or case/whitespace-colliding headers, inconsistent row widths and malformed quoting, and accounts for empty versus nonempty cells by column.
+- The structural CSV inventory rejects blank or case/whitespace-colliding headers, inconsistent row widths and invalid quote syntax, and accounts for empty versus nonempty cells by column.
+- Source mapping is explicit and exact; every parsed source row has a unique stable row ID. Missing cells follow a declared per-field policy and are never imputed silently.
 - 100% of duplicate IDs, undeclared source identities, unsafe file paths, missing stable lineage, inconsistent source-field units/variable mappings, unjustified conversion, invalid/non-finite values, fabricated censored point values and malformed censoring bounds are rejected.
 - Independent count reconciliation: every input row is either represented or listed with a reason for exclusion; no silent drops.
 - Raw source values and units survive every normalization.
