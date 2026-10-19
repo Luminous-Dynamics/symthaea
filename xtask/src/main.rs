@@ -106,7 +106,7 @@ enum Commands {
     },
     /// Account for nutrient delivery from explicit, source-backed JSON; no nutrition adequacy claim.
     CropfoundryNutritionAccounting {
-        /// Path to a JSON input matching cropfoundry-nutrition-accounting-input-v0.
+        /// Path to a JSON input matching cropfoundry-nutrition-accounting-input-v1 (v0 point-only inputs are accepted).
         #[arg(long)]
         input: PathBuf,
         /// Optional path for the JSON accounting receipt.
