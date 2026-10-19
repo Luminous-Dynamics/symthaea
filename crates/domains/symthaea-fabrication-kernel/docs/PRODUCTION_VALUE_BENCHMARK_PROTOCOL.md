@@ -50,6 +50,16 @@ These are investigation thresholds, not universal specifications or achieved res
 
 Reject or explicitly fail eligibility for duplicate scenario IDs; missing/extra scenarios; mixed policy labels; changed workload identity; changed fixed input quantities; unit partition off by one; material balance off by one milligram; zero/negative/non-finite duration; negative/non-finite energy; integer overflow; zero accepted units causing division by zero; critical safety violations; escaped nonconforming units; or held output. Future forecasting comparisons should additionally include label-shuffle controls and report matched conventional baselines. Those statistical tests are not implemented by this arithmetic module.
 
+## Paired uncertainty without pseudo-replication
+
+The companion `paired_inference` module provides a deterministic percentile cluster-bootstrap interval for the mean paired difference. It requires at least 20 independently sampled clusters and at least 1000 resamples. It records the seed, resample count, confidence level, mean and median difference, interval bounds, and the number of clusters where the candidate is better/worse/tied under a declared metric direction.
+
+**Cluster before bootstrap.** The caller must aggregate observations inside a genuinely independent unit (for example, material lot, production day, or independent site) and provide one paired value per unit. Repeated pieces, time samples, or multiple scenarios from one lot must not be passed as separate independent clusters. Cluster IDs must be unique and paired; the function rejects duplicates and non-finite values. The interval is over an equal-cluster-weighted mean difference.
+
+This is a percentile bootstrap description of uncertainty, not a causal identification procedure or a statistical proof of superiority. It emits no p-value and does not decide eligibility by whether a confidence interval excludes zero. The independence assumption, study design, missingness, stopping rule, measurement uncertainty, and direction of each metric must be justified outside the helper. The minimum cluster count is a conservative project gate, not a universal theorem; small or highly heterogeneous studies may require substantially more data or another preregistered method.
+
+`PairedBootstrapConfig::default()` uses 10,000 bootstrap replicates and a fixed reproducible seed. Always report the exact configuration and cluster definition.
+
 ## Research anchors
 
 - [NIST Smart Manufacturing Systems Test Bed](https://www.nist.gov/laboratories/tools-instruments/smart-manufacturing-systems-sms-test-bed): integrated CAD/CAM, machine tools, inspection, MTConnect data, and lifecycle information for manufacturing evaluation.
