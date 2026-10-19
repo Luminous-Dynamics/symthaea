@@ -58,6 +58,14 @@ A policy that wins this synthetic score has only passed an algorithmic test. A d
 - Whether the more complicated policy gives measurable decision value over simple baselines.
 - Whether the answer changes under stress weights, storage thresholds, forecast error, dropout patterns and scenario mix.
 
+## Candidate field-stage benchmark (not enabled by the synthetic harness)
+
+Before a real trial, choose the crop, soil, irrigation hardware, locally accepted schedule and marketable-quality endpoints with a cooperating agronomist/farm partner. Then preregister a *candidate* practical success criterion: at least 15% lower metered irrigation volume than the strongest locally accepted comparator, with marketable yield non-inferior within a 5% margin. These are proposed design targets only; adjust them before seeing outcomes using agronomic justification, control variability, baseline yield, water scarcity context and a power analysis.
+
+For a trial to pass those targets, report confidence intervals, not just point estimates. One possible rule is an upper confidence bound on the irrigation-volume ratio below 0.85 and a lower confidence bound on the marketable-yield ratio above 0.95, alongside acceptable produce quality and no violation of water or food-safety constraints. Use randomized blocked plots with calibrated flow meters, treatment blinding where feasible, preregistered exclusion rules, enough independent plots/sites/seasons for the stated power, and the same weather and crop-stage records across comparators. Also measure pumping energy, labor, maintenance, input costs, salinity/leaching where relevant, sensor failures and farmer workload. If water is saved by transferring stress or cost to another part of the system, do not declare overall success.
+
+This is deliberately a separate evidence tier. The fixed synthetic scenarios can test that a policy respects coded constraints; they cannot justify those field-stage thresholds or predict the probability of achieving them.
+
 ## Follow-on measurements
 
 Before proposing field deployment, add independently calibrated soil-moisture / root-zone observations, weather forecast vintages with issue-time timestamps, metered applied water, irrigation hardware limits, crop-stage definitions, plot-level outcomes and an agronomist-reviewed soil-water budget. Report runtime on target hardware and total instrumentation, connectivity, power, maintenance and labor cost. Preserve all scenario definitions and policy settings before looking at results.
