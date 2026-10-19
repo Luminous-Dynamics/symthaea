@@ -1,5 +1,6 @@
 use anyhow::{Context, Result, anyhow};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::PathBuf;
 
@@ -53,6 +54,8 @@ struct NutritionAccountingInput {
 #[derive(Debug, Clone, Serialize)]
 struct NutritionAccountingReceipt {
     receipt_schema: String,
+    input_sha256: Option<String>,
+    input_snapshot: NutritionAccountingInput,
     batch_id: String,
     nutrient_id: String,
     accounting_pass: bool,
@@ -88,6 +91,7 @@ fn valid_sha256(value: &str) -> bool {
 }
 
 fn audit_input(input: NutritionAccountingInput) -> NutritionAccountingReceipt {
+    let input_snapshot = input.clone();
     let mut issues = Vec::new();
     let concentration = input.concentration_mg_per_kg;
     let serving_mass = input.served_edible_mass_kg;
@@ -106,6 +110,9 @@ fn audit_input(input: NutritionAccountingInput) -> NutritionAccountingReceipt {
     }
     if serving_mass.is_none_or(|value| !value.is_finite() || value <= 0.0) {
         issues.push("served_edible_mass_kg must be present, finite and greater than zero".to_owned());
+    }
+    if input.concentration_stage.is_none() {
+        issues.push("concentration_stage must be explicit".to_owned());
     }
     if input.concentration_mass_basis.is_none() || input.served_mass_basis.is_none() {
         issues.push("concentration and serving mass bases must be explicit".to_owned());
@@ -201,6 +208,8 @@ fn audit_input(input: NutritionAccountingInput) -> NutritionAccountingReceipt {
 
     NutritionAccountingReceipt {
         receipt_schema: "cropfoundry-nutrition-accounting-receipt-v0".to_owned(),
+        input_sha256: None,
+        input_snapshot,
         batch_id: input.batch_id,
         nutrient_id: input.nutrient_id,
         accounting_pass,
@@ -241,7 +250,8 @@ pub fn run(input_path: PathBuf, out: Option<PathBuf>) -> Result<()> {
         .with_context(|| format!("cannot read nutrition-accounting input {}", input_path.display()))?;
     let input: NutritionAccountingInput = serde_json::from_slice(&raw)
         .context("input must be a cropfoundry-nutrition-accounting-input-v0 JSON object")?;
-    let receipt = audit_input(input);
+    let mut receipt = audit_input(input);
+    receipt.input_sha256 = Some(format!("{:x}", Sha256::digest(&raw)));
     let rendered = serde_json::to_string_pretty(&receipt)?;
     println!("{rendered}");
     if let Some(path) = out {
@@ -287,6 +297,22 @@ mod tests {
             currency_code: Some("ZAR".to_owned()),
             source_sha256: Some("a".repeat(64)),
         }
+    }
+
+    #[test]
+    fn receipt_retains_input_assumptions_and_provenance_fields() {
+        let input = fixture();
+        let receipt = audit_input(input.clone());
+        assert_eq!(receipt.input_snapshot.batch_id, input.batch_id);
+        assert_eq!(
+            receipt.input_snapshot.concentration_mass_basis,
+            Some(MassBasis::FreshEdibleMass)
+        );
+        assert_eq!(receipt.input_snapshot.bioavailability_fraction, Some(0.25));
+        assert_eq!(
+            receipt.input_snapshot.bioavailability_evidence_uri,
+            Some("urn:literature:iron-bioavailability".to_owned())
+        );
     }
 
     #[test]
