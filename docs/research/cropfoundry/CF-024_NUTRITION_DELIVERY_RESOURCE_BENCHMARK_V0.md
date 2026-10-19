@@ -56,6 +56,14 @@ The input schema requires the edible mass to correspond to the exact stage of th
 
 The prototype is a calculator and provenance-contract test, not a validated nutrition model. Its synthetic CI fixture uses invented values only to exercise the implementation; it cannot establish a crop nutrient value, nutrient adequacy, health outcome, food safety or farm recommendation.
 
+## Reference data path: South Africa first, global comparator second
+
+For a South African use case, begin with [SAFOODS](https://safoods.mrc.ac.za/) as the local food-composition reference and access path. Its public site describes 1,857 foods and a free web view of energy and selected macronutrients/fibre; its [2024 sixth-edition composition tables](https://safoods.mrc.ac.za/products.html) cover 36 nutrients across 16 food groups and are sold as an electronic publication ([site details](https://safoods.mrc.ac.za/composition.html)). The free view may support a restricted schema/matching pilot, but it does not expose every nutrient needed for CF-024. The detailed table's research-use, purchase, redistribution and model-training terms need clarification before acquisition or reuse. SAFOODS values are reference means, not exact nutrient assays for a user's cultivar, lot, farm or preparation; some source values are not South African in origin.
+
+[USDA FoodData Central](https://fdc.nal.usda.gov/api-guide/) provides a global comparator and its official API guide states that FDC data are CC0 1.0. It is useful for testing parsers, food identifiers, nutrient tags and provenance, but FDC includes different data types and food/processing states and cannot stand in for local South African assay data. Any snapshot should preserve the FDC data type, food ID, reference, nutrient basis and preparation state.
+
+Follow [FAO/INFOODS standards and guidelines](https://www.fao.org/infoods/infoods/standards-guidelines/en/) for food matching, units/denominators, nomenclature and data quality. Keep analytical, calculated, borrowed/literature and imputed values distinct at nutrient-record level; never average across unmatched food states or fresh/dry bases by convenience. These sources are now recorded as DS-015 (SAFOODS) and DS-016 (USDA FDC), both training-disabled in the source manifest.
+
 ## Proposed baseline suite
 
 1. **Mass-yield baseline:** maximize edible harvested mass under equal water, land, energy and budget caps.
