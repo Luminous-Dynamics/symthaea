@@ -521,8 +521,17 @@ mod tests {
                 == (1..=5).collect::<Vec<_>>()
         }));
         assert!(receipt.preference_sweep.iter().all(|item| {
-            item.weights.values().sum::<f64>() - 1.0
-                <= 1e-9
+            (item.weights.values().sum::<f64>() - 1.0).abs() <= 1e-9
+        }));
+        assert!(receipt.policies.iter().all(|policy| {
+            policy.pareto_front_member == policy.dominated_by_policies.is_empty()
+        }));
+        assert!(receipt.policies.iter().all(|policy| {
+            policy.dominated_by_policies.iter().all(|dominator| {
+                receipt.policies.iter().any(|candidate| {
+                    candidate.policy == *dominator && candidate.pareto_front_member
+                })
+            })
         }));
     }
 
