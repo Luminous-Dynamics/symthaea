@@ -6,6 +6,7 @@
 //! confidence intervals, or physical-vessel qualification.
 
 use std::collections::{BTreeMap, BTreeSet};
+use sha2::{Digest, Sha256};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ValidationSliceRequirement {
@@ -26,6 +27,8 @@ pub struct ValidationProfile {
     pub profile_id: String,
     pub dataset_manifest_sha256: String,
     pub model_configuration_sha256: String,
+    /// Digest of all acceptance-relevant profile content (excluding this field itself).
+    pub profile_manifest_sha256: String,
     pub required_slices: Vec<ValidationSliceRequirement>,
 }
 
@@ -55,6 +58,7 @@ pub enum ValidationDisposition {
 pub enum ValidationIssue {
     EmptyProfileField { field: &'static str },
     InvalidProfileDigest { field: &'static str },
+    ProfileManifestDigestMismatch,
     NoRequiredSlices,
     DuplicateRequiredSlice {
         operating_case_id: String,
@@ -120,6 +124,7 @@ pub struct SliceScore {
 #[derive(Debug, Clone, PartialEq)]
 pub struct ValidationScorecard {
     pub profile_id: String,
+    pub profile_manifest_sha256: String,
     pub disposition: ValidationDisposition,
     pub input_observation_count: usize,
     pub unique_observation_count: usize,
@@ -222,6 +227,92 @@ impl ResidualAccumulator {
     }
 }
 
+
+#[derive(Default)]
+struct CanonicalProfileEncoder(Vec<u8>);
+
+impl CanonicalProfileEncoder {
+    fn new(domain: &str) -> Self {
+        let mut encoder = Self::default();
+        encoder.text("domain", domain);
+        encoder
+    }
+
+    fn field(&mut self, name: &str, value: &[u8]) {
+        self.0.extend_from_slice(&(name.len() as u64).to_be_bytes());
+        self.0.extend_from_slice(name.as_bytes());
+        self.0.extend_from_slice(&(value.len() as u64).to_be_bytes());
+        self.0.extend_from_slice(value);
+    }
+
+    fn text(&mut self, name: &str, value: &str) {
+        self.field(name, value.as_bytes());
+    }
+
+    fn count(&mut self, name: &str, value: usize) {
+        self.field(name, &(value as u64).to_be_bytes());
+    }
+
+    fn float(&mut self, name: &str, value: f64) {
+        self.field(name, &value.to_bits().to_be_bytes());
+    }
+}
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    let digest = Sha256::digest(bytes);
+    let mut output = String::with_capacity(64);
+    use std::fmt::Write as _;
+    for byte in digest {
+        write!(&mut output, "{byte:02x}").expect("writing to String cannot fail");
+    }
+    output
+}
+
+/// Canonical digest of the full validation profile. Requirements are sorted by all
+/// acceptance-relevant fields, and numeric thresholds are encoded as IEEE-754 bits.
+pub fn canonical_validation_profile_sha256(profile: &ValidationProfile) -> String {
+    let mut encoder = CanonicalProfileEncoder::new("marine-validation-profile-v1");
+    encoder.text("profile_id", profile.profile_id.trim());
+    encoder.text(
+        "dataset_manifest_sha256",
+        &profile.dataset_manifest_sha256.to_ascii_lowercase(),
+    );
+    encoder.text(
+        "model_configuration_sha256",
+        &profile.model_configuration_sha256.to_ascii_lowercase(),
+    );
+
+    let mut requirements = profile.required_slices.clone();
+    requirements.sort_by(|a, b| {
+        a.operating_case_id
+            .trim()
+            .cmp(b.operating_case_id.trim())
+            .then_with(|| a.observable_id.trim().cmp(b.observable_id.trim()))
+            .then_with(|| a.minimum_observations.cmp(&b.minimum_observations))
+            .then_with(|| a.normalization_scale.total_cmp(&b.normalization_scale))
+            .then_with(|| a.max_normalized_rmse.total_cmp(&b.max_normalized_rmse))
+            .then_with(|| {
+                a.max_normalized_absolute_error
+                    .total_cmp(&b.max_normalized_absolute_error)
+            })
+    });
+    encoder.count("required_slice_count", requirements.len());
+    for requirement in &requirements {
+        let mut item = CanonicalProfileEncoder::new("marine-validation-slice-v1");
+        item.text("operating_case_id", requirement.operating_case_id.trim());
+        item.text("observable_id", requirement.observable_id.trim());
+        item.count("minimum_observations", requirement.minimum_observations);
+        item.float("normalization_scale", requirement.normalization_scale);
+        item.float("max_normalized_rmse", requirement.max_normalized_rmse);
+        item.float(
+            "max_normalized_absolute_error",
+            requirement.max_normalized_absolute_error,
+        );
+        encoder.field("required_slice", &item.0);
+    }
+    sha256_hex(&encoder.0)
+}
+
 fn is_nonempty(value: &str) -> bool {
     !value.trim().is_empty()
 }
@@ -242,6 +333,10 @@ fn validate_profile(profile: &ValidationProfile, issues: &mut Vec<ValidationIssu
             profile.model_configuration_sha256.as_str(),
             "model_configuration_sha256",
         ),
+        (
+            profile.profile_manifest_sha256.as_str(),
+            "profile_manifest_sha256",
+        ),
     ] {
         if !is_nonempty(value) {
             issues.push(ValidationIssue::EmptyProfileField { field });
@@ -257,9 +352,20 @@ fn validate_profile(profile: &ValidationProfile, issues: &mut Vec<ValidationIssu
             profile.model_configuration_sha256.as_str(),
             "model_configuration_sha256",
         ),
+        (
+            profile.profile_manifest_sha256.as_str(),
+            "profile_manifest_sha256",
+        ),
     ] {
         if !valid_sha256_hex(value) {
             issues.push(ValidationIssue::InvalidProfileDigest { field });
+            invalid = true;
+        }
+    }
+    if valid_sha256_hex(&profile.profile_manifest_sha256) {
+        let expected = canonical_validation_profile_sha256(profile);
+        if !profile.profile_manifest_sha256.eq_ignore_ascii_case(&expected) {
+            issues.push(ValidationIssue::ProfileManifestDigestMismatch);
             invalid = true;
         }
     }
@@ -487,7 +593,7 @@ pub fn score_validation(
             continue;
         }
         let requirement = requirements[&key];
-        let accumulator = accumulators.get_mut(&key).expect("required slice initialized");
+        let accumulator = accumulators.entry(key.clone()).or_default();
         if !accumulator.add(residual, requirement.normalization_scale) {
             issues.push(ValidationIssue::NonFiniteMetric {
                 operating_case_id: key.0.clone(),
@@ -587,6 +693,7 @@ pub fn score_validation(
 
     ValidationScorecard {
         profile_id: profile.profile_id.clone(),
+        profile_manifest_sha256: profile.profile_manifest_sha256.clone(),
         disposition,
         input_observation_count: observations.len(),
         unique_observation_count,
@@ -617,15 +724,18 @@ mod tests {
     }
 
     fn profile() -> ValidationProfile {
-        ValidationProfile {
+        let mut profile = ValidationProfile {
             profile_id: "dtc-shallow-water-r1".to_owned(),
             dataset_manifest_sha256: DATASET_DIGEST.to_owned(),
             model_configuration_sha256: MODEL_DIGEST.to_owned(),
+            profile_manifest_sha256: String::new(),
             required_slices: vec![
                 slice("depth-ratio-4.0", "resistance", 2, 100.0, 0.05, 0.10),
                 slice("depth-ratio-1.2", "resistance", 2, 100.0, 0.05, 0.10),
             ],
-        }
+        };
+        profile.profile_manifest_sha256 = canonical_validation_profile_sha256(&profile);
+        profile
     }
 
     fn observation(id: &str, case: &str, reference: f64, prediction: f64) -> ValidationObservation {
@@ -769,6 +879,23 @@ mod tests {
         let scorecard = score_validation(&profile(), &observations);
         assert_eq!(scorecard.disposition, ValidationDisposition::PassDeclaredThresholds);
         assert!(scorecard.slices.iter().all(|s| s.root_mean_squared_error == Some(0.0)));
+    }
+
+    #[test]
+    fn stale_threshold_profile_digest_is_rejected() {
+        let mut p = profile();
+        p.required_slices[0].max_normalized_rmse = 0.001;
+        let scorecard = score_validation(&p, &valid_observations());
+        assert_eq!(scorecard.disposition, ValidationDisposition::InvalidProfile);
+        assert!(scorecard.issues.contains(&ValidationIssue::ProfileManifestDigestMismatch));
+    }
+
+    #[test]
+    fn profile_digest_is_invariant_to_required_slice_order() {
+        let mut p = profile();
+        let original = canonical_validation_profile_sha256(&p);
+        p.required_slices.reverse();
+        assert_eq!(canonical_validation_profile_sha256(&p), original);
     }
 
     #[test]
