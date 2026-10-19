@@ -1,0 +1,94 @@
+# Mobility telemetry benchmark contract — v0.1
+
+**Status:** proposed benchmark contract; thresholds below are engineering targets, not measured results or universal standards.  
+**Owner:** [TYRE-DATA-001 #8076](https://github.com/Luminous-Dynamics/symthaea/issues/8076), composed with [TRANSPORT-ROAD-001 #6247](https://github.com/Luminous-Dynamics/symthaea/issues/6247).  
+**Implementation baseline:** [telemetry manifest and raw-trace validator](MOBILITY_TELEMETRY_REFERENCE_ARCHITECTURE_2026-10-19.md).
+
+## Paradigm shift
+
+Do not optimize for “more telemetry.” Optimize for the smallest reproducible evidence package that can support a bounded engineering claim.
+
+A telemetry record is not just time plus value. It is an observation with:
+- a declared physical quantity, unit, coordinate frame, sign convention and acquisition configuration;
+- sensor identity, calibration state, timestamp source and uncertainty;
+- explicit validity and loss state, with no silent repair;
+- provenance for raw bytes, decoder/filter transforms, dataset rights and protocol;
+- a claim-specific evidence ceiling.
+
+Keep raw capture immutable. Every filter, synchronization correction, decoded bus signal, resampling step and derived quantity is a new versioned artifact pointing back to the raw evidence. Missing is not zero; receive time is not necessarily sample time; decoded CAN is not a substitute for raw frames; and a valid file is not proof of physical accuracy.
+
+Use an interoperable exporter rather than making our schema a format island: [ASAM MDF](https://www.asam.net/standards/detail/mdf/) is a suitable future interchange target. Linux [SocketCAN timestamp facilities](https://docs.rs/socketcan/latest/socketcan/timestamp/index.html) are a candidate optional adapter. Neither dependency should be required to validate a plain session manifest and trace.
+
+## Benchmark ladder
+
+| Level | Benchmark | Pass condition | What a pass does not establish |
+|---|---|---|---|
+| B0 | Schema and semantics | Unique IDs, valid references, finite positive sample rates, known units, explicit clock domain and sign/frame conventions | Sensor accuracy |
+| B1 | Byte and custody integrity | Declared bytes, lengths and SHA-256 match; raw artifacts remain inside the session root; rights/calibration receipts are explicit | Permission where none was granted; truthful sensor calibration |
+| B2 | Adversarial fault injection | Zero false accepts across the frozen mutation matrix; invalid samples stay visible; no implicit interpolation, zero-fill or row deletion | Hardware reliability |
+| B3 | Determinism and replay | Same raw bytes + manifest + decoder versions yield the same canonical report digest; toolchain/build identity is recorded | Correct physics |
+| B4 | Bench capture and timing | Known injected drops reconcile exactly with counters; clock offset/jitter and sample loss meet the pre-registered test budget; power-loss recovery preserves committed records | Calibration traceability unless independently evidenced |
+| B5 | Metrology | Each claim's uncertainty budget is measured using traceable reference instruments over the declared operating envelope | Vehicle/tire performance outside that envelope |
+| B6 | Claim-specific validation | Entire runs, days, vehicles or tire specimens are held out; prediction error and uncertainty are reported per unit/run, including outliers | Regulatory approval or safe public-road use |
+
+### Initial software acceptance targets
+
+These targets apply only to the software/fixture suite and must be reported separately from hardware results.
+
+1. **Fail-closed corpus:** zero false accepts across every frozen negative control in the machine-readable fault matrix. A change to expected outcomes requires a reviewed rationale, not deleting a failing case.
+2. **No silent alteration:** zero implicit zero-fills, interpolations, outlier deletions or unit conversions in the raw layer. Any transformation is opt-in, versioned and emits its own artifact.
+3. **Content identity:** SHA-256 and byte length match for 100% of declared raw artifacts before a recorded-session report can pass.
+4. **Replay determinism:** 100/100 replays of the same fixture on the same build produce the same canonical report digest. Volatile fields must be excluded from the canonical digest, not ignored after a mismatch.
+5. **Claim separation:** 100% of synthetic, planned, rights-incomplete, uncalibrated or channel-incomplete sessions remain ineligible for physical claims.
+6. **Gap observability:** every injected dropped-sample pattern remains detectable from sequence/counters/timestamps or an explicit event. A gap diagnostic may flag a likely gap; it must never synthesize a sample.
+
+These are proposed gate definitions, not claims that the current implementation has met them. The Rust validator has authored unit tests, but the tests still need execution on an equipped runner.
+
+## Initial hardware targets to measure, not assume
+
+Treat these as revision-A goals that can be changed only before a test campaign and with a recorded reason.
+
+- **Capture completeness:** at least 99.99% of expected IMU/wheel/power samples during a one-hour controlled bench run at the declared target rates, with every loss accounted for by independent reference counts or an explicit logger-overflow/error counter. Report per channel and interval; an aggregate percentage must not hide a failed channel.
+- **Electrical time alignment:** voltage/current pairwise alignment p99 no worse than 1 ms and maximum no worse than 2 ms during a calibrated 100 Hz reference campaign; record timestamp source and uncertainty. If the instrumentation cannot meet this budget, restrict the claim or upgrade acquisition hardware.
+- **Energy accounting:** relative error no worse than 1% against a calibrated reference energy meter on pre-registered steady and stepped-load profiles, including a declared integration method and boundary. Also publish the combined uncertainty; meeting a percentage target does not erase uncertainty.
+- **Recovery:** after controlled power cuts, all reported committed records remain byte-identical, the final session is marked incomplete unless cleanly closed, and any lost tail is bounded/reported—not silently treated as a valid close.
+- **Clock discipline:** test offset, drift, jitter and reboot behavior over the full session duration. GNSS UTC/PPS is an anchor, not an excuse to replace the monotonic clock or omit measured synchronization uncertainty.
+- **Thermal/environmental coverage:** validate at specified temperatures, supply conditions, vibration and storage fill states before advertising those conditions as supported.
+
+Do not select a generic force, grip or temperature accuracy threshold without specifying the sensor chain, calibration reference, range, loading geometry, uncertainty model and applicable test method. Freeze those per measurement programme.
+
+## Fault injection matrix and conformance
+
+The machine-readable matrix lists required negative controls. Include positive controls so a validator that rejects everything does not pass. At minimum, exercise:
+- malformed or reordered headers, empty traces and unknown channels/statuses;
+- VALID samples with missing values, non-finite numbers, sequence gaps, timestamp regression and repeated timestamps for a channel;
+- repeated timestamps across different channels where simultaneous sampling is permitted;
+- explicit sensor-fault rows with missing values, preserved as invalid observations;
+- long inter-sample gaps: report the gap while retaining all original rows;
+- duplicate IDs, unresolved sensor links, unsupported units, invalid sample rates and missing calibration receipts;
+- traversal paths, missing raw artifacts and byte-length/digest tampering;
+- absent permission, unverified clocks, missing claim-required channels and simulated evidence relabelled as physical.
+
+A matrix case counts as detected only when the observed decision equals the frozen expectation and required diagnostics are present. “The command exited zero” is insufficient: compare the structured report and the artifact digests.
+
+## Splits and leakage prevention
+
+For predictive tire/vehicle models, partition at the independent unit that can leak identity or operating conditions:
+- tire monitoring: group by tire/unit and complete recording segment;
+- tire force/compound work: hold out tire specimen/batch, not random rows;
+- vehicle dynamics: hold out complete runs and preferably track/day/vehicle;
+- powertrain: hold out drive cycles, ambient conditions and test sessions.
+
+Report per-group metrics, worst-group behavior, uncertainty calibration and out-of-distribution cases. A shuffled row split is a smoke test, not evidence of generalization. Fit normalizers and feature-selection only on training data.
+
+## Output contract
+
+Every benchmark report should include: benchmark version; source commit; toolchain/build identity; fixture and manifest hashes; case ID and expected/observed result; per-channel loss and timing summaries; calibration/protocol/rights references; software and physical gates separately; failed cases and reasons; claim ceiling. Preserve failing raw fixtures so a regression can be replayed.
+
+## Next concrete work
+
+1. Execute the existing Rust validator tests and frozen fault matrix on a host with the workspace toolchain.
+2. Add a canonical report digest and replay-determinism test.
+3. Build a host recorder/replayer before MCU firmware; add SocketCAN only as a receive-only, fail-closed adapter and test unavailable timestamp modes.
+4. Build a known-signal bench: pulse/step signal generator, synchronized voltage/current reference and independent sample counter.
+5. Validate the physical sensor chain and uncertainty before any real-world efficiency, handling, tire-force or safety claim.
