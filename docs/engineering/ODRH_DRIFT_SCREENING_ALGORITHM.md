@@ -12,7 +12,7 @@ The initial Rust core is intentionally conservative: it does not fit a drift cur
 
 ## Algorithm v0.1
 
-The caller must freeze a run interval, nominal control value, absolute guard half-width, ordered control slots and DUT observation times before using the report.
+The caller must freeze a run interval, nominal control value, absolute guard half-width, a positive maximum allowed gap, ordered control slots and DUT observation times before using the report.
 
 For a nominal value (c) and half-width (g ge 0), the accepted interval is:
 
@@ -35,7 +35,7 @@ An observation outside all such windows is labelled `NO_OUT_OF_BAND_CONTROL_DETE
 
 The checker rejects non-finite or reversed run bounds, non-finite nominal/guard parameters, negative guard width, empty or duplicate IDs, non-monotonic control times, out-of-run times, duplicate DUT IDs, and a schedule without controls. Missing controls do not disappear from denominators: they become an explicit bad control slot and quarantine the interval.
 
-The algorithm does not yet select a control cadence, establish guard limits from historical distribution, estimate false-alarm/missed-drift rates, infer the unobserved drift trajectory between anchors, or provide a validated drift-correction model. Those require a chosen instrument/measurand, suitable reference artifact, repeated observations, and an uncertainty model.
+The plan now declares a maximum allowed control-schedule gap. The verifier computes the largest gap including run-start-to-first-control, between consecutive scheduled slots, and last-control-to-run-end; it rejects a schedule that exceeds the declared cap. This detects an under-specified plan but does not establish that the chosen cadence is physically adequate. The algorithm does not select the control cadence, establish guard limits from historical distribution, estimate false-alarm/missed-drift rates, infer the unobserved drift trajectory between anchors, or provide a validated drift-correction model. Those require a chosen instrument/measurand, suitable reference artifact, repeated observations, and an uncertainty model.
 
 ## Synthetic benchmark matrix
 
@@ -49,6 +49,7 @@ The algorithm does not yet select a control cadence, establish guard limits from
 | Bad last control | Quarantine extends to run end |
 | Two bad controls separated by one good control | Preserve both control identities and each affected interval |
 | Duplicate control ID or unordered schedule | Reject plan |
+| A run-edge or inter-control schedule gap exceeds the predeclared cap | Reject plan before screening observations |
 | Observation outside run interval | Reject plan |
 | No out-of-band control detected | Explicitly do not claim physical qualification |
 
@@ -62,7 +63,7 @@ The [ICDM Information Display Measurements Standard](https://www.sid.org/Standar
 
 ## Reproducing the synthetic example
 
-The exact synthetic plan is [display-drift-control-plan-v0.1.json](display-drift-control-plan-v0.1.json), governed by [display-drift-control-plan.schema.json](display-drift-control-plan.schema.json). Run:
+The exact synthetic plan is [display-drift-control-plan-v0.1.json](display-drift-control-plan-v0.1.json), governed by [display-drift-control-plan.schema.json](display-drift-control-plan.schema.json). It caps the planned control gap at 40 seconds and its synthetic schedule's maximum edge/inter-slot gap is 40 seconds. Run:
 
     cargo run --manifest-path tools/open-display-platform-verify/Cargo.toml -- \
       --drift-plan docs/engineering/display-drift-control-plan-v0.1.json \
