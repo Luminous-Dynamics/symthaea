@@ -8,7 +8,7 @@
 //! angular response, spectral response, or calibrated optical performance.
 
 use serde_json::Value;
-use super::{EXPECTED_SCHEMA_DRAFT, approximately_equal, sha256_hex};
+use super::{EXPECTED_SCHEMA_DRAFT, sha256_hex};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct GeometryScreenInput {
@@ -178,11 +178,11 @@ pub fn evaluate_geometry_screen(
     // The angular derivatives are expressed per radian, so convert degrees.
     let distance_term_h = 2.0 * horizontal_half_angle.tan()
         * input.distance_standard_uncertainty_mm;
-    let angle_term_h = input.distance_mm * horizontal_half_angle.cos().powi(-2)
+    let angle_term_h = input.distance_mm * (1.0 / horizontal_half_angle.cos().powi(2))
         * input.horizontal_fov_standard_uncertainty_deg.to_radians();
     let distance_term_v = 2.0 * vertical_half_angle.tan()
         * input.distance_standard_uncertainty_mm;
-    let angle_term_v = input.distance_mm * vertical_half_angle.cos().powi(-2)
+    let angle_term_v = input.distance_mm * (1.0 / vertical_half_angle.cos().powi(2))
         * input.vertical_fov_standard_uncertainty_deg.to_radians();
 
     let standard_h = distance_term_h.hypot(angle_term_h);
