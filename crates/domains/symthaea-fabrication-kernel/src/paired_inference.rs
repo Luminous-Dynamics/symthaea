@@ -13,6 +13,7 @@
 //! It does not establish randomization, causal identification, measurement validity,
 //! adequate statistical power, or physical provenance. Those remain protocol duties.
 
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 use std::error::Error;
 use std::fmt;
@@ -22,8 +23,11 @@ use std::fmt;
 pub const MIN_INDEPENDENT_CLUSTERS: usize = 20;
 /// Minimum bootstrap draws required for a report.
 pub const MIN_BOOTSTRAP_REPLICATES: usize = 1_000;
+/// Version for the machine-readable paired-inference report.
+pub const PAIRED_INFERENCE_REPORT_SCHEMA_VERSION: u16 = 1;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum MetricDirection {
     HigherIsBetter,
     LowerIsBetter,
@@ -31,14 +35,16 @@ pub enum MetricDirection {
 
 /// One pair of outcomes after aggregation within a truly independent cluster.
 /// Delta is always candidate minus baseline; direction only labels better/worse.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct PairedClusterObservation {
     pub cluster_id: String,
     pub baseline: f64,
     pub candidate: f64,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct PairedBootstrapConfig {
     pub replicates: usize,
     pub seed: u64,
@@ -56,8 +62,11 @@ impl Default for PairedBootstrapConfig {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct PairedBootstrapReport {
+    /// Version of the serialized report contract.
+    pub schema_version: u16,
     pub independent_cluster_count: usize,
     pub bootstrap_replicates: usize,
     pub seed: u64,
@@ -216,6 +225,7 @@ pub fn analyze_paired_clusters(
         .ok_or(PairedInferenceError::NonFiniteStatistic)?;
 
     Ok(PairedBootstrapReport {
+        schema_version: PAIRED_INFERENCE_REPORT_SCHEMA_VERSION,
         independent_cluster_count: deltas.len(),
         bootstrap_replicates: config.replicates,
         seed: config.seed,
@@ -296,6 +306,17 @@ mod tests {
             seed,
             confidence_level: 0.95,
         }
+    }
+
+    #[test]
+    fn report_json_round_trip_is_versioned_and_deterministic() {
+        let data = observations(&vec![-2.0; MIN_INDEPENDENT_CLUSTERS]);
+        let report = analyze_paired_clusters(&data, MetricDirection::LowerIsBetter, config(7)).unwrap();
+        let json = serde_json::to_string(&report).unwrap();
+        let decoded: PairedBootstrapReport = serde_json::from_str(&json).unwrap();
+        assert_eq!(report, decoded);
+        assert_eq!(decoded.schema_version, PAIRED_INFERENCE_REPORT_SCHEMA_VERSION);
+        assert!(serde_json::from_str::<PairedClusterObservation>(r#"{"unexpected":true}"#).is_err());
     }
 
     #[test]
