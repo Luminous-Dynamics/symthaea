@@ -228,6 +228,44 @@
         "null"
       ],
       "pattern": "^[A-Fa-f0-9]{64}$"
+    },
+    "water_boundary": {
+      "enum": [
+        "irrigation_applied",
+        "total_applied_water",
+        "crop_consumptive_use",
+        "blue_water_footprint",
+        "green_water_footprint",
+        "full_supply_chain_water_footprint",
+        null
+      ]
+    },
+    "land_boundary": {
+      "enum": [
+        "allocated_cultivated_area",
+        "harvested_area",
+        "full_supply_chain_land_footprint",
+        null
+      ]
+    },
+    "energy_boundary": {
+      "enum": [
+        "on_farm_operations",
+        "irrigation_pumping",
+        "postharvest_processing",
+        "full_supply_chain_energy",
+        null
+      ]
+    },
+    "cost_boundary": {
+      "enum": [
+        "farm_gate",
+        "production_only",
+        "postharvest_processing",
+        "delivered_to_market",
+        "delivered_to_serving",
+        null
+      ]
     }
   },
   "allOf": [
@@ -555,12 +593,22 @@
       },
       "then": {
         "required": [
-          "currency_code"
+          "currency_code",
+          "cost_boundary"
         ],
         "properties": {
           "currency_code": {
             "type": "string",
             "pattern": "^[A-Za-z]{3}$"
+          },
+          "cost_boundary": {
+            "enum": [
+              "farm_gate",
+              "production_only",
+              "postharvest_processing",
+              "delivered_to_market",
+              "delivered_to_serving"
+            ]
           }
         }
       }
@@ -651,6 +699,230 @@
           "uncertainty_evidence_uri": {
             "type": "string",
             "minLength": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "water_liters": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "water_liters"
+        ]
+      },
+      "then": {
+        "required": [
+          "water_boundary"
+        ],
+        "properties": {
+          "water_boundary": {
+            "enum": [
+              "irrigation_applied",
+              "total_applied_water",
+              "crop_consumptive_use",
+              "blue_water_footprint",
+              "green_water_footprint",
+              "full_supply_chain_water_footprint"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "water_boundary": {
+            "enum": [
+              "irrigation_applied",
+              "total_applied_water",
+              "crop_consumptive_use",
+              "blue_water_footprint",
+              "green_water_footprint",
+              "full_supply_chain_water_footprint"
+            ]
+          }
+        },
+        "required": [
+          "water_boundary"
+        ]
+      },
+      "then": {
+        "required": [
+          "water_liters"
+        ],
+        "properties": {
+          "water_liters": {
+            "type": "number",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "land_square_meters": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "land_square_meters"
+        ]
+      },
+      "then": {
+        "required": [
+          "land_boundary"
+        ],
+        "properties": {
+          "land_boundary": {
+            "enum": [
+              "allocated_cultivated_area",
+              "harvested_area",
+              "full_supply_chain_land_footprint"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "land_boundary": {
+            "enum": [
+              "allocated_cultivated_area",
+              "harvested_area",
+              "full_supply_chain_land_footprint"
+            ]
+          }
+        },
+        "required": [
+          "land_boundary"
+        ]
+      },
+      "then": {
+        "required": [
+          "land_square_meters"
+        ],
+        "properties": {
+          "land_square_meters": {
+            "type": "number",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "energy_kwh": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "energy_kwh"
+        ]
+      },
+      "then": {
+        "required": [
+          "energy_boundary"
+        ],
+        "properties": {
+          "energy_boundary": {
+            "enum": [
+              "on_farm_operations",
+              "irrigation_pumping",
+              "postharvest_processing",
+              "full_supply_chain_energy"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "energy_boundary": {
+            "enum": [
+              "on_farm_operations",
+              "irrigation_pumping",
+              "postharvest_processing",
+              "full_supply_chain_energy"
+            ]
+          }
+        },
+        "required": [
+          "energy_boundary"
+        ]
+      },
+      "then": {
+        "required": [
+          "energy_kwh"
+        ],
+        "properties": {
+          "energy_kwh": {
+            "type": "number",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "cost_amount": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "cost_amount"
+        ]
+      },
+      "then": {
+        "required": [
+          "cost_boundary"
+        ],
+        "properties": {
+          "cost_boundary": {
+            "enum": [
+              "farm_gate",
+              "production_only",
+              "postharvest_processing",
+              "delivered_to_market",
+              "delivered_to_serving"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "cost_boundary": {
+            "enum": [
+              "farm_gate",
+              "production_only",
+              "postharvest_processing",
+              "delivered_to_market",
+              "delivered_to_serving"
+            ]
+          }
+        },
+        "required": [
+          "cost_boundary"
+        ]
+      },
+      "then": {
+        "required": [
+          "cost_amount"
+        ],
+        "properties": {
+          "cost_amount": {
+            "type": "number",
+            "minimum": 0
           }
         }
       }
