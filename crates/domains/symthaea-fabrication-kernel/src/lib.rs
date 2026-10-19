@@ -66,6 +66,7 @@ pub mod post_rollback_requalification_tracker;
 pub mod primitives;
 pub mod printer_control;
 pub mod process;
+pub mod production_value;
 pub mod promotion_replay;
 pub mod provenance;
 pub mod qualification;
