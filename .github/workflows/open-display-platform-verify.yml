@@ -11,6 +11,9 @@ on:
       - "docs/engineering/VISUAL_UTILITY_PER_JOULE_PROTOCOL.md"
       - "docs/engineering/display-energy-trace-synthetic-v0.1.json"
       - "docs/engineering/display-energy-trace.schema.json"
+      - "docs/engineering/display-measurement-geometry-synthetic-v0.1.json"
+      - "docs/engineering/display-measurement-geometry.schema.json"
+      - "tools/open-display-platform-verify/src/geometry.rs"
       - "docs/engineering/OPEN_DISPLAY_HARDWARE_REUSE_CANDIDATES.md"
       - "docs/engineering/OPEN_DISPLAY_REFERENCE_HARDWARE.md"
       - "docs/engineering/display-measurement-run-template-v0.1.json"
@@ -32,6 +35,9 @@ on:
       - "docs/engineering/VISUAL_UTILITY_PER_JOULE_PROTOCOL.md"
       - "docs/engineering/display-energy-trace-synthetic-v0.1.json"
       - "docs/engineering/display-energy-trace.schema.json"
+      - "docs/engineering/display-measurement-geometry-synthetic-v0.1.json"
+      - "docs/engineering/display-measurement-geometry.schema.json"
+      - "tools/open-display-platform-verify/src/geometry.rs"
       - "docs/engineering/OPEN_DISPLAY_HARDWARE_REUSE_CANDIDATES.md"
       - "docs/engineering/OPEN_DISPLAY_REFERENCE_HARDWARE.md"
       - "docs/engineering/display-measurement-run-template-v0.1.json"
@@ -258,7 +264,7 @@ jobs:
       - name: Run unit and mutation tests
         run: cargo test --manifest-path tools/open-display-platform-verify/Cargo.toml
 
-      - name: Verify repository, CAD receipt and synthetic drift plan
+      - name: Verify repository, CAD receipt, drift, energy and geometry screens
         shell: bash
         run: |
           set -euo pipefail
@@ -269,6 +275,8 @@ jobs:
             --drift-schema docs/engineering/display-drift-control-plan.schema.json \
             --energy-trace docs/engineering/display-energy-trace-synthetic-v0.1.json \
             --energy-schema docs/engineering/display-energy-trace.schema.json \
+            --geometry-record docs/engineering/display-measurement-geometry-synthetic-v0.1.json \
+            --geometry-schema docs/engineering/display-measurement-geometry.schema.json \
             | tee target/odrh-validation/verification-report.json
           sha256sum target/odrh-validation/verification-report.json \
             >> target/odrh-validation/final-artifact-sha256sums.txt
