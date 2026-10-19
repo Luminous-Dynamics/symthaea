@@ -33,6 +33,12 @@ jq -e \
   --arg manifest_sha "$MANIFEST_SHA" \
   --slurpfile receipt "$RECEIPT" \
   '
+    ($source|test("^[0-9a-f]{40}$")) and
+    ($attestor|test("^[0-9a-f]{40}$")) and
+    ($attestor_ref=="Luminous-Dynamics/symthaea/.github/workflows/rea-evidence-attestation.yml@refs/heads/main") and
+    ($attestor_run|test("^[0-9]+$")) and
+    ($provider_run|test("^[0-9]+$")) and
+    ($provider_url==("https://github.com/Luminous-Dynamics/symthaea/actions/runs/"+$provider_run)) and
     ($receipt|length)==1 and ($receipt[0]|type)=="object" and
     (keys|sort)==["attestationRun","evidenceTier","limitations","predicateType","providerRun","qualification","repository","schemaVersion","subject"] and
     .schemaVersion=="symthaea.rea-provider-smoke-attestation.v1" and
