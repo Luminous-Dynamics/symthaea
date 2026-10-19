@@ -760,6 +760,93 @@ mod tests {
     }
 
     #[test]
+    fn cropfoundry_portfolio_checked_in_fixture_has_reproducible_totals() {
+        let raw = include_str!("../../docs/research/cropfoundry/nutrition-portfolio-example-v0.json");
+        let input: PortfolioInput = serde_json::from_str(raw).unwrap();
+        let receipt = reconcile_portfolio(input, format!("{:x}", Sha256::digest(raw.as_bytes())));
+        assert!(receipt.accounting_pass, "{:?}", receipt.issues);
+        assert_eq!(receipt.common_resource_count, 3);
+        let option_a = receipt
+            .options
+            .iter()
+            .find(|option| option.option_id == "leafy-option-a")
+            .unwrap();
+        assert_eq!(option_a.total_water_liters, Some(22.0));
+        let iron = option_a
+            .nutrients
+            .iter()
+            .find(|nutrient| nutrient.nutrient_id == "iron")
+            .unwrap();
+        assert_eq!(iron.total_delivered_mg, Some(19.0));
+        assert!((iron.mg_per_liter_water.unwrap() - 19.0 / 22.0).abs() < 1e-9);
+        assert!(iron.estimated_bioavailable_total_mg.is_none());
+        assert_eq!(iron.bioavailability_coverage_batch_count, 0);
+    }
+
+    #[test]
+    fn cropfoundry_portfolio_schema_locks_unknown_top_level_fields() {
+        let schema: Value = serde_json::from_str(include_str!(
+            "../../docs/research/cropfoundry/nutrition-portfolio-input-v0.schema.json"
+        ))
+        .unwrap();
+        assert_eq!(schema["additionalProperties"], false);
+        assert_eq!(
+            schema["properties"]["options"]["items"]["properties"]["records"]["items"]["$ref"],
+            "nutrition-accounting-input-v1.schema.json"
+        );
+
+        let mut input: Value = serde_json::from_str(include_str!(
+            "../../docs/research/cropfoundry/nutrition-portfolio-example-v0.json"
+        ))
+        .unwrap();
+        input["unreviewed_field"] = serde_json::json!(true);
+        assert!(serde_json::from_value::<PortfolioInput>(input).is_err());
+    }
+
+    #[test]
+    fn cropfoundry_portfolio_keeps_partial_resource_ledgers_incomparable() {
+        let mut crop_b = option("crop-b", 80.0, 30.0);
+        for record in &mut crop_b.records {
+            record.as_object_mut().unwrap().remove("water_liters");
+            record.as_object_mut().unwrap().remove("water_boundary");
+        }
+        let receipt = portfolio(vec![option("crop-a", 100.0, 20.0), crop_b]);
+        assert!(!receipt.accounting_pass);
+        assert!(
+            receipt
+                .issues
+                .iter()
+                .any(|issue| issue.contains("water_liters is incomplete"))
+        );
+    }
+
+    #[test]
+    fn cropfoundry_portfolio_sums_only_complete_nutrient_intervals() {
+        let mut crop_a = option("crop-a", 100.0, 20.0);
+        for record in &mut crop_a.records {
+            let concentration = record["concentration_mg_per_kg"].as_f64().unwrap();
+            record["concentration_lower_mg_per_kg"] =
+                serde_json::json!(concentration * 0.9);
+            record["concentration_upper_mg_per_kg"] =
+                serde_json::json!(concentration * 1.1);
+            record["edible_mass_lower_kg_at_concentration_stage"] = serde_json::json!(0.09);
+            record["edible_mass_upper_kg_at_concentration_stage"] = serde_json::json!(0.11);
+            record["uncertainty_interval_kind"] = serde_json::json!("sensitivity_bounds");
+            record["uncertainty_evidence_uri"] =
+                serde_json::json!("urn:synthetic-interval-method");
+        }
+        let receipt = portfolio(vec![crop_a, option("crop-b", 80.0, 30.0)]);
+        assert!(receipt.accounting_pass, "{:?}", receipt.issues);
+        let iron = receipt.options[0]
+            .nutrients
+            .iter()
+            .find(|nutrient| nutrient.nutrient_id == "iron")
+            .unwrap();
+        assert_eq!(iron.total_delivered_interval_lower_mg, Some(16.2));
+        assert_eq!(iron.total_delivered_interval_upper_mg, Some(24.2));
+    }
+
+    #[test]
     fn cropfoundry_portfolio_sums_resources_once_per_batch_not_once_per_nutrient() {
         let receipt = portfolio(vec![option("crop-a", 100.0, 20.0), option("crop-b", 80.0, 30.0)]);
         assert!(receipt.accounting_pass, "{:?}", receipt.issues);
