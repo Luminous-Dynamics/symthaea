@@ -21,7 +21,7 @@ cargo run -q -p xtask -- cropfoundry-nutrition-portfolio \
 cargo test -p xtask cropfoundry_portfolio
 ```
 
-The example contains two fake crop options, each with two batches and two nutrients. It is an arithmetic fixture, not plant data. The receipt preserves output by nutrient, measured-concentration versus estimated-delivery counts, uncertainty intervals where supplied, bioavailability-estimate coverage, resource ratios, common boundary labels, errors and warnings. The command does not rank or recommend options.
+The example contains two fake crop options, each with two batches and two nutrients. It is an arithmetic fixture, not plant data. The receipt preserves output by nutrient, measured-concentration versus estimated-delivery counts, uncertainty intervals where supplied, bioavailability-estimate coverage, resource ratios, common boundary labels, errors and warnings. Separate per-nutrient flags say whether interval comparisons and bioavailability comparisons are available across *all* options; accounting success does not imply those optional evidence types are comparable. The command does not rank or recommend options.
 
 ## Invariants that matter
 
