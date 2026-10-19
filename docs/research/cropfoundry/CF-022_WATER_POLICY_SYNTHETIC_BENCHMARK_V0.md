@@ -78,6 +78,23 @@ Keep the two comparisons separate:
 
 The second counterfactual is intended to diagnose whether the risk-aware score gain comes from allocating water to particular plots rather than simply using less water. It is still possible to hide burden by sacrificing one plot, so inspect zone-level stress and distributional metrics alongside aggregate stress. No agronomic or biological claim follows from either comparison.
 
+## Exploratory result: aggregate stress is not a sufficient objective
+
+The first successful matched-dose harness receipt gives a concrete counterexample. All four receipt policies had zero daily total-water-budget violations and zero per-plot-limit violations across the six scenarios.
+
+| Synthetic policy | Mean aggregate stress proxy | Median worst-zone stress proxy | Maximum worst-zone stress proxy | Mean worst-to-best zone stress ratio | Total irrigation (plot-mm) | Mean allocation dispersion |
+|---|---:|---:|---:|---:|---:|---:|
+| Equal-share calendar | 958.356 | 539.651 | 597.378 | 7.312 | 1,386.0 | 0.000 |
+| Soil threshold | 1,225.457 | 508.365 | 577.237 | 2.069 | 1,373.1 | 9.016 |
+| Uncertainty-aware marginal risk | 643.215 | 562.845 | 610.689 | 6,151.882 | 909.7 | 33.400 |
+| Water-matched rotating-uniform counterfactual | 1,497.231 | 563.419 | 607.899 | 1.447 | 909.7 | 0.057 |
+
+All scores are from the toy scenario equations. "plot-mm" is a sum of synthetic depths, not physical water volume. The matched-uniform row uses the risk-aware policy's exact daily total-water trace, so both policies use the same amount of water on every day.
+
+The risk-aware policy has a much lower **aggregate** stress proxy than the dose-matched uniform counterfactual, but its worst-zone stress is not lower, its maximum worst-zone exposure is slightly higher, and its mean worst-to-best zone-stress ratio is extreme. In several scenarios it allocated almost all water to zones 0 and 2 while zone 1 accumulated almost all the stress proxy. The score rewarded protecting two zones and allowed one to be sacrificed. That is a **benchmark failure of the aggregate objective**, even though arithmetic, determinism and resource constraints passed.
+
+Do not describe the -57.36% matched-dose stress delta as success. The next research increment should add and test a minimax/fairness-aware allocation policy, and acceptance should include a predeclared bound on worst-zone stress and disparity alongside aggregate performance. No crop safety or agronomic guarantee can be inferred from these synthetic numbers.
+
 ## Acceptance tests for the matched-dose comparison
 
 The implementation must demonstrate all of the following before a receipt is considered structurally valid:
