@@ -32,9 +32,10 @@ A second binary compares four selection policies under equal experiment budgets 
 - `seeded_random`;
 - `maximin_coverage`;
 - `model_disagreement` (global linear trend versus local piecewise-linear interpolation);
-- `coverage_guarded_disagreement` (the same disagreement signal, with a minimum spacing constraint based on the declared experiment budget).
+- `coverage_guarded_disagreement` (the same disagreement signal, with a minimum spacing constraint based on the declared experiment budget);
+- `cost_aware_integrated_disagreement` (greedy reduction in integrated squared disagreement between a global linear model and a local piecewise-linear model, divided by a predeclared toy setup-cost profile).
 
-Each policy begins from the same endpoint/midpoint observations, has the same experiment budget, and sees the same deterministic per-location noise for a given seed. Evaluation error is computed on a dense synthetic oracle grid excluding sampled positions. Reports include the selected grid indices per trial, mean absolute error, p90 absolute error, mean RMSE and worst per-trial maximum absolute error. The comparison is deliberately not called Bayesian optimization or calibrated information gain.
+Each policy begins from the same endpoint/midpoint observations, has the same experiment budget, and sees the same deterministic per-location noise for a given seed. Evaluation error is computed on a dense synthetic oracle grid excluding sampled positions. Reports include selected grid indices, synthetic cost units per trial, mean absolute error, p90 absolute error, mean RMSE and worst per-trial maximum absolute error. The cost profile is a deterministic test fixture, not a currency, procurement quote or measured labor cost. The new policy is a two-model heuristic: it is **not** calibrated Bayesian expected information gain or a formal integrated mean squared prediction error implementation. The comparison is deliberately not called Bayesian optimization or calibrated information gain.
 
 Run the reproducible default tournament (100 seeds, 11 observations per policy/surface):
 
@@ -42,7 +43,7 @@ Run the reproducible default tournament (100 seeds, 11 observations per policy/s
 cargo run --manifest-path tools/mus-doe-audit/Cargo.toml --bin policy_tournament -- --seeds 100 --budget 11
 ```
 
-The output is a deterministic JSON report. Try alternative preregistered seed counts and odd budgets between 3 and 101, keeping policies at the same budget. The tournament does not select or qualify a real instrument design. Synthetic performance is an algorithm sanity check, not evidence of physical-model accuracy.
+The output is a deterministic JSON report. The current tournament holds the number of observations equal across policies and reports their incurred synthetic costs; because costs vary by grid region, it is not yet a fixed-total-cost comparison. Try alternative preregistered seed counts and odd budgets between 3 and 101, keeping policy observation counts matched. The tournament does not select or qualify a real instrument design. A follow-on fixed-total-cost benchmark should let each policy stop when a common cumulative cost budget is reached. Synthetic performance is an algorithm sanity check, not evidence of physical-model accuracy.
 
 ## Exit codes and claim ceiling
 
