@@ -104,14 +104,16 @@ cargo test -p xtask frozen_fault_matrix_cases_match_expected_outcomes
 cargo run -p xtask -- mobility-telemetry-benchmark \
   --source-commit "$(git rev-parse HEAD)" \
   --out reports/mobility_telemetry_benchmark.json
+cargo run -p xtask -- mobility-telemetry-verify-report \
+  --input reports/mobility_telemetry_benchmark.json
 ```
 
-The command verifies that `--source-commit` exactly matches `git rev-parse HEAD`, captures the executing environment by running `rustc -Vv` plus `cargo --version` (failure to execute either command fails closed), reads the frozen JSON matrix, applies each specified mutation, compares observed and expected decisions and checks required diagnostic tokens (including gap/invalid-row counters), emits a hash-bound JSON report with a canonical report digest, and exits nonzero on any outcome or diagnostic mismatch. It does not measure hardware. It has been authored but not compiled or run in this environment.
+The benchmark command verifies that `--source-commit` exactly matches `git rev-parse HEAD`, refuses dirty tracked/untracked checkout state except the explicitly requested report path, captures the executing environment by running `rustc -Vv` plus `cargo --version` (failure to execute either command fails closed), validates the matrix schema and positive/negative controls, applies each mutation, checks expected outcomes and required diagnostic tokens, and emits a hash-bound JSON report with a canonical report digest. The standalone `mobility-telemetry-verify-report` command then recomputes that digest and cross-checks case counts, pass/fail totals, status, and required-diagnostic consistency without replaying the benchmark. These tools have been authored but not compiled or run in this environment. It does not measure hardware. It has been authored but not compiled or run in this environment.
 
 Next:
 
-1. Execute the Rust tests and matrix on a host with the workspace toolchain; retain the exact-head report and build identity.
-2. Verify the canonical report digest and run the full suite 100 times on the same build to measure replay determinism; a unit test checks digest stability and content sensitivity.
+1. Execute the Rust tests and matrix on a host with the workspace toolchain; retain the exact-head report and build identity, then run `mobility-telemetry-verify-report` before sharing/archive.
+2. Run the full suite 100 times on the same build to measure replay determinism; a unit test checks 100 repeated canonical digest computations and content-tamper detection.
 3. Build a host recorder/replayer before MCU firmware; add SocketCAN only as a receive-only, fail-closed adapter and test unavailable timestamp modes.
 4. Build a known-signal bench: pulse/step signal generator, synchronized voltage/current reference and independent sample counter.
 5. Validate the physical sensor chain and uncertainty before any real-world efficiency, handling, tire-force or safety claim.
