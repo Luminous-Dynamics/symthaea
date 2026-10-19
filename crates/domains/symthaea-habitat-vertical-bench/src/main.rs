@@ -266,7 +266,7 @@ fn main() {
                 process::exit(1);
             }
             println!(
-                "synthetic recall response drill: PASS ({} targets; affected={}; contained={}; unresolved={}; false-positive controls={}; closure={}; real recall=NOT PERFORMED)",
+                "synthetic recall response drill definition: VALID ({} targets; affected={}; contained={}; unresolved={}; false-positive controls={}; closure={}; real recall=NOT PERFORMED)",
                 recall_drill.target_count,
                 recall_drill.affected_terminal_ids.len(),
                 recall_drill.confirmed_contained_count,
