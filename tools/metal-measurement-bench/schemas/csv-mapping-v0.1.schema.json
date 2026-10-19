@@ -7,7 +7,8 @@
     "schema_version",
     "artifact_relative_path",
     "source_row_id_header",
-    "columns"
+    "columns",
+    "excluded_columns"
   ],
   "properties": {
     "schema_version": {
@@ -64,6 +65,29 @@
               "preserve_missing"
             ],
             "description": "Choose whether an empty mapped cell fails reconciliation or is counted explicitly as missing. No imputation is performed."
+          }
+        }
+      }
+    },
+    "excluded_columns": {
+      "type": "array",
+      "description": "Every source header other than source_row_id_header and mapped columns must be explicitly excluded with a reviewable reason.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "source_header",
+          "reason"
+        ],
+        "properties": {
+          "source_header": {
+            "type": "string",
+            "minLength": 1
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Why the source column is excluded from this profile; the source bytes remain bound in the artifact digest."
           }
         }
       }
