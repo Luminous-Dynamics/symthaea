@@ -3,7 +3,7 @@
 //! This checks JSON shape and software safety metadata. It is not a JSON Schema
 //! engine, a clinical oracle, a protocol approval service, or clinical validation.
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -246,7 +246,9 @@ fn validate_schema_contract(schema: &Value, corpus: &ScenarioCorpus) -> Result<(
             .and_then(Value::as_bool)
             != Some(true)
     {
-        bail!("scenario schema must keep fixtures synthetic and clinical content separately required");
+        bail!(
+            "scenario schema must keep fixtures synthetic and clinical content separately required"
+        );
     }
     if schema
         .pointer("/properties/scenarios/items/properties/scenario_id/pattern")
@@ -378,7 +380,11 @@ fn validate_corpus(corpus: &ScenarioCorpus, schema: &Value) -> Result<()> {
                 scenario.scenario_type
             );
         }
-        if !enum_contains(schema, "expected_disposition", &scenario.expected_disposition) {
+        if !enum_contains(
+            schema,
+            "expected_disposition",
+            &scenario.expected_disposition,
+        ) {
             bail!(
                 "{}: expected_disposition {:?} is not declared by schema",
                 scenario.scenario_id,
@@ -454,7 +460,12 @@ fn validate_corpus(corpus: &ScenarioCorpus, schema: &Value) -> Result<()> {
     if !has_fail_closed_control {
         bail!("corpus must retain at least one fail-closed negative control");
     }
-    for required_type in ["content_integrity", "content_currency", "connectivity", "missing_data"] {
+    for required_type in [
+        "content_integrity",
+        "content_currency",
+        "connectivity",
+        "missing_data",
+    ] {
         if !scenario_types.contains(required_type) {
             bail!("corpus is missing required fault dimension {required_type}");
         }
@@ -471,7 +482,10 @@ fn validate_corpus(corpus: &ScenarioCorpus, schema: &Value) -> Result<()> {
 
 fn validate_benchmark(benchmark: &BenchmarkSpec) -> Result<()> {
     if benchmark.schema_version != BENCHMARK_VERSION {
-        bail!("unsupported benchmark spec version: {}", benchmark.schema_version);
+        bail!(
+            "unsupported benchmark spec version: {}",
+            benchmark.schema_version
+        );
     }
     if benchmark.status != "proposed_targets_unmeasured" {
         bail!("benchmark targets must remain explicitly unmeasured until evaluated");
@@ -520,7 +534,11 @@ fn validate_benchmark(benchmark: &BenchmarkSpec) -> Result<()> {
             }
         }
     }
-    if benchmark.release_gates.iter().any(|gate| gate.trim().is_empty()) {
+    if benchmark
+        .release_gates
+        .iter()
+        .any(|gate| gate.trim().is_empty())
+    {
         bail!("release gates must not contain empty entries");
     }
     if benchmark
@@ -538,10 +556,8 @@ fn validate_benchmark(benchmark: &BenchmarkSpec) -> Result<()> {
 mod tests {
     use super::*;
 
-    const CORPUS_JSON: &str =
-        include_str!("../../docs/research/first-aid/scenario-corpus-v0.json");
-    const BENCHMARK_JSON: &str =
-        include_str!("../../docs/research/first-aid/benchmark-v0.json");
+    const CORPUS_JSON: &str = include_str!("../../docs/research/first-aid/scenario-corpus-v0.json");
+    const BENCHMARK_JSON: &str = include_str!("../../docs/research/first-aid/benchmark-v0.json");
     const SCHEMA_JSON: &str =
         include_str!("../../docs/research/first-aid/scenario-corpus-v0.schema.json");
 
