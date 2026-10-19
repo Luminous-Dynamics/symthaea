@@ -109,7 +109,10 @@ fn parse_utc_timestamp(value: &str) -> Option<UtcTimestamp> {
     let without_z = value.strip_suffix('Z')?;
     let (clock, fraction) = match without_z.split_once('.') {
         Some((clock, fraction)) => {
-            if fraction.is_empty() || !fraction.bytes().all(|byte| byte.is_ascii_digit()) {
+            if fraction.is_empty()
+                || fraction.len() > 9
+                || !fraction.bytes().all(|byte| byte.is_ascii_digit())
+            {
                 return None;
             }
             (clock, Some(fraction))
@@ -314,14 +317,20 @@ pub fn validate_culinary_experiment_v1(
             errors.push(format!("{label}.direction is required"));
             continue;
         };
+        if non_empty(value, "description").is_none() {
+            errors.push(format!("{label}.description is required"));
+        }
         if !DIRECTIONS.contains(&direction) {
             errors.push(format!("{label}.direction is invalid"));
         }
-        if direction == "target" && finite_number(value, "target_value").is_none() {
+        let target_value = value.get("target_value");
+        if target_value.is_none() {
+            errors.push(format!("{label}.target_value must be present (null when not applicable)"));
+        } else if direction == "target" && finite_number(value, "target_value").is_none() {
             errors.push(format!("{label} with target direction requires finite target_value"));
         }
-        if direction != "target" && value.get("target_value").is_some_and(|field| !field.is_null()) {
-            errors.push(format!("{label} target_value must be null unless direction is target"));
+        if direction != "target" && target_value.is_some_and(|field| !field.is_null()) {
+            errors.push(format!("{label}.target_value must be null unless direction is target"));
         }
         if outcome_definitions.insert(id.to_owned(), OutcomeDefinition {
             unit: unit.to_owned(),
