@@ -1289,7 +1289,9 @@ mod tests {
         );
 
         assert_eq!(
-            receipt.pointer("/claim_boundaries/preview_rendered").and_then(Value::as_bool),
+            receipt
+                .pointer("/claim_boundaries/preview_rendered")
+                .and_then(Value::as_bool),
             Some(false),
             "the historical workflow did not render a preview"
         );
@@ -1321,9 +1323,9 @@ mod tests {
             "ODRH-CAD-NEGATIVE-PLATE-THICKNESS",
         ] {
             assert!(
-                checks.iter().any(|check| {
-                    check.get("id").and_then(Value::as_str) == Some(required_id)
-                }),
+                checks
+                    .iter()
+                    .any(|check| { check.get("id").and_then(Value::as_str) == Some(required_id) }),
                 "historical CAD receipt omits evidenced negative control {required_id}"
             );
         }
