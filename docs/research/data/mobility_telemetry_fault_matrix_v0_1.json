@@ -1,7 +1,7 @@
 {
   "schema_version": "0.1.0",
   "suite_id": "MOBILITY-TELEMETRY-CONFORMANCE-001",
-  "status": "frozen_proposed_matrix_v0_1_with_receipt_content_binding_not_yet_executed",
+  "status": "frozen_proposed_matrix_v0_1_with_per_channel_gap_ledger_control_not_yet_executed",
   "claim_ceiling": "Software conformance only. No demonstrated hardware reliability, measurement accuracy, vehicle performance, tire qualification, or roadworthiness.",
   "interpretation": {
     "positive_controls_required": true,
@@ -361,6 +361,18 @@
       "rust_test": "uncertainty_budget_receipt_must_match_manifest_content",
       "required_detail_tokens": [
         "does not match manifest budget"
+      ]
+    },
+    {
+      "id": "TRACE-014",
+      "category": "trace_loss_ledger",
+      "mutation": "gap_event_reports_estimated_missing_samples",
+      "expected": "accept_with_diagnostic",
+      "diagnostic": "gap ledger preserves both timestamps and records a clearly labelled missing-sample estimate",
+      "rust_test": "gap_event_reports_estimated_missing_samples",
+      "required_detail_tokens": [
+        "estimated_missing_samples=4",
+        "exact_gap_ns=500000000"
       ]
     }
   ],
