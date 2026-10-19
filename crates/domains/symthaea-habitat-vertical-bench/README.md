@@ -34,17 +34,19 @@ The default fixture is embedded at compile time from `docs/research/fixtures/hab
 - exactly one final inspection, requiring inspection and measurement skills and a required hold point;
 - complete negative-control and disruption descriptions;
 - a definition-only counterfactual campaign covering exactly the eight source disruption IDs, with per-case interventions, hard invariants, required outputs, metric references, and unresolved execution blockers;
+- a synthetic resilience-options qualifier covering 6 strategy concepts × 8 disruptions = 48 challenge-oracle cells, exact source-scenario coverage, integer interval ordering, localized mitigation invariants, and precondition gates;
+- explicit refusal to assign scenario probabilities, compute ROI/expected annual loss, monetize service loss, or run/select a robust frontier without the existing qualified owner APIs;
 - no fabricated numeric campaign results, no implicit baseline/candidate policy binding, and no confusion between campaign definition validation and simulation;
 - proposed target status and the delivered-cost ratio range;
 - synthetic-only physical-measurement, factory-commissioning, human-evaluation and replication states.
 
 ## Tests and verification status
 
-The source currently contains 44 authored Rust unit tests across the structural/arithmetic qualifier and the scenario-campaign qualifier (31 existing + 13 new scenario tests). They have not been compiled or executed in the current environment; do not describe them as passing. Run the commands above against the exact branch head before treating the qualifier as an executed test result. The scenario-campaign tests qualify definitions only, not scheduling outcomes.
+The source currently contains 57 authored Rust unit tests across three modules (31 structural/accounting + 13 scenario-campaign + 13 resilience-option tests). They have not been compiled or executed in the current environment; do not describe them as passing. Run the commands above against the exact branch head before treating the qualifier as an executed test result. Both new suites qualify synthetic definitions only, not scheduling or resilience outcomes.
 
 ## Deliberate limits
 
-This is a schema/consistency, synthetic arithmetic and scenario-definition qualifier, not a scheduler, optimizer, production-execution engine, supplier verifier, material-property validator, factory code/safety reviewer, costing audit, LCA engine or product qualification system. It checks the frozen graph's exact known-answer descendant sets and the eight disruption definitions; it does not prove physical lot-genealogy completeness, quarantine a real article, execute disruptions, compare baseline/candidate schedules, test cost formulas against observed books, verify a real factory layout, or show that any proposed target is achieved. The household-goods policy identities and scheduler adapter remain unbound. Those steps require exact current owner APIs and eventually measured evidence.
+This is a schema/consistency, synthetic arithmetic and scenario-definition qualifier, not a scheduler, optimizer, production-execution engine, supplier verifier, material-property validator, factory code/safety reviewer, costing audit, LCA engine or product qualification system. It checks the frozen graph's exact known-answer descendant sets and the eight disruption definitions; it does not prove physical lot-genealogy completeness, quarantine a real article, execute disruptions, compare baseline/candidate schedules, test cost formulas against observed books, verify a real factory layout, or show that any proposed target is achieved. The household-goods policy identities and scheduler adapter remain unbound. The option matrix is a constructed oracle for future interval-frontier tests, not realistic predicted outcomes. Those steps require exact current owner APIs and eventually measured evidence.
 
 The crate uses the existing graph-theory implementation rather than adding another graph engine. It is a research/benchmark consumer and must not be treated as physical execution authority.
 
