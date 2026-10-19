@@ -812,6 +812,43 @@ mod tests {
     }
 
     #[test]
+    fn cropfoundry_portfolio_counts_preparation_stage_delivery_as_estimated() {
+        let mut crop = option("crop-a", 100.0, 20.0);
+        crop.records[0]["concentration_stage"] = serde_json::json!("measured_before_preparation");
+        crop.records[0]["retention_fraction"] = serde_json::json!(0.8);
+        crop.records[0]["retention_evidence_uri"] =
+            serde_json::json!("urn:synthetic-retention-factor");
+        let receipt = portfolio(vec![crop, option("crop-b", 80.0, 30.0)]);
+        assert!(receipt.accounting_pass, "{:?}", receipt.issues);
+        let iron = receipt.options[0]
+            .nutrients
+            .iter()
+            .find(|nutrient| nutrient.nutrient_id == "iron")
+            .unwrap();
+        assert_eq!(iron.direct_assay_concentration_batch_count, 2);
+        assert_eq!(iron.estimated_delivery_batch_count, 1);
+    }
+
+    #[test]
+    fn cropfoundry_portfolio_sum_overflow_fails_closed() {
+        let mut crop_a = option("crop-a", 100.0, 20.0);
+        for record in &mut crop_a.records {
+            if record["nutrient_id"] == "iron" {
+                record["concentration_mg_per_kg"] = serde_json::json!(1.7e308);
+                record["edible_mass_kg_at_concentration_stage"] = serde_json::json!(1.0);
+            }
+        }
+        let receipt = portfolio(vec![crop_a, option("crop-b", 80.0, 30.0)]);
+        assert!(!receipt.accounting_pass);
+        assert!(
+            receipt.options[0]
+                .issues
+                .iter()
+                .any(|issue| issue.contains("total overflowed"))
+        );
+    }
+
+    #[test]
     fn cropfoundry_portfolio_checks_resource_currency_comparability() {
         let mut crop_b = option("crop-b", 80.0, 30.0);
         crop_b.records.iter_mut().for_each(|record| {
