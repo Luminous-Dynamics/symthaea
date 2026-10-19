@@ -156,7 +156,9 @@
         "mapped_column_count",
         "columns",
         "reconciliation_note",
-        "claim_ceiling"
+        "claim_ceiling",
+        "excluded_column_count",
+        "excluded_columns"
       ],
       "properties": {
         "artifact_relative_path": {
@@ -254,6 +256,41 @@
         "claim_ceiling": {
           "type": "string",
           "minLength": 1
+        },
+        "excluded_column_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "excluded_columns": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "source_header",
+              "reason",
+              "nonempty_cells",
+              "empty_cells"
+            ],
+            "properties": {
+              "source_header": {
+                "type": "string",
+                "minLength": 1
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1
+              },
+              "nonempty_cells": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "empty_cells": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
         }
       }
     }
