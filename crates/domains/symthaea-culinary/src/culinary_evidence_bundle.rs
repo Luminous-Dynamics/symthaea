@@ -292,8 +292,8 @@ pub fn verify_culinary_evidence_bundle_v1(
 
     let mut verified_process_trace_ids = BTreeSet::new();
     let mut seen_process_trace_ids = BTreeSet::new();
-    let blocks = match experiment.get("blocks").and_then(Value::as_array) {
-        Some(items) => items,
+    let blocks: &[Value] = match experiment.get("blocks").and_then(Value::as_array) {
+        Some(items) => items.as_slice(),
         None => {
             errors.push("experiment.blocks must be an array".to_owned());
             &[]
@@ -302,8 +302,8 @@ pub fn verify_culinary_evidence_bundle_v1(
     let mut outcome_source_refs = BTreeSet::new();
 
     for (block_index, block) in blocks.iter().enumerate() {
-        let runs = match block.get("runs").and_then(Value::as_array) {
-            Some(items) => items,
+        let runs: &[Value] = match block.get("runs").and_then(Value::as_array) {
+            Some(items) => items.as_slice(),
             None => {
                 errors.push(format!("experiment.blocks[{block_index}].runs must be an array"));
                 continue;
