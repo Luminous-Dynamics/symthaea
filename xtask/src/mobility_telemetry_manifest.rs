@@ -1214,6 +1214,30 @@ fn evaluate_fault_case(mutation: &str, manifest: &Manifest) -> (String, String) 
                 Err(error) => ("reject".to_owned(), error.to_string()),
             }
         }
+        "gap_event_reports_estimated_missing_samples" => {
+            let raw = b"timestamp_ns,channel_id,raw_value,sample_status,sequence\n1,gnss.speed_mps,0,VALID,0\n100000001,gnss.speed_mps,1,VALID,1\n600000001,gnss.speed_mps,2,VALID,2\n";
+            match validate_trace_bytes(raw, manifest) {
+                Ok(report)
+                    if report.row_count == 3
+                        && report.gaps.len() == 1
+                        && report.gaps[0].previous_timestamp_ns == 100_000_001
+                        && report.gaps[0].current_timestamp_ns == 600_000_001
+                        && report.gaps[0].estimated_missing_samples == 4 =>
+                {
+                    (
+                        "accept_with_diagnostic".to_owned(),
+                        "all three rows retained; estimated_missing_samples=4; exact_gap_ns=500000000".to_owned()
+                    )
+                }
+                Ok(report) => (
+                    "accept_without_required_diagnostic".to_owned(),
+                    format!("rows={}, gap_events={}, estimated_missing={:?}",
+                        report.row_count, report.gaps.len(),
+                        report.gaps.iter().map(|gap| gap.estimated_missing_samples).collect::<Vec<_>>())
+                ),
+                Err(error) => ("reject".to_owned(), error.to_string()),
+            }
+        }
         "header_only_empty_trace" => {
             let raw = b"timestamp_ns,channel_id,raw_value,sample_status,sequence\n";
             trace_case_outcome(raw, manifest)
@@ -2063,7 +2087,7 @@ mod tests {
         )).expect("frozen telemetry fault matrix parses");
         let cases = matrix.get("cases").and_then(serde_json::Value::as_array)
             .expect("fault matrix has a case array");
-        assert_eq!(cases.len(), 32, "matrix size changes require deliberate review");
+        assert_eq!(cases.len(), 33, "matrix size changes require deliberate review");
         assert_eq!(
             matrix.get("schema_version").and_then(serde_json::Value::as_str),
             Some(SCHEMA_VERSION),
@@ -2494,5 +2518,18 @@ mod tests {
         assert_eq!(report.gaps[0].observed_gap_ns, 500_000_000);
         assert_eq!(report.gaps[0].estimated_missing_samples, 4);
         assert_eq!(report.channels.iter().map(|c| c.sample_count).sum::<usize>(), 3);
+    }
+
+    #[test]
+    fn gap_event_reports_estimated_missing_samples() {
+        let fixture = manifest();
+        let raw = b"timestamp_ns,channel_id,raw_value,sample_status,sequence\n1,gnss.speed_mps,0,VALID,0\n100000001,gnss.speed_mps,1,VALID,1\n600000001,gnss.speed_mps,2,VALID,2\n";
+        let report = validate_trace_bytes(raw, &fixture).expect("gap is a diagnostic not a parse failure");
+        assert_eq!(report.row_count, 3);
+        assert_eq!(report.gaps.len(), 1);
+        assert_eq!(report.gaps[0].previous_timestamp_ns, 100_000_001);
+        assert_eq!(report.gaps[0].current_timestamp_ns, 600_000_001);
+        assert_eq!(report.gaps[0].estimated_missing_samples, 4);
+        assert_eq!(report.channels.iter().map(|channel| channel.sample_count).sum::<usize>(), 3);
     }
 }
