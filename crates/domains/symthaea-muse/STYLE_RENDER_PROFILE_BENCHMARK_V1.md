@@ -97,7 +97,12 @@ neutral profile versus dialect profile, level matched, identical MIDI, identical
 SoundFont, same sample rate and mastering chain. Keep the composition and
 instrument ensemble constant for the renderer-profile ablation. For a separate
 style-identity trial, allow the score, ensemble and dialect to vary, and balance
-listener familiarity. Never combine the two into one score.
+listener familiarity. Randomize presentation order and hide renderer/model
+identity until debrief; if AI-versus-human labelling is of interest, test that in
+a separate randomized factor instead of confounding it with sound. Recent work
+finds disclosure labels can affect attitudes to music, so provenance should not
+quietly become the style-recognition treatment. Never combine the profile
+ablation and full style-identity trial into one score.
 
 Targets for the first pilot (proposed, not existing results):
 
@@ -156,6 +161,10 @@ while leaving the score and declared grammar unchanged.
   (Artificial Intelligence Review, 2026) distinguishes symbolic and audio
   evaluation and recommends multiple complementary measures:
   https://doi.org/10.1007/s10462-026-11582-x
+- Chia et al. (December 2025), *Do listeners devalue AI-generated pop music?*
+  experimentally studies AI-labelled versus human-labelled music and motivates
+  treating provenance disclosure as a separate randomized factor:
+  https://doi.org/10.1016/j.chbah.2025.100217
 - MusicGen model card summarizing FAD, KL, CLAP, and human evaluations of audio
   quality and text relevance on held-out evaluation sets:
   https://github.com/aime-labs/MusicGen/blob/main/MODEL_CARD.md
