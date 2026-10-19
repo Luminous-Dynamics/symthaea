@@ -25,7 +25,7 @@ To screen whether an instrument's ideal rectangular field-of-view footprint fits
       --geometry-record docs/engineering/display-measurement-geometry-synthetic-v0.1.json \
       --geometry-schema docs/engineering/display-measurement-geometry.schema.json
 
-This uses an ideal planar-target geometry model, propagates first-order distance/FOV uncertainty, then makes the fit decision with a conservative upper-envelope plus centering and edge guards. The checked-in inputs are synthetic: it is not a lens/distortion, detector-response, calibration or physical-fit qualification.
+This uses an ideal planar-target geometry model, propagates first-order distance/FOV uncertainty, then makes the fit decision with a conservative upper-envelope plus centering and edge guards. Its report includes residual margin and patch-utilization fractions on each axis. The checked-in inputs are synthetic: it is not a lens/distortion, detector-response, calibration or physical-fit qualification.
 
 To validate a run-specific geometry receipt after the OpenSCAD checks:
 
