@@ -117,5 +117,70 @@
         }
       }
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "design": {
+            "properties": {
+              "allocation_unit": {
+                "const": "plot"
+              }
+            },
+            "required": [
+              "allocation_unit"
+            ]
+          }
+        },
+        "required": [
+          "design"
+        ]
+      },
+      "then": {
+        "properties": {
+          "design": {
+            "properties": {
+              "plots_per_cluster": {
+                "const": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "design": {
+            "properties": {
+              "allocation_unit": {
+                "enum": [
+                  "farm",
+                  "greenhouse_cluster"
+                ]
+              }
+            },
+            "required": [
+              "allocation_unit"
+            ]
+          }
+        },
+        "required": [
+          "design"
+        ]
+      },
+      "then": {
+        "properties": {
+          "design": {
+            "properties": {
+              "plots_per_cluster": {
+                "minimum": 2
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
 }
