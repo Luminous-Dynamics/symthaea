@@ -54,6 +54,15 @@ jobs:
             --out "$RUNNER_TEMP/cropfoundry-water-policy.json"
           test -s "$RUNNER_TEMP/cropfoundry-water-policy.json"
 
+      - name: Execute synthetic robust-policy diagnostics
+        run: |
+          cargo run -q -p xtask -- cropfoundry-robust-policy-demo \
+            --out "$RUNNER_TEMP/cropfoundry-robust-policy.json"
+          grep -q '"benchmark_id": "CF-025"' "$RUNNER_TEMP/cropfoundry-robust-policy.json"
+          grep -q '"calibrated_probability_claim": false' "$RUNNER_TEMP/cropfoundry-robust-policy.json"
+          grep -q '"tail_sample_count": 1' "$RUNNER_TEMP/cropfoundry-robust-policy.json"
+          grep -q '"pareto_front_member": true' "$RUNNER_TEMP/cropfoundry-robust-policy.json"
+
       - name: Check postharvest mass-balance audit CLI
         run: cargo run -q -p xtask -- cropfoundry-postharvest-audit --help
 
