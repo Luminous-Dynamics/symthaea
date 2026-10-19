@@ -831,6 +831,8 @@ struct FaultMatrixCaseReport {
     mutation: String,
     expected: String,
     observed: String,
+    required_detail_tokens: Vec<String>,
+    missing_detail_tokens: Vec<String>,
     passed: bool,
     detail: String,
 }
@@ -1225,17 +1227,35 @@ pub fn run_benchmark(
             .context("fault-matrix case has no string mutation")?.to_owned();
         let expected = case.get("expected").and_then(serde_json::Value::as_str)
             .context("fault-matrix case has no string expected outcome")?.to_owned();
+        let required_detail_tokens = case.get("required_detail_tokens")
+            .and_then(serde_json::Value::as_array)
+            .context("fault-matrix case has no required_detail_tokens array")?
+            .iter()
+            .map(|token| token.as_str()
+                .map(str::to_owned)
+                .context("required detail token must be a string"))
+            .collect::<Result<Vec<_>>>()?;
+        if required_detail_tokens.is_empty() {
+            bail!("fault-matrix case {case_id} must require at least one diagnostic token");
+        }
         if !seen_ids.insert(case_id.clone()) {
             bail!("duplicate fault-matrix case ID {case_id}");
         }
 
         let (observed, detail) = evaluate_fault_case(&mutation, &manifest);
-        let passed = observed == expected;
+        let detail_lower = detail.to_lowercase();
+        let missing_detail_tokens: Vec<String> = required_detail_tokens.iter()
+            .filter(|token| !detail_lower.contains(&token.to_lowercase()))
+            .cloned()
+            .collect();
+        let passed = observed == expected && missing_detail_tokens.is_empty();
         results.push(FaultMatrixCaseReport {
             case_id,
             mutation,
             expected,
             observed,
+            required_detail_tokens,
+            missing_detail_tokens,
             passed,
             detail,
         });
@@ -1585,6 +1605,16 @@ mod tests {
             assert!(ids.insert(id), "duplicate case ID {id}");
             let (observed, detail) = evaluate_fault_case(mutation, &fixture);
             assert_eq!(observed, expected, "fault case {id} ({mutation}): {detail}");
+            let tokens = case.get("required_detail_tokens").and_then(serde_json::Value::as_array)
+                .expect("case has required diagnostic tokens");
+            assert!(!tokens.is_empty(), "fault case {id} must assert a diagnostic, not only an exit class");
+            for token in tokens {
+                let token = token.as_str().expect("diagnostic token is a string");
+                assert!(
+                    detail.to_lowercase().contains(&token.to_lowercase()),
+                    "fault case {id} missing required diagnostic token {token:?}; observed detail: {detail}"
+                );
+            }
         }
     }
 
