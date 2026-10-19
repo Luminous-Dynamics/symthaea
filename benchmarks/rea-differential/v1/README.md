@@ -40,7 +40,7 @@ An abstention is not a success and is not counted as a correct extraction. Publi
 | Repeated-run semantic projection agreement | 100/100 |
 | Rejection of enumerated injected contract defects | 100% |
 
-Score at least four separate dimensions: **detector accuracy**, **recovery fidelity**, **byte-accounting integrity**, and **provenance/lineage fidelity**. Runtime and memory should be reported separately, never traded against silent byte loss.
+Score at least five separate dimensions: **detector accuracy**, **recovery fidelity**, **byte-accounting integrity**, **coordinate-space/transform fidelity**, and **provenance/lineage fidelity**. Runtime and memory should be reported separately, never traded against silent byte loss.
 
 Do not report one aggregate “firmware extraction accuracy” percentage without the denominators, eligible provider-format matrix, abstention rate, fixture-family split, and confidence intervals. Providers that do not support a format should not be punished as if they claimed to parse it; equally, an unsupported result must never be converted to a pass.
 
