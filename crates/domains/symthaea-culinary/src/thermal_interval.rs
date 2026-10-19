@@ -349,7 +349,8 @@ pub fn evaluate_thermal_interval_envelope_v1(
             && non_empty(observation, "measurement_kind") == Some(measurement_kind)
     }) {
         let observation_id = non_empty(observation, "observation_id").unwrap_or("<missing>");
-        let status = non_empty(observation, "temperature_c")
+        let status = observation
+            .get("temperature_c")
             .and_then(|temperature| non_empty(temperature, "status"))
             .unwrap_or("missing");
         if status == "unknown" {
