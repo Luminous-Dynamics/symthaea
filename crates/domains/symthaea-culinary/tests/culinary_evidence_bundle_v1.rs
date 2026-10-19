@@ -9,6 +9,7 @@ use symthaea_culinary::culinary_evidence_bundle::{
     analyze_paired_outcomes_with_verified_bundle_v1,
     verify_culinary_evidence_bundle_v1,
 };
+use symthaea_culinary::culinary_ro_crate::export_culinary_evidence_bundle_ro_crate_v1;
 
 fn fixture() -> Value {
     serde_json::from_str(include_str!(
@@ -115,7 +116,7 @@ fn verify_bundle(
     experiment: &Value,
     manifest_bytes: &[u8],
     manifest_sha: &str,
-    payloads: &'a BTreeMap<String, Vec<u8>>,
+    payloads: &BTreeMap<String, Vec<u8>>,
 ) -> symthaea_culinary::culinary_evidence_bundle::VerifiedCulinaryEvidenceBundleV1 {
     verify_culinary_evidence_bundle_v1(experiment, manifest_bytes, manifest_sha, payloads).unwrap()
 }
@@ -388,4 +389,74 @@ fn unbound_outcome_source_reference_is_rejected() {
         Value::String("urn:test-evidence:absent-source".into());
     let error = verify_culinary_evidence_bundle_v1(&experiment,&manifest_bytes,&manifest_sha,&payloads).unwrap_err();
     assert!(error.iter().any(|item| item.contains("has no manifest artifact")));
+}
+
+
+#[test]
+fn ro_crate_export_preserves_exact_manifest_and_payload_bytes() {
+    let (experiment, manifest_bytes, manifest_sha, payloads) = test_only_bundle();
+    let exported = export_culinary_evidence_bundle_ro_crate_v1(
+        &experiment, &manifest_bytes, &manifest_sha, &payloads
+    ).unwrap();
+
+    assert_eq!(exported.manifest_sha256(), manifest_sha);
+    assert_eq!(exported.files().len(), payloads.len() + 2);
+    assert_eq!(
+        exported.files().get("culinary-evidence-manifest.json").unwrap(),
+        &manifest_bytes
+    );
+
+    let manifest: Value = serde_json::from_slice(&manifest_bytes).unwrap();
+    for artifact in manifest["artifacts"].as_array().unwrap() {
+        let id = artifact["artifact_id"].as_str().unwrap();
+        let path = artifact["path"].as_str().unwrap();
+        assert_eq!(exported.files().get(path).unwrap(), payloads.get(id).unwrap());
+    }
+
+    let parsed_metadata: Value = serde_json::from_slice(
+        exported.files().get("ro-crate-metadata.json").unwrap()
+    ).unwrap();
+    assert_eq!(parsed_metadata, exported.metadata().clone());
+
+    let graph = exported.metadata()["@graph"].as_array().unwrap();
+    let root = graph.iter().find(|node| node["@id"] == "./").unwrap();
+    assert_eq!(root["@type"], "Dataset");
+    let parts = root["hasPart"].as_array().unwrap();
+    assert_eq!(parts.len(), payloads.len() + 1);
+    let referenced: std::collections::BTreeSet<String> = parts.iter()
+        .map(|item| item["@id"].as_str().unwrap().to_owned()).collect();
+    assert_eq!(referenced.len(), parts.len());
+    assert!(referenced.contains("culinary-evidence-manifest.json"));
+    for artifact in manifest["artifacts"].as_array().unwrap() {
+        assert!(referenced.contains(artifact["path"].as_str().unwrap()));
+    }
+
+    let repeated = export_culinary_evidence_bundle_ro_crate_v1(
+        &experiment, &manifest_bytes, &manifest_sha, &payloads
+    ).unwrap();
+    assert_eq!(exported.files(), repeated.files());
+}
+
+#[test]
+fn ro_crate_export_rejects_payload_tampering_before_packaging() {
+    let (experiment, manifest_bytes, manifest_sha, mut payloads) = test_only_bundle();
+    let id = payloads.keys().next().unwrap().clone();
+    payloads.get_mut(&id).unwrap().push(b'X');
+    let error = export_culinary_evidence_bundle_ro_crate_v1(
+        &experiment, &manifest_bytes, &manifest_sha, &payloads
+    ).unwrap_err();
+    assert!(!error.is_empty());
+}
+
+#[test]
+fn ro_crate_export_rejects_reserved_metadata_path_collisions() {
+    let (experiment, manifest_bytes, _, payloads) = test_only_bundle();
+    let mut manifest: Value = serde_json::from_slice(&manifest_bytes).unwrap();
+    manifest["artifacts"][0]["path"] = Value::String("ro-crate-metadata.json".into());
+    let bytes = serde_json::to_vec(&manifest).unwrap();
+    let digest = sha256_hex(&bytes);
+    let error = export_culinary_evidence_bundle_ro_crate_v1(
+        &experiment, &bytes, &digest, &payloads
+    ).unwrap_err();
+    assert!(error.iter().any(|item| item.contains("reserved file")));
 }
