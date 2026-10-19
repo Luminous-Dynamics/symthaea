@@ -96,3 +96,18 @@ jobs:
           grep -q '"nutrient_mass_delivered_interval_upper_mg": 13.6' "$RUNNER_TEMP/cropfoundry-nutrition-receipt.json"
           grep -q '"bioavailable_nutrient_mass_delivered_interval_lower_mg": 2.1' "$RUNNER_TEMP/cropfoundry-nutrition-receipt.json"
           grep -q '"bioavailable_nutrient_mass_delivered_interval_upper_mg": 4.08' "$RUNNER_TEMP/cropfoundry-nutrition-receipt.json"
+
+      - name: Check nutrition portfolio CLI
+        run: cargo run -q -p xtask -- cropfoundry-nutrition-portfolio --help
+
+      - name: Execute checked-in synthetic nutrition portfolio fixture
+        run: |
+          cargo run -q -p xtask -- cropfoundry-nutrition-portfolio \
+            --input docs/research/cropfoundry/nutrition-portfolio-example-v0.json \
+            --out "$RUNNER_TEMP/cropfoundry-nutrition-portfolio-receipt.json"
+          grep -q '"accounting_pass": true' "$RUNNER_TEMP/cropfoundry-nutrition-portfolio-receipt.json"
+          grep -q '"common_resource_count": 3' "$RUNNER_TEMP/cropfoundry-nutrition-portfolio-receipt.json"
+          grep -q '"total_water_liters": 22.0' "$RUNNER_TEMP/cropfoundry-nutrition-portfolio-receipt.json"
+          grep -q '"total_delivered_mg": 19.0' "$RUNNER_TEMP/cropfoundry-nutrition-portfolio-receipt.json"
+          grep -q '"total_delivered_mg": 16.5' "$RUNNER_TEMP/cropfoundry-nutrition-portfolio-receipt.json"
+          grep -q '"training_authorized": false' "$RUNNER_TEMP/cropfoundry-nutrition-portfolio-receipt.json"
