@@ -6,6 +6,7 @@ mod duplicate_scan;
 mod manifest;
 mod rhn_sweep;
 mod tire_monitoring_intake;
+mod mobility_telemetry_manifest;
 
 #[derive(Parser)]
 struct Cli {
@@ -71,6 +72,14 @@ enum Commands {
         #[arg(long)]
         out: Option<PathBuf>,
     },
+    /// Validate cross-vehicle telemetry manifest structure, artifact digests and claim eligibility.
+    MobilityTelemetryManifest {
+        #[arg(long, default_value = "docs/research/data/mobility_telemetry_manifest_v0_1.json")]
+        input: PathBuf,
+        /// Optional path for a JSON report; otherwise report to stdout.
+        #[arg(long)]
+        out: Option<PathBuf>,
+    },
     GenerateManifest {
         #[arg(long, default_value = ".")]
         root: PathBuf,
@@ -123,6 +132,15 @@ fn main() -> anyhow::Result<()> {
             let input_dir = if input_dir.is_absolute() { input_dir } else { root.join(input_dir) };
             let out = out.map(|path| if path.is_absolute() { path } else { root.join(path) });
             tire_monitoring_intake::run(&input_dir, out.as_deref())?;
+        }
+        Commands::MobilityTelemetryManifest { input, out } => {
+            let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .expect("xtask lives one level below the workspace root")
+                .to_path_buf();
+            let input = if input.is_absolute() { input } else { root.join(input) };
+            let out = out.map(|path| if path.is_absolute() { path } else { root.join(path) });
+            mobility_telemetry_manifest::run(&input, out.as_deref())?;
         }
         Commands::GenerateManifest { root } => {
             let files = vec!["Cargo.toml", "src/lib.rs", "symthaea-core/Cargo.toml"];
