@@ -21,7 +21,10 @@ pub mod drift_control;
 pub use drift_control::{DriftPlanValidationReport, validate_drift_control_plan_str};
 pub mod energy;
 pub mod geometry;
-pub use geometry::{GeometryScreenInput, GeometryScreenResult, evaluate_geometry_screen, validate_geometry_screen_str};
+pub use geometry::{
+    evaluate_geometry_screen, validate_geometry_screen_str, GeometryScreenInput,
+    GeometryScreenResult,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ValidationReport {
