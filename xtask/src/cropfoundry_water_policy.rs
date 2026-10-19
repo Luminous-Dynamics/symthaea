@@ -185,8 +185,8 @@ fn allocate_water(
     let mut allocation = [0.0; ZONES];
     match policy {
         Policy::EqualShareCalendar => {
-            let share =
-                (scenario.daily_water_budget_plot_mm / ZONES as f64).min(MAX_IRRIGATION_PER_ZONE_MM);
+            let share = (scenario.daily_water_budget_plot_mm / ZONES as f64)
+                .min(MAX_IRRIGATION_PER_ZONE_MM);
             allocation.fill(share);
         }
         Policy::SoilThreshold => {
@@ -345,8 +345,9 @@ fn build_receipt() -> Result<WaterPolicyReceipt> {
         if result.policy != Policy::EqualShareCalendar.name() {
             if let Some(baseline) = baseline_scores.get(&result.scenario_id).copied() {
                 if baseline > 1e-9 {
-                    result.relative_stress_change_vs_equal_share_pct =
-                        Some(round3((result.stress_exposure_proxy - baseline) / baseline * 100.0));
+                    result.relative_stress_change_vs_equal_share_pct = Some(round3(
+                        (result.stress_exposure_proxy - baseline) / baseline * 100.0,
+                    ));
                 }
             }
         }
@@ -481,7 +482,12 @@ mod tests {
         assert_eq!(receipt.policy_count, 3);
         assert_eq!(receipt.results.len(), 12);
         assert_eq!(receipt.aggregates.len(), 3);
-        assert!(receipt.aggregates.iter().all(|aggregate| aggregate.scenario_count == 4));
+        assert!(
+            receipt
+                .aggregates
+                .iter()
+                .all(|aggregate| aggregate.scenario_count == 4)
+        );
         assert!(
             receipt
                 .results
@@ -499,9 +505,11 @@ mod tests {
             .filter(|result| result.policy == Policy::EqualShareCalendar.name())
             .collect::<Vec<_>>();
         assert_eq!(baseline.len(), 4);
-        assert!(baseline
-            .iter()
-            .all(|result| result.relative_stress_change_vs_equal_share_pct.is_none()));
+        assert!(
+            baseline
+                .iter()
+                .all(|result| result.relative_stress_change_vs_equal_share_pct.is_none())
+        );
         assert!(receipt.results.iter().all(|result| {
             result
                 .relative_stress_change_vs_equal_share_pct
