@@ -1,0 +1,506 @@
+use anyhow::{Result, anyhow};
+use serde::Serialize;
+use std::collections::BTreeMap;
+
+use crate::cropfoundry_water_policy::{ScenarioResult, build_receipt};
+
+const TAIL_FRACTION_95: f64 = 0.05;
+
+#[derive(Debug, Clone, Copy)]
+struct Preference {
+    id: &'static str,
+    name: &'static str,
+    mean_stress: f64,
+    cvar95_stress: f64,
+    worst_zone_stress: f64,
+    water_use: f64,
+    allocation_dispersion: f64,
+}
+
+fn preferences() -> [Preference; 4] {
+    [
+        Preference {
+            id: "balanced",
+            name: "balanced mean-tail-equity",
+            mean_stress: 0.40,
+            cvar95_stress: 0.30,
+            worst_zone_stress: 0.20,
+            water_use: 0.05,
+            allocation_dispersion: 0.05,
+        },
+        Preference {
+            id: "tail_guard",
+            name: "upper-tail protection",
+            mean_stress: 0.20,
+            cvar95_stress: 0.45,
+            worst_zone_stress: 0.30,
+            water_use: 0.025,
+            allocation_dispersion: 0.025,
+        },
+        Preference {
+            id: "water_scarcity",
+            name: "water scarcity",
+            mean_stress: 0.30,
+            cvar95_stress: 0.25,
+            worst_zone_stress: 0.20,
+            water_use: 0.20,
+            allocation_dispersion: 0.05,
+        },
+        Preference {
+            id: "distribution_first",
+            name: "distributional protection",
+            mean_stress: 0.25,
+            cvar95_stress: 0.20,
+            worst_zone_stress: 0.30,
+            water_use: 0.05,
+            allocation_dispersion: 0.20,
+        },
+    ]
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct PolicyRobustnessScore {
+    policy: String,
+    scenario_count: usize,
+    tail_fraction: f64,
+    tail_sample_count: usize,
+    mean_stress_exposure_proxy: f64,
+    median_stress_exposure_proxy: f64,
+    p95_stress_exposure_proxy_nearest_rank: f64,
+    cvar95_stress_exposure_proxy: f64,
+    max_worst_zone_stress_exposure_proxy: f64,
+    mean_worst_zone_stress_exposure_proxy: f64,
+    mean_water_applied_plot_mm: f64,
+    total_water_applied_plot_mm: f64,
+    mean_plot_allocation_dispersion_plot_mm: f64,
+    mean_regret_vs_per_scenario_best_stress_proxy: f64,
+    total_water_budget_violation_days: usize,
+    total_per_plot_limit_violation_days: usize,
+    pareto_front_member: bool,
+    dominated_by_policies: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct PreferenceRanking {
+    preference_id: String,
+    preference_name: String,
+    weights: BTreeMap<String, f64>,
+    top_ranked_policy: String,
+    top_policy_score: f64,
+    ranking: Vec<PreferenceCandidateScore>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct PreferenceCandidateScore {
+    policy: String,
+    normalized_score: f64,
+    rank: usize,
+}
+
+#[derive(Debug, Serialize)]
+struct RobustPolicyReceipt {
+    receipt_schema: String,
+    benchmark_id: String,
+    execution_mode: String,
+    synthetic_only: bool,
+    calibrated_probability_claim: bool,
+    biological_performance_claim: bool,
+    training_authorized: bool,
+    scenario_count: usize,
+    policy_count: usize,
+    robustness_objectives: Vec<String>,
+    preference_count: usize,
+    distinct_top_ranked_policy_count: usize,
+    hard_constraint_summary: String,
+    policies: Vec<PolicyRobustnessScore>,
+    preference_sweep: Vec<PreferenceRanking>,
+    caveats: Vec<String>,
+}
+
+fn mean(values: &[f64]) -> f64 {
+    values.iter().sum::<f64>() / values.len() as f64
+}
+
+fn median(sorted: &[f64]) -> f64 {
+    (sorted[(sorted.len() - 1) / 2] + sorted[sorted.len() / 2]) / 2.0
+}
+
+fn nearest_rank(sorted: &[f64], quantile: f64) -> f64 {
+    let rank = ((sorted.len() as f64 * quantile).ceil() as usize).max(1);
+    sorted[rank.saturating_sub(1).min(sorted.len() - 1)]
+}
+
+fn cvar_upper_tail(sorted: &[f64], tail_fraction: f64) -> (f64, usize) {
+    let tail_count = ((sorted.len() as f64 * tail_fraction).ceil() as usize).max(1);
+    let start = sorted.len().saturating_sub(tail_count);
+    (mean(&sorted[start..]), sorted.len() - start)
+}
+
+fn normalize(value: f64, maximum: f64) -> f64 {
+    if maximum > 0.0 {
+        value / maximum
+    } else {
+        0.0
+    }
+}
+
+fn dominates(left: &PolicyRobustnessScore, right: &PolicyRobustnessScore) -> bool {
+    let left_values = [
+        left.mean_stress_exposure_proxy,
+        left.cvar95_stress_exposure_proxy,
+        left.max_worst_zone_stress_exposure_proxy,
+        left.mean_water_applied_plot_mm,
+        left.mean_plot_allocation_dispersion_plot_mm,
+    ];
+    let right_values = [
+        right.mean_stress_exposure_proxy,
+        right.cvar95_stress_exposure_proxy,
+        right.max_worst_zone_stress_exposure_proxy,
+        right.mean_water_applied_plot_mm,
+        right.mean_plot_allocation_dispersion_plot_mm,
+    ];
+    let no_worse = left_values
+        .iter()
+        .zip(right_values)
+        .all(|(left_value, right_value)| *left_value <= right_value + 1e-9);
+    let strictly_better = left_values
+        .iter()
+        .zip(right_values)
+        .any(|(left_value, right_value)| *left_value < right_value - 1e-9);
+    no_worse && strictly_better
+}
+
+fn build_policy_scores(results: &[ScenarioResult]) -> Result<Vec<PolicyRobustnessScore>> {
+    if results.is_empty() {
+        return Err(anyhow!("robust-policy evaluator received no scenario results"));
+    }
+    let mut grouped = BTreeMap::<String, Vec<&ScenarioResult>>::new();
+    let mut minimum_stress_by_scenario = BTreeMap::<String, f64>::new();
+    for result in results {
+        grouped
+            .entry(result.policy.clone())
+            .or_default()
+            .push(result);
+        minimum_stress_by_scenario
+            .entry(result.scenario_id.clone())
+            .and_modify(|best| *best = best.min(result.stress_exposure_proxy))
+            .or_insert(result.stress_exposure_proxy);
+    }
+    let scenario_ids = grouped
+        .values()
+        .next()
+        .map(|items| items.iter().map(|item| item.scenario_id.clone()).collect::<Vec<_>>())
+        .unwrap_or_default();
+    let expected_scenario_count = scenario_ids.len();
+    if expected_scenario_count == 0 {
+        return Err(anyhow!("robust-policy evaluator has no declared scenarios"));
+    }
+
+    let mut scores = Vec::new();
+    for (policy, items) in grouped {
+        let observed_ids = items
+            .iter()
+            .map(|item| item.scenario_id.clone())
+            .collect::<std::collections::BTreeSet<_>>();
+        if items.len() != expected_scenario_count || observed_ids.len() != items.len() {
+            return Err(anyhow!(
+                "policy {policy} has {} rows and {} distinct scenario IDs; expected {expected_scenario_count} paired scenarios",
+                items.len(),
+                observed_ids.len()
+            ));
+        }
+
+        let mut stress = items
+            .iter()
+            .map(|item| item.stress_exposure_proxy)
+            .collect::<Vec<_>>();
+        stress.sort_by(f64::total_cmp);
+        let (cvar95, tail_count) = cvar_upper_tail(&stress, TAIL_FRACTION_95);
+        let worst_zone = items
+            .iter()
+            .map(|item| item.max_zone_stress_exposure_proxy)
+            .collect::<Vec<_>>();
+        let regrets = items
+            .iter()
+            .map(|item| {
+                let best = minimum_stress_by_scenario
+                    .get(&item.scenario_id)
+                    .copied()
+                    .unwrap_or(item.stress_exposure_proxy);
+                item.stress_exposure_proxy - best
+            })
+            .collect::<Vec<_>>();
+        let water = items
+            .iter()
+            .map(|item| item.total_irrigation_applied_plot_mm)
+            .collect::<Vec<_>>();
+        let dispersions = items
+            .iter()
+            .map(|item| item.plot_allocation_dispersion_plot_mm)
+            .collect::<Vec<_>>();
+        let water_budget_violations = items
+            .iter()
+            .map(|item| item.water_budget_violation_days)
+            .sum::<usize>();
+        let actuator_violations = items
+            .iter()
+            .map(|item| item.per_plot_limit_violation_days)
+            .sum::<usize>();
+        if water_budget_violations != 0 || actuator_violations != 0 {
+            return Err(anyhow!(
+                "robust-policy feasibility gate failed for {policy}: {water_budget_violations} water-cap violations, {actuator_violations} actuator-limit violations"
+            ));
+        }
+        scores.push(PolicyRobustnessScore {
+            policy,
+            scenario_count: items.len(),
+            tail_fraction: TAIL_FRACTION_95,
+            tail_sample_count: tail_count,
+            mean_stress_exposure_proxy: mean(&stress),
+            median_stress_exposure_proxy: median(&stress),
+            p95_stress_exposure_proxy_nearest_rank: nearest_rank(&stress, 0.95),
+            cvar95_stress_exposure_proxy: cvar95,
+            max_worst_zone_stress_exposure_proxy: worst_zone
+                .iter()
+                .copied()
+                .max_by(f64::total_cmp)
+                .unwrap_or(0.0),
+            mean_worst_zone_stress_exposure_proxy: mean(&worst_zone),
+            mean_water_applied_plot_mm: mean(&water),
+            total_water_applied_plot_mm: water.iter().sum(),
+            mean_plot_allocation_dispersion_plot_mm: mean(&dispersions),
+            mean_regret_vs_per_scenario_best_stress_proxy: mean(&regrets),
+            total_water_budget_violation_days: water_budget_violations,
+            total_per_plot_limit_violation_days: actuator_violations,
+            pareto_front_member: false,
+            dominated_by_policies: Vec::new(),
+        });
+    }
+
+    for right_index in 0..scores.len() {
+        let dominators = (0..scores.len())
+            .filter(|left_index| {
+                *left_index != right_index && dominates(&scores[*left_index], &scores[right_index])
+            })
+            .map(|left_index| scores[left_index].policy.clone())
+            .collect::<Vec<_>>();
+        scores[right_index].pareto_front_member = dominators.is_empty();
+        scores[right_index].dominated_by_policies = dominators;
+    }
+    scores.sort_by(|left, right| left.policy.cmp(&right.policy));
+    Ok(scores)
+}
+
+fn build_preference_sweep(scores: &[PolicyRobustnessScore]) -> Vec<PreferenceRanking> {
+    let maxima = [
+        scores
+            .iter()
+            .map(|score| score.mean_stress_exposure_proxy)
+            .fold(0.0_f64, f64::max),
+        scores
+            .iter()
+            .map(|score| score.cvar95_stress_exposure_proxy)
+            .fold(0.0_f64, f64::max),
+        scores
+            .iter()
+            .map(|score| score.max_worst_zone_stress_exposure_proxy)
+            .fold(0.0_f64, f64::max),
+        scores
+            .iter()
+            .map(|score| score.mean_water_applied_plot_mm)
+            .fold(0.0_f64, f64::max),
+        scores
+            .iter()
+            .map(|score| score.mean_plot_allocation_dispersion_plot_mm)
+            .fold(0.0_f64, f64::max),
+    ];
+    let mut sweep = Vec::new();
+    for preference in preferences() {
+        let mut ranking = scores
+            .iter()
+            .map(|score| {
+                let normalized_score = preference.mean_stress
+                    * normalize(score.mean_stress_exposure_proxy, maxima[0])
+                    + preference.cvar95_stress
+                        * normalize(score.cvar95_stress_exposure_proxy, maxima[1])
+                    + preference.worst_zone_stress
+                        * normalize(score.max_worst_zone_stress_exposure_proxy, maxima[2])
+                    + preference.water_use * normalize(score.mean_water_applied_plot_mm, maxima[3])
+                    + preference.allocation_dispersion
+                        * normalize(score.mean_plot_allocation_dispersion_plot_mm, maxima[4]);
+                PreferenceCandidateScore {
+                    policy: score.policy.clone(),
+                    normalized_score,
+                    rank: 0,
+                }
+            })
+            .collect::<Vec<_>>();
+        ranking.sort_by(|left, right| {
+            left.normalized_score
+                .total_cmp(&right.normalized_score)
+                .then_with(|| left.policy.cmp(&right.policy))
+        });
+        for (index, candidate) in ranking.iter_mut().enumerate() {
+            candidate.rank = index + 1;
+        }
+        let top = ranking.first().expect("nonempty policy list");
+        let weights = BTreeMap::from([
+            ("mean_stress".to_owned(), preference.mean_stress),
+            ("cvar95_stress".to_owned(), preference.cvar95_stress),
+            ("worst_zone_stress".to_owned(), preference.worst_zone_stress),
+            ("water_use".to_owned(), preference.water_use),
+            (
+                "allocation_dispersion".to_owned(),
+                preference.allocation_dispersion,
+            ),
+        ]);
+        sweep.push(PreferenceRanking {
+            preference_id: preference.id.to_owned(),
+            preference_name: preference.name.to_owned(),
+            weights,
+            top_ranked_policy: top.policy.clone(),
+            top_policy_score: top.normalized_score,
+            ranking,
+        });
+    }
+    sweep
+}
+
+fn build_receipt() -> Result<RobustPolicyReceipt> {
+    let base = build_receipt_water_policy()?;
+    if base.scenario_count != 6 || base.policy_count != 5 {
+        return Err(anyhow!(
+            "robust-policy receipt expected 6 scenarios x 5 policies; received {} x {}",
+            base.scenario_count,
+            base.policy_count
+        ));
+    }
+    let scores = build_policy_scores(&base.results)?;
+    let preference_sweep = build_preference_sweep(&scores);
+    let distinct_top_ranked_policy_count = preference_sweep
+        .iter()
+        .map(|item| item.top_ranked_policy.clone())
+        .collect::<std::collections::BTreeSet<_>>()
+        .len();
+    if scores.iter().any(|score| {
+        !score.mean_stress_exposure_proxy.is_finite()
+            || !score.cvar95_stress_exposure_proxy.is_finite()
+            || !score.max_worst_zone_stress_exposure_proxy.is_finite()
+            || !score.mean_water_applied_plot_mm.is_finite()
+            || !score.mean_plot_allocation_dispersion_plot_mm.is_finite()
+    }) {
+        return Err(anyhow!("robust-policy receipt contains non-finite metrics"));
+    }
+    Ok(RobustPolicyReceipt {
+        receipt_schema: "cropfoundry-robust-policy-receipt-v0".to_owned(),
+        benchmark_id: "CF-025".to_owned(),
+        execution_mode: "deterministic_synthetic_scenario_sensitivity".to_owned(),
+        synthetic_only: true,
+        calibrated_probability_claim: false,
+        biological_performance_claim: false,
+        training_authorized: false,
+        scenario_count: base.scenario_count,
+        policy_count: base.policy_count,
+        robustness_objectives: vec![
+            "mean synthetic stress exposure".to_owned(),
+            "nearest-rank 95th percentile and upper-tail mean".to_owned(),
+            "maximum per-zone synthetic stress burden".to_owned(),
+            "irrigation use in synthetic plot-mm".to_owned(),
+            "per-zone irrigation allocation dispersion".to_owned(),
+        ],
+        preference_count: preference_sweep.len(),
+        distinct_top_ranked_policy_count,
+        hard_constraint_summary: "Every base policy/scenario result has zero daily water-budget and per-plot actuator-limit violations; this is a code-level synthetic invariant only.".to_owned(),
+        policies: scores,
+        preference_sweep,
+        caveats: vec![
+            "All scenario parameters and objective values are synthetic; no plant, soil or farm is modelled.".to_owned(),
+            "With six scenario values, the nearest-rank p95 and CVaR95 both use only the single worst scenario; they are diagnostics, not calibrated probability estimates.".to_owned(),
+            "The per-scenario best policy used for regret is a hindsight oracle diagnostic and is not available prospectively.".to_owned(),
+            "Normalized weighted rankings are a declared preference-sensitivity demonstration, not an objectively correct recommendation.".to_owned(),
+            "Pareto dominance only applies to these five declared synthetic objectives; omitted constraints or objectives can change conclusions.".to_owned(),
+            "Zero synthetic violations do not validate real actuator limits, safety, water rights, yield, nutrition, economics or field transfer.".to_owned(),
+            "No training or external dataset ingestion occurs in this command.".to_owned(),
+        ],
+    })
+}
+
+/// Run robust-policy diagnostics over the existing synthetic irrigation suite; no new simulation model is introduced.
+pub fn run(out: Option<std::path::PathBuf>) -> Result<()> {
+    let receipt = build_receipt()?;
+    let rendered = serde_json::to_string_pretty(&receipt)?;
+    println!("{rendered}");
+    if let Some(path) = out {
+        if let Some(parent) = path.parent().filter(|parent| !parent.as_os_str().is_empty()) {
+            std::fs::create_dir_all(parent)
+                .map_err(|error| anyhow!("cannot create output directory {}: {error}", parent.display()))?;
+        }
+        std::fs::write(&path, format!("{rendered}\n"))
+            .map_err(|error| anyhow!("cannot write robust-policy receipt {}: {error}", path.display()))?;
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn robust_policy_receipt_is_deterministic_and_synthetic_only() {
+        let first = serde_json::to_string(&build_receipt().unwrap()).unwrap();
+        let second = serde_json::to_string(&build_receipt().unwrap()).unwrap();
+        assert_eq!(first, second);
+        let receipt = build_receipt().unwrap();
+        assert_eq!(receipt.benchmark_id, "CF-025");
+        assert_eq!(receipt.scenario_count, 6);
+        assert_eq!(receipt.policy_count, 5);
+        assert_eq!(receipt.preference_count, 4);
+        assert!(!receipt.calibrated_probability_claim);
+        assert!(!receipt.biological_performance_claim);
+        assert!(!receipt.training_authorized);
+    }
+
+    #[test]
+    fn robust_policy_tail_sample_count_is_explicit_for_six_scenarios() {
+        let receipt = build_receipt().unwrap();
+        assert!(receipt
+            .policies
+            .iter()
+            .all(|policy| policy.tail_sample_count == 1));
+        assert!(receipt.policies.iter().all(|policy| {
+            (policy.cvar95_stress_exposure_proxy - policy.p95_stress_exposure_proxy_nearest_rank)
+                .abs()
+                <= 1e-9
+        }));
+    }
+
+    #[test]
+    fn robust_policy_pareto_and_preference_sweep_preserve_all_policies() {
+        let receipt = build_receipt().unwrap();
+        assert!(receipt
+            .policies
+            .iter()
+            .any(|policy| policy.pareto_front_member));
+        assert!(receipt.preference_sweep.iter().all(|item| item.ranking.len() == 5));
+        assert!(receipt.preference_sweep.iter().all(|item| {
+            item.ranking.iter().map(|score| score.rank).collect::<Vec<_>>()
+                == (1..=5).collect::<Vec<_>>()
+        }));
+        assert!(receipt.preference_sweep.iter().all(|item| {
+            item.weights.values().sum::<f64>() - 1.0
+                <= 1e-9
+        }));
+    }
+
+    #[test]
+    fn policy_scenario_pairing_and_hard_constraints_are_required() {
+        let base = build_receipt_water_policy().unwrap();
+        let scores = build_policy_scores(&base.results).unwrap();
+        assert_eq!(scores.len(), 5);
+        assert!(scores.iter().all(|score| score.scenario_count == 6));
+        assert!(scores.iter().all(|score| {
+            score.total_water_budget_violation_days == 0
+                && score.total_per_plot_limit_violation_days == 0
+        }));
+    }
+}
