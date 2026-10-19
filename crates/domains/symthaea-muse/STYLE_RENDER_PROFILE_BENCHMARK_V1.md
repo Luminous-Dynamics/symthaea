@@ -19,10 +19,12 @@ The first seam is a typed performance contract. Style.grammar_profile() keeps
 grammar family/phrase/harmony architecture but specializes the performance dialect
 by style, so a tango and a bossa do not inherit identical timing merely because
 their specifications happen to share texture flags. The selected dialect then
-controls timing/expression, room hypotheses, and broad mastering balance across
-the native and FluidSynth paths. MIDI downloads, performed notes, and keeper MIDI
-use that same selection. User-authored specs still have no declared style identity
-and are explicitly left on the versioned heuristic fallback.
+controls timing/expression, a directional room hypothesis in both native and
+FluidSynth renderers, and broad mastering balance. The reverb engines are not
+acoustically equivalent, so the invariant is shared *directional intent*, not
+identical room response. MIDI downloads, performed notes, ListenPerformanceBundle,
+and keeper MIDI use that same selection. User-authored specs still have no
+declared style identity and are explicitly left on the versioned heuristic fallback.
 
 Every mastering profile retains the same integrated-loudness target, limiter
 ceiling, and section-leveling behavior; only three-band balance targets and EQ
@@ -63,9 +65,13 @@ with named, versioned rendering controls rather than adding more heuristic flags
 - The eight grammar dialects map one-to-one to renderer dialects; test that
   each timing scale is finite and bounded, and each mastering profile shares
   loudness/limiter targets.
-- The native renderer, FluidSynth, MIDI download, notes endpoint and keeper MIDI
-  use the candidate's same declared dialect; custom specs explicitly take the
-  heuristic fallback.
+- The native renderer and FluidSynth both receive the same directional room
+  hypothesis and broad mastering profile. Assert dry/groove versus wet/drone
+  ordering separately per backend; do not assert acoustic equivalence between
+  their different reverb algorithms.
+- MIDI download, notes endpoint, ListenPerformanceBundle, analyst evidence, and
+  keeper MIDI use the candidate's same declared dialect; custom specs explicitly
+  take the heuristic fallback.
 - The renderer recipe records the dialect in schema v4 whenever it is declared.
 
 ### Audio sanity gate
