@@ -212,24 +212,24 @@ fn audit_input(input: NutritionAccountingInput) -> NutritionAccountingReceipt {
 
     let accounting_pass = issues.is_empty();
     let direct_assay = input.concentration_provenance == ConcentrationProvenance::DirectAssay;
-    let pre_preparation_mass = if accounting_pass {
+    let nutrient_mass_at_concentration_stage = if accounting_pass {
         concentration.zip(stage_mass).map(|(c, mass)| c * mass)
     } else {
         None
     };
-    let measured_or_modeled_mass = match input.concentration_stage {
-        Some(ConcentrationStage::MeasuredAtServing) if accounting_pass => pre_preparation_mass,
+    let delivered_nutrient_mass = match input.concentration_stage {
+        Some(ConcentrationStage::MeasuredAtServing) if accounting_pass => nutrient_mass_at_concentration_stage,
         Some(ConcentrationStage::MeasuredBeforePreparation) if accounting_pass => {
-            pre_preparation_mass
+            nutrient_mass_at_concentration_stage
                 .zip(input.retention_fraction)
                 .map(|(mass, retention)| mass * retention)
         }
         _ => None,
     };
-    let bioavailable_mass = measured_or_modeled_mass
+    let bioavailable_mass = delivered_nutrient_mass
         .zip(input.bioavailability_fraction)
         .map(|(mass, fraction)| mass * fraction);
-    let nutrient_per_serving = measured_or_modeled_mass
+    let nutrient_per_serving = delivered_nutrient_mass
         .zip(input.servings_in_batch)
         .map(|(mass, count)| mass / count as f64);
     let bioavailable_per_serving = bioavailable_mass
@@ -247,22 +247,22 @@ fn audit_input(input: NutritionAccountingInput) -> NutritionAccountingReceipt {
         measured_nutrient_mass_delivered_mg: if direct_assay
             && input.concentration_stage == Some(ConcentrationStage::MeasuredAtServing)
         {
-            measured_or_modeled_mass
+            delivered_nutrient_mass
         } else {
             None
         },
         modeled_nutrient_mass_delivered_mg: if !direct_assay || input.concentration_stage == Some(ConcentrationStage::MeasuredBeforePreparation) {
-            measured_or_modeled_mass
+            delivered_nutrient_mass
         } else {
             None
         },
         bioavailable_nutrient_mass_delivered_mg: bioavailable_mass,
         nutrient_mg_per_serving: nutrient_per_serving,
         bioavailable_nutrient_mg_per_serving: bioavailable_per_serving,
-        nutrient_mg_per_liter_water: ratio(measured_or_modeled_mass, input.water_liters),
-        nutrient_mg_per_square_meter: ratio(measured_or_modeled_mass, input.land_square_meters),
-        nutrient_mg_per_kwh: ratio(measured_or_modeled_mass, input.energy_kwh),
-        nutrient_mg_per_currency_unit: ratio(measured_or_modeled_mass, input.cost_amount),
+        nutrient_mg_per_liter_water: ratio(delivered_nutrient_mass, input.water_liters),
+        nutrient_mg_per_square_meter: ratio(delivered_nutrient_mass, input.land_square_meters),
+        nutrient_mg_per_kwh: ratio(delivered_nutrient_mass, input.energy_kwh),
+        nutrient_mg_per_currency_unit: ratio(delivered_nutrient_mass, input.cost_amount),
         currency_code: input.currency_code.map(|value| value.trim().to_ascii_uppercase()),
         issues,
         caveats: vec![
@@ -364,10 +364,22 @@ mod tests {
         assert!(receipt.accounting_pass);
         assert_eq!(receipt.measured_nutrient_mass_delivered_mg, Some(12.0));
         assert_eq!(receipt.bioavailable_nutrient_mass_delivered_mg, Some(3.0));
+        assert_eq!(receipt.nutrient_mg_per_serving, Some(12.0));
+        assert_eq!(receipt.bioavailable_nutrient_mg_per_serving, Some(3.0));
         assert_eq!(receipt.nutrient_mg_per_liter_water, Some(0.4));
         assert_eq!(receipt.nutrient_mg_per_square_meter, Some(6.0));
         assert_eq!(receipt.nutrient_mg_per_kwh, Some(24.0));
         assert_eq!(receipt.nutrient_mg_per_currency_unit, Some(9.6));
+    }
+
+    #[test]
+    fn batch_nutrient_mass_is_divided_only_by_declared_serving_count() {
+        let mut input = fixture();
+        input.servings_in_batch = Some(2);
+        let receipt = audit_input(input);
+        assert!(receipt.accounting_pass);
+        assert_eq!(receipt.measured_nutrient_mass_delivered_mg, Some(12.0));
+        assert_eq!(receipt.nutrient_mg_per_serving, Some(6.0));
     }
 
     #[test]
