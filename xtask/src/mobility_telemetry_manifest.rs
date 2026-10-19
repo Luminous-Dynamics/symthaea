@@ -21,6 +21,14 @@ const EVIDENCE_CLASSES: &[&str] = &[
     "FieldObserved",
 ];
 const PHYSICAL_EVIDENCE: &[&str] = &["InstrumentedPhysical", "FieldObserved"];
+// Do not infer synchronization verification from a free-form label containing "verified".
+const VERIFIED_SYNC_METHODS: &[&str] = &[
+    "gnss_pps_verified",
+    "hardware_timestamp_verified",
+    "ptp_verified",
+    "shared_clock_verified",
+];
+const MAX_PHYSICAL_ALIGNMENT_UNCERTAINTY_NS: u64 = 2_000_000;
 const SESSION_STATES: &[&str] = &["planned", "recorded", "closed"];
 const CALIBRATION_STATES: &[&str] = &[
     "planned",
@@ -449,11 +457,14 @@ fn claim_eligibility(manifest: &Manifest, claim: &str) -> ClaimEligibility {
     if manifest.data_rights.permission_receipt_id.as_deref().is_none_or(str::is_empty) {
         reasons.push("missing_rights_or_collection_receipt".into());
     }
-    if manifest.timebase.sync_method.contains("planned")
-        || manifest.timebase.sync_method == "unknown"
-        || manifest.timebase.sync_method == "unsynchronized"
-    {
-        reasons.push("clock_sync_not_verified".into());
+    if !VERIFIED_SYNC_METHODS.contains(&manifest.timebase.sync_method.as_str()) {
+        reasons.push("clock_sync_method_not_verified".into());
+    }
+    if !manifest.artifacts.iter().any(|artifact| artifact.kind == "clock_sync_record") {
+        reasons.push("missing_clock_sync_record_artifact".into());
+    }
+    if manifest.timebase.max_alignment_uncertainty_ns > MAX_PHYSICAL_ALIGNMENT_UNCERTAINTY_NS {
+        reasons.push("clock_alignment_uncertainty_exceeds_v0_1_limit".into());
     }
     if !manifest.artifacts.iter().any(|artifact| artifact.kind == "raw_sensor_log") {
         reasons.push("missing_raw_sensor_log_artifact".into());
