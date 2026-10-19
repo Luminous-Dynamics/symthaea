@@ -172,6 +172,7 @@ Evidence classes remain distinct: `ANALYTIC_FIXTURE`, `SYNTHETIC_EVALUATION`, `O
 ## 10. Research anchors
 
 - DINOv3 official repository / paper and model-specific license: https://github.com/facebookresearch/dinov3 and https://ai.meta.com/research/publications/dinov3/
+- Perception Encoder models and checkpoint families (verify exact checkpoint and terms): https://github.com/facebookresearch/perception_models
 - SAM 3.1 / SAM 3 (current promptable concept detection, segmentation and tracking comparator; the reported 32 FPS is on an H100, not our target hardware): https://ai.meta.com/blog/segment-anything-model-3/ and https://ai.meta.com/research/sam3/
 - SAM 2 (compatibility / historical baseline where useful): https://ai.meta.com/research/sam2/
 - MOSEv2 complex video segmentation / disappearance and reappearance: https://mose.video/ (non-commercial research terms; check current license)
