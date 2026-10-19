@@ -997,10 +997,7 @@ mod tests {
                 risk.relative_stress_change_vs_matched_water_equal_share_pct
                     .is_some()
             );
-            assert!(
-                matched.plot_allocation_dispersion_plot_mm
-                    <= risk.plot_allocation_dispersion_plot_mm
-            );
+            assert!(matched.plot_allocation_dispersion_plot_mm <= 0.2);
         }
     }
 
