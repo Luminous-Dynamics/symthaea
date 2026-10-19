@@ -13,7 +13,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: bioprotein-target-selection-\${{ github.event.pull_request.number || github.ref }}
+  group: bioprotein-target-selection-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -22,12 +22,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      EXPECTED_HEAD: \${{ github.event.pull_request.head.sha || github.sha }}
+      EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
       - name: Checkout exact PR head
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
-          ref: \${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
           persist-credentials: false
 
@@ -65,7 +65,7 @@ jobs:
           test -s target/bioprotein-target-selection-receipt.json
 
       - name: Preserve target-selection receipt artifact
-        if: \${{ always() && hashFiles('target/bioprotein-target-selection-receipt.json') != '' }}
+        if: ${{ always() && hashFiles('target/bioprotein-target-selection-receipt.json') != '' }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: bioprotein-target-selection-receipt
