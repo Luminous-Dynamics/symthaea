@@ -36,6 +36,7 @@
 //! conditional D/z calculation. They are not food-safety verdicts.
 
 pub mod composition_closure;
+pub mod culinary_experiment;
 pub mod balance;
 pub mod data;
 pub mod dynamics;
