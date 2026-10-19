@@ -275,6 +275,11 @@ fn percentile(sorted: &[f64], probability: f64) -> Option<f64> {
     let fraction = position - low_index as f64;
     let low = sorted[low_index];
     let high = sorted[high_index];
+    // Preserve exact endpoints for constant samples instead of introducing
+    // floating-point noise through an algebraically redundant interpolation.
+    if low == high {
+        return Some(low);
+    }
     let value = low * (1.0 - fraction) + high * fraction;
     value.is_finite().then_some(value)
 }
