@@ -10,7 +10,7 @@ A small Rust reference harness for the Symthaea OPEN-WORLD-PHYSICS-001 research 
 - A bounded grid-search model-selection baseline with a Gaussian-likelihood/BIC-like score using declared observation noise, plus an explicit indeterminate disposition when the best two structural families are too close (ΔBIC-like score < 2).
 - Separate training-fit and structural extrapolation scores over a fixed held-out domain.
 - Deterministic machine-readable JSON reports with a SHA-256 corpus fingerprint and a receipt digest that detects report-byte changes.
-- Known-answer, domain-rejection, query-repeatability, deterministic-report, model-selection ambiguity semantics, and receipt-tampering tests.
+- Known-answer, domain-rejection, query-repeatability, noisy reference-family recovery under both policies, deterministic-report, model-selection ambiguity semantics, and receipt-tampering tests.
 
 ## Run
 
