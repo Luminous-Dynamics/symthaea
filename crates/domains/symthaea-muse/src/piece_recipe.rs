@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use symthaea_music_theory::{CompositionSpec, MusicalIntent};
 
-pub const PIECE_RECIPE_SCHEMA_VERSION: u32 = 3;
+pub const PIECE_RECIPE_SCHEMA_VERSION: u32 = 4;
 
 /// Renderer and model identity required to interpret or reproduce an export.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -45,6 +45,10 @@ pub struct RendererRecipe {
     /// environment manifest.
     #[serde(default)]
     pub render_environment_sha256: Option<String>,
+    /// Declared grammar/style performance dialect used to realize this piece.
+    /// None means a custom spec used the renderer's versioned heuristic fallback.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub performance_dialect: Option<symthaea_music_theory::PerformanceDialect>,
 }
 
 impl RendererRecipe {
@@ -66,6 +70,7 @@ impl RendererRecipe {
             renderer_binary_sha256: None,
             performance_model_sha256: None,
             render_environment_sha256: None,
+            performance_dialect: None,
         }
     }
 
