@@ -1011,6 +1011,17 @@ fn evaluate_fault_case(mutation: &str, manifest: &Manifest) -> (String, String) 
                 ("eligible_or_unexplained".to_owned(), format!("eligibility report: {claim:?}"))
             }
         }
+        "unrecognized_sync_method_with_verified_word" => {
+            let mut candidate = manifest.clone();
+            candidate.timebase.sync_method = "operator_claims_verified".to_owned();
+            let claim = claim_eligibility(&candidate, "ride_energy");
+            if !claim.physical_eligible
+                && claim.reasons.iter().any(|reason| reason == "clock_sync_method_not_verified") {
+                ("ineligible".to_owned(), "free-form verified-looking text does not pass the sync allow-list".to_owned())
+            } else {
+                ("eligible_or_unexplained".to_owned(), format!("clock gate failed open: {claim:?}"))
+            }
+        }
         "planned_or_synthetic_fixture_claimed_as_physical" => {
             if manifest.claim_targets.iter().all(|claim| !claim_eligibility(manifest, claim).physical_eligible) {
                 ("ineligible".to_owned(), "planned DesignOnly fixture cannot support physical claims".to_owned())
@@ -1405,7 +1416,7 @@ mod tests {
         )).expect("frozen telemetry fault matrix parses");
         let cases = matrix.get("cases").and_then(serde_json::Value::as_array)
             .expect("fault matrix has a case array");
-        assert_eq!(cases.len(), 23, "matrix size changes require deliberate review");
+        assert_eq!(cases.len(), 24, "matrix size changes require deliberate review");
         let mut ids = BTreeSet::new();
         for case in cases {
             let id = case.get("id").and_then(serde_json::Value::as_str)
@@ -1418,5 +1429,42 @@ mod tests {
             let (observed, detail) = evaluate_fault_case(mutation, &fixture);
             assert_eq!(observed, expected, "fault case {id} ({mutation}): {detail}");
         }
+    }
+
+    #[test]
+    fn unrecognized_sync_method_blocks_physical_claim() {
+        let mut fixture = manifest();
+        fixture.timebase.sync_method = "operator_claims_verified".to_owned();
+        let claim = claim_eligibility(&fixture, "ride_energy");
+        assert!(!claim.physical_eligible);
+        assert!(claim.reasons.iter().any(|reason| reason == "clock_sync_method_not_verified"));
+    }
+
+    #[test]
+    fn verified_sync_method_requires_a_content_addressed_sync_record() {
+        let mut fixture = manifest();
+        fixture.timebase.sync_method = "gnss_pps_verified".to_owned();
+        fixture.artifacts.push(Artifact {
+            relative_path: "clock/sync-record.json".into(),
+            kind: "clock_sync_record".into(),
+            byte_len: 1,
+            sha256: format!("sha256:{}", "a".repeat(64)),
+        });
+        let claim = claim_eligibility(&fixture, "ride_energy");
+        assert!(!claim.reasons.iter().any(|reason| reason == "clock_sync_method_not_verified"));
+        assert!(!claim.reasons.iter().any(|reason| reason == "missing_clock_sync_record_artifact"));
+
+        fixture.artifacts.retain(|artifact| artifact.kind != "clock_sync_record");
+        let claim_without_receipt = claim_eligibility(&fixture, "ride_energy");
+        assert!(claim_without_receipt.reasons.iter().any(|reason| reason == "missing_clock_sync_record_artifact"));
+    }
+
+    #[test]
+    fn alignment_uncertainty_over_two_milliseconds_blocks_physical_claim() {
+        let mut fixture = manifest();
+        fixture.timebase.max_alignment_uncertainty_ns = 2_000_001;
+        let claim = claim_eligibility(&fixture, "ride_energy");
+        assert!(!claim.physical_eligible);
+        assert!(claim.reasons.iter().any(|reason| reason == "clock_alignment_uncertainty_exceeds_v0_1_limit"));
     }
 }
