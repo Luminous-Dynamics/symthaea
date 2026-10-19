@@ -4136,8 +4136,14 @@ fn performance_bundle_payload(
     spec: &CompositionSpec,
     seed: u64,
     state: &MusicalState,
+    performance_dialect: Option<symthaea_music_theory::PerformanceDialect>,
 ) -> (ListenPerformanceBundle, Vec<BundleWarning>) {
-    let voices = symthaea_muse::theory_realize::perform_with_spec(score, spec, seed, state);
+    let voices = match performance_dialect {
+        Some(dialect) => symthaea_muse::theory_realize::perform_with_spec_and_dialect(
+            score, spec, seed, state, dialect,
+        ),
+        None => symthaea_muse::theory_realize::perform_with_spec(score, spec, seed, state),
+    };
     let symbolic = symbolic_notes(score);
     let symbolic_times: HashMap<&str, (f64, f64)> = symbolic
         .iter()
@@ -4364,7 +4370,7 @@ async fn performance_bundle(
     State(studio): State<Arc<Studio>>,
     AxPath(id): AxPath<u64>,
 ) -> Result<Json<BundleEnvelope<ListenPerformanceBundle>>, StatusCode> {
-    let (score, spec, seed, state, created_at_unix_ms, wav) = {
+    let (score, spec, seed, state, created_at_unix_ms, wav, performance_dialect) = {
         let store = studio.candidates.lock().unwrap();
         let candidate = store.get(&id).ok_or(StatusCode::NOT_FOUND)?;
         (
@@ -4374,9 +4380,11 @@ async fn performance_bundle(
             candidate.state.clone(),
             candidate.created_at_unix_ms,
             candidate.wav.clone(),
+            candidate.performance_dialect,
         )
     };
-    let (payload, warnings) = performance_bundle_payload(&score, &spec, seed, &state);
+    let (payload, warnings) =
+        performance_bundle_payload(&score, &spec, seed, &state, performance_dialect);
     Ok(Json(BundleEnvelope {
         piece_id: id,
         render_id: Some(render_id(id, &wav)),
@@ -4719,7 +4727,13 @@ async fn analyst_bundle(
         performance_features: None,
     };
     let (composition, mut warnings) = composition_bundle(&score, &recipe);
-    let (performance, perf_warnings) = performance_bundle_payload(&score, &spec, seed, &state);
+    let (performance, perf_warnings) = performance_bundle_payload(
+        &score,
+        &spec,
+        seed,
+        &state,
+        recipe.renderer.performance_dialect,
+    );
     warnings.extend(perf_warnings);
     warnings.extend(style_warnings);
     let mut payload = symthaea_muse::analyst::analyze_piece(
