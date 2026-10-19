@@ -427,9 +427,9 @@ fn build_receipt() -> Result<RobustPolicyReceipt> {
         return Err(anyhow!("robust-policy receipt contains non-finite metrics"));
     }
     Ok(RobustPolicyReceipt {
-        receipt_schema: "cropfoundry-robust-policy-receipt-v0".to_owned(),
+        receipt_schema: "cropfoundry-robust-policy-receipt-v1".to_owned(),
         benchmark_id: "CF-025".to_owned(),
-        execution_mode: "deterministic_synthetic_scenario_sensitivity".to_owned(),
+        execution_mode: "deterministic_synthetic_30_case_sensitivity_lattice".to_owned(),
         synthetic_only: true,
         calibrated_probability_claim: false,
         biological_performance_claim: false,
@@ -450,7 +450,7 @@ fn build_receipt() -> Result<RobustPolicyReceipt> {
         preference_sweep,
         caveats: vec![
             "All scenario parameters and objective values are synthetic; no plant, soil or farm is modelled.".to_owned(),
-            "The 30-case lattice gives the empirical CVaR95 two upper-tail scenario samples. Cases are fixed sensitivity points, not a random or calibrated probability sample; p95/CVaR95 remain diagnostics, not estimates of field-outcome probabilities.".to_owned(),
+            "The fixed 30-case lattice gives the scenario-set CVaR95 two upper-tail sensitivity cases. These are designed points, not a random or calibrated probability sample; p95/CVaR95 remain diagnostics, not estimates of field-outcome probabilities.".to_owned(),
             "The per-scenario best policy used for regret is a hindsight oracle diagnostic and is not available prospectively.".to_owned(),
             "Normalized weighted rankings are a declared preference-sensitivity demonstration, not an objectively correct recommendation.".to_owned(),
             "Pareto dominance only applies to these five declared synthetic objectives; omitted constraints or objectives can change conclusions.".to_owned(),
@@ -515,8 +515,10 @@ mod tests {
         let second = serde_json::to_string(&build_receipt().unwrap()).unwrap();
         assert_eq!(first, second);
         let receipt = build_receipt().unwrap();
+        assert_eq!(receipt.receipt_schema, "cropfoundry-robust-policy-receipt-v1");
         assert_eq!(receipt.benchmark_id, "CF-025");
         assert_eq!(receipt.scenario_count, 30);
+        assert_eq!(receipt.execution_mode, "deterministic_synthetic_30_case_sensitivity_lattice");
         assert_eq!(receipt.policy_count, 5);
         assert_eq!(receipt.preference_count, 4);
         assert!(!receipt.calibrated_probability_claim);
