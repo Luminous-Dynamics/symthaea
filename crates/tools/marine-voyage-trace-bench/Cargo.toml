@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 license = "AGPL-3.0-or-later"
 publish = false
-description = "Dependency-free, evidence-bounded integration of synchronized marine electrical-power traces"
+description = "Evidence-bounded marine power-trace integration and SHA-256-bound reference intake"
 
 [dependencies]
 sha2 = "=0.10.9"
