@@ -548,7 +548,7 @@ fn validate_contract(
                     && (known_answer_count == 0 || fault_mutation_count == 0)
                 {
                     bail!(
-                        "{}: safety-critical mapping requires both a known-answer case and a fault-mutation case",
+                        "{}: safety-critical mapping needs known-answer and fault-mutation cases",
                         mapping.requirement_id
                     );
                 }
@@ -672,7 +672,7 @@ fn validate_contract(
                             let oracle_case = oracle_cases
                                 .get(case_id)
                                 .with_context(|| {
-                                    format!("change case {case_id} is missing from independent oracle")
+                                    format!("change case {case_id} missing from oracle")
                                 })?;
                             if oracle_case.requirement_id != record.requirement_id {
                                 bail!(
@@ -787,7 +787,10 @@ mod tests {
         assert_eq!(validated.oracle_case_count, 6);
         assert_eq!(validated.known_answer_case_count, 3);
         assert_eq!(validated.fault_mutation_case_count, 3);
-        assert_eq!(validated.oracle_sha256, "28ebb0721856de30088c40dc0aab385078c5b5e7401646ecae8285f29dbe5bef");
+        assert_eq!(
+            validated.oracle_sha256,
+            "28ebb0721856de30088c40dc0aab385078c5b5e7401646ecae8285f29dbe5bef"
+        );
     }
 
     #[test]
