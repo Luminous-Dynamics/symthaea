@@ -216,6 +216,8 @@ struct CsvColumnMapping {
     canonical_field_id: String,
     raw_unit: String,
     role: CsvFieldRole,
+    value_kind: CsvValueKind,
+    missing_tokens: Vec<String>,
     missing_policy: CsvMissingPolicy,
 }
 
@@ -225,6 +227,13 @@ enum CsvFieldRole {
     Metadata,
     Predictor,
     TargetOutcome,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum CsvValueKind {
+    Text,
+    FiniteNumber,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
@@ -240,9 +249,14 @@ struct CsvMappedColumnReceipt {
     canonical_field_id: String,
     raw_unit: String,
     role: CsvFieldRole,
+    value_kind: CsvValueKind,
+    missing_tokens: Vec<String>,
+    missing_token_counts: BTreeMap<String, usize>,
     missing_policy: CsvMissingPolicy,
     nonempty_cells: usize,
+    numeric_values_validated: usize,
     preserved_missing_cells: usize,
+    preserved_missing_token_cells: usize,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -527,6 +541,22 @@ fn reconcile_csv_bytes(
                 "mapped source header, canonical field ID, and raw unit must be explicit".into(),
             ));
         }
+
+        let mut declared_missing_tokens = BTreeSet::new();
+        for token in &column.missing_tokens {
+            if token.trim().is_empty() || token != token.trim() {
+                return Err(AdapterError::Validation(format!(
+                    "missing-value tokens for source field {:?} must be nonblank exact tokens without surrounding whitespace",
+                    column.source_header
+                )));
+            }
+            if !declared_missing_tokens.insert(token.clone()) {
+                return Err(AdapterError::Validation(format!(
+                    "missing-value token {:?} is duplicated for source field {:?}",
+                    token, column.source_header
+                )));
+            }
+        }
         if column.source_header == mapping.source_row_id_header {
             return Err(AdapterError::Validation(format!(
                 "source row identity column {:?} cannot also be mapped as a measurement field",
@@ -618,9 +648,14 @@ fn reconcile_csv_bytes(
             canonical_field_id: column.canonical_field_id.clone(),
             raw_unit: column.raw_unit.clone(),
             role: column.role,
+            value_kind: column.value_kind,
+            missing_tokens: column.missing_tokens.clone(),
+            missing_token_counts: column.missing_tokens.iter().cloned().map(|token| (token, 0)).collect(),
             missing_policy: column.missing_policy,
             nonempty_cells: 0,
+            numeric_values_validated: 0,
             preserved_missing_cells: 0,
+            preserved_missing_token_cells: 0,
         })
         .collect();
 
@@ -652,26 +687,66 @@ fn reconcile_csv_bytes(
         row_ids_hasher.update(row_id_bytes);
 
         for (mapping_index, source_index) in mapped_indices.iter().enumerate() {
-            let cell = record.get(*source_index).unwrap_or_default().trim();
-            if cell.is_empty() {
-                if mapping.columns[mapping_index].missing_policy == CsvMissingPolicy::Reject {
+            let column_spec = &mapping.columns[mapping_index];
+            let cell = record.get(*source_index).unwrap_or_default();
+            let missing_token = column_spec.missing_tokens.iter().find(|token| token.as_str() == cell);
+            if cell.trim().is_empty() || missing_token.is_some() {
+                if column_spec.missing_policy == CsvMissingPolicy::Reject {
                     return Err(AdapterError::Validation(format!(
                         "CSV record {} has a missing value in required source field {:?}",
-                        record_index + 1, mapping.columns[mapping_index].source_header
+                        record_index + 1, column_spec.source_header
                     )));
                 }
-                mapped_receipts[mapping_index].preserved_missing_cells =
-                    mapped_receipts[mapping_index].preserved_missing_cells.checked_add(1)
-                    .ok_or_else(|| AdapterError::Validation(
-                        "CSV missing-cell count overflow".into()
+                if let Some(token) = missing_token {
+                    let count = mapped_receipts[mapping_index]
+                        .missing_token_counts
+                        .get_mut(token)
+                        .ok_or_else(|| AdapterError::Validation(
+                            "declared missing-value token has no receipt counter".into()
+                        ))?;
+                    *count = count.checked_add(1).ok_or_else(|| AdapterError::Validation(
+                        "missing-value token count overflow".into()
                     ))?;
-            } else {
-                mapped_receipts[mapping_index].nonempty_cells =
-                    mapped_receipts[mapping_index].nonempty_cells.checked_add(1)
+                    mapped_receipts[mapping_index].preserved_missing_token_cells =
+                        mapped_receipts[mapping_index].preserved_missing_token_cells.checked_add(1)
+                        .ok_or_else(|| AdapterError::Validation(
+                            "preserved missing-token count overflow".into()
+                        ))?;
+                } else {
+                    mapped_receipts[mapping_index].preserved_missing_cells =
+                        mapped_receipts[mapping_index].preserved_missing_cells.checked_add(1)
+                        .ok_or_else(|| AdapterError::Validation(
+                            "CSV blank-cell count overflow".into()
+                        ))?;
+                }
+                continue;
+            }
+
+            if column_spec.value_kind == CsvValueKind::FiniteNumber {
+                let parsed = cell.trim().parse::<f64>().map_err(|_| {
+                    AdapterError::Validation(format!(
+                        "CSV record {} field {:?} is not a valid finite number; source text {:?}",
+                        record_index + 1, column_spec.source_header, cell
+                    ))
+                })?;
+                if !parsed.is_finite() {
+                    return Err(AdapterError::Validation(format!(
+                        "CSV record {} field {:?} contains a non-finite numeric token {:?}",
+                        record_index + 1, column_spec.source_header, cell
+                    )));
+                }
+                mapped_receipts[mapping_index].numeric_values_validated =
+                    mapped_receipts[mapping_index].numeric_values_validated.checked_add(1)
                     .ok_or_else(|| AdapterError::Validation(
-                        "CSV nonempty-cell count overflow".into()
+                        "numeric cell count overflow".into()
                     ))?;
             }
+
+            mapped_receipts[mapping_index].nonempty_cells =
+                mapped_receipts[mapping_index].nonempty_cells.checked_add(1)
+                .ok_or_else(|| AdapterError::Validation(
+                    "CSV nonempty-cell count overflow".into()
+                ))?;
         }
 
         for (excluded_index, source_index) in excluded_indices.iter().enumerate() {
@@ -1757,6 +1832,8 @@ mod tests {
                     canonical_field_id: "tensile.stress".into(),
                     raw_unit: "MPa".into(),
                     role: CsvFieldRole::TargetOutcome,
+                    value_kind: CsvValueKind::FiniteNumber,
+                    missing_tokens: Vec::new(),
                     missing_policy: CsvMissingPolicy::PreserveMissing,
                 },
                 CsvColumnMapping {
@@ -1764,6 +1841,8 @@ mod tests {
                     canonical_field_id: "specimen.note".into(),
                     raw_unit: "text".into(),
                     role: CsvFieldRole::Metadata,
+                    value_kind: CsvValueKind::Text,
+                    missing_tokens: Vec::new(),
                     missing_policy: CsvMissingPolicy::PreserveMissing,
                 },
             ],
