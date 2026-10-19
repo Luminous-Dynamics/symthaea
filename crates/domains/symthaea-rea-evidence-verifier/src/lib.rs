@@ -21,6 +21,8 @@ pub struct VerifiedEvidence {
     pub status: &'static str,
     pub evidence_tier: &'static str,
     pub receipt_sha256: String,
+    pub verification_mode: &'static str,
+    pub receipt_digest_anchor_matched: bool,
     pub source_head_sha: String,
     pub checkout_commit_sha: String,
     pub provider_version: String,
@@ -180,15 +182,21 @@ pub fn verify_bundle(
     artifact_root: &Path,
     source_root: &Path,
     expected_head: &str,
+    expected_receipt_sha256: Option<&str>,
 ) -> VResult<VerifiedEvidence> {
     if !is_git_sha(expected_head) {
         return Err(err("expected source head must be a lowercase 40-character Git SHA"));
     }
 
     let receipt_path = artifact_root.join("receipt.json");
-    let raw_receipt = fs::read(&receipt_path)
-        .map_err(|e| err(format!("cannot read provider receipt {}: {e}", receipt_path.display())))?;
+    let raw_receipt = read_bounded(&receipt_path, 1_048_576, "provider receipt")?;
     let receipt_sha256 = hash_bytes(&raw_receipt);
+    let receipt_digest_anchor_matched = match expected_receipt_sha256 {
+        Some(expected) if !is_digest(expected) => return Err(err("expected receipt digest must be a lowercase SHA-256")),
+        Some(expected) if expected != receipt_sha256 => return Err(err("provider receipt does not match the independently supplied receipt digest")),
+        Some(_) => true,
+        None => false,
+    };
     let receipt: Value = serde_json::from_slice(&raw_receipt)
         .map_err(|e| err(format!("receipt is not valid JSON: {e}")))?;
 
@@ -306,8 +314,7 @@ pub fn verify_bundle(
     let meta_path = artifact_root.join("provider-metamorphic-receipt.json");
     let meta_sha = digest_field(&receipt, "provider_metamorphic.receipt_sha256")?;
     verify_digest_at(&meta_path, &meta_sha, "provider metamorphic receipt")?;
-    let meta_bytes = fs::read(&meta_path)
-        .map_err(|e| err(format!("cannot read provider metamorphic receipt: {e}")))?;
+    let meta_bytes = read_bounded(&meta_path, 1_048_576, "provider metamorphic receipt")?;
     let meta: Value = serde_json::from_slice(&meta_bytes)
         .map_err(|e| err(format!("provider metamorphic receipt is not valid JSON: {e}")))?;
     if text_field(&meta, "schema_version")? != PROVIDER_META_SCHEMA {
@@ -342,6 +349,8 @@ pub fn verify_bundle(
         status: "verified",
         evidence_tier: "unblob-provider-smoke",
         receipt_sha256,
+        verification_mode: if receipt_digest_anchor_matched { "receipt-digest-anchored" } else { "integrity-consistency-only" },
+        receipt_digest_anchor_matched,
         source_head_sha,
         checkout_commit_sha,
         provider_version: PROVIDER_VERSION.to_owned(),
