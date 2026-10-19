@@ -14,6 +14,7 @@ use symthaea_habitat_vertical_bench::assumption_falsification::{
 };
 use symthaea_habitat_vertical_bench::event_replay::{validate_event_log_str, EMBEDDED_EVENT_LOG};
 use symthaea_habitat_vertical_bench::material_ledger::{validate_material_ledger_str, EMBEDDED_MATERIAL_LEDGER};
+use symthaea_habitat_vertical_bench::measurement_gate::{validate_measurement_gate_str, EMBEDDED_MEASUREMENT_GATE};
 use symthaea_habitat_vertical_bench::{validate_fixture_str, EMBEDDED_FIXTURE};
 
 fn main() {
@@ -191,12 +192,39 @@ fn main() {
                 material_ledger.closing_mass_mg,
                 material_ledger.nonzero_closing_account_count
             );
+            let measurement_gate = match validate_measurement_gate_str(EMBEDDED_MEASUREMENT_GATE) {
+                Ok(report) => report,
+                Err(error) => {
+                    eprintln!("invalid embedded measurement-gate JSON: {error}");
+                    process::exit(2);
+                }
+            };
+            if !measurement_gate.is_valid() {
+                eprintln!("MEASUREMENT GATE DEFINITION: FAIL ({} findings)", measurement_gate.issues.len());
+                for issue in measurement_gate.issues {
+                    eprintln!("{} {}: {}", issue.code, issue.path, issue.message);
+                }
+                process::exit(1);
+            }
+            let count_disposition = |name: &str| {
+                measurement_gate.results.iter().filter(|result| result.disposition == name).count()
+            };
+            println!(
+                "synthetic measurement decision-rule fixture: PASS ({} cases; conforming={}; nonconforming={}; indeterminate={}; blocked={}; not_evaluable={}; physical measurements=NONE)",
+                measurement_gate.case_count,
+                count_disposition("Conforming"),
+                count_disposition("Nonconforming"),
+                count_disposition("Indeterminate"),
+                count_disposition("Blocked"),
+                count_disposition("NotEvaluable")
+            );
         } else {
             println!("embedded disruption campaign: not checked against the alternate fixture");
             println!("embedded resilience option matrix: not checked against the alternate fixture");
             println!("embedded assumption/test definitions: not checked against the alternate fixture");
             println!("embedded event replay contract: not checked against the alternate fixture");
             println!("embedded material ledger: not checked against the alternate fixture");
+            println!("embedded measurement gate: not checked against the alternate fixture");
         }
 
         println!("STRUCTURAL FIXTURE VALIDATION: PASS");
