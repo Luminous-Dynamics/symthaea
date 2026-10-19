@@ -35,7 +35,9 @@
           "canonical_field_id",
           "raw_unit",
           "role",
-          "missing_policy"
+          "missing_policy",
+          "value_kind",
+          "missing_tokens"
         ],
         "properties": {
           "source_header": {
@@ -65,6 +67,23 @@
               "preserve_missing"
             ],
             "description": "Choose whether an empty mapped cell fails reconciliation or is counted explicitly as missing. No imputation is performed."
+          },
+          "value_kind": {
+            "enum": [
+              "text",
+              "finite_number"
+            ],
+            "description": "Explicit lexical validator; numeric fields must parse as finite IEEE-754 values."
+          },
+          "missing_tokens": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^\\S(?:.*\\S)?$"
+            },
+            "description": "Exact, case-sensitive source tokens treated as missing; blank cells are missing separately. Do not guess sentinel values."
           }
         }
       }
