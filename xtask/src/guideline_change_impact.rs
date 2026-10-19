@@ -5,7 +5,7 @@
 //! and rejects incomplete or inconsistent change-impact records. It is not a
 //! clinical guideline compiler or a clinical-validity oracle.
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
@@ -100,11 +100,7 @@ struct ValidatedChangeImpact {
     change_record_count: usize,
 }
 
-pub fn run(
-    root: &Path,
-    contract_arg: &Path,
-    out_arg: Option<&Path>,
-) -> Result<()> {
+pub fn run(root: &Path, contract_arg: &Path, out_arg: Option<&Path>) -> Result<()> {
     let contract_path = resolve(root, contract_arg);
     let contract_bytes = fs::read(&contract_path)
         .with_context(|| format!("read change-impact contract {}", contract_path.display()))?;
@@ -200,27 +196,42 @@ fn source_path_is_allowed(path: &str) -> bool {
         return false;
     }
     parsed.components().all(|part| {
-        !matches!(part, Component::ParentDir | Component::RootDir | Component::Prefix(_))
+        !matches!(
+            part,
+            Component::ParentDir | Component::RootDir | Component::Prefix(_)
+        )
     })
 }
 
-fn parse_synthetic_requirements(source: &str, revision_id: &str) -> Result<BTreeMap<String, String>> {
+fn parse_synthetic_requirements(
+    source: &str,
+    revision_id: &str,
+) -> Result<BTreeMap<String, String>> {
     let mut requirements = BTreeMap::new();
     for (index, line) in source.lines().enumerate() {
         if !line.starts_with("REQ-") {
             continue;
         }
-        let (id, text) = line
-            .split_once(':')
-            .with_context(|| format!("{revision_id}: line {} has malformed requirement", index + 1))?;
+        let (id, text) = line.split_once(':').with_context(|| {
+            format!(
+                "{revision_id}: line {} has malformed requirement",
+                index + 1
+            )
+        })?;
         if !is_requirement_id(id) {
-            bail!("{revision_id}: line {} has invalid requirement ID {id:?}", index + 1);
+            bail!(
+                "{revision_id}: line {} has invalid requirement ID {id:?}",
+                index + 1
+            );
         }
         let text = text.trim();
         if text.is_empty() {
             bail!("{revision_id}: line {} has an empty requirement", index + 1);
         }
-        if requirements.insert(id.to_string(), text.to_string()).is_some() {
+        if requirements
+            .insert(id.to_string(), text.to_string())
+            .is_some()
+        {
             bail!("{revision_id}: duplicate source requirement ID {id}");
         }
     }
@@ -230,9 +241,15 @@ fn parse_synthetic_requirements(source: &str, revision_id: &str) -> Result<BTree
     Ok(requirements)
 }
 
-fn validate_contract(contract: &ChangeImpactContract, root: &Path) -> Result<ValidatedChangeImpact> {
+fn validate_contract(
+    contract: &ChangeImpactContract,
+    root: &Path,
+) -> Result<ValidatedChangeImpact> {
     if contract.schema_version != CONTRACT_VERSION {
-        bail!("unsupported change-impact schema: {}", contract.schema_version);
+        bail!(
+            "unsupported change-impact schema: {}",
+            contract.schema_version
+        );
     }
     if contract.status != SYNTHETIC_STATUS {
         bail!("change-impact fixture must remain synthetic-only");
@@ -331,7 +348,10 @@ fn validate_contract(contract: &ChangeImpactContract, root: &Path) -> Result<Val
             bail!("invalid requirement mapping ID: {}", mapping.requirement_id);
         }
         if mappings.insert(&mapping.requirement_id, mapping).is_some() {
-            bail!("duplicate requirement mapping ID: {}", mapping.requirement_id);
+            bail!(
+                "duplicate requirement mapping ID: {}",
+                mapping.requirement_id
+            );
         }
         if mapping.source_revision_id != contract.to_revision_id {
             bail!(
@@ -368,7 +388,10 @@ fn validate_contract(contract: &ChangeImpactContract, root: &Path) -> Result<Val
             mapping.disposition.as_str(),
             "accepted" | "excluded" | "unresolved"
         ) {
-            bail!("{}: unknown requirement disposition", mapping.requirement_id);
+            bail!(
+                "{}: unknown requirement disposition",
+                mapping.requirement_id
+            );
         }
 
         if !mapping.test_ids.is_empty() {
@@ -383,7 +406,10 @@ fn validate_contract(contract: &ChangeImpactContract, root: &Path) -> Result<Val
                     bail!("{}: accepted mapping requires a review record", mapping.requirement_id);
                 }
                 if mapping.test_ids.is_empty() {
-                    bail!("{}: accepted mapping requires at least one test ID", mapping.requirement_id);
+                    bail!(
+                        "{}: accepted mapping requires at least one test ID",
+                        mapping.requirement_id
+                    );
                 }
                 if mapping.criticality == "safety_critical" && mapping.test_ids.len() < 2 {
                     bail!(
@@ -393,8 +419,18 @@ fn validate_contract(contract: &ChangeImpactContract, root: &Path) -> Result<Val
                 }
             }
             "excluded" => {
-                if mapping.reviewer_record_id.as_deref().unwrap_or("").trim().is_empty()
-                    || mapping.exclusion_rationale.as_deref().unwrap_or("").trim().is_empty()
+                if mapping
+                    .reviewer_record_id
+                    .as_deref()
+                    .unwrap_or("")
+                    .trim()
+                    .is_empty()
+                    || mapping
+                        .exclusion_rationale
+                        .as_deref()
+                        .unwrap_or("")
+                        .trim()
+                        .is_empty()
                 {
                     bail!(
                         "{}: exclusion requires a reviewer record and explicit rationale",
@@ -402,10 +438,16 @@ fn validate_contract(contract: &ChangeImpactContract, root: &Path) -> Result<Val
                     );
                 }
                 if mapping.bundle_target.is_some() {
-                    bail!("{}: excluded mapping must not have a bundle target", mapping.requirement_id);
+                    bail!(
+                        "{}: excluded mapping must not have a bundle target",
+                        mapping.requirement_id
+                    );
                 }
                 if !mapping.test_ids.is_empty() {
-                    bail!("{}: excluded mapping must not claim accepted test coverage", mapping.requirement_id);
+                    bail!(
+                        "{}: excluded mapping must not claim accepted test coverage",
+                        mapping.requirement_id
+                    );
                 }
             }
             "unresolved" => {
@@ -433,14 +475,22 @@ fn validate_contract(contract: &ChangeImpactContract, root: &Path) -> Result<Val
     let mut change_ids = HashSet::new();
     for record in &contract.change_records {
         if !is_requirement_id(&record.requirement_id) {
-            bail!("invalid change-record requirement ID: {}", record.requirement_id);
+            bail!(
+                "invalid change-record requirement ID: {}",
+                record.requirement_id
+            );
         }
         if !change_ids.insert(record.requirement_id.as_str()) {
             bail!("duplicate change-impact record: {}", record.requirement_id);
         }
         let expected_kind = expected_changes
             .get(&record.requirement_id)
-            .with_context(|| format!("change record {} is not a source diff", record.requirement_id))?;
+            .with_context(|| {
+                format!(
+                    "change record {} is not a source diff",
+                    record.requirement_id
+                )
+            })?;
         if expected_kind != &record.change_kind {
             bail!(
                 "{}: declared change kind {} differs from source diff {}",
@@ -460,11 +510,16 @@ fn validate_contract(contract: &ChangeImpactContract, root: &Path) -> Result<Val
             "changed" | "added" => {
                 let mapping = mappings
                     .get(record.requirement_id.as_str())
-                    .with_context(|| format!("{} has no candidate mapping", record.requirement_id))?;
+                    .with_context(|| {
+                        format!("{} has no candidate mapping", record.requirement_id)
+                    })?;
                 match mapping.disposition.as_str() {
                     "accepted" => {
                         if record.disposition != "retested" {
-                            bail!("{}: accepted changes must be retested", record.requirement_id);
+                            bail!(
+                                "{}: accepted changes must be retested",
+                                record.requirement_id
+                            );
                         }
                         if mapping.criticality == "safety_critical" && record.case_ids.len() < 2 {
                             bail!(
@@ -492,7 +547,10 @@ fn validate_contract(contract: &ChangeImpactContract, root: &Path) -> Result<Val
                         }
                     }
                     "unresolved" => {
-                        bail!("{}: unresolved changed requirement cannot be released", record.requirement_id);
+                        bail!(
+                            "{}: unresolved changed requirement cannot be released",
+                            record.requirement_id
+                        );
                     }
                     _ => unreachable!("disposition enum validated above"),
                 }
@@ -580,7 +638,9 @@ mod tests {
     #[test]
     fn omitted_source_change_record_is_rejected() {
         let mut contract = fixture();
-        contract.change_records.retain(|record| record.requirement_id != "REQ-003");
+        contract
+            .change_records
+            .retain(|record| record.requirement_id != "REQ-003");
         assert_rejected(&contract);
     }
 
@@ -670,7 +730,9 @@ mod tests {
     #[test]
     fn candidate_requirement_without_mapping_is_rejected() {
         let mut contract = fixture();
-        contract.requirements.retain(|mapping| mapping.requirement_id != "REQ-003");
+        contract
+            .requirements
+            .retain(|mapping| mapping.requirement_id != "REQ-003");
         assert_rejected(&contract);
     }
 
