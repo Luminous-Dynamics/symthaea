@@ -66,6 +66,12 @@ This is a percentile bootstrap description of uncertainty, not a causal identifi
 
 `PairedBootstrapConfig::default()` uses 10,000 bootstrap replicates and a fixed reproducible seed. Always report the exact configuration and cluster definition.
 
+### AM-Bench dataset-selection caveat
+
+The current NIST index links AMB2025-02 tensile measurements, AMB2025-03 fatigue measurements, and AMB2025-06/07 laser-track calibration data. The AMB2025-02 description says eight miniature tensile specimens were excised from the same leg of one original AMB2022-01 artifact. Therefore those eight specimens must not automatically be treated as eight independent production clusters; the shared parent artifact is a potential dependence source. That dataset can support a narrowly defined material-property prediction exercise with the published split/target, but it cannot satisfy this protocol's 20-independent-cluster gate merely by counting specimens.
+
+NIST publishes each dataset's citation instructions at the DOI/PDR landing page. Before ingestion, record the exact dataset revision, licence/terms, files and checksums, units, missingness, specimen/build/lot lineage, and permissible prediction target. The NIST page notes that AM-Bench 2025 journal articles are published after measurement activities complete; use the current source dataset and cited measurement description, not an inferred challenge score. If the PDR landing metadata cannot be read or provenance cannot be established, leave the adapter and evaluation blocked instead of fabricating the missing details.
+
 ## Machine-readable report artifacts
 
 The production-outcome and paired-inference reports are serializable via Serde and include explicit `schema_version` fields. Structured inputs reject unknown fields where strict record deserialization is defined. JSON round-trip unit tests check the stability of report structures, not authenticity. Consumers should archive the serialized report with the exact source-code revision, input manifest, configuration, and an independently computed digest of the emitted bytes. Schema version changes must be deliberate and tested before Mycelix or another downstream evidence ledger consumes the format.
