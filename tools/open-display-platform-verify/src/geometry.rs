@@ -497,7 +497,8 @@ mod tests {
     #[test]
     fn larger_distance_and_angular_uncertainty_do_not_shrink_guarded_footprint() {
         let baseline = geometry_input();
-        let baseline_result = evaluate_geometry_screen(&baseline).expect("baseline geometry is valid");
+        let baseline_result =
+            evaluate_geometry_screen(&baseline).expect("baseline geometry is valid");
 
         let mut stressed = baseline;
         stressed.distance_mm += 100.0;
@@ -531,7 +532,8 @@ mod tests {
         input.uniform_patch_width_mm = first.total_required_width_mm;
         input.uniform_patch_height_mm = first.total_required_height_mm;
 
-        let exact_edge = evaluate_geometry_screen(&input).expect("exactly sufficient patch is valid");
+        let exact_edge =
+            evaluate_geometry_screen(&input).expect("exactly sufficient patch is valid");
         assert!(exact_edge.horizontal_fits);
         assert!(exact_edge.vertical_fits);
         close(exact_edge.horizontal_margin_mm, 0.0, 1e-12);
