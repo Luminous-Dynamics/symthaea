@@ -356,7 +356,7 @@
         "site says nutrient values are means, reported per 100 g edible food, and warns natural variation by species/cultivar, soil, climate, practices, processing, storage and transport",
         "not all values are of South African origin; nutrient-level source references are recorded in the system"
       ],
-      "observed_metadata": "Highest-priority local reference/access path for CF-024, but not necessarily a cultivar-level trial dataset. The free web view is limited to selected macronutrients and energy; the more detailed 2024 tables are sold through SAFOODS/MRC. The record does not grant unrestricted redistribution or model-training rights. No table, workbook or food records have been downloaded or audited by this workstream.",
+      "observed_metadata": "The current official site lists 1,857 food items in SAFOODS v.2023, with a free web view of energy, carbohydrate, protein, fat and fibre. It states values are means per 100 g edible food and that natural variation depends on cultivar, soil, climate, practice, storage and processing; it also says not all nutrient values are of South African origin. The FAQ states written SAMRC permission is required before any part of the South African Food Database is reproduced. No table or food records have been downloaded or audited here.",
       "license_status": "free_selected_web_view_and_paid_2024_tables_reuse_terms_need_review",
       "access_status": "public_selected_nutrient_web_view_full_composition_tables_paid",
       "ingestion_status": "discovery_only",
@@ -367,7 +367,7 @@
       ],
       "training_authorized": false,
       "content_sha256": null,
-      "next_gate": "Ask SAFOODS/MRC about allowed research access, purchase/use rights, attribution, redistribution and machine-learning terms for the specific 2024 table. If authorized, pin exact edition/file digest and nutrient-level source references; capture units, edible portion, fresh/dry basis, analytical/calculated/imputed status, food matching and uncertainty. Do not treat national mean values as the user's crop, cultivar, farm or household observation.",
+      "next_gate": "Contact SAFOODS/MRC for written permission and exact research, machine-learning, redistribution and citation terms before reproducing records or tables. If access is granted, pin exact edition/file digest and nutrient-level source references; capture units, edible portion, fresh/dry basis, analytical/calculated/imputed status, food matching and uncertainty. Keep national means separate from crop-lot assays.",
       "initial_intended_role": "Local South African food-composition reference and access pathway for CF-024, after terms review. It can support reference values and food matching only within documented limitations; it does not replace directly assayed cultivar, site, post-harvest and preparation-specific observations."
     },
     {
