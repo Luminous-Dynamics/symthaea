@@ -573,6 +573,226 @@ pub fn run(input_path: &Path, output_path: Option<&Path>) -> Result<()> {
     Ok(())
 }
 
+
+#[derive(Debug, Deserialize)]
+struct RawTraceRow {
+    timestamp_ns: u64,
+    channel_id: String,
+    raw_value: String,
+    sample_status: String,
+    sequence: u64,
+}
+
+#[derive(Debug, Serialize)]
+struct TraceChannelSummary {
+    channel_id: String,
+    sample_count: usize,
+    valid_count: usize,
+    invalid_or_saturated_count: usize,
+    missing_value_count: usize,
+    suspected_gap_count: usize,
+    maximum_inter_sample_gap_ns: Option<u64>,
+}
+
+#[derive(Debug, Serialize)]
+struct TraceReport {
+    report_version: String,
+    trace_sha256: String,
+    trace_byte_len: usize,
+    row_count: usize,
+    valid_sample_count: usize,
+    invalid_or_saturated_sample_count: usize,
+    missing_value_count: usize,
+    suspected_gap_count: usize,
+    channels: Vec<TraceChannelSummary>,
+    claim_ceiling: String,
+}
+
+#[derive(Debug, Default)]
+struct MutableChannelSummary {
+    sample_count: usize,
+    valid_count: usize,
+    invalid_or_saturated_count: usize,
+    missing_value_count: usize,
+    suspected_gap_count: usize,
+    maximum_inter_sample_gap_ns: Option<u64>,
+    last_timestamp_ns: Option<u64>,
+}
+
+fn validate_trace_bytes(raw: &[u8], manifest: &Manifest) -> Result<TraceReport> {
+    let mut reader = csv::ReaderBuilder::new()
+        .has_headers(true)
+        .flexible(false)
+        .from_reader(std::io::Cursor::new(raw));
+    const HEADER: &[&str] = &[
+        "timestamp_ns",
+        "channel_id",
+        "raw_value",
+        "sample_status",
+        "sequence",
+    ];
+    let headers = reader.headers().context("reading raw telemetry trace header")?;
+    if headers.len() != HEADER.len()
+        || !headers.iter().zip(HEADER.iter()).all(|(actual, expected)| actual == *expected)
+    {
+        bail!("raw telemetry trace header does not match v0.1 contract");
+    }
+
+    let channels_by_id: std::collections::BTreeMap<&str, &Channel> = manifest
+        .channels
+        .iter()
+        .map(|channel| (channel.channel_id.as_str(), channel))
+        .collect();
+    let mut channel_stats = std::collections::BTreeMap::<String, MutableChannelSummary>::new();
+    let mut previous_global_timestamp: Option<u64> = None;
+    let mut row_count = 0usize;
+    let mut valid_sample_count = 0usize;
+    let mut invalid_or_saturated_sample_count = 0usize;
+    let mut missing_value_count = 0usize;
+    let mut suspected_gap_count = 0usize;
+
+    for (index, result) in reader.deserialize::<RawTraceRow>().enumerate() {
+        let row_number = index + 2;
+        let row = result.with_context(|| format!("parsing raw telemetry row {row_number}"))?;
+        if row.sequence != row_count as u64 {
+            bail!(
+                "row {row_number} sequence {} is not the expected contiguous sequence {}",
+                row.sequence,
+                row_count
+            );
+        }
+        if previous_global_timestamp.is_some_and(|last| row.timestamp_ns < last) {
+            bail!("row {row_number} timestamp regressed in logger-monotonic order");
+        }
+        previous_global_timestamp = Some(row.timestamp_ns);
+
+        let channel = channels_by_id
+            .get(row.channel_id.as_str())
+            .with_context(|| format!("row {row_number} references undeclared channel {}", row.channel_id))?;
+        if !["VALID", "INVALID", "SATURATED", "SENSOR_FAULT"].contains(&row.sample_status.as_str()) {
+            bail!("row {row_number} has unsupported sample_status {}", row.sample_status);
+        }
+        let value = if row.raw_value.trim().is_empty() {
+            None
+        } else {
+            let parsed = row.raw_value.trim().parse::<f64>()
+                .with_context(|| format!("row {row_number} has nonnumeric raw_value"))?;
+            if !parsed.is_finite() {
+                bail!("row {row_number} has non-finite raw_value");
+            }
+            Some(parsed)
+        };
+        if row.sample_status == "VALID" && value.is_none() {
+            bail!("row {row_number} marked VALID with an empty raw_value");
+        }
+
+        let summary = channel_stats.entry(row.channel_id.clone()).or_default();
+        if summary.last_timestamp_ns.is_some_and(|last| row.timestamp_ns <= last) {
+            bail!("row {row_number} repeats or regresses the timestamp for channel {}", row.channel_id);
+        }
+        if let Some(last) = summary.last_timestamp_ns {
+            let gap_ns = row.timestamp_ns - last;
+            summary.maximum_inter_sample_gap_ns = Some(
+                summary.maximum_inter_sample_gap_ns.map_or(gap_ns, |prior| prior.max(gap_ns))
+            );
+            let expected_period_ns = (1_000_000_000.0 / channel.sample_rate_hz).round() as u64;
+            // This is a diagnostic only, not a data deletion or acceptance rule.
+            // Gaps remain visible via timestamps and explicit logger event records.
+            if expected_period_ns > 0 && gap_ns as f64 > expected_period_ns as f64 * 2.5 {
+                summary.suspected_gap_count += 1;
+                suspected_gap_count += 1;
+            }
+        }
+        summary.last_timestamp_ns = Some(row.timestamp_ns);
+        summary.sample_count += 1;
+        if row.sample_status == "VALID" {
+            summary.valid_count += 1;
+            valid_sample_count += 1;
+        } else {
+            summary.invalid_or_saturated_count += 1;
+            invalid_or_saturated_sample_count += 1;
+        }
+        if value.is_none() {
+            summary.missing_value_count += 1;
+            missing_value_count += 1;
+        }
+        row_count += 1;
+    }
+    if row_count == 0 {
+        bail!("raw telemetry trace contains no rows");
+    }
+
+    let channels = channel_stats.into_iter().map(|(channel_id, summary)| TraceChannelSummary {
+        channel_id,
+        sample_count: summary.sample_count,
+        valid_count: summary.valid_count,
+        invalid_or_saturated_count: summary.invalid_or_saturated_count,
+        missing_value_count: summary.missing_value_count,
+        suspected_gap_count: summary.suspected_gap_count,
+        maximum_inter_sample_gap_ns: summary.maximum_inter_sample_gap_ns,
+    }).collect();
+
+    Ok(TraceReport {
+        report_version: SCHEMA_VERSION.to_owned(),
+        trace_sha256: format!("sha256:{:x}", Sha256::digest(raw)),
+        trace_byte_len: raw.len(),
+        row_count,
+        valid_sample_count,
+        invalid_or_saturated_sample_count,
+        missing_value_count,
+        suspected_gap_count,
+        channels,
+        claim_ceiling: "CSV structure, declared channel membership, monotonic timestamps, raw-value validity and likely sample-gap diagnostics only. No physical accuracy, energy-efficiency, tire-grip, safety, roadworthiness or approval claim.".into(),
+    })
+}
+
+pub fn run_trace(
+    manifest_path: &Path,
+    trace_path: &Path,
+    output_path: Option<&Path>,
+) -> Result<()> {
+    let manifest_raw = fs::read(manifest_path)
+        .with_context(|| format!("reading telemetry manifest {}", manifest_path.display()))?;
+    let manifest: Manifest = serde_json::from_slice(&manifest_raw)
+        .with_context(|| format!("parsing telemetry manifest {}", manifest_path.display()))?;
+    validate_structure(&manifest)?;
+
+    let trace_raw = fs::read(trace_path)
+        .with_context(|| format!("reading telemetry trace {}", trace_path.display()))?;
+    if manifest.session_state != "planned" {
+        verify_artifacts(manifest_path, &manifest.artifacts)?;
+        let root = manifest_path.parent().context("manifest has no parent")?.canonicalize()?;
+        let canonical_trace = trace_path.canonicalize()
+            .with_context(|| format!("resolving telemetry trace {}", trace_path.display()))?;
+        if !canonical_trace.starts_with(&root) {
+            bail!("recorded telemetry trace must remain inside the manifest directory");
+        }
+        let relative = canonical_trace.strip_prefix(&root)
+            .context("computing trace path relative to manifest directory")?
+            .to_string_lossy()
+            .replace('\\', "/");
+        let declared = manifest.artifacts.iter().any(|artifact| {
+            artifact.relative_path == relative && artifact.kind == "raw_sensor_log"
+        });
+        if !declared {
+            bail!("trace path must match a declared raw_sensor_log artifact for recorded/closed sessions");
+        }
+    }
+
+    let report = validate_trace_bytes(&trace_raw, &manifest)?;
+    let encoded = serde_json::to_string_pretty(&report)?;
+    if let Some(path) = output_path {
+        if let Some(parent) = path.parent().filter(|parent| !parent.as_os_str().is_empty()) {
+            fs::create_dir_all(parent)
+                .with_context(|| format!("creating report directory {}", parent.display()))?;
+        }
+        fs::write(path, format!("{encoded}\n"))
+            .with_context(|| format!("writing telemetry trace report {}", path.display()))?;
+    }
+    println!("{encoded}");
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -675,6 +895,53 @@ mod tests {
         assert!(!claim.physical_eligible);
         assert!(claim.reasons.iter().any(|reason| reason == "sensor_not_calibrated:dc-voltage-01"));
         assert!(claim.reasons.iter().any(|reason| reason == "sensor_not_calibrated:dc-current-01"));
+    }
+
+    #[test]
+    fn synthetic_trace_parses_without_claiming_physical_validity() {
+        let fixture = manifest();
+        let raw = include_bytes!("../../docs/research/data/mobility_telemetry_trace_v0_1.csv");
+        let report = validate_trace_bytes(raw, &fixture).expect("synthetic trace parses");
+        assert_eq!(report.row_count, 5);
+        assert_eq!(report.valid_sample_count, 4);
+        assert_eq!(report.invalid_or_saturated_sample_count, 1);
+        assert_eq!(report.missing_value_count, 1);
+        assert_eq!(report.trace_sha256.len(), 71);
+    }
+
+    #[test]
+    fn valid_sample_may_not_have_an_empty_value() {
+        let fixture = manifest();
+        let raw = b"timestamp_ns,channel_id,raw_value,sample_status,sequence\n1,gnss.speed_mps,,VALID,0\n";
+        assert!(validate_trace_bytes(raw, &fixture).is_err());
+    }
+
+    #[test]
+    fn unknown_channel_is_rejected() {
+        let fixture = manifest();
+        let raw = b"timestamp_ns,channel_id,raw_value,sample_status,sequence\n1,unknown.speed,1,VALID,0\n";
+        assert!(validate_trace_bytes(raw, &fixture).is_err());
+    }
+
+    #[test]
+    fn sequence_gap_is_rejected_instead_of_hidden() {
+        let fixture = manifest();
+        let raw = b"timestamp_ns,channel_id,raw_value,sample_status,sequence\n1,gnss.speed_mps,1,VALID,0\n2,gnss.speed_mps,2,VALID,2\n";
+        assert!(validate_trace_bytes(raw, &fixture).is_err());
+    }
+
+    #[test]
+    fn timestamp_regression_is_rejected() {
+        let fixture = manifest();
+        let raw = b"timestamp_ns,channel_id,raw_value,sample_status,sequence\n3,gnss.speed_mps,1,VALID,0\n2,dc_bus.voltage_v,2,VALID,1\n";
+        assert!(validate_trace_bytes(raw, &fixture).is_err());
+    }
+
+    #[test]
+    fn repeated_timestamp_for_same_channel_is_rejected() {
+        let fixture = manifest();
+        let raw = b"timestamp_ns,channel_id,raw_value,sample_status,sequence\n3,gnss.speed_mps,1,VALID,0\n3,gnss.speed_mps,2,VALID,1\n";
+        assert!(validate_trace_bytes(raw, &fixture).is_err());
     }
 
     #[test]
