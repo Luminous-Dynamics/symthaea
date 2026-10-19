@@ -784,12 +784,44 @@ mod tests {
         assert_eq!(validated.candidate_requirement_count, 3);
         assert_eq!(validated.mapped_requirement_count, 3);
         assert_eq!(validated.change_record_count, 2);
+        assert_eq!(validated.oracle_case_count, 6);
+        assert_eq!(validated.known_answer_case_count, 3);
+        assert_eq!(validated.fault_mutation_case_count, 3);
+        assert_eq!(validated.oracle_sha256, "28ebb0721856de30088c40dc0aab385078c5b5e7401646ecae8285f29dbe5bef");
     }
 
     #[test]
     fn mutated_source_digest_is_rejected() {
         let mut contract = fixture();
         contract.source_revisions[1].source_sha256 = "0".repeat(64);
+        assert_rejected(&contract);
+    }
+
+    #[test]
+    fn tampered_oracle_digest_is_rejected() {
+        let mut contract = fixture();
+        contract.oracle_fixture_sha256 = "0".repeat(64);
+        assert_rejected(&contract);
+    }
+
+    #[test]
+    fn mapping_test_id_must_exist_in_the_oracle() {
+        let mut contract = fixture();
+        contract.requirements[0].test_ids[0] = "KAT-999".to_string();
+        assert_rejected(&contract);
+    }
+
+    #[test]
+    fn mapping_test_must_belong_to_the_same_requirement() {
+        let mut contract = fixture();
+        contract.requirements[0].test_ids[0] = "KAT-002".to_string();
+        assert_rejected(&contract);
+    }
+
+    #[test]
+    fn oracle_class_cannot_authorize_clinical_use() {
+        let mut contract = fixture();
+        contract.oracle_class = "clinical_authority".to_string();
         assert_rejected(&contract);
     }
 
