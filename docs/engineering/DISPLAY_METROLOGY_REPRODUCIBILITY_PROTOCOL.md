@@ -33,6 +33,8 @@ For each instrument used by a measured observation, the run record must bind the
 
 These bindings make the evidence addressable and mutation-detectable; they do **not** by themselves establish metrological traceability or fitness for purpose. NIST notes that traceability of a measurement result requires a documented, unbroken chain of calibrations, with each contributing uncertainty, and that calibration alone does not establish fitness for a particular decision. [NIST Policy on Metrological Traceability](https://www.nist.gov/calibrations/traceability).
 
+For an exploratory measured record, a declared-but-unreviewed capability profile may be recorded, but its limitations must remain visible and it cannot support an independently reviewed observation. To mark a result INDEPENDENTLY_REVIEWED, every instrument used for that observation must have both a calibration artifact and a capability-profile artifact linked by exact digest, and the capability profile itself must be marked independently reviewed. A successful software check validates these internal links and status relationships only; it does not verify the truth of the source document, reviewer independence, calibration quality, or actual sensor fitness.
+
 A report must distinguish actual input state from requested state. For example, a requested HDR mode does not establish that the signal negotiated or the display operated in HDR.
 
 ### Timestamp and calibration-date syntax
