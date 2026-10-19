@@ -134,7 +134,12 @@ band balance, integrated loudness and peak, onset/duration consistency,
 instrument/pitch/velocity coverage, style-tag similarity where appropriate,
 and blind listener judgments. Distributional or text/audio scores can be useful
 diagnostics but cannot substitute for human assessments of quality, relevance,
-or stylistic credibility.
+or stylistic credibility. A 2026 survey likewise concludes that no single measure
+is sufficient and distinguishes symbolic evaluation (tonality, rhythm, structure,
+diversity, controllability) from audio evaluation (timbre, transients, perceptual
+quality). We should preserve that separation and add a control-fidelity test:
+changing a declared dialect should alter only its intended rendering channels
+while leaving the score and declared grammar unchanged.
 
 ## References
 
@@ -147,6 +152,10 @@ or stylistic credibility.
 - *From Aesthetics to Human Preferences* (IEEE MLSP 2025) discusses inconsistent
   relationships between distributional metrics and human preference:
   https://doi.org/10.1109/MLSP62443.2025.11204254
+- *Recent advances in music generation: methods, evaluation, and challenges*
+  (Artificial Intelligence Review, 2026) distinguishes symbolic and audio
+  evaluation and recommends multiple complementary measures:
+  https://doi.org/10.1007/s10462-026-11582-x
 - MusicGen model card summarizing FAD, KL, CLAP, and human evaluations of audio
   quality and text relevance on held-out evaluation sets:
   https://github.com/aime-labs/MusicGen/blob/main/MODEL_CARD.md
