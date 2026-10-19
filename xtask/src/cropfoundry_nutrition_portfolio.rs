@@ -1008,6 +1008,23 @@ mod tests {
     }
 
     #[test]
+    fn cropfoundry_portfolio_resource_sum_overflow_fails_closed() {
+        let mut crop_a = option("crop-a", 100.0, 20.0);
+        for record in &mut crop_a.records {
+            record["water_liters"] = serde_json::json!(1.0e308);
+        }
+        let receipt = portfolio(vec![crop_a, option("crop-b", 80.0, 30.0)]);
+        assert!(!receipt.accounting_pass);
+        assert!(
+            receipt.options[0]
+                .issues
+                .iter()
+                .any(|issue| issue.contains("resource total water_liters overflowed"))
+        );
+        assert_eq!(receipt.options[0].total_water_liters, None);
+    }
+
+    #[test]
     fn cropfoundry_portfolio_checks_resource_currency_comparability() {
         let mut crop_b = option("crop-b", 80.0, 30.0);
         crop_b.records.iter_mut().for_each(|record| {
