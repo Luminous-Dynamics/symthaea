@@ -1,0 +1,287 @@
+{
+  "schema_version": "1.0.0",
+  "experiment_id": "synthetic-paired-cooking-study-v1",
+  "protocol_id": "synthetic-yield-waste-energy-pilot",
+  "protocol_version": "1.0.0",
+  "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "preregistered_at": "2026-10-19T00:00:00Z",
+  "control_condition_id": "baseline",
+  "variant_condition_id": "variant",
+  "outcome_definitions": [
+    {
+      "outcome_id": "prepared_yield_g",
+      "unit": "g",
+      "direction": "maximize",
+      "target_value": null,
+      "description": "Final edible prepared mass"
+    },
+    {
+      "outcome_id": "discarded_material_g",
+      "unit": "g",
+      "direction": "minimize",
+      "target_value": null,
+      "description": "Measured discarded material from the batch boundary"
+    },
+    {
+      "outcome_id": "energy_input_wh",
+      "unit": "Wh",
+      "direction": "minimize",
+      "target_value": null,
+      "description": "Energy input attributed to this run"
+    }
+  ],
+  "blocks": [
+    {
+      "block_id": "synthetic-block-001",
+      "randomization_seed": "synthetic-seed-001",
+      "randomized_order": [
+        "baseline",
+        "variant"
+      ],
+      "runs": [
+        {
+          "run_id": "synthetic-run-001",
+          "condition_id": "baseline",
+          "execution_order": 0,
+          "process_trace_id": "synthetic-process-trace-001-control",
+          "started_at": "2026-10-19T00:10:00Z",
+          "ended_at": "2026-10-19T00:20:00Z",
+          "outcomes": [
+            {
+              "outcome_id": "prepared_yield_g",
+              "status": "estimated",
+              "value": 246,
+              "lower": 243,
+              "upper": 249,
+              "unit": "g",
+              "method": "synthetic scale estimate",
+              "unknown_reason": null,
+              "evidence": {
+                "source_ref": "urn:synthetic:synthetic-run-001:prepared_yield_g",
+                "source_version": "synthetic-fixture-v1",
+                "known_at": "2026-10-19T02:00:00Z",
+                "evidence_status": "synthetic"
+              }
+            },
+            {
+              "outcome_id": "discarded_material_g",
+              "status": "estimated",
+              "value": 8,
+              "lower": 7,
+              "upper": 9,
+              "unit": "g",
+              "method": "synthetic collection estimate",
+              "unknown_reason": null,
+              "evidence": {
+                "source_ref": "urn:synthetic:synthetic-run-001:discarded_material_g",
+                "source_version": "synthetic-fixture-v1",
+                "known_at": "2026-10-19T02:00:00Z",
+                "evidence_status": "synthetic"
+              }
+            },
+            {
+              "outcome_id": "energy_input_wh",
+              "status": "estimated",
+              "value": 95,
+              "lower": 93,
+              "upper": 97,
+              "unit": "Wh",
+              "method": "synthetic energy-meter estimate",
+              "unknown_reason": null,
+              "evidence": {
+                "source_ref": "urn:synthetic:synthetic-run-001:energy_input_wh",
+                "source_version": "synthetic-fixture-v1",
+                "known_at": "2026-10-19T02:00:00Z",
+                "evidence_status": "synthetic"
+              }
+            }
+          ]
+        },
+        {
+          "run_id": "synthetic-run-002",
+          "condition_id": "variant",
+          "execution_order": 1,
+          "process_trace_id": "synthetic-process-trace-002-variant",
+          "started_at": "2026-10-19T00:21:00Z",
+          "ended_at": "2026-10-19T00:31:00Z",
+          "outcomes": [
+            {
+              "outcome_id": "prepared_yield_g",
+              "status": "estimated",
+              "value": 252,
+              "lower": 249,
+              "upper": 255,
+              "unit": "g",
+              "method": "synthetic scale estimate",
+              "unknown_reason": null,
+              "evidence": {
+                "source_ref": "urn:synthetic:synthetic-run-002:prepared_yield_g",
+                "source_version": "synthetic-fixture-v1",
+                "known_at": "2026-10-19T02:00:00Z",
+                "evidence_status": "synthetic"
+              }
+            },
+            {
+              "outcome_id": "discarded_material_g",
+              "status": "estimated",
+              "value": 5,
+              "lower": 4,
+              "upper": 6,
+              "unit": "g",
+              "method": "synthetic collection estimate",
+              "unknown_reason": null,
+              "evidence": {
+                "source_ref": "urn:synthetic:synthetic-run-002:discarded_material_g",
+                "source_version": "synthetic-fixture-v1",
+                "known_at": "2026-10-19T02:00:00Z",
+                "evidence_status": "synthetic"
+              }
+            },
+            {
+              "outcome_id": "energy_input_wh",
+              "status": "estimated",
+              "value": 100,
+              "lower": 98,
+              "upper": 102,
+              "unit": "Wh",
+              "method": "synthetic energy-meter estimate",
+              "unknown_reason": null,
+              "evidence": {
+                "source_ref": "urn:synthetic:synthetic-run-002:energy_input_wh",
+                "source_version": "synthetic-fixture-v1",
+                "known_at": "2026-10-19T02:00:00Z",
+                "evidence_status": "synthetic"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "block_id": "synthetic-block-002",
+      "randomization_seed": "synthetic-seed-002",
+      "randomized_order": [
+        "variant",
+        "baseline"
+      ],
+      "runs": [
+        {
+          "run_id": "synthetic-run-003",
+          "condition_id": "variant",
+          "execution_order": 0,
+          "process_trace_id": "synthetic-process-trace-003-variant",
+          "started_at": "2026-10-19T01:10:00Z",
+          "ended_at": "2026-10-19T01:20:00Z",
+          "outcomes": [
+            {
+              "outcome_id": "prepared_yield_g",
+              "status": "estimated",
+              "value": 255,
+              "lower": 252,
+              "upper": 258,
+              "unit": "g",
+              "method": "synthetic scale estimate",
+              "unknown_reason": null,
+              "evidence": {
+                "source_ref": "urn:synthetic:synthetic-run-003:prepared_yield_g",
+                "source_version": "synthetic-fixture-v1",
+                "known_at": "2026-10-19T02:00:00Z",
+                "evidence_status": "synthetic"
+              }
+            },
+            {
+              "outcome_id": "discarded_material_g",
+              "status": "estimated",
+              "value": 4,
+              "lower": 3,
+              "upper": 5,
+              "unit": "g",
+              "method": "synthetic collection estimate",
+              "unknown_reason": null,
+              "evidence": {
+                "source_ref": "urn:synthetic:synthetic-run-003:discarded_material_g",
+                "source_version": "synthetic-fixture-v1",
+                "known_at": "2026-10-19T02:00:00Z",
+                "evidence_status": "synthetic"
+              }
+            },
+            {
+              "outcome_id": "energy_input_wh",
+              "status": "estimated",
+              "value": 98,
+              "lower": 96,
+              "upper": 100,
+              "unit": "Wh",
+              "method": "synthetic energy-meter estimate",
+              "unknown_reason": null,
+              "evidence": {
+                "source_ref": "urn:synthetic:synthetic-run-003:energy_input_wh",
+                "source_version": "synthetic-fixture-v1",
+                "known_at": "2026-10-19T02:00:00Z",
+                "evidence_status": "synthetic"
+              }
+            }
+          ]
+        },
+        {
+          "run_id": "synthetic-run-004",
+          "condition_id": "baseline",
+          "execution_order": 1,
+          "process_trace_id": "synthetic-process-trace-004-control",
+          "started_at": "2026-10-19T01:21:00Z",
+          "ended_at": "2026-10-19T01:31:00Z",
+          "outcomes": [
+            {
+              "outcome_id": "prepared_yield_g",
+              "status": "estimated",
+              "value": 249,
+              "lower": 246,
+              "upper": 252,
+              "unit": "g",
+              "method": "synthetic scale estimate",
+              "unknown_reason": null,
+              "evidence": {
+                "source_ref": "urn:synthetic:synthetic-run-004:prepared_yield_g",
+                "source_version": "synthetic-fixture-v1",
+                "known_at": "2026-10-19T02:00:00Z",
+                "evidence_status": "synthetic"
+              }
+            },
+            {
+              "outcome_id": "discarded_material_g",
+              "status": "estimated",
+              "value": 7,
+              "lower": 6,
+              "upper": 8,
+              "unit": "g",
+              "method": "synthetic collection estimate",
+              "unknown_reason": null,
+              "evidence": {
+                "source_ref": "urn:synthetic:synthetic-run-004:discarded_material_g",
+                "source_version": "synthetic-fixture-v1",
+                "known_at": "2026-10-19T02:00:00Z",
+                "evidence_status": "synthetic"
+              }
+            },
+            {
+              "outcome_id": "energy_input_wh",
+              "status": "estimated",
+              "value": 94,
+              "lower": 92,
+              "upper": 96,
+              "unit": "Wh",
+              "method": "synthetic energy-meter estimate",
+              "unknown_reason": null,
+              "evidence": {
+                "source_ref": "urn:synthetic:synthetic-run-004:energy_input_wh",
+                "source_version": "synthetic-fixture-v1",
+                "known_at": "2026-10-19T02:00:00Z",
+                "evidence_status": "synthetic"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
