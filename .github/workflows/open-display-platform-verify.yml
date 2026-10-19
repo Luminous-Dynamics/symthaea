@@ -245,13 +245,18 @@ jobs:
       - name: Run unit and mutation tests
         run: cargo test --manifest-path tools/open-display-platform-verify/Cargo.toml
 
-      - name: Verify repository manifest and runtime CAD receipt
+      - name: Verify repository, CAD receipt and synthetic drift plan
+        shell: bash
         run: |
+          set -euo pipefail
           cargo run --manifest-path tools/open-display-platform-verify/Cargo.toml -- \
             --cad-receipt target/odrh-validation/odrh-cad-runtime-receipt.json \
             --cad-receipt-schema hardware/open-display-reference/validation/odrh-cad-runtime-receipt.schema.json \
             --drift-plan docs/engineering/display-drift-control-plan-v0.1.json \
-            --drift-schema docs/engineering/display-drift-control-plan.schema.json
+            --drift-schema docs/engineering/display-drift-control-plan.schema.json \
+            | tee target/odrh-validation/verification-report.json
+          sha256sum target/odrh-validation/verification-report.json \
+            >> target/odrh-validation/final-artifact-sha256sums.txt
 
       - name: Upload reproducible CAD and validation artifacts
         if: always()
