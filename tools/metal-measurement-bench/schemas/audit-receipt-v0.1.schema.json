@@ -210,7 +210,12 @@
               "role",
               "missing_policy",
               "nonempty_cells",
-              "preserved_missing_cells"
+              "preserved_missing_cells",
+              "value_kind",
+              "missing_tokens",
+              "missing_token_counts",
+              "numeric_values_validated",
+              "preserved_missing_token_cells"
             ],
             "properties": {
               "source_header": {
@@ -243,6 +248,35 @@
                 "minimum": 0
               },
               "preserved_missing_cells": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "value_kind": {
+                "enum": [
+                  "text",
+                  "finite_number"
+                ]
+              },
+              "missing_tokens": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "uniqueItems": true
+              },
+              "missing_token_counts": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "numeric_values_validated": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "preserved_missing_token_cells": {
                 "type": "integer",
                 "minimum": 0
               }
