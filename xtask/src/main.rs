@@ -4,6 +4,7 @@ use std::path::PathBuf;
 mod crate_status;
 mod cropfoundry_csv_audit;
 mod cropfoundry_nutrition_accounting;
+mod cropfoundry_nutrition_portfolio;
 mod cropfoundry_postharvest_audit;
 mod cropfoundry_robust_policy;
 mod cropfoundry_validate;
@@ -114,6 +115,15 @@ enum Commands {
         #[arg(long)]
         out: Option<PathBuf>,
     },
+    /// Compare complete nutrient delivery across options without double-counting batch resources.
+    CropfoundryNutritionPortfolio {
+        /// Path to the portfolio JSON envelope; records use the row-level nutrition accounting schema.
+        #[arg(long)]
+        input: PathBuf,
+        /// Optional path for the JSON portfolio receipt.
+        #[arg(long)]
+        out: Option<PathBuf>,
+    },
     /// Run tail-risk, Pareto and preference-sensitivity diagnostics over the synthetic irrigation suite.
     CropfoundryRobustPolicyDemo {
         /// Optional path to write the JSON robustness receipt.
@@ -212,6 +222,9 @@ fn main() -> anyhow::Result<()> {
         }
         Commands::CropfoundryNutritionAccounting { input, out } => {
             cropfoundry_nutrition_accounting::run(input, out)?;
+        }
+        Commands::CropfoundryNutritionPortfolio { input, out } => {
+            cropfoundry_nutrition_portfolio::run(input, out)?;
         }
         Commands::CropfoundryRobustPolicyDemo { out } => {
             cropfoundry_robust_policy::run(out)?;
