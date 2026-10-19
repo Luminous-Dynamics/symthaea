@@ -26,6 +26,21 @@ The objective should be a vector before it becomes a scalar: amounts delivered f
 
 Do not optimize an opaque aggregate nutrition score. If decision-makers later choose weighted trade-offs, record the weights, their provenance, the hard constraints, and a Pareto frontier so users can see which nutrients or groups are losing out.
 
+## Executable nutrient-accounting prototype
+
+A local-only accounting CLI has been added to test explicit nutrient/mass/resource arithmetic and fail closed on unsupported assumptions. It accepts a small JSON record rather than downloading or selecting a dataset:
+
+```bash
+cargo run -q -p xtask -- cropfoundry-nutrition-accounting \
+  --input /path/to/nutrition-accounting-input-v0.json \
+  --out reports/cropfoundry/nutrition-accounting-receipt.json
+cargo test -p xtask cropfoundry_nutrition
+```
+
+The input schema distinguishes concentration measured at serving from concentration measured before preparation. Pre-preparation values require an explicit retention fraction and a separate evidence URI. Fresh-edible and dry-edible mass bases must match. Bioavailability is calculated only when an explicit factor and its own evidence URI are provided; unknown factors remain unknown. Direct assays require a method, evidence URI and source artifact digest. The receipt retains the exact input snapshot and its SHA-256, keeps literature/model estimates separate from direct assays, and reports nutrient mass per water, land, energy and currency units only when those resource measurements exist.
+
+The prototype is a calculator and provenance-contract test, not a validated nutrition model. Its synthetic CI fixture uses invented values only to exercise the implementation; it cannot establish a crop nutrient value, nutrient adequacy, health outcome, food safety or farm recommendation.
+
 ## Proposed baseline suite
 
 1. **Mass-yield baseline:** maximize edible harvested mass under equal water, land, energy and budget caps.
