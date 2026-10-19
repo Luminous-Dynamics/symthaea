@@ -12,7 +12,14 @@ command -v tar >/dev/null 2>&1 || fail "tar required"
 command -v gzip >/dev/null 2>&1 || fail "gzip required"
 command -v find >/dev/null 2>&1 || fail "find required"
 command -v cmp >/dev/null 2>&1 || fail "cmp required"
+command -v git >/dev/null 2>&1 || fail "git required"
 [ -f "$NORMALIZER" ] || fail "semantic normalizer missing"
+source_head_sha=$(printenv REA_TEST_SOURCE_SHA 2>/dev/null || git rev-parse HEAD)
+checkout_commit_sha=$(git rev-parse HEAD)
+workflow_event_sha=${GITHUB_SHA:-unknown}
+normalizer_sha=$(sha256sum "$NORMALIZER" | awk '{print $1}')
+cases_manifest_sha=$(sha256sum "$ROOT/cases.json" | awk '{print $1}')
+oracle_sha=$(sha256sum "$ROOT/oracle.json" | awk '{print $1}')
 
 version=$(unblob --version 2>&1) || fail "cannot read Unblob version"
 printf '%s\n' "$version" | grep -Eq '26[.]6[.]4([[:space:]]|$)' || fail "expected Unblob 26.6.4; got: $version"
@@ -118,6 +125,12 @@ raw_mutated=$(awk '{print $1}' "$OUT/run-mutated/raw-report.sha256")
 jq -n \
   --arg benchmark "ENG-REA-005-REAL-PROVIDER" \
   --arg provider_version "$version" \
+  --arg source_head_sha "$source_head_sha" \
+  --arg checkout_commit_sha "$checkout_commit_sha" \
+  --arg workflow_event_sha "$workflow_event_sha" \
+  --arg normalizer_sha256 "$normalizer_sha" \
+  --arg cases_manifest_sha256 "$cases_manifest_sha" \
+  --arg oracle_sha256 "$oracle_sha" \
   --arg executable_path "$tool_path" \
   --arg executable_sha256 "$tool_sha" \
   --arg python_version "$python_version" \
@@ -131,7 +144,17 @@ jq -n \
   --arg raw_report_sha256_mutated "$raw_mutated" \
   --arg semantic_projection_sha256 "$sem_a" \
   --arg mutated_semantic_projection_sha256 "$sem_mutated" \
-  '{benchmark:$benchmark,provider_version:$provider_version,executable_path:$executable_path,executable_sha256:$executable_sha256,python_version:$python_version,pip_freeze_sha256:$pip_freeze_sha256,fixture_input_sha256:$fixture_sha256,mutated_fixture_input_sha256:$mutated_fixture_sha256,expected_payload_sha256:$expected_payload_sha256,mutated_expected_payload_sha256:$mutated_payload_sha256,raw_report_sha256:{run_a:$raw_report_sha256_run_a,run_b:$raw_report_sha256_run_b,run_mutated:$raw_report_sha256_mutated},semantic_projection_sha256:{equivalent_runs:$semantic_projection_sha256,semantic_mutation:$mutated_semantic_projection_sha256},claims_ceiling:"Pinned Unblob CLI on owned inert nested gzip/tar/text fixtures only; no REA, recovered firmware execution, emulator, or hardware qualification."}' > "$OUT/receipt.json"
+  '{benchmark:$benchmark,source:{head_sha:$source_head_sha,checkout_commit_sha:$checkout_commit_sha,workflow_event_sha:$workflow_event_sha,normalizer_sha256:$normalizer_sha256,cases_manifest_sha256:$cases_manifest_sha256,oracle_sha256:$oracle_sha256},provider_version:$provider_version,executable_path:$executable_path,executable_sha256:$executable_sha256,python_version:$python_version,pip_freeze_sha256:$pip_freeze_sha256,fixture_input_sha256:$fixture_sha256,mutated_fixture_input_sha256:$mutated_fixture_sha256,expected_payload_sha256:$expected_payload_sha256,mutated_expected_payload_sha256:$mutated_payload_sha256,raw_report_sha256:{run_a:$raw_report_sha256_run_a,run_b:$raw_report_sha256_run_b,run_mutated:$raw_report_sha256_mutated},semantic_projection_sha256:{equivalent_runs:$semantic_projection_sha256,semantic_mutation:$mutated_semantic_projection_sha256},claims_ceiling:"Pinned Unblob CLI on owned inert nested gzip/tar/text fixtures only; no REA, recovered firmware execution, emulator, or hardware qualification."}' > "$OUT/receipt.json"
+
+jq -e --arg source "$source_head_sha" --arg checkout "$checkout_commit_sha" --arg normalizer "$normalizer_sha" --arg cases "$cases_manifest_sha" --arg oracle "$oracle_sha" --arg raw_a "$raw_a" --arg raw_b "$raw_b" --arg raw_mutated "$raw_mutated" --arg sem "$sem_a" --arg sem_mutated "$sem_mutated" '
+  .benchmark=="ENG-REA-005-REAL-PROVIDER" and
+  .source.head_sha==$source and .source.checkout_commit_sha==$checkout and
+  .source.normalizer_sha256==$normalizer and .source.cases_manifest_sha256==$cases and
+  .source.oracle_sha256==$oracle and
+  .raw_report_sha256.run_a==$raw_a and .raw_report_sha256.run_b==$raw_b and .raw_report_sha256.run_mutated==$raw_mutated and
+  .semantic_projection_sha256.equivalent_runs==$sem and .semantic_projection_sha256.semantic_mutation==$sem_mutated
+' "$OUT/receipt.json" >/dev/null || fail "provider receipt failed source/report/projection digest consistency validation"
+printf '\nPASS ENG-REA-005 receipt binding: source head, checkout commit, normalizer, manifest, oracle, raw reports and projections match.\n'
 printf '\nPASS ENG-REA-005 real-provider smoke: 2/2 equivalent runs preserved semantic identity; 1/1 semantic mutation changed the projection; raw reports stayed unchanged.\n'
 printf 'Evidence directory: %s\n' "$OUT"
 printf 'Receipt: %s/receipt.json\n' "$OUT"
