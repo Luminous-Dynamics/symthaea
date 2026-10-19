@@ -341,7 +341,7 @@ pub fn validate_assumption_falsification(
             let stage = nonempty_string(experiment, "stage").unwrap_or_default();
             let physical_stage = ["controlled_physical_test", "bounded_sample", "controlled_repair_trial"]
                 .iter()
-                .any(|physical| stage.contains(physical));
+                .any(|physical| stage.contains(*physical));
             if physical_stage {
                 let approval = nonempty_string(experiment, "safety_authority").unwrap_or_default();
                 if !approval.contains("not_approved") && !approval.contains("not approved") {
@@ -558,7 +558,13 @@ fn reject_ungrounded_quantitative_claims(
         match value {
             Value::Object(object) => {
                 for (key, child) in object {
-                    if [
+                    let always_forbidden_result = [
+                        "measured_cost",
+                        "measured_duration",
+                        "observed_outcomes",
+                    ]
+                    .contains(&key.as_str());
+                    let model_value_key = [
                         "scenario_probability",
                         "failure_probability",
                         "outcome_probability",
@@ -567,12 +573,21 @@ fn reject_ungrounded_quantitative_claims(
                         "expected_value",
                         "expected_roi",
                         "expected_annual_loss",
-                        "measured_cost",
-                        "measured_duration",
-                        "observed_outcomes",
                     ]
-                    .contains(&key.as_str())
-                        && !child.is_null()
+                    .contains(&key.as_str());
+                    let explicit_unprovided = child.is_null()
+                        || child.as_str().is_some_and(|status| {
+                            [
+                                "not_supplied",
+                                "not_measured",
+                                "not_run",
+                                "none",
+                                "intentionally_not_computed",
+                            ]
+                            .contains(&status)
+                        });
+                    if always_forbidden_result && !child.is_null()
+                        || model_value_key && !explicit_unprovided
                     {
                         push(
                             issues,
