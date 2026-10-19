@@ -12,7 +12,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 
 pub const EXPECTED_SCHEMA_VERSION: &str = "0.1.0";
 pub const EXPECTED_SCHEMA_DRAFT: &str = "https://json-schema.org/draft/2020-12/schema";
@@ -73,15 +73,6 @@ pub enum SelectionReason {
     InformationGainPerCost,
 }
 
-impl SelectionReason {
-    const fn as_str(self) -> &'static str {
-        match self {
-            Self::ProtectedControl => "PROTECTED_CONTROL",
-            Self::ProtectedCoverage => "PROTECTED_COVERAGE",
-            Self::InformationGainPerCost => "INFORMATION_GAIN_PER_COST",
-        }
-    }
-}
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct SelectedExperiment {
@@ -290,6 +281,15 @@ fn validate_plan(plan: &ExperimentSelectionPlan) -> Vec<String> {
                 candidate.id
             ));
         }
+        if candidate.cost_units.is_finite()
+            && candidate.cost_units > 0.0
+            && !(candidate.predicted_information_gain / candidate.cost_units).is_finite()
+        {
+            errors.push(format!(
+                "candidate {} predicted information-gain-per-cost is non-finite",
+                candidate.id
+            ));
+        }
         let candidate_coverage: BTreeSet<&str> =
             candidate.covers.iter().map(String::as_str).collect();
         if candidate_coverage.len() != candidate.covers.len()
@@ -395,16 +395,17 @@ fn run_selection(
                 }
                 let coverage_per_cost = marginal as f64 / candidate.cost_units;
                 let gain_per_cost = candidate.predicted_information_gain / candidate.cost_units;
-                Some((candidate, marginal, coverage_per_cost + gain_per_cost * 1e-9))
+                Some((candidate, marginal, coverage_per_cost, gain_per_cost))
             })
             .collect();
         eligible.sort_by(|left, right| {
             right
                 .2
                 .total_cmp(&left.2)
+                .then_with(|| right.3.total_cmp(&left.3))
                 .then_with(|| left.0.id.cmp(&right.0.id))
         });
-        let Some((candidate, _, _)) = eligible.first().copied() else {
+        let Some((candidate, _, _, _)) = eligible.first().copied() else {
             return Err(vec![format!(
                 "cannot satisfy protected coverage within the frozen budget; uncovered strata: {}",
                 uncovered.into_iter().collect::<Vec<_>>().join(", ")
