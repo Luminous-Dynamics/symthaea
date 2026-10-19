@@ -37,8 +37,9 @@ struct NutritionAccountingInput {
     concentration_provenance: ConcentrationProvenance,
     concentration_evidence_uri: Option<String>,
     assay_method: Option<String>,
-    served_edible_mass_kg: Option<f64>,
-    served_mass_basis: Option<MassBasis>,
+    edible_mass_kg_at_concentration_stage: Option<f64>,
+    edible_mass_basis_at_concentration_stage: Option<MassBasis>,
+    servings_in_batch: Option<u64>,
     retention_fraction: Option<f64>,
     retention_evidence_uri: Option<String>,
     bioavailability_fraction: Option<f64>,
@@ -60,9 +61,11 @@ struct NutritionAccountingReceipt {
     nutrient_id: String,
     accounting_pass: bool,
     concentration_is_direct_assay: bool,
-    nutrient_mass_at_serving_mg: Option<f64>,
-    modeled_nutrient_mass_at_serving_mg: Option<f64>,
-    bioavailable_nutrient_mass_mg: Option<f64>,
+    measured_nutrient_mass_delivered_mg: Option<f64>,
+    modeled_measured_nutrient_mass_delivered_mg: Option<f64>,
+    bioavailable_nutrient_mass_delivered_mg: Option<f64>,
+    nutrient_mg_per_serving: Option<f64>,
+    bioavailable_nutrient_mg_per_serving: Option<f64>,
     nutrient_mg_per_liter_water: Option<f64>,
     nutrient_mg_per_square_meter: Option<f64>,
     nutrient_mg_per_kwh: Option<f64>,
@@ -98,7 +101,7 @@ fn audit_input(input: NutritionAccountingInput) -> NutritionAccountingReceipt {
     let input_snapshot = input.clone();
     let mut issues = Vec::new();
     let concentration = input.concentration_mg_per_kg;
-    let serving_mass = input.served_edible_mass_kg;
+    let stage_mass = input.edible_mass_kg_at_concentration_stage;
 
     if input.schema_version != "cropfoundry-nutrition-accounting-input-v0" {
         issues.push("unsupported input schema_version".to_owned());
@@ -112,17 +115,19 @@ fn audit_input(input: NutritionAccountingInput) -> NutritionAccountingReceipt {
     if concentration.is_none_or(|value| !valid_nonnegative(value)) {
         issues.push("concentration_mg_per_kg must be present, finite and non-negative".to_owned());
     }
-    if serving_mass.is_none_or(|value| !value.is_finite() || value <= 0.0) {
-        issues
-            .push("served_edible_mass_kg must be present, finite and greater than zero".to_owned());
+    if stage_mass.is_none_or(|value| !value.is_finite() || value <= 0.0) {
+        issues.push(
+            "edible_mass_kg_at_concentration_stage must be present, finite and greater than zero"
+                .to_owned(),
+        );
     }
     if input.concentration_stage.is_none() {
         issues.push("concentration_stage must be explicit".to_owned());
     }
-    if input.concentration_mass_basis.is_none() || input.served_mass_basis.is_none() {
-        issues.push("concentration and serving mass bases must be explicit".to_owned());
-    } else if input.concentration_mass_basis != input.served_mass_basis {
-        issues.push("concentration mass basis does not match served mass basis".to_owned());
+    if input.concentration_mass_basis.is_none() || input.edible_mass_basis_at_concentration_stage.is_none() {
+        issues.push("concentration and stage-mass bases must be explicit".to_owned());
+    } else if input.concentration_mass_basis != input.edible_mass_basis_at_concentration_stage {
+        issues.push("concentration mass basis does not match edible mass basis at the concentration stage".to_owned());
     }
     if input
         .retention_fraction
@@ -167,6 +172,9 @@ fn audit_input(input: NutritionAccountingInput) -> NutritionAccountingReceipt {
             "pre-preparation concentration requires an explicit retention_fraction".to_owned(),
         );
     }
+    if input.servings_in_batch == Some(0) {
+        issues.push("servings_in_batch must be greater than zero when supplied".to_owned());
+    }
     if input.retention_fraction.is_some()
         && !has_nonblank(input.retention_evidence_uri.as_deref())
     {
@@ -205,7 +213,7 @@ fn audit_input(input: NutritionAccountingInput) -> NutritionAccountingReceipt {
     let accounting_pass = issues.is_empty();
     let direct_assay = input.concentration_provenance == ConcentrationProvenance::DirectAssay;
     let pre_preparation_mass = if accounting_pass {
-        concentration.zip(serving_mass).map(|(c, m)| c * m)
+        concentration.zip(stage_mass).map(|(c, mass)| c * mass)
     } else {
         None
     };
@@ -221,6 +229,12 @@ fn audit_input(input: NutritionAccountingInput) -> NutritionAccountingReceipt {
     let bioavailable_mass = measured_or_modeled_mass
         .zip(input.bioavailability_fraction)
         .map(|(mass, fraction)| mass * fraction);
+    let nutrient_per_serving = measured_or_modeled_mass
+        .zip(input.servings_in_batch)
+        .map(|(mass, count)| mass / count as f64);
+    let bioavailable_per_serving = bioavailable_mass
+        .zip(input.servings_in_batch)
+        .map(|(mass, count)| mass / count as f64);
 
     NutritionAccountingReceipt {
         receipt_schema: "cropfoundry-nutrition-accounting-receipt-v0".to_owned(),
@@ -230,19 +244,21 @@ fn audit_input(input: NutritionAccountingInput) -> NutritionAccountingReceipt {
         nutrient_id: input.nutrient_id,
         accounting_pass,
         concentration_is_direct_assay: direct_assay,
-        nutrient_mass_at_serving_mg: if direct_assay
+        measured_nutrient_mass_delivered_mg: if direct_assay
             && input.concentration_stage == Some(ConcentrationStage::MeasuredAtServing)
         {
             measured_or_modeled_mass
         } else {
             None
         },
-        modeled_nutrient_mass_at_serving_mg: if !direct_assay || input.concentration_stage == Some(ConcentrationStage::MeasuredBeforePreparation) {
+        modeled_measured_nutrient_mass_delivered_mg: if !direct_assay || input.concentration_stage == Some(ConcentrationStage::MeasuredBeforePreparation) {
             measured_or_modeled_mass
         } else {
             None
         },
-        bioavailable_nutrient_mass_mg: bioavailable_mass,
+        bioavailable_nutrient_mass_delivered_mg: bioavailable_mass,
+        nutrient_mg_per_serving: nutrient_per_serving,
+        bioavailable_nutrient_mg_per_serving: bioavailable_per_serving,
         nutrient_mg_per_liter_water: ratio(measured_or_modeled_mass, input.water_liters),
         nutrient_mg_per_square_meter: ratio(measured_or_modeled_mass, input.land_square_meters),
         nutrient_mg_per_kwh: ratio(measured_or_modeled_mass, input.energy_kwh),
@@ -310,8 +326,9 @@ mod tests {
             concentration_provenance: ConcentrationProvenance::DirectAssay,
             concentration_evidence_uri: Some("urn:assay:iron:batch-1".to_owned()),
             assay_method: Some("validated-lab-method-v1".to_owned()),
-            served_edible_mass_kg: Some(0.15),
-            served_mass_basis: Some(MassBasis::FreshEdibleMass),
+            edible_mass_kg_at_concentration_stage: Some(0.15),
+            edible_mass_basis_at_concentration_stage: Some(MassBasis::FreshEdibleMass),
+            servings_in_batch: Some(1),
             retention_fraction: None,
             retention_evidence_uri: None,
             bioavailability_fraction: Some(0.25),
@@ -345,8 +362,8 @@ mod tests {
     fn direct_at_serving_assay_computes_nutrient_mass_and_resource_ratios() {
         let receipt = audit_input(fixture());
         assert!(receipt.accounting_pass);
-        assert_eq!(receipt.nutrient_mass_at_serving_mg, Some(12.0));
-        assert_eq!(receipt.bioavailable_nutrient_mass_mg, Some(3.0));
+        assert_eq!(receipt.measured_nutrient_mass_delivered_mg, Some(12.0));
+        assert_eq!(receipt.bioavailable_nutrient_mass_delivered_mg, Some(3.0));
         assert_eq!(receipt.nutrient_mg_per_liter_water, Some(0.4));
         assert_eq!(receipt.nutrient_mg_per_square_meter, Some(6.0));
         assert_eq!(receipt.nutrient_mg_per_kwh, Some(24.0));
@@ -360,8 +377,8 @@ mod tests {
         input.bioavailability_evidence_uri = None;
         let receipt = audit_input(input);
         assert!(receipt.accounting_pass);
-        assert_eq!(receipt.nutrient_mass_at_serving_mg, Some(12.0));
-        assert_eq!(receipt.bioavailable_nutrient_mass_mg, None);
+        assert_eq!(receipt.measured_nutrient_mass_delivered_mg, Some(12.0));
+        assert_eq!(receipt.bioavailable_nutrient_mass_delivered_mg, None);
     }
 
     #[test]
@@ -372,8 +389,8 @@ mod tests {
         input.retention_evidence_uri = Some("urn:retention:study-v1".to_owned());
         let receipt = audit_input(input);
         assert!(receipt.accounting_pass);
-        assert_eq!(receipt.nutrient_mass_at_serving_mg, None);
-        assert_eq!(receipt.modeled_nutrient_mass_at_serving_mg, Some(9.0));
+        assert_eq!(receipt.measured_nutrient_mass_delivered_mg, None);
+        assert_eq!(receipt.modeled_measured_nutrient_mass_delivered_mg, Some(9.0));
     }
 
     #[test]
@@ -388,8 +405,8 @@ mod tests {
                 .iter()
                 .any(|issue| issue.contains("concentration_stage"))
         );
-        assert_eq!(receipt.nutrient_mass_at_serving_mg, None);
-        assert_eq!(receipt.modeled_nutrient_mass_at_serving_mg, None);
+        assert_eq!(receipt.measured_nutrient_mass_delivered_mg, None);
+        assert_eq!(receipt.modeled_measured_nutrient_mass_delivered_mg, None);
     }
 
     #[test]
@@ -404,7 +421,7 @@ mod tests {
                 .iter()
                 .any(|issue| issue.contains("mass basis"))
         );
-        assert_eq!(receipt.nutrient_mass_at_serving_mg, None);
+        assert_eq!(receipt.measured_nutrient_mass_delivered_mg, None);
     }
 
     #[test]
@@ -478,7 +495,7 @@ mod tests {
         let receipt = audit_input(input);
         assert!(receipt.accounting_pass);
         assert!(!receipt.concentration_is_direct_assay);
-        assert_eq!(receipt.nutrient_mass_at_serving_mg, None);
-        assert_eq!(receipt.modeled_nutrient_mass_at_serving_mg, Some(12.0));
+        assert_eq!(receipt.measured_nutrient_mass_delivered_mg, None);
+        assert_eq!(receipt.modeled_measured_nutrient_mass_delivered_mg, Some(12.0));
     }
 }
