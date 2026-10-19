@@ -202,7 +202,6 @@ pub fn verify_culinary_evidence_bundle_v1(
     let mut by_id = BTreeMap::<String, EvidenceArtifactWireV1>::new();
     let mut by_source_ref = BTreeMap::<String, EvidenceArtifactWireV1>::new();
     let mut protocol_artifacts = Vec::new();
-    let mut process_trace_artifact_count = 0usize;
 
     for (index, artifact) in wire.artifacts.iter().enumerate() {
         let label = format!("artifacts[{index}]");
@@ -238,20 +237,23 @@ pub fn verify_culinary_evidence_bundle_v1(
         }
         match artifact.artifact_kind.as_str() {
             "protocol" => protocol_artifacts.push(artifact),
-            "process_trace" => process_trace_artifact_count += 1,
             _ => {}
         }
         by_id.insert(artifact.artifact_id.clone(), artifact.clone());
         by_source_ref.insert(artifact.source_ref.clone(), artifact.clone());
     }
 
+    let mut referenced_artifact_ids = BTreeSet::new();
     if protocol_artifacts.len() != 1 {
         errors.push(format!(
             "manifest must contain exactly one protocol artifact, found {}",
             protocol_artifacts.len()
         ));
-    } else if protocol_artifacts[0].sha256 != wire.protocol_sha256 {
-        errors.push("protocol artifact SHA-256 must equal manifest protocol_sha256".to_owned());
+    } else {
+        if protocol_artifacts[0].sha256 != wire.protocol_sha256 {
+            errors.push("protocol artifact SHA-256 must equal manifest protocol_sha256".to_owned());
+        }
+        referenced_artifact_ids.insert(protocol_artifacts[0].artifact_id.clone());
     }
 
     let expected_ids: BTreeSet<String> = by_id.keys().cloned().collect();
@@ -289,6 +291,7 @@ pub fn verify_culinary_evidence_bundle_v1(
     }
 
     let mut verified_process_trace_ids = BTreeSet::new();
+    let mut seen_process_trace_ids = BTreeSet::new();
     let blocks = match experiment.get("blocks").and_then(Value::as_array) {
         Some(items) => items,
         None => {
@@ -312,9 +315,13 @@ pub fn verify_culinary_evidence_bundle_v1(
                 errors.push(format!("{label}.process_trace_id is required"));
                 continue;
             };
+            if !seen_process_trace_ids.insert(trace_id.to_owned()) {
+                errors.push(format!("{label}.process_trace_id {trace_id:?} is reused by multiple runs"));
+            }
             match by_id.get(trace_id) {
                 Some(artifact) if artifact.artifact_kind == "process_trace" => {
                     verified_process_trace_ids.insert(trace_id.to_owned());
+                    referenced_artifact_ids.insert(trace_id.to_owned());
                 }
                 _ => errors.push(format!(
                     "{label}.process_trace_id {trace_id:?} must resolve to a declared process_trace artifact with the same artifact_id"
@@ -347,12 +354,13 @@ pub fn verify_culinary_evidence_bundle_v1(
                                 "{outcome_label} source_version does not match artifact manifest for {source_ref:?}"
                             ));
                         }
-                        if !matches!(artifact.artifact_kind.as_str(), "raw_measurement" | "derived_outcome" | "other") {
+                        if !matches!(artifact.artifact_kind.as_str(), "raw_measurement" | "derived_outcome") {
                             errors.push(format!(
                                 "{outcome_label} source_ref resolves to incompatible artifact_kind {:?}",
                                 artifact.artifact_kind
                             ));
                         }
+                        referenced_artifact_ids.insert(artifact.artifact_id.clone());
                         if non_empty(evidence, "evidence_status") == Some("qualified")
                             && source_ref.starts_with("urn:synthetic:")
                         {
@@ -364,6 +372,12 @@ pub fn verify_culinary_evidence_bundle_v1(
                     )),
                 }
             }
+        }
+    }
+
+    for artifact_id in by_id.keys() {
+        if !referenced_artifact_ids.contains(artifact_id) {
+            errors.push(format!("manifest artifact {artifact_id:?} is not referenced by protocol, process trace, or outcome evidence"));
         }
     }
 
