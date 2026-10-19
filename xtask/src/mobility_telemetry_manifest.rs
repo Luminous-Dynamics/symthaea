@@ -825,7 +825,7 @@ fn validate_trace_bytes(raw: &[u8], manifest: &Manifest) -> Result<TraceReport> 
 }
 
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 struct FaultMatrixCaseReport {
     case_id: String,
     mutation: String,
@@ -835,7 +835,7 @@ struct FaultMatrixCaseReport {
     detail: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 struct FaultMatrixReport {
     report_version: String,
     suite_id: String,
@@ -844,12 +844,22 @@ struct FaultMatrixReport {
     toolchain_id: String,
     build_identity: String,
     matrix_sha256: String,
+    canonical_report_sha256: String,
     manifest_sha256: String,
     case_count: usize,
     passed_count: usize,
     failed_count: usize,
     cases: Vec<FaultMatrixCaseReport>,
     claim_ceiling: String,
+}
+
+
+fn canonical_benchmark_report_sha256(report: &FaultMatrixReport) -> Result<String> {
+    let mut canonical = report.clone();
+    canonical.canonical_report_sha256.clear();
+    let bytes = serde_json::to_vec(&canonical)
+        .context("serializing canonical telemetry benchmark report")?;
+    Ok(format!("sha256:{:x}", Sha256::digest(bytes)))
 }
 
 fn trace_case_outcome(raw: &[u8], manifest: &Manifest) -> (String, String) {
@@ -1234,7 +1244,7 @@ pub fn run_benchmark(
     let case_count = results.len();
     let passed_count = results.iter().filter(|case| case.passed).count();
     let failed_count = case_count - passed_count;
-    let report = FaultMatrixReport {
+    let mut report = FaultMatrixReport {
         report_version: SCHEMA_VERSION.to_owned(),
         suite_id,
         status: if failed_count == 0 { "pass" } else { "fail" }.to_owned(),
@@ -1247,6 +1257,7 @@ pub fn run_benchmark(
             std::env::consts::OS
         ),
         matrix_sha256: format!("sha256:{:x}", Sha256::digest(&matrix_raw)),
+        canonical_report_sha256: String::new(),
         manifest_sha256: format!("sha256:{:x}", Sha256::digest(&manifest_raw)),
         case_count,
         passed_count,
@@ -1254,6 +1265,7 @@ pub fn run_benchmark(
         cases: results,
         claim_ceiling: "The suite checks declared software-contract behavior against synthetic fixtures only. A passing report does not establish hardware reliability, metrological accuracy, physical vehicle/tire performance, roadworthiness or approval.".to_owned(),
     };
+    report.canonical_report_sha256 = canonical_benchmark_report_sha256(&report)?;
     let encoded = serde_json::to_string_pretty(&report)?;
     if let Some(path) = output_path {
         if let Some(parent) = path.parent().filter(|parent| !parent.as_os_str().is_empty()) {
@@ -1673,5 +1685,39 @@ mod tests {
         let claim = claim_eligibility(&fixture, "ride_energy");
         assert!(!claim.physical_eligible);
         assert!(claim.reasons.iter().any(|reason| reason == "uncertainty_budget_not_verified"));
+    }
+
+    #[test]
+    fn canonical_benchmark_digest_is_stable_and_content_sensitive() {
+        let mut report = FaultMatrixReport {
+            report_version: SCHEMA_VERSION.to_owned(),
+            suite_id: "test-suite".to_owned(),
+            status: "pass".to_owned(),
+            source_commit: "a".repeat(40),
+            toolchain_id: "rustc test; cargo test".to_owned(),
+            build_identity: "xtask_package_version=test;target=x86_64-linux".to_owned(),
+            matrix_sha256: format!("sha256:{}", "b".repeat(64)),
+            canonical_report_sha256: String::new(),
+            manifest_sha256: format!("sha256:{}", "c".repeat(64)),
+            case_count: 1,
+            passed_count: 1,
+            failed_count: 0,
+            cases: vec![FaultMatrixCaseReport {
+                case_id: "TEST-001".to_owned(),
+                mutation: "positive_control".to_owned(),
+                expected: "accept".to_owned(),
+                observed: "accept".to_owned(),
+                passed: true,
+                detail: "expected counters match".to_owned(),
+            }],
+            claim_ceiling: "synthetic software conformance only".to_owned(),
+        };
+        let digest_one = canonical_benchmark_report_sha256(&report).expect("digest computes");
+        let digest_two = canonical_benchmark_report_sha256(&report).expect("digest recomputes");
+        assert_eq!(digest_one, digest_two);
+
+        report.cases[0].passed = false;
+        let changed = canonical_benchmark_report_sha256(&report).expect("changed digest computes");
+        assert_ne!(digest_one, changed, "a changed benchmark result must change its digest");
     }
 }
