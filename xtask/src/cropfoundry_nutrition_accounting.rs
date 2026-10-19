@@ -634,7 +634,25 @@ mod tests {
         assert_eq!(schema["additionalProperties"], false);
         assert_eq!(schema["properties"]["schema_version"]["const"], INPUT_SCHEMA_V1);
 
-        let mut input = serde_json::to_value(fixture()).unwrap();
+        let input = serde_json::to_value(fixture()).unwrap();
+        let input_fields = input
+            .as_object()
+            .unwrap()
+            .keys()
+            .cloned()
+            .collect::<std::collections::BTreeSet<_>>();
+        let schema_fields = schema["properties"]
+            .as_object()
+            .unwrap()
+            .keys()
+            .cloned()
+            .collect::<std::collections::BTreeSet<_>>();
+        assert_eq!(input_fields, schema_fields);
+        for required in schema["required"].as_array().unwrap() {
+            assert!(schema_fields.contains(required.as_str().unwrap()));
+        }
+
+        let mut input = input;
         input["unexpected_extra_field"] = serde_json::json!(true);
         assert!(serde_json::from_value::<NutritionAccountingInput>(input).is_err());
     }
