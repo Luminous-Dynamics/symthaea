@@ -25,14 +25,12 @@ use sha2::{Digest, Sha256};
 use crate::paired_outcome_analysis::{
     PairedOutcomeAnalysisV1, analyze_paired_outcomes_v1,
 };
+use crate::process_trace::validate_culinary_process_trace_v1;
 
 const ARTIFACT_KINDS: &[&str] = &[
     "protocol",
     "process_trace",
-    "raw_measurement",
-    "derived_outcome",
-    "instrument_calibration",
-    "other",
+    "measurement_record",
 ];
 
 #[derive(Debug, Clone, Deserialize)]
@@ -281,6 +279,23 @@ pub fn verify_culinary_evidence_bundle_v1(
         if actual_sha != artifact.sha256 {
             errors.push(format!("artifact {artifact_id:?} payload SHA-256 mismatch"));
         }
+        if artifact.artifact_kind == "process_trace" {
+            match serde_json::from_slice::<Value>(bytes) {
+                Ok(trace) => {
+                    if non_empty(&trace, "trace_id") != Some(artifact_id.as_str()) {
+                        errors.push(format!("process trace artifact {artifact_id:?} internal trace_id does not match artifact_id"));
+                    }
+                    if let Err(nested) = validate_culinary_process_trace_v1(&trace) {
+                        errors.extend(nested.into_iter().map(|message| {
+                            format!("process trace artifact {artifact_id:?}: {message}")
+                        }));
+                    }
+                }
+                Err(error) => errors.push(format!(
+                    "process trace artifact {artifact_id:?} is not valid JSON: {error}"
+                )),
+            }
+        }
         verified_byte_count = match verified_byte_count.checked_add(bytes.len() as u64) {
             Some(value) => value,
             None => {
@@ -354,11 +369,42 @@ pub fn verify_culinary_evidence_bundle_v1(
                                 "{outcome_label} source_version does not match artifact manifest for {source_ref:?}"
                             ));
                         }
-                        if !matches!(artifact.artifact_kind.as_str(), "raw_measurement" | "derived_outcome") {
+                        if artifact.artifact_kind != "measurement_record" {
                             errors.push(format!(
-                                "{outcome_label} source_ref resolves to incompatible artifact_kind {:?}",
+                                "{outcome_label} source_ref must resolve to artifact_kind \"measurement_record\", got {:?}",
                                 artifact.artifact_kind
                             ));
+                        } else if let Some(bytes) = artifact_bytes.get(&artifact.artifact_id) {
+                            match serde_json::from_slice::<Value>(bytes) {
+                                Ok(record) => {
+                                    let expected_string_fields = [
+                                        ("schema_version", "1.0.0"),
+                                        ("run_id", non_empty(run, "run_id").unwrap_or("")),
+                                        ("outcome_id", non_empty(outcome, "outcome_id").unwrap_or("")),
+                                        ("status", non_empty(outcome, "status").unwrap_or("")),
+                                        ("unit", non_empty(outcome, "unit").unwrap_or("")),
+                                        ("method", non_empty(outcome, "method").unwrap_or("")),
+                                    ];
+                                    for (field, expected) in expected_string_fields {
+                                        if non_empty(&record, field) != Some(expected) {
+                                            errors.push(format!(
+                                                "{outcome_label} measurement payload field {field:?} does not match experiment outcome"
+                                            ));
+                                        }
+                                    }
+                                    for field in ["value", "lower", "upper", "unknown_reason"] {
+                                        match (outcome.get(field), record.get(field)) {
+                                            (Some(expected), Some(actual)) if expected == actual => {}
+                                            _ => errors.push(format!(
+                                                "{outcome_label} measurement payload field {field:?} does not exactly match experiment outcome"
+                                            )),
+                                        }
+                                    }
+                                }
+                                Err(error) => errors.push(format!(
+                                    "{outcome_label} measurement artifact is not valid JSON: {error}"
+                                )),
+                            }
                         }
                         referenced_artifact_ids.insert(artifact.artifact_id.clone());
                         if non_empty(evidence, "evidence_status") == Some("qualified")
