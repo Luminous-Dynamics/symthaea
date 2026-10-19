@@ -97,6 +97,13 @@ check(){
 check "$TMP/predicate.json" || { cat "$TMP/check.log" >&2; fail "valid predicate rejected"; }
 printf 'PASS valid provider-smoke predicate accepted.\n'
 
+if sh "$CHECKER" "$TMP/predicate.json" "$TMP/receipt.json" "$TMP/bundle-manifest.json" \
+    "$SOURCE_HEAD" "$ATTESTOR_SHA" "Luminous-Dynamics/symthaea/.github/workflows/attacker.yml@refs/heads/main" \
+    "$ATTESTOR_RUN" "$PROVIDER_RUN" "$PROVIDER_URL" > "$TMP/untrusted-ref.log" 2>&1; then
+  fail "checker accepted an untrusted caller-supplied attestor workflow reference"
+fi
+printf 'PASS independently supplied attestor-workflow mismatch rejected.\n'
+
 kill_mutation(){
   label=$1
   filter=$2
@@ -122,4 +129,4 @@ kill_mutation unexpected-root-field '.unreviewed=true'
 kill_mutation malformed-sha256 '.subject.receiptSha256="deadbeef"'
 kill_mutation unknown-limitation '.limitations[0]="Validated firmware device safety"'
 
-printf '\nPASS ENG-REA-008 predicate contract: valid fixture accepted; 15/15 tampering and scope mutations rejected.\n'
+printf '\nPASS ENG-REA-008 predicate contract: valid fixture accepted; 15/15 tampering and scope mutations rejected; external signer-policy mismatch rejected.\n'
