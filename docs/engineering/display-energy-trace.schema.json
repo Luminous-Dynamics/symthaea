@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/engineering/display-energy-trace.schema.json",
+  "title": "ODRH synthetic power-trace integration plan",
+  "description": "Synthetic-only power trace for validating energy integration and task-normalization arithmetic; not a physical energy result or meter qualification.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schema_version",
+    "trace_id",
+    "title",
+    "record_state",
+    "claim_ceiling",
+    "measurand",
+    "power_unit",
+    "time_unit",
+    "energy_unit",
+    "accounting_boundary_id",
+    "window_start_seconds",
+    "window_end_seconds",
+    "max_sample_gap_seconds",
+    "samples",
+    "attempted_tasks",
+    "successful_tasks"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "const": "https://json-schema.org/draft/2020-12/schema"
+    },
+    "schema_version": {
+      "type": "string",
+      "const": "0.1.0"
+    },
+    "trace_id": {
+      "type": "string",
+      "pattern": "^ODRH-ENERGY-TRACE-[A-Z0-9-]+$"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "record_state": {
+      "type": "string",
+      "const": "SYNTHETIC_TEST_ONLY"
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "const": "SYNTHETIC_POWER_TRACE_ONLY_NOT_PHYSICAL_QUALIFICATION"
+    },
+    "measurand": {
+      "type": "string",
+      "minLength": 1
+    },
+    "power_unit": {
+      "type": "string",
+      "const": "W"
+    },
+    "time_unit": {
+      "type": "string",
+      "const": "s"
+    },
+    "energy_unit": {
+      "type": "string",
+      "const": "J"
+    },
+    "accounting_boundary_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "window_start_seconds": {
+      "type": "number"
+    },
+    "window_end_seconds": {
+      "type": "number"
+    },
+    "max_sample_gap_seconds": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "samples": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "time_seconds",
+          "power_watts"
+        ],
+        "properties": {
+          "time_seconds": {
+            "type": "number"
+          },
+          "power_watts": {
+            "type": "number",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "attempted_tasks": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "successful_tasks": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "notes": {
+      "type": "string"
+    }
+  }
+}
