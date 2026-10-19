@@ -936,7 +936,7 @@ fn validate_trace_bytes(raw: &[u8], manifest: &Manifest) -> Result<TraceReport> 
 }
 
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 struct FaultMatrixCaseReport {
     case_id: String,
     mutation: String,
@@ -948,7 +948,7 @@ struct FaultMatrixCaseReport {
     detail: String,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 struct FaultMatrixReport {
     report_version: String,
     suite_id: String,
@@ -974,6 +974,58 @@ fn canonical_benchmark_report_sha256(report: &FaultMatrixReport) -> Result<Strin
         .context("serializing canonical telemetry benchmark report")?;
     Ok(format!("sha256:{:x}", Sha256::digest(bytes)))
 }
+
+fn verify_canonical_benchmark_report(report: &FaultMatrixReport) -> Result<()> {
+    if report.case_count != report.cases.len() {
+        bail!("benchmark report case_count does not match cases array");
+    }
+    let actual_passed = report.cases.iter()
+        .filter(|case| case.observed == case.expected && case.missing_detail_tokens.is_empty())
+        .count();
+    if actual_passed != report.passed_count || report.case_count - actual_passed != report.failed_count {
+        bail!("benchmark report aggregate pass/fail counts disagree with per-case results");
+    }
+    let expected_status = if report.failed_count == 0 { "pass" } else { "fail" };
+    if report.status != expected_status {
+        bail!("benchmark report status disagrees with pass/fail counts");
+    }
+    for case in &report.cases {
+        let internally_passed = case.observed == case.expected && case.missing_detail_tokens.is_empty();
+        if case.passed != internally_passed {
+            bail!("benchmark report case {} has inconsistent passed flag", case.case_id);
+        }
+        if case.required_detail_tokens.is_empty() {
+            bail!("benchmark report case {} contains no required detail tokens", case.case_id);
+        }
+    }
+    let computed_digest = canonical_benchmark_report_sha256(report)?;
+    if report.canonical_report_sha256 != computed_digest {
+        bail!(
+            "canonical report SHA-256 mismatch: recorded {}, recomputed {}",
+            report.canonical_report_sha256,
+            computed_digest
+        );
+    }
+    Ok(())
+}
+
+pub fn run_verify_report(report_path: &Path) -> Result<()> {
+    let raw = fs::read(report_path)
+        .with_context(|| format!("reading telemetry benchmark report {}", report_path.display()))?;
+    let report: FaultMatrixReport = serde_json::from_slice(&raw)
+        .with_context(|| format!("parsing telemetry benchmark report {}", report_path.display()))?;
+    verify_canonical_benchmark_report(&report)?;
+    println!(
+        "{{\\\"verification\\\":\\\"pass\\\",\\\"canonical_report_sha256\\\":\\\"{}\\\",\\\"source_commit\\\":\\\"{}\\\",\\\"case_count\\\":{},\\\"passed_count\\\":{},\\\"failed_count\\\":{}}}",
+        report.canonical_report_sha256,
+        report.source_commit,
+        report.case_count,
+        report.passed_count,
+        report.failed_count
+    );
+    Ok(())
+}
+
 
 fn trace_case_outcome(raw: &[u8], manifest: &Manifest) -> (String, String) {
     match validate_trace_bytes(raw, manifest) {
@@ -1980,6 +2032,14 @@ mod tests {
                 "identical canonical report inputs must always produce the same digest"
             );
         }
+        report.canonical_report_sha256 = digest_one.clone();
+        verify_canonical_benchmark_report(&report).expect("unchanged report verifies");
+        report.cases[0].detail.push_str("; tampered");
+        assert!(
+            verify_canonical_benchmark_report(&report).is_err(),
+            "tampering with report content must be detected"
+        );
+        report.cases[0].detail = "expected counters match".to_owned();
 
         report.cases[0].passed = false;
         let changed = canonical_benchmark_report_sha256(&report).expect("changed digest computes");
