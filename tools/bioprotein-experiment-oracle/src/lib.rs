@@ -6,8 +6,8 @@
 //! minus experiment cost, not by assay accuracy, variance reduction, or yield alone.
 //! It does not authorize experiments, predict biology, establish food safety, or validate a TEA/LCA.
 
-pub mod robust;
 pub mod regret;
+pub mod robust;
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
