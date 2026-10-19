@@ -57,11 +57,21 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cargo run --manifest-path tools/bioprotein-experiment-oracle/Cargo.toml -- \
+          cargo run --manifest-path tools/bioprotein-experiment-oracle/Cargo.toml --bin bioprotein-experiment-oracle -- \
             --expected-head "$EXPECTED_HEAD" \
             --corpus docs/research/bioprotein-experiments/experiment-value-corpus-v1.json \
             --receipt target/bioprotein-experiment-value-receipt.json
           test -s target/bioprotein-experiment-value-receipt.json
+
+      - name: Produce exact-head robust EVSI receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --manifest-path tools/bioprotein-experiment-oracle/Cargo.toml --bin bioprotein-robust-evsi -- \
+            --expected-head "$EXPECTED_HEAD" \
+            --suite docs/research/bioprotein-experiments/robust-evsi-corpus-v1.json \
+            --receipt target/bioprotein-robust-evsi-receipt.json
+          test -s target/bioprotein-robust-evsi-receipt.json
 
       - name: Preserve receipt artifact
         if: ${{ always() && hashFiles('target/bioprotein-experiment-value-receipt.json') != '' }}
@@ -69,5 +79,14 @@ jobs:
         with:
           name: bioprotein-experiment-value-receipt
           path: target/bioprotein-experiment-value-receipt.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Preserve robust EVSI receipt artifact
+        if: ${{ always() && hashFiles('target/bioprotein-robust-evsi-receipt.json') != '' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: bioprotein-robust-evsi-receipt
+          path: target/bioprotein-robust-evsi-receipt.json
           if-no-files-found: error
           retention-days: 30

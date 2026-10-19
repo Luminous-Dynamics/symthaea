@@ -1,0 +1,2164 @@
+{
+  "corpus_id": "BIOPROTEIN-ROBUST-EVSI-CORPUS-V1",
+  "schema_version": "1.0.0",
+  "scenario_weight_scale": 10000,
+  "family_count": 8,
+  "claim_ceiling": "All scenario weights, prior weights, likelihoods, costs, tags and outcomes in this corpus are synthetic. The stress test measures stability over declared joint scenario bundles only, not calibrated real-world probabilities or empirical bioprocess outcomes.",
+  "families": [
+    {
+      "family_id": "ROBUST-001",
+      "correlation_model": "joint_scenario_set",
+      "decision_contract_digest": "sha256:decision-contract-robust-001",
+      "scenarios": [
+        {
+          "scenario_id": "base",
+          "weight": 4000,
+          "uncertainty_class": "parameter_shift",
+          "assumption_tags": [
+            "feedstock_mid",
+            "power_cost_mid",
+            "recovery_mid"
+          ],
+          "case": {
+            "case_id": "ROBUST-001-base",
+            "scenario_digest": "sha256:robust-001-base",
+            "probability_scale": 10000,
+            "states": [
+              {
+                "state_id": "favorable",
+                "prior_weight": 5000
+              },
+              {
+                "state_id": "adverse",
+                "prior_weight": 5000
+              }
+            ],
+            "actions": [
+              {
+                "action_id": "invest",
+                "utilities": {
+                  "favorable": 10,
+                  "adverse": -20
+                }
+              },
+              {
+                "action_id": "defer",
+                "utilities": {
+                  "favorable": 0,
+                  "adverse": 0
+                }
+              }
+            ],
+            "experiments": [
+              {
+                "experiment_id": "assay-a",
+                "cost_utility": 1,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:robust-001-base",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 9200,
+                      "negative": 800
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 800,
+                      "negative": 9200
+                    }
+                  }
+                ]
+              },
+              {
+                "experiment_id": "assay-b",
+                "cost_utility": 2,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:robust-001-base",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 8500,
+                      "negative": 1500
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 1500,
+                      "negative": 8500
+                    }
+                  }
+                ]
+              }
+            ],
+            "expected": {
+              "status": "selected",
+              "selected_experiment_id": "assay-a",
+              "reason_codes": [
+                "positive_net_evsi",
+                "highest_net_evsi_selected"
+              ]
+            }
+          }
+        },
+        {
+          "scenario_id": "dry",
+          "weight": 3000,
+          "uncertainty_class": "correlated_joint_shock",
+          "assumption_tags": [
+            "feedstock_low",
+            "power_cost_high",
+            "recovery_loss_high"
+          ],
+          "case": {
+            "case_id": "ROBUST-001-dry",
+            "scenario_digest": "sha256:robust-001-dry",
+            "probability_scale": 10000,
+            "states": [
+              {
+                "state_id": "favorable",
+                "prior_weight": 4500
+              },
+              {
+                "state_id": "adverse",
+                "prior_weight": 5500
+              }
+            ],
+            "actions": [
+              {
+                "action_id": "invest",
+                "utilities": {
+                  "favorable": 10,
+                  "adverse": -20
+                }
+              },
+              {
+                "action_id": "defer",
+                "utilities": {
+                  "favorable": 0,
+                  "adverse": 0
+                }
+              }
+            ],
+            "experiments": [
+              {
+                "experiment_id": "assay-a",
+                "cost_utility": 1,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:robust-001-dry",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 9200,
+                      "negative": 800
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 800,
+                      "negative": 9200
+                    }
+                  }
+                ]
+              },
+              {
+                "experiment_id": "assay-b",
+                "cost_utility": 2,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:robust-001-dry",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 8500,
+                      "negative": 1500
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 1500,
+                      "negative": 8500
+                    }
+                  }
+                ]
+              }
+            ],
+            "expected": {
+              "status": "selected",
+              "selected_experiment_id": "assay-a",
+              "reason_codes": [
+                "positive_net_evsi",
+                "highest_net_evsi_selected"
+              ]
+            }
+          }
+        },
+        {
+          "scenario_id": "wet",
+          "weight": 3000,
+          "uncertainty_class": "parameter_shift",
+          "assumption_tags": [
+            "feedstock_high",
+            "power_cost_low",
+            "recovery_high"
+          ],
+          "case": {
+            "case_id": "ROBUST-001-wet",
+            "scenario_digest": "sha256:robust-001-wet",
+            "probability_scale": 10000,
+            "states": [
+              {
+                "state_id": "favorable",
+                "prior_weight": 5500
+              },
+              {
+                "state_id": "adverse",
+                "prior_weight": 4500
+              }
+            ],
+            "actions": [
+              {
+                "action_id": "invest",
+                "utilities": {
+                  "favorable": 10,
+                  "adverse": -20
+                }
+              },
+              {
+                "action_id": "defer",
+                "utilities": {
+                  "favorable": 0,
+                  "adverse": 0
+                }
+              }
+            ],
+            "experiments": [
+              {
+                "experiment_id": "assay-a",
+                "cost_utility": 1,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:robust-001-wet",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 9200,
+                      "negative": 800
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 800,
+                      "negative": 9200
+                    }
+                  }
+                ]
+              },
+              {
+                "experiment_id": "assay-b",
+                "cost_utility": 2,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:robust-001-wet",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 8500,
+                      "negative": 1500
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 1500,
+                      "negative": 8500
+                    }
+                  }
+                ]
+              }
+            ],
+            "expected": {
+              "status": "selected",
+              "selected_experiment_id": "assay-a",
+              "reason_codes": [
+                "positive_net_evsi",
+                "highest_net_evsi_selected"
+              ]
+            }
+          }
+        }
+      ],
+      "expected": {
+        "status": "robust_winner",
+        "robust_winner": "assay-a",
+        "scenario_winners": [
+          "assay-a",
+          "assay-a",
+          "assay-a"
+        ],
+        "reason_codes": [
+          "winner_stable_across_joint_scenarios"
+        ]
+      }
+    },
+    {
+      "family_id": "ROBUST-002",
+      "correlation_model": "joint_scenario_set",
+      "decision_contract_digest": "sha256:decision-contract-robust-002",
+      "scenarios": [
+        {
+          "scenario_id": "01-low-cost",
+          "weight": 3000,
+          "uncertainty_class": "correlated_joint_shock",
+          "assumption_tags": [
+            "favorable_prior_3000",
+            "assay_a_cost_1",
+            "assay_b_cost_1"
+          ],
+          "case": {
+            "case_id": "ROBUST-002-01-low-cost",
+            "scenario_digest": "sha256:robust-002-01-low-cost",
+            "probability_scale": 10000,
+            "states": [
+              {
+                "state_id": "favorable",
+                "prior_weight": 3000
+              },
+              {
+                "state_id": "adverse",
+                "prior_weight": 7000
+              }
+            ],
+            "actions": [
+              {
+                "action_id": "invest",
+                "utilities": {
+                  "favorable": 10,
+                  "adverse": -20
+                }
+              },
+              {
+                "action_id": "defer",
+                "utilities": {
+                  "favorable": 0,
+                  "adverse": 0
+                }
+              }
+            ],
+            "experiments": [
+              {
+                "experiment_id": "assay-a",
+                "cost_utility": 1,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:robust-002-01-low-cost",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 9800,
+                      "negative": 200
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 200,
+                      "negative": 9800
+                    }
+                  }
+                ]
+              },
+              {
+                "experiment_id": "assay-b",
+                "cost_utility": 1,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:robust-002-01-low-cost",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 8500,
+                      "negative": 1500
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 1500,
+                      "negative": 8500
+                    }
+                  }
+                ]
+              }
+            ],
+            "expected": {
+              "status": "selected",
+              "selected_experiment_id": "assay-a",
+              "reason_codes": [
+                "positive_net_evsi",
+                "highest_net_evsi_selected"
+              ]
+            }
+          }
+        },
+        {
+          "scenario_id": "02-price-shock",
+          "weight": 4000,
+          "uncertainty_class": "correlated_joint_shock",
+          "assumption_tags": [
+            "favorable_prior_4000",
+            "assay_a_cost_3",
+            "assay_b_cost_0"
+          ],
+          "case": {
+            "case_id": "ROBUST-002-02-price-shock",
+            "scenario_digest": "sha256:robust-002-02-price-shock",
+            "probability_scale": 10000,
+            "states": [
+              {
+                "state_id": "favorable",
+                "prior_weight": 4000
+              },
+              {
+                "state_id": "adverse",
+                "prior_weight": 6000
+              }
+            ],
+            "actions": [
+              {
+                "action_id": "invest",
+                "utilities": {
+                  "favorable": 10,
+                  "adverse": -20
+                }
+              },
+              {
+                "action_id": "defer",
+                "utilities": {
+                  "favorable": 0,
+                  "adverse": 0
+                }
+              }
+            ],
+            "experiments": [
+              {
+                "experiment_id": "assay-a",
+                "cost_utility": 3,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:robust-002-02-price-shock",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 9800,
+                      "negative": 200
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 200,
+                      "negative": 9800
+                    }
+                  }
+                ]
+              },
+              {
+                "experiment_id": "assay-b",
+                "cost_utility": 0,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:robust-002-02-price-shock",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 8500,
+                      "negative": 1500
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 1500,
+                      "negative": 8500
+                    }
+                  }
+                ]
+              }
+            ],
+            "expected": {
+              "status": "selected",
+              "selected_experiment_id": "assay-b",
+              "reason_codes": [
+                "positive_net_evsi",
+                "highest_net_evsi_selected"
+              ]
+            }
+          }
+        },
+        {
+          "scenario_id": "03-recovery-shift",
+          "weight": 3000,
+          "uncertainty_class": "correlated_joint_shock",
+          "assumption_tags": [
+            "favorable_prior_6000",
+            "assay_a_cost_4",
+            "assay_b_cost_0"
+          ],
+          "case": {
+            "case_id": "ROBUST-002-03-recovery-shift",
+            "scenario_digest": "sha256:robust-002-03-recovery-shift",
+            "probability_scale": 10000,
+            "states": [
+              {
+                "state_id": "favorable",
+                "prior_weight": 6000
+              },
+              {
+                "state_id": "adverse",
+                "prior_weight": 4000
+              }
+            ],
+            "actions": [
+              {
+                "action_id": "invest",
+                "utilities": {
+                  "favorable": 10,
+                  "adverse": -20
+                }
+              },
+              {
+                "action_id": "defer",
+                "utilities": {
+                  "favorable": 0,
+                  "adverse": 0
+                }
+              }
+            ],
+            "experiments": [
+              {
+                "experiment_id": "assay-a",
+                "cost_utility": 4,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:robust-002-03-recovery-shift",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 9800,
+                      "negative": 200
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 200,
+                      "negative": 9800
+                    }
+                  }
+                ]
+              },
+              {
+                "experiment_id": "assay-b",
+                "cost_utility": 0,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:robust-002-03-recovery-shift",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 8500,
+                      "negative": 1500
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 1500,
+                      "negative": 8500
+                    }
+                  }
+                ]
+              }
+            ],
+            "expected": {
+              "status": "selected",
+              "selected_experiment_id": "assay-b",
+              "reason_codes": [
+                "positive_net_evsi",
+                "highest_net_evsi_selected"
+              ]
+            }
+          }
+        }
+      ],
+      "expected": {
+        "status": "scenario_sensitive",
+        "robust_winner": null,
+        "scenario_winners": [
+          "assay-a",
+          "assay-b",
+          "assay-b"
+        ],
+        "reason_codes": [
+          "decision_not_stable_across_joint_scenarios"
+        ]
+      }
+    },
+    {
+      "family_id": "ROBUST-003",
+      "correlation_model": "joint_scenario_set",
+      "decision_contract_digest": "sha256:decision-contract-robust-003",
+      "scenarios": [
+        {
+          "scenario_id": "energy-cost-spike",
+          "weight": 1000,
+          "uncertainty_class": "correlated_joint_shock",
+          "assumption_tags": [
+            "energy_cost_spike",
+            "assay_cost_spike"
+          ],
+          "case": {
+            "case_id": "ROBUST-003-energy-cost-spike",
+            "scenario_digest": "sha256:robust-003-energy-cost-spike",
+            "probability_scale": 10000,
+            "states": [
+              {
+                "state_id": "favorable",
+                "prior_weight": 5000
+              },
+              {
+                "state_id": "adverse",
+                "prior_weight": 5000
+              }
+            ],
+            "actions": [
+              {
+                "action_id": "invest",
+                "utilities": {
+                  "favorable": 10,
+                  "adverse": -20
+                }
+              },
+              {
+                "action_id": "defer",
+                "utilities": {
+                  "favorable": 0,
+                  "adverse": 0
+                }
+              }
+            ],
+            "experiments": [
+              {
+                "experiment_id": "assay-a",
+                "cost_utility": 6,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:robust-003-energy-cost-spike",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 9200,
+                      "negative": 800
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 800,
+                      "negative": 9200
+                    }
+                  }
+                ]
+              },
+              {
+                "experiment_id": "assay-b",
+                "cost_utility": 7,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:robust-003-energy-cost-spike",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 8000,
+                      "negative": 2000
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 2000,
+                      "negative": 8000
+                    }
+                  }
+                ]
+              }
+            ],
+            "expected": {
+              "status": "no_positive_evsi",
+              "selected_experiment_id": null,
+              "reason_codes": [
+                "no_positive_net_evsi"
+              ]
+            }
+          }
+        },
+        {
+          "scenario_id": "nominal",
+          "weight": 7000,
+          "uncertainty_class": "parameter_shift",
+          "assumption_tags": [
+            "nominal_assay_performance",
+            "nominal_cost"
+          ],
+          "case": {
+            "case_id": "ROBUST-003-nominal",
+            "scenario_digest": "sha256:robust-003-nominal",
+            "probability_scale": 10000,
+            "states": [
+              {
+                "state_id": "favorable",
+                "prior_weight": 5000
+              },
+              {
+                "state_id": "adverse",
+                "prior_weight": 5000
+              }
+            ],
+            "actions": [
+              {
+                "action_id": "invest",
+                "utilities": {
+                  "favorable": 10,
+                  "adverse": -20
+                }
+              },
+              {
+                "action_id": "defer",
+                "utilities": {
+                  "favorable": 0,
+                  "adverse": 0
+                }
+              }
+            ],
+            "experiments": [
+              {
+                "experiment_id": "assay-a",
+                "cost_utility": 1,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:robust-003-nominal",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 9200,
+                      "negative": 800
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 800,
+                      "negative": 9200
+                    }
+                  }
+                ]
+              },
+              {
+                "experiment_id": "assay-b",
+                "cost_utility": 6,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:robust-003-nominal",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 8000,
+                      "negative": 2000
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 2000,
+                      "negative": 8000
+                    }
+                  }
+                ]
+              }
+            ],
+            "expected": {
+              "status": "selected",
+              "selected_experiment_id": "assay-a",
+              "reason_codes": [
+                "positive_net_evsi",
+                "highest_net_evsi_selected"
+              ]
+            }
+          }
+        },
+        {
+          "scenario_id": "yield-degradation",
+          "weight": 2000,
+          "uncertainty_class": "correlated_joint_shock",
+          "assumption_tags": [
+            "recovery_degrades",
+            "assay_likelihood_degrades"
+          ],
+          "case": {
+            "case_id": "ROBUST-003-yield-degradation",
+            "scenario_digest": "sha256:robust-003-yield-degradation",
+            "probability_scale": 10000,
+            "states": [
+              {
+                "state_id": "favorable",
+                "prior_weight": 5000
+              },
+              {
+                "state_id": "adverse",
+                "prior_weight": 5000
+              }
+            ],
+            "actions": [
+              {
+                "action_id": "invest",
+                "utilities": {
+                  "favorable": 10,
+                  "adverse": -20
+                }
+              },
+              {
+                "action_id": "defer",
+                "utilities": {
+                  "favorable": 0,
+                  "adverse": 0
+                }
+              }
+            ],
+            "experiments": [
+              {
+                "experiment_id": "assay-a",
+                "cost_utility": 3,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:robust-003-yield-degradation",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 7000,
+                      "negative": 3000
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 3000,
+                      "negative": 7000
+                    }
+                  }
+                ]
+              },
+              {
+                "experiment_id": "assay-b",
+                "cost_utility": 6,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:robust-003-yield-degradation",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 7000,
+                      "negative": 3000
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 3000,
+                      "negative": 7000
+                    }
+                  }
+                ]
+              }
+            ],
+            "expected": {
+              "status": "no_positive_evsi",
+              "selected_experiment_id": null,
+              "reason_codes": [
+                "no_positive_net_evsi"
+              ]
+            }
+          }
+        }
+      ],
+      "expected": {
+        "status": "scenario_sensitive",
+        "robust_winner": null,
+        "scenario_winners": [
+          null,
+          "assay-a",
+          null
+        ],
+        "reason_codes": [
+          "decision_not_stable_across_joint_scenarios"
+        ]
+      }
+    },
+    {
+      "family_id": "ROBUST-004",
+      "correlation_model": "joint_scenario_set",
+      "decision_contract_digest": "sha256:decision-contract-robust-004",
+      "scenarios": [
+        {
+          "scenario_id": "high-prior",
+          "weight": 3000,
+          "uncertainty_class": "parameter_shift",
+          "assumption_tags": [
+            "high_prior",
+            "high_test_cost"
+          ],
+          "case": {
+            "case_id": "ROBUST-004-high-prior",
+            "scenario_digest": "sha256:robust-004-high-prior",
+            "probability_scale": 10000,
+            "states": [
+              {
+                "state_id": "favorable",
+                "prior_weight": 7000
+              },
+              {
+                "state_id": "adverse",
+                "prior_weight": 3000
+              }
+            ],
+            "actions": [
+              {
+                "action_id": "invest",
+                "utilities": {
+                  "favorable": 10,
+                  "adverse": -20
+                }
+              },
+              {
+                "action_id": "defer",
+                "utilities": {
+                  "favorable": 0,
+                  "adverse": 0
+                }
+              }
+            ],
+            "experiments": [
+              {
+                "experiment_id": "assay-a",
+                "cost_utility": 7,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:robust-004-high-prior",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 9200,
+                      "negative": 800
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 800,
+                      "negative": 9200
+                    }
+                  }
+                ]
+              },
+              {
+                "experiment_id": "assay-b",
+                "cost_utility": 7,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:robust-004-high-prior",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 8500,
+                      "negative": 1500
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 1500,
+                      "negative": 8500
+                    }
+                  }
+                ]
+              }
+            ],
+            "expected": {
+              "status": "no_positive_evsi",
+              "selected_experiment_id": null,
+              "reason_codes": [
+                "no_positive_net_evsi"
+              ]
+            }
+          }
+        },
+        {
+          "scenario_id": "low-prior",
+          "weight": 3000,
+          "uncertainty_class": "parameter_shift",
+          "assumption_tags": [
+            "low_prior",
+            "high_test_cost"
+          ],
+          "case": {
+            "case_id": "ROBUST-004-low-prior",
+            "scenario_digest": "sha256:robust-004-low-prior",
+            "probability_scale": 10000,
+            "states": [
+              {
+                "state_id": "favorable",
+                "prior_weight": 3000
+              },
+              {
+                "state_id": "adverse",
+                "prior_weight": 7000
+              }
+            ],
+            "actions": [
+              {
+                "action_id": "invest",
+                "utilities": {
+                  "favorable": 10,
+                  "adverse": -20
+                }
+              },
+              {
+                "action_id": "defer",
+                "utilities": {
+                  "favorable": 0,
+                  "adverse": 0
+                }
+              }
+            ],
+            "experiments": [
+              {
+                "experiment_id": "assay-a",
+                "cost_utility": 7,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:robust-004-low-prior",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 9200,
+                      "negative": 800
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 800,
+                      "negative": 9200
+                    }
+                  }
+                ]
+              },
+              {
+                "experiment_id": "assay-b",
+                "cost_utility": 7,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:robust-004-low-prior",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 8500,
+                      "negative": 1500
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 1500,
+                      "negative": 8500
+                    }
+                  }
+                ]
+              }
+            ],
+            "expected": {
+              "status": "no_positive_evsi",
+              "selected_experiment_id": null,
+              "reason_codes": [
+                "no_positive_net_evsi"
+              ]
+            }
+          }
+        },
+        {
+          "scenario_id": "mid-prior",
+          "weight": 4000,
+          "uncertainty_class": "parameter_shift",
+          "assumption_tags": [
+            "mid_prior",
+            "high_test_cost"
+          ],
+          "case": {
+            "case_id": "ROBUST-004-mid-prior",
+            "scenario_digest": "sha256:robust-004-mid-prior",
+            "probability_scale": 10000,
+            "states": [
+              {
+                "state_id": "favorable",
+                "prior_weight": 5000
+              },
+              {
+                "state_id": "adverse",
+                "prior_weight": 5000
+              }
+            ],
+            "actions": [
+              {
+                "action_id": "invest",
+                "utilities": {
+                  "favorable": 10,
+                  "adverse": -20
+                }
+              },
+              {
+                "action_id": "defer",
+                "utilities": {
+                  "favorable": 0,
+                  "adverse": 0
+                }
+              }
+            ],
+            "experiments": [
+              {
+                "experiment_id": "assay-a",
+                "cost_utility": 7,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:robust-004-mid-prior",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 9200,
+                      "negative": 800
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 800,
+                      "negative": 9200
+                    }
+                  }
+                ]
+              },
+              {
+                "experiment_id": "assay-b",
+                "cost_utility": 7,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:robust-004-mid-prior",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 8500,
+                      "negative": 1500
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 1500,
+                      "negative": 8500
+                    }
+                  }
+                ]
+              }
+            ],
+            "expected": {
+              "status": "no_positive_evsi",
+              "selected_experiment_id": null,
+              "reason_codes": [
+                "no_positive_net_evsi"
+              ]
+            }
+          }
+        }
+      ],
+      "expected": {
+        "status": "no_positive_evsi",
+        "robust_winner": null,
+        "scenario_winners": [
+          null,
+          null,
+          null
+        ],
+        "reason_codes": [
+          "no_positive_net_evsi_in_any_scenario"
+        ]
+      }
+    },
+    {
+      "family_id": "ROBUST-005",
+      "correlation_model": "joint_scenario_set",
+      "decision_contract_digest": "sha256:decision-contract-robust-005",
+      "scenarios": [
+        {
+          "scenario_id": "permission-unknown",
+          "weight": 4000,
+          "uncertainty_class": "structural_model_alternative",
+          "assumption_tags": [
+            "permission_evidence_unknown"
+          ],
+          "case": {
+            "case_id": "ROBUST-005-permission-unknown",
+            "scenario_digest": "sha256:robust-005-permission-unknown",
+            "probability_scale": 10000,
+            "states": [
+              {
+                "state_id": "favorable",
+                "prior_weight": 5000
+              },
+              {
+                "state_id": "adverse",
+                "prior_weight": 5000
+              }
+            ],
+            "actions": [
+              {
+                "action_id": "invest",
+                "utilities": {
+                  "favorable": 10,
+                  "adverse": -20
+                }
+              },
+              {
+                "action_id": "defer",
+                "utilities": {
+                  "favorable": 0,
+                  "adverse": 0
+                }
+              }
+            ],
+            "experiments": [
+              {
+                "experiment_id": "assay-a",
+                "cost_utility": 1,
+                "authorization": "unknown",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:robust-005-permission-unknown",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 9200,
+                      "negative": 800
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 800,
+                      "negative": 9200
+                    }
+                  }
+                ]
+              },
+              {
+                "experiment_id": "assay-b",
+                "cost_utility": 7,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:robust-005-permission-unknown",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 8000,
+                      "negative": 2000
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 2000,
+                      "negative": 8000
+                    }
+                  }
+                ]
+              }
+            ],
+            "expected": {
+              "status": "indeterminate",
+              "selected_experiment_id": null,
+              "reason_codes": [
+                "unresolved_experiment_gate_may_change_decision"
+              ]
+            }
+          }
+        },
+        {
+          "scenario_id": "permitted-a",
+          "weight": 3000,
+          "uncertainty_class": "parameter_shift",
+          "assumption_tags": [
+            "permission_verified"
+          ],
+          "case": {
+            "case_id": "ROBUST-005-permitted-a",
+            "scenario_digest": "sha256:robust-005-permitted-a",
+            "probability_scale": 10000,
+            "states": [
+              {
+                "state_id": "favorable",
+                "prior_weight": 5000
+              },
+              {
+                "state_id": "adverse",
+                "prior_weight": 5000
+              }
+            ],
+            "actions": [
+              {
+                "action_id": "invest",
+                "utilities": {
+                  "favorable": 10,
+                  "adverse": -20
+                }
+              },
+              {
+                "action_id": "defer",
+                "utilities": {
+                  "favorable": 0,
+                  "adverse": 0
+                }
+              }
+            ],
+            "experiments": [
+              {
+                "experiment_id": "assay-a",
+                "cost_utility": 1,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:robust-005-permitted-a",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 9200,
+                      "negative": 800
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 800,
+                      "negative": 9200
+                    }
+                  }
+                ]
+              },
+              {
+                "experiment_id": "assay-b",
+                "cost_utility": 7,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:robust-005-permitted-a",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 8000,
+                      "negative": 2000
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 2000,
+                      "negative": 8000
+                    }
+                  }
+                ]
+              }
+            ],
+            "expected": {
+              "status": "selected",
+              "selected_experiment_id": "assay-a",
+              "reason_codes": [
+                "positive_net_evsi",
+                "highest_net_evsi_selected"
+              ]
+            }
+          }
+        },
+        {
+          "scenario_id": "verified-again",
+          "weight": 3000,
+          "uncertainty_class": "parameter_shift",
+          "assumption_tags": [
+            "permission_verified"
+          ],
+          "case": {
+            "case_id": "ROBUST-005-verified-again",
+            "scenario_digest": "sha256:robust-005-verified-again",
+            "probability_scale": 10000,
+            "states": [
+              {
+                "state_id": "favorable",
+                "prior_weight": 5000
+              },
+              {
+                "state_id": "adverse",
+                "prior_weight": 5000
+              }
+            ],
+            "actions": [
+              {
+                "action_id": "invest",
+                "utilities": {
+                  "favorable": 10,
+                  "adverse": -20
+                }
+              },
+              {
+                "action_id": "defer",
+                "utilities": {
+                  "favorable": 0,
+                  "adverse": 0
+                }
+              }
+            ],
+            "experiments": [
+              {
+                "experiment_id": "assay-a",
+                "cost_utility": 1,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:robust-005-verified-again",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 9200,
+                      "negative": 800
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 800,
+                      "negative": 9200
+                    }
+                  }
+                ]
+              },
+              {
+                "experiment_id": "assay-b",
+                "cost_utility": 7,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:robust-005-verified-again",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 8000,
+                      "negative": 2000
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 2000,
+                      "negative": 8000
+                    }
+                  }
+                ]
+              }
+            ],
+            "expected": {
+              "status": "selected",
+              "selected_experiment_id": "assay-a",
+              "reason_codes": [
+                "positive_net_evsi",
+                "highest_net_evsi_selected"
+              ]
+            }
+          }
+        }
+      ],
+      "expected": {
+        "status": "indeterminate",
+        "robust_winner": null,
+        "scenario_winners": [
+          null,
+          "assay-a",
+          "assay-a"
+        ],
+        "reason_codes": [
+          "unresolved_hard_gate_or_evidence_in_at_least_one_scenario"
+        ]
+      }
+    },
+    {
+      "family_id": "ROBUST-006",
+      "correlation_model": "joint_scenario_set",
+      "decision_contract_digest": "sha256:decision-contract-robust-006",
+      "scenarios": [
+        {
+          "scenario_id": "model-a",
+          "weight": 5000,
+          "uncertainty_class": "structural_model_alternative",
+          "assumption_tags": [
+            "test_model_a",
+            "high_assay_sensitivity"
+          ],
+          "case": {
+            "case_id": "ROBUST-006-model-a",
+            "scenario_digest": "sha256:robust-006-model-a",
+            "probability_scale": 10000,
+            "states": [
+              {
+                "state_id": "favorable",
+                "prior_weight": 5000
+              },
+              {
+                "state_id": "adverse",
+                "prior_weight": 5000
+              }
+            ],
+            "actions": [
+              {
+                "action_id": "invest",
+                "utilities": {
+                  "favorable": 10,
+                  "adverse": -20
+                }
+              },
+              {
+                "action_id": "defer",
+                "utilities": {
+                  "favorable": 0,
+                  "adverse": 0
+                }
+              }
+            ],
+            "experiments": [
+              {
+                "experiment_id": "assay-a",
+                "cost_utility": 1,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:robust-006-model-a",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 9800,
+                      "negative": 200
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 200,
+                      "negative": 9800
+                    }
+                  }
+                ]
+              },
+              {
+                "experiment_id": "assay-b",
+                "cost_utility": 1,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:robust-006-model-a",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 8500,
+                      "negative": 1500
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 1500,
+                      "negative": 8500
+                    }
+                  }
+                ]
+              }
+            ],
+            "expected": {
+              "status": "selected",
+              "selected_experiment_id": "assay-a",
+              "reason_codes": [
+                "positive_net_evsi",
+                "highest_net_evsi_selected"
+              ]
+            }
+          }
+        },
+        {
+          "scenario_id": "model-b",
+          "weight": 5000,
+          "uncertainty_class": "structural_model_alternative",
+          "assumption_tags": [
+            "test_model_b",
+            "sensitivity_degraded"
+          ],
+          "case": {
+            "case_id": "ROBUST-006-model-b",
+            "scenario_digest": "sha256:robust-006-model-b",
+            "probability_scale": 10000,
+            "states": [
+              {
+                "state_id": "favorable",
+                "prior_weight": 5000
+              },
+              {
+                "state_id": "adverse",
+                "prior_weight": 5000
+              }
+            ],
+            "actions": [
+              {
+                "action_id": "invest",
+                "utilities": {
+                  "favorable": 10,
+                  "adverse": -20
+                }
+              },
+              {
+                "action_id": "defer",
+                "utilities": {
+                  "favorable": 0,
+                  "adverse": 0
+                }
+              }
+            ],
+            "experiments": [
+              {
+                "experiment_id": "assay-a",
+                "cost_utility": 4,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:robust-006-model-b",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 7200,
+                      "negative": 2800
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 2800,
+                      "negative": 7200
+                    }
+                  }
+                ]
+              },
+              {
+                "experiment_id": "assay-b",
+                "cost_utility": 0,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:robust-006-model-b",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 8500,
+                      "negative": 1500
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 1500,
+                      "negative": 8500
+                    }
+                  }
+                ]
+              }
+            ],
+            "expected": {
+              "status": "selected",
+              "selected_experiment_id": "assay-b",
+              "reason_codes": [
+                "positive_net_evsi",
+                "highest_net_evsi_selected"
+              ]
+            }
+          }
+        }
+      ],
+      "expected": {
+        "status": "scenario_sensitive",
+        "robust_winner": null,
+        "scenario_winners": [
+          "assay-a",
+          "assay-b"
+        ],
+        "reason_codes": [
+          "decision_not_stable_across_joint_scenarios"
+        ]
+      }
+    },
+    {
+      "family_id": "ROBUST-007",
+      "correlation_model": "joint_scenario_set",
+      "decision_contract_digest": "sha256:decision-contract-robust-007",
+      "scenarios": [
+        {
+          "scenario_id": "nominal",
+          "weight": 9000,
+          "uncertainty_class": "parameter_shift",
+          "assumption_tags": [
+            "nominal"
+          ],
+          "case": {
+            "case_id": "ROBUST-007-nominal",
+            "scenario_digest": "sha256:robust-007-nominal",
+            "probability_scale": 10000,
+            "states": [
+              {
+                "state_id": "favorable",
+                "prior_weight": 5000
+              },
+              {
+                "state_id": "adverse",
+                "prior_weight": 5000
+              }
+            ],
+            "actions": [
+              {
+                "action_id": "invest",
+                "utilities": {
+                  "favorable": 10,
+                  "adverse": -20
+                }
+              },
+              {
+                "action_id": "defer",
+                "utilities": {
+                  "favorable": 0,
+                  "adverse": 0
+                }
+              }
+            ],
+            "experiments": [
+              {
+                "experiment_id": "assay-a",
+                "cost_utility": 1,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:robust-007-nominal",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 9200,
+                      "negative": 800
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 800,
+                      "negative": 9200
+                    }
+                  }
+                ]
+              },
+              {
+                "experiment_id": "assay-b",
+                "cost_utility": 7,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:robust-007-nominal",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 8000,
+                      "negative": 2000
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 2000,
+                      "negative": 8000
+                    }
+                  }
+                ]
+              }
+            ],
+            "expected": {
+              "status": "selected",
+              "selected_experiment_id": "assay-a",
+              "reason_codes": [
+                "positive_net_evsi",
+                "highest_net_evsi_selected"
+              ]
+            }
+          }
+        },
+        {
+          "scenario_id": "tail-shock",
+          "weight": 1000,
+          "uncertainty_class": "distribution_shift",
+          "assumption_tags": [
+            "low_probability_common_cause_shock",
+            "test_unavailable"
+          ],
+          "case": {
+            "case_id": "ROBUST-007-tail-shock",
+            "scenario_digest": "sha256:robust-007-tail-shock",
+            "probability_scale": 10000,
+            "states": [
+              {
+                "state_id": "favorable",
+                "prior_weight": 5000
+              },
+              {
+                "state_id": "adverse",
+                "prior_weight": 5000
+              }
+            ],
+            "actions": [
+              {
+                "action_id": "invest",
+                "utilities": {
+                  "favorable": 10,
+                  "adverse": -20
+                }
+              },
+              {
+                "action_id": "defer",
+                "utilities": {
+                  "favorable": 0,
+                  "adverse": 0
+                }
+              }
+            ],
+            "experiments": [
+              {
+                "experiment_id": "assay-a",
+                "cost_utility": 1,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:mismatched-scenario",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 9200,
+                      "negative": 800
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 800,
+                      "negative": 9200
+                    }
+                  }
+                ]
+              },
+              {
+                "experiment_id": "assay-b",
+                "cost_utility": 7,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:robust-007-tail-shock",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 8000,
+                      "negative": 2000
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 2000,
+                      "negative": 8000
+                    }
+                  }
+                ]
+              }
+            ],
+            "expected": {
+              "status": "no_positive_evsi",
+              "selected_experiment_id": null,
+              "reason_codes": [
+                "no_positive_net_evsi"
+              ]
+            }
+          }
+        }
+      ],
+      "expected": {
+        "status": "scenario_sensitive",
+        "robust_winner": null,
+        "scenario_winners": [
+          "assay-a",
+          null
+        ],
+        "reason_codes": [
+          "decision_not_stable_across_joint_scenarios"
+        ]
+      }
+    },
+    {
+      "family_id": "ROBUST-008",
+      "correlation_model": "joint_scenario_set",
+      "decision_contract_digest": "sha256:decision-contract-robust-008",
+      "scenarios": [
+        {
+          "scenario_id": "alpha",
+          "weight": 5000,
+          "uncertainty_class": "parameter_shift",
+          "assumption_tags": [
+            "prior_uncertainty"
+          ],
+          "case": {
+            "case_id": "ROBUST-008-alpha",
+            "scenario_digest": "sha256:robust-008-alpha",
+            "probability_scale": 10000,
+            "states": [
+              {
+                "state_id": "favorable",
+                "prior_weight": 5000
+              },
+              {
+                "state_id": "adverse",
+                "prior_weight": 5000
+              }
+            ],
+            "actions": [
+              {
+                "action_id": "invest",
+                "utilities": {
+                  "favorable": 10,
+                  "adverse": -20
+                }
+              },
+              {
+                "action_id": "defer",
+                "utilities": {
+                  "favorable": 0,
+                  "adverse": 0
+                }
+              }
+            ],
+            "experiments": [
+              {
+                "experiment_id": "assay-a",
+                "cost_utility": 1,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:robust-008-alpha",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 9200,
+                      "negative": 800
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 800,
+                      "negative": 9200
+                    }
+                  }
+                ]
+              },
+              {
+                "experiment_id": "assay-b",
+                "cost_utility": 2,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:robust-008-alpha",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 8500,
+                      "negative": 1500
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 1500,
+                      "negative": 8500
+                    }
+                  }
+                ]
+              }
+            ],
+            "expected": {
+              "status": "selected",
+              "selected_experiment_id": "assay-a",
+              "reason_codes": [
+                "positive_net_evsi",
+                "highest_net_evsi_selected"
+              ]
+            }
+          }
+        },
+        {
+          "scenario_id": "beta",
+          "weight": 4000,
+          "uncertainty_class": "correlated_joint_shock",
+          "assumption_tags": [
+            "correlated_stress"
+          ],
+          "case": {
+            "case_id": "ROBUST-008-beta",
+            "scenario_digest": "sha256:robust-008-beta",
+            "probability_scale": 10000,
+            "states": [
+              {
+                "state_id": "favorable",
+                "prior_weight": 4500
+              },
+              {
+                "state_id": "adverse",
+                "prior_weight": 5500
+              }
+            ],
+            "actions": [
+              {
+                "action_id": "invest",
+                "utilities": {
+                  "favorable": 10,
+                  "adverse": -20
+                }
+              },
+              {
+                "action_id": "defer",
+                "utilities": {
+                  "favorable": 0,
+                  "adverse": 0
+                }
+              }
+            ],
+            "experiments": [
+              {
+                "experiment_id": "assay-a",
+                "cost_utility": 1,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:robust-008-beta",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 9200,
+                      "negative": 800
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 800,
+                      "negative": 9200
+                    }
+                  }
+                ]
+              },
+              {
+                "experiment_id": "assay-b",
+                "cost_utility": 2,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:robust-008-beta",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 8500,
+                      "negative": 1500
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 1500,
+                      "negative": 8500
+                    }
+                  }
+                ]
+              }
+            ],
+            "expected": {
+              "status": "selected",
+              "selected_experiment_id": "assay-a",
+              "reason_codes": [
+                "positive_net_evsi",
+                "highest_net_evsi_selected"
+              ]
+            }
+          }
+        }
+      ],
+      "expected": {
+        "status": "invalid_input",
+        "robust_winner": null,
+        "scenario_winners": [],
+        "reason_codes": [
+          "scenario_weight_sum_mismatch"
+        ]
+      }
+    }
+  ]
+}
