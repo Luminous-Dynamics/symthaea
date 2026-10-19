@@ -103,7 +103,6 @@ fn bounded_outcome(run: &Value, outcome_id: &str) -> Option<BoundedOutcome> {
 fn directional_tally(
     direction: &str,
     target: Option<f64>,
-    difference: &PairedOutcomeDifferenceV1,
     control_value: f64,
     variant_value: f64,
 ) -> Option<OrderingTally> {
@@ -117,7 +116,6 @@ fn directional_tally(
         "observe" => return None,
         _ => return None,
     };
-    let _ = difference;
     Some(match comparison {
         std::cmp::Ordering::Less => OrderingTally::ControlWin,
         std::cmp::Ordering::Equal => OrderingTally::Tie,
@@ -229,7 +227,6 @@ pub fn analyze_paired_outcomes_v1(
             if let Some(tally) = directional_tally(
                 direction,
                 target_value,
-                &pair,
                 control.value,
                 variant.value,
             ) {
@@ -258,6 +255,12 @@ pub fn analyze_paired_outcomes_v1(
         let maximum_paired_difference = pairs.iter()
             .map(|pair| pair.difference)
             .fold(f64::NEG_INFINITY, f64::max);
+        if !mean_paired_difference.is_finite()
+            || !mean_measurement_bound_lower.is_finite()
+            || !mean_measurement_bound_upper.is_finite()
+        {
+            return Err(vec![format!("aggregate paired summary overflowed for outcome {outcome_id:?}")]);
+        }
         let directional = (direction != "observe").then_some(());
         summaries.push(PairedOutcomeSummaryV1 {
             outcome_id: outcome_id.to_owned(),
