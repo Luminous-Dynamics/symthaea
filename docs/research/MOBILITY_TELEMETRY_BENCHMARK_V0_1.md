@@ -89,7 +89,7 @@ Report per-group metrics, worst-group behavior, uncertainty calibration and out-
 
 ## Output contract
 
-Every benchmark report should include: benchmark version; source commit; toolchain/build identity; fixture and manifest hashes; case ID and expected/observed result; per-channel loss and timing summaries; calibration/protocol/rights references; software and physical gates separately; failed cases and reasons; claim ceiling. Preserve failing raw fixtures so a regression can be replayed.
+Every benchmark case includes both the expected/observed outcome and the required diagnostic tokens; a correct exit class with a missing explanation does not pass. Reports include a canonical SHA-256 computed over the serialized report with its `canonical_report_sha256` field blank; a verifier blanks that field and recomputes it. Every benchmark report should include: benchmark version; source commit; toolchain/build identity; fixture and manifest hashes; case ID and expected/observed result; per-channel loss and timing summaries; calibration/protocol/rights references; software and physical gates separately; failed cases and reasons; claim ceiling. Preserve failing raw fixtures so a regression can be replayed.
 
 ## Executable entry point and next concrete work
 
@@ -99,11 +99,10 @@ Run from the workspace root once Cargo/Rust are available:
 cargo test -p xtask frozen_fault_matrix_cases_match_expected_outcomes
 cargo run -p xtask -- mobility-telemetry-benchmark \
   --source-commit "$(git rev-parse HEAD)" \
-  --toolchain-id "$(rustc -Vv | tr '\n' ';') | $(cargo --version)" \
   --out reports/mobility_telemetry_benchmark.json
 ```
 
-The command verifies that `--source-commit` exactly matches `git rev-parse HEAD`, requires an explicit `rustc -Vv` plus `cargo --version` toolchain identity, reads the frozen JSON matrix, applies each specified mutation, compares observed and expected decisions (including required gap/invalid-row diagnostics), emits a hash-bound JSON report, and exits nonzero on any mismatch. It does not measure hardware. It has been authored but not compiled or run in this environment.
+The command verifies that `--source-commit` exactly matches `git rev-parse HEAD`, captures the executing environment by running `rustc -Vv` plus `cargo --version` (failure to execute either command fails closed), reads the frozen JSON matrix, applies each specified mutation, compares observed and expected decisions (including required gap/invalid-row diagnostics), emits a hash-bound JSON report with a canonical report digest, and exits nonzero on any outcome or required-diagnostic mismatch. It does not measure hardware. It has been authored but not compiled or run in this environment.
 
 Next:
 
