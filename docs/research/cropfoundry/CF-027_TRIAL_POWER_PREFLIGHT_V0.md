@@ -35,7 +35,7 @@ cargo run -q -p xtask -- cropfoundry-trial-power-plan \
 cargo test -p xtask cropfoundry_trial_power
 ```
 
-The receipt pins the exact input bytes with SHA-256 and preserves the protocol and variance-evidence identifiers. These identifiers are not independently resolved by the tool.
+The receipt pins the exact input bytes with SHA-256 and preserves the protocol and variance-evidence identifiers. These identifiers are not independently resolved by the tool. The receipt always includes side-by-side sample-size sensitivity for 80% and 90% target power, in addition to the requested target.
 
 ### Method supported in v0
 
