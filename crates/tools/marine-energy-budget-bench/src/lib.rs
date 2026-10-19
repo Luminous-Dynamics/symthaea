@@ -602,6 +602,8 @@ mod tests {
         let band = result.saving_fraction_interval.expect("ready comparison");
         assert!(band.lower > 0.0);
         assert!(band.upper > band.lower);
+        assert!((band.lower - (1.0 - 1_015.0 / 1_085.0)).abs() < 1e-12);
+        assert!((band.upper - (1.0 - 985.0 / 1_115.0)).abs() < 1e-12);
     }
 
     #[test]
@@ -638,6 +640,18 @@ mod tests {
             case_id: "candidate".to_owned()
         }));
         assert!(result.candidate_metrics.is_none());
+    }
+
+    #[test]
+    fn invalid_auxiliary_uncertainty_is_detected_even_if_energy_is_missing() {
+        let candidate = case("candidate", 900.0, 10.0, None, Some(f64::NAN));
+        let result = assess_case(&candidate);
+        assert_eq!(result.state, AssessmentState::Invalid);
+        assert!(result.findings.iter().any(|finding| matches!(
+            finding,
+            Finding::InvalidNonFinite { case_id, field }
+                if case_id == "candidate" && field == "auxiliary_uncertainty_wh"
+        )));
     }
 
     #[test]
