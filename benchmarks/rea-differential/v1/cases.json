@@ -1,0 +1,337 @@
+{
+  "schema_version": "symthaea.rea-differential-cases.v1",
+  "corpus_id": "rea-differential-v1",
+  "purpose": "Deterministic, inert, generated known-answer fixture recipes. Provider findings are scored against generated expected trees and byte-ledger oracles, never against provider self-reports.",
+  "safety_constraints": [
+    "Only generated text and container fixtures; no vendor firmware",
+    "Never execute extracted files",
+    "No device writes, firmware flashing, or emulator execution",
+    "Record provider unsupported and unknown capability as abstention, not success"
+  ],
+  "cases": [
+    {
+      "case_id": "nested-gzip-tar-001",
+      "family": "nested-containers",
+      "recipe": "gzip(tar(payload.txt))",
+      "supported_baseline": true,
+      "expected_files": [
+        {
+          "path": "payload.txt",
+          "utf8": "REA known-answer payload 001\n",
+          "logical_id": "payload-001"
+        }
+      ],
+      "required_region_kinds": [
+        "gzip-container",
+        "tar-container"
+      ],
+      "accounting_classes": [
+        "identified",
+        "padding"
+      ],
+      "mutations": [
+        "wrong-child-content-hash",
+        "dropped-child-edge",
+        "false-root-offset"
+      ]
+    },
+    {
+      "case_id": "offset-prefix-suffix-002",
+      "family": "offset-boundaries",
+      "recipe": "prefix-bytes || gzip(tar(payload.txt)) || suffix-bytes",
+      "supported_baseline": true,
+      "expected_files": [
+        {
+          "path": "payload.txt",
+          "utf8": "REA known-answer payload 002\n",
+          "logical_id": "payload-002"
+        }
+      ],
+      "required_region_kinds": [
+        "leading-bytes",
+        "gzip-container",
+        "trailing-bytes"
+      ],
+      "accounting_classes": [
+        "identified",
+        "padding",
+        "unknown"
+      ],
+      "mutations": [
+        "offset-minus-one",
+        "offset-plus-one",
+        "dropped-leading-span",
+        "invented-completeness"
+      ]
+    },
+    {
+      "case_id": "adjacent-gzip-objects-003",
+      "family": "adjacent-containers",
+      "recipe": "gzip(left.txt) || gzip(right.txt)",
+      "supported_baseline": true,
+      "expected_files": [
+        {
+          "path": "left.txt",
+          "utf8": "left-003\n",
+          "logical_id": "adjacent-left"
+        },
+        {
+          "path": "right.txt",
+          "utf8": "right-003\n",
+          "logical_id": "adjacent-right"
+        }
+      ],
+      "required_region_kinds": [
+        "gzip-container"
+      ],
+      "accounting_classes": [
+        "identified"
+      ],
+      "mutations": [
+        "merge-adjacent-regions",
+        "drop-second-object"
+      ]
+    },
+    {
+      "case_id": "duplicate-basename-004",
+      "family": "path-collisions",
+      "recipe": "tar(left/config.txt,right/config.txt)",
+      "supported_baseline": true,
+      "expected_files": [
+        {
+          "path": "left/config.txt",
+          "utf8": "left config 004\n",
+          "logical_id": "left-config"
+        },
+        {
+          "path": "right/config.txt",
+          "utf8": "right config 004\n",
+          "logical_id": "right-config"
+        }
+      ],
+      "required_region_kinds": [
+        "tar-container"
+      ],
+      "accounting_classes": [
+        "identified"
+      ],
+      "mutations": [
+        "flatten-colliding-basename",
+        "overwrite-first-output",
+        "duplicate-output-path"
+      ]
+    },
+    {
+      "case_id": "identical-content-distinct-paths-005",
+      "family": "path-collisions",
+      "recipe": "tar(alpha/same.bin,beta/same.bin) with identical file bytes",
+      "supported_baseline": true,
+      "expected_files": [
+        {
+          "path": "alpha/same.bin",
+          "utf8": "identical-005\n",
+          "logical_id": "alpha-copy"
+        },
+        {
+          "path": "beta/same.bin",
+          "utf8": "identical-005\n",
+          "logical_id": "beta-copy"
+        }
+      ],
+      "required_region_kinds": [
+        "tar-container"
+      ],
+      "accounting_classes": [
+        "identified"
+      ],
+      "mutations": [
+        "deduplicate-by-content-and-drop-path",
+        "invent-third-copy"
+      ]
+    },
+    {
+      "case_id": "decoy-magic-006",
+      "family": "false-positives",
+      "recipe": "plain text contains archive magic-like bytes but no valid container",
+      "supported_baseline": true,
+      "expected_files": [],
+      "required_region_kinds": [],
+      "accounting_classes": [
+        "unknown"
+      ],
+      "mutations": [
+        "treat-magic-as-valid-container",
+        "emit-fabricated-file",
+        "claim-complete-with-unknown-bytes"
+      ]
+    },
+    {
+      "case_id": "bad-checksum-tar-007",
+      "family": "corrupt-inputs",
+      "recipe": "tar header checksum byte flipped; no extraction-side effects",
+      "supported_baseline": "abstain-or-partial",
+      "expected_files": [],
+      "required_region_kinds": [
+        "candidate-container"
+      ],
+      "accounting_classes": [
+        "unknown",
+        "ambiguous",
+        "unsupported"
+      ],
+      "mutations": [
+        "claim-valid-tar",
+        "emit-content-without-checksum-warning",
+        "erase-unknown-region"
+      ]
+    },
+    {
+      "case_id": "truncated-gzip-008",
+      "family": "corrupt-inputs",
+      "recipe": "gzip header plus truncated compressed stream",
+      "supported_baseline": "abstain-or-partial",
+      "expected_files": [],
+      "required_region_kinds": [
+        "candidate-container"
+      ],
+      "accounting_classes": [
+        "unknown",
+        "ambiguous",
+        "unsupported"
+      ],
+      "mutations": [
+        "emit-truncated-payload-as-complete",
+        "drop-tail-gap",
+        "claim-complete"
+      ]
+    },
+    {
+      "case_id": "recursion-depth-boundary-009",
+      "family": "recursion",
+      "recipe": "gzip(gzip(gzip(payload.txt))) at configured recursion limit 2",
+      "supported_baseline": "partial-or-abstain",
+      "expected_files": [],
+      "required_region_kinds": [
+        "gzip-container"
+      ],
+      "accounting_classes": [
+        "identified",
+        "unknown",
+        "unsupported"
+      ],
+      "mutations": [
+        "silently-drop-depth-limited-child",
+        "claim-complete",
+        "report-wrong-depth"
+      ]
+    },
+    {
+      "case_id": "zero-ff-padding-010",
+      "family": "padding",
+      "recipe": "0x00 padding || gzip(payload.txt) || 0xFF padding",
+      "supported_baseline": true,
+      "expected_files": [
+        {
+          "path": "payload.txt",
+          "utf8": "padding-010\n",
+          "logical_id": "padding-payload"
+        }
+      ],
+      "required_region_kinds": [
+        "leading-padding",
+        "gzip-container",
+        "trailing-padding"
+      ],
+      "accounting_classes": [
+        "identified",
+        "padding"
+      ],
+      "mutations": [
+        "misclassify-padding-as-payload",
+        "skip-padding-without-accounting",
+        "overlap-byte-ledger"
+      ]
+    },
+    {
+      "case_id": "one-byte-offset-011",
+      "family": "offset-boundaries",
+      "recipe": "single 0x7e prefix byte || gzip(payload.txt)",
+      "supported_baseline": true,
+      "expected_files": [
+        {
+          "path": "payload.txt",
+          "utf8": "offset-011\n",
+          "logical_id": "offset-payload"
+        }
+      ],
+      "required_region_kinds": [
+        "leading-bytes",
+        "gzip-container"
+      ],
+      "accounting_classes": [
+        "identified",
+        "unknown"
+      ],
+      "mutations": [
+        "round-offset",
+        "floor-offset",
+        "source-offset-relative-to-child"
+      ]
+    },
+    {
+      "case_id": "empty-payload-012",
+      "family": "empty-files",
+      "recipe": "tar contains an empty file plus a non-empty sibling",
+      "supported_baseline": true,
+      "expected_files": [
+        {
+          "path": "empty.txt",
+          "utf8": "",
+          "logical_id": "empty-payload"
+        },
+        {
+          "path": "sibling.txt",
+          "utf8": "sibling-012\n",
+          "logical_id": "nonempty-sibling"
+        }
+      ],
+      "required_region_kinds": [
+        "tar-container"
+      ],
+      "accounting_classes": [
+        "identified"
+      ],
+      "mutations": [
+        "drop-zero-length-output",
+        "treat-empty-as-missing",
+        "invent-nonzero-length"
+      ]
+    },
+    {
+      "case_id": "nested-transformation-013",
+      "family": "transform-provenance",
+      "recipe": "gzip(tar(gzip(inner.txt)))",
+      "supported_baseline": true,
+      "expected_files": [
+        {
+          "path": "inner.txt",
+          "utf8": "inner-013\n",
+          "logical_id": "nested-inner"
+        }
+      ],
+      "required_region_kinds": [
+        "outer-gzip",
+        "tar-container",
+        "inner-gzip"
+      ],
+      "accounting_classes": [
+        "identified"
+      ],
+      "mutations": [
+        "map-decompressed-child-to-false-root-offset",
+        "swap-parent-edge",
+        "lose-transform-kind"
+      ]
+    }
+  ]
+}
