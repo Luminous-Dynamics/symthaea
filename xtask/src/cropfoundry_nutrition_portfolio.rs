@@ -963,6 +963,28 @@ mod tests {
     }
 
     #[test]
+    fn cropfoundry_portfolio_withholds_totals_when_one_row_fails() {
+        let mut crop_a = option("crop-a", 100.0, 20.0);
+        crop_a.records[1]["concentration_mg_per_kg"] = serde_json::json!(-2.0);
+        let receipt = portfolio(vec![crop_a, option("crop-b", 80.0, 30.0)]);
+        assert!(!receipt.accounting_pass);
+        let iron = receipt.options[0]
+            .nutrients
+            .iter()
+            .find(|nutrient| nutrient.nutrient_id == "iron")
+            .unwrap();
+        let zinc = receipt.options[0]
+            .nutrients
+            .iter()
+            .find(|nutrient| nutrient.nutrient_id == "zinc")
+            .unwrap();
+        assert_eq!(iron.total_delivered_mg, None);
+        assert_eq!(zinc.total_delivered_mg, None);
+        assert!(!receipt.options[0].resource_ledger_complete);
+        assert_eq!(receipt.nutrient_interval_comparison_available["iron"], false);
+    }
+
+    #[test]
     fn cropfoundry_portfolio_rejects_resource_duplication_mismatch_within_batch() {
         let mut crop = option("crop-a", 100.0, 20.0);
         crop.records[1]["water_liters"] = serde_json::json!(99.0);
