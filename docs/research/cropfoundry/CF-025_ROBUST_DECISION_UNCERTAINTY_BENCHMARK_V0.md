@@ -60,6 +60,22 @@ All policies must face the same scenario data and hard constraints. For syntheti
 5. Report per-scenario objectives, constraint slack, tail contribution, recommendation/ranking changes, per-zone/per-group outcomes and full receipts.
 6. Recompute and preserve results if the score/objective changes. Do not compare scores across different proxy versions or uncertainty contracts as though they were the same benchmark.
 
+## Executable synthetic diagnostic — CF-025 harness v0
+
+The Rust command `cropfoundry-robust-policy-demo` reuses the existing CF-022 six-scenario/five-policy receipts. It does not introduce a second water simulator or consume external datasets:
+
+```bash
+cargo run -q -p xtask -- cropfoundry-robust-policy-demo \
+  --out reports/cropfoundry/robust-policy-synthetic-v0.json
+cargo test -p xtask cropfoundry_robust_policy
+```
+
+For each policy, the receipt reports mean and median synthetic stress, nearest-rank p95, upper-tail mean/CVaR95, maximum and mean worst-zone burden, water totals, allocation dispersion, and mean regret against the per-scenario best stress score. It emits a Pareto-front membership flag and dominated-policy set across mean stress, tail stress, worst-zone burden, water use and allocation dispersion. Four declared preference profiles then sweep weighted normalized scores and record the complete policy ranking and top-ranked policy for each profile.
+
+**Critical sample-size caveat:** the current suite has six synthetic scenario values per policy. At a 5% tail fraction, `ceil(6 × 0.05) = 1`, so the p95 nearest-rank value and CVaR95 both use the single worst scenario. The receipt explicitly includes `tail_sample_count: 1`; these values are diagnostics, not estimates of a calibrated 95th-percentile field outcome. To estimate an empirical tail with useful resolution, add substantially more predeclared scenario families and, for statistical claims, calibrated joint uncertainty distributions plus held-out outcomes. Do not turn this six-point suite into a claim of “95% reliability.”
+
+The preference sweep is deliberately transparent, but each weighted score encodes normative trade-offs. A lower water-use objective can inadvertently reward under-irrigation; therefore it is always paired with stress/tail/worst-zone burden and hard constraints, and even a top rank is **not** an agronomic recommendation. Pareto dominance means only that another declared policy is no worse on every one of these five synthetic objectives and strictly better on at least one; omitted objectives may reverse the comparison.
+
 ## Current CropFoundry status
 
 CF-022's five-policy irrigation harness is a useful starting point: it already includes water caps, per-plot actuator limits, per-zone stress, a dose-matched hindsight comparator, and a greedy minimax heuristic. Receipt v2 also corrected a starvation-scoring blind spot and exposes the count of scenarios contributing to its worst-to-best ratio. This is not yet a robust optimization benchmark: it uses a small deterministic synthetic suite, not a calibrated joint uncertainty distribution. CF-025 adds the next gate: scenario sensitivity and preference stability first; calibrated uncertainty and chance constraints only when defensible data exist.
