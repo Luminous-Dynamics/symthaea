@@ -1,7 +1,7 @@
 {
   "schema_version": "0.1.0",
   "suite_id": "MOBILITY-TELEMETRY-CONFORMANCE-001",
-  "status": "frozen_proposed_matrix_v0_1_with_clock_sync_negative_control_not_yet_executed",
+  "status": "frozen_proposed_matrix_v0_1_includes_clock_sync_and_uncertainty_negative_controls_not_yet_executed",
   "claim_ceiling": "Software conformance only. No demonstrated hardware reliability, measurement accuracy, vehicle performance, tire qualification, or roadworthiness.",
   "interpretation": {
     "positive_controls_required": true,
@@ -201,6 +201,22 @@
       "expected": "ineligible",
       "diagnostic": "clock_sync_method_not_verified",
       "rust_test": "unrecognized_sync_method_blocks_physical_claim"
+    },
+    {
+      "id": "CLAIM-005",
+      "category": "uncertainty_gate",
+      "mutation": "physical_claim_without_claim_specific_uncertainty_budget",
+      "expected": "ineligible",
+      "diagnostic": "missing_claim_uncertainty_budget",
+      "rust_test": "missing_claim_uncertainty_budget_blocks_physical_claim"
+    },
+    {
+      "id": "CLAIM-006",
+      "category": "uncertainty_gate",
+      "mutation": "expanded_uncertainty_exceeds_acceptance_tolerance",
+      "expected": "ineligible",
+      "diagnostic": "uncertainty_budget_exceeds_tolerance",
+      "rust_test": "budget_above_tolerance_blocks_physical_claim"
     }
   ],
   "hardware_targets": [
