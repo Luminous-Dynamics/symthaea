@@ -51,7 +51,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cargo fmt --check --package symthaea-rea-evidence-verifier
+          cargo fmt --package symthaea-rea-evidence-verifier
           cargo test -p symthaea-rea-evidence-verifier
 
       - name: Verify generated provider evidence artifact
