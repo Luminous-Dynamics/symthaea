@@ -683,10 +683,12 @@ pub fn score_validation(
         ValidationDisposition::InvalidProfile
     } else if invalid_observations {
         ValidationDisposition::InvalidObservations
+    } else if threshold_failure {
+        // Preserve a proven per-slice failure even when some other required slice
+        // lacks coverage. The missing slice remains visible in issues/score output.
+        ValidationDisposition::FailDeclaredThresholds
     } else if insufficient_coverage {
         ValidationDisposition::IncompleteCoverage
-    } else if threshold_failure {
-        ValidationDisposition::FailDeclaredThresholds
     } else {
         ValidationDisposition::PassDeclaredThresholds
     };
@@ -792,6 +794,25 @@ mod tests {
         let shallow = scorecard.slices.iter().find(|s| s.operating_case_id == "depth-ratio-1.2").unwrap();
         assert_eq!(shallow.thresholds_met, Some(false));
         assert!(shallow.maximum_normalized_absolute_error.unwrap() > 0.10);
+    }
+
+    #[test]
+    fn known_slice_failure_is_not_demoted_by_another_missing_slice() {
+        let observations = vec![
+            observation("deep-bad-1", "depth-ratio-4.0", 100.0, 140.0),
+            observation("deep-bad-2", "depth-ratio-4.0", 200.0, 200.0),
+        ];
+        let scorecard = score_validation(&profile(), &observations);
+        assert_eq!(scorecard.disposition, ValidationDisposition::FailDeclaredThresholds);
+        assert!(scorecard.issues.iter().any(|issue| matches!(
+            issue,
+            ValidationIssue::InsufficientCoverage {
+                operating_case_id,
+                observable_id,
+                observed: 0,
+                ..
+            } if operating_case_id == "depth-ratio-1.2" && observable_id == "resistance"
+        )));
     }
 
     #[test]
