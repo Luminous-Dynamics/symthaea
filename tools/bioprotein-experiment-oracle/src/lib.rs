@@ -541,11 +541,11 @@ pub fn run_cli() -> i32 {
         synthetic_only_claim_ceiling: CLAIM_CEILING.to_owned(),
         contract_passed,
     };
-    if let Some(parent) = receipt_path.parent() {
-        if let Err(error) = fs::create_dir_all(parent) {
-            eprintln!("cannot create receipt directory: {error}");
-            return 2;
-        }
+    if let Some(parent) = receipt_path.parent()
+        && let Err(error) = fs::create_dir_all(parent)
+    {
+        eprintln!("cannot create receipt directory: {error}");
+        return 2;
     }
     let receipt_json = match serde_json::to_vec_pretty(&receipt) {
         Ok(bytes) => bytes,
