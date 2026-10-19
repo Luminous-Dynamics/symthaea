@@ -15,6 +15,7 @@ use symthaea_habitat_vertical_bench::assumption_falsification::{
 use symthaea_habitat_vertical_bench::event_replay::{validate_event_log_str, EMBEDDED_EVENT_LOG};
 use symthaea_habitat_vertical_bench::material_ledger::{validate_material_ledger_str, EMBEDDED_MATERIAL_LEDGER};
 use symthaea_habitat_vertical_bench::measurement_gate::{validate_measurement_gate_str, EMBEDDED_MEASUREMENT_GATE};
+use symthaea_habitat_vertical_bench::audit_bundle::{validate_audit_bundle_str, EMBEDDED_AUDIT_BUNDLE};
 use symthaea_habitat_vertical_bench::{validate_fixture_str, EMBEDDED_FIXTURE};
 
 fn main() {
@@ -218,6 +219,33 @@ fn main() {
                 count_disposition("Blocked"),
                 count_disposition("NotEvaluable")
             );
+            let audit_bundle = match validate_audit_bundle_str(
+                EMBEDDED_AUDIT_BUNDLE,
+                EMBEDDED_FIXTURE,
+                EMBEDDED_EVENT_LOG,
+                EMBEDDED_MATERIAL_LEDGER,
+                EMBEDDED_MEASUREMENT_GATE,
+            ) {
+                Ok(report) => report,
+                Err(error) => {
+                    eprintln!("invalid embedded cross-layer audit bundle JSON: {error}");
+                    process::exit(2);
+                }
+            };
+            if !audit_bundle.is_valid() {
+                eprintln!("CROSS-LAYER AUDIT BUNDLE: FAIL ({} findings)", audit_bundle.issues.len());
+                for issue in audit_bundle.issues {
+                    eprintln!("{} {}: {}", issue.code, issue.path, issue.message);
+                }
+                process::exit(1);
+            }
+            println!(
+                "synthetic cross-layer audit bundle: PASS ({} fixture fingerprints verified; {} events; {} material transactions; {} measurement cases; source authenticity=NOT ESTABLISHED)",
+                audit_bundle.artifact_count,
+                audit_bundle.event_count,
+                audit_bundle.material_transaction_count,
+                audit_bundle.measurement_case_count
+            );
         } else {
             println!("embedded disruption campaign: not checked against the alternate fixture");
             println!("embedded resilience option matrix: not checked against the alternate fixture");
@@ -225,6 +253,7 @@ fn main() {
             println!("embedded event replay contract: not checked against the alternate fixture");
             println!("embedded material ledger: not checked against the alternate fixture");
             println!("embedded measurement gate: not checked against the alternate fixture");
+            println!("embedded cross-layer audit bundle: not checked against the alternate fixture");
         }
 
         println!("STRUCTURAL FIXTURE VALIDATION: PASS");
