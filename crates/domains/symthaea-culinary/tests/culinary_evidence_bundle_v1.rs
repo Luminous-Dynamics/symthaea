@@ -289,3 +289,46 @@ fn unreferenced_manifest_artifact_is_rejected() {
     let error = verify_culinary_evidence_bundle_v1(&experiment,&bytes,&digest,&payloads).unwrap_err();
     assert!(error.iter().any(|item| item.contains("is not referenced")));
 }
+
+
+#[test]
+fn measurement_artifact_bytes_must_match_consumed_outcome_values() {
+    let (experiment, manifest_bytes, _, mut payloads) = test_only_bundle();
+    let artifact_id = "measurement-synthetic-run-001-prepared_yield_g";
+    let mut record: Value = serde_json::from_slice(payloads.get(artifact_id).unwrap()).unwrap();
+    record["value"] = json!(777.0);
+    let altered_payload = serde_json::to_vec(&record).unwrap();
+    payloads.insert(artifact_id.into(), altered_payload.clone());
+
+    let mut manifest: Value = serde_json::from_slice(&manifest_bytes).unwrap();
+    let item = manifest["artifacts"].as_array_mut().unwrap().iter_mut()
+        .find(|artifact| artifact["artifact_id"] == artifact_id)
+        .unwrap();
+    item["sha256"] = Value::String(sha256_hex(&altered_payload));
+    item["byte_length"] = json!(altered_payload.len());
+    let bytes = serde_json::to_vec(&manifest).unwrap();
+    let digest = sha256_hex(&bytes);
+    let error = verify_culinary_evidence_bundle_v1(&experiment,&bytes,&digest,&payloads).unwrap_err();
+    assert!(error.iter().any(|item| item.contains("does not exactly match experiment outcome")));
+}
+
+#[test]
+fn process_trace_payload_identity_must_match_manifest_artifact_id() {
+    let (experiment, manifest_bytes, _, mut payloads) = test_only_bundle();
+    let artifact_id = "synthetic-process-trace-001-control";
+    let mut trace: Value = serde_json::from_slice(payloads.get(artifact_id).unwrap()).unwrap();
+    trace["trace_id"] = Value::String("different-trace-id".into());
+    let altered_payload = serde_json::to_vec(&trace).unwrap();
+    payloads.insert(artifact_id.into(), altered_payload.clone());
+
+    let mut manifest: Value = serde_json::from_slice(&manifest_bytes).unwrap();
+    let item = manifest["artifacts"].as_array_mut().unwrap().iter_mut()
+        .find(|artifact| artifact["artifact_id"] == artifact_id)
+        .unwrap();
+    item["sha256"] = Value::String(sha256_hex(&altered_payload));
+    item["byte_length"] = json!(altered_payload.len());
+    let bytes = serde_json::to_vec(&manifest).unwrap();
+    let digest = sha256_hex(&bytes);
+    let error = verify_culinary_evidence_bundle_v1(&experiment,&bytes,&digest,&payloads).unwrap_err();
+    assert!(error.iter().any(|item| item.contains("internal trace_id does not match artifact_id")));
+}
