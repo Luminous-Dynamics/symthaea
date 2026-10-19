@@ -1,0 +1,36 @@
+name: REA Evidence Receipt Verifier
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
+    paths:
+      - "crates/domains/symthaea-rea-evidence-verifier/**"
+      - ".github/workflows/rea-evidence-receipt.yml"
+  push:
+    branches: [main]
+    paths:
+      - "crates/domains/symthaea-rea-evidence-verifier/**"
+      - ".github/workflows/rea-evidence-receipt.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rea-evidence-receipt-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verifier:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact triggering revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Set up pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+      - name: Format verifier sources
+        run: cargo fmt --package symthaea-rea-evidence-verifier
+      - name: Unit and negative-control tests
+        run: cargo test -p symthaea-rea-evidence-verifier

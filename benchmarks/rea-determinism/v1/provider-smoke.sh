@@ -13,13 +13,18 @@ command -v gzip >/dev/null 2>&1 || fail "gzip required"
 command -v find >/dev/null 2>&1 || fail "find required"
 command -v cmp >/dev/null 2>&1 || fail "cmp required"
 command -v git >/dev/null 2>&1 || fail "git required"
+REQUIREMENTS_LOCK="$ROOT/requirements-unblob-26.6.4.lock"
 [ -f "$NORMALIZER" ] || fail "semantic normalizer missing"
+[ -f "$REQUIREMENTS_LOCK" ] || fail "provider dependency lock missing"
+requirements_lock_sha=$(sha256sum "$REQUIREMENTS_LOCK" | awk '{print $1}')
 source_head_sha=$(printenv REA_TEST_SOURCE_SHA 2>/dev/null || git rev-parse HEAD)
 checkout_commit_sha=$(git rev-parse HEAD)
 workflow_event_sha=${GITHUB_SHA:-unknown}
 normalizer_sha=$(sha256sum "$NORMALIZER" | awk '{print $1}')
 cases_manifest_sha=$(sha256sum "$ROOT/cases.json" | awk '{print $1}')
 oracle_sha=$(sha256sum "$ROOT/oracle.json" | awk '{print $1}')
+provider_smoke_script_sha=$(sha256sum "$ROOT/provider-smoke.sh" | awk '{print $1}')
+provider_metamorphic_script_sha=$(sha256sum "$ROOT/provider-metamorphic-sweep.sh" | awk '{print $1}')
 
 version=$(unblob --version 2>&1) || fail "cannot read Unblob version"
 printf '%s\n' "$version" | grep -Eq '26[.]6[.]4([[:space:]]|$)' || fail "expected Unblob 26.6.4; got: $version"
@@ -28,7 +33,13 @@ tool_path=$(command -v unblob)
 tool_sha=$(sha256sum "$tool_path" | awk '{print $1}')
 freeze_file="/tmp/rea-unblob-pip-freeze.$$"
 python3 -m pip freeze | LC_ALL=C sort > "$freeze_file"
+if ! cmp -s "$REQUIREMENTS_LOCK" "$freeze_file"; then
+  diff -u "$REQUIREMENTS_LOCK" "$freeze_file" >&2 || true
+  rm -f "$freeze_file"
+  fail "resolved Python package set differs from the checked-in provider lock"
+fi
 pip_freeze_sha=$(sha256sum "$freeze_file" | awk '{print $1}')
+[ "$pip_freeze_sha" = "$requirements_lock_sha" ] || fail "provider lock and resolved package digest differ"
 
 OUT=$(printenv REA_PROVIDER_ARTIFACT_DIR 2>/dev/null || true)
 if [ -n "$OUT" ]; then
@@ -134,6 +145,21 @@ provider_metamorphic_sem=$(jq -er '.semantic_projection_sha256' "$provider_metam
 [ "$provider_metamorphic_count" -eq 64 ] || fail "actual-provider metamorphic sweep did not execute 64 variants"
 [ "$provider_metamorphic_sem" = "$sem_a" ] || fail "actual-provider metamorphic digest diverged from run-a"
 
+manifest_tmp=$(mktemp "${TMPDIR:-/tmp}/rea-evidence-bundle-manifest.XXXXXX") || fail "could not allocate bundle manifest staging file"
+(
+  cd "$OUT"
+  find . -type f ! -path './receipt.json' ! -path './bundle-manifest.json' -print |
+    LC_ALL=C sort |
+    while IFS= read -r file; do
+      relative=${file#./}
+      digest=$(sha256sum "$file" | awk '{print $1}')
+      printf '%s\t%s\n' "$relative" "$digest"
+    done
+) > "$manifest_tmp" || fail "could not enumerate bundle manifest inputs"
+jq -R -s 'split("\n") | map(select(length > 0) | split("\t") | {path: .[0], sha256: .[1]}) | {schema_version:"symthaea.rea-evidence-bundle-manifest.v1",files:.}' "$manifest_tmp" > "$OUT/bundle-manifest.json"   || fail "could not create bundle manifest"
+rm -f "$manifest_tmp"
+bundle_manifest_sha=$(sha256sum "$OUT/bundle-manifest.json" | awk '{print $1}')
+
 jq -n \
   --arg benchmark "ENG-REA-005-REAL-PROVIDER" \
   --arg provider_version "$version" \
@@ -143,6 +169,10 @@ jq -n \
   --arg normalizer_sha256 "$normalizer_sha" \
   --arg cases_manifest_sha256 "$cases_manifest_sha" \
   --arg oracle_sha256 "$oracle_sha" \
+  --arg requirements_lock_sha256 "$requirements_lock_sha" \
+  --arg bundle_manifest_sha256 "$bundle_manifest_sha" \
+  --arg provider_smoke_script_sha256 "$provider_smoke_script_sha" \
+  --arg provider_metamorphic_script_sha256 "$provider_metamorphic_script_sha" \
   --arg executable_path "$tool_path" \
   --arg executable_sha256 "$tool_sha" \
   --arg python_version "$python_version" \
@@ -159,13 +189,19 @@ jq -n \
   --arg provider_metamorphic_receipt_sha256 "$provider_metamorphic_sha" \
   --argjson provider_metamorphic_variant_count "$provider_metamorphic_count" \
   --arg provider_metamorphic_semantic_sha256 "$provider_metamorphic_sem" \
-  '{benchmark:$benchmark,source:{head_sha:$source_head_sha,checkout_commit_sha:$checkout_commit_sha,workflow_event_sha:$workflow_event_sha,normalizer_sha256:$normalizer_sha256,cases_manifest_sha256:$cases_manifest_sha256,oracle_sha256:$oracle_sha256},provider_version:$provider_version,executable_path:$executable_path,executable_sha256:$executable_sha256,python_version:$python_version,pip_freeze_sha256:$pip_freeze_sha256,fixture_input_sha256:$fixture_sha256,mutated_fixture_input_sha256:$mutated_fixture_sha256,expected_payload_sha256:$expected_payload_sha256,mutated_expected_payload_sha256:$mutated_payload_sha256,raw_report_sha256:{run_a:$raw_report_sha256_run_a,run_b:$raw_report_sha256_run_b,run_mutated:$raw_report_sha256_mutated},semantic_projection_sha256:{equivalent_runs:$semantic_projection_sha256,semantic_mutation:$mutated_semantic_projection_sha256},provider_metamorphic:{receipt_sha256:$provider_metamorphic_receipt_sha256,equivalent_variants:$provider_metamorphic_variant_count,semantic_projection_sha256:$provider_metamorphic_semantic_sha256},claims_ceiling:"Pinned Unblob CLI on owned inert nested gzip/tar/text fixtures only; no REA, recovered firmware execution, emulator, or hardware qualification."}' > "$OUT/receipt.json"
+  '{schema_version:"symthaea.rea-provider-smoke-receipt.v1",benchmark:$benchmark,qualification:{tier:"unblob-provider-smoke",rea_cli_mcp_parity:false,firmware_execution:false,emulation:false,device_qualification:false},source:{head_sha:$source_head_sha,checkout_commit_sha:$checkout_commit_sha,workflow_event_sha:$workflow_event_sha,normalizer_sha256:$normalizer_sha256,cases_manifest_sha256:$cases_manifest_sha256,oracle_sha256:$oracle_sha256,requirements_lock_sha256:$requirements_lock_sha256,provider_smoke_script_sha256:$provider_smoke_script_sha256,provider_metamorphic_script_sha256:$provider_metamorphic_script_sha256},provider_version:$provider_version,executable_path:$executable_path,executable_sha256:$executable_sha256,python_version:$python_version,pip_freeze_sha256:$pip_freeze_sha256,fixture_input_sha256:$fixture_sha256,mutated_fixture_input_sha256:$mutated_fixture_sha256,expected_payload_sha256:$expected_payload_sha256,mutated_expected_payload_sha256:$mutated_payload_sha256,raw_report_sha256:{run_a:$raw_report_sha256_run_a,run_b:$raw_report_sha256_run_b,run_mutated:$raw_report_sha256_mutated},semantic_projection_sha256:{equivalent_runs:$semantic_projection_sha256,semantic_mutation:$mutated_semantic_projection_sha256},provider_metamorphic:{receipt_sha256:$provider_metamorphic_receipt_sha256,equivalent_variants:$provider_metamorphic_variant_count,semantic_projection_sha256:$provider_metamorphic_semantic_sha256},bundle_manifest_sha256:$bundle_manifest_sha256,claims_ceiling:"Pinned Unblob CLI on owned inert nested gzip/tar/text fixtures only; no REA, recovered firmware execution, emulator, or hardware qualification."}' > "$OUT/receipt.json"
 
-jq -e --arg source "$source_head_sha" --arg checkout "$checkout_commit_sha" --arg normalizer "$normalizer_sha" --arg cases "$cases_manifest_sha" --arg oracle "$oracle_sha" --arg raw_a "$raw_a" --arg raw_b "$raw_b" --arg raw_mutated "$raw_mutated" --arg sem "$sem_a" --arg sem_mutated "$sem_mutated" --arg provider_meta_sha "$provider_metamorphic_sha" --arg provider_meta_sem "$provider_metamorphic_sem" '
+jq -e --arg source "$source_head_sha" --arg checkout "$checkout_commit_sha" --arg normalizer "$normalizer_sha" --arg cases "$cases_manifest_sha" --arg oracle "$oracle_sha" --arg requirements_lock "$requirements_lock_sha" --arg provider_script "$provider_smoke_script_sha" --arg provider_meta_script "$provider_metamorphic_script_sha" --arg raw_a "$raw_a" --arg raw_b "$raw_b" --arg raw_mutated "$raw_mutated" --arg sem "$sem_a" --arg sem_mutated "$sem_mutated" --arg provider_meta_sha "$provider_metamorphic_sha" --arg provider_meta_sem "$provider_metamorphic_sem" --arg bundle_manifest_sha "$bundle_manifest_sha" '
+  .schema_version=="symthaea.rea-provider-smoke-receipt.v1" and
   .benchmark=="ENG-REA-005-REAL-PROVIDER" and
+  .qualification.tier=="unblob-provider-smoke" and .qualification.rea_cli_mcp_parity==false and
+  .qualification.firmware_execution==false and .qualification.emulation==false and .qualification.device_qualification==false and
+  .bundle_manifest_sha256==$bundle_manifest_sha and
   .source.head_sha==$source and .source.checkout_commit_sha==$checkout and
   .source.normalizer_sha256==$normalizer and .source.cases_manifest_sha256==$cases and
-  .source.oracle_sha256==$oracle and
+  .source.oracle_sha256==$oracle and .source.requirements_lock_sha256==$requirements_lock and
+  .source.provider_smoke_script_sha256==$provider_script and
+  .source.provider_metamorphic_script_sha256==$provider_meta_script and
   .raw_report_sha256.run_a==$raw_a and .raw_report_sha256.run_b==$raw_b and .raw_report_sha256.run_mutated==$raw_mutated and
   .semantic_projection_sha256.equivalent_runs==$sem and .semantic_projection_sha256.semantic_mutation==$sem_mutated and
   .provider_metamorphic.receipt_sha256==$provider_meta_sha and .provider_metamorphic.semantic_projection_sha256==$provider_meta_sem and .provider_metamorphic.equivalent_variants==64

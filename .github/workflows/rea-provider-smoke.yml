@@ -4,6 +4,7 @@ on:
     types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
     paths:
       - "benchmarks/rea-determinism/v1/**"
+      - "crates/domains/symthaea-rea-evidence-verifier/**"
       - ".github/workflows/rea-provider-smoke.yml"
   workflow_dispatch:
 
@@ -33,15 +34,38 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python -m pip install --disable-pip-version-check 'unblob==26.6.4'
+          python -m pip install --disable-pip-version-check -r benchmarks/rea-determinism/v1/requirements-unblob-26.6.4.lock
+          python -m pip check
           unblob --version
-          python -m pip freeze | sort
+          python -m pip freeze | LC_ALL=C sort
       - name: Run real-provider fixture twice
         shell: bash
         env:
           REA_PROVIDER_ARTIFACT_DIR: ${{ runner.temp }}/rea-provider-evidence
           REA_TEST_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: sh benchmarks/rea-determinism/v1/provider-smoke.sh
+
+      - name: Set up pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Test independent Rust receipt verifier
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo fmt --package symthaea-rea-evidence-verifier
+          cargo test -p symthaea-rea-evidence-verifier
+
+      - name: Verify generated provider evidence artifact
+        shell: bash
+        env:
+          REA_PROVIDER_ARTIFACT_DIR: ${{ runner.temp }}/rea-provider-evidence
+          REA_TEST_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          cargo run -p symthaea-rea-evidence-verifier -- \
+            --artifact-dir "$REA_PROVIDER_ARTIFACT_DIR" \
+            --source-root benchmarks/rea-determinism/v1 \
+            --expected-head "$REA_TEST_SOURCE_SHA"
       - name: Preserve raw provider evidence and receipt
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
