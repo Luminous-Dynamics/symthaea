@@ -48,6 +48,7 @@ struct RequirementMapping {
     requirement_id: String,
     source_revision_id: String,
     source_locator: String,
+    source_requirement_sha256: String,
     criticality: String,
     disposition: String,
     bundle_target: Option<String>,
@@ -270,10 +271,6 @@ fn validate_contract(contract: &ChangeImpactContract, root: &Path) -> Result<Val
                 revision.revision_id
             );
         }
-        if revisions.contains_key(&revision.revision_id) {
-            bail!("duplicate source revision ID: {}", revision.revision_id);
-        }
-
         let bytes = fs::read(root.join(&revision.source_path))
             .with_context(|| format!("read synthetic source {}", revision.source_path))?;
         let actual_sha = sha256_hex(&bytes);
@@ -288,9 +285,11 @@ fn validate_contract(contract: &ChangeImpactContract, root: &Path) -> Result<Val
         let text = std::str::from_utf8(&bytes)
             .with_context(|| format!("{} is not valid UTF-8", revision.source_path))?;
         let requirements = parse_synthetic_requirements(text, &revision.revision_id)?;
+        if revisions.insert(revision.revision_id.clone(), revision).is_some() {
+            bail!("duplicate source revision ID: {}", revision.revision_id);
+        }
         source_artifact_sha256.insert(revision.revision_id.clone(), actual_sha);
         source_requirements.insert(revision.revision_id.clone(), requirements);
-        revisions.insert(revision.revision_id.clone(), revision);
     }
 
     if !revisions.contains_key(&contract.from_revision_id) {
@@ -341,12 +340,24 @@ fn validate_contract(contract: &ChangeImpactContract, root: &Path) -> Result<Val
                 contract.to_revision_id
             );
         }
-        if mapping.source_locator.trim().is_empty() {
-            bail!("{}: source locator must not be empty", mapping.requirement_id);
-        }
-        if !to.contains_key(&mapping.requirement_id) {
+        let candidate_text = to
+            .get(&mapping.requirement_id)
+            .with_context(|| format!("{}: mapping references no candidate requirement", mapping.requirement_id))?;
+        let expected_locator = format!(
+            "synthetic://{}/{}",
+            contract.to_revision_id,
+            mapping.requirement_id
+        );
+        if mapping.source_locator != expected_locator {
             bail!(
-                "{}: mapping references no requirement in candidate source",
+                "{}: source locator does not bind to the exact candidate revision and requirement ID",
+                mapping.requirement_id
+            );
+        }
+        let expected_requirement_sha = sha256_hex(candidate_text.as_bytes());
+        if mapping.source_requirement_sha256 != expected_requirement_sha {
+            bail!(
+                "{}: source requirement digest mismatch",
                 mapping.requirement_id
             );
         }
@@ -607,6 +618,39 @@ mod tests {
             .expect("REQ-002 mapping exists");
         mapping.test_ids = vec!["KAT-002".to_string()];
         assert_rejected(&contract);
+    }
+
+    #[test]
+    fn requirement_text_digest_mismatch_is_rejected() {
+        let mut contract = fixture();
+        contract.requirements[1].source_requirement_sha256 = "0".repeat(64);
+        assert_rejected(&contract);
+    }
+
+    #[test]
+    fn explicit_exclusion_is_allowed_only_with_rationale() {
+        let mut contract = fixture();
+        let mapping = contract
+            .requirements
+            .iter_mut()
+            .find(|mapping| mapping.requirement_id == "REQ-003")
+            .expect("REQ-003 mapping exists");
+        mapping.disposition = "excluded".to_string();
+        mapping.bundle_target = None;
+        mapping.test_ids.clear();
+        mapping.reviewer_record_id = Some("SYNTHETIC-REVIEW-EXCLUSION".to_string());
+        mapping.exclusion_rationale = Some("Excluded in this software-only fixture by design".to_string());
+
+        let record = contract
+            .change_records
+            .iter_mut()
+            .find(|record| record.requirement_id == "REQ-003")
+            .expect("REQ-003 change record exists");
+        record.disposition = "explicit_exclusion".to_string();
+        record.case_ids.clear();
+        record.rationale = Some("Reviewed software-only exclusion".to_string());
+
+        assert!(validate_contract(&contract, &root()).is_ok());
     }
 
     #[test]
