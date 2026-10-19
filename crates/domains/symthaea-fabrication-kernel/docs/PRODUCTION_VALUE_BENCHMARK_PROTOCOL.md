@@ -66,7 +66,10 @@ This is a percentile bootstrap description of uncertainty, not a causal identifi
 - [NIST Digital Twins for Advanced Manufacturing](https://www.nist.gov/programs-projects/digital-twins-advanced-manufacturing): interoperability, verification/validation, and quantified model uncertainty.
 - [NASA-STD-7009B](https://standards.nasa.gov/standard/NASA/NASA-STD-7009): active modeling-and-simulation credibility standard covering verification, validation, and uncertainty.
 
-These sources motivate the evaluation design; they do not validate this code or demonstrate a production improvement.
+- [ISO 22400-1:2014](https://www.iso.org/cms/%20render/live/en/sites/isoorg/contents/data/standard/05/68/56847.html): a manufacturing-operations KPI concepts and terminology framework; ISO reports the edition was reviewed and confirmed in 2025. This protocol borrows the discipline of explicit KPI scope and units but does not claim ISO conformance.
+- [NIST AM-Bench source-data index](https://www.nist.gov/ambench/direct-am-bench-data-links-and-referencing-guidance) lists public measurement datasets, including AMB2025-02 tensile tests of PBF-LB IN718 (DOI [10.18434/mds2-3735](https://doi.org/10.18434/mds2-3735)), AMB2025-03 high-cycle fatigue tests of PBF-LB Ti-6Al-4V (DOI [10.18434/mds2-3734](https://doi.org/10.18434/mds2-3734)), and AMB2025-06/07 laser-track calibration data (DOI [10.18434/mds2-3707](https://doi.org/10.18434/mds2-3707)). These are possible source-bound model/material validation tasks, not factory yield, energy-per-part, or throughput evidence. Compose with the existing source-bound Symthaea data work (#8033/#8079 and #8058) rather than creating a duplicate dataset adapter.
+
+These sources motivate the evaluation design; they do not validate this code or demonstrate a production improvement. Data selection still requires inspection of the DOI landing record, licence, schema, units, provenance, dependent-observation structure, and approved train/validation/test split.
 
 ## Local verification
 
