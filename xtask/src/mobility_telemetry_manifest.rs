@@ -953,4 +953,81 @@ mod tests {
         fixture.timebase.master_clock = "wall_clock_guess".into();
         assert!(validate_structure(&fixture).is_err());
     }
+
+    #[test]
+    fn empty_trace_is_rejected() {
+        let fixture = manifest();
+        let raw = b"timestamp_ns,channel_id,raw_value,sample_status,sequence\n";
+        assert!(validate_trace_bytes(raw, &fixture).is_err());
+    }
+
+    #[test]
+    fn wrong_header_is_rejected() {
+        let fixture = manifest();
+        let raw = b"timestamp_ns,raw_value,channel_id,sample_status,sequence\n1,1,gnss.speed_mps,VALID,0\n";
+        assert!(validate_trace_bytes(raw, &fixture).is_err());
+    }
+
+    #[test]
+    fn non_finite_raw_value_is_rejected() {
+        let fixture = manifest();
+        let raw = b"timestamp_ns,channel_id,raw_value,sample_status,sequence\n1,gnss.speed_mps,NaN,VALID,0\n";
+        assert!(validate_trace_bytes(raw, &fixture).is_err());
+        let raw_inf = b"timestamp_ns,channel_id,raw_value,sample_status,sequence\n1,gnss.speed_mps,inf,VALID,0\n";
+        assert!(validate_trace_bytes(raw_inf, &fixture).is_err());
+    }
+
+    #[test]
+    fn unsupported_sample_status_is_rejected() {
+        let fixture = manifest();
+        let raw = b"timestamp_ns,channel_id,raw_value,sample_status,sequence\n1,gnss.speed_mps,1,UNKNOWN,0\n";
+        assert!(validate_trace_bytes(raw, &fixture).is_err());
+    }
+
+    #[test]
+    fn equal_timestamps_across_distinct_channels_are_accepted() {
+        let fixture = manifest();
+        let raw = b"timestamp_ns,channel_id,raw_value,sample_status,sequence\n100,gnss.speed_mps,1,VALID,0\n100,dc_bus.voltage_v,48,VALID,1\n";
+        let report = validate_trace_bytes(raw, &fixture)
+            .expect("same-clock simultaneous observations from different channels are valid");
+        assert_eq!(report.row_count, 2);
+        assert_eq!(report.valid_sample_count, 2);
+        assert_eq!(report.suspected_gap_count, 0);
+    }
+
+    #[test]
+    fn fault_rows_remain_explicit_and_missing() {
+        let fixture = manifest();
+        let raw = b"timestamp_ns,channel_id,raw_value,sample_status,sequence\n1,dc_bus.current_a,,SENSOR_FAULT,0\n";
+        let report = validate_trace_bytes(raw, &fixture)
+            .expect("an explicit sensor fault is a valid trace row, not a valid measurement");
+        assert_eq!(report.row_count, 1);
+        assert_eq!(report.valid_sample_count, 0);
+        assert_eq!(report.invalid_or_saturated_sample_count, 1);
+        assert_eq!(report.missing_value_count, 1);
+        assert_eq!(report.channels[0].sample_count, 1);
+        assert_eq!(report.channels[0].missing_value_count, 1);
+    }
+
+    #[test]
+    fn large_gap_is_reported_without_filling() {
+        let fixture = manifest();
+        let channel = fixture.channels.iter()
+            .find(|channel| channel.channel_id == "gnss.speed_mps")
+            .expect("fixture declares GNSS speed");
+        let period_ns = (1_000_000_000.0 / channel.sample_rate_hz).round() as u64;
+        assert!(period_ns > 0);
+        let raw = format!(
+            "timestamp_ns,channel_id,raw_value,sample_status,sequence\n1,gnss.speed_mps,0,VALID,0\n{},gnss.speed_mps,1,VALID,1\n{},gnss.speed_mps,2,VALID,2\n",
+            1 + period_ns,
+            1 + period_ns * 6
+        );
+        let report = validate_trace_bytes(raw.as_bytes(), &fixture)
+            .expect("gaps are diagnosed rather than causing row deletion");
+        assert_eq!(report.row_count, 3);
+        assert_eq!(report.valid_sample_count, 3);
+        assert_eq!(report.suspected_gap_count, 1);
+        assert_eq!(report.channels[0].sample_count, 3);
+        assert_eq!(report.channels[0].suspected_gap_count, 1);
+    }
 }
