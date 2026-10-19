@@ -1581,6 +1581,44 @@ mod tests {
         validate_measurement_run_str(&encoded(&record), RUN_SCHEMA_TEXT)
             .expect("well-formed linearized covariance budget should validate");
 
+        let mut bad_profile_digest = record.clone();
+        let profile_index = bad_profile_digest["raw_artifacts"]
+            .as_array()
+            .expect("raw artifacts must be an array")
+            .iter()
+            .position(|artifact| {
+                artifact.get("artifact_id").and_then(Value::as_str)
+                    == Some("ODRH-ART-CAP-POWER-001")
+            })
+            .expect("capability-profile artifact must exist");
+        bad_profile_digest["raw_artifacts"][profile_index]["sha256"] =
+            Value::String("eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_owned());
+        assert!(
+            validate_measurement_run_str(&encoded(&bad_profile_digest), RUN_SCHEMA_TEXT)
+                .expect_err("capability-profile artifact mutation must fail")
+                .iter()
+                .any(|error| error.contains("capability-profile digest does not match"))
+        );
+
+        let mut bad_calibration_role = record.clone();
+        let calibration_index = bad_calibration_role["raw_artifacts"]
+            .as_array()
+            .expect("raw artifacts must be an array")
+            .iter()
+            .position(|artifact| {
+                artifact.get("artifact_id").and_then(Value::as_str)
+                    == Some("ODRH-ART-CAL-POWER-001")
+            })
+            .expect("calibration artifact must exist");
+        bad_calibration_role["raw_artifacts"][calibration_index]["role"] =
+            Value::String("OTHER".to_owned());
+        assert!(
+            validate_measurement_run_str(&encoded(&bad_calibration_role), RUN_SCHEMA_TEXT)
+                .expect_err("wrong calibration-artifact role must fail")
+                .iter()
+                .any(|error| error.contains("calibration artifact ODRH-ART-CAL-POWER-001 has the wrong role"))
+        );
+
         let mut mutated = record;
         mutated["observations"][0]["uncertainty_budget"]["covariance_terms"][0]["covariance_contribution"] =
             serde_json::json!(0.2);
