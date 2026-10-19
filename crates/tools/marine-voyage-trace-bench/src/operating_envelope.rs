@@ -139,10 +139,7 @@ fn fingerprint_issues(
             case_id: spec.case_id.clone(),
         });
     }
-    if pair.campaign_id.trim().is_empty()
-        || pair.campaign_id != pair.baseline_energy.trace_id && pair.campaign_id.is_empty()
-    {
-        // This deliberately only checks for a non-empty campaign identity here.
+    if pair.campaign_id.trim().is_empty() {
         // Campaign-to-profile matching is checked by the caller against PairAssessment.
         issues.push(EnvelopeIssue::PairCampaignMismatch {
             case_id: spec.case_id.clone(),
