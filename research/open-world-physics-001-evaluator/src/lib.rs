@@ -153,6 +153,17 @@ pub struct ReportBody {
     /// False by design: this first reference corpus is open source and source-visible.
     pub blind_evaluation: bool,
     pub corpus_sha256: String,
+    /// Compiler identity captured by the build script.
+    pub rustc_identity: String,
+    /// Cargo identity captured by the build script.
+    pub cargo_identity: String,
+    /// Git HEAD at build time; source-tree cleanliness is recorded separately.
+    pub source_commit_at_build: String,
+    pub source_tree_state_at_build: String,
+    /// SHA-256 over Cargo.toml, build.rs and Rust source files used by this harness.
+    pub evaluator_source_sha256: String,
+    /// SHA-256 over the nested Cargo.lock, or "missing" when unavailable.
+    pub dependency_lock_sha256: String,
     pub training_query_budget_per_case: usize,
     pub holdout_point_count_per_case: usize,
     pub policies: Vec<PolicySummary>,
@@ -596,6 +607,24 @@ pub fn run_reference_benchmark() -> BenchmarkReport {
         schema: REPORT_SCHEMA.to_owned(),
         blind_evaluation: false,
         corpus_sha256: reference_corpus_sha256(),
+        rustc_identity: option_env!("OPEN_WORLD_RUSTC_ID")
+            .unwrap_or("unavailable")
+            .to_owned(),
+        cargo_identity: option_env!("OPEN_WORLD_CARGO_ID")
+            .unwrap_or("unavailable")
+            .to_owned(),
+        source_commit_at_build: option_env!("OPEN_WORLD_SOURCE_COMMIT")
+            .unwrap_or("unavailable")
+            .to_owned(),
+        source_tree_state_at_build: option_env!("OPEN_WORLD_SOURCE_TREE_STATE")
+            .unwrap_or("unavailable")
+            .to_owned(),
+        evaluator_source_sha256: option_env!("OPEN_WORLD_SOURCE_SHA256")
+            .unwrap_or("unavailable")
+            .to_owned(),
+        dependency_lock_sha256: option_env!("OPEN_WORLD_LOCK_SHA256")
+            .unwrap_or("missing")
+            .to_owned(),
         training_query_budget_per_case: TRAIN_QUERY_BUDGET,
         holdout_point_count_per_case: HOLDOUT_POINT_COUNT,
         policies,
@@ -746,6 +775,12 @@ mod tests {
         assert!(first.verify_receipt());
         assert!(!first.body.blind_evaluation);
         assert_eq!(first.body.cases.len(), 6);
+        assert!(!first.body.rustc_identity.is_empty());
+        assert!(!first.body.cargo_identity.is_empty());
+        assert!(!first.body.source_commit_at_build.is_empty());
+        assert!(!first.body.source_tree_state_at_build.is_empty());
+        assert!(!first.body.evaluator_source_sha256.is_empty());
+        assert!(!first.body.dependency_lock_sha256.is_empty());
     }
 
     #[test]
