@@ -80,6 +80,7 @@ enum Policy {
     EqualShareCalendar,
     SoilThreshold,
     UncertaintyAware,
+    GreedyMinimaxStress,
 }
 
 impl Policy {
@@ -88,6 +89,7 @@ impl Policy {
             Self::EqualShareCalendar => "equal_share_calendar",
             Self::SoilThreshold => "soil_threshold",
             Self::UncertaintyAware => "uncertainty_aware_marginal_risk",
+            Self::GreedyMinimaxStress => "greedy_minimax_stress",
         }
     }
 }
@@ -211,6 +213,30 @@ fn sensor_reading(storage_mm: f64, day: usize, zone: usize) -> f64 {
     (storage_mm + repeatable_error).clamp(0.0, STORAGE_CAP_MM)
 }
 
+fn predicted_zone_risks(
+    observed_storage: [f64; ZONES],
+    allocation: [f64; ZONES],
+    stale_age: [usize; ZONES],
+    day: usize,
+    scenario: Scenario,
+) -> [f64; ZONES] {
+    let forecast_rain = rain_mm(day, scenario);
+    std::array::from_fn(|zone| {
+        let stale = stale_age[zone].min(4) as f64;
+        let conservative_demand =
+            forecast_demand_mm(day, zone, scenario) * (1.10 + 0.05 * stale);
+        let risk_weight = criticality(day, zone) * (1.0 + 0.12 * stale);
+        risk_weight
+            * exposure(
+                observed_storage[zone] + allocation[zone],
+                conservative_demand,
+                forecast_rain,
+                day,
+                zone,
+            )
+    })
+}
+
 fn allocate_water(
     policy: Policy,
     observed_storage: [f64; ZONES],
@@ -283,6 +309,63 @@ fn allocate_water(
                 }
                 let Some((zone, gain)) = best else { break };
                 if gain <= 1e-9 {
+                    break;
+                }
+                allocation[zone] += ALLOCATION_STEP_MM;
+            }
+        }
+        Policy::GreedyMinimaxStress => {
+            let units =
+                (scenario.daily_water_budget_plot_mm / ALLOCATION_STEP_MM).floor() as usize;
+            for _ in 0..units {
+                let current_risks =
+                    predicted_zone_risks(observed_storage, allocation, stale_age, day, scenario);
+                let current_max = current_risks
+                    .iter()
+                    .copied()
+                    .max_by(f64::total_cmp)
+                    .unwrap_or(0.0);
+                let current_sum = current_risks.iter().sum::<f64>();
+                let mut best: Option<(usize, f64, f64)> = None;
+
+                for zone in 0..ZONES {
+                    if allocation[zone] + ALLOCATION_STEP_MM
+                        > MAX_IRRIGATION_PER_ZONE_MM + 1e-9
+                    {
+                        continue;
+                    }
+                    let mut candidate = allocation;
+                    candidate[zone] += ALLOCATION_STEP_MM;
+                    let risks = predicted_zone_risks(
+                        observed_storage,
+                        candidate,
+                        stale_age,
+                        day,
+                        scenario,
+                    );
+                    let candidate_max = risks
+                        .iter()
+                        .copied()
+                        .max_by(f64::total_cmp)
+                        .unwrap_or(0.0);
+                    let candidate_sum = risks.iter().sum::<f64>();
+                    let better = best.is_none_or(|(_, best_max, best_sum)| {
+                        candidate_max < best_max - 1e-9
+                            || ((candidate_max - best_max).abs() <= 1e-9
+                                && candidate_sum < best_sum - 1e-9)
+                    });
+                    if better {
+                        best = Some((zone, candidate_max, candidate_sum));
+                    }
+                }
+
+                let Some((zone, best_max, best_sum)) = best else {
+                    break;
+                };
+                let improves_max = best_max < current_max - 1e-9;
+                let improves_sum = (best_max - current_max).abs() <= 1e-9
+                    && best_sum < current_sum - 1e-9;
+                if !improves_max && !improves_sum {
                     break;
                 }
                 allocation[zone] += ALLOCATION_STEP_MM;
