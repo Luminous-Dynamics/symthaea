@@ -3620,14 +3620,27 @@ mod tests {
             (Style::HindustaniInspired, P::DroneElastic),
         ];
         for (style, expected) in cases {
-            assert_eq!(style.grammar_profile().performance, expected, "{style:?}");
+            assert_eq!(
+                style.grammar_profile().performance,
+                expected,
+                "{style:?}"
+            );
         }
 
         // Style-specific timing must not silently reassign the composition
         // grammar family; this is an orthogonal renderer/performance contract.
-        assert_eq!(Style::Tango.grammar_profile().family, Style::Tango.grammar_family());
-        assert_eq!(Style::Fugue.grammar_profile().family, Style::Fugue.grammar_family());
-        assert_eq!(Style::Ambient.grammar_profile().family, Style::Ambient.grammar_family());
+        assert_eq!(
+            Style::Tango.grammar_profile().family,
+            Style::Tango.grammar_family()
+        );
+        assert_eq!(
+            Style::Fugue.grammar_profile().family,
+            Style::Fugue.grammar_family()
+        );
+        assert_eq!(
+            Style::Ambient.grammar_profile().family,
+            Style::Ambient.grammar_family()
+        );
     }
 
 }
