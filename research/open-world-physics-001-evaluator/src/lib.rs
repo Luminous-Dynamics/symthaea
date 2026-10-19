@@ -21,7 +21,6 @@ pub const HOLDOUT_X_MAX: f64 = 7.0;
 pub const TRAIN_QUERY_BUDGET: usize = 12;
 pub const HOLDOUT_POINT_COUNT: usize = 31;
 const RELATIVE_NOISE: f64 = 0.005;
-const FIT_FLOOR: f64 = 1.0e-16;
 /// A BIC difference below this value is reported as indeterminate, not a unique recovery.
 const BIC_DECISIVE_DELTA: f64 = 2.0;
 
@@ -416,15 +415,19 @@ fn bic_for(law: Law, observations: &[Observation]) -> Option<f64> {
     if observations.is_empty() {
         return None;
     }
-    let mut rss = 0.0;
+    // Gaussian -2 log-likelihood up to the candidate-independent constant
+    // ln(2*pi), followed by the BIC parameter-count penalty.
+    let mut negative_two_log_likelihood = 0.0;
     for observation in observations {
+        if !observation.declared_sigma.is_finite() || observation.declared_sigma <= 0.0 {
+            return None;
+        }
         let predicted = law.predict(observation.x)?;
-        let residual = predicted - observation.response;
-        rss += residual * residual;
+        let residual = (predicted - observation.response) / observation.declared_sigma;
+        negative_two_log_likelihood += residual * residual + 2.0 * observation.declared_sigma.ln();
     }
     let n = observations.len() as f64;
-    let mean_rss = (rss / n).max(FIT_FLOOR);
-    let score = n * mean_rss.ln() + law.family.parameter_count() as f64 * n.ln();
+    let score = negative_two_log_likelihood + law.family.parameter_count() as f64 * n.ln();
     score.is_finite().then_some(score)
 }
 
@@ -676,7 +679,8 @@ mod tests {
                 .map(|(i, x)| Observation {
                     x,
                     response: world.truth.predict(x).unwrap(),
-                    declared_sigma: 0.0,
+                    declared_sigma: RELATIVE_NOISE
+                        * world.truth.predict(x).unwrap().abs().max(0.05),
                 })
                 .collect::<Vec<_>>();
             let fitted = fit_grid_baseline(&observations).unwrap();
