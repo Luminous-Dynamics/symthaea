@@ -628,8 +628,7 @@ mod tests {
 
     #[test]
     fn unknown_top_level_corpus_fields_are_rejected() {
-        let mut value: Value =
-            serde_json::from_str(CORPUS_JSON).expect("checked-in corpus parses");
+        let mut value: Value = serde_json::from_str(CORPUS_JSON).expect("checked-in corpus parses");
         value["unexpected_authority"] = serde_json::json!(true);
         assert!(serde_json::from_value::<ScenarioCorpus>(value).is_err());
     }
@@ -654,8 +653,7 @@ mod tests {
     #[test]
     fn schema_cannot_enable_clinical_use() {
         let (corpus, _, mut schema) = fixtures();
-        schema["properties"]["clinical_use_authorized"]["const"] =
-            serde_json::json!(true);
+        schema["properties"]["clinical_use_authorized"]["const"] = serde_json::json!(true);
         assert!(validate_schema_contract(&schema, &corpus).is_err());
     }
 
