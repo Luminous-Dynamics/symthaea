@@ -1820,7 +1820,7 @@ mod tests {
             include_str!("../schemas/csv-mapping-v0.1.schema.json")
         ).unwrap();
         let required = mapping_schema["required"].as_array().unwrap();
-        for field in ["schema_version", "artifact_relative_path", "source_row_id_header", "columns"] {
+        for field in ["schema_version", "artifact_relative_path", "source_row_id_header", "columns", "excluded_columns"] {
             assert!(required.iter().any(|value| value == field),
                 "mapping schema does not require {field}");
         }
@@ -1849,6 +1849,7 @@ mod tests {
         assert_eq!(result.data_row_count, 2);
         assert_eq!(result.unique_source_row_ids, 2);
         assert_eq!(result.mapped_column_count, 2);
+        assert_eq!(result.excluded_column_count, 0);
         assert_eq!(result.columns[0].source_header, "stress_mpa");
         assert_eq!(result.columns[0].raw_unit, "MPa");
         assert_eq!(result.columns[0].role, CsvFieldRole::TargetOutcome);
@@ -1862,6 +1863,61 @@ mod tests {
         let mapping = fixture_csv_mapping();
         let mapping_bytes = serde_json::to_vec(&mapping).unwrap();
         assert!(reconcile_csv_bytes(bytes, &mapping, &mapping_bytes, "fixture.csv").is_err());
+    }
+
+    #[test]
+    fn csv_reconciliation_rejects_unmapped_columns_without_disposition() {
+        let bytes = b"source_row_id,stress_mpa,specimen_note,export_comment\nR-001,920,note,unused\n";
+        let mapping = fixture_csv_mapping();
+        let mapping_bytes = serde_json::to_vec(&mapping).unwrap();
+        assert!(reconcile_csv_bytes(bytes, &mapping, &mapping_bytes, "fixture.csv").is_err());
+    }
+
+    #[test]
+    fn csv_reconciliation_counts_every_explicitly_excluded_column() {
+        let bytes = b"source_row_id,stress_mpa,specimen_note,export_comment\nR-001,920,as-built,legacy-a\nR-002,,repeat,\n";
+        let mut mapping = fixture_csv_mapping();
+        mapping.excluded_columns.push(CsvExcludedColumn {
+            source_header: "export_comment".into(),
+            reason: "Retain source traceability, exclude from this profile's predictors and targets.".into(),
+        });
+        let mapping_bytes = serde_json::to_vec(&mapping).unwrap();
+        let result = reconcile_csv_bytes(bytes, &mapping, &mapping_bytes, "fixture.csv").unwrap();
+        assert_eq!(result.mapped_column_count, 2);
+        assert_eq!(result.excluded_column_count, 1);
+        assert_eq!(result.excluded_columns[0].source_header, "export_comment");
+        assert_eq!(result.excluded_columns[0].nonempty_cells, 1);
+        assert_eq!(result.excluded_columns[0].empty_cells, 1);
+        assert!(result.excluded_columns[0].reason.contains("exclude from this profile"));
+    }
+
+    #[test]
+    fn csv_reconciliation_rejects_ambiguous_or_unjustified_exclusions() {
+        let bytes = b"source_row_id,stress_mpa,specimen_note,export_comment\nR-001,920,note,unused\n";
+
+        let mut overlaps_mapped = fixture_csv_mapping();
+        overlaps_mapped.excluded_columns.push(CsvExcludedColumn {
+            source_header: "stress_mpa".into(),
+            reason: "incorrect overlap".into(),
+        });
+        let bytes_for_mapping = serde_json::to_vec(&overlaps_mapped).unwrap();
+        assert!(reconcile_csv_bytes(bytes, &overlaps_mapped, &bytes_for_mapping, "fixture.csv").is_err());
+
+        let mut unknown_header = fixture_csv_mapping();
+        unknown_header.excluded_columns.push(CsvExcludedColumn {
+            source_header: "not_in_source.csv".into(),
+            reason: "header does not exist".into(),
+        });
+        let bytes_for_mapping = serde_json::to_vec(&unknown_header).unwrap();
+        assert!(reconcile_csv_bytes(bytes, &unknown_header, &bytes_for_mapping, "fixture.csv").is_err());
+
+        let mut missing_reason = fixture_csv_mapping();
+        missing_reason.excluded_columns.push(CsvExcludedColumn {
+            source_header: "export_comment".into(),
+            reason: "  ".into(),
+        });
+        let bytes_for_mapping = serde_json::to_vec(&missing_reason).unwrap();
+        assert!(reconcile_csv_bytes(bytes, &missing_reason, &bytes_for_mapping, "fixture.csv").is_err());
     }
 
     #[test]
