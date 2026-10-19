@@ -1,0 +1,74 @@
+name: Bioprotein Target Selection Contract
+
+on:
+  pull_request:
+    paths:
+      - "tools/bioprotein-experiment-oracle/**"
+      - "docs/research/bioprotein-experiments/target-selection-corpus-v1.json"
+      - "docs/research/bioprotein-experiments/target-selection-corpus-schema-v1.json"
+      - "docs/research/BIOPROTEIN_TARGET_SELECTION_V1.md"
+      - ".github/workflows/bioprotein-target-selection.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bioprotein-target-selection-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    name: Exact-head synthetic target-selection contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9
+        with:
+          toolchain: "1.96.0"
+          components: rustfmt, clippy
+
+      - name: Confirm checkout is exact requested head
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$EXPECTED_HEAD"
+          printf 'expected_head=%s\nactual_head=%s\n' "$EXPECTED_HEAD" "$actual"
+
+      - name: Format focused crate
+        run: cargo fmt --manifest-path tools/bioprotein-experiment-oracle/Cargo.toml -- --check
+
+      - name: Test focused crate
+        run: cargo test --manifest-path tools/bioprotein-experiment-oracle/Cargo.toml
+
+      - name: Clippy focused crate
+        run: cargo clippy --manifest-path tools/bioprotein-experiment-oracle/Cargo.toml --all-targets -- -D warnings
+
+      - name: Produce exact-head target-selection receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --manifest-path tools/bioprotein-experiment-oracle/Cargo.toml --bin bioprotein-target-selection -- \
+            --expected-head "$EXPECTED_HEAD" \
+            --corpus docs/research/bioprotein-experiments/target-selection-corpus-v1.json \
+            --receipt target/bioprotein-target-selection-receipt.json
+          test -s target/bioprotein-target-selection-receipt.json
+
+      - name: Preserve target-selection receipt artifact
+        if: ${{ always() && hashFiles('target/bioprotein-target-selection-receipt.json') != '' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: bioprotein-target-selection-receipt
+          path: target/bioprotein-target-selection-receipt.json
+          if-no-files-found: error
+          retention-days: 30

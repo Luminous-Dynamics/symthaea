@@ -1,0 +1,361 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/bioprotein-target-selection-corpus-v1.json",
+  "title": "Bioprotein MVP target-selection corpus v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "corpus_id",
+    "schema_version",
+    "case_count",
+    "claim_ceiling",
+    "cases"
+  ],
+  "properties": {
+    "corpus_id": {
+      "const": "BIOPROTEIN-TARGET-SELECTION-CORPUS-V1"
+    },
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "case_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 1
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/case"
+      }
+    }
+  },
+  "$defs": {
+    "gateState": {
+      "enum": [
+        "pass",
+        "fail",
+        "unknown",
+        "not_assessed"
+      ]
+    },
+    "evidenceLabel": {
+      "enum": [
+        "measured",
+        "literature",
+        "estimated",
+        "simulated",
+        "synthetic"
+      ]
+    },
+    "brief": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ingredient_class",
+        "intended_application",
+        "functional_job",
+        "product_spec_digest",
+        "quality_purity_basis",
+        "functional_unit",
+        "target_volume_low",
+        "target_volume_high",
+        "volume_unit",
+        "value_basis_id",
+        "evidence_vintage",
+        "biology_endpoint",
+        "process_closure_digest",
+        "scale_transfer_basis",
+        "tea_lca_boundary_digest",
+        "region_scenario_digest",
+        "feedstock_scenario_digest",
+        "electricity_scenario_digest"
+      ],
+      "properties": {
+        "ingredient_class": {
+          "type": "string",
+          "minLength": 1
+        },
+        "intended_application": {
+          "type": "string",
+          "minLength": 1
+        },
+        "functional_job": {
+          "type": "string",
+          "minLength": 1
+        },
+        "product_spec_digest": {
+          "type": "string",
+          "minLength": 1
+        },
+        "quality_purity_basis": {
+          "type": "string",
+          "minLength": 1
+        },
+        "functional_unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target_volume_low": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "target_volume_high": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "volume_unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "value_basis_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_vintage": {
+          "type": "string",
+          "minLength": 1
+        },
+        "biology_endpoint": {
+          "type": "string",
+          "minLength": 1
+        },
+        "process_closure_digest": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scale_transfer_basis": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tea_lca_boundary_digest": {
+          "type": "string",
+          "minLength": 1
+        },
+        "region_scenario_digest": {
+          "type": "string",
+          "minLength": 1
+        },
+        "feedstock_scenario_digest": {
+          "type": "string",
+          "minLength": 1
+        },
+        "electricity_scenario_digest": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "gates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "food_safety",
+        "authorization",
+        "source_rights",
+        "market_evidence",
+        "biology_function",
+        "process_closure",
+        "scale_transfer"
+      ],
+      "properties": {
+        "food_safety": {
+          "$ref": "#/$defs/gateState"
+        },
+        "authorization": {
+          "$ref": "#/$defs/gateState"
+        },
+        "source_rights": {
+          "$ref": "#/$defs/gateState"
+        },
+        "market_evidence": {
+          "$ref": "#/$defs/gateState"
+        },
+        "biology_function": {
+          "$ref": "#/$defs/gateState"
+        },
+        "process_closure": {
+          "$ref": "#/$defs/gateState"
+        },
+        "scale_transfer": {
+          "$ref": "#/$defs/gateState"
+        }
+      }
+    },
+    "objective": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "objective_id",
+        "direction",
+        "unit",
+        "low",
+        "high"
+      ],
+      "properties": {
+        "objective_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "direction": {
+          "enum": [
+            "maximize",
+            "minimize"
+          ]
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "low": {
+          "type": "integer"
+        },
+        "high": {
+          "type": "integer"
+        }
+      }
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target_id",
+        "brief",
+        "evidence_label",
+        "claim_basis",
+        "gates",
+        "objectives"
+      ],
+      "properties": {
+        "target_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "brief": {
+          "$ref": "#/$defs/brief"
+        },
+        "evidence_label": {
+          "$ref": "#/$defs/evidenceLabel"
+        },
+        "claim_basis": {
+          "$ref": "#/$defs/evidenceLabel"
+        },
+        "gates": {
+          "$ref": "#/$defs/gates"
+        },
+        "objectives": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/objective"
+          }
+        }
+      }
+    },
+    "expectedTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target_id",
+        "disposition",
+        "reason_codes",
+        "dominates"
+      ],
+      "properties": {
+        "target_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "disposition": {
+          "enum": [
+            "eligible",
+            "blocked",
+            "indeterminate"
+          ]
+        },
+        "reason_codes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "dominates": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "expected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "reason_codes",
+        "targets",
+        "pareto_frontier_ids"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "valid",
+            "incomparable",
+            "invalid_input"
+          ]
+        },
+        "reason_codes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "targets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/expectedTarget"
+          }
+        },
+        "pareto_frontier_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "targets",
+        "expected"
+      ],
+      "properties": {
+        "case_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "targets": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/target"
+          }
+        },
+        "expected": {
+          "$ref": "#/$defs/expected"
+        }
+      }
+    }
+  }
+}
