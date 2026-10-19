@@ -19681,6 +19681,18 @@ name = "symthaea-proof-audit"
 version = "0.1.0"
 
 [[package]]
+name = "symthaea-proof-insights"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "regex",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "sha2 0.10.9",
+]
+
+[[package]]
 name = "symthaea-proprioception"
 version = "0.1.0"
 dependencies = [

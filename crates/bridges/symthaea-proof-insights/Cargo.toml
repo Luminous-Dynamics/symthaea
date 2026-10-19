@@ -1,0 +1,19 @@
+[package]
+name = "symthaea-proof-insights"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics"]
+description = "Provenance indexer for proof-insight transfer research artifacts"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+keywords = ["lean4", "theorem-proving", "research", "provenance"]
+categories = ["science", "mathematics"]
+
+[dependencies]
+anyhow = { workspace = true }
+regex = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+serde_yaml = "0.9"

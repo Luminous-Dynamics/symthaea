@@ -1,0 +1,613 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/benchmarks/proof-insight-transfer-v0/insight-record.schema.json",
+  "title": "Proof Insight Transfer Record v0",
+  "description": "Provenance-linked, falsifiable record of a candidate mathematical strategy extracted from a source artifact. A record is not itself a proof.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "record_id",
+    "source",
+    "theorem",
+    "artifact",
+    "insight",
+    "verification",
+    "semantic_validation",
+    "review"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.insight-record.v0"
+    },
+    "record_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]*$"
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository_url",
+        "commit",
+        "path",
+        "sha256",
+        "family_id",
+        "license_status"
+      ],
+      "properties": {
+        "repository_url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "commit": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "family_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "license_status": {
+          "enum": [
+            "verified",
+            "needs_review",
+            "restricted",
+            "unknown"
+          ]
+        },
+        "upstream_record_status": {
+          "enum": [
+            "manuscript_claim",
+            "informal_supporting_result",
+            "formalized_supporting_result",
+            "formalized_main_result",
+            "unknown"
+          ]
+        }
+      }
+    },
+    "theorem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "theorem_id",
+        "statement_digest",
+        "domain",
+        "claim_status"
+      ],
+      "properties": {
+        "theorem_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "statement_text": {
+          "type": "string",
+          "maxLength": 20000
+        },
+        "statement_digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "domain": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "claim_status": {
+          "enum": [
+            "manuscript_claim",
+            "formalized_main_result",
+            "formalized_supporting_result",
+            "informal_consequence",
+            "unverified",
+            "unknown"
+          ]
+        },
+        "assumptions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "related_family_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "path",
+        "sha256"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "manuscript",
+            "lean_declaration",
+            "lean_file",
+            "reasoning_summary",
+            "other"
+          ]
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "lean_toolchain": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "mathlib_revision": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "verification_scope": {
+          "type": "string",
+          "maxLength": 2000
+        },
+        "verification_command": {
+          "type": "string",
+          "maxLength": 2000
+        }
+      }
+    },
+    "insight": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "move_id",
+        "obstacle",
+        "strategy",
+        "preconditions",
+        "transformation",
+        "evidence",
+        "failure_boundaries",
+        "transfer_candidates"
+      ],
+      "properties": {
+        "move_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "obstacle": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        },
+        "strategy": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        },
+        "preconditions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "transformation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "before_state",
+            "after_state"
+          ],
+          "properties": {
+            "before_state": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4000
+            },
+            "after_state": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4000
+            },
+            "expected_obligation_change": {
+              "type": "string",
+              "maxLength": 2000
+            }
+          }
+        },
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "source_path",
+              "locator",
+              "evidence_kind"
+            ],
+            "properties": {
+              "source_path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "locator": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              },
+              "evidence_kind": {
+                "enum": [
+                  "lean_declaration",
+                  "proof_step",
+                  "manuscript_span",
+                  "reasoning_summary",
+                  "reviewer_annotation"
+                ]
+              },
+              "excerpt": {
+                "type": "string",
+                "maxLength": 400
+              },
+              "supports": {
+                "type": "string",
+                "maxLength": 1000
+              }
+            }
+          }
+        },
+        "failure_boundaries": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          }
+        },
+        "transfer_candidates": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "target_family_id",
+              "rationale",
+              "status"
+            ],
+            "properties": {
+              "target_family_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "target_theorem_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "rationale": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2000
+              },
+              "preconditions_checked": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "status": {
+                "enum": [
+                  "untriaged",
+                  "candidate",
+                  "preconditions_satisfied",
+                  "counterexample_found",
+                  "verified_transfer",
+                  "rejected",
+                  "not_attempted"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "exact_statement_checked",
+        "axiom_policy"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "not_attempted",
+            "manuscript_only",
+            "manual_review",
+            "passed",
+            "failed",
+            "timed_out",
+            "tool_unavailable",
+            "scope_unclear"
+          ]
+        },
+        "exact_statement_checked": {
+          "type": "boolean"
+        },
+        "checker": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "checker_version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "exact_statement_digest": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^([0-9a-f]{64})?$"
+        },
+        "axiom_policy": {
+          "enum": [
+            "not_applicable",
+            "declared_classical",
+            "constructive_policy",
+            "custom",
+            "unknown"
+          ]
+        },
+        "axioms": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "receipt_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^([0-9a-f]{64})?$"
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 2000
+          }
+        }
+      }
+    },
+    "review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "independent_review_count"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "unreviewed",
+            "single_review",
+            "independently_reviewed",
+            "disputed",
+            "rejected"
+          ]
+        },
+        "independent_review_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "review_notes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 2000
+          }
+        }
+      }
+    },
+    "semantic_validation": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Evidence about correspondence to the intended informal claim and downstream semantic checks. Compilation alone is not semantic validation.",
+      "required": [
+        "status",
+        "statement_correspondence",
+        "successor_tests",
+        "mutation_controls"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "not_attempted",
+            "passed",
+            "failed",
+            "inconclusive",
+            "not_applicable"
+          ]
+        },
+        "statement_correspondence": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "independent_reviewer_count"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "not_reviewed",
+                "matches_intended_claim",
+                "mismatch_found",
+                "disputed",
+                "not_applicable"
+              ]
+            },
+            "independent_reviewer_count": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "notes": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "maxLength": 2000
+              }
+            }
+          }
+        },
+        "successor_tests": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "test_id",
+              "source_path",
+              "test_declaration",
+              "outcome",
+              "depends_on_candidate"
+            ],
+            "properties": {
+              "test_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "source_path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "test_declaration": {
+                "type": "string",
+                "minLength": 1
+              },
+              "outcome": {
+                "enum": [
+                  "passed",
+                  "failed",
+                  "timed_out",
+                  "tool_unavailable",
+                  "unrelated_build_failure",
+                  "not_attempted"
+                ]
+              },
+              "depends_on_candidate": {
+                "type": "boolean"
+              },
+              "failure_relevance": {
+                "enum": [
+                  "relevant_semantic_regression",
+                  "unrelated",
+                  "unknown",
+                  "not_applicable"
+                ]
+              },
+              "receipt_sha256": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "pattern": "^([0-9a-f]{64})?$"
+              },
+              "notes": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "maxLength": 2000
+                }
+              }
+            }
+          }
+        },
+        "mutation_controls": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "mutation_id",
+              "description",
+              "expected_detection",
+              "observed_detection",
+              "status"
+            ],
+            "properties": {
+              "mutation_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "description": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2000
+              },
+              "expected_detection": {
+                "type": "boolean"
+              },
+              "observed_detection": {
+                "type": "boolean"
+              },
+              "status": {
+                "enum": [
+                  "detected_as_expected",
+                  "missed",
+                  "unexpected_failure",
+                  "not_run"
+                ]
+              },
+              "notes": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "maxLength": 2000
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
