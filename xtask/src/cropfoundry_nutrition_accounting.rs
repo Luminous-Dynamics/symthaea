@@ -181,7 +181,8 @@ fn audit_input(input: NutritionAccountingInput) -> NutritionAccountingReceipt {
     if input.servings_in_batch == Some(0) {
         issues.push("servings_in_batch must be greater than zero when supplied".to_owned());
     }
-    if input.retention_fraction.is_some() && !has_nonblank(input.retention_evidence_uri.as_deref()) {
+    if input.retention_fraction.is_some() && !has_nonblank(input.retention_evidence_uri.as_deref())
+    {
         issues.push("retention_fraction requires its own evidence URI".to_owned());
     }
     if input.bioavailability_fraction.is_some()
