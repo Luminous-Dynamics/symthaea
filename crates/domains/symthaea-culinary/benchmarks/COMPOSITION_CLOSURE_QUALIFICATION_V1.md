@@ -15,7 +15,7 @@ A profile is evaluated on a fixed basis of grams per 100 g edible fresh-weight f
 - available carbohydrate plus dietary fibre; or
 - total carbohydrate (already including fibre) without a second fibre row.
 
-Each supplied component pins source, version, known-at time, evidence status, unit, denominator basis and food state. Components below quantification limit are represented as [0, LOQ] with no point estimate. Not-analysed, not-reported, unsupported-basis and conflicting-source cases must be represented explicitly and produce an indeterminate result; their absence is never silently treated as zero.
+Each supplied component pins source, version, known-at time, evidence status, unit, denominator basis and food state. Components below quantification limit are represented as [0, LOQ] with no point estimate. Not-analysed, not-reported, unsupported-basis and conflicting-source cases must be represented explicitly, with source/version/time/evidence metadata for the missingness claim, and usually produce an indeterminate result; their absence is never silently treated as zero. If a known nonnegative lower bound already exceeds the acceptable upper band, the result remains outside acceptable even with a missing component.
 
 Disposition is conservative over the summed interval:
 - within_preferred: the entire interval is inside [97, 103];
