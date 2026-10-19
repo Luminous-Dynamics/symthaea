@@ -501,7 +501,8 @@ mod tests {
         writer.finalize().unwrap();
 
         let mut bytes = std::fs::read(&valid_path).unwrap();
-        bytes.truncate(bytes.len().saturating_sub(1));
+        let truncated_len = bytes.len().saturating_sub(1);
+        bytes.truncate(truncated_len);
         std::fs::write(&truncated_path, bytes).unwrap();
         assert!(
             master_wav(
