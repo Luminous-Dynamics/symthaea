@@ -50,6 +50,7 @@ struct AccountSpec {
 struct QuantityLine {
     account_id: String,
     quantity: u64,
+    unit: String,
 }
 
 pub fn validate_material_ledger_str(
@@ -270,8 +271,8 @@ pub fn validate_material_ledger(
 
         let inputs = read_lines(&transaction, "inputs", &path, &accounts, &mut issues);
         let outputs = read_lines(&transaction, "outputs", &path, &accounts, &mut issues);
-        validate_unique_lines(&inputs, &path, "inputs", &mut issues);
-        validate_unique_lines(&outputs, &path, "outputs", &mut issues);
+        let inputs_unique = validate_unique_lines(&inputs, &path, "inputs", &mut issues);
+        let outputs_unique = validate_unique_lines(&outputs, &path, "outputs", &mut issues);
 
         let input_total = sum_lines(&inputs);
         let output_total = sum_lines(&outputs);
@@ -297,7 +298,15 @@ pub fn validate_material_ledger(
             push(&mut issues, "ACCOUNT_USED_ON_BOTH_SIDES", &path, "the same account may not appear on both sides of a transaction");
         }
 
+        let lines_well_formed = inputs.iter().chain(outputs.iter()).all(|line| {
+            line.quantity > 0
+                && line.unit == "mg"
+                && accounts.get(&line.account_id).is_some_and(|account| account.unit == line.unit)
+        });
         let mut can_apply = input_total.is_some() && output_total.is_some() && input_total == output_total
+            && lines_well_formed
+            && inputs_unique
+            && outputs_unique
             && !input_accounts.iter().any(|account| output_accounts.contains(account));
         let mut consumed_by_account = HashMap::<String, u64>::new();
         for line in &inputs {
@@ -459,18 +468,21 @@ fn read_lines(
             Some(spec) if spec.unit != unit => push(issues, "UNIT_MISMATCH", format!("{line_path}.unit"), "line unit differs from account unit"),
             Some(_) => {}
         }
-        result.push(QuantityLine { account_id: account_id.to_owned(), quantity });
+        result.push(QuantityLine { account_id: account_id.to_owned(), quantity, unit });
     }
     result
 }
 
-fn validate_unique_lines(lines: &[QuantityLine], path: &str, side: &str, issues: &mut Vec<LedgerIssue>) {
+fn validate_unique_lines(lines: &[QuantityLine], path: &str, side: &str, issues: &mut Vec<LedgerIssue>) -> bool {
     let mut seen = HashSet::new();
+    let mut unique = true;
     for line in lines {
         if !seen.insert(line.account_id.clone()) {
+            unique = false;
             push(issues, "DUPLICATE_ACCOUNT_LINE", format!("{path}.{side}"), format!("account {:?} appears more than once on the same side", line.account_id));
         }
     }
+    unique
 }
 
 fn sum_lines(lines: &[QuantityLine]) -> Option<u64> {
