@@ -34,7 +34,8 @@
         "MUT-001"
       ],
       "reviewer_record_id": "SYNTHETIC-REVIEW-001",
-      "exclusion_rationale": null
+      "exclusion_rationale": null,
+      "source_requirement_sha256": "f70e94f69d511171573a59d433308b79c640b043e40bc12368135a5af01d72ca"
     },
     {
       "requirement_id": "REQ-002",
@@ -48,7 +49,8 @@
         "MUT-002"
       ],
       "reviewer_record_id": "SYNTHETIC-REVIEW-002",
-      "exclusion_rationale": null
+      "exclusion_rationale": null,
+      "source_requirement_sha256": "850320c96545736ed236d0a345fe9b5c1f7ca85680f03031bf1b4f376b48a116"
     },
     {
       "requirement_id": "REQ-003",
@@ -62,7 +64,8 @@
         "MUT-003"
       ],
       "reviewer_record_id": "SYNTHETIC-REVIEW-003",
-      "exclusion_rationale": null
+      "exclusion_rationale": null,
+      "source_requirement_sha256": "0a88ec953807b3de32753e183c561cc2f90a32ad096939a20e29c7e169fd9e94"
     }
   ],
   "change_records": [
