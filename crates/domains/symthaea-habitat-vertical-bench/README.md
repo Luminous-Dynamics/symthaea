@@ -45,7 +45,7 @@ The default fixture is embedded at compile time from `docs/research/fixtures/hab
 
 ## Tests and verification status
 
-The source currently contains 100 authored Rust unit tests across six modules (31 structural/accounting + 13 scenario-campaign + 13 resilience-option + 13 assumption-falsification + 15 event-replay tests). They have not been compiled or executed in the current environment; do not describe them as passing. Run the commands above against the exact branch head before treating the qualifier as an executed test result. The scenario, resilience-option and assumption-falsification suites qualify definitions only, not scheduling, experiment selection, or resilience outcomes.
+The source currently contains 117 authored Rust unit tests across seven modules (31 structural/accounting + 13 scenario-campaign + 13 resilience-option + 13 assumption-falsification + 15 event-replay + 15 material-ledger + 17 measurement-gate tests). They have not been compiled or executed in the current environment; do not describe them as passing. Run the commands above against the exact branch head before treating the qualifier as an executed test result. The scenario, resilience-option and assumption-falsification suites qualify definitions only, not scheduling, experiment selection, or resilience outcomes.
 
 ## Deliberate limits
 
