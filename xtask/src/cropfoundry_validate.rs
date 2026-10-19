@@ -61,6 +61,7 @@ fn validate_benchmark_contract(root: &Value) -> std::result::Result<usize, Vec<S
         "not_evaluable_until_paired_stress_sensor_data_pinned",
         "not_evaluable_until_calibration_reference_and_site_metadata_pinned",
         "not_evaluable_until_postharvest_batch_storage_and_quality_data_pinned",
+        "not_evaluable_until_nutrient_assays_retention_factors_and_diet_requirements_pinned",
     ];
     let mut ids = BTreeSet::new();
 
@@ -374,7 +375,7 @@ mod tests {
     fn committed_benchmark_contract_is_well_formed_and_non_passing() {
         let fixture: Value = serde_json::from_str(BENCHMARK_FIXTURE).unwrap();
         let count = validate_benchmark_contract(&fixture).unwrap();
-        assert_eq!(count, 23);
+        assert_eq!(count, 24);
     }
 
     #[test]
