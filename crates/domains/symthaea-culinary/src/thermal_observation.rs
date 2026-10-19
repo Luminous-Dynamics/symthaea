@@ -12,6 +12,8 @@
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
 
+use crate::process_trace::validate_culinary_process_trace_v1;
+
 const SENSOR_KINDS: &[&str] = &[
     "thermocouple", "thermistor", "infrared", "oven_controller", "other",
 ];
@@ -196,6 +198,10 @@ pub fn validate_thermal_observation_log_v1(
     let mut errors = Vec::new();
     let mut blockers = Vec::new();
     let mut all_qualified = true;
+
+    if let Err(nested) = validate_culinary_process_trace_v1(trace) {
+        errors.extend(nested.into_iter().map(|error| format!("trace: {error}")));
+    }
 
     if non_empty(log, "schema_version") != Some("1.0.0") {
         errors.push("schema_version must be 1.0.0".to_owned());
@@ -458,7 +464,8 @@ mod tests {
     #[test]
     fn duplicate_observation_ids_fail_closed() {
         let mut value = log();
-        value["observations"][1]["observation_id"] = value["observations"][0]["observation_id"].clone();
+        let first_observation_id = value["observations"][0]["observation_id"].clone();
+        value["observations"][1]["observation_id"] = first_observation_id;
         assert!(validate_thermal_observation_log_v1(&trace(), &value).is_err());
     }
 
@@ -472,7 +479,8 @@ mod tests {
     #[test]
     fn timestamp_must_increase_in_sequence_order() {
         let mut value = log();
-        value["observations"][2]["measured_at"] = value["observations"][0]["measured_at"].clone();
+        let first_timestamp = value["observations"][0]["measured_at"].clone();
+        value["observations"][2]["measured_at"] = first_timestamp;
         assert!(validate_thermal_observation_log_v1(&trace(), &value).is_err());
     }
 
