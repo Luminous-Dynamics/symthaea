@@ -17,7 +17,7 @@ Validate an alternate fixture by passing its path:
 cargo run -p symthaea-habitat-vertical-bench --bin validate-habitat-vertical -- path/to/fixture.json
 ```
 
-The default fixture is embedded at compile time from `docs/research/fixtures/habitat-vertical-v0.1.json`. The CLI also validates the definition-only campaign, event replay, quantity-aware material ledger, interval-aware measurement gate, cross-layer audit bundle, and recall-response drill fixtures. A successful run means only that fixture structure, synthetic arithmetic controls, scenario definitions, event identity/causal replay, the synthetic quantity ledger, measurement-decision known answers, and exact fixture-byte fingerprints are internally consistent. It does not run a scheduler or simulate a disruption. The CLI prints the synthetic cost ratio and mass-balance known answers; negative controls are declared and only the mutations covered by unit tests are exercised by the test suite.
+The default fixture is embedded at compile time from `docs/research/fixtures/habitat-vertical-v0.1.json`. The CLI also validates the definition-only campaign, event replay, quantity-aware material ledger, interval-aware measurement gate, cross-layer audit bundle (now including the recall-response fixture), and recall-response drill. A successful run means only that fixture structure, synthetic arithmetic controls, scenario definitions, event identity/causal replay, the synthetic quantity ledger, measurement-decision known answers, and exact fixture-byte fingerprints are internally consistent. It does not run a scheduler or simulate a disruption. The CLI prints the synthetic cost ratio and mass-balance known answers; negative controls are declared and only the mutations covered by unit tests are exercised by the test suite.
 
 ## Checks
 
@@ -47,7 +47,7 @@ The default fixture is embedded at compile time from `docs/research/fixtures/hab
 
 ## Tests and verification status
 
-The source currently contains 147 authored Rust unit tests across nine modules (31 structural/accounting + 13 scenario-campaign + 13 resilience-option + 13 assumption-falsification + 15 event-replay + 15 material-ledger + 17 measurement-gate + 13 audit-bundle + 16 recall-drill tests). They have not been compiled or executed in the current environment; do not describe them as passing. Run the commands above against the exact branch head before treating the qualifier as an executed test result. The scenario, resilience-option and assumption-falsification suites qualify definitions only, not scheduling, experiment selection, or resilience outcomes.
+The source currently contains 150 authored Rust unit tests across nine modules (31 structural/accounting + 13 scenario-campaign + 13 resilience-option + 13 assumption-falsification + 15 event-replay + 15 material-ledger + 17 measurement-gate + 16 audit-bundle + 17 recall-drill tests). They have not been compiled or executed in the current environment; do not describe them as passing. Run the commands above against the exact branch head before treating the qualifier as an executed test result. The scenario, resilience-option and assumption-falsification suites qualify definitions only, not scheduling, experiment selection, or resilience outcomes.
 
 ## Deliberate limits
 
@@ -79,3 +79,6 @@ The default CLI validates `docs/research/fixtures/habitat-recall-closure-v0.1.js
 
 
 The cross-layer audit bundle now fingerprints the recall-response fixture as a fifth source, reruns its causal recall qualifier, and independently checks the derived affected set and response closure state. A bundle may be internally valid while its recall state remains `OPEN_UNRESOLVED`; audit consistency must never be confused with physical recall closure. Three additional audit-bundle tests challenge stale recall bytes, tampered summary outcomes and component failures. They are authored, not yet compiled or executed.
+
+
+The cross-layer audit bundle now fingerprints five inputs (base product/process, event replay, material ledger, measurement gate, and recall response) by exact byte length and SHA-256. It reruns all five relevant validators and independently compares the response closure counts/status. The expected recall state intentionally remains `OPEN_UNRESOLVED`; bundle validity means the synthetic sources and expected results agree, not that a real recall is closed.

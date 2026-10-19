@@ -6,7 +6,7 @@
 
 Individually correct modules can still disagree about what the same production history means. One validator may accept an event stream, another may accept a quantity ledger whose source references have changed, and a third may accept measurement decisions based on a different fixture revision. The integration unit should therefore be a **pinned, replayable evidence bundle**: exact inputs, independently rerun component validators, and a separate manifest of expected outputs.
 
-This is a consumer of the existing structural, event-replay, material-ledger, and measurement-gate owners. It does not create another event system, provenance authority, scheduler, inventory ledger, or metrology engine.
+This is a consumer of the existing structural, event-replay, material-ledger, measurement-gate, and recall-response owners. It does not create another event system, provenance authority, scheduler, inventory ledger, or metrology engine.
 
 ## Provenance and integrity boundary
 
@@ -17,7 +17,7 @@ This implementation pins five source fixtures by SHA-256 over exact UTF-8 bytes,
 ## What is included
 
 - `docs/research/fixtures/habitat-audit-bundle-v0.1.json`: exact source paths, UTF-8 byte lengths, SHA-256 digests, explicit claim ceilings, and independently declared expected component summaries.
-- `crates/domains/symthaea-habitat-vertical-bench/src/audit_bundle.rs`: verifies artifact set/path/schema/byte length/digest, reruns the five component validators, checks the expected result counts, and ensures that each fixture remains on its stated synthetic-evidence boundary.
+- `crates/domains/symthaea-habitat-vertical-bench/src/audit_bundle.rs`: verifies artifact set/path/schema/byte length/digest, reruns the structural, event-replay, material-ledger, measurement-gate and recall-response validators, checks the expected result counts and closure state, and ensures that each fixture remains on its stated synthetic-evidence boundary.
 - The default `validate-habitat-vertical` CLI executes the bundle audit after the existing component checks. A successful audit means the pinned synthetic inputs and known answers agree; it is not physical commissioning or product qualification.
 
 ## Proposed benchmarks (not achieved)
