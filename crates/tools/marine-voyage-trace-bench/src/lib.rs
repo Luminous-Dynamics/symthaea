@@ -5,6 +5,7 @@
 //! correct environmental conditions, or implement a sea-trial standard.
 
 pub mod paired_trial;
+pub mod operating_envelope;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PowerChannel {
