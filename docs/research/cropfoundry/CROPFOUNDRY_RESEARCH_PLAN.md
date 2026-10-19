@@ -117,6 +117,16 @@ A candidate source is the [passive-cooling-blanket tomato dataset](https://zenod
 
 The provisional prospective research target is at least 10% lower measured marketable-mass loss with non-inferior predeclared quality, zero additional safety-gate failures, and no increase in fully loaded cost/energy/emissions per marketable kilogram. This target must be reviewed against baseline variability, a power analysis and partner priorities and locked before outcomes are seen. The data contract, leakage controls, study stages and claim ceiling are specified in [CF-023_POSTHARVEST_EDIBLE_OUTPUT_BENCHMARK_V0.md](./CF-023_POSTHARVEST_EDIBLE_OUTPUT_BENCHMARK_V0.md). No intervention result or local loss rate is claimed.
 
+## Additional paradigm shift: measure nutrition delivered per scarce resource
+
+CropFoundry should move from optimizing yield/area to optimizing **verified safe nutrient delivery per unit of water, land, energy, cost and labor**, through harvest, storage and preparation. A nutrient concentration reading, harvested mass, edible servings and bioavailable nutrient delivery are distinct outcomes. No food basket should earn a good score by shifting shortfall to another nutrient or population group.
+
+Recent synthesis proposes nutritional resilience as the joint preservation of productivity, nutrient density, bioavailability and dietary diversity ([Dissanayaka et al., 2026](https://www.frontiersin.org/journals/nutrition/articles/10.3389/fnut.2026.1987519/abstract)). A large meta-analysis of elevated CO₂ effects covers 43 crops and 32 nutrients/antinutrients across 29,524 observation pairs ([ter Haar et al., *Global Change Biology*](https://pmc.ncbi.nlm.nih.gov/articles/PMC12616468/)); a 2026 review likewise documents nutrient-specific and crop/stress-specific variation ([Bello et al., 2026](https://doi.org/10.3390/agriculture16111220)). This evidence justifies a separate benchmark objective; it does not prove CropFoundry can improve human nutrition.
+
+**CF-024** formalizes nutrient mass after measured edible fractions and documented post-harvest/preparation retention, with any bioavailability factor separately sourced and uncertain. The comparison set must include mass-yield, nutrient-density, lowest-cost, diverse-basket and uncertainty-robust baselines under equal resource envelopes. Report every nutrient, requirement group, cost and resource constraint. Keep direct assays distinct from literature factors and model estimates; unknown is not zero. Do not infer nutrient content from images.
+
+The proposal is blocked until source-backed assays, nutrient units and mass basis, edible/serving definitions, retention factors, bioavailability evidence where used, and population-specific requirements are pinned. A provisional 10% improvement target can only be considered after independent nutrition/domain review and pre-registration, with no new nutrient shortfall, affordability or diversity regression, or resource-limit violations. See [CF-024_NUTRITION_DELIVERY_RESOURCE_BENCHMARK_V0.md](./CF-024_NUTRITION_DELIVERY_RESOURCE_BENCHMARK_V0.md). No dietary-health outcome is claimed.
+
 ## System boundaries
 
 - **Symthaea:** evidence-aware reasoning, candidate generation, uncertainty handling, multi-objective ranking, experiment selection, and recommendation receipts.
