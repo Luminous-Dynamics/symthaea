@@ -422,6 +422,105 @@ fn validate_uncertainty_budget(
     errors
 }
 
+/// Parse a fixed-width ASCII decimal field without accepting signs or whitespace.
+fn parse_ascii_decimal(bytes: &[u8]) -> Option<u32> {
+    if bytes.is_empty() || !bytes.iter().all(u8::is_ascii_digit) {
+        return None;
+    }
+    bytes.iter().try_fold(0_u32, |value, byte| {
+        value
+            .checked_mul(10)?
+            .checked_add(u32::from(*byte - b'0'))
+    })
+}
+
+/// Validate a Gregorian YYYY-MM-DD calendar date.
+fn is_valid_iso_date_bytes(bytes: &[u8]) -> bool {
+    if bytes.len() != 10 || bytes[4] != b'-' || bytes[7] != b'-' {
+        return false;
+    }
+    let (Some(year), Some(month), Some(day)) = (
+        parse_ascii_decimal(&bytes[0..4]),
+        parse_ascii_decimal(&bytes[5..7]),
+        parse_ascii_decimal(&bytes[8..10]),
+    ) else {
+        return false;
+    };
+    if !(1..=12).contains(&month) {
+        return false;
+    }
+    let leap_year = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+    let days_in_month = match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 if leap_year => 29,
+        2 => 28,
+        _ => return false,
+    };
+    (1..=days_in_month).contains(&day)
+}
+
+fn is_valid_iso_date(value: &str) -> bool {
+    is_valid_iso_date_bytes(value.as_bytes())
+}
+
+/// Validate the RFC 3339 date-time syntax used by run timestamps.
+///
+/// JSON Schema Draft 2020-12 treats format as annotation-only by default.
+/// This application-level check validates calendar dates, time fields,
+/// fractional seconds, and an explicit timezone rather than trusting annotation.
+fn is_valid_rfc3339_datetime(value: &str) -> bool {
+    let bytes = value.as_bytes();
+    if bytes.len() < 20
+        || !is_valid_iso_date_bytes(&bytes[..10])
+        || !matches!(bytes[10], b'T' | b't')
+        || bytes[13] != b':'
+        || bytes[16] != b':'
+    {
+        return false;
+    }
+
+    let (Some(hour), Some(minute), Some(second)) = (
+        parse_ascii_decimal(&bytes[11..13]),
+        parse_ascii_decimal(&bytes[14..16]),
+        parse_ascii_decimal(&bytes[17..19]),
+    ) else {
+        return false;
+    };
+    if hour > 23 || minute > 59 || second > 60 {
+        return false;
+    }
+
+    let mut index = 19;
+    if bytes.get(index) == Some(&b'.') {
+        index += 1;
+        let fraction_start = index;
+        while bytes.get(index).is_some_and(u8::is_ascii_digit) {
+            index += 1;
+        }
+        if index == fraction_start {
+            return false;
+        }
+    }
+
+    match bytes.get(index) {
+        Some(b'Z' | b'z') => index + 1 == bytes.len(),
+        Some(b'+' | b'-') => {
+            if bytes.len() != index + 6 || bytes[index + 3] != b':' {
+                return false;
+            }
+            let (Some(offset_hour), Some(offset_minute)) = (
+                parse_ascii_decimal(&bytes[index + 1..index + 3]),
+                parse_ascii_decimal(&bytes[index + 4..index + 6]),
+            ) else {
+                return false;
+            };
+            offset_hour <= 23 && offset_minute <= 59
+        }
+        _ => false,
+    }
+}
+
 fn validate_measurement_run_semantics(record: &Value) -> Vec<String> {
     let mut errors = Vec::new();
     let record_state = record
@@ -434,6 +533,18 @@ fn validate_measurement_run_semantics(record: &Value) -> Vec<String> {
         .unwrap_or("INVALID");
     let acquired_at = record.get("acquired_at").and_then(Value::as_str);
     let run_date = acquired_at.and_then(|timestamp| timestamp.get(..10));
+    if acquired_at.is_some_and(|timestamp| !is_valid_rfc3339_datetime(timestamp)) {
+        errors.push("acquired_at must be a valid RFC 3339 date-time with an explicit timezone".to_owned());
+    }
+    if record
+        .get("review")
+        .and_then(Value::as_object)
+        .and_then(|review| review.get("reviewed_at"))
+        .and_then(Value::as_str)
+        .is_some_and(|timestamp| !is_valid_rfc3339_datetime(timestamp))
+    {
+        errors.push("review.reviewed_at must be a valid RFC 3339 date-time with an explicit timezone".to_owned());
+    }
 
     let instruments = record
         .get("instruments")
@@ -492,6 +603,15 @@ fn validate_measurement_run_semantics(record: &Value) -> Vec<String> {
             .get("instrument_id")
             .and_then(Value::as_str)
             .unwrap_or("<missing>");
+        if instrument
+            .get("calibration_valid_through")
+            .and_then(Value::as_str)
+            .is_some_and(|date| !is_valid_iso_date(date))
+        {
+            errors.push(format!(
+                "instrument {instrument_id} has an invalid calibration_valid_through date"
+            ));
+        }
         if instrument.get("calibration_state").and_then(Value::as_str) == Some("VALID")
             && (instrument
                 .get("calibration_record_digest")
