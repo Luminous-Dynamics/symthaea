@@ -15,7 +15,8 @@
     "control_condition_id",
     "variant_condition_id",
     "outcome_definitions",
-    "blocks"
+    "blocks",
+    "analysis_plan"
   ],
   "properties": {
     "schema_version": {
@@ -63,6 +64,9 @@
       "items": {
         "$ref": "#/$defs/block"
       }
+    },
+    "analysis_plan": {
+      "$ref": "#/$defs/analysisPlan"
     }
   },
   "$defs": {
@@ -289,6 +293,43 @@
         "randomization_method": {
           "type": "string",
           "minLength": 1
+        }
+      }
+    },
+    "analysisPlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "primary_outcome_id",
+        "paired_estimand",
+        "summary_method",
+        "uncertainty_semantics",
+        "missing_data_policy",
+        "population_inference",
+        "report_all_declared_outcomes"
+      ],
+      "properties": {
+        "primary_outcome_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "paired_estimand": {
+          "const": "variant_minus_control"
+        },
+        "summary_method": {
+          "const": "mean_paired_difference"
+        },
+        "uncertainty_semantics": {
+          "const": "measurement_bounds_only"
+        },
+        "missing_data_policy": {
+          "const": "fail_closed"
+        },
+        "population_inference": {
+          "const": "not_estimated"
+        },
+        "report_all_declared_outcomes": {
+          "const": true
         }
       }
     }

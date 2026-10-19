@@ -37,6 +37,7 @@
 
 pub mod composition_closure;
 pub mod culinary_experiment;
+pub mod paired_outcome_analysis;
 pub mod balance;
 pub mod data;
 pub mod dynamics;
