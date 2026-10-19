@@ -532,7 +532,7 @@ impl FrameprobeHeader {
         });
         let delivery_time_us = delivery_index
             .and_then(|index| fields.get(index))
-            .map(str::trim)
+            .map(|value| value.trim())
             .filter(|value| !value.is_empty())
             .map(|value| parse_u64(value, "deliveryTime"))
             .transpose()?;
