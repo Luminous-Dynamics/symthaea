@@ -635,6 +635,14 @@ fn audit_input(input: NutritionAccountingInput) -> NutritionAccountingReceipt {
     }
 }
 
+/// Evaluate one typed accounting record for reuse by the portfolio reconciler.
+pub(crate) fn audit_json_value(value: &serde_json::Value) -> Result<serde_json::Value> {
+    let input: NutritionAccountingInput = serde_json::from_value(value.clone())
+        .context("portfolio record is not a valid nutrition-accounting input")?;
+    serde_json::to_value(audit_input(input))
+        .context("cannot serialize the per-record nutrition accounting receipt")
+}
+
 /// Validate one explicit JSON accounting record; no dataset is downloaded or trained on.
 pub fn run(input_path: PathBuf, out: Option<PathBuf>) -> Result<()> {
     let raw = fs::read(&input_path).with_context(|| {
