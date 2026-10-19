@@ -221,9 +221,16 @@ pub fn analyze_paired_clusters(
     let mut bootstrap_means = Vec::with_capacity(config.replicates);
     for _ in 0..config.replicates {
         let mut sampled_mean = 0.0;
+        let mut correction = 0.0;
         for _ in 0..deltas.len() {
             let sampled = deltas[rng.index(deltas.len())];
-            sampled_mean += sampled / deltas.len() as f64;
+            // Kahan-compensated summation avoids accumulating systematic
+            // round-off in constant-sample known-answer cases.
+            let term = sampled / deltas.len() as f64;
+            let adjusted = term - correction;
+            let next = sampled_mean + adjusted;
+            correction = (next - sampled_mean) - adjusted;
+            sampled_mean = next;
         }
         if !sampled_mean.is_finite() {
             return Err(PairedInferenceError::NonFiniteStatistic);
