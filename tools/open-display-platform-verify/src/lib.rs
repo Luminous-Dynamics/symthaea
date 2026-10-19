@@ -605,11 +605,7 @@ fn validate_measurement_run_semantics(record: &Value) -> Vec<String> {
         if observation.get("status").and_then(Value::as_str) != Some("NOT_EVALUATED")
             && let Some(ids) = observation.get("instrument_ids").and_then(Value::as_array)
         {
-            measured_instrument_ids.extend(
-                ids.iter()
-                    .filter_map(Value::as_str)
-                    .map(str::to_owned),
-            );
+            measured_instrument_ids.extend(ids.iter().filter_map(Value::as_str).map(str::to_owned));
         }
     }
 
@@ -1591,8 +1587,9 @@ mod tests {
                     == Some("ODRH-ART-CAP-POWER-001")
             })
             .expect("capability-profile artifact must exist");
-        bad_profile_digest["raw_artifacts"][profile_index]["sha256"] =
-            Value::String("eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_owned());
+        bad_profile_digest["raw_artifacts"][profile_index]["sha256"] = Value::String(
+            "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_owned(),
+        );
         assert!(
             validate_measurement_run_str(&encoded(&bad_profile_digest), RUN_SCHEMA_TEXT)
                 .expect_err("capability-profile artifact mutation must fail")
