@@ -388,7 +388,12 @@ mod tests {
         input.concentration_stage = None;
         let receipt = audit_input(input);
         assert!(!receipt.accounting_pass);
-        assert!(receipt.issues.iter().any(|issue| issue.contains("concentration_stage")));
+        assert!(
+            receipt
+                .issues
+                .iter()
+                .any(|issue| issue.contains("concentration_stage"))
+        );
         assert_eq!(receipt.nutrient_mass_at_serving_mg, None);
         assert_eq!(receipt.modeled_nutrient_mass_at_serving_mg, None);
     }
