@@ -147,7 +147,7 @@ pub fn analyze_paired_clusters(
     let mut seen = BTreeSet::new();
     let mut rows = observations.to_vec();
     for row in &rows {
-        if row.cluster_id.trim().is_empty() || row.cluster_id.trim() != row.cluster_id {
+        if row.cluster_id.trim().is_empty() || row.cluster_id.trim() != row.cluster_id.as_str() {
             return Err(PairedInferenceError::InvalidClusterId);
         }
         if !seen.insert(row.cluster_id.as_str()) {
