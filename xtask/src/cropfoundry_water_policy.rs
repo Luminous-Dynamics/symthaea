@@ -83,6 +83,7 @@ struct ScenarioResult {
     simulated_days: usize,
     daily_water_budget_plot_mm: f64,
     total_irrigation_applied_plot_mm: f64,
+    plot_allocation_dispersion_plot_mm: f64,
     total_overflow_proxy_plot_mm: f64,
     stress_exposure_proxy: f64,
     relative_stress_change_vs_equal_share_pct: Option<f64>,
@@ -97,6 +98,7 @@ struct PolicyAggregate {
     mean_stress_exposure_proxy: f64,
     median_stress_exposure_proxy: f64,
     total_irrigation_applied_plot_mm: f64,
+    mean_plot_allocation_dispersion_plot_mm: f64,
     mean_relative_stress_change_vs_equal_share_pct: Option<f64>,
     total_water_budget_violation_days: usize,
 }
@@ -261,6 +263,7 @@ fn simulate_one(scenario: Scenario, policy: Policy) -> ScenarioResult {
     let mut last_observation = storage;
     let mut stale_age = [0_usize; ZONES];
     let mut irrigation_total = 0.0;
+    let mut irrigation_by_zone = [0.0; ZONES];
     let mut overflow_total = 0.0;
     let mut stress_exposure = 0.0;
     let mut sensor_reads = 0_usize;
@@ -289,6 +292,7 @@ fn simulate_one(scenario: Scenario, policy: Policy) -> ScenarioResult {
         }
 
         for zone in 0..ZONES {
+            irrigation_by_zone[zone] += allocation[zone];
             let irrigated_storage = storage[zone] + allocation[zone];
             overflow_total += (irrigated_storage - STORAGE_CAP_MM).max(0.0);
             let after_use = (irrigated_storage.min(STORAGE_CAP_MM)
@@ -301,12 +305,19 @@ fn simulate_one(scenario: Scenario, policy: Policy) -> ScenarioResult {
     }
 
     let total_reads = sensor_reads + missing_reads;
+    let mean_zone_irrigation = irrigation_by_zone.iter().sum::<f64>() / ZONES as f64;
+    let variance_zone_irrigation = irrigation_by_zone
+        .iter()
+        .map(|value| (value - mean_zone_irrigation).powi(2))
+        .sum::<f64>()
+        / ZONES as f64;
     ScenarioResult {
         scenario_id: scenario.id.to_owned(),
         policy: policy.name().to_owned(),
         simulated_days: DAYS,
         daily_water_budget_plot_mm: scenario.daily_water_budget_plot_mm,
         total_irrigation_applied_plot_mm: round3(irrigation_total),
+        plot_allocation_dispersion_plot_mm: round3(variance_zone_irrigation.sqrt()),
         total_overflow_proxy_plot_mm: round3(overflow_total),
         stress_exposure_proxy: round3(stress_exposure),
         relative_stress_change_vs_equal_share_pct: None,
@@ -391,6 +402,13 @@ fn build_receipt() -> Result<WaterPolicyReceipt> {
                     .map(|result| result.total_irrigation_applied_plot_mm)
                     .sum(),
             ),
+            mean_plot_allocation_dispersion_plot_mm: round3(
+                policy_results
+                    .iter()
+                    .map(|result| result.plot_allocation_dispersion_plot_mm)
+                    .sum::<f64>()
+                    / policy_results.len() as f64,
+            ),
             mean_relative_stress_change_vs_equal_share_pct: mean_relative_change,
             total_water_budget_violation_days: policy_results
                 .iter()
@@ -410,6 +428,7 @@ fn build_receipt() -> Result<WaterPolicyReceipt> {
     if results.iter().any(|result| {
         !result.stress_exposure_proxy.is_finite()
             || !result.total_irrigation_applied_plot_mm.is_finite()
+            || !result.plot_allocation_dispersion_plot_mm.is_finite()
             || !result.sensor_dropout_fraction.is_finite()
     }) {
         return Err(anyhow!(
@@ -497,6 +516,16 @@ mod tests {
     }
 
     #[test]
+    fn cropfoundry_equal_share_baseline_has_zero_allocation_dispersion() {
+        let receipt = build_receipt().unwrap();
+        assert!(receipt
+            .results
+            .iter()
+            .filter(|result| result.policy == Policy::EqualShareCalendar.name())
+            .all(|result| result.plot_allocation_dispersion_plot_mm <= 1e-6));
+    }
+
+    #[test]
     fn cropfoundry_water_policy_reports_comparable_baseline_deltas() {
         let receipt = build_receipt().unwrap();
         let baseline = receipt
@@ -537,6 +566,8 @@ mod tests {
         for result in receipt.results {
             assert!(result.stress_exposure_proxy.is_finite());
             assert!(result.total_irrigation_applied_plot_mm.is_finite());
+            assert!(result.plot_allocation_dispersion_plot_mm.is_finite());
+            assert!(result.plot_allocation_dispersion_plot_mm >= 0.0);
             assert!((0.0..=1.0).contains(&result.sensor_dropout_fraction));
             assert!(
                 result.total_irrigation_applied_plot_mm
