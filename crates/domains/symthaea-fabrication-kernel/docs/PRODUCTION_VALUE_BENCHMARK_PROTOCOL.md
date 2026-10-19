@@ -50,6 +50,12 @@ These are investigation thresholds, not universal specifications or achieved res
 
 Reject or explicitly fail eligibility for duplicate scenario IDs; missing/extra scenarios; mixed policy labels; changed workload identity; changed fixed input quantities; unit partition off by one; material balance off by one milligram; zero/negative/non-finite duration; negative/non-finite energy; integer overflow; zero accepted units causing division by zero; critical safety violations; escaped nonconforming units; or held output. Future forecasting comparisons should additionally include label-shuffle controls and report matched conventional baselines. Those statistical tests are not implemented by this arithmetic module.
 
+## Typed evidence classes and provenance boundary
+
+The outcome evaluator requires each run to declare one evidence class: `SyntheticFixture`, `SimulationOutput`, or `InstrumentObserved`. A comparison fails when a policy mixes classes internally or when the baseline and candidate classes differ. This prevents direct comparison of synthetic/modelled outcomes against instrument-observed outcomes from passing as a paired evaluation.
+
+Each run also carries a workload SHA-256 identity and a raw-source-record SHA-256 field. The current implementation validates only lowercase 64-character hexadecimal syntax; it does **not** recompute hashes, fetch records, verify signatures, authenticate instruments, or establish that the declared class is truthful. Test fixtures use digest-shaped identifiers only. Production integration must compute digests from the canonical bytes, preserve the referenced evidence, authenticate acquisition where feasible, and record the measurement protocol. `InstrumentObserved` means the record is declared to originate from instruments; it is not synonymous with independently validated or causally identified.
+
 ## Paired uncertainty without pseudo-replication
 
 The companion `paired_inference` module provides a deterministic percentile cluster-bootstrap interval for the mean paired difference. It requires at least 20 independently sampled clusters and at least 1000 resamples. It records the seed, resample count, confidence level, mean and median difference, interval bounds, and the number of clusters where the candidate is better/worse/tied under a declared metric direction.
