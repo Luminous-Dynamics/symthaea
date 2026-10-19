@@ -93,6 +93,9 @@ when covariance is negligible. If common calibration/reference or other covarian
 
 ### 4A. Control measurements and drift
 
+The executable conservative screening model is documented in [ODRH_DRIFT_SCREENING_ALGORITHM.md](ODRH_DRIFT_SCREENING_ALGORITHM.md) and implemented in `tools/open-display-platform-verify/src/drift_control.rs`. Its output is a control-screening status only; it is deliberately not a physical qualification or a drift-correction model.
+
+
 A repeatability study can look stable while the instrument drifts slowly enough to bias a candidate-versus-baseline comparison. When a suitable stable control/reference stimulus or artifact exists, define an interleaved schedule before data collection (for example, start/end of each measurement block and after a remount or relevant reconfiguration). Record the control identity, measurand/unit, expected range, calibration/provenance, geometry and uncertainty. Do not call an ordinary DUT remeasurement a traceable reference standard.
 
 If no suitable control is available, mark drift surveillance NOT_EVALUATED. Control results monitor the measurement chain; they do not prove the display itself is stable or accurate.
