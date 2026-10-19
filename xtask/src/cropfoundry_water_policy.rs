@@ -95,22 +95,22 @@ impl Policy {
 }
 
 #[derive(Debug, Serialize, Clone)]
-struct ScenarioResult {
-    scenario_id: String,
-    policy: String,
+pub(crate) struct ScenarioResult {
+    pub(crate) scenario_id: String,
+    pub(crate) policy: String,
     drought_start_day: Option<usize>,
     heat_start_day: Option<usize>,
     forecast_bias_fraction: f64,
     sensor_dropout_period_days: Option<usize>,
     simulated_days: usize,
     daily_water_budget_plot_mm: f64,
-    total_irrigation_applied_plot_mm: f64,
+    pub(crate) total_irrigation_applied_plot_mm: f64,
     zone_irrigation_applied_plot_mm: [f64; ZONES],
-    plot_allocation_dispersion_plot_mm: f64,
+    pub(crate) plot_allocation_dispersion_plot_mm: f64,
     total_overflow_proxy_plot_mm: f64,
-    stress_exposure_proxy: f64,
+    pub(crate) stress_exposure_proxy: f64,
     zone_stress_exposure_proxy: [f64; ZONES],
-    max_zone_stress_exposure_proxy: f64,
+    pub(crate) max_zone_stress_exposure_proxy: f64,
     min_zone_stress_exposure_proxy: f64,
     worst_to_best_zone_stress_ratio: Option<f64>,
     stress_delta_vs_reference_proxy: Option<f64>,
@@ -118,8 +118,8 @@ struct ScenarioResult {
     relative_stress_change_vs_equal_share_pct: Option<f64>,
     relative_stress_change_vs_matched_water_equal_share_pct: Option<f64>,
     sensor_dropout_fraction: f64,
-    water_budget_violation_days: usize,
-    per_plot_limit_violation_days: usize,
+    pub(crate) water_budget_violation_days: usize,
+    pub(crate) per_plot_limit_violation_days: usize,
 }
 
 #[derive(Debug, Serialize)]
@@ -141,7 +141,7 @@ struct PolicyAggregate {
 }
 
 #[derive(Debug, Serialize)]
-struct WaterPolicyReceipt {
+pub(crate) struct WaterPolicyReceipt {
     schema_version: String,
     benchmark_id: String,
     execution_mode: String,
@@ -149,11 +149,11 @@ struct WaterPolicyReceipt {
     synthetic_only: bool,
     biological_performance_claim: bool,
     training_authorized: bool,
-    scenario_count: usize,
-    policy_count: usize,
+    pub(crate) scenario_count: usize,
+    pub(crate) policy_count: usize,
     invariant_summary: String,
     aggregates: Vec<PolicyAggregate>,
-    results: Vec<ScenarioResult>,
+    pub(crate) results: Vec<ScenarioResult>,
     caveats: Vec<String>,
 }
 
@@ -511,7 +511,7 @@ fn round3(value: f64) -> f64 {
     (value * 1000.0).round() / 1000.0
 }
 
-fn build_receipt() -> Result<WaterPolicyReceipt> {
+pub(crate) fn build_receipt() -> Result<WaterPolicyReceipt> {
     let all_scenarios = scenarios();
     let mut results = Vec::new();
     for scenario in all_scenarios {
