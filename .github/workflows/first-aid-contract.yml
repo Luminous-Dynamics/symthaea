@@ -104,8 +104,12 @@ jobs:
             .candidate_requirement_count == 3 and
             .mapped_requirement_count == 3 and
             .change_record_count == 2 and
+            .oracle_case_count == 6 and
+            .known_answer_case_count == 3 and
+            .fault_mutation_case_count == 3 and
+            .oracle_sha256 == "28ebb0721856de30088c40dc0aab385078c5b5e7401646ecae8285f29dbe5bef" and
             .claim_ceiling == "synthetic source-change mapping integrity only; no clinical validation" and
-            ([.contract_sha256, .validator_source_sha256,
+            ([.contract_sha256, .oracle_sha256, .validator_source_sha256,
               .entrypoint_source_sha256, .executable_sha256] | all(test("^[0-9a-f]{64}$"))) and
             (.source_artifact_sha256 | length == 2) and
             ([.source_artifact_sha256[]] | all(test("^[0-9a-f]{64}$")))
