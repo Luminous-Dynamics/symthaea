@@ -266,6 +266,203 @@ pub fn screen_drift_controls(
     })
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct DriftPlanValidationReport {
+    pub plan_id: String,
+    pub measurand: String,
+    pub unit: String,
+    pub plan_sha256: String,
+    pub schema_sha256: String,
+    pub screening: DriftScreeningReport,
+}
+
+impl DriftPlanValidationReport {
+    /// Stable machine-readable report explicitly bounded to synthetic screening.
+    #[must_use]
+    pub fn to_json(&self) -> serde_json::Value {
+        serde_json::json!({
+            "verifier": "open-display-platform-verify",
+            "verifier_version": env!("CARGO_PKG_VERSION"),
+            "plan_id": self.plan_id,
+            "measurand": self.measurand,
+            "unit": self.unit,
+            "plan_sha256": self.plan_sha256,
+            "schema_sha256": self.schema_sha256,
+            "guard_band": {
+                "lower": self.screening.guard_lower,
+                "upper": self.screening.guard_upper,
+                "boundary_rule": "INCLUSIVE"
+            },
+            "controls": self.screening.controls.iter().map(|control| serde_json::json!({
+                "control_id": control.control_id,
+                "time_seconds": control.time_seconds,
+                "measured_value": control.measured_value,
+                "disposition": control.disposition.as_str()
+            })).collect::<Vec<_>>(),
+            "observations": self.screening.observations.iter().map(|observation| serde_json::json!({
+                "observation_id": observation.observation_id,
+                "time_seconds": observation.time_seconds,
+                "disposition": observation.disposition.as_str(),
+                "responsible_control_ids": observation.responsible_control_ids
+            })).collect::<Vec<_>>(),
+            "qualification": self.screening.qualification,
+            "claim_ceiling": "Synthetic control-screening algorithm only. No physical instrument, calibration, drift-detection capability or display result is qualified."
+        })
+    }
+}
+
+/// Validate and execute a synthetic-only drift-control plan using the checked-in schema.
+///
+/// This interface intentionally refuses plans labelled as physical runs. Real
+/// run-record integration must be introduced through a later explicit schema
+/// version after a control artifact, measurement basis, cadence and uncertainty
+/// budget have been selected and reviewed.
+pub fn validate_drift_control_plan_str(
+    plan_text: &str,
+    schema_text: &str,
+) -> Result<DriftPlanValidationReport, Vec<String>> {
+    let schema: serde_json::Value = match serde_json::from_str(schema_text) {
+        Ok(value) => value,
+        Err(error) => return Err(vec![format!("drift schema JSON parse error: {error}")]),
+    };
+    let plan_value: serde_json::Value = match serde_json::from_str(plan_text) {
+        Ok(value) => value,
+        Err(error) => return Err(vec![format!("drift plan JSON parse error: {error}")]),
+    };
+
+    let mut errors = Vec::new();
+    if schema.get("$schema").and_then(serde_json::Value::as_str)
+        != Some("https://json-schema.org/draft/2020-12/schema")
+    {
+        errors.push("drift schema must declare JSON Schema Draft 2020-12".to_owned());
+    }
+    match jsonschema::draft202012::new(&schema) {
+        Ok(validator) => {
+            for error in validator.iter_errors(&plan_value) {
+                errors.push(format!("drift plan JSON Schema violation: {error}"));
+            }
+        }
+        Err(error) => errors.push(format!("drift schema compilation failed: {error}")),
+    }
+
+    if plan_value.get("record_state").and_then(serde_json::Value::as_str)
+        != Some("SYNTHETIC_TEST_ONLY")
+    {
+        errors.push("drift screening v0.1 only accepts SYNTHETIC_TEST_ONLY plans".to_owned());
+    }
+    if plan_value.get("claim_ceiling").and_then(serde_json::Value::as_str)
+        != Some("SYNTHETIC_OR_CONTROL_SCREENING_ONLY_NOT_PHYSICAL_QUALIFICATION")
+    {
+        errors.push("drift plan claim ceiling is invalid".to_owned());
+    }
+
+    let Some(controls_value) = plan_value.get("controls").and_then(serde_json::Value::as_array) else {
+        errors.push("drift plan controls must be an array".to_owned());
+        return Err(errors);
+    };
+    let Some(observations_value) = plan_value
+        .get("observations")
+        .and_then(serde_json::Value::as_array)
+    else {
+        errors.push("drift plan observations must be an array".to_owned());
+        return Err(errors);
+    };
+
+    let controls = controls_value
+        .iter()
+        .map(|control| ScheduledControl {
+            id: control
+                .get("control_id")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or("")
+                .to_owned(),
+            time_seconds: control
+                .get("time_seconds")
+                .and_then(serde_json::Value::as_f64)
+                .unwrap_or(f64::NAN),
+            value: control.get("value").and_then(|value| {
+                if value.is_null() {
+                    None
+                } else {
+                    value.as_f64()
+                }
+            }),
+        })
+        .collect();
+    let observations = observations_value
+        .iter()
+        .map(|observation| DutObservation {
+            id: observation
+                .get("observation_id")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or("")
+                .to_owned(),
+            time_seconds: observation
+                .get("time_seconds")
+                .and_then(serde_json::Value::as_f64)
+                .unwrap_or(f64::NAN),
+        })
+        .collect();
+    let screening = DriftControlPlan {
+        run_start_seconds: plan_value
+            .get("run_start_seconds")
+            .and_then(serde_json::Value::as_f64)
+            .unwrap_or(f64::NAN),
+        run_end_seconds: plan_value
+            .get("run_end_seconds")
+            .and_then(serde_json::Value::as_f64)
+            .unwrap_or(f64::NAN),
+        nominal_value: plan_value
+            .get("nominal_value")
+            .and_then(serde_json::Value::as_f64)
+            .unwrap_or(f64::NAN),
+        guard_half_width: plan_value
+            .get("guard_half_width")
+            .and_then(serde_json::Value::as_f64)
+            .unwrap_or(f64::NAN),
+        controls,
+        dut_observations: observations,
+    };
+
+    let screening = match screen_drift_controls(&screening) {
+        Ok(report) => Some(report),
+        Err(screening_errors) => {
+            errors.extend(screening_errors);
+            None
+        }
+    };
+    errors.sort();
+    errors.dedup();
+    if !errors.is_empty() {
+        return Err(errors);
+    }
+
+    let plan_id = plan_value
+        .get("plan_id")
+        .and_then(serde_json::Value::as_str)
+        .expect("schema validates plan_id")
+        .to_owned();
+    let measurand = plan_value
+        .get("measurand")
+        .and_then(serde_json::Value::as_str)
+        .expect("schema validates measurand")
+        .to_owned();
+    let unit = plan_value
+        .get("unit")
+        .and_then(serde_json::Value::as_str)
+        .expect("schema validates unit")
+        .to_owned();
+
+    Ok(DriftPlanValidationReport {
+        plan_id,
+        measurand,
+        unit,
+        plan_sha256: super::sha256_hex(plan_text.as_bytes()),
+        schema_sha256: super::sha256_hex(schema_text.as_bytes()),
+        screening: screening.expect("a validated screen report must exist"),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
