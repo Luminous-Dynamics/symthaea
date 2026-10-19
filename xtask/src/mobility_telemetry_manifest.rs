@@ -257,6 +257,71 @@ fn known_claim(claim: &str) -> bool {
     CLAIM_REQUIREMENTS.iter().any(|(name, _)| *name == claim)
 }
 
+
+const RIDE_ENERGY_UNCERTAINTY_REQUIREMENTS: &[(&str, &[&str])] = &[
+    ("dc_bus_voltage", &["V"]),
+    ("dc_bus_current", &["A"]),
+    ("net_dc_bus_energy", &["J", "Wh"]),
+    ("ground_speed", &["m/s"]),
+];
+const LONGITUDINAL_UNCERTAINTY_REQUIREMENTS: &[(&str, &[&str])] = &[
+    ("ground_speed", &["m/s"]),
+    ("longitudinal_acceleration", &["m/s^2"]),
+    ("front_wheel_angular_speed", &["rad/s"]),
+    ("rear_wheel_angular_speed", &["rad/s"]),
+    ("stopping_distance", &["m"]),
+];
+const TIRE_HEALTH_UNCERTAINTY_REQUIREMENTS: &[(&str, &[&str])] = &[
+    ("front_tire_pressure", &["Pa", "kPa"]),
+    ("rear_tire_pressure", &["Pa", "kPa"]),
+    ("front_tire_temperature", &["degC"]),
+    ("rear_tire_temperature", &["degC"]),
+];
+const MOTOR_MAP_UNCERTAINTY_REQUIREMENTS: &[(&str, &[&str])] = &[
+    ("motor_torque", &["N*m"]),
+    ("motor_angular_speed", &["rad/s"]),
+    ("dc_bus_voltage", &["V"]),
+    ("dc_bus_current", &["A"]),
+    ("motor_temperature", &["degC"]),
+    ("inverter_temperature", &["degC"]),
+    ("motor_efficiency", &["1"]),
+];
+const TIRE_FORCE_UNCERTAINTY_REQUIREMENTS: &[(&str, &[&str])] = &[
+    ("normal_load", &["N"]),
+    ("longitudinal_force", &["N"]),
+    ("lateral_force", &["N"]),
+    ("slip_ratio", &["1"]),
+    ("slip_angle", &["rad"]),
+    ("camber_angle", &["rad"]),
+];
+const ICE_ENERGY_UNCERTAINTY_REQUIREMENTS: &[(&str, &[&str])] = &[
+    ("fuel_mass_flow", &["kg/s"]),
+    ("engine_angular_speed", &["rad/s"]),
+    ("wheel_torque", &["N*m"]),
+    ("wheel_angular_speed", &["rad/s"]),
+    ("fuel_energy", &["J", "Wh"]),
+];
+
+fn claim_uncertainty_requirements(claim: &str) -> Option<&'static [(&'static str, &'static [&'static str])]> {
+    match claim {
+        "ride_energy" => Some(RIDE_ENERGY_UNCERTAINTY_REQUIREMENTS),
+        "longitudinal_dynamics" => Some(LONGITUDINAL_UNCERTAINTY_REQUIREMENTS),
+        "tire_health" => Some(TIRE_HEALTH_UNCERTAINTY_REQUIREMENTS),
+        "motor_map" => Some(MOTOR_MAP_UNCERTAINTY_REQUIREMENTS),
+        "tire_force_characterization" => Some(TIRE_FORCE_UNCERTAINTY_REQUIREMENTS),
+        "ice_fuel_energy" => Some(ICE_ENERGY_UNCERTAINTY_REQUIREMENTS),
+        _ => None,
+    }
+}
+
+fn known_uncertainty_pair(claim: &str, measurand: &str, unit: &str) -> bool {
+    claim_uncertainty_requirements(claim).is_some_and(|requirements| {
+        requirements.iter().any(|(required_measurand, allowed_units)| {
+            *required_measurand == measurand && allowed_units.contains(&unit)
+        })
+    })
+}
+
 fn required_channels(claim: &str) -> Option<&'static [&'static str]> {
     CLAIM_REQUIREMENTS
         .iter()
@@ -405,15 +470,15 @@ fn validate_structure(manifest: &Manifest) -> Result<()> {
         }
     }
 
-    let mut budget_claims = BTreeSet::new();
+    let mut budget_keys = BTreeSet::new();
     for budget in &manifest.uncertainty_budgets {
         if !known_claim(&budget.claim_target)
             || !manifest.claim_targets.iter().any(|claim| claim == &budget.claim_target)
         {
             bail!("uncertainty budget references undeclared claim target: {}", budget.claim_target);
         }
-        if !budget_claims.insert(budget.claim_target.as_str()) {
-            bail!("duplicate uncertainty budget for claim target: {}", budget.claim_target);
+        if !budget_keys.insert((budget.claim_target.as_str(), budget.measurand.as_str())) {
+            bail!("duplicate uncertainty budget for claim/measurand: {}/{}", budget.claim_target, budget.measurand);
         }
         if budget.measurand.trim().is_empty()
             || !KNOWN_UNITS.contains(&budget.unit.as_str())
@@ -422,6 +487,12 @@ fn validate_structure(manifest: &Manifest) -> Result<()> {
             || !valid_relative_path(&budget.artifact_path)
         {
             bail!("uncertainty budget for {} has invalid measurand, unit, state or artifact path", budget.claim_target);
+        }
+        if !known_uncertainty_pair(&budget.claim_target, &budget.measurand, &budget.unit) {
+            bail!(
+                "uncertainty budget has unsupported claim/measurand/unit combination: {}/{}/{}",
+                budget.claim_target, budget.measurand, budget.unit
+            );
         }
         if !budget.standard_uncertainty.is_finite() || budget.standard_uncertainty < 0.0
             || !budget.expanded_uncertainty.is_finite() || budget.expanded_uncertainty < 0.0
@@ -565,16 +636,28 @@ fn claim_eligibility(manifest: &Manifest, claim: &str) -> ClaimEligibility {
         reasons.push("claim_required_channels_missing".into());
     }
 
-    match manifest.uncertainty_budgets.iter().find(|budget| budget.claim_target == claim) {
-        None => reasons.push("missing_claim_uncertainty_budget".into()),
-        Some(budget) => {
-            if !["bench_characterized", "independently_reviewed"].contains(&budget.evidence_state.as_str()) {
-                reasons.push("uncertainty_budget_not_verified".into());
+    let required_uncertainties = claim_uncertainty_requirements(claim).unwrap_or(&[]);
+    let mut missing_uncertainty_budget = false;
+    for (measurand, _) in required_uncertainties {
+        match manifest.uncertainty_budgets.iter().find(|budget| {
+            budget.claim_target == claim && budget.measurand == *measurand
+        }) {
+            None => {
+                missing_uncertainty_budget = true;
+                reasons.push(format!("missing_uncertainty_budget:{measurand}"));
             }
-            if budget.expanded_uncertainty > budget.acceptance_tolerance {
-                reasons.push("uncertainty_budget_exceeds_tolerance".into());
+            Some(budget) => {
+                if !["bench_characterized", "independently_reviewed"].contains(&budget.evidence_state.as_str()) {
+                    reasons.push("uncertainty_budget_not_verified".into());
+                }
+                if budget.expanded_uncertainty > budget.acceptance_tolerance {
+                    reasons.push("uncertainty_budget_exceeds_tolerance".into());
+                }
             }
         }
+    }
+    if missing_uncertainty_budget {
+        reasons.push("missing_claim_uncertainty_budget".into());
     }
 
     let sensors: std::collections::BTreeMap<&str, &Sensor> = manifest
