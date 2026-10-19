@@ -552,8 +552,9 @@ mod tests {
     #[test]
     fn mission_mismatch_is_rejected() {
         let mut p = profile();
+        let results = complete_results(&p);
         p.cases[0].mission_id = "mission-other".to_owned();
-        let audit = audit_envelope(&p, &complete_results(&p));
+        let audit = audit_envelope(&p, &results);
         assert!(has_issue(&audit, &EnvelopeIssue::MissionMismatch { case_id: "low-speed".to_owned() }));
         assert_ne!(audit.disposition, EnvelopeDisposition::CompleteForEnvelopeComparison);
     }
