@@ -91,7 +91,8 @@ Run from the workspace root once Cargo/Rust are available:
 
 ```sh
 cargo test -p xtask frozen_fault_matrix_cases_match_expected_outcomes
-cargo run -p xtask -- mobility-telemetry-benchmark \\
+cargo run -p xtask -- mobility-telemetry-benchmark \
+  --source-commit "$(git rev-parse HEAD)" \
   --out reports/mobility_telemetry_benchmark.json
 ```
 
