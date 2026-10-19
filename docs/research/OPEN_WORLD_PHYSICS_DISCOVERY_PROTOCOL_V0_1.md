@@ -271,6 +271,12 @@ These existing works motivate different benchmark lanes; none alone covers the e
 4. **Connect through an adapter** to the existing active-discovery and typed-generation APIs only after the evaluator's rules are independently testable. The evaluator must not reuse the agent's scoring implementation as its oracle.
 5. **Add held-out structural families and measured-data adapters** only when their source and validation contracts are ready.
 
+### First executable reference slice
+
+The initial Rust reference harness is drafted separately in [PR #8150](https://github.com/Luminous-Dynamics/symthaea/pull/8150) and tracked by [issue #8143](https://github.com/Luminous-Dynamics/symthaea/issues/8143). It contains three dimensionless law families, a query-only API, matched-budget fixed-grid and seeded-random policies, a bounded grid-search baseline with declared-noise scoring, a structural-family ambiguity disposition, held-out-range metrics, and a digest-bound JSON report.
+
+**Scope ceiling:** it is an open source-visible reference corpus (`blind_evaluation=false`), not an integrated Ramanujan/EUREKA run, not a hidden benchmark, and not an SOTA result. The code is drafted but has not been compiled or tested in this execution environment; the focused workflow is authored and its exact-head result has not been observed. The benchmark corpus and source should be reviewed before adding the agent adapter.
+
 ### Local-first verification contract
 
 Every implementation PR must record exact local commands, toolchain, corpus digest, candidate commit and outcomes. Run focused tests before broader suites; do not depend on CI availability to discover local deterministic/analytical failures. If a Rust toolchain or dataset is unavailable, mark execution as **not run**, not pass. A queued, skipped, stale-head, or missing workflow is not evidence of correctness.
