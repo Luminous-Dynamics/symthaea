@@ -1,0 +1,51 @@
+name: Water repair closure 001
+
+on:
+  pull_request:
+    paths:
+      - "tools/water-repair-closure-001/**"
+  push:
+    branches: [main]
+    paths:
+      - "tools/water-repair-closure-001/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reference-evaluator:
+    name: Exact-revision synthetic oracle
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      IMPLEMENTATION_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Check out exact source revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install Rust stable and rustfmt
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Check formatting
+        run: cargo fmt --manifest-path tools/water-repair-closure-001/Cargo.toml -- --check
+
+      - name: Run deterministic and adversarial tests
+        run: cargo test --manifest-path tools/water-repair-closure-001/Cargo.toml
+
+      - name: Evaluate all frozen cases and emit exact-revision receipt
+        run: |
+          cargo run --manifest-path tools/water-repair-closure-001/Cargo.toml --             --inputs tools/water-repair-closure-001/fixtures/inputs-v1.json             --oracle tools/water-repair-closure-001/fixtures/oracle-v1.json             --receipt target/water-repair-closure-001/receipt.json             --implementation-sha "${IMPLEMENTATION_SHA}"
+
+      - name: Upload receipt, including failed evaluations
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: water-repair-closure-001-receipt
+          path: target/water-repair-closure-001/receipt.json
+          if-no-files-found: warn
