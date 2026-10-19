@@ -219,10 +219,10 @@ The companion example `blind_render_listening_pack` converts a complete renderer
 Run from the workspace root after producing a complete `renderer_ab_fair` cohort:
 
 ```sh
-export SYMTHAEA_BLIND_PACK_SEED="$(od -An -N32 -tx1 /dev/urandom | tr -d ' \\n')"
-cargo run --release -p symthaea-muse --features theory --example blind_render_listening_pack -- \\
-  audio_output/renderer-ab-fair-synth/renderer-ab-fair-manifest.json \\
-  "$PWD" \\
+export SYMTHAEA_BLIND_PACK_SEED="$(od -An -N32 -tx1 /dev/urandom | tr -d ' \n')"
+cargo run --release -p symthaea-muse --features theory --example blind_render_listening_pack -- \
+  audio_output/renderer-ab-fair-synth/renderer-ab-fair-manifest.json \
+  "$PWD" \
   audio_output/listening-packs/pilot-001
 ```
 
