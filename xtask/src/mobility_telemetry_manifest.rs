@@ -1109,6 +1109,36 @@ fn evaluate_fault_case(mutation: &str, manifest: &Manifest) -> (String, String) 
                 Err(error) => ("reject".to_owned(), error.to_string()),
             }
         }
+        "calibration_receipt_not_backed_by_artifact" => {
+            let mut candidate = manifest.clone();
+            candidate.sensors[0].calibration_state = "calibrated".to_owned();
+            candidate.sensors[0].calibration_receipt_id = Some("calibration/gnss.json".to_owned());
+            candidate.artifacts.push(Artifact {
+                relative_path: "calibration/other.json".to_owned(),
+                kind: "calibration_record".to_owned(),
+                byte_len: 1,
+                sha256: format!("sha256:{}", "f".repeat(64)),
+            });
+            structure_case_outcome(&candidate)
+        }
+        "rights_receipt_id_not_backed_by_artifact" => {
+            let mut candidate = manifest.clone();
+            candidate.data_rights.rights_state = "project_owned".to_owned();
+            candidate.data_rights.permission_receipt_id = Some("collection/approval.json".to_owned());
+            candidate.artifacts.push(Artifact {
+                relative_path: "collection/other.json".to_owned(),
+                kind: "collection_authorization".to_owned(),
+                byte_len: 1,
+                sha256: format!("sha256:{}", "1".repeat(64)),
+            });
+            let claim = claim_eligibility(&candidate, "ride_energy");
+            if !claim.physical_eligible
+                && claim.reasons.iter().any(|reason| reason == "rights_receipt_id_not_backed_by_artifact") {
+                ("ineligible".to_owned(), "rights_receipt_id_not_backed_by_artifact".to_owned())
+            } else {
+                ("eligible_or_unexplained".to_owned(), format!("rights receipt reference was not checked: {claim:?}"))
+            }
+        }
         "duplicate_sensor_id" => {
             let mut candidate = manifest.clone();
             candidate.sensors.push(candidate.sensors[0].clone());
@@ -1739,7 +1769,7 @@ mod tests {
         )).expect("frozen telemetry fault matrix parses");
         let cases = matrix.get("cases").and_then(serde_json::Value::as_array)
             .expect("fault matrix has a case array");
-        assert_eq!(cases.len(), 28, "matrix size changes require deliberate review");
+        assert_eq!(cases.len(), 30, "matrix size changes require deliberate review");
         let mut ids = BTreeSet::new();
         for case in cases {
             let id = case.get("id").and_then(serde_json::Value::as_str)
