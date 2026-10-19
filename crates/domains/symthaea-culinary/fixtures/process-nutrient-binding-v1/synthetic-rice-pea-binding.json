@@ -1,0 +1,15 @@
+{
+  "schema_version": "1.0.0",
+  "trace_id": "synthetic-rice-pea-process-trace-v1",
+  "final_product_stream_id": "cooked-meal",
+  "ingredient_stream_bindings": [
+    {
+      "ingredient_id": "rice",
+      "stream_id": "rice-input"
+    },
+    {
+      "ingredient_id": "peas",
+      "stream_id": "peas-input"
+    }
+  ]
+}
