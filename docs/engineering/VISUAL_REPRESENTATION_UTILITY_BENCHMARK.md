@@ -47,7 +47,7 @@ For the controlled A/C/D ablation, keep data splits, evaluator, downstream track
 
 ## 4. First corpus: 48 deterministic synthetic cases
 
-Use Symtropy's existing hidden-truth scenario machinery. This corpus is a proposed workload plan, not evidence that the current evaluator already supports all case semantics.
+Use Symtropy's existing hidden-truth scenario machinery. This corpus is a proposed workload plan, not evidence that the current evaluator already supports all case semantics. The 48 cases are a conformance/diagnostic pilot, not automatically a statistically powered superiority study; expand independent scenario/seed clusters according to a preregistered power analysis before confirmatory claims.
 
 Create six scenario families with eight fixed cases each, varying seed, object/texture identity and nuisance parameters within each family:
 
@@ -171,8 +171,8 @@ Evidence classes remain distinct: `ANALYTIC_FIXTURE`, `SYNTHETIC_EVALUATION`, `O
 
 ## 10. Research anchors
 
-- DINOv3 official repository / paper: https://github.com/facebookresearch/dinov3 and https://ai.meta.com/research/publications/dinov3/
-- SAM 3.1 / SAM 3 (current promptable concept detection, segmentation and tracking comparator): https://ai.meta.com/blog/segment-anything-model-3/ and https://ai.meta.com/research/sam3/
+- DINOv3 official repository / paper and model-specific license: https://github.com/facebookresearch/dinov3 and https://ai.meta.com/research/publications/dinov3/
+- SAM 3.1 / SAM 3 (current promptable concept detection, segmentation and tracking comparator; the reported 32 FPS is on an H100, not our target hardware): https://ai.meta.com/blog/segment-anything-model-3/ and https://ai.meta.com/research/sam3/
 - SAM 2 (compatibility / historical baseline where useful): https://ai.meta.com/research/sam2/
 - TAO open-world tracking: https://taodataset.org/
 - TrackEval reference HOTA and tracking metrics: https://github.com/JonathonLuiten/TrackEval
