@@ -168,6 +168,8 @@ pub struct StabilityMetrics {
     pub post_change_observation_count: usize,
     pub unsafe_trust_fraction_after_change: Option<f64>,
     pub false_quarantine_on_stable_process: bool,
+    /// Detects an alert/quarantine before a known evaluator-injected change.
+    pub premature_quarantine_before_change: bool,
     pub quarantine_on_single_transient_outlier: bool,
     pub mean_absolute_residual_mm: f64,
     pub maximum_absolute_residual_mm: f64,
@@ -465,6 +467,10 @@ fn build_metrics(
         unsafe_trust_fraction_after_change,
         false_quarantine_on_stable_process: scenario == StabilityScenario::StableProcess
             && first_quarantine_step.is_some(),
+        premature_quarantine_before_change: match (expected_change_step, first_quarantine_step) {
+            (Some(change), Some(quarantine)) => quarantine < change,
+            _ => false,
+        },
         quarantine_on_single_transient_outlier: scenario == StabilityScenario::TransientOutlier
             && first_quarantine_step.is_some(),
         mean_absolute_residual_mm: if observations.is_empty() {
