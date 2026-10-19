@@ -18,7 +18,7 @@ cargo run -q -p xtask -- cropfoundry-nutrition-accounting \
   --out reports/cropfoundry/nutrient-accounting-receipt.json
 ```
 
-The command records the input's own SHA-256 and emits a `cropfoundry-nutrition-accounting-receipt-v1` receipt with nutrient mass per batch and declared serving, plus ratios per litre of water, square metre of land, kWh and currency unit when the corresponding inputs are known. Legacy v0 point-only inputs remain accepted; v0 inputs cannot include the new interval fields. A missing resource measurement stays unknown; a zero/absent denominator does not produce an infinite or invented efficiency. Resource ratios are comparable only when the water/land/energy/cost boundaries, unit definitions, crop stage and allocation rules match.
+The command records the input's own SHA-256 and emits a `cropfoundry-nutrition-accounting-receipt-v1` receipt with nutrient mass per batch and declared serving, plus ratios per litre of water, square metre of land, kWh and currency unit when the corresponding inputs are known. The versioned machine-readable contract is [nutrition-accounting-input-v1.schema.json](./nutrition-accounting-input-v1.schema.json); runtime deserialization rejects unknown fields. Legacy v0 point-only inputs remain accepted; v0 inputs cannot include the new interval fields. A missing resource measurement stays unknown; a zero/absent denominator does not produce an infinite or invented efficiency. Resource ratios are comparable only when the water/land/energy/cost boundaries, unit definitions, crop stage and allocation rules match.
 
 ### Accounting equations
 
