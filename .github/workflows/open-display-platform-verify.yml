@@ -146,8 +146,8 @@ jobs:
             echo "$check_id expected triangles=$expected observed triangles=$actual"
             test "$actual" = "$expected"
           }
-          check_triangle_count "$RUNNER_TEMP/odrh-default.stl" "ODRH-CAD-DEFAULT-EXPORT"
-          check_triangle_count "$RUNNER_TEMP/odrh-alternate.stl" "ODRH-CAD-ALTERNATE-DIMENSIONS"
+          check_triangle_count "target/odrh-validation/odrh-default.stl" "ODRH-CAD-DEFAULT-EXPORT"
+          check_triangle_count "target/odrh-validation/odrh-alternate.stl" "ODRH-CAD-ALTERNATE-DIMENSIONS"
 
           if openscad -D 'sensor_aperture_d_mm=100' \
             -o "target/odrh-validation/odrh-invalid.stl" "$cad" \
