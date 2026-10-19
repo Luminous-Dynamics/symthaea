@@ -208,7 +208,11 @@ fn validate_case(case: &Case) -> Vec<String> {
         if utility_states != state_ids {
             errors.push("invalid_action_utility_coverage".to_owned());
         }
-        if action.utilities.values().any(|value| value.abs() > UTILITY_ABS_LIMIT) {
+        if action
+            .utilities
+            .values()
+            .any(|value| value.abs() > UTILITY_ABS_LIMIT)
+        {
             errors.push("invalid_utility_bound".to_owned());
         }
     }
@@ -239,7 +243,8 @@ fn validate_case(case: &Case) -> Vec<String> {
             errors.push("invalid_likelihood_state_coverage".to_owned());
         }
 
-        let outcome_sets: Vec<BTreeSet<&str>> = experiment.likelihoods
+        let outcome_sets: Vec<BTreeSet<&str>> = experiment
+            .likelihoods
             .iter()
             .map(|row| row.outcomes.keys().map(String::as_str).collect())
             .collect();
@@ -290,12 +295,16 @@ pub fn evaluate_case(case: &Case) -> CaseEvaluation {
     let scale_squared = scale * scale;
 
     // Expected utility without new information, numerator denominator = scale.
-    let baseline_numerator = case.actions.iter().map(|action| {
-        case.states.iter().fold(0_i128, |sum, state| {
-            sum + i128::from(state.prior_weight)
-                * i128::from(action.utilities[&state.state_id])
+    let baseline_numerator = case
+        .actions
+        .iter()
+        .map(|action| {
+            case.states.iter().fold(0_i128, |sum, state| {
+                sum + i128::from(state.prior_weight) * i128::from(action.utilities[&state.state_id])
+            })
         })
-    }).max().unwrap_or(0);
+        .max()
+        .unwrap_or(0);
 
     let mut values = Vec::<(String, i128, i128)>::new();
     let mut excluded_experiments = Vec::new();
@@ -325,43 +334,57 @@ pub fn evaluate_case(case: &Case) -> CaseEvaluation {
             continue;
         }
 
-        let rows_by_state: BTreeMap<&str, &OutcomeLikelihoods> = experiment.likelihoods
+        let rows_by_state: BTreeMap<&str, &OutcomeLikelihoods> = experiment
+            .likelihoods
             .iter()
             .map(|row| (row.state_id.as_str(), row))
             .collect();
         let mut outcome_names: Vec<&str> = experiment.likelihoods[0]
-            .outcomes.keys().map(String::as_str).collect();
+            .outcomes
+            .keys()
+            .map(String::as_str)
+            .collect();
         outcome_names.sort_unstable();
 
         // Sum over possible outcomes, each taking the best action for that outcome.
         let post_information_numerator = outcome_names.iter().fold(0_i128, |outer_sum, outcome| {
-            let best_action_numerator = case.actions.iter().map(|action| {
-                case.states.iter().fold(0_i128, |inner_sum, state| {
-                    let likelihood = rows_by_state[state.state_id.as_str()].outcomes[*outcome];
-                    inner_sum
-                        + i128::from(state.prior_weight)
-                            * i128::from(likelihood)
-                            * i128::from(action.utilities[&state.state_id])
+            let best_action_numerator = case
+                .actions
+                .iter()
+                .map(|action| {
+                    case.states.iter().fold(0_i128, |inner_sum, state| {
+                        let likelihood = rows_by_state[state.state_id.as_str()].outcomes[*outcome];
+                        inner_sum
+                            + i128::from(state.prior_weight)
+                                * i128::from(likelihood)
+                                * i128::from(action.utilities[&state.state_id])
+                    })
                 })
-            }).max().unwrap_or(0);
+                .max()
+                .unwrap_or(0);
             outer_sum + best_action_numerator
         });
 
         let gross_evsi_numerator = post_information_numerator - baseline_numerator * scale;
         let net_evsi_numerator =
             gross_evsi_numerator - i128::from(experiment.cost_utility) * scale_squared;
-        values.push((experiment.experiment_id.clone(), gross_evsi_numerator, net_evsi_numerator));
+        values.push((
+            experiment.experiment_id.clone(),
+            gross_evsi_numerator,
+            net_evsi_numerator,
+        ));
     }
 
     values.sort_by(|a, b| b.2.cmp(&a.2).then_with(|| a.0.cmp(&b.0)));
     excluded_experiments.sort_by(|a, b| a.experiment_id.cmp(&b.experiment_id));
-    let experiment_values: Vec<ExperimentValue> = values.iter().map(|(id, gross, net)| {
-        ExperimentValue {
+    let experiment_values: Vec<ExperimentValue> = values
+        .iter()
+        .map(|(id, gross, net)| ExperimentValue {
             experiment_id: id.clone(),
             gross_evsi_numerator: gross.to_string(),
             net_evsi_numerator: net.to_string(),
-        }
-    }).collect();
+        })
+        .collect();
 
     if let Some((experiment_id, _, _)) = values.iter().find(|(_, _, net)| *net > 0) {
         return CaseEvaluation {
@@ -481,8 +504,11 @@ pub fn run_cli() -> i32 {
     }
 
     let results = evaluate_corpus(&corpus);
-    let cases: Vec<CaseReceipt> = corpus.cases.iter().zip(results.iter()).map(|(case, result)| {
-        CaseReceipt {
+    let cases: Vec<CaseReceipt> = corpus
+        .cases
+        .iter()
+        .zip(results.iter())
+        .map(|(case, result)| CaseReceipt {
             case_id: result.case_id.clone(),
             status: result.status,
             selected_experiment_id: result.selected_experiment_id.clone(),
@@ -490,9 +516,10 @@ pub fn run_cli() -> i32 {
             experiment_values: result.experiment_values.clone(),
             excluded_experiments: result.excluded_experiments.clone(),
             expected_contract_match: result.matches_expected(&case.expected),
-        }
-    }).collect();
-    let failed_case_ids: Vec<String> = cases.iter()
+        })
+        .collect();
+    let failed_case_ids: Vec<String> = cases
+        .iter()
         .filter(|receipt| !receipt.expected_contract_match)
         .map(|receipt| receipt.case_id.clone())
         .collect();
@@ -539,8 +566,9 @@ pub fn run_cli() -> i32 {
 mod tests {
     use super::*;
 
-    const CORPUS_JSON: &str =
-        include_str!("../../../docs/research/bioprotein-experiments/experiment-value-corpus-v1.json");
+    const CORPUS_JSON: &str = include_str!(
+        "../../../docs/research/bioprotein-experiments/experiment-value-corpus-v1.json"
+    );
 
     fn fixture() -> Corpus {
         serde_json::from_str(CORPUS_JSON).expect("frozen experiment-value corpus parses")
@@ -566,30 +594,45 @@ mod tests {
 
     #[test]
     fn illustrative_positive_case_has_exact_integer_value() {
-        let case = fixture().cases.into_iter()
-            .find(|case| case.case_id == "EVSI-001").expect("EVSI-001 exists");
+        let case = fixture()
+            .cases
+            .into_iter()
+            .find(|case| case.case_id == "EVSI-001")
+            .expect("EVSI-001 exists");
         let result = evaluate_case(&case);
         assert_eq!(result.status, ResultStatus::Selected);
         assert_eq!(result.selected_experiment_id.as_deref(), Some("assay-a"));
-        assert_eq!(result.experiment_values[0].gross_evsi_numerator, "350000000");
+        assert_eq!(
+            result.experiment_values[0].gross_evsi_numerator,
+            "350000000"
+        );
         assert_eq!(result.experiment_values[0].net_evsi_numerator, "250000000");
     }
 
     #[test]
     fn unknown_authorization_is_never_treated_as_permission() {
-        let mut case = fixture().cases.into_iter()
-            .find(|case| case.case_id == "EVSI-005").expect("EVSI-005 exists");
+        let mut case = fixture()
+            .cases
+            .into_iter()
+            .find(|case| case.case_id == "EVSI-005")
+            .expect("EVSI-005 exists");
         case.experiments[0].authorization = Authorization::Unknown;
         let result = evaluate_case(&case);
         assert_eq!(result.status, ResultStatus::Indeterminate);
         assert_eq!(result.selected_experiment_id, None);
-        assert_eq!(result.excluded_experiments[0].reason_code, "authorization_unknown");
+        assert_eq!(
+            result.excluded_experiments[0].reason_code,
+            "authorization_unknown"
+        );
     }
 
     #[test]
     fn experiment_order_does_not_change_winner() {
-        let mut case = fixture().cases.into_iter()
-            .find(|case| case.case_id == "EVSI-007").expect("EVSI-007 exists");
+        let mut case = fixture()
+            .cases
+            .into_iter()
+            .find(|case| case.case_id == "EVSI-007")
+            .expect("EVSI-007 exists");
         let first = evaluate_case(&case);
         case.experiments.reverse();
         let second = evaluate_case(&case);
@@ -601,8 +644,11 @@ mod tests {
 
     #[test]
     fn independent_test_outcomes_have_zero_gross_evsi() {
-        let case = fixture().cases.into_iter()
-            .find(|case| case.case_id == "EVSI-003").expect("EVSI-003 exists");
+        let case = fixture()
+            .cases
+            .into_iter()
+            .find(|case| case.case_id == "EVSI-003")
+            .expect("EVSI-003 exists");
         let result = evaluate_case(&case);
         assert_eq!(result.status, ResultStatus::NoPositiveEvsi);
         assert_eq!(result.experiment_values[0].gross_evsi_numerator, "0");
@@ -610,11 +656,18 @@ mod tests {
 
     #[test]
     fn invalid_probability_mass_fails_closed() {
-        let case = fixture().cases.into_iter()
-            .find(|case| case.case_id == "EVSI-008").expect("EVSI-008 exists");
+        let case = fixture()
+            .cases
+            .into_iter()
+            .find(|case| case.case_id == "EVSI-008")
+            .expect("EVSI-008 exists");
         let result = evaluate_case(&case);
         assert_eq!(result.status, ResultStatus::InvalidInput);
-        assert!(result.reason_codes.iter()
-            .any(|reason| reason == "invalid_outcome_probability_sum"));
+        assert!(
+            result
+                .reason_codes
+                .iter()
+                .any(|reason| reason == "invalid_outcome_probability_sum")
+        );
     }
 }
