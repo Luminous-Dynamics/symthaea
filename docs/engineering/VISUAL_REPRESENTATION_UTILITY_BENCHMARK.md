@@ -182,3 +182,12 @@ Evidence classes remain distinct: `ANALYTIC_FIXTURE`, `SYNTHETIC_EVALUATION`, `O
 - WorldArena 2.0 extends evaluation to visuo-tactile settings, online RL environments and simulated / real robot platforms: https://github.com/WorldArena2/WorldArena-2.0
 
 These references define comparison points only. No Symthaea result is implied by a paper's published score or by adding a baseline adapter.
+
+
+## 11. Follow-on: allocate compute by downstream decision value
+
+The representation comparison above measures task quality and end-to-end resource use for fixed comparison arms. It does not, by itself, qualify an online policy that decides whether to spend more compute for a particular frame. That requires the allocator to be scored against the **downstream decision** and charged for its own compute.
+
+A dedicated follow-on now tracks this gap: [VIS-DVPC-001 #8156](https://github.com/Luminous-Dynamics/symthaea/issues/8156). It compares always-cheap, always-expensive, random, confidence-only, surprise-only, uncertainty-aware and decision-value-guided escalation at fixed budgets. Its evaluator-only oracle may inspect both counterfactual outcomes for retrospective scoring but must never be exposed to the producer. This composes with the existing active-vision and shared decision-impact work; it does not create another saliency implementation or optimizer.
+
+The key hypothesis is that improved visual output can reduce downstream decision quality. Therefore do not use perception confidence, entropy reduction or FLOPs saved as substitutes for decision value, and do not assert adaptive-routing gains until paired held-out results support them. The proposed target at a 20% resource budget is at least 20% lower downstream loss than matched-budget random escalation, with hard budget enforcement and no material primary OOD regression; this is an unqualified research target, not a result.
