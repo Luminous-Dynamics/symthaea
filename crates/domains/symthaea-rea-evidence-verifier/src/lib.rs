@@ -1,3 +1,5 @@
+pub mod differential;
+
 //! Offline verification of REA provider-smoke evidence bundles.
 //!
 //! This verifies artifact bytes against their receipt. It does not verify
