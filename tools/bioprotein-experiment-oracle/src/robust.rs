@@ -7,7 +7,7 @@
 //! experiment authorization, biological prediction, or proof of robustness outside
 //! the declared scenario set.
 
-use super::{evaluate_case, sha256_hex, Case, CaseEvaluation, ResultStatus};
+use super::{Case, CaseEvaluation, ResultStatus, evaluate_case, sha256_hex};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
@@ -127,7 +127,8 @@ impl RobustEvaluation {
     pub fn matches_expected(&self, expected: &RobustExpected) -> bool {
         self.status == expected.status
             && self.robust_winner == expected.robust_winner
-            && self.scenario_results
+            && self
+                .scenario_results
                 .iter()
                 .map(|result| result.selected_experiment_id.clone())
                 .collect::<Vec<_>>()
@@ -181,7 +182,10 @@ fn action_signature(case: &Case) -> BTreeMap<String, BTreeMap<String, i64>> {
 }
 
 fn state_signature(case: &Case) -> BTreeSet<String> {
-    case.states.iter().map(|state| state.state_id.clone()).collect()
+    case.states
+        .iter()
+        .map(|state| state.state_id.clone())
+        .collect()
 }
 
 fn experiment_signature(case: &Case) -> BTreeSet<String> {
@@ -220,7 +224,10 @@ fn validate_family(family: &RobustFamily) -> Vec<String> {
         }
         weight_sum += u64::from(scenario.weight);
         if scenario.assumption_tags.is_empty()
-            || scenario.assumption_tags.iter().any(|tag| tag.trim().is_empty())
+            || scenario
+                .assumption_tags
+                .iter()
+                .any(|tag| tag.trim().is_empty())
         {
             errors.push("scenario_assumption_tags_missing".to_owned());
         }
@@ -340,7 +347,9 @@ pub fn evaluate_family(family: &RobustFamily) -> RobustEvaluation {
             None,
             vec!["unresolved_hard_gate_or_evidence_in_at_least_one_scenario".to_owned()],
         ),
-        RobustStatus::InvalidInput => unreachable!("invalid scenario exits before family classification"),
+        RobustStatus::InvalidInput => {
+            unreachable!("invalid scenario exits before family classification")
+        }
     };
 
     let candidate_ids: Vec<String> = family
@@ -402,7 +411,10 @@ pub fn evaluate_family(family: &RobustFamily) -> RobustEvaluation {
         }
 
         if numeric_error {
-            return invalid_family(&family.family_id, "robust_value_arithmetic_or_parse_failure");
+            return invalid_family(
+                &family.family_id,
+                "robust_value_arithmetic_or_parse_failure",
+            );
         }
 
         candidates.push(CandidateRobustness {
@@ -580,9 +592,8 @@ pub fn run_cli() -> i32 {
 mod tests {
     use super::*;
 
-    const CORPUS_JSON: &str = include_str!(
-        "../../../docs/research/bioprotein-experiments/robust-evsi-corpus-v1.json"
-    );
+    const CORPUS_JSON: &str =
+        include_str!("../../../docs/research/bioprotein-experiments/robust-evsi-corpus-v1.json");
 
     fn corpus() -> RobustCorpus {
         serde_json::from_str(CORPUS_JSON).expect("robust EVSI corpus parses")
@@ -705,6 +716,9 @@ mod tests {
         let mut suite = corpus();
         let first_family_id = suite.families[0].family_id.clone();
         suite.families[1].family_id = first_family_id;
-        assert_eq!(validate_corpus_header(&suite), Err("duplicate_or_empty_family_id"));
+        assert_eq!(
+            validate_corpus_header(&suite),
+            Err("duplicate_or_empty_family_id")
+        );
     }
 }
