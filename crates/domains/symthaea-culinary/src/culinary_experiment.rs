@@ -339,6 +339,31 @@ pub fn validate_culinary_experiment_v1(
         }
     }
 
+    let analysis_plan = experiment.get("analysis_plan");
+    if analysis_plan.is_none() {
+        errors.push("analysis_plan is required".to_owned());
+    }
+    if let Some(plan) = analysis_plan {
+        let primary = non_empty(plan, "primary_outcome_id");
+        if !primary.is_some_and(|id| outcome_definitions.contains_key(id)) {
+            errors.push("analysis_plan.primary_outcome_id must reference a declared outcome".to_owned());
+        }
+        for (key, expected) in [
+            ("paired_estimand", "variant_minus_control"),
+            ("summary_method", "mean_paired_difference"),
+            ("uncertainty_semantics", "measurement_bounds_only"),
+            ("missing_data_policy", "fail_closed"),
+            ("population_inference", "not_estimated"),
+        ] {
+            if non_empty(plan, key) != Some(expected) {
+                errors.push(format!("analysis_plan.{key} must be {expected:?}"));
+            }
+        }
+        if plan.get("report_all_declared_outcomes").and_then(Value::as_bool) != Some(true) {
+            errors.push("analysis_plan.report_all_declared_outcomes must be true".to_owned());
+        }
+    }
+
     let blocks: &[Value] = match experiment.get("blocks").and_then(Value::as_array) {
         Some(items) if !items.is_empty() => items.as_slice(),
         _ => {
