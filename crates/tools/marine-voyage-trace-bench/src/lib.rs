@@ -7,6 +7,7 @@
 pub mod paired_trial;
 pub mod operating_envelope;
 pub mod fidelity_ledger;
+pub mod reference_intake;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PowerChannel {
