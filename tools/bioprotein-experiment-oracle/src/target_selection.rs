@@ -275,9 +275,15 @@ fn validate_case(case: &TargetCase) -> Vec<String> {
             ("days_to_ready", ObjectiveDirection::Minimize),
         ];
         for (objective_id, expected_direction) in required_objectives {
-            match target.objectives.iter().find(|objective| objective.objective_id == objective_id) {
+            match target
+                .objectives
+                .iter()
+                .find(|objective| objective.objective_id == objective_id)
+            {
                 Some(objective) if objective.direction != expected_direction => {
-                    errors.insert(format!("required_objective_direction_mismatch:{objective_id}"));
+                    errors.insert(format!(
+                        "required_objective_direction_mismatch:{objective_id}"
+                    ));
                 }
                 Some(_) => {}
                 None => {
@@ -285,7 +291,9 @@ fn validate_case(case: &TargetCase) -> Vec<String> {
                 }
             }
         }
-        if let Some(capacity) = target.objectives.iter()
+        if let Some(capacity) = target
+            .objectives
+            .iter()
             .find(|objective| objective.objective_id == "compliant_capacity")
         {
             if capacity.unit != b.volume_unit {
@@ -701,7 +709,10 @@ mod tests {
             "biology_function_failed",
             "process_closure_failed",
         ] {
-            assert!(blocked.reason_codes.contains(&reason.to_owned()), "{reason}");
+            assert!(
+                blocked.reason_codes.contains(&reason.to_owned()),
+                "{reason}"
+            );
         }
         assert!(actual.pareto_frontier_ids.is_empty());
     }
@@ -788,10 +799,17 @@ mod tests {
                 "compliant_capacity_unit_mismatch",
             ),
         ] {
-            let case = corpus.cases.iter().find(|case| case.case_id == case_id).unwrap();
+            let case = corpus
+                .cases
+                .iter()
+                .find(|case| case.case_id == case_id)
+                .unwrap();
             let actual = evaluate_case(case);
             assert_eq!(actual.status, CaseStatus::InvalidInput, "{case_id}");
-            assert!(actual.reason_codes.contains(&reason.to_owned()), "{case_id}");
+            assert!(
+                actual.reason_codes.contains(&reason.to_owned()),
+                "{case_id}"
+            );
             assert!(actual.targets.is_empty(), "{case_id}");
         }
     }
