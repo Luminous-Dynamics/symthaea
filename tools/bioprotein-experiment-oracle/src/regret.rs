@@ -439,7 +439,7 @@ pub fn evaluate_family(family: &RegretFamily) -> RegretEvaluation {
             .filter(|id| {
                 cost_by_id
                     .get(id.as_str())
-                    .is_some_and(|cost| **cost <= scenario.budget_utility)
+                    .is_some_and(|cost| *cost <= scenario.budget_utility)
             })
             .cloned()
             .collect();
