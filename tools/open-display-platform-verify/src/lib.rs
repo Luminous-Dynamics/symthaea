@@ -847,6 +847,16 @@ fn validate_measurement_run_semantics(record: &Value) -> Vec<String> {
                         "measured observation {observation_id} uses instrument {id} without VALID calibration state"
                     ));
                 }
+                if status == "INDEPENDENTLY_REVIEWED"
+                    && instrument
+                        .get("capability_profile_status")
+                        .and_then(Value::as_str)
+                        != Some("INDEPENDENTLY_REVIEWED")
+                {
+                    errors.push(format!(
+                        "independently reviewed observation {observation_id} uses instrument {id} whose capability profile is not independently reviewed"
+                    ));
+                }
                 if instrument
                     .get("calibration_valid_through")
                     .and_then(Value::as_str)
