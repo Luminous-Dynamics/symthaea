@@ -94,6 +94,14 @@ with named, versioned rendering controls rather than adding more heuristic flags
   keeper MIDI use the candidate's same declared dialect; custom specs explicitly
   take the heuristic fallback.
 - The renderer recipe records the dialect in schema v4 whenever it is declared.
+- The same-MIDI 2×2 example computes the room effect at default mastering, the
+  mastering effect at default room, and their interaction. Synthetic tests inject
+  known factor effects and an interaction, then verify the recovered values;
+  a separate case verifies that purely additive effects produce zero interaction.
+- Malformed WAV input fails closed: sample decoding errors are not dropped,
+  partial-channel frames are rejected, and non-finite float samples must not flow
+  into loudness or spectral measurements. Unit tests cover NaN and truncated PCM
+  fixtures; they are authored but remain unexecuted until a Rust toolchain runs them.
 
 ### Audio sanity gate
 
