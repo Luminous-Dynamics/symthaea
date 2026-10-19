@@ -70,3 +70,39 @@ jobs:
             --delimiter ';' \
             --out "$RUNNER_TEMP/cropfoundry-postharvest-receipt.json"
           grep -q '"row_checks_pass": true' "$RUNNER_TEMP/cropfoundry-postharvest-receipt.json"
+
+      - name: Check nutrient-accounting CLI
+        run: cargo run -q -p xtask -- cropfoundry-nutrition-accounting --help
+
+      - name: Execute synthetic nutrient-accounting fixture
+        run: |
+          cat > "$RUNNER_TEMP/cropfoundry-nutrition-input.json" <<'JSON'
+          {
+            "schema_version": "cropfoundry-nutrition-accounting-input-v0",
+            "batch_id": "synthetic-nutrition-lot",
+            "nutrient_id": "iron",
+            "concentration_mg_per_kg": 80.0,
+            "concentration_mass_basis": "fresh_edible_mass",
+            "concentration_stage": "measured_at_serving",
+            "concentration_provenance": "direct_assay",
+            "concentration_evidence_uri": "urn:synthetic-assay:iron-v0",
+            "assay_method": "synthetic-fixture-only",
+            "served_edible_mass_kg": 0.15,
+            "served_mass_basis": "fresh_edible_mass",
+            "retention_fraction": null,
+            "retention_evidence_uri": null,
+            "bioavailability_fraction": 0.25,
+            "bioavailability_evidence_uri": "urn:synthetic-literature-factor:v0",
+            "water_liters": 30.0,
+            "land_square_meters": 2.0,
+            "energy_kwh": 0.5,
+            "cost_amount": 1.25,
+            "currency_code": "ZAR",
+            "source_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+          JSON
+          cargo run -q -p xtask -- cropfoundry-nutrition-accounting \
+            --input "$RUNNER_TEMP/cropfoundry-nutrition-input.json" \
+            --out "$RUNNER_TEMP/cropfoundry-nutrition-receipt.json"
+          grep -q '"accounting_pass": true' "$RUNNER_TEMP/cropfoundry-nutrition-receipt.json"
+          grep -q '"input_sha256":' "$RUNNER_TEMP/cropfoundry-nutrition-receipt.json"
