@@ -414,8 +414,18 @@ mod tests {
         input.assay_method = Some("  ".to_owned());
         let receipt = audit_input(input);
         assert!(!receipt.accounting_pass);
-        assert!(receipt.issues.iter().any(|issue| issue.contains("concentration_evidence_uri")));
-        assert!(receipt.issues.iter().any(|issue| issue.contains("assay_method")));
+        assert!(
+            receipt
+                .issues
+                .iter()
+                .any(|issue| issue.contains("concentration_evidence_uri"))
+        );
+        assert!(
+            receipt
+                .issues
+                .iter()
+                .any(|issue| issue.contains("assay_method"))
+        );
     }
 
     #[test]
