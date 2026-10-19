@@ -427,7 +427,7 @@ mod tests {
     fn current_source_manifest_keeps_every_source_non_trainable() {
         let fixture: Value = serde_json::from_str(SOURCE_FIXTURE).unwrap();
         let count = validate_source_manifest(&fixture).unwrap();
-        assert_eq!(count, 14);
+        assert_eq!(count, 16);
         assert!(
             fixture["sources"]
                 .as_array()
@@ -531,7 +531,7 @@ mod tests {
         source["content_sha256"] =
             json!("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
 
-        assert_eq!(validate_source_manifest(&fixture).unwrap(), 14);
+        assert_eq!(validate_source_manifest(&fixture).unwrap(), 16);
     }
 
     #[test]
@@ -541,7 +541,7 @@ mod tests {
         fixture["sources"][0]["permitted_current_use"] =
             json!(["public_metadata_review", "schema_audit"]);
         fixture["sources"][0]["training_authorized"] = json!(false);
-        assert_eq!(validate_source_manifest(&fixture).unwrap(), 14);
+        assert_eq!(validate_source_manifest(&fixture).unwrap(), 16);
     }
 
     #[test]
