@@ -45,7 +45,9 @@
 //! SoundFont/VCSL environment and record the new output before interpreting it.
 //!
 //! ```sh
+//! export SYMTHAEA_GIT_REVISION="$(git rev-parse HEAD)"
 //! nix shell nixpkgs#fluidsynth nixpkgs#soundfont-fluid --command bash -c '
+//!   export SYMTHAEA_GIT_REVISION="$SYMTHAEA_GIT_REVISION"
 //!   export SYMTHAEA_FLUIDSYNTH=$(which fluidsynth)
 //!   export SYMTHAEA_SOUNDFONT=$(ls /nix/store/*/share/soundfonts/FluidR3_GM2-2.sf2 | head -1)
 //!   cargo run --release -p symthaea-muse --features theory --example renderer_ab_fair'
