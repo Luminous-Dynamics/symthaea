@@ -39,6 +39,10 @@ pub struct GeometryScreenResult {
     pub conservative_footprint_height_mm: f64,
     pub total_required_width_mm: f64,
     pub total_required_height_mm: f64,
+    pub horizontal_margin_mm: f64,
+    pub vertical_margin_mm: f64,
+    pub horizontal_utilization_fraction: f64,
+    pub vertical_utilization_fraction: f64,
     pub uniform_patch_width_mm: f64,
     pub uniform_patch_height_mm: f64,
     pub horizontal_fits: bool,
@@ -75,6 +79,14 @@ impl GeometryScreenResult {
             "required_patch_extent_mm": {
                 "width": self.total_required_width_mm,
                 "height": self.total_required_height_mm
+            },
+            "remaining_patch_margin_mm": {
+                "width": self.horizontal_margin_mm,
+                "height": self.vertical_margin_mm
+            },
+            "patch_utilization_fraction": {
+                "width": self.horizontal_utilization_fraction,
+                "height": self.vertical_utilization_fraction
             },
             "available_uniform_patch_mm": {
                 "width": self.uniform_patch_width_mm,
@@ -221,8 +233,12 @@ pub fn evaluate_geometry_screen(
         ]);
     }
 
-    let horizontal_fits = required_width <= input.uniform_patch_width_mm;
-    let vertical_fits = required_height <= input.uniform_patch_height_mm;
+    let horizontal_margin = input.uniform_patch_width_mm - required_width;
+    let vertical_margin = input.uniform_patch_height_mm - required_height;
+    let horizontal_utilization = required_width / input.uniform_patch_width_mm;
+    let vertical_utilization = required_height / input.uniform_patch_height_mm;
+    let horizontal_fits = horizontal_margin >= 0.0;
+    let vertical_fits = vertical_margin >= 0.0;
     let screen_status = if horizontal_fits && vertical_fits {
         "WITHIN_GUARD_BAND"
     } else {
@@ -242,6 +258,10 @@ pub fn evaluate_geometry_screen(
         conservative_footprint_height_mm: conservative_height,
         total_required_width_mm: required_width,
         total_required_height_mm: required_height,
+        horizontal_margin_mm: horizontal_margin,
+        vertical_margin_mm: vertical_margin,
+        horizontal_utilization_fraction: horizontal_utilization,
+        vertical_utilization_fraction: vertical_utilization,
         uniform_patch_width_mm: input.uniform_patch_width_mm,
         uniform_patch_height_mm: input.uniform_patch_height_mm,
         horizontal_fits,
@@ -501,6 +521,10 @@ mod tests {
         let exact_edge = evaluate_geometry_screen(&input).expect("exactly sufficient patch is valid");
         assert!(exact_edge.horizontal_fits);
         assert!(exact_edge.vertical_fits);
+        close(exact_edge.horizontal_margin_mm, 0.0, 1e-12);
+        close(exact_edge.vertical_margin_mm, 0.0, 1e-12);
+        close(exact_edge.horizontal_utilization_fraction, 1.0, 1e-12);
+        close(exact_edge.vertical_utilization_fraction, 1.0, 1e-12);
         assert_eq!(exact_edge.screen_status, "WITHIN_GUARD_BAND");
 
         input.uniform_patch_width_mm -= 1e-9;
@@ -508,6 +532,10 @@ mod tests {
             evaluate_geometry_screen(&input).expect("just-too-small patch is still a valid measurement setup");
         assert!(!just_too_small.horizontal_fits);
         assert!(just_too_small.vertical_fits);
+        assert!(just_too_small.horizontal_margin_mm < 0.0);
+        assert!(just_too_small.vertical_margin_mm >= 0.0);
+        assert!(just_too_small.horizontal_utilization_fraction > 1.0);
+        assert!(just_too_small.vertical_utilization_fraction <= 1.0);
         assert_eq!(just_too_small.screen_status, "OUTSIDE_GUARD_BAND");
     }
 
