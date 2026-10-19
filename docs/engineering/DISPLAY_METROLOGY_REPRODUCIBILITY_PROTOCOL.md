@@ -184,7 +184,7 @@ Use the existing [visual utility-per-joule protocol](VISUAL_UTILITY_PER_JOULE_PR
 - [OPEN_DISPLAY_HARDWARE_REUSE_CANDIDATES.md](OPEN_DISPLAY_HARDWARE_REUSE_CANDIDATES.md): reusable optical latency hardware and instrument candidates.
 - [DISPLAY_PATTERN_ROBUSTNESS_AND_UNCERTAINTY.md](DISPLAY_PATTERN_ROBUSTNESS_AND_UNCERTAINTY.md): per-pattern context and conservative uncertainty handling.
 - [VISUAL_UTILITY_PER_JOULE_PROTOCOL.md](VISUAL_UTILITY_PER_JOULE_PROTOCOL.md): task success and energy accounting.
-- [DISPLAY_MANUFACTURING_ROUTE_PROTOCOL.md](DISPLAY_MANUFACTURING_ROUTE_PROTOCOL.md): manufacturing evidence, yield/repair/cost identities and Pareto gate.
+- [display manufacturing route protocol](https://github.com/Luminous-Dynamics/symthaea/blob/research/vis-tech-001-program-2026-10-17/docs/engineering/DISPLAY_MANUFACTURING_ROUTE_PROTOCOL.md): manufacturing evidence, yield/repair/cost identities and Pareto gate.
 - [Mycelix VIS-EVID-001 #5157](https://github.com/Luminous-Dynamics/mycelix/issues/5157): evidence provenance; a receipt does not itself certify the physical measurement.
 
 All proposed gates are unqualified until instruments, procedures, baselines and measurements have been independently reviewed.
