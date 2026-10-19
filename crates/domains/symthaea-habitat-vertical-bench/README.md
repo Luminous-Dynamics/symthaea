@@ -17,7 +17,7 @@ Validate an alternate fixture by passing its path:
 cargo run -p symthaea-habitat-vertical-bench --bin validate-habitat-vertical -- path/to/fixture.json
 ```
 
-The default fixture is embedded at compile time from `docs/research/fixtures/habitat-vertical-v0.1.json`. A successful run means only that the fixture parses and meets the structural and synthetic arithmetic invariants implemented here. The CLI prints the synthetic cost ratio and mass-balance known answers; negative controls are declared and only the mutations covered by unit tests are executed.
+The default fixture is embedded at compile time from `docs/research/fixtures/habitat-vertical-v0.1.json`. The CLI also validates the embedded definition-only campaign in `docs/research/fixtures/habitat-vertical-scenarios-v0.1.json`. A successful run means only that fixture structure, synthetic arithmetic controls, and the eight scenario definitions are internally consistent. It does not run a scheduler or simulate a disruption. The CLI prints the synthetic cost ratio and mass-balance known answers; negative controls are declared and only the mutations covered by unit tests are exercised by the test suite.
 
 ## Checks
 
@@ -33,16 +33,18 @@ The default fixture is embedded at compile time from `docs/research/fixtures/hab
 - exact known-answer descendant sets, including two affected packed units and an unrelated control unit;
 - exactly one final inspection, requiring inspection and measurement skills and a required hold point;
 - complete negative-control and disruption descriptions;
+- a definition-only counterfactual campaign covering exactly the eight source disruption IDs, with per-case interventions, hard invariants, required outputs, metric references, and unresolved execution blockers;
+- no fabricated numeric campaign results, no implicit baseline/candidate policy binding, and no confusion between campaign definition validation and simulation;
 - proposed target status and the delivered-cost ratio range;
 - synthetic-only physical-measurement, factory-commissioning, human-evaluation and replication states.
 
 ## Tests and verification status
 
-The source currently contains 31 authored Rust unit tests. They have not been compiled or executed in the current environment; do not describe them as passing. Run the commands above against the exact branch head before treating the qualifier as an executed test result.
+The source currently contains 44 authored Rust unit tests across the structural/arithmetic qualifier and the scenario-campaign qualifier (31 existing + 13 new scenario tests). They have not been compiled or executed in the current environment; do not describe them as passing. Run the commands above against the exact branch head before treating the qualifier as an executed test result. The scenario-campaign tests qualify definitions only, not scheduling outcomes.
 
 ## Deliberate limits
 
-This is a schema/consistency and synthetic reachability qualifier, not a scheduler, optimizer, production-execution engine, supplier verifier, material-property validator, factory code/safety reviewer, costing audit, LCA engine or product qualification system. It checks the frozen graph's exact known-answer descendant sets; it does not prove physical lot-genealogy completeness, quarantine a real article, execute the declared disruption scenarios, test cost formulas against observed books, verify a real factory layout, or show that any proposed target is achieved. Those require separate known-answer tests, exact current owner APIs, and eventually measured evidence.
+This is a schema/consistency, synthetic arithmetic and scenario-definition qualifier, not a scheduler, optimizer, production-execution engine, supplier verifier, material-property validator, factory code/safety reviewer, costing audit, LCA engine or product qualification system. It checks the frozen graph's exact known-answer descendant sets and the eight disruption definitions; it does not prove physical lot-genealogy completeness, quarantine a real article, execute disruptions, compare baseline/candidate schedules, test cost formulas against observed books, verify a real factory layout, or show that any proposed target is achieved. The household-goods policy identities and scheduler adapter remain unbound. Those steps require exact current owner APIs and eventually measured evidence.
 
 The crate uses the existing graph-theory implementation rather than adding another graph engine. It is a research/benchmark consumer and must not be treated as physical execution authority.
 
