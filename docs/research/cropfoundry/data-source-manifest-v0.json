@@ -1,7 +1,7 @@
 {
   "manifest": "CropFoundryDataSourceInventory",
   "version": "0.1.0-proposal",
-  "snapshot_date": "2026-10-18",
+  "snapshot_date": "2026-10-19",
   "status": "discovery_only",
   "policy": {
     "default_ingestion_state": "quarantined",
@@ -320,6 +320,30 @@
       "content_sha256": null,
       "next_gate": "Confirm artifact-specific license/access terms and any linked paper/data terms. If authorized, download the three listed workbooks, pin SHA-256 hashes and retrieval time, inspect units/replicate/time-point structure and missingness, and determine whether time points support a predeclared chronological evaluation.",
       "initial_intended_role": "Small-scale CF-020 feasibility candidate for spectral/fluorescence/physiological alignment under controlled heat. It cannot establish thermal-camera performance, early warning before visible symptoms, field efficacy, or South African geographic transfer."
+    },
+    {
+      "id": "DS-014",
+      "title": "Dataset on tackling postharvest tomato losses in tropical climates using a passive cooling blanket",
+      "source_uri": "https://zenodo.org/records/15856413",
+      "source_type": "postharvest_tomato_storage_and_transport_experiment",
+      "reported_content": [
+        "multiple XLSX workbooks associated with published tomato passive-cooling-blanket work",
+        "reported measures include produce weight, firmness, color, soluble solids content and acidity",
+        "reported comparisons include charcoal cooling blanket and ambient shade/storage conditions",
+        "potential data for batch/stage-specific mass loss and quality-retention audit"
+      ],
+      "observed_metadata": "The Zenodo v3 record was published 2025-07-10 and lists eight XLSX files totalling about 2.3 MB. Its visible Rights/License section has no populated license value. The linked work describes a Uganda tomato supply-chain pilot; published aggregate findings are not local South African efficacy evidence. The files have not been downloaded, parsed or audited, and their batch/replicate semantics, intervention assignment, exact units, data dictionary and missingness have not yet been verified.",
+      "license_status": "unresolved_license_field_not_populated_on_record",
+      "access_status": "public_open_record_artifact_terms_not_verified",
+      "ingestion_status": "quarantined",
+      "permitted_current_use": [
+        "public_metadata_review",
+        "citation"
+      ],
+      "training_authorized": false,
+      "content_sha256": null,
+      "next_gate": "Verify rights for the exact eight XLSX artifacts and linked publication terms; if authorized, retrieve the minimum subset, record retrieval time and file digests, inspect workbook structures, units, batches, treatment allocation, loss-stage definitions, replicates, quality criteria and missingness, then design a leakage-resistant baseline audit. Keep training disabled until artifact-specific authorization is explicitly reviewed.",
+      "initial_intended_role": "Candidate for CF-023 mass-balance and postharvest-quality schema audit after rights review. Do not infer freshness or food safety from appearance alone; do not treat reported paper summaries as independent row-level data or local South African validation."
     }
   ]
 }
