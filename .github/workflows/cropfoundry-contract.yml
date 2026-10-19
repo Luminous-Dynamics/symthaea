@@ -132,3 +132,17 @@ jobs:
           grep -q '"scenario_policy_diagnostics": \[' "$RUNNER_TEMP/cropfoundry-robust-policy-receipt.json"
           grep -q '"calibrated_probability_claim": false' "$RUNNER_TEMP/cropfoundry-robust-policy-receipt.json"
           grep -q '"biological_performance_claim": false' "$RUNNER_TEMP/cropfoundry-robust-policy-receipt.json"
+
+      - name: Check trial-power preflight CLI
+        run: cargo run -q -p xtask -- cropfoundry-trial-power-plan --help
+
+      - name: Execute synthetic field-trial power preflight
+        run: |
+          cargo run -q -p xtask -- cropfoundry-trial-power-plan \
+            --input docs/research/cropfoundry/trial-power-input-example-v0.json \
+            --out "$RUNNER_TEMP/cropfoundry-trial-power-receipt.json"
+          grep -q '"receipt_schema": "cropfoundry-trial-power-receipt-v0"' "$RUNNER_TEMP/cropfoundry-trial-power-receipt.json"
+          grep -q '"clusters_required_per_arm": 20' "$RUNNER_TEMP/cropfoundry-trial-power-receipt.json"
+          grep -q '"total_planned_plots_two_arms": 200' "$RUNNER_TEMP/cropfoundry-trial-power-receipt.json"
+          grep -q '"field_efficacy_claim": false' "$RUNNER_TEMP/cropfoundry-trial-power-receipt.json"
+          grep -q '"training_authorized": false' "$RUNNER_TEMP/cropfoundry-trial-power-receipt.json"
