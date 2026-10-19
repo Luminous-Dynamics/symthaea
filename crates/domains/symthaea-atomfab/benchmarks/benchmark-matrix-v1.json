@@ -1,0 +1,298 @@
+{
+  "schema_version": 1,
+  "registry_id": "atomfab-benchmark-matrix-v1",
+  "reviewed_on": "2026-10-19",
+  "status": "planned_not_executed",
+  "purpose": "Compare AtomFab's decision and evidence layer with current specialist models, public scientific benchmarks, conventional acquisition policies, and process-twin baselines.",
+  "claim_policy": {
+    "no_sota_claim_until": [
+      "the official task and split are reproduced",
+      "the exact baseline model/tool version and configuration are pinned",
+      "test/train overlap is audited where feasible",
+      "equal budgets and target definitions are used for policy comparisons",
+      "all failed runs and exclusions are reported",
+      "metrics are independently recomputed from raw predictions or traceable outputs"
+    ],
+    "distinguish_result_classes": [
+      "reference",
+      "prediction",
+      "simulation",
+      "measurement",
+      "independently_reproduced"
+    ],
+    "rule": "Novel architecture, high source-code volume, or internal test success is not evidence of state-of-the-art performance."
+  },
+  "benchmark_lanes": [
+    {
+      "id": "scientific-ms25",
+      "status": "first_reference_lane",
+      "goal": "Reproduce task-level atomistic metrics and derived-observable behavior on a tractable, license-compatible MS25 subset.",
+      "reference": {
+        "name": "MS25",
+        "doi": "10.1021/acs.jcim.5c01262",
+        "url": "https://doi.org/10.1021/acs.jcim.5c01262",
+        "systems": [
+          "MgO surfaces",
+          "liquid water",
+          "zeolites",
+          "Pt surface reaction",
+          "high-entropy alloys",
+          "disordered Zr oxides"
+        ]
+      },
+      "baselines": [
+        "Published MS25 reference results using the exact declared reference method, settings and subset.",
+        "Choose the strongest compatible pinned pretrained potential from the public Matbench Discovery model catalog; candidate pool includes MatRIS-10M-OAM, eSEN-30M-OAM, Orb-v3, MatterSim-v1.5M, and MACE-MP-0/OMAT variants, subject to species, dataset, license, precision and hardware compatibility.",
+        "One simpler domain-appropriate baseline where scientifically meaningful.",
+        "Policy ablation: same potential/evaluator with the selection/evidence layer disabled."
+      ],
+      "metrics": [
+        "energy MAE/RMSE/max error",
+        "force MAE/RMSE/max error",
+        "derived observable error",
+        "per-family error",
+        "OOD calibration"
+      ],
+      "gates": [
+        "reproduce a published baseline within its reported tolerance",
+        "preserve exact reference method and units",
+        "group correlated configurations by parent material",
+        "report failures and exclusions"
+      ]
+    },
+    {
+      "id": "crystal-stability",
+      "status": "leaderboard_comparison_after_lane_1",
+      "goal": "Measure competitiveness on the official high-throughput crystal stability task.",
+      "reference": {
+        "name": "Matbench Discovery",
+        "doi": "10.1038/s42256-025-01055-1",
+        "url": "https://docs.materialsproject.org/services/ml-and-ai-applications/matbench-discovery"
+      },
+      "baselines": [
+        "Current official Matbench Discovery leaderboard models, pinning the exact checkpoint, metadata and evaluator version.",
+        "Candidate current catalog models include MatRIS-10M-OAM, eSEN-30M-OAM, Orb-v3, MatterSim-v1.5M and MACE variants when their task coverage and use terms permit.",
+        "A published or simpler baseline from the official benchmark protocol."
+      ],
+      "metrics": [
+        "official F1",
+        "precision",
+        "recall",
+        "discovery acceleration factor",
+        "compute per evaluated structure"
+      ],
+      "gates": [
+        "use the official evaluator and fixed split",
+        "only compare scores with matching compliance labels",
+        "do not infer overall manufacturing performance from a stability score"
+      ]
+    },
+    {
+      "id": "experimental-reality-gap",
+      "status": "validation_lane_no_hardware_claim",
+      "goal": "Test whether model selection, uncertainty and abstention improve agreement with experimental properties.",
+      "reference": {
+        "name": "UniFFBench / MinX",
+        "doi": "10.1038/s43588-026-01019-4",
+        "url": "https://doi.org/10.1038/s43588-026-01019-4",
+        "scope": "1500+ mineral systems, 85 elements, experimental reference measurements"
+      },
+      "baselines": [
+        "pinned universal MLIP baselines from the benchmark",
+        "simple chemistry/structure baseline where applicable"
+      ],
+      "metrics": [
+        "property error against experiment",
+        "reference uncertainty-aware normalized error",
+        "interval coverage",
+        "abstention risk-coverage curve",
+        "error by material/environment family"
+      ],
+      "gates": [
+        "respect experimental reference uncertainty",
+        "separate in-domain from OOD cases",
+        "do not label simulation outputs as measurement"
+      ]
+    },
+    {
+      "id": "off-equilibrium-search",
+      "status": "planned",
+      "goal": "Test whether potential-guided search recovers correct structures and energetic hierarchy under perturbed geometries.",
+      "reference": {
+        "name": "2026 universal interatomic potential EOS and minima-hopping benchmark",
+        "doi": "10.1038/s41524-026-02251-2",
+        "url": "https://doi.org/10.1038/s41524-026-02251-2"
+      },
+      "baselines": [
+        "pinned universal MLIPs",
+        "reference DFT results",
+        "simple local/random search baseline where applicable"
+      ],
+      "metrics": [
+        "equation-of-state curve error",
+        "equilibrium volume",
+        "bulk modulus",
+        "reference structure recovery",
+        "pairwise energetic-ordering accuracy",
+        "search cost"
+      ],
+      "gates": [
+        "separate equilibrium and far-from-equilibrium reports",
+        "count failed and duplicated searches",
+        "validate energetic rankings against the declared reference method"
+      ]
+    },
+    {
+      "id": "catalyst-later",
+      "status": "later_domain_lane",
+      "goal": "Measure adsorption and relaxation quality when a catalytic-material use case is selected.",
+      "reference": {
+        "name": "Open Catalyst Project OC20/OC22",
+        "url": "https://opencatalystproject.org/"
+      },
+      "baselines": [
+        "official task baselines",
+        "current available pretrained potential under matched settings"
+      ],
+      "metrics": [
+        "official energy-within-threshold metric",
+        "energy MAE",
+        "relaxation success",
+        "compute and memory cost"
+      ],
+      "gates": [
+        "do not compare metrics across non-equivalent leaderboards",
+        "freeze data/model version and relaxation protocol"
+      ]
+    },
+    {
+      "id": "active-learning-policy",
+      "status": "first_algorithmic_ablation",
+      "goal": "Isolate whether Symthaea's decision layer improves candidate selection when physics outputs are held constant.",
+      "reference": {
+        "name": "Frozen labelled subset with retrospective masked queries",
+        "url": null
+      },
+      "baselines": [
+        "random",
+        "diversity-only",
+        "uncertainty-only",
+        "cost-aware acquisition",
+        "Symthaea policy",
+        "Symthaea with history/retrieval ablated"
+      ],
+      "metrics": [
+        "best validated objective at equal cost",
+        "area under learning curve",
+        "AF",
+        "EF",
+        "decision regret",
+        "queries and time to target",
+        "risk-coverage curve"
+      ],
+      "gates": [
+        "freeze target and budget before campaigns",
+        "at least 20 fixed seeds for a strong comparative claim when feasible",
+        "matched target costs",
+        "report full curves and confidence intervals",
+        "no win unless quality is at least as good at equal budget"
+      ]
+    },
+    {
+      "id": "symtropy-workcell",
+      "status": "first_process_twin_lane",
+      "goal": "Validate process feasibility and fault response on a simulation-only surrogate workcell.",
+      "reference": {
+        "name": "Symtropy AtomFab digital-twin contract",
+        "url": "https://github.com/Luminous-Dynamics/symtropy/pull/2140"
+      },
+      "baselines": [
+        "static constraint checker",
+        "simple conventional path planner",
+        "Symthaea decision policy with process feedback ablated"
+      ],
+      "metrics": [
+        "false-feasible count/rate",
+        "missed-feasible count",
+        "collision/limit violations",
+        "fault detection precision/recall",
+        "safe-stop latency",
+        "recovery",
+        "replay fidelity"
+      ],
+      "gates": [
+        "zero false-feasible accepts on the frozen adversarial hard-constraint suite",
+        "undefined false-feasible rate when no cases are accepted",
+        "every rejection has a reason",
+        "synthetic validity must not be presented as hardware validation"
+      ]
+    },
+    {
+      "id": "metrology-prospective",
+      "status": "blocked_until_laboratory_gate",
+      "goal": "Test prediction-to-measurement gap on a supervised physical material process.",
+      "reference": {
+        "name": "Prospectively selected and independently measured samples",
+        "url": null
+      },
+      "baselines": [
+        "frozen prediction before experiment",
+        "declared conventional planning or expert baseline"
+      ],
+      "metrics": [
+        "property error against experiment",
+        "yield",
+        "defect density",
+        "process repeatability",
+        "time/cost to target",
+        "failed runs/rework",
+        "uncertainty calibration"
+      ],
+      "gates": [
+        "pre-register protocol and exclusions",
+        "independent instrumentation/interlocks",
+        "operator approval",
+        "calibration and sample provenance",
+        "independent characterization"
+      ]
+    }
+  ],
+  "policy_baselines": [
+    {
+      "id": "random",
+      "definition": "Uniform selection from the eligible candidate pool with fixed seeds."
+    },
+    {
+      "id": "diversity",
+      "definition": "Select candidates to maximize a predeclared geometric/feature-space diversity objective."
+    },
+    {
+      "id": "uncertainty",
+      "definition": "Select candidates with highest calibrated predictive uncertainty."
+    },
+    {
+      "id": "cost_aware",
+      "definition": "Select by expected target improvement or information value divided by measured evaluation cost."
+    },
+    {
+      "id": "symthaea_full",
+      "definition": "Preregistered AtomFab policy using evidence, constraints, uncertainty and history."
+    },
+    {
+      "id": "symthaea_ablation",
+      "definition": "Same policy with the specific claimed advantage disabled; matched model, budget and seeds."
+    }
+  ],
+  "performance_claims": {
+    "accelerations": {
+      "stretch_target_median_af": 2,
+      "minimum_campaigns": 20,
+      "confidence_interval": "95% bootstrap lower bound > 1.0",
+      "precondition": "same preregistered target, matched query cost model, equal final-quality requirement"
+    },
+    "process_feasibility": {
+      "maximum_false_feasible_accepts_on_frozen_adversarial_suite": 0,
+      "if_no_candidates_accepted": "false_feasible_rate=null; never report as 0"
+    }
+  }
+}

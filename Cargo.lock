@@ -18182,6 +18182,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "symthaea-atomfab"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "symthaea-audit"
 version = "0.1.0"
 dependencies = [
