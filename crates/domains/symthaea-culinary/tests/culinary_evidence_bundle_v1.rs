@@ -97,7 +97,7 @@ fn test_only_bundle() -> (Value, Vec<u8>, String, BTreeMap<String, Vec<u8>>) {
     (experiment, manifest_bytes, manifest_sha, payloads)
 }
 
-fn verify_bundle<'a>(
+fn verify_bundle(
     experiment: &Value,
     manifest_bytes: &[u8],
     manifest_sha: &str,
@@ -217,8 +217,8 @@ fn duplicate_manifest_fields_are_rejected_by_typed_deserialization() {
     let (experiment, manifest_bytes, _, payloads)=test_only_bundle();
     let text=String::from_utf8(manifest_bytes).unwrap();
     let injected=text.replacen(
-        "{\"schema_version\":",
-        "{\"bundle_id\":\"first\",\"bundle_id\":\"second\",\"schema_version\":",
+        "{",
+        "{\"bundle_id\":\"first\",\"bundle_id\":\"second\",",
         1
     );
     let bytes=injected.into_bytes();
@@ -251,4 +251,27 @@ fn duplicate_artifact_paths_are_rejected() {
     let digest=sha256_hex(&bytes);
     let error=verify_culinary_evidence_bundle_v1(&experiment,&bytes,&digest,&payloads).unwrap_err();
     assert!(error.iter().any(|item|item.contains("duplicate artifact path")));
+}
+
+
+#[test]
+fn unreferenced_manifest_artifact_is_rejected() {
+    let (experiment, manifest_bytes, _, mut payloads) = test_only_bundle();
+    let mut manifest: Value = serde_json::from_slice(&manifest_bytes).unwrap();
+    let extra_payload = b"declared but unreachable artifact".to_vec();
+    let extra_id = "unreferenced-artifact";
+    manifest["artifacts"].as_array_mut().unwrap().push(json!({
+        "artifact_id":extra_id,
+        "artifact_kind":"other",
+        "path":"extra/unreferenced.bin",
+        "source_ref":"urn:test-evidence:unreferenced",
+        "source_version":"v1",
+        "sha256":sha256_hex(&extra_payload),
+        "byte_length":extra_payload.len()
+    }));
+    payloads.insert(extra_id.into(), extra_payload);
+    let bytes = serde_json::to_vec(&manifest).unwrap();
+    let digest = sha256_hex(&bytes);
+    let error = verify_culinary_evidence_bundle_v1(&experiment,&bytes,&digest,&payloads).unwrap_err();
+    assert!(error.iter().any(|item| item.contains("is not referenced")));
 }
