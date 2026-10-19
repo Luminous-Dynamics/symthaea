@@ -192,6 +192,67 @@ struct CsvInventory {
     claim_ceiling: &'static str,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CsvMappingSpec {
+    schema_version: String,
+    artifact_relative_path: String,
+    source_row_id_header: String,
+    columns: Vec<CsvColumnMapping>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CsvColumnMapping {
+    source_header: String,
+    canonical_field_id: String,
+    raw_unit: String,
+    role: CsvFieldRole,
+    missing_policy: CsvMissingPolicy,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum CsvFieldRole {
+    Metadata,
+    Predictor,
+    TargetOutcome,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum CsvMissingPolicy {
+    Reject,
+    PreserveMissing,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct CsvMappedColumnReceipt {
+    source_header: String,
+    canonical_field_id: String,
+    raw_unit: String,
+    role: CsvFieldRole,
+    missing_policy: CsvMissingPolicy,
+    nonempty_cells: usize,
+    preserved_missing_cells: usize,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct CsvReconciliationReceipt {
+    artifact_relative_path: String,
+    artifact_sha256: String,
+    mapping_sha256: String,
+    headers_sha256: String,
+    source_row_id_header: String,
+    ordered_source_row_ids_sha256: String,
+    data_row_count: usize,
+    unique_source_row_ids: usize,
+    mapped_column_count: usize,
+    columns: Vec<CsvMappedColumnReceipt>,
+    reconciliation_note: &'static str,
+    claim_ceiling: &'static str,
+}
+
 #[derive(Debug, Clone, Serialize)]
 struct AuditReceipt {
     receipt_schema_version: &'static str,
@@ -206,6 +267,8 @@ struct AuditReceipt {
     held_out_outcome_groups: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     csv_inventory: Option<CsvInventory>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    csv_reconciliation: Option<CsvReconciliationReceipt>,
     claim_ceiling: &'static str,
 }
 
@@ -300,6 +363,181 @@ fn inspect_csv_bytes(bytes: &[u8], relative_path: &str) -> Result<CsvInventory> 
         columns,
         row_identity_note: "rows are reported as parsed-record counts only; data-row ordinal is not an upstream row identifier",
         claim_ceiling: "CSV byte/shape inventory only; no semantic field mapping or model-accuracy claim",
+    })
+}
+
+fn reconcile_csv_bytes(
+    bytes: &[u8],
+    mapping: &CsvMappingSpec,
+    mapping_bytes: &[u8],
+    expected_relative_path: &str,
+) -> Result<CsvReconciliationReceipt> {
+    if mapping.schema_version != "0.1.0" {
+        return Err(AdapterError::Validation(format!(
+            "unsupported CSV mapping schema_version {:?}",
+            mapping.schema_version
+        )));
+    }
+
+    let declared_path = safe_relative_path(&mapping.artifact_relative_path)?;
+    if declared_path.to_string_lossy() != expected_relative_path {
+        return Err(AdapterError::Validation(format!(
+            "mapping artifact path {:?} does not match requested manifest path {:?}",
+            mapping.artifact_relative_path, expected_relative_path
+        )));
+    }
+    if !nonblank(&mapping.source_row_id_header) {
+        return Err(AdapterError::Validation(
+            "source_row_id_header must identify an exact nonblank source header".into(),
+        ));
+    }
+    if mapping.columns.is_empty() {
+        return Err(AdapterError::Validation(
+            "CSV mapping must declare at least one semantic column".into(),
+        ));
+    }
+
+    let inventory = inspect_csv_bytes(bytes, expected_relative_path)?;
+    let mut reader = csv::ReaderBuilder::new()
+        .has_headers(true)
+        .flexible(false)
+        .from_reader(bytes);
+    let headers = reader.headers()?.clone();
+
+    let row_id_index = headers.iter()
+        .position(|header| header == mapping.source_row_id_header)
+        .ok_or_else(|| AdapterError::Validation(format!(
+            "source row identifier header {:?} is absent from the exact CSV header",
+            mapping.source_row_id_header
+        )))?;
+
+    let mut source_headers = BTreeSet::new();
+    let mut canonical_fields = BTreeSet::new();
+    let mut mapped_indices = Vec::with_capacity(mapping.columns.len());
+    for column in &mapping.columns {
+        if !nonblank(&column.source_header)
+            || !nonblank(&column.canonical_field_id)
+            || !nonblank(&column.raw_unit)
+        {
+            return Err(AdapterError::Validation(
+                "mapped source header, canonical field ID, and raw unit must be explicit".into(),
+            ));
+        }
+        if column.source_header == mapping.source_row_id_header {
+            return Err(AdapterError::Validation(format!(
+                "source row identity column {:?} cannot also be mapped as a measurement field",
+                column.source_header
+            )));
+        }
+        if !source_headers.insert(column.source_header.clone()) {
+            return Err(AdapterError::Validation(format!(
+                "source header {:?} is mapped more than once",
+                column.source_header
+            )));
+        }
+        if !canonical_fields.insert(column.canonical_field_id.clone()) {
+            return Err(AdapterError::Validation(format!(
+                "canonical field ID {:?} is mapped more than once",
+                column.canonical_field_id
+            )));
+        }
+        let index = headers.iter()
+            .position(|header| header == column.source_header)
+            .ok_or_else(|| AdapterError::Validation(format!(
+                "mapped source header {:?} is absent from the exact CSV header",
+                column.source_header
+            )))?;
+        mapped_indices.push(index);
+    }
+
+    let mut rows = 0usize;
+    let mut seen_row_ids = BTreeSet::new();
+    let mut row_ids_hasher = Sha256::new();
+    let mut mapped_receipts: Vec<CsvMappedColumnReceipt> = mapping.columns.iter()
+        .map(|column| CsvMappedColumnReceipt {
+            source_header: column.source_header.clone(),
+            canonical_field_id: column.canonical_field_id.clone(),
+            raw_unit: column.raw_unit.clone(),
+            role: column.role,
+            missing_policy: column.missing_policy,
+            nonempty_cells: 0,
+            preserved_missing_cells: 0,
+        })
+        .collect();
+
+    for (record_index, result) in reader.records().enumerate() {
+        let record = result?;
+        rows = rows.checked_add(1).ok_or_else(|| {
+            AdapterError::Validation("CSV reconciliation row count overflow".into())
+        })?;
+        let row_id = record.get(row_id_index).unwrap_or_default().trim();
+        if row_id.is_empty() {
+            return Err(AdapterError::Validation(format!(
+                "CSV data record {} has a blank source-native row ID in header {:?}",
+                record_index + 1, mapping.source_row_id_header
+            )));
+        }
+        if !seen_row_ids.insert(row_id.to_string()) {
+            return Err(AdapterError::Validation(format!(
+                "CSV source-native row ID {:?} is duplicated", row_id
+            )));
+        }
+        let row_id_bytes = row_id.as_bytes();
+        row_ids_hasher.update((row_id_bytes.len() as u64).to_be_bytes());
+        row_ids_hasher.update(row_id_bytes);
+
+        for (mapping_index, source_index) in mapped_indices.iter().enumerate() {
+            let cell = record.get(*source_index).unwrap_or_default().trim();
+            if cell.is_empty() {
+                if mapping.columns[mapping_index].missing_policy == CsvMissingPolicy::Reject {
+                    return Err(AdapterError::Validation(format!(
+                        "CSV record {} has a missing value in required source field {:?}",
+                        record_index + 1, mapping.columns[mapping_index].source_header
+                    )));
+                }
+                mapped_receipts[mapping_index].preserved_missing_cells =
+                    mapped_receipts[mapping_index].preserved_missing_cells.checked_add(1)
+                    .ok_or_else(|| AdapterError::Validation(
+                        "CSV missing-cell count overflow".into()
+                    ))?;
+            } else {
+                mapped_receipts[mapping_index].nonempty_cells =
+                    mapped_receipts[mapping_index].nonempty_cells.checked_add(1)
+                    .ok_or_else(|| AdapterError::Validation(
+                        "CSV nonempty-cell count overflow".into()
+                    ))?;
+            }
+        }
+    }
+
+    if rows != inventory.data_row_count || seen_row_ids.len() != rows {
+        return Err(AdapterError::Validation(
+            "CSV reconciliation row count or source row identity accounting mismatch".into(),
+        ));
+    }
+
+    let mut header_hasher = Sha256::new();
+    for header in headers.iter() {
+        let header_bytes = header.as_bytes();
+        header_hasher.update((header_bytes.len() as u64).to_be_bytes());
+        header_hasher.update(header_bytes);
+    }
+    let headers_sha256 = format!("{:x}", header_hasher.finalize());
+    let ordered_source_row_ids_sha256 = format!("{:x}", row_ids_hasher.finalize());
+
+    Ok(CsvReconciliationReceipt {
+        artifact_relative_path: expected_relative_path.to_string(),
+        artifact_sha256: sha256_hex(bytes),
+        mapping_sha256: sha256_hex(mapping_bytes),
+        headers_sha256,
+        source_row_id_header: mapping.source_row_id_header.clone(),
+        ordered_source_row_ids_sha256,
+        data_row_count: rows,
+        unique_source_row_ids: seen_row_ids.len(),
+        mapped_column_count: mapped_receipts.len(),
+        columns: mapped_receipts,
+        reconciliation_note: "all parsed records were accounted for; source-native row IDs are unique; exact source headers were mapped as declared; missing values follow the explicit per-column policy",
+        claim_ceiling: "source row/header mapping integrity only; no numeric parsing, unit conversion, prediction accuracy, or physical qualification claim",
     })
 }
 
@@ -1026,6 +1264,7 @@ fn manifest_receipt(
         record_count,
         held_out_outcome_groups: groups,
         csv_inventory: None,
+        csv_reconciliation: None,
         claim_ceiling: "source/contract integrity only; not evidence of model accuracy or physical qualification",
     }
 }
@@ -1033,7 +1272,7 @@ fn manifest_receipt(
 fn run(args: &[String]) -> Result<AuditReceipt> {
     if args.len() < 3 {
         return Err(AdapterError::Validation(
-            "usage: metal-measurement-bench validate-manifest MANIFEST.json | verify-artifacts MANIFEST.json ARTIFACT_DIR | inspect-csv MANIFEST.json ARTIFACT_DIR RELATIVE_CSV_PATH | validate-records MANIFEST.json OBSERVATIONS.json ARTIFACT_DIR".into(),
+            "usage: metal-measurement-bench validate-manifest MANIFEST.json | verify-artifacts MANIFEST.json ARTIFACT_DIR | inspect-csv MANIFEST.json ARTIFACT_DIR RELATIVE_CSV_PATH | reconcile-csv MANIFEST.json ARTIFACT_DIR MAPPING.json RELATIVE_CSV_PATH | validate-records MANIFEST.json OBSERVATIONS.json ARTIFACT_DIR".into(),
         ));
     }
     let operation = args[1].as_str();
@@ -1116,6 +1355,60 @@ fn run(args: &[String]) -> Result<AuditReceipt> {
                 Vec::new(),
             );
             receipt.csv_inventory = Some(inventory);
+            Ok(receipt)
+        }
+        "reconcile-csv" => {
+            if args.len() != 6 {
+                return Err(AdapterError::Validation(
+                    "reconcile-csv requires artifact root, mapping JSON and manifest-declared relative CSV path".into(),
+                ));
+            }
+            let (mapping, mapping_bytes): (CsvMappingSpec, Vec<u8>) =
+                read_json(Path::new(&args[4]))?;
+            let requested_relative = safe_relative_path(&args[5])?;
+            let relative_string = requested_relative.to_string_lossy().to_string();
+            if !relative_string.to_lowercase().ends_with(".csv") {
+                return Err(AdapterError::Validation(
+                    "reconcile-csv accepts only a .csv artifact path".into(),
+                ));
+            }
+            let artifact = manifest.artifacts.iter()
+                .find(|artifact| artifact.relative_path == relative_string)
+                .ok_or_else(|| AdapterError::Validation(format!(
+                    "CSV path {:?} is not declared by the manifest", relative_string
+                )))?;
+
+            let root = Path::new(&args[3]);
+            verify_artifacts(&manifest, root)?;
+            let canonical_root = fs::canonicalize(root).map_err(|error| io_error(root, error))?;
+            let requested_path = canonical_root.join(&requested_relative);
+            let canonical_path = fs::canonicalize(&requested_path)
+                .map_err(|error| io_error(&requested_path, error))?;
+            if !canonical_path.starts_with(&canonical_root) || !canonical_path.is_file() {
+                return Err(AdapterError::Validation(format!(
+                    "CSV artifact {:?} is outside the verified root or is not a regular file",
+                    relative_string
+                )));
+            }
+            let bytes = fs::read(&canonical_path).map_err(|error| io_error(&canonical_path, error))?;
+            if bytes.len() as u64 != artifact.size_bytes || sha256_hex(&bytes) != artifact.sha256 {
+                return Err(AdapterError::Validation(format!(
+                    "CSV artifact {:?} changed after initial verification", relative_string
+                )));
+            }
+            let reconciliation = reconcile_csv_bytes(
+                &bytes, &mapping, &mapping_bytes, &relative_string
+            )?;
+            let mut receipt = manifest_receipt(
+                "reconcile-csv",
+                "CSV_SOURCE_ROWS_AND_EXPLICIT_FIELDS_RECONCILED",
+                &manifest_bytes,
+                Some(sha256_hex(&bytes)),
+                manifest.artifacts.len(),
+                reconciliation.data_row_count,
+                Vec::new(),
+            );
+            receipt.csv_reconciliation = Some(reconciliation);
             Ok(receipt)
         }
         "validate-records" => {
@@ -1266,6 +1559,88 @@ mod tests {
             censoring: Censoring::Uncensored,
             metadata_note: None,
         }
+    }
+
+    fn fixture_csv_mapping() -> CsvMappingSpec {
+        CsvMappingSpec {
+            schema_version: "0.1.0".into(),
+            artifact_relative_path: "fixture.csv".into(),
+            source_row_id_header: "source_row_id".into(),
+            columns: vec![
+                CsvColumnMapping {
+                    source_header: "stress_mpa".into(),
+                    canonical_field_id: "tensile.stress".into(),
+                    raw_unit: "MPa".into(),
+                    role: CsvFieldRole::TargetOutcome,
+                    missing_policy: CsvMissingPolicy::PreserveMissing,
+                },
+                CsvColumnMapping {
+                    source_header: "specimen_note".into(),
+                    canonical_field_id: "specimen.note".into(),
+                    raw_unit: "text".into(),
+                    role: CsvFieldRole::Metadata,
+                    missing_policy: CsvMissingPolicy::PreserveMissing,
+                },
+            ],
+        }
+    }
+
+    #[test]
+    fn csv_reconciliation_binds_exact_headers_units_roles_and_source_row_ids() {
+        let bytes = b"source_row_id,stress_mpa,specimen_note\nR-001,920,as-built\nR-002,,repeat\n";
+        let mapping = fixture_csv_mapping();
+        let mapping_bytes = serde_json::to_vec(&mapping).unwrap();
+        let result = reconcile_csv_bytes(bytes, &mapping, &mapping_bytes, "fixture.csv").unwrap();
+        assert_eq!(result.artifact_sha256, sha256_hex(bytes));
+        assert_eq!(result.mapping_sha256, sha256_hex(&mapping_bytes));
+        assert_eq!(result.data_row_count, 2);
+        assert_eq!(result.unique_source_row_ids, 2);
+        assert_eq!(result.mapped_column_count, 2);
+        assert_eq!(result.columns[0].source_header, "stress_mpa");
+        assert_eq!(result.columns[0].raw_unit, "MPa");
+        assert_eq!(result.columns[0].role, CsvFieldRole::TargetOutcome);
+        assert_eq!(result.columns[0].preserved_missing_cells, 1);
+        assert_eq!(result.columns[1].nonempty_cells, 2);
+    }
+
+    #[test]
+    fn csv_reconciliation_rejects_absent_header_and_repeated_row_ids() {
+        let bytes = b"source_row_id,stress_mpa\nR-001,920\nR-002,930\n";
+        let mut mapping = fixture_csv_mapping();
+        let mapping_bytes = serde_json::to_vec(&mapping).unwrap();
+        assert!(reconcile_csv_bytes(bytes, &mapping, &mapping_bytes, "fixture.csv").is_err());
+
+        mapping.columns.truncate(1);
+        let duplicate_rows = b"source_row_id,stress_mpa\nR-001,920\nR-001,930\n";
+        let mapping_bytes = serde_json::to_vec(&mapping).unwrap();
+        assert!(reconcile_csv_bytes(duplicate_rows, &mapping, &mapping_bytes, "fixture.csv").is_err());
+    }
+
+    #[test]
+    fn csv_reconciliation_applies_missing_policy_without_silent_imputation() {
+        let bytes = b"source_row_id,stress_mpa,specimen_note\nR-001,,note\n";
+        let mut mapping = fixture_csv_mapping();
+        mapping.columns[0].missing_policy = CsvMissingPolicy::Reject;
+        let mapping_bytes = serde_json::to_vec(&mapping).unwrap();
+        assert!(reconcile_csv_bytes(bytes, &mapping, &mapping_bytes, "fixture.csv").is_err());
+
+        mapping.columns[0].missing_policy = CsvMissingPolicy::PreserveMissing;
+        let mapping_bytes = serde_json::to_vec(&mapping).unwrap();
+        let result = reconcile_csv_bytes(bytes, &mapping, &mapping_bytes, "fixture.csv").unwrap();
+        assert_eq!(result.columns[0].preserved_missing_cells, 1);
+        assert_eq!(result.columns[0].nonempty_cells, 0);
+    }
+
+    #[test]
+    fn csv_reconciliation_rejects_mismatched_artifact_identity_and_duplicate_mapping_fields() {
+        let bytes = b"source_row_id,stress_mpa,specimen_note\nR-001,920,note\n";
+        let mut mapping = fixture_csv_mapping();
+        let mapping_bytes = serde_json::to_vec(&mapping).unwrap();
+        assert!(reconcile_csv_bytes(bytes, &mapping, &mapping_bytes, "other.csv").is_err());
+
+        mapping.columns[1].canonical_field_id = mapping.columns[0].canonical_field_id.clone();
+        let mapping_bytes = serde_json::to_vec(&mapping).unwrap();
+        assert!(reconcile_csv_bytes(bytes, &mapping, &mapping_bytes, "fixture.csv").is_err());
     }
 
     #[test]
