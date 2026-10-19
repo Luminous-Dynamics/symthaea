@@ -22,6 +22,7 @@ struct PortfolioInput {
     schema_version: String,
     portfolio_id: String,
     comparison_basis: String,
+    comparison_basis_evidence_uri: String,
     expected_nutrient_ids: Vec<String>,
     options: Vec<PortfolioOptionInput>,
 }
@@ -91,6 +92,7 @@ struct NutritionPortfolioReceipt {
     input_sha256: String,
     portfolio_id: String,
     comparison_basis: String,
+    comparison_basis_evidence_uri: String,
     expected_nutrient_ids: Vec<String>,
     option_count: usize,
     common_resource_count: usize,
@@ -587,6 +589,9 @@ fn reconcile_portfolio(input: PortfolioInput, input_sha256: String) -> Nutrition
     if input.comparison_basis.trim().is_empty() {
         issues.push("comparison_basis must be explicit".to_owned());
     }
+    if input.comparison_basis_evidence_uri.trim().is_empty() {
+        issues.push("comparison_basis_evidence_uri must identify the study protocol or comparison evidence".to_owned());
+    }
     if input.expected_nutrient_ids.is_empty()
         || input.expected_nutrient_ids.iter().any(|id| id.trim().is_empty())
         || expected_set.len() != input.expected_nutrient_ids.len()
@@ -712,6 +717,7 @@ fn reconcile_portfolio(input: PortfolioInput, input_sha256: String) -> Nutrition
         input_sha256,
         portfolio_id: input.portfolio_id,
         comparison_basis: input.comparison_basis,
+        comparison_basis_evidence_uri: input.comparison_basis_evidence_uri,
         expected_nutrient_ids: input.expected_nutrient_ids,
         option_count: options.len(),
         common_resource_count,
@@ -827,6 +833,7 @@ mod tests {
                 schema_version: PORTFOLIO_SCHEMA_V0.to_owned(),
                 portfolio_id: "synthetic-portfolio".to_owned(),
                 comparison_basis: "same synthetic site-season unit".to_owned(),
+                comparison_basis_evidence_uri: "urn:synthetic-comparison-protocol".to_owned(),
                 expected_nutrient_ids: vec!["iron".to_owned(), "zinc".to_owned()],
                 options,
             },
