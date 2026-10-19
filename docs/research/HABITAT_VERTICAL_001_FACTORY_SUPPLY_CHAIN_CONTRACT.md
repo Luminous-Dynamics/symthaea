@@ -155,6 +155,12 @@ The follow-on [HABITAT-COUNTERFACTUAL-001 campaign contract](./HABITAT_COUNTERFA
 
 The campaign validator checks exact ID coverage against the source disruption list, prevents numeric outputs from being embedded in a definition-only fixture, and refuses implicit baseline/candidate policy revisions. It is not a scheduler or simulator. Baseline/candidate scoring remains blocked until the canonical policy revisions and a household-goods adapter are inspected, bound, and independently verified. Thirteen new Rust tests are authored for these contract invariants; none has been compiled or executed in this environment.
 
+### Resilience option-value comparison
+
+Follow-on [HABITAT-RESILIENCE-OPTIONS-001](./HABITAT_RESILIENCE_OPTIONS_001_OPTION_VALUE.md) and its 6-option × 8-disruption synthetic fixture establish a test corpus for **the option value of qualified flexibility**: alternative qualified supply, workcell/skill redundancy, essential-utility continuity, modular/common components and an integrated portfolio. These 48 cells intentionally use fabricated challenge-oracle bounds, not predicted factory outcomes.
+
+The benchmark keeps incremental investment, lost accepted-unit-hours, recovery time and hard constraints separate. It assigns no scenario probabilities, computes no ROI or expected annual loss, and grants no real resilience credit without the exact supplier/resource/product/service qualification gates. It is designed to consume the existing robust-frontier and robust decision owners once their exact interfaces are qualified; it must not introduce another scheduler or optimizer.
+
 ## Synthetic arithmetic known answers now included
 
 The fixture includes explicit arithmetic-control data so the first qualifier tests more than graph shape:
