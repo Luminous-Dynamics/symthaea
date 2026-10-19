@@ -134,11 +134,55 @@ fn resolve_wav_path(audio_root: &Path, declared: &str) -> PathBuf {
 }
 
 fn validate_wave_bytes(bytes: &[u8], context: &str) -> Result<()> {
-    if bytes.len() < 12
-        || &bytes[0..4] != b"RIFF"
-        || &bytes[8..12] != b"WAVE"
-    {
-        return Err(format!("{context}: expected a RIFF/WAVE container"));
+    if bytes.len() < 44 || &bytes[0..4] != b"RIFF" || &bytes[8..12] != b"WAVE" {
+        return Err(format!("{context}: expected a non-empty RIFF/WAVE container"));
+    }
+    let declared_riff_bytes = u32::from_le_bytes(bytes[4..8].try_into().expect("slice has four bytes")) as usize;
+    if declared_riff_bytes.checked_add(8) != Some(bytes.len()) {
+        return Err(format!("{context}: RIFF size does not match actual file length"));
+    }
+
+    let mut offset = 12usize;
+    let mut has_format = false;
+    let mut has_audio_data = false;
+    while offset < bytes.len() {
+        if bytes.len() - offset < 8 {
+            return Err(format!("{context}: truncated WAVE chunk header"));
+        }
+        let chunk_id = &bytes[offset..offset + 4];
+        let chunk_bytes = u32::from_le_bytes(
+            bytes[offset + 4..offset + 8]
+                .try_into()
+                .expect("slice has four bytes"),
+        ) as usize;
+        let payload_start = offset + 8;
+        let payload_end = payload_start
+            .checked_add(chunk_bytes)
+            .ok_or_else(|| format!("{context}: WAVE chunk length overflow"))?;
+        if payload_end > bytes.len() {
+            return Err(format!("{context}: WAVE chunk exceeds file length"));
+        }
+        if chunk_id == b"fmt " {
+            if chunk_bytes < 16 {
+                return Err(format!("{context}: WAVE format chunk is shorter than 16 bytes"));
+            }
+            has_format = true;
+        }
+        if chunk_id == b"data" {
+            if chunk_bytes == 0 {
+                return Err(format!("{context}: WAVE audio data chunk is empty"));
+            }
+            has_audio_data = true;
+        }
+        offset = payload_end
+            .checked_add(chunk_bytes % 2)
+            .ok_or_else(|| format!("{context}: WAVE padding length overflow"))?;
+        if offset > bytes.len() {
+            return Err(format!("{context}: WAVE chunk padding exceeds file length"));
+        }
+    }
+    if offset != bytes.len() || !has_format || !has_audio_data {
+        return Err(format!("{context}: WAVE requires complete fmt and non-empty data chunks"));
     }
     Ok(())
 }
@@ -582,11 +626,33 @@ mod tests {
         assert_eq!(csv_field("plain"), "plain");
     }
 
+    fn valid_test_wave() -> Vec<u8> {
+        let mut bytes = b"RIFF".to_vec();
+        bytes.extend_from_slice(&40u32.to_le_bytes()); // file size excluding RIFF header
+        bytes.extend_from_slice(b"WAVEfmt ");
+        bytes.extend_from_slice(&16u32.to_le_bytes());
+        bytes.extend_from_slice(&1u16.to_le_bytes()); // PCM
+        bytes.extend_from_slice(&2u16.to_le_bytes()); // stereo
+        bytes.extend_from_slice(&44_100u32.to_le_bytes());
+        bytes.extend_from_slice(&176_400u32.to_le_bytes());
+        bytes.extend_from_slice(&4u16.to_le_bytes()); // block alignment
+        bytes.extend_from_slice(&16u16.to_le_bytes());
+        bytes.extend_from_slice(b"data");
+        bytes.extend_from_slice(&4u32.to_le_bytes());
+        bytes.extend_from_slice(&[0, 0, 0, 0]);
+        bytes
+    }
+
     #[test]
-    fn wave_container_requires_riff_and_wave_markers() {
-        assert!(validate_wave_bytes(b"RIFFxxxxWAVE", "fixture").is_ok());
-        assert!(validate_wave_bytes(b"RIFFxxxxNOPE", "fixture").is_err());
-        assert!(validate_wave_bytes(b"short", "fixture").is_err());
+    fn wave_container_requires_consistent_riff_chunks() {
+        assert!(validate_wave_bytes(&valid_test_wave(), "fixture").is_ok());
+        assert!(validate_wave_bytes(b"RIFFxxxxWAVE", "fixture").is_err());
+        let mut truncated = valid_test_wave();
+        truncated.pop();
+        assert!(validate_wave_bytes(&truncated, "fixture").is_err());
+        let mut no_data = valid_test_wave();
+        no_data[40..44].copy_from_slice(&0u32.to_le_bytes());
+        assert!(validate_wave_bytes(&no_data, "fixture").is_err());
     }
 
     #[test]
