@@ -54,6 +54,9 @@ struct TrialPowerPlan {
     co_primary_endpoint_count: usize,
     bonferroni_alpha_per_endpoint: f64,
     target_power: f64,
+    design_type: String,
+    allocation_unit: String,
+    intracluster_correlation: f64,
     z_critical_two_sided: f64,
     z_power: f64,
     independent_plots_required_per_arm_before_cluster_and_attrition_adjustment: usize,
@@ -302,6 +305,9 @@ fn calculate(input: &PowerInput, input_sha256: String) -> Result<TrialPowerPlan>
         co_primary_endpoint_count: endpoint.co_primary_endpoint_count,
         bonferroni_alpha_per_endpoint: alpha_per_endpoint,
         target_power: endpoint.target_power,
+        design_type: design.design_type.clone(),
+        allocation_unit: design.allocation_unit.clone(),
+        intracluster_correlation: design.intracluster_correlation,
         z_critical_two_sided: z_critical,
         z_power,
         independent_plots_required_per_arm_before_cluster_and_attrition_adjustment: independent_n,
@@ -389,6 +395,9 @@ mod tests {
         let plan = calculate(&fixture(), "a".repeat(64)).unwrap();
         assert_eq!(plan.independent_plots_required_per_arm_before_cluster_and_attrition_adjustment, 63);
         assert_eq!(plan.total_planned_plots_two_arms, 126);
+        assert_eq!(plan.design_type, "parallel_two_arm_clustered");
+        assert_eq!(plan.allocation_unit, "plot");
+        assert_eq!(plan.intracluster_correlation, 0.0);
         assert!((plan.design_effect - 1.0).abs() < 1e-12);
     }
 
