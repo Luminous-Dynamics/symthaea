@@ -2013,8 +2013,13 @@ mod tests {
         assert_eq!(report.valid_sample_count, 0);
         assert_eq!(report.invalid_or_saturated_sample_count, 1);
         assert_eq!(report.missing_value_count, 1);
-        assert_eq!(report.channels[0].sample_count, 1);
-        assert_eq!(report.channels[0].missing_value_count, 1);
+        let current = report.channels.iter()
+            .find(|channel| channel.channel_id == "dc_bus.current_a")
+            .expect("current channel is included in the per-channel ledger");
+        assert_eq!(current.sample_count, 1);
+        assert_eq!(current.missing_value_count, 1);
+        assert_eq!(current.estimated_expected_sample_count, Some(1));
+        assert_eq!(current.estimated_missing_sample_count, Some(0));
     }
 
     #[test]
@@ -2035,8 +2040,19 @@ mod tests {
         assert_eq!(report.row_count, 3);
         assert_eq!(report.valid_sample_count, 3);
         assert_eq!(report.suspected_gap_count, 1);
-        assert_eq!(report.channels[0].sample_count, 3);
-        assert_eq!(report.channels[0].suspected_gap_count, 1);
+        let speed = report.channels.iter()
+            .find(|channel| channel.channel_id == "gnss.speed_mps")
+            .expect("GNSS speed summary is present");
+        assert_eq!(speed.sample_count, 3);
+        assert_eq!(speed.suspected_gap_count, 1);
+        assert_eq!(speed.estimated_expected_sample_count, Some(7));
+        assert_eq!(speed.estimated_missing_sample_count, Some(4));
+        assert_eq!(report.gaps.len(), 1);
+        assert_eq!(report.gaps[0].channel_id, "gnss.speed_mps");
+        assert_eq!(report.gaps[0].previous_timestamp_ns, 100_000_001);
+        assert_eq!(report.gaps[0].current_timestamp_ns, 600_000_001);
+        assert_eq!(report.gaps[0].estimated_missing_samples, 4);
+        assert!(report.loss_ledger_claim_ceiling.contains("independent loss counter"));
     }
 
     #[test]
@@ -2447,5 +2463,36 @@ mod tests {
         let error = validate_fault_matrix_fixture_manifest(&simulated)
             .expect_err("the mutation suite itself must remain DesignOnly");
         assert!(error.to_string().contains("only DesignOnly fixtures"));
+    }
+
+    #[test]
+    fn declared_but_unobserved_channels_are_visible_in_loss_ledger() {
+        let fixture = manifest();
+        let raw = b"timestamp_ns,channel_id,raw_value,sample_status,sequence\n1,gnss.speed_mps,1,VALID,0\n";
+        let report = validate_trace_bytes(raw, &fixture)
+            .expect("one valid channel is enough for a structurally valid trace");
+        assert_eq!(report.channels.len(), fixture.channels.len());
+        let absent = report.channels.iter()
+            .find(|channel| channel.channel_id == "dc_bus.current_a")
+            .expect("declared current channel is not dropped from the report");
+        assert_eq!(absent.sample_count, 0);
+        assert_eq!(absent.first_timestamp_ns, None);
+        assert_eq!(absent.last_timestamp_ns, None);
+        assert_eq!(absent.estimated_expected_sample_count, None);
+        assert_eq!(absent.estimated_missing_sample_count, None);
+        assert!(absent.loss_estimate_basis.contains("estimate only"));
+    }
+
+    #[test]
+    fn gap_ledger_never_changes_or_fills_raw_rows() {
+        let fixture = manifest();
+        let raw = b"timestamp_ns,channel_id,raw_value,sample_status,sequence\n1,gnss.speed_mps,0,VALID,0\n100000001,gnss.speed_mps,1,VALID,1\n600000001,gnss.speed_mps,2,VALID,2\n";
+        let report = validate_trace_bytes(raw, &fixture).expect("gapped trace is diagnosable");
+        assert_eq!(report.row_count, 3);
+        assert_eq!(report.valid_sample_count, 3);
+        assert_eq!(report.gaps.len(), 1);
+        assert_eq!(report.gaps[0].observed_gap_ns, 500_000_000);
+        assert_eq!(report.gaps[0].estimated_missing_samples, 4);
+        assert_eq!(report.channels.iter().map(|c| c.sample_count).sum::<usize>(), 3);
     }
 }
