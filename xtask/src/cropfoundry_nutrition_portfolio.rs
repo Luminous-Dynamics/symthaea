@@ -265,12 +265,15 @@ fn aggregate_option(
         same_batch_resources(batch_rows, &mut issues, batch_id);
     }
 
+    let cost_recorded = grouped_batches
+        .values()
+        .any(|batch_rows| number_field(&batch_rows[0].input, "cost_amount").is_some());
     let currencies_for_option: BTreeSet<String> = grouped_batches
         .values()
         .filter_map(|batch_rows| text_field(&batch_rows[0].input, "currency_code"))
         .map(|value| value.to_ascii_uppercase())
         .collect();
-    if currencies_for_option.len() > 1 {
+    if cost_recorded && currencies_for_option.len() > 1 {
         issues.push(format!(
             "option {} mixes currencies across batch resource ledgers",
             option.option_id
