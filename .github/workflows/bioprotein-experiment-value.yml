@@ -90,3 +90,22 @@ jobs:
           path: target/bioprotein-robust-evsi-receipt.json
           if-no-files-found: error
           retention-days: 30
+
+      - name: Produce exact-head decision regret receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --manifest-path tools/bioprotein-experiment-oracle/Cargo.toml --bin bioprotein-evsi-regret -- \
+            --expected-head "$EXPECTED_HEAD" \
+            --corpus docs/research/bioprotein-experiments/decision-regret-corpus-v1.json \
+            --receipt target/bioprotein-decision-regret-receipt.json
+          test -s target/bioprotein-decision-regret-receipt.json
+
+      - name: Preserve decision regret receipt artifact
+        if: ${{ always() && hashFiles('target/bioprotein-decision-regret-receipt.json') != '' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: bioprotein-decision-regret-receipt
+          path: target/bioprotein-decision-regret-receipt.json
+          if-no-files-found: error
+          retention-days: 30
