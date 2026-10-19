@@ -2796,4 +2796,51 @@ mod tests {
              different melody -- got a byte-identical note sequence for both states"
         );
     }
+
+    #[test]
+    fn grammar_dialects_are_preserved_by_renderer_mapping() {
+        use symthaea_music_theory::PerformanceDialect as G;
+
+        let pairs = [
+            (G::ClassicalRubato, PerformanceDialect::ClassicalRubato),
+            (G::DanceLocked, PerformanceDialect::DanceLocked),
+            (G::JazzLaidBack, PerformanceDialect::JazzLaidBack),
+            (G::FolkLift, PerformanceDialect::FolkLift),
+            (G::ProcessExact, PerformanceDialect::ProcessExact),
+            (G::DroneElastic, PerformanceDialect::DroneElastic),
+            (G::DramaticTiming, PerformanceDialect::DramaticTiming),
+            (G::ChoralBlend, PerformanceDialect::ChoralBlend),
+        ];
+        for (grammar, renderer) in pairs {
+            assert_eq!(map_grammar_dialect(grammar), renderer, "{grammar:?}");
+        }
+    }
+
+    #[test]
+    fn every_performance_dialect_has_finite_bounded_scales() {
+        let dialects = [
+            PerformanceDialect::ClassicalRubato,
+            PerformanceDialect::DanceLocked,
+            PerformanceDialect::JazzLaidBack,
+            PerformanceDialect::FolkLift,
+            PerformanceDialect::ProcessExact,
+            PerformanceDialect::DroneElastic,
+            PerformanceDialect::DramaticTiming,
+            PerformanceDialect::ChoralBlend,
+        ];
+        for dialect in dialects {
+            let scales = [
+                dialect.breath_scale(),
+                dialect.climax_scale(),
+                dialect.cadence_scale(),
+                dialect.jitter_scale() as f64,
+                dialect.expressive_blend_scale() as f64,
+            ];
+            assert!(
+                scales.iter().all(|scale| scale.is_finite() && *scale >= 0.0 && *scale <= 1.5),
+                "{dialect:?}: {scales:?}"
+            );
+        }
+    }
+
 }
