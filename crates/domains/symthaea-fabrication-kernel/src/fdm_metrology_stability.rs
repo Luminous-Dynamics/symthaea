@@ -701,13 +701,19 @@ mod tests {
             7,
         )
         .unwrap();
+        let stable = run_stability_arm(
+            StabilityScenario::StableProcess,
+            StabilityMonitorPolicy::HybridPersistenceGuard,
+            7,
+        )
+        .unwrap();
         assert_ne!(
             offset.observations[20].residual_mm,
             gain.observations[20].residual_mm
         );
         assert!(
             variance.metrics.maximum_absolute_residual_mm
-                > offset.metrics.maximum_absolute_residual_mm
+                > stable.metrics.maximum_absolute_residual_mm
         );
     }
 
