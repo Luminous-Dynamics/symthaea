@@ -65,7 +65,7 @@ Physical eligibility also requires a claim-specific uncertainty budget (measuran
 
 ## Fault injection matrix and conformance
 
-The machine-readable matrix lists 27 required positive and negative controls, including clock-method spoofing, missing claim-specific uncertainty budgets, an expanded-uncertainty value that exceeds its pre-registered tolerance, and a calculated-but-not-characterized budget. Include positive controls so a validator that rejects everything does not pass. At minimum, exercise:
+The machine-readable matrix lists 28 required positive and negative controls, including clock-method spoofing, missing claim-specific uncertainty budgets, an expanded-uncertainty value that exceeds its pre-registered tolerance, and a calculated-but-not-characterized budget. Include positive controls so a validator that rejects everything does not pass. At minimum, exercise:
 - malformed or reordered headers, empty traces and unknown channels/statuses;
 - VALID samples with missing values, non-finite numbers, sequence gaps, timestamp regression and repeated timestamps for a channel;
 - repeated timestamps across different channels where simultaneous sampling is permitted;
@@ -87,6 +87,10 @@ For predictive tire/vehicle models, partition at the independent unit that can l
 
 Report per-group metrics, worst-group behavior, uncertainty calibration and out-of-distribution cases. A shuffled row split is a smoke test, not evidence of generalization. Fit normalizers and feature-selection only on training data.
 
+### Per-claim uncertainty completeness
+
+Every physical claim needs a separate uncertainty budget for every required measurand—not one budget for the headline score. For example, `ride_energy` needs budgets for bus voltage, bus current, net DC bus energy and ground speed; tire-force characterization needs separate budgets for normal/longitudinal/lateral forces plus slip ratio, slip angle and camber. The Rust schema checks claim/measurand/unit pairs, duplicate pairs, numeric consistency, evidence state and content-addressed budget records. Missing even one required measurand keeps the claim ineligible.
+
 ## Output contract
 
 Every benchmark case includes both the expected/observed outcome and the required diagnostic tokens; a correct exit class with a missing explanation does not pass. Reports include a canonical SHA-256 computed over the serialized report with its `canonical_report_sha256` field blank; a verifier blanks that field and recomputes it. Every benchmark report should include: benchmark version; source commit; toolchain/build identity; fixture and manifest hashes; case ID and expected/observed result; per-channel loss and timing summaries; calibration/protocol/rights references; software and physical gates separately; failed cases and reasons; claim ceiling. Preserve failing raw fixtures so a regression can be replayed.
@@ -107,7 +111,7 @@ The command verifies that `--source-commit` exactly matches `git rev-parse HEAD`
 Next:
 
 1. Execute the Rust tests and matrix on a host with the workspace toolchain; retain the exact-head report and build identity.
-2. Add a canonical report digest and 100/100 replay-determinism test.
+2. Verify the canonical report digest and run the full suite 100 times on the same build to measure replay determinism; a unit test checks digest stability and content sensitivity.
 3. Build a host recorder/replayer before MCU firmware; add SocketCAN only as a receive-only, fail-closed adapter and test unavailable timestamp modes.
 4. Build a known-signal bench: pulse/step signal generator, synchronized voltage/current reference and independent sample counter.
 5. Validate the physical sensor chain and uncertainty before any real-world efficiency, handling, tire-force or safety claim.
