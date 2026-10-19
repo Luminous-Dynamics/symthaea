@@ -1,0 +1,1228 @@
+{
+  "schema_version": "fep-efe-action-002a-reference-v1",
+  "status": "frozen_unqualified_reference_source",
+  "intended_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/6223",
+  "profile": "FiniteCategoricalExpectedInformationGainV1",
+  "formulas": {
+    "predictive_observation": "q(o|a)=sum_s q(s) q(o|s,a)",
+    "posterior": "q(s|o,a)=q(s)q(o|s,a)/q(o|a), only when q(o|a)>0",
+    "expected_kl": "EIG(a)=sum_o q(o|a) KL(q(s|o,a)||q(s))",
+    "entropy_identity": "EIG(a)=H(q(s))-sum_o q(o|a)H(q(s|o,a))",
+    "score_orientation": "E_info(a)=-EIG(a) under the EFE minimization convention",
+    "entropy_notation": "H(p) = -sum_i p_i ln(p_i), with 0 ln 0 defined as 0"
+  },
+  "identity_contract": [
+    "profile ID and version",
+    "ordered or canonicalized state support and prior",
+    "observation support and action-conditioned likelihood matrix",
+    "numeric/tolerance policy",
+    "model/profile generation",
+    "exact corpus/schema version"
+  ],
+  "numeric_policy": {
+    "probabilities": "decimal strings; raw numeric JSON values are intentionally rejected in the malformed-shape controls",
+    "normalization_tolerance": 1e-12,
+    "expected": "symbolic expression where simple, otherwise relation/identity against paired cases",
+    "log_base": "natural logarithm",
+    "impossible_branch": "zero predictive mass contributes zero; do not manufacture a posterior for it",
+    "no_silent_renormalization": true
+  },
+  "cases": [
+    {
+      "id": "I01-uninformative-uniform",
+      "kind": "valid_model",
+      "state_ids": [
+        "s0",
+        "s1"
+      ],
+      "prior": [
+        "0.5",
+        "0.5"
+      ],
+      "observation_ids": [
+        "o0",
+        "o1"
+      ],
+      "likelihood_by_state": [
+        [
+          "0.5",
+          "0.5"
+        ],
+        [
+          "0.5",
+          "0.5"
+        ]
+      ],
+      "expected": {
+        "valid": true,
+        "eig_expression": "0",
+        "relation_to_zero": "equal"
+      }
+    },
+    {
+      "id": "I02-perfect-binary-reveal",
+      "kind": "valid_model",
+      "state_ids": [
+        "s0",
+        "s1"
+      ],
+      "prior": [
+        "0.5",
+        "0.5"
+      ],
+      "observation_ids": [
+        "o0",
+        "o1"
+      ],
+      "likelihood_by_state": [
+        [
+          "1",
+          "0"
+        ],
+        [
+          "0",
+          "1"
+        ]
+      ],
+      "expected": {
+        "valid": true,
+        "eig_expression": "ln(2)",
+        "relation_to_zero": "strictly_positive"
+      }
+    },
+    {
+      "id": "I03-binary-symmetric-error-quarter",
+      "kind": "valid_model",
+      "state_ids": [
+        "s0",
+        "s1"
+      ],
+      "prior": [
+        "0.5",
+        "0.5"
+      ],
+      "observation_ids": [
+        "o0",
+        "o1"
+      ],
+      "likelihood_by_state": [
+        [
+          "0.75",
+          "0.25"
+        ],
+        [
+          "0.25",
+          "0.75"
+        ]
+      ],
+      "expected": {
+        "valid": true,
+        "eig_expression": "ln(2)-H(1/4)",
+        "relation_to_zero": "strictly_positive"
+      }
+    },
+    {
+      "id": "I04-binary-symmetric-error-tenth",
+      "kind": "valid_model",
+      "state_ids": [
+        "s0",
+        "s1"
+      ],
+      "prior": [
+        "0.5",
+        "0.5"
+      ],
+      "observation_ids": [
+        "o0",
+        "o1"
+      ],
+      "likelihood_by_state": [
+        [
+          "0.9",
+          "0.1"
+        ],
+        [
+          "0.1",
+          "0.9"
+        ]
+      ],
+      "expected": {
+        "valid": true,
+        "eig_expression": "ln(2)-H(1/10)",
+        "relation_to_zero": "strictly_positive"
+      }
+    },
+    {
+      "id": "I05-skewed-prior-perfect-reveal",
+      "kind": "valid_model",
+      "state_ids": [
+        "s0",
+        "s1"
+      ],
+      "prior": [
+        "0.25",
+        "0.75"
+      ],
+      "observation_ids": [
+        "o0",
+        "o1"
+      ],
+      "likelihood_by_state": [
+        [
+          "1",
+          "0"
+        ],
+        [
+          "0",
+          "1"
+        ]
+      ],
+      "expected": {
+        "valid": true,
+        "eig_expression": "H(1/4)",
+        "relation_to_zero": "strictly_positive"
+      }
+    },
+    {
+      "id": "I06-uninformative-skewed-prior",
+      "kind": "valid_model",
+      "state_ids": [
+        "s0",
+        "s1"
+      ],
+      "prior": [
+        "0.2",
+        "0.8"
+      ],
+      "observation_ids": [
+        "o0",
+        "o1"
+      ],
+      "likelihood_by_state": [
+        [
+          "0.8",
+          "0.2"
+        ],
+        [
+          "0.8",
+          "0.2"
+        ]
+      ],
+      "expected": {
+        "valid": true,
+        "eig_expression": "0",
+        "relation_to_zero": "equal"
+      }
+    },
+    {
+      "id": "I07-perfect-ternary-reveal",
+      "kind": "valid_model",
+      "state_ids": [
+        "s0",
+        "s1",
+        "s2"
+      ],
+      "prior": [
+        "0.3333333333333333",
+        "0.3333333333333333",
+        "0.3333333333333334"
+      ],
+      "observation_ids": [
+        "o0",
+        "o1",
+        "o2"
+      ],
+      "likelihood_by_state": [
+        [
+          "1",
+          "0",
+          "0"
+        ],
+        [
+          "0",
+          "1",
+          "0"
+        ],
+        [
+          "0",
+          "0",
+          "1"
+        ]
+      ],
+      "expected": {
+        "valid": true,
+        "eig_expression": "ln(3)",
+        "relation_to_zero": "strictly_positive"
+      }
+    },
+    {
+      "id": "I08-ternary-partition",
+      "kind": "valid_model",
+      "state_ids": [
+        "s0",
+        "s1",
+        "s2"
+      ],
+      "prior": [
+        "0.3333333333333333",
+        "0.3333333333333333",
+        "0.3333333333333334"
+      ],
+      "observation_ids": [
+        "o0",
+        "o1"
+      ],
+      "likelihood_by_state": [
+        [
+          "1",
+          "0"
+        ],
+        [
+          "0",
+          "1"
+        ],
+        [
+          "0",
+          "1"
+        ]
+      ],
+      "expected": {
+        "valid": true,
+        "eig_expression": "ln(3)-(2/3)*ln(2)",
+        "relation_to_zero": "strictly_positive"
+      }
+    },
+    {
+      "id": "I09-impossible-observation-branch",
+      "kind": "valid_model",
+      "state_ids": [
+        "s0",
+        "s1"
+      ],
+      "prior": [
+        "1",
+        "0"
+      ],
+      "observation_ids": [
+        "o0",
+        "o1"
+      ],
+      "likelihood_by_state": [
+        [
+          "1",
+          "0"
+        ],
+        [
+          "0",
+          "1"
+        ]
+      ],
+      "expected": {
+        "valid": true,
+        "eig_expression": "0",
+        "relation_to_zero": "equal",
+        "zero_mass_branch": "o1"
+      }
+    },
+    {
+      "id": "I10-many-to-one-binary-partition",
+      "kind": "valid_model",
+      "state_ids": [
+        "s0",
+        "s1",
+        "s2"
+      ],
+      "prior": [
+        "0.25",
+        "0.25",
+        "0.5"
+      ],
+      "observation_ids": [
+        "groupA",
+        "groupB"
+      ],
+      "likelihood_by_state": [
+        [
+          "1",
+          "0"
+        ],
+        [
+          "1",
+          "0"
+        ],
+        [
+          "0",
+          "1"
+        ]
+      ],
+      "expected": {
+        "valid": true,
+        "eig_expression": "ln(2)",
+        "relation_to_zero": "strictly_positive"
+      }
+    },
+    {
+      "id": "I11-observation-label-permutation",
+      "kind": "valid_model",
+      "state_ids": [
+        "s0",
+        "s1"
+      ],
+      "prior": [
+        "0.5",
+        "0.5"
+      ],
+      "observation_ids": [
+        "o1",
+        "o0"
+      ],
+      "likelihood_by_state": [
+        [
+          "0.25",
+          "0.75"
+        ],
+        [
+          "0.75",
+          "0.25"
+        ]
+      ],
+      "expected": {
+        "valid": true,
+        "eig_expression": "ln(2)-H(1/4)",
+        "relation_to_zero": "strictly_positive",
+        "compare_to": "I03-binary-symmetric-error-quarter",
+        "relation_to_compared_case": "equal"
+      }
+    },
+    {
+      "id": "I12-state-label-permutation",
+      "kind": "valid_model",
+      "state_ids": [
+        "s1",
+        "s0"
+      ],
+      "prior": [
+        "0.5",
+        "0.5"
+      ],
+      "observation_ids": [
+        "o0",
+        "o1"
+      ],
+      "likelihood_by_state": [
+        [
+          "0.25",
+          "0.75"
+        ],
+        [
+          "0.75",
+          "0.25"
+        ]
+      ],
+      "expected": {
+        "valid": true,
+        "eig_expression": "ln(2)-H(1/4)",
+        "relation_to_zero": "strictly_positive",
+        "compare_to": "I03-binary-symmetric-error-quarter",
+        "relation_to_compared_case": "equal"
+      }
+    },
+    {
+      "id": "I13-noisier-sensor-lower-eig",
+      "kind": "valid_model",
+      "state_ids": [
+        "s0",
+        "s1"
+      ],
+      "prior": [
+        "0.5",
+        "0.5"
+      ],
+      "observation_ids": [
+        "o0",
+        "o1"
+      ],
+      "likelihood_by_state": [
+        [
+          "0.6",
+          "0.4"
+        ],
+        [
+          "0.4",
+          "0.6"
+        ]
+      ],
+      "expected": {
+        "valid": true,
+        "eig_expression": "ln(2)-H(2/5)",
+        "relation_to_zero": "strictly_positive",
+        "compare_to": "I03-binary-symmetric-error-quarter",
+        "relation_to_compared_case": "less"
+      }
+    },
+    {
+      "id": "I14-highly-skewed-perfect-prior",
+      "kind": "valid_model",
+      "state_ids": [
+        "s0",
+        "s1"
+      ],
+      "prior": [
+        "0.99",
+        "0.01"
+      ],
+      "observation_ids": [
+        "o0",
+        "o1"
+      ],
+      "likelihood_by_state": [
+        [
+          "1",
+          "0"
+        ],
+        [
+          "0",
+          "1"
+        ]
+      ],
+      "expected": {
+        "valid": true,
+        "eig_expression": "H(1/100)",
+        "relation_to_zero": "strictly_positive",
+        "compare_to": "I02-perfect-binary-reveal",
+        "relation_to_compared_case": "less"
+      }
+    },
+    {
+      "id": "I15-nonuniform-prior-no-information",
+      "kind": "valid_model",
+      "state_ids": [
+        "s0",
+        "s1"
+      ],
+      "prior": [
+        "0.25",
+        "0.75"
+      ],
+      "observation_ids": [
+        "o0",
+        "o1"
+      ],
+      "likelihood_by_state": [
+        [
+          "0.75",
+          "0.25"
+        ],
+        [
+          "0.75",
+          "0.25"
+        ]
+      ],
+      "expected": {
+        "valid": true,
+        "eig_expression": "0",
+        "relation_to_zero": "equal"
+      }
+    },
+    {
+      "id": "I16-perfect-reveal-skew-repeat",
+      "kind": "valid_model",
+      "state_ids": [
+        "s0",
+        "s1"
+      ],
+      "prior": [
+        "0.25",
+        "0.75"
+      ],
+      "observation_ids": [
+        "o0",
+        "o1"
+      ],
+      "likelihood_by_state": [
+        [
+          "1",
+          "0"
+        ],
+        [
+          "0",
+          "1"
+        ]
+      ],
+      "expected": {
+        "valid": true,
+        "eig_expression": "H(1/4)",
+        "relation_to_zero": "strictly_positive",
+        "compare_to": "I05-skewed-prior-perfect-reveal",
+        "relation_to_compared_case": "equal"
+      }
+    },
+    {
+      "id": "I17-independent-three-symbol-sensor",
+      "kind": "valid_model",
+      "state_ids": [
+        "s0",
+        "s1"
+      ],
+      "prior": [
+        "0.35",
+        "0.65"
+      ],
+      "observation_ids": [
+        "o0",
+        "o1",
+        "o2"
+      ],
+      "likelihood_by_state": [
+        [
+          "0.2",
+          "0.3",
+          "0.5"
+        ],
+        [
+          "0.2",
+          "0.3",
+          "0.5"
+        ]
+      ],
+      "expected": {
+        "valid": true,
+        "eig_expression": "0",
+        "relation_to_zero": "equal"
+      }
+    },
+    {
+      "id": "I18-four-state-two-group-observation",
+      "kind": "valid_model",
+      "state_ids": [
+        "s0",
+        "s1",
+        "s2",
+        "s3"
+      ],
+      "prior": [
+        "0.25",
+        "0.25",
+        "0.25",
+        "0.25"
+      ],
+      "observation_ids": [
+        "left",
+        "right"
+      ],
+      "likelihood_by_state": [
+        [
+          "1",
+          "0"
+        ],
+        [
+          "1",
+          "0"
+        ],
+        [
+          "0",
+          "1"
+        ],
+        [
+          "0",
+          "1"
+        ]
+      ],
+      "expected": {
+        "valid": true,
+        "eig_expression": "ln(2)",
+        "relation_to_zero": "strictly_positive"
+      }
+    },
+    {
+      "id": "I19-ternary-perfect-skewed",
+      "kind": "valid_model",
+      "state_ids": [
+        "s0",
+        "s1",
+        "s2"
+      ],
+      "prior": [
+        "0.2",
+        "0.3",
+        "0.5"
+      ],
+      "observation_ids": [
+        "o0",
+        "o1",
+        "o2"
+      ],
+      "likelihood_by_state": [
+        [
+          "1",
+          "0",
+          "0"
+        ],
+        [
+          "0",
+          "1",
+          "0"
+        ],
+        [
+          "0",
+          "0",
+          "1"
+        ]
+      ],
+      "expected": {
+        "valid": true,
+        "eig_expression": "H((1/5,3/10,1/2))",
+        "relation_to_zero": "strictly_positive"
+      }
+    },
+    {
+      "id": "I20-known-state-with-zero-mass-branch",
+      "kind": "valid_model",
+      "state_ids": [
+        "s0",
+        "s1"
+      ],
+      "prior": [
+        "1",
+        "0"
+      ],
+      "observation_ids": [
+        "o0",
+        "o1",
+        "o2"
+      ],
+      "likelihood_by_state": [
+        [
+          "0.25",
+          "0.75",
+          "0"
+        ],
+        [
+          "0",
+          "0",
+          "1"
+        ]
+      ],
+      "expected": {
+        "valid": true,
+        "eig_expression": "0",
+        "relation_to_zero": "equal",
+        "zero_mass_branch": "o2"
+      }
+    },
+    {
+      "id": "I21-duplicated-observation-resolution",
+      "kind": "valid_model",
+      "state_ids": [
+        "s0",
+        "s1"
+      ],
+      "prior": [
+        "0.5",
+        "0.5"
+      ],
+      "observation_ids": [
+        "oA",
+        "oB",
+        "oC"
+      ],
+      "likelihood_by_state": [
+        [
+          "0.5",
+          "0.25",
+          "0.25"
+        ],
+        [
+          "0.5",
+          "0.25",
+          "0.25"
+        ]
+      ],
+      "expected": {
+        "valid": true,
+        "eig_expression": "0",
+        "relation_to_zero": "equal"
+      }
+    },
+    {
+      "id": "I22-three-state-partition-relabelled",
+      "kind": "valid_model",
+      "state_ids": [
+        "s2",
+        "s0",
+        "s1"
+      ],
+      "prior": [
+        "0.3333333333333333",
+        "0.3333333333333333",
+        "0.3333333333333334"
+      ],
+      "observation_ids": [
+        "oB",
+        "oA"
+      ],
+      "likelihood_by_state": [
+        [
+          "1",
+          "0"
+        ],
+        [
+          "0",
+          "1"
+        ],
+        [
+          "1",
+          "0"
+        ]
+      ],
+      "expected": {
+        "valid": true,
+        "eig_expression": "ln(3)-(2/3)*ln(2)",
+        "relation_to_zero": "strictly_positive",
+        "compare_to": "I08-ternary-partition",
+        "relation_to_compared_case": "equal"
+      }
+    },
+    {
+      "id": "I35-asymmetric-observation-branches",
+      "kind": "valid_model",
+      "state_ids": [
+        "s0",
+        "s1"
+      ],
+      "prior": [
+        "0.5",
+        "0.5"
+      ],
+      "observation_ids": [
+        "o0",
+        "o1"
+      ],
+      "likelihood_by_state": [
+        [
+          "0.8",
+          "0.2"
+        ],
+        [
+          "0.3",
+          "0.7"
+        ]
+      ],
+      "expected": {
+        "valid": true,
+        "eig_expression": "H(0.55)-0.5*H(0.8)-0.5*H(0.3)",
+        "relation_to_zero": "strictly_positive",
+        "asymmetric_branch_contributions": true
+      }
+    },
+    {
+      "id": "I23-negative-prior",
+      "kind": "invalid_model",
+      "state_ids": [
+        "s0",
+        "s1"
+      ],
+      "prior": [
+        "-0.1",
+        "1.1"
+      ],
+      "observation_ids": [
+        "o0",
+        "o1"
+      ],
+      "likelihood_by_state": [
+        [
+          "1",
+          "0"
+        ],
+        [
+          "0",
+          "1"
+        ]
+      ],
+      "expected": {
+        "valid": false,
+        "reject_reason": "negative_prior"
+      }
+    },
+    {
+      "id": "I24-unnormalized-prior",
+      "kind": "invalid_model",
+      "state_ids": [
+        "s0",
+        "s1"
+      ],
+      "prior": [
+        "0.5",
+        "0.4"
+      ],
+      "observation_ids": [
+        "o0",
+        "o1"
+      ],
+      "likelihood_by_state": [
+        [
+          "1",
+          "0"
+        ],
+        [
+          "0",
+          "1"
+        ]
+      ],
+      "expected": {
+        "valid": false,
+        "reject_reason": "prior_not_normalized"
+      }
+    },
+    {
+      "id": "I25-nonfinite-prior",
+      "kind": "invalid_model",
+      "state_ids": [
+        "s0",
+        "s1"
+      ],
+      "prior": [
+        "NaN",
+        "1"
+      ],
+      "observation_ids": [
+        "o0",
+        "o1"
+      ],
+      "likelihood_by_state": [
+        [
+          "1",
+          "0"
+        ],
+        [
+          "0",
+          "1"
+        ]
+      ],
+      "expected": {
+        "valid": false,
+        "reject_reason": "non_finite_probability"
+      }
+    },
+    {
+      "id": "I26-negative-likelihood",
+      "kind": "invalid_model",
+      "state_ids": [
+        "s0",
+        "s1"
+      ],
+      "prior": [
+        "0.5",
+        "0.5"
+      ],
+      "observation_ids": [
+        "o0",
+        "o1"
+      ],
+      "likelihood_by_state": [
+        [
+          "-0.1",
+          "1.1"
+        ],
+        [
+          "0.2",
+          "0.8"
+        ]
+      ],
+      "expected": {
+        "valid": false,
+        "reject_reason": "negative_likelihood"
+      }
+    },
+    {
+      "id": "I27-unnormalized-likelihood-row",
+      "kind": "invalid_model",
+      "state_ids": [
+        "s0",
+        "s1"
+      ],
+      "prior": [
+        "0.5",
+        "0.5"
+      ],
+      "observation_ids": [
+        "o0",
+        "o1"
+      ],
+      "likelihood_by_state": [
+        [
+          "0.7",
+          "0.4"
+        ],
+        [
+          "0.2",
+          "0.8"
+        ]
+      ],
+      "expected": {
+        "valid": false,
+        "reject_reason": "likelihood_row_not_normalized"
+      }
+    },
+    {
+      "id": "I28-nonfinite-likelihood",
+      "kind": "invalid_model",
+      "state_ids": [
+        "s0",
+        "s1"
+      ],
+      "prior": [
+        "0.5",
+        "0.5"
+      ],
+      "observation_ids": [
+        "o0",
+        "o1"
+      ],
+      "likelihood_by_state": [
+        [
+          "NaN",
+          "1"
+        ],
+        [
+          "0",
+          "1"
+        ]
+      ],
+      "expected": {
+        "valid": false,
+        "reject_reason": "non_finite_probability"
+      }
+    },
+    {
+      "id": "I29-empty-state-support",
+      "kind": "invalid_model",
+      "state_ids": [],
+      "prior": [],
+      "observation_ids": [
+        "o0"
+      ],
+      "likelihood_by_state": [],
+      "expected": {
+        "valid": false,
+        "reject_reason": "empty_state_support"
+      }
+    },
+    {
+      "id": "I30-empty-observation-support",
+      "kind": "invalid_model",
+      "state_ids": [
+        "s0",
+        "s1"
+      ],
+      "prior": [
+        "0.5",
+        "0.5"
+      ],
+      "observation_ids": [],
+      "likelihood_by_state": [
+        [],
+        []
+      ],
+      "expected": {
+        "valid": false,
+        "reject_reason": "empty_observation_support"
+      }
+    },
+    {
+      "id": "I31-likelihood-dimension-mismatch",
+      "kind": "invalid_model",
+      "state_ids": [
+        "s0",
+        "s1"
+      ],
+      "prior": [
+        "0.5",
+        "0.5"
+      ],
+      "observation_ids": [
+        "o0",
+        "o1"
+      ],
+      "likelihood_by_state": [
+        [
+          1,
+          0
+        ],
+        [
+          1
+        ]
+      ],
+      "expected": {
+        "valid": false,
+        "reject_reason": "likelihood_observation_dimension_mismatch"
+      }
+    },
+    {
+      "id": "I32-prior-state-count-mismatch",
+      "kind": "invalid_model",
+      "state_ids": [
+        "s0",
+        "s1",
+        "s2"
+      ],
+      "prior": [
+        "0.5",
+        "0.5"
+      ],
+      "observation_ids": [
+        "o0",
+        "o1"
+      ],
+      "likelihood_by_state": [
+        [
+          "1",
+          "0"
+        ],
+        [
+          "0",
+          "1"
+        ],
+        [
+          "0.5",
+          "0.5"
+        ]
+      ],
+      "expected": {
+        "valid": false,
+        "reject_reason": "prior_state_dimension_mismatch"
+      }
+    },
+    {
+      "id": "I33-missing-likelihood-row",
+      "kind": "invalid_model",
+      "state_ids": [
+        "s0",
+        "s1",
+        "s2"
+      ],
+      "prior": [
+        "0.3",
+        "0.3",
+        "0.4"
+      ],
+      "observation_ids": [
+        "o0",
+        "o1"
+      ],
+      "likelihood_by_state": [
+        [
+          "1",
+          "0"
+        ],
+        [
+          "0",
+          "1"
+        ]
+      ],
+      "expected": {
+        "valid": false,
+        "reject_reason": "likelihood_state_dimension_mismatch"
+      }
+    },
+    {
+      "id": "I34-infinite-likelihood",
+      "kind": "invalid_model",
+      "state_ids": [
+        "s0",
+        "s1"
+      ],
+      "prior": [
+        "0.5",
+        "0.5"
+      ],
+      "observation_ids": [
+        "o0",
+        "o1"
+      ],
+      "likelihood_by_state": [
+        [
+          "Infinity",
+          "0"
+        ],
+        [
+          "0",
+          "1"
+        ]
+      ],
+      "expected": {
+        "valid": false,
+        "reject_reason": "non_finite_probability"
+      }
+    }
+  ],
+  "mutation_controls": [
+    {
+      "id": "EIG-MUT-01",
+      "mutation": "Use the expected observation mean in place of the predictive observation distribution.",
+      "witness_case": "I03-binary-symmetric-error-quarter",
+      "expected_detection": "EIG computation must consume the full likelihood distribution, not a mean observation."
+    },
+    {
+      "id": "EIG-MUT-02",
+      "mutation": "Omit the expectation over future observations and use one selected/realized observation.",
+      "witness_case": "I35-asymmetric-observation-branches",
+      "expected_detection": "Candidate-time EIG must average over every positive-mass observation branch."
+    },
+    {
+      "id": "EIG-MUT-03",
+      "mutation": "Reverse KL(q(s|o,a) || q(s)) to KL(q(s) || q(s|o,a)).",
+      "witness_case": "I09-impossible-observation-branch",
+      "expected_detection": "Invalid support or changed semantics must not pass as the frozen EIG profile."
+    },
+    {
+      "id": "EIG-MUT-04",
+      "mutation": "Renormalize a materially malformed prior without reporting rejection.",
+      "witness_case": "I24-unnormalized-prior",
+      "expected_detection": "Reject before scoring; no silent normalization."
+    },
+    {
+      "id": "EIG-MUT-05",
+      "mutation": "Allow a negative or non-finite likelihood.",
+      "witness_case": "I26-negative-likelihood",
+      "expected_detection": "Fail closed on the malformed probability domain."
+    },
+    {
+      "id": "EIG-MUT-06",
+      "mutation": "Renumber observations or latent states without consistently permuting the probability arrays.",
+      "witness_case": "I11-observation-label-permutation",
+      "expected_detection": "Consistent relabeling is invariant; inconsistent relabeling changes the model identity or fails a comparison."
+    },
+    {
+      "id": "EIG-MUT-07",
+      "mutation": "Manufacture a posterior when the predictive observation probability is zero.",
+      "witness_case": "I09-impossible-observation-branch",
+      "expected_detection": "Zero-mass branch contributes zero and has no fabricated posterior."
+    },
+    {
+      "id": "EIG-MUT-08",
+      "mutation": "Promote DiagonalGaussianPredictedEntropyDeltaV1 to the EIG profile without observation/posterior integration.",
+      "witness_case": "I03-binary-symmetric-error-quarter",
+      "expected_detection": "Reject profile identity/claim promotion."
+    },
+    {
+      "id": "EIG-MUT-09",
+      "mutation": "Commit a hypothetical posterior into the live belief or evidence store.",
+      "witness_case": "I02-perfect-binary-reveal",
+      "expected_detection": "Requires a state-purity integration oracle; this JSON arithmetic corpus alone cannot establish purity."
+    },
+    {
+      "id": "EIG-MUT-10",
+      "mutation": "Reverse the EFE score orientation so higher EIG increases the minimization score.",
+      "witness_case": "I03-binary-symmetric-error-quarter",
+      "expected_detection": "Raw EIG stays non-negative; E_info=-EIG under the frozen score convention."
+    }
+  ],
+  "claim_ceiling": [
+    "A future qualified PASS applies only to the frozen finite categorical software profile.",
+    "EIG is prospective expected information under the supplied model, not realized or physical information gain.",
+    "A hypothetical posterior is not live belief, evidence, or authority.",
+    "This fixture corpus alone does not establish calibration, optimal decisions, scientific FEP validity, or production correspondence."
+  ]
+}
