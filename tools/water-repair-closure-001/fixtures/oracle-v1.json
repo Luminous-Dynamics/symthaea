@@ -28,7 +28,7 @@
       "reason_codes": [
         "MISSING_AS_LEFT_EVIDENCE"
       ],
-      "semantic_effect_count": 1,
+      "semantic_effect_count": 0,
       "duplicate_delivery_idempotent": false
     },
     {
@@ -55,7 +55,7 @@
       "reason_codes": [
         "ASSET_IDENTITY_MISMATCH"
       ],
-      "semantic_effect_count": 1,
+      "semantic_effect_count": 0,
       "duplicate_delivery_idempotent": false
     },
     {
@@ -64,7 +64,7 @@
       "reason_codes": [
         "STALE_OR_UNQUALIFIED_MEASUREMENT"
       ],
-      "semantic_effect_count": 1,
+      "semantic_effect_count": 0,
       "duplicate_delivery_idempotent": false
     },
     {
@@ -73,7 +73,7 @@
       "reason_codes": [
         "PHYSICAL_OBSERVATION_MISSING"
       ],
-      "semantic_effect_count": 1,
+      "semantic_effect_count": 0,
       "duplicate_delivery_idempotent": false
     },
     {
@@ -82,7 +82,7 @@
       "reason_codes": [
         "MISSING_OR_UNKNOWN_UNIT"
       ],
-      "semantic_effect_count": 1,
+      "semantic_effect_count": 0,
       "duplicate_delivery_idempotent": false
     },
     {
@@ -91,7 +91,7 @@
       "reason_codes": [
         "INVALID_UNIT_CONVERSION"
       ],
-      "semantic_effect_count": 1,
+      "semantic_effect_count": 0,
       "duplicate_delivery_idempotent": false
     },
     {
@@ -100,7 +100,7 @@
       "reason_codes": [
         "REQUIRED_WATER_QUALITY_CLEARANCE_MISSING"
       ],
-      "semantic_effect_count": 1,
+      "semantic_effect_count": 0,
       "duplicate_delivery_idempotent": false
     },
     {
@@ -109,7 +109,7 @@
       "reason_codes": [
         "MEDIA_IDENTITY_OR_CURRENTNESS_UNKNOWN"
       ],
-      "semantic_effect_count": 1,
+      "semantic_effect_count": 0,
       "duplicate_delivery_idempotent": false
     },
     {
@@ -118,7 +118,7 @@
       "reason_codes": [
         "PART_COMPATIBILITY_UNQUALIFIED"
       ],
-      "semantic_effect_count": 1,
+      "semantic_effect_count": 0,
       "duplicate_delivery_idempotent": false
     },
     {
@@ -127,7 +127,7 @@
       "reason_codes": [
         "RECONDITIONED_COMPONENT_NOT_REQUALIFIED"
       ],
-      "semantic_effect_count": 1,
+      "semantic_effect_count": 0,
       "duplicate_delivery_idempotent": false
     },
     {
@@ -136,7 +136,7 @@
       "reason_codes": [
         "COMMISSIONING_MISSING"
       ],
-      "semantic_effect_count": 1,
+      "semantic_effect_count": 0,
       "duplicate_delivery_idempotent": false
     },
     {
@@ -145,7 +145,7 @@
       "reason_codes": [
         "REDUNDANCY_INDEPENDENCE_UNPROVEN"
       ],
-      "semantic_effect_count": 1,
+      "semantic_effect_count": 0,
       "duplicate_delivery_idempotent": false
     },
     {
@@ -154,7 +154,7 @@
       "reason_codes": [
         "RESIDUAL_DISPOSITION_MISSING"
       ],
-      "semantic_effect_count": 1,
+      "semantic_effect_count": 0,
       "duplicate_delivery_idempotent": false
     },
     {
@@ -163,7 +163,7 @@
       "reason_codes": [
         "AUTHORIZATION_MISSING_OR_MISMATCHED"
       ],
-      "semantic_effect_count": 1,
+      "semantic_effect_count": 0,
       "duplicate_delivery_idempotent": false
     },
     {
@@ -172,7 +172,7 @@
       "reason_codes": [
         "AUTHORIZATION_NOT_CURRENT_OR_IN_SCOPE"
       ],
-      "semantic_effect_count": 1,
+      "semantic_effect_count": 0,
       "duplicate_delivery_idempotent": false
     },
     {
@@ -181,7 +181,7 @@
       "reason_codes": [
         "TIME_ALIGNMENT_FAILURE"
       ],
-      "semantic_effect_count": 1,
+      "semantic_effect_count": 0,
       "duplicate_delivery_idempotent": false
     },
     {
@@ -190,7 +190,7 @@
       "reason_codes": [
         "ACCESS_POLICY_VIOLATION"
       ],
-      "semantic_effect_count": 1,
+      "semantic_effect_count": 0,
       "duplicate_delivery_idempotent": false
     },
     {
@@ -199,7 +199,7 @@
       "reason_codes": [
         "CONFLICTING_OBSERVATIONS"
       ],
-      "semantic_effect_count": 1,
+      "semantic_effect_count": 0,
       "duplicate_delivery_idempotent": false
     }
   ]
