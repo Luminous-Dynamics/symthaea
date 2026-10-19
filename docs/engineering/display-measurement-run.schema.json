@@ -292,10 +292,25 @@
           "supported_measurands": {
             "type": "array",
             "items": {
-              "type": "string",
-              "minLength": 1
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "measurand",
+                "unit"
+              ],
+              "properties": {
+                "measurand": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "unit": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
             },
-            "uniqueItems": true
+            "uniqueItems": true,
+            "description": "Machine-readable measurand/unit pairs supported by the instrument capability profile."
           },
           "calibration_record_artifact_id": {
             "type": [
