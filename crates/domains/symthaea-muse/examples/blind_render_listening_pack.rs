@@ -16,15 +16,15 @@ use std::path::{Path, PathBuf};
 
 const EXPECTED_SCHEMA: &str = "symthaea-muse-renderer-ab-evidence-v1";
 const PACK_SCHEMA: &str = "melothaea-blind-listening-pack-v1";
-const STYLES: [&str; 8] = [
-    "ClassicalRubato",
-    "DanceLocked",
-    "ProcessExact",
-    "FolkLift",
-    "JazzLaidBack",
-    "DroneElastic",
-    "DramaticTiming",
-    "ChoralBlend",
+const STYLE_DIALECTS: [(&str, &str); 8] = [
+    ("Classical", "ClassicalRubato"),
+    ("Tango", "DanceLocked"),
+    ("JazzBallad", "JazzLaidBack"),
+    ("Folk", "FolkLift"),
+    ("Minimalism", "ProcessExact"),
+    ("HindustaniInspired", "DroneElastic"),
+    ("Cinematic", "DramaticTiming"),
+    ("SacredChoral", "ChoralBlend"),
 ];
 
 const ARMS: [(&str, &str); 4] = [
@@ -248,8 +248,8 @@ fn read_blocks(manifest: &Value, audio_root: &Path) -> Result<(Vec<SourceBlock>,
         .and_then(|value| value.get("expected_dialect_count"))
         .and_then(Value::as_u64)
         .ok_or_else(|| "manifest.contract.expected_dialect_count is missing".to_owned())?;
-    if expected_dialects != STYLES.len() as u64 {
-        return Err(format!("expected exactly {} dialects", STYLES.len()));
+    if expected_dialects != STYLE_DIALECTS.len() as u64 {
+        return Err(format!("expected exactly {} style/dialect mappings", STYLE_DIALECTS.len()));
     }
 
     let mut blocks = Vec::with_capacity(records.len());
@@ -262,8 +262,20 @@ fn read_blocks(manifest: &Value, audio_root: &Path) -> Result<(Vec<SourceBlock>,
             return Err(format!("{context} is not complete; refusing to drop a failed cell"));
         }
         let style = required_string(record, "style", &context)?.to_owned();
-        if !STYLES.contains(&style.as_str()) {
-            return Err(format!("{context} has unexpected style {style:?}"));
+        let expected_dialect = STYLE_DIALECTS
+            .iter()
+            .find(|(expected_style, _)| *expected_style == style)
+            .map(|(_, dialect)| *dialect)
+            .ok_or_else(|| format!("{context} has unexpected style {style:?}"))?;
+        let declared_dialect = required_string(record, "grammar_performance_dialect", &context)?;
+        if declared_dialect != expected_dialect {
+            return Err(format!(
+                "{context} style {style:?} maps to {expected_dialect:?}, not declared {declared_dialect:?}"
+            ));
+        }
+        let _renderer_dialect = required_string(record, "renderer_dialect", &context)?;
+        if required_string(record, "profile_version", &context)? != "melothaea-style-render-profile-v1" {
+            return Err(format!("{context} has an unsupported profile_version"));
         }
         let seed_label = match record.get("seed") {
             Some(Value::String(value)) if !value.trim().is_empty() => value.clone(),
@@ -352,11 +364,11 @@ fn read_blocks(manifest: &Value, audio_root: &Path) -> Result<(Vec<SourceBlock>,
         });
     }
 
-    if seen_styles.len() != STYLES.len() {
-        let missing = STYLES
+    if seen_styles.len() != STYLE_DIALECTS.len() {
+        let missing = STYLE_DIALECTS
             .iter()
-            .filter(|style| !seen_styles.contains(*style))
-            .copied()
+            .filter(|(style, _)| !seen_styles.contains(*style))
+            .map(|(style, _)| *style)
             .collect::<Vec<_>>();
         return Err(format!("style cohort incomplete; missing: {}", missing.join(", ")));
     }
@@ -654,9 +666,12 @@ mod tests {
             })
         };
         let mut records = Vec::new();
-        for (index, style) in STYLES.iter().enumerate() {
+        for (index, (style, dialect)) in STYLE_DIALECTS.iter().enumerate() {
             records.push(json!({
                 "style": style,
+                "grammar_performance_dialect": dialect,
+                "renderer_dialect": dialect,
+                "profile_version": "melothaea-style-render-profile-v1",
                 "seed": index + 1,
                 "status": "complete",
                 "input_midi": { "sha256": format!("{:064x}", index + 1) },
