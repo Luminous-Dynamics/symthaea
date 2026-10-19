@@ -675,6 +675,15 @@ mod tests {
     }
 
     #[test]
+    fn mission_identity_mismatch_is_incomparable() {
+        let mut candidate = improved_candidate();
+        candidate.mission.mission_id = "different-mission-v1".to_owned();
+        let result = compare(&baseline(), &candidate);
+        assert_eq!(result.disposition, ComparisonDisposition::Incomparable);
+        assert!(result.findings.contains(&Finding::MissionMismatch));
+    }
+
+    #[test]
     fn service_mismatch_is_incomparable() {
         let mut candidate = improved_candidate();
         candidate.mission.payload_kg = Some(1_500.0);
