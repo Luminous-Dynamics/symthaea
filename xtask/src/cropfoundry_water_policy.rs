@@ -489,6 +489,25 @@ mod tests {
     }
 
     #[test]
+    fn cropfoundry_water_policy_reports_comparable_baseline_deltas() {
+        let receipt = build_receipt().unwrap();
+        let baseline = receipt
+            .results
+            .iter()
+            .filter(|result| result.policy == Policy::EqualShareCalendar.name())
+            .collect::<Vec<_>>();
+        assert_eq!(baseline.len(), 4);
+        assert!(baseline
+            .iter()
+            .all(|result| result.relative_stress_change_vs_equal_share_pct.is_none()));
+        assert!(receipt.results.iter().all(|result| {
+            result
+                .relative_stress_change_vs_equal_share_pct
+                .is_none_or(f64::is_finite)
+        }));
+    }
+
+    #[test]
     fn cropfoundry_water_policy_is_never_a_biological_claim() {
         let receipt = build_receipt().unwrap();
         assert!(receipt.synthetic_only);
