@@ -777,6 +777,21 @@ mod tests {
     }
 
     #[test]
+    fn stale_split_digest_blocks_changed_observable_units_or_source_revision() {
+        let (mut dataset, plan) = fixture();
+        dataset.observables[0].canonical_unit = "kN".to_owned();
+        let changed_units = audit(&dataset, &plan);
+        assert_eq!(changed_units.disposition, IntakeDisposition::Blocked);
+        assert!(changed_units.issues.contains(&IntakeIssue::SplitManifestDigestMismatch));
+
+        let (mut dataset, plan) = fixture();
+        dataset.source_revision = "source-revision-r2".to_owned();
+        let changed_source = audit(&dataset, &plan);
+        assert_eq!(changed_source.disposition, IntakeDisposition::Blocked);
+        assert!(changed_source.issues.contains(&IntakeIssue::SplitManifestDigestMismatch));
+    }
+
+    #[test]
     fn absent_raw_bytes_or_model_bytes_block_intake() {
         let (dataset, plan) = fixture();
         let no_raw = audit_reference_intake(&dataset, &plan, None, Some(MODEL_BYTES));
