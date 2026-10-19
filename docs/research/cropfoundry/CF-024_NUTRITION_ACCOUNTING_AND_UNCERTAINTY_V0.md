@@ -22,19 +22,19 @@ The command records the input's own SHA-256 and reports nutrient mass per batch 
 
 ### Accounting equations
 
-For an assay concentration (C) in mg/kg of the stated edible mass basis and edible mass (M) in kg at the same stage:
+For concentration `C` in mg/kg of the stated edible mass basis and edible mass `M` in kg at the same stage:
 
-[
-N_{mathrm{stage}},(mathrm{mg}) = C,(mathrm{mg/kg})	imes M,(mathrm{kg})
-]
+```text
+nutrient_mass_at_stage_mg = C_mg_per_kg * M_kg
+```
 
-When concentration is measured at serving, that measured product is the delivered nutrient mass and no retention factor is applied. When concentration is measured before preparation, the prototype requires an explicit, evidence-linked retention factor (r):
+When concentration is measured at serving, this measured product is the delivered nutrient mass and no retention factor is applied. When concentration is measured before preparation, the prototype requires an explicit, evidence-linked retention factor `r`:
 
-[
-N_{mathrm{served}} = C 	imes M 	imes r
-]
+```text
+nutrient_mass_at_serving_mg = C_mg_per_kg * M_kg * r
+```
 
-A bioavailability fraction (b) is optional and must have its own evidence URI. When supplied, the output is explicitly *estimated bioavailable nutrient mass* (N_{mathrm{served}}	imes b), never relabelled as a direct assay. Missing (b) produces no bioavailability estimate; it is not treated as 1. Direct assays require an assay method, concentration evidence URI and a 64-character source digest. The digest's syntax is checked; this CLI does not authenticate it against an independent artifact registry.
+A bioavailability fraction `b` is optional and must have its own evidence URI. When supplied, the output is explicitly *estimated bioavailable nutrient mass* `nutrient_mass_at_serving_mg * b`, never relabelled as a direct assay. Missing `b` produces no bioavailability estimate; it is not treated as 1. Direct assays require an assay method, concentration evidence URI and a 64-character source digest. The digest's syntax is checked; this CLI does not authenticate it against an independent artifact registry.
 
 ## New uncertainty interval support
 
