@@ -33,6 +33,7 @@ These numbers are not directly comparable to leaderboard miniF2F scores: the han
 - Retrieval matters in formal proving, but random theorem splits can leak nearby proof patterns. LeanDojo documents family-/premise-aware generalization concerns and a Lean 4 benchmark with 122,517 theorems/proofs.
 - DeepSeek-Prover-V2 reports 88.9% pass ratio on miniF2F-test and 49/658 PutnamBench problems in its 2025 paper. Treat those as **published results under that paper's setup**, not a guarantee about the October 2026 global frontier.
 - The 2026 ACL paper *Discover and Prove* introduces hard-mode variants where the model must first discover an answer instead of being handed the answer in the formal statement. It reports 36 formally proved PutnamBench theorems in hard mode and emphasizes the gap between informal answer discovery and formal proof completion.
+- **Latest research-grade comparator (14 October 2026):** First Proof Batch 3 tested five systems on ten specialist research-math problems. Thirty expert reviewers scored correctness, exposition, and attribution. ProofCouncil reached 9/10 correct and GPT-6 Astra 7/10; only 4/10 Astra solutions had adequate citations, versus 7/10 for ProofCouncil. Negative scoring penalized wrong answers, and the open-weight entrant's submissions all contained major errors. This is not numerically comparable to Lean benchmarks, but shows why research-grade evaluation must measure correctness, exposition, attribution, and abstention separately. (https://1stproof.org/third-batch-press-release.html)
 - OpenAI's pinned public `math` snapshot (`1581d4cbdd69a0faf34b2089614fe2a814316a6a`) has 719 manuscripts in 372 related-result families and reports roughly 42% of top-line results formalized. The indexer cross-checks the README's declared family count against parsed catalog headers and fingerprints the README, family map, formalization catalog, and Comparator scope notes. Its deterministic family split is a pre-screen assignment—not a guarantee against cross-family mathematical dependence or pretraining contamination. The repository maintainers warn that some Comparator configurations validate supporting results rather than the paper's headline theorem.
 - **A critical evaluation finding:** the ACL 2026 industry-track paper *Benchmarking Testing in Automated Theorem Proving* proposes T², evaluating generated theorem statements by compiling dependent successor theorems. In its 2,206-problem setup, the best reported model reached 38.9% testing accuracy despite strong compilation results. This is a reason to measure semantic/downstream correctness, not just “Lean accepted.” (https://aclanthology.org/2026.acl-industry.150/)
 
@@ -91,6 +92,8 @@ Report separate results for:
 - counterexample detection;
 - assumption/axiom auditing;
 - human-rated explanatory utility;
+- formal-statement fidelity and dependent-successor semantic checks;
+- citation/attribution quality and calibrated abstention on research-grade claims;
 - compute and wall-clock cost.
 
 This prevents a gain in one easy-to-measure metric from disguising regressions elsewhere.
@@ -150,6 +153,8 @@ Thresholds below are **proposed go/no-go goals**, not measured results. Pilot es
 | Metric | Definition | Initial target |
 |---|---|---|
 | Insight evidence fidelity | Fraction of factual statements in sampled records supported by cited proof/manuscript evidence, scored by two reviewers | ≥90%; disagreements retained |
+| Research explanation quality | Blinded expert ratings of correctness, exposition, and attribution; false claims are separately penalized | Report per-axis scores and inter-rater agreement; do not hide incorrect results in an average |
+| Abstention quality | Risk-versus-coverage curve: incorrect or unsupported assertions as the system answers more transfer requests | At matched coverage, beat the no-abstention baseline on unsupported-claim rate; report false-abstention rate separately |
 | Structural retrieval | Expert-labelled relevant strategy in Recall@10, grouped by theorem family | ≥15% relative lift over strongest simple baseline before scale-up |
 | Verified transfer lift | Absolute change in target theorems with checker-accepted, exact-statement proofs vs strongest matched baseline | ≥10 percentage points on a sufficiently powered family-held-out evaluation; 95% interval for lift excludes zero |
 | Falsification controls | Rejection of seeded wrong-target, vacuous, `sorry`, undeclared-axiom, and violated-precondition cases | 100% of frozen deterministic gate fixtures rejected |
@@ -170,7 +175,7 @@ Use established suites for proving competence, but do not confuse them with the 
 - **OpenAI `math` artifacts:** source material for proof-insight provenance and cross-family analysis, not a standardized leaderboard by themselves.
 - **PITB:** cross-family strategy transfer and quality of mathematical insight records.
 
-The relevant published comparison points located for this design include DeepSeek-Prover-V2 (miniF2F-test 88.9%, PutnamBench 49/658 in its paper), the 2026 *Discover and Prove* hard-mode results, and T² semantic testing. These are distinct setups and must remain distinct rows in reports. The First Proof challenge's research-level tasks are another qualitative evaluation of research usefulness, but its human-reviewed outcomes are not directly comparable to Lean benchmark pass rates.
+The relevant published comparison points located for this design include DeepSeek-Prover-V2 (miniF2F-test 88.9%, PutnamBench 49/658 in its paper), the 2026 *Discover and Prove* hard-mode results, T² semantic testing, and First Proof Batch 3's human-reviewed research-level evaluation. These are distinct setups and must remain distinct rows in reports. First Proof Batch 3's reported scores (up to 9/10 correct) are not directly comparable to Lean pass rates, but its axes—correctness, exposition, attribution, and penalties for wrong answers—should influence PITB's research track.
 
 Before publishing any claim of “state of the art,” perform a dated source review and reproduce a directly comparable baseline on the exact benchmark, split, Lean/Mathlib versions, compute budget, and Pass@k protocol. Otherwise phrase results as “our measured result on PITB v0,” not SOTA.
 
@@ -231,6 +236,7 @@ Negative results must be preserved. A system that accurately says “no transfer
 - DeepSeek-Prover-V2, 2025: https://arxiv.org/abs/2504.21801
 - Liu et al., *Discover and Prove: An Open-source Agentic Framework for Hard Mode Automated Theorem Proving in Lean 4*, ACL 2026: https://aclanthology.org/2026.acl-long.3/
 - Kim et al., *Benchmarking Testing in Automated Theorem Proving*, ACL 2026 Industry Track (T² downstream semantic tests): https://aclanthology.org/2026.acl-industry.150/
+- First Proof Project, *Third Batch Press Release*, 14 October 2026: https://1stproof.org/third-batch-press-release.html
 - OpenAI, *Our First Proof submissions*, 20 February 2026: https://openai.com/index/first-proof-submissions/
 
 ## Claim ceiling
