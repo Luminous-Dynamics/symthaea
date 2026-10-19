@@ -792,13 +792,27 @@ mod tests {
     }
 
     #[test]
-    fn matched_synthetic_observation_does_not_depend_on_selection_policy() {
+    fn matched_synthetic_observations_are_identical_for_shared_selected_locations() {
+        let policies = SelectionPolicy::ALL;
         for surface in SurfaceFamily::ALL {
-            for candidate in [0, 10, 37, 50, 91, 100] {
-                assert_eq!(
-                    observe(surface, candidate, 123),
-                    observe(surface, candidate, 123)
-                );
+            for pair in policies.windows(2) {
+                let left = select_observations(surface, pair[0], 123, 11)
+                    .into_iter()
+                    .collect::<std::collections::BTreeMap<_, _>>();
+                let right = select_observations(surface, pair[1], 123, 11)
+                    .into_iter()
+                    .collect::<std::collections::BTreeMap<_, _>>();
+                for (index, left_value) in &left {
+                    if let Some(right_value) = right.get(index) {
+                        assert_eq!(
+                            left_value, right_value,
+                            "shared observation differs for surface {}, index {index}, policies {} and {}",
+                            surface.name(),
+                            pair[0].name(),
+                            pair[1].name()
+                        );
+                    }
+                }
             }
         }
     }
