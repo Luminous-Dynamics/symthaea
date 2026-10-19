@@ -5,6 +5,7 @@ mod crate_status;
 mod cropfoundry_csv_audit;
 mod cropfoundry_nutrition_accounting;
 mod cropfoundry_postharvest_audit;
+mod cropfoundry_robust_policy;
 mod cropfoundry_validate;
 mod cropfoundry_water_policy;
 mod duplicate_scan;
@@ -113,6 +114,12 @@ enum Commands {
         #[arg(long)]
         out: Option<PathBuf>,
     },
+    /// Run tail-risk, Pareto and preference-sensitivity diagnostics over the synthetic irrigation suite.
+    CropfoundryRobustPolicyDemo {
+        /// Optional path to write the JSON robustness receipt.
+        #[arg(long)]
+        out: Option<PathBuf>,
+    },
     RhnSweep {
         #[arg(long, default_value = "1024")]
         dims: String,
@@ -205,6 +212,9 @@ fn main() -> anyhow::Result<()> {
         }
         Commands::CropfoundryNutritionAccounting { input, out } => {
             cropfoundry_nutrition_accounting::run(input, out)?;
+        }
+        Commands::CropfoundryRobustPolicyDemo { out } => {
+            cropfoundry_robust_policy::run(out)?;
         }
         Commands::RhnSweep {
             dims,
