@@ -21,13 +21,13 @@ Each target has seven explicit gates: food safety, authorization, source rights,
 
 ## Interval-aware Pareto semantics
 
-The objectives are typed intervals with explicit direction and unit. Maximization objective A robustly beats B only when A.low is at least B.high; minimization requires A.high to be at most B.low. At least one objective must be strictly better. Overlap is uncertainty—not a tie-break invitation. All objective sets, units, functional units, the target volume band, product specification, price basis/vintage, TEA/LCA boundary, and regional/feedstock/electricity scenario digests must match. Otherwise the case is incomparable and no Pareto frontier is emitted. The contract performs no implicit conversions, imputation, or scalar weighting across unlike objectives.
+The objectives are typed intervals with explicit direction and unit. The canonical set is required: functional fit, compliant usable capacity, contribution margin per kilogram, cost per kilogram, energy per kilogram, water per kilogram, and time to readiness. Their maximize/minimize directions are enforced, and the compliant-capacity unit must exactly match the declared target-volume unit. Maximization objective A robustly beats B only when A.low is at least B.high; minimization requires A.high to be at most B.low. At least one objective must be strictly better. Overlap is uncertainty—not a tie-break invitation. All objective sets, units, functional units, the target volume band, product specification, price basis/vintage, TEA/LCA boundary, and regional/feedstock/electricity scenario digests must match. Otherwise the case is incomparable and no Pareto frontier is emitted. The contract performs no implicit conversions, imputation, or scalar weighting across unlike objectives.
 
 Only eligible targets enter the Pareto relations. A failed or indeterminate target can never dominate an eligible target or appear on the frontier. The frontier is a set, not a forced single winner. EVSI can then prioritize the next evidence acquisition; the decision-regret benchmark can compare that plan to simple baselines under the same budget.
 
 ## Frozen synthetic corpus
 
-Twelve cases exercise:
+Fifteen cases exercise:
 1. robustly dominated product target;
 2. attractive market/metric proxy blocked by authorization;
 3. high nominal titer with poor recovered usable output;
@@ -39,7 +39,10 @@ Twelve cases exercise:
 9. synthetic fixture mislabeled as measured (negative control);
 10. stale market-value evidence;
 11. objective unit mismatch;
-12. inconsistent demand/target-volume band.
+12. inconsistent demand/target-volume band;
+13. missing core capacity and contribution-margin objectives (negative control);
+14. reversed functional-fit objective direction (negative control);
+15. compliant-capacity unit contradicts target-volume unit (negative control).
 
 All data, ranges, values, digests and gate states in the corpus are invented. Pass means the encoded contract matches this frozen fixture—not that any real target is viable.
 
@@ -53,6 +56,8 @@ All data, ranges, values, digests and gate states in the corpus are invented. Pa
 | Silent unit conversion or missing-value imputation | 0 |
 | Pareto relations across overlapping intervals | 0 |
 | Frontier emitted for incomparable contexts | 0 |
+| Missing core objective or reversed direction accepted | 0 |
+| Compliant-capacity unit mismatch accepted | 0 |
 | Exact-head mismatch accepted | 0 |
 | Receipt includes corpus SHA-256 and per-case reasons | 100% |
 

@@ -265,6 +265,33 @@ fn validate_case(case: &TargetCase) -> Vec<String> {
                 errors.insert("invalid_objective_interval".to_owned());
             }
         }
+        let required_objectives = [
+            ("functional_fit", ObjectiveDirection::Maximize),
+            ("compliant_capacity", ObjectiveDirection::Maximize),
+            ("contribution_margin_per_kg", ObjectiveDirection::Maximize),
+            ("cost_per_kg", ObjectiveDirection::Minimize),
+            ("energy_per_kg", ObjectiveDirection::Minimize),
+            ("water_per_kg", ObjectiveDirection::Minimize),
+            ("days_to_ready", ObjectiveDirection::Minimize),
+        ];
+        for (objective_id, expected_direction) in required_objectives {
+            match target.objectives.iter().find(|objective| objective.objective_id == objective_id) {
+                Some(objective) if objective.direction != expected_direction => {
+                    errors.insert(format!("required_objective_direction_mismatch:{objective_id}"));
+                }
+                Some(_) => {}
+                None => {
+                    errors.insert(format!("required_objective_missing:{objective_id}"));
+                }
+            }
+        }
+        if let Some(capacity) = target.objectives.iter()
+            .find(|objective| objective.objective_id == "compliant_capacity")
+        {
+            if capacity.unit != b.volume_unit {
+                errors.insert("compliant_capacity_unit_mismatch".to_owned());
+            }
+        }
     }
     errors.into_iter().collect()
 }
@@ -716,6 +743,31 @@ mod tests {
                     .all(|target| target.dominates.is_empty()),
                 "{id}"
             );
+        }
+    }
+
+    #[test]
+    fn core_objectives_cannot_be_omitted_or_reversed() {
+        let corpus = fixture();
+        for (case_id, reason) in [
+            (
+                "MVP-013-missing-core-objectives-negative-control",
+                "required_objective_missing:compliant_capacity",
+            ),
+            (
+                "MVP-014-reversed-objective-direction-negative-control",
+                "required_objective_direction_mismatch:functional_fit",
+            ),
+            (
+                "MVP-015-compliant-capacity-unit-mismatch-negative-control",
+                "compliant_capacity_unit_mismatch",
+            ),
+        ] {
+            let case = corpus.cases.iter().find(|case| case.case_id == case_id).unwrap();
+            let actual = evaluate_case(case);
+            assert_eq!(actual.status, CaseStatus::InvalidInput, "{case_id}");
+            assert!(actual.reason_codes.contains(&reason.to_owned()), "{case_id}");
+            assert!(actual.targets.is_empty(), "{case_id}");
         }
     }
 
