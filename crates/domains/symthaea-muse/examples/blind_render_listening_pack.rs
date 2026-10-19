@@ -106,7 +106,7 @@ fn score(seed: &str, domain: &str, identity: &str) -> String {
 }
 
 fn csv_field(value: &str) -> String {
-    if value.contains([',', '"', '\n', '\r']) {
+    if value.contains(',') || value.contains('"') || value.contains('\n') || value.contains('\r') {
         format!("\"{}\"", value.replace('"', "\"\""))
     } else {
         value.to_owned()
@@ -290,7 +290,7 @@ fn read_blocks(manifest: &Value, audio_root: &Path) -> Result<(Vec<SourceBlock>,
     if seen_styles.len() != STYLES.len() {
         let missing = STYLES
             .iter()
-            .filter(|style| !seen_styles.contains(**style))
+            .filter(|style| !seen_styles.contains(*style))
             .copied()
             .collect::<Vec<_>>();
         return Err(format!("style cohort incomplete; missing: {}", missing.join(", ")));
