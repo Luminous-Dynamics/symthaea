@@ -23,6 +23,10 @@ Inspect a specific manifest-declared CSV after every artifact in the manifest ha
 
     cargo run --manifest-path tools/metal-measurement-bench/Cargo.toml -- inspect-csv MANIFEST.json ARTIFACT_DIR relative/path.csv
 
+Inventory a manifest-declared ZIP archive without extracting any member:
+
+    cargo run --manifest-path tools/metal-measurement-bench/Cargo.toml -- inspect-zip MANIFEST.json ARTIFACT_DIR relative/path.zip
+
 Reconcile exact source-native row IDs and an explicit mapping file against the manifest-declared CSV:
 
     cargo run --manifest-path tools/metal-measurement-bench/Cargo.toml -- reconcile-csv MANIFEST.json ARTIFACT_DIR MAPPING.json relative/path.csv
@@ -30,6 +34,8 @@ Reconcile exact source-native row IDs and an explicit mapping file against the m
 For a normalized observation set:
 
     cargo run --manifest-path tools/metal-measurement-bench/Cargo.toml -- validate-records MANIFEST.json OBSERVATIONS.json ARTIFACT_DIR
+
+The `inspect-zip` command inventories safe member paths, compressed/uncompressed sizes, CRC-32 metadata and directory flags from a verified archive without extracting members. It rejects absolute/traversal/backslash paths, symlinks, duplicate names, case-colliding paths and archives with more than 100,000 members. The receipt is bound to the exact outer archive SHA-256. Member CRC-32 values are not cryptographic per-file digests, and this inventory is not a license decision or a semantic data parse.
 
 Machine-readable contracts:
 - `tools/metal-measurement-bench/schemas/measurement-manifest-v0.1.schema.json`
