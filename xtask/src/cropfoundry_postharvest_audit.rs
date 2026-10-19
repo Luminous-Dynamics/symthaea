@@ -92,6 +92,10 @@ fn header_index(headers: &[String], sought: &str) -> Option<usize> {
     headers.iter().position(|header| header == sought)
 }
 
+fn record_field(record: &StringRecord, index: Option<usize>) -> &str {
+    index.and_then(|i| record.get(i)).unwrap_or("").trim()
+}
+
 fn audit_bytes(
     bytes: &[u8],
     delimiter: u8,
@@ -195,13 +199,10 @@ fn audit_bytes(
         if record.len() != headers.len() {
             rows_with_width_mismatch += 1;
         }
-        let field = |index: Option<usize>| -> &str {
-            index.and_then(|i| record.get(i)).unwrap_or("").trim()
-        };
-        let lot_id = field(lot_index).to_owned();
-        let stage_id = field(stage_index).to_owned();
-        let replicate_id = field(replicate_index).to_owned();
-        let measurement_time = field(time_index).to_owned();
+        let lot_id = record_field(&record, lot_index).to_owned();
+        let stage_id = record_field(&record, stage_index).to_owned();
+        let replicate_id = record_field(&record, replicate_index).to_owned();
+        let measurement_time = record_field(&record, time_index).to_owned();
         let mut issues = Vec::new();
 
         if record.len() != headers.len() {
@@ -216,13 +217,13 @@ fn audit_bytes(
             ("stage_id", stage_id.as_str()),
             ("replicate_id", replicate_id.as_str()),
             ("measurement_time", measurement_time.as_str()),
-            ("measurement_method", field(method_index)),
+            ("measurement_method", record_field(&record, method_index)),
         ] {
             if value.is_empty() {
                 issues.push(format!("{label} must be non-empty"));
             }
         }
-        if !field(unit_index).eq_ignore_ascii_case("kg") {
+        if !record_field(&record, unit_index).eq_ignore_ascii_case("kg") {
             issues.push("mass_unit must be exactly kg for all mass columns in this v0 profile".to_owned());
         }
 
@@ -242,20 +243,24 @@ fn audit_bytes(
         }
 
         let input_mass = input_index.and_then(|index| {
-            parse_nonnegative_mass(field(Some(index)), "input_mass_kg", &mut issues)
+            parse_nonnegative_mass(record_field(&record, Some(index)), "input_mass_kg", &mut issues)
         });
         if input_mass.is_some_and(|mass| mass <= 0.0) {
             issues.push("input_mass_kg must be greater than zero".to_owned());
         }
         let mut outflow_total = 0.0;
         let mut all_outflows_valid = true;
+        let mut parsed_outflows = Vec::with_capacity(OUTFLOW_COLUMNS.len());
         for (index, name) in outflow_indices.iter().zip(OUTFLOW_COLUMNS) {
-            let parsed = index.and_then(|i| parse_nonnegative_mass(field(Some(i)), name, &mut issues));
+            let parsed = index.and_then(|i| {
+                parse_nonnegative_mass(record_field(&record, Some(i)), name, &mut issues)
+            });
             if let Some(mass) = parsed {
                 outflow_total += mass;
             } else {
                 all_outflows_valid = false;
             }
+            parsed_outflows.push(parsed);
         }
         let accounted_outflow_mass = all_outflows_valid.then_some(outflow_total);
         let residual = input_mass.zip(accounted_outflow_mass).map(|(input, output)| input - output);
@@ -276,14 +281,7 @@ fn audit_bytes(
         let residual_fraction = residual.zip(input_mass).and_then(|(delta, input)| {
             (input > 0.0).then_some(delta / input)
         });
-        let marketable_mass = outflow_indices
-            .first()
-            .and_then(|index| *index)
-            .and_then(|index| parse_nonnegative_mass(
-                field(Some(index)),
-                "marketable_output_mass_kg",
-                &mut Vec::new(),
-            ));
+        let marketable_mass = parsed_outflows.first().copied().flatten();
         let marketable_fraction =
             marketable_mass.zip(input_mass).and_then(|(marketable, input)| {
                 (input > 0.0).then_some(marketable / input)
