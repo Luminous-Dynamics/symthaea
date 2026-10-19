@@ -444,6 +444,18 @@
       "title": "NIST Measurement Process Characterization handbook — instrument drift bias",
       "url": "https://itl.nist.gov/div898/handbook/mpc/section3/mpc3312.htm",
       "purpose": "Reference for drift effects and the assumptions behind particular drift-elimination designs; ODRH does not presume linear drift or equally spaced correction is valid."
+    },
+    {
+      "id": "SRC-IEC-62087-7",
+      "title": "IEC 62087-7:2018 — methods of measurement for power consumption, computer monitors",
+      "url": "https://webstore.iec.ch/en/publication/27420",
+      "purpose": "Applicable standards reference for mains-powered computer-monitor power measurements within its stated scope; the project protocol records method edition and deviations without reproducing or claiming compliance."
+    },
+    {
+      "id": "SRC-NIST-MPC-HANDBOOK",
+      "title": "NIST/SEMATECH Measurement Process Characterization handbook",
+      "url": "https://www.itl.nist.gov/div898/handbook/mpc/mpc.htm",
+      "purpose": "Reference for check standards, measurement-process stability, repeatability/reproducibility and uncertainty; ODRH control screening remains a limited synthetic method, not a replacement for statistical procedures."
     }
   ]
 }
