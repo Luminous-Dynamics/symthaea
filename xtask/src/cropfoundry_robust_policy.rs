@@ -186,12 +186,17 @@ fn build_policy_scores(results: &[ScenarioResult]) -> Result<Vec<PolicyRobustnes
             .and_modify(|best| *best = best.min(result.stress_exposure_proxy))
             .or_insert(result.stress_exposure_proxy);
     }
-    let scenario_ids = grouped
+    let expected_scenario_ids = grouped
         .values()
         .next()
-        .map(|items| items.iter().map(|item| item.scenario_id.clone()).collect::<Vec<_>>())
+        .map(|items| {
+            items
+                .iter()
+                .map(|item| item.scenario_id.clone())
+                .collect::<std::collections::BTreeSet<_>>()
+        })
         .unwrap_or_default();
-    let expected_scenario_count = scenario_ids.len();
+    let expected_scenario_count = expected_scenario_ids.len();
     if expected_scenario_count == 0 {
         return Err(anyhow!("robust-policy evaluator has no declared scenarios"));
     }
@@ -202,11 +207,12 @@ fn build_policy_scores(results: &[ScenarioResult]) -> Result<Vec<PolicyRobustnes
             .iter()
             .map(|item| item.scenario_id.clone())
             .collect::<std::collections::BTreeSet<_>>();
-        if items.len() != expected_scenario_count || observed_ids.len() != items.len() {
+        if items.len() != expected_scenario_count
+            || observed_ids.len() != items.len()
+            || observed_ids != expected_scenario_ids
+        {
             return Err(anyhow!(
-                "policy {policy} has {} rows and {} distinct scenario IDs; expected {expected_scenario_count} paired scenarios",
-                items.len(),
-                observed_ids.len()
+                "policy {policy} scenario IDs do not match the common evaluation suite"
             ));
         }
 
@@ -383,11 +389,20 @@ fn build_receipt() -> Result<RobustPolicyReceipt> {
         .collect::<std::collections::BTreeSet<_>>()
         .len();
     if scores.iter().any(|score| {
-        !score.mean_stress_exposure_proxy.is_finite()
-            || !score.cvar95_stress_exposure_proxy.is_finite()
-            || !score.max_worst_zone_stress_exposure_proxy.is_finite()
-            || !score.mean_water_applied_plot_mm.is_finite()
-            || !score.mean_plot_allocation_dispersion_plot_mm.is_finite()
+        [
+            score.mean_stress_exposure_proxy,
+            score.median_stress_exposure_proxy,
+            score.p95_stress_exposure_proxy_nearest_rank,
+            score.cvar95_stress_exposure_proxy,
+            score.max_worst_zone_stress_exposure_proxy,
+            score.mean_worst_zone_stress_exposure_proxy,
+            score.mean_water_applied_plot_mm,
+            score.total_water_applied_plot_mm,
+            score.mean_plot_allocation_dispersion_plot_mm,
+            score.mean_regret_vs_per_scenario_best_stress_proxy,
+        ]
+        .iter()
+        .any(|value| !value.is_finite())
     }) {
         return Err(anyhow!("robust-policy receipt contains non-finite metrics"));
     }
@@ -472,6 +487,16 @@ mod tests {
                 .abs()
                 <= 1e-9
         }));
+    }
+
+    #[test]
+    fn robust_policy_rejects_different_scenario_sets_even_when_row_counts_match() {
+        let base = build_receipt_water_policy().unwrap();
+        let mut results = base.results.clone();
+        let policy = results[0].policy.clone();
+        let row = results.iter_mut().find(|row| row.policy == policy).unwrap();
+        row.scenario_id = "unexpected-replacement-scenario".to_owned();
+        assert!(build_policy_scores(&results).is_err());
     }
 
     #[test]
