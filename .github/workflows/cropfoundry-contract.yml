@@ -47,3 +47,9 @@ jobs:
 
       - name: Check local CSV auditor CLI
         run: cargo run -q -p xtask -- cropfoundry-audit-csv --help
+
+      - name: Execute synthetic irrigation-policy harness
+        run: |
+          cargo run -q -p xtask -- cropfoundry-water-policy-demo \
+            --out "$RUNNER_TEMP/cropfoundry-water-policy.json"
+          test -s "$RUNNER_TEMP/cropfoundry-water-policy.json"
