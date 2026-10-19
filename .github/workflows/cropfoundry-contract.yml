@@ -53,3 +53,6 @@ jobs:
           cargo run -q -p xtask -- cropfoundry-water-policy-demo \
             --out "$RUNNER_TEMP/cropfoundry-water-policy.json"
           test -s "$RUNNER_TEMP/cropfoundry-water-policy.json"
+
+      - name: Check postharvest mass-balance audit CLI
+        run: cargo run -q -p xtask -- cropfoundry-postharvest-audit --help
