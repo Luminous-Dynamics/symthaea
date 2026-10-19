@@ -556,11 +556,17 @@ fn reconcile_csv_bytes(
         rows = rows.checked_add(1).ok_or_else(|| {
             AdapterError::Validation("CSV reconciliation row count overflow".into())
         })?;
-        let row_id = record.get(row_id_index).unwrap_or_default().trim();
-        if row_id.is_empty() {
+        let row_id = record.get(row_id_index).unwrap_or_default();
+        if row_id.trim().is_empty() {
             return Err(AdapterError::Validation(format!(
                 "CSV data record {} has a blank source-native row ID in header {:?}",
                 record_index + 1, mapping.source_row_id_header
+            )));
+        }
+        if row_id != row_id.trim() {
+            return Err(AdapterError::Validation(format!(
+                "CSV source-native row ID in record {} has surrounding whitespace; identity normalization is not implicit",
+                record_index + 1
             )));
         }
         if !seen_row_ids.insert(row_id.to_string()) {
@@ -1755,6 +1761,14 @@ mod tests {
         assert_eq!(result.columns[0].role, CsvFieldRole::TargetOutcome);
         assert_eq!(result.columns[0].preserved_missing_cells, 1);
         assert_eq!(result.columns[1].nonempty_cells, 2);
+    }
+
+    #[test]
+    fn csv_reconciliation_rejects_surrounding_whitespace_in_source_row_ids() {
+        let bytes = b"source_row_id,stress_mpa,specimen_note\n R-001,920,note\n";
+        let mapping = fixture_csv_mapping();
+        let mapping_bytes = serde_json::to_vec(&mapping).unwrap();
+        assert!(reconcile_csv_bytes(bytes, &mapping, &mapping_bytes, "fixture.csv").is_err());
     }
 
     #[test]
