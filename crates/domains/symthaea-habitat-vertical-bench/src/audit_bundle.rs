@@ -7,7 +7,7 @@
 //! authenticate authors or sources and do not prove that any underlying claim
 //! is true. Every component is rerun and each result is compared independently.
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use serde_json::Value;
 use sha2::{Digest, Sha256};
