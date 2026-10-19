@@ -139,6 +139,20 @@ fn ratio(numerator: Option<f64>, denominator: Option<f64>) -> Option<f64> {
     })
 }
 
+fn sum_finite(values: impl Iterator<Item = f64>) -> Option<f64> {
+    let mut total = 0.0;
+    for value in values {
+        if !value.is_finite() || value < 0.0 {
+            return None;
+        }
+        total += value;
+        if !total.is_finite() {
+            return None;
+        }
+    }
+    Some(total)
+}
+
 fn delivered_nutrient_mass(receipt: &Value) -> Option<f64> {
     number_field(receipt, "measured_nutrient_mass_delivered_mg")
         .or_else(|| number_field(receipt, "modeled_nutrient_mass_delivered_mg"))
@@ -261,6 +275,10 @@ fn aggregate_option(
     }
 
     let batch_count = grouped_batches.len();
+    let row_accounting_complete = rows.len() == option.records.len()
+        && rows.iter().all(|row| {
+            field(&row.receipt, "accounting_pass").and_then(Value::as_bool) == Some(true)
+        });
     let mut resource_totals = BTreeMap::<String, Option<f64>>::new();
     let mut resource_boundaries = BTreeMap::<String, Option<String>>::new();
     let mut resource_measured_counts = BTreeMap::<String, usize>::new();
@@ -293,7 +311,11 @@ fn aggregate_option(
             }
         }
         resource_measured_counts.insert(value_key.to_owned(), measured_batches);
-        let total_option = if values_complete && measured_batches == batch_count && total.is_finite() {
+        let total_option = if row_accounting_complete
+            && values_complete
+            && measured_batches == batch_count
+            && total.is_finite()
+        {
             Some(total)
         } else {
             None
@@ -326,7 +348,18 @@ fn aggregate_option(
                 .iter()
                 .map(|row| delivered_nutrient_mass(&row.receipt))
                 .collect();
-            values.iter().all(Option::is_some).then(|| values.iter().flatten().sum::<f64>())
+            if values.iter().all(Option::is_some) {
+                let total = sum_finite(values.iter().flatten().copied());
+                if total.is_none() {
+                    issues.push(format!(
+                        "option {} nutrient {nutrient_id} total overflowed the finite numeric range",
+                        option.option_id
+                    ));
+                }
+                total
+            } else {
+                None
+            }
         } else {
             None
         };
@@ -355,10 +388,22 @@ fn aggregate_option(
                 option.option_id
             ));
         }
-        let total_lower = (intervals_complete && nutrient_rows.len() == batch_count)
-            .then(|| lower.iter().flatten().sum::<f64>());
-        let total_upper = (intervals_complete && nutrient_rows.len() == batch_count)
-            .then(|| upper.iter().flatten().sum::<f64>());
+        let total_lower = if intervals_complete && nutrient_rows.len() == batch_count {
+            sum_finite(lower.iter().flatten().copied())
+        } else {
+            None
+        };
+        let total_upper = if intervals_complete && nutrient_rows.len() == batch_count {
+            sum_finite(upper.iter().flatten().copied())
+        } else {
+            None
+        };
+        if intervals_complete && (total_lower.is_none() || total_upper.is_none()) {
+            issues.push(format!(
+                "option {} nutrient {nutrient_id} interval sum is non-finite or invalid",
+                option.option_id
+            ));
+        }
 
         let bioavailability_values: Vec<Option<f64>> = nutrient_rows
             .iter()
@@ -366,7 +411,14 @@ fn aggregate_option(
             .collect();
         let bioavailability_coverage = bioavailability_values.iter().filter(|value| value.is_some()).count();
         let bioavailable_total = if bioavailability_coverage == batch_count && batch_count > 0 {
-            Some(bioavailability_values.iter().flatten().sum::<f64>())
+            let total = sum_finite(bioavailability_values.iter().flatten().copied());
+            if total.is_none() {
+                issues.push(format!(
+                    "option {} nutrient {nutrient_id} bioavailable total overflowed",
+                    option.option_id
+                ));
+            }
+            total
         } else {
             None
         };
@@ -387,10 +439,24 @@ fn aggregate_option(
             && bio_high.len() == batch_count
             && bio_low.iter().all(Option::is_some)
             && bio_high.iter().all(Option::is_some);
-        let bioavailable_lower = (bio_interval_complete && batch_count > 0)
-            .then(|| bio_low.iter().flatten().sum::<f64>());
-        let bioavailable_upper = (bio_interval_complete && batch_count > 0)
-            .then(|| bio_high.iter().flatten().sum::<f64>());
+        let bioavailable_lower = if bio_interval_complete && batch_count > 0 {
+            sum_finite(bio_low.iter().flatten().copied())
+        } else {
+            None
+        };
+        let bioavailable_upper = if bio_interval_complete && batch_count > 0 {
+            sum_finite(bio_high.iter().flatten().copied())
+        } else {
+            None
+        };
+        if bio_interval_complete
+            && (bioavailable_lower.is_none() || bioavailable_upper.is_none())
+        {
+            issues.push(format!(
+                "option {} nutrient {nutrient_id} bioavailable interval sum is non-finite",
+                option.option_id
+            ));
+        }
 
         let direct_assay_count = nutrient_rows
             .iter()
@@ -440,10 +506,13 @@ fn aggregate_option(
     if grouped_batches.is_empty() {
         issues.push(format!("option {} contains no valid batches", option.option_id));
     }
-    let resource_ledger_complete = !grouped_batches.is_empty()
+    let resource_ledger_complete = row_accounting_complete
+        && !grouped_batches.is_empty()
         && RESOURCE_FIELDS.iter().all(|(key, _)| {
             let measured = resource_measured_counts.get(*key).copied().unwrap_or(0);
-            measured == 0 || measured == batch_count
+            measured == 0
+                || (measured == batch_count
+                    && resource_totals.get(*key).map(|value| value.is_some()).unwrap_or(false))
         });
     OptionPortfolioReceipt {
         option_id: option.option_id.clone(),
