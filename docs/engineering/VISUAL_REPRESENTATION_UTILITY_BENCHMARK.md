@@ -172,7 +172,8 @@ Evidence classes remain distinct: `ANALYTIC_FIXTURE`, `SYNTHETIC_EVALUATION`, `O
 ## 10. Research anchors
 
 - DINOv3 official repository / paper: https://github.com/facebookresearch/dinov3 and https://ai.meta.com/research/publications/dinov3/
-- SAM 2: https://ai.meta.com/research/sam2/
+- SAM 3.1 / SAM 3 (current promptable concept detection, segmentation and tracking comparator): https://ai.meta.com/blog/segment-anything-model-3/ and https://ai.meta.com/research/sam3/
+- SAM 2 (compatibility / historical baseline where useful): https://ai.meta.com/research/sam2/
 - TAO open-world tracking: https://taodataset.org/
 - TrackEval reference HOTA and tracking metrics: https://github.com/JonathonLuiten/TrackEval
 - WorldArena evaluates video perceptual quality and downstream embodied utility: https://github.com/tsinghua-fib-lab/WorldArena
