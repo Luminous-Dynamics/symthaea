@@ -544,7 +544,7 @@ mod tests {
     #[test]
     fn accepts_consistent_provider_receipt_and_keeps_claim_scope_narrow() {
         let f = create_fixture();
-        let result = verify_bundle(&f.artifact, &f.source, &f.expected_head).unwrap();
+        let result = verify_bundle(&f.artifact, &f.source, &f.expected_head, None).unwrap();
         assert_eq!(result.status, "verified");
         assert_eq!(result.evidence_tier, "unblob-provider-smoke");
         assert_eq!(result.provider_metamorphic_variants_verified, 64);
@@ -555,24 +555,44 @@ mod tests {
     }
 
     #[test]
+    fn reports_digest_anchor_only_when_independently_supplied() {
+        let f = create_fixture();
+        let receipt_sha = hash_file(&f.artifact.join("receipt.json")).unwrap();
+        let anchored = verify_bundle(&f.artifact, &f.source, &f.expected_head, Some(&receipt_sha)).unwrap();
+        assert_eq!(anchored.verification_mode, "receipt-digest-anchored");
+        assert!(anchored.receipt_digest_anchor_matched);
+        let unanchored = verify_bundle(&f.artifact, &f.source, &f.expected_head, None).unwrap();
+        assert_eq!(unanchored.verification_mode, "integrity-consistency-only");
+        assert!(!unanchored.receipt_digest_anchor_matched);
+    }
+
+    #[test]
+    fn rejects_wrong_independent_receipt_digest() {
+        let f = create_fixture();
+        let incorrect = "0".repeat(64);
+        assert!(verify_bundle(&f.artifact, &f.source, &f.expected_head, Some(&incorrect))
+            .unwrap_err().to_string().contains("independently supplied receipt digest"));
+    }
+
+    #[test]
     fn rejects_wrong_expected_source_head() {
         let f = create_fixture();
         let other = "9999999999999999999999999999999999999999";
-        assert!(verify_bundle(&f.artifact, &f.source, other).unwrap_err().to_string().contains("expected head"));
+        assert!(verify_bundle(&f.artifact, &f.source, other, None).unwrap_err().to_string().contains("expected head"));
     }
 
     #[test]
     fn rejects_changed_raw_report_bytes() {
         let f = create_fixture();
         write(&f.artifact.join("run-a/raw-report.json"), b"{\"tampered\":true}\n");
-        assert!(verify_bundle(&f.artifact, &f.source, &f.expected_head).unwrap_err().to_string().contains("digest mismatch"));
+        assert!(verify_bundle(&f.artifact, &f.source, &f.expected_head, None).unwrap_err().to_string().contains("digest mismatch"));
     }
 
     #[test]
     fn rejects_changed_normalizer_source() {
         let f = create_fixture();
         write(&f.source.join("normalize.jq"), b"modified normalizer\n");
-        assert!(verify_bundle(&f.artifact, &f.source, &f.expected_head).unwrap_err().to_string().contains("normalizer"));
+        assert!(verify_bundle(&f.artifact, &f.source, &f.expected_head, None).unwrap_err().to_string().contains("normalizer"));
     }
 
     #[test]
@@ -589,7 +609,7 @@ mod tests {
             b"{\"projection\":\"same\"}\n",
         );
         write(&f.artifact.join("receipt.json"), serde_json::to_vec_pretty(&changed).unwrap().as_slice());
-        assert!(verify_bundle(&f.artifact, &f.source, &f.expected_head).unwrap_err().to_string().contains("did not change"));
+        assert!(verify_bundle(&f.artifact, &f.source, &f.expected_head, None).unwrap_err().to_string().contains("did not change"));
     }
 
     #[test]
@@ -599,14 +619,14 @@ mod tests {
         let mut changed = raw;
         changed["claims_ceiling"] = json!("Validated REA CLI/MCP parity and hardware behavior.");
         write(&f.artifact.join("receipt.json"), serde_json::to_vec_pretty(&changed).unwrap().as_slice());
-        assert!(verify_bundle(&f.artifact, &f.source, &f.expected_head).unwrap_err().to_string().contains("claim scope"));
+        assert!(verify_bundle(&f.artifact, &f.source, &f.expected_head, None).unwrap_err().to_string().contains("claim scope"));
     }
 
     #[test]
     fn rejects_provider_metamorphic_receipt_digest_mismatch() {
         let f = create_fixture();
         write(&f.artifact.join("provider-metamorphic-receipt.json"), b"{\"tampered\":true}");
-        assert!(verify_bundle(&f.artifact, &f.source, &f.expected_head).unwrap_err().to_string().contains("digest mismatch"));
+        assert!(verify_bundle(&f.artifact, &f.source, &f.expected_head, None).unwrap_err().to_string().contains("digest mismatch"));
     }
 
     #[test]
@@ -616,13 +636,13 @@ mod tests {
         let mut changed = raw;
         changed["source"]["oracle_sha256"] = json!("1234");
         write(&f.artifact.join("receipt.json"), serde_json::to_vec_pretty(&changed).unwrap().as_slice());
-        assert!(verify_bundle(&f.artifact, &f.source, &f.expected_head).unwrap_err().to_string().contains("lowercase SHA-256"));
+        assert!(verify_bundle(&f.artifact, &f.source, &f.expected_head, None).unwrap_err().to_string().contains("lowercase SHA-256"));
     }
 
     #[test]
     fn rejects_wrong_extracted_payload_even_when_receipt_is_unchanged() {
         let f = create_fixture();
         write(&f.artifact.join("run-b/extracted/payload.txt"), b"not the expected payload\n");
-        assert!(verify_bundle(&f.artifact, &f.source, &f.expected_head).unwrap_err().to_string().contains("extracted payload"));
+        assert!(verify_bundle(&f.artifact, &f.source, &f.expected_head, None).unwrap_err().to_string().contains("extracted payload"));
     }
 }
