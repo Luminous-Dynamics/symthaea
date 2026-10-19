@@ -359,14 +359,28 @@ fn validate_contract(
             bail!("{}: incomplete or malformed oracle case", case.case_id);
         }
         if case.case_kind == "known_answer" && case.fault_injection.is_some() {
-            bail!("{}: known-answer case must not declare a fault injection", case.case_id);
+            bail!(
+                "{}: known-answer case must not declare a fault injection",
+                case.case_id
+            );
         }
         if case.case_kind == "fault_mutation"
-            && case.fault_injection.as_deref().unwrap_or("").trim().is_empty()
+            && case
+                .fault_injection
+                .as_deref()
+                .unwrap_or("")
+                .trim()
+                .is_empty()
         {
-            bail!("{}: mutation case must declare a fault injection", case.case_id);
+            bail!(
+                "{}: mutation case must declare a fault injection",
+                case.case_id
+            );
         }
-        if oracle_cases.insert(case.case_id.clone(), case.clone()).is_some() {
+        if oracle_cases
+            .insert(case.case_id.clone(), case.clone())
+            .is_some()
+        {
             bail!("duplicate oracle case ID: {}", case.case_id);
         }
     }
@@ -406,7 +420,10 @@ fn validate_contract(
         let text = std::str::from_utf8(&bytes)
             .with_context(|| format!("{} is not valid UTF-8", revision.source_path))?;
         let requirements = parse_synthetic_requirements(text, &revision.revision_id)?;
-        if revisions.insert(revision.revision_id.clone(), revision).is_some() {
+        if revisions
+            .insert(revision.revision_id.clone(), revision)
+            .is_some()
+        {
             bail!("duplicate source revision ID: {}", revision.revision_id);
         }
         source_artifact_sha256.insert(revision.revision_id.clone(), actual_sha);
@@ -464,14 +481,12 @@ fn validate_contract(
                 contract.to_revision_id
             );
         }
-        let candidate_text = to
-            .get(&mapping.requirement_id)
-            .with_context(|| {
-                format!(
-                    "{}: mapping references no candidate requirement",
-                    mapping.requirement_id
-                )
-            })?;
+        let candidate_text = to.get(&mapping.requirement_id).with_context(|| {
+            format!(
+                "{}: mapping references no candidate requirement",
+                mapping.requirement_id
+            )
+        })?;
         let expected_locator = format!(
             "synthetic://{}/{}",
             contract.to_revision_id,
@@ -509,14 +524,12 @@ fn validate_contract(
         let mut known_answer_count = 0usize;
         let mut fault_mutation_count = 0usize;
         for test_id in &mapping.test_ids {
-            let oracle_case = oracle_cases
-                .get(test_id)
-                .with_context(|| {
-                    format!(
-                        "{}: test ID {test_id} is missing from independent oracle",
-                        mapping.requirement_id
-                    )
-                })?;
+            let oracle_case = oracle_cases.get(test_id).with_context(|| {
+                format!(
+                    "{}: test ID {test_id} is missing from independent oracle",
+                    mapping.requirement_id
+                )
+            })?;
             if oracle_case.requirement_id != mapping.requirement_id {
                 bail!(
                     "{}: test ID {test_id} belongs to requirement {}, not this mapping",
@@ -532,11 +545,29 @@ fn validate_contract(
         }
         match mapping.disposition.as_str() {
             "accepted" => {
-                if mapping.bundle_target.as_deref().unwrap_or("").trim().is_empty() {
-                    bail!("{}: accepted mapping requires a bundle target", mapping.requirement_id);
+                if mapping
+                    .bundle_target
+                    .as_deref()
+                    .unwrap_or("")
+                    .trim()
+                    .is_empty()
+                {
+                    bail!(
+                        "{}: accepted mapping requires a bundle target",
+                        mapping.requirement_id
+                    );
                 }
-                if mapping.reviewer_record_id.as_deref().unwrap_or("").trim().is_empty() {
-                    bail!("{}: accepted mapping requires a review record", mapping.requirement_id);
+                if mapping
+                    .reviewer_record_id
+                    .as_deref()
+                    .unwrap_or("")
+                    .trim()
+                    .is_empty()
+                {
+                    bail!(
+                        "{}: accepted mapping requires a review record",
+                        mapping.requirement_id
+                    );
                 }
                 if mapping.test_ids.is_empty() {
                     bail!(
@@ -637,8 +668,17 @@ fn validate_contract(
         if !record.case_ids.is_empty() {
             unique_nonempty(&record.case_ids, "case_ids", &record.requirement_id)?;
         }
-        if record.reviewer_record_id.as_deref().unwrap_or("").trim().is_empty() {
-            bail!("{}: change record requires a review record", record.requirement_id);
+        if record
+            .reviewer_record_id
+            .as_deref()
+            .unwrap_or("")
+            .trim()
+            .is_empty()
+        {
+            bail!(
+                "{}: change record requires a review record",
+                record.requirement_id
+            );
         }
 
         match expected_kind.as_str() {
@@ -669,11 +709,9 @@ fn validate_contract(
                                     record.requirement_id
                                 );
                             }
-                            let oracle_case = oracle_cases
-                                .get(case_id)
-                                .with_context(|| {
-                                    format!("change case {case_id} missing from oracle")
-                                })?;
+                            let oracle_case = oracle_cases.get(case_id).with_context(|| {
+                                format!("change case {case_id} missing from oracle")
+                            })?;
                             if oracle_case.requirement_id != record.requirement_id {
                                 bail!(
                                     "{}: change case {case_id} is bound to a different requirement",
