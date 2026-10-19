@@ -18,7 +18,8 @@
     "nominal_value",
     "guard_half_width",
     "controls",
-    "observations"
+    "observations",
+    "maximum_control_gap_seconds"
   ],
   "properties": {
     "$schema": {
@@ -109,6 +110,11 @@
           }
         }
       }
+    },
+    "maximum_control_gap_seconds": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "description": "Predeclared maximum allowed gap between scheduled control slots, including run edges. The verifier checks the schedule only; it does not select or validate a physically adequate cadence."
     }
   }
 }
