@@ -655,19 +655,41 @@ mod tests {
     }
 
     #[test]
-    fn invalid_probability_mass_fails_closed() {
-        let case = fixture()
+    fn state_action_and_likelihood_row_order_do_not_change_values() {
+        let mut case = fixture()
             .cases
             .into_iter()
-            .find(|case| case.case_id == "EVSI-008")
-            .expect("EVSI-008 exists");
+            .find(|case| case.case_id == "EVSI-006")
+            .expect("EVSI-006 exists");
+        let before = evaluate_case(&case);
+        case.states.reverse();
+        case.actions.reverse();
+        for experiment in &mut case.experiments {
+            experiment.likelihoods.reverse();
+        }
+        let after = evaluate_case(&case);
+        assert_eq!(before.status, after.status);
+        assert_eq!(before.selected_experiment_id, after.selected_experiment_id);
+        assert_eq!(before.experiment_values, after.experiment_values);
+    }
+
+    #[test]
+    fn extreme_signed_utility_is_rejected_without_overflow() {
+        let mut case = fixture()
+            .cases
+            .into_iter()
+            .find(|case| case.case_id == "EVSI-001")
+            .expect("EVSI-001 exists");
+        case.actions[0]
+            .utilities
+            .insert("favorable".to_owned(), i64::MIN);
         let result = evaluate_case(&case);
         assert_eq!(result.status, ResultStatus::InvalidInput);
         assert!(
             result
                 .reason_codes
                 .iter()
-                .any(|reason| reason == "invalid_outcome_probability_sum")
+                .any(|reason| reason == "invalid_utility_bound")
         );
     }
 }
