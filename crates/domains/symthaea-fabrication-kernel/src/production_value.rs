@@ -8,14 +8,19 @@
 //! sensor adapter, metrology authenticator, causal estimator, controller, or
 //! proof that supplied outcomes were measured in the physical world.
 
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::error::Error;
 use std::fmt;
 
+/// Version for the machine-readable production-outcome report.
+pub const PRODUCTION_VALUE_REPORT_SCHEMA_VERSION: u16 = 1;
+
 /// Claimed evidence class for this outcome record. This is a declaration, not
 /// an authenticated attestation; the evaluator prevents cross-class comparisons
 /// but cannot prove that a record really belongs to the declared class.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum EvidenceClass {
     /// Known-answer fixtures or generated synthetic outcomes.
     SyntheticFixture,
@@ -30,7 +35,8 @@ pub enum EvidenceClass {
 /// Unit dispositions are mutually exclusive and must sum to `input_units`.
 /// Material mass is measured in integer milligrams, and all destinations,
 /// including held material and residual, must sum to `material_input_mg`.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ProductionRun {
     pub scenario_id: String,
     pub policy_id: String,
@@ -216,7 +222,8 @@ impl fmt::Display for EvaluationError {
 }
 impl Error for EvaluationError {}
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct OutcomeSummary {
     pub scenario_count: usize,
     pub input_units: u64,
@@ -259,8 +266,11 @@ impl OutcomeSummary {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ProductionValueReport {
+    /// Version of the serialized report contract.
+    pub schema_version: u16,
     pub baseline_policy_id: String,
     pub candidate_policy_id: String,
     /// Declared evidence class shared by every compared run.
@@ -347,6 +357,7 @@ pub fn compare_production_outcomes(
     }
 
     Ok(ProductionValueReport {
+        schema_version: PRODUCTION_VALUE_REPORT_SCHEMA_VERSION,
         baseline_policy_id: baseline_policy_id.to_owned(),
         candidate_policy_id: candidate_policy_id.to_owned(),
         evidence_class: baseline_evidence,
@@ -515,6 +526,18 @@ mod tests {
             compare_production_outcomes("baseline", &b, "candidate", &c),
             Err(EvaluationError::EvidenceClassMismatch { .. })
         ));
+    }
+
+    #[test]
+    fn report_json_round_trip_preserves_schema_and_evidence_class() {
+        let (baseline, candidate) = pair();
+        let report = compare_production_outcomes("baseline", &baseline, "candidate", &candidate).unwrap();
+        let json = serde_json::to_string(&report).unwrap();
+        let decoded: ProductionValueReport = serde_json::from_str(&json).unwrap();
+        assert_eq!(report, decoded);
+        assert_eq!(decoded.schema_version, PRODUCTION_VALUE_REPORT_SCHEMA_VERSION);
+        assert_eq!(decoded.evidence_class, EvidenceClass::InstrumentObserved);
+        assert!(serde_json::from_str::<ProductionRun>(r#"{"unexpected":true}"#).is_err());
     }
 
     #[test]
