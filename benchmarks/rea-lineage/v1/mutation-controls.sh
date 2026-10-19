@@ -28,5 +28,13 @@ prepare null-to-zero
 jq '(.cases[]|select(.id=="LNG-007").derivations[0].parent_file_range)={"offset":0,"length":1}' "$work/null-to-zero/cases.json" >"$work/a.json"
 mv "$work/a.json" "$work/null-to-zero/cases.json"
 expect_reject null-to-zero "$work/null-to-zero"
-printf 'PASS all three lineage mutation controls\n'
+prepare missing-stage-kind
+jq 'del(.cases[]|select(.id=="LNG-017").derivations[0].stage_kind)' "$work/missing-stage-kind/cases.json" >"$work/a.json"
+mv "$work/a.json" "$work/missing-stage-kind/cases.json"
+expect_reject missing-stage-kind "$work/missing-stage-kind"
+prepare empty-provider-id
+jq '(.cases[]|select(.id=="LNG-014").chunks[0].provider_id)=""' "$work/empty-provider-id/cases.json" >"$work/a.json"
+mv "$work/a.json" "$work/empty-provider-id/cases.json"
+expect_reject empty-provider-id "$work/empty-provider-id"
+printf 'PASS all five lineage mutation controls\n'
 printf 'NOTE: synthetic contract only; no provider or device executed.\n'
