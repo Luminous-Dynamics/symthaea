@@ -45,6 +45,23 @@ jobs:
       # actions/checkout v4.2.2 pinned to an immutable commit.
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
 
+      - name: Prepare reproducibility bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          artifact_dir="target/odrh-validation"
+          mkdir -p "$artifact_dir"
+          cp hardware/open-display-reference/cad/odrh_sensor_interface_plate.scad "$artifact_dir/"
+          cp hardware/open-display-reference/validation/odrh_sensor_plate_cad_check-v0.1.json "$artifact_dir/"
+          cp hardware/open-display-reference/LICENSE "$artifact_dir/"
+          cp hardware/open-display-reference/README.md "$artifact_dir/"
+          cp docs/engineering/open-display-reference-platform-v0.1.json "$artifact_dir/"
+          cp docs/engineering/open-display-reference-platform.schema.json "$artifact_dir/"
+          cp docs/engineering/display-measurement-run-template-v0.1.json "$artifact_dir/"
+          cp docs/engineering/display-measurement-run.schema.json "$artifact_dir/"
+          cp docs/engineering/DISPLAY_METROLOGY_REPRODUCIBILITY_PROTOCOL.md "$artifact_dir/"
+          sha256sum "$artifact_dir"/* > "$artifact_dir/input-sha256sums.txt"
+
       - name: Install pinned Rust toolchain
         shell: bash
         run: |
@@ -63,14 +80,22 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          artifact_dir="target/odrh-validation"
           cad="hardware/open-display-reference/cad/odrh_sensor_interface_plate.scad"
-          openscad -o "$RUNNER_TEMP/odrh-default.stl" "$cad"
-          openscad -D 'plate_width_mm=100' -D 'plate_height_mm=60' \
-            -o "$RUNNER_TEMP/odrh-alternate.stl" "$cad"
-          echo "Default STL SHA-256:"
-          sha256sum "$RUNNER_TEMP/odrh-default.stl"
-          echo "Alternate STL SHA-256:"
-          sha256sum "$RUNNER_TEMP/odrh-alternate.stl"
+          openscad --version > "$artifact_dir/openscad-version.txt" 2>&1
+          if ! openscad -o "$artifact_dir/odrh-default.stl" "$cad" \
+            > "$artifact_dir/odrh-default-render.log" 2>&1; then
+            cat "$artifact_dir/odrh-default-render.log"
+            exit 1
+          fi
+          if ! openscad -D 'plate_width_mm=100' -D 'plate_height_mm=60' \
+            -o "$artifact_dir/odrh-alternate.stl" "$cad" \
+            > "$artifact_dir/odrh-alternate-render.log" 2>&1; then
+            cat "$artifact_dir/odrh-alternate-render.log"
+            exit 1
+          fi
+          sha256sum "$artifact_dir/odrh-default.stl" "$artifact_dir/odrh-alternate.stl" \
+            | tee "$artifact_dir/mesh-sha256sums.txt"
 
       - name: Check exported mesh bounds and parameter rejection
         shell: bash
@@ -97,8 +122,10 @@ jobs:
               }
             ' "$file"
           }
-          check_bounds "$RUNNER_TEMP/odrh-default.stl" 80 5 80
-          check_bounds "$RUNNER_TEMP/odrh-alternate.stl" 100 5 60
+          check_bounds "target/odrh-validation/odrh-default.stl" 80 5 80 \
+            | tee "target/odrh-validation/default-bounds.txt"
+          check_bounds "target/odrh-validation/odrh-alternate.stl" 100 5 60 \
+            | tee "target/odrh-validation/alternate-bounds.txt"
 
           receipt="hardware/open-display-reference/validation/odrh_sensor_plate_cad_check-v0.1.json"
           cad="hardware/open-display-reference/cad/odrh_sensor_interface_plate.scad"
@@ -123,31 +150,79 @@ jobs:
           check_triangle_count "$RUNNER_TEMP/odrh-alternate.stl" "ODRH-CAD-ALTERNATE-DIMENSIONS"
 
           if openscad -D 'sensor_aperture_d_mm=100' \
-            -o "$RUNNER_TEMP/odrh-invalid.stl" "$cad" \
-            > "$RUNNER_TEMP/odrh-invalid.log" 2>&1; then
+            -o "target/odrh-validation/odrh-invalid.stl" "$cad" \
+            > "target/odrh-validation/odrh-invalid-aperture.log" 2>&1; then
             echo "Oversized aperture override unexpectedly rendered"
             exit 1
           fi
           grep -F "Sensor aperture overlaps the diagonal mounting-hole envelope" \
-            "$RUNNER_TEMP/odrh-invalid.log"
+            "target/odrh-validation/odrh-invalid-aperture.log"
 
           if openscad -D 'mount_pitch_x_mm=100' \
-            -o "$RUNNER_TEMP/odrh-invalid-pitch.stl" "$cad" \
-            > "$RUNNER_TEMP/odrh-invalid-pitch.log" 2>&1; then
+            -o "target/odrh-validation/odrh-invalid-pitch.stl" "$cad" \
+            > "target/odrh-validation/odrh-invalid-pitch.log" 2>&1; then
             echo "Invalid mount-pitch override unexpectedly rendered"
             exit 1
           fi
           grep -F "Horizontal mounting-hole grid violates edge margin" \
-            "$RUNNER_TEMP/odrh-invalid-pitch.log"
+            "target/odrh-validation/odrh-invalid-pitch.log"
 
           if openscad -D 'plate_thickness_mm=0.5' \
-            -o "$RUNNER_TEMP/odrh-invalid-thickness.stl" "$cad" \
-            > "$RUNNER_TEMP/odrh-invalid-thickness.log" 2>&1; then
+            -o "target/odrh-validation/odrh-invalid-thickness.stl" "$cad" \
+            > "target/odrh-validation/odrh-invalid-thickness.log" 2>&1; then
             echo "Invalid plate-thickness override unexpectedly rendered"
             exit 1
           fi
           grep -F "Counterbore depth must be smaller than plate thickness" \
-            "$RUNNER_TEMP/odrh-invalid-thickness.log"
+            "target/odrh-validation/odrh-invalid-thickness.log"
+
+      - name: Write run-bound geometry receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          artifact_dir="target/odrh-validation"
+          source_hash="$(sha256sum hardware/open-display-reference/cad/odrh_sensor_interface_plate.scad | awk '{print $1}')"
+          default_hash="$(sha256sum "$artifact_dir/odrh-default.stl" | awk '{print $1}')"
+          alternate_hash="$(sha256sum "$artifact_dir/odrh-alternate.stl" | awk '{print $1}')"
+          tool_version="$(cat "$artifact_dir/openscad-version.txt")"
+          jq -n \
+            --arg repo "$GITHUB_REPOSITORY" \
+            --arg commit "$GITHUB_SHA" \
+            --arg run_id "$GITHUB_RUN_ID" \
+            --arg run_attempt "$GITHUB_RUN_ATTEMPT" \
+            --arg run_url "https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            --arg source_hash "$source_hash" \
+            --arg tool_version "$tool_version" \
+            --arg default_hash "$default_hash" \
+            --arg alternate_hash "$alternate_hash" \
+            '{
+              schema_version: "0.1.0",
+              validation_id: "ODRH-CAD-RUN-001",
+              claim_boundary: "GEOMETRY_EXPORT_CHECKED_NOT_PHYSICALLY_QUALIFIED",
+              source: {
+                path: "hardware/open-display-reference/cad/odrh_sensor_interface_plate.scad",
+                sha256: $source_hash
+              },
+              tool: {name: "OpenSCAD", version_output: $tool_version},
+              execution: {
+                repository: $repo,
+                commit_sha: $commit,
+                workflow_run_id: $run_id,
+                workflow_run_attempt: $run_attempt,
+                workflow_run_url: $run_url
+              },
+              outputs: [
+                {name: "default.stl", sha256: $default_hash, expected_bounds_mm: [80, 5, 80]},
+                {name: "alternate.stl", sha256: $alternate_hash, override: {plate_width_mm: 100, plate_height_mm: 60}, expected_bounds_mm: [100, 5, 60]}
+              ],
+              negative_controls: [
+                {parameter: "sensor_aperture_d_mm", override: 100, expected_failure: "Sensor aperture overlaps the diagonal mounting-hole envelope"},
+                {parameter: "mount_pitch_x_mm", override: 100, expected_failure: "Horizontal mounting-hole grid violates edge margin"},
+                {parameter: "plate_thickness_mm", override: 0.5, expected_failure: "Counterbore depth must be smaller than plate thickness"}
+              ],
+              physical_validation: "NOT_PERFORMED"
+            }' > "$artifact_dir/odrh-cad-runtime-receipt.json"
+          sha256sum "$artifact_dir"/* > "$artifact_dir/final-artifact-sha256sums.txt"
 
       - name: Check formatting
         run: cargo fmt --manifest-path tools/open-display-platform-verify/Cargo.toml -- --check
@@ -160,3 +235,12 @@ jobs:
 
       - name: Verify repository manifest
         run: cargo run --manifest-path tools/open-display-platform-verify/Cargo.toml
+
+      - name: Upload reproducible CAD and validation artifacts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: odrh-validation-${{ github.run_id }}-${{ github.run_attempt }}
+          path: target/odrh-validation/
+          if-no-files-found: warn
+          retention-days: 14
