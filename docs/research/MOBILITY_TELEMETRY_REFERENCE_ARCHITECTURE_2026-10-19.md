@@ -129,12 +129,15 @@ Targets for the first software tranche: zero false accepts across missing-channe
 
 ### Current implementation
 
-The first implementation is the **manifest and raw-trace validation layer**, not pretend firmware. Both commands are wired into the existing `xtask` binary and introduce no new dependencies. The manifest module has 17 authored unit tests covering duplicate IDs, unknown sensors/channels, rates, missing claim coverage, calibration receipts, safe paths/digests, clock regression and invalid/missing samples.
+The first implementation is the **manifest, raw-trace validator and fault-matrix runner**, not pretend firmware. All three commands are wired into the existing `xtask` binary and introduce no new dependencies. The telemetry module has 25 authored unit tests covering schema/claim gates, trace failure modes and all 23 frozen matrix cases; five further tests cover the vendored tire-monitoring intake. These tests have not been compiled or run in this environment.
 
 From the workspace root:
 
 ```sh
 cargo test -p xtask mobility_telemetry_manifest
+cargo test -p xtask frozen_fault_matrix_cases_match_expected_outcomes
+cargo run -p xtask -- mobility-telemetry-benchmark \
+  --out reports/mobility_telemetry_benchmark.json
 cargo run -p xtask -- mobility-telemetry-manifest \
   --input docs/research/data/mobility_telemetry_manifest_v0_1.json \
   --out reports/mobility_telemetry_manifest.json
@@ -147,6 +150,6 @@ cargo run -p xtask -- mobility-telemetry-trace \
 
 The planned manifest declares 12 sensors and 20 semantic channels. The five-row synthetic trace is deliberately small and includes one missing raw value explicitly marked `INVALID`; it is never silently replaced with zero. Source-side replay found no schema/channel/sequence/timestamp/value violations: four valid samples, one invalid-or-saturated sample, and one missing raw value. This replay is not execution of the Rust code.
 
-The manifest is `session_state: planned` and `evidence_class: DesignOnly`; all three requested physical claim profiles remain ineligible. For `recorded`/`closed` sessions the Rust path verifies declared artifact sizes and SHA-256 and rejects paths outside the manifest directory. Cargo/rustc/rustfmt are unavailable in this environment, so compilation/tests remain unverified.
+The machine-readable fault matrix is `docs/research/data/mobility_telemetry_fault_matrix_v0_1.json` (23 cases). The runner applies each named mutation to the manifest/trace fixtures, checks observed vs expected outcomes and required diagnostics, hashes the matrix and manifest, writes a structured JSON report, and exits nonzero if any case mismatches. This runner is authored but not yet executed. The manifest is `session_state: planned` and `evidence_class: DesignOnly`; all three requested physical claim profiles remain ineligible. For `recorded`/`closed` sessions the Rust path verifies declared artifact sizes and SHA-256 and rejects paths outside the manifest directory. Cargo/rustc/rustfmt are unavailable in this environment, so compilation/tests remain unverified.
 
 No hardware has been purchased or built in this increment, no physical measurements have been made, and this design is not a safety-qualified product.
