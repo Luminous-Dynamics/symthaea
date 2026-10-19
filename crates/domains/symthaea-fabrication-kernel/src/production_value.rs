@@ -219,10 +219,7 @@ impl fmt::Display for EvaluationError {
             } => {
                 write!(f, "invalid run {scenario_id}: {reason}")
             }
-            Self::InvalidDigest {
-                scenario_id,
-                field,
-            } => write!(
+            Self::InvalidDigest { scenario_id, field } => write!(
                 f,
                 "invalid lowercase SHA-256 syntax for {field} in run {scenario_id}"
             ),
