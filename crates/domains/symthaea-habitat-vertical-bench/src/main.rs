@@ -9,6 +9,9 @@ use symthaea_habitat_vertical_bench::scenario_campaign::{
 use symthaea_habitat_vertical_bench::resilience_options::{
     validate_resilience_options_str, EMBEDDED_RESILIENCE_OPTIONS,
 };
+use symthaea_habitat_vertical_bench::assumption_falsification::{
+    validate_assumption_falsification_str, EMBEDDED_HABITAT_ASSUMPTIONS,
+};
 use symthaea_habitat_vertical_bench::{validate_fixture_str, EMBEDDED_FIXTURE};
 
 fn main() {
@@ -118,9 +121,33 @@ fn main() {
                 "synthetic resilience option matrix: PASS ({} options x {} scenarios = {} cells; robust frontier=NOT RUN; probabilities=NOT ASSUMED)",
                 options.option_count, options.scenario_count, options.outcome_count
             );
+            let assumptions = match validate_assumption_falsification_str(EMBEDDED_HABITAT_ASSUMPTIONS) {
+                Ok(report) => report,
+                Err(error) => {
+                    eprintln!("invalid embedded assumption-falsification JSON: {error}");
+                    process::exit(2);
+                }
+            };
+            if !assumptions.is_valid() {
+                eprintln!(
+                    "ASSUMPTION FALSIFICATION DEFINITIONS: FAIL ({} findings)",
+                    assumptions.issues.len()
+                );
+                for issue in assumptions.issues {
+                    eprintln!("{} {}: {}", issue.code, issue.path, issue.message);
+                }
+                process::exit(1);
+            }
+            println!(
+                "factory assumption/test definitions: PASS ({} assumptions; {} candidate tests; {} critical assumptions; selection=NOT RUN; observations=0)",
+                assumptions.assumption_count,
+                assumptions.experiment_count,
+                assumptions.critical_assumption_count
+            );
         } else {
             println!("embedded disruption campaign: not checked against the alternate fixture");
             println!("embedded resilience option matrix: not checked against the alternate fixture");
+            println!("embedded assumption/test definitions: not checked against the alternate fixture");
         }
 
         println!("STRUCTURAL FIXTURE VALIDATION: PASS");
