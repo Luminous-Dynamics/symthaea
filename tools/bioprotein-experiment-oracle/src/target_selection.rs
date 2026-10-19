@@ -556,7 +556,7 @@ pub fn run_cli() -> i32 {
         corpus_id: corpus.corpus_id,
         schema_version: corpus.schema_version,
         corpus_sha256: sha256_hex(&corpus_bytes),
-        declared_head: expected_head,
+        declared_head: expected_head.clone(),
         exact_head_match: actual_head == expected_head,
         actual_head,
         case_count: cases.len(),
@@ -626,7 +626,7 @@ mod tests {
     fn overlapping_intervals_do_not_create_robust_dominance() {
         let case = fixture()
             .cases
-            .iter()
+            .into_iter()
             .find(|case| case.case_id == "MVP-008-overlapping-intervals")
             .unwrap();
         let a = case
@@ -656,7 +656,7 @@ mod tests {
     fn failed_authorization_cannot_be_compensated_by_metrics() {
         let case = fixture()
             .cases
-            .iter()
+            .into_iter()
             .find(|case| case.case_id == "MVP-002-hard-gate-over-market")
             .unwrap();
         let target = case
@@ -677,10 +677,10 @@ mod tests {
     fn unknown_scale_transfer_is_indeterminate_and_not_frontier_eligible() {
         let case = fixture()
             .cases
-            .iter()
+            .into_iter()
             .find(|case| case.case_id == "MVP-006-scale-transfer-unknown")
             .unwrap();
-        let actual = evaluate_case(case);
+        let actual = evaluate_case(&case);
         let uncertain = actual
             .targets
             .iter()
@@ -720,10 +720,10 @@ mod tests {
     fn synthetic_data_cannot_be_promoted_to_measured_claims() {
         let case = fixture()
             .cases
-            .iter()
+            .into_iter()
             .find(|case| case.case_id == "MVP-009-synthetic-as-measured-negative-control")
             .unwrap();
-        let actual = evaluate_case(case);
+        let actual = evaluate_case(&case);
         assert_eq!(actual.status, CaseStatus::InvalidInput);
         assert!(
             actual
@@ -737,10 +737,10 @@ mod tests {
     fn downstream_usable_capacity_not_nominal_titer_drives_frontier() {
         let case = fixture()
             .cases
-            .iter()
+            .into_iter()
             .find(|case| case.case_id == "MVP-003-usable-output-over-titer")
             .unwrap();
-        let actual = evaluate_case(case);
+        let actual = evaluate_case(&case);
         assert_eq!(
             actual.pareto_frontier_ids,
             vec!["lower-titer-high-recovery".to_owned()]
