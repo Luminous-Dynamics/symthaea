@@ -2,7 +2,9 @@ use anyhow::{Result, anyhow};
 use serde::Serialize;
 use std::collections::BTreeMap;
 
-use crate::cropfoundry_water_policy::{ScenarioResult, build_receipt as build_receipt_water_policy};
+use crate::cropfoundry_water_policy::{
+    ScenarioResult, build_receipt as build_receipt_water_policy,
+};
 
 const TAIL_FRACTION_95: f64 = 0.05;
 
@@ -137,11 +139,7 @@ fn cvar_upper_tail(sorted: &[f64], tail_fraction: f64) -> (f64, usize) {
 }
 
 fn normalize(value: f64, maximum: f64) -> f64 {
-    if maximum > 0.0 {
-        value / maximum
-    } else {
-        0.0
-    }
+    if maximum > 0.0 { value / maximum } else { 0.0 }
 }
 
 fn dominates(left: &PolicyRobustnessScore, right: &PolicyRobustnessScore) -> bool {
@@ -172,7 +170,9 @@ fn dominates(left: &PolicyRobustnessScore, right: &PolicyRobustnessScore) -> boo
 
 fn build_policy_scores(results: &[ScenarioResult]) -> Result<Vec<PolicyRobustnessScore>> {
     if results.is_empty() {
-        return Err(anyhow!("robust-policy evaluator received no scenario results"));
+        return Err(anyhow!(
+            "robust-policy evaluator received no scenario results"
+        ));
     }
     let mut grouped = BTreeMap::<String, Vec<&ScenarioResult>>::new();
     let mut minimum_stress_by_scenario = BTreeMap::<String, f64>::new();
@@ -455,12 +455,23 @@ pub fn run(out: Option<std::path::PathBuf>) -> Result<()> {
     let rendered = serde_json::to_string_pretty(&receipt)?;
     println!("{rendered}");
     if let Some(path) = out {
-        if let Some(parent) = path.parent().filter(|parent| !parent.as_os_str().is_empty()) {
-            std::fs::create_dir_all(parent)
-                .map_err(|error| anyhow!("cannot create output directory {}: {error}", parent.display()))?;
+        if let Some(parent) = path
+            .parent()
+            .filter(|parent| !parent.as_os_str().is_empty())
+        {
+            std::fs::create_dir_all(parent).map_err(|error| {
+                anyhow!(
+                    "cannot create output directory {}: {error}",
+                    parent.display()
+                )
+            })?;
         }
-        std::fs::write(&path, format!("{rendered}\n"))
-            .map_err(|error| anyhow!("cannot write robust-policy receipt {}: {error}", path.display()))?;
+        std::fs::write(&path, format!("{rendered}\n")).map_err(|error| {
+            anyhow!(
+                "cannot write robust-policy receipt {}: {error}",
+                path.display()
+            )
+        })?;
     }
     Ok(())
 }
@@ -487,10 +498,12 @@ mod tests {
     #[test]
     fn robust_policy_tail_sample_count_is_explicit_for_six_scenarios() {
         let receipt = build_receipt().unwrap();
-        assert!(receipt
-            .policies
-            .iter()
-            .all(|policy| policy.tail_sample_count == 1));
+        assert!(
+            receipt
+                .policies
+                .iter()
+                .all(|policy| policy.tail_sample_count == 1)
+        );
         assert!(receipt.policies.iter().all(|policy| {
             (policy.cvar95_stress_exposure_proxy - policy.p95_stress_exposure_proxy_nearest_rank)
                 .abs()
@@ -511,18 +524,31 @@ mod tests {
     #[test]
     fn robust_policy_pareto_and_preference_sweep_preserve_all_policies() {
         let receipt = build_receipt().unwrap();
-        assert!(receipt
-            .policies
-            .iter()
-            .any(|policy| policy.pareto_front_member));
-        assert!(receipt.preference_sweep.iter().all(|item| item.ranking.len() == 5));
+        assert!(
+            receipt
+                .policies
+                .iter()
+                .any(|policy| policy.pareto_front_member)
+        );
+        assert!(
+            receipt
+                .preference_sweep
+                .iter()
+                .all(|item| item.ranking.len() == 5)
+        );
         assert!(receipt.preference_sweep.iter().all(|item| {
-            item.ranking.iter().map(|score| score.rank).collect::<Vec<_>>()
+            item.ranking
+                .iter()
+                .map(|score| score.rank)
+                .collect::<Vec<_>>()
                 == (1..=5).collect::<Vec<_>>()
         }));
-        assert!(receipt.preference_sweep.iter().all(|item| {
-            (item.weights.values().sum::<f64>() - 1.0).abs() <= 1e-9
-        }));
+        assert!(
+            receipt
+                .preference_sweep
+                .iter()
+                .all(|item| { (item.weights.values().sum::<f64>() - 1.0).abs() <= 1e-9 })
+        );
         assert!(receipt.policies.iter().all(|policy| {
             policy.pareto_front_member == policy.dominated_by_policies.is_empty()
         }));
