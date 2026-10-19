@@ -17,7 +17,7 @@ Validate an alternate fixture by passing its path:
 cargo run -p symthaea-habitat-vertical-bench --bin validate-habitat-vertical -- path/to/fixture.json
 ```
 
-The default fixture is embedded at compile time from `docs/research/fixtures/habitat-vertical-v0.1.json`. The CLI also validates the embedded definition-only campaign in `docs/research/fixtures/habitat-vertical-scenarios-v0.1.json`. A successful run means only that fixture structure, synthetic arithmetic controls, and the eight scenario definitions are internally consistent. It does not run a scheduler or simulate a disruption. The CLI prints the synthetic cost ratio and mass-balance known answers; negative controls are declared and only the mutations covered by unit tests are exercised by the test suite.
+The default fixture is embedded at compile time from `docs/research/fixtures/habitat-vertical-v0.1.json`. The CLI also validates the embedded definition-only campaign in `docs/research/fixtures/habitat-vertical-scenarios-v0.1.json` and the synthetic replay contract in `docs/research/fixtures/habitat-event-replay-v0.1.json`. A successful run means only that fixture structure, synthetic arithmetic controls, the eight scenario definitions, and event identity/causal replay are internally consistent. It does not run a scheduler or simulate a disruption. The CLI prints the synthetic cost ratio and mass-balance known answers; negative controls are declared and only the mutations covered by unit tests are exercised by the test suite.
 
 ## Checks
 
@@ -36,14 +36,14 @@ The default fixture is embedded at compile time from `docs/research/fixtures/hab
 - a definition-only counterfactual campaign covering exactly the eight source disruption IDs, with per-case interventions, hard invariants, required outputs, metric references, and unresolved execution blockers;
 - a synthetic resilience-options qualifier covering 6 strategy concepts × 8 disruptions = 48 challenge-oracle cells, exact source-scenario coverage, integer interval ordering, localized mitigation invariants, and precondition gates;
 - explicit refusal to assign scenario probabilities, compute ROI/expected annual loss, monetize service loss, or run/select a robust frontier without the existing qualified owner APIs;
-- a factory assumption-falsification qualifier covering 9 claims and 10 candidate tests, with source-linked option/scenario dependencies, concrete falsifiers, distinct support/failure/indeterminate outcomes, explicit not-run selection and execution states, and no numeric experiment cost/probability/results;
+- a factory assumption-falsification qualifier covering 9 claims and 10 candidate tests, with source-linked option/scenario dependencies, concrete falsifiers, distinct support/failure/indeterminate outcomes, explicit not-run selection and execution states, and no numeric experiment cost/probability/results;\n- a manufacturing-event replay qualifier covering event identity, exact-redelivery idempotence, conflicting-ID rejection, strict UTC clock ordering, deterministic causal replay, source-graph references and causal object ancestry; it explicitly does not compute cryptographic digests or model quantities;
 - no fabricated numeric campaign results, no implicit baseline/candidate policy binding, and no confusion between campaign definition validation and simulation;
 - proposed target status and the delivered-cost ratio range;
 - synthetic-only physical-measurement, factory-commissioning, human-evaluation and replication states.
 
 ## Tests and verification status
 
-The source currently contains 70 authored Rust unit tests across four modules (31 structural/accounting + 13 scenario-campaign + 13 resilience-option + 13 assumption-falsification tests). They have not been compiled or executed in the current environment; do not describe them as passing. Run the commands above against the exact branch head before treating the qualifier as an executed test result. The scenario, resilience-option and assumption-falsification suites qualify definitions only, not scheduling, experiment selection, or resilience outcomes.
+The source currently contains 84 authored Rust unit tests across four modules (31 structural/accounting + 13 scenario-campaign + 13 resilience-option + 13 assumption-falsification + 14 event-replay tests). They have not been compiled or executed in the current environment; do not describe them as passing. Run the commands above against the exact branch head before treating the qualifier as an executed test result. The scenario, resilience-option and assumption-falsification suites qualify definitions only, not scheduling, experiment selection, or resilience outcomes.
 
 ## Deliberate limits
 
@@ -52,3 +52,8 @@ This is a schema/consistency, synthetic arithmetic and scenario-definition quali
 The crate uses the existing graph-theory implementation rather than adding another graph engine. It is a research/benchmark consumer and must not be treated as physical execution authority.
 
 Tracking issue: https://github.com/Luminous-Dynamics/symthaea/issues/8051
+
+
+## Manufacturing event replay (synthetic only)
+
+The default CLI also validates `docs/research/fixtures/habitat-event-replay-v0.1.json`. The prototype detects conflicting duplicate identities, missing causal records, causal cycles/time inversions, unknown process/object references, and inputs outside declared causal ancestry. Exact redeliveries are counted and deduplicated, and the canonical event sequence is deterministic despite arrival-order permutation. The event protocol is inspired by GS1 EPCIS but is **not EPCIS-conformant**. Source authentication, signatures, payload digests, quantitative inventory allocation, and physical event truth are not implemented. These new tests are authored, not compiled or executed in the current environment.
