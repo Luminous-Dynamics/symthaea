@@ -22,7 +22,7 @@ cargo run -q -p xtask -- cropfoundry-water-policy-demo \
 cargo test -p xtask cropfoundry_water_policy
 ```
 
-The harness runs 6 fixed scenario profiles × 4 receipt policies × 42 time steps:
+The harness runs 6 fixed scenario profiles × 5 receipt policies × 42 time steps:
 
 - `reference`: nominal sensor/forecast assumptions and a fixed water cap.
 - `water_rationing_only`: lower water cap with the same weather, forecast and sensor settings as the reference.
@@ -37,8 +37,9 @@ Policies are:
 2. `soil_threshold`: use held/observed storage to refill the greatest deficit toward a fixed threshold.
 3. `uncertainty_aware_marginal_risk`: allocate in small increments according to estimated marginal reduction of the declared shortfall proxy. It adds a fixed conservative demand margin and raises plot priority when readings are stale; these are explicit heuristics, not statistically calibrated prediction intervals.
 4. `water_matched_rotating_equal_share`: a hindsight counterfactual that reallocates the risk-aware policy's exact daily total water uniformly across zones, rotating discrete rounding remainders. It isolates water-placement effects but is not a deployable policy.
+5. `greedy_minimax_stress`: a greedy fairness-oriented policy that tests each candidate water increment and chooses the allocation that minimizes maximum predicted per-zone stress proxy, using summed proxy as a tie-breaker. This is a heuristic policy, not a global optimality or field-safety guarantee.
 
-The v1 receipt records scenario parameters, per-scenario and per-zone irrigation, overflow proxy, aggregate and per-zone stress-exposure proxies, worst/best zone burden, worst-to-best ratio, cumulative allocation dispersion, percentage change against equal-share, and the risk-aware policy's stress delta versus the dose-matched rotating-uniform counterfactual. It also reports absolute/relative stress change versus the same policy in the reference scenario, plus policy-level mean/median aggregate and worst-zone proxies and water totals. It also reports sensor-dropout fraction and daily budget violations. The executable fails if any policy exceeds a daily total-water budget, exceeds any plot's actuator limit, or emits non-finite core metrics.
+The v1 receipt records scenario parameters, per-scenario and per-zone irrigation, overflow proxy, aggregate and per-zone stress-exposure proxies, worst/best zone burden, worst-to-best ratio, cumulative allocation dispersion, percentage change against equal-share, and the risk-aware policy's stress delta versus the dose-matched rotating-uniform counterfactual. It also reports absolute/relative stress change versus the same policy in the reference scenario, plus policy-level mean/median aggregate and worst-zone proxies and water totals. It also reports sensor-dropout fraction and daily budget violations. The executable fails if any policy exceeds a daily total-water budget, exceeds any plot's actuator limit, or emits non-finite core metrics. It now scores the minimax policy alongside the two original optimization policies and the dose-matched hindsight counterfactual.
 
 
 **Unit note:** per-plot storage/demand values are synthetic depth-like values. Global irrigation totals add depths over equally weighted toy plots and are labelled `plot-mm`; without plot areas, flow rates and hydraulics, these sums are not volumetric water use and must not be compared with farm meter readings.
