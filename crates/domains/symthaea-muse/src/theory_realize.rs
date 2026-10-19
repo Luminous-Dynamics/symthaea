@@ -28,8 +28,10 @@ use crate::{AudioData, Composition, MuseConfig, MusicalState, Note};
 use symthaea_music_theory::score::{Emphasis, VoiceRole as TheoryRole};
 use symthaea_music_theory::{MusicalIntent, Score as TheoryScore, Style};
 
-/// Per-style-family PERFORMANCE INTERPRETATION — how a tradition's player
-/// treats the clock, not what notes they play. Until this existed, ONE
+/// Per-style PERFORMANCE INTERPRETATION — how a tradition's player treats
+/// the clock, not what notes they play. The style-level grammar profile is
+/// authoritative when available; dialect_for_spec remains a fallback for
+/// user-authored specs with no style identity. Until this existed, ONE
 /// classical-piano-derived performer interpreted every tradition: the same
 /// rubato constants, the same humanize jitter, the same MAESTRO piano
 /// expressive blend for a tango, a drone piece, and a nocturne alike.
@@ -63,10 +65,17 @@ pub enum PerformanceDialect {
     /// reduced (0.6x — a reel drives through its cadences), and jitter is
     /// slightly LOOSER (1.2x): session looseness, not concert precision.
     FolkLift,
-    /// Blues/jazz: laid-back time. Jitter up (1.3x), phrase-final rubato
-    /// and the expressive blend both kept — a jazz ballad leans harder
-    /// into time than a classical player, never less.
+    /// Blues/jazz/bossa: laid-back time with slightly looser placement.
     JazzLaidBack,
+    /// A slowly unfolding, elastic drone or modal arc: more breath and climax
+    /// time than a pulse-driven process, without classical-style accent shaping.
+    DroneElastic,
+    /// Dramatic scenes and long-range climaxes: broadened phrase breaths and
+    /// cadential timing to clarify the large-scale narrative arc.
+    DramaticTiming,
+    /// Choral/imitative ensemble: restrained independent-note jitter and a
+    /// gentler expressive layer so simultaneous lines keep their blend.
+    ChoralBlend,
 }
 
 impl PerformanceDialect {
@@ -78,6 +87,9 @@ impl PerformanceDialect {
             | PerformanceDialect::JazzLaidBack => 1.0,
             PerformanceDialect::DanceLocked => 0.25,
             PerformanceDialect::ProcessExact => 0.1,
+            PerformanceDialect::DroneElastic => 1.4,
+            PerformanceDialect::DramaticTiming => 1.35,
+            PerformanceDialect::ChoralBlend => 0.8,
         }
     }
 
@@ -99,6 +111,9 @@ impl PerformanceDialect {
             PerformanceDialect::FolkLift => 0.6,
             PerformanceDialect::DanceLocked => 0.25,
             PerformanceDialect::ProcessExact => 0.1,
+            PerformanceDialect::DroneElastic => 1.1,
+            PerformanceDialect::DramaticTiming => 1.4,
+            PerformanceDialect::ChoralBlend => 0.75,
         }
     }
 
@@ -110,6 +125,9 @@ impl PerformanceDialect {
             PerformanceDialect::ProcessExact => 0.4,
             PerformanceDialect::FolkLift => 1.2,
             PerformanceDialect::JazzLaidBack => 1.3,
+            PerformanceDialect::DroneElastic => 0.7,
+            PerformanceDialect::DramaticTiming => 1.1,
+            PerformanceDialect::ChoralBlend => 0.5,
         }
     }
 
@@ -123,6 +141,9 @@ impl PerformanceDialect {
             | PerformanceDialect::JazzLaidBack => 1.0,
             PerformanceDialect::DanceLocked => 0.4,
             PerformanceDialect::ProcessExact => 0.0,
+            PerformanceDialect::DroneElastic => 0.7,
+            PerformanceDialect::DramaticTiming => 1.2,
+            PerformanceDialect::ChoralBlend => 0.65,
         }
     }
 }
@@ -144,10 +165,9 @@ impl PerformanceDialect {
 /// 3. `roll_ornaments` or `drone` → [`PerformanceDialect::FolkLift`]
 /// 4. everything else → [`PerformanceDialect::ClassicalRubato`] (the identity)
 ///
-/// Known v1 limits (documented, not hidden): March reads as ClassicalRubato
-/// (no spec property marks its clock-insistence), and plain Folk/ModalFolk
-/// read as ClassicalRubato (their specs carry none of the folk habit flags
-/// — only Celtic's drone and Irish's rolls are visible at the spec level).
+/// This heuristic remains a fallback only: incidental spec flags cannot
+/// reliably reconstruct an author's intended tradition. Preset-driven
+/// composition should use Style::grammar_profile().performance.
 pub fn dialect_for_spec(spec: &symthaea_music_theory::CompositionSpec) -> PerformanceDialect {
     use symthaea_music_theory::Accompaniment as A;
     use symthaea_music_theory::DrumPolicy;
@@ -1013,7 +1033,7 @@ pub fn realize_styled(
         seed,
         state,
         sample_rate,
-        None,
+        Some(map_grammar_dialect(style.grammar_profile().performance)),
     )
 }
 
@@ -1162,16 +1182,12 @@ pub fn realize_with_spec_and_dialect(
     )
 }
 
-/// Map the grammar-level 8-variant [`symthaea_music_theory::
-/// PerformanceDialect`] (declared per [`crate::style::Style::
-/// grammar_profile`]/[`symthaea_music_theory::grammar::GrammarProfile`])
-/// down to this crate's own 5-variant rendering-internals enum. The two
-/// are deliberately separate types (this crate's is what `Rubato`/
-/// `performance_voices_with_dialect` actually consume; the grammar crate's
-/// is a higher-level per-style-family label) — `DramaticTiming`/
-/// `ChoralBlend` have no closer existing analog than the general classical
-/// rubato feel, disclosed here rather than silently picked.
-pub(crate) fn map_grammar_dialect(
+/// Map a declared grammar/style performance dialect to the renderer's
+/// matching timing, articulation, and mastering profile. Kept explicit so
+/// preset-driven native rendering, MIDI export, and FluidSynth rendering all
+/// consume the same selected dialect rather than independently guessing from
+/// spec flags.
+pub fn map_grammar_dialect(
     d: symthaea_music_theory::PerformanceDialect,
 ) -> PerformanceDialect {
     use symthaea_music_theory::PerformanceDialect as G;
@@ -1180,9 +1196,10 @@ pub(crate) fn map_grammar_dialect(
         G::DanceLocked => PerformanceDialect::DanceLocked,
         G::JazzLaidBack => PerformanceDialect::JazzLaidBack,
         G::FolkLift => PerformanceDialect::FolkLift,
-        // Matches dialect_for_spec's own drone -> ProcessExact precedent.
-        G::ProcessExact | G::DroneElastic => PerformanceDialect::ProcessExact,
-        G::DramaticTiming | G::ChoralBlend => PerformanceDialect::ClassicalRubato,
+        G::ProcessExact => PerformanceDialect::ProcessExact,
+        G::DroneElastic => PerformanceDialect::DroneElastic,
+        G::DramaticTiming => PerformanceDialect::DramaticTiming,
+        G::ChoralBlend => PerformanceDialect::ChoralBlend,
     }
 }
 
