@@ -69,6 +69,8 @@ A ride logger does not produce motor efficiency maps or tire-force curves by its
 
 Use a logger-wide monotonic nanosecond clock for every sample and record GNSS UTC/PPS anchors separately. Record measured clock skew and synchronization uncertainty rather than treating GNSS time as exact. Keep original sensor timestamps when available. Never silently interpolate through data loss; emit an explicit gap/overflow event with duration/count. Record raw values before filtering; derived/filter outputs get separate channel IDs and transform versions.
 
+For a **physical claim**, v0.1 clock eligibility is fail-closed: `sync_method` must exactly match `gnss_pps_verified`, `hardware_timestamp_verified`, `ptp_verified` or `shared_clock_verified`; a `clock_sync_record` must be declared as a content-addressed artifact and pass normal artifact verification; and `max_alignment_uncertainty_ns` must be at most 2,000,000 ns. A word like `verified` in an arbitrary method label is not evidence. The 2 ms ceiling is the v0.1 proposal tied to the revision-A electrical capture target, not a universal timing tolerance; tighter claim-specific budgets may be required.
+
 ## Open manifest contract
 
 The planned example is [mobility_telemetry_manifest_v0_1.json](data/mobility_telemetry_manifest_v0_1.json). It declares vehicle identity, session state and evidence class; clock/synchronization plan; sensor IDs and calibration receipts; semantic channel IDs, SI units, rates, axes/sign conventions and sensor assignments; data rights; raw artifact hashes; and claim targets for ride energy, longitudinal dynamics, tire health, motor maps, tire-force rigs or combustion energy.
