@@ -1030,6 +1030,29 @@ mod tests {
     }
 
     #[test]
+    fn cropfoundry_disparity_ratio_denominator_is_explicit() {
+        let receipt = build_receipt().unwrap();
+        for aggregate in &receipt.aggregates {
+            assert!(aggregate.worst_to_best_ratio_defined_scenario_count <= aggregate.scenario_count);
+            assert_eq!(
+                aggregate.mean_worst_to_best_zone_stress_ratio.is_some(),
+                aggregate.worst_to_best_ratio_defined_scenario_count > 0
+            );
+            if aggregate.policy == WATER_MATCHED_POLICY_NAME {
+                assert_eq!(aggregate.worst_to_best_ratio_defined_scenario_count, 3);
+            } else {
+                assert_eq!(aggregate.worst_to_best_ratio_defined_scenario_count, 6);
+            }
+        }
+        for result in &receipt.results {
+            assert_eq!(
+                result.worst_to_best_zone_stress_ratio.is_some(),
+                result.min_zone_stress_exposure_proxy > 1e-9
+            );
+        }
+    }
+
+    #[test]
     fn cropfoundry_water_policy_reports_comparable_baseline_deltas() {
         let receipt = build_receipt().unwrap();
         let baseline = receipt
