@@ -51,6 +51,7 @@ pub struct EventEvidence {
     pub event_id: String,
     pub content_payload: String,
     pub content_sha256: String,
+    pub conflicting_content_payload: Option<String>,
     pub delivered_copies: u32,
     pub content_conflict: bool,
 }
@@ -263,6 +264,14 @@ pub fn validate_input_corpus(corpus: &InputCorpus) -> Result<(), String> {
         }
         if sha256_hex(case.event.content_payload.as_bytes()) != case.event.content_sha256 {
             return Err(format!("event content SHA-256 does not match payload in {}", case.case_id));
+        }
+        let has_conflicting_payload = case.event.conflicting_content_payload.as_ref()
+            .is_some_and(|payload| payload.as_bytes() != case.event.content_payload.as_bytes());
+        if has_conflicting_payload != case.event.content_conflict {
+            return Err(format!(
+                "content-conflict flag does not match conflicting payload evidence in {}",
+                case.case_id
+            ));
         }
     }
     Ok(())
@@ -568,6 +577,13 @@ mod tests {
     fn event_payload_digest_is_actually_verified() {
         let mut corpus = frozen_inputs();
         corpus.cases[0].event.content_payload.push_str("|tampered");
+        assert!(validate_input_corpus(&corpus).is_err());
+    }
+
+    #[test]
+    fn conflict_flag_requires_different_duplicate_payload_evidence() {
+        let mut corpus = frozen_inputs();
+        corpus.cases[4].event.content_conflict = false;
         assert!(validate_input_corpus(&corpus).is_err());
     }
 
