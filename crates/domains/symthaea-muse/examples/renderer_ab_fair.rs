@@ -665,6 +665,9 @@ fn main() {
                 || color.reverb_level != base_color.reverb_level
                 || color.reverb_damp != base_color.reverb_damp
                 || color.chorus_level != base_color.chorus_level
+                || mastering.target_lufs != neutral_mastering.target_lufs
+                || mastering.limiter_ceiling_db != neutral_mastering.limiter_ceiling_db
+                || mastering.section_leveling_db != neutral_mastering.section_leveling_db
                 || mastering.target_low_ratio != neutral_mastering.target_low_ratio
                 || mastering.target_mid_ratio != neutral_mastering.target_mid_ratio
                 || mastering.target_high_ratio != neutral_mastering.target_high_ratio
@@ -938,7 +941,7 @@ mod tests {
         let room_effect = [0.5, 2.0, 0.02, -0.01];
         let master_effect = [0.4, -0.5, -0.01, 0.03];
         let interaction = [0.2, 0.25, 0.005, -0.004];
-        let add = |a: [f32; 4], b: [f32; 4]| {
+        let add = |a: [f32; 4], b: [f32; 4]| -> [f32; 4] {
             std::array::from_fn(|i| a[i] + b[i])
         };
         let baseline = arm("default", baseline_metrics);
