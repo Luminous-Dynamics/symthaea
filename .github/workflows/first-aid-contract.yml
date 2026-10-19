@@ -98,7 +98,8 @@ jobs:
           jq -e --arg expected "$EXPECTED_HEAD" '
             .status == "synthetic_change_impact_contract_passed" and
             .source_revision_sha == $expected and
-            .source_requirement_count == 5 and
+            .baseline_requirement_count == 2 and
+            .candidate_requirement_count == 3 and
             .mapped_requirement_count == 3 and
             .change_record_count == 2 and
             .claim_ceiling == "synthetic source-change mapping integrity only; no clinical validation" and
