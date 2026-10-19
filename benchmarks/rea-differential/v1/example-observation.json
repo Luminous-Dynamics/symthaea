@@ -12,12 +12,20 @@
     {
       "id": "root",
       "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "byte_length": 10
+      "byte_length": 10,
+      "parent_coordinate_space_id": null,
+      "parent_start": null,
+      "parent_end": null,
+      "transform_kind": "source"
     },
     {
       "id": "tar-stream",
       "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "byte_length": 7
+      "byte_length": 7,
+      "parent_coordinate_space_id": "root",
+      "parent_start": 0,
+      "parent_end": 10,
+      "transform_kind": "decompress:gzip"
     }
   ],
   "accounting": [
