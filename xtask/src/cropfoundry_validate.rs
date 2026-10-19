@@ -60,6 +60,7 @@ fn validate_benchmark_contract(root: &Value) -> std::result::Result<usize, Vec<S
         "not_evaluable_until_time_series_metadata_pinned",
         "not_evaluable_until_paired_stress_sensor_data_pinned",
         "not_evaluable_until_calibration_reference_and_site_metadata_pinned",
+        "not_evaluable_until_postharvest_batch_storage_and_quality_data_pinned",
     ];
     let mut ids = BTreeSet::new();
 
@@ -373,7 +374,7 @@ mod tests {
     fn committed_benchmark_contract_is_well_formed_and_non_passing() {
         let fixture: Value = serde_json::from_str(BENCHMARK_FIXTURE).unwrap();
         let count = validate_benchmark_contract(&fixture).unwrap();
-        assert_eq!(count, 22);
+        assert_eq!(count, 23);
     }
 
     #[test]
@@ -425,7 +426,7 @@ mod tests {
     fn current_source_manifest_keeps_every_source_non_trainable() {
         let fixture: Value = serde_json::from_str(SOURCE_FIXTURE).unwrap();
         let count = validate_source_manifest(&fixture).unwrap();
-        assert_eq!(count, 13);
+        assert_eq!(count, 14);
         assert!(
             fixture["sources"]
                 .as_array()
@@ -529,7 +530,7 @@ mod tests {
         source["content_sha256"] =
             json!("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
 
-        assert_eq!(validate_source_manifest(&fixture).unwrap(), 13);
+        assert_eq!(validate_source_manifest(&fixture).unwrap(), 14);
     }
 
     #[test]
