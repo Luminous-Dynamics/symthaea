@@ -3,6 +3,7 @@ use sha2::{Digest, Sha256};
 use std::{
     collections::{BTreeMap, BTreeSet},
     env, fs,
+    io::{Cursor, Write},
     path::{Component, Path, PathBuf},
     process::ExitCode,
 };
@@ -22,6 +23,8 @@ enum AdapterError {
     Json(#[from] serde_json::Error),
     #[error("CSV error: {0}")]
     Csv(#[from] csv::Error),
+    #[error("ZIP error: {0}")]
+    Zip(#[from] zip::result::ZipError),
     #[error("validation failed: {0}")]
     Validation(String),
 }
@@ -286,6 +289,27 @@ struct CsvReconciliationReceipt {
 }
 
 #[derive(Debug, Clone, Serialize)]
+struct ZipMemberInventory {
+    member_path: String,
+    compressed_size_bytes: u64,
+    uncompressed_size_bytes: u64,
+    crc32_hex: String,
+    is_directory: bool,
+    unix_mode: Option<u32>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct ZipInventory {
+    artifact_relative_path: String,
+    archive_sha256: String,
+    member_count: usize,
+    total_uncompressed_bytes: u64,
+    members: Vec<ZipMemberInventory>,
+    inventory_note: &'static str,
+    claim_ceiling: &'static str,
+}
+
+#[derive(Debug, Clone, Serialize)]
 struct AuditReceipt {
     receipt_schema_version: &'static str,
     adapter_version: &'static str,
@@ -301,6 +325,8 @@ struct AuditReceipt {
     csv_inventory: Option<CsvInventory>,
     #[serde(skip_serializing_if = "Option::is_none")]
     csv_reconciliation: Option<CsvReconciliationReceipt>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    zip_inventory: Option<ZipInventory>,
     claim_ceiling: &'static str,
 }
 
@@ -410,6 +436,96 @@ fn validate_csv_quote_syntax(bytes: &[u8]) -> Result<()> {
         ));
     }
     Ok(())
+}
+
+fn inspect_zip_bytes(bytes: &[u8], relative_path: &str) -> Result<ZipInventory> {
+    const MAX_MEMBERS: usize = 100_000;
+
+    let cursor = Cursor::new(bytes);
+    let mut archive = zip::ZipArchive::new(cursor)?;
+    if archive.len() > MAX_MEMBERS {
+        return Err(AdapterError::Validation(format!(
+            "ZIP archive has {} members, exceeding the inventory limit of {MAX_MEMBERS}",
+            archive.len()
+        )));
+    }
+
+    let mut members = Vec::with_capacity(archive.len());
+    let mut exact_names = BTreeSet::new();
+    let mut portable_names = BTreeSet::new();
+    let mut total_uncompressed_bytes = 0u64;
+
+    for index in 0..archive.len() {
+        let member = archive.by_index(index)?;
+        let raw_name = std::str::from_utf8(member.name_raw()).map_err(|_| {
+            AdapterError::Validation(format!(
+                "ZIP member {index} has a non-UTF-8 path; refusing ambiguous portable identity"
+            ))
+        })?;
+        if raw_name.is_empty()
+            || raw_name.contains('\\')
+            || raw_name.contains(':')
+            || raw_name.starts_with('/')
+            || raw_name.starts_with("//")
+        {
+            return Err(AdapterError::Validation(format!(
+                "ZIP member path {raw_name:?} is empty, non-portable, or absolute"
+            )));
+        }
+
+        let member_path = Path::new(raw_name);
+        if member_path.components().any(|component| {
+            !matches!(component, Component::Normal(_))
+        }) {
+            return Err(AdapterError::Validation(format!(
+                "ZIP member path {raw_name:?} contains traversal or non-normal path components"
+            )));
+        }
+
+        let unix_mode = member.unix_mode();
+        if unix_mode.is_some_and(|mode| mode & 0o170000 == 0o120000) {
+            return Err(AdapterError::Validation(format!(
+                "ZIP member {raw_name:?} is a symlink; archives with symlinks are not accepted"
+            )));
+        }
+
+        if !exact_names.insert(raw_name.to_string()) {
+            return Err(AdapterError::Validation(format!(
+                "ZIP archive contains duplicate member path {raw_name:?}"
+            )));
+        }
+        let portable_key = raw_name.to_lowercase();
+        if !portable_names.insert(portable_key) {
+            return Err(AdapterError::Validation(format!(
+                "ZIP archive contains case-colliding member path {raw_name:?}"
+            )));
+        }
+
+        total_uncompressed_bytes = total_uncompressed_bytes
+            .checked_add(member.size())
+            .ok_or_else(|| AdapterError::Validation(
+                "ZIP total uncompressed size overflow".into()
+            ))?;
+
+        members.push(ZipMemberInventory {
+            member_path: raw_name.to_string(),
+            compressed_size_bytes: member.compressed_size(),
+            uncompressed_size_bytes: member.size(),
+            crc32_hex: format!("{:08x}", member.crc32()),
+            is_directory: member.is_dir(),
+            unix_mode,
+        });
+    }
+
+    Ok(ZipInventory {
+        artifact_relative_path: relative_path.to_string(),
+        archive_sha256: sha256_hex(bytes),
+        member_count: members.len(),
+        total_uncompressed_bytes,
+        members,
+        inventory_note: "central-directory inventory only; member content was not extracted or individually cryptographically hashed",
+        claim_ceiling: "archive structure and path-safety inventory only; not semantic data validation, source permission, or model-accuracy evidence",
+    })
 }
 
 fn inspect_csv_bytes(bytes: &[u8], relative_path: &str) -> Result<CsvInventory> {
@@ -1524,6 +1640,7 @@ fn manifest_receipt(
         held_out_outcome_groups: groups,
         csv_inventory: None,
         csv_reconciliation: None,
+        zip_inventory: None,
         claim_ceiling: "source/contract integrity only; not evidence of model accuracy or physical qualification",
     }
 }
@@ -1531,7 +1648,7 @@ fn manifest_receipt(
 fn run(args: &[String]) -> Result<AuditReceipt> {
     if args.len() < 3 {
         return Err(AdapterError::Validation(
-            "usage: metal-measurement-bench validate-manifest MANIFEST.json | verify-artifacts MANIFEST.json ARTIFACT_DIR | inspect-csv MANIFEST.json ARTIFACT_DIR RELATIVE_CSV_PATH | reconcile-csv MANIFEST.json ARTIFACT_DIR MAPPING.json RELATIVE_CSV_PATH | validate-records MANIFEST.json OBSERVATIONS.json ARTIFACT_DIR".into(),
+            "usage: metal-measurement-bench validate-manifest MANIFEST.json | verify-artifacts MANIFEST.json ARTIFACT_DIR | inspect-csv MANIFEST.json ARTIFACT_DIR RELATIVE_CSV_PATH | inspect-zip MANIFEST.json ARTIFACT_DIR RELATIVE_ZIP_PATH | reconcile-csv MANIFEST.json ARTIFACT_DIR MAPPING.json RELATIVE_CSV_PATH | validate-records MANIFEST.json OBSERVATIONS.json ARTIFACT_DIR".into(),
         ));
     }
     let operation = args[1].as_str();
@@ -1614,6 +1731,56 @@ fn run(args: &[String]) -> Result<AuditReceipt> {
                 Vec::new(),
             );
             receipt.csv_inventory = Some(inventory);
+            Ok(receipt)
+        }
+        "inspect-zip" => {
+            if args.len() != 5 {
+                return Err(AdapterError::Validation(
+                    "inspect-zip requires artifact root and manifest-declared relative ZIP path".into(),
+                ));
+            }
+            let requested_relative = safe_relative_path(&args[4])?;
+            let relative_string = requested_relative.to_string_lossy().to_string();
+            if !relative_string.to_lowercase().ends_with(".zip") {
+                return Err(AdapterError::Validation(
+                    "inspect-zip accepts only a .zip artifact path".into(),
+                ));
+            }
+            let artifact = manifest.artifacts.iter()
+                .find(|artifact| artifact.relative_path == relative_string)
+                .ok_or_else(|| AdapterError::Validation(format!(
+                    "ZIP path {:?} is not declared by the manifest", relative_string
+                )))?;
+
+            let root = Path::new(&args[3]);
+            verify_artifacts(&manifest, root)?;
+            let canonical_root = fs::canonicalize(root).map_err(|error| io_error(root, error))?;
+            let requested_path = canonical_root.join(&requested_relative);
+            let canonical_path = fs::canonicalize(&requested_path)
+                .map_err(|error| io_error(&requested_path, error))?;
+            if !canonical_path.starts_with(&canonical_root) || !canonical_path.is_file() {
+                return Err(AdapterError::Validation(format!(
+                    "ZIP artifact {:?} is outside the verified root or is not a regular file",
+                    relative_string
+                )));
+            }
+            let bytes = fs::read(&canonical_path).map_err(|error| io_error(&canonical_path, error))?;
+            if bytes.len() as u64 != artifact.size_bytes || sha256_hex(&bytes) != artifact.sha256 {
+                return Err(AdapterError::Validation(format!(
+                    "ZIP artifact {:?} changed after initial verification", relative_string
+                )));
+            }
+            let inventory = inspect_zip_bytes(&bytes, &relative_string)?;
+            let mut receipt = manifest_receipt(
+                "inspect-zip",
+                "ZIP_STRUCTURE_INVENTORIED_NO_EXTRACTION",
+                &manifest_bytes,
+                Some(sha256_hex(&bytes)),
+                manifest.artifacts.len(),
+                inventory.member_count,
+                Vec::new(),
+            );
+            receipt.zip_inventory = Some(inventory);
             Ok(receipt)
         }
         "reconcile-csv" => {
@@ -2002,6 +2169,59 @@ mod tests {
         });
         let bytes_for_mapping = serde_json::to_vec(&missing_reason).unwrap();
         assert!(reconcile_csv_bytes(bytes, &missing_reason, &bytes_for_mapping, "fixture.csv").is_err());
+    }
+
+    fn zip_fixture(entries: &[(&str, &[u8], u32)]) -> Vec<u8> {
+        let cursor = Cursor::new(Vec::new());
+        let mut writer = zip::ZipWriter::new(cursor);
+        for (name, bytes, mode) in entries {
+            let options = zip::write::SimpleFileOptions::default().unix_permissions(*mode);
+            writer.start_file(*name, options).unwrap();
+            writer.write_all(bytes).unwrap();
+        }
+        writer.finish().unwrap().into_inner()
+    }
+
+    #[test]
+    fn zip_inventory_binds_member_paths_sizes_crc_and_archive_digest() {
+        let bytes = zip_fixture(&[
+            ("data.csv", b"row,value\nR-1,1.5\n", 0o100644),
+            ("readme.txt", b"metadata only", 0o100644),
+        ]);
+        let inventory = inspect_zip_bytes(&bytes, "source.zip").unwrap();
+        assert_eq!(inventory.archive_sha256, sha256_hex(&bytes));
+        assert_eq!(inventory.member_count, 2);
+        assert_eq!(inventory.members[0].member_path, "data.csv");
+        assert_eq!(inventory.members[0].uncompressed_size_bytes, b"row,value\nR-1,1.5\n".len() as u64);
+        assert_eq!(inventory.members[0].crc32_hex.len(), 8);
+        assert!(inventory.total_uncompressed_bytes > 0);
+        assert!(inventory.inventory_note.contains("not extracted"));
+    }
+
+    #[test]
+    fn zip_inventory_rejects_traversal_absolute_and_backslash_paths() {
+        for member in ["../escape.csv", "/absolute.csv", "nested/../../escape.csv", r"nested\escape.csv", "C:/drive.csv"] {
+            let bytes = zip_fixture(&[(member, b"x", 0o100644)]);
+            assert!(inspect_zip_bytes(&bytes, "source.zip").is_err(), "accepted unsafe member {member:?}");
+        }
+    }
+
+    #[test]
+    fn zip_inventory_rejects_symlinks_duplicates_and_case_collisions() {
+        let symlink = zip_fixture(&[("link", b"target.csv", 0o120777)]);
+        assert!(inspect_zip_bytes(&symlink, "source.zip").is_err());
+
+        let duplicate = zip_fixture(&[
+            ("same.csv", b"a", 0o100644),
+            ("same.csv", b"b", 0o100644),
+        ]);
+        assert!(inspect_zip_bytes(&duplicate, "source.zip").is_err());
+
+        let case_collision = zip_fixture(&[
+            ("Data.csv", b"a", 0o100644),
+            ("data.csv", b"b", 0o100644),
+        ]);
+        assert!(inspect_zip_bytes(&case_collision, "source.zip").is_err());
     }
 
     #[test]
