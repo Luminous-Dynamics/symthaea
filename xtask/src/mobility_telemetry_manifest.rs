@@ -1014,8 +1014,44 @@ fn canonical_benchmark_report_sha256(report: &FaultMatrixReport) -> Result<Strin
 }
 
 fn verify_canonical_benchmark_report(report: &FaultMatrixReport) -> Result<()> {
-    if report.case_count != report.cases.len() {
-        bail!("benchmark report case_count does not match cases array");
+    if report.case_count == 0 || report.case_count != report.cases.len() {
+        bail!("benchmark report case_count is empty or does not match cases array");
+    }
+    if report.suite_id.trim().is_empty() || report.toolchain_id.trim().is_empty() {
+        bail!("benchmark report is missing suite or toolchain identity");
+    }
+    if !(report.source_commit.len() == 40 || report.source_commit.len() == 64)
+        || !report.source_commit.bytes().all(|byte| byte.is_ascii_hexdigit())
+    {
+        bail!("benchmark report source_commit is not a full hexadecimal Git ID");
+    }
+    if !valid_sha256(&report.matrix_sha256)
+        || !valid_sha256(&report.manifest_sha256)
+        || !valid_sha256(&report.canonical_report_sha256)
+    {
+        bail!("benchmark report contains malformed content digests");
+    }
+    const ALLOWED_OUTCOMES: &[&str] = &[
+        "accept", "reject", "accept_with_diagnostic",
+        "structurally_valid_but_ineligible", "ineligible",
+    ];
+    for case in &report.cases {
+        if !ALLOWED_OUTCOMES.contains(&case.expected.as_str())
+            || !ALLOWED_OUTCOMES.contains(&case.observed.as_str())
+        {
+            bail!("benchmark report case {} has an unsupported outcome", case.case_id);
+        }
+        if case.required_detail_tokens.is_empty() {
+            bail!("benchmark report case {} contains no required diagnostic tokens", case.case_id);
+        }
+        let detail_lower = case.detail.to_lowercase();
+        let recomputed_missing: Vec<String> = case.required_detail_tokens.iter()
+            .filter(|token| !detail_lower.contains(&token.to_lowercase()))
+            .cloned()
+            .collect();
+        if recomputed_missing != case.missing_detail_tokens {
+            bail!("benchmark report case {} has inconsistent diagnostic-token accounting", case.case_id);
+        }
     }
     let actual_passed = report.cases.iter()
         .filter(|case| case.observed == case.expected && case.missing_detail_tokens.is_empty())
@@ -1031,9 +1067,6 @@ fn verify_canonical_benchmark_report(report: &FaultMatrixReport) -> Result<()> {
         let internally_passed = case.observed == case.expected && case.missing_detail_tokens.is_empty();
         if case.passed != internally_passed {
             bail!("benchmark report case {} has inconsistent passed flag", case.case_id);
-        }
-        if case.required_detail_tokens.is_empty() {
-            bail!("benchmark report case {} contains no required detail tokens", case.case_id);
         }
     }
     let computed_digest = canonical_benchmark_report_sha256(report)?;
