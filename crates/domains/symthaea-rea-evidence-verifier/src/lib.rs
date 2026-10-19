@@ -248,8 +248,10 @@ fn collect_bundle_paths(root: &Path, current: &Path, output: &mut Vec<String>, d
 
 fn verify_bundle_manifest(root: &Path, expected_digest: &str) -> VResult<()> {
     let manifest_path = root.join("bundle-manifest.json");
-    verify_digest_at(&manifest_path, expected_digest, "bundle manifest")?;
     let raw = read_bounded(&manifest_path, 4 * 1024 * 1024, "bundle manifest")?;
+    if hash_bytes(&raw) != expected_digest {
+        return Err(err("bundle manifest digest mismatch"));
+    }
     let manifest: Value = serde_json::from_slice(&raw)
         .map_err(|e| err(format!("bundle manifest is not valid JSON: {e}")))?;
     if text_field(&manifest, "schema_version")? != BUNDLE_MANIFEST_SCHEMA {
