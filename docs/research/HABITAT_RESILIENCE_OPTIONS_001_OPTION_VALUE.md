@@ -76,3 +76,8 @@ The engineering implication is not to make the model more elaborate at any cost.
 ## Claim ceiling
 
 This fixture adds a synthetic decision challenge only. It does not qualify suppliers, machines, workers, backup utilities, modular interfaces or repair paths; it does not establish a factory layout, capital budget, risk forecast, resilience improvement, product safety, savings, or operational readiness. All real decisions remain blocked by missing evidence and the existing engineering/authorization owners.
+
+## Upstream assumption tests
+
+A resilience strategy should not be scored until the assumptions that confer its claimed mitigation have been examined. The follow-on [HABITAT-ASSUMPTION-FALSIFICATION-001](./HABITAT_ASSUMPTION_FALSIFICATION_001.md) binds nine assumptions to ten candidate tests. It explicitly does not claim that tests have been selected or that any cost, duration, probability, supplier capability, utility behavior, repair result, or option benefit has been measured. Use those definitions to identify which evidence must be admitted before an option's mitigation bounds can be treated as anything beyond synthetic challenge values.
+
