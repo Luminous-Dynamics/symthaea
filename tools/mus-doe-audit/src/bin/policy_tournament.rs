@@ -204,7 +204,6 @@ fn piecewise_linear_prediction(observations: &[(usize, f64)], grid_index: usize)
     left_value + proportion * (right_value - left_value)
 }
 
-
 fn linear_coefficients(observations: &[(usize, f64)]) -> (f64, f64) {
     if observations.len() == 1 {
         return (0.0, observations[0].1);
@@ -709,7 +708,6 @@ mod tests {
         assert!(indices.windows(2).all(|pair| pair[1] - pair[0] >= minimum));
     }
 
-
     #[test]
     fn cost_aware_policy_returns_an_unsampled_candidate_and_positive_cost() {
         let observations = select_observations(
@@ -718,22 +716,31 @@ mod tests {
             23,
             11,
         );
-        let positions = observations.iter().map(|(index, _)| *index).collect::<Vec<_>>();
+        let positions = observations
+            .iter()
+            .map(|(index, _)| *index)
+            .collect::<Vec<_>>();
         assert_eq!(positions.len(), 11);
-        assert_eq!(positions.iter().copied().collect::<std::collections::BTreeSet<_>>().len(), 11);
-        let total_cost: f64 = positions.iter().map(|index| synthetic_experiment_cost_units(*index)).sum();
+        assert_eq!(
+            positions
+                .iter()
+                .copied()
+                .collect::<std::collections::BTreeSet<_>>()
+                .len(),
+            11
+        );
+        let total_cost: f64 = positions
+            .iter()
+            .map(|index| synthetic_experiment_cost_units(*index))
+            .sum();
         assert!(total_cost.is_finite() && total_cost > 0.0);
     }
 
     #[test]
     fn integrated_disagreement_energy_is_finite_and_nonnegative() {
         for surface in SurfaceFamily::ALL {
-            let observations = select_observations(
-                surface,
-                SelectionPolicy::MaximinCoverage,
-                31,
-                11,
-            );
+            let observations =
+                select_observations(surface, SelectionPolicy::MaximinCoverage, 31, 11);
             let energy = integrated_disagreement_energy(&observations);
             assert!(energy.is_finite() && energy >= 0.0);
         }
@@ -742,9 +749,23 @@ mod tests {
     #[test]
     fn tournament_reports_synthetic_cost_for_every_policy() {
         let report = run_tournament(3, 11);
-        assert!(report.trials.iter().all(|trial| trial.total_synthetic_cost_units > 0.0));
-        assert!(report.summaries.iter().all(|summary| summary.mean_synthetic_cost_units > 0.0));
-        assert!(report.summaries.iter().all(|summary| summary.p90_synthetic_cost_units >= summary.mean_synthetic_cost_units));
+        assert!(
+            report
+                .trials
+                .iter()
+                .all(|trial| trial.total_synthetic_cost_units > 0.0)
+        );
+        assert!(
+            report
+                .summaries
+                .iter()
+                .all(|summary| summary.mean_synthetic_cost_units > 0.0)
+        );
+        assert!(
+            report.summaries.iter().all(
+                |summary| summary.p90_synthetic_cost_units >= summary.mean_synthetic_cost_units
+            )
+        );
     }
 
     #[test]
