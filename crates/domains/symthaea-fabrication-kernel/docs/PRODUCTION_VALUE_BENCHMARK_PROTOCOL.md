@@ -72,6 +72,17 @@ The current NIST index links AMB2025-02 tensile measurements, AMB2025-03 fatigue
 
 NIST publishes each dataset's citation instructions at the DOI/PDR landing page. Before ingestion, record the exact dataset revision, licence/terms, files and checksums, units, missingness, specimen/build/lot lineage, and permissible prediction target. The NIST page notes that AM-Bench 2025 journal articles are published after measurement activities complete; use the current source dataset and cited measurement description, not an inferred challenge score. If the PDR landing metadata cannot be read or provenance cannot be established, leave the adapter and evaluation blocked instead of fabricating the missing details.
 
+## Cross-stack composition boundaries
+
+Reuse the existing work rather than growing parallel owners:
+
+- [Symtropy QDRIFT-SYNTH-001 PR #2066](https://github.com/Luminous-Dynamics/symtropy/pull/2066) supplies a deterministic synthetic drift/tool-wear/maintenance-policy challenge, including the biased-sensor negative control. It is useful for evaluator and falsification integration, but its toy-model outcomes are not physical measurements.
+- [Symtropy MFG-DATA-001 PR #2080](https://github.com/Luminous-Dynamics/symtropy/pull/2080) reports a pinned, tool-disjoint Vicomtech machine-tool-wear feature evaluation with source-native label values. Its current feature-level results are not factory throughput, yield, energy-per-part, calibration, or a qualified maintenance policy. Do not map it into this production-outcome evaluator by inventing duration, mass, or energy fields.
+- [Mycelix MFG-QDRIFT-001 #5218](https://github.com/Luminous-Dynamics/mycelix/issues/5218) owns the cross-repository process-run receipt and evidence-state contract; it already points to the versioned [ManufacturingEvidenceEntry PR #5197](https://github.com/Luminous-Dynamics/mycelix/pull/5197) and scientific benchmark manifest [PR #5180](https://github.com/Luminous-Dynamics/mycelix/pull/5180). This evaluator's report is a referenced artifact, not a provenance ledger or an attestation.
+- Sol-Atlas can contribute site-bound material, energy, water, transport and supplier context only when each input has a source/version, spatial and temporal scope, units and uncertainty. Spatial context alone cannot qualify a manufacturing process model.
+
+The first integration should use the synthetic QDRIFT negative control to test that evidence class never promotes from `SimulationOutput` to `InstrumentObserved`; the first external-data work should use the already source-pinned tool-disjoint split as a separate model-validation lane. Actual production benefit requires process-level observations with the required measurement boundaries and a controlled paired pilot.
+
 ## Machine-readable report artifacts
 
 The production-outcome and paired-inference reports are serializable via Serde and include explicit `schema_version` fields. Structured inputs reject unknown fields where strict record deserialization is defined. JSON round-trip unit tests check the stability of report structures, not authenticity. Consumers should archive the serialized report with the exact source-code revision, input manifest, configuration, and an independently computed digest of the emitted bytes. Schema version changes must be deliberate and tested before Mycelix or another downstream evidence ledger consumes the format.
