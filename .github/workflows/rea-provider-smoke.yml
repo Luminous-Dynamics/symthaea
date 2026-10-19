@@ -1,5 +1,11 @@
 name: REA Pinned Provider Smoke
 on:
+  push:
+    branches: [main]
+    paths:
+      - "benchmarks/rea-determinism/v1/**"
+      - "crates/domains/symthaea-rea-evidence-verifier/**"
+      - ".github/workflows/rea-provider-smoke.yml"
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
     paths:

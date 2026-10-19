@@ -4,6 +4,8 @@ on:
     types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
     paths:
       - "benchmarks/rea-determinism/v1/**"
+      - "schemas/rea-provider-smoke-attestation-v1.schema.json"
+      - ".github/workflows/rea-evidence-attestation.yml"
       - ".github/workflows/rea-determinism-contract.yml"
   push:
     branches: [main]
@@ -50,3 +52,7 @@ jobs:
       - name: Verify 512 equivalent metamorphic report transformations
         shell: bash
         run: sh benchmarks/rea-determinism/v1/metamorphic-sweep.sh
+
+      - name: Verify signed predicate scope and tamper controls
+        shell: bash
+        run: sh benchmarks/rea-determinism/v1/attestation-predicate-tests.sh
