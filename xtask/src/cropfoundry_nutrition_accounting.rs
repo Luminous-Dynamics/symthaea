@@ -110,9 +110,30 @@ fn valid_nonnegative(value: f64) -> bool {
 }
 
 fn ratio(numerator: Option<f64>, denominator: Option<f64>) -> Option<f64> {
-    numerator
-        .zip(denominator)
-        .and_then(|(n, d)| (n.is_finite() && d.is_finite() && n >= 0.0 && d > 0.0).then_some(n / d))
+    numerator.zip(denominator).and_then(|(n, d)| {
+        if n.is_finite() && d.is_finite() && n >= 0.0 && d > 0.0 {
+            let value = n / d;
+            value.is_finite().then_some(value)
+        } else {
+            None
+        }
+    })
+}
+
+fn finite_product(values: &[f64], label: &str, issues: &mut Vec<String>) -> Option<f64> {
+    let mut product = 1.0;
+    for value in values {
+        if !valid_nonnegative(*value) {
+            issues.push(format!("{label} contains an invalid factor"));
+            return None;
+        }
+        product *= value;
+        if !product.is_finite() {
+            issues.push(format!("{label} overflowed the finite numeric range"));
+            return None;
+        }
+    }
+    Some(product)
 }
 
 fn validate_bound_pair(
@@ -350,12 +371,18 @@ fn audit_input(input: NutritionAccountingInput) -> NutritionAccountingReceipt {
         issues.push("currency_code must be a three-letter alphabetic code".to_owned());
     }
 
-    let accounting_pass = issues.is_empty();
+    let mut accounting_pass = issues.is_empty();
     let direct_assay = input.concentration_provenance == ConcentrationProvenance::DirectAssay;
     let delivery_mass_is_estimated = !direct_assay
         || input.concentration_stage == Some(ConcentrationStage::MeasuredBeforePreparation);
     let nutrient_mass_at_concentration_stage = if accounting_pass {
-        concentration.zip(stage_mass).map(|(c, mass)| c * mass)
+        concentration.zip(stage_mass).and_then(|(c, mass)| {
+            finite_product(
+                &[c, mass],
+                "nutrient mass at concentration stage",
+                &mut issues,
+            )
+        })
     } else {
         None
     };
@@ -366,13 +393,21 @@ fn audit_input(input: NutritionAccountingInput) -> NutritionAccountingReceipt {
         Some(ConcentrationStage::MeasuredBeforePreparation) if accounting_pass => {
             nutrient_mass_at_concentration_stage
                 .zip(input.retention_fraction)
-                .map(|(mass, retention)| mass * retention)
+                .and_then(|(mass, retention)| {
+                    finite_product(&[mass, retention], "nutrient mass at serving", &mut issues)
+                })
         }
         _ => None,
     };
     let bioavailable_mass = delivered_nutrient_mass
         .zip(input.bioavailability_fraction)
-        .map(|(mass, fraction)| mass * fraction);
+        .and_then(|(mass, fraction)| {
+            finite_product(
+                &[mass, fraction],
+                "estimated bioavailable nutrient mass",
+                &mut issues,
+            )
+        });
 
     let delivered_interval = if accounting_pass {
         match (
@@ -384,15 +419,37 @@ fn audit_input(input: NutritionAccountingInput) -> NutritionAccountingReceipt {
             (Some(concentration_low), Some(concentration_high), Some(mass_low), Some(mass_high)) => {
                 match input.concentration_stage {
                     Some(ConcentrationStage::MeasuredAtServing) => {
-                        Some((concentration_low * mass_low, concentration_high * mass_high))
+                        let lower = finite_product(
+                            &[concentration_low, mass_low],
+                            "lower delivered nutrient-mass bound",
+                            &mut issues,
+                        );
+                        let upper = finite_product(
+                            &[concentration_high, mass_high],
+                            "upper delivered nutrient-mass bound",
+                            &mut issues,
+                        );
+                        lower.zip(upper)
                     }
                     Some(ConcentrationStage::MeasuredBeforePreparation) => {
-                        input.retention_lower_fraction.zip(input.retention_upper_fraction).map(
-                            |(retention_low, retention_high)| (
-                                concentration_low * mass_low * retention_low,
-                                concentration_high * mass_high * retention_high,
-                            ),
-                        )
+                        if let (Some(retention_low), Some(retention_high)) = (
+                            input.retention_lower_fraction,
+                            input.retention_upper_fraction,
+                        ) {
+                            let lower = finite_product(
+                                &[concentration_low, mass_low, retention_low],
+                                "lower delivered nutrient-mass bound",
+                                &mut issues,
+                            );
+                            let upper = finite_product(
+                                &[concentration_high, mass_high, retention_high],
+                                "upper delivered nutrient-mass bound",
+                                &mut issues,
+                            );
+                            lower.zip(upper)
+                        } else {
+                            None
+                        }
                     }
                     None => None,
                 }
@@ -406,8 +463,21 @@ fn audit_input(input: NutritionAccountingInput) -> NutritionAccountingReceipt {
         input
             .bioavailability_lower_fraction
             .zip(input.bioavailability_upper_fraction)
-            .map(|(factor_low, factor_high)| (low * factor_low, high * factor_high))
+            .and_then(|(factor_low, factor_high)| {
+                let lower = finite_product(
+                    &[low, factor_low],
+                    "lower bioavailable nutrient-mass bound",
+                    &mut issues,
+                );
+                let upper = finite_product(
+                    &[high, factor_high],
+                    "upper bioavailable nutrient-mass bound",
+                    &mut issues,
+                );
+                lower.zip(upper)
+            })
     });
+    accounting_pass = accounting_pass && issues.is_empty();
     let nutrient_per_serving = delivered_nutrient_mass
         .zip(input.servings_in_batch)
         .map(|(mass, count)| mass / count as f64);
@@ -712,6 +782,22 @@ mod tests {
         assert!(receipt.accounting_pass);
         assert_eq!(receipt.nutrient_mass_delivered_interval_lower_mg, Some(6.37));
         assert_eq!(receipt.nutrient_mass_delivered_interval_upper_mg, Some(12.24));
+    }
+
+    #[test]
+    fn numeric_overflow_fails_closed_instead_of_emitting_infinite_nutrient_mass() {
+        let mut input = fixture();
+        input.concentration_mg_per_kg = Some(1e308);
+        input.edible_mass_kg_at_concentration_stage = Some(1e308);
+        let receipt = audit_input(input);
+        assert!(!receipt.accounting_pass);
+        assert_eq!(receipt.measured_nutrient_mass_delivered_mg, None);
+        assert!(
+            receipt
+                .issues
+                .iter()
+                .any(|issue| issue.contains("overflowed the finite numeric range"))
+        );
     }
 
     #[test]
