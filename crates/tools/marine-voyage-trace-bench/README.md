@@ -74,3 +74,23 @@ The official [ITTC benchmark repository](https://www.ittc.info/benchmark-reposit
 ## Claim ceiling
 
 A Complete result means only that the canonical trace passed this crate's metadata, time-coverage, numeric and integration gates. It does not validate the measurement system, prove a hydrodynamic improvement, show corrected speed-power performance, establish lifecycle emissions, demonstrate vessel safety, or certify compliance.
+
+
+## Reference-data intake and leakage-resistant validation
+
+The `reference_intake` module audits whether a declared reference source is ready for a model/data comparison. It requires inspected raw bytes and the exact artifact SHA-256, a documented rights decision, reviewed observable names/units/definitions, and a frozen split over operating-condition groups. It fails closed if calibration and hold-out groups overlap, groups are undeclared/unassigned, or the model was not declared frozen before hold-out access.
+
+Two comparison dispositions are kept separate:
+- `ReadyForUncertaintyAwareComparison`: measurement-uncertainty metadata is reported and reviewed.
+- `ReadyForDescriptiveComparisonOnly`: data is otherwise admitted but the source does not report measurement uncertainty. This cannot support uncertainty-coverage claims.
+- `Blocked`: missing/unreviewed/invalid intake or split metadata.
+
+A passing result only permits a declared comparison to begin. Hashes do not authenticate the publisher or prove a license; the freeze flag is an attestation, not proof of blinding. This module does not download data, perform unit conversions, execute CFD, validate the model or establish physical performance.
+
+### Candidate reference sources: discovery only
+
+- The [ITTC benchmark repository](https://ittc.info/benchmark-repository/) is a directory of separate resistance/propulsion, manoeuvring and cavitation/noise source families; ITTC notes link maintenance and data property are not its responsibility. It is not itself a measured dataset.
+- A 2026 paper on the [Duisburg Test Case in shallow water](https://doi.org/10.1080/09377255.2026.2644800) reports publicly available experimental resistance and self-propulsion data for depth-to-draught ratios 4.0, 2.0 and 1.2. The raw artifacts, hashes, reuse terms, units and uncertainty metadata have **not** been inspected by this crate and must remain blocked until reviewed.
+- The [ITTC CFD-validation benchmark procedure](https://ittc.info/search/?q=Self-Propulsion) is a process/reference source, not a substitute for raw measurement data.
+
+Do not tune a solver on the hold-out condition. Prefer grouped leave-one-operating-condition-out evaluation and report error separately for each observable and condition. If a data source omits uncertainty information, report descriptive residuals only; do not manufacture confidence levels. Unit-test fixtures are synthetic placeholders and never count as physical evidence.
