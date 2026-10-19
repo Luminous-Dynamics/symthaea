@@ -217,6 +217,41 @@ Our differentiating goal is **evidence-bound theory revision integrated with Sym
 
 This is an integration and assurance contribution, not a claim that interactive altered-law discovery is itself new. Avoid "first" claims without a direct, documented survey.
 
+## State-of-the-art comparison: separate the tasks before comparing scores
+
+A credible SOTA claim needs task-matched baselines. There are at least three different competitions; they must not be averaged into one “physics intelligence” number.
+
+### Track A — symbolic law recovery from supplied data
+
+Compare the cold Ramanujan pipeline, the matched random-grammar control, and a strong symbolic-regression baseline such as parallel symbolic enumeration (PSE) where an equivalent implementation and compute budget are available. PSE reports evaluation across more than 200 synthetic and experimental problem sets and substantial accuracy/runtime improvements over prior methods; this makes it an important relevant baseline for equation recovery, not a direct substitute for an interactive experiment-design benchmark. https://doi.org/10.1038/s43588-025-00904-8
+
+Report structural equivalence where identifiable, blind prediction error, expression description length/complexity, wall time, peak memory, search evaluations, stability under noise, and parameter uncertainty. Use identical data, operator grammar where that is the intended comparison, stopping rules, and compute budgets. Report both “native strengths” and a controlled common-grammar comparison rather than handicapping a baseline through an incompatible interface.
+
+### Track B — interactive physical discovery
+
+Use DiscoverPhysics, PhysGym and Science-Gym as reference points for world design and evaluation methodology. DiscoverPhysics uses 22 altered-law worlds and scores held-out trajectories plus a separate explanation measure; its paper reports that even the strongest evaluated agents passed only about half of its worlds, with latent-structure cases particularly difficult. Do not claim a win from a different or easier private corpus.
+
+Compare fixed-grid, random, and the existing robust model-separation selector (#8034) with the same worlds, priors, allowed queries, noise, experiment costs and trial seeds. Where compatible, reproduce published benchmark splits before adding new worlds. Separate:
+- prior condition (named/meaningful variables, anonymized variables, model-family hints absent/present);
+- hypothesis/candidate family recovery versus held-out predictive consequences;
+- number and cost of experiments to a fixed success criterion;
+- prediction-interval calibration and appropriate abstention;
+- failure rate on nuisance, latent-variable, symmetry-breaking and out-of-domain cases.
+
+### Track C — forward/inverse field modeling
+
+Use PDEBench and qualified classical solvers for the PDE-specific tasks. A symbolic law-discovery score is not interchangeable with a PDE surrogate's error or speed. Compare on the same discretization, boundary/initial conditions, resolution, horizon, and held-out physical regimes, and account separately for solver discretization error.
+
+### Industry position
+
+Large-scale scientific foundation-model efforts are also advancing, but often toward specialized tasks rather than open-ended physical-law discovery. For example, CERN and Mistral announced a strategic partnership on 15 October 2026 for a collider-physics foundation model trained on simulated collision data, targeting reconstruction, particle identification and unexpected-signal detection. This is an important adjacent industry direction, not an apples-to-apples competitor to the v0 altered-law task. https://home.cern/cern-and-mistral-join-forces-to-accelerate-ai-for-science/
+
+### What would justify “better than SOTA”
+
+Pre-register the comparison. Freeze exact source commits, corpora, data access, priors, hardware/compute limits and evaluator versions. Evaluate paired seeds and report uncertainty intervals. A stretch objective is at least 25% fewer experiment-cost units at matched recovery performance, or a statistically supported improvement in recovery and held-out prediction at the same budget, with no deterioration in invalid-input handling, uncertainty calibration, or false-certification rate. This is a target, not an achieved result.
+
+Require an independent reproduction before making a broad superiority claim. If one lane improves and another regresses, publish the Pareto trade-off rather than averaging away the regression. Report costs and failures, not just accuracy.
+
 ## Research anchors
 
 These existing works motivate different benchmark lanes; none alone covers the entire proposed protocol:
