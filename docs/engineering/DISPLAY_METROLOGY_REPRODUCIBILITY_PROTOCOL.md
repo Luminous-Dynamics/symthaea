@@ -29,6 +29,10 @@ Each metric must declare:
 - uncertainty budget, confidence/coverage convention, instrument range and expected minimum engineering effect;
 - raw-artifact retention path/hash, analysis version, exclusions/aborts, and independent-verifier identity.
 
+For each instrument used by a measured observation, the run record must bind the exact calibration artifact plus its digest, and a separate measurement-capability profile artifact plus its digest. The latter documents operating range, spectral/temporal response or sampling limits, and the measurands for which the instrument is appropriate. A missing, unresolved, role-mismatched, or digest-mismatched artifact prevents the measurement record from validating. A capability profile marked UNASSESSED or INADEQUATE cannot support a measured observation; a declared-but-unreviewed profile may support an exploratory, unqualified measurement but not be promoted to independent qualification.
+
+These bindings make the evidence addressable and mutation-detectable; they do **not** by themselves establish metrological traceability or fitness for purpose. NIST notes that traceability of a measurement result requires a documented, unbroken chain of calibrations, with each contributing uncertainty, and that calibration alone does not establish fitness for a particular decision. [NIST Policy on Metrological Traceability](https://www.nist.gov/calibrations/traceability).
+
 A report must distinguish actual input state from requested state. For example, a requested HDR mode does not establish that the signal negotiated or the display operated in HDR.
 
 ### Timestamp and calibration-date syntax
