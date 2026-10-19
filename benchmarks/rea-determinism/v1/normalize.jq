@@ -11,9 +11,9 @@ def known_report_types: [
   "ExtractCommandFailedReport", "OutputDirectoryExistsReport", "ExtractorDependencyNotFoundReport",
   "ExtractedFileDeletedReport", "ExtractorTimedOut", "MaliciousSymlinkRemoved",
   "MultiFileCollisionReport", "StatReport", "HashReport", "FileMagicReport",
-  "RandomnessReport", "EncryptionMetadataReport", "ChunkReport", "UnknownChunkReport",
+  "RandomnessReport", "ChunkReport", "UnknownChunkReport",
   "CarveDirectoryReport", "MultiFileReport", "ExtractionProblem", "PathTraversalProblem",
-  "LinkExtractionProblem", "SpecialFileExtractionProblem"
+  "LinkExtractionProblem", "SpecialFileExtractionProblem", "ExtendedAttributeExtractionProblem"
 ];
 
 def relpath($root; $p):
