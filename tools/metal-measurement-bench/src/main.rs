@@ -2082,6 +2082,12 @@ mod tests {
         assert!(receipt_schema["properties"]["csv_reconciliation"]["properties"]["mapping_sha256"].is_object());
         assert!(receipt_schema["properties"]["csv_reconciliation"]["properties"]["columns"]["items"]["properties"]["numeric_values_validated"].is_object());
         assert!(receipt_schema["properties"]["csv_reconciliation"]["properties"]["excluded_columns"].is_object());
+        assert!(receipt_schema["properties"]["zip_inventory"]["properties"]["archive_sha256"].is_object());
+        assert!(receipt_schema["allOf"].as_array().unwrap().iter().any(|condition| {
+            condition["if"]["properties"]["operation"]["const"] == "inspect-zip"
+                && condition["then"]["required"].as_array().unwrap()
+                    .iter().any(|value| value == "zip_inventory")
+        }));
         assert!(receipt_schema["allOf"].as_array().unwrap().iter().any(|condition| {
             condition["if"]["properties"]["operation"]["const"] == "reconcile-csv"
                 && condition["then"]["required"].as_array().unwrap()
@@ -2180,6 +2186,46 @@ mod tests {
             writer.write_all(bytes).unwrap();
         }
         writer.finish().unwrap().into_inner()
+    }
+
+    #[test]
+    fn inspect_zip_operation_binds_verified_archive_to_receipt() {
+        let temp = tempdir().unwrap();
+        let artifact_root = temp.path().join("artifacts");
+        fs::create_dir_all(&artifact_root).unwrap();
+        let archive_bytes = zip_fixture(&[
+            ("calibration.csv", b"source_row_id,value\nR-001,3.5\n", 0o100644),
+            ("README.txt", b"metadata", 0o100644),
+        ]);
+        fs::write(artifact_root.join("source.zip"), &archive_bytes).unwrap();
+
+        let mut manifest = record_manifest();
+        manifest.artifacts[0].relative_path = "source.zip".into();
+        manifest.artifacts[0].media_type = "application/zip".into();
+        manifest.artifacts[0].sha256 = sha256_hex(&archive_bytes);
+        manifest.artifacts[0].size_bytes = archive_bytes.len() as u64;
+        let manifest_path = temp.path().join("manifest.json");
+        fs::write(&manifest_path, serde_json::to_vec(&manifest).unwrap()).unwrap();
+
+        let args = vec![
+            "metal-measurement-bench".to_string(),
+            "inspect-zip".to_string(),
+            manifest_path.display().to_string(),
+            artifact_root.display().to_string(),
+            "source.zip".to_string(),
+        ];
+        let receipt = run(&args).unwrap();
+        assert_eq!(receipt.operation, "inspect-zip");
+        assert_eq!(receipt.status, "ZIP_STRUCTURE_INVENTORIED_NO_EXTRACTION");
+        assert_eq!(receipt.record_count, 2);
+        assert_eq!(receipt.evidence_input_sha256.as_deref(), Some(sha256_hex(&archive_bytes).as_str()));
+        let inventory = receipt.zip_inventory.unwrap();
+        assert_eq!(inventory.archive_sha256, sha256_hex(&archive_bytes));
+        assert_eq!(inventory.member_count, 2);
+
+        let mut undeclared_args = args;
+        undeclared_args[4] = "unlisted.zip".to_string();
+        assert!(run(&undeclared_args).is_err());
     }
 
     #[test]
