@@ -473,6 +473,8 @@ pub fn score_case(oracle: &OracleCase, observed: &Observation) -> Result<Scoreca
             || reason.contains("out of bounds")
             || reason.contains("unknown coordinate space")
             || reason.contains("extra coordinate space")
+            || reason.contains("duplicated")
+            || reason.contains("does not match the selected source identity")
             || reason.contains("missed or false-positive")
             || reason.contains("known-answer output tree differs")
             || reason.contains("overlap")
