@@ -748,6 +748,346 @@ fn validate_trace_bytes(raw: &[u8], manifest: &Manifest) -> Result<TraceReport> 
     })
 }
 
+
+#[derive(Debug, Serialize)]
+struct FaultMatrixCaseReport {
+    case_id: String,
+    mutation: String,
+    expected: String,
+    observed: String,
+    passed: bool,
+    detail: String,
+}
+
+#[derive(Debug, Serialize)]
+struct FaultMatrixReport {
+    report_version: String,
+    suite_id: String,
+    status: String,
+    matrix_sha256: String,
+    manifest_sha256: String,
+    case_count: usize,
+    passed_count: usize,
+    failed_count: usize,
+    cases: Vec<FaultMatrixCaseReport>,
+    claim_ceiling: String,
+}
+
+fn trace_case_outcome(raw: &[u8], manifest: &Manifest) -> (String, String) {
+    match validate_trace_bytes(raw, manifest) {
+        Ok(report) => (
+            "accept".to_owned(),
+            format!(
+                "rows={}, valid={}, invalid_or_saturated={}, missing={}, suspected_gaps={}",
+                report.row_count,
+                report.valid_sample_count,
+                report.invalid_or_saturated_sample_count,
+                report.missing_value_count,
+                report.suspected_gap_count,
+            ),
+        ),
+        Err(error) => ("reject".to_owned(), error.to_string()),
+    }
+}
+
+fn structure_case_outcome(manifest: &Manifest) -> (String, String) {
+    match validate_structure(manifest) {
+        Ok(()) => ("accept".to_owned(), "manifest structure accepted".to_owned()),
+        Err(error) => ("reject".to_owned(), error.to_string()),
+    }
+}
+
+fn evaluate_fault_case(mutation: &str, manifest: &Manifest) -> (String, String) {
+    match mutation {
+        "known_valid_multi_rate_fixture" => {
+            let raw = include_bytes!("../../docs/research/data/mobility_telemetry_trace_v0_1.csv");
+            match validate_trace_bytes(raw, manifest) {
+                Ok(report)
+                    if report.row_count == 5
+                        && report.valid_sample_count == 4
+                        && report.invalid_or_saturated_sample_count == 1
+                        && report.missing_value_count == 1 =>
+                {
+                    ("accept".to_owned(), "fixture accepted and expected counters match".to_owned())
+                }
+                Ok(report) => (
+                    "accept_with_wrong_summary".to_owned(),
+                    format!("unexpected baseline counters: rows={}, valid={}, invalid={}, missing={}",
+                        report.row_count, report.valid_sample_count,
+                        report.invalid_or_saturated_sample_count, report.missing_value_count),
+                ),
+                Err(error) => ("reject".to_owned(), error.to_string()),
+            }
+        }
+        "header_only_empty_trace" => {
+            let raw = b"timestamp_ns,channel_id,raw_value,sample_status,sequence\n";
+            trace_case_outcome(raw, manifest)
+        }
+        "reordered_header" => {
+            let raw = b"timestamp_ns,raw_value,channel_id,sample_status,sequence\n1,1,gnss.speed_mps,VALID,0\n";
+            trace_case_outcome(raw, manifest)
+        }
+        "undeclared_channel" => {
+            let raw = b"timestamp_ns,channel_id,raw_value,sample_status,sequence\n1,not.declared,1,VALID,0\n";
+            trace_case_outcome(raw, manifest)
+        }
+        "valid_status_with_empty_raw_value" => {
+            let raw = b"timestamp_ns,channel_id,raw_value,sample_status,sequence\n1,gnss.speed_mps,,VALID,0\n";
+            trace_case_outcome(raw, manifest)
+        }
+        "NaN_or_infinity_raw_value" => {
+            let nan = b"timestamp_ns,channel_id,raw_value,sample_status,sequence\n1,gnss.speed_mps,NaN,VALID,0\n";
+            let infinity = b"timestamp_ns,channel_id,raw_value,sample_status,sequence\n1,gnss.speed_mps,inf,VALID,0\n";
+            let a = validate_trace_bytes(nan, manifest);
+            let b = validate_trace_bytes(infinity, manifest);
+            match (a, b) {
+                (Err(a), Err(b)) => ("reject".to_owned(), format!("NaN rejected ({a}); infinity rejected ({b})")),
+                (a, b) => ("accept".to_owned(), format!("non-finite input incorrectly accepted: NaN={}, infinity={}",
+                    a.is_ok(), b.is_ok())),
+            }
+        }
+        "unknown_sample_status" => {
+            let raw = b"timestamp_ns,channel_id,raw_value,sample_status,sequence\n1,gnss.speed_mps,1,UNKNOWN,0\n";
+            trace_case_outcome(raw, manifest)
+        }
+        "global_sequence_gap" => {
+            let raw = b"timestamp_ns,channel_id,raw_value,sample_status,sequence\n1,gnss.speed_mps,1,VALID,0\n2,gnss.speed_mps,2,VALID,2\n";
+            trace_case_outcome(raw, manifest)
+        }
+        "logger_timestamp_regression" => {
+            let raw = b"timestamp_ns,channel_id,raw_value,sample_status,sequence\n3,gnss.speed_mps,1,VALID,0\n2,dc_bus.voltage_v,48,VALID,1\n";
+            trace_case_outcome(raw, manifest)
+        }
+        "repeated_timestamp_same_channel" => {
+            let raw = b"timestamp_ns,channel_id,raw_value,sample_status,sequence\n3,gnss.speed_mps,1,VALID,0\n3,gnss.speed_mps,2,VALID,1\n";
+            trace_case_outcome(raw, manifest)
+        }
+        "same_timestamp_on_distinct_channels" => {
+            let raw = b"timestamp_ns,channel_id,raw_value,sample_status,sequence\n100,gnss.speed_mps,1,VALID,0\n100,dc_bus.voltage_v,48,VALID,1\n";
+            trace_case_outcome(raw, manifest)
+        }
+        "sensor_fault_with_missing_value" => {
+            let raw = b"timestamp_ns,channel_id,raw_value,sample_status,sequence\n1,dc_bus.current_a,,SENSOR_FAULT,0\n";
+            match validate_trace_bytes(raw, manifest) {
+                Ok(report)
+                    if report.row_count == 1
+                        && report.valid_sample_count == 0
+                        && report.invalid_or_saturated_sample_count == 1
+                        && report.missing_value_count == 1 =>
+                {
+                    ("accept_with_diagnostic".to_owned(), "fault row and missing-value counters preserved".to_owned())
+                }
+                Ok(report) => (
+                    "accept_without_required_diagnostic".to_owned(),
+                    format!("fault-row counters mismatch: rows={}, invalid={}, missing={}",
+                        report.row_count, report.invalid_or_saturated_sample_count, report.missing_value_count),
+                ),
+                Err(error) => ("reject".to_owned(), error.to_string()),
+            }
+        }
+        "inter_sample_gap_above_diagnostic_threshold" => {
+            let channel = match manifest.channels.iter().find(|channel| channel.channel_id == "gnss.speed_mps") {
+                Some(channel) => channel,
+                None => return ("reject".to_owned(), "fixture lacks gnss.speed_mps".to_owned()),
+            };
+            let period_ns = (1_000_000_000.0 / channel.sample_rate_hz).round() as u64;
+            if period_ns == 0 {
+                return ("reject".to_owned(), "GNSS sample period rounded to zero".to_owned());
+            }
+            let raw = format!(
+                "timestamp_ns,channel_id,raw_value,sample_status,sequence\n1,gnss.speed_mps,0,VALID,0\n{},gnss.speed_mps,1,VALID,1\n{},gnss.speed_mps,2,VALID,2\n",
+                1 + period_ns,
+                1 + period_ns * 6
+            );
+            match validate_trace_bytes(raw.as_bytes(), manifest) {
+                Ok(report) if report.row_count == 3 && report.suspected_gap_count == 1 =>
+                    ("accept_with_diagnostic".to_owned(), "all three rows retained; one suspected gap reported".to_owned()),
+                Ok(report) => ("accept_without_required_diagnostic".to_owned(),
+                    format!("rows={}, suspected_gaps={}", report.row_count, report.suspected_gap_count)),
+                Err(error) => ("reject".to_owned(), error.to_string()),
+            }
+        }
+        "duplicate_sensor_id" => {
+            let mut candidate = manifest.clone();
+            candidate.sensors.push(candidate.sensors[0].clone());
+            structure_case_outcome(&candidate)
+        }
+        "duplicate_channel_id" => {
+            let mut candidate = manifest.clone();
+            candidate.channels.push(candidate.channels[0].clone());
+            structure_case_outcome(&candidate)
+        }
+        "unresolved_sensor_reference" => {
+            let mut candidate = manifest.clone();
+            candidate.channels[0].sensor_id = "sensor-does-not-exist".to_owned();
+            structure_case_outcome(&candidate)
+        }
+        "zero_negative_or_nonfinite_sample_rate" => {
+            let mut outcomes = Vec::new();
+            for rate in [0.0, -1.0, f64::NAN] {
+                let mut candidate = manifest.clone();
+                candidate.channels[0].sample_rate_hz = rate;
+                outcomes.push(validate_structure(&candidate).is_err());
+            }
+            if outcomes.iter().all(|rejected| *rejected) {
+                ("reject".to_owned(), "zero, negative and NaN sample rates all rejected".to_owned())
+            } else {
+                ("accept".to_owned(), format!("sample-rate rejection outcomes: {outcomes:?}"))
+            }
+        }
+        "calibrated_sensor_without_receipt" => {
+            let mut candidate = manifest.clone();
+            candidate.sensors[0].calibration_state = "calibrated".to_owned();
+            candidate.sensors[0].calibration_receipt_id = None;
+            structure_case_outcome(&candidate)
+        }
+        "absolute_or_traversal_artifact_path" => {
+            let paths = ["../secrets.txt", "/tmp/raw.csv", "data/../../secret", r"raw\..\secret.csv"];
+            if paths.iter().all(|path| !valid_relative_path(path)) {
+                ("reject".to_owned(), "absolute and traversal paths rejected".to_owned())
+            } else {
+                ("accept".to_owned(), "at least one unsafe path was accepted".to_owned())
+            }
+        }
+        "malformed_or_unprefixed_sha256" => {
+            let unprefixed = "a".repeat(64);
+            let invalid_hex = format!("sha256:{}", "g".repeat(64));
+            if !valid_sha256(&unprefixed) && !valid_sha256(&invalid_hex) {
+                ("reject".to_owned(), "unprefixed and invalid-hex digests rejected".to_owned())
+            } else {
+                ("accept".to_owned(), "at least one malformed digest was accepted".to_owned())
+            }
+        }
+        "claim_required_channel_removed" => {
+            let mut candidate = manifest.clone();
+            candidate.channels.retain(|channel| channel.channel_id != "dc_bus.current_a");
+            match validate_structure(&candidate) {
+                Err(error) => ("reject".to_owned(), error.to_string()),
+                Ok(()) => {
+                    let claim = claim_eligibility(&candidate, "ride_energy");
+                    if !claim.physical_eligible
+                        && claim.missing_channels.iter().any(|channel| channel == "dc_bus.current_a")
+                        && claim.reasons.iter().any(|reason| reason == "claim_required_channels_missing") {
+                        ("structurally_valid_but_ineligible".to_owned(),
+                         "only ride_energy is blocked by its missing required channel".to_owned())
+                    } else {
+                        ("eligible_or_unexplained".to_owned(), format!("eligibility report: {claim:?}"))
+                    }
+                }
+            }
+        }
+        "physical_claim_with_uncalibrated_sensor" => {
+            let mut candidate = manifest.clone();
+            candidate.session_state = "closed".to_owned();
+            candidate.evidence_class = "InstrumentedPhysical".to_owned();
+            candidate.data_rights.rights_state = "project_owned".to_owned();
+            candidate.data_rights.permission_receipt_id = Some("collection-approval-001".to_owned());
+            candidate.timebase.sync_method = "gnss_pps_verified".to_owned();
+            candidate.artifacts = vec![
+                Artifact { relative_path:"raw/session.csv".into(),kind:"raw_sensor_log".into(),byte_len:1,sha256:format!("sha256:{}", "a".repeat(64)) },
+                Artifact { relative_path:"protocol/test.json".into(),kind:"measurement_protocol".into(),byte_len:1,sha256:format!("sha256:{}", "b".repeat(64)) },
+                Artifact { relative_path:"calibration/cal.json".into(),kind:"calibration_record".into(),byte_len:1,sha256:format!("sha256:{}", "c".repeat(64)) },
+                Artifact { relative_path:"authorization/collection.json".into(),kind:"collection_authorization".into(),byte_len:1,sha256:format!("sha256:{}", "d".repeat(64)) },
+            ];
+            let claim = claim_eligibility(&candidate, "ride_energy");
+            if !claim.physical_eligible
+                && claim.reasons.iter().any(|reason| reason == "sensor_not_calibrated:dc-voltage-01")
+                && claim.reasons.iter().any(|reason| reason == "sensor_not_calibrated:dc-current-01") {
+                ("ineligible".to_owned(), "both uncalibrated electrical sensors block physical energy claim".to_owned())
+            } else {
+                ("eligible_or_unexplained".to_owned(), format!("eligibility report: {claim:?}"))
+            }
+        }
+        "planned_or_synthetic_fixture_claimed_as_physical" => {
+            if manifest.claim_targets.iter().all(|claim| !claim_eligibility(manifest, claim).physical_eligible) {
+                ("ineligible".to_owned(), "planned DesignOnly fixture cannot support physical claims".to_owned())
+            } else {
+                ("eligible".to_owned(), "a planned fixture unexpectedly supports a physical claim".to_owned())
+            }
+        }
+        _ => ("unimplemented".to_owned(), format!("unknown fault-matrix mutation: {mutation}")),
+    }
+}
+
+pub fn run_benchmark(
+    manifest_path: &Path,
+    matrix_path: &Path,
+    output_path: Option<&Path>,
+) -> Result<()> {
+    let manifest_raw = fs::read(manifest_path)
+        .with_context(|| format!("reading telemetry manifest {}", manifest_path.display()))?;
+    let manifest: Manifest = serde_json::from_slice(&manifest_raw)
+        .with_context(|| format!("parsing telemetry manifest {}", manifest_path.display()))?;
+    validate_structure(&manifest)?;
+
+    let matrix_raw = fs::read(matrix_path)
+        .with_context(|| format!("reading telemetry fault matrix {}", matrix_path.display()))?;
+    let matrix: serde_json::Value = serde_json::from_slice(&matrix_raw)
+        .with_context(|| format!("parsing telemetry fault matrix {}", matrix_path.display()))?;
+    let suite_id = matrix.get("suite_id").and_then(serde_json::Value::as_str)
+        .context("fault matrix has no string suite_id")?.to_owned();
+    let cases = matrix.get("cases").and_then(serde_json::Value::as_array)
+        .context("fault matrix has no cases array")?;
+    if cases.is_empty() {
+        bail!("fault matrix contains no cases");
+    }
+
+    let mut seen_ids = BTreeSet::<String>::new();
+    let mut results = Vec::with_capacity(cases.len());
+    for case in cases {
+        let case_id = case.get("id").and_then(serde_json::Value::as_str)
+            .context("fault-matrix case has no string id")?.to_owned();
+        let mutation = case.get("mutation").and_then(serde_json::Value::as_str)
+            .context("fault-matrix case has no string mutation")?.to_owned();
+        let expected = case.get("expected").and_then(serde_json::Value::as_str)
+            .context("fault-matrix case has no string expected outcome")?.to_owned();
+        if !seen_ids.insert(case_id.clone()) {
+            bail!("duplicate fault-matrix case ID {case_id}");
+        }
+
+        let (observed, detail) = evaluate_fault_case(&mutation, &manifest);
+        let passed = observed == expected;
+        results.push(FaultMatrixCaseReport {
+            case_id,
+            mutation,
+            expected,
+            observed,
+            passed,
+            detail,
+        });
+    }
+
+    let case_count = results.len();
+    let passed_count = results.iter().filter(|case| case.passed).count();
+    let failed_count = case_count - passed_count;
+    let report = FaultMatrixReport {
+        report_version: SCHEMA_VERSION.to_owned(),
+        suite_id,
+        status: if failed_count == 0 { "pass" } else { "fail" }.to_owned(),
+        matrix_sha256: format!("sha256:{:x}", Sha256::digest(&matrix_raw)),
+        manifest_sha256: format!("sha256:{:x}", Sha256::digest(&manifest_raw)),
+        case_count,
+        passed_count,
+        failed_count,
+        cases: results,
+        claim_ceiling: "The suite checks declared software-contract behavior against synthetic fixtures only. A passing report does not establish hardware reliability, metrological accuracy, physical vehicle/tire performance, roadworthiness or approval.".to_owned(),
+    };
+    let encoded = serde_json::to_string_pretty(&report)?;
+    if let Some(path) = output_path {
+        if let Some(parent) = path.parent().filter(|parent| !parent.as_os_str().is_empty()) {
+            fs::create_dir_all(parent)
+                .with_context(|| format!("creating benchmark report directory {}", parent.display()))?;
+        }
+        fs::write(path, format!("{encoded}\n"))
+            .with_context(|| format!("writing telemetry benchmark report {}", path.display()))?;
+    }
+    println!("{encoded}");
+    if failed_count != 0 {
+        bail!("mobility telemetry fault matrix failed {failed_count} of {case_count} cases");
+    }
+    Ok(())
+}
+
 pub fn run_trace(
     manifest_path: &Path,
     trace_path: &Path,
