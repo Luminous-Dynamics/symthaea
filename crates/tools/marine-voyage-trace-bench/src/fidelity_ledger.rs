@@ -97,6 +97,11 @@ pub enum FidelityIssue {
     EmptyRequirements,
     NoRequiredReleaseGate,
     DuplicateRequirementId { requirement_id: String },
+    CandidateConfigurationMismatch {
+        candidate_id: String,
+        first_sha256: String,
+        observed_sha256: String,
+    },
     InvalidRequirement { requirement_id: String, field: &'static str },
     MissingRequirementEvidence {
         requirement_id: String,
@@ -221,7 +226,23 @@ fn validate_profile(profile: &FidelityProfile, issues: &mut Vec<FidelityIssue>) 
     }
 
     let mut seen = BTreeSet::new();
+    let mut candidate_configurations: BTreeMap<String, String> = BTreeMap::new();
     for requirement in &profile.requirements {
+        if let Some(first_digest) = candidate_configurations.get(&requirement.candidate_id) {
+            if first_digest != &requirement.configuration_sha256 {
+                issues.push(FidelityIssue::CandidateConfigurationMismatch {
+                    candidate_id: requirement.candidate_id.clone(),
+                    first_sha256: first_digest.clone(),
+                    observed_sha256: requirement.configuration_sha256.clone(),
+                });
+                invalid = true;
+            }
+        } else {
+            candidate_configurations.insert(
+                requirement.candidate_id.clone(),
+                requirement.configuration_sha256.clone(),
+            );
+        }
         if !seen.insert(requirement.requirement_id.clone()) {
             issues.push(FidelityIssue::DuplicateRequirementId {
                 requirement_id: requirement.requirement_id.clone(),
@@ -809,6 +830,19 @@ mod tests {
         let audit = audit_fidelity_campaign(&p, &[]);
         assert_eq!(audit.disposition, FidelityAuditDisposition::InvalidProfile);
         assert!(has_issue(&audit, &FidelityIssue::NoRequiredReleaseGate));
+    }
+
+    #[test]
+    fn candidate_geometry_digest_must_be_stable_across_operating_cases() {
+        let mut p = profile();
+        p.requirements[3].configuration_sha256 = "e".repeat(64);
+        let audit = audit_fidelity_campaign(&p, &complete_receipts(&p));
+        assert_eq!(audit.disposition, FidelityAuditDisposition::InvalidProfile);
+        assert!(audit.issues.iter().any(|issue| matches!(
+            issue,
+            FidelityIssue::CandidateConfigurationMismatch { candidate_id, .. }
+                if candidate_id == "hull-prop-v1"
+        )));
     }
 
     #[test]
