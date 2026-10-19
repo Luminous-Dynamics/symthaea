@@ -401,6 +401,12 @@ fn build_pack(manifest_path: &Path, audio_root: &Path, output_root: &Path, seed:
         .map_err(|error| format!("cannot create staging directory: {error}"))?;
     fs::create_dir_all(&operator_stage)
         .map_err(|error| format!("cannot create operator staging directory: {error}"))?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&operator_stage, fs::Permissions::from_mode(0o700))
+            .map_err(|error| format!("cannot restrict operator-key directory permissions: {error}"))?;
+    }
 
     let outcome = (|| -> Result<()> {
         let mut block_order: Vec<usize> = (0..blocks.len()).collect();
@@ -524,7 +530,7 @@ fn build_pack(manifest_path: &Path, audio_root: &Path, output_root: &Path, seed:
             .map_err(|error| format!("cannot write participant manifest: {error}"))?;
         fs::write(
             participant_stage.join("LISTENER-INSTRUCTIONS.txt"),
-            "MELIOTHaea renderer profile listening pilot\n\n\
+            "Melothaea renderer profile listening pilot\n\n\
              For each clip, rate the target-style fit, overall audio quality, and audible artifacts on a 1-7 scale. \
              Use the notes column for brief observations. The same composition may occur in more than one clip; \
              judge each presentation independently before comparing your ratings. Do not infer that higher loudness, \
@@ -553,8 +559,6 @@ fn build_pack(manifest_path: &Path, audio_root: &Path, output_root: &Path, seed:
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
-            fs::set_permissions(&operator_stage, fs::Permissions::from_mode(0o700))
-                .map_err(|error| format!("cannot restrict operator-key directory permissions: {error}"))?;
             fs::set_permissions(&key_path, fs::Permissions::from_mode(0o600))
                 .map_err(|error| format!("cannot restrict operator-key permissions: {error}"))?;
         }
@@ -566,8 +570,10 @@ fn build_pack(manifest_path: &Path, audio_root: &Path, output_root: &Path, seed:
         let _ = fs::remove_dir_all(&staging);
         return Err(error);
     }
-    fs::rename(&participant_stage, &participant_final)
-        .map_err(|error| format!("cannot publish participant pack: {error}"))?;
+    if let Err(error) = fs::rename(&participant_stage, &participant_final) {
+        let _ = fs::remove_dir_all(&staging);
+        return Err(format!("cannot publish participant pack: {error}"));
+    }
     if let Err(error) = fs::rename(&operator_stage, &operator_final) {
         let _ = fs::remove_dir_all(&participant_final);
         let _ = fs::remove_dir_all(&staging);
@@ -698,6 +704,23 @@ mod tests {
         assert_eq!(blocks.len(), STYLES.len());
         assert_eq!(revision, "a".repeat(40));
         assert_eq!(blocks.iter().map(|block| block.arms.len()).sum::<usize>(), STYLES.len() * ARMS.len());
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn wav_header_sample_rate_must_match_manifest() {
+        let root = fixture_root("sample-rate-mismatch");
+        let (manifest_path, _) = make_fixture(&root);
+        let mut manifest: Value = serde_json::from_slice(&fs::read(&manifest_path).unwrap()).unwrap();
+        for record in manifest["records"].as_array_mut().unwrap() {
+            record["arms"]["fluidsynth_default_profile"]["sample_rate_hz"] = json!(48_000);
+            record["arms"]["fluidsynth_room_only"]["sample_rate_hz"] = json!(48_000);
+            record["arms"]["fluidsynth_mastering_only"]["sample_rate_hz"] = json!(48_000);
+            record["arms"]["fluidsynth_dialect_profile"]["sample_rate_hz"] = json!(48_000);
+        }
+        let result = read_blocks(&manifest, &root);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("disagrees with WAV header"));
         fs::remove_dir_all(root).ok();
     }
 
