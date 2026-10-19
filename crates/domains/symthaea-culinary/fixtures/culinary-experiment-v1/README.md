@@ -18,3 +18,8 @@ All outcomes are marked `estimated` and all source records `synthetic` intention
 It checks paired-block identity, assignment-order consistency, protocol preregistration before data collection, outcome completeness, unit agreement, finite ordered intervals, unique run/block/outcome identifiers, and the boundary between structural completeness and evidence-qualified observations.
 
 A valid dataset is not automatically causal evidence. Source locators and `qualified` labels are declared metadata; they do not authenticate a source or validate a study design independently.
+
+## Frozen analysis plan
+
+The fixture now declares `prepared_yield_g` as its primary outcome and freezes the V1 descriptive estimand (`variant - control`), mean paired difference, fail-closed handling of missing data, measurement-bound-only interval semantics, and the statement that population inference is not estimated. These fields are part of preregistration, not choices made after seeing outcomes.
+
