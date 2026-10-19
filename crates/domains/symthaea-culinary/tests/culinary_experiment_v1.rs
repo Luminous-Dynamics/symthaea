@@ -93,7 +93,8 @@ fn inverted_uncertainty_interval_is_rejected() {
 #[test]
 fn duplicate_run_ids_across_blocks_are_rejected() {
     let mut value = fixture();
-    value["blocks"][1]["runs"][0]["run_id"] = value["blocks"][0]["runs"][0]["run_id"].clone();
+    let duplicate_id = value["blocks"][0]["runs"][0]["run_id"].clone();
+    value["blocks"][1]["runs"][0]["run_id"] = duplicate_id;
     assert!(validate_culinary_experiment_v1(&value).is_err());
 }
 
@@ -136,5 +137,13 @@ fn unsupported_subnanosecond_timestamp_precision_is_rejected() {
 fn target_outcome_requires_an_explicit_target_value() {
     let mut value = fixture();
     value["outcome_definitions"][0]["direction"] = Value::String("target".into());
+    assert!(validate_culinary_experiment_v1(&value).is_err());
+}
+
+
+#[test]
+fn randomization_method_is_required() {
+    let mut value = fixture();
+    value["blocks"][0]["randomization_method"] = Value::String("".into());
     assert!(validate_culinary_experiment_v1(&value).is_err());
 }
