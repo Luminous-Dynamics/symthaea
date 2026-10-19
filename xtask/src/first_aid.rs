@@ -88,6 +88,7 @@ struct ValidationReceipt {
     corpus_sha256: String,
     benchmark_sha256: String,
     schema_sha256: String,
+    source_revision_sha: String,
     validator_source_sha256: String,
     entrypoint_source_sha256: String,
     executable_sha256: String,
@@ -137,6 +138,8 @@ pub fn run(
         corpus_sha256: sha256_hex(&corpus_bytes),
         benchmark_sha256: sha256_hex(&benchmark_bytes),
         schema_sha256: sha256_hex(&schema_bytes),
+        source_revision_sha: std::env::var("FIRST_AID_SOURCE_REVISION")
+            .unwrap_or_else(|_| "not-provided".to_string()),
         validator_source_sha256: sha256_hex(&validator_source),
         entrypoint_source_sha256: sha256_hex(&entrypoint_source),
         executable_sha256: sha256_hex(&executable_bytes),
@@ -570,7 +573,7 @@ mod tests {
     fn checked_in_contracts_are_consistent() {
         let (corpus, benchmark, _) = fixtures();
         assert_eq!(corpus.scenarios.len(), 24);
-        assert_eq!(benchmark.benchmarks.len(), 15);
+        assert_eq!(benchmark.benchmarks.len(), 16);
         assert_eq!(benchmark.status, "proposed_targets_unmeasured");
         assert!(!corpus.clinical_use_authorized);
         assert!(!benchmark.clinical_use_authorized);
@@ -621,5 +624,32 @@ mod tests {
         let (_, mut benchmark, _) = fixtures();
         benchmark.status = "clinically_validated".to_string();
         assert!(validate_benchmark(&benchmark).is_err());
+    }
+
+    #[test]
+    fn source_revision_is_recorded_as_an_explicit_receipt_field() {
+        let value = serde_json::to_value(ValidationReceipt {
+            receipt_version: "first-aid-contract-receipt-v0",
+            status: "contract_validation_passed",
+            corpus_sha256: "c".repeat(64),
+            benchmark_sha256: "b".repeat(64),
+            schema_sha256: "s".repeat(64),
+            source_revision_sha: "f".repeat(40),
+            validator_source_sha256: "1".repeat(64),
+            entrypoint_source_sha256: "2".repeat(64),
+            executable_sha256: "3".repeat(64),
+            runtime_os: "test-os".to_string(),
+            runtime_arch: "test-arch".to_string(),
+            scenario_count: 24,
+            benchmark_count: 16,
+            baseline_count: 5,
+            claim_ceiling: "synthetic contract integrity only; no clinical validation",
+        })
+        .expect("receipt must serialize");
+        assert_eq!(
+            value["source_revision_sha"].as_str(),
+            Some("ffffffffffffffffffffffffffffffffffffffff")
+        );
+        assert_eq!(value["benchmark_count"], 16);
     }
 }
