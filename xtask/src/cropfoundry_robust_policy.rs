@@ -2,7 +2,7 @@ use anyhow::{Result, anyhow};
 use serde::Serialize;
 use std::collections::BTreeMap;
 
-use crate::cropfoundry_water_policy::{ScenarioResult, build_receipt};
+use crate::cropfoundry_water_policy::{ScenarioResult, build_receipt as build_receipt_water_policy};
 
 const TAIL_FRACTION_95: f64 = 0.05;
 
