@@ -92,5 +92,8 @@
       "rationale": null
     }
   ],
-  "notes": "Synthetic source-to-mapping integrity fixture. Source files contain no clinical treatment content. This is not a clinical guideline, not a real protocol compiler, and not evidence of clinical correctness."
+  "notes": "Synthetic source-to-mapping integrity fixture. Source files contain no clinical treatment content. This is not a clinical guideline, not a real protocol compiler, and not evidence of clinical correctness.",
+  "oracle_fixture_path": "docs/research/first-aid/fixtures/change-impact-independent-oracle-v0.json",
+  "oracle_fixture_sha256": "28ebb0721856de30088c40dc0aab385078c5b5e7401646ecae8285f29dbe5bef",
+  "oracle_class": "separate_synthetic_expected_outcomes"
 }
