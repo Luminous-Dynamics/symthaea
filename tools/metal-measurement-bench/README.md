@@ -35,7 +35,7 @@ For a normalized observation set:
 
     cargo run --manifest-path tools/metal-measurement-bench/Cargo.toml -- validate-records MANIFEST.json OBSERVATIONS.json ARTIFACT_DIR
 
-The `inspect-zip` command inventories safe member paths, compressed/uncompressed sizes, CRC-32 metadata and directory flags from a verified archive without extracting members. It rejects absolute/traversal/backslash paths, symlinks, duplicate names, case-colliding paths and archives with more than 100,000 members. The receipt is bound to the exact outer archive SHA-256. Member CRC-32 values are not cryptographic per-file digests, and this inventory is not a license decision or a semantic data parse.
+The `inspect-zip` command inventories safe member paths, compressed/uncompressed sizes, CRC-32 metadata and directory flags from a verified archive without extracting members. It rejects absolute/traversal/backslash paths, repeated or dot path components, Windows-reserved or normalization-ambiguous names, symlinks, duplicate names, case-colliding paths and archives with more than 100,000 members. The receipt is bound to the exact outer archive SHA-256. Member CRC-32 values are not cryptographic per-file digests, and this inventory is not a license decision or a semantic data parse.
 
 Machine-readable contracts:
 - `tools/metal-measurement-bench/schemas/measurement-manifest-v0.1.schema.json`
