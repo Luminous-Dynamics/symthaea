@@ -11,16 +11,274 @@ const STORAGE_CAP_MM: f64 = 10.0;
 const MAX_IRRIGATION_PER_ZONE_MM: f64 = 3.5;
 const ALLOCATION_STEP_MM: f64 = 0.05;
 const BASE_DEMAND_MM: [f64; ZONES] = [2.2, 2.7, 1.8];
-const WATER_MATCHED_POLICY_NAME: &str = "water_matched_rotating_equal_share";
+pub(crate) const WATER_MATCHED_POLICY_NAME: &str = "water_matched_rotating_equal_share";
 
 #[derive(Clone, Copy)]
-struct Scenario {
-    id: &'static str,
-    daily_water_budget_plot_mm: f64,
-    drought_start_day: Option<usize>,
-    heat_start_day: Option<usize>,
-    forecast_bias: f64,
-    sensor_dropout_period: Option<usize>,
+pub(crate) struct Scenario {
+    pub(crate) id: &'static str,
+    pub(crate) daily_water_budget_plot_mm: f64,
+    pub(crate) drought_start_day: Option<usize>,
+    pub(crate) heat_start_day: Option<usize>,
+    pub(crate) forecast_bias: f64,
+    pub(crate) sensor_dropout_period: Option<usize>,
+}
+
+pub(crate) /// Fixed, deterministic extension of the CF-022 base suite for robustness sensitivity.
+pub(crate) fn robustness_scenarios() -> Vec<Scenario> {
+    let mut suite = scenarios().to_vec();
+    suite.extend([
+        Scenario {
+            id: "water_cap_only_3_5",
+            daily_water_budget_plot_mm: 3.5,
+            drought_start_day: None,
+            heat_start_day: None,
+            forecast_bias: 0.0,
+            sensor_dropout_period: None,
+        },
+        Scenario {
+            id: "water_cap_only_4_0",
+            daily_water_budget_plot_mm: 4.0,
+            drought_start_day: None,
+            heat_start_day: None,
+            forecast_bias: 0.0,
+            sensor_dropout_period: None,
+        },
+        Scenario {
+            id: "water_cap_only_5_5",
+            daily_water_budget_plot_mm: 5.5,
+            drought_start_day: None,
+            heat_start_day: None,
+            forecast_bias: 0.0,
+            sensor_dropout_period: None,
+        },
+        Scenario {
+            id: "water_cap_only_6_5",
+            daily_water_budget_plot_mm: 6.5,
+            drought_start_day: None,
+            heat_start_day: None,
+            forecast_bias: 0.0,
+            sensor_dropout_period: None,
+        },
+        Scenario {
+            id: "forecast_bias_only_negative_0_30",
+            daily_water_budget_plot_mm: 6.0,
+            drought_start_day: None,
+            heat_start_day: None,
+            forecast_bias: -0.30,
+            sensor_dropout_period: None,
+        },
+        Scenario {
+            id: "forecast_bias_only_negative_0_20",
+            daily_water_budget_plot_mm: 6.0,
+            drought_start_day: None,
+            heat_start_day: None,
+            forecast_bias: -0.20,
+            sensor_dropout_period: None,
+        },
+        Scenario {
+            id: "forecast_bias_only_positive_0_10",
+            daily_water_budget_plot_mm: 6.0,
+            drought_start_day: None,
+            heat_start_day: None,
+            forecast_bias: 0.10,
+            sensor_dropout_period: None,
+        },
+        Scenario {
+            id: "forecast_bias_only_positive_0_20",
+            daily_water_budget_plot_mm: 6.0,
+            drought_start_day: None,
+            heat_start_day: None,
+            forecast_bias: 0.20,
+            sensor_dropout_period: None,
+        },
+        Scenario {
+            id: "sensor_dropout_only_period_3",
+            daily_water_budget_plot_mm: 6.0,
+            drought_start_day: None,
+            heat_start_day: None,
+            forecast_bias: 0.0,
+            sensor_dropout_period: Some(3),
+        },
+        Scenario {
+            id: "sensor_dropout_only_period_5",
+            daily_water_budget_plot_mm: 6.0,
+            drought_start_day: None,
+            heat_start_day: None,
+            forecast_bias: 0.0,
+            sensor_dropout_period: Some(5),
+        },
+        Scenario {
+            id: "sensor_dropout_only_period_11",
+            daily_water_budget_plot_mm: 6.0,
+            drought_start_day: None,
+            heat_start_day: None,
+            forecast_bias: 0.0,
+            sensor_dropout_period: Some(11),
+        },
+        Scenario {
+            id: "drought_only_start_day_8",
+            daily_water_budget_plot_mm: 6.0,
+            drought_start_day: Some(8),
+            heat_start_day: None,
+            forecast_bias: 0.0,
+            sensor_dropout_period: None,
+        },
+        Scenario {
+            id: "drought_only_start_day_16",
+            daily_water_budget_plot_mm: 6.0,
+            drought_start_day: Some(16),
+            heat_start_day: None,
+            forecast_bias: 0.0,
+            sensor_dropout_period: None,
+        },
+        Scenario {
+            id: "drought_only_start_day_24",
+            daily_water_budget_plot_mm: 6.0,
+            drought_start_day: Some(24),
+            heat_start_day: None,
+            forecast_bias: 0.0,
+            sensor_dropout_period: None,
+        },
+        Scenario {
+            id: "heat_only_start_day_16",
+            daily_water_budget_plot_mm: 6.0,
+            drought_start_day: None,
+            heat_start_day: Some(16),
+            forecast_bias: 0.0,
+            sensor_dropout_period: None,
+        },
+        Scenario {
+            id: "heat_only_start_day_24",
+            daily_water_budget_plot_mm: 6.0,
+            drought_start_day: None,
+            heat_start_day: Some(24),
+            forecast_bias: 0.0,
+            sensor_dropout_period: None,
+        },
+        Scenario {
+            id: "heat_only_start_day_32",
+            daily_water_budget_plot_mm: 6.0,
+            drought_start_day: None,
+            heat_start_day: Some(32),
+            forecast_bias: 0.0,
+            sensor_dropout_period: None,
+        },
+        Scenario {
+            id: "heat_drought_low_water",
+            daily_water_budget_plot_mm: 4.0,
+            drought_start_day: Some(8),
+            heat_start_day: Some(16),
+            forecast_bias: 0.0,
+            sensor_dropout_period: None,
+        },
+        Scenario {
+            id: "heat_drought_severe_underforecast",
+            daily_water_budget_plot_mm: 6.0,
+            drought_start_day: Some(8),
+            heat_start_day: Some(16),
+            forecast_bias: -0.30,
+            sensor_dropout_period: None,
+        },
+        Scenario {
+            id: "heat_drought_sensor_dropout_3",
+            daily_water_budget_plot_mm: 5.0,
+            drought_start_day: Some(8),
+            heat_start_day: Some(16),
+            forecast_bias: 0.0,
+            sensor_dropout_period: Some(3),
+        },
+        Scenario {
+            id: "low_water_severe_underforecast",
+            daily_water_budget_plot_mm: 3.5,
+            drought_start_day: None,
+            heat_start_day: None,
+            forecast_bias: -0.30,
+            sensor_dropout_period: None,
+        },
+        Scenario {
+            id: "low_water_sensor_dropout_3",
+            daily_water_budget_plot_mm: 3.5,
+            drought_start_day: None,
+            heat_start_day: None,
+            forecast_bias: 0.0,
+            sensor_dropout_period: Some(3),
+        },
+        Scenario {
+            id: "compound_heat_drought_underforecast_dropout",
+            daily_water_budget_plot_mm: 4.0,
+            drought_start_day: Some(8),
+            heat_start_day: Some(16),
+            forecast_bias: -0.30,
+            sensor_dropout_period: Some(3),
+        },
+        Scenario {
+            id: "compound_late_heat_late_drought_bias_dropout",
+            daily_water_budget_plot_mm: 4.5,
+            drought_start_day: Some(24),
+            heat_start_day: Some(32),
+            forecast_bias: -0.20,
+            sensor_dropout_period: Some(5),
+        },
+    ]);
+    suite
+}
+
+/// Re-simulate each fixed scenario for the same five policies and the dose-matched comparator.
+pub(crate) fn simulate_policy_suite(all_scenarios: &[Scenario]) -> Result<Vec<ScenarioResult>> {
+    if all_scenarios.is_empty() {
+        return Err(anyhow!("scenario suite must contain at least one scenario"));
+    }
+    let mut ids = std::collections::BTreeSet::new();
+    if all_scenarios.iter().any(|scenario| !ids.insert(scenario.id)) {
+        return Err(anyhow!("scenario suite contains duplicate scenario IDs"));
+    }
+    let mut results = Vec::with_capacity(all_scenarios.len() * 5);
+    for scenario in all_scenarios.iter().copied() {
+        let (equal_share_result, _) = simulate_one(scenario, Policy::EqualShareCalendar, None);
+        let (soil_threshold_result, _) = simulate_one(scenario, Policy::SoilThreshold, None);
+        let (risk_result, risk_trace) = simulate_one(scenario, Policy::UncertaintyAware, None);
+        let (minimax_result, _) = simulate_one(scenario, Policy::GreedyMinimaxStress, None);
+        let (matched_result, matched_trace) = simulate_one(
+            scenario,
+            Policy::EqualShareCalendar,
+            Some(&risk_trace),
+        );
+        if (risk_result.total_irrigation_applied_plot_mm
+            - matched_result.total_irrigation_applied_plot_mm)
+            .abs()
+            > 1e-3
+            || risk_trace
+                .iter()
+                .zip(matched_trace)
+                .any(|(risk, matched)| (risk - matched).abs() > 1e-8)
+        {
+            return Err(anyhow!(
+                "dose-matched counterfactual mismatch for scenario {}",
+                scenario.id
+            ));
+        }
+        results.extend([
+            equal_share_result,
+            soil_threshold_result,
+            risk_result,
+            minimax_result,
+            matched_result,
+        ]);
+    }
+    let water_violations = results
+        .iter()
+        .map(|result| result.water_budget_violation_days)
+        .sum::<usize>();
+    let plot_violations = results
+        .iter()
+        .map(|result| result.per_plot_limit_violation_days)
+        .sum::<usize>();
+    if water_violations != 0 || plot_violations != 0 {
+        return Err(anyhow!(
+            "scenario suite has {water_violations} water-budget violations and {plot_violations} per-plot limit violations"
+        ));
+    }
+    Ok(results)
 }
 
 fn scenarios() -> [Scenario; 6] {
@@ -76,7 +334,7 @@ fn scenarios() -> [Scenario; 6] {
     ]
 }
 #[derive(Clone, Copy)]
-enum Policy {
+pub(crate) enum Policy {
     EqualShareCalendar,
     SoilThreshold,
     UncertaintyAware,
@@ -84,7 +342,7 @@ enum Policy {
 }
 
 impl Policy {
-    fn name(self) -> &'static str {
+    pub(crate) fn name(self) -> &'static str {
         match self {
             Self::EqualShareCalendar => "equal_share_calendar",
             Self::SoilThreshold => "soil_threshold",
@@ -376,7 +634,7 @@ fn matched_uniform_allocation(daily_total_mm: f64, day: usize) -> [f64; ZONES] {
     allocation
 }
 
-fn simulate_one(
+pub(crate) fn simulate_one(
     scenario: Scenario,
     policy: Policy,
     matched_daily_totals: Option<&[f64; DAYS]>,
