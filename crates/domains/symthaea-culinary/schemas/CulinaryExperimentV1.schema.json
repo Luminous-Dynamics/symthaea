@@ -257,7 +257,8 @@
         "block_id",
         "randomization_seed",
         "randomized_order",
-        "runs"
+        "runs",
+        "randomization_method"
       ],
       "properties": {
         "block_id": {
@@ -284,6 +285,10 @@
           "items": {
             "$ref": "#/$defs/run"
           }
+        },
+        "randomization_method": {
+          "type": "string",
+          "minLength": 1
         }
       }
     }
