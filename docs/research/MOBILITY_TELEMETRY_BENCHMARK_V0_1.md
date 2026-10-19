@@ -61,9 +61,11 @@ Do not select a generic force, grip or temperature accuracy threshold without sp
 
 A physical claim is blocked unless the manifest uses one of the exact v0.1 synchronization methods (`gnss_pps_verified`, `hardware_timestamp_verified`, `ptp_verified`, or `shared_clock_verified`), declares a content-addressed `clock_sync_record` artifact, and states maximum alignment uncertainty at or below 2 ms. Artifact byte length and SHA-256 are checked for recorded/closed sessions. Free-form labels containing the word `verified` do not count. This is a conservative v0.1 engineering gate, not a universal tolerance; tighter claim-specific limits may be needed.
 
+Physical eligibility also requires a claim-specific uncertainty budget (measurand and unit, standard uncertainty, expanded uncertainty, coverage factor, acceptance tolerance, evidence state and a content-addressed `uncertainty_budget_record`). The budget must be bench-characterized or independently reviewed and its expanded uncertainty must not exceed tolerance. A syntactically valid calibration receipt by itself is not enough. This follows the metrology principle that uncertainty contributes along the calibration chain and fitness for purpose is a separate requirement ([NIST policy](https://www.nist.gov/calibrations/traceability)).
+
 ## Fault injection matrix and conformance
 
-The machine-readable matrix lists 24 required positive and negative controls, including a new control that tries to pass an unrecognized clock method whose label merely says `verified`. Include positive controls so a validator that rejects everything does not pass. At minimum, exercise:
+The machine-readable matrix lists 26 required positive and negative controls, including clock-method spoofing, missing claim-specific uncertainty budgets, and an expanded-uncertainty value that exceeds its pre-registered tolerance. Include positive controls so a validator that rejects everything does not pass. At minimum, exercise:
 - malformed or reordered headers, empty traces and unknown channels/statuses;
 - VALID samples with missing values, non-finite numbers, sequence gaps, timestamp regression and repeated timestamps for a channel;
 - repeated timestamps across different channels where simultaneous sampling is permitted;
