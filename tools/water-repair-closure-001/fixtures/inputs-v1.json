@@ -1,0 +1,1877 @@
+{
+  "schema_version": "water-repair-closure-001-inputs-v1",
+  "qualification_status": "NotRun",
+  "claim_ceiling": "SyntheticFieldRepairLifecycleOnly",
+  "cases": [
+    {
+      "case_id": "WR-01",
+      "profile": "non_potable_module",
+      "profile_requirements_reviewed": true,
+      "asset_id": "synthetic-wr-01-asset",
+      "configuration_id": "synthetic-wr-01-configuration-v1",
+      "event": {
+        "event_id": "event-WR-01",
+        "content_sha256": "57522d3031000000000000000000000000000000000000000000000000000000",
+        "delivered_copies": 1,
+        "content_conflict": false
+      },
+      "authorization_state": "valid",
+      "as_found": {
+        "present": true,
+        "asset_matches": true,
+        "kind": "Observed",
+        "current": true,
+        "instrument_qualified": true,
+        "unit_status": "valid",
+        "within_window": true,
+        "passed": true,
+        "uncertainty": "bounded_acceptable",
+        "conflicting": false
+      },
+      "as_left": {
+        "present": true,
+        "asset_matches": true,
+        "kind": "Observed",
+        "current": true,
+        "instrument_qualified": true,
+        "unit_status": "valid",
+        "within_window": true,
+        "passed": true,
+        "uncertainty": "bounded_acceptable",
+        "conflicting": false
+      },
+      "component": {
+        "required": true,
+        "identity_known": true,
+        "compatible": true,
+        "qualified": true,
+        "reconditioned": false,
+        "requalified": true
+      },
+      "media": {
+        "required": true,
+        "identity_known": true,
+        "current": true
+      },
+      "commissioning": {
+        "required": true,
+        "complete": true
+      },
+      "water_quality": {
+        "required": false,
+        "clearance_present": true,
+        "passed": true
+      },
+      "redundancy": {
+        "independence_claimed": false,
+        "independent_failure_domain_evidenced": false,
+        "common_mode_present": false
+      },
+      "residual": {
+        "required": true,
+        "disposition_known": true,
+        "recovery_claimed": false,
+        "recovery_qualified": false,
+        "input_mass_g": 1000,
+        "recovered_mass_g": 0
+      },
+      "service_outcome": {
+        "required": false,
+        "observed": true,
+        "model_digest_matches": true,
+        "time_aligned": true,
+        "protected_floor_met": true
+      },
+      "privacy": {
+        "public_projection_requested": false,
+        "location_restricted": false,
+        "access_policy_allows": true
+      }
+    },
+    {
+      "case_id": "WR-02",
+      "profile": "municipal_distribution",
+      "profile_requirements_reviewed": true,
+      "asset_id": "synthetic-wr-02-asset",
+      "configuration_id": "synthetic-wr-02-configuration-v1",
+      "event": {
+        "event_id": "event-WR-02",
+        "content_sha256": "57522d3032000000000000000000000000000000000000000000000000000000",
+        "delivered_copies": 1,
+        "content_conflict": false
+      },
+      "authorization_state": "valid",
+      "as_found": {
+        "present": true,
+        "asset_matches": true,
+        "kind": "Observed",
+        "current": true,
+        "instrument_qualified": true,
+        "unit_status": "valid",
+        "within_window": true,
+        "passed": true,
+        "uncertainty": "bounded_acceptable",
+        "conflicting": false
+      },
+      "as_left": {
+        "present": true,
+        "asset_matches": true,
+        "kind": "Observed",
+        "current": true,
+        "instrument_qualified": true,
+        "unit_status": "valid",
+        "within_window": true,
+        "passed": true,
+        "uncertainty": "bounded_acceptable",
+        "conflicting": false
+      },
+      "component": {
+        "required": true,
+        "identity_known": true,
+        "compatible": true,
+        "qualified": true,
+        "reconditioned": false,
+        "requalified": true
+      },
+      "media": {
+        "required": false,
+        "identity_known": true,
+        "current": true
+      },
+      "commissioning": {
+        "required": true,
+        "complete": true
+      },
+      "water_quality": {
+        "required": false,
+        "clearance_present": true,
+        "passed": true
+      },
+      "redundancy": {
+        "independence_claimed": false,
+        "independent_failure_domain_evidenced": false,
+        "common_mode_present": false
+      },
+      "residual": {
+        "required": true,
+        "disposition_known": true,
+        "recovery_claimed": false,
+        "recovery_qualified": false,
+        "input_mass_g": 1000,
+        "recovered_mass_g": 0
+      },
+      "service_outcome": {
+        "required": true,
+        "observed": true,
+        "model_digest_matches": true,
+        "time_aligned": true,
+        "protected_floor_met": true
+      },
+      "privacy": {
+        "public_projection_requested": false,
+        "location_restricted": false,
+        "access_policy_allows": true
+      }
+    },
+    {
+      "case_id": "WR-03",
+      "profile": "non_potable_module",
+      "profile_requirements_reviewed": true,
+      "asset_id": "synthetic-wr-03-asset",
+      "configuration_id": "synthetic-wr-03-configuration-v1",
+      "event": {
+        "event_id": "event-WR-03",
+        "content_sha256": "57522d3033000000000000000000000000000000000000000000000000000000",
+        "delivered_copies": 1,
+        "content_conflict": false
+      },
+      "authorization_state": "valid",
+      "as_found": {
+        "present": true,
+        "asset_matches": true,
+        "kind": "Observed",
+        "current": true,
+        "instrument_qualified": true,
+        "unit_status": "valid",
+        "within_window": true,
+        "passed": true,
+        "uncertainty": "bounded_acceptable",
+        "conflicting": false
+      },
+      "as_left": {
+        "present": false,
+        "asset_matches": true,
+        "kind": "Observed",
+        "current": true,
+        "instrument_qualified": true,
+        "unit_status": "valid",
+        "within_window": true,
+        "passed": true,
+        "uncertainty": "bounded_acceptable",
+        "conflicting": false
+      },
+      "component": {
+        "required": true,
+        "identity_known": true,
+        "compatible": true,
+        "qualified": true,
+        "reconditioned": false,
+        "requalified": true
+      },
+      "media": {
+        "required": true,
+        "identity_known": true,
+        "current": true
+      },
+      "commissioning": {
+        "required": true,
+        "complete": true
+      },
+      "water_quality": {
+        "required": false,
+        "clearance_present": true,
+        "passed": true
+      },
+      "redundancy": {
+        "independence_claimed": false,
+        "independent_failure_domain_evidenced": false,
+        "common_mode_present": false
+      },
+      "residual": {
+        "required": true,
+        "disposition_known": true,
+        "recovery_claimed": false,
+        "recovery_qualified": false,
+        "input_mass_g": 1000,
+        "recovered_mass_g": 0
+      },
+      "service_outcome": {
+        "required": false,
+        "observed": true,
+        "model_digest_matches": true,
+        "time_aligned": true,
+        "protected_floor_met": true
+      },
+      "privacy": {
+        "public_projection_requested": false,
+        "location_restricted": false,
+        "access_policy_allows": true
+      }
+    },
+    {
+      "case_id": "WR-04",
+      "profile": "non_potable_module",
+      "profile_requirements_reviewed": true,
+      "asset_id": "synthetic-wr-04-asset",
+      "configuration_id": "synthetic-wr-04-configuration-v1",
+      "event": {
+        "event_id": "event-WR-04",
+        "content_sha256": "57522d3034000000000000000000000000000000000000000000000000000000",
+        "delivered_copies": 2,
+        "content_conflict": false
+      },
+      "authorization_state": "valid",
+      "as_found": {
+        "present": true,
+        "asset_matches": true,
+        "kind": "Observed",
+        "current": true,
+        "instrument_qualified": true,
+        "unit_status": "valid",
+        "within_window": true,
+        "passed": true,
+        "uncertainty": "bounded_acceptable",
+        "conflicting": false
+      },
+      "as_left": {
+        "present": true,
+        "asset_matches": true,
+        "kind": "Observed",
+        "current": true,
+        "instrument_qualified": true,
+        "unit_status": "valid",
+        "within_window": true,
+        "passed": true,
+        "uncertainty": "bounded_acceptable",
+        "conflicting": false
+      },
+      "component": {
+        "required": true,
+        "identity_known": true,
+        "compatible": true,
+        "qualified": true,
+        "reconditioned": false,
+        "requalified": true
+      },
+      "media": {
+        "required": true,
+        "identity_known": true,
+        "current": true
+      },
+      "commissioning": {
+        "required": true,
+        "complete": true
+      },
+      "water_quality": {
+        "required": false,
+        "clearance_present": true,
+        "passed": true
+      },
+      "redundancy": {
+        "independence_claimed": false,
+        "independent_failure_domain_evidenced": false,
+        "common_mode_present": false
+      },
+      "residual": {
+        "required": true,
+        "disposition_known": true,
+        "recovery_claimed": false,
+        "recovery_qualified": false,
+        "input_mass_g": 1000,
+        "recovered_mass_g": 0
+      },
+      "service_outcome": {
+        "required": false,
+        "observed": true,
+        "model_digest_matches": true,
+        "time_aligned": true,
+        "protected_floor_met": true
+      },
+      "privacy": {
+        "public_projection_requested": false,
+        "location_restricted": false,
+        "access_policy_allows": true
+      }
+    },
+    {
+      "case_id": "WR-05",
+      "profile": "non_potable_module",
+      "profile_requirements_reviewed": true,
+      "asset_id": "synthetic-wr-05-asset",
+      "configuration_id": "synthetic-wr-05-configuration-v1",
+      "event": {
+        "event_id": "event-WR-05",
+        "content_sha256": "57522d3035000000000000000000000000000000000000000000000000000000",
+        "delivered_copies": 1,
+        "content_conflict": true
+      },
+      "authorization_state": "valid",
+      "as_found": {
+        "present": true,
+        "asset_matches": true,
+        "kind": "Observed",
+        "current": true,
+        "instrument_qualified": true,
+        "unit_status": "valid",
+        "within_window": true,
+        "passed": true,
+        "uncertainty": "bounded_acceptable",
+        "conflicting": false
+      },
+      "as_left": {
+        "present": true,
+        "asset_matches": true,
+        "kind": "Observed",
+        "current": true,
+        "instrument_qualified": true,
+        "unit_status": "valid",
+        "within_window": true,
+        "passed": true,
+        "uncertainty": "bounded_acceptable",
+        "conflicting": false
+      },
+      "component": {
+        "required": true,
+        "identity_known": true,
+        "compatible": true,
+        "qualified": true,
+        "reconditioned": false,
+        "requalified": true
+      },
+      "media": {
+        "required": true,
+        "identity_known": true,
+        "current": true
+      },
+      "commissioning": {
+        "required": true,
+        "complete": true
+      },
+      "water_quality": {
+        "required": false,
+        "clearance_present": true,
+        "passed": true
+      },
+      "redundancy": {
+        "independence_claimed": false,
+        "independent_failure_domain_evidenced": false,
+        "common_mode_present": false
+      },
+      "residual": {
+        "required": true,
+        "disposition_known": true,
+        "recovery_claimed": false,
+        "recovery_qualified": false,
+        "input_mass_g": 1000,
+        "recovered_mass_g": 0
+      },
+      "service_outcome": {
+        "required": false,
+        "observed": true,
+        "model_digest_matches": true,
+        "time_aligned": true,
+        "protected_floor_met": true
+      },
+      "privacy": {
+        "public_projection_requested": false,
+        "location_restricted": false,
+        "access_policy_allows": true
+      }
+    },
+    {
+      "case_id": "WR-06",
+      "profile": "non_potable_module",
+      "profile_requirements_reviewed": true,
+      "asset_id": "synthetic-wr-06-asset",
+      "configuration_id": "synthetic-wr-06-configuration-v1",
+      "event": {
+        "event_id": "event-WR-06",
+        "content_sha256": "57522d3036000000000000000000000000000000000000000000000000000000",
+        "delivered_copies": 1,
+        "content_conflict": false
+      },
+      "authorization_state": "valid",
+      "as_found": {
+        "present": true,
+        "asset_matches": true,
+        "kind": "Observed",
+        "current": true,
+        "instrument_qualified": true,
+        "unit_status": "valid",
+        "within_window": true,
+        "passed": true,
+        "uncertainty": "bounded_acceptable",
+        "conflicting": false
+      },
+      "as_left": {
+        "present": true,
+        "asset_matches": false,
+        "kind": "Observed",
+        "current": true,
+        "instrument_qualified": true,
+        "unit_status": "valid",
+        "within_window": true,
+        "passed": true,
+        "uncertainty": "bounded_acceptable",
+        "conflicting": false
+      },
+      "component": {
+        "required": true,
+        "identity_known": true,
+        "compatible": true,
+        "qualified": true,
+        "reconditioned": false,
+        "requalified": true
+      },
+      "media": {
+        "required": true,
+        "identity_known": true,
+        "current": true
+      },
+      "commissioning": {
+        "required": true,
+        "complete": true
+      },
+      "water_quality": {
+        "required": false,
+        "clearance_present": true,
+        "passed": true
+      },
+      "redundancy": {
+        "independence_claimed": false,
+        "independent_failure_domain_evidenced": false,
+        "common_mode_present": false
+      },
+      "residual": {
+        "required": true,
+        "disposition_known": true,
+        "recovery_claimed": false,
+        "recovery_qualified": false,
+        "input_mass_g": 1000,
+        "recovered_mass_g": 0
+      },
+      "service_outcome": {
+        "required": false,
+        "observed": true,
+        "model_digest_matches": true,
+        "time_aligned": true,
+        "protected_floor_met": true
+      },
+      "privacy": {
+        "public_projection_requested": false,
+        "location_restricted": false,
+        "access_policy_allows": true
+      }
+    },
+    {
+      "case_id": "WR-07",
+      "profile": "non_potable_module",
+      "profile_requirements_reviewed": true,
+      "asset_id": "synthetic-wr-07-asset",
+      "configuration_id": "synthetic-wr-07-configuration-v1",
+      "event": {
+        "event_id": "event-WR-07",
+        "content_sha256": "57522d3037000000000000000000000000000000000000000000000000000000",
+        "delivered_copies": 1,
+        "content_conflict": false
+      },
+      "authorization_state": "valid",
+      "as_found": {
+        "present": true,
+        "asset_matches": true,
+        "kind": "Observed",
+        "current": true,
+        "instrument_qualified": true,
+        "unit_status": "valid",
+        "within_window": true,
+        "passed": true,
+        "uncertainty": "bounded_acceptable",
+        "conflicting": false
+      },
+      "as_left": {
+        "present": true,
+        "asset_matches": true,
+        "kind": "Observed",
+        "current": false,
+        "instrument_qualified": false,
+        "unit_status": "valid",
+        "within_window": true,
+        "passed": true,
+        "uncertainty": "bounded_acceptable",
+        "conflicting": false
+      },
+      "component": {
+        "required": true,
+        "identity_known": true,
+        "compatible": true,
+        "qualified": true,
+        "reconditioned": false,
+        "requalified": true
+      },
+      "media": {
+        "required": true,
+        "identity_known": true,
+        "current": true
+      },
+      "commissioning": {
+        "required": true,
+        "complete": true
+      },
+      "water_quality": {
+        "required": false,
+        "clearance_present": true,
+        "passed": true
+      },
+      "redundancy": {
+        "independence_claimed": false,
+        "independent_failure_domain_evidenced": false,
+        "common_mode_present": false
+      },
+      "residual": {
+        "required": true,
+        "disposition_known": true,
+        "recovery_claimed": false,
+        "recovery_qualified": false,
+        "input_mass_g": 1000,
+        "recovered_mass_g": 0
+      },
+      "service_outcome": {
+        "required": false,
+        "observed": true,
+        "model_digest_matches": true,
+        "time_aligned": true,
+        "protected_floor_met": true
+      },
+      "privacy": {
+        "public_projection_requested": false,
+        "location_restricted": false,
+        "access_policy_allows": true
+      }
+    },
+    {
+      "case_id": "WR-08",
+      "profile": "municipal_distribution",
+      "profile_requirements_reviewed": true,
+      "asset_id": "synthetic-wr-08-asset",
+      "configuration_id": "synthetic-wr-08-configuration-v1",
+      "event": {
+        "event_id": "event-WR-08",
+        "content_sha256": "57522d3038000000000000000000000000000000000000000000000000000000",
+        "delivered_copies": 1,
+        "content_conflict": false
+      },
+      "authorization_state": "valid",
+      "as_found": {
+        "present": true,
+        "asset_matches": true,
+        "kind": "Observed",
+        "current": true,
+        "instrument_qualified": true,
+        "unit_status": "valid",
+        "within_window": true,
+        "passed": true,
+        "uncertainty": "bounded_acceptable",
+        "conflicting": false
+      },
+      "as_left": {
+        "present": true,
+        "asset_matches": true,
+        "kind": "Simulated",
+        "current": true,
+        "instrument_qualified": true,
+        "unit_status": "valid",
+        "within_window": true,
+        "passed": true,
+        "uncertainty": "bounded_acceptable",
+        "conflicting": false
+      },
+      "component": {
+        "required": true,
+        "identity_known": true,
+        "compatible": true,
+        "qualified": true,
+        "reconditioned": false,
+        "requalified": true
+      },
+      "media": {
+        "required": false,
+        "identity_known": true,
+        "current": true
+      },
+      "commissioning": {
+        "required": true,
+        "complete": true
+      },
+      "water_quality": {
+        "required": false,
+        "clearance_present": true,
+        "passed": true
+      },
+      "redundancy": {
+        "independence_claimed": false,
+        "independent_failure_domain_evidenced": false,
+        "common_mode_present": false
+      },
+      "residual": {
+        "required": true,
+        "disposition_known": true,
+        "recovery_claimed": false,
+        "recovery_qualified": false,
+        "input_mass_g": 1000,
+        "recovered_mass_g": 0
+      },
+      "service_outcome": {
+        "required": true,
+        "observed": true,
+        "model_digest_matches": true,
+        "time_aligned": true,
+        "protected_floor_met": true
+      },
+      "privacy": {
+        "public_projection_requested": false,
+        "location_restricted": false,
+        "access_policy_allows": true
+      }
+    },
+    {
+      "case_id": "WR-09",
+      "profile": "building_plumbing",
+      "profile_requirements_reviewed": false,
+      "asset_id": "synthetic-wr-09-asset",
+      "configuration_id": "synthetic-wr-09-configuration-v1",
+      "event": {
+        "event_id": "event-WR-09",
+        "content_sha256": "57522d3039000000000000000000000000000000000000000000000000000000",
+        "delivered_copies": 1,
+        "content_conflict": false
+      },
+      "authorization_state": "valid",
+      "as_found": {
+        "present": true,
+        "asset_matches": true,
+        "kind": "Observed",
+        "current": true,
+        "instrument_qualified": true,
+        "unit_status": "valid",
+        "within_window": true,
+        "passed": true,
+        "uncertainty": "bounded_acceptable",
+        "conflicting": false
+      },
+      "as_left": {
+        "present": true,
+        "asset_matches": true,
+        "kind": "Observed",
+        "current": true,
+        "instrument_qualified": true,
+        "unit_status": "missing",
+        "within_window": true,
+        "passed": true,
+        "uncertainty": "bounded_acceptable",
+        "conflicting": false
+      },
+      "component": {
+        "required": true,
+        "identity_known": true,
+        "compatible": true,
+        "qualified": true,
+        "reconditioned": false,
+        "requalified": true
+      },
+      "media": {
+        "required": false,
+        "identity_known": true,
+        "current": true
+      },
+      "commissioning": {
+        "required": true,
+        "complete": true
+      },
+      "water_quality": {
+        "required": false,
+        "clearance_present": true,
+        "passed": true
+      },
+      "redundancy": {
+        "independence_claimed": false,
+        "independent_failure_domain_evidenced": false,
+        "common_mode_present": false
+      },
+      "residual": {
+        "required": true,
+        "disposition_known": true,
+        "recovery_claimed": false,
+        "recovery_qualified": false,
+        "input_mass_g": 1000,
+        "recovered_mass_g": 0
+      },
+      "service_outcome": {
+        "required": false,
+        "observed": true,
+        "model_digest_matches": true,
+        "time_aligned": true,
+        "protected_floor_met": true
+      },
+      "privacy": {
+        "public_projection_requested": false,
+        "location_restricted": false,
+        "access_policy_allows": true
+      }
+    },
+    {
+      "case_id": "WR-10",
+      "profile": "building_plumbing",
+      "profile_requirements_reviewed": false,
+      "asset_id": "synthetic-wr-10-asset",
+      "configuration_id": "synthetic-wr-10-configuration-v1",
+      "event": {
+        "event_id": "event-WR-10",
+        "content_sha256": "57522d3130000000000000000000000000000000000000000000000000000000",
+        "delivered_copies": 1,
+        "content_conflict": false
+      },
+      "authorization_state": "valid",
+      "as_found": {
+        "present": true,
+        "asset_matches": true,
+        "kind": "Observed",
+        "current": true,
+        "instrument_qualified": true,
+        "unit_status": "valid",
+        "within_window": true,
+        "passed": true,
+        "uncertainty": "bounded_acceptable",
+        "conflicting": false
+      },
+      "as_left": {
+        "present": true,
+        "asset_matches": true,
+        "kind": "Observed",
+        "current": true,
+        "instrument_qualified": true,
+        "unit_status": "conversion_invalid",
+        "within_window": true,
+        "passed": true,
+        "uncertainty": "bounded_acceptable",
+        "conflicting": false
+      },
+      "component": {
+        "required": true,
+        "identity_known": true,
+        "compatible": true,
+        "qualified": true,
+        "reconditioned": false,
+        "requalified": true
+      },
+      "media": {
+        "required": false,
+        "identity_known": true,
+        "current": true
+      },
+      "commissioning": {
+        "required": true,
+        "complete": true
+      },
+      "water_quality": {
+        "required": false,
+        "clearance_present": true,
+        "passed": true
+      },
+      "redundancy": {
+        "independence_claimed": false,
+        "independent_failure_domain_evidenced": false,
+        "common_mode_present": false
+      },
+      "residual": {
+        "required": true,
+        "disposition_known": true,
+        "recovery_claimed": false,
+        "recovery_qualified": false,
+        "input_mass_g": 1000,
+        "recovered_mass_g": 0
+      },
+      "service_outcome": {
+        "required": false,
+        "observed": true,
+        "model_digest_matches": true,
+        "time_aligned": true,
+        "protected_floor_met": true
+      },
+      "privacy": {
+        "public_projection_requested": false,
+        "location_restricted": false,
+        "access_policy_allows": true
+      }
+    },
+    {
+      "case_id": "WR-11",
+      "profile": "building_plumbing",
+      "profile_requirements_reviewed": false,
+      "asset_id": "synthetic-wr-11-asset",
+      "configuration_id": "synthetic-wr-11-configuration-v1",
+      "event": {
+        "event_id": "event-WR-11",
+        "content_sha256": "57522d3131000000000000000000000000000000000000000000000000000000",
+        "delivered_copies": 1,
+        "content_conflict": false
+      },
+      "authorization_state": "valid",
+      "as_found": {
+        "present": true,
+        "asset_matches": true,
+        "kind": "Observed",
+        "current": true,
+        "instrument_qualified": true,
+        "unit_status": "valid",
+        "within_window": true,
+        "passed": true,
+        "uncertainty": "bounded_acceptable",
+        "conflicting": false
+      },
+      "as_left": {
+        "present": true,
+        "asset_matches": true,
+        "kind": "Observed",
+        "current": true,
+        "instrument_qualified": true,
+        "unit_status": "valid",
+        "within_window": true,
+        "passed": true,
+        "uncertainty": "bounded_acceptable",
+        "conflicting": false
+      },
+      "component": {
+        "required": true,
+        "identity_known": true,
+        "compatible": true,
+        "qualified": true,
+        "reconditioned": false,
+        "requalified": true
+      },
+      "media": {
+        "required": false,
+        "identity_known": true,
+        "current": true
+      },
+      "commissioning": {
+        "required": true,
+        "complete": true
+      },
+      "water_quality": {
+        "required": true,
+        "clearance_present": false,
+        "passed": false
+      },
+      "redundancy": {
+        "independence_claimed": false,
+        "independent_failure_domain_evidenced": false,
+        "common_mode_present": false
+      },
+      "residual": {
+        "required": true,
+        "disposition_known": true,
+        "recovery_claimed": false,
+        "recovery_qualified": false,
+        "input_mass_g": 1000,
+        "recovered_mass_g": 0
+      },
+      "service_outcome": {
+        "required": false,
+        "observed": true,
+        "model_digest_matches": true,
+        "time_aligned": true,
+        "protected_floor_met": true
+      },
+      "privacy": {
+        "public_projection_requested": false,
+        "location_restricted": false,
+        "access_policy_allows": true
+      }
+    },
+    {
+      "case_id": "WR-12",
+      "profile": "non_potable_module",
+      "profile_requirements_reviewed": true,
+      "asset_id": "synthetic-wr-12-asset",
+      "configuration_id": "synthetic-wr-12-configuration-v1",
+      "event": {
+        "event_id": "event-WR-12",
+        "content_sha256": "57522d3132000000000000000000000000000000000000000000000000000000",
+        "delivered_copies": 1,
+        "content_conflict": false
+      },
+      "authorization_state": "valid",
+      "as_found": {
+        "present": true,
+        "asset_matches": true,
+        "kind": "Observed",
+        "current": true,
+        "instrument_qualified": true,
+        "unit_status": "valid",
+        "within_window": true,
+        "passed": true,
+        "uncertainty": "bounded_acceptable",
+        "conflicting": false
+      },
+      "as_left": {
+        "present": true,
+        "asset_matches": true,
+        "kind": "Observed",
+        "current": true,
+        "instrument_qualified": true,
+        "unit_status": "valid",
+        "within_window": true,
+        "passed": true,
+        "uncertainty": "bounded_acceptable",
+        "conflicting": false
+      },
+      "component": {
+        "required": true,
+        "identity_known": true,
+        "compatible": true,
+        "qualified": true,
+        "reconditioned": false,
+        "requalified": true
+      },
+      "media": {
+        "required": true,
+        "identity_known": false,
+        "current": false
+      },
+      "commissioning": {
+        "required": true,
+        "complete": true
+      },
+      "water_quality": {
+        "required": false,
+        "clearance_present": true,
+        "passed": true
+      },
+      "redundancy": {
+        "independence_claimed": false,
+        "independent_failure_domain_evidenced": false,
+        "common_mode_present": false
+      },
+      "residual": {
+        "required": true,
+        "disposition_known": true,
+        "recovery_claimed": false,
+        "recovery_qualified": false,
+        "input_mass_g": 1000,
+        "recovered_mass_g": 0
+      },
+      "service_outcome": {
+        "required": false,
+        "observed": true,
+        "model_digest_matches": true,
+        "time_aligned": true,
+        "protected_floor_met": true
+      },
+      "privacy": {
+        "public_projection_requested": false,
+        "location_restricted": false,
+        "access_policy_allows": true
+      }
+    },
+    {
+      "case_id": "WR-13",
+      "profile": "non_potable_module",
+      "profile_requirements_reviewed": true,
+      "asset_id": "synthetic-wr-13-asset",
+      "configuration_id": "synthetic-wr-13-configuration-v1",
+      "event": {
+        "event_id": "event-WR-13",
+        "content_sha256": "57522d3133000000000000000000000000000000000000000000000000000000",
+        "delivered_copies": 1,
+        "content_conflict": false
+      },
+      "authorization_state": "valid",
+      "as_found": {
+        "present": true,
+        "asset_matches": true,
+        "kind": "Observed",
+        "current": true,
+        "instrument_qualified": true,
+        "unit_status": "valid",
+        "within_window": true,
+        "passed": true,
+        "uncertainty": "bounded_acceptable",
+        "conflicting": false
+      },
+      "as_left": {
+        "present": true,
+        "asset_matches": true,
+        "kind": "Observed",
+        "current": true,
+        "instrument_qualified": true,
+        "unit_status": "valid",
+        "within_window": true,
+        "passed": true,
+        "uncertainty": "bounded_acceptable",
+        "conflicting": false
+      },
+      "component": {
+        "required": true,
+        "identity_known": true,
+        "compatible": false,
+        "qualified": false,
+        "reconditioned": false,
+        "requalified": true
+      },
+      "media": {
+        "required": true,
+        "identity_known": true,
+        "current": true
+      },
+      "commissioning": {
+        "required": true,
+        "complete": true
+      },
+      "water_quality": {
+        "required": false,
+        "clearance_present": true,
+        "passed": true
+      },
+      "redundancy": {
+        "independence_claimed": false,
+        "independent_failure_domain_evidenced": false,
+        "common_mode_present": false
+      },
+      "residual": {
+        "required": true,
+        "disposition_known": true,
+        "recovery_claimed": false,
+        "recovery_qualified": false,
+        "input_mass_g": 1000,
+        "recovered_mass_g": 0
+      },
+      "service_outcome": {
+        "required": false,
+        "observed": true,
+        "model_digest_matches": true,
+        "time_aligned": true,
+        "protected_floor_met": true
+      },
+      "privacy": {
+        "public_projection_requested": false,
+        "location_restricted": false,
+        "access_policy_allows": true
+      }
+    },
+    {
+      "case_id": "WR-14",
+      "profile": "municipal_distribution",
+      "profile_requirements_reviewed": true,
+      "asset_id": "synthetic-wr-14-asset",
+      "configuration_id": "synthetic-wr-14-configuration-v1",
+      "event": {
+        "event_id": "event-WR-14",
+        "content_sha256": "57522d3134000000000000000000000000000000000000000000000000000000",
+        "delivered_copies": 1,
+        "content_conflict": false
+      },
+      "authorization_state": "valid",
+      "as_found": {
+        "present": true,
+        "asset_matches": true,
+        "kind": "Observed",
+        "current": true,
+        "instrument_qualified": true,
+        "unit_status": "valid",
+        "within_window": true,
+        "passed": true,
+        "uncertainty": "bounded_acceptable",
+        "conflicting": false
+      },
+      "as_left": {
+        "present": true,
+        "asset_matches": true,
+        "kind": "Observed",
+        "current": true,
+        "instrument_qualified": true,
+        "unit_status": "valid",
+        "within_window": true,
+        "passed": true,
+        "uncertainty": "bounded_acceptable",
+        "conflicting": false
+      },
+      "component": {
+        "required": true,
+        "identity_known": true,
+        "compatible": true,
+        "qualified": true,
+        "reconditioned": true,
+        "requalified": false
+      },
+      "media": {
+        "required": false,
+        "identity_known": true,
+        "current": true
+      },
+      "commissioning": {
+        "required": true,
+        "complete": true
+      },
+      "water_quality": {
+        "required": false,
+        "clearance_present": true,
+        "passed": true
+      },
+      "redundancy": {
+        "independence_claimed": false,
+        "independent_failure_domain_evidenced": false,
+        "common_mode_present": false
+      },
+      "residual": {
+        "required": true,
+        "disposition_known": true,
+        "recovery_claimed": false,
+        "recovery_qualified": false,
+        "input_mass_g": 1000,
+        "recovered_mass_g": 0
+      },
+      "service_outcome": {
+        "required": true,
+        "observed": true,
+        "model_digest_matches": true,
+        "time_aligned": true,
+        "protected_floor_met": true
+      },
+      "privacy": {
+        "public_projection_requested": false,
+        "location_restricted": false,
+        "access_policy_allows": true
+      }
+    },
+    {
+      "case_id": "WR-15",
+      "profile": "municipal_distribution",
+      "profile_requirements_reviewed": true,
+      "asset_id": "synthetic-wr-15-asset",
+      "configuration_id": "synthetic-wr-15-configuration-v1",
+      "event": {
+        "event_id": "event-WR-15",
+        "content_sha256": "57522d3135000000000000000000000000000000000000000000000000000000",
+        "delivered_copies": 1,
+        "content_conflict": false
+      },
+      "authorization_state": "valid",
+      "as_found": {
+        "present": true,
+        "asset_matches": true,
+        "kind": "Observed",
+        "current": true,
+        "instrument_qualified": true,
+        "unit_status": "valid",
+        "within_window": true,
+        "passed": true,
+        "uncertainty": "bounded_acceptable",
+        "conflicting": false
+      },
+      "as_left": {
+        "present": true,
+        "asset_matches": true,
+        "kind": "Observed",
+        "current": true,
+        "instrument_qualified": true,
+        "unit_status": "valid",
+        "within_window": true,
+        "passed": true,
+        "uncertainty": "bounded_acceptable",
+        "conflicting": false
+      },
+      "component": {
+        "required": true,
+        "identity_known": true,
+        "compatible": true,
+        "qualified": true,
+        "reconditioned": false,
+        "requalified": true
+      },
+      "media": {
+        "required": false,
+        "identity_known": true,
+        "current": true
+      },
+      "commissioning": {
+        "required": true,
+        "complete": false
+      },
+      "water_quality": {
+        "required": false,
+        "clearance_present": true,
+        "passed": true
+      },
+      "redundancy": {
+        "independence_claimed": false,
+        "independent_failure_domain_evidenced": false,
+        "common_mode_present": false
+      },
+      "residual": {
+        "required": true,
+        "disposition_known": true,
+        "recovery_claimed": false,
+        "recovery_qualified": false,
+        "input_mass_g": 1000,
+        "recovered_mass_g": 0
+      },
+      "service_outcome": {
+        "required": true,
+        "observed": true,
+        "model_digest_matches": true,
+        "time_aligned": true,
+        "protected_floor_met": true
+      },
+      "privacy": {
+        "public_projection_requested": false,
+        "location_restricted": false,
+        "access_policy_allows": true
+      }
+    },
+    {
+      "case_id": "WR-16",
+      "profile": "municipal_distribution",
+      "profile_requirements_reviewed": true,
+      "asset_id": "synthetic-wr-16-asset",
+      "configuration_id": "synthetic-wr-16-configuration-v1",
+      "event": {
+        "event_id": "event-WR-16",
+        "content_sha256": "57522d3136000000000000000000000000000000000000000000000000000000",
+        "delivered_copies": 1,
+        "content_conflict": false
+      },
+      "authorization_state": "valid",
+      "as_found": {
+        "present": true,
+        "asset_matches": true,
+        "kind": "Observed",
+        "current": true,
+        "instrument_qualified": true,
+        "unit_status": "valid",
+        "within_window": true,
+        "passed": true,
+        "uncertainty": "bounded_acceptable",
+        "conflicting": false
+      },
+      "as_left": {
+        "present": true,
+        "asset_matches": true,
+        "kind": "Observed",
+        "current": true,
+        "instrument_qualified": true,
+        "unit_status": "valid",
+        "within_window": true,
+        "passed": true,
+        "uncertainty": "bounded_acceptable",
+        "conflicting": false
+      },
+      "component": {
+        "required": true,
+        "identity_known": true,
+        "compatible": true,
+        "qualified": true,
+        "reconditioned": false,
+        "requalified": true
+      },
+      "media": {
+        "required": false,
+        "identity_known": true,
+        "current": true
+      },
+      "commissioning": {
+        "required": true,
+        "complete": true
+      },
+      "water_quality": {
+        "required": false,
+        "clearance_present": true,
+        "passed": true
+      },
+      "redundancy": {
+        "independence_claimed": true,
+        "independent_failure_domain_evidenced": false,
+        "common_mode_present": true
+      },
+      "residual": {
+        "required": true,
+        "disposition_known": true,
+        "recovery_claimed": false,
+        "recovery_qualified": false,
+        "input_mass_g": 1000,
+        "recovered_mass_g": 0
+      },
+      "service_outcome": {
+        "required": true,
+        "observed": true,
+        "model_digest_matches": true,
+        "time_aligned": true,
+        "protected_floor_met": true
+      },
+      "privacy": {
+        "public_projection_requested": false,
+        "location_restricted": false,
+        "access_policy_allows": true
+      }
+    },
+    {
+      "case_id": "WR-17",
+      "profile": "non_potable_module",
+      "profile_requirements_reviewed": true,
+      "asset_id": "synthetic-wr-17-asset",
+      "configuration_id": "synthetic-wr-17-configuration-v1",
+      "event": {
+        "event_id": "event-WR-17",
+        "content_sha256": "57522d3137000000000000000000000000000000000000000000000000000000",
+        "delivered_copies": 1,
+        "content_conflict": false
+      },
+      "authorization_state": "valid",
+      "as_found": {
+        "present": true,
+        "asset_matches": true,
+        "kind": "Observed",
+        "current": true,
+        "instrument_qualified": true,
+        "unit_status": "valid",
+        "within_window": true,
+        "passed": true,
+        "uncertainty": "bounded_acceptable",
+        "conflicting": false
+      },
+      "as_left": {
+        "present": true,
+        "asset_matches": true,
+        "kind": "Observed",
+        "current": true,
+        "instrument_qualified": true,
+        "unit_status": "valid",
+        "within_window": true,
+        "passed": true,
+        "uncertainty": "bounded_acceptable",
+        "conflicting": false
+      },
+      "component": {
+        "required": true,
+        "identity_known": true,
+        "compatible": true,
+        "qualified": true,
+        "reconditioned": false,
+        "requalified": true
+      },
+      "media": {
+        "required": true,
+        "identity_known": true,
+        "current": true
+      },
+      "commissioning": {
+        "required": true,
+        "complete": true
+      },
+      "water_quality": {
+        "required": false,
+        "clearance_present": true,
+        "passed": true
+      },
+      "redundancy": {
+        "independence_claimed": false,
+        "independent_failure_domain_evidenced": false,
+        "common_mode_present": false
+      },
+      "residual": {
+        "required": true,
+        "disposition_known": false,
+        "recovery_claimed": false,
+        "recovery_qualified": false,
+        "input_mass_g": 1000,
+        "recovered_mass_g": 0
+      },
+      "service_outcome": {
+        "required": false,
+        "observed": true,
+        "model_digest_matches": true,
+        "time_aligned": true,
+        "protected_floor_met": true
+      },
+      "privacy": {
+        "public_projection_requested": false,
+        "location_restricted": false,
+        "access_policy_allows": true
+      }
+    },
+    {
+      "case_id": "WR-18",
+      "profile": "building_plumbing",
+      "profile_requirements_reviewed": false,
+      "asset_id": "synthetic-wr-18-asset",
+      "configuration_id": "synthetic-wr-18-configuration-v1",
+      "event": {
+        "event_id": "event-WR-18",
+        "content_sha256": "57522d3138000000000000000000000000000000000000000000000000000000",
+        "delivered_copies": 1,
+        "content_conflict": false
+      },
+      "authorization_state": "missing",
+      "as_found": {
+        "present": true,
+        "asset_matches": true,
+        "kind": "Observed",
+        "current": true,
+        "instrument_qualified": true,
+        "unit_status": "valid",
+        "within_window": true,
+        "passed": true,
+        "uncertainty": "bounded_acceptable",
+        "conflicting": false
+      },
+      "as_left": {
+        "present": true,
+        "asset_matches": true,
+        "kind": "Observed",
+        "current": true,
+        "instrument_qualified": true,
+        "unit_status": "valid",
+        "within_window": true,
+        "passed": true,
+        "uncertainty": "bounded_acceptable",
+        "conflicting": false
+      },
+      "component": {
+        "required": true,
+        "identity_known": true,
+        "compatible": true,
+        "qualified": true,
+        "reconditioned": false,
+        "requalified": true
+      },
+      "media": {
+        "required": false,
+        "identity_known": true,
+        "current": true
+      },
+      "commissioning": {
+        "required": true,
+        "complete": true
+      },
+      "water_quality": {
+        "required": false,
+        "clearance_present": true,
+        "passed": true
+      },
+      "redundancy": {
+        "independence_claimed": false,
+        "independent_failure_domain_evidenced": false,
+        "common_mode_present": false
+      },
+      "residual": {
+        "required": true,
+        "disposition_known": true,
+        "recovery_claimed": false,
+        "recovery_qualified": false,
+        "input_mass_g": 1000,
+        "recovered_mass_g": 0
+      },
+      "service_outcome": {
+        "required": false,
+        "observed": true,
+        "model_digest_matches": true,
+        "time_aligned": true,
+        "protected_floor_met": true
+      },
+      "privacy": {
+        "public_projection_requested": false,
+        "location_restricted": false,
+        "access_policy_allows": true
+      }
+    },
+    {
+      "case_id": "WR-19",
+      "profile": "building_plumbing",
+      "profile_requirements_reviewed": false,
+      "asset_id": "synthetic-wr-19-asset",
+      "configuration_id": "synthetic-wr-19-configuration-v1",
+      "event": {
+        "event_id": "event-WR-19",
+        "content_sha256": "57522d3139000000000000000000000000000000000000000000000000000000",
+        "delivered_copies": 1,
+        "content_conflict": false
+      },
+      "authorization_state": "expired",
+      "as_found": {
+        "present": true,
+        "asset_matches": true,
+        "kind": "Observed",
+        "current": true,
+        "instrument_qualified": true,
+        "unit_status": "valid",
+        "within_window": true,
+        "passed": true,
+        "uncertainty": "bounded_acceptable",
+        "conflicting": false
+      },
+      "as_left": {
+        "present": true,
+        "asset_matches": true,
+        "kind": "Observed",
+        "current": true,
+        "instrument_qualified": true,
+        "unit_status": "valid",
+        "within_window": true,
+        "passed": true,
+        "uncertainty": "bounded_acceptable",
+        "conflicting": false
+      },
+      "component": {
+        "required": true,
+        "identity_known": true,
+        "compatible": true,
+        "qualified": true,
+        "reconditioned": false,
+        "requalified": true
+      },
+      "media": {
+        "required": false,
+        "identity_known": true,
+        "current": true
+      },
+      "commissioning": {
+        "required": true,
+        "complete": true
+      },
+      "water_quality": {
+        "required": false,
+        "clearance_present": true,
+        "passed": true
+      },
+      "redundancy": {
+        "independence_claimed": false,
+        "independent_failure_domain_evidenced": false,
+        "common_mode_present": false
+      },
+      "residual": {
+        "required": true,
+        "disposition_known": true,
+        "recovery_claimed": false,
+        "recovery_qualified": false,
+        "input_mass_g": 1000,
+        "recovered_mass_g": 0
+      },
+      "service_outcome": {
+        "required": false,
+        "observed": true,
+        "model_digest_matches": true,
+        "time_aligned": true,
+        "protected_floor_met": true
+      },
+      "privacy": {
+        "public_projection_requested": false,
+        "location_restricted": false,
+        "access_policy_allows": true
+      }
+    },
+    {
+      "case_id": "WR-20",
+      "profile": "municipal_distribution",
+      "profile_requirements_reviewed": true,
+      "asset_id": "synthetic-wr-20-asset",
+      "configuration_id": "synthetic-wr-20-configuration-v1",
+      "event": {
+        "event_id": "event-WR-20",
+        "content_sha256": "57522d3230000000000000000000000000000000000000000000000000000000",
+        "delivered_copies": 1,
+        "content_conflict": false
+      },
+      "authorization_state": "valid",
+      "as_found": {
+        "present": true,
+        "asset_matches": true,
+        "kind": "Observed",
+        "current": true,
+        "instrument_qualified": true,
+        "unit_status": "valid",
+        "within_window": true,
+        "passed": true,
+        "uncertainty": "bounded_acceptable",
+        "conflicting": false
+      },
+      "as_left": {
+        "present": true,
+        "asset_matches": true,
+        "kind": "Observed",
+        "current": true,
+        "instrument_qualified": true,
+        "unit_status": "valid",
+        "within_window": true,
+        "passed": true,
+        "uncertainty": "bounded_acceptable",
+        "conflicting": false
+      },
+      "component": {
+        "required": true,
+        "identity_known": true,
+        "compatible": true,
+        "qualified": true,
+        "reconditioned": false,
+        "requalified": true
+      },
+      "media": {
+        "required": false,
+        "identity_known": true,
+        "current": true
+      },
+      "commissioning": {
+        "required": true,
+        "complete": true
+      },
+      "water_quality": {
+        "required": false,
+        "clearance_present": true,
+        "passed": true
+      },
+      "redundancy": {
+        "independence_claimed": false,
+        "independent_failure_domain_evidenced": false,
+        "common_mode_present": false
+      },
+      "residual": {
+        "required": true,
+        "disposition_known": true,
+        "recovery_claimed": false,
+        "recovery_qualified": false,
+        "input_mass_g": 1000,
+        "recovered_mass_g": 0
+      },
+      "service_outcome": {
+        "required": true,
+        "observed": true,
+        "model_digest_matches": true,
+        "time_aligned": false,
+        "protected_floor_met": true
+      },
+      "privacy": {
+        "public_projection_requested": false,
+        "location_restricted": false,
+        "access_policy_allows": true
+      }
+    },
+    {
+      "case_id": "WR-21",
+      "profile": "building_plumbing",
+      "profile_requirements_reviewed": false,
+      "asset_id": "synthetic-wr-21-asset",
+      "configuration_id": "synthetic-wr-21-configuration-v1",
+      "event": {
+        "event_id": "event-WR-21",
+        "content_sha256": "57522d3231000000000000000000000000000000000000000000000000000000",
+        "delivered_copies": 1,
+        "content_conflict": false
+      },
+      "authorization_state": "valid",
+      "as_found": {
+        "present": true,
+        "asset_matches": true,
+        "kind": "Observed",
+        "current": true,
+        "instrument_qualified": true,
+        "unit_status": "valid",
+        "within_window": true,
+        "passed": true,
+        "uncertainty": "bounded_acceptable",
+        "conflicting": false
+      },
+      "as_left": {
+        "present": true,
+        "asset_matches": true,
+        "kind": "Observed",
+        "current": true,
+        "instrument_qualified": true,
+        "unit_status": "valid",
+        "within_window": true,
+        "passed": true,
+        "uncertainty": "bounded_acceptable",
+        "conflicting": false
+      },
+      "component": {
+        "required": true,
+        "identity_known": true,
+        "compatible": true,
+        "qualified": true,
+        "reconditioned": false,
+        "requalified": true
+      },
+      "media": {
+        "required": false,
+        "identity_known": true,
+        "current": true
+      },
+      "commissioning": {
+        "required": true,
+        "complete": true
+      },
+      "water_quality": {
+        "required": false,
+        "clearance_present": true,
+        "passed": true
+      },
+      "redundancy": {
+        "independence_claimed": false,
+        "independent_failure_domain_evidenced": false,
+        "common_mode_present": false
+      },
+      "residual": {
+        "required": true,
+        "disposition_known": true,
+        "recovery_claimed": false,
+        "recovery_qualified": false,
+        "input_mass_g": 1000,
+        "recovered_mass_g": 0
+      },
+      "service_outcome": {
+        "required": false,
+        "observed": true,
+        "model_digest_matches": true,
+        "time_aligned": true,
+        "protected_floor_met": true
+      },
+      "privacy": {
+        "public_projection_requested": true,
+        "location_restricted": true,
+        "access_policy_allows": false
+      }
+    },
+    {
+      "case_id": "WR-22",
+      "profile": "non_potable_module",
+      "profile_requirements_reviewed": true,
+      "asset_id": "synthetic-wr-22-asset",
+      "configuration_id": "synthetic-wr-22-configuration-v1",
+      "event": {
+        "event_id": "event-WR-22",
+        "content_sha256": "57522d3232000000000000000000000000000000000000000000000000000000",
+        "delivered_copies": 1,
+        "content_conflict": false
+      },
+      "authorization_state": "valid",
+      "as_found": {
+        "present": true,
+        "asset_matches": true,
+        "kind": "Observed",
+        "current": true,
+        "instrument_qualified": true,
+        "unit_status": "valid",
+        "within_window": true,
+        "passed": true,
+        "uncertainty": "bounded_acceptable",
+        "conflicting": false
+      },
+      "as_left": {
+        "present": true,
+        "asset_matches": true,
+        "kind": "Observed",
+        "current": true,
+        "instrument_qualified": true,
+        "unit_status": "valid",
+        "within_window": true,
+        "passed": true,
+        "uncertainty": "bounded_acceptable",
+        "conflicting": true
+      },
+      "component": {
+        "required": true,
+        "identity_known": true,
+        "compatible": true,
+        "qualified": true,
+        "reconditioned": false,
+        "requalified": true
+      },
+      "media": {
+        "required": true,
+        "identity_known": true,
+        "current": true
+      },
+      "commissioning": {
+        "required": true,
+        "complete": true
+      },
+      "water_quality": {
+        "required": false,
+        "clearance_present": true,
+        "passed": true
+      },
+      "redundancy": {
+        "independence_claimed": false,
+        "independent_failure_domain_evidenced": false,
+        "common_mode_present": false
+      },
+      "residual": {
+        "required": true,
+        "disposition_known": true,
+        "recovery_claimed": false,
+        "recovery_qualified": false,
+        "input_mass_g": 1000,
+        "recovered_mass_g": 0
+      },
+      "service_outcome": {
+        "required": false,
+        "observed": true,
+        "model_digest_matches": true,
+        "time_aligned": true,
+        "protected_floor_met": true
+      },
+      "privacy": {
+        "public_projection_requested": false,
+        "location_restricted": false,
+        "access_policy_allows": true
+      }
+    }
+  ]
+}
