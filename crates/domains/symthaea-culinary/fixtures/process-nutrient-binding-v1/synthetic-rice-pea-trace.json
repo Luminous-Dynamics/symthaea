@@ -1,0 +1,139 @@
+{
+  "schema_version": "1.0.0",
+  "trace_id": "synthetic-rice-pea-process-trace-v1",
+  "process_id": "synthetic-boil-with-water-v1",
+  "batch_basis": "single_batch",
+  "mass_unit": "g",
+  "food_state_start": "raw",
+  "food_state_end": "cooked",
+  "boundary_inventory_status": "claimed_complete",
+  "boundary_inventory_evidence": {
+    "source_ref": "urn:synthetic:boundary:rice-pea",
+    "source_version": "paired-fixture-v1",
+    "known_at": "2026-10-19T00:00:00Z",
+    "evidence_status": "synthetic"
+  },
+  "steps": [
+    {
+      "step_id": "boil",
+      "operation": "heat",
+      "input_stream_ids": [
+        "rice-input",
+        "peas-input",
+        "boiling-water"
+      ],
+      "output_stream_ids": [
+        "cooked-meal",
+        "evaporated-water"
+      ],
+      "evidence": {
+        "source_ref": "urn:synthetic:step:boil",
+        "source_version": "paired-fixture-v1",
+        "known_at": "2026-10-19T00:00:00Z",
+        "evidence_status": "synthetic"
+      }
+    }
+  ],
+  "streams": [
+    {
+      "stream_id": "rice-input",
+      "material_class": "ingredient",
+      "disposition": "consumed",
+      "from_step_id": "external",
+      "to_step_id": "boil",
+      "mass_g": {
+        "status": "estimated",
+        "value": 150,
+        "lower": 148,
+        "upper": 152,
+        "unit": "g"
+      },
+      "evidence": {
+        "source_ref": "urn:synthetic:mass:rice",
+        "source_version": "illustrative-v1",
+        "known_at": "2026-10-18T00:00:00Z",
+        "evidence_status": "synthetic"
+      }
+    },
+    {
+      "stream_id": "peas-input",
+      "material_class": "ingredient",
+      "disposition": "consumed",
+      "from_step_id": "external",
+      "to_step_id": "boil",
+      "mass_g": {
+        "status": "estimated",
+        "value": 50,
+        "lower": 49,
+        "upper": 51,
+        "unit": "g"
+      },
+      "evidence": {
+        "source_ref": "urn:synthetic:mass:peas",
+        "source_version": "illustrative-v1",
+        "known_at": "2026-10-18T00:00:00Z",
+        "evidence_status": "synthetic"
+      }
+    },
+    {
+      "stream_id": "boiling-water",
+      "material_class": "added_water",
+      "disposition": "consumed",
+      "from_step_id": "external",
+      "to_step_id": "boil",
+      "mass_g": {
+        "status": "estimated",
+        "value": 80,
+        "lower": 78,
+        "upper": 82,
+        "unit": "g"
+      },
+      "evidence": {
+        "source_ref": "urn:synthetic:mass:boiling-water",
+        "source_version": "paired-fixture-v1",
+        "known_at": "2026-10-19T00:00:00Z",
+        "evidence_status": "synthetic"
+      }
+    },
+    {
+      "stream_id": "cooked-meal",
+      "material_class": "edible_product",
+      "disposition": "retained",
+      "from_step_id": "boil",
+      "to_step_id": "external",
+      "mass_g": {
+        "status": "measured",
+        "value": 260,
+        "lower": 258,
+        "upper": 262,
+        "unit": "g"
+      },
+      "evidence": {
+        "source_ref": "urn:synthetic:mass:cooked-meal",
+        "source_version": "paired-fixture-v1",
+        "known_at": "2026-10-19T00:00:00Z",
+        "evidence_status": "synthetic"
+      }
+    },
+    {
+      "stream_id": "evaporated-water",
+      "material_class": "evaporated_water",
+      "disposition": "evaporated",
+      "from_step_id": "boil",
+      "to_step_id": "external",
+      "mass_g": {
+        "status": "estimated",
+        "value": 20,
+        "lower": 18,
+        "upper": 22,
+        "unit": "g"
+      },
+      "evidence": {
+        "source_ref": "urn:synthetic:mass:evaporated-water",
+        "source_version": "paired-fixture-v1",
+        "known_at": "2026-10-19T00:00:00Z",
+        "evidence_status": "synthetic"
+      }
+    }
+  ]
+}
