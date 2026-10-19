@@ -1085,8 +1085,7 @@ mod tests {
             aggregate.max_worst_zone_stress_exposure_proxy
                 >= aggregate.median_worst_zone_stress_exposure_proxy
                 && aggregate.total_per_plot_limit_violation_days == 0
-                && aggregate.worst_to_best_ratio_defined_scenario_count
-                    <= aggregate.scenario_count
+                && aggregate.worst_to_best_ratio_defined_scenario_count <= aggregate.scenario_count
                 && (aggregate.mean_worst_to_best_zone_stress_ratio.is_some()
                     == (aggregate.worst_to_best_ratio_defined_scenario_count > 0))
         }));
