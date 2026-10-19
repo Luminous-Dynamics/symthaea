@@ -60,6 +60,18 @@ The [NIST Measurement Process Characterization handbook](https://www.itl.nist.go
 
 The [ICDM Information Display Measurements Standard](https://www.sid.org/Standards/ICDM/ICDM) provides display measurement procedures but does not set universal performance/compliance thresholds. A selected measurement method and project-specific acceptance criteria still need to be recorded separately.
 
+## Reproducing the synthetic example
+
+The exact synthetic plan is [display-drift-control-plan-v0.1.json](display-drift-control-plan-v0.1.json), governed by [display-drift-control-plan.schema.json](display-drift-control-plan.schema.json). Run:
+
+    cargo run --manifest-path tools/open-display-platform-verify/Cargo.toml -- \
+      --drift-plan docs/engineering/display-drift-control-plan-v0.1.json \
+      --drift-schema docs/engineering/display-drift-control-plan.schema.json
+
+The scenario has acceptable controls at 10 and 80 elapsed seconds, and an out-of-band control at 50. Its 60-second DUT observation is quarantined; observations at 5 and 90 seconds are not bracketed by the failure interval. These are synthetic known-answer values, not a recommendation for control cadence or an empirical drift rate.
+
+The focused workflow retains the run-specific CAD/receipt bundle separately; its optional drift output is in the standard verifier JSON report and has this same synthetic-only claim ceiling.
+
 ## Test status boundary
 
 The Rust unit tests use synthetic values and verify the deterministic behavior of this screening function. They do not show that a real sensor drifts, that a given cadence will detect real drift, that the guard half-width is appropriate, or that any physical display measurement is accurate. No physical control artifact, instrument or display was selected for this software-only increment.
