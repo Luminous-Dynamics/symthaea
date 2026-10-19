@@ -376,7 +376,7 @@ fn run_selection(
     let required: BTreeSet<String> = plan.required_coverage.iter().cloned().collect();
     while !required.is_subset(&covered) {
         let uncovered: BTreeSet<String> = required.difference(&covered).cloned().collect();
-        let mut eligible: Vec<(&ExperimentCandidate, usize, f64)> = plan
+        let mut eligible: Vec<(&ExperimentCandidate, usize, f64, f64)> = plan
             .candidates
             .iter()
             .filter(|candidate| candidate.kind == ExperimentKind::Exploratory)
