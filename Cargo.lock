@@ -18600,6 +18600,7 @@ dependencies = [
  "symthaea-fep",
  "symthaea-organic-chemistry",
  "symthaea-thermofluids",
+ "sha2",
 ]
 
 [[package]]
