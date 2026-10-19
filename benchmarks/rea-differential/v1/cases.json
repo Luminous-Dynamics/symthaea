@@ -17,7 +17,7 @@
       "expected_files": [
         {
           "path": "payload.txt",
-          "utf8": "REA known-answer payload 001\n",
+          "utf8": "Unblob semantic-projection fixture v1: inert known-answer text.\n",
           "logical_id": "payload-001"
         }
       ],
@@ -331,6 +331,32 @@
         "map-decompressed-child-to-false-root-offset",
         "swap-parent-edge",
         "lose-transform-kind"
+      ]
+    },
+    {
+      "case_id": "nested-gzip-tar-mutation-014",
+      "family": "content-mutation-controls",
+      "recipe": "gzip(tar(payload.txt)) with the payload bytes deliberately changed",
+      "supported_baseline": true,
+      "expected_files": [
+        {
+          "path": "payload.txt",
+          "utf8": "Unblob semantic-projection fixture v2: inert known-answer text.\n",
+          "logical_id": "payload-001-mutated"
+        }
+      ],
+      "required_region_kinds": [
+        "gzip-container",
+        "tar-container"
+      ],
+      "accounting_classes": [
+        "identified",
+        "padding"
+      ],
+      "mutations": [
+        "reuse-baseline-payload-digest",
+        "false-equivalence-to-baseline",
+        "wrong-mutated-parent-transform"
       ]
     }
   ]
