@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/engineering/display-measurement-geometry.schema.json",
+  "title": "ODRH geometric measurement footprint screen",
+  "description": "Synthetic or design-stage ideal-geometry screen only; not an optical or physical qualification.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "record_id",
+    "record_state",
+    "claim_ceiling",
+    "physical_validation",
+    "geometry"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "const": "https://json-schema.org/draft/2020-12/schema"
+    },
+    "schema_version": {
+      "type": "string",
+      "const": "0.1.0"
+    },
+    "record_id": {
+      "type": "string",
+      "const": "GEOM-SYNTH-001"
+    },
+    "record_state": {
+      "type": "string",
+      "const": "SYNTHETIC_DESIGN_SCREEN_ONLY"
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "const": "GEOMETRIC_SETUP_SCREEN_ONLY_NOT_PHYSICAL_QUALIFICATION"
+    },
+    "physical_validation": {
+      "type": "string",
+      "const": "NOT_PERFORMED"
+    },
+    "geometry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "distance_mm",
+        "horizontal_fov_deg",
+        "vertical_fov_deg",
+        "distance_standard_uncertainty_mm",
+        "horizontal_fov_standard_uncertainty_deg",
+        "vertical_fov_standard_uncertainty_deg",
+        "coverage_factor",
+        "uniform_patch_width_mm",
+        "uniform_patch_height_mm",
+        "centering_uncertainty_mm",
+        "edge_guard_mm"
+      ],
+      "properties": {
+        "distance_mm": {"type": "number", "exclusiveMinimum": 0},
+        "horizontal_fov_deg": {"type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 179},
+        "vertical_fov_deg": {"type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 179},
+        "distance_standard_uncertainty_mm": {"type": "number", "minimum": 0},
+        "horizontal_fov_standard_uncertainty_deg": {"type": "number", "minimum": 0},
+        "vertical_fov_standard_uncertainty_deg": {"type": "number", "minimum": 0},
+        "coverage_factor": {"type": "number", "exclusiveMinimum": 0},
+        "uniform_patch_width_mm": {"type": "number", "exclusiveMinimum": 0},
+        "uniform_patch_height_mm": {"type": "number", "exclusiveMinimum": 0},
+        "centering_uncertainty_mm": {"type": "number", "minimum": 0},
+        "edge_guard_mm": {"type": "number", "minimum": 0}
+      }
+    }
+  }
+}
