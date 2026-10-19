@@ -75,7 +75,7 @@ The official [ITTC benchmark repository](https://www.ittc.info/benchmark-reposit
 
 ## Held-out validation scorecard by condition and observable
 
-The `validation_scorecard` module compares predictions against a frozen matrix of required operating-case × observable slices. Each profile fixes the dataset-manifest digest, model/configuration digest, minimum count per slice, normalization scale, maximum normalized RMSE and maximum normalized pointwise error. Scales and tolerances are domain/profile inputs, not hard-coded marine constants and not chosen after seeing candidate scores.
+The `validation_scorecard` module compares predictions against a frozen matrix of required operating-case × observable slices. Each profile fixes the dataset-manifest digest, model/configuration digest, minimum count per slice, normalization scale, maximum normalized RMSE and maximum normalized pointwise error. Scales and tolerances are domain/profile inputs, not hard-coded marine constants and not chosen after seeing candidate scores. The acceptance profile itself carries a canonical SHA-256 digest over its dataset/model identities, complete slice matrix, minimum counts, normalization scales and thresholds. Stale digests are invalidated when a threshold changes; equivalent slice ordering yields the same digest.
 
 Each slice reports signed bias, mean absolute error, RMSE, maximum absolute error, normalized RMSE and maximum normalized absolute error. No global average is used to hide a failed condition. Missing cases yield `IncompleteCoverage`; malformed or mismatched observations yield `InvalidObservations`; failed thresholds yield `FailDeclaredThresholds`.
 
