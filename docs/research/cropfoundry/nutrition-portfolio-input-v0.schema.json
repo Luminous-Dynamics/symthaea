@@ -10,7 +10,8 @@
     "portfolio_id",
     "comparison_basis",
     "expected_nutrient_ids",
-    "options"
+    "options",
+    "comparison_basis_evidence_uri"
   ],
   "properties": {
     "schema_version": {
@@ -57,6 +58,11 @@
           }
         }
       }
+    },
+    "comparison_basis_evidence_uri": {
+      "type": "string",
+      "minLength": 1,
+      "description": "URI to a preregistered study protocol, allocation/comparison definition, or other evidence supporting that options share the stated comparison basis."
     }
   }
 }
