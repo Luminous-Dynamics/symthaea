@@ -29,6 +29,16 @@ fn synthetic_case(
     }
 }
 
+fn disposition_code(disposition: ComparisonDisposition) -> &'static str {
+    match disposition {
+        ComparisonDisposition::RobustSavingWithinDeclaredBounds => "ROBUST_SAVING",
+        ComparisonDisposition::RobustWorseWithinDeclaredBounds => "ROBUST_WORSE",
+        ComparisonDisposition::Indeterminate => "INDETERMINATE",
+        ComparisonDisposition::Incomparable => "INCOMPARABLE",
+        ComparisonDisposition::Invalid => "INVALID",
+    }
+}
+
 fn main() {
     let baseline = synthetic_case("baseline", 1_000.0, 100.0);
     let candidate = synthetic_case("candidate", 900.0, 100.0);
@@ -46,8 +56,8 @@ fn main() {
     // Stable CSV demonstration; all values are synthetic and only test accounting.
     println!("schema,disposition,baseline_total_wh,candidate_total_wh,nominal_saving_fraction,conservative_saving_lower,conservative_saving_upper,baseline_wh_per_km,candidate_wh_per_km");
     println!(
-        "marine-energy-budget-v0,{:?},{:.3},{:.3},{:.9},{:.9},{:.9},{:.3},{:.3}",
-        report.disposition,
+        "marine-energy-budget-v0,{},{:.3},{:.3},{:.9},{:.9},{:.9},{:.3},{:.3}",
+        disposition_code(report.disposition),
         baseline_metrics.total_input_wh,
         candidate_metrics.total_input_wh,
         saving,
