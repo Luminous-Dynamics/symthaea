@@ -362,7 +362,12 @@ fn validate_contract(
         }
         let candidate_text = to
             .get(&mapping.requirement_id)
-            .with_context(|| format!("{}: mapping references no candidate requirement", mapping.requirement_id))?;
+            .with_context(|| {
+                format!(
+                    "{}: mapping references no candidate requirement",
+                    mapping.requirement_id
+                )
+            })?;
         let expected_locator = format!(
             "synthetic://{}/{}",
             contract.to_revision_id,
@@ -370,7 +375,7 @@ fn validate_contract(
         );
         if mapping.source_locator != expected_locator {
             bail!(
-                "{}: source locator does not bind to the exact candidate revision and requirement ID",
+                "{}: source locator does not bind to candidate revision and requirement ID",
                 mapping.requirement_id
             );
         }
@@ -413,7 +418,7 @@ fn validate_contract(
                 }
                 if mapping.criticality == "safety_critical" && mapping.test_ids.len() < 2 {
                     bail!(
-                        "{}: safety-critical mapping requires at least two independently identified test IDs",
+                        "{}: safety-critical mapping requires two independent test IDs",
                         mapping.requirement_id
                     );
                 }
@@ -466,7 +471,7 @@ fn validate_contract(
     let mapped_ids: HashSet<&str> = mappings.keys().copied().collect();
     if candidate_ids != mapped_ids {
         bail!(
-            "candidate source/mapping coverage mismatch: source has {} requirement IDs, mappings have {}",
+            "candidate mapping coverage mismatch: source IDs {}, mapping IDs {}",
             candidate_ids.len(),
             mapped_ids.len()
         );
@@ -523,14 +528,14 @@ fn validate_contract(
                         }
                         if mapping.criticality == "safety_critical" && record.case_ids.len() < 2 {
                             bail!(
-                                "{}: changed safety-critical requirement needs at least two impact cases",
+                                "{}: changed safety-critical requirement needs two impact cases",
                                 record.requirement_id
                             );
                         }
                         for case_id in &record.case_ids {
                             if !mapping.test_ids.contains(case_id) {
                                 bail!(
-                                    "{}: change case {case_id} is not in the requirement's test IDs",
+                                    "{}: change case {case_id} is absent from requirement test IDs",
                                     record.requirement_id
                                 );
                             }
@@ -699,7 +704,8 @@ mod tests {
         mapping.bundle_target = None;
         mapping.test_ids.clear();
         mapping.reviewer_record_id = Some("SYNTHETIC-REVIEW-EXCLUSION".to_string());
-        mapping.exclusion_rationale = Some("Excluded in this software-only fixture by design".to_string());
+        mapping.exclusion_rationale =
+            Some("Excluded in this software-only fixture by design".to_string());
 
         let record = contract
             .change_records
