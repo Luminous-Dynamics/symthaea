@@ -115,6 +115,12 @@ Freeze at least these 22 synthetic known-answer cases before implementing a prod
 
 Add property and metamorphic tests: permuting input record order must not alter the result; adding missing/invalid evidence must never improve disposition; widening measurement uncertainty must not strengthen a claim; changing the asset or source digest must break exact binding; a correction must append/supersede rather than rewrite history.
 
+
+
+### Corpus maturity / next implementation boundary
+
+The v1 JSON file is a machine-readable **case matrix**: it freezes profile, expected disposition, reason codes and required assertions. It is not yet a fully executable set of event/evidence payloads, and no implementation has computed the expected outputs. The concrete synthetic input bundles and independent Rust evaluator are tracked in [WATER-REPAIR-001A #8128](https://github.com/Luminous-Dynamics/symthaea/issues/8128). Until those inputs and evaluator exist and run on an exact revision, the corpus remains `NotRun`; no executable-benchmark or pass claim should be made.
+
 ## Acceptance gates
 
 These are engineering targets for the reference contract, not regulatory requirements or claims about a deployed utility.
