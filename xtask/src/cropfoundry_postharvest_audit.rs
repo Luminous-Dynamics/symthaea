@@ -436,7 +436,7 @@ mod tests {
     }
 
     #[test]
-    fn balanced_lot_stage_emits_a_non_authorizing_receipt() {
+    fn cropfoundry_postharvest_balanced_lot_stage_emits_a_non_authorizing_receipt() {
         let input = format!(
             "{HEADER}\nlot-1;harvest;rep-1;2026-01-01T08:00:00Z;kg;calibrated_scale;10;8;1;0.5;0.4;0.1\n"
         );
@@ -450,7 +450,7 @@ mod tests {
     }
 
     #[test]
-    fn unexplained_mass_residual_fails_closed() {
+    fn cropfoundry_postharvest_unexplained_mass_residual_fails_closed() {
         let input = format!(
             "{HEADER}\nlot-1;storage;rep-1;2026-01-02T08:00:00Z;kg;calibrated_scale;10;7;1;0.5;0.5;0.2\n"
         );
@@ -460,7 +460,7 @@ mod tests {
     }
 
     #[test]
-    fn negative_mass_is_rejected() {
+    fn cropfoundry_postharvest_negative_mass_is_rejected() {
         let input = format!(
             "{HEADER}\nlot-1;harvest;rep-1;2026-01-01;kg;scale;-1;0;0;0;0;0\n"
         );
@@ -470,7 +470,7 @@ mod tests {
     }
 
     #[test]
-    fn wrong_mass_unit_is_rejected() {
+    fn cropfoundry_postharvest_wrong_mass_unit_is_rejected() {
         let input = format!(
             "{HEADER}\nlot-1;harvest;rep-1;2026-01-01;g;scale;10000;8000;1000;500;400;100\n"
         );
@@ -480,7 +480,7 @@ mod tests {
     }
 
     #[test]
-    fn duplicate_lot_stage_replicate_time_fails_closed() {
+    fn cropfoundry_postharvest_duplicate_lot_stage_replicate_time_fails_closed() {
         let row = "lot-1;harvest;rep-1;2026-01-01;kg;scale;10;8;1;0.5;0.4;0.1";
         let input = format!("{HEADER}\n{row}\n{row}\n");
         let receipt = audit(&input);
@@ -489,7 +489,7 @@ mod tests {
     }
 
     #[test]
-    fn missing_required_column_fails_closed() {
+    fn cropfoundry_postharvest_missing_required_column_fails_closed() {
         let input = "lot_id;stage_id;input_mass_kg\nlot-1;harvest;10\n";
         let receipt = audit(&input);
         assert!(!receipt.row_checks_pass);
@@ -499,7 +499,7 @@ mod tests {
     }
 
     #[test]
-    fn wrong_external_digest_does_not_pass() {
+    fn cropfoundry_postharvest_wrong_external_digest_does_not_pass() {
         let row = "lot-1;harvest;rep-1;2026-01-01;kg;scale;10;8;1;0.5;0.4;0.1";
         let input = format!("{HEADER}\n{row}\n");
         let expected = "a".repeat(64);
@@ -519,7 +519,7 @@ mod tests {
     }
 
     #[test]
-    fn source_identity_is_preserved_not_authorized() {
+    fn cropfoundry_postharvest_source_identity_is_preserved_not_authorized() {
         let input = format!(
             "{HEADER}\nlot-1;harvest;rep-1;2026-01-01;kg;scale;10;8;1;0.5;0.4;0.1\n"
         );
