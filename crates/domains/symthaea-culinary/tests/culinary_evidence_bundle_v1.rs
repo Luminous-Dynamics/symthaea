@@ -355,3 +355,37 @@ fn duplicate_measurement_record_fields_are_rejected() {
     let error = verify_culinary_evidence_bundle_v1(&experiment,&bytes,&digest,&payloads).unwrap_err();
     assert!(error.iter().any(|item| item.contains("duplicate field")));
 }
+
+
+#[test]
+fn duplicate_artifact_ids_are_rejected() {
+    let (experiment, manifest_bytes, _, payloads) = test_only_bundle();
+    let mut manifest: Value = serde_json::from_slice(&manifest_bytes).unwrap();
+    let duplicated_id = manifest["artifacts"][1]["artifact_id"].clone();
+    manifest["artifacts"][2]["artifact_id"] = duplicated_id;
+    let bytes = serde_json::to_vec(&manifest).unwrap();
+    let digest = sha256_hex(&bytes);
+    let error = verify_culinary_evidence_bundle_v1(&experiment,&bytes,&digest,&payloads).unwrap_err();
+    assert!(error.iter().any(|item| item.contains("duplicate artifact_id")));
+}
+
+#[test]
+fn duplicate_source_references_are_rejected() {
+    let (experiment, manifest_bytes, _, payloads) = test_only_bundle();
+    let mut manifest: Value = serde_json::from_slice(&manifest_bytes).unwrap();
+    let source_ref = manifest["artifacts"][1]["source_ref"].clone();
+    manifest["artifacts"][2]["source_ref"] = source_ref;
+    let bytes = serde_json::to_vec(&manifest).unwrap();
+    let digest = sha256_hex(&bytes);
+    let error = verify_culinary_evidence_bundle_v1(&experiment,&bytes,&digest,&payloads).unwrap_err();
+    assert!(error.iter().any(|item| item.contains("duplicate artifact source_ref")));
+}
+
+#[test]
+fn unbound_outcome_source_reference_is_rejected() {
+    let (mut experiment, manifest_bytes, manifest_sha, payloads) = test_only_bundle();
+    experiment["blocks"][0]["runs"][0]["outcomes"][0]["evidence"]["source_ref"] =
+        Value::String("urn:test-evidence:absent-source".into());
+    let error = verify_culinary_evidence_bundle_v1(&experiment,&manifest_bytes,&manifest_sha,&payloads).unwrap_err();
+    assert!(error.iter().any(|item| item.contains("has no manifest artifact")));
+}
