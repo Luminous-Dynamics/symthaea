@@ -756,7 +756,8 @@ mod tests {
     #[test]
     fn duplicate_option_scenario_outcome_is_rejected() {
         let mut value = fixture();
-        value["scenario_outcomes"][1] = value["scenario_outcomes"][0].clone();
+        let first = value["scenario_outcomes"][0].clone();
+        value["scenario_outcomes"][1] = first;
         assert!(has_code(
             &validate_resilience_options(&value),
             "OUTCOME_PAIR_DUPLICATE"
@@ -797,10 +798,10 @@ mod tests {
     #[test]
     fn declared_mitigation_must_improve_both_synthetic_metrics() {
         let mut value = fixture();
-        value["scenario_outcomes"][8]["lost_accepted_unit_hours_bounds"] =
-            value["scenario_outcomes"][0]["lost_accepted_unit_hours_bounds"].clone();
-        value["scenario_outcomes"][8]["recovery_hours_bounds"] =
-            value["scenario_outcomes"][0]["recovery_hours_bounds"].clone();
+        let baseline_loss = value["scenario_outcomes"][0]["lost_accepted_unit_hours_bounds"].clone();
+        let baseline_recovery = value["scenario_outcomes"][0]["recovery_hours_bounds"].clone();
+        value["scenario_outcomes"][8]["lost_accepted_unit_hours_bounds"] = baseline_loss;
+        value["scenario_outcomes"][8]["recovery_hours_bounds"] = baseline_recovery;
         assert!(has_code(
             &validate_resilience_options(&value),
             "DECLARED_MITIGATION_NOT_REFLECTED"
