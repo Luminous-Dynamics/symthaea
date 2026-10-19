@@ -51,6 +51,7 @@
         "runId",
         "url",
         "workflow",
+        "workflowDatabaseId",
         "event",
         "ref",
         "sourceHeadSha",
@@ -72,6 +73,9 @@
         },
         "workflow": {
           "const": "REA Pinned Provider Smoke"
+        },
+        "workflowDatabaseId": {
+          "const": 389295795
         },
         "event": {
           "const": "push"
