@@ -27,7 +27,7 @@ Only eligible targets enter the Pareto relations. A failed or indeterminate targ
 
 ## Frozen synthetic corpus
 
-Fifteen cases exercise:
+Sixteen cases exercise:
 1. robustly dominated product target;
 2. attractive market/metric proxy blocked by authorization;
 3. high nominal titer with poor recovered usable output;
@@ -42,7 +42,8 @@ Fifteen cases exercise:
 12. inconsistent demand/target-volume band;
 13. missing core capacity and contribution-margin objectives (negative control);
 14. reversed functional-fit objective direction (negative control);
-15. compliant-capacity unit contradicts target-volume unit (negative control).
+15. compliant-capacity unit contradicts target-volume unit (negative control);
+16. simultaneous food-safety, product-function and process-closure failures remain non-compensatory.
 
 All data, ranges, values, digests and gate states in the corpus are invented. Pass means the encoded contract matches this frozen fixture—not that any real target is viable.
 

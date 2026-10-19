@@ -682,6 +682,31 @@ mod tests {
     }
 
     #[test]
+    fn food_safety_biology_and_process_failures_are_noncompensatory() {
+        let case = fixture()
+            .cases
+            .iter()
+            .find(|case| case.case_id == "MVP-016-hard-gate-fail-coverage")
+            .unwrap();
+        let actual = evaluate_case(case);
+        assert_eq!(actual.status, CaseStatus::Valid);
+        let blocked = actual
+            .targets
+            .iter()
+            .find(|target| target.target_id == "multiple-hard-gate-failures")
+            .unwrap();
+        assert_eq!(blocked.disposition, TargetDisposition::Blocked);
+        for reason in [
+            "food_safety_failed",
+            "biology_function_failed",
+            "process_closure_failed",
+        ] {
+            assert!(blocked.reason_codes.contains(&reason.to_owned()), "{reason}");
+        }
+        assert!(actual.pareto_frontier_ids.is_empty());
+    }
+
+    #[test]
     fn failed_authorization_cannot_be_compensated_by_metrics() {
         let case = fixture()
             .cases
