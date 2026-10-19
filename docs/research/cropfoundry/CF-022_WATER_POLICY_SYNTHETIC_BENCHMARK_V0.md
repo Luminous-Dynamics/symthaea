@@ -22,7 +22,7 @@ cargo run -q -p xtask -- cropfoundry-water-policy-demo \
 cargo test -p xtask cropfoundry_water_policy
 ```
 
-The harness runs 6 fixed scenario profiles × 3 policies × 42 time steps:
+The harness runs 6 fixed scenario profiles × 4 receipt policies × 42 time steps:
 
 - `reference`: nominal sensor/forecast assumptions and a fixed water cap.
 - `water_rationing_only`: lower water cap with the same weather, forecast and sensor settings as the reference.
@@ -38,7 +38,7 @@ Policies are:
 3. `uncertainty_aware_marginal_risk`: allocate in small increments according to estimated marginal reduction of the declared shortfall proxy. It adds a fixed conservative demand margin and raises plot priority when readings are stale; these are explicit heuristics, not statistically calibrated prediction intervals.
 4. `water_matched_rotating_equal_share`: a hindsight counterfactual that reallocates the risk-aware policy's exact daily total water uniformly across zones, rotating discrete rounding remainders. It isolates water-placement effects but is not a deployable policy.
 
-The v1 receipt records scenario parameters, per-scenario and per-zone irrigation, overflow proxy, aggregate and per-zone stress-exposure proxies, worst/best zone burden, worst-to-best ratio, cumulative allocation dispersion, percentage change against equal-share allocation, and absolute/relative stress change versus the same policy in the reference scenario, plus policy-level mean/median aggregate and worst-zone proxies and water totals. It also reports sensor-dropout fraction and daily budget violations. The executable fails if any policy exceeds a daily water cap or emits non-finite core metrics.
+The v1 receipt records scenario parameters, per-scenario and per-zone irrigation, overflow proxy, aggregate and per-zone stress-exposure proxies, worst/best zone burden, worst-to-best ratio, cumulative allocation dispersion, percentage change against equal-share, and the risk-aware policy's stress delta versus the dose-matched rotating-uniform counterfactual. It also reports absolute/relative stress change versus the same policy in the reference scenario, plus policy-level mean/median aggregate and worst-zone proxies and water totals. It also reports sensor-dropout fraction and daily budget violations. The executable fails if any policy exceeds a daily water cap or emits non-finite core metrics.
 
 
 **Unit note:** per-plot storage/demand values are synthetic depth-like values. Global irrigation totals add depths over equally weighted toy plots and are labelled `plot-mm`; without plot areas, flow rates and hydraulics, these sums are not volumetric water use and must not be compared with farm meter readings.
@@ -77,6 +77,17 @@ Keep the two comparisons separate:
 - **Dose-matched comparison:** the per-day total water is fixed to the risk-aware trace; differences in the synthetic score then come from spatial allocation, state feedback and the fixture's plot dynamics, not the total daily dose.
 
 The second counterfactual is intended to diagnose whether the risk-aware score gain comes from allocating water to particular plots rather than simply using less water. It is still possible to hide burden by sacrificing one plot, so inspect zone-level stress and distributional metrics alongside aggregate stress. No agronomic or biological claim follows from either comparison.
+
+## Acceptance tests for the matched-dose comparison
+
+The implementation must demonstrate all of the following before a receipt is considered structurally valid:
+- For every scenario, the risk-aware and water-matched records have identical **daily** irrigation totals, not just matching run totals.
+- The matched record has zero water-budget violations and respects each plot's irrigation limit.
+- The matched-uniform policy's cumulative per-plot allocation dispersion is no greater than the risk-aware policy's dispersion in the declared test scenarios; this is an algorithmic property of this deterministic fixture, not a universal farm guarantee.
+- The risk-aware record reports the stress difference relative to its matched-dose baseline; the baseline itself has no self-comparison delta.
+- Every receipt stays `synthetic_only: true`, `biological_performance_claim: false`, and `training_authorized: false`.
+
+If any invariant fails, fix the allocator or weaken the claim to match the exact invariant that is proved; do not hide the failure behind a better aggregate score.
 
 ## Per-zone safety and distributional reporting — receipt schema v1
 
