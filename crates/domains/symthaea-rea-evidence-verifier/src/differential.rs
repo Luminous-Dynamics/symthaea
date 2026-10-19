@@ -402,7 +402,9 @@ pub fn score_case(oracle: &OracleCase, observed: &Observation) -> Result<Scoreca
     let oracle_spaces = coordinate_map(&oracle.coordinate_spaces, "oracle", &mut reasons);
     let observed_spaces = coordinate_map(&observed.coordinate_spaces, "observed", &mut reasons);
     validate_coordinate_graph(&oracle_spaces, "oracle", &mut reasons);
-    validate_coordinate_graph(&observed_spaces, "observed", &mut reasons);
+    if capability_supported || !observed.coordinate_spaces.is_empty() {
+        validate_coordinate_graph(&observed_spaces, "observed", &mut reasons);
+    }
     same_root_space(&oracle.source, &oracle_spaces, "oracle", &mut reasons);
     if capability_supported {
         same_root_space(&observed.source, &observed_spaces, "observed", &mut reasons);
