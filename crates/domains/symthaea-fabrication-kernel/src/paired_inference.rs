@@ -99,15 +99,26 @@ impl fmt::Display for PairedInferenceError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::TooFewClusters { found, minimum } => {
-                write!(f, "found {found} independent clusters; need at least {minimum}")
+                write!(
+                    f,
+                    "found {found} independent clusters; need at least {minimum}"
+                )
             }
             Self::TooFewReplicates { found, minimum } => {
-                write!(f, "found {found} bootstrap replicates; need at least {minimum}")
+                write!(
+                    f,
+                    "found {found} bootstrap replicates; need at least {minimum}"
+                )
             }
             Self::InvalidConfidenceLevel => {
-                write!(f, "confidence_level must be finite and strictly between 0.5 and 1.0")
+                write!(
+                    f,
+                    "confidence_level must be finite and strictly between 0.5 and 1.0"
+                )
             }
-            Self::InvalidClusterId => write!(f, "cluster IDs must be non-empty and already trimmed"),
+            Self::InvalidClusterId => {
+                write!(f, "cluster IDs must be non-empty and already trimmed")
+            }
             Self::DuplicateCluster { cluster_id } => {
                 write!(f, "cluster ID is duplicated: {cluster_id}")
             }
@@ -115,7 +126,10 @@ impl fmt::Display for PairedInferenceError {
                 write!(f, "cluster {cluster_id} contains a non-finite outcome")
             }
             Self::NonFiniteDelta { cluster_id } => {
-                write!(f, "candidate-minus-baseline delta is non-finite for cluster {cluster_id}")
+                write!(
+                    f,
+                    "candidate-minus-baseline delta is non-finite for cluster {cluster_id}"
+                )
             }
             Self::NonFiniteStatistic => write!(f, "a statistic or bootstrap result is non-finite"),
         }
@@ -181,8 +195,8 @@ pub fn analyze_paired_clusters(
     let mean_delta = stable_mean(&deltas).ok_or(PairedInferenceError::NonFiniteStatistic)?;
     let mut sorted_deltas = deltas.clone();
     sorted_deltas.sort_by(f64::total_cmp);
-    let median_delta = percentile(&sorted_deltas, 0.5)
-        .ok_or(PairedInferenceError::NonFiniteStatistic)?;
+    let median_delta =
+        percentile(&sorted_deltas, 0.5).ok_or(PairedInferenceError::NonFiniteStatistic)?;
 
     let mut better = 0;
     let mut worse = 0;
@@ -244,16 +258,15 @@ fn stable_mean(values: &[f64]) -> Option<f64> {
     if values.is_empty() {
         return None;
     }
-    let mean = values.iter().fold(0.0, |acc, value| acc + value / values.len() as f64);
+    let mean = values
+        .iter()
+        .fold(0.0, |acc, value| acc + value / values.len() as f64);
     mean.is_finite().then_some(mean)
 }
 
 /// Linear-interpolated quantile over a non-empty, sorted finite slice.
 fn percentile(sorted: &[f64], probability: f64) -> Option<f64> {
-    if sorted.is_empty()
-        || !probability.is_finite()
-        || !(0.0..=1.0).contains(&probability)
-    {
+    if sorted.is_empty() || !probability.is_finite() || !(0.0..=1.0).contains(&probability) {
         return None;
     }
     let position = probability * (sorted.len() - 1) as f64;
@@ -311,11 +324,15 @@ mod tests {
     #[test]
     fn report_json_round_trip_is_versioned_and_deterministic() {
         let data = observations(&vec![-2.0; MIN_INDEPENDENT_CLUSTERS]);
-        let report = analyze_paired_clusters(&data, MetricDirection::LowerIsBetter, config(7)).unwrap();
+        let report =
+            analyze_paired_clusters(&data, MetricDirection::LowerIsBetter, config(7)).unwrap();
         let json = serde_json::to_string(&report).unwrap();
         let decoded: PairedBootstrapReport = serde_json::from_str(&json).unwrap();
         assert_eq!(report, decoded);
-        assert_eq!(decoded.schema_version, PAIRED_INFERENCE_REPORT_SCHEMA_VERSION);
+        assert_eq!(
+            decoded.schema_version,
+            PAIRED_INFERENCE_REPORT_SCHEMA_VERSION
+        );
         let mut observation_json = serde_json::to_value(&data[0]).unwrap();
         observation_json
             .as_object_mut()
@@ -327,13 +344,17 @@ mod tests {
     #[test]
     fn constant_improvement_has_exact_known_answer_interval() {
         let data = observations(&vec![-2.0; MIN_INDEPENDENT_CLUSTERS]);
-        let report = analyze_paired_clusters(&data, MetricDirection::LowerIsBetter, config(7)).unwrap();
+        let report =
+            analyze_paired_clusters(&data, MetricDirection::LowerIsBetter, config(7)).unwrap();
         assert_eq!(report.independent_cluster_count, MIN_INDEPENDENT_CLUSTERS);
         assert_eq!(report.mean_delta, -2.0);
         assert_eq!(report.median_delta, -2.0);
         assert_eq!(report.interval_lower, -2.0);
         assert_eq!(report.interval_upper, -2.0);
-        assert_eq!(report.candidate_better_cluster_count, MIN_INDEPENDENT_CLUSTERS);
+        assert_eq!(
+            report.candidate_better_cluster_count,
+            MIN_INDEPENDENT_CLUSTERS
+        );
         assert_eq!(report.candidate_worse_cluster_count, 0);
         assert_eq!(report.tied_cluster_count, 0);
     }
@@ -341,21 +362,34 @@ mod tests {
     #[test]
     fn fixed_seed_is_deterministic_and_order_invariant() {
         let data = observations(&(-10..10).map(|n| n as f64).collect::<Vec<_>>());
-        let first = analyze_paired_clusters(&data, MetricDirection::HigherIsBetter, config(42)).unwrap();
+        let first =
+            analyze_paired_clusters(&data, MetricDirection::HigherIsBetter, config(42)).unwrap();
         let mut reversed = data.clone();
         reversed.reverse();
-        let second = analyze_paired_clusters(&reversed, MetricDirection::HigherIsBetter, config(42)).unwrap();
+        let second =
+            analyze_paired_clusters(&reversed, MetricDirection::HigherIsBetter, config(42))
+                .unwrap();
         assert_eq!(first, second);
     }
 
     #[test]
     fn better_and_worse_counts_follow_declared_direction() {
-        let data = observations(&[-2.0, -1.0, 0.0, 1.0, 2.0, -3.0, 3.0, 0.5, -0.5, 4.0,
-                                 -4.0, 5.0, -5.0, 6.0, -6.0, 7.0, -7.0, 8.0, -8.0, 9.0]);
-        let low = analyze_paired_clusters(&data, MetricDirection::LowerIsBetter, config(9)).unwrap();
-        let high = analyze_paired_clusters(&data, MetricDirection::HigherIsBetter, config(9)).unwrap();
-        assert_eq!(low.candidate_better_cluster_count, high.candidate_worse_cluster_count);
-        assert_eq!(low.candidate_worse_cluster_count, high.candidate_better_cluster_count);
+        let data = observations(&[
+            -2.0, -1.0, 0.0, 1.0, 2.0, -3.0, 3.0, 0.5, -0.5, 4.0, -4.0, 5.0, -5.0, 6.0, -6.0, 7.0,
+            -7.0, 8.0, -8.0, 9.0,
+        ]);
+        let low =
+            analyze_paired_clusters(&data, MetricDirection::LowerIsBetter, config(9)).unwrap();
+        let high =
+            analyze_paired_clusters(&data, MetricDirection::HigherIsBetter, config(9)).unwrap();
+        assert_eq!(
+            low.candidate_better_cluster_count,
+            high.candidate_worse_cluster_count
+        );
+        assert_eq!(
+            low.candidate_worse_cluster_count,
+            high.candidate_better_cluster_count
+        );
         assert_eq!(low.tied_cluster_count, 1);
     }
 
@@ -398,13 +432,19 @@ mod tests {
     #[test]
     fn rejects_invalid_configuration() {
         let data = observations(&vec![1.0; MIN_INDEPENDENT_CLUSTERS]);
-        let too_few = PairedBootstrapConfig { replicates: 999, ..config(1) };
+        let too_few = PairedBootstrapConfig {
+            replicates: 999,
+            ..config(1)
+        };
         assert!(matches!(
             analyze_paired_clusters(&data, MetricDirection::HigherIsBetter, too_few),
             Err(PairedInferenceError::TooFewReplicates { .. })
         ));
 
-        let bad_confidence = PairedBootstrapConfig { confidence_level: 1.0, ..config(1) };
+        let bad_confidence = PairedBootstrapConfig {
+            confidence_level: 1.0,
+            ..config(1)
+        };
         assert!(matches!(
             analyze_paired_clusters(&data, MetricDirection::HigherIsBetter, bad_confidence),
             Err(PairedInferenceError::InvalidConfidenceLevel)
