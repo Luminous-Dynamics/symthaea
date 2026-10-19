@@ -1,0 +1,84 @@
+name: FEP EIG 002A1 Independent Qualifier
+
+on:
+  push:
+    branches:
+      - "fep-efe-action-002a1-independent-oracle"
+  pull_request:
+    branches:
+      - "fep-efe-action-002a-reference-contract"
+    paths:
+      - "scripts/validate_fep_efe_action_002a.py"
+      - ".github/workflows/fep-efe-action-002a1-qualifier.yml"
+      - "docs/fep/FEP_EFE_ACTION_002A.md"
+      - "docs/fep/data/fep_efe_action_002a_reference_v1.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fep-efe-action-002a1-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  SOURCE_HEAD: ea38fc24ddfa5e720fccd4ab1c7bccd02624cdbd
+  CONTRACT_BLOB: f8c11e4e775a4836b1a63e0178ede370f0979c66
+  CORPUS_BLOB: 8dd133d15a15ba4931d125a60918dbd69e18902e
+
+jobs:
+  qualify:
+    name: Independent finite-EIG oracle
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out the exact triggering head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      - name: Verify frozen source and qualifier-only overlay
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git merge-base --is-ancestor "$SOURCE_HEAD" HEAD
+
+          test "$(git rev-parse "$SOURCE_HEAD:docs/fep/FEP_EFE_ACTION_002A.md")" = "$CONTRACT_BLOB"
+          test "$(git rev-parse "$SOURCE_HEAD:docs/fep/data/fep_efe_action_002a_reference_v1.json")" = "$CORPUS_BLOB"
+          test "$(git rev-parse "HEAD:docs/fep/FEP_EFE_ACTION_002A.md")" = "$CONTRACT_BLOB"
+          test "$(git rev-parse "HEAD:docs/fep/data/fep_efe_action_002a_reference_v1.json")" = "$CORPUS_BLOB"
+
+          git diff --name-only "$SOURCE_HEAD"...HEAD | sort > /tmp/qualifier-paths.txt
+          printf '%s\n' \
+            ".github/workflows/fep-efe-action-002a1-qualifier.yml" \
+            "scripts/validate_fep_efe_action_002a.py" | sort > /tmp/expected-paths.txt
+          diff -u /tmp/expected-paths.txt /tmp/qualifier-paths.txt
+          cat /tmp/qualifier-paths.txt
+
+      - name: Record Python executor identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          python_path="$(command -v python3)"
+          printf 'workflow=%s\n' "$GITHUB_WORKFLOW"
+          printf 'event=%s\n' "${{ github.event_name }}"
+          printf 'trigger_sha=%s\n' "$GITHUB_SHA"
+          printf 'checked_out_sha=%s\n' "$(git rev-parse HEAD)"
+          printf 'python_path=%s\n' "$python_path"
+          printf 'python_realpath=%s\n' "$(readlink -f "$python_path")"
+          printf 'python_sha256=%s\n' "$(sha256sum "$(readlink -f "$python_path")" | cut -d ' ' -f 1)"
+          python3 --version
+          python3 -c 'import platform, sys; print("implementation=" + platform.python_implementation()); print("version=" + sys.version)'
+
+      - name: Run independent expected-information-gain oracle
+        run: python3 scripts/validate_fep_efe_action_002a.py
+
+      - name: Verify source immutability and clean postflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git rev-parse HEAD:docs/fep/FEP_EFE_ACTION_002A.md)" = "$CONTRACT_BLOB"
+          test "$(git rev-parse HEAD:docs/fep/data/fep_efe_action_002a_reference_v1.json)" = "$CORPUS_BLOB"
+          test -z "$(git status --porcelain)"
