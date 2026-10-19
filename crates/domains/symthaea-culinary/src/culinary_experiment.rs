@@ -366,6 +366,9 @@ pub fn validate_culinary_experiment_v1(
         if non_empty(block, "randomization_seed").is_none() {
             errors.push(format!("{block_label}.randomization_seed is required"));
         }
+        if non_empty(block, "randomization_method").is_none() {
+            errors.push(format!("{block_label}.randomization_method is required"));
+        }
         let random_order_raw_len = block
             .get("randomized_order")
             .and_then(Value::as_array)
