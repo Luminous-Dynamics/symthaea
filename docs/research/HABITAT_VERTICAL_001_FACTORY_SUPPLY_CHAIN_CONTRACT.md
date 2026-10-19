@@ -155,6 +155,12 @@ The follow-on [HABITAT-COUNTERFACTUAL-001 campaign contract](./HABITAT_COUNTERFA
 
 The campaign validator checks exact ID coverage against the source disruption list, prevents numeric outputs from being embedded in a definition-only fixture, and refuses implicit baseline/candidate policy revisions. It is not a scheduler or simulator. Baseline/candidate scoring remains blocked until the canonical policy revisions and a household-goods adapter are inspected, bound, and independently verified. Thirteen new Rust tests are authored for these contract invariants; none has been compiled or executed in this environment.
 
+### Assumption falsification before resilience investment
+
+The follow-on [HABITAT-ASSUMPTION-FALSIFICATION-001 contract](./HABITAT_ASSUMPTION_FALSIFICATION_001.md) and [machine-readable experiment definitions](./fixtures/habitat-assumption-falsification-v0.1.json) bind decision-critical assumptions to falsifiers and candidate checks before selecting a resilience option. The current fixture covers 9 assumptions, 10 candidate tests, supplier/material qualification, alternate resource/skill availability, utility common modes, module/repair claims, cost-boundary comparability, and the validity boundary around synthetic intervals.
+
+It records no test results, measured experiment costs/durations, or scenario probabilities. The candidate tests are not ranked or selected; documentary, analytical, simulated and physical evidence remain distinct. The benchmark composes the shared [manufacturing assumption-falsification proposal #8080](https://github.com/Luminous-Dynamics/symthaea/pull/8080) and [decision-value benchmark #7803](https://github.com/Luminous-Dynamics/symthaea/issues/7803), rather than creating another experimental selector.
+
 ### Resilience option-value comparison
 
 Follow-on [HABITAT-RESILIENCE-OPTIONS-001](./HABITAT_RESILIENCE_OPTIONS_001_OPTION_VALUE.md) and its 6-option × 8-disruption synthetic fixture establish a test corpus for **the option value of qualified flexibility**: alternative qualified supply, workcell/skill redundancy, essential-utility continuity, modular/common components and an integrated portfolio. These 48 cells intentionally use fabricated challenge-oracle bounds, not predicted factory outcomes.
