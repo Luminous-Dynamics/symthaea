@@ -573,7 +573,7 @@ mod tests {
     fn checked_in_contracts_are_consistent() {
         let (corpus, benchmark, _) = fixtures();
         assert_eq!(corpus.scenarios.len(), 24);
-        assert_eq!(benchmark.benchmarks.len(), 16);
+        assert_eq!(benchmark.benchmarks.len(), 17);
         assert_eq!(benchmark.status, "proposed_targets_unmeasured");
         assert!(!corpus.clinical_use_authorized);
         assert!(!benchmark.clinical_use_authorized);
