@@ -34,9 +34,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python -m pip install --disable-pip-version-check 'unblob==26.6.4'
+          python -m pip install --disable-pip-version-check -r benchmarks/rea-determinism/v1/requirements-unblob-26.6.4.lock
+          python -m pip check
           unblob --version
-          python -m pip freeze | sort
+          python -m pip freeze | LC_ALL=C sort
       - name: Run real-provider fixture twice
         shell: bash
         env:
