@@ -22,6 +22,7 @@ pub struct VerifiedEvidence {
     pub status: &'static str,
     pub evidence_tier: &'static str,
     pub receipt_sha256: String,
+    pub bundle_manifest_sha256: String,
     pub verification_mode: &'static str,
     pub receipt_digest_anchor_matched: bool,
     pub source_head_sha: String,
@@ -240,7 +241,12 @@ fn verify_bundle_manifest(root: &Path, expected_digest: &str) -> VResult<()> {
         let relative = text_field(entry, "path")?;
         let digest = digest_field(entry, "sha256")?;
         let parsed = Path::new(&relative);
-        if parsed.is_absolute() || parsed.components().any(|component| !matches!(component, std::path::Component::Normal(_))) {
+        if parsed.is_absolute()
+            || relative.contains('\\\\')
+            || relative.contains(':')
+            || relative.split('/').any(|part| part == "." || part == ".." || part.is_empty())
+            || parsed.components().any(|component| !matches!(component, std::path::Component::Normal(_)))
+        {
             return Err(err(format!("bundle manifest path is not normalized and relative: {relative}")));
         }
         if relative == "receipt.json" || relative == "bundle-manifest.json" {
@@ -454,6 +460,7 @@ pub fn verify_bundle(
         status: "verified",
         evidence_tier: "unblob-provider-smoke",
         receipt_sha256,
+        bundle_manifest_sha256: bundle_manifest_sha,
         verification_mode: if receipt_digest_anchor_matched { "receipt-digest-anchored" } else { "integrity-consistency-only" },
         receipt_digest_anchor_matched,
         source_head_sha,
@@ -735,6 +742,14 @@ mod tests {
         changed["source"]["oracle_sha256"] = json!("1234");
         write(&f.artifact.join("receipt.json"), serde_json::to_vec_pretty(&changed).unwrap().as_slice());
         assert!(verify_bundle(&f.artifact, &f.source, &f.expected_head, None).unwrap_err().to_string().contains("lowercase SHA-256"));
+    }
+
+    #[test]
+    fn rejects_unmanifested_extra_artifact_files() {
+        let f = create_fixture();
+        write(&f.artifact.join("unexpected.bin"), b"unmanifested evidence");
+        assert!(verify_bundle(&f.artifact, &f.source, &f.expected_head, None)
+            .unwrap_err().to_string().contains("file set"));
     }
 
     #[test]
