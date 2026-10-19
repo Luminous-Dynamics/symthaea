@@ -356,14 +356,14 @@ pub fn verify_bundle(
     let _python_version = text_field(&receipt, "python_version")?;
     let _executable_sha = digest_field(&receipt, "executable_sha256")?;
     let pip_freeze_sha = digest_field(&receipt, "pip_freeze_sha256")?;
-    if pip_freeze_sha != requirements_lock_sha {
-        return Err(err("resolved dependency snapshot does not match the checked-in provider lock"));
-    }
 
     let normalizer_sha = digest_field(&receipt, "source.normalizer_sha256")?;
     let cases_sha = digest_field(&receipt, "source.cases_manifest_sha256")?;
     let oracle_sha = digest_field(&receipt, "source.oracle_sha256")?;
     let requirements_lock_sha = digest_field(&receipt, "source.requirements_lock_sha256")?;
+    if pip_freeze_sha != requirements_lock_sha {
+        return Err(err("resolved dependency snapshot does not match the checked-in provider lock"));
+    }
     let provider_smoke_sha = digest_field(&receipt, "source.provider_smoke_script_sha256")?;
     let provider_meta_script_sha = digest_field(&receipt, "source.provider_metamorphic_script_sha256")?;
     verify_digest_at(&source_root.join("normalize.jq"), &normalizer_sha, "normalizer")?;
