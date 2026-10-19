@@ -1,0 +1,836 @@
+{
+  "corpus_id": "BIOPROTEIN-EXPERIMENT-VALUE-CORPUS-V1",
+  "schema_version": "1.0.0",
+  "claim_ceiling": "All values and outcomes are synthetic decision-theory fixtures. No experiment permission, assay validity, biological performance, food safety, production economics, or lifecycle outcome is established.",
+  "cases": [
+    {
+      "case_id": "EVSI-001",
+      "scenario_digest": "sha256:synthetic-scenario-a",
+      "probability_scale": 10000,
+      "states": [
+        {
+          "state_id": "favorable",
+          "prior_weight": 5000
+        },
+        {
+          "state_id": "adverse",
+          "prior_weight": 5000
+        }
+      ],
+      "actions": [
+        {
+          "action_id": "invest",
+          "utilities": {
+            "favorable": 10,
+            "adverse": -20
+          }
+        },
+        {
+          "action_id": "defer",
+          "utilities": {
+            "favorable": 0,
+            "adverse": 0
+          }
+        }
+      ],
+      "experiments": [
+        {
+          "experiment_id": "assay-a",
+          "cost_utility": 1,
+          "authorization": "permitted",
+          "evidence_state": "complete",
+          "scenario_digest": "sha256:synthetic-scenario-a",
+          "likelihoods": [
+            {
+              "state_id": "favorable",
+              "outcomes": {
+                "positive": 9000,
+                "negative": 1000
+              }
+            },
+            {
+              "state_id": "adverse",
+              "outcomes": {
+                "positive": 1000,
+                "negative": 9000
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "status": "selected",
+        "selected_experiment_id": "assay-a",
+        "reason_codes": [
+          "positive_net_evsi",
+          "highest_net_evsi_selected"
+        ]
+      }
+    },
+    {
+      "case_id": "EVSI-002",
+      "scenario_digest": "sha256:synthetic-scenario-a",
+      "probability_scale": 10000,
+      "states": [
+        {
+          "state_id": "favorable",
+          "prior_weight": 5000
+        },
+        {
+          "state_id": "adverse",
+          "prior_weight": 5000
+        }
+      ],
+      "actions": [
+        {
+          "action_id": "invest",
+          "utilities": {
+            "favorable": 10,
+            "adverse": -20
+          }
+        },
+        {
+          "action_id": "defer",
+          "utilities": {
+            "favorable": 0,
+            "adverse": 0
+          }
+        }
+      ],
+      "experiments": [
+        {
+          "experiment_id": "assay-expensive",
+          "cost_utility": 5,
+          "authorization": "permitted",
+          "evidence_state": "complete",
+          "scenario_digest": "sha256:synthetic-scenario-a",
+          "likelihoods": [
+            {
+              "state_id": "favorable",
+              "outcomes": {
+                "positive": 9000,
+                "negative": 1000
+              }
+            },
+            {
+              "state_id": "adverse",
+              "outcomes": {
+                "positive": 1000,
+                "negative": 9000
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "status": "no_positive_evsi",
+        "selected_experiment_id": null,
+        "reason_codes": [
+          "no_positive_net_evsi"
+        ]
+      }
+    },
+    {
+      "case_id": "EVSI-003",
+      "scenario_digest": "sha256:synthetic-scenario-a",
+      "probability_scale": 10000,
+      "states": [
+        {
+          "state_id": "favorable",
+          "prior_weight": 5000
+        },
+        {
+          "state_id": "adverse",
+          "prior_weight": 5000
+        }
+      ],
+      "actions": [
+        {
+          "action_id": "invest",
+          "utilities": {
+            "favorable": 10,
+            "adverse": -20
+          }
+        },
+        {
+          "action_id": "defer",
+          "utilities": {
+            "favorable": 0,
+            "adverse": 0
+          }
+        }
+      ],
+      "experiments": [
+        {
+          "experiment_id": "uninformative-test",
+          "cost_utility": 0,
+          "authorization": "permitted",
+          "evidence_state": "complete",
+          "scenario_digest": "sha256:synthetic-scenario-a",
+          "likelihoods": [
+            {
+              "state_id": "favorable",
+              "outcomes": {
+                "positive": 5000,
+                "negative": 5000
+              }
+            },
+            {
+              "state_id": "adverse",
+              "outcomes": {
+                "positive": 5000,
+                "negative": 5000
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "status": "no_positive_evsi",
+        "selected_experiment_id": null,
+        "reason_codes": [
+          "no_positive_net_evsi"
+        ]
+      }
+    },
+    {
+      "case_id": "EVSI-004",
+      "scenario_digest": "sha256:synthetic-scenario-a",
+      "probability_scale": 10000,
+      "states": [
+        {
+          "state_id": "favorable",
+          "prior_weight": 5000
+        },
+        {
+          "state_id": "adverse",
+          "prior_weight": 5000
+        }
+      ],
+      "actions": [
+        {
+          "action_id": "invest",
+          "utilities": {
+            "favorable": 10,
+            "adverse": -20
+          }
+        },
+        {
+          "action_id": "defer",
+          "utilities": {
+            "favorable": 0,
+            "adverse": 0
+          }
+        }
+      ],
+      "experiments": [
+        {
+          "experiment_id": "restricted-test",
+          "cost_utility": 0,
+          "authorization": "restricted",
+          "evidence_state": "complete",
+          "scenario_digest": "sha256:synthetic-scenario-a",
+          "likelihoods": [
+            {
+              "state_id": "favorable",
+              "outcomes": {
+                "positive": 9000,
+                "negative": 1000
+              }
+            },
+            {
+              "state_id": "adverse",
+              "outcomes": {
+                "positive": 1000,
+                "negative": 9000
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "status": "blocked",
+        "selected_experiment_id": null,
+        "reason_codes": [
+          "no_eligible_experiment"
+        ]
+      }
+    },
+    {
+      "case_id": "EVSI-005",
+      "scenario_digest": "sha256:synthetic-scenario-a",
+      "probability_scale": 10000,
+      "states": [
+        {
+          "state_id": "favorable",
+          "prior_weight": 5000
+        },
+        {
+          "state_id": "adverse",
+          "prior_weight": 5000
+        }
+      ],
+      "actions": [
+        {
+          "action_id": "invest",
+          "utilities": {
+            "favorable": 10,
+            "adverse": -20
+          }
+        },
+        {
+          "action_id": "defer",
+          "utilities": {
+            "favorable": 0,
+            "adverse": 0
+          }
+        }
+      ],
+      "experiments": [
+        {
+          "experiment_id": "unknown-authorization",
+          "cost_utility": 0,
+          "authorization": "unknown",
+          "evidence_state": "complete",
+          "scenario_digest": "sha256:synthetic-scenario-a",
+          "likelihoods": [
+            {
+              "state_id": "favorable",
+              "outcomes": {
+                "positive": 9000,
+                "negative": 1000
+              }
+            },
+            {
+              "state_id": "adverse",
+              "outcomes": {
+                "positive": 1000,
+                "negative": 9000
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "status": "indeterminate",
+        "selected_experiment_id": null,
+        "reason_codes": [
+          "unresolved_experiment_gate_may_change_decision"
+        ]
+      }
+    },
+    {
+      "case_id": "EVSI-006",
+      "scenario_digest": "sha256:synthetic-scenario-a",
+      "probability_scale": 10000,
+      "states": [
+        {
+          "state_id": "favorable",
+          "prior_weight": 5000
+        },
+        {
+          "state_id": "adverse",
+          "prior_weight": 5000
+        }
+      ],
+      "actions": [
+        {
+          "action_id": "invest",
+          "utilities": {
+            "favorable": 10,
+            "adverse": -20
+          }
+        },
+        {
+          "action_id": "defer",
+          "utilities": {
+            "favorable": 0,
+            "adverse": 0
+          }
+        }
+      ],
+      "experiments": [
+        {
+          "experiment_id": "assay-a",
+          "cost_utility": 1,
+          "authorization": "permitted",
+          "evidence_state": "complete",
+          "scenario_digest": "sha256:synthetic-scenario-a",
+          "likelihoods": [
+            {
+              "state_id": "favorable",
+              "outcomes": {
+                "positive": 9000,
+                "negative": 1000
+              }
+            },
+            {
+              "state_id": "adverse",
+              "outcomes": {
+                "positive": 1000,
+                "negative": 9000
+              }
+            }
+          ]
+        },
+        {
+          "experiment_id": "perfect-but-costly",
+          "cost_utility": 4,
+          "authorization": "permitted",
+          "evidence_state": "complete",
+          "scenario_digest": "sha256:synthetic-scenario-a",
+          "likelihoods": [
+            {
+              "state_id": "favorable",
+              "outcomes": {
+                "positive": 10000,
+                "negative": 0
+              }
+            },
+            {
+              "state_id": "adverse",
+              "outcomes": {
+                "positive": 0,
+                "negative": 10000
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "status": "selected",
+        "selected_experiment_id": "assay-a",
+        "reason_codes": [
+          "positive_net_evsi",
+          "highest_net_evsi_selected"
+        ]
+      }
+    },
+    {
+      "case_id": "EVSI-007",
+      "scenario_digest": "sha256:synthetic-scenario-a",
+      "probability_scale": 10000,
+      "states": [
+        {
+          "state_id": "favorable",
+          "prior_weight": 5000
+        },
+        {
+          "state_id": "adverse",
+          "prior_weight": 5000
+        }
+      ],
+      "actions": [
+        {
+          "action_id": "invest",
+          "utilities": {
+            "favorable": 10,
+            "adverse": -20
+          }
+        },
+        {
+          "action_id": "defer",
+          "utilities": {
+            "favorable": 0,
+            "adverse": 0
+          }
+        }
+      ],
+      "experiments": [
+        {
+          "experiment_id": "assay-z",
+          "cost_utility": 1,
+          "authorization": "permitted",
+          "evidence_state": "complete",
+          "scenario_digest": "sha256:synthetic-scenario-a",
+          "likelihoods": [
+            {
+              "state_id": "favorable",
+              "outcomes": {
+                "positive": 9000,
+                "negative": 1000
+              }
+            },
+            {
+              "state_id": "adverse",
+              "outcomes": {
+                "positive": 1000,
+                "negative": 9000
+              }
+            }
+          ]
+        },
+        {
+          "experiment_id": "assay-a",
+          "cost_utility": 1,
+          "authorization": "permitted",
+          "evidence_state": "complete",
+          "scenario_digest": "sha256:synthetic-scenario-a",
+          "likelihoods": [
+            {
+              "state_id": "favorable",
+              "outcomes": {
+                "positive": 9000,
+                "negative": 1000
+              }
+            },
+            {
+              "state_id": "adverse",
+              "outcomes": {
+                "positive": 1000,
+                "negative": 9000
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "status": "selected",
+        "selected_experiment_id": "assay-a",
+        "reason_codes": [
+          "positive_net_evsi",
+          "highest_net_evsi_selected"
+        ]
+      }
+    },
+    {
+      "case_id": "EVSI-008",
+      "scenario_digest": "sha256:synthetic-scenario-a",
+      "probability_scale": 10000,
+      "states": [
+        {
+          "state_id": "favorable",
+          "prior_weight": 5000
+        },
+        {
+          "state_id": "adverse",
+          "prior_weight": 5000
+        }
+      ],
+      "actions": [
+        {
+          "action_id": "invest",
+          "utilities": {
+            "favorable": 10,
+            "adverse": -20
+          }
+        },
+        {
+          "action_id": "defer",
+          "utilities": {
+            "favorable": 0,
+            "adverse": 0
+          }
+        }
+      ],
+      "experiments": [
+        {
+          "experiment_id": "malformed-probability-test",
+          "cost_utility": 0,
+          "authorization": "permitted",
+          "evidence_state": "complete",
+          "scenario_digest": "sha256:synthetic-scenario-a",
+          "likelihoods": [
+            {
+              "state_id": "favorable",
+              "outcomes": {
+                "positive": 9000,
+                "negative": 500
+              }
+            },
+            {
+              "state_id": "adverse",
+              "outcomes": {
+                "positive": 1000,
+                "negative": 8500
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "status": "invalid_input",
+        "selected_experiment_id": null,
+        "reason_codes": [
+          "invalid_outcome_probability_sum"
+        ]
+      }
+    },
+    {
+      "case_id": "EVSI-009",
+      "scenario_digest": "sha256:synthetic-scenario-a",
+      "probability_scale": 10000,
+      "states": [
+        {
+          "state_id": "favorable",
+          "prior_weight": 4000
+        },
+        {
+          "state_id": "adverse",
+          "prior_weight": 5000
+        }
+      ],
+      "actions": [
+        {
+          "action_id": "invest",
+          "utilities": {
+            "favorable": 10,
+            "adverse": -20
+          }
+        },
+        {
+          "action_id": "defer",
+          "utilities": {
+            "favorable": 0,
+            "adverse": 0
+          }
+        }
+      ],
+      "experiments": [
+        {
+          "experiment_id": "bad-prior-case",
+          "cost_utility": 1,
+          "authorization": "permitted",
+          "evidence_state": "complete",
+          "scenario_digest": "sha256:synthetic-scenario-a",
+          "likelihoods": [
+            {
+              "state_id": "favorable",
+              "outcomes": {
+                "positive": 9000,
+                "negative": 1000
+              }
+            },
+            {
+              "state_id": "adverse",
+              "outcomes": {
+                "positive": 1000,
+                "negative": 9000
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "status": "invalid_input",
+        "selected_experiment_id": null,
+        "reason_codes": [
+          "invalid_prior_sum"
+        ]
+      }
+    },
+    {
+      "case_id": "EVSI-010",
+      "scenario_digest": "sha256:synthetic-scenario-a",
+      "probability_scale": 10000,
+      "states": [
+        {
+          "state_id": "favorable",
+          "prior_weight": 5000
+        },
+        {
+          "state_id": "adverse",
+          "prior_weight": 5000
+        }
+      ],
+      "actions": [
+        {
+          "action_id": "invest",
+          "utilities": {
+            "favorable": 10,
+            "adverse": -20
+          }
+        },
+        {
+          "action_id": "defer",
+          "utilities": {
+            "favorable": 0,
+            "adverse": 0
+          }
+        }
+      ],
+      "experiments": [
+        {
+          "experiment_id": "wrong-scenario-test",
+          "cost_utility": 0,
+          "authorization": "permitted",
+          "evidence_state": "complete",
+          "scenario_digest": "sha256:synthetic-scenario-b",
+          "likelihoods": [
+            {
+              "state_id": "favorable",
+              "outcomes": {
+                "positive": 9000,
+                "negative": 1000
+              }
+            },
+            {
+              "state_id": "adverse",
+              "outcomes": {
+                "positive": 1000,
+                "negative": 9000
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "status": "blocked",
+        "selected_experiment_id": null,
+        "reason_codes": [
+          "no_eligible_experiment"
+        ]
+      }
+    },
+    {
+      "case_id": "EVSI-011",
+      "scenario_digest": "sha256:synthetic-scenario-a",
+      "probability_scale": 10000,
+      "states": [
+        {
+          "state_id": "favorable",
+          "prior_weight": 5000
+        },
+        {
+          "state_id": "adverse",
+          "prior_weight": 5000
+        }
+      ],
+      "actions": [
+        {
+          "action_id": "invest",
+          "utilities": {
+            "favorable": 10,
+            "adverse": -20
+          }
+        },
+        {
+          "action_id": "defer",
+          "utilities": {
+            "favorable": 0,
+            "adverse": 0
+          }
+        }
+      ],
+      "experiments": [
+        {
+          "experiment_id": "incomplete-test",
+          "cost_utility": 0,
+          "authorization": "permitted",
+          "evidence_state": "incomplete",
+          "scenario_digest": "sha256:synthetic-scenario-a",
+          "likelihoods": [
+            {
+              "state_id": "favorable",
+              "outcomes": {
+                "positive": 9000,
+                "negative": 1000
+              }
+            },
+            {
+              "state_id": "adverse",
+              "outcomes": {
+                "positive": 1000,
+                "negative": 9000
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "status": "blocked",
+        "selected_experiment_id": null,
+        "reason_codes": [
+          "no_eligible_experiment"
+        ]
+      }
+    },
+    {
+      "case_id": "EVSI-012",
+      "scenario_digest": "sha256:synthetic-scenario-a",
+      "probability_scale": 10000,
+      "states": [
+        {
+          "state_id": "favorable",
+          "prior_weight": 5000
+        },
+        {
+          "state_id": "adverse",
+          "prior_weight": 5000
+        }
+      ],
+      "actions": [
+        {
+          "action_id": "invest",
+          "utilities": {
+            "favorable": 10,
+            "adverse": -20
+          }
+        },
+        {
+          "action_id": "defer",
+          "utilities": {
+            "favorable": 0,
+            "adverse": 0
+          }
+        }
+      ],
+      "experiments": [
+        {
+          "experiment_id": "assay-a",
+          "cost_utility": 1,
+          "authorization": "permitted",
+          "evidence_state": "complete",
+          "scenario_digest": "sha256:synthetic-scenario-a",
+          "likelihoods": [
+            {
+              "state_id": "favorable",
+              "outcomes": {
+                "positive": 9000,
+                "negative": 1000
+              }
+            },
+            {
+              "state_id": "adverse",
+              "outcomes": {
+                "positive": 1000,
+                "negative": 9000
+              }
+            }
+          ]
+        },
+        {
+          "experiment_id": "unapproved-perfect-test",
+          "cost_utility": 0,
+          "authorization": "unknown",
+          "evidence_state": "complete",
+          "scenario_digest": "sha256:synthetic-scenario-a",
+          "likelihoods": [
+            {
+              "state_id": "favorable",
+              "outcomes": {
+                "positive": 10000,
+                "negative": 0
+              }
+            },
+            {
+              "state_id": "adverse",
+              "outcomes": {
+                "positive": 0,
+                "negative": 10000
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "status": "selected",
+        "selected_experiment_id": "assay-a",
+        "reason_codes": [
+          "positive_net_evsi",
+          "highest_net_evsi_selected"
+        ]
+      }
+    }
+  ]
+}
