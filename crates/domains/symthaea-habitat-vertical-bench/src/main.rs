@@ -6,6 +6,9 @@ use std::{env, fs, process};
 use symthaea_habitat_vertical_bench::scenario_campaign::{
     validate_scenario_campaign_str, EMBEDDED_SCENARIO_CAMPAIGN,
 };
+use symthaea_habitat_vertical_bench::resilience_options::{
+    validate_resilience_options_str, EMBEDDED_RESILIENCE_OPTIONS,
+};
 use symthaea_habitat_vertical_bench::{validate_fixture_str, EMBEDDED_FIXTURE};
 
 fn main() {
@@ -94,8 +97,30 @@ fn main() {
                 "synthetic disruption campaign definition: PASS ({} scenarios; numeric results={}; simulation=NOT RUN)",
                 campaign.scenario_count, campaign.numeric_result_count
             );
+            let options = match validate_resilience_options_str(EMBEDDED_RESILIENCE_OPTIONS) {
+                Ok(report) => report,
+                Err(error) => {
+                    eprintln!("invalid embedded resilience-options JSON: {error}");
+                    process::exit(2);
+                }
+            };
+            if !options.is_valid() {
+                eprintln!(
+                    "RESILIENCE OPTIONS DEFINITION: FAIL ({} findings)",
+                    options.issues.len()
+                );
+                for issue in options.issues {
+                    eprintln!("{} {}: {}", issue.code, issue.path, issue.message);
+                }
+                process::exit(1);
+            }
+            println!(
+                "synthetic resilience option matrix: PASS ({} options x {} scenarios = {} cells; robust frontier=NOT RUN; probabilities=NOT ASSUMED)",
+                options.option_count, options.scenario_count, options.outcome_count
+            );
         } else {
             println!("embedded disruption campaign: not checked against the alternate fixture");
+            println!("embedded resilience option matrix: not checked against the alternate fixture");
         }
 
         println!("STRUCTURAL FIXTURE VALIDATION: PASS");
