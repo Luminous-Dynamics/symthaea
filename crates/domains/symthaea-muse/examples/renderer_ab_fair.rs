@@ -22,14 +22,12 @@
 //!
 //! # What it does NOT do
 //!
-//! It produces no listening pack and asks for no listening. Per the project's
-//! standing rule, analytics gate first; clips are escalated only if the numbers
-//! justify it. It prints objective per-arm measurements and a verdict on whether
-//! the arms are even distinguishable.
+//! It produces no blinded listening pack and asks for no listening. It emits the
+//! WAV variants for a later randomized study, but audio metrics are not a verdict
+//! on preference or authenticity.
 //!
-//! Renders land in `audio_output/renderer-ab-fair/` relative to the CARGO
-//! WORKSPACE root (i.e. `symthaea/audio_output/...`), which `symthaea/.gitignore`
-//! already excludes — the WAVs are ~97 MB for the default cohort.
+//! Renders land in `audio_output/renderer-ab-fair-{synth|vcsl}/` relative to the
+//! CARGO WORKSPACE root, which `symthaea/.gitignore` already excludes.
 //!
 //! # Historical baseline (2026-07-30; NOT the current eight-profile run)
 //!
@@ -157,25 +155,37 @@ fn measure(name: &'static str, frames: &[[f32; 2]], sr: u32) -> Arm {
 fn wav_to_frames(bytes: &[u8]) -> Option<(Vec<[f32; 2]>, u32)> {
     let mut r = hound::WavReader::new(std::io::Cursor::new(bytes)).ok()?;
     let spec = r.spec();
-    let ch = spec.channels.max(1) as usize;
+    if spec.channels == 0 || spec.sample_rate == 0 {
+        return None;
+    }
+    let ch = spec.channels as usize;
     let samples: Vec<f32> = match spec.sample_format {
         hound::SampleFormat::Int => {
             let scale = 1.0 / (1i64 << (spec.bits_per_sample - 1)) as f32;
             r.samples::<i32>()
-                .filter_map(Result::ok)
-                .map(|s| s as f32 * scale)
-                .collect()
+                .map(|sample| sample.map(|value| value as f32 * scale))
+                .collect::<Result<Vec<_>, _>>()
+                .ok()?
         }
-        hound::SampleFormat::Float => r.samples::<f32>().filter_map(Result::ok).collect(),
+        hound::SampleFormat::Float => r.samples::<f32>().collect::<Result<Vec<_>, _>>().ok()?,
     };
+    if samples.is_empty()
+        || samples.len() % ch != 0
+        || samples.iter().any(|sample| !sample.is_finite())
+    {
+        return None;
+    }
     let frames = if ch == 1 {
         samples.iter().map(|&s| [s, s]).collect()
     } else {
         samples
             .chunks_exact(ch)
-            .map(|c| [c[0], c[1 % ch]])
+            .map(|c| [c[0], c[1]])
             .collect()
     };
+    if frames.is_empty() {
+        return None;
+    }
     Some((frames, spec.sample_rate))
 }
 
@@ -465,7 +475,7 @@ fn main() {
         let d_high = b.high - a.high;
         let d_low = b.low - a.low;
         println!(
-            "  Δ(profile−native): crest {d_crest:+.2} dB   high-band {d_high:+.3}   \\
+            "  Δ(profile−native): crest {d_crest:+.2} dB   high-band {d_high:+.3}   \
              low-band {d_low:+.3}"
         );
         let profile_crest_delta = b.crest_db - neutral.crest_db;
@@ -473,7 +483,7 @@ fn main() {
         let profile_low_delta = b.low - neutral.low;
         let profile_lufs_delta = b.lufs - neutral.lufs;
         println!(
-            "  Δ(dialect−default FluidSynth): LUFS {profile_lufs_delta:+.2}  crest {profile_crest_delta:+.2} dB  \\
+            "  Δ(dialect−default FluidSynth): LUFS {profile_lufs_delta:+.2}  crest {profile_crest_delta:+.2} dB  \
              high-band {profile_high_delta:+.3}  low-band {profile_low_delta:+.3}"
         );
 
@@ -623,11 +633,11 @@ fn main() {
         );
     }
     println!(
-        "\nInterpretation limits, stated: LUFS is expected to match closely BY \\
-         CONSTRUCTION now that both arms share one mastering target, so a small \\
-         ΔLUFS is a sanity check on the chain, NOT evidence about renderer quality. \\
-         Crest and spectral balance are the informative columns. None of these \\
-         measures perceived quality; they only say whether the arms differ enough \\
+        "\nInterpretation limits, stated: LUFS is expected to match closely BY \
+         CONSTRUCTION now that both arms share one mastering target, so a small \
+         ΔLUFS is a sanity check on the chain, NOT evidence about renderer quality. \
+         Crest and spectral balance are the informative columns. None of these \
+         measures perceived quality; they only say whether the arms differ enough \
          to be worth a listening escalation."
     );
     println!("Renders kept in {}", out_dir.display());
@@ -707,7 +717,7 @@ fn main() {
     );
     if !run_complete {
         eprintln!(
-            "INCOMPLETE evidence: require all {} cohort rows, a 40/64-hex SYMTHAEA_GIT_REVISION, \\
+            "INCOMPLETE evidence: require all {} cohort rows, a 40/64-hex SYMTHAEA_GIT_REVISION, \
              FluidSynth version output, and a valid SYMTHAEA_VCSL_MANIFEST_SHA256 when VCSL is enabled.",
             cohort.len()
         );
