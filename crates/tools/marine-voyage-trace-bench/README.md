@@ -1,12 +1,12 @@
 # Marine voyage trace benchmark (V0)
 
-This dependency-free Rust crate converts a canonical synchronized trace of propulsion and auxiliary electrical input power into separate and total energy bands. It is the data-collection bridge for [MARINE-TRACE-001](https://github.com/Luminous-Dynamics/symthaea/issues/8102) and is intended to compose with [MARINE-ENERGY-BUDGET-001](https://github.com/Luminous-Dynamics/symthaea/issues/8092).
+This small Rust crate converts a canonical synchronized trace of propulsion and auxiliary electrical input power into separate and total energy bands. It is the data-collection bridge for [MARINE-TRACE-001](https://github.com/Luminous-Dynamics/symthaea/issues/8102) and is intended to compose with [MARINE-ENERGY-BUDGET-001](https://github.com/Luminous-Dynamics/symthaea/issues/8092).
 
 ## Run
 
-    cargo test --locked --offline --manifest-path crates/tools/marine-voyage-trace-bench/Cargo.toml
+    cargo test --locked --manifest-path crates/tools/marine-voyage-trace-bench/Cargo.toml
 
-    cargo run --locked --offline --manifest-path crates/tools/marine-voyage-trace-bench/Cargo.toml --example synthetic
+    cargo run --locked --manifest-path crates/tools/marine-voyage-trace-bench/Cargo.toml --example synthetic
 
 The example uses synthetic values only. No result from it is physical evidence.
 
@@ -74,3 +74,32 @@ The official [ITTC benchmark repository](https://www.ittc.info/benchmark-reposit
 ## Claim ceiling
 
 A Complete result means only that the canonical trace passed this crate's metadata, time-coverage, numeric and integration gates. It does not validate the measurement system, prove a hydrodynamic improvement, show corrected speed-power performance, establish lifecycle emissions, demonstrate vessel safety, or certify compliance.
+
+
+## Reference-data intake and leakage-resistant validation
+
+The `reference_intake` module audits whether a declared reference source is ready for a model/data comparison. It requires inspected raw bytes and the exact artifact SHA-256, a documented rights decision, reviewed observable names/units/definitions, and a frozen split over operating-condition groups. It fails closed if calibration and hold-out groups overlap, groups are undeclared/unassigned, or the model was not declared frozen before hold-out access.
+
+Two comparison dispositions are kept separate:
+- `ReadyForUncertaintyAwareComparison`: measurement-uncertainty metadata is reported and reviewed.
+- `ReadyForDescriptiveComparisonOnly`: data is otherwise admitted but the source does not report measurement uncertainty. This cannot support uncertainty-coverage claims.
+- `Blocked`: missing/unreviewed/invalid intake or split metadata.
+
+A passing result only permits a declared comparison to begin. Hashes do not authenticate the publisher or prove a license; the freeze flag is an attestation, not proof of blinding. This module does not download data, perform unit conversions, execute CFD, validate the model or establish physical performance.
+
+### Content-bound SHA-256 contract
+
+The intake audit now uses the maintained Rust `sha2` crate rather than a hand-written cryptographic primitive. The caller must provide the actual raw artifact bytes and model/configuration bytes; the audit recomputes their SHA-256 and rejects mismatches against the declared digests. The versioned canonical dataset manifest binds the raw-byte digest, citation/source revision, rights reference/status, uncertainty-status declaration, observable contracts, and operating-group inventory. The canonical split digest additionally binds that dataset manifest, model/configuration bytes, the frozen-before-holdout declaration, and normalized calibration/hold-out groups.
+
+Length-prefixed fields prevent delimiter collisions. Set-valued observables and group lists are canonically sorted, so permuting equivalent input vectors does not change the digest; changing bytes, units, rights, source revision, model configuration or a split assignment does change it. The digest field itself is excluded from its own canonical preimage.
+
+This still cannot prove publisher authenticity, legal rights, or that a team never inspected held-out results before declaring the model frozen. Those require independently reviewed evidence and access controls. SHA-256 establishes byte identity and manifest consistency, not truth.
+
+
+### Candidate reference sources: discovery only
+
+- The [ITTC benchmark repository](https://ittc.info/benchmark-repository/) is a directory of separate resistance/propulsion, manoeuvring and cavitation/noise source families; ITTC notes link maintenance and data property are not its responsibility. It is not itself a measured dataset.
+- A 2026 paper on the [Duisburg Test Case in shallow water](https://doi.org/10.1080/09377255.2026.2644800) reports publicly available experimental resistance and self-propulsion data for depth-to-draught ratios 4.0, 2.0 and 1.2. The raw artifacts, hashes, reuse terms, units and uncertainty metadata have **not** been inspected by this crate and must remain blocked until reviewed.
+- The [ITTC CFD-validation benchmark procedure](https://ittc.info/search/?q=Self-Propulsion) is a process/reference source, not a substitute for raw measurement data.
+
+Do not tune a solver on the hold-out condition. Prefer grouped leave-one-operating-condition-out evaluation and report error separately for each observable and condition. If a data source omits uncertainty information, report descriptive residuals only; do not manufacture confidence levels. Unit-test fixtures are synthetic placeholders and never count as physical evidence.
