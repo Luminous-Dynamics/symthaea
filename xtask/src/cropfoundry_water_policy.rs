@@ -197,8 +197,10 @@ fn minimum_storage_mm(day: usize, zone: usize) -> f64 {
 }
 
 fn exposure(storage_mm: f64, demand_mm: f64, rain_mm: f64, day: usize, zone: usize) -> f64 {
-    let end_storage = (storage_mm - demand_mm + rain_mm).clamp(0.0, STORAGE_CAP_MM);
-    let deficit = (minimum_storage_mm(day, zone) - end_storage).max(0.0);
+    // Preserve a negative end-of-step water margin as unmet demand for scoring.
+    // The simulator clamps physical storage separately before the next step.
+    let end_storage_margin = storage_mm.min(STORAGE_CAP_MM) - demand_mm + rain_mm;
+    let deficit = (minimum_storage_mm(day, zone) - end_storage_margin).max(0.0);
     criticality(day, zone) * deficit * deficit
 }
 
@@ -433,7 +435,13 @@ fn simulate_one(
             .max(0.0);
             let after_rain = (after_use + rain_mm(day, scenario)).clamp(0.0, STORAGE_CAP_MM);
             storage[zone] = after_rain;
-            let zone_exposure = exposure(after_rain, 0.0, 0.0, day, zone);
+            let zone_exposure = exposure(
+                irrigated_storage,
+                actual_demand_mm(day, zone, scenario),
+                rain_mm(day, scenario),
+                day,
+                zone,
+            );
             stress_exposure += zone_exposure;
             zone_stress_exposure[zone] += zone_exposure;
         }
@@ -730,7 +738,7 @@ fn build_receipt() -> Result<WaterPolicyReceipt> {
     }
 
     Ok(WaterPolicyReceipt {
-        schema_version: "cropfoundry-water-policy-receipt-v1".to_owned(),
+        schema_version: "cropfoundry-water-policy-receipt-v2".to_owned(),
         benchmark_id: "CF-022".to_owned(),
         execution_mode: "deterministic_synthetic_algorithm_harness".to_owned(),
         budget_measurement_unit: "plot-mm sum; not physical volume".to_owned(),
@@ -740,7 +748,7 @@ fn build_receipt() -> Result<WaterPolicyReceipt> {
         scenario_count: all_scenarios.len(),
         policy_count: policy_names.len(),
         invariant_summary:
-            "Zero daily-budget and per-plot-limit violations; synthetic proxy, not a plant model."
+            "Zero daily-budget and per-plot-limit violations; unmet-demand margin is scored below empty storage."
                 .to_owned(),
         aggregates,
         results,
@@ -921,6 +929,17 @@ mod tests {
                 reference.sensor_dropout_period_days
             );
         }
+    }
+
+    #[test]
+    fn cropfoundry_stress_proxy_preserves_signal_below_empty_storage() {
+        let day = 22;
+        let zone = 1;
+        let fully_starved = exposure(0.0, 4.0, 0.0, day, zone);
+        let slightly_more_water = exposure(ALLOCATION_STEP_MM, 4.0, 0.0, day, zone);
+        let demand_covered = exposure(4.0, 4.0, 0.0, day, zone);
+        assert!(slightly_more_water < fully_starved);
+        assert!(demand_covered < slightly_more_water);
     }
 
     #[test]
