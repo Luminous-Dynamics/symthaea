@@ -1016,7 +1016,7 @@ pub fn run_verify_report(report_path: &Path) -> Result<()> {
         .with_context(|| format!("parsing telemetry benchmark report {}", report_path.display()))?;
     verify_canonical_benchmark_report(&report)?;
     println!(
-        "{{\\\"verification\\\":\\\"pass\\\",\\\"canonical_report_sha256\\\":\\\"{}\\\",\\\"source_commit\\\":\\\"{}\\\",\\\"case_count\\\":{},\\\"passed_count\\\":{},\\\"failed_count\\\":{}}}",
+        "{{\"verification\":\"pass\",\"canonical_report_sha256\":\"{}\",\"source_commit\":\"{}\",\"case_count\":{},\"passed_count\":{},\"failed_count\":{}}}",
         report.canonical_report_sha256,
         report.source_commit,
         report.case_count,
