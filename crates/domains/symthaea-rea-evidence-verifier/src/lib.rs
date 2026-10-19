@@ -615,9 +615,15 @@ mod tests {
     fn create_fixture() -> Fixture {
         let suffix = NEXT.fetch_add(1, Ordering::Relaxed);
         let root = std::env::temp_dir().join(format!("rea-evidence-verify-{}-{suffix}", std::process::id()));
-        let source = root.join("source");
+        let source = root.join("repo/benchmarks/rea-determinism/v1");
+        let differential = root.join("repo/benchmarks/rea-differential/v1");
+        let schemas = root.join("repo/schemas");
+        let crate_src = root.join("repo/crates/domains/symthaea-rea-evidence-verifier/src");
         let artifact = root.join("artifact");
         fs::create_dir_all(&source).unwrap();
+        fs::create_dir_all(&differential).unwrap();
+        fs::create_dir_all(&schemas).unwrap();
+        fs::create_dir_all(&crate_src).unwrap();
         fs::create_dir_all(&artifact).unwrap();
 
         let normalizer = b"normalize fixture v1\n";
@@ -630,6 +636,24 @@ mod tests {
         write(&source.join("requirements-unblob-26.6.4.lock"), requirements_lock);
         write(&source.join("provider-smoke.sh"), b"provider smoke script v1\n");
         write(&source.join("provider-metamorphic-sweep.sh"), b"provider metamorphic script v1\n");
+        let diff_cases = b"{\"schema_version\":\"diff-cases\"}\n";
+        let diff_policy = b"{\"schema_version\":\"diff-policy\"}\n";
+        let oracle_builder = b"oracle builder fixture v1\n";
+        let unblob_adapter = b"Unblob adapter fixture v1\n";
+        let oracle_schema = b"{\"$schema\":\"oracle-schema\"}\n";
+        let observation_schema = b"{\"$schema\":\"observation-schema\"}\n";
+        let scorecard_schema = b"{\"$schema\":\"scorecard-schema\"}\n";
+        let differential_scorer = b"differential scorer fixture v1\n";
+        let differential_cli = b"differential cli fixture v1\n";
+        write(&differential.join("cases.json"), diff_cases);
+        write(&differential.join("oracle-policy.json"), diff_policy);
+        write(&differential.join("build-oracle.sh"), oracle_builder);
+        write(&differential.join("unblob-smoke-adapter.sh"), unblob_adapter);
+        write(&schemas.join("rea-differential-oracle-v1.schema.json"), oracle_schema);
+        write(&schemas.join("rea-differential-observation-v1.schema.json"), observation_schema);
+        write(&schemas.join("rea-differential-scorecard-v1.schema.json"), scorecard_schema);
+        write(&crate_src.join("differential.rs"), differential_scorer);
+        write(&crate_src.join("main.rs"), differential_cli);
 
         let head = "1234567890abcdef1234567890abcdef12345678".to_owned();
         let checkout = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_owned();
@@ -656,6 +680,15 @@ mod tests {
         let cases_sha = sha(cases);
         let oracle_sha = sha(oracle);
         let requirements_lock_sha = sha(requirements_lock);
+        let differential_cases_sha = sha(diff_cases);
+        let differential_policy_sha = sha(diff_policy);
+        let differential_oracle_builder_sha = sha(oracle_builder);
+        let unblob_differential_adapter_sha = sha(unblob_adapter);
+        let differential_oracle_schema_sha = sha(oracle_schema);
+        let differential_observation_schema_sha = sha(observation_schema);
+        let differential_scorecard_schema_sha = sha(scorecard_schema);
+        let differential_scorer_sha = sha(differential_scorer);
+        let differential_cli_sha = sha(differential_cli);
 
         write(&artifact.join("fixture-source/payload.txt"), payload);
         write(&artifact.join("fixture.gz"), input);
@@ -715,6 +748,15 @@ mod tests {
                 "oracle_sha256": oracle_sha,
                 "provider_smoke_script_sha256": sha(b"provider smoke script v1\n"),
                 "provider_metamorphic_script_sha256": sha(b"provider metamorphic script v1\n"),
+                "differential_cases_sha256": differential_cases_sha,
+                "differential_policy_sha256": differential_policy_sha,
+                "differential_oracle_builder_sha256": differential_oracle_builder_sha,
+                "unblob_differential_adapter_sha256": unblob_differential_adapter_sha,
+                "differential_oracle_schema_sha256": differential_oracle_schema_sha,
+                "differential_observation_schema_sha256": differential_observation_schema_sha,
+                "differential_scorecard_schema_sha256": differential_scorecard_schema_sha,
+                "differential_scorer_sha256": differential_scorer_sha,
+                "differential_cli_sha256": differential_cli_sha,
             },
             "provider_version": PROVIDER_VERSION,
             "executable_path": "/usr/local/bin/unblob",
