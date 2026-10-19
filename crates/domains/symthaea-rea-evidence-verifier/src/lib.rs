@@ -355,16 +355,21 @@ pub fn verify_bundle(
     }
     let _python_version = text_field(&receipt, "python_version")?;
     let _executable_sha = digest_field(&receipt, "executable_sha256")?;
-    let _pip_freeze_sha = digest_field(&receipt, "pip_freeze_sha256")?;
+    let pip_freeze_sha = digest_field(&receipt, "pip_freeze_sha256")?;
+    if pip_freeze_sha != requirements_lock_sha {
+        return Err(err("resolved dependency snapshot does not match the checked-in provider lock"));
+    }
 
     let normalizer_sha = digest_field(&receipt, "source.normalizer_sha256")?;
     let cases_sha = digest_field(&receipt, "source.cases_manifest_sha256")?;
     let oracle_sha = digest_field(&receipt, "source.oracle_sha256")?;
+    let requirements_lock_sha = digest_field(&receipt, "source.requirements_lock_sha256")?;
     let provider_smoke_sha = digest_field(&receipt, "source.provider_smoke_script_sha256")?;
     let provider_meta_script_sha = digest_field(&receipt, "source.provider_metamorphic_script_sha256")?;
     verify_digest_at(&source_root.join("normalize.jq"), &normalizer_sha, "normalizer")?;
     verify_digest_at(&source_root.join("cases.json"), &cases_sha, "cases manifest")?;
     verify_digest_at(&source_root.join("oracle.json"), &oracle_sha, "oracle")?;
+    verify_digest_at(&source_root.join("requirements-unblob-26.6.4.lock"), &requirements_lock_sha, "provider dependency lock")?;
     verify_digest_at(&source_root.join("provider-smoke.sh"), &provider_smoke_sha, "provider smoke script")?;
     verify_digest_at(&source_root.join("provider-metamorphic-sweep.sh"), &provider_meta_script_sha, "provider metamorphic script")?;
 
@@ -378,6 +383,8 @@ pub fn verify_bundle(
 
     verify_digest_file(&artifact_root.join("fixture-input-sha256.txt"), &input_sha, "baseline input manifest")?;
     verify_digest_file(&artifact_root.join("mutated-fixture-input-sha256.txt"), &mutated_input_sha, "mutated input manifest")?;
+    verify_digest_at(&artifact_root.join("fixture.gz"), &input_sha, "baseline gzip source fixture")?;
+    verify_digest_at(&artifact_root.join("fixture-mutated.gz"), &mutated_input_sha, "mutated gzip source fixture")?;
     verify_digest_file(&artifact_root.join("expected-payload-sha256.txt"), &expected_payload_sha, "baseline payload manifest")?;
     verify_digest_file(&artifact_root.join("mutated-expected-payload-sha256.txt"), &mutated_payload_sha, "mutated payload manifest")?;
     verify_digest_at(&artifact_root.join("fixture-source/payload.txt"), &expected_payload_sha, "baseline source payload")?;
@@ -540,9 +547,11 @@ mod tests {
         let normalizer = b"normalize fixture v1\n";
         let cases = b"{\"schema_version\":\"cases\"}\n";
         let oracle = b"{\"schema_version\":\"oracle\"}\n";
+        let requirements_lock = b"Markdown==3.11.1\n";
         write(&source.join("normalize.jq"), normalizer);
         write(&source.join("cases.json"), cases);
         write(&source.join("oracle.json"), oracle);
+        write(&source.join("requirements-unblob-26.6.4.lock"), requirements_lock);
         write(&source.join("provider-smoke.sh"), b"provider smoke script v1\n");
         write(&source.join("provider-metamorphic-sweep.sh"), b"provider metamorphic script v1\n");
 
@@ -570,8 +579,11 @@ mod tests {
         let normalizer_sha = sha(normalizer);
         let cases_sha = sha(cases);
         let oracle_sha = sha(oracle);
+        let requirements_lock_sha = sha(requirements_lock);
 
         write(&artifact.join("fixture-source/payload.txt"), payload);
+        write(&artifact.join("fixture.gz"), input);
+        write(&artifact.join("fixture-mutated.gz"), input_mutated);
         write(&artifact.join("fixture-source-mutated/payload.txt"), payload_mutated);
         for (lane, input_bytes, raw, projection, extracted) in [
             ("run-a", input.as_slice(), raw_a.as_slice(), projection_a.as_slice(), payload.as_slice()),
@@ -632,7 +644,7 @@ mod tests {
             "executable_path": "/usr/local/bin/unblob",
             "executable_sha256": "c".repeat(64),
             "python_version": "Python 3.12.0",
-            "pip_freeze_sha256": "d".repeat(64),
+            "pip_freeze_sha256": requirements_lock_sha,
             "fixture_input_sha256": input_sha,
             "mutated_fixture_input_sha256": mutated_input_sha,
             "expected_payload_sha256": payload_sha,
@@ -764,6 +776,14 @@ mod tests {
         write(&f.artifact.join("unexpected.bin"), b"unmanifested evidence");
         assert!(verify_bundle(&f.artifact, &f.source, &f.expected_head, None)
             .unwrap_err().to_string().contains("file set"));
+    }
+
+    #[test]
+    fn rejects_provider_dependency_lock_drift() {
+        let f = create_fixture();
+        write(&f.source.join("requirements-unblob-26.6.4.lock"), b"Markdown==3.11.2\n");
+        assert!(verify_bundle(&f.artifact, &f.source, &f.expected_head, None)
+            .unwrap_err().to_string().contains("provider dependency lock"));
     }
 
     #[test]
