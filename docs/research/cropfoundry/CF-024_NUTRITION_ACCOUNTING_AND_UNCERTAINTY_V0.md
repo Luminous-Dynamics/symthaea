@@ -10,7 +10,7 @@ That distinction is empirically important. A systematic review covering 67 studi
 
 ## Current executable: one explicit nutrient/batch accounting receipt
 
-Run from the workspace root with a JSON input that conforms to `cropfoundry-nutrition-accounting-input-v0`:
+Run from the workspace root with a JSON input that conforms to `cropfoundry-nutrition-accounting-input-v1`:
 
 ```bash
 cargo run -q -p xtask -- cropfoundry-nutrition-accounting \
@@ -18,7 +18,7 @@ cargo run -q -p xtask -- cropfoundry-nutrition-accounting \
   --out reports/cropfoundry/nutrient-accounting-receipt.json
 ```
 
-The command records the input's own SHA-256 and reports nutrient mass per batch and declared serving, plus ratios per litre of water, square metre of land, kWh and currency unit when the corresponding inputs are known. A missing resource measurement stays unknown; a zero/absent denominator does not produce an infinite or invented efficiency. Resource ratios are comparable only when the water/land/energy/cost boundaries, unit definitions, crop stage and allocation rules match.
+The command records the input's own SHA-256 and emits a `cropfoundry-nutrition-accounting-receipt-v1` receipt with nutrient mass per batch and declared serving, plus ratios per litre of water, square metre of land, kWh and currency unit when the corresponding inputs are known. Legacy v0 point-only inputs remain accepted; v0 inputs cannot include the new interval fields. A missing resource measurement stays unknown; a zero/absent denominator does not produce an infinite or invented efficiency. Resource ratios are comparable only when the water/land/energy/cost boundaries, unit definitions, crop stage and allocation rules match.
 
 ### Accounting equations
 
@@ -38,7 +38,7 @@ A bioavailability fraction `b` is optional and must have its own evidence URI. W
 
 ## New uncertainty interval support
 
-Point estimates can hide a range of outcomes and are particularly misleading when concentration, edible mass, processing retention and bioavailability are taken from different sources. The input now optionally accepts paired lower/upper bounds for:
+Point estimates can hide a range of outcomes and are particularly misleading when concentration, edible mass, processing retention and bioavailability are taken from different sources. Input schema v1 optionally accepts paired lower/upper bounds for:
 
 - nutrient concentration (mg/kg);
 - edible mass at the same measurement stage (kg);
