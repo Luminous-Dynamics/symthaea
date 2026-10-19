@@ -3,6 +3,7 @@
 # Uses only generated gzip -> tar -> text fixtures. Never executes extracted content.
 set -eu
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+DIFFERENTIAL_ROOT=$(CDPATH= cd -- "$ROOT/../../rea-differential/v1" && pwd)
 NORMALIZER="$ROOT/normalize.jq"
 fail(){ printf 'FAIL: %s\n' "$*" >&2; exit 1; }
 command -v unblob >/dev/null 2>&1 || fail "pinned Unblob 26.6.4 is required"
@@ -13,6 +14,7 @@ command -v gzip >/dev/null 2>&1 || fail "gzip required"
 command -v find >/dev/null 2>&1 || fail "find required"
 command -v cmp >/dev/null 2>&1 || fail "cmp required"
 command -v git >/dev/null 2>&1 || fail "git required"
+command -v cargo >/dev/null 2>&1 || fail "cargo required"
 REQUIREMENTS_LOCK="$ROOT/requirements-unblob-26.6.4.lock"
 [ -f "$NORMALIZER" ] || fail "semantic normalizer missing"
 [ -f "$REQUIREMENTS_LOCK" ] || fail "provider dependency lock missing"
@@ -25,6 +27,11 @@ cases_manifest_sha=$(sha256sum "$ROOT/cases.json" | awk '{print $1}')
 oracle_sha=$(sha256sum "$ROOT/oracle.json" | awk '{print $1}')
 provider_smoke_script_sha=$(sha256sum "$ROOT/provider-smoke.sh" | awk '{print $1}')
 provider_metamorphic_script_sha=$(sha256sum "$ROOT/provider-metamorphic-sweep.sh" | awk '{print $1}')
+differential_cases_sha=$(sha256sum "$DIFFERENTIAL_ROOT/cases.json" | awk '{print $1}')
+differential_oracle_builder_sha=$(sha256sum "$DIFFERENTIAL_ROOT/build-oracle.sh" | awk '{print $1}')
+unblob_differential_adapter_sha=$(sha256sum "$DIFFERENTIAL_ROOT/unblob-smoke-adapter.sh" | awk '{print $1}')
+differential_scorer_sha=$(sha256sum "$ROOT/../../../crates/domains/symthaea-rea-evidence-verifier/src/differential.rs" | awk '{print $1}')
+differential_cli_sha=$(sha256sum "$ROOT/../../../crates/domains/symthaea-rea-evidence-verifier/src/main.rs" | awk '{print $1}')
 
 version=$(unblob --version 2>&1) || fail "cannot read Unblob version"
 printf '%s\n' "$version" | grep -Eq '26[.]6[.]4([[:space:]]|$)' || fail "expected Unblob 26.6.4; got: $version"
@@ -76,6 +83,13 @@ printf '%s\n' "$fixture_sha" > "$OUT/fixture-input-sha256.txt"
 printf '%s\n' "$mutated_fixture_sha" > "$OUT/mutated-fixture-input-sha256.txt"
 printf '%s\n' "$payload_sha" > "$OUT/expected-payload-sha256.txt"
 printf '%s\n' "$mutated_payload_sha" > "$OUT/mutated-expected-payload-sha256.txt"
+
+bash "$DIFFERENTIAL_ROOT/build-oracle.sh" "$OUT/fixture.gz" "$OUT/nested.tar" \
+  "$OUT/fixture-source/payload.txt" "nested-gzip-tar-001" "payload-001" \
+  "$OUT/oracle-nested-gzip-tar-001.json"
+bash "$DIFFERENTIAL_ROOT/build-oracle.sh" "$OUT/fixture-mutated.gz" "$OUT/nested-mutated.tar" \
+  "$OUT/fixture-source-mutated/payload.txt" "nested-gzip-tar-mutation-014" "payload-001-mutated" \
+  "$OUT/oracle-nested-gzip-tar-mutation-014.json"
 
 for lane in run-a run-b run-mutated; do
   run="$OUT/$lane"
