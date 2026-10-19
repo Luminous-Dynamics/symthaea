@@ -17,7 +17,7 @@ Validate an alternate fixture by passing its path:
 cargo run -p symthaea-habitat-vertical-bench --bin validate-habitat-vertical -- path/to/fixture.json
 ```
 
-The default fixture is embedded at compile time from `docs/research/fixtures/habitat-vertical-v0.1.json`. The CLI also validates the embedded definition-only campaign in `docs/research/fixtures/habitat-vertical-scenarios-v0.1.json` the synthetic replay contract in `docs/research/fixtures/habitat-event-replay-v0.1.json`, the quantity-aware ledger in `docs/research/fixtures/habitat-material-ledger-v0.1.json`, and the interval-aware measurement gate in `docs/research/fixtures/habitat-measurement-gate-v0.1.json`. A successful run means only that fixture structure, synthetic arithmetic controls, the eight scenario definitions, event identity/causal replay, the synthetic quantity ledger, and measurement-decision known answers are internally consistent. It does not run a scheduler or simulate a disruption. The CLI prints the synthetic cost ratio and mass-balance known answers; negative controls are declared and only the mutations covered by unit tests are exercised by the test suite.
+The default fixture is embedded at compile time from `docs/research/fixtures/habitat-vertical-v0.1.json`. The CLI also validates the definition-only campaign, event replay, quantity-aware material ledger, interval-aware measurement gate, and cross-layer audit bundle fixtures. A successful run means only that fixture structure, synthetic arithmetic controls, scenario definitions, event identity/causal replay, the synthetic quantity ledger, measurement-decision known answers, and exact fixture-byte fingerprints are internally consistent. It does not run a scheduler or simulate a disruption. The CLI prints the synthetic cost ratio and mass-balance known answers; negative controls are declared and only the mutations covered by unit tests are exercised by the test suite.
 
 ## Checks
 
@@ -39,13 +39,15 @@ The default fixture is embedded at compile time from `docs/research/fixtures/hab
 - a factory assumption-falsification qualifier covering 9 claims and 10 candidate tests, with source-linked option/scenario dependencies, concrete falsifiers, distinct support/failure/indeterminate outcomes, explicit not-run selection and execution states, and no numeric experiment cost/probability/results;
 - a manufacturing-event replay qualifier covering event identity, exact-redelivery idempotence, conflicting-ID rejection, strict UTC clock ordering, deterministic causal replay, source-graph references and causal object ancestry; it explicitly does not compute cryptographic digests or model quantities;
 - a quantity-aware material ledger covering 16 accounts and nine ordered transactions, exact integer mg conservation, account overdraw prevention, source-event/operation references, byproduct and rework disposition, and frozen closing-balance known answers; the piece-equivalent-to-mg conversion remains explicitly blocked;
+- an interval-aware measurement gate with five explicit dispositions, checked integer uncertainty bounds, unit and calibration-validity checks, and rejection of unsupported probability claims;
+- a cross-layer audit bundle that pins exact UTF-8 byte lengths and SHA-256 fingerprints for the four source fixtures, reruns all component validators, and checks event/ledger/measurement summaries against an independent manifest; digest matches are not source authentication;
 - no fabricated numeric campaign results, no implicit baseline/candidate policy binding, and no confusion between campaign definition validation and simulation;
 - proposed target status and the delivered-cost ratio range;
 - synthetic-only physical-measurement, factory-commissioning, human-evaluation and replication states.
 
 ## Tests and verification status
 
-The source currently contains 117 authored Rust unit tests across seven modules (31 structural/accounting + 13 scenario-campaign + 13 resilience-option + 13 assumption-falsification + 15 event-replay + 15 material-ledger + 17 measurement-gate tests). They have not been compiled or executed in the current environment; do not describe them as passing. Run the commands above against the exact branch head before treating the qualifier as an executed test result. The scenario, resilience-option and assumption-falsification suites qualify definitions only, not scheduling, experiment selection, or resilience outcomes.
+The source currently contains 130 authored Rust unit tests across eight modules (31 structural/accounting + 13 scenario-campaign + 13 resilience-option + 13 assumption-falsification + 15 event-replay + 15 material-ledger + 17 measurement-gate + 13 audit-bundle tests). They have not been compiled or executed in the current environment; do not describe them as passing. Run the commands above against the exact branch head before treating the qualifier as an executed test result. The scenario, resilience-option and assumption-falsification suites qualify definitions only, not scheduling, experiment selection, or resilience outcomes.
 
 ## Deliberate limits
 
@@ -64,3 +66,8 @@ The default CLI also validates `docs/research/fixtures/habitat-event-replay-v0.1
 ## Quantity-aware material ledger (synthetic only)
 
 The default embedded-fixture CLI also validates `docs/research/fixtures/habitat-material-ledger-v0.1.json`. Its nine transactions account for a single textile-fiber component-mass stream through cutting, sewing, rework recovery, inspection, packaging, and dispatch. Each transaction must conserve exact integer milligrams and each account must remain nonnegative; final account balances and known-answer totals are checked. The fixture reuses event and traceability identities as contextual references, but its quantities are an independent synthetic overlay—not source measurements. Conversion from the base fixture's `piece_equivalent` to mg is blocked until a qualified conversion exists. These tests are authored, not compiled or executed in the current environment.
+
+
+## Cross-layer audit bundle (synthetic only)
+
+The default CLI validates `docs/research/fixtures/habitat-audit-bundle-v0.1.json`. It checks exact UTF-8 byte lengths and SHA-256 fingerprints of the base, event-replay, material-ledger, and measurement-gate fixtures, reruns each existing validator, and compares component summaries against the manifest. Hash matches establish byte identity only: there is no signature, trusted timestamp, source authentication, or proof of physical truth. These tests are authored, not compiled or executed.
