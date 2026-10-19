@@ -1672,6 +1672,74 @@ mod tests {
     }
 
     #[test]
+    fn reconcile_csv_operation_binds_verified_inputs_and_mapping_to_receipt() {
+        let temp = tempdir().unwrap();
+        let artifact_root = temp.path().join("artifacts");
+        fs::create_dir_all(&artifact_root).unwrap();
+        let artifact_bytes = b"source_row_id,stress_mpa,specimen_note\nR-001,920,as-built\nR-002,,repeat\n";
+        fs::write(artifact_root.join("fixture.csv"), artifact_bytes).unwrap();
+
+        let mut manifest = record_manifest();
+        manifest.artifacts[0].sha256 = sha256_hex(artifact_bytes);
+        manifest.artifacts[0].size_bytes = artifact_bytes.len() as u64;
+        let manifest_path = temp.path().join("manifest.json");
+        fs::write(&manifest_path, serde_json::to_vec(&manifest).unwrap()).unwrap();
+
+        let mapping = fixture_csv_mapping();
+        let mapping_bytes = serde_json::to_vec(&mapping).unwrap();
+        let mapping_path = temp.path().join("mapping.json");
+        fs::write(&mapping_path, &mapping_bytes).unwrap();
+
+        let args = vec![
+            "metal-measurement-bench".to_string(),
+            "reconcile-csv".to_string(),
+            manifest_path.display().to_string(),
+            artifact_root.display().to_string(),
+            mapping_path.display().to_string(),
+            "fixture.csv".to_string(),
+        ];
+        let receipt = run(&args).unwrap();
+        assert_eq!(receipt.operation, "reconcile-csv");
+        assert_eq!(receipt.status, "CSV_SOURCE_ROWS_AND_EXPLICIT_FIELDS_RECONCILED");
+        assert_eq!(receipt.record_count, 2);
+        assert_eq!(receipt.evidence_input_sha256.as_deref(), Some(sha256_hex(artifact_bytes).as_str()));
+        let reconciliation = receipt.csv_reconciliation.unwrap();
+        assert_eq!(reconciliation.artifact_sha256, sha256_hex(artifact_bytes));
+        assert_eq!(reconciliation.mapping_sha256, sha256_hex(&mapping_bytes));
+        assert_eq!(reconciliation.data_row_count, 2);
+        assert_eq!(reconciliation.unique_source_row_ids, 2);
+        assert_eq!(reconciliation.columns[0].preserved_missing_cells, 1);
+
+        let mut undeclared_args = args;
+        undeclared_args[5] = "unlisted.csv".to_string();
+        assert!(run(&undeclared_args).is_err());
+    }
+
+    #[test]
+    fn committed_csv_mapping_schema_and_receipt_operation_are_bound() {
+        let mapping_schema: serde_json::Value = serde_json::from_str(
+            include_str!("../schemas/csv-mapping-v0.1.schema.json")
+        ).unwrap();
+        let required = mapping_schema["required"].as_array().unwrap();
+        for field in ["schema_version", "artifact_relative_path", "source_row_id_header", "columns"] {
+            assert!(required.iter().any(|value| value == field),
+                "mapping schema does not require {field}");
+        }
+        assert!(mapping_schema["properties"]["columns"]["items"]["properties"]["missing_policy"]["enum"]
+            .as_array().unwrap().iter().any(|value| value == "preserve_missing"));
+
+        let receipt_schema: serde_json::Value = serde_json::from_str(
+            include_str!("../schemas/audit-receipt-v0.1.schema.json")
+        ).unwrap();
+        assert!(receipt_schema["properties"]["csv_reconciliation"]["properties"]["mapping_sha256"].is_object());
+        assert!(receipt_schema["allOf"].as_array().unwrap().iter().any(|condition| {
+            condition["if"]["properties"]["operation"]["const"] == "reconcile-csv"
+                && condition["then"]["required"].as_array().unwrap()
+                    .iter().any(|value| value == "csv_reconciliation")
+        }));
+    }
+
+    #[test]
     fn csv_reconciliation_binds_exact_headers_units_roles_and_source_row_ids() {
         let bytes = b"source_row_id,stress_mpa,specimen_note\nR-001,920,as-built\nR-002,,repeat\n";
         let mapping = fixture_csv_mapping();
