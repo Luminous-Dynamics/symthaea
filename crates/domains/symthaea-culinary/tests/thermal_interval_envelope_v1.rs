@@ -260,3 +260,19 @@ fn selected_sensor_and_measurement_kind_are_explicit() {
     )
     .is_err());
 }
+
+
+#[test]
+fn microsecond_timestamp_spacing_is_not_lost_to_epoch_float_precision() {
+    let mut log = log_fixture();
+    log["observations"][0]["measured_at"] =
+        Value::String("2026-10-19T00:00:00.000001Z".into());
+    log["observations"][1]["measured_at"] =
+        Value::String("2026-10-19T00:00:00.000002Z".into());
+    log["observations"][2]["measured_at"] =
+        Value::String("2026-10-19T00:00:00.000003Z".into());
+
+    let result = evaluate(&log, &model());
+    close(result.elapsed_minutes, 2e-6 / 60.0, 1e-14);
+    assert!(result.nominal_log10_reduction.is_finite());
+}
