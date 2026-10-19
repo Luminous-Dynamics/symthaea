@@ -211,7 +211,7 @@ fn validate_case(case: &Case) -> Vec<String> {
         if action
             .utilities
             .values()
-            .any(|value| value.abs() > UTILITY_ABS_LIMIT)
+            .any(|value| value.unsigned_abs() > UTILITY_ABS_LIMIT as u64)
         {
             errors.push("invalid_utility_bound".to_owned());
         }
