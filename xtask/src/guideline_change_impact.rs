@@ -81,7 +81,8 @@ struct ChangeImpactReceipt {
     runtime_arch: String,
     from_revision_id: String,
     to_revision_id: String,
-    source_requirement_count: usize,
+    baseline_requirement_count: usize,
+    candidate_requirement_count: usize,
     mapped_requirement_count: usize,
     change_record_count: usize,
     claim_ceiling: &'static str,
@@ -92,7 +93,8 @@ struct ValidatedChangeImpact {
     source_artifact_sha256: BTreeMap<String, String>,
     from_revision_id: String,
     to_revision_id: String,
-    source_requirement_count: usize,
+    baseline_requirement_count: usize,
+    candidate_requirement_count: usize,
     mapped_requirement_count: usize,
     change_record_count: usize,
 }
@@ -131,7 +133,8 @@ pub fn run(
         runtime_arch: std::env::consts::ARCH.to_string(),
         from_revision_id: validated.from_revision_id,
         to_revision_id: validated.to_revision_id,
-        source_requirement_count: validated.source_requirement_count,
+        baseline_requirement_count: validated.baseline_requirement_count,
+        candidate_requirement_count: validated.candidate_requirement_count,
         mapped_requirement_count: validated.mapped_requirement_count,
         change_record_count: validated.change_record_count,
         claim_ceiling: "synthetic source-change mapping integrity only; no clinical validation",
@@ -357,7 +360,9 @@ fn validate_contract(contract: &ChangeImpactContract, root: &Path) -> Result<Val
             bail!("{}: unknown requirement disposition", mapping.requirement_id);
         }
 
-        unique_nonempty(&mapping.test_ids, "test_ids", &mapping.requirement_id)?;
+        if !mapping.test_ids.is_empty() {
+            unique_nonempty(&mapping.test_ids, "test_ids", &mapping.requirement_id)?;
+        }
         match mapping.disposition.as_str() {
             "accepted" => {
                 if mapping.bundle_target.as_deref().unwrap_or("").trim().is_empty() {
@@ -433,7 +438,9 @@ fn validate_contract(contract: &ChangeImpactContract, root: &Path) -> Result<Val
                 expected_kind
             );
         }
-        unique_nonempty(&record.case_ids, "case_ids", &record.requirement_id)?;
+        if !record.case_ids.is_empty() {
+            unique_nonempty(&record.case_ids, "case_ids", &record.requirement_id)?;
+        }
         if record.reviewer_record_id.as_deref().unwrap_or("").trim().is_empty() {
             bail!("{}: change record requires a review record", record.requirement_id);
         }
@@ -447,6 +454,12 @@ fn validate_contract(contract: &ChangeImpactContract, root: &Path) -> Result<Val
                     "accepted" => {
                         if record.disposition != "retested" {
                             bail!("{}: accepted changes must be retested", record.requirement_id);
+                        }
+                        if mapping.criticality == "safety_critical" && record.case_ids.len() < 2 {
+                            bail!(
+                                "{}: changed safety-critical requirement needs at least two impact cases",
+                                record.requirement_id
+                            );
                         }
                         for case_id in &record.case_ids {
                             if !mapping.test_ids.contains(case_id) {
@@ -507,7 +520,8 @@ fn validate_contract(contract: &ChangeImpactContract, root: &Path) -> Result<Val
         source_artifact_sha256,
         from_revision_id: contract.from_revision_id.clone(),
         to_revision_id: contract.to_revision_id.clone(),
-        source_requirement_count: from.len() + to.len(),
+        baseline_requirement_count: from.len(),
+        candidate_requirement_count: to.len(),
         mapped_requirement_count: contract.requirements.len(),
         change_record_count: contract.change_records.len(),
     })
@@ -539,7 +553,8 @@ mod tests {
     fn checked_in_source_diff_and_mapping_are_consistent() {
         let validated = validate_contract(&fixture(), &root()).expect("fixture should validate");
         assert_eq!(validated.source_artifact_sha256.len(), 2);
-        assert_eq!(validated.source_requirement_count, 5);
+        assert_eq!(validated.baseline_requirement_count, 2);
+        assert_eq!(validated.candidate_requirement_count, 3);
         assert_eq!(validated.mapped_requirement_count, 3);
         assert_eq!(validated.change_record_count, 2);
     }
@@ -629,7 +644,7 @@ mod tests {
     }
 
     #[test]
-    fn unresolved_source_diff_cannot_be_silently_omitted() {
+    fn missing_change_review_record_is_rejected() {
         let mut contract = fixture();
         contract.change_records[0].reviewer_record_id = None;
         assert_rejected(&contract);
