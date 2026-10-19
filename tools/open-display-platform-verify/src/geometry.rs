@@ -430,12 +430,12 @@ mod tests {
             .expect("synthetic ideal geometry should be valid");
         close(
             result.nominal_footprint_width_mm,
-            2.0 * 1000.0 * (10.0_f64.to_radians() / 2.0).tan(),
+            174.977_327_051_848_02,
             1e-10,
         );
         close(
             result.nominal_footprint_height_mm,
-            2.0 * 1000.0 * (5.0_f64.to_radians() / 2.0).tan(),
+            87.321_885_817_024_11,
             1e-10,
         );
         assert!(result.horizontal_fits);
@@ -458,6 +458,37 @@ mod tests {
             result.total_required_width_mm,
             expected_width + 2.0 * (input.centering_uncertainty_mm + input.edge_guard_mm),
             1e-10,
+        );
+    }
+
+    #[test]
+    fn larger_distance_and_angular_uncertainty_do_not_shrink_guarded_footprint() {
+        let baseline = geometry_input();
+        let baseline_result =
+            evaluate_geometry_screen(&baseline).expect("baseline geometry is valid");
+
+        let mut stressed = baseline;
+        stressed.distance_mm += 100.0;
+        stressed.horizontal_fov_standard_uncertainty_deg *= 2.0;
+        stressed.vertical_fov_standard_uncertainty_deg *= 2.0;
+        let stressed_result =
+            evaluate_geometry_screen(&stressed).expect("stressed geometry remains valid");
+
+        assert!(
+            stressed_result.conservative_footprint_width_mm
+                > baseline_result.conservative_footprint_width_mm
+        );
+        assert!(
+            stressed_result.conservative_footprint_height_mm
+                > baseline_result.conservative_footprint_height_mm
+        );
+        assert!(
+            stressed_result.total_required_width_mm
+                > baseline_result.total_required_width_mm
+        );
+        assert!(
+            stressed_result.total_required_height_mm
+                > baseline_result.total_required_height_mm
         );
     }
 
