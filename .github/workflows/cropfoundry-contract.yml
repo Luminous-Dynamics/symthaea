@@ -127,5 +127,8 @@ jobs:
           grep -q '"scenario_count": 30' "$RUNNER_TEMP/cropfoundry-robust-policy-receipt.json"
           grep -q '"policy_count": 5' "$RUNNER_TEMP/cropfoundry-robust-policy-receipt.json"
           grep -q '"tail_sample_count": 2' "$RUNNER_TEMP/cropfoundry-robust-policy-receipt.json"
+          grep -q '"upper_tail_scenario_ids": \[' "$RUNNER_TEMP/cropfoundry-robust-policy-receipt.json"
+          grep -q '"scenario_policy_diagnostics_count": 150' "$RUNNER_TEMP/cropfoundry-robust-policy-receipt.json"
+          grep -q '"scenario_policy_diagnostics": \[' "$RUNNER_TEMP/cropfoundry-robust-policy-receipt.json"
           grep -q '"calibrated_probability_claim": false' "$RUNNER_TEMP/cropfoundry-robust-policy-receipt.json"
           grep -q '"biological_performance_claim": false' "$RUNNER_TEMP/cropfoundry-robust-policy-receipt.json"
