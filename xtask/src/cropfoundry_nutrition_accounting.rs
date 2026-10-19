@@ -61,11 +61,12 @@ struct NutritionAccountingReceipt {
     nutrient_id: String,
     accounting_pass: bool,
     concentration_is_direct_assay: bool,
+    delivery_mass_is_estimated: bool,
     measured_nutrient_mass_delivered_mg: Option<f64>,
     modeled_nutrient_mass_delivered_mg: Option<f64>,
-    bioavailable_nutrient_mass_delivered_mg: Option<f64>,
+    estimated_bioavailable_nutrient_mass_delivered_mg: Option<f64>,
     nutrient_mg_per_serving: Option<f64>,
-    bioavailable_nutrient_mg_per_serving: Option<f64>,
+    estimated_bioavailable_nutrient_mg_per_serving: Option<f64>,
     nutrient_mg_per_liter_water: Option<f64>,
     nutrient_mg_per_square_meter: Option<f64>,
     nutrient_mg_per_kwh: Option<f64>,
@@ -212,6 +213,8 @@ fn audit_input(input: NutritionAccountingInput) -> NutritionAccountingReceipt {
 
     let accounting_pass = issues.is_empty();
     let direct_assay = input.concentration_provenance == ConcentrationProvenance::DirectAssay;
+    let delivery_mass_is_estimated = !direct_assay
+        || input.concentration_stage == Some(ConcentrationStage::MeasuredBeforePreparation);
     let nutrient_mass_at_concentration_stage = if accounting_pass {
         concentration.zip(stage_mass).map(|(c, mass)| c * mass)
     } else {
@@ -244,6 +247,7 @@ fn audit_input(input: NutritionAccountingInput) -> NutritionAccountingReceipt {
         nutrient_id: input.nutrient_id,
         accounting_pass,
         concentration_is_direct_assay: direct_assay,
+        delivery_mass_is_estimated,
         measured_nutrient_mass_delivered_mg: if direct_assay
             && input.concentration_stage == Some(ConcentrationStage::MeasuredAtServing)
         {
@@ -251,14 +255,14 @@ fn audit_input(input: NutritionAccountingInput) -> NutritionAccountingReceipt {
         } else {
             None
         },
-        modeled_nutrient_mass_delivered_mg: if !direct_assay || input.concentration_stage == Some(ConcentrationStage::MeasuredBeforePreparation) {
+        modeled_nutrient_mass_delivered_mg: if delivery_mass_is_estimated {
             delivered_nutrient_mass
         } else {
             None
         },
-        bioavailable_nutrient_mass_delivered_mg: bioavailable_mass,
+        estimated_bioavailable_nutrient_mass_delivered_mg: bioavailable_mass,
         nutrient_mg_per_serving: nutrient_per_serving,
-        bioavailable_nutrient_mg_per_serving: bioavailable_per_serving,
+        estimated_bioavailable_nutrient_mg_per_serving: bioavailable_per_serving,
         nutrient_mg_per_liter_water: ratio(delivered_nutrient_mass, input.water_liters),
         nutrient_mg_per_square_meter: ratio(delivered_nutrient_mass, input.land_square_meters),
         nutrient_mg_per_kwh: ratio(delivered_nutrient_mass, input.energy_kwh),
@@ -269,7 +273,8 @@ fn audit_input(input: NutritionAccountingInput) -> NutritionAccountingReceipt {
             "Concentration x edible mass is an accounting calculation, not a dietary adequacy or health outcome.".to_owned(),
             "Literature/modelled composition and retention values remain estimates, even when the arithmetic passes.".to_owned(),
             "source_sha256 is format-checked here; the CLI does not authenticate it against an independent artifact registry.".to_owned(),
-            "Missing bioavailability evidence yields no bioavailable-mass estimate; it is not assumed to equal nutrient mass.".to_owned(),
+            "Bioavailability-adjusted mass is always an estimate in this prototype, not a direct assay result.".to_owned(),
+            "Missing bioavailability evidence yields no estimate; it is not assumed to equal nutrient mass.".to_owned(),
             "Resource ratios are only comparable with matching system boundaries, units, crop stage and allocation rules.".to_owned(),
             "Food safety, dietary requirements, upper limits and population suitability are not evaluated.".to_owned(),
             "This receipt does not authorize model training or farm recommendations.".to_owned(),
@@ -359,13 +364,23 @@ mod tests {
     }
 
     #[test]
+    fn delivery_mass_provenance_is_explicit_in_the_receipt() {
+        let direct = audit_input(fixture());
+        assert!(!direct.delivery_mass_is_estimated);
+        let mut estimated = fixture();
+        estimated.concentration_provenance = ConcentrationProvenance::LiteratureValue;
+        let literature = audit_input(estimated);
+        assert!(literature.delivery_mass_is_estimated);
+    }
+
+    #[test]
     fn direct_at_serving_assay_computes_nutrient_mass_and_resource_ratios() {
         let receipt = audit_input(fixture());
         assert!(receipt.accounting_pass);
         assert_eq!(receipt.measured_nutrient_mass_delivered_mg, Some(12.0));
-        assert_eq!(receipt.bioavailable_nutrient_mass_delivered_mg, Some(3.0));
+        assert_eq!(receipt.estimated_bioavailable_nutrient_mass_delivered_mg, Some(3.0));
         assert_eq!(receipt.nutrient_mg_per_serving, Some(12.0));
-        assert_eq!(receipt.bioavailable_nutrient_mg_per_serving, Some(3.0));
+        assert_eq!(receipt.estimated_bioavailable_nutrient_mg_per_serving, Some(3.0));
         assert_eq!(receipt.nutrient_mg_per_liter_water, Some(0.4));
         assert_eq!(receipt.nutrient_mg_per_square_meter, Some(6.0));
         assert_eq!(receipt.nutrient_mg_per_kwh, Some(24.0));
@@ -390,7 +405,7 @@ mod tests {
         let receipt = audit_input(input);
         assert!(receipt.accounting_pass);
         assert_eq!(receipt.measured_nutrient_mass_delivered_mg, Some(12.0));
-        assert_eq!(receipt.bioavailable_nutrient_mass_delivered_mg, None);
+        assert_eq!(receipt.estimated_bioavailable_nutrient_mass_delivered_mg, None);
     }
 
     #[test]
