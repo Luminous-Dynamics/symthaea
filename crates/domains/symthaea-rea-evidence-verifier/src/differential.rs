@@ -274,6 +274,11 @@ pub fn score_case(oracle: &OracleCase, observed: &Observation) -> Result<Scoreca
     for file in &observed.files {
         validate_file(file, "observed", &mut reasons);
     }
+    for region in &oracle.expected_regions {
+        if region.start >= region.end || region.end > oracle.source.byte_length {
+            reasons.push(format!("oracle region is out of bounds or empty: {} {}..{}", region.kind, region.start, region.end));
+        }
+    }
     if duplicate_path_count(&oracle.expected_files) > 0 {
         reasons.push("oracle contains duplicate output paths; oracle must define collision semantics explicitly".into());
     }
@@ -354,6 +359,9 @@ pub fn score_case(oracle: &OracleCase, observed: &Observation) -> Result<Scoreca
             || reason.contains("span exceeds")
             || reason.contains("span is empty")
             || reason.contains("unknown accounting disposition")
+            || reason.contains("not normalized and relative")
+            || reason.contains("SHA-256 is malformed")
+            || reason.contains("empty logical ID")
     });
 
     let status = if !capability_supported {
@@ -468,7 +476,6 @@ mod tests {
             AccountingSpan { start: 0, end: 7, disposition: "identified".into() },
             AccountingSpan { start: 7, end: 10, disposition: "unknown".into() },
         ];
-        obs.regions.retain(|r| r.kind != "trailing-padding");
         let score = score_case(&oracle(), &obs).unwrap();
         assert_eq!(score.status, "fail");
         assert!(!score.complete_extraction_claim_accepted);
@@ -557,6 +564,53 @@ mod tests {
         obs.files[0].path = "../escape.bin".into();
         let score = score_case(&oracle(), &obs).unwrap();
         assert_eq!(score.status, "fail");
+    }
+
+    #[test]
+    fn rejects_extra_unexpected_output_files() {
+        let mut obs = observation();
+        obs.files.push(ExpectedFile {
+            path: "root/unexpected.bin".into(),
+            sha256: "e".repeat(64),
+            byte_length: 1,
+            logical_id: "unexpected-001".into(),
+        });
+        let score = score_case(&oracle(), &obs).unwrap();
+        assert_eq!(score.status, "fail");
+        assert_eq!(score.metrics.extra_or_wrong_files, 1);
+    }
+
+    #[test]
+    fn unsupported_spans_are_accounted_but_never_complete() {
+        let mut obs = observation();
+        obs.accounting = vec![
+            AccountingSpan { start: 0, end: 7, disposition: "identified".into() },
+            AccountingSpan { start: 7, end: 10, disposition: "unsupported".into() },
+        ];
+        obs.complete_extraction_claim = false;
+        let score = score_case(&oracle(), &obs).unwrap();
+        assert_eq!(score.status, "partial");
+        assert_eq!(score.metrics.unsupported_bytes, 3);
+        assert!(!score.complete_extraction_claim_accepted);
+    }
+
+    #[test]
+    fn rejects_out_of_bounds_region_even_when_other_results_match() {
+        let mut obs = observation();
+        obs.regions.push(Region { kind: "fake".into(), start: 9, end: 11 });
+        let score = score_case(&oracle(), &obs).unwrap();
+        assert_eq!(score.status, "fail");
+        assert!(score.reasons.iter().any(|reason| reason.contains("out of bounds")));
+    }
+
+    #[test]
+    fn refuses_wrong_schema_and_wrong_case_identity() {
+        let mut obs = observation();
+        obs.schema_version = "unknown.schema".into();
+        assert!(score_case(&oracle(), &obs).unwrap_err().to_string().contains("unsupported observation schema"));
+        obs.schema_version = OBSERVATION_SCHEMA.into();
+        obs.case_id = "different-case".into();
+        assert!(score_case(&oracle(), &obs).unwrap_err().to_string().contains("case IDs"));
     }
 
     #[test]
