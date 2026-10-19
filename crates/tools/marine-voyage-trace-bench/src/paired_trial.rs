@@ -218,6 +218,16 @@ pub enum OrderCoverage {
     BothOrdersObserved,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ComparisonOrderCounts {
+    pub baseline_candidate_id: String,
+    pub candidate_candidate_id: String,
+    pub baseline_first_pairs: usize,
+    pub candidate_first_pairs: usize,
+    pub order_coverage: OrderCoverage,
+    pub order_count_difference: usize,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct CampaignAudit {
     pub campaign_id: String,
@@ -231,6 +241,10 @@ pub struct CampaignAudit {
     pub baseline_first_eligible_pairs: usize,
     pub candidate_first_eligible_pairs: usize,
     pub ineligible_runs: usize,
+    /// Order counts keyed by the exact baseline/candidate pair. Campaign-wide
+    /// coverage is considered balanced only when every compared design pair
+    /// has observations in both orders.
+    pub comparison_order_counts: Vec<ComparisonOrderCounts>,
     pub order_coverage: OrderCoverage,
     pub order_count_difference: usize,
 }
@@ -263,6 +277,7 @@ pub fn audit_campaign(campaign_id: &str, runs: &[TrialRun]) -> CampaignAudit {
     let mut baseline_first_eligible_pairs = 0;
     let mut candidate_first_eligible_pairs = 0;
     let mut ineligible_runs = 0;
+    let mut order_counts: BTreeMap<(String, String), (usize, usize)> = BTreeMap::new();
 
     for ((group_campaign_id, pair_id), mut group) in groups {
         group.sort_by(|a, b| {
@@ -306,10 +321,17 @@ pub fn audit_campaign(campaign_id: &str, runs: &[TrialRun]) -> CampaignAudit {
             PairDisposition::EligibleForEnergyComparison => {
                 eligible_pair_count += 1;
                 if let Some(pair) = &assessment.eligible_pair {
+                    let key = (
+                        pair.baseline_candidate_id.clone(),
+                        pair.candidate_candidate_id.clone(),
+                    );
+                    let counts = order_counts.entry(key).or_insert((0, 0));
                     if pair.baseline_order == TrialOrder::First {
                         baseline_first_eligible_pairs += 1;
+                        counts.0 += 1;
                     } else {
                         candidate_first_eligible_pairs += 1;
+                        counts.1 += 1;
                     }
                 }
             }
@@ -321,13 +343,34 @@ pub fn audit_campaign(campaign_id: &str, runs: &[TrialRun]) -> CampaignAudit {
         pair_assessments.push(assessment);
     }
 
-    let order_coverage = match (
-        baseline_first_eligible_pairs > 0,
-        candidate_first_eligible_pairs > 0,
-    ) {
-        (false, false) => OrderCoverage::NoEligiblePairs,
-        (true, true) => OrderCoverage::BothOrdersObserved,
-        _ => OrderCoverage::SingleOrderOnly,
+    let comparison_order_counts: Vec<ComparisonOrderCounts> = order_counts
+        .into_iter()
+        .map(|((baseline_candidate_id, candidate_candidate_id), (baseline_first_pairs, candidate_first_pairs))| {
+            let order_coverage = match (baseline_first_pairs > 0, candidate_first_pairs > 0) {
+                (false, false) => OrderCoverage::NoEligiblePairs,
+                (true, true) => OrderCoverage::BothOrdersObserved,
+                _ => OrderCoverage::SingleOrderOnly,
+            };
+            ComparisonOrderCounts {
+                baseline_candidate_id,
+                candidate_candidate_id,
+                baseline_first_pairs,
+                candidate_first_pairs,
+                order_coverage,
+                order_count_difference: baseline_first_pairs.abs_diff(candidate_first_pairs),
+            }
+        })
+        .collect();
+
+    let order_coverage = if comparison_order_counts.is_empty() {
+        OrderCoverage::NoEligiblePairs
+    } else if comparison_order_counts
+        .iter()
+        .all(|counts| counts.order_coverage == OrderCoverage::BothOrdersObserved)
+    {
+        OrderCoverage::BothOrdersObserved
+    } else {
+        OrderCoverage::SingleOrderOnly
     };
 
     CampaignAudit {
@@ -342,6 +385,7 @@ pub fn audit_campaign(campaign_id: &str, runs: &[TrialRun]) -> CampaignAudit {
         baseline_first_eligible_pairs,
         candidate_first_eligible_pairs,
         ineligible_runs,
+        comparison_order_counts,
         order_coverage,
         order_count_difference: baseline_first_eligible_pairs.abs_diff(candidate_first_eligible_pairs),
     }
@@ -565,6 +609,22 @@ mod tests {
         assert_eq!(audit.total_runs, 2);
         assert_eq!(audit.incomparable_pair_count, 2);
         assert_eq!(audit.ineligible_runs, 2);
+    }
+
+    #[test]
+    fn order_coverage_is_assessed_per_exact_candidate_pair() {
+        let runs = vec![
+            complete_run("pair-1", "baseline-v1", TrialArm::Baseline, TrialOrder::First),
+            complete_run("pair-1", "candidate-v2", TrialArm::Candidate, TrialOrder::Second),
+            complete_run("pair-2", "baseline-v1", TrialArm::Baseline, TrialOrder::Second),
+            complete_run("pair-2", "candidate-v3", TrialArm::Candidate, TrialOrder::First),
+        ];
+        let audit = audit_campaign("campaign-A", &runs);
+        assert_eq!(audit.order_coverage, OrderCoverage::SingleOrderOnly);
+        assert_eq!(audit.comparison_order_counts.len(), 2);
+        assert!(audit.comparison_order_counts.iter().all(|counts| {
+            counts.order_coverage == OrderCoverage::SingleOrderOnly
+        }));
     }
 
     #[test]
