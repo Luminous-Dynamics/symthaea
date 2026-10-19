@@ -40,7 +40,10 @@
           "fault_injections",
           "required_invariants",
           "forbidden_behaviors",
-          "expected_disposition"
+          "expected_disposition",
+          "source_bundle_state",
+          "connectivity",
+          "clinical_review_status"
         ],
         "properties": {
           "scenario_id": {
@@ -128,7 +131,8 @@
               "preserve_unknowns_use_approved_fallback",
               "mark_resource_unconfirmed",
               "handoff_with_explicit_unknowns",
-              "reject_out_of_scope_request"
+              "reject_out_of_scope_request",
+              "redact_sensitive_payloads"
             ]
           },
           "clinical_review_status": {
