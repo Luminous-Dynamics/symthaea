@@ -1,0 +1,73 @@
+# Culinary content-addressed evidence qualification benchmark v1
+
+**Status:** content-integrity contract and synthetic byte fixtures. It does not authenticate an issuer, establish that randomization occurred, or validate scientific claims.
+
+## Paradigm shift
+
+A label such as `evidence_status = qualified` is a declaration—not proof that the supporting source exists or that its contents have remained unchanged. The evidence bundle therefore pins the exact manifest bytes using a separately supplied SHA-256 digest, verifies every artifact's byte count and SHA-256, and binds every process-trace ID and outcome evidence source/version pair to a named artifact.
+
+This implements a narrow, concrete slice of provenance interoperability inspired by W3C PROV's distinction among entities (artifacts), activities (process runs) and agents/responsibility. PROV can describe provenance; the Culinary bundle additionally checks the exact payload bytes referenced by its manifest:
+- https://www.w3.org/TR/prov-primer/
+- https://www.w3.org/TR/prov-constraints/
+
+## API
+
+`verify_culinary_evidence_bundle_v1(experiment, manifest_bytes, expected_manifest_sha256, artifact_bytes)` returns an opaque `VerifiedCulinaryEvidenceBundleV1` only when:
+- the digest of the exact manifest byte sequence equals a digest supplied separately by the caller;
+- strict typed JSON deserialization succeeds with unknown/duplicate fields rejected;
+- experiment ID and preregistered protocol digest match the manifest;
+- exactly one protocol artifact exists, and its declared/verified SHA-256 matches the experiment's protocol digest;
+- every artifact has unique ID, source reference and path, safe normalized relative path, positive byte length and canonical lowercase SHA-256;
+- exactly the manifest-declared payload IDs are supplied, with no missing/extraneous bytes, and every byte length and SHA-256 matches;
+- each run's process-trace ID resolves to its own unique process-trace artifact; the payload is parsed with duplicate-key rejection, passes the existing process-trace validator, and its embedded `trace_id` matches the artifact ID;
+- each outcome evidence source reference and version resolves to a unique `measurement_record` artifact;
+- the measurement-record payload's run ID, outcome ID, status, unit, method, point value, lower/upper bounds and unknown reason exactly match the outcome record consumed by the analysis;
+- all artifacts are reachable from the protocol, run trace or outcome evidence; unreferenced artifacts fail closed.
+
+`analyze_paired_outcomes_with_verified_bundle_v1` additionally fingerprints the in-memory experiment value and rejects a changed object before running the existing paired-outcome analysis.
+
+## Industry comparison: what this is and is not
+
+| Reference system / standard | What it contributes | Culinary's current scope | Remaining gap before claiming conformance or superiority |
+|---|---|---|---|
+| ISO 22005:2007 food/feed traceability | Principles and requirements for traceability-system design through the food/feed chain; the ISO catalogue says the 2007 edition was reviewed and confirmed in 2022. | Links each paired run to a process-trace ID and links outcome records to byte-verified evidence. | No ingredient lot/recall network, supplier chain, custody workflows, operational traceability procedures, or ISO conformance assessment. This is an experiment-artifact layer, not a traceability management system. |
+| RO-Crate 1.3 | A current machine-readable way to package research data, metadata, context, and provenance for sharing, reuse and preservation. | Domain-specific manifest with exact-byte SHA-256, byte-length checks, trace validation and measurement-record equality. | No RO-Crate JSON-LD exporter/importer or profiles. Prefer an adapter to RO-Crate instead of claiming the bespoke manifest supersedes a general research object format. |
+| W3C PROV | Interoperable provenance descriptions of entities, activities, agents/responsibility and derivation. | Protocol, process traces and outcome files are linked through artifact IDs and source references. | Agents, custody events, richer derivation edges, and provenance-of-provenance still need explicit mapping. |
+| CONSORT 2025 outcome/reporting guidance | Defines outcome variables/metrics/aggregation/time points and encourages reporting effects with precision. | Preregistration and descriptive paired contrasts are represented separately from measurement bounds. | No inferential confidence intervals, formal power/sample-size calculations, multiplicity control, or external review of protocol deviations. |
+
+References: [ISO 22005 catalogue](https://www.iso.org/standard/36297.html), [RO-Crate 1.3 specification](https://www.researchobject.org/ro-crate/specification/1.3/introduction.html), [W3C PROV Primer](https://www.w3.org/TR/prov-primer/), [CONSORT 2025 explanation and elaboration](https://www.bmj.com/content/389/bmj-2024-081124).
+
+These are reference points, not claims that Culinary conforms to those standards or outperforms their full implementations. The differentiating opportunity is the narrow cross-contract guarantee: the bytes behind a claimed outcome must match the exact record consumed by the paired analysis, and a post-verification experiment mutation invalidates the verification capability.
+
+## Acceptance gates
+
+1. 100% of one-byte payload changes rejected by hash or byte-length check.
+2. 100% of manifest-byte changes rejected when the expected digest is frozen separately.
+3. 100% of missing and undeclared payload entries rejected.
+4. 100% of duplicate artifact IDs, paths, source references, duplicate JSON fields in manifests/trace/measurement payloads, and unsafe paths rejected.
+5. 100% of process-trace IDs and outcome source/version pairs resolve to the exact declared artifact kind.
+6. Zero unreferenced manifest artifacts accepted.
+7. Any mutation of the experiment after verification invalidates the opaque verified-bundle capability.
+8. A byte-verified file remains only a byte-verified file: SHA-256 is not issuer authentication, calibration proof, evidence truth, safety assessment or causal attribution.
+9. Rust tests, formatting, compilation and Clippy must complete against the exact head. Skipped, queued or absent workflows are not pass evidence.
+
+## Trust model and residual risks
+
+- The expected manifest digest must come from a separate trusted record, such as a reviewed immutable reference or signed run receipt. Comparing a manifest with a digest read only from the same untrusted manifest would prove nothing about the manifest's integrity.
+- The caller resolves paths to payload bytes. It must reject symlinks and ensure canonical resolution remains within the authorized artifact root. This library applies lexical path rules and checks the bytes once supplied; it does not do filesystem I/O.
+- Hash correctness proves equality to the pinned digest; it does not prove who captured the sample or whether a thermometer was calibrated correctly. Issuer identity needs a separate signature/key trust policy.
+- The bundle verifier binds the paired experiment's protocol, process trace IDs and outcome evidence. It does not claim that raw source artifacts support the observed values scientifically or that the reported variant effect is causal.
+- The previous metadata-only analyzer remains available for contract/oracle tests. Source-bound analysis must use `analyze_paired_outcomes_with_verified_bundle_v1`; test-only evidence locators never count as experimental evidence.
+
+## Synthetic negative controls
+
+The test module creates 1 protocol, 4 process-trace and 12 measurement-record payloads in memory. These bytes are synthetic and authored only to test exact-byte plumbing. The 21 Rust tests cover successful binding, byte tampering, manifest digest mismatch, protocol digest mismatch, missing/extra payloads, unsafe paths, missing process traces, source-version drift, stale verified capabilities, duplicate fields, synthetic-source spoofing, duplicate paths/unreferenced artifacts, and mismatches between hashed measurement/trace payloads and the consumed experiment.
+
+## Relationship to experimental reporting
+
+After content integrity is established, statistical design remains a separate gate. CONSORT 2025 calls for primary and secondary outcomes to be defined by measurement variable, analysis metric, aggregation and time point, and for outcome effects to be reported with precision. This evidence bundle does not replace that design/analysis work:
+- https://www.bmj.com/content/389/bmj-2024-081124
+
+## Qualification boundary
+
+The implementation currently provides a byte-verification API, an opaque experiment-bound verification receipt, a JSON Schema, and adversarial unit tests. The tests have **not** been compiled or executed in this environment. No claim of full schema validation, exact-head CI pass, real evidence authenticity, sensor calibration, food safety, or scientific benefit is made.

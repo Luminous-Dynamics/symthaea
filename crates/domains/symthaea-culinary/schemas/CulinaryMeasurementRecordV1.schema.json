@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "CulinaryMeasurementRecordV1.schema.json",
+  "title": "Culinary content-addressed measurement record V1",
+  "description": "A content-addressed measurement record whose values must exactly match the outcome record consumed by the analysis.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "outcome_id",
+    "status",
+    "value",
+    "lower",
+    "upper",
+    "unit",
+    "method",
+    "unknown_reason"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "outcome_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "enum": [
+        "observed",
+        "estimated",
+        "unknown"
+      ]
+    },
+    "value": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "lower": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "upper": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "unit": {
+      "type": "string",
+      "minLength": 1
+    },
+    "method": {
+      "type": "string",
+      "minLength": 1
+    },
+    "unknown_reason": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  }
+}
