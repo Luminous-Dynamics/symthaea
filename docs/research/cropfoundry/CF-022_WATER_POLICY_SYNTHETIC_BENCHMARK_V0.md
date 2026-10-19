@@ -25,8 +25,8 @@ cargo test -p xtask cropfoundry_water_policy
 The harness runs 6 fixed scenario profiles × 3 policies × 42 time steps:
 
 - `reference`: nominal sensor/forecast assumptions and a fixed water cap.
-- `water_rationing`: tighter cap, drought onset and mild under-forecast.
-- `heat_and_drought`: heat/drought interaction, tighter cap and larger demand under-forecast.
+- `water_rationing_only`: lower water cap with the same weather, forecast and sensor settings as the reference.
+- `heat_and_drought`: heat/drought interaction and a tighter cap, without forecast bias or sensor dropout.
 - `forecast_bias_only`: negative demand-forecast bias with reference water/weather/sensor settings.
 - `sensor_dropout_only`: periodic missing soil observations with reference water/weather/forecast settings.
 - `combined_heat_drought_forecast_bias_and_sensor_dropout`: compound stress, biased forecasts and periodic sensor dropouts.
@@ -53,7 +53,7 @@ A policy that wins this synthetic score has only passed an algorithmic test. A d
 ## ## What this benchmark is designed to reveal
 
 - Whether the policy accounts for the cost of scarce water instead of always filling all plots equally.
-- Whether decisions degrade gracefully with biased forecasts and intermittent/stale observations. The `forecast_bias_only` and `sensor_dropout_only` profiles are paired with the reference profile. Their deltas can isolate these synthetic factors; water-rationing and compound-scenario deltas confound multiple changes and must not be attributed to one cause.
+- Whether decisions degrade gracefully with biased forecasts and intermittent/stale observations. The `water_rationing_only`, `forecast_bias_only` and `sensor_dropout_only` profiles are paired with the reference profile, changing only the designated factor. Their deltas can isolate each synthetic effect; heat/drought and compound-scenario deltas must not be attributed to one cause.
 - Whether hard resource caps remain satisfied under all tested conditions.
 - Whether the more complicated policy gives measurable decision value over simple baselines.
 - Whether the answer changes under stress weights, storage thresholds, forecast error, dropout patterns and scenario mix.
