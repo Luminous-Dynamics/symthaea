@@ -24,6 +24,7 @@ This work is an extension of the existing scientific-discovery architecture, **n
 - **ScientificModel / PhysicsIR** is the intended solver-independent model boundary in [#6879](https://github.com/Luminous-Dynamics/symthaea/issues/6879) and its implementation [PR #6880](https://github.com/Luminous-Dynamics/symthaea/pull/6880). Reuse its model identity, typing, assumptions, provenance, and evidence-requirement semantics when available; do not create a second canonical model IR in this benchmark.
 - **Physics typing** and symbolic-domain hardening are owned by [#6868](https://github.com/Luminous-Dynamics/symthaea/issues/6868), [PR #6869](https://github.com/Luminous-Dynamics/symthaea/pull/6869), and [PR #6865](https://github.com/Luminous-Dynamics/symthaea/pull/6865). Do not create a parallel unit/type or proof framework.
 - The current `integrated_discovery.rs` already composes typed generation, active experiment selection, and observation smoothing with a factorial ablation. Reuse it through a narrow adapter; the evaluator must remain independent of the agent's scoring code.
+- Robust, uncertainty-aware experiment ranking is also being implemented in [PR #8034](https://github.com/Luminous-Dynamics/symthaea/pull/8034), `symthaea-experiment-design`: maximin standardized separation between rival models, normalized by relative experiment cost. Its documentation explicitly says this is not expected information gain or a posterior, and its runtime handoff is not yet integrated. Reuse it as a candidate selector/baseline after its own qualification; do not reimplement its ranking formula here.
 
 **What is additive here:** a blinded benchmark suite where the governing dynamics can be composed or altered beyond familiar textbook law families, with structural holdouts, rival-mechanism discrimination, adversarial controls, and a fixed-cost experiment budget. It tests the *open-world discovery capability* above the existing interfaces. It does not replace or re-specify the Ramanujan→EUREKA handoff.
 
@@ -199,6 +200,20 @@ Use the same hidden worlds, initial conditions, budgets, and observation noise f
 - Rejects altered manifests, missing evidence, leaked split identities, invalid units, non-finite outputs, and unsupported status promotion.
 
 A proposed theory may be loaded into a *shadow simulation* for comparison, never used to replace the default dynamics without separate review and regression qualification.
+
+## Differentiation from existing discovery benchmarks
+
+A generic "agent discovers altered physics through experiments" benchmark would duplicate published work. In particular, DiscoverPhysics already evaluates 22 procedurally generated nonstandard N-body worlds using repeated experiment rounds, held-out particle trajectories, and a separate explanation score. PhysGym controls prior-knowledge cues, while Science-Gym combines active data collection, experiment design, and equation discovery across seven scientific simulations.
+
+Our differentiating goal is **evidence-bound theory revision integrated with Symthaea's existing research stack**, rather than another standalone LLM leaderboard:
+
+1. Carry a candidate from Ramanujan through the existing Ramanujan→EUREKA handoff / ScientificModel boundary without allowing candidate-generation code to certify itself.
+2. Evaluate active experiment choice with matched budgets, controlled uncertainty, calibrated rival-model predictions, and the existing robust-separation selector (#8034) alongside random and fixed-query baselines.
+3. Score both held-out predictive consequences and structural correctness where identifiable, using independent equivalence checks or analytical oracles when available—not only an LLM judge.
+4. Include dimensional/type failures, mathematical domain errors, solver discretization error, symmetry/invariant checks where applicable, and explicit counterexample-driven theory revision.
+5. Bind exact world, candidate, query, solver and observation identities, and report uncertainty and claim maturity separately. A digest is integrity metadata, not proof of scientific validity.
+
+This is an integration and assurance contribution, not a claim that interactive altered-law discovery is itself new. Avoid "first" claims without a direct, documented survey.
 
 ## Research anchors
 
