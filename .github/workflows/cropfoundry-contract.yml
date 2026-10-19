@@ -114,3 +114,17 @@ jobs:
           grep -q '"nutrient_interval_comparison_available": {' "$RUNNER_TEMP/cropfoundry-nutrition-portfolio-receipt.json"
           grep -q '"bioavailability_comparison_available": {' "$RUNNER_TEMP/cropfoundry-nutrition-portfolio-receipt.json"
           grep -q '"iron": false' "$RUNNER_TEMP/cropfoundry-nutrition-portfolio-receipt.json"
+
+      - name: Check robust-policy CLI
+        run: cargo run -q -p xtask -- cropfoundry-robust-policy-demo --help
+
+      - name: Execute robust policy on the deterministic sensitivity lattice
+        run: |
+          cargo run -q -p xtask -- cropfoundry-robust-policy-demo \
+            --out "$RUNNER_TEMP/cropfoundry-robust-policy-receipt.json"
+          grep -q '"benchmark_id": "CF-025"' "$RUNNER_TEMP/cropfoundry-robust-policy-receipt.json"
+          grep -q '"scenario_count": 30' "$RUNNER_TEMP/cropfoundry-robust-policy-receipt.json"
+          grep -q '"policy_count": 5' "$RUNNER_TEMP/cropfoundry-robust-policy-receipt.json"
+          grep -q '"tail_sample_count": 2' "$RUNNER_TEMP/cropfoundry-robust-policy-receipt.json"
+          grep -q '"calibrated_probability_claim": false' "$RUNNER_TEMP/cropfoundry-robust-policy-receipt.json"
+          grep -q '"biological_performance_claim": false' "$RUNNER_TEMP/cropfoundry-robust-policy-receipt.json"
