@@ -91,7 +91,7 @@ jobs:
             .status == "contract_validation_passed" and
             .source_revision_sha == $expected and
             .scenario_count == 24 and
-            .benchmark_count == 16 and
+            .benchmark_count == 17 and
             .claim_ceiling == "synthetic contract integrity only; no clinical validation" and
             ([.corpus_sha256, .benchmark_sha256, .schema_sha256,
               .validator_source_sha256, .entrypoint_source_sha256,
