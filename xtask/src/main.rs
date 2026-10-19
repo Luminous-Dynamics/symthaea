@@ -89,6 +89,9 @@ enum Commands {
         /// Exact full Git commit ID for the code being benchmarked (40 or 64 hex characters).
         #[arg(long)]
         source_commit: String,
+        /// Exact output from "rustc -Vv" and "cargo --version" for this build.
+        #[arg(long)]
+        toolchain_id: String,
         /// Optional path for a JSON report; otherwise report to stdout.
         #[arg(long)]
         out: Option<PathBuf>,
@@ -165,15 +168,32 @@ fn main() -> anyhow::Result<()> {
             let out = out.map(|path| if path.is_absolute() { path } else { root.join(path) });
             mobility_telemetry_manifest::run(&input, out.as_deref())?;
         }
-        Commands::MobilityTelemetryBenchmark { manifest, matrix, source_commit, out } => {
+        Commands::MobilityTelemetryBenchmark { manifest, matrix, source_commit, toolchain_id, out } => {
             let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
                 .parent()
                 .expect("xtask lives one level below the workspace root")
                 .to_path_buf();
+            let git_head = std::process::Command::new("git")
+                .args(["rev-parse", "HEAD"])
+                .current_dir(&root)
+                .output()?;
+            if !git_head.status.success() {
+                anyhow::bail!("could not verify checkout HEAD via git rev-parse HEAD");
+            }
+            let actual_head = String::from_utf8(git_head.stdout)?.trim().to_owned();
+            if actual_head != source_commit {
+                anyhow::bail!(
+                    "--source-commit {} does not match current checkout HEAD {}",
+                    source_commit,
+                    actual_head
+                );
+            }
             let manifest = if manifest.is_absolute() { manifest } else { root.join(manifest) };
             let matrix = if matrix.is_absolute() { matrix } else { root.join(matrix) };
             let out = out.map(|path| if path.is_absolute() { path } else { root.join(path) });
-            mobility_telemetry_manifest::run_benchmark(&manifest, &matrix, &source_commit, out.as_deref())?;
+            mobility_telemetry_manifest::run_benchmark(
+                &manifest, &matrix, &source_commit, &toolchain_id, out.as_deref()
+            )?;
         }
         Commands::MobilityTelemetryTrace { manifest, input, out } => {
             let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
