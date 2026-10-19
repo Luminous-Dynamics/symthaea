@@ -23,13 +23,12 @@ fn main() {
         Err(error) => fail(&error, 2),
     };
 
-    let stdin = io::stdin();
     let input: Box<dyn BufRead> = match options.input {
         Some(path) => match open_input(&path) {
             Ok(reader) => Box::new(reader),
             Err(error) => fail(&error, 2),
         },
-        None => Box::new(stdin.lock())
+        None => Box::new(BufReader::new(io::stdin())),
     };
 
     let stdout = io::stdout();
@@ -200,7 +199,7 @@ mod tests {
             "80,43400,1800,1200,{};,200\n",
             samples
                 .iter()
-                .map(u16::to_string)
+                .map(|sample| sample.to_string())
                 .collect::<Vec<_>>()
                 .join(";")
         );
