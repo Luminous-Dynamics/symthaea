@@ -31,6 +31,14 @@ Each metric must declare:
 
 A report must distinguish actual input state from requested state. For example, a requested HDR mode does not establish that the signal negotiated or the display operated in HDR.
 
+### Timestamp and calibration-date syntax
+
+The run-record schema labels acquisition/review values as RFC 3339 date-times and calibration expiry as a date. Under JSON Schema Draft 2020-12, `format` is annotation-only by default unless format-assertion behavior is explicitly enabled. Therefore `open-display-platform-verify` also performs an application-level syntax check: impossible Gregorian dates, malformed time/offset fields, missing timezone, invalid fractional-second syntax, and impossible calibration expiry dates must reject. Calibration expiry and acquisition-date comparisons are applied only to syntactically valid values.
+
+This is syntax and internal-consistency validation, not proof that a device was calibrated, that the calibration certificate is genuine, or that its stated validity period is appropriate. RFC 3339 permits a seconds field of `60` for leap seconds; this verifier checks that field's syntax but does not maintain an authoritative leap-second history. A future extension that needs that level of assurance must bind an authoritative time/leap-second policy.
+
+Reference: [JSON Schema Draft 2020-12 Validation — format annotation and assertion behavior](https://json-schema.org/draft/2020-12/json-schema-validation).
+
 ## 3. Decision capability before candidate comparison
 
 Freeze the smallest engineering difference that would alter a decision: MDE (minimum decision effect). Build an uncertainty budget for the measurement system and the declared operating conditions.
