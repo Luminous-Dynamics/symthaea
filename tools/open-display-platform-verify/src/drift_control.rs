@@ -36,6 +36,9 @@ pub struct DriftControlPlan {
     pub nominal_value: f64,
     /// Absolute half-width of the predeclared guard band. Boundaries are inclusive.
     pub guard_half_width: f64,
+    /// Predeclared upper bound for planned spacing, including run-edge gaps.
+    /// This is an experimental design constraint, not a validated drift-detection rate.
+    pub maximum_control_gap_seconds: f64,
     pub controls: Vec<ScheduledControl>,
     pub dut_observations: Vec<DutObservation>,
 }
@@ -101,6 +104,8 @@ pub struct ObservationDecision {
 pub struct DriftScreeningReport {
     pub guard_lower: f64,
     pub guard_upper: f64,
+    pub maximum_control_gap_seconds: f64,
+    pub observed_max_control_gap_seconds: f64,
     pub controls: Vec<ControlDecision>,
     pub observations: Vec<ObservationDecision>,
     /// Hard boundary for interpretation: this report is not a physical qualification.
@@ -136,6 +141,11 @@ pub fn screen_drift_controls(plan: &DriftControlPlan) -> Result<DriftScreeningRe
     }
     if !plan.guard_half_width.is_finite() || plan.guard_half_width < 0.0 {
         errors.push("guard half-width must be finite and nonnegative".to_owned());
+    }
+    if !plan.maximum_control_gap_seconds.is_finite()
+        || plan.maximum_control_gap_seconds <= 0.0
+    {
+        errors.push("maximum control gap must be finite and positive".to_owned());
     }
 
     let lower = plan.nominal_value - plan.guard_half_width;
@@ -199,6 +209,23 @@ pub fn screen_drift_controls(plan: &DriftControlPlan) -> Result<DriftScreeningRe
         return Err(errors);
     }
 
+    // Include the run edges so a schedule with dense internal controls cannot hide
+    // an unmonitored start or end interval.
+    let mut scheduled_times = Vec::with_capacity(plan.controls.len() + 2);
+    scheduled_times.push(plan.run_start_seconds);
+    scheduled_times.extend(plan.controls.iter().map(|control| control.time_seconds));
+    scheduled_times.push(plan.run_end_seconds);
+    let observed_max_control_gap_seconds = scheduled_times
+        .windows(2)
+        .map(|pair| pair[1] - pair[0])
+        .fold(0.0_f64, f64::max);
+    if observed_max_control_gap_seconds > plan.maximum_control_gap_seconds {
+        return Err(vec![format!(
+            "scheduled control gap exceeds predeclared maximum: observed {observed_max_control_gap_seconds}, allowed {}",
+            plan.maximum_control_gap_seconds
+        )]);
+    }
+
     let controls: Vec<ControlDecision> = plan
         .controls
         .iter()
@@ -256,6 +283,8 @@ pub fn screen_drift_controls(plan: &DriftControlPlan) -> Result<DriftScreeningRe
     Ok(DriftScreeningReport {
         guard_lower: lower,
         guard_upper: upper,
+        maximum_control_gap_seconds: plan.maximum_control_gap_seconds,
+        observed_max_control_gap_seconds,
         controls,
         observations,
         qualification: "SYNTHETIC_OR_CONTROL_SCREENING_ONLY_NOT_PHYSICAL_QUALIFICATION",
@@ -288,6 +317,12 @@ impl DriftPlanValidationReport {
                 "lower": self.screening.guard_lower,
                 "upper": self.screening.guard_upper,
                 "boundary_rule": "INCLUSIVE"
+            },
+            "control_schedule": {
+                "maximum_allowed_gap_seconds": self.screening.maximum_control_gap_seconds,
+                "observed_max_gap_seconds": self.screening.observed_max_control_gap_seconds,
+                "gap_scope": "run_start_to_first_control_between_control_slots_and_last_control_to_run_end",
+                "claim_limit": "Planned spacing only; does not establish drift-detection power or physical stability."
             },
             "controls": self.screening.controls.iter().map(|control| serde_json::json!({
                 "control_id": control.control_id,
@@ -423,6 +458,10 @@ pub fn validate_drift_control_plan_str(
             .get("guard_half_width")
             .and_then(serde_json::Value::as_f64)
             .unwrap_or(f64::NAN),
+        maximum_control_gap_seconds: plan_value
+            .get("maximum_control_gap_seconds")
+            .and_then(serde_json::Value::as_f64)
+            .unwrap_or(f64::NAN),
         controls,
         dut_observations: observations,
     };
@@ -502,6 +541,7 @@ mod tests {
             run_end_seconds: 100.0,
             nominal_value: 10.0,
             guard_half_width: 1.0,
+            maximum_control_gap_seconds: 100.0,
             controls,
             dut_observations,
         }
@@ -515,6 +555,8 @@ mod tests {
         assert_eq!(report.measurand, "synthetic check-standard response");
         assert_eq!(report.unit, "arbitrary_units");
         assert_eq!(report.screening.controls.len(), 3);
+        assert_eq!(report.screening.maximum_control_gap_seconds, 40.0);
+        assert_eq!(report.screening.observed_max_control_gap_seconds, 40.0);
         assert_eq!(
             report.screening.observations[0].disposition,
             ObservationDisposition::NoOutOfBandControlDetected
@@ -764,6 +806,49 @@ mod tests {
         assert_eq!(report.observations[0].responsible_control_ids.len(), 2);
         assert_eq!(report.observations[0].responsible_control_ids[0], "bad_a");
         assert_eq!(report.observations[0].responsible_control_ids[1], "bad_b");
+    }
+
+    #[test]
+    fn planned_control_gap_includes_run_edges_and_rejects_sparse_schedule() {
+        let mut sparse = plan(
+            vec![
+                control("first", 10.0, Some(10.0)),
+                control("last", 90.0, Some(10.0)),
+            ],
+            vec![sample("middle", 50.0)],
+        );
+        sparse.maximum_control_gap_seconds = 30.0;
+        let errors = screen_drift_controls(&sparse)
+            .expect_err("a plan with an 80-second internal gap must fail a 30-second cap");
+        assert!(errors.iter().any(|e| e.contains("scheduled control gap exceeds")));
+
+        let mut edge_gap = plan(
+            vec![
+                control("first", 20.0, Some(10.0)),
+                control("last", 90.0, Some(10.0)),
+            ],
+            vec![],
+        );
+        edge_gap.maximum_control_gap_seconds = 25.0;
+        let errors = screen_drift_controls(&edge_gap)
+            .expect_err("the 30-second terminal edge gap must be checked too");
+        assert!(errors.iter().any(|e| e.contains("scheduled control gap exceeds")));
+    }
+
+    #[test]
+    fn invalid_control_gap_bounds_are_rejected() {
+        let mut invalid = plan(vec![control("only", 50.0, Some(10.0))], vec![]);
+        invalid.maximum_control_gap_seconds = 0.0;
+        assert!(screen_drift_controls(&invalid)
+            .expect_err("zero control gap cap must fail")
+            .iter()
+            .any(|e| e.contains("maximum control gap must be finite and positive")));
+
+        invalid.maximum_control_gap_seconds = f64::INFINITY;
+        assert!(screen_drift_controls(&invalid)
+            .expect_err("infinite control gap cap must fail")
+            .iter()
+            .any(|e| e.contains("maximum control gap must be finite and positive")));
     }
 
     #[test]
