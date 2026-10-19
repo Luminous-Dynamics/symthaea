@@ -73,7 +73,11 @@
       "required": [
         "id",
         "sha256",
-        "byte_length"
+        "byte_length",
+        "parent_coordinate_space_id",
+        "parent_start",
+        "parent_end",
+        "transform_kind"
       ],
       "properties": {
         "id": {
@@ -87,8 +91,97 @@
         "byte_length": {
           "type": "integer",
           "minimum": 0
+        },
+        "parent_coordinate_space_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "parent_start": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "parent_end": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "transform_kind": {
+          "type": "string",
+          "minLength": 1
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "id": {
+                "const": "root"
+              }
+            },
+            "required": [
+              "id"
+            ]
+          },
+          "then": {
+            "properties": {
+              "parent_coordinate_space_id": {
+                "const": null
+              },
+              "parent_start": {
+                "const": null
+              },
+              "parent_end": {
+                "const": null
+              },
+              "transform_kind": {
+                "const": "source"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "id": {
+                "not": {
+                  "const": "root"
+                }
+              }
+            },
+            "required": [
+              "id"
+            ]
+          },
+          "then": {
+            "properties": {
+              "parent_coordinate_space_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "parent_start": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "parent_end": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "transform_kind": {
+                "not": {
+                  "const": "source"
+                }
+              }
+            }
+          }
+        }
+      ]
     },
     "region": {
       "type": "object",
