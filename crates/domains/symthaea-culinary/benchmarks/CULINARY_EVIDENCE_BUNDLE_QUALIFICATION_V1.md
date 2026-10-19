@@ -48,7 +48,7 @@ This implements a narrow, concrete slice of provenance interoperability inspired
 
 ## Synthetic negative controls
 
-The test module creates 1 protocol, 4 process-trace and 12 measurement-record payloads in memory. These bytes are synthetic and authored only to test exact-byte plumbing. The 18 Rust tests cover successful binding, byte tampering, manifest digest mismatch, protocol digest mismatch, missing/extra payloads, unsafe paths, missing process traces, source-version drift, stale verified capabilities, duplicate fields, synthetic-source spoofing, duplicate paths/unreferenced artifacts, and mismatches between hashed measurement/trace payloads and the consumed experiment.
+The test module creates 1 protocol, 4 process-trace and 12 measurement-record payloads in memory. These bytes are synthetic and authored only to test exact-byte plumbing. The 21 Rust tests cover successful binding, byte tampering, manifest digest mismatch, protocol digest mismatch, missing/extra payloads, unsafe paths, missing process traces, source-version drift, stale verified capabilities, duplicate fields, synthetic-source spoofing, duplicate paths/unreferenced artifacts, and mismatches between hashed measurement/trace payloads and the consumed experiment.
 
 ## Relationship to experimental reporting
 
