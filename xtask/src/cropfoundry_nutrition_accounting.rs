@@ -39,6 +39,44 @@ enum UncertaintyIntervalKind {
     ObservedRange,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum WaterBoundary {
+    IrrigationApplied,
+    TotalAppliedWater,
+    CropConsumptiveUse,
+    BlueWaterFootprint,
+    GreenWaterFootprint,
+    FullSupplyChainWaterFootprint,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum LandBoundary {
+    AllocatedCultivatedArea,
+    HarvestedArea,
+    FullSupplyChainLandFootprint,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum EnergyBoundary {
+    OnFarmOperations,
+    IrrigationPumping,
+    PostharvestProcessing,
+    FullSupplyChainEnergy,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum CostBoundary {
+    FarmGate,
+    ProductionOnly,
+    PostharvestProcessing,
+    DeliveredToMarket,
+    DeliveredToServing,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct NutritionAccountingInput {
@@ -69,9 +107,13 @@ struct NutritionAccountingInput {
     uncertainty_interval_kind: Option<UncertaintyIntervalKind>,
     uncertainty_evidence_uri: Option<String>,
     water_liters: Option<f64>,
+    water_boundary: Option<WaterBoundary>,
     land_square_meters: Option<f64>,
+    land_boundary: Option<LandBoundary>,
     energy_kwh: Option<f64>,
+    energy_boundary: Option<EnergyBoundary>,
     cost_amount: Option<f64>,
+    cost_boundary: Option<CostBoundary>,
     currency_code: Option<String>,
     source_sha256: Option<String>,
 }
@@ -97,9 +139,13 @@ struct NutritionAccountingReceipt {
     nutrient_mg_per_serving: Option<f64>,
     estimated_bioavailable_nutrient_mg_per_serving: Option<f64>,
     nutrient_mg_per_liter_water: Option<f64>,
+    water_boundary: Option<WaterBoundary>,
     nutrient_mg_per_square_meter: Option<f64>,
+    land_boundary: Option<LandBoundary>,
     nutrient_mg_per_kwh: Option<f64>,
+    energy_boundary: Option<EnergyBoundary>,
     nutrient_mg_per_currency_unit: Option<f64>,
+    cost_boundary: Option<CostBoundary>,
     currency_code: Option<String>,
     issues: Vec<String>,
     caveats: Vec<String>,
@@ -376,6 +422,23 @@ fn audit_input(input: NutritionAccountingInput) -> NutritionAccountingReceipt {
     {
         issues.push("cost_amount requires an explicit currency_code".to_owned());
     }
+
+    for (label, measurement_present, boundary_present) in [
+        ("water_liters", input.water_liters.is_some(), input.water_boundary.is_some()),
+        (
+            "land_square_meters",
+            input.land_square_meters.is_some(),
+            input.land_boundary.is_some(),
+        ),
+        ("energy_kwh", input.energy_kwh.is_some(), input.energy_boundary.is_some()),
+        ("cost_amount", input.cost_amount.is_some(), input.cost_boundary.is_some()),
+    ] {
+        if measurement_present != boundary_present {
+            issues.push(format!(
+                "{label} and its resource boundary must be supplied together"
+            ));
+        }
+    }
     if input.currency_code.as_deref().is_some_and(|value| {
         value.trim().len() != 3 || !value.trim().bytes().all(|b| b.is_ascii_alphabetic())
     }) {
@@ -526,9 +589,13 @@ fn audit_input(input: NutritionAccountingInput) -> NutritionAccountingReceipt {
         nutrient_mg_per_serving: nutrient_per_serving,
         estimated_bioavailable_nutrient_mg_per_serving: bioavailable_per_serving,
         nutrient_mg_per_liter_water: ratio(delivered_nutrient_mass, input.water_liters),
+        water_boundary: input.water_boundary,
         nutrient_mg_per_square_meter: ratio(delivered_nutrient_mass, input.land_square_meters),
+        land_boundary: input.land_boundary,
         nutrient_mg_per_kwh: ratio(delivered_nutrient_mass, input.energy_kwh),
+        energy_boundary: input.energy_boundary,
         nutrient_mg_per_currency_unit: ratio(delivered_nutrient_mass, input.cost_amount),
+        cost_boundary: input.cost_boundary,
         currency_code: input.currency_code.map(|value| value.trim().to_ascii_uppercase()),
         issues,
         caveats: vec![
@@ -613,9 +680,13 @@ mod tests {
             uncertainty_interval_kind: None,
             uncertainty_evidence_uri: None,
             water_liters: Some(30.0),
+            water_boundary: Some(WaterBoundary::IrrigationApplied),
             land_square_meters: Some(2.0),
+            land_boundary: Some(LandBoundary::AllocatedCultivatedArea),
             energy_kwh: Some(0.5),
+            energy_boundary: Some(EnergyBoundary::OnFarmOperations),
             cost_amount: Some(1.25),
+            cost_boundary: Some(CostBoundary::FarmGate),
             currency_code: Some("ZAR".to_owned()),
             source_sha256: Some("a".repeat(64)),
         }
@@ -975,12 +1046,29 @@ mod tests {
     }
 
     #[test]
+    fn resource_efficiency_requires_matching_measurement_boundaries() {
+        let mut input = fixture();
+        input.water_boundary = None;
+        let receipt = audit_input(input);
+        assert!(!receipt.accounting_pass);
+        assert!(receipt
+            .issues
+            .iter()
+            .any(|issue| issue.contains("water_liters and its resource boundary")));
+        assert_eq!(receipt.nutrient_mg_per_liter_water, None);
+    }
+
+    #[test]
     fn unknown_resource_measurements_stay_unknown() {
         let mut input = fixture();
         input.water_liters = None;
+        input.water_boundary = None;
         input.land_square_meters = None;
+        input.land_boundary = None;
         input.energy_kwh = None;
+        input.energy_boundary = None;
         input.cost_amount = None;
+        input.cost_boundary = None;
         input.currency_code = None;
         let receipt = audit_input(input);
         assert!(receipt.accounting_pass);
