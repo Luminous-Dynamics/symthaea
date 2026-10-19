@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 use std::fs;
-use std::path::{Component, Path, PathBuf};
+use std::path::{Component, Path};
 
 const SCHEMA_VERSION: &str = "0.1.0";
 const EVIDENCE_CLASSES: &[&str] = &[
@@ -37,6 +37,10 @@ const RIGHTS_STATES: &[&str] = &[
     "explicit_permission",
     "cc_by_4_0",
     "other_documented_license",
+];
+const KNOWN_UNITS: &[&str] = &[
+    "m/s", "m", "deg", "rad", "rad/s", "m/s^2", "N", "N*m", "V", "A",
+    "W", "J", "Wh", "kg", "kg/s", "s", "ns", "degC", "kPa", "Pa",
 ];
 const ARTIFACT_KINDS: &[&str] = &[
     "raw_sensor_log",
@@ -332,6 +336,7 @@ fn validate_structure(manifest: &Manifest) -> Result<()> {
         }
         if channel.quantity.trim().is_empty()
             || channel.unit.trim().is_empty()
+            || !KNOWN_UNITS.contains(&channel.unit.as_str())
             || channel.sign_convention.trim().is_empty()
             || channel.axis_or_frame.trim().is_empty()
             || channel.source_mode.trim().is_empty()
@@ -434,7 +439,9 @@ fn claim_eligibility(manifest: &Manifest, claim: &str) -> ClaimEligibility {
     if manifest.session_state != "closed" {
         reasons.push("session_not_closed".into());
     }
-    if !["project_owned", "explicit_permission"].contains(&manifest.data_rights.rights_state.as_str()) {
+    if !["project_owned", "explicit_permission", "cc_by_4_0", "other_documented_license"]
+        .contains(&manifest.data_rights.rights_state.as_str())
+    {
         reasons.push("data_rights_not_cleared_for_physical_claim".into());
     }
     if manifest.data_rights.permission_receipt_id.as_deref().is_none_or(str::is_empty) {
@@ -449,13 +456,36 @@ fn claim_eligibility(manifest: &Manifest, claim: &str) -> ClaimEligibility {
     if !manifest.artifacts.iter().any(|artifact| artifact.kind == "raw_sensor_log") {
         reasons.push("missing_raw_sensor_log_artifact".into());
     }
+    if manifest.vehicle.mass_kg.is_none_or(|mass| !mass.is_finite() || mass <= 0.0) {
+        reasons.push("missing_measured_vehicle_mass".into());
+    }
+    if manifest.vehicle.payload_kg.is_none_or(|payload| !payload.is_finite() || payload < 0.0) {
+        reasons.push("missing_declared_payload".into());
+    }
+    if manifest.vehicle.configuration_digest == format!("sha256:{}", "0".repeat(64)) {
+        reasons.push("placeholder_vehicle_configuration_digest".into());
+    }
+    for (position, tire) in [
+        ("front", manifest.vehicle.tire_front.as_ref()),
+        ("rear", manifest.vehicle.tire_rear.as_ref()),
+    ] {
+        match tire {
+            Some(tire)
+                if !["", "TBD", "not_recorded"].contains(&tire.make_model.as_str())
+                    && !["", "TBD", "not_recorded"].contains(&tire.size.as_str())
+                    && tire.pressure_kpa.is_some_and(|pressure| pressure.is_finite() && pressure > 0.0)
+                    && !["", "not_recorded"].contains(&tire.tread_state.as_str()) => {}
+            _ => reasons.push(format!("incomplete_{position}_tire_setup")),
+        }
+    }
     if !manifest.artifacts.iter().any(|artifact| artifact.kind == "measurement_protocol") {
         reasons.push("missing_measurement_protocol_artifact".into());
     }
     if !manifest.artifacts.iter().any(|artifact| artifact.kind == "calibration_record") {
         reasons.push("missing_calibration_record_artifact".into());
     }
-    if manifest.data_rights.rights_state == "explicit_permission"
+    if ["explicit_permission", "cc_by_4_0", "other_documented_license"]
+        .contains(&manifest.data_rights.rights_state.as_str())
         && !manifest.artifacts.iter().any(|artifact| artifact.kind == "rights_receipt")
     {
         reasons.push("missing_rights_receipt_artifact".into());
@@ -494,21 +524,6 @@ fn claim_eligibility(manifest: &Manifest, claim: &str) -> ClaimEligibility {
         reasons,
         missing_channels,
     }
-}
-
-#[derive(Debug, Serialize)]
-struct Report {
-    report_version: String,
-    manifest_id: String,
-    manifest_sha256: String,
-    session_state: String,
-    evidence_class: String,
-    structural_validation_pass: bool,
-    artifact_verification: String,
-    requested_claim_count: usize,
-    physically_eligible_claim_count: usize,
-    claims: Vec<ClaimEligibility>,
-    claim_ceiling: String,
 }
 
 pub fn run(input_path: &Path, output_path: Option<&Path>) -> Result<()> {
