@@ -534,7 +534,9 @@ fn validate_measurement_run_semantics(record: &Value) -> Vec<String> {
     let acquired_at = record.get("acquired_at").and_then(Value::as_str);
     let run_date = acquired_at.and_then(|timestamp| timestamp.get(..10));
     if acquired_at.is_some_and(|timestamp| !is_valid_rfc3339_datetime(timestamp)) {
-        errors.push("acquired_at must be a valid RFC 3339 date-time with an explicit timezone".to_owned());
+        errors.push(
+            "acquired_at must be a valid RFC 3339 date-time with an explicit timezone".to_owned(),
+        );
     }
     if record
         .get("review")
@@ -543,7 +545,10 @@ fn validate_measurement_run_semantics(record: &Value) -> Vec<String> {
         .and_then(Value::as_str)
         .is_some_and(|timestamp| !is_valid_rfc3339_datetime(timestamp))
     {
-        errors.push("review.reviewed_at must be a valid RFC 3339 date-time with an explicit timezone".to_owned());
+        errors.push(
+            "review.reviewed_at must be a valid RFC 3339 date-time with an explicit timezone"
+                .to_owned(),
+        );
     }
 
     let instruments = record
@@ -1091,7 +1096,10 @@ fn sha256_hex(bytes: &[u8]) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{is_valid_iso_date, is_valid_rfc3339_datetime, sha256_hex, validate_measurement_run_str, validate_platform_str};
+    use super::{
+        is_valid_iso_date, is_valid_rfc3339_datetime, sha256_hex,
+        validate_measurement_run_str, validate_platform_str,
+    };
     use serde_json::Value;
 
     const MANIFEST_TEXT: &str =
