@@ -56,3 +56,17 @@ jobs:
 
       - name: Check postharvest mass-balance audit CLI
         run: cargo run -q -p xtask -- cropfoundry-postharvest-audit --help
+
+      - name: Execute synthetic postharvest mass-balance fixture
+        run: |
+          cat > "$RUNNER_TEMP/cropfoundry-postharvest.csv" <<'CSV'
+          lot_id;stage_id;replicate_id;measurement_time;mass_unit;measurement_method;input_mass_kg;marketable_output_mass_kg;edible_discard_mass_kg;inedible_removed_mass_kg;moisture_loss_mass_kg;handling_loss_mass_kg
+          synthetic-lot-1;harvest;replicate-1;2026-10-19T08:00:00Z;kg;calibrated-scale;10;8;1;0.5;0.4;0.1
+          CSV
+          cargo run -q -p xtask -- cropfoundry-postharvest-audit \
+            --input "$RUNNER_TEMP/cropfoundry-postharvest.csv" \
+            --source-id SYNTHETIC-CI-FIXTURE \
+            --source-uri urn:cropfoundry:postharvest-ci-fixture-v0 \
+            --delimiter ';' \
+            --out "$RUNNER_TEMP/cropfoundry-postharvest-receipt.json"
+          grep -q '"row_checks_pass": true' "$RUNNER_TEMP/cropfoundry-postharvest-receipt.json"
