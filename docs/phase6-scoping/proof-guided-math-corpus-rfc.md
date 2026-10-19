@@ -75,6 +75,8 @@ cargo run -p xtask -- proof-corpus-validate
 
 The command is intentionally metadata-only. It validates the schema version, required negative-control policy, unique entry IDs, lowercase 40-hex commit/blob identities, exact source-path-to-pinned-URL correspondence, and candidate-only status. It does not fetch upstream files, compile Lean, or qualify any theorem. Unit tests cover a valid fixture, floating branch URL rejection, accidental status promotion, omitted hostile controls, and duplicate identities.
 
+**Local validation at PR head `7933b888b7a42dc2073c3aeaf322dc36dd0ef264` (2026-10-19):** the committed `xtask` source and manifest were extracted unchanged into a temporary standalone workspace because the repository workspace currently fails discovery: `crates/core/*` includes `crates/core/symthaea-observation-attestation`, which has source files but no `Cargo.toml`. The validator reported `2 candidate entries, 1 retrieval baselines`; `cargo test ... proof_corpus` passed all 6 tests. The standalone workspace resolved Rust dependencies locally and did not modify this checkout. This validates only the metadata preflight and its unit tests, not the full workspace, Lean, retrieval, theorem validity, or production correspondence. The normal repository-level commands remain unverified until the workspace manifest issue is fixed.
+
 This provides a deterministic low-cost gate before any proof retrieval/qualification work. Its own compile/test result is still unverified until executed against this exact branch head.
 
 ## Reuse existing Symthaea provenance work
