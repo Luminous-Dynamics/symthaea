@@ -764,6 +764,8 @@ struct FaultMatrixReport {
     report_version: String,
     suite_id: String,
     status: String,
+    source_commit: String,
+    build_identity: String,
     matrix_sha256: String,
     manifest_sha256: String,
     case_count: usize,
@@ -1012,8 +1014,13 @@ fn evaluate_fault_case(mutation: &str, manifest: &Manifest) -> (String, String) 
 pub fn run_benchmark(
     manifest_path: &Path,
     matrix_path: &Path,
+    source_commit: &str,
     output_path: Option<&Path>,
 ) -> Result<()> {
+    let valid_commit_length = source_commit.len() == 40 || source_commit.len() == 64;
+    if !valid_commit_length || !source_commit.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        bail!("--source-commit must be a full 40- or 64-character hexadecimal commit ID");
+    }
     let manifest_raw = fs::read(manifest_path)
         .with_context(|| format!("reading telemetry manifest {}", manifest_path.display()))?;
     let manifest: Manifest = serde_json::from_slice(&manifest_raw)
@@ -1064,6 +1071,14 @@ pub fn run_benchmark(
         report_version: SCHEMA_VERSION.to_owned(),
         suite_id,
         status: if failed_count == 0 { "pass" } else { "fail" }.to_owned(),
+        source_commit: source_commit.to_owned(),
+        build_identity: format!(
+            "xtask_package_version={};target={}-{};rustc_version={}",
+            env!("CARGO_PKG_VERSION"),
+            std::env::consts::ARCH,
+            std::env::consts::OS,
+            option_env!("RUSTC_VERSION").unwrap_or("not_embedded")
+        ),
         matrix_sha256: format!("sha256:{:x}", Sha256::digest(&matrix_raw)),
         manifest_sha256: format!("sha256:{:x}", Sha256::digest(&manifest_raw)),
         case_count,
