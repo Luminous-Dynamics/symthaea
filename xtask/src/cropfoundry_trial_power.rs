@@ -345,6 +345,18 @@ fn calculate(input: &PowerInput, input_sha256: String) -> Result<TrialPowerPlan>
         "Confirm assumptions and analysis with an agricultural statistician before preregistration."
             .to_owned(),
     ];
+    if endpoint.familywise_alpha > 0.05 {
+        warnings.push(
+            "Family-wise alpha exceeds the provisional CF-027 target of 0.05; justify it before confirmatory use."
+                .to_owned(),
+        );
+    }
+    if endpoint.target_power < 0.8 {
+        warnings.push(
+            "Requested target power is below the provisional CF-027 target of 0.80; inspect the 80%/90% sensitivity table."
+                .to_owned(),
+        );
+    }
     if primary.clusters_required_per_arm < 10 && design.allocation_unit != "plot" {
         warnings.push(
             "Fewer than 10 randomized clusters per arm: normal design-effect approximation may be optimistic; use cluster-aware simulation or small-sample correction."
