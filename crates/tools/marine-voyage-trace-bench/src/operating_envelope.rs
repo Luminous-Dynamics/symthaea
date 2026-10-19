@@ -416,4 +416,268 @@ pub fn audit_envelope(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::marine_voyage_trace_bench::paired_trial;
+    use crate::paired_trial::EligiblePair;
+    use crate::{EnergyBand, TraceEnergy};
+
+    fn energy(trace_id: &str, case: &OperatingCaseSpec) -> TraceEnergy {
+        TraceEnergy {
+            trace_id: trace_id.to_owned(),
+            raw_trace_sha256: "a".repeat(64),
+            mission_id: case.mission_id.clone(),
+            condition_digest: case.condition_digest.clone(),
+            service_digest: case.service_digest.clone(),
+            calibration_epoch_id: "meter-epoch-A".to_owned(),
+            energy_boundary_id: "dc-input-boundary-A".to_owned(),
+            uncertainty_method_id: "absolute-bound-v1".to_owned(),
+            start_ms: 0,
+            end_ms: 60_000,
+            duration_ms: 60_000,
+            sample_count: 61,
+            max_observed_gap_ms: 1_000,
+            propulsion_wh: EnergyBand { lower_wh: 80.0, nominal_wh: 100.0, upper_wh: 120.0 },
+            auxiliary_wh: EnergyBand { lower_wh: 8.0, nominal_wh: 10.0, upper_wh: 12.0 },
+            total_wh: EnergyBand { lower_wh: 88.0, nominal_wh: 110.0, upper_wh: 132.0 },
+        }
+    }
+
+    fn case(case_id: &str, service_suffix: char, condition: &str) -> OperatingCaseSpec {
+        OperatingCaseSpec {
+            case_id: case_id.to_owned(),
+            mission_id: "mission-A".to_owned(),
+            service_digest: service_suffix.to_string().repeat(64),
+            condition_digest: condition.to_owned(),
+        }
+    }
+
+    fn profile() -> OperatingEnvelopeSpec {
+        OperatingEnvelopeSpec {
+            profile_id: "profile-A".to_owned(),
+            manifest_sha256: "f".repeat(64),
+            campaign_id: "campaign-A".to_owned(),
+            cases: vec![
+                case("low-speed", 'b', "condition-low-speed"),
+                case("cruise", 'c', "condition-cruise"),
+            ],
+        }
+    }
+
+    fn result(
+        case: &OperatingCaseSpec,
+        campaign_id: &str,
+        baseline_id: &str,
+        candidate_id: &str,
+    ) -> PairAssessment {
+        PairAssessment {
+            campaign_id: campaign_id.to_owned(),
+            pair_id: case.case_id.clone(),
+            disposition: PairDisposition::EligibleForEnergyComparison,
+            issues: vec![],
+            eligible_pair: Some(EligiblePair {
+                campaign_id: campaign_id.to_owned(),
+                pair_id: case.case_id.clone(),
+                baseline_candidate_id: baseline_id.to_owned(),
+                candidate_candidate_id: candidate_id.to_owned(),
+                baseline_order: crate::paired_trial::TrialOrder::First,
+                candidate_order: crate::paired_trial::TrialOrder::Second,
+                baseline_energy: energy(&format!("base-{}", case.case_id), case),
+                candidate_energy: energy(&format!("candidate-{}", case.case_id), case),
+            }),
+            run_count: 2,
+        }
+    }
+
+    fn complete_results(p: &OperatingEnvelopeSpec) -> Vec<PairAssessment> {
+        p.cases.iter()
+            .map(|case| result(case, &p.campaign_id, "baseline-v1", "candidate-v2"))
+            .collect()
+    }
+
+    fn has_issue(audit: &EnvelopeAudit, expected: &EnvelopeIssue) -> bool {
+        audit.issues.contains(expected)
+    }
+
+    #[test]
+    fn complete_matching_envelope_is_eligible_for_comparison() {
+        let p = profile();
+        let audit = audit_envelope(&p, &complete_results(&p));
+        assert_eq!(audit.disposition, EnvelopeDisposition::CompleteForEnvelopeComparison);
+        assert_eq!(audit.expected_case_count, 2);
+        assert_eq!(audit.eligible_case_count, 2);
+        assert_eq!(audit.baseline_design_id.as_deref(), Some("baseline-v1"));
+        assert_eq!(audit.candidate_design_id.as_deref(), Some("candidate-v2"));
+    }
+
+    #[test]
+    fn missing_required_case_never_passes() {
+        let p = profile();
+        let mut results = complete_results(&p);
+        results.pop();
+        let audit = audit_envelope(&p, &results);
+        assert_eq!(audit.disposition, EnvelopeDisposition::Incomplete);
+        assert_eq!(audit.missing_case_count, 1);
+    }
+
+    #[test]
+    fn unexpected_case_is_visible_and_blocks_complete_status() {
+        let p = profile();
+        let mut results = complete_results(&p);
+        let extra = case("unregistered-condition", 'd', "condition-extra");
+        results.push(result(&extra, "campaign-A", "baseline-v1", "candidate-v2"));
+        let audit = audit_envelope(&p, &results);
+        assert_eq!(audit.disposition, EnvelopeDisposition::Incomplete);
+        assert_eq!(audit.unexpected_case_count, 1);
+        assert!(has_issue(&audit, &EnvelopeIssue::UnexpectedCase { case_id: "unregistered-condition".to_owned() }));
+    }
+
+    #[test]
+    fn duplicate_profile_case_id_invalidates_profile() {
+        let mut p = profile();
+        p.cases.push(p.cases[0].clone());
+        let audit = audit_envelope(&p, &complete_results(&p));
+        assert_eq!(audit.disposition, EnvelopeDisposition::InvalidProfile);
+        assert!(has_issue(&audit, &EnvelopeIssue::DuplicateCaseId { case_id: "low-speed".to_owned() }));
+    }
+
+    #[test]
+    fn duplicate_result_for_case_blocks_profile() {
+        let p = profile();
+        let mut results = complete_results(&p);
+        results.push(results[0].clone());
+        let audit = audit_envelope(&p, &results);
+        assert_eq!(audit.disposition, EnvelopeDisposition::Incomplete);
+        assert_eq!(audit.duplicate_case_count, 1);
+        assert!(has_issue(&audit, &EnvelopeIssue::DuplicateCaseResult { case_id: "low-speed".to_owned(), count: 2 }));
+    }
+
+    #[test]
+    fn mission_mismatch_is_rejected() {
+        let mut p = profile();
+        p.cases[0].mission_id = "mission-other".to_owned();
+        let audit = audit_envelope(&p, &complete_results(&p));
+        assert!(has_issue(&audit, &EnvelopeIssue::MissionMismatch { case_id: "low-speed".to_owned() }));
+        assert_ne!(audit.disposition, EnvelopeDisposition::CompleteForEnvelopeComparison);
+    }
+
+    #[test]
+    fn service_fingerprint_mismatch_is_rejected() {
+        let p = profile();
+        let mut results = complete_results(&p);
+        if let Some(pair) = results[0].eligible_pair.as_mut() {
+            pair.candidate_energy.service_digest = "d".repeat(64);
+        }
+        let audit = audit_envelope(&p, &results);
+        assert!(has_issue(&audit, &EnvelopeIssue::ServiceDigestMismatch { case_id: "low-speed".to_owned() }));
+    }
+
+    #[test]
+    fn condition_mismatch_is_rejected() {
+        let p = profile();
+        let mut results = complete_results(&p);
+        if let Some(pair) = results[0].eligible_pair.as_mut() {
+            pair.candidate_energy.condition_digest = "different-condition".to_owned();
+        }
+        let audit = audit_envelope(&p, &results);
+        assert!(has_issue(&audit, &EnvelopeIssue::ConditionMismatch { case_id: "low-speed".to_owned() }));
+    }
+
+    #[test]
+    fn mixed_baseline_designs_across_cases_are_rejected() {
+        let p = profile();
+        let mut results = complete_results(&p);
+        if let Some(pair) = results[1].eligible_pair.as_mut() {
+            pair.baseline_candidate_id = "another-baseline".to_owned();
+        }
+        let audit = audit_envelope(&p, &results);
+        assert!(audit.issues.iter().any(|issue| matches!(issue, EnvelopeIssue::BaselineDesignMismatch { .. })));
+    }
+
+    #[test]
+    fn mixed_candidate_designs_across_cases_are_rejected() {
+        let p = profile();
+        let mut results = complete_results(&p);
+        if let Some(pair) = results[1].eligible_pair.as_mut() {
+            pair.candidate_candidate_id = "another-candidate".to_owned();
+        }
+        let audit = audit_envelope(&p, &results);
+        assert!(audit.issues.iter().any(|issue| matches!(issue, EnvelopeIssue::CandidateDesignMismatch { .. })));
+    }
+
+    #[test]
+    fn incomparable_pair_does_not_count_as_coverage() {
+        let p = profile();
+        let mut results = complete_results(&p);
+        results[0].disposition = PairDisposition::Incomparable;
+        results[0].eligible_pair = None;
+        results[0].issues = vec![crate::paired_trial::PairingIssue::ConditionMismatch];
+        let audit = audit_envelope(&p, &results);
+        assert_eq!(audit.eligible_case_count, 1);
+        assert_eq!(audit.incomparable_case_count, 1);
+        assert_ne!(audit.disposition, EnvelopeDisposition::CompleteForEnvelopeComparison);
+    }
+
+    #[test]
+    fn wrong_campaign_is_rejected() {
+        let p = profile();
+        let mut results = complete_results(&p);
+        results[0].campaign_id = "campaign-other".to_owned();
+        let audit = audit_envelope(&p, &results);
+        assert!(has_issue(&audit, &EnvelopeIssue::PairCampaignMismatch { case_id: "low-speed".to_owned() }));
+    }
+
+    #[test]
+    fn invalid_profile_digest_is_rejected() {
+        let mut p = profile();
+        p.manifest_sha256 = "not-a-sha256".to_owned();
+        let audit = audit_envelope(&p, &complete_results(&p));
+        assert_eq!(audit.disposition, EnvelopeDisposition::InvalidProfile);
+        assert!(has_issue(&audit, &EnvelopeIssue::InvalidManifestDigest));
+    }
+
+    #[test]
+    fn empty_case_set_is_invalid() {
+        let mut p = profile();
+        p.cases.clear();
+        let audit = audit_envelope(&p, &[]);
+        assert_eq!(audit.disposition, EnvelopeDisposition::InvalidProfile);
+        assert!(has_issue(&audit, &EnvelopeIssue::EmptyCaseSet));
+    }
+
+    #[test]
+    fn malformed_service_digest_is_invalid_profile() {
+        let mut p = profile();
+        p.cases[0].service_digest = "not-hex".to_owned();
+        let audit = audit_envelope(&p, &complete_results(&p));
+        assert_eq!(audit.disposition, EnvelopeDisposition::InvalidProfile);
+        assert!(audit.issues.iter().any(|issue| matches!(issue, EnvelopeIssue::InvalidServiceDigest { case_id } if case_id == "low-speed")));
+    }
+
+    #[test]
+    fn same_baseline_and_candidate_is_rejected() {
+        let p = profile();
+        let results = p.cases.iter()
+            .map(|case| result(case, "campaign-A", "design-A", "design-A"))
+            .collect::<Vec<_>>();
+        let audit = audit_envelope(&p, &results);
+        assert!(audit.issues.iter().any(|issue| matches!(issue, EnvelopeIssue::SameDesignForBaselineAndCandidate { .. })));
+    }
+
+    #[test]
+    fn input_order_permutation_produces_same_audit() {
+        let p = profile();
+        let results = complete_results(&p);
+        let mut reversed_profile = p.clone();
+        reversed_profile.cases.reverse();
+        let reversed_results = results.iter().cloned().rev().collect::<Vec<_>>();
+        assert_eq!(audit_envelope(&p, &results), audit_envelope(&reversed_profile, &reversed_results));
+    }
+
+    #[test]
+    fn eligible_disposition_without_pair_payload_is_rejected() {
+        let p = profile();
+        let mut results = complete_results(&p);
+        results[0].eligible_pair = None;
+        let audit = audit_envelope(&p, &results);
+        assert!(has_issue(&audit, &EnvelopeIssue::EligiblePairPayloadMissing { case_id: "low-speed".to_owned() }));
+        assert_ne!(audit.disposition, EnvelopeDisposition::CompleteForEnvelopeComparison);
+    }
+}
