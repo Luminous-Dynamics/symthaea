@@ -81,6 +81,8 @@
       "required": [
         "design_type",
         "allocation_unit",
+        "randomization_method",
+        "blocking_unit",
         "plots_per_cluster",
         "intracluster_correlation",
         "attrition_fraction",
@@ -114,6 +116,20 @@
         "planned_site_season_count": {
           "type": "integer",
           "minimum": 1
+        },
+        "randomization_method": {
+          "enum": [
+            "completely_randomized",
+            "randomized_complete_block",
+            "stratified_randomized",
+            "cluster_randomized",
+            "other_preregistered"
+          ]
+        },
+        "blocking_unit": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Explicit block identifier/unit, or the string none. This preflight records it but does not model block efficiency."
         }
       }
     }
@@ -143,6 +159,11 @@
             "properties": {
               "plots_per_cluster": {
                 "const": 1
+              },
+              "randomization_method": {
+                "not": {
+                  "const": "cluster_randomized"
+                }
               }
             }
           }
@@ -176,6 +197,12 @@
             "properties": {
               "plots_per_cluster": {
                 "minimum": 2
+              },
+              "randomization_method": {
+                "enum": [
+                  "cluster_randomized",
+                  "other_preregistered"
+                ]
               }
             }
           }
