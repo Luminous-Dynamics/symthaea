@@ -189,7 +189,10 @@ struct Evaluator {
 
 impl Evaluator {
     fn new(profile: EvaluationProfile, oracle_holdout: Digest, oracle_expected_value: u64) -> Self {
-        assert_eq!(profile.holdout, oracle_holdout, "oracle must bind the declared holdout");
+        assert_eq!(
+            profile.holdout, oracle_holdout,
+            "oracle must bind the declared holdout"
+        );
         Self {
             profile,
             oracle_holdout,
@@ -647,5 +650,7 @@ fn main() {
     assert_oracle_is_not_authority();
 
     println!("SYM-CIV-003 PASS: independent-evaluation boundary smoke controls hold.");
-    println!("Claim ceiling: local semantic/type-flow control only; not evaluator correctness or deployment safety.");
+    println!(
+        "Claim ceiling: local semantic/type-flow control only; not evaluator correctness or deployment safety."
+    );
 }
