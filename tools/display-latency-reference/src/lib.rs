@@ -181,7 +181,7 @@ impl LatencyConfig {
 pub struct LatencyResult {
     pub status: LatencyStatus,
     pub reference: TimingReference,
-    pub reason: Option<&'static str>,
+    pub reason: Option<String>,
     pub baseline_adc: Option<f64>,
     pub settled_adc: Option<f64>,
     pub swing_adc: Option<f64>,
@@ -206,7 +206,7 @@ impl LatencyResult {
         Self {
             status,
             reference,
-            reason,
+            reason: reason.map(str::to_owned),
             baseline_adc: None,
             settled_adc: None,
             swing_adc: None,
@@ -592,7 +592,7 @@ mod tests {
         }
         CaptureRow {
             click_duration_us: 80,
-            total_duration_us: 44_200,
+            total_duration_us: 43_400,
             declared_sample_count: sample_count,
             pre_click_samples,
             samples,
@@ -738,9 +738,14 @@ mod tests {
         let mut too_short = step_capture();
         too_short.samples.truncate(1_100);
         too_short.declared_sample_count = too_short.samples.len();
+        too_short.pre_click_samples = 500;
+        let config = LatencyConfig {
+            minimum_noise_samples: 600,
+            ..LatencyConfig::default()
+        };
         assert_eq!(
-            analyze_capture(&too_short, TimingReference::Press, LatencyConfig::default())
-                .expect("default config valid")
+            analyze_capture(&too_short, TimingReference::Press, config)
+                .expect("configuration valid")
                 .status,
             LatencyStatus::InsufficientSamples
         );
