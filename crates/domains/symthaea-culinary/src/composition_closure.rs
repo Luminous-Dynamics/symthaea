@@ -335,9 +335,11 @@ pub fn check_proximate_composition_closure_v1(
     {
         return Err(vec!["summed proximate composition is non-finite".to_owned()]);
     }
-    let disposition = upper_sum
-        .map(|upper| classify(lower_sum, upper))
-        .unwrap_or(CompositionClosureDispositionV1::Indeterminate);
+    let disposition = match upper_sum {
+        Some(upper) => classify(lower_sum, upper),
+        None if lower_sum > 105.0 => CompositionClosureDispositionV1::OutsideAcceptable,
+        None => CompositionClosureDispositionV1::Indeterminate,
+    };
     if let (Some(point), Some(upper)) = (point_sum, upper_sum) {
         if point < lower_sum || point > upper {
             return Err(vec!["component intervals do not contain the point sum".to_owned()]);
@@ -382,6 +384,23 @@ mod tests {
         value["components"][0]["upper"] = json!(68.0);
         let result = check_proximate_composition_closure_v1(&value).unwrap();
         assert_eq!(result.disposition, CompositionClosureDispositionV1::Indeterminate);
+    }
+
+    #[test]
+    fn unavailable_component_does_not_hide_a_known_lower_sum_above_limit() {
+        let mut value = fixture();
+        value["components"][0]["value"] = json!(70.0);
+        value["components"][0]["lower"] = json!(70.0);
+        value["components"][0]["upper"] = json!(70.0);
+        value["components"].as_array_mut().unwrap().pop();
+        value["unavailable_components"] = serde_json::json!([{
+            "component_id": "alcohol",
+            "reason": "not_analyzed",
+            "detail": "synthetic missingness test"
+        }]);
+        let result = check_proximate_composition_closure_v1(&value).unwrap();
+        assert_eq!(result.disposition, CompositionClosureDispositionV1::OutsideAcceptable);
+        assert!(result.upper_sum_g_per_100g.is_none());
     }
 
     #[test]
