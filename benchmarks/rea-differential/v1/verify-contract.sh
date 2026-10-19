@@ -14,8 +14,8 @@ command -v cargo >/dev/null 2>&1 || fail "cargo required"
 jq -e '
   .schema_version=="symthaea.rea-differential-cases.v1" and
   .corpus_id=="rea-differential-v1" and
-  (.cases|length)==13 and
-  ([.cases[].case_id]|unique|length)==13 and
+  (.cases|length)==14 and
+  ([.cases[].case_id]|unique|length)==14 and
   all(.cases[]; (.mutations|length)>0 and (.required_region_kinds|unique|length)==(.required_region_kinds|length))
 ' "$CASES" >/dev/null || fail "case catalog schema or uniqueness invariant failed"
 
