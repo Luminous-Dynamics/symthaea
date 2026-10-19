@@ -242,7 +242,12 @@ fn calculate(input: &PowerInput, input_sha256: String) -> Result<TrialPowerPlan>
     }
     let required_plots = (attrition_adjusted as usize).max(2);
     let clusters_per_arm = required_plots.div_ceil(design.plots_per_cluster);
-    let planned_plots_per_arm = clusters_per_arm * design.plots_per_cluster;
+    let planned_plots_per_arm = clusters_per_arm
+        .checked_mul(design.plots_per_cluster)
+        .ok_or_else(|| anyhow!("planned per-arm plot count exceeds supported integer range"))?;
+    let total_planned_plots_two_arms = planned_plots_per_arm
+        .checked_mul(2)
+        .ok_or_else(|| anyhow!("two-arm total plot count exceeds supported integer range"))?;
     let effective_retained = planned_plots_per_arm as f64
         * (1.0 - design.attrition_fraction)
         / design_effect;
@@ -306,7 +311,7 @@ fn calculate(input: &PowerInput, input_sha256: String) -> Result<TrialPowerPlan>
         plots_per_cluster: design.plots_per_cluster,
         clusters_required_per_arm: clusters_per_arm,
         planned_plots_per_arm_after_cluster_rounding: planned_plots_per_arm,
-        total_planned_plots_two_arms: planned_plots_per_arm * 2,
+        total_planned_plots_two_arms,
         planned_site_season_count: design.planned_site_season_count,
         approximate_effective_retained_plots_per_arm: (effective_retained * 1000.0).round() / 1000.0,
         warnings,
@@ -432,6 +437,15 @@ mod tests {
         input.design.allocation_unit = "farm".to_owned();
         input.design.plots_per_cluster = 1;
         assert!(validate(&input).is_err());
+    }
+
+    #[test]
+    fn integer_overflow_in_cluster_rounding_fails_closed() {
+        let mut input = fixture();
+        input.design.allocation_unit = "farm".to_owned();
+        input.design.plots_per_cluster = usize::MAX;
+        input.design.intracluster_correlation = 0.0;
+        assert!(calculate(&input, "f".repeat(64)).is_err());
     }
 
     #[test]
