@@ -137,6 +137,16 @@ A 2026 multi-cropping irrigation study proposes chance-constrained multi-objecti
 
 A provisional target—only after calibration data and domain review are pinned—is at least 95% feasibility on the declared non-adversarial evaluation suite and a pre-registered upper-tail shortfall limit. All adversarial scenarios and any hard-constraint violations must be disclosed. CF-025 remains blocked until joint uncertainty sets and the preference protocol are pinned; see [CF-025_ROBUST_DECISION_UNCERTAINTY_BENCHMARK_V0.md](./CF-025_ROBUST_DECISION_UNCERTAINTY_BENCHMARK_V0.md). A robust synthetic algorithm run is not evidence of crop efficacy or calibrated risk.
 
+## Additional paradigm shift: robust decisions under hybrid uncertainty
+
+CropFoundry should not call a policy robust because it wins one expected score. A policy can trade away a single plot, crop, nutrient or future season while improving the mean. CF-022's v1 score defect showed that even a deterministic objective can create a misleading optimizer incentive; receipt v2 repairs the starvation signal and reports per-zone outcomes. The next layer is uncertainty-aware robustness: measure feasibility, upper-tail and worst-case losses, sensitivity to assumptions, and whether recommendations reverse under reasonable risk preferences.
+
+A 2026 multi-cropping irrigation study proposes chance-constrained multi-objective robust programming and examines how risk preferences and robust penalties affect solutions ([Agronomy 2026, 16(18), 1786](https://www.mdpi.com/2073-4395/16/18/1786)). A separate 2026 site-specific irrigation study reports that the leading source of soil-moisture forecast uncertainty shifts from model parameters to weather uncertainty at longer forecast horizons ([SWIM2](https://doi.org/10.1016/j.agwat.2026.110300)). These are methodological examples, not validation for Gauteng crops or CropFoundry.
+
+**CF-025** defines a robust-decision contract across crop, irrigation, post-harvest and nutrition decisions. It requires joint uncertainty definitions, empirical-vs-literature-vs-expert-vs-synthetic provenance, dependence assumptions, matched scenarios, tail metrics for every objective, hard feasibility (not average constraint penalties), Pareto outputs, and a declared sweep of risk preferences. Expected-value, chance-constrained, minimax, tail-aware and Pareto baselines must see the same uncertainty suite. For synthetic scenario frequencies, do not claim calibrated real-world probabilities.
+
+A provisional target—only after calibration data and domain review are pinned—is at least 95% feasibility on the declared non-adversarial evaluation suite and a pre-registered upper-tail shortfall limit. All adversarial scenarios and any hard-constraint violations must be disclosed. CF-025 remains blocked until joint uncertainty sets and the preference protocol are pinned; see [CF-025_ROBUST_DECISION_UNCERTAINTY_BENCHMARK_V0.md](./CF-025_ROBUST_DECISION_UNCERTAINTY_BENCHMARK_V0.md). A robust synthetic algorithm run is not evidence of crop efficacy or calibrated risk.
+
 ## System boundaries
 
 - **Symthaea:** evidence-aware reasoning, candidate generation, uncertainty handling, multi-objective ranking, experiment selection, and recommendation receipts.
