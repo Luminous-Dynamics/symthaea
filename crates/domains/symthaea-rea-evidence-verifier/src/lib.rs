@@ -196,7 +196,17 @@ fn find_files_named(root: &Path, name: &str, output: &mut Vec<PathBuf>) -> VResu
     Ok(())
 }
 
-fn collect_bundle_paths(root: &Path, current: &Path, output: &mut Vec<String>) -> VResult<()> {
+fn collect_bundle_paths(root: &Path, current: &Path, output: &mut Vec<String>, depth: usize) -> VResult<()> {
+    const MAX_DEPTH: usize = 64;
+    const MAX_FILES: usize = 10_000;
+    if depth > MAX_DEPTH {
+        return Err(err(format!("bundle directory depth exceeds {MAX_DEPTH}")));
+    }
+    let metadata = fs::symlink_metadata(current)
+        .map_err(|e| err(format!("cannot inspect bundle directory {}: {e}", current.display())))?;
+    if metadata.file_type().is_symlink() || !metadata.is_dir() {
+        return Err(err(format!("bundle path is not a real directory: {}", current.display())));
+    }
     let entries = fs::read_dir(current)
         .map_err(|e| err(format!("cannot enumerate bundle directory {}: {e}", current.display())))?;
     for item in entries {
@@ -207,7 +217,7 @@ fn collect_bundle_paths(root: &Path, current: &Path, output: &mut Vec<String>) -
             return Err(err(format!("bundle contains a symlink: {}", item.path().display())));
         }
         if kind.is_dir() {
-            collect_bundle_paths(root, &item.path(), output)?;
+            collect_bundle_paths(root, &item.path(), output, depth + 1)?;
         } else if kind.is_file() {
             let relative = item.path().strip_prefix(root)
                 .map_err(|e| err(format!("bundle path escaped root: {e}")))?
@@ -217,6 +227,9 @@ fn collect_bundle_paths(root: &Path, current: &Path, output: &mut Vec<String>) -
                 return Err(err(format!("bundle contains a non-normal relative path: {relative}")));
             }
             output.push(relative);
+            if output.len() > MAX_FILES {
+                return Err(err(format!("bundle file count exceeds {MAX_FILES}")));
+            }
         } else {
             return Err(err(format!("bundle contains a non-regular entry: {}", item.path().display())));
         }
@@ -237,6 +250,7 @@ fn verify_bundle_manifest(root: &Path, expected_digest: &str) -> VResult<()> {
         .as_array()
         .ok_or_else(|| err("bundle manifest files must be an array"))?;
     let mut manifest_paths = Vec::with_capacity(files.len());
+    let mut expected_files = Vec::with_capacity(files.len());
     for entry in files {
         let relative = text_field(entry, "path")?;
         let digest = digest_field(entry, "sha256")?;
@@ -255,15 +269,39 @@ fn verify_bundle_manifest(root: &Path, expected_digest: &str) -> VResult<()> {
         if manifest_paths.last().is_some_and(|last: &String| last >= &relative) {
             return Err(err("bundle manifest paths must be unique and sorted"));
         }
-        verify_digest_at(&root.join(&relative), &digest, &format!("manifest file {relative}"))?;
-        manifest_paths.push(relative);
+        manifest_paths.push(relative.clone());
+        expected_files.push((relative, digest));
     }
+
+    // Enumerate the actual tree first, refusing symlink traversal before any
+    // manifest entry can trigger file reads outside the downloaded artifact.
     let mut actual_paths = Vec::new();
-    collect_bundle_paths(root, root, &mut actual_paths)?;
+    collect_bundle_paths(root, root, &mut actual_paths, 0)?;
     actual_paths.retain(|p| p != "receipt.json" && p != "bundle-manifest.json");
     actual_paths.sort();
     if actual_paths != manifest_paths {
         return Err(err("bundle manifest file set does not exactly match the artifact bundle"));
+    }
+
+    const MAX_FILE_BYTES: u64 = 256 * 1024 * 1024;
+    const MAX_TOTAL_BYTES: u64 = 512 * 1024 * 1024;
+    let mut total_bytes = 0_u64;
+    for (relative, digest) in expected_files {
+        let path = root.join(&relative);
+        let metadata = fs::symlink_metadata(&path)
+            .map_err(|e| err(format!("cannot inspect manifest file {relative}: {e}")))?;
+        if metadata.file_type().is_symlink() || !metadata.is_file() {
+            return Err(err(format!("manifest entry is not a regular non-symlink file: {relative}")));
+        }
+        if metadata.len() > MAX_FILE_BYTES {
+            return Err(err(format!("manifest file exceeds {MAX_FILE_BYTES} bytes: {relative}")));
+        }
+        total_bytes = total_bytes.checked_add(metadata.len())
+            .ok_or_else(|| err("bundle total size overflow"))?;
+        if total_bytes > MAX_TOTAL_BYTES {
+            return Err(err(format!("bundle total file size exceeds {MAX_TOTAL_BYTES} bytes")));
+        }
+        verify_digest_at(&path, &digest, &format!("manifest file {relative}"))?;
     }
     Ok(())
 }
@@ -520,7 +558,7 @@ mod tests {
     }
     fn refresh_bundle_manifest(root: &Path) -> String {
         let mut paths = Vec::new();
-        collect_bundle_paths(root, root, &mut paths).unwrap();
+        collect_bundle_paths(root, root, &mut paths, 0).unwrap();
         paths.retain(|path| path != "receipt.json" && path != "bundle-manifest.json");
         paths.sort();
         let files: Vec<Value> = paths
