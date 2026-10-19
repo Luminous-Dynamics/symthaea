@@ -117,6 +117,7 @@ struct ScenarioResult {
     relative_stress_change_vs_matched_water_equal_share_pct: Option<f64>,
     sensor_dropout_fraction: f64,
     water_budget_violation_days: usize,
+    per_plot_limit_violation_days: usize,
 }
 
 #[derive(Debug, Serialize)]
@@ -133,6 +134,7 @@ struct PolicyAggregate {
     mean_relative_stress_change_vs_equal_share_pct: Option<f64>,
     mean_relative_stress_change_vs_matched_water_equal_share_pct: Option<f64>,
     total_water_budget_violation_days: usize,
+    total_per_plot_limit_violation_days: usize,
 }
 
 #[derive(Debug, Serialize)]
@@ -318,6 +320,7 @@ fn simulate_one(
     let mut sensor_reads = 0_usize;
     let mut missing_reads = 0_usize;
     let mut violation_days = 0_usize;
+    let mut per_plot_limit_violation_days = 0_usize;
 
     for day in 0..DAYS {
         let mut observed = last_observation;
@@ -343,6 +346,12 @@ fn simulate_one(
         irrigation_total += applied;
         if applied > scenario.daily_water_budget_plot_mm + 1e-8 {
             violation_days += 1;
+        }
+        if allocation
+            .iter()
+            .any(|amount| *amount > MAX_IRRIGATION_PER_ZONE_MM + 1e-8)
+        {
+            per_plot_limit_violation_days += 1;
         }
 
         for zone in 0..ZONES {
@@ -413,6 +422,7 @@ fn simulate_one(
                 missing_reads as f64 / total_reads as f64
             },
             water_budget_violation_days: violation_days,
+            per_plot_limit_violation_days,
         },
         daily_irrigation_trace,
     )
@@ -605,16 +615,24 @@ fn build_receipt() -> Result<WaterPolicyReceipt> {
                 .iter()
                 .map(|result| result.water_budget_violation_days)
                 .sum(),
+            total_per_plot_limit_violation_days: policy_results
+                .iter()
+                .map(|result| result.per_plot_limit_violation_days)
+                .sum(),
         });
     }
 
-    let violations = results
+    let budget_violations = results
         .iter()
         .map(|result| result.water_budget_violation_days)
         .sum::<usize>();
-    if violations != 0 {
+    let per_plot_violations = results
+        .iter()
+        .map(|result| result.per_plot_limit_violation_days)
+        .sum::<usize>();
+    if budget_violations != 0 || per_plot_violations != 0 {
         return Err(anyhow!(
-            "synthetic water-policy invariant failed: {violations} daily budget violations"
+            "synthetic water-policy invariant failed: {budget_violations} daily budget violations, {per_plot_violations} per-plot limit violations"
         ));
     }
     if results.iter().any(|result| {
@@ -649,12 +667,13 @@ fn build_receipt() -> Result<WaterPolicyReceipt> {
         scenario_count: all_scenarios.len(),
         policy_count: policy_names.len(),
         invariant_summary:
-            "Zero cap violations; synthetic proxy, not a plant model; per-zone burden and water-matched allocation are reported."
+            "Zero daily-budget and per-plot-limit violations; synthetic proxy, not a plant model."
                 .to_owned(),
         aggregates,
         results,
         caveats: vec![
             "Scenario traces and parameters are illustrative synthetic assumptions.".to_owned(),
+            "The simulator separately fails on daily-total water-budget and per-plot actuator-limit violations.".to_owned(),
             "The stress proxy is not calibrated to a crop or farm economics.".to_owned(),
             "Aggregate scores hide uneven burdens; inspect per-plot stress and irrigation."
                 .to_owned(),
@@ -736,6 +755,12 @@ mod tests {
                 .results
                 .iter()
                 .all(|result| result.water_budget_violation_days == 0)
+        );
+        assert!(
+            receipt
+                .results
+                .iter()
+                .all(|result| result.per_plot_limit_violation_days == 0)
         );
     }
 
@@ -849,6 +874,7 @@ mod tests {
                 matched.total_irrigation_applied_plot_mm
             );
             assert_eq!(matched.water_budget_violation_days, 0);
+            assert_eq!(matched.per_plot_limit_violation_days, 0);
             assert!(
                 matched
                     .relative_stress_change_vs_matched_water_equal_share_pct
@@ -945,6 +971,7 @@ mod tests {
         assert!(receipt.aggregates.iter().all(|aggregate| {
             aggregate.max_worst_zone_stress_exposure_proxy
                 >= aggregate.median_worst_zone_stress_exposure_proxy
+                && aggregate.total_per_plot_limit_violation_days == 0
         }));
     }
 
