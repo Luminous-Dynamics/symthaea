@@ -59,10 +59,12 @@ impl RenderColor {
 /// sliders stay authoritative (the base is computed from state exactly as
 /// before); the dialect only SHIFTS the room the way the tradition's
 /// recording practice would:
-/// - ProcessExact (minimalism/ambient/drone, sacred-like stillness) — a
-///   larger, wetter space: the sustained material IS the reverb's food.
-/// - DanceLocked / JazzLaidBack — drier and closer: a rhythm section is
-///   close-mic'd; a wash would smear the groove that is the clock.
+/// - ProcessExact / DroneElastic — larger, wetter spaces for sustained
+///   process or slowly unfolding modal/drone material.
+/// - ChoralBlend — a larger, softer room for a unified ensemble image.
+/// - DramaticTiming — a moderate room lift intended to reinforce large arcs.
+/// - DanceLocked / JazzLaidBack — drier and closer so reverberation does not
+///   smear the groove that is the clock.
 /// - ClassicalRubato / FolkLift — unchanged (returned bit-identical).
 #[cfg(feature = "theory")]
 pub fn room_for_dialect(
