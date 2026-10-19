@@ -248,7 +248,10 @@ fn action_signature(case: &Case) -> BTreeMap<String, BTreeMap<String, i64>> {
 }
 
 fn state_signature(case: &Case) -> BTreeSet<String> {
-    case.states.iter().map(|state| state.state_id.clone()).collect()
+    case.states
+        .iter()
+        .map(|state| state.state_id.clone())
+        .collect()
 }
 
 fn experiment_signature(case: &Case) -> BTreeSet<String> {
@@ -303,7 +306,10 @@ fn validate_family(family: &RegretFamily) -> Vec<String> {
             reference_budget = Some(scenario.budget_utility);
         }
         if scenario.assumption_tags.is_empty()
-            || scenario.assumption_tags.iter().any(|tag| tag.trim().is_empty())
+            || scenario
+                .assumption_tags
+                .iter()
+                .any(|tag| tag.trim().is_empty())
         {
             errors.push("scenario_assumption_tags_missing".to_owned());
         }
@@ -376,9 +382,7 @@ fn choose_by_score(
         .min_by(|left, right| {
             let left_score = scores.get(*left).map(get_score).unwrap_or(i64::MIN);
             let right_score = scores.get(*right).map(get_score).unwrap_or(i64::MIN);
-            right_score
-                .cmp(&left_score)
-                .then_with(|| left.cmp(right))
+            right_score.cmp(&left_score).then_with(|| left.cmp(right))
         })
         .cloned()
 }
@@ -451,12 +455,9 @@ pub fn evaluate_family(family: &RegretFamily) -> RegretEvaluation {
             if net <= 0 {
                 continue;
             }
-            if oracle
-                .as_ref()
-                .is_none_or(|(current_id, current_net)| {
-                    net > *current_net || (net == *current_net && experiment_id < current_id)
-                })
-            {
+            if oracle.as_ref().is_none_or(|(current_id, current_net)| {
+                net > *current_net || (net == *current_net && experiment_id < current_id)
+            }) {
                 oracle = Some((experiment_id.clone(), net));
             }
         }
@@ -470,16 +471,12 @@ pub fn evaluate_family(family: &RegretFamily) -> RegretEvaluation {
             .map(|score| (score.experiment_id.clone(), score))
             .collect();
 
-        let yield_selection = choose_by_score(
-            &eligible_ids,
-            &score_map,
-            |score| score.expected_output_score,
-        );
-        let sensitivity_selection = choose_by_score(
-            &eligible_ids,
-            &score_map,
-            |score| score.local_sensitivity_score,
-        );
+        let yield_selection = choose_by_score(&eligible_ids, &score_map, |score| {
+            score.expected_output_score
+        });
+        let sensitivity_selection = choose_by_score(&eligible_ids, &score_map, |score| {
+            score.local_sensitivity_score
+        });
         let round_robin_selection = if eligible_ids.is_empty() {
             None
         } else {
@@ -791,13 +788,21 @@ mod tests {
             .expect("budget family exists");
         let evaluation = evaluate_family(&family);
         for scenario in &evaluation.scenario_results {
-            assert!(!scenario.eligible_experiment_ids.iter().any(|id| id == "assay-a"));
+            assert!(
+                !scenario
+                    .eligible_experiment_ids
+                    .iter()
+                    .any(|id| id == "assay-a")
+            );
             let yield_choice = scenario
                 .choices
                 .iter()
                 .find(|choice| choice.strategy == RegretStrategy::YieldOnly)
                 .expect("yield baseline choice exists");
-            assert_ne!(yield_choice.selected_experiment_id.as_deref(), Some("assay-a"));
+            assert_ne!(
+                yield_choice.selected_experiment_id.as_deref(),
+                Some("assay-a")
+            );
         }
     }
 
