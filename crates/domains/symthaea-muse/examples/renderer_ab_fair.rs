@@ -538,8 +538,6 @@ fn main() {
 
         let Some(wav) = fluid_render::render_midi_to_wav_with_mastering(
             &mid, SR, Some(color), &mastering,
-        let Some(wav) = fluid_render::render_midi_to_wav_with_mastering(
-            &mid, SR, Some(color), &mastering,
         ) else {
             let reason = format!("{style:?}/{seed}: dialect-profile FluidSynth render failed");
             eprintln!("{reason}; skipping");
