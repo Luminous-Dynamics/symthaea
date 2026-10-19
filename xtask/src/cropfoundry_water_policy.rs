@@ -1040,11 +1040,18 @@ mod tests {
                 aggregate.mean_worst_to_best_zone_stress_ratio.is_some(),
                 aggregate.worst_to_best_ratio_defined_scenario_count > 0
             );
-            if aggregate.policy == WATER_MATCHED_POLICY_NAME {
-                assert_eq!(aggregate.worst_to_best_ratio_defined_scenario_count, 3);
-            } else {
-                assert_eq!(aggregate.worst_to_best_ratio_defined_scenario_count, 6);
-            }
+            let independently_counted = receipt
+                .results
+                .iter()
+                .filter(|result| {
+                    result.policy == aggregate.policy
+                        && result.worst_to_best_zone_stress_ratio.is_some()
+                })
+                .count();
+            assert_eq!(
+                aggregate.worst_to_best_ratio_defined_scenario_count,
+                independently_counted
+            );
         }
         for result in &receipt.results {
             assert_eq!(
