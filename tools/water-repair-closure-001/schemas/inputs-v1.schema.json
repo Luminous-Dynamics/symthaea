@@ -74,6 +74,7 @@
             "additionalProperties": false,
             "required": [
               "event_id",
+              "content_payload",
               "content_sha256",
               "delivered_copies",
               "content_conflict"
@@ -93,6 +94,10 @@
               },
               "content_conflict": {
                 "type": "boolean"
+              },
+              "content_payload": {
+                "type": "string",
+                "minLength": 1
               }
             }
           },
