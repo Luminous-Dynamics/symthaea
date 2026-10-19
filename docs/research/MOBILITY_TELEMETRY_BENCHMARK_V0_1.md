@@ -85,10 +85,22 @@ Report per-group metrics, worst-group behavior, uncertainty calibration and out-
 
 Every benchmark report should include: benchmark version; source commit; toolchain/build identity; fixture and manifest hashes; case ID and expected/observed result; per-channel loss and timing summaries; calibration/protocol/rights references; software and physical gates separately; failed cases and reasons; claim ceiling. Preserve failing raw fixtures so a regression can be replayed.
 
-## Next concrete work
+## Executable entry point and next concrete work
 
-1. Execute the existing Rust validator tests and frozen fault matrix on a host with the workspace toolchain.
-2. Add a canonical report digest and replay-determinism test.
+Run from the workspace root once Cargo/Rust are available:
+
+```sh
+cargo test -p xtask frozen_fault_matrix_cases_match_expected_outcomes
+cargo run -p xtask -- mobility-telemetry-benchmark \\
+  --out reports/mobility_telemetry_benchmark.json
+```
+
+The command reads the frozen JSON matrix, applies the specified mutation for each case, compares observed and expected decisions (including required gap/invalid-row diagnostics), emits a hash-bound JSON report, and exits nonzero on any mismatch. It does not measure hardware. It has been authored but not compiled or run in this environment.
+
+Next:
+
+1. Execute the Rust tests and matrix on a host with the workspace toolchain; retain the exact-head report and build identity.
+2. Add a canonical report digest and 100/100 replay-determinism test.
 3. Build a host recorder/replayer before MCU firmware; add SocketCAN only as a receive-only, fail-closed adapter and test unavailable timestamp modes.
 4. Build a known-signal bench: pulse/step signal generator, synchronized voltage/current reference and independent sample counter.
 5. Validate the physical sensor chain and uncertainty before any real-world efficiency, handling, tire-force or safety claim.
