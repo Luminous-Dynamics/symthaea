@@ -1163,9 +1163,8 @@ pub fn realize_with_spec(
 /// listening study needs: e.g. force every arm to `ProcessExact` (neutral
 /// performance) so timing/expression differences don't confound a
 /// structural-recognition question, or force each arm to its own style's
-/// dialect deliberately. Maps down to this crate's own smaller
-/// [`PerformanceDialect`] via [`map_grammar_dialect`] before reaching the
-/// render internals.
+/// dialect deliberately. Maps one-to-one into this crate's renderer
+/// dialect through [`map_grammar_dialect`] before reaching render internals.
 pub fn realize_with_spec_and_dialect(
     score: &TheoryScore,
     spec: &symthaea_music_theory::CompositionSpec,
