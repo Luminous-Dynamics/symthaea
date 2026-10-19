@@ -181,8 +181,17 @@ fn main() {
         let state = MusicalState::default();
 
         // ── Arm A: native additive/sample renderer, mastered in realize_core.
-        let comp =
-            symthaea_muse::theory_realize::realize_with_spec(&score, &spec, seed, &state, SR);
+        let grammar_dialect = style.grammar_profile().performance;
+        let renderer_dialect =
+            symthaea_muse::theory_realize::map_grammar_dialect(grammar_dialect);
+        let comp = symthaea_muse::theory_realize::realize_with_spec_and_dialect(
+            &score,
+            &spec,
+            seed,
+            &state,
+            SR,
+            grammar_dialect,
+        );
         let AudioData::StereoF32(native_frames) = &comp.audio else {
             eprintln!("{style:?}/{seed}: native render was not stereo f32; skipping");
             continue;
@@ -199,16 +208,24 @@ fn main() {
 
         // ── Arm B: the SAME performed MIDI through FluidSynth, now also mastered.
         let mid = out_dir.join(format!("{style:?}_{seed}.mid"));
-        if midi_export::export_performance_midi(&score, &spec, seed, &state, &mid).is_err() {
+        if midi_export::export_performance_midi_with_dialect(
+            &score,
+            &spec,
+            seed,
+            &state,
+            grammar_dialect,
+            &mid,
+        )
+        .is_err()
+        {
             eprintln!("{style:?}/{seed}: MIDI export failed; skipping");
             continue;
         }
-        let dialect = symthaea_muse::theory_realize::dialect_for_spec(&spec);
         let color = fluid_render::room_for_dialect(
             fluid_render::RenderColor::from_state(&state),
-            dialect,
+            renderer_dialect,
         );
-        let mastering = auto_master::MasteringConfig::for_dialect(dialect);
+        let mastering = auto_master::MasteringConfig::for_dialect(renderer_dialect);
         let Some(wav) = fluid_render::render_midi_to_wav_with_mastering(
             &mid,
             SR,
