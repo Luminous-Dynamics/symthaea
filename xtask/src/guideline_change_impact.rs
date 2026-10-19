@@ -506,6 +506,30 @@ fn validate_contract(
         if !mapping.test_ids.is_empty() {
             unique_nonempty(&mapping.test_ids, "test_ids", &mapping.requirement_id)?;
         }
+        let mut known_answer_count = 0usize;
+        let mut fault_mutation_count = 0usize;
+        for test_id in &mapping.test_ids {
+            let oracle_case = oracle_cases
+                .get(test_id)
+                .with_context(|| {
+                    format!(
+                        "{}: test ID {test_id} is missing from independent oracle",
+                        mapping.requirement_id
+                    )
+                })?;
+            if oracle_case.requirement_id != mapping.requirement_id {
+                bail!(
+                    "{}: test ID {test_id} belongs to requirement {}, not this mapping",
+                    mapping.requirement_id,
+                    oracle_case.requirement_id
+                );
+            }
+            match oracle_case.case_kind.as_str() {
+                "known_answer" => known_answer_count += 1,
+                "fault_mutation" => fault_mutation_count += 1,
+                _ => unreachable!("oracle case kind was validated above"),
+            }
+        }
         match mapping.disposition.as_str() {
             "accepted" => {
                 if mapping.bundle_target.as_deref().unwrap_or("").trim().is_empty() {
@@ -520,9 +544,11 @@ fn validate_contract(
                         mapping.requirement_id
                     );
                 }
-                if mapping.criticality == "safety_critical" && mapping.test_ids.len() < 2 {
+                if mapping.criticality == "safety_critical"
+                    && (known_answer_count == 0 || fault_mutation_count == 0)
+                {
                     bail!(
-                        "{}: safety-critical mapping requires two independent test IDs",
+                        "{}: safety-critical mapping requires both a known-answer case and a fault-mutation case",
                         mapping.requirement_id
                     );
                 }
@@ -643,6 +669,17 @@ fn validate_contract(
                                     record.requirement_id
                                 );
                             }
+                            let oracle_case = oracle_cases
+                                .get(case_id)
+                                .with_context(|| {
+                                    format!("change case {case_id} is missing from independent oracle")
+                                })?;
+                            if oracle_case.requirement_id != record.requirement_id {
+                                bail!(
+                                    "{}: change case {case_id} is bound to a different requirement",
+                                    record.requirement_id
+                                );
+                            }
                         }
                     }
                     "excluded" => {
@@ -702,6 +739,18 @@ fn validate_contract(
         candidate_requirement_count: to.len(),
         mapped_requirement_count: contract.requirements.len(),
         change_record_count: contract.change_records.len(),
+        oracle_sha256,
+        oracle_case_count: oracle.cases.len(),
+        known_answer_case_count: oracle
+            .cases
+            .iter()
+            .filter(|case| case.case_kind == "known_answer")
+            .count(),
+        fault_mutation_case_count: oracle
+            .cases
+            .iter()
+            .filter(|case| case.case_kind == "fault_mutation")
+            .count(),
     })
 }
 
