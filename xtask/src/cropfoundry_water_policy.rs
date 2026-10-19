@@ -420,7 +420,7 @@ fn build_receipt() -> Result<WaterPolicyReceipt> {
         schema_version: "cropfoundry-water-policy-receipt-v0".to_owned(),
         benchmark_id: "CF-022".to_owned(),
         execution_mode: "deterministic_synthetic_algorithm_harness".to_owned(),
-        budget_measurement_unit: "plot-mm: summed depth across equally weighted synthetic plots; not a calibrated volumetric water budget".to_owned(),
+        budget_measurement_unit: "plot-mm sum; not physical volume".to_owned(),
         synthetic_only: true,
         biological_performance_claim: false,
         training_authorized: false,
