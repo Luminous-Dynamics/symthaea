@@ -7,6 +7,7 @@ description = "Synthetic-only structural qualifier for the household-goods facto
 
 [dependencies]
 serde_json = { workspace = true }
+sha2 = { workspace = true }
 symthaea-graph-theory = { path = "../symthaea-graph-theory" }
 
 [[bin]]
