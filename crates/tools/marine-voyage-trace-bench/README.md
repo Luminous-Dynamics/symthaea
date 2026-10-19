@@ -71,6 +71,20 @@ This ledger composes with [MARINE-EXP-001 #7641](https://github.com/Luminous-Dyn
 
 The official [ITTC benchmark repository](https://www.ittc.info/benchmark-repository/) lists separate reference families for ship resistance/propulsion, manoeuvring predictions, and cavitation/noise round-robin work. A fidelity receipt must bind its specific source/method/revision and relevant operating case; a generic label such as "CFD" does not qualify a result across those different physical questions. The ITTC resistance/propulsion benchmark procedure is [7.5-03-02-02, 2024 Revision 03](https://www.ittc.info/search/?q=Self-Propulsion).
 
+
+
+## Held-out validation scorecard by condition and observable
+
+The `validation_scorecard` module compares predictions against a frozen matrix of required operating-case × observable slices. Each profile fixes the dataset-manifest digest, model/configuration digest, minimum count per slice, normalization scale, maximum normalized RMSE and maximum normalized pointwise error. Scales and tolerances are domain/profile inputs, not hard-coded marine constants and not chosen after seeing candidate scores. The acceptance profile itself carries a canonical SHA-256 digest over its dataset/model identities, complete slice matrix, minimum counts, normalization scales and thresholds. Stale digests are invalidated when a threshold changes; equivalent slice ordering yields the same digest.
+
+Each slice reports signed bias, mean absolute error, RMSE, maximum absolute error, normalized RMSE and maximum normalized absolute error. No global average is used to hide a failed condition. Missing cases yield `IncompleteCoverage`; malformed or mismatched observations yield `InvalidObservations`; failed thresholds yield `FailDeclaredThresholds`.
+
+Residual metrics are kept separate from experimental uncertainty, numerical/discretization uncertainty, model discrepancy and applicability-domain error. The scorecard computes descriptive residuals only: it does not calculate uncertainty coverage, prove model calibration, infer a physical saving or qualify a vessel. It requires upstream reference intake and a frozen model-configuration identity to be managed separately.
+
+The synthetic tests use a shallow-water outlier to verify that a bad required operating condition fails even when many deep-water observations are perfect. A production study should use the admitted DTC/ITTC reference observations only after the raw files, rights, units, case identities and uncertainty metadata are independently reviewed; the paper listing is not itself proof of admissible data.
+
+Benchmark targets include exact synthetic known-answer arithmetic, zero false pass when a required slice violates its predeclared threshold, deterministic output under input permutation, and explicit missing-case / bad-digest / nonfinite / duplicate-ID controls. These are proposed target gates, not achieved performance results.
+
 ## Claim ceiling
 
 A Complete result means only that the canonical trace passed this crate's metadata, time-coverage, numeric and integration gates. It does not validate the measurement system, prove a hydrodynamic improvement, show corrected speed-power performance, establish lifecycle emissions, demonstrate vessel safety, or certify compliance.
