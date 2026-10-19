@@ -199,6 +199,14 @@ struct CsvMappingSpec {
     artifact_relative_path: String,
     source_row_id_header: String,
     columns: Vec<CsvColumnMapping>,
+    excluded_columns: Vec<CsvExcludedColumn>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct CsvExcludedColumn {
+    source_header: String,
+    reason: String,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -238,6 +246,14 @@ struct CsvMappedColumnReceipt {
 }
 
 #[derive(Debug, Clone, Serialize)]
+struct CsvExcludedColumnReceipt {
+    source_header: String,
+    reason: String,
+    nonempty_cells: usize,
+    empty_cells: usize,
+}
+
+#[derive(Debug, Clone, Serialize)]
 struct CsvReconciliationReceipt {
     artifact_relative_path: String,
     artifact_sha256: String,
@@ -249,6 +265,8 @@ struct CsvReconciliationReceipt {
     unique_source_row_ids: usize,
     mapped_column_count: usize,
     columns: Vec<CsvMappedColumnReceipt>,
+    excluded_column_count: usize,
+    excluded_columns: Vec<CsvExcludedColumnReceipt>,
     reconciliation_note: &'static str,
     claim_ceiling: &'static str,
 }
@@ -536,6 +554,61 @@ fn reconcile_csv_bytes(
         mapped_indices.push(index);
     }
 
+    let mut excluded_headers = BTreeSet::new();
+    let mut excluded_indices = Vec::with_capacity(mapping.excluded_columns.len());
+    for excluded in &mapping.excluded_columns {
+        if !nonblank(&excluded.source_header) || !nonblank(&excluded.reason) {
+            return Err(AdapterError::Validation(
+                "excluded source header and exclusion reason must be explicit".into(),
+            ));
+        }
+        if excluded.source_header == mapping.source_row_id_header {
+            return Err(AdapterError::Validation(
+                "the source row identifier cannot be excluded as a data column".into(),
+            ));
+        }
+        if source_headers.contains(&excluded.source_header) {
+            return Err(AdapterError::Validation(format!(
+                "source header {:?} cannot be both mapped and excluded",
+                excluded.source_header
+            )));
+        }
+        if !excluded_headers.insert(excluded.source_header.clone()) {
+            return Err(AdapterError::Validation(format!(
+                "source header {:?} is excluded more than once",
+                excluded.source_header
+            )));
+        }
+        let index = headers.iter()
+            .position(|header| header == excluded.source_header)
+            .ok_or_else(|| AdapterError::Validation(format!(
+                "excluded source header {:?} is absent from the exact CSV header",
+                excluded.source_header
+            )))?;
+        excluded_indices.push(index);
+    }
+
+    for header in headers.iter() {
+        if header != mapping.source_row_id_header
+            && !source_headers.contains(header)
+            && !excluded_headers.contains(header)
+        {
+            return Err(AdapterError::Validation(format!(
+                "source header {:?} has neither a field mapping nor an explicit exclusion reason",
+                header
+            )));
+        }
+    }
+
+    let mut excluded_receipts: Vec<CsvExcludedColumnReceipt> = mapping.excluded_columns.iter()
+        .map(|excluded| CsvExcludedColumnReceipt {
+            source_header: excluded.source_header.clone(),
+            reason: excluded.reason.clone(),
+            nonempty_cells: 0,
+            empty_cells: 0,
+        })
+        .collect();
+
     let mut rows = 0usize;
     let mut seen_row_ids = BTreeSet::new();
     let mut row_ids_hasher = Sha256::new();
@@ -600,6 +673,23 @@ fn reconcile_csv_bytes(
                     ))?;
             }
         }
+
+        for (excluded_index, source_index) in excluded_indices.iter().enumerate() {
+            let cell = record.get(*source_index).unwrap_or_default();
+            if cell.trim().is_empty() {
+                excluded_receipts[excluded_index].empty_cells =
+                    excluded_receipts[excluded_index].empty_cells.checked_add(1)
+                    .ok_or_else(|| AdapterError::Validation(
+                        "excluded CSV empty-cell count overflow".into()
+                    ))?;
+            } else {
+                excluded_receipts[excluded_index].nonempty_cells =
+                    excluded_receipts[excluded_index].nonempty_cells.checked_add(1)
+                    .ok_or_else(|| AdapterError::Validation(
+                        "excluded CSV nonempty-cell count overflow".into()
+                    ))?;
+            }
+        }
     }
 
     if rows != inventory.data_row_count || seen_row_ids.len() != rows {
@@ -628,8 +718,10 @@ fn reconcile_csv_bytes(
         unique_source_row_ids: seen_row_ids.len(),
         mapped_column_count: mapped_receipts.len(),
         columns: mapped_receipts,
-        reconciliation_note: "all parsed records were accounted for; source-native row IDs are unique; exact source headers were mapped as declared; missing values follow the explicit per-column policy",
-        claim_ceiling: "source row/header mapping integrity only; no numeric parsing, unit conversion, prediction accuracy, or physical qualification claim",
+        excluded_column_count: excluded_receipts.len(),
+        excluded_columns: excluded_receipts,
+        reconciliation_note: "all data headers are either explicitly mapped or excluded with a reason; all parsed rows and source-native row IDs were accounted for; missing values follow the declared field policy",
+        claim_ceiling: "source row/header coverage integrity only; no numeric parsing, unit conversion, prediction accuracy, or physical qualification claim",
     })
 }
 
@@ -1658,6 +1750,7 @@ mod tests {
             schema_version: "0.1.0".into(),
             artifact_relative_path: "fixture.csv".into(),
             source_row_id_header: "source_row_id".into(),
+            excluded_columns: Vec::new(),
             columns: vec![
                 CsvColumnMapping {
                     source_header: "stress_mpa".into(),
