@@ -493,6 +493,28 @@ mod tests {
     }
 
     #[test]
+    fn uniform_patch_fit_boundary_is_inclusive_and_below_boundary_fails() {
+        let mut input = geometry_input();
+        let first = evaluate_geometry_screen(&input)
+            .expect("initial geometry must be valid");
+        input.uniform_patch_width_mm = first.total_required_width_mm;
+        input.uniform_patch_height_mm = first.total_required_height_mm;
+
+        let exact_edge = evaluate_geometry_screen(&input)
+            .expect("exactly sufficient patch is valid");
+        assert!(exact_edge.horizontal_fits);
+        assert!(exact_edge.vertical_fits);
+        assert_eq!(exact_edge.screen_status, "WITHIN_GUARD_BAND");
+
+        input.uniform_patch_width_mm -= 1e-9;
+        let just_too_small = evaluate_geometry_screen(&input)
+            .expect("just-too-small patch is still a valid measurement setup");
+        assert!(!just_too_small.horizontal_fits);
+        assert!(just_too_small.vertical_fits);
+        assert_eq!(just_too_small.screen_status, "OUTSIDE_GUARD_BAND");
+    }
+
+    #[test]
     fn patch_fit_refuses_when_conservative_footprint_exceeds_uniform_region() {
         let mut input = geometry_input();
         input.uniform_patch_width_mm = 180.0;
