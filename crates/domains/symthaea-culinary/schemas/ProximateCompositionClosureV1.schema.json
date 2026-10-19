@@ -249,5 +249,101 @@
         }
       }
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "carbohydrate_basis": {
+            "const": "available_plus_fibre"
+          }
+        },
+        "required": [
+          "carbohydrate_basis"
+        ]
+      },
+      "then": {
+        "properties": {
+          "components": {
+            "items": {
+              "not": {
+                "properties": {
+                  "component_id": {
+                    "const": "total_carbohydrate"
+                  }
+                },
+                "required": [
+                  "component_id"
+                ]
+              }
+            }
+          },
+          "unavailable_components": {
+            "items": {
+              "not": {
+                "properties": {
+                  "component_id": {
+                    "const": "total_carbohydrate"
+                  }
+                },
+                "required": [
+                  "component_id"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "carbohydrate_basis": {
+            "const": "total_includes_fibre"
+          }
+        },
+        "required": [
+          "carbohydrate_basis"
+        ]
+      },
+      "then": {
+        "properties": {
+          "components": {
+            "items": {
+              "not": {
+                "properties": {
+                  "component_id": {
+                    "enum": [
+                      "available_carbohydrate",
+                      "dietary_fibre"
+                    ]
+                  }
+                },
+                "required": [
+                  "component_id"
+                ]
+              }
+            }
+          },
+          "unavailable_components": {
+            "items": {
+              "not": {
+                "properties": {
+                  "component_id": {
+                    "enum": [
+                      "available_carbohydrate",
+                      "dietary_fibre"
+                    ]
+                  }
+                },
+                "required": [
+                  "component_id"
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
 }
