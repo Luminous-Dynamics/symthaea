@@ -90,7 +90,36 @@ fn hash_bytes(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
 }
 
+fn ensure_regular_non_symlink(path: &Path, label: &str) -> VResult<()> {
+    let metadata = fs::symlink_metadata(path)
+        .map_err(|e| err(format!("cannot inspect {label} {}: {e}", path.display())))?;
+    if metadata.file_type().is_symlink() || !metadata.is_file() {
+        return Err(err(format!("{label} must be a regular non-symlink file: {}", path.display())));
+    }
+    Ok(())
+}
+
+fn read_bounded(path: &Path, max_bytes: u64, label: &str) -> VResult<Vec<u8>> {
+    ensure_regular_non_symlink(path, label)?;
+    let metadata = fs::metadata(path)
+        .map_err(|e| err(format!("cannot stat {label} {}: {e}", path.display())))?;
+    if metadata.len() > max_bytes {
+        return Err(err(format!("{label} exceeds the {max_bytes}-byte verification limit")));
+    }
+    let mut file = File::open(path)
+        .map_err(|e| err(format!("cannot open {label} {}: {e}", path.display())))?;
+    let mut bytes = Vec::with_capacity(metadata.len() as usize);
+    file.take(max_bytes + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|e| err(format!("cannot read {label} {}: {e}", path.display())))?;
+    if bytes.len() as u64 > max_bytes {
+        return Err(err(format!("{label} grew beyond the {max_bytes}-byte verification limit")));
+    }
+    Ok(bytes)
+}
+
 fn hash_file(path: &Path) -> VResult<String> {
+    ensure_regular_non_symlink(path, "evidence file")?;
     let mut file = File::open(path)
         .map_err(|e| err(format!("cannot open evidence file {}: {e}", path.display())))?;
     let mut hasher = Sha256::new();
@@ -121,8 +150,9 @@ fn verify_digest_at(path: &Path, expected: &str, label: &str) -> VResult<()> {
 }
 
 fn read_digest_file(path: &Path, label: &str) -> VResult<String> {
-    let raw = fs::read_to_string(path)
-        .map_err(|e| err(format!("cannot read {label} {}: {e}", path.display())))?;
+    let bytes = read_bounded(path, 1024, label)?;
+    let raw = std::str::from_utf8(&bytes)
+        .map_err(|e| err(format!("{label} is not UTF-8: {e}")))?;
     let digest = raw.trim();
     if !is_digest(digest) {
         return Err(err(format!("{label}: expected one lowercase SHA-256 line")));
