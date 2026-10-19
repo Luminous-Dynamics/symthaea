@@ -50,6 +50,7 @@ struct NutrientPortfolioTotal {
     total_delivered_mg: Option<f64>,
     total_delivered_interval_lower_mg: Option<f64>,
     total_delivered_interval_upper_mg: Option<f64>,
+    interval_coverage_batch_count: usize,
     estimated_bioavailable_total_mg: Option<f64>,
     bioavailability_coverage_batch_count: usize,
     estimated_bioavailable_interval_lower_mg: Option<f64>,
@@ -94,6 +95,8 @@ struct NutritionPortfolioReceipt {
     option_count: usize,
     common_resource_count: usize,
     comparable_resource_boundaries: BTreeMap<String, Option<String>>,
+    nutrient_interval_comparison_available: BTreeMap<String, bool>,
+    bioavailability_comparison_available: BTreeMap<String, bool>,
     accounting_pass: bool,
     dietary_adequacy_evaluated: bool,
     food_safety_validated: bool,
@@ -382,6 +385,11 @@ fn aggregate_option(
         let intervals_complete = !nutrient_rows.is_empty()
             && lower.iter().all(Option::is_some)
             && upper.iter().all(Option::is_some);
+        let interval_coverage_batch_count = lower
+            .iter()
+            .zip(&upper)
+            .filter(|(low, high)| low.is_some() && high.is_some())
+            .count();
         if any_interval && !intervals_complete {
             issues.push(format!(
                 "option {} nutrient {nutrient_id} has partial interval coverage across batches",
@@ -490,6 +498,7 @@ fn aggregate_option(
             total_delivered_mg: total_delivered,
             total_delivered_interval_lower_mg: total_lower,
             total_delivered_interval_upper_mg: total_upper,
+            interval_coverage_batch_count,
             estimated_bioavailable_total_mg: bioavailable_total,
             bioavailability_coverage_batch_count: bioavailability_coverage,
             estimated_bioavailable_interval_lower_mg: bioavailable_lower,
@@ -632,6 +641,39 @@ fn reconcile_portfolio(input: PortfolioInput, input_sha256: String) -> Nutrition
     for option in &mut options {
         option.accounting_pass = option.accounting_pass && option.issues.is_empty() && common_resource_count > 0;
     }
+    let mut nutrient_interval_comparison_available = BTreeMap::new();
+    let mut bioavailability_comparison_available = BTreeMap::new();
+    for nutrient_id in &input.expected_nutrient_ids {
+        let interval_available = !options.is_empty()
+            && options.iter().all(|option| {
+                option
+                    .nutrients
+                    .iter()
+                    .find(|nutrient| nutrient.nutrient_id == *nutrient_id)
+                    .is_some_and(|nutrient| {
+                        nutrient.batch_count == option.batch_count
+                            && nutrient.interval_coverage_batch_count == option.batch_count
+                            && nutrient.total_delivered_interval_lower_mg.is_some()
+                            && nutrient.total_delivered_interval_upper_mg.is_some()
+                    })
+            });
+        let bioavailability_available = !options.is_empty()
+            && options.iter().all(|option| {
+                option
+                    .nutrients
+                    .iter()
+                    .find(|nutrient| nutrient.nutrient_id == *nutrient_id)
+                    .is_some_and(|nutrient| {
+                        nutrient.batch_count == option.batch_count
+                            && nutrient.bioavailability_coverage_batch_count == option.batch_count
+                            && nutrient.estimated_bioavailable_total_mg.is_some()
+                    })
+            });
+        nutrient_interval_comparison_available
+            .insert(nutrient_id.clone(), interval_available);
+        bioavailability_comparison_available
+            .insert(nutrient_id.clone(), bioavailability_available);
+    }
     let accounting_pass = issues.is_empty()
         && options.iter().all(|option| option.accounting_pass);
     NutritionPortfolioReceipt {
@@ -643,6 +685,8 @@ fn reconcile_portfolio(input: PortfolioInput, input_sha256: String) -> Nutrition
         option_count: options.len(),
         common_resource_count,
         comparable_resource_boundaries,
+        nutrient_interval_comparison_available,
+        bioavailability_comparison_available,
         accounting_pass,
         dietary_adequacy_evaluated: false,
         food_safety_validated: false,
@@ -778,6 +822,8 @@ mod tests {
             .find(|nutrient| nutrient.nutrient_id == "iron")
             .unwrap();
         assert_eq!(iron.total_delivered_mg, Some(19.0));
+        assert_eq!(receipt.nutrient_interval_comparison_available["iron"], false);
+        assert_eq!(receipt.bioavailability_comparison_available["iron"], false);
         assert!((iron.mg_per_liter_water.unwrap() - 19.0 / 22.0).abs() < 1e-9);
         assert!(iron.estimated_bioavailable_total_mg.is_none());
         assert_eq!(iron.bioavailability_coverage_batch_count, 0);
@@ -844,6 +890,7 @@ mod tests {
             .unwrap();
         assert_eq!(iron.total_delivered_interval_lower_mg, Some(16.2));
         assert_eq!(iron.total_delivered_interval_upper_mg, Some(24.2));
+        assert_eq!(receipt.nutrient_interval_comparison_available["iron"], false);
     }
 
     #[test]
