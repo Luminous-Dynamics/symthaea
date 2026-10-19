@@ -523,6 +523,8 @@ fn build_receipt() -> Result<WaterPolicyReceipt> {
         let (soil_threshold_result, _) = simulate_one(scenario, Policy::SoilThreshold, None);
         let (risk_aware_result, risk_daily_totals) =
             simulate_one(scenario, Policy::UncertaintyAware, None);
+        let (minimax_fair_result, _) =
+            simulate_one(scenario, Policy::GreedyMinimaxStress, None);
         let (matched_uniform_result, matched_daily_totals) = simulate_one(
             scenario,
             Policy::EqualShareCalendar,
@@ -549,6 +551,7 @@ fn build_receipt() -> Result<WaterPolicyReceipt> {
         results.push(equal_share_result);
         results.push(soil_threshold_result);
         results.push(risk_aware_result);
+        results.push(minimax_fair_result);
         results.push(matched_uniform_result);
     }
 
@@ -607,6 +610,7 @@ fn build_receipt() -> Result<WaterPolicyReceipt> {
         Policy::EqualShareCalendar.name(),
         Policy::SoilThreshold.name(),
         Policy::UncertaintyAware.name(),
+        Policy::GreedyMinimaxStress.name(),
         WATER_MATCHED_POLICY_NAME,
     ];
     let mut aggregates = Vec::new();
@@ -811,8 +815,8 @@ mod tests {
         );
         assert_eq!(receipt.benchmark_id, "CF-022");
         assert_eq!(receipt.scenario_count, 6);
-        assert_eq!(receipt.policy_count, 4);
-        assert_eq!(receipt.results.len(), 24);
+        assert_eq!(receipt.policy_count, 5);
+        assert_eq!(receipt.results.len(), 30);
         assert!(receipt.results.iter().any(|result| {
             result.scenario_id == "forecast_bias_only"
                 && result.forecast_bias_fraction < 0.0
@@ -826,7 +830,7 @@ mod tests {
                 && result.forecast_bias_fraction == 0.0
                 && result.sensor_dropout_fraction > 0.0
         }));
-        assert_eq!(receipt.aggregates.len(), 4);
+        assert_eq!(receipt.aggregates.len(), 5);
         assert!(
             receipt
                 .aggregates
@@ -930,6 +934,27 @@ mod tests {
                 policy_result.sensor_dropout_period_days,
                 reference.sensor_dropout_period_days
             );
+        }
+    }
+
+    #[test]
+    fn cropfoundry_minimax_policy_reports_all_zone_constraints_and_metrics() {
+        let receipt = build_receipt().unwrap();
+        for scenario in scenarios() {
+            let fair = receipt
+                .results
+                .iter()
+                .find(|result| {
+                    result.scenario_id == scenario.id
+                        && result.policy == Policy::GreedyMinimaxStress.name()
+                })
+                .unwrap();
+            assert_eq!(fair.water_budget_violation_days, 0);
+            assert_eq!(fair.per_plot_limit_violation_days, 0);
+            assert_eq!(fair.zone_stress_exposure_proxy.len(), ZONES);
+            assert_eq!(fair.zone_irrigation_applied_plot_mm.len(), ZONES);
+            assert!(fair.max_zone_stress_exposure_proxy.is_finite());
+            assert!(fair.relative_stress_change_vs_equal_share_pct.is_some());
         }
     }
 
