@@ -8,6 +8,7 @@ mod cropfoundry_nutrition_portfolio;
 mod cropfoundry_postharvest_audit;
 mod cropfoundry_robust_policy;
 mod cropfoundry_validate;
+mod cropfoundry_trial_power;
 mod cropfoundry_water_policy;
 mod duplicate_scan;
 mod manifest;
@@ -130,6 +131,15 @@ enum Commands {
         #[arg(long)]
         out: Option<PathBuf>,
     },
+    /// Estimate field-trial sample size from explicit pilot assumptions; this is a preflight, not a final analysis.
+    CropfoundryTrialPowerPlan {
+        /// Input JSON file matching cropfoundry-trial-power-input-v0.
+        #[arg(long)]
+        input: PathBuf,
+        /// Optional path to write the SHA-256-bound planning receipt.
+        #[arg(long)]
+        out: Option<PathBuf>,
+    },
     RhnSweep {
         #[arg(long, default_value = "1024")]
         dims: String,
@@ -228,6 +238,9 @@ fn main() -> anyhow::Result<()> {
         }
         Commands::CropfoundryRobustPolicyDemo { out } => {
             cropfoundry_robust_policy::run(out)?;
+        }
+        Commands::CropfoundryTrialPowerPlan { input, out } => {
+            cropfoundry_trial_power::run(input, out)?;
         }
         Commands::RhnSweep {
             dims,
