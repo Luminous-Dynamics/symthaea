@@ -9,6 +9,7 @@
     "corpus_id",
     "case_id",
     "source",
+    "coordinate_spaces",
     "expected_regions",
     "expected_files"
   ],
@@ -26,6 +27,13 @@
     },
     "source": {
       "$ref": "#/$defs/source"
+    },
+    "coordinate_spaces": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/coordinate_space"
+      }
     },
     "expected_regions": {
       "type": "array",
@@ -59,15 +67,43 @@
         }
       }
     },
+    "coordinate_space": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "sha256",
+        "byte_length"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "byte_length": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
     "region": {
       "type": "object",
       "additionalProperties": false,
       "required": [
+        "coordinate_space_id",
         "kind",
         "start",
         "end"
       ],
       "properties": {
+        "coordinate_space_id": {
+          "type": "string",
+          "minLength": 1
+        },
         "kind": {
           "type": "string",
           "minLength": 1
