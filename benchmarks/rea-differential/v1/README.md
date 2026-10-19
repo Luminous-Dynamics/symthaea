@@ -10,7 +10,7 @@ The same independent oracle should score every provider. A parser's own report c
 
 ## Files
 
-- `cases.json`: 13 deterministic fixture recipes covering nested transforms, leading/trailing bytes, adjacent containers, path collisions, false-positive magic, corrupt/truncated inputs, depth limits, padding, single-byte offsets, and empty files.
+- `cases.json`: 14 deterministic fixture recipes covering nested transforms, leading/trailing bytes, adjacent containers, path collisions, false-positive magic, corrupt/truncated inputs, depth limits, padding, single-byte offsets, and empty files.
 - `oracle-policy.json`: meaning of pass/partial/fail/abstain, metrics, and proposed acceptance targets.
 - `example-oracle.json` / `example-observation.json`: an intentionally synthetic 10-byte contract fixture used to exercise the scorer.
 - `verify-contract.sh`: validates the catalog and runs positive/negative end-to-end scorecard controls.
