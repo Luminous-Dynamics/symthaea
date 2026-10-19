@@ -1,0 +1,447 @@
+#![deny(unsafe_code)]
+// Copyright (C) 2026 Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
+//! Conservative control-chart screening for a predeclared metrology run.
+//!
+//! This pure Rust core classifies the scheduled control readings, then marks DUT
+//! observations in the uncertainty interval surrounding an out-of-band, missing,
+//! or invalid control as NOT_EVALUATED. It does not estimate/correct drift and
+//! does not turn "no excursion detected" into proof of measurement accuracy.
+
+use std::collections::BTreeSet;
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ScheduledControl {
+    /// Stable, unique control slot identity.
+    pub id: String,
+    /// Expected slot position in monotonic elapsed seconds. For missing readings,
+    /// this planned time is used as the conservative interval anchor.
+    pub time_seconds: f64,
+    /// The measured control value, or None if the scheduled control was missed.
+    pub value: Option<f64>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct DutObservation {
+    pub id: String,
+    /// Monotonic elapsed seconds in the same time base as control slots.
+    pub time_seconds: f64,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct DriftControlPlan {
+    pub run_start_seconds: f64,
+    pub run_end_seconds: f64,
+    pub nominal_value: f64,
+    /// Absolute half-width of the predeclared guard band. Boundaries are inclusive.
+    pub guard_half_width: f64,
+    pub controls: Vec<ScheduledControl>,
+    pub dut_observations: Vec<DutObservation>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ControlDisposition {
+    InBand,
+    OutOfBand,
+    Missing,
+    Invalid,
+}
+
+impl ControlDisposition {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::InBand => "IN_BAND",
+            Self::OutOfBand => "OUT_OF_BAND",
+            Self::Missing => "MISSING",
+            Self::Invalid => "INVALID",
+        }
+    }
+
+    const fn is_acceptable(self) -> bool {
+        matches!(self, Self::InBand)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ControlDecision {
+    pub control_id: String,
+    pub time_seconds: f64,
+    pub measured_value: Option<f64>,
+    pub disposition: ControlDisposition,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ObservationDisposition {
+    NoOutOfBandControlDetected,
+    QuarantinedByControlExcursion,
+}
+
+impl ObservationDisposition {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::NoOutOfBandControlDetected => "NO_OUT_OF_BAND_CONTROL_DETECTED",
+            Self::QuarantinedByControlExcursion => "NOT_EVALUATED_CONTROL_EXCURSION",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ObservationDecision {
+    pub observation_id: String,
+    pub time_seconds: f64,
+    pub disposition: ObservationDisposition,
+    /// IDs of control slots responsible for quarantine, in schedule order.
+    pub responsible_control_ids: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct DriftScreeningReport {
+    pub guard_lower: f64,
+    pub guard_upper: f64,
+    pub controls: Vec<ControlDecision>,
+    pub observations: Vec<ObservationDecision>,
+    /// Hard boundary for interpretation: this report is not a physical qualification.
+    pub qualification: &'static str,
+}
+
+/// Apply a frozen absolute guard band and conservative quarantine intervals.
+///
+/// For every missing, invalid, or out-of-band control slot, its quarantine window
+/// extends from the preceding acceptable control (or run start) through the next
+/// acceptable control (or run end), inclusive. Overlapping windows are retained as
+/// their responsible slot IDs rather than silently averaged or normalized away.
+///
+/// A "NO_OUT_OF_BAND_CONTROL_DETECTED" observation means only that no bad scheduled
+/// control window brackets it under this algorithm. It is not proof of calibration,
+/// traceability, stability between controls, or measurement fitness.
+///
+/// # Errors
+///
+/// Rejects invalid run bounds/configuration, duplicate/empty IDs, unordered control
+/// slots, out-of-run timestamps, and invalid DUT-observation timestamps.
+pub fn screen_drift_controls(
+    plan: &DriftControlPlan,
+) -> Result<DriftScreeningReport, Vec<String>> {
+    let mut errors = Vec::new();
+
+    if !plan.run_start_seconds.is_finite()
+        || !plan.run_end_seconds.is_finite()
+        || plan.run_end_seconds <= plan.run_start_seconds
+    {
+        errors.push("run bounds must be finite and end after start".to_owned());
+    }
+    if !plan.nominal_value.is_finite() {
+        errors.push("control nominal value must be finite".to_owned());
+    }
+    if !plan.guard_half_width.is_finite() || plan.guard_half_width < 0.0 {
+        errors.push("guard half-width must be finite and nonnegative".to_owned());
+    }
+
+    let lower = plan.nominal_value - plan.guard_half_width;
+    let upper = plan.nominal_value + plan.guard_half_width;
+    if !lower.is_finite() || !upper.is_finite() {
+        errors.push("control guard-band bounds must be finite".to_owned());
+    }
+
+    let mut control_ids = BTreeSet::new();
+    let mut previous_time: Option<f64> = None;
+    for control in &plan.controls {
+        if control.id.trim().is_empty() {
+            errors.push("control slot IDs must be nonempty".to_owned());
+        }
+        if !control_ids.insert(control.id.clone()) {
+            errors.push(format!("duplicate control slot ID: {}", control.id));
+        }
+        if !control.time_seconds.is_finite()
+            || control.time_seconds < plan.run_start_seconds
+            || control.time_seconds > plan.run_end_seconds
+        {
+            errors.push(format!(
+                "control slot {} timestamp is non-finite or outside the run",
+                control.id
+            ));
+        }
+        if previous_time.is_some_and(|previous| control.time_seconds <= previous) {
+            errors.push(format!(
+                "control schedule is not strictly time-ordered at {}",
+                control.id
+            ));
+        }
+        previous_time = Some(control.time_seconds);
+    }
+
+    let mut observation_ids = BTreeSet::new();
+    for observation in &plan.dut_observations {
+        if observation.id.trim().is_empty() {
+            errors.push("DUT observation IDs must be nonempty".to_owned());
+        }
+        if !observation_ids.insert(observation.id.clone()) {
+            errors.push(format!("duplicate DUT observation ID: {}", observation.id));
+        }
+        if !observation.time_seconds.is_finite()
+            || observation.time_seconds < plan.run_start_seconds
+            || observation.time_seconds > plan.run_end_seconds
+        {
+            errors.push(format!(
+                "DUT observation {} timestamp is non-finite or outside the run",
+                observation.id
+            ));
+        }
+    }
+
+    if plan.controls.is_empty() {
+        errors.push("at least one predeclared control slot is required".to_owned());
+    }
+    if !errors.is_empty() {
+        errors.sort();
+        errors.dedup();
+        return Err(errors);
+    }
+
+    let controls: Vec<ControlDecision> = plan
+        .controls
+        .iter()
+        .map(|control| {
+            let disposition = match control.value {
+                None => ControlDisposition::Missing,
+                Some(value) if !value.is_finite() => ControlDisposition::Invalid,
+                Some(value) if value < lower || value > upper => ControlDisposition::OutOfBand,
+                Some(_) => ControlDisposition::InBand,
+            };
+            ControlDecision {
+                control_id: control.id.clone(),
+                time_seconds: control.time_seconds,
+                measured_value: control.value,
+                disposition,
+            }
+        })
+        .collect();
+
+    let mut observations = Vec::with_capacity(plan.dut_observations.len());
+    for observation in &plan.dut_observations {
+        let mut responsible = Vec::new();
+        for (index, decision) in controls.iter().enumerate() {
+            if decision.disposition.is_acceptable() {
+                continue;
+            }
+            let previous_good = controls[..index]
+                .iter()
+                .rev()
+                .find(|control| control.disposition.is_acceptable())
+                .map_or(plan.run_start_seconds, |control| control.time_seconds);
+            let next_good = controls[index + 1..]
+                .iter()
+                .find(|control| control.disposition.is_acceptable())
+                .map_or(plan.run_end_seconds, |control| control.time_seconds);
+
+            if observation.time_seconds >= previous_good
+                && observation.time_seconds <= next_good
+            {
+                responsible.push(decision.control_id.clone());
+            }
+        }
+
+        let disposition = if responsible.is_empty() {
+            ObservationDisposition::NoOutOfBandControlDetected
+        } else {
+            ObservationDisposition::QuarantinedByControlExcursion
+        };
+        observations.push(ObservationDecision {
+            observation_id: observation.id.clone(),
+            time_seconds: observation.time_seconds,
+            disposition,
+            responsible_control_ids: responsible,
+        });
+    }
+
+    Ok(DriftScreeningReport {
+        guard_lower: lower,
+        guard_upper: upper,
+        controls,
+        observations,
+        qualification: "SYNTHETIC_OR_CONTROL_SCREENING_ONLY_NOT_PHYSICAL_QUALIFICATION",
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        ControlDisposition, DriftControlPlan, DutObservation, ObservationDisposition,
+        ScheduledControl, screen_drift_controls,
+    };
+
+    fn control(id: &str, time_seconds: f64, value: Option<f64>) -> ScheduledControl {
+        ScheduledControl {
+            id: id.to_owned(),
+            time_seconds,
+            value,
+        }
+    }
+
+    fn sample(id: &str, time_seconds: f64) -> DutObservation {
+        DutObservation {
+            id: id.to_owned(),
+            time_seconds,
+        }
+    }
+
+    fn plan(controls: Vec<ScheduledControl>, dut_observations: Vec<DutObservation>) -> DriftControlPlan {
+        DriftControlPlan {
+            run_start_seconds: 0.0,
+            run_end_seconds: 100.0,
+            nominal_value: 10.0,
+            guard_half_width: 1.0,
+            controls,
+            dut_observations,
+        }
+    }
+
+    #[test]
+    fn guard_band_boundaries_are_inclusive() {
+        let report = screen_drift_controls(&plan(
+            vec![control("lower", 10.0, Some(9.0)), control("upper", 90.0, Some(11.0))],
+            vec![sample("inside", 50.0)],
+        ))
+        .expect("boundary values are valid controls");
+        assert_eq!(report.guard_lower, 9.0);
+        assert_eq!(report.guard_upper, 11.0);
+        assert!(report.controls.iter().all(|c| c.disposition == ControlDisposition::InBand));
+        assert_eq!(
+            report.observations[0].disposition,
+            ObservationDisposition::NoOutOfBandControlDetected
+        );
+    }
+
+    #[test]
+    fn out_of_band_control_quarantines_the_interval_between_good_anchors() {
+        let report = screen_drift_controls(&plan(
+            vec![
+                control("pre", 10.0, Some(10.0)),
+                control("excursion", 50.0, Some(12.0)),
+                control("post", 80.0, Some(10.0)),
+            ],
+            vec![sample("before", 5.0), sample("affected", 60.0), sample("after", 90.0)],
+        ))
+        .expect("control schedule should validate");
+        assert_eq!(report.controls[1].disposition, ControlDisposition::OutOfBand);
+        assert_eq!(
+            report.observations[0].disposition,
+            ObservationDisposition::NoOutOfBandControlDetected
+        );
+        assert_eq!(
+            report.observations[1].disposition,
+            ObservationDisposition::QuarantinedByControlExcursion
+        );
+        assert_eq!(report.observations[1].responsible_control_ids, ["excursion"]);
+        assert_eq!(
+            report.observations[2].disposition,
+            ObservationDisposition::NoOutOfBandControlDetected
+        );
+    }
+
+    #[test]
+    fn missing_control_is_not_interpreted_as_in_band() {
+        let report = screen_drift_controls(&plan(
+            vec![
+                control("pre", 10.0, Some(10.0)),
+                control("missed", 50.0, None),
+                control("post", 80.0, Some(10.0)),
+            ],
+            vec![sample("affected", 50.0)],
+        ))
+        .expect("missing readings are represented as slots");
+        assert_eq!(report.controls[1].disposition, ControlDisposition::Missing);
+        assert_eq!(
+            report.observations[0].disposition,
+            ObservationDisposition::QuarantinedByControlExcursion
+        );
+    }
+
+    #[test]
+    fn non_finite_control_value_is_invalid_and_quarantines() {
+        let report = screen_drift_controls(&plan(
+            vec![
+                control("pre", 10.0, Some(10.0)),
+                control("invalid", 50.0, Some(f64::NAN)),
+                control("post", 80.0, Some(10.0)),
+            ],
+            vec![sample("affected", 55.0)],
+        ))
+        .expect("non-finite reading is preserved as invalid control evidence");
+        assert_eq!(report.controls[1].disposition, ControlDisposition::Invalid);
+        assert_eq!(
+            report.observations[0].disposition,
+            ObservationDisposition::QuarantinedByControlExcursion
+        );
+    }
+
+    #[test]
+    fn first_and_last_bad_controls_extend_to_run_edges() {
+        let report = screen_drift_controls(&plan(
+            vec![
+                control("first_bad", 10.0, Some(12.0)),
+                control("good", 50.0, Some(10.0)),
+                control("last_bad", 90.0, Some(8.0)),
+            ],
+            vec![
+                sample("early", 2.0),
+                sample("middle", 60.0),
+                sample("late", 99.0),
+            ],
+        ))
+        .expect("edge control excursions should validate");
+        assert_eq!(
+            report.observations[0].disposition,
+            ObservationDisposition::QuarantinedByControlExcursion
+        );
+        assert_eq!(
+            report.observations[1].disposition,
+            ObservationDisposition::QuarantinedByControlExcursion
+        );
+        assert_eq!(
+            report.observations[2].disposition,
+            ObservationDisposition::QuarantinedByControlExcursion
+        );
+    }
+
+    #[test]
+    fn duplicate_ids_unordered_controls_and_out_of_run_times_reject() {
+        let duplicate = screen_drift_controls(&plan(
+            vec![control("x", 10.0, Some(10.0)), control("x", 20.0, Some(10.0))],
+            vec![],
+        ));
+        assert!(duplicate.expect_err("duplicate IDs must fail").iter().any(|e| e.contains("duplicate control")));
+
+        let unordered = screen_drift_controls(&plan(
+            vec![control("later", 20.0, Some(10.0)), control("earlier", 10.0, Some(10.0))],
+            vec![],
+        ));
+        assert!(unordered.expect_err("out-of-order controls must fail").iter().any(|e| e.contains("time-ordered")));
+
+        let outside = screen_drift_controls(&plan(
+            vec![control("outside", 110.0, Some(10.0))],
+            vec![],
+        ));
+        assert!(outside.expect_err("out-of-run control must fail").iter().any(|e| e.contains("outside the run")));
+    }
+
+    #[test]
+    fn no_detected_excursion_is_not_labeled_physical_pass() {
+        let report = screen_drift_controls(&plan(
+            vec![control("a", 10.0, Some(10.0)), control("b", 90.0, Some(10.0))],
+            vec![sample("d", 50.0)],
+        ))
+        .expect("screening should be valid");
+        assert_eq!(
+            report.qualification,
+            "SYNTHETIC_OR_CONTROL_SCREENING_ONLY_NOT_PHYSICAL_QUALIFICATION"
+        );
+        assert_eq!(
+            report.observations[0].disposition,
+            ObservationDisposition::NoOutOfBandControlDetected
+        );
+    }
+}
