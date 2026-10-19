@@ -623,7 +623,10 @@ mod tests {
             exponent: 2.0,
             scale: 2.0,
         };
-        assert!((screened.predict(2.0).unwrap() - std::f64::consts::E.recip() / 2.0).abs() < 1.0e-12);
+        assert!(
+            (screened.predict(2.0).unwrap() - std::f64::consts::E.recip() / 2.0).abs()
+                < 1.0e-12
+        );
 
         let saturating = Law {
             family: LawFamily::Saturating,
