@@ -26,16 +26,7 @@ jobs:
         uses: actions/checkout@v4
       - name: Install stable Rust
         uses: dtolnay/rust-toolchain@stable
-      - name: Generate deterministic dependency lockfile for maintainer review
-        run: cargo generate-lockfile --manifest-path tools/metal-measurement-bench/Cargo.toml
-      - name: Run adapter tests
+      - name: Run adapter tests against the committed dependency graph
         run: cargo test --locked --manifest-path tools/metal-measurement-bench/Cargo.toml
       - name: Validate committed NIST source manifest
         run: cargo run --locked --manifest-path tools/metal-measurement-bench/Cargo.toml -- validate-manifest tools/metal-measurement-bench/schemas/amb2025-02-source-manifest-v0.1.json
-      - name: Export exact resolved lockfile for commit
-        uses: actions/upload-artifact@v4
-        with:
-          name: metal-measurement-cargo-lock
-          path: tools/metal-measurement-bench/Cargo.lock
-          if-no-files-found: error
-          retention-days: 3
