@@ -35,9 +35,10 @@ map(
         else . end
       else . end)
       | walk(if type=="object" then with_entries(
-          if (["path","carve_dir","extraction_path","link_path"]|index(.key))!=null and (.value|type)=="string"
-            then .value=rebase($oldroot;$newroot;.value)
-          elif .key=="paths" and (.value|type)=="array" then .value |= map(rebase($oldroot;$newroot;.))
+          . as $entry |
+          if (["path","carve_dir","extraction_path","link_path"]|index($entry.key))!=null and ($entry.value|type)=="string"
+            then .value=rebase($oldroot;$newroot;$entry.value)
+          elif $entry.key=="paths" and ($entry.value|type)=="array" then .value |= map(rebase($oldroot;$newroot;.))
           else . end)
         else . end)
     )
