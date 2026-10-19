@@ -1,0 +1,51 @@
+{
+  "schema_version": "symthaea.rea-differential-oracle.v1",
+  "corpus_id": "rea-differential-v1",
+  "case_id": "contract-example-001",
+  "source": {
+    "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "byte_length": 10
+  },
+  "coordinate_spaces": [
+    {
+      "id": "root",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "byte_length": 10,
+      "parent_coordinate_space_id": null,
+      "parent_start": null,
+      "parent_end": null,
+      "transform_kind": "source"
+    },
+    {
+      "id": "tar-stream",
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "byte_length": 7,
+      "parent_coordinate_space_id": "root",
+      "parent_start": 0,
+      "parent_end": 10,
+      "transform_kind": "decompress:gzip"
+    }
+  ],
+  "expected_regions": [
+    {
+      "coordinate_space_id": "root",
+      "kind": "gzip-container",
+      "start": 0,
+      "end": 10
+    },
+    {
+      "coordinate_space_id": "tar-stream",
+      "kind": "tar-container",
+      "start": 0,
+      "end": 7
+    }
+  ],
+  "expected_files": [
+    {
+      "path": "payload.txt",
+      "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "byte_length": 4,
+      "logical_id": "payload-001"
+    }
+  ]
+}

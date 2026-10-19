@@ -1,0 +1,54 @@
+name: REA Differential Extraction Contract
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
+    paths:
+      - "crates/domains/symthaea-rea-evidence-verifier/**"
+      - "benchmarks/rea-differential/v1/**"
+      - "schemas/rea-differential-*.schema.json"
+      - ".github/workflows/rea-differential-contract.yml"
+  push:
+    branches: [main]
+    paths:
+      - "crates/domains/symthaea-rea-evidence-verifier/**"
+      - "benchmarks/rea-differential/v1/**"
+      - "schemas/rea-differential-*.schema.json"
+      - ".github/workflows/rea-differential-contract.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rea-differential-contract-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  differential-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact triggering revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Set up pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+      - name: Check schema and catalog JSON syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq empty benchmarks/rea-differential/v1/cases.json
+          jq empty benchmarks/rea-differential/v1/oracle-policy.json
+          jq empty benchmarks/rea-differential/v1/example-oracle.json
+          jq empty benchmarks/rea-differential/v1/example-observation.json
+          jq empty schemas/rea-differential-cases-v1.schema.json
+          jq empty schemas/rea-differential-oracle-v1.schema.json
+          jq empty schemas/rea-differential-observation-v1.schema.json
+          jq empty schemas/rea-differential-scorecard-v1.schema.json
+      - name: Format verifier crate
+        run: cargo fmt --package symthaea-rea-evidence-verifier
+      - name: Test scoring and receipt verifiers
+        run: cargo test -p symthaea-rea-evidence-verifier
+      - name: Run scorecard contract and mutation controls
+        run: sh benchmarks/rea-differential/v1/verify-contract.sh

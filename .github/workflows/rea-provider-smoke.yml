@@ -4,6 +4,8 @@ on:
     types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
     paths:
       - "benchmarks/rea-determinism/v1/**"
+      - "benchmarks/rea-differential/v1/**"
+      - "schemas/rea-differential-*.schema.json"
       - "crates/domains/symthaea-rea-evidence-verifier/**"
       - ".github/workflows/rea-provider-smoke.yml"
   workflow_dispatch:
@@ -38,22 +40,22 @@ jobs:
           python -m pip check
           unblob --version
           python -m pip freeze | LC_ALL=C sort
-      - name: Run real-provider fixture twice
-        shell: bash
-        env:
-          REA_PROVIDER_ARTIFACT_DIR: ${{ runner.temp }}/rea-provider-evidence
-          REA_TEST_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-        run: sh benchmarks/rea-determinism/v1/provider-smoke.sh
-
       - name: Set up pinned Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
 
-      - name: Test independent Rust receipt verifier
+      - name: Test Rust receipt and differential scorers
         shell: bash
         run: |
           set -euo pipefail
           cargo fmt --package symthaea-rea-evidence-verifier
           cargo test -p symthaea-rea-evidence-verifier
+
+      - name: Run real-provider fixtures and score differential observations
+        shell: bash
+        env:
+          REA_PROVIDER_ARTIFACT_DIR: ${{ runner.temp }}/rea-provider-evidence
+          REA_TEST_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: sh benchmarks/rea-determinism/v1/provider-smoke.sh
 
       - name: Verify generated provider evidence artifact
         shell: bash

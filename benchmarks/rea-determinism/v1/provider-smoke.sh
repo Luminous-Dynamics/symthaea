@@ -3,6 +3,7 @@
 # Uses only generated gzip -> tar -> text fixtures. Never executes extracted content.
 set -eu
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+DIFFERENTIAL_ROOT=$(CDPATH= cd -- "$ROOT/../../rea-differential/v1" && pwd)
 NORMALIZER="$ROOT/normalize.jq"
 fail(){ printf 'FAIL: %s\n' "$*" >&2; exit 1; }
 command -v unblob >/dev/null 2>&1 || fail "pinned Unblob 26.6.4 is required"
@@ -13,6 +14,7 @@ command -v gzip >/dev/null 2>&1 || fail "gzip required"
 command -v find >/dev/null 2>&1 || fail "find required"
 command -v cmp >/dev/null 2>&1 || fail "cmp required"
 command -v git >/dev/null 2>&1 || fail "git required"
+command -v cargo >/dev/null 2>&1 || fail "cargo required"
 REQUIREMENTS_LOCK="$ROOT/requirements-unblob-26.6.4.lock"
 [ -f "$NORMALIZER" ] || fail "semantic normalizer missing"
 [ -f "$REQUIREMENTS_LOCK" ] || fail "provider dependency lock missing"
@@ -25,6 +27,15 @@ cases_manifest_sha=$(sha256sum "$ROOT/cases.json" | awk '{print $1}')
 oracle_sha=$(sha256sum "$ROOT/oracle.json" | awk '{print $1}')
 provider_smoke_script_sha=$(sha256sum "$ROOT/provider-smoke.sh" | awk '{print $1}')
 provider_metamorphic_script_sha=$(sha256sum "$ROOT/provider-metamorphic-sweep.sh" | awk '{print $1}')
+differential_cases_sha=$(sha256sum "$DIFFERENTIAL_ROOT/cases.json" | awk '{print $1}')
+differential_oracle_builder_sha=$(sha256sum "$DIFFERENTIAL_ROOT/build-oracle.sh" | awk '{print $1}')
+unblob_differential_adapter_sha=$(sha256sum "$DIFFERENTIAL_ROOT/unblob-smoke-adapter.sh" | awk '{print $1}')
+differential_policy_sha=$(sha256sum "$DIFFERENTIAL_ROOT/oracle-policy.json" | awk '{print $1}')
+differential_oracle_schema_sha=$(sha256sum "$ROOT/../../../schemas/rea-differential-oracle-v1.schema.json" | awk '{print $1}')
+differential_observation_schema_sha=$(sha256sum "$ROOT/../../../schemas/rea-differential-observation-v1.schema.json" | awk '{print $1}')
+differential_scorecard_schema_sha=$(sha256sum "$ROOT/../../../schemas/rea-differential-scorecard-v1.schema.json" | awk '{print $1}')
+differential_scorer_sha=$(sha256sum "$ROOT/../../../crates/domains/symthaea-rea-evidence-verifier/src/differential.rs" | awk '{print $1}')
+differential_cli_sha=$(sha256sum "$ROOT/../../../crates/domains/symthaea-rea-evidence-verifier/src/main.rs" | awk '{print $1}')
 
 version=$(unblob --version 2>&1) || fail "cannot read Unblob version"
 printf '%s\n' "$version" | grep -Eq '26[.]6[.]4([[:space:]]|$)' || fail "expected Unblob 26.6.4; got: $version"
@@ -76,6 +87,13 @@ printf '%s\n' "$fixture_sha" > "$OUT/fixture-input-sha256.txt"
 printf '%s\n' "$mutated_fixture_sha" > "$OUT/mutated-fixture-input-sha256.txt"
 printf '%s\n' "$payload_sha" > "$OUT/expected-payload-sha256.txt"
 printf '%s\n' "$mutated_payload_sha" > "$OUT/mutated-expected-payload-sha256.txt"
+
+bash "$DIFFERENTIAL_ROOT/build-oracle.sh" "$OUT/fixture.gz" "$OUT/nested.tar" \
+  "$OUT/fixture-source/payload.txt" "nested-gzip-tar-001" "payload-001" \
+  "$OUT/oracle-nested-gzip-tar-001.json"
+bash "$DIFFERENTIAL_ROOT/build-oracle.sh" "$OUT/fixture-mutated.gz" "$OUT/nested-mutated.tar" \
+  "$OUT/fixture-source-mutated/payload.txt" "nested-gzip-tar-mutation-014" "payload-001-mutated" \
+  "$OUT/oracle-nested-gzip-tar-mutation-014.json"
 
 for lane in run-a run-b run-mutated; do
   run="$OUT/$lane"
@@ -145,6 +163,33 @@ provider_metamorphic_sem=$(jq -er '.semantic_projection_sha256' "$provider_metam
 [ "$provider_metamorphic_count" -eq 64 ] || fail "actual-provider metamorphic sweep did not execute 64 variants"
 [ "$provider_metamorphic_sem" = "$sem_a" ] || fail "actual-provider metamorphic digest diverged from run-a"
 
+# Convert the actual provider report into a provider-neutral observation, then
+# recompute a known-answer scorecard. Oracles come from fixture bytes, not Unblob.
+for lane in run-a run-b run-mutated; do
+  run="$OUT/$lane"
+  if [ "$lane" = "run-mutated" ]; then
+    oracle="$OUT/oracle-nested-gzip-tar-mutation-014.json"
+  else
+    oracle="$OUT/oracle-nested-gzip-tar-001.json"
+  fi
+  cp "$oracle" "$run/differential-oracle.json"
+  bash "$DIFFERENTIAL_ROOT/unblob-smoke-adapter.sh" \
+    "$run/raw-report.json" "$run/input.bin" "$run/extracted" \
+    "$run/differential-oracle.json" "$version" "$run/differential-observation.json"
+  cargo run --quiet --package symthaea-rea-evidence-verifier -- \
+    score-case --oracle "$run/differential-oracle.json" \
+    --observation "$run/differential-observation.json" > "$run/differential-scorecard.json" \
+    || fail "$lane known-answer extraction-fidelity score was not a full pass"
+  jq -e '.status=="pass" and .complete_extraction_claim_accepted==true and
+         .metrics.source_identity_match==true and .metrics.known_file_recall_percent==100 and
+         .metrics.extra_or_wrong_files==0 and .metrics.unexplained_bytes==0 and
+         .metrics.overlapping_accounting_bytes==0 and .metrics.missed_or_false_regions==0 and
+         .metrics.coordinate_spaces_missing_or_wrong==0 and .metrics.coordinate_spaces_extra==0' \
+    "$run/differential-scorecard.json" >/dev/null \
+    || fail "$lane scorecard violated a strict known-answer gate"
+  printf 'PASS %s differential extraction score: 100%% known-file recall, zero unexplained/overlapping bytes.\n' "$lane"
+done
+
 manifest_tmp=$(mktemp "${TMPDIR:-/tmp}/rea-evidence-bundle-manifest.XXXXXX") || fail "could not allocate bundle manifest staging file"
 (
   cd "$OUT"
@@ -173,6 +218,15 @@ jq -n \
   --arg bundle_manifest_sha256 "$bundle_manifest_sha" \
   --arg provider_smoke_script_sha256 "$provider_smoke_script_sha" \
   --arg provider_metamorphic_script_sha256 "$provider_metamorphic_script_sha" \
+  --arg differential_cases_sha256 "$differential_cases_sha" \
+  --arg differential_policy_sha256 "$differential_policy_sha" \
+  --arg differential_oracle_builder_sha256 "$differential_oracle_builder_sha" \
+  --arg unblob_differential_adapter_sha256 "$unblob_differential_adapter_sha" \
+  --arg differential_oracle_schema_sha256 "$differential_oracle_schema_sha" \
+  --arg differential_observation_schema_sha256 "$differential_observation_schema_sha" \
+  --arg differential_scorecard_schema_sha256 "$differential_scorecard_schema_sha" \
+  --arg differential_scorer_sha256 "$differential_scorer_sha" \
+  --arg differential_cli_sha256 "$differential_cli_sha" \
   --arg executable_path "$tool_path" \
   --arg executable_sha256 "$tool_sha" \
   --arg python_version "$python_version" \
@@ -189,9 +243,9 @@ jq -n \
   --arg provider_metamorphic_receipt_sha256 "$provider_metamorphic_sha" \
   --argjson provider_metamorphic_variant_count "$provider_metamorphic_count" \
   --arg provider_metamorphic_semantic_sha256 "$provider_metamorphic_sem" \
-  '{schema_version:"symthaea.rea-provider-smoke-receipt.v1",benchmark:$benchmark,qualification:{tier:"unblob-provider-smoke",rea_cli_mcp_parity:false,firmware_execution:false,emulation:false,device_qualification:false},source:{head_sha:$source_head_sha,checkout_commit_sha:$checkout_commit_sha,workflow_event_sha:$workflow_event_sha,normalizer_sha256:$normalizer_sha256,cases_manifest_sha256:$cases_manifest_sha256,oracle_sha256:$oracle_sha256,requirements_lock_sha256:$requirements_lock_sha256,provider_smoke_script_sha256:$provider_smoke_script_sha256,provider_metamorphic_script_sha256:$provider_metamorphic_script_sha256},provider_version:$provider_version,executable_path:$executable_path,executable_sha256:$executable_sha256,python_version:$python_version,pip_freeze_sha256:$pip_freeze_sha256,fixture_input_sha256:$fixture_sha256,mutated_fixture_input_sha256:$mutated_fixture_sha256,expected_payload_sha256:$expected_payload_sha256,mutated_expected_payload_sha256:$mutated_payload_sha256,raw_report_sha256:{run_a:$raw_report_sha256_run_a,run_b:$raw_report_sha256_run_b,run_mutated:$raw_report_sha256_mutated},semantic_projection_sha256:{equivalent_runs:$semantic_projection_sha256,semantic_mutation:$mutated_semantic_projection_sha256},provider_metamorphic:{receipt_sha256:$provider_metamorphic_receipt_sha256,equivalent_variants:$provider_metamorphic_variant_count,semantic_projection_sha256:$provider_metamorphic_semantic_sha256},bundle_manifest_sha256:$bundle_manifest_sha256,claims_ceiling:"Pinned Unblob CLI on owned inert nested gzip/tar/text fixtures only; no REA, recovered firmware execution, emulator, or hardware qualification."}' > "$OUT/receipt.json"
+  '{schema_version:"symthaea.rea-provider-smoke-receipt.v1",benchmark:$benchmark,qualification:{tier:"unblob-provider-smoke",rea_cli_mcp_parity:false,firmware_execution:false,emulation:false,device_qualification:false},source:{head_sha:$source_head_sha,checkout_commit_sha:$checkout_commit_sha,workflow_event_sha:$workflow_event_sha,normalizer_sha256:$normalizer_sha256,cases_manifest_sha256:$cases_manifest_sha256,oracle_sha256:$oracle_sha256,requirements_lock_sha256:$requirements_lock_sha256,provider_smoke_script_sha256:$provider_smoke_script_sha256,provider_metamorphic_script_sha256:$provider_metamorphic_script_sha256,differential_cases_sha256:$differential_cases_sha256,differential_policy_sha256:$differential_policy_sha256,differential_oracle_builder_sha256:$differential_oracle_builder_sha256,unblob_differential_adapter_sha256:$unblob_differential_adapter_sha256,differential_oracle_schema_sha256:$differential_oracle_schema_sha256,differential_observation_schema_sha256:$differential_observation_schema_sha256,differential_scorecard_schema_sha256:$differential_scorecard_schema_sha256,differential_scorer_sha256:$differential_scorer_sha256,differential_cli_sha256:$differential_cli_sha256},provider_version:$provider_version,executable_path:$executable_path,executable_sha256:$executable_sha256,python_version:$python_version,pip_freeze_sha256:$pip_freeze_sha256,fixture_input_sha256:$fixture_sha256,mutated_fixture_input_sha256:$mutated_fixture_sha256,expected_payload_sha256:$expected_payload_sha256,mutated_expected_payload_sha256:$mutated_payload_sha256,raw_report_sha256:{run_a:$raw_report_sha256_run_a,run_b:$raw_report_sha256_run_b,run_mutated:$raw_report_sha256_mutated},semantic_projection_sha256:{equivalent_runs:$semantic_projection_sha256,semantic_mutation:$mutated_semantic_projection_sha256},provider_metamorphic:{receipt_sha256:$provider_metamorphic_receipt_sha256,equivalent_variants:$provider_metamorphic_variant_count,semantic_projection_sha256:$provider_metamorphic_semantic_sha256},bundle_manifest_sha256:$bundle_manifest_sha256,claims_ceiling:"Pinned Unblob CLI on owned inert nested gzip/tar/text fixtures only; no REA, recovered firmware execution, emulator, or hardware qualification."}' > "$OUT/receipt.json"
 
-jq -e --arg source "$source_head_sha" --arg checkout "$checkout_commit_sha" --arg normalizer "$normalizer_sha" --arg cases "$cases_manifest_sha" --arg oracle "$oracle_sha" --arg requirements_lock "$requirements_lock_sha" --arg provider_script "$provider_smoke_script_sha" --arg provider_meta_script "$provider_metamorphic_script_sha" --arg raw_a "$raw_a" --arg raw_b "$raw_b" --arg raw_mutated "$raw_mutated" --arg sem "$sem_a" --arg sem_mutated "$sem_mutated" --arg provider_meta_sha "$provider_metamorphic_sha" --arg provider_meta_sem "$provider_metamorphic_sem" --arg bundle_manifest_sha "$bundle_manifest_sha" '
+jq -e --arg source "$source_head_sha" --arg checkout "$checkout_commit_sha" --arg normalizer "$normalizer_sha" --arg cases "$cases_manifest_sha" --arg oracle "$oracle_sha" --arg requirements_lock "$requirements_lock_sha" --arg provider_script "$provider_smoke_script_sha" --arg provider_meta_script "$provider_metamorphic_script_sha" --arg differential_cases "$differential_cases_sha" --arg differential_policy "$differential_policy_sha" --arg differential_oracle_builder "$differential_oracle_builder_sha" --arg unblob_adapter "$unblob_differential_adapter_sha" --arg differential_oracle_schema "$differential_oracle_schema_sha" --arg differential_observation_schema "$differential_observation_schema_sha" --arg differential_scorecard_schema "$differential_scorecard_schema_sha" --arg differential_scorer "$differential_scorer_sha" --arg differential_cli "$differential_cli_sha" --arg raw_a "$raw_a" --arg raw_b "$raw_b" --arg raw_mutated "$raw_mutated" --arg sem "$sem_a" --arg sem_mutated "$sem_mutated" --arg provider_meta_sha "$provider_metamorphic_sha" --arg provider_meta_sem "$provider_metamorphic_sem" --arg bundle_manifest_sha "$bundle_manifest_sha" '
   .schema_version=="symthaea.rea-provider-smoke-receipt.v1" and
   .benchmark=="ENG-REA-005-REAL-PROVIDER" and
   .qualification.tier=="unblob-provider-smoke" and .qualification.rea_cli_mcp_parity==false and
@@ -202,6 +256,15 @@ jq -e --arg source "$source_head_sha" --arg checkout "$checkout_commit_sha" --ar
   .source.oracle_sha256==$oracle and .source.requirements_lock_sha256==$requirements_lock and
   .source.provider_smoke_script_sha256==$provider_script and
   .source.provider_metamorphic_script_sha256==$provider_meta_script and
+  .source.differential_cases_sha256==$differential_cases and
+  .source.differential_policy_sha256==$differential_policy and
+  .source.differential_oracle_builder_sha256==$differential_oracle_builder and
+  .source.unblob_differential_adapter_sha256==$unblob_adapter and
+  .source.differential_oracle_schema_sha256==$differential_oracle_schema and
+  .source.differential_observation_schema_sha256==$differential_observation_schema and
+  .source.differential_scorecard_schema_sha256==$differential_scorecard_schema and
+  .source.differential_scorer_sha256==$differential_scorer and
+  .source.differential_cli_sha256==$differential_cli and
   .raw_report_sha256.run_a==$raw_a and .raw_report_sha256.run_b==$raw_b and .raw_report_sha256.run_mutated==$raw_mutated and
   .semantic_projection_sha256.equivalent_runs==$sem and .semantic_projection_sha256.semantic_mutation==$sem_mutated and
   .provider_metamorphic.receipt_sha256==$provider_meta_sha and .provider_metamorphic.semantic_projection_sha256==$provider_meta_sem and .provider_metamorphic.equivalent_variants==64

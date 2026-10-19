@@ -1,0 +1,243 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/schemas/rea-differential-oracle-v1.schema.json",
+  "title": "Single generated known-answer extraction oracle",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "corpus_id",
+    "case_id",
+    "source",
+    "coordinate_spaces",
+    "expected_regions",
+    "expected_files"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "symthaea.rea-differential-oracle.v1"
+    },
+    "corpus_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source": {
+      "$ref": "#/$defs/source"
+    },
+    "coordinate_spaces": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/coordinate_space"
+      }
+    },
+    "expected_regions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/region"
+      }
+    },
+    "expected_files": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/file"
+      }
+    }
+  },
+  "$defs": {
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sha256",
+        "byte_length"
+      ],
+      "properties": {
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "byte_length": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "coordinate_space": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "sha256",
+        "byte_length",
+        "parent_coordinate_space_id",
+        "parent_start",
+        "parent_end",
+        "transform_kind"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "byte_length": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "parent_coordinate_space_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "parent_start": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "parent_end": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "transform_kind": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "id": {
+                "const": "root"
+              }
+            },
+            "required": [
+              "id"
+            ]
+          },
+          "then": {
+            "properties": {
+              "parent_coordinate_space_id": {
+                "const": null
+              },
+              "parent_start": {
+                "const": null
+              },
+              "parent_end": {
+                "const": null
+              },
+              "transform_kind": {
+                "const": "source"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "id": {
+                "not": {
+                  "const": "root"
+                }
+              }
+            },
+            "required": [
+              "id"
+            ]
+          },
+          "then": {
+            "properties": {
+              "parent_coordinate_space_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "parent_start": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "parent_end": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "transform_kind": {
+                "not": {
+                  "const": "source"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "region": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "coordinate_space_id",
+        "kind",
+        "start",
+        "end"
+      ],
+      "properties": {
+        "coordinate_space_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "type": "string",
+          "minLength": 1
+        },
+        "start": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "end": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "file": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256",
+        "byte_length",
+        "logical_id"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "byte_length": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "logical_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

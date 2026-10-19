@@ -1,0 +1,180 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/schemas/rea-differential-scorecard-v1.schema.json",
+  "title": "Provider-neutral extraction fidelity scorecard",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "corpus_id",
+    "case_id",
+    "provider_id",
+    "provider_version",
+    "status",
+    "complete_extraction_claim_accepted",
+    "metrics",
+    "reasons"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "symthaea.rea-differential-scorecard.v1"
+    },
+    "corpus_id": {
+      "type": "string"
+    },
+    "case_id": {
+      "type": "string"
+    },
+    "provider_id": {
+      "type": "string"
+    },
+    "provider_version": {
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "pass",
+        "partial",
+        "fail",
+        "abstain"
+      ]
+    },
+    "complete_extraction_claim_accepted": {
+      "type": "boolean"
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_identity_match",
+        "coordinate_spaces_expected",
+        "coordinate_spaces_exact",
+        "coordinate_spaces_missing_or_wrong",
+        "coordinate_spaces_extra",
+        "known_files_expected",
+        "known_files_exact",
+        "known_file_recall_percent",
+        "output_files_observed",
+        "extra_or_wrong_files",
+        "duplicate_paths",
+        "expected_regions",
+        "exact_regions",
+        "missed_or_false_regions",
+        "source_bytes",
+        "coordinate_space_bytes",
+        "accounted_unique_bytes",
+        "unexplained_bytes",
+        "overlapping_accounting_bytes",
+        "unknown_bytes",
+        "unsupported_bytes",
+        "ambiguous_bytes",
+        "padding_bytes",
+        "identified_bytes"
+      ],
+      "properties": {
+        "source_identity_match": {
+          "type": "boolean"
+        },
+        "coordinate_spaces_expected": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "coordinate_spaces_exact": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "coordinate_spaces_missing_or_wrong": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "coordinate_spaces_extra": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "known_files_expected": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "known_files_exact": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "known_file_recall_percent": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "output_files_observed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "extra_or_wrong_files": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "duplicate_paths": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "expected_regions": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "exact_regions": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "missed_or_false_regions": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "source_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "coordinate_space_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "accounted_unique_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unexplained_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "overlapping_accounting_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unknown_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unsupported_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "ambiguous_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "padding_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "identified_bytes": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "reasons": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}
