@@ -46,3 +46,7 @@ jobs:
       - name: Verify weakened normalizers are detected
         shell: bash
         run: sh benchmarks/rea-determinism/v1/mutation-controls.sh
+
+      - name: Verify 512 equivalent metamorphic report transformations
+        shell: bash
+        run: sh benchmarks/rea-determinism/v1/metamorphic-sweep.sh
