@@ -3583,7 +3583,7 @@ mod tests {
             seen
         );
     }
- 
+
     #[test]
     fn style_profiles_declare_performance_dialects_explicitly() {
         use crate::grammar::PerformanceDialect as P;
