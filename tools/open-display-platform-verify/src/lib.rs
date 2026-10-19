@@ -602,14 +602,14 @@ fn validate_measurement_run_semantics(record: &Value) -> Vec<String> {
         .collect();
     let mut measured_instrument_ids = BTreeSet::new();
     for observation in observations {
-        if observation.get("status").and_then(Value::as_str) != Some("NOT_EVALUATED") {
-            if let Some(ids) = observation.get("instrument_ids").and_then(Value::as_array) {
-                measured_instrument_ids.extend(
-                    ids.iter()
-                        .filter_map(Value::as_str)
-                        .map(str::to_owned),
-                );
-            }
+        if observation.get("status").and_then(Value::as_str) != Some("NOT_EVALUATED")
+            && let Some(ids) = observation.get("instrument_ids").and_then(Value::as_array)
+        {
+            measured_instrument_ids.extend(
+                ids.iter()
+                    .filter_map(Value::as_str)
+                    .map(str::to_owned),
+            );
         }
     }
 
@@ -1616,7 +1616,9 @@ mod tests {
             validate_measurement_run_str(&encoded(&bad_calibration_role), RUN_SCHEMA_TEXT)
                 .expect_err("wrong calibration-artifact role must fail")
                 .iter()
-                .any(|error| error.contains("calibration artifact ODRH-ART-CAL-POWER-001 has the wrong role"))
+                .any(|error| {
+                    error.contains("calibration artifact ODRH-ART-CAL-POWER-001 has the wrong role")
+                })
         );
 
         let mut mutated = record;
