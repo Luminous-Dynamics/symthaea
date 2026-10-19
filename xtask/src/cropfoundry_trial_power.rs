@@ -577,6 +577,8 @@ mod tests {
     fn cluster_randomization_requires_multiple_plots_per_cluster() {
         let mut input = fixture();
         input.design.allocation_unit = "farm".to_owned();
+        input.design.randomization_method = "cluster_randomized".to_owned();
+        input.design.blocking_unit = "farm".to_owned();
         input.design.plots_per_cluster = 1;
         assert!(validate(&input).is_err());
     }
