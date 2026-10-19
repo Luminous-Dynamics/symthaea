@@ -62,7 +62,7 @@ The case manifest freezes IDs, family, factor levels, seed, renderer/configurati
 
 Partition by generator parameters and object/texture identity families, not random adjacent frames. Any train/validation/test split that permits near-duplicate rendered scenes to cross boundaries must be rejected.
 
-Before expanding to public video, prove basic behavior with these small fixtures. Later adapters may cover the [TAO open-world tracking dataset](https://taodataset.org/) or applicable video segmentation datasets; dataset-specific evidence must be kept distinct and honor each dataset's terms.
+Before expanding to public video, prove basic behavior with these small fixtures. Later adapters should prioritize [MOSEv2](https://mose.video/) for complex scenes, occlusion and disappearance/reappearance, then the [TAO open-world tracking dataset](https://taodataset.org/) for long-tail tracking. For downstream world-model/functionality claims, consider [WorldArena 2.0](https://github.com/WorldArena2/WorldArena-2.0) separately. Keep synthetic, offline-video and physical-robot evidence distinct. MOSEv2 is offered for non-commercial research; verify dataset terms before use, and do not download restricted data in CI or redistribute it.
 
 ## 5. Causal delivery and leakage controls
 
@@ -174,6 +174,7 @@ Evidence classes remain distinct: `ANALYTIC_FIXTURE`, `SYNTHETIC_EVALUATION`, `O
 - DINOv3 official repository / paper and model-specific license: https://github.com/facebookresearch/dinov3 and https://ai.meta.com/research/publications/dinov3/
 - SAM 3.1 / SAM 3 (current promptable concept detection, segmentation and tracking comparator; the reported 32 FPS is on an H100, not our target hardware): https://ai.meta.com/blog/segment-anything-model-3/ and https://ai.meta.com/research/sam3/
 - SAM 2 (compatibility / historical baseline where useful): https://ai.meta.com/research/sam2/
+- MOSEv2 complex video segmentation / disappearance and reappearance: https://mose.video/ (non-commercial research terms; check current license)
 - TAO open-world tracking: https://taodataset.org/
 - TrackEval reference HOTA and tracking metrics: https://github.com/JonathonLuiten/TrackEval
 - WorldArena evaluates video perceptual quality and downstream embodied utility: https://github.com/tsinghua-fib-lab/WorldArena
