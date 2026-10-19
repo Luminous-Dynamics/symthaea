@@ -133,7 +133,10 @@ pub fn run(
 
     if let Some(out_arg) = out_arg {
         let out_path = resolve(root, out_arg);
-        if let Some(parent) = out_path.parent() {
+        if let Some(parent) = out_path
+            .parent()
+            .filter(|parent| !parent.as_os_str().is_empty())
+        {
             fs::create_dir_all(parent)
                 .with_context(|| format!("create receipt directory {}", parent.display()))?;
         }
