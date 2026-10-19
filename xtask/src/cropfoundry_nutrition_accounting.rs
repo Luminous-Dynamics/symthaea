@@ -203,14 +203,18 @@ fn validate_bound_pair(
                 valid_nonnegative(low) && valid_nonnegative(high)
             };
             if !valid {
-                issues.push(format!("{label} bounds must be finite and in the permitted range"));
+                issues.push(format!(
+                    "{label} bounds must be finite and in the permitted range"
+                ));
             }
             if low > high {
                 issues.push(format!("{label} lower bound exceeds upper bound"));
             }
             if let Some(value) = point {
                 if value.is_finite() && (value < low || value > high) {
-                    issues.push(format!("{label} point estimate is outside the declared bounds"));
+                    issues.push(format!(
+                        "{label} point estimate is outside the declared bounds"
+                    ));
                 }
             } else {
                 issues.push(format!("{label} bounds require a point estimate"));
@@ -218,7 +222,9 @@ fn validate_bound_pair(
             true
         }
         _ => {
-            issues.push(format!("{label} lower and upper bounds must be provided together"));
+            issues.push(format!(
+                "{label} lower and upper bounds must be provided together"
+            ));
             true
         }
     }
@@ -348,16 +354,17 @@ fn audit_input(input: NutritionAccountingInput) -> NutritionAccountingReceipt {
         true,
         &mut issues,
     );
-    let any_intervals = concentration_bounds
-        || edible_mass_bounds
-        || retention_bounds
-        || bioavailability_bounds;
+    let any_intervals =
+        concentration_bounds || edible_mass_bounds || retention_bounds || bioavailability_bounds;
     if input.schema_version == INPUT_SCHEMA_V0
         && (any_intervals
             || input.uncertainty_interval_kind.is_some()
             || has_nonblank(input.uncertainty_evidence_uri.as_deref()))
     {
-        issues.push("input schema v0 does not support uncertainty interval fields; use schema v1".to_owned());
+        issues.push(
+            "input schema v0 does not support uncertainty interval fields; use schema v1"
+                .to_owned(),
+        );
     }
     if any_intervals {
         if input.uncertainty_interval_kind.is_none()
@@ -424,14 +431,26 @@ fn audit_input(input: NutritionAccountingInput) -> NutritionAccountingReceipt {
     }
 
     for (label, measurement_present, boundary_present) in [
-        ("water_liters", input.water_liters.is_some(), input.water_boundary.is_some()),
+        (
+            "water_liters",
+            input.water_liters.is_some(),
+            input.water_boundary.is_some(),
+        ),
         (
             "land_square_meters",
             input.land_square_meters.is_some(),
             input.land_boundary.is_some(),
         ),
-        ("energy_kwh", input.energy_kwh.is_some(), input.energy_boundary.is_some()),
-        ("cost_amount", input.cost_amount.is_some(), input.cost_boundary.is_some()),
+        (
+            "energy_kwh",
+            input.energy_kwh.is_some(),
+            input.energy_boundary.is_some(),
+        ),
+        (
+            "cost_amount",
+            input.cost_amount.is_some(),
+            input.cost_boundary.is_some(),
+        ),
     ] {
         if measurement_present != boundary_present {
             issues.push(format!(
@@ -490,44 +509,47 @@ fn audit_input(input: NutritionAccountingInput) -> NutritionAccountingReceipt {
             input.edible_mass_lower_kg_at_concentration_stage,
             input.edible_mass_upper_kg_at_concentration_stage,
         ) {
-            (Some(concentration_low), Some(concentration_high), Some(mass_low), Some(mass_high)) => {
-                match input.concentration_stage {
-                    Some(ConcentrationStage::MeasuredAtServing) => {
+            (
+                Some(concentration_low),
+                Some(concentration_high),
+                Some(mass_low),
+                Some(mass_high),
+            ) => match input.concentration_stage {
+                Some(ConcentrationStage::MeasuredAtServing) => {
+                    let lower = finite_product(
+                        &[concentration_low, mass_low],
+                        "lower delivered nutrient-mass bound",
+                        &mut issues,
+                    );
+                    let upper = finite_product(
+                        &[concentration_high, mass_high],
+                        "upper delivered nutrient-mass bound",
+                        &mut issues,
+                    );
+                    lower.zip(upper)
+                }
+                Some(ConcentrationStage::MeasuredBeforePreparation) => {
+                    if let (Some(retention_low), Some(retention_high)) = (
+                        input.retention_lower_fraction,
+                        input.retention_upper_fraction,
+                    ) {
                         let lower = finite_product(
-                            &[concentration_low, mass_low],
+                            &[concentration_low, mass_low, retention_low],
                             "lower delivered nutrient-mass bound",
                             &mut issues,
                         );
                         let upper = finite_product(
-                            &[concentration_high, mass_high],
+                            &[concentration_high, mass_high, retention_high],
                             "upper delivered nutrient-mass bound",
                             &mut issues,
                         );
                         lower.zip(upper)
+                    } else {
+                        None
                     }
-                    Some(ConcentrationStage::MeasuredBeforePreparation) => {
-                        if let (Some(retention_low), Some(retention_high)) = (
-                            input.retention_lower_fraction,
-                            input.retention_upper_fraction,
-                        ) {
-                            let lower = finite_product(
-                                &[concentration_low, mass_low, retention_low],
-                                "lower delivered nutrient-mass bound",
-                                &mut issues,
-                            );
-                            let upper = finite_product(
-                                &[concentration_high, mass_high, retention_high],
-                                "upper delivered nutrient-mass bound",
-                                &mut issues,
-                            );
-                            lower.zip(upper)
-                        } else {
-                            None
-                        }
-                    }
-                    None => None,
                 }
-            }
+                None => None,
+            },
             _ => None,
         }
     } else {
@@ -701,8 +723,14 @@ mod tests {
         let receipt = audit_input(input);
         assert!(receipt.accounting_pass);
         assert_eq!(receipt.measured_nutrient_mass_delivered_mg, Some(12.0));
-        assert_eq!(receipt.nutrient_mass_delivered_interval_lower_mg, Some(10.5));
-        assert_eq!(receipt.nutrient_mass_delivered_interval_upper_mg, Some(13.6));
+        assert_eq!(
+            receipt.nutrient_mass_delivered_interval_lower_mg,
+            Some(10.5)
+        );
+        assert_eq!(
+            receipt.nutrient_mass_delivered_interval_upper_mg,
+            Some(13.6)
+        );
         assert_eq!(
             receipt.bioavailable_nutrient_mass_delivered_interval_lower_mg,
             Some(2.1)
@@ -724,7 +752,10 @@ mod tests {
             "https://json-schema.org/draft/2020-12/schema"
         );
         assert_eq!(schema["additionalProperties"], false);
-        assert_eq!(schema["properties"]["schema_version"]["const"], INPUT_SCHEMA_V1);
+        assert_eq!(
+            schema["properties"]["schema_version"]["const"],
+            INPUT_SCHEMA_V1
+        );
 
         let input = serde_json::to_value(fixture()).unwrap();
         let input_fields = input
@@ -790,14 +821,20 @@ mod tests {
             Some(3.0)
         );
         assert_eq!(receipt.nutrient_mg_per_liter_water, Some(0.4));
-        assert_eq!(receipt.water_boundary, Some(WaterBoundary::IrrigationApplied));
+        assert_eq!(
+            receipt.water_boundary,
+            Some(WaterBoundary::IrrigationApplied)
+        );
         assert_eq!(receipt.nutrient_mg_per_square_meter, Some(6.0));
         assert_eq!(
             receipt.land_boundary,
             Some(LandBoundary::AllocatedCultivatedArea)
         );
         assert_eq!(receipt.nutrient_mg_per_kwh, Some(24.0));
-        assert_eq!(receipt.energy_boundary, Some(EnergyBoundary::OnFarmOperations));
+        assert_eq!(
+            receipt.energy_boundary,
+            Some(EnergyBoundary::OnFarmOperations)
+        );
         assert_eq!(receipt.nutrient_mg_per_currency_unit, Some(9.6));
         assert_eq!(receipt.cost_boundary, Some(CostBoundary::FarmGate));
     }
@@ -853,7 +890,10 @@ mod tests {
         let receipt = audit_input(input);
         assert!(receipt.accounting_pass);
         assert_eq!(receipt.nutrient_mass_delivered_interval_lower_mg, Some(9.8));
-        assert_eq!(receipt.nutrient_mass_delivered_interval_upper_mg, Some(14.4));
+        assert_eq!(
+            receipt.nutrient_mass_delivered_interval_upper_mg,
+            Some(14.4)
+        );
         assert_eq!(
             receipt.bioavailable_nutrient_mass_delivered_interval_lower_mg,
             Some(1.96)
@@ -877,10 +917,12 @@ mod tests {
         input.edible_mass_upper_kg_at_concentration_stage = Some(0.16);
         let receipt = audit_input(input);
         assert!(!receipt.accounting_pass);
-        assert!(receipt
-            .issues
-            .iter()
-            .any(|issue| issue.contains("interval kind and evidence URI")));
+        assert!(
+            receipt
+                .issues
+                .iter()
+                .any(|issue| issue.contains("interval kind and evidence URI"))
+        );
         assert_eq!(receipt.nutrient_mass_delivered_interval_lower_mg, None);
     }
 
@@ -891,10 +933,12 @@ mod tests {
         partial.edible_mass_lower_kg_at_concentration_stage = Some(0.14);
         let receipt = audit_input(partial);
         assert!(!receipt.accounting_pass);
-        assert!(receipt
-            .issues
-            .iter()
-            .any(|issue| issue.contains("lower and upper bounds")));
+        assert!(
+            receipt
+                .issues
+                .iter()
+                .any(|issue| issue.contains("lower and upper bounds"))
+        );
 
         let mut inconsistent = fixture();
         inconsistent.concentration_lower_mg_per_kg = Some(90.0);
@@ -903,10 +947,12 @@ mod tests {
         inconsistent.edible_mass_upper_kg_at_concentration_stage = Some(0.16);
         let receipt = audit_input(inconsistent);
         assert!(!receipt.accounting_pass);
-        assert!(receipt
-            .issues
-            .iter()
-            .any(|issue| issue.contains("point estimate is outside")));
+        assert!(
+            receipt
+                .issues
+                .iter()
+                .any(|issue| issue.contains("point estimate is outside"))
+        );
     }
 
     #[test]
@@ -926,8 +972,14 @@ mod tests {
 
         let receipt = audit_input(input);
         assert!(receipt.accounting_pass);
-        assert_eq!(receipt.nutrient_mass_delivered_interval_lower_mg, Some(6.37));
-        assert_eq!(receipt.nutrient_mass_delivered_interval_upper_mg, Some(12.24));
+        assert_eq!(
+            receipt.nutrient_mass_delivered_interval_lower_mg,
+            Some(6.37)
+        );
+        assert_eq!(
+            receipt.nutrient_mass_delivered_interval_upper_mg,
+            Some(12.24)
+        );
     }
 
     #[test]
@@ -967,10 +1019,12 @@ mod tests {
         input.uncertainty_evidence_uri = Some("urn:uncertainty:v1-only".to_owned());
         let receipt = audit_input(input);
         assert!(!receipt.accounting_pass);
-        assert!(receipt
-            .issues
-            .iter()
-            .any(|issue| issue.contains("use schema v1")));
+        assert!(
+            receipt
+                .issues
+                .iter()
+                .any(|issue| issue.contains("use schema v1"))
+        );
     }
 
     #[test]
@@ -1058,10 +1112,12 @@ mod tests {
         input.water_boundary = None;
         let receipt = audit_input(input);
         assert!(!receipt.accounting_pass);
-        assert!(receipt
-            .issues
-            .iter()
-            .any(|issue| issue.contains("water_liters and its resource boundary")));
+        assert!(
+            receipt
+                .issues
+                .iter()
+                .any(|issue| issue.contains("water_liters and its resource boundary"))
+        );
         assert_eq!(receipt.nutrient_mg_per_liter_water, None);
         assert_eq!(receipt.measured_nutrient_mass_delivered_mg, None);
 
@@ -1069,10 +1125,12 @@ mod tests {
         missing_measurement.water_liters = None;
         let receipt = audit_input(missing_measurement);
         assert!(!receipt.accounting_pass);
-        assert!(receipt
-            .issues
-            .iter()
-            .any(|issue| issue.contains("water_liters and its resource boundary")));
+        assert!(
+            receipt
+                .issues
+                .iter()
+                .any(|issue| issue.contains("water_liters and its resource boundary"))
+        );
     }
 
     #[test]
