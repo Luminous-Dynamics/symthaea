@@ -123,11 +123,7 @@ fn forecast_demand_mm(day: usize, zone: usize, scenario: Scenario) -> f64 {
 fn rain_mm(day: usize, scenario: Scenario) -> f64 {
     let is_rain_day = day % 7 == 4;
     let in_drought = scenario.drought_start_day.is_some_and(|start| day >= start);
-    if is_rain_day && !in_drought {
-        1.1
-    } else {
-        0.0
-    }
+    if is_rain_day && !in_drought { 1.1 } else { 0.0 }
 }
 
 fn criticality(day: usize, zone: usize) -> f64 {
@@ -174,16 +170,17 @@ fn allocate_water(
     let mut allocation = [0.0; ZONES];
     match policy {
         Policy::EqualShareCalendar => {
-            let share = (scenario.daily_water_cap_mm / ZONES as f64)
-                .min(MAX_IRRIGATION_PER_ZONE_MM);
+            let share =
+                (scenario.daily_water_cap_mm / ZONES as f64).min(MAX_IRRIGATION_PER_ZONE_MM);
             allocation.fill(share);
         }
         Policy::SoilThreshold => {
             let units = (scenario.daily_water_cap_mm / ALLOCATION_STEP_MM).floor() as usize;
             for _ in 0..units {
                 let next = (0..ZONES)
-                    .filter(|zone| allocation[*zone] + ALLOCATION_STEP_MM
-                        <= MAX_IRRIGATION_PER_ZONE_MM + 1e-9)
+                    .filter(|zone| {
+                        allocation[*zone] + ALLOCATION_STEP_MM <= MAX_IRRIGATION_PER_ZONE_MM + 1e-9
+                    })
                     .max_by(|left, right| {
                         let left_gap = (7.2 - observed_storage[*left] - allocation[*left]).max(0.0);
                         let right_gap =
@@ -203,32 +200,18 @@ fn allocate_water(
             for _ in 0..units {
                 let mut best: Option<(usize, f64)> = None;
                 for zone in 0..ZONES {
-                    if allocation[zone] + ALLOCATION_STEP_MM
-                        > MAX_IRRIGATION_PER_ZONE_MM + 1e-9
-                    {
+                    if allocation[zone] + ALLOCATION_STEP_MM > MAX_IRRIGATION_PER_ZONE_MM + 1e-9 {
                         continue;
                     }
                     let forecast_demand = forecast_demand_mm(day, zone, scenario);
                     let forecast_rain = rain_mm(day, scenario);
                     let current_storage = observed_storage[zone] + allocation[zone];
-                    let risk_weight = criticality(day, zone)
-                        * (1.0 + 0.12 * stale_age[zone].min(4) as f64);
-                    let before = risk_weight
-                        * exposure(
-                            current_storage,
-                            forecast_demand,
-                            forecast_rain,
-                            day,
-                            zone,
-                        );
+                    let risk_weight =
+                        criticality(day, zone) * (1.0 + 0.12 * stale_age[zone].min(4) as f64);
+                    let before =
+                        risk_weight * exposure(current_storage, forecast_demand, forecast_rain, day, zone);
                     let after = risk_weight
-                        * exposure(
-                            current_storage + ALLOCATION_STEP_MM,
-                            forecast_demand,
-                            forecast_rain,
-                            day,
-                            zone,
-                        );
+                        * exposure(current_storage + ALLOCATION_STEP_MM, forecast_demand, forecast_rain, day, zone);
                     let marginal_gain = before - after;
                     if best.is_none_or(|(_, best_gain)| marginal_gain > best_gain) {
                         best = Some((zone, marginal_gain));
@@ -285,13 +268,7 @@ fn simulate_one(scenario: Scenario, policy: Policy) -> ScenarioResult {
             .max(0.0);
             let after_rain = (after_use + rain_mm(day, scenario)).clamp(0.0, STORAGE_CAP_MM);
             storage[zone] = after_rain;
-            stress_exposure += exposure(
-                after_rain,
-                0.0,
-                0.0,
-                day,
-                zone,
-            );
+            stress_exposure += exposure(after_rain, 0.0, 0.0, day, zone);
         }
     }
 
@@ -344,7 +321,9 @@ fn build_receipt() -> Result<WaterPolicyReceipt> {
             || !result.total_irrigation_applied_mm.is_finite()
             || !result.sensor_dropout_fraction.is_finite()
     }) {
-        return Err(anyhow!("synthetic water-policy output contains non-finite metrics"));
+        return Err(anyhow!(
+            "synthetic water-policy output contains non-finite metrics"
+        ));
     }
 
     Ok(WaterPolicyReceipt {
@@ -374,11 +353,16 @@ pub fn run(out: Option<PathBuf>) -> Result<()> {
     let rendered = serde_json::to_string_pretty(&receipt)?;
     println!("{rendered}");
     if let Some(path) = out {
-        if let Some(parent) = path.parent().filter(|parent| !parent.as_os_str().is_empty()) {
-            fs::create_dir_all(parent)
-                .map_err(|error| {
-                    anyhow!("cannot create output directory {}: {error}", parent.display())
-                })?;
+        if let Some(parent) = path
+            .parent()
+            .filter(|parent| !parent.as_os_str().is_empty())
+        {
+            fs::create_dir_all(parent).map_err(|error| {
+                anyhow!(
+                    "cannot create output directory {}: {error}",
+                    parent.display()
+                )
+            })?;
         }
         fs::write(&path, format!("{rendered}\n"))
             .map_err(|error| anyhow!("cannot write receipt {}: {error}", path.display()))?;
@@ -404,7 +388,12 @@ mod tests {
         assert_eq!(receipt.scenario_count, 4);
         assert_eq!(receipt.policy_count, 3);
         assert_eq!(receipt.results.len(), 12);
-        assert!(receipt.results.iter().all(|result| result.water_budget_violation_days == 0));
+        assert!(
+            receipt
+                .results
+                .iter()
+                .all(|result| result.water_budget_violation_days == 0)
+        );
     }
 
     #[test]
@@ -413,7 +402,12 @@ mod tests {
         assert!(receipt.synthetic_only);
         assert!(!receipt.biological_performance_claim);
         assert!(!receipt.training_authorized);
-        assert!(receipt.caveats.iter().any(|note| note.contains("not calibrated to a crop")));
+        assert!(
+            receipt
+                .caveats
+                .iter()
+                .any(|note| note.contains("not calibrated to a crop"))
+        );
     }
 
     #[test]
@@ -423,8 +417,10 @@ mod tests {
             assert!(result.stress_exposure_proxy.is_finite());
             assert!(result.total_irrigation_applied_mm.is_finite());
             assert!((0.0..=1.0).contains(&result.sensor_dropout_fraction));
-            assert!(result.total_irrigation_applied_mm
-                <= result.simulated_days as f64 * result.daily_water_cap_mm + 1e-6);
+            assert!(
+                result.total_irrigation_applied_mm
+                    <= result.simulated_days as f64 * result.daily_water_cap_mm + 1e-6
+            );
         }
     }
 }
