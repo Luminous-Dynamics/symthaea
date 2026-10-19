@@ -356,14 +356,14 @@ fn build_receipt() -> Result<WaterPolicyReceipt> {
         training_authorized: false,
         scenario_count: all_scenarios.len(),
         policy_count: policies.len(),
-        invariant_summary: "Zero daily cap violations; the objective is synthetic, not a plant model.".to_owned(),
+        invariant_summary: "Zero cap violations; synthetic proxy, not a plant model.".to_owned(),
         results,
         caveats: vec![
             "Scenario traces and parameters are illustrative synthetic assumptions.".to_owned(),
-            "The stress proxy is not calibrated to crop, soil, yield, nutrition, or farm economics.".to_owned(),
+            "The stress proxy is not calibrated to a crop or farm economics.".to_owned(),
             "Lower scores do not establish field water savings or yield gains.".to_owned(),
             "This tests deterministic execution and hard water accounting only.".to_owned(),
-            "Field use requires calibration, external validation, farmer review, and replicated trials.".to_owned(),
+            "Field use requires calibration, farmer review, and replicated trials.".to_owned(),
         ],
     })
 }
