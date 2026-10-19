@@ -501,6 +501,24 @@ mod tests {
     fn put_digest(root: &Path, path: &str, digest: &str) {
         write(&root.join(path), format!("{digest}\n").as_bytes());
     }
+    fn refresh_bundle_manifest(root: &Path) -> String {
+        let mut paths = Vec::new();
+        collect_bundle_paths(root, root, &mut paths).unwrap();
+        paths.retain(|path| path != "receipt.json" && path != "bundle-manifest.json");
+        paths.sort();
+        let files: Vec<Value> = paths
+            .iter()
+            .map(|path| json!({"path": path, "sha256": hash_file(&root.join(path)).unwrap()}))
+            .collect();
+        let manifest = json!({
+            "schema_version": BUNDLE_MANIFEST_SCHEMA,
+            "files": files,
+        });
+        let bytes = serde_json::to_vec_pretty(&manifest).unwrap();
+        let digest = sha(&bytes);
+        write(&root.join("bundle-manifest.json"), &bytes);
+        digest
+    }
     fn create_fixture() -> Fixture {
         let suffix = NEXT.fetch_add(1, Ordering::Relaxed);
         let root = std::env::temp_dir().join(format!("rea-evidence-verify-{}-{suffix}", std::process::id()));
@@ -578,20 +596,7 @@ mod tests {
         let meta_sha = sha(&meta_bytes);
         write(&artifact.join("provider-metamorphic-receipt.json"), &meta_bytes);
 
-        let mut bundle_paths = Vec::new();
-        collect_bundle_paths(&artifact, &artifact, &mut bundle_paths).unwrap();
-        bundle_paths.sort();
-        let bundle_entries: Vec<Value> = bundle_paths
-            .iter()
-            .map(|path| json!({"path": path, "sha256": hash_file(&artifact.join(path)).unwrap()}))
-            .collect();
-        let bundle_manifest = json!({
-            "schema_version": BUNDLE_MANIFEST_SCHEMA,
-            "files": bundle_entries,
-        });
-        let bundle_manifest_bytes = serde_json::to_vec_pretty(&bundle_manifest).unwrap();
-        let bundle_manifest_sha = sha(&bundle_manifest_bytes);
-        write(&artifact.join("bundle-manifest.json"), &bundle_manifest_bytes);
+        let bundle_manifest_sha = refresh_bundle_manifest(&artifact);
 
         let receipt = json!({
             "schema_version": RECEIPT_SCHEMA,
@@ -699,6 +704,8 @@ mod tests {
             &f.artifact.join("run-mutated/semantic-projection.json"),
             b"{\"projection\":\"same\"}\n",
         );
+        let manifest_sha = refresh_bundle_manifest(&f.artifact);
+        changed["bundle_manifest_sha256"] = json!(manifest_sha);
         write(&f.artifact.join("receipt.json"), serde_json::to_vec_pretty(&changed).unwrap().as_slice());
         assert!(verify_bundle(&f.artifact, &f.source, &f.expected_head, None).unwrap_err().to_string().contains("did not change"));
     }
@@ -747,13 +754,18 @@ mod tests {
         fs::remove_file(&report).unwrap();
         symlink(f.artifact.join("run-b/raw-report.json"), &report).unwrap();
         assert!(verify_bundle(&f.artifact, &f.source, &f.expected_head, None)
-            .unwrap_err().to_string().contains("non-symlink"));
+            .unwrap_err().to_string().contains("symlink"));
     }
 
     #[test]
     fn rejects_wrong_extracted_payload_even_when_receipt_is_unchanged() {
         let f = create_fixture();
         write(&f.artifact.join("run-b/extracted/payload.txt"), b"not the expected payload\n");
+        let raw: Value = serde_json::from_slice(&fs::read(f.artifact.join("receipt.json")).unwrap()).unwrap();
+        let mut changed = raw;
+        let manifest_sha = refresh_bundle_manifest(&f.artifact);
+        changed["bundle_manifest_sha256"] = json!(manifest_sha);
+        write(&f.artifact.join("receipt.json"), serde_json::to_vec_pretty(&changed).unwrap().as_slice());
         assert!(verify_bundle(&f.artifact, &f.source, &f.expected_head, None).unwrap_err().to_string().contains("extracted payload"));
     }
 }
