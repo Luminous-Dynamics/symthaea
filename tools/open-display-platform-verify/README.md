@@ -19,6 +19,14 @@ To validate the checked-in synthetic power trace and print energy per successful
 
 The sample trace is synthetic and must remain SYNTHETIC_TEST_ONLY. Its known-answer output is 35 J total and 17.5 J per successful task (3 attempts, 2 successes); it does not establish instrument accuracy or physical monitor power.
 
+To screen whether an instrument's ideal rectangular field-of-view footprint fits inside a uniform test patch, use:
+
+    cargo run --manifest-path tools/open-display-platform-verify/Cargo.toml -- \
+      --geometry-record docs/engineering/display-measurement-geometry-synthetic-v0.1.json \
+      --geometry-schema docs/engineering/display-measurement-geometry.schema.json
+
+This uses an ideal planar-target geometry model, propagates first-order distance/FOV uncertainty, then makes the fit decision with a conservative upper-envelope plus centering and edge guards. The checked-in inputs are synthetic: it is not a lens/distortion, detector-response, calibration or physical-fit qualification.
+
 To validate a run-specific geometry receipt after the OpenSCAD checks:
 
     cargo run --manifest-path tools/open-display-platform-verify/Cargo.toml -- \
