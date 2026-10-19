@@ -10,6 +10,7 @@
 use std::collections::{HashMap, HashSet};
 
 pub mod accounting;
+pub mod scenario_campaign;
 
 use serde_json::Value;
 use symthaea_graph_theory::Graph;
