@@ -72,10 +72,25 @@ struct TrialPowerPlan {
     total_planned_plots_two_arms: usize,
     planned_site_season_count: usize,
     approximate_effective_retained_plots_per_arm: f64,
+    power_sensitivity: Vec<PowerSensitivityResult>,
     warnings: Vec<String>,
     field_efficacy_claim: bool,
     training_authorized: bool,
     notes: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct PowerSensitivityResult {
+    target_power: f64,
+    z_power: f64,
+    independent_plots_required_per_arm: usize,
+    design_effect: f64,
+    attrition_fraction: f64,
+    required_recruited_plots_per_arm_before_cluster_rounding: usize,
+    clusters_required_per_arm: usize,
+    planned_plots_per_arm_after_cluster_rounding: usize,
+    total_planned_plots_two_arms: usize,
+    approximate_effective_retained_plots_per_arm: f64,
 }
 
 fn inverse_normal_cdf(p: f64) -> Result<f64> {
@@ -223,14 +238,13 @@ fn validate(input: &PowerInput) -> Result<()> {
     Ok(())
 }
 
-fn calculate(input: &PowerInput, input_sha256: String) -> Result<TrialPowerPlan> {
-    validate(input)?;
-    let endpoint = &input.endpoint;
-    let design = &input.design;
-    let alpha_per_endpoint =
-        endpoint.familywise_alpha / endpoint.co_primary_endpoint_count as f64;
-    let z_critical = inverse_normal_cdf(1.0 - alpha_per_endpoint / 2.0)?;
-    let z_power = inverse_normal_cdf(endpoint.target_power)?;
+fn estimate_sample_size(
+    endpoint: &EndpointInput,
+    design: &DesignInput,
+    z_critical: f64,
+    target_power: f64,
+) -> Result<PowerSensitivityResult> {
+    let z_power = inverse_normal_cdf(target_power)?;
     let effect = endpoint.minimum_detectable_effect_abs;
     let sigma = endpoint.residual_sd;
     let raw_n = (2.0 * (z_critical + z_power).powi(2) * sigma.powi(2) / effect.powi(2)).ceil();
@@ -241,6 +255,9 @@ fn calculate(input: &PowerInput, input_sha256: String) -> Result<TrialPowerPlan>
     let design_effect = 1.0
         + (design.plots_per_cluster.saturating_sub(1) as f64)
             * design.intracluster_correlation;
+    if !design_effect.is_finite() || design_effect < 1.0 {
+        return Err(anyhow!("cluster design effect is not finite or is less than one"));
+    }
     let attrition_adjusted =
         ((independent_n as f64 * design_effect) / (1.0 - design.attrition_fraction)).ceil();
     if !attrition_adjusted.is_finite() || attrition_adjusted > (usize::MAX / 4) as f64 {
@@ -258,6 +275,33 @@ fn calculate(input: &PowerInput, input_sha256: String) -> Result<TrialPowerPlan>
         * (1.0 - design.attrition_fraction)
         / design_effect;
 
+    Ok(PowerSensitivityResult {
+        target_power,
+        z_power,
+        independent_plots_required_per_arm: independent_n,
+        design_effect,
+        attrition_fraction: design.attrition_fraction,
+        required_recruited_plots_per_arm_before_cluster_rounding: required_plots,
+        clusters_required_per_arm: clusters_per_arm,
+        planned_plots_per_arm_after_cluster_rounding: planned_plots_per_arm,
+        total_planned_plots_two_arms,
+        approximate_effective_retained_plots_per_arm: (effective_retained * 1000.0).round() / 1000.0,
+    })
+}
+
+fn calculate(input: &PowerInput, input_sha256: String) -> Result<TrialPowerPlan> {
+    validate(input)?;
+    let endpoint = &input.endpoint;
+    let design = &input.design;
+    let alpha_per_endpoint =
+        endpoint.familywise_alpha / endpoint.co_primary_endpoint_count as f64;
+    let z_critical = inverse_normal_cdf(1.0 - alpha_per_endpoint / 2.0)?;
+    let primary = estimate_sample_size(endpoint, design, z_critical, endpoint.target_power)?;
+    let power_sensitivity = [0.8_f64, 0.9_f64]
+        .into_iter()
+        .map(|target_power| estimate_sample_size(endpoint, design, z_critical, target_power))
+        .collect::<Result<Vec<_>>>()?;
+
     let mut warnings = vec![
         "Normal-approximation preflight only; not a final design-specific power calculation."
             .to_owned(),
@@ -268,7 +312,7 @@ fn calculate(input: &PowerInput, input_sha256: String) -> Result<TrialPowerPlan>
         "Confirm assumptions and analysis with an agricultural statistician before preregistration."
             .to_owned(),
     ];
-    if clusters_per_arm < 10 && design.allocation_unit != "plot" {
+    if primary.clusters_required_per_arm < 10 && design.allocation_unit != "plot" {
         warnings.push(
             "Fewer than 10 randomized clusters per arm: normal design-effect approximation may be optimistic; use cluster-aware simulation or small-sample correction."
                 .to_owned(),
@@ -302,8 +346,8 @@ fn calculate(input: &PowerInput, input_sha256: String) -> Result<TrialPowerPlan>
         method: "two_arm_normal_approximation_with_bonferroni_and_cluster_design_effect".to_owned(),
         endpoint_name: endpoint.name.clone(),
         endpoint_unit: endpoint.unit.clone(),
-        minimum_detectable_effect_abs: effect,
-        residual_sd: sigma,
+        minimum_detectable_effect_abs: endpoint.minimum_detectable_effect_abs,
+        residual_sd: endpoint.residual_sd,
         familywise_alpha: endpoint.familywise_alpha,
         co_primary_endpoint_count: endpoint.co_primary_endpoint_count,
         bonferroni_alpha_per_endpoint: alpha_per_endpoint,
@@ -312,17 +356,22 @@ fn calculate(input: &PowerInput, input_sha256: String) -> Result<TrialPowerPlan>
         allocation_unit: design.allocation_unit.clone(),
         intracluster_correlation: design.intracluster_correlation,
         z_critical_two_sided: z_critical,
-        z_power,
-        independent_plots_required_per_arm_before_cluster_and_attrition_adjustment: independent_n,
-        design_effect,
+        z_power: primary.z_power,
+        independent_plots_required_per_arm_before_cluster_and_attrition_adjustment:
+            primary.independent_plots_required_per_arm,
+        design_effect: primary.design_effect,
         attrition_fraction: design.attrition_fraction,
-        required_recruited_plots_per_arm_before_cluster_rounding: required_plots,
+        required_recruited_plots_per_arm_before_cluster_rounding:
+            primary.required_recruited_plots_per_arm_before_cluster_rounding,
         plots_per_cluster: design.plots_per_cluster,
-        clusters_required_per_arm: clusters_per_arm,
-        planned_plots_per_arm_after_cluster_rounding: planned_plots_per_arm,
-        total_planned_plots_two_arms,
+        clusters_required_per_arm: primary.clusters_required_per_arm,
+        planned_plots_per_arm_after_cluster_rounding:
+            primary.planned_plots_per_arm_after_cluster_rounding,
+        total_planned_plots_two_arms: primary.total_planned_plots_two_arms,
         planned_site_season_count: design.planned_site_season_count,
-        approximate_effective_retained_plots_per_arm: (effective_retained * 1000.0).round() / 1000.0,
+        approximate_effective_retained_plots_per_arm:
+            primary.approximate_effective_retained_plots_per_arm,
+        power_sensitivity,
         warnings,
         field_efficacy_claim: false,
         training_authorized: false,
@@ -407,6 +456,22 @@ mod tests {
         assert!((inverse_normal_cdf(0.975).unwrap() - 1.959_963_986).abs() < 1e-6);
         assert!((inverse_normal_cdf(0.9).unwrap() - 1.281_551_566).abs() < 1e-6);
         assert!((inverse_normal_cdf(0.5).unwrap()).abs() < 1e-8);
+    }
+
+    #[test]
+    fn plan_reports_standard_eighty_and_ninety_percent_power_sensitivity() {
+        let plan = calculate(&fixture(), "a".repeat(64)).unwrap();
+        assert_eq!(plan.power_sensitivity.len(), 2);
+        assert_eq!(plan.power_sensitivity[0].target_power, 0.8);
+        assert_eq!(plan.power_sensitivity[1].target_power, 0.9);
+        assert!(
+            plan.power_sensitivity[1].independent_plots_required_per_arm
+                > plan.power_sensitivity[0].independent_plots_required_per_arm
+        );
+        assert!(plan
+            .power_sensitivity
+            .iter()
+            .all(|entry| entry.total_planned_plots_two_arms > 0));
     }
 
     #[test]
