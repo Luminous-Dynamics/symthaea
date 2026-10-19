@@ -67,6 +67,7 @@ jobs:
           TARGET_HEAD_SHA: ${{ steps.target.outputs.head_sha }}
         run: |
           set -euo pipefail
+          [[ "$TARGET_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "provider run returned an invalid source SHA" >&2; exit 2; }
           git fetch --no-tags --depth=1 origin "$TARGET_HEAD_SHA"
           git checkout --detach "$TARGET_HEAD_SHA"
           test "$(git rev-parse HEAD)" = "$TARGET_HEAD_SHA"
@@ -130,7 +131,9 @@ jobs:
         run: |
           set -euo pipefail
           MANIFEST="$RUNNER_TEMP/rea-provider-evidence/bundle-manifest.json"
+          RECEIPT="$RUNNER_TEMP/rea-provider-evidence/receipt.json"
           MANIFEST_SHA=$(sha256sum "$MANIFEST" | awk '{print $1}')
+          RECEIPT_SHA=$(sha256sum "$RECEIPT" | awk '{print $1}')
           gh attestation verify "$MANIFEST" \
             --bundle "$ATTESTATION_BUNDLE_PATH" \
             --repo "$GITHUB_REPOSITORY" \
@@ -139,8 +142,8 @@ jobs:
             --source-digest "$GITHUB_SHA" \
             --source-ref "$GITHUB_REF" \
             --format json > "$RUNNER_TEMP/verified-attestation.json"
-          jq -e --arg predicate "$PREDICATE_TYPE" --arg target "$TARGET_HEAD_SHA" --arg manifest "$MANIFEST_SHA" \
-            '. as $all | ($all | length) == 1 and ($all[0].verificationResult.statement as $s | $s.predicateType == $predicate and ($s.subject | length) == 1 and $s.subject[0].digest.sha256 == $manifest and $s.predicate.schemaVersion == "symthaea.rea-provider-smoke-attestation.v1" and $s.predicate.evidenceTier == "unblob-provider-smoke" and $s.predicate.providerRun.sourceHeadSha == $target and $s.predicate.subject.bundleManifestSha256 == $manifest and $s.predicate.qualification.reaCliMcpParity == false and $s.predicate.qualification.deviceQualification == false)' "$RUNNER_TEMP/verified-attestation.json" >/dev/null
+          jq -e --arg predicate "$PREDICATE_TYPE" --arg target "$TARGET_HEAD_SHA" --arg manifest "$MANIFEST_SHA" --arg receipt "$RECEIPT_SHA" --arg attestor_sha "$GITHUB_SHA" \
+            '. as $all | ($all | length) == 1 and ($all[0].verificationResult.statement as $s | $s.predicateType == $predicate and ($s.subject | length) == 1 and $s.subject[0].digest.sha256 == $manifest and $s.predicate.schemaVersion == "symthaea.rea-provider-smoke-attestation.v1" and $s.predicate.evidenceTier == "unblob-provider-smoke" and $s.predicate.providerRun.sourceHeadSha == $target and $s.predicate.subject.bundleManifestSha256 == $manifest and $s.predicate.subject.receiptSha256 == $receipt and $s.predicate.attestationRun.sourceCommitSha == $attestor_sha and $s.predicate.attestationRun.ref == "refs/heads/main" and $s.predicate.qualification.reaCliMcpParity == false and $s.predicate.qualification.deviceQualification == false)' "$RUNNER_TEMP/verified-attestation.json" >/dev/null
 
       - name: Publish signed attestation bundle for portable verification
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
