@@ -271,7 +271,8 @@
         "coverage and false-feasible count alongside selective risk; abstention is not free success",
         "matched-seed Pareto frontier over validated objective quality, unique reference-validated discoveries, and declared total cost",
         "paired median acceleration factor and percentile bootstrap interval across all predeclared matched seeds",
-        "number of predeclared seed pairs reaching the same target under both policies; non-reaching pairs block target-reaching confidence intervals"
+        "number of predeclared seed pairs reaching the same target under both policies; non-reaching pairs block target-reaching confidence intervals",
+        "paired target-reach rate and candidate-minus-baseline reach-rate difference with percentile-bootstrap interval over every predeclared seed, including failed and incomplete campaigns"
       ],
       "gates": [
         "freeze target and budget before campaigns",
@@ -285,7 +286,8 @@
         "bootstrap acceleration intervals require at least 20 predeclared paired seeds and every pair must reach the same frozen target; never drop non-reaching seeds to create a success-only interval",
         "pin confidence level, resample count and bootstrap seed; a speedup claim requires the 95% percentile-bootstrap lower bound above 1 and no worse validated objective quality at equal total cost",
         "pin ensemble checkpoints and calibrate disagreement on validation-only data; include inference cost and compare against shuffled-disagreement controls",
-        "counterexample-guided policy must predeclare falsifiable hypotheses and score every proposed counterexample against the reference evaluator; no post-hoc target changes"
+        "counterexample-guided policy must predeclare falsifiable hypotheses and score every proposed counterexample against the reference evaluator; no post-hoc target changes",
+        "publish target-reachability counts and paired discordant outcomes over the full predeclared seed roster; failed/incomplete runs count as not reaching target and are never omitted from this endpoint"
       ]
     },
     {
