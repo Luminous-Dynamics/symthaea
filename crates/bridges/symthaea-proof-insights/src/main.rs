@@ -960,13 +960,20 @@ fn materialize_temporal_target(
 }
 
 fn verify_temporal_target_bundle(bundle_path: &Path) -> Result<()> {
-    let bytes = fs::read(bundle_path)
-        .with_context(|| format!("cannot read temporal target bundle {}", bundle_path.display()))?;
+    let bytes = fs::read(bundle_path).with_context(|| {
+        format!(
+            "cannot read temporal target bundle {}",
+            bundle_path.display()
+        )
+    })?;
     let bundle: TemporalTargetBundle =
         serde_json::from_slice(&bytes).context("parse temporal target bundle JSON")?;
     let payload = &bundle.payload;
     if payload.schema_version != "pitb.temporal-target-bundle.v0" {
-        bail!("unsupported temporal target bundle schema {}", payload.schema_version);
+        bail!(
+            "unsupported temporal target bundle schema {}",
+            payload.schema_version
+        );
     }
     if !payload.repository_url.starts_with("https://") {
         bail!("temporal target bundle must pin an HTTPS repository URL");
@@ -998,22 +1005,32 @@ fn verify_temporal_target_bundle(bundle_path: &Path) -> Result<()> {
     let mut seen_ids = BTreeSet::new();
     let mut statement_found = false;
     for artifact in &payload.visible_artifacts {
-        if artifact.artifact_id.trim().is_empty() || !seen_ids.insert(artifact.artifact_id.as_str()) {
+        if artifact.artifact_id.trim().is_empty() || !seen_ids.insert(artifact.artifact_id.as_str())
+        {
             bail!("bundle contains an empty or duplicate visible artifact ID");
         }
         let normalized_path = normalize_root_relative_path(&artifact.path)?;
         if normalized_path != artifact.path {
             bail!("bundle artifact path is not canonical: {}", artifact.path);
         }
-        validate_sha256_hex(&artifact.content_sha256)
-            .with_context(|| format!("invalid bundle content digest for {}", artifact.artifact_id))?;
-        validate_sha256_hex(&artifact.source_file_sha256)
-            .with_context(|| format!("invalid bundle source-file digest for {}", artifact.artifact_id))?;
-        validate_git_sha(&artifact.source_commit)
-            .with_context(|| format!("invalid bundle source commit for {}", artifact.artifact_id))?;
+        validate_sha256_hex(&artifact.content_sha256).with_context(|| {
+            format!("invalid bundle content digest for {}", artifact.artifact_id)
+        })?;
+        validate_sha256_hex(&artifact.source_file_sha256).with_context(|| {
+            format!(
+                "invalid bundle source-file digest for {}",
+                artifact.artifact_id
+            )
+        })?;
+        validate_git_sha(&artifact.source_commit).with_context(|| {
+            format!("invalid bundle source commit for {}", artifact.artifact_id)
+        })?;
         let observed_content_digest = format!("{:x}", Sha256::digest(artifact.content.as_bytes()));
         if observed_content_digest != artifact.content_sha256 {
-            bail!("bundle artifact content does not match digest for {}", artifact.artifact_id);
+            bail!(
+                "bundle artifact content does not match digest for {}",
+                artifact.artifact_id
+            );
         }
 
         if artifact.artifact_id == payload.statement_artifact_id {
@@ -1021,9 +1038,13 @@ fn verify_temporal_target_bundle(bundle_path: &Path) -> Result<()> {
                 || artifact.theorem_id.as_deref() != Some(payload.theorem_id.as_str())
                 || artifact.content_sha256 != payload.statement_sha256
                 || artifact.target_position.is_some()
-                || artifact.available_at_position.is_none_or(|position| position > payload.position)
+                || artifact
+                    .available_at_position
+                    .is_none_or(|position| position > payload.position)
             {
-                bail!("bundle's exact target-statement artifact violates the statement/visibility contract");
+                bail!(
+                    "bundle's exact target-statement artifact violates the statement/visibility contract"
+                );
             }
             statement_found = true;
             continue;
@@ -1032,7 +1053,9 @@ fn verify_temporal_target_bundle(bundle_path: &Path) -> Result<()> {
         match artifact.artifact_kind.as_str() {
             "proof_body" => {
                 if artifact.available_at_position.is_some()
-                    || artifact.target_position.is_none_or(|position| position >= payload.position)
+                    || artifact
+                        .target_position
+                        .is_none_or(|position| position >= payload.position)
                 {
                     bail!(
                         "bundle proof {} is not an earlier completed proof",
@@ -1042,7 +1065,9 @@ fn verify_temporal_target_bundle(bundle_path: &Path) -> Result<()> {
             }
             "definition" | "module_context" | "theorem_statement" => {
                 if artifact.target_position.is_some()
-                    || artifact.available_at_position.is_none_or(|position| position >= payload.position)
+                    || artifact
+                        .available_at_position
+                        .is_none_or(|position| position >= payload.position)
                 {
                     bail!(
                         "bundle artifact {} was not available before the target",
