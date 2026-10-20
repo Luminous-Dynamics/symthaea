@@ -405,15 +405,31 @@ pub fn top_weighted_ranking_overlap(
         }
     }
 
-    let mut predicted_prefix = BTreeSet::new();
-    let mut reference_prefix = BTreeSet::new();
+    // At prefix depth d, a candidate contributes to the overlap exactly when
+    // both its predicted and reference rank are <= d. Count each shared ID at
+    // its max rank once, then accumulate the prefix counts. This avoids
+    // repeatedly intersecting two growing sets (quadratic work for long lists).
+    let len = predicted_ranking.len();
+    let reference_positions: std::collections::HashMap<u64, usize> = reference_ranking
+        .iter()
+        .copied()
+        .enumerate()
+        .map(|(index, identifier)| (identifier, index + 1))
+        .collect();
+    let mut shared_starting_at = vec![0usize; len + 1];
+    for (index, identifier) in predicted_ranking.iter().copied().enumerate() {
+        if let Some(reference_rank) = reference_positions.get(&identifier).copied() {
+            let first_shared_depth = (index + 1).max(reference_rank);
+            shared_starting_at[first_shared_depth] += 1;
+        }
+    }
+
+    let mut shared_prefix_count = 0usize;
     let mut weighted_overlap = 0.0;
     let mut total_weight = 0.0;
-    for depth in 1..=predicted_ranking.len() {
-        predicted_prefix.insert(predicted_ranking[depth - 1]);
-        reference_prefix.insert(reference_ranking[depth - 1]);
-        let shared = predicted_prefix.intersection(&reference_prefix).count();
-        let prefix_overlap = shared as f64 / depth as f64;
+    for depth in 1..=len {
+        shared_prefix_count += shared_starting_at[depth];
+        let prefix_overlap = shared_prefix_count as f64 / depth as f64;
         let weight = (1.0 - persistence) * persistence.powf((depth - 1) as f64);
         weighted_overlap += weight * prefix_overlap;
         total_weight += weight;
@@ -629,6 +645,25 @@ mod tests {
         assert!(predicted.normalized_score < 1.0);
         assert!(predicted.normalized_score > 0.0);
         assert!(predicted.normalized_score > lower_persistence.normalized_score);
+    }
+
+    #[test]
+    fn top_weighted_overlap_is_zero_for_disjoint_rankings() {
+        let summary = top_weighted_ranking_overlap(&[1, 2, 3], &[4, 5, 6], 0.94)
+            .expect("equal-length unique rankings should compare");
+        assert_eq!(summary.normalized_score, 0.0);
+    }
+
+    #[test]
+    fn top_weighted_overlap_handles_large_candidate_rankings() {
+        let predicted: Vec<u64> = (0..20_000).collect();
+        let mut reference = predicted.clone();
+        reference.reverse();
+        let summary = top_weighted_ranking_overlap(&predicted, &reference, 0.94)
+            .expect("large valid rankings should compare");
+        assert_eq!(summary.evaluated_depths, 20_000);
+        assert!(summary.normalized_score.is_finite());
+        assert!((0.0..=1.0).contains(&summary.normalized_score));
     }
 
     #[test]
