@@ -410,6 +410,57 @@ jobs:
             (.source_fingerprints | any(.path == "lean/ComparatorChallenges/README.md"))
           ' "$first" >/dev/null
           test -z "$(git -C "$upstream" status --porcelain)"
+          python - "$upstream" "$first" "$GITHUB_WORKSPACE" <<'PY'
+          import hashlib
+          import json
+          import sys
+          from pathlib import Path
+
+          upstream, index_path, workspace = map(Path, sys.argv[1:])
+          record_path = workspace / "data/benchmarks/proof-insight-transfer-v0/candidates/025-short-egyptian-greedy-residue.json"
+          split_path = workspace / "data/benchmarks/proof-insight-transfer-v0/splits.json"
+          record = json.loads(record_path.read_text())
+          index = json.loads(index_path.read_text())
+          split_manifest = json.loads(split_path.read_text())
+
+          relative = Path(record["source"]["path"])
+          if relative.is_absolute() or ".." in relative.parts:
+              raise SystemExit("candidate source path must remain repository-relative")
+          source = upstream / relative
+          try:
+              source.resolve().relative_to(upstream.resolve())
+          except ValueError as error:
+              raise SystemExit("candidate source path escaped the pinned checkout") from error
+          source_bytes = source.read_bytes()
+          source_sha256 = hashlib.sha256(source_bytes).hexdigest()
+          if source_sha256 != record["source"]["sha256"]:
+              raise SystemExit("candidate source SHA-256 differs from the pinned upstream bytes")
+          if source_sha256 != record["artifact"]["sha256"]:
+              raise SystemExit("candidate artifact and source digests disagree")
+          statement = record["theorem"]["statement_text"]
+          statement_digest = hashlib.sha256(statement.encode("utf-8")).hexdigest()
+          if statement_digest != record["theorem"]["statement_digest"]:
+              raise SystemExit("candidate statement digest does not match its exact stored UTF-8 text")
+          if statement.encode("utf-8") not in source_bytes:
+              raise SystemExit("candidate theorem signature is not an exact substring of the pinned source")
+          indexed = [
+              item for item in index["source_fingerprints"]
+              if item["path"] == record["source"]["path"]
+          ]
+          if len(indexed) != 1 or indexed[0]["sha256"] != source_sha256:
+              raise SystemExit("candidate source digest does not match the reproducible source index")
+          family = record["source"]["family_id"]
+          assignments = [
+              item for item in split_manifest["families"]
+              if item["family_id"] == family
+          ]
+          if len(assignments) != 1 or assignments[0]["split"] != "train":
+              raise SystemExit("new candidate must remain in exactly one frozen training family")
+          print(
+              "PITB_TRAINING_CANDIDATE_PROVENANCE_PASS: "
+              f"family={family} source_sha256={source_sha256} statement_sha256={statement_digest}"
+          )
+          PY
           echo "PITB_PINNED_SOURCE_INDEX_PASS: $upstream_sha"
       - name: Upload exact-source index and receipts
         uses: actions/upload-artifact@v4
