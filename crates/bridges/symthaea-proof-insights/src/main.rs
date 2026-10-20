@@ -185,6 +185,8 @@ struct TemporalEvidenceArtifact {
     path: String,
     artifact_kind: String,
     content_sha256: String,
+    content_start_line: usize,
+    content_end_line: usize,
     source_file_sha256: String,
     source_commit: String,
     available_at_position: usize,
@@ -517,6 +519,374 @@ fn execute_from_args() -> Result<()> {
         );
     }
     Ok(())
+}
+
+fn verify_temporal_manifest_file(repository_root: &Path, manifest_path: &Path) -> Result<()> {
+    let root = repository_root
+        .canonicalize()
+        .with_context(|| format!("cannot resolve temporal repository {}", repository_root.display()))?;
+    let bytes = fs::read(manifest_path)
+        .with_context(|| format!("cannot read temporal manifest {}", manifest_path.display()))?;
+    let manifest: TemporalReplayManifest =
+        serde_json::from_slice(&bytes).context("parse temporal replay manifest JSON")?;
+    validate_temporal_manifest(&manifest)?;
+
+    let actual_head = git_output(&root, &["rev-parse", "HEAD"])?;
+    if actual_head != manifest.repository_commit {
+        bail!(
+            "temporal repository HEAD mismatch: manifest pins {}, checkout is {}",
+            manifest.repository_commit,
+            actual_head
+        );
+    }
+    let status = git_output(&root, &["status", "--porcelain"])?;
+    if !status.is_empty() {
+        bail!("temporal repository checkout must be clean before validating replay evidence");
+    }
+
+    let mut previous_completion_commit: Option<&str> = None;
+    for event in &manifest.events {
+        if !git_is_ancestor(&root, &event.target_state_commit, &manifest.repository_commit)? {
+            bail!(
+                "target state commit {} for {} is not an ancestor of the pinned repository commit",
+                event.target_state_commit,
+                event.target_id
+            );
+        }
+        if !git_is_ancestor(&root, &event.proof_completion_commit, &manifest.repository_commit)? {
+            bail!(
+                "proof completion commit {} for {} is not an ancestor of the pinned repository commit",
+                event.proof_completion_commit,
+                event.target_id
+            );
+        }
+        if !git_is_ancestor(&root, &event.target_state_commit, &event.proof_completion_commit)? {
+            bail!(
+                "target state commit must precede or equal proof completion for {}",
+                event.target_id
+            );
+        }
+        if let Some(previous) = previous_completion_commit {
+            if !git_is_ancestor(&root, previous, &event.target_state_commit)? {
+                bail!(
+                    "target {} is evaluated before the previous timeline proof was available",
+                    event.target_id
+                );
+            }
+        }
+
+        for artifact_id in &event.visible_artifact_ids {
+            let artifact = manifest
+                .artifacts
+                .iter()
+                .find(|artifact| artifact.artifact_id == *artifact_id)
+                .context("visible artifact disappeared after temporal manifest validation")?;
+            if !git_is_ancestor(&root, &artifact.source_commit, &event.target_state_commit)? {
+                bail!(
+                    "future-commit leakage: artifact {} from {} was not in target {}'s historical state",
+                    artifact.artifact_id,
+                    artifact.source_commit,
+                    event.target_id
+                );
+            }
+        }
+        previous_completion_commit = Some(&event.proof_completion_commit);
+    }
+
+    let mut file_cache: BTreeMap<(String, String), Vec<u8>> = BTreeMap::new();
+    for artifact in &manifest.artifacts {
+        if !git_is_ancestor(&root, &artifact.source_commit, &manifest.repository_commit)? {
+            bail!(
+                "artifact {} references a source commit outside the pinned repository history",
+                artifact.artifact_id
+            );
+        }
+        let cache_key = (artifact.source_commit.clone(), artifact.path.clone());
+        if !file_cache.contains_key(&cache_key) {
+            let source = git_show_file(&root, &artifact.source_commit, &artifact.path)?;
+            let file_digest = format!("{:x}", Sha256::digest(&source));
+            if file_digest != artifact.source_file_sha256 {
+                bail!(
+                    "source-file digest mismatch for artifact {} at {}:{}",
+                    artifact.artifact_id,
+                    artifact.source_commit,
+                    artifact.path
+                );
+            }
+            file_cache.insert(cache_key.clone(), source);
+        }
+        let source = file_cache
+            .get(&cache_key)
+            .context("source-file cache entry missing after insertion")?;
+        let span = exact_line_span(source, artifact.content_start_line, artifact.content_end_line)
+            .with_context(|| format!("invalid source locator for artifact {}", artifact.artifact_id))?;
+        let span_digest = format!("{:x}", Sha256::digest(span));
+        if span_digest != artifact.content_sha256 {
+            bail!(
+                "artifact content digest mismatch for {} ({}:{}-{})",
+                artifact.artifact_id,
+                artifact.path,
+                artifact.content_start_line,
+                artifact.content_end_line
+            );
+        }
+    }
+
+    println!(
+        "PITB_TEMPORAL_MANIFEST_PASS: events={} artifacts={} repository_commit={}",
+        manifest.events.len(),
+        manifest.artifacts.len(),
+        manifest.repository_commit
+    );
+    Ok(())
+}
+
+fn validate_temporal_manifest(manifest: &TemporalReplayManifest) -> Result<()> {
+    if manifest.schema_version != "pitb.temporal-replay-manifest.v0" {
+        bail!("unsupported temporal replay manifest schema {}", manifest.schema_version);
+    }
+    if !manifest.repository_url.starts_with("https://") {
+        bail!("temporal repository URL must be an explicit HTTPS URL");
+    }
+    validate_git_sha(&manifest.repository_commit).context("invalid pinned repository commit")?;
+    validate_sha256_hex(&manifest.timeline_sha256).context("invalid timeline SHA-256")?;
+    if manifest.lean_toolchain.trim().is_empty()
+        || manifest.lean_toolchain.eq_ignore_ascii_case("latest")
+        || manifest.mathlib_revision.trim().is_empty()
+        || manifest.mathlib_revision.eq_ignore_ascii_case("latest")
+    {
+        bail!("temporal manifest must pin Lean and Mathlib versions");
+    }
+    validate_git_sha(&manifest.mathlib_revision).context("Mathlib revision must be a full commit SHA")?;
+    if manifest.events.is_empty() || manifest.artifacts.is_empty() {
+        bail!("temporal replay manifest must contain both timeline events and evidence artifacts");
+    }
+
+    let mut event_positions = BTreeSet::new();
+    let mut target_ids = BTreeSet::new();
+    let mut event_theorems = BTreeMap::new();
+    let mut previous_position = None;
+    for event in &manifest.events {
+        if event.target_id.trim().is_empty() || event.theorem_id.trim().is_empty() {
+            bail!("temporal targets require non-empty target and theorem IDs");
+        }
+        if !target_ids.insert(event.target_id.as_str()) {
+            bail!("duplicate temporal target ID {}", event.target_id);
+        }
+        if !event_positions.insert(event.position) {
+            bail!("duplicate temporal position {}", event.position);
+        }
+        if previous_position.is_some_and(|previous| event.position <= previous) {
+            bail!("temporal events must be in strictly increasing timeline order");
+        }
+        previous_position = Some(event.position);
+        validate_git_sha(&event.target_state_commit)
+            .with_context(|| format!("invalid target-state commit for {}", event.target_id))?;
+        validate_git_sha(&event.proof_completion_commit)
+            .with_context(|| format!("invalid proof-completion commit for {}", event.target_id))?;
+        validate_sha256_hex(&event.statement_sha256)
+            .with_context(|| format!("invalid statement digest for {}", event.target_id))?;
+        if event.statement_artifact_id == event.proof_artifact_id {
+            bail!("target statement and hidden proof must be separate artifacts for {}", event.target_id);
+        }
+        event_theorems.insert(event.proof_artifact_id.as_str(), event);
+    }
+
+    let mut artifacts_by_id = BTreeMap::new();
+    for artifact in &manifest.artifacts {
+        if artifact.artifact_id.trim().is_empty() {
+            bail!("temporal artifact IDs must not be empty");
+        }
+        if artifacts_by_id.insert(artifact.artifact_id.as_str(), artifact).is_some() {
+            bail!("duplicate temporal artifact ID {}", artifact.artifact_id);
+        }
+        let normalized_path = normalize_root_relative_path(&artifact.path)?;
+        if normalized_path != artifact.path {
+            bail!(
+                "temporal artifact path must be canonical and repository-relative: {}",
+                artifact.path
+            );
+        }
+        if artifact.path.is_empty() {
+            bail!("temporal artifact path must not be empty");
+        }
+        validate_sha256_hex(&artifact.content_sha256)
+            .with_context(|| format!("invalid content digest for {}", artifact.artifact_id))?;
+        validate_sha256_hex(&artifact.source_file_sha256)
+            .with_context(|| format!("invalid source-file digest for {}", artifact.artifact_id))?;
+        validate_git_sha(&artifact.source_commit)
+            .with_context(|| format!("invalid source commit for {}", artifact.artifact_id))?;
+        if artifact.content_start_line == 0 || artifact.content_end_line < artifact.content_start_line {
+            bail!("artifact {} must have a valid one-based inclusive line range", artifact.artifact_id);
+        }
+        if ![
+            "theorem_statement",
+            "proof_body",
+            "definition",
+            "module_context",
+        ]
+        .contains(&artifact.artifact_kind.as_str())
+        {
+            bail!("unsupported temporal artifact kind {} for {}", artifact.artifact_kind, artifact.artifact_id);
+        }
+        if artifact.available_at_position > manifest.events.last().map(|event| event.position).unwrap_or(0) {
+            bail!("artifact {} appears after the last registered timeline event", artifact.artifact_id);
+        }
+    }
+
+    for event in &manifest.events {
+        let statement = artifacts_by_id
+            .get(event.statement_artifact_id.as_str())
+            .with_context(|| format!("target {} lacks its target-statement artifact", event.target_id))?;
+        if statement.artifact_kind != "theorem_statement"
+            || statement.theorem_id.as_deref() != Some(event.theorem_id.as_str())
+            || statement.available_at_position > event.position
+            || statement.content_sha256 != event.statement_sha256
+        {
+            bail!("target-statement artifact does not match the statement/position contract for {}", event.target_id);
+        }
+        let proof = artifacts_by_id
+            .get(event.proof_artifact_id.as_str())
+            .with_context(|| format!("target {} lacks its evaluator-only proof artifact", event.target_id))?;
+        if proof.artifact_kind != "proof_body"
+            || proof.theorem_id.as_deref() != Some(event.theorem_id.as_str())
+            || proof.available_at_position != event.position
+            || proof.source_commit != event.proof_completion_commit
+        {
+            bail!("hidden proof artifact does not match its timeline event for {}", event.target_id);
+        }
+
+        let mut visible_ids = BTreeSet::new();
+        for artifact_id in &event.visible_artifact_ids {
+            if !visible_ids.insert(artifact_id.as_str()) {
+                bail!("target {} repeats visible artifact ID {}", event.target_id, artifact_id);
+            }
+            let artifact = artifacts_by_id
+                .get(artifact_id.as_str())
+                .with_context(|| format!("target {} references unknown visible artifact {}", event.target_id, artifact_id))?;
+            if artifact_id == &event.proof_artifact_id {
+                bail!("target {} leaks its own proof artifact into model-visible context", event.target_id);
+            }
+            if artifact_id != &event.statement_artifact_id
+                && artifact.available_at_position >= event.position
+            {
+                bail!(
+                    "future-evidence leakage: artifact {} was not available before target {}",
+                    artifact.artifact_id,
+                    event.target_id
+                );
+            }
+        }
+        if !visible_ids.contains(event.statement_artifact_id.as_str()) {
+            bail!("target {} must expose its exact target statement to the solver", event.target_id);
+        }
+        if visible_ids.contains(event.proof_artifact_id.as_str()) {
+            bail!("target {} must hide the ground-truth proof from the solver", event.target_id);
+        }
+
+        for visible_id in &event.visible_artifact_ids {
+            let visible = artifacts_by_id
+                .get(visible_id.as_str())
+                .context("visible artifact missing after prior lookup")?;
+            for (future_proof_id, future_event) in &event_theorems {
+                if future_event.position >= event.position {
+                    let future_proof = artifacts_by_id
+                        .get(*future_proof_id)
+                        .context("future proof artifact missing after registration")?;
+                    if visible.content_sha256 == future_proof.content_sha256 {
+                        bail!(
+                            "exact proof-content leakage: target {} sees artifact {} with the content digest of hidden/future proof {}",
+                            event.target_id,
+                            visible.artifact_id,
+                            future_proof.artifact_id
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    for artifact in &manifest.artifacts {
+        if artifact.artifact_kind == "proof_body" {
+            let event = event_theorems
+                .get(artifact.artifact_id.as_str())
+                .with_context(|| format!("proof artifact {} is not assigned to a registered timeline event", artifact.artifact_id))?;
+            if event.position != artifact.available_at_position
+                || event.theorem_id != artifact.theorem_id.as_deref().unwrap_or_default()
+            {
+                bail!("proof artifact {} is inconsistent with its timeline event", artifact.artifact_id);
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn validate_git_sha(value: &str) -> Result<()> {
+    if value.len() != 40 || !value.chars().all(|character| character.is_ascii_hexdigit()) {
+        bail!("expected a full 40-character Git SHA");
+    }
+    Ok(())
+}
+
+fn validate_sha256_hex(value: &str) -> Result<()> {
+    if value.len() != 64 || !value.chars().all(|character| character.is_ascii_hexdigit()) {
+        bail!("expected a 64-character SHA-256 digest");
+    }
+    Ok(())
+}
+
+fn git_is_ancestor(root: &Path, ancestor: &str, descendant: &str) -> Result<bool> {
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(root)
+        .args(["merge-base", "--is-ancestor", ancestor, descendant])
+        .output()
+        .context("failed to run git merge-base for temporal ancestry validation")?;
+    if output.status.success() {
+        Ok(true)
+    } else if output.status.code() == Some(1) {
+        Ok(false)
+    } else {
+        bail!(
+            "git merge-base failed while checking temporal ancestry: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        )
+    }
+}
+
+fn git_show_file(root: &Path, commit: &str, path: &str) -> Result<Vec<u8>> {
+    let revision = format!("{commit}:{path}");
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(root)
+        .args(["show", &revision])
+        .output()
+        .with_context(|| format!("failed to read pinned source {revision}"))?;
+    if !output.status.success() {
+        bail!(
+            "git show {revision} failed: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        );
+    }
+    Ok(output.stdout)
+}
+
+fn exact_line_span(source: &[u8], start_line: usize, end_line: usize) -> Result<&[u8]> {
+    let text = std::str::from_utf8(source).context("pinned source file is not UTF-8")?;
+    let lines: Vec<&str> = text.split_inclusive('
+').collect();
+    if start_line == 0 || end_line < start_line || end_line > lines.len() {
+        bail!("line range {start_line}-{end_line} is outside {} source lines", lines.len());
+    }
+    let start = lines.iter().take(start_line - 1).map(|line| line.len()).sum::<usize>();
+    let length = lines
+        .iter()
+        .skip(start_line - 1)
+        .take(end_line - start_line + 1)
+        .map(|line| line.len())
+        .sum::<usize>();
+    Ok(&source[start..start + length])
 }
 
 fn verify_split_files(generated_path: &Path, frozen_path: &Path) -> Result<()> {
