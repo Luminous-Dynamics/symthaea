@@ -544,7 +544,9 @@ fn verify_temporal_manifest_file(repository_root: &Path, manifest_path: &Path) -
         );
     }
     let actual_origin = git_output(&root, &["remote", "get-url", "origin"])?;
-    if normalize_repository_url(&actual_origin) != normalize_repository_url(&manifest.repository_url) {
+    if normalize_repository_url(&actual_origin)
+        != normalize_repository_url(&manifest.repository_url)
+    {
         bail!(
             "temporal repository origin mismatch: manifest pins {}, checkout origin is {}",
             manifest.repository_url,
@@ -557,7 +559,10 @@ fn verify_temporal_manifest_file(repository_root: &Path, manifest_path: &Path) -
     }
     let timeline = git_show_file(&root, &manifest.repository_commit, &manifest.timeline_path)?;
     if format!("{:x}", Sha256::digest(&timeline)) != manifest.timeline_sha256 {
-        bail!("timeline digest does not match {} at the pinned repository commit", manifest.timeline_path);
+        bail!(
+            "timeline digest does not match {} at the pinned repository commit",
+            manifest.timeline_path
+        );
     }
 
     let mut previous_completion_commit: Option<&str> = None;
@@ -690,7 +695,9 @@ fn validate_temporal_manifest(manifest: &TemporalReplayManifest) -> Result<()> {
     }
     validate_git_sha(&manifest.repository_commit).context("invalid pinned repository commit")?;
     let normalized_timeline_path = normalize_root_relative_path(&manifest.timeline_path)?;
-    if normalized_timeline_path != manifest.timeline_path || manifest.timeline_path.is_empty() {
+    if normalized_timeline_path != manifest.timeline_path
+        || manifest.timeline_path.is_empty()
+    {
         bail!("timeline path must be canonical and repository-relative");
     }
     validate_sha256_hex(&manifest.timeline_sha256).context("invalid timeline SHA-256")?;
@@ -938,7 +945,10 @@ fn validate_temporal_manifest(manifest: &TemporalReplayManifest) -> Result<()> {
 
 fn normalize_repository_url(url: &str) -> String {
     let normalized = url.trim().trim_end_matches('/').to_ascii_lowercase();
-    normalized.strip_suffix(".git").unwrap_or(&normalized).to_owned()
+    normalized
+        .strip_suffix(".git")
+        .unwrap_or(&normalized)
+        .to_owned()
 }
 
 fn validate_git_sha(value: &str) -> Result<()> {
