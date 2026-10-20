@@ -557,6 +557,74 @@ jobs:
               "PITB_TEMPORAL_SCHEMA_PASS: Draft 2020-12 positive fixture accepted; "
               f"{len(mutants)} malformed-manifest controls rejected"
           )
+
+          bundle_schema_path = Path("data/benchmarks/proof-insight-transfer-v0/temporal-target-bundle.schema.json")
+          bundle_schema = json.loads(bundle_schema_path.read_text())
+          Draft202012Validator.check_schema(bundle_schema)
+          bundle_validator = Draft202012Validator(bundle_schema, format_checker=FormatChecker())
+          bundle = {
+              "payload_sha256": sha("f"),
+              "payload": {
+                  "schema_version": "pitb.temporal-target-bundle.v0",
+                  "repository_url": "https://example.invalid/temporal-fixture",
+                  "repository_commit": commit("5"),
+                  "target_id": "target-001",
+                  "theorem_id": "Example.second",
+                  "position": 1,
+                  "target_state_commit": commit("2"),
+                  "statement_sha256": sha("c"),
+                  "visible_artifacts": [
+                      {
+                          "artifact_id": "statement-001",
+                          "path": "lean/Example.lean",
+                          "artifact_kind": "theorem_statement",
+                          "content_sha256": sha("c"),
+                          "source_file_sha256": sha("7"),
+                          "source_commit": commit("2"),
+                          "available_at_position": 1,
+                          "target_position": None,
+                          "theorem_id": "Example.second",
+                          "content": "theorem second : True :="
+                      },
+                      {
+                          "artifact_id": "proof-000",
+                          "path": "lean/Example.lean",
+                          "artifact_kind": "proof_body",
+                          "content_sha256": sha("b"),
+                          "source_file_sha256": sha("f"),
+                          "source_commit": commit("2"),
+                          "available_at_position": None,
+                          "target_position": 0,
+                          "theorem_id": "Example.first",
+                          "content": "exact True.intro"
+                      }
+                  ]
+              }
+          }
+          bundle_validator.validate(bundle)
+          bundle_mutants = []
+          bad_bundle_digest = copy.deepcopy(bundle)
+          bad_bundle_digest["payload_sha256"] = "not-a-digest"
+          bundle_mutants.append(bad_bundle_digest)
+          path_traversal_bundle = copy.deepcopy(bundle)
+          path_traversal_bundle["payload"]["visible_artifacts"][0]["path"] = "../outside.lean"
+          bundle_mutants.append(path_traversal_bundle)
+          evaluator_leak_kind = copy.deepcopy(bundle)
+          evaluator_leak_kind["payload"]["visible_artifacts"][0]["artifact_kind"] = "completion_statement"
+          bundle_mutants.append(evaluator_leak_kind)
+          unknown_bundle_authority = copy.deepcopy(bundle)
+          unknown_bundle_authority["payload"]["trusted"] = True
+          bundle_mutants.append(unknown_bundle_authority)
+          for number, mutant in enumerate(bundle_mutants, start=1):
+              try:
+                  bundle_validator.validate(mutant)
+              except ValidationError:
+                  continue
+              raise SystemExit(f"temporal target bundle negative control {number} unexpectedly passed")
+          print(
+              "PITB_TEMPORAL_BUNDLE_SCHEMA_PASS: Draft 2020-12 positive fixture accepted; "
+              f"{len(bundle_mutants)} invalid-bundle controls rejected"
+          )
           PY
       - name: Index pinned OpenAI math snapshot twice
         shell: bash
