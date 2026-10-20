@@ -266,6 +266,7 @@ fn execute() -> Result<()> {
     validate_baseline_receipt(&receipt)?;
     let selected_baseline = receipt.selected_arm.clone();
 
+    let results_digest = sha256_hex(&results_bytes);
     let result_text = String::from_utf8(results_bytes).context("results JSONL must be UTF-8")?;
     let mut outcomes = Vec::new();
     for (line_index, line) in result_text.lines().enumerate() {
@@ -329,7 +330,7 @@ fn execute() -> Result<()> {
         protocol_id: config.protocol_id,
         protocol_sha256: config.protocol_sha256,
         run_config_sha256: sha256_hex(&config_bytes),
-        results_jsonl_sha256: sha256_hex(&results_bytes),
+        results_jsonl_sha256: results_digest,
         split_manifest_sha256: config.split_manifest_sha256,
         partition_digest_sha256: config.partition_digest_sha256,
         baseline_selection_receipt_sha256: config.baseline_selection_receipt_sha256,
