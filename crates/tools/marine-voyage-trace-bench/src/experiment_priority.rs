@@ -1139,8 +1139,7 @@ mod tests {
             "rev-2",
             1,
         ));
-        let receipts = vec![receipt(&profile.requirements[0], "physical-1", 100)];
-        let audit = audit_fidelity_campaign(&profile, &receipts);
+        let audit = audit_fidelity_campaign(&profile, &[]);
         let proposals = vec![physical("tank-run", Some(80), None)];
         let report = prioritize_next_experiment(
             &profile,
