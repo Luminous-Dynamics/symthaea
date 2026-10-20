@@ -140,13 +140,6 @@ pub enum CalibrationIssue {
     ModelConfigurationMismatch { observation_id: String },
     UndeclaredEvaluationGroup { observation_id: String },
     MissingEvaluationGroup { evaluation_group_id: String },
-    MissingEvaluationGroupSlice {
-        evaluation_group_id: String,
-        operating_case_id: String,
-        observable_id: String,
-        unit_id: String,
-        nominal_coverage_bp: u16,
-    },
     UndeclaredSlice {
         observation_id: String,
         operating_case_id: String,
@@ -755,7 +748,6 @@ pub fn evaluate_calibration(
         .map(|s| s.trim().to_owned())
         .collect();
     let mut seen_evaluation_groups = BTreeSet::new();
-    let mut seen_evaluation_group_slices: BTreeSet<GroupSliceKey> = BTreeSet::new();
     let mut sorted_observations: Vec<&CalibrationObservation> = observations
         .iter()
         .filter(|o| {
@@ -899,13 +891,6 @@ pub fn evaluate_calibration(
 
         let group_id = observation.evaluation_group_id.trim().to_owned();
         seen_evaluation_groups.insert(group_id.clone());
-        seen_evaluation_group_slices.insert((
-            group_id,
-            key.0.clone(),
-            key.1.clone(),
-            key.2.clone(),
-            key.3,
-        ));
         if observation.applicability != ApplicabilityStatus::WithinDeclaredEnvelope {
             issues.push(CalibrationIssue::ApplicabilityNotEstablished {
                 observation_id: id.clone(),
@@ -922,7 +907,6 @@ pub fn evaluate_calibration(
         }
     }
 
-    let mut missing_group_slices: BTreeSet<SliceKey> = BTreeSet::new();
     for group_id in &eval_groups {
         if !seen_evaluation_groups.contains(group_id) {
             issues.push(CalibrationIssue::MissingEvaluationGroup {
@@ -930,36 +914,14 @@ pub fn evaluate_calibration(
             });
             missing_required_coverage = true;
         }
-        for key in requirements.keys() {
-            let group_slice_key = (
-                group_id.clone(),
-                key.0.clone(),
-                key.1.clone(),
-                key.2.clone(),
-                key.3,
-            );
-            if !seen_evaluation_group_slices.contains(&group_slice_key) {
-                issues.push(CalibrationIssue::MissingEvaluationGroupSlice {
-                    evaluation_group_id: group_id.clone(),
-                    operating_case_id: key.0.clone(),
-                    observable_id: key.1.clone(),
-                    unit_id: key.2.clone(),
-                    nominal_coverage_bp: key.3,
-                });
-                missing_group_slices.insert(key.clone());
-                missing_required_coverage = true;
-            }
-        }
     }
 
     let mut slices = Vec::new();
     let mut threshold_failure = false;
     for (key, requirement) in &requirements {
         let accumulator = accumulators.get(key).copied().unwrap_or_default();
-        let enough_observations = accumulator.count >= requirement.minimum_observations;
-        let complete_group_coverage = !missing_group_slices.contains(key);
-        let enough = enough_observations && complete_group_coverage;
-        if !enough_observations {
+        let enough = accumulator.count >= requirement.minimum_observations;
+        if !enough {
             issues.push(CalibrationIssue::InsufficientCoverage {
                 operating_case_id: key.0.clone(),
                 observable_id: key.1.clone(),
@@ -1227,38 +1189,28 @@ mod tests {
     }
 
     #[test]
-    fn slice_gate_is_indeterminate_when_declared_groups_are_missing_even_if_minimum_count_is_met() {
+    fn distinct_operating_slices_may_have_distinct_independent_group_membership() {
         let mut p = profile();
         p.required_slices[0].minimum_observations = 1;
-        p.profile_manifest_sha256 = canonical_calibration_profile_sha256(&p);
-        let only_one_group = vec![
-            observation("obs-1", "eval-A", 8.0, 12.0, 10.0),
-        ];
-        let report = evaluate_calibration(&p, &only_one_group);
-        assert_eq!(report.disposition, CalibrationDisposition::IncompleteCoverage);
-        assert_eq!(report.slices[0].observation_count, 1);
-        assert_eq!(report.slices[0].coverage_gate_met, None);
-        assert_eq!(report.slices[0].interval_score_gate_met, None);
-        assert_eq!(report.slices[0].thresholds_met, None);
-    }
-
-    #[test]
-    fn every_declared_evaluation_group_must_cover_every_required_slice() {
-        let mut p = profile();
         let mut second = requirement();
         second.operating_case_id = "depth-ratio-4.0".to_owned();
+        second.minimum_observations = 1;
         p.required_slices.push(second);
         p.profile_manifest_sha256 = canonical_calibration_profile_sha256(&p);
-        let observations = two_covered();
+
+        let observations = vec![
+            observation("deep-1", "eval-A", 8.0, 12.0, 10.0),
+            {
+                let mut o = observation("shallow-1", "eval-B", 8.0, 12.0, 10.0);
+                o.operating_case_id = "depth-ratio-1.2".to_owned();
+                o
+            },
+        ];
         let report = evaluate_calibration(&p, &observations);
-        assert_eq!(report.disposition, CalibrationDisposition::IncompleteCoverage);
-        assert!(has_issue(&report, &CalibrationIssue::MissingEvaluationGroupSlice {
-            evaluation_group_id: "eval-A".to_owned(),
-            operating_case_id: "depth-ratio-4.0".to_owned(),
-            observable_id: "resistance".to_owned(),
-            unit_id: "N".to_owned(),
-            nominal_coverage_bp: 9_000,
-        }));
+        assert_eq!(report.disposition, CalibrationDisposition::PassDeclaredCalibrationThresholds);
+        assert_eq!(report.slices.len(), 2);
+        assert!(report.slices.iter().all(|slice| slice.observation_count == 1));
+        assert!(report.slices.iter().all(|slice| slice.thresholds_met == Some(true)));
     }
 
     #[test]
