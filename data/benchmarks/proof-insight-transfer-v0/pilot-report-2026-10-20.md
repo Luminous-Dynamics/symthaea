@@ -57,6 +57,12 @@ The source lemma `card_le_twice_chromaticNumber_of_indepNum` assumes `indepNum G
 - Manuscript license status remains `needs_review`.
 - No target transfer was attempted with a prover, and no proof-verification, successor-test, independent reviewer, mutation-run, or SOTA result is claimed.
 
+## Engineering validation status (2026-10-20)
+
+The dedicated GitHub Actions workflow was observed at run `39436173031` on earlier branch head `500a0456e6ab2c343164af57ea8f04a745377a4a`. The pinned Rust toolchain setup, isolated-crate staging, and `cargo fmt --check` completed successfully, but the next step (`cargo test --locked`) failed **before compiling or running the tests**: Cargo said the copied isolated `Cargo.lock` needed updating. Later steps, including the independent JSON Schema validator and source-index reproducibility check, were skipped. This is a lockfile/isolated-manifest graph mismatch, not a unit-test assertion failure.
+
+A follow-up root-lock patch `0c17139e142f640e8ac6299f7e62c6e55d750a69` adds the `const-oid 0.9.6` dependency edge to the locked `digest 0.10.7` package to reflect the workspace's `sha2/oid` feature used by the isolated crate. The workflow was also updated to validate both checked-in candidate records rather than only family 156 (`1dd188825f653faac10b4ce9b4f544f793a1e229`). **No post-fix run has been observed yet**, so the lockfile repair and candidate-validator execution remain unverified. Do not infer success from the source change.
+
 ## What the pilot taught us
 
 1. **Transfer needs a type system, not a similarity score.** Domain objects, bridge lemmas, invariants, and proof obligations must line up. A superficial shared proof shape should be rejected.
