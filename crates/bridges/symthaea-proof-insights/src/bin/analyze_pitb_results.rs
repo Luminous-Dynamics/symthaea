@@ -978,8 +978,8 @@ fn compute_family_aggregates(
                 paired_effect_percentage_points: 0.0,
             });
         aggregate.target_count += 1;
-        aggregate.treatment_semantic_gate_successes += usize::from(treatment_success);
-        aggregate.baseline_semantic_gate_successes += usize::from(baseline_success);
+        aggregate.treatment_semantic_gate_successes += if treatment_success { 1 } else { 0 };
+        aggregate.baseline_semantic_gate_successes += if baseline_success { 1 } else { 0 };
         aggregate.paired_delta_sum += delta;
     }
     for aggregate in aggregates.values_mut() {
@@ -1149,5 +1149,154 @@ mod tests {
         assert!(validate_repo_relative_path("../outside.lean").is_err());
         assert!(validate_repo_relative_path("/absolute/path.lean").is_err());
         assert!(validate_repo_relative_path("lean\\..\\outside.lean").is_err());
+    }
+
+    #[test]
+    fn clustered_bootstrap_is_deterministic_and_publishes_family_aggregates() {
+        let first = test_target("090", "target-090-a", true, false);
+        let second = test_target("091", "target-091-a", true, false);
+        let targets = vec![&first, &second];
+        let aggregates =
+            compute_family_aggregates(&targets, "A").expect("matched target outcomes");
+        assert_eq!(aggregates.len(), 2);
+        assert_eq!(aggregates[0].target_count, 1);
+        assert_eq!(aggregates[0].paired_delta_sum, 1);
+        assert_eq!(aggregates[0].paired_effect_percentage_points, 100.0);
+
+        let left = paired_cluster_bootstrap(
+            &aggregates,
+            EXPECTED_BOOTSTRAP_REPLICATES,
+            20261020,
+        )
+        .expect("valid family bootstrap");
+        let right = paired_cluster_bootstrap(
+            &aggregates,
+            EXPECTED_BOOTSTRAP_REPLICATES,
+            20261020,
+        )
+        .expect("same seed is repeatable");
+        assert_eq!(left, right);
+        assert_eq!(left, (1.0, 1.0, 1.0, 2, 2));
+    }
+
+    #[test]
+    fn known_exposed_family_cannot_enter_confirmatory_denominator() {
+        let target = test_target(REQUIRED_EXPOSED_FAMILY, "target-exposed", false, false);
+        let config = test_config();
+        let frozen_families = BTreeMap::from([(
+            REQUIRED_EXPOSED_FAMILY.to_string(),
+            "test".to_string(),
+        )]);
+        let error = validate_outcomes(&[target], &config, &frozen_families)
+            .expect_err("known-exposed family must be rejected");
+        assert!(error.to_string().contains("known-exposed family 089"));
+    }
+
+    #[test]
+    fn arm_budget_mismatch_is_rejected_before_scoring() {
+        let mut target = test_target("090", "target-budget-mismatch", false, false);
+        target.arms[0].budget.max_tokens += 1;
+        let config = test_config();
+        let frozen_families =
+            BTreeMap::from([("090".to_string(), "test".to_string())]);
+        let error = validate_outcomes(&[target], &config, &frozen_families)
+            .expect_err("unequal arm budget must be rejected");
+        assert!(error.to_string().contains("different from the frozen matched budget"));
+    }
+
+    fn test_config() -> RunConfig {
+        RunConfig {
+            schema_version: RUN_CONFIG_SCHEMA.to_string(),
+            protocol_id: EXPECTED_PROTOCOL_ID.to_string(),
+            protocol_sha256: "a".repeat(64),
+            split_manifest_sha256: "b".repeat(64),
+            partition_digest_sha256: "c".repeat(64),
+            baseline_selection_receipt_sha256: "d".repeat(64),
+            known_exposed_family_ids: vec![REQUIRED_EXPOSED_FAMILY.to_string()],
+            bootstrap_replicates: EXPECTED_BOOTSTRAP_REPLICATES,
+            bootstrap_seed: 20261020,
+            model_version: "test-model-v1".to_string(),
+            checker_version: "lean-checker-test-v1".to_string(),
+            budget: Budget {
+                max_model_calls: 8,
+                max_tokens: 16_000,
+                max_wall_ms: 300_000,
+                max_cost_microusd: 500_000,
+            },
+        }
+    }
+
+    fn test_target(
+        family_id: &str,
+        target_id: &str,
+        treatment_success: bool,
+        baseline_success: bool,
+    ) -> TargetOutcome {
+        let budget = Budget {
+            max_model_calls: 8,
+            max_tokens: 16_000,
+            max_wall_ms: 300_000,
+            max_cost_microusd: 500_000,
+        };
+        let arms = ARMS
+            .iter()
+            .map(|arm_id| {
+                let success = match *arm_id {
+                    "A" => baseline_success,
+                    "F" => treatment_success,
+                    _ => false,
+                };
+                ArmOutcome {
+                    arm: (*arm_id).to_string(),
+                    status: if success {
+                        OutcomeStatus::VerifiedSuccess
+                    } else {
+                        OutcomeStatus::Failed
+                    },
+                    checker_passed: success,
+                    semantic_gate_passed: success,
+                    model_version: "test-model-v1".to_string(),
+                    checker_version: "lean-checker-test-v1".to_string(),
+                    budget: budget.clone(),
+                    model_calls_used: 1,
+                    tokens_used: 100,
+                    wall_ms: 100,
+                    cost_microusd: 100,
+                    config_sha256: sha256_hex(format!("fixed-config-{arm_id}").as_bytes()),
+                    input_sha256: sha256_hex(format!("input-{target_id}-{arm_id}").as_bytes()),
+                    retrieval_log_sha256: sha256_hex(
+                        format!("retrieval-{target_id}-{arm_id}").as_bytes(),
+                    ),
+                    checker_receipt_sha256: sha256_hex(
+                        format!("checker-{target_id}-{arm_id}").as_bytes(),
+                    ),
+                    semantic_gate_receipt_sha256: sha256_hex(
+                        format!("semantic-{target_id}-{arm_id}").as_bytes(),
+                    ),
+                }
+            })
+            .collect();
+
+        TargetOutcome {
+            schema_version: RUN_RESULTS_SCHEMA.to_string(),
+            target_id: target_id.to_string(),
+            family_id: family_id.to_string(),
+            split: "test".to_string(),
+            eligibility: Eligibility::Eligible,
+            source_commit: Some(EXPECTED_UPSTREAM_COMMIT.to_string()),
+            theorem_id: Some(format!("Test.{target_id}")),
+            artifact_path: Some(format!("lean/Test/{target_id}.lean")),
+            artifact_sha256: Some(sha256_hex(format!("artifact-{target_id}").as_bytes())),
+            lean_toolchain: Some("leanprover/lean4:fixed-test-toolchain".to_string()),
+            mathlib_revision: Some(EXPECTED_UPSTREAM_COMMIT.to_string()),
+            statement_sha256: Some(sha256_hex(format!("statement-{target_id}").as_bytes())),
+            eligibility_receipt_sha256: Some(sha256_hex(b"eligibility")),
+            statement_review_receipt_sha256: Some(sha256_hex(b"statement-review")),
+            proof_audit_receipt_sha256: Some(sha256_hex(b"proof-audit")),
+            successor_test_receipt_sha256: Some(sha256_hex(b"successor-test")),
+            mutation_receipt_sha256: Some(sha256_hex(b"mutation")),
+            exclusion_reason: None,
+            arms,
+        }
     }
 }
