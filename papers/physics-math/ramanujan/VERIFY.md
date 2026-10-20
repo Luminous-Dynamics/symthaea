@@ -79,9 +79,9 @@ The PCR3BP row deserves attention: the discovered expression has variance $2.7 \
 
 ## SMT proof witness availability
 
-**Nine SMT-LIB2 witness files are currently documented as committed under `proofs/`**; see `proofs/README.md` for the complete inventory and individual claims. The original Hénon-Heiles witness is `henon_heiles_6H.smt2`, using the equivalent scaled Hamiltonian `6H = 3(px² + py²) + 3(x² + y²) + 6x²y − 2y³`.
+**Ten SMT-LIB2 witness files are now documented under `proofs/`**; see `proofs/README.md` for the complete inventory. The Hénon-Heiles family has both the scaled `henon_heiles_6H.smt2` witness and the original unscaled `henon_heiles_exact_H.smt2` witness using exact rational constants.
 
-The working source now supports exact rational literals and emits an additional, unscaled `henon_heiles_exact_H` obligation. This new output is a **pending verification target**, not a committed proof witness: do not count it as proven until the exact generated file has been checked by Z3 (and preferably an independent SMT solver) and its digest-bound evidence is recorded.
+On source head `03476c730f5dc19bea0e38d4a71dd0ac72730ca0`, the exact-head workflow returned `unsat` for the unscaled obligation using Z3 4.13.0 and emitted a witness with SHA-256 `2b2228a76ed50f67ae87a7726115ca2d68c242936a2d0a03f474806fd8542728`. The same bytes are now committed in the witness directory. A second independent SMT solver has not yet been used for cross-checking.
 
 ### Honest distinction between "PROVEN (showcase)" and "formally verified (SMT)"
 
@@ -96,7 +96,7 @@ The Lotka–Volterra invariant is `PROVEN` (symbolic + numerical) but **not** `u
 
 ### Hénon-Heiles: legacy scaling and exact-rational follow-up
 
-The legacy `SymExpr::Const(f64)` path cannot represent `1/3` exactly. The committed `6H` witness avoids that decimal-vs-rational mismatch by scaling the Hamiltonian. The draft adds an explicit rational node so the original `H` can serialize `1/2` and `1/3` as SMT-LIB2 rational terms. The exact-rational obligation is not yet a proven result in the committed evidence: the exact-head run must close it with `unsat`, and the generated witness must then be independently re-checked and committed.
+The legacy `SymExpr::Const(f64)` path cannot represent `1/3` exactly. The new `SymExpr::Rational(i64, u64)` path preserves the intended mathematical constant and serializes it as an exact SMT real literal (for example `(/ 1.0 3.0)`). The committed unscaled witness records the negated derivative obligation and returns `unsat` on Z3 4.13.0. The `6H` result remains a rescaling regression control. Cross-checking the exact witness with a second solver remains follow-up work.
 
 ## Cross-host determinism
 
