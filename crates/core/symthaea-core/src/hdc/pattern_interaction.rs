@@ -611,6 +611,35 @@ mod tests {
     }
 
     #[test]
+    fn fixed_seed_produces_identical_report() {
+        let config = PatternInteractionConfig {
+            dimension: 1_024,
+            prototype_count: 24,
+            trials: 8,
+            noise_fractions: vec![0.05, 0.10, 0.20],
+            bundle_sizes: vec![1, 3, 5, 9],
+        };
+        let first = run_pattern_interaction_suite(0x504c_4154, &config).expect("first run");
+        let second = run_pattern_interaction_suite(0x504c_4154, &config).expect("second run");
+        assert_eq!(first, second);
+    }
+
+    #[test]
+    fn pattern_space_rejects_dimension_mismatch_and_duplicate_labels() {
+        let mut space = PatternSpace::new(8).expect("space");
+        let pattern = PatternVector::seeded_random(8, 100).expect("pattern");
+        space.insert("alpha", pattern.clone()).expect("first insert");
+        assert_eq!(
+            space.insert("alpha", pattern),
+            Err(PatternSpaceError::DuplicateLabel("alpha".to_string())),
+        );
+        assert!(matches!(
+            space.rank(&PatternVector::seeded_random(4, 101).expect("wrong-sized query")),
+            Err(PatternSpaceError::DimensionMismatch { expected: 8, actual: 4 }),
+        ));
+    }
+
+    #[test]
     fn invalid_basis_and_noise_are_rejected() {
         let pattern = PatternVector::seeded_random(8, 1).expect("pattern");
         assert_eq!(
