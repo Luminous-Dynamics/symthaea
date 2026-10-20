@@ -22,11 +22,11 @@ This separates transfer from hindsight. It also measures whether a strategy surv
 
 ## Preliminary source audit: Dalek pin
 
-The first pinned source audit is now implemented in the Rust research tool; it is deliberately separate from generating a solver-visible target manifest. The reproducible source pin is Dalek Lean Bench commit `9fdbfd066420aebcf61a70b06eba57a108c41340`, with toolchain `leanprover/lean4:v4.28.0-rc1` and the Mathlib revision read from the pinned `lake-manifest.json`.
+The Rust research tool now has two separately reported, read-only audits for the pinned Dalek Lean Bench snapshot at commit `9fdbfd066420aebcf61a70b06eba57a108c41340`, with toolchain `leanprover/lean4:v4.28.0-rc1` and the Mathlib revision read from the pinned `lake-manifest.json`.
 
-A read-only parse of the tracked `proof_timeline.csv` at that commit found **248 nonblank data rows**, not 249; 243 rows have a nonempty `spec_theorem` path, 5 paths are blank, 243 IDs are nonempty and unique, and the rows reference 91 distinct completion commits. Statuses split into 235 `verified` and 13 `externally verified`. The pinned README claims 249 timeline theorems. This discrepancy is a data-quality finding, not a reason to fabricate a row: the new audit report records both numbers and sets `timeline_row_count_matches_readme_claim=false`. CI pins the source commit, checks commit ancestry for every row, recomputes the timeline digest, validates the audit output schema, and asserts that all 248 input rows are accounted for.
+### Timeline integrity
 
-The audit command (from the isolated crate environment used in the repository workflow) is:
+Parsing the tracked `proof_timeline.csv` yields **248 data rows**, not 249; 243 have a nonempty `spec_theorem` path, five paths are blank, 243 IDs are nonempty and unique, and 91 distinct completion commits occur. Statuses split into 235 `verified` and 13 `externally verified`. The pinned README claims 249 timeline theorems. This is an explicit data-quality discrepancy, not a reason to fabricate a 249th row: the audit records both counts and sets `timeline_row_count_matches_readme_claim=false`. CI checks the pinned source commit, each completion commit's ancestry, actual source-file availability at completion, output schema, all-row accounting, and the independently recomputed timeline digest.
 
 ```bash
 cargo run --release --locked --bin symthaea-proof-insights -- \
@@ -34,7 +34,18 @@ cargo run --release --locked --bin symthaea-proof-insights -- \
   proof_timeline.csv /path/to/output/dalek-temporal-timeline-audit.json
 ```
 
-This only inventories chronology, hashes and source-path availability. It does **not** prove the historical projects build, does not create the per-target `sorry` mutations, and does not count as a model evaluation. The existing audit also found that the upstream evaluator masks target/future proofs against a HEAD checkout rather than checking out every row's original repository state, so PITB's strict historical replay remains a separate follow-up requirement. See [the detailed pinned source audit](dalek-temporal-data-audit-2026-10-20.md) for statement drift and dataset/timeline join risks.
+### Dataset-to-timeline join integrity
+
+The same pinned source includes `dataset.jsonl` with 146 records. The exact-path join audit reports **39 records with one timeline-path match, 58 with multiple matching timeline rows, and 49 with no matching timeline path**; the pinned CI gate asserts those counts so that changes in the upstream artifact become visible. A path match is not sufficient proof of theorem identity. The Rust audit keeps ambiguous matches ambiguous, hashes each stored formal statement, checks whether `commit_before` exists and is an ancestor of the pinned HEAD/completion commit, and records whether the normalized formal statement appears in the source file at the pre-state and at the completion commit. It preserves the match relation per row instead of choosing the first candidate.
+
+```bash
+cargo run --release --locked --bin symthaea-proof-insights -- \
+  --audit-temporal-dataset /path/to/clean-dalek-checkout \
+  proof_timeline.csv dataset.jsonl \
+  /path/to/output/dalek-temporal-dataset-audit.json
+```
+
+The pinned source files and report schemas are content-validated by CI. The audit records are data/provenance evidence only: they do **not** prove the historical projects build, do not create the per-target `sorry` mutations, do not establish statement equivalence for ambiguous joins, and are not model benchmark scores. The existing source audit also found that the upstream evaluator masks target/future proofs against a HEAD checkout rather than checking out every row's original repository state. PITB's strict historical replay remains a separate follow-up requirement; see [the detailed pinned source audit](dalek-temporal-data-audit-2026-10-20.md) for statement drift and remaining identity-resolution risks.
 
 ## Track design
 
