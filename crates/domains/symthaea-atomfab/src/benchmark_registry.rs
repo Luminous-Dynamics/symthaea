@@ -245,7 +245,7 @@ mod tests {
         registry
             .validate()
             .expect("registry should be internally consistent");
-        assert_eq!(registry.benchmark_lanes.len(), 9);
+        assert_eq!(registry.benchmark_lanes.len(), 10);
         assert!(
             registry
                 .benchmark_lanes
@@ -396,4 +396,41 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn evidence_routing_lane_requires_calibrated_multifidelity_comparisons() {
+        let registry = load_embedded_registry().expect("checked-in JSON should parse");
+        let lane = registry
+            .benchmark_lanes
+            .iter()
+            .find(|lane| lane.id == "multi-fidelity-evidence-routing")
+            .expect("multi-fidelity evidence-routing lane should be registered");
+        assert!(
+            lane.baselines.iter().any(|baseline| {
+                baseline.contains("Fixed cheapest-first")
+            }),
+            "router benchmark must include a conventional fixed-fidelity baseline"
+        );
+        assert!(
+            lane.metrics.iter().any(|metric| {
+                metric.contains("decision-loss reduction estimate calibration")
+            }),
+            "router benchmark must score calibration of its value estimates"
+        );
+        assert!(
+            lane.gates.iter().any(|gate| {
+                gate.contains("same request, evidence domain")
+                    && gate.contains("budget")
+            }),
+            "router benchmark must prevent unlike-domain or unlike-budget comparisons"
+        );
+        assert!(
+            lane.gates.iter().any(|gate| {
+                gate.contains("shuffled value estimates")
+                    && gate.contains("inflated uncalibrated value")
+            }),
+            "router benchmark must resist value-estimate gaming"
+        );
+    }
+
 }
