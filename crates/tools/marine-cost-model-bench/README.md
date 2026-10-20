@@ -43,6 +43,22 @@ Unit tests cover hand-calculable costs, NRE amortization, lifecycle costs, robus
 
 The synthetic example is only an arithmetic fixture. Do not label its outputs as boat-market prices, actual cost savings or vessel performance. Before industry comparison, populate a separate reviewed dataset with date-stamped quotes, invoices or permitted public prices, comparable delivery scope, production volume, service duty cycle, operating geography and uncertainty. Keep first-unit prototypes separate from mature series builds.
 
+## Initial public procurement anchors
+
+The companion file `references/public-procurement-anchors.csv` is a **source register**, not a normalized price dataset. It records source type, date, quantity when explicitly stated, scope clues, missing fields, and a conservative comparability disposition.
+
+Initial leads include:
+
+- CanadaBuys award record [CW2350457-000](https://canadabuys.canada.ca/en/tender-opportunities/contract-history/cw2350457-000): a maximum-6.0 m aluminium hull jet-boat contract with a published total value of CAD 187,726.35 including amendments. It is associated with a standing-offer contract over a 23-month term and the quantity/scope should not be assumed to equal one delivered vessel.
+- CanadaBuys award record [CW2349465-000](https://canadabuys.canada.ca/en/tender-opportunities/contract-history/cw2349465-000): a published total contract value of CAD 428,538.96 including amendments for a 6.1 m welded-aluminium commercial vessel; the procurement description includes twin engines and a trailer for one vessel. The line-item cost and tax/delivery breakdown is still missing.
+- CanadaBuys award record [CW2342791-000](https://canadabuys.canada.ca/en/tender-opportunities/contract-history/cw2342791-000): CAD 123,488.40 for a 4.8–5.5 m aluminium jet-boat contract with trailer, including amendments. Engine rating and detailed equipment/tax/commissioning scope are unresolved.
+- South African Department of Water and Sanitation tender [WQ-32149](https://www.dws.gov.za/Tenders/Docs/2025/Tender%20Document%20%20WQ%20%20-%2032149.pdf): a 5.2 m SAMSA-accredited RIB specification with a 100 hp four-stroke outboard, licensed trailer and accessories. The surfaced price fields are blank; this is a specification lead, **not** price evidence.
+- The [National Treasury Transparency Portal](https://data.etenders.gov.za/) publishes procurement exports in OCDS-oriented CSV/JSON/Excel and an API, with records from May 2021 under CC BY 4.0; its notice says only a subset of eTender records is captured. Each boat-specific record still needs retrieval, rights/scope review and a source digest.
+
+**Do not compare these totals as though they were equivalent boat prices.** They differ by vessel form, propulsion, equipment, quantity/contract term, amendments, currency, country, date and likely tax/delivery conditions. Currency conversions and inflation escalation are not applied by the Rust calculator. To admit an award as an actual comparable, obtain the detailed procurement specification, award and amendments, quantity, price components, taxes, commissioning/delivery boundary, and use an agreed price-year/region basis. If these details cannot be resolved, keep it as context-only evidence.
+
+This first register makes a missing-evidence gap visible; it does not yet establish South African market prices, a current average, or any percentage savings.
+
 ## Research comparison
 
 - The [IMO GreenVoyage2050 hull-form optimization overview](https://greenvoyage2050.imo.org/technology/hull-form-optimization/) says main particulars are often already optimized but operating profiles outside a design point can be underweighted. It estimates traditional tank-tested hull optimization savings in total fuel consumption at 0.1–4%, while higher percentages may refer to main-engine fuel at a particular design point. Use the proper denominator and scope.
