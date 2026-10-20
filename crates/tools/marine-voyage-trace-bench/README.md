@@ -102,6 +102,12 @@ This follows the *distinction* used in ITTC uncertainty/verification/validation 
 
 A 2026 MARSTRUCT study reports 24 sets of calculations from 22 codes and 15 institutions across three ship types for wave-induced motions and global loads. It is a useful reminder that validation depends on hull type, method family and response quantity; it is not directly comparable to the calm-water DTC resistance cases: https://www.sciencedirect.com/science/article/pii/S0951833926002443.
 
+
+
+## Held-out prediction-interval calibration
+
+The separate prediction_interval_calibration module evaluates central predictive intervals using empirical coverage, Wilson 95% coverage bounds, normalized width and the central interval score. It is not a probabilistic reinterpretation of the conservative bounds accepted by uncertainty_comparison. It requires disjoint calibration/evaluation groups, a frozen model attestation, fixed model/prediction/data digests, and one observation per declared independent group per slice. Borderline/out-of-domain/unknown applicability cannot pass. Read the full protocol and benchmark gates in [PREDICTION_INTERVAL_CALIBRATION.md](PREDICTION_INTERVAL_CALIBRATION.md). The included fixtures are synthetic; Rust tests have not been run in this environment.
+
 ## Claim ceiling
 
 A Complete result means only that the canonical trace passed this crate's metadata, time-coverage, numeric and integration gates. It does not validate the measurement system, prove a hydrodynamic improvement, show corrected speed-power performance, establish lifecycle emissions, demonstrate vessel safety, or certify compliance.
