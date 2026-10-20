@@ -76,6 +76,43 @@ pub struct FeasibilitySummary {
     pub false_feasible_rate: Option<f64>,
 }
 
+/// One scalar prediction and reference, paired with an uncertainty score used
+/// to decide whether a model should abstain from recommending the prediction.
+#[derive(Debug, Clone, Copy)]
+pub struct UncertaintyComparison {
+    pub predicted: f64,
+    pub reference: f64,
+    /// Non-negative uncertainty score; its units and construction are model-defined.
+    pub uncertainty: f64,
+}
+
+/// One point on a risk-coverage curve after retaining the least-uncertain cases.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct RiskCoveragePoint {
+    /// Number of samples retained at or below the uncertainty threshold.
+    pub accepted_count: usize,
+    /// Fraction of the full evaluation set retained, in (0, 1].
+    pub coverage: f64,
+    /// Mean absolute prediction error on retained samples.
+    pub mean_absolute_error: f64,
+    /// Worst absolute prediction error on retained samples.
+    pub max_absolute_error: f64,
+    /// Largest uncertainty value among retained samples.
+    pub uncertainty_threshold: f64,
+}
+
+/// Discrete uncertainty-selective evaluation with a conservative stepwise AURC.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RiskCoverageSummary {
+    pub count: usize,
+    /// Stepwise area under risk-coverage: sum of each coverage increment times
+    /// the risk at the increment's endpoint. Lower is better for fixed units.
+    pub area_under_curve: f64,
+    /// Points are ordered by ascending coverage and include every distinct
+    /// uncertainty threshold; equal uncertainty values enter as one group.
+    pub points: Vec<RiskCoveragePoint>,
+}
+
 /// One prediction interval and the observed reference value.
 #[derive(Debug, Clone, Copy)]
 pub struct IntervalComparison {
@@ -100,6 +137,7 @@ pub enum BenchmarkError {
     EmptyInput,
     NonFiniteValue { index: usize, field: &'static str },
     InvalidInterval { index: usize },
+    InvalidUncertainty { index: usize },
     InvalidTieTolerance,
     InvalidPersistence,
     RankingLengthMismatch,
@@ -123,6 +161,9 @@ impl fmt::Display for BenchmarkError {
                     f,
                     "sample {index} has a lower interval bound above its upper bound"
                 )
+            }
+            Self::InvalidUncertainty { index } => {
+                write!(f, "sample {index} has an invalid (negative or non-finite) uncertainty")
             }
             Self::InvalidTieTolerance => write!(f, "tie tolerance must be finite and non-negative"),
             Self::InvalidPersistence => write!(
@@ -267,6 +308,91 @@ pub fn summarize_intervals(
         return Err(BenchmarkError::NonFiniteMetric);
     }
     Ok(summary)
+}
+
+/// Evaluate abstention using a risk-coverage curve sorted by increasing uncertainty.
+///
+/// Samples with equal uncertainty are admitted together, so the result does not
+/// depend on input ordering or use arbitrary tie-breaking to improve the score.
+/// The reported AURC is a discrete right-step integral:
+/// `sum((accepted_count - previous_count) / N * risk_at_this_point)`.
+///
+/// This is a descriptive benchmark primitive. It does not establish that the
+/// uncertainty score is calibrated; thresholds and score construction must be
+/// frozen on validation data before reporting test-set performance.
+pub fn summarize_risk_coverage(
+    samples: &[UncertaintyComparison],
+) -> Result<RiskCoverageSummary, BenchmarkError> {
+    if samples.is_empty() {
+        return Err(BenchmarkError::EmptyInput);
+    }
+
+    let mut ordered = samples.to_vec();
+    for (index, sample) in ordered.iter().enumerate() {
+        for (field, value) in [
+            ("predicted", sample.predicted),
+            ("reference", sample.reference),
+        ] {
+            if !value.is_finite() {
+                return Err(BenchmarkError::NonFiniteValue { index, field });
+            }
+        }
+        if !sample.uncertainty.is_finite() || sample.uncertainty < 0.0 {
+            return Err(BenchmarkError::InvalidUncertainty { index });
+        }
+        let error = sample.predicted - sample.reference;
+        if !error.is_finite() || !error.abs().is_finite() {
+            return Err(BenchmarkError::NonFiniteMetric);
+        }
+    }
+
+    ordered.sort_by(|a, b| a.uncertainty.total_cmp(&b.uncertainty));
+    let count = ordered.len();
+    let denominator = count as f64;
+    let mut points = Vec::new();
+    let mut accepted_count = 0usize;
+    let mut absolute_error_total = 0.0;
+    let mut max_absolute_error: f64 = 0.0;
+    let mut weighted_risk_area = 0.0;
+
+    while accepted_count < count {
+        let threshold = ordered[accepted_count].uncertainty;
+        let previous_count = accepted_count;
+        while accepted_count < count && ordered[accepted_count].uncertainty == threshold {
+            let error = (ordered[accepted_count].predicted - ordered[accepted_count].reference).abs();
+            absolute_error_total += error;
+            max_absolute_error = max_absolute_error.max(error);
+            if !absolute_error_total.is_finite() {
+                return Err(BenchmarkError::NonFiniteMetric);
+            }
+            accepted_count += 1;
+        }
+
+        let mean_absolute_error = absolute_error_total / accepted_count as f64;
+        let coverage = accepted_count as f64 / denominator;
+        let coverage_increment = (accepted_count - previous_count) as f64 / denominator;
+        weighted_risk_area += coverage_increment * mean_absolute_error;
+        if !mean_absolute_error.is_finite()
+            || !coverage.is_finite()
+            || !weighted_risk_area.is_finite()
+            || !(0.0..=1.0).contains(&coverage)
+        {
+            return Err(BenchmarkError::NonFiniteMetric);
+        }
+        points.push(RiskCoveragePoint {
+            accepted_count,
+            coverage,
+            mean_absolute_error,
+            max_absolute_error,
+            uncertainty_threshold: threshold,
+        });
+    }
+
+    Ok(RiskCoverageSummary {
+        count,
+        area_under_curve: weighted_risk_area,
+        points,
+    })
 }
 
 /// Compare pairwise predicted energies to reference energies.
@@ -566,6 +692,98 @@ mod tests {
                 observed: 1.5,
             }]),
             Err(BenchmarkError::InvalidInterval { index: 0 })
+        );
+    }
+
+    #[test]
+    fn risk_coverage_orders_by_uncertainty_and_reports_stepwise_area() {
+        let summary = summarize_risk_coverage(&[
+            UncertaintyComparison {
+                predicted: 10.0,
+                reference: 0.0,
+                uncertainty: 0.9,
+            },
+            UncertaintyComparison {
+                predicted: 1.0,
+                reference: 0.0,
+                uncertainty: 0.1,
+            },
+            UncertaintyComparison {
+                predicted: 2.0,
+                reference: 0.0,
+                uncertainty: 0.2,
+            },
+        ])
+        .expect("finite non-negative uncertainty should summarize");
+
+        assert_eq!(summary.count, 3);
+        assert_eq!(summary.points.len(), 3);
+        assert_eq!(summary.points[0].accepted_count, 1);
+        assert_eq!(summary.points[0].uncertainty_threshold, 0.1);
+        assert!((summary.points[0].mean_absolute_error - 1.0).abs() < 1e-12);
+        assert_eq!(summary.points[1].accepted_count, 2);
+        assert!((summary.points[1].mean_absolute_error - 1.5).abs() < 1e-12);
+        assert_eq!(summary.points[2].accepted_count, 3);
+        assert!((summary.points[2].mean_absolute_error - (13.0 / 3.0)).abs() < 1e-12);
+        let expected_area = (1.0 / 3.0) * 1.0 + (1.0 / 3.0) * 1.5 + (1.0 / 3.0) * (13.0 / 3.0);
+        assert!((summary.area_under_curve - expected_area).abs() < 1e-12);
+    }
+
+    #[test]
+    fn risk_coverage_groups_equal_uncertainty_and_is_input_order_invariant() {
+        let a = UncertaintyComparison {
+            predicted: 1.0,
+            reference: 0.0,
+            uncertainty: 0.2,
+        };
+        let b = UncertaintyComparison {
+            predicted: 9.0,
+            reference: 0.0,
+            uncertainty: 0.2,
+        };
+        let c = UncertaintyComparison {
+            predicted: 2.0,
+            reference: 0.0,
+            uncertainty: 0.8,
+        };
+        let first = summarize_risk_coverage(&[a, b, c]).expect("valid samples");
+        let second = summarize_risk_coverage(&[c, b, a]).expect("permutation should not change result");
+        assert_eq!(first, second);
+        assert_eq!(first.points.len(), 2);
+        assert_eq!(first.points[0].accepted_count, 2);
+        assert!((first.points[0].mean_absolute_error - 5.0).abs() < 1e-12);
+        assert_eq!(first.points[1].accepted_count, 3);
+    }
+
+    #[test]
+    fn risk_coverage_rejects_empty_negative_uncertainty_and_non_finite_values() {
+        assert_eq!(summarize_risk_coverage(&[]), Err(BenchmarkError::EmptyInput));
+        assert_eq!(
+            summarize_risk_coverage(&[UncertaintyComparison {
+                predicted: 0.0,
+                reference: 0.0,
+                uncertainty: -0.1,
+            }]),
+            Err(BenchmarkError::InvalidUncertainty { index: 0 })
+        );
+        assert_eq!(
+            summarize_risk_coverage(&[UncertaintyComparison {
+                predicted: 0.0,
+                reference: 0.0,
+                uncertainty: f64::NAN,
+            }]),
+            Err(BenchmarkError::InvalidUncertainty { index: 0 })
+        );
+        assert_eq!(
+            summarize_risk_coverage(&[UncertaintyComparison {
+                predicted: f64::INFINITY,
+                reference: 0.0,
+                uncertainty: 0.2,
+            }]),
+            Err(BenchmarkError::NonFiniteValue {
+                index: 0,
+                field: "predicted",
+            })
         );
     }
 
