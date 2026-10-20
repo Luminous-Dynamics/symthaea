@@ -10,8 +10,7 @@
 
 use std::{
     collections::{BTreeMap, BTreeSet},
-    env,
-    fs,
+    env, fs,
     path::{Component, Path},
     process::ExitCode,
 };
@@ -252,12 +251,7 @@ fn execute() -> Result<()> {
 
     let config: RunConfig =
         serde_json::from_slice(&config_bytes).context("parse frozen run config JSON")?;
-    validate_config(
-        &config,
-        &protocol_bytes,
-        &split_bytes,
-        &receipt_bytes,
-    )?;
+    validate_config(&config, &protocol_bytes, &split_bytes, &receipt_bytes)?;
 
     let split_manifest: SplitManifest =
         serde_json::from_slice(&split_bytes).context("parse frozen split manifest JSON")?;
@@ -374,9 +368,7 @@ fn execute() -> Result<()> {
         external_replication: "not_evaluated",
         interpretation,
     };
-    let out_path = args
-        .get("--out")
-        .context("missing --out path")?;
+    let out_path = args.get("--out").context("missing --out path")?;
     let mut serialized = serde_json::to_vec_pretty(&report).context("serialize analysis report")?;
     serialized.push(b'\n');
     fs::write(out_path, serialized)
@@ -386,7 +378,9 @@ fn execute() -> Result<()> {
         report.eligible_target_count,
         report.eligible_family_count,
         report.selected_baseline_arm,
-        report.primary_comparison.paired_absolute_effect_percentage_points,
+        report
+            .primary_comparison
+            .paired_absolute_effect_percentage_points,
         report
             .primary_comparison
             .clustered_bootstrap_lower_percentage_points,
@@ -455,8 +449,14 @@ fn validate_config(
     }
     for (field, value) in [
         ("protocol_sha256", config.protocol_sha256.as_str()),
-        ("split_manifest_sha256", config.split_manifest_sha256.as_str()),
-        ("partition_digest_sha256", config.partition_digest_sha256.as_str()),
+        (
+            "split_manifest_sha256",
+            config.split_manifest_sha256.as_str(),
+        ),
+        (
+            "partition_digest_sha256",
+            config.partition_digest_sha256.as_str(),
+        ),
         (
             "baseline_selection_receipt_sha256",
             config.baseline_selection_receipt_sha256.as_str(),
@@ -644,10 +644,7 @@ fn validate_outcomes(
 
         match target.eligibility {
             Eligibility::Eligible => {
-                if config
-                    .known_exposed_family_ids
-                    .contains(&target.family_id)
-                {
+                if config.known_exposed_family_ids.contains(&target.family_id) {
                     bail!(
                         "known-exposed family {} was included as eligible",
                         target.family_id
@@ -665,11 +662,21 @@ fn validate_outcomes(
                         statement_sha
                     );
                 }
-                if target.exclusion_reason.as_deref().is_some_and(|s| !s.trim().is_empty()) {
-                    bail!("eligible target {} has an exclusion reason", target.target_id);
+                if target
+                    .exclusion_reason
+                    .as_deref()
+                    .is_some_and(|s| !s.trim().is_empty())
+                {
+                    bail!(
+                        "eligible target {} has an exclusion reason",
+                        target.target_id
+                    );
                 }
                 if target.family_id.trim().is_empty() {
-                    bail!("eligible target {} has an empty family id", target.target_id);
+                    bail!(
+                        "eligible target {} has an empty family id",
+                        target.family_id
+                    );
                 }
                 let source_commit = target
                     .source_commit
@@ -688,8 +695,18 @@ fn validate_outcomes(
                     "eligible target lacks repository-relative artifact path",
                 )?;
                 if theorem_id.is_empty()
-                    || target.lean_toolchain.as_deref().unwrap_or_default().trim().is_empty()
-                    || target.mathlib_revision.as_deref().unwrap_or_default().trim().is_empty()
+                    || target
+                        .lean_toolchain
+                        .as_deref()
+                        .unwrap_or_default()
+                        .trim()
+                        .is_empty()
+                    || target
+                        .mathlib_revision
+                        .as_deref()
+                        .unwrap_or_default()
+                        .trim()
+                        .is_empty()
                 {
                     bail!(
                         "eligible target {} must identify theorem, Lean toolchain and Mathlib revision",
@@ -700,11 +717,26 @@ fn validate_outcomes(
                     .with_context(|| format!("target {} artifact path", target.target_id))?;
                 for (label, digest) in [
                     ("artifact", target.artifact_sha256.as_deref()),
-                    ("eligibility receipt", target.eligibility_receipt_sha256.as_deref()),
-                    ("statement review receipt", target.statement_review_receipt_sha256.as_deref()),
-                    ("proof audit receipt", target.proof_audit_receipt_sha256.as_deref()),
-                    ("successor-test receipt", target.successor_test_receipt_sha256.as_deref()),
-                    ("mutation receipt", target.mutation_receipt_sha256.as_deref()),
+                    (
+                        "eligibility receipt",
+                        target.eligibility_receipt_sha256.as_deref(),
+                    ),
+                    (
+                        "statement review receipt",
+                        target.statement_review_receipt_sha256.as_deref(),
+                    ),
+                    (
+                        "proof audit receipt",
+                        target.proof_audit_receipt_sha256.as_deref(),
+                    ),
+                    (
+                        "successor-test receipt",
+                        target.successor_test_receipt_sha256.as_deref(),
+                    ),
+                    (
+                        "mutation receipt",
+                        target.mutation_receipt_sha256.as_deref(),
+                    ),
                 ] {
                     validate_sha256(digest.context(label)?)
                         .with_context(|| format!("target {} {label} digest", target.target_id))?;
@@ -750,7 +782,8 @@ fn validate_arm_set(
                 arm.arm
             );
         }
-        if arm.model_version != config.model_version || arm.checker_version != config.checker_version
+        if arm.model_version != config.model_version
+            || arm.checker_version != config.checker_version
         {
             bail!(
                 "target {} arm {} model/checker version differs from frozen config",
@@ -772,10 +805,13 @@ fn validate_arm_set(
             ("checker receipt", arm.checker_receipt_sha256.as_str()),
             ("semantic-gate receipt", arm.semantic_gate_receipt_sha256.as_str()),
         ] {
-            validate_sha256(digest)
-                .with_context(|| format!("target {} arm {} {label} digest", target.target_id, arm.arm))?;
+            validate_sha256(digest).with_context(|| {
+                format!("target {} arm {} {label} digest", target.target_id, arm.arm)
+            })?;
         }
-        if let Some(previous) = arm_config_digests.insert(arm.arm.clone(), arm.config_sha256.clone()) {
+        if let Some(previous) =
+            arm_config_digests.insert(arm.arm.clone(), arm.config_sha256.clone())
+        {
             if previous != arm.config_sha256 {
                 bail!(
                     "arm {} changed configuration across held-out targets",
@@ -849,9 +885,7 @@ fn same_budget(left: &Budget, right: &Budget) -> bool {
 }
 
 fn compute_arm_metrics(targets: &[&TargetOutcome]) -> Vec<ArmMetrics> {
-    ARMS
-        .iter()
-        .map(|arm_name| {
+    ARMS.iter().map(|arm_name| {
             let arms: Vec<&ArmOutcome> = targets
                 .iter()
                 .flat_map(|target| target.arms.iter())
@@ -865,10 +899,8 @@ fn compute_arm_metrics(targets: &[&TargetOutcome]) -> Vec<ArmMetrics> {
             let total_wall_ms: u128 = arms.iter().map(|arm| u128::from(arm.wall_ms)).sum();
             let total_cost_microusd: u128 =
                 arms.iter().map(|arm| u128::from(arm.cost_microusd)).sum();
-            let total_model_calls: u64 = arms
-                .iter()
-                .map(|arm| u64::from(arm.model_calls_used))
-                .sum();
+            let total_model_calls: u64 =
+                arms.iter().map(|arm| u64::from(arm.model_calls_used)).sum();
             ArmMetrics {
                 arm: (*arm_name).to_string(),
                 target_count,
@@ -914,8 +946,15 @@ fn paired_cluster_bootstrap(
             .iter()
             .find(|arm| arm.arm == baseline_arm)
             .context("selected baseline arm missing after validation")?;
-        let delta = (if treatment.semantic_gate_passed { 1_i8 } else { 0_i8 })
-            - (if baseline.semantic_gate_passed { 1_i8 } else { 0_i8 });
+        let delta = (if treatment.semantic_gate_passed {
+            1_i8
+        } else {
+            0_i8
+        }) - (if baseline.semantic_gate_passed {
+            1_i8
+        } else {
+            0_i8
+        });
         deltas_by_family
             .entry(target.family_id.clone())
             .or_default()
@@ -977,7 +1016,10 @@ fn validate_repo_relative_path(value: &str) -> Result<()> {
         bail!("expected a non-empty repository-relative POSIX path");
     }
     if path.components().any(|component| {
-        matches!(component, Component::ParentDir | Component::RootDir | Component::Prefix(_))
+        matches!(
+            component,
+            Component::ParentDir | Component::RootDir | Component::Prefix(_)
+        )
     }) {
         bail!("path may not escape the repository root");
     }
@@ -1071,5 +1113,3 @@ mod tests {
         assert!(validate_repo_relative_path("/absolute/path.lean").is_err());
         assert!(validate_repo_relative_path("lean\\..\\outside.lean").is_err());
     }
-
-}
