@@ -1093,6 +1093,9 @@ fn audit_temporal_dataset(
     {
         bail!("refusing to overwrite a symlink as temporal dataset audit output");
     }
+    let canonical_report =
+        serde_json::to_vec(&audit).context("serialize canonical temporal dataset audit")?;
+    let report_sha256 = format!("{:x}", Sha256::digest(&canonical_report));
     let mut encoded =
         serde_json::to_vec_pretty(&audit).context("serialize temporal dataset audit")?;
     encoded.push(b'\n');
@@ -1109,9 +1112,7 @@ fn audit_temporal_dataset(
             .statement_match_relation_counts
             .values()
             .sum::<usize>(),
-        sha256_hex(
-            &serde_json::to_vec(&audit).context("serialize canonical temporal dataset audit")?
-        ),
+        report_sha256,
     );
     Ok(())
 }
