@@ -49,12 +49,24 @@ impl EvidenceClass {
 
     fn caveat(self) -> &'static str {
         match self {
-            Self::SyntheticSimulation => "This is a model result, not a physical-network measurement.",
-            Self::BenchObservedSnapshot => "This is a diagnostic snapshot; by itself it does not prove application task success or instrument calibration.",
-            Self::LabMeasurement => "The record is labelled as lab evidence; this explanation does not independently authenticate its instruments or measurements.",
-            Self::FieldPilot => "The record is labelled as field-pilot evidence; conclusions apply only to the recorded sites, population, hardware and trial conditions.",
-            Self::ReliabilityQualification => "The record is labelled as reliability-qualification evidence; inspect its protocol, raw receipts and statistical assumptions before generalizing.",
-            Self::Unknown => "The evidence class is missing or unrecognized; do not infer measured performance from this report.",
+            Self::SyntheticSimulation => {
+                "This is a model result, not a physical-network measurement."
+            }
+            Self::BenchObservedSnapshot => {
+                "This is a diagnostic snapshot; by itself it does not prove application task success or instrument calibration."
+            }
+            Self::LabMeasurement => {
+                "The record is labelled as lab evidence; this explanation does not independently authenticate its instruments or measurements."
+            }
+            Self::FieldPilot => {
+                "The record is labelled as field-pilot evidence; conclusions apply only to the recorded sites, population, hardware and trial conditions."
+            }
+            Self::ReliabilityQualification => {
+                "The record is labelled as reliability-qualification evidence; inspect its protocol, raw receipts and statistical assumptions before generalizing."
+            }
+            Self::Unknown => {
+                "The evidence class is missing or unrecognized; do not infer measured performance from this report."
+            }
         }
     }
 }
@@ -154,12 +166,17 @@ fn parse_priority_rows(row: &Value) -> Result<Option<Vec<PriorityOutcome>>, Stri
         let tasks = required_u64(baseline, "task_count", "baseline_by_priority")?;
         let candidate_tasks = required_u64(candidate, "task_count", "candidate_by_priority")?;
         if tasks != candidate_tasks {
-            return Err(format!("priority {priority} has mismatched trial denominators"));
+            return Err(format!(
+                "priority {priority} has mismatched trial denominators"
+            ));
         }
         let baseline_completed = required_u64(baseline, "completed_tasks", "baseline_by_priority")?;
-        let candidate_completed = required_u64(candidate, "completed_tasks", "candidate_by_priority")?;
+        let candidate_completed =
+            required_u64(candidate, "completed_tasks", "candidate_by_priority")?;
         if baseline_completed > tasks || candidate_completed > tasks {
-            return Err(format!("priority {priority} completion exceeds its denominator"));
+            return Err(format!(
+                "priority {priority} completion exceeds its denominator"
+            ));
         }
         let baseline_misses = optional_u64(baseline, "deadline_misses");
         let candidate_misses = optional_u64(candidate, "deadline_misses");
@@ -177,7 +194,9 @@ fn parse_priority_rows(row: &Value) -> Result<Option<Vec<PriorityOutcome>>, Stri
                 task_noun(delta.unsigned_abs())
             )
         } else {
-            format!("Both policies complete {baseline_completed}/{tasks} {priority} tasks in this scenario.")
+            format!(
+                "Both policies complete {baseline_completed}/{tasks} {priority} tasks in this scenario."
+            )
         };
         outcomes.push(PriorityOutcome {
             priority: priority.to_owned(),
@@ -226,16 +245,22 @@ pub fn explain_report(report: &Value) -> Result<Explanation, String> {
         let candidate = row
             .get("candidate_fair_share")
             .filter(|value| value.is_object())
-            .ok_or_else(|| format!("per_mode/{mode}/candidate_fair_share: required object is missing"))?;
+            .ok_or_else(|| {
+                format!("per_mode/{mode}/candidate_fair_share: required object is missing")
+            })?;
         let baseline_tasks = required_u64(baseline, "task_count", mode)?;
         let candidate_tasks = required_u64(candidate, "task_count", mode)?;
         if baseline_tasks != candidate_tasks {
-            return Err(format!("per_mode/{mode}: baseline and candidate denominators differ; paired explanation refused"));
+            return Err(format!(
+                "per_mode/{mode}: baseline and candidate denominators differ; paired explanation refused"
+            ));
         }
         let baseline_completed = required_u64(baseline, "completed_tasks", mode)?;
         let candidate_completed = required_u64(candidate, "completed_tasks", mode)?;
         if baseline_completed > baseline_tasks || candidate_completed > candidate_tasks {
-            return Err(format!("per_mode/{mode}: completed count exceeds task denominator"));
+            return Err(format!(
+                "per_mode/{mode}: completed count exceeds task denominator"
+            ));
         }
         let delta = completion_delta(candidate_completed, baseline_completed)?;
         let plain_explanation = if baseline_tasks == 0 {
@@ -260,7 +285,10 @@ pub fn explain_report(report: &Value) -> Result<Explanation, String> {
             )
         };
         if delta < 0 {
-            findings.push(format!("Task completion regresses in {label}.", label = mode_label(mode)));
+            findings.push(format!(
+                "Task completion regresses in {label}.",
+                label = mode_label(mode)
+            ));
         }
         if let (Some(b), Some(c)) = (
             optional_u64(baseline, "completed_task_jain_fairness_ppm"),
@@ -399,24 +427,54 @@ mod tests {
     #[test]
     fn explicit_simulation_boundary_is_preserved() {
         let explanation = explain_report(&report()).unwrap();
-        assert_eq!(explanation.evidence_class, EvidenceClass::SyntheticSimulation);
-        assert!(explanation.headline.contains("live Wi-Fi performance has not been tested"));
-        assert!(explanation.limitations.iter().any(|item| item.contains("airtime")));
+        assert_eq!(
+            explanation.evidence_class,
+            EvidenceClass::SyntheticSimulation
+        );
+        assert!(
+            explanation
+                .headline
+                .contains("live Wi-Fi performance has not been tested")
+        );
+        assert!(
+            explanation
+                .limitations
+                .iter()
+                .any(|item| item.contains("airtime"))
+        );
     }
 
     #[test]
     fn mode_episodes_are_not_summed() {
         let explanation = explain_report(&report()).unwrap();
         assert_eq!(explanation.modes.len(), 2);
-        assert!(explanation.limitations.iter().any(|item| item.contains("independent simulation episode")));
+        assert!(
+            explanation
+                .limitations
+                .iter()
+                .any(|item| item.contains("independent simulation episode"))
+        );
     }
 
     #[test]
     fn essential_deadline_misses_are_visible() {
         let explanation = explain_report(&report()).unwrap();
-        assert!(explanation.findings.iter().any(|item| item.contains("FIFO misses 1 essential deadline")));
-        let online = explanation.modes.iter().find(|item| item.mode == "online").unwrap();
-        let essential = online.by_priority.iter().find(|item| item.priority == "essential").unwrap();
+        assert!(
+            explanation
+                .findings
+                .iter()
+                .any(|item| item.contains("FIFO misses 1 essential deadline"))
+        );
+        let online = explanation
+            .modes
+            .iter()
+            .find(|item| item.mode == "online")
+            .unwrap();
+        let essential = online
+            .by_priority
+            .iter()
+            .find(|item| item.priority == "essential")
+            .unwrap();
         assert_eq!(essential.baseline_deadline_misses, Some(1));
         assert_eq!(essential.candidate_completed, 1);
     }
@@ -434,19 +492,36 @@ mod tests {
     fn missing_numbers_and_denominator_mismatches_fail_closed() {
         let mut value = report();
         value["multiwindow_recovery"]["per_mode"][0]["baseline"]["completed_tasks"] = Value::Null;
-        assert!(explain_report(&value).unwrap_err().contains("missing or invalid"));
+        assert!(
+            explain_report(&value)
+                .unwrap_err()
+                .contains("missing or invalid")
+        );
 
         let mut value = report();
-        value["multiwindow_recovery"]["per_mode"][0]["candidate_fair_share"]["task_count"] = json!(2);
-        assert!(explain_report(&value).unwrap_err().contains("denominators differ"));
+        value["multiwindow_recovery"]["per_mode"][0]["candidate_fair_share"]["task_count"] =
+            json!(2);
+        assert!(
+            explain_report(&value)
+                .unwrap_err()
+                .contains("denominators differ")
+        );
     }
 
     #[test]
     fn absent_priority_data_is_disclosed_not_filled_in() {
         let mut value = report();
-        value["multiwindow_recovery"]["per_mode"][0].as_object_mut().unwrap().remove("baseline_by_priority");
+        value["multiwindow_recovery"]["per_mode"][0]
+            .as_object_mut()
+            .unwrap()
+            .remove("baseline_by_priority");
         let explanation = explain_report(&value).unwrap();
-        assert!(explanation.limitations.iter().any(|item| item.contains("Per-priority outcome rows were absent")));
+        assert!(
+            explanation
+                .limitations
+                .iter()
+                .any(|item| item.contains("Per-priority outcome rows were absent"))
+        );
     }
 
     #[test]
