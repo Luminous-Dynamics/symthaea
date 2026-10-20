@@ -1034,7 +1034,7 @@ mod tests {
             &[2, 1, 3, 4],
             &[8, 1, 6, 4],
         ];
-        let persistence = 0.94;
+        let persistence: f64 = 0.94;
 
         for predicted in rankings {
             for reference in rankings {
