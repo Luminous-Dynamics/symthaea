@@ -420,7 +420,7 @@ pub fn paired_bootstrap_binary_safety_comparison(
 
         for name in metric_names() {
             if let (Some(candidate), Some(baseline)) =
-                (metric_value(&candidate_metrics, name), metric_value(&baseline_metrics, name))
+                (metric_value(&candidate_metrics, *name), metric_value(&baseline_metrics, *name))
             {
                 samples.entry(name.to_string()).or_default().push(candidate - baseline);
             }
