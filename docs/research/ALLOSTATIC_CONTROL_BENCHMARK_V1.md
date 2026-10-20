@@ -56,10 +56,10 @@ These profiles are synthetic and intentionally small. They are not an industry b
 | Stress-reactive | Rest based on current stress and a resource floor | Instantaneous-response baseline |
 | Allostatic-reactive | Rest based on accumulated load and a resource floor | Cumulative-load baseline |
 | Predictive viability | Use a noisy external warning stream, its confidence, projected reserve and projected load | Candidate method |
-| Shuffled-forecast control | Same decision structure/noise scale with time-shifted warning content | Tests whether timely forecast content matters |
+| Shuffled-forecast control | Apply the same controller to a deterministic permutation of noisy forecast-value/confidence pairs | Removes temporal alignment while preserving the set of warning observations |
 | Oracle predictive | Predictive method given the simulator's true future short-horizon load | Diagnostic upper bound only; not deployable |
 
-The oracle is not a fair competitor and must never be reported as a deployable baseline. The shuffled forecast is a negative control. Neither should count as independent evidence that predictive control generalizes.
+The oracle is not a fair competitor and must never be reported as a deployable baseline. The shuffled forecast is an offline negative control: it preserves the generated warning observations but permutes their time order, so it is not a deployable policy. Neither should count as independent evidence that predictive control generalizes.
 
 ### Reported metrics
 
