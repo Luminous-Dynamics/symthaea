@@ -17,6 +17,7 @@ csv = "=1.4.0"
 serde = { version = "=1.0.228", features = ["derive"] }
 serde_json = "=1.0.150"
 sha2 = "=0.10.9"
+jsonschema = { version = "=0.59.0", default-features = false }
 
 [[bin]]
 name = "beverage_benchmark_receipt"
@@ -29,3 +30,7 @@ path = "../../crates/domains/symthaea-culinary/src/bin/wine_quality_source_audit
 [[bin]]
 name = "fermentation_time_series_audit"
 path = "../../crates/domains/symthaea-culinary/src/bin/fermentation_time_series_audit.rs"
+
+[[bin]]
+name = "schema_contract_audit"
+path = "src/bin/schema_contract_audit.rs"
