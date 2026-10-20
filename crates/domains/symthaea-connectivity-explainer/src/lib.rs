@@ -476,12 +476,18 @@ pub fn render_human(explanation: &Explanation) -> String {
     let _ = writeln!(
         out,
         "  Scenario SHA-256: {}",
-        explanation.scenario_sha256.as_deref().unwrap_or("not supplied")
+        explanation
+            .scenario_sha256
+            .as_deref()
+            .unwrap_or("not supplied")
     );
     let _ = writeln!(
         out,
         "  Profile SHA-256:  {}",
-        explanation.profile_sha256.as_deref().unwrap_or("not supplied")
+        explanation
+            .profile_sha256
+            .as_deref()
+            .unwrap_or("not supplied")
     );
     let _ = writeln!(out, "  Explainer schema: {}", explanation.schema_version);
     out
