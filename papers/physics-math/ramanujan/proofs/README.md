@@ -31,7 +31,7 @@ Ten committed formal proof witnesses across six distinct dynamical systems, incl
 
 The standard Hamiltonian is `H = ½(px² + py²) + ½(x² + y²) + x²y − y³/3`. The legacy serializer stores constants as `f64`; `1/3` becomes `0.3333333333333333`, which SMT-LIB2 interprets as a different exact rational. The committed `henon_heiles_6H.smt2` therefore clears the fractional coefficients by proving the equivalent scaled invariant.
 
-The source now represents rational constants explicitly and emits exact SMT-LIB2 real rational terms (for example `(/ 1.0 3.0)`). The new `henon_heiles_exact_H.smt2` witness was generated from exact source head `03476c730f5dc19bea0e38d4a71dd0ac72730ca0`; Z3 4.13.0 returned `unsat`. The committed witness SHA-256 is `2b2228a76ed50f67ae87a7726115ca2d68c242936a2d0a03f474806fd8542728`. The scaled witness remains a separate regression control. An independent second-solver comparison is still desirable and is not claimed here.
+The source now represents rational constants explicitly and emits exact SMT-LIB2 real rational terms (for example `(/ 1.0 3.0)`). The new `henon_heiles_exact_H.smt2` witness was generated and replayed on exact source head `918b49737f7836bb3a15fc864585d35c3c0b0905` in [workflow run #39389514605](https://github.com/Luminous-Dynamics/symthaea/actions/runs/39389514605). Both Z3 4.13.0 and cvc5 1.1.2 returned `unsat` on the same committed bytes. Witness SHA-256: `2b2228a76ed50f67ae87a7726115ca2d68c242936a2d0a03f474806fd8542728`. A machine-readable receipt is committed at `henon_heiles_exact_H.receipt.txt`. The scaled witness remains a separate regression control.
 
 ## Independent re-verification
 
@@ -40,6 +40,8 @@ Any SMT-LIB2-compliant solver closes each file. With Z3:
 ```bash
 # verify the exact-rational Hénon-Heiles witness:
 z3 -smt2 papers/physics-math/ramanujan/proofs/henon_heiles_exact_H.smt2
+# expected output: unsat
+cvc5 papers/physics-math/ramanujan/proofs/henon_heiles_exact_H.smt2
 # expected output: unsat
 
 # verify another witness:
@@ -53,7 +55,7 @@ for f in papers/physics-math/ramanujan/proofs/*.smt2; do
 done
 ```
 
-CVC5 and MathSAT should also return `unsat`. Different solvers may take different times (Z3 is fast on these: ~50 ms each).
+cvc5 1.1.2 independently returned `unsat` for the exact-rational Hénon-Heiles witness in the recorded run. The other legacy witnesses still need their own cross-solver replay before claiming dual-solver coverage for the entire corpus; MathSAT has not been run in this effort.
 
 ## Problems NOT in this directory and why
 
