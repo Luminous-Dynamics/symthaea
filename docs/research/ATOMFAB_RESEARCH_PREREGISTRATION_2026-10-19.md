@@ -165,7 +165,7 @@ For atom manipulation specifically, later hardware benchmarks should use lattice
 - Implement pure Rust metrics for scalar prediction errors, prediction-interval coverage, pairwise energy ordering, normalized finite-prefix top-weighted ranking overlap at preregistered persistence p=0.94, uncertainty-selective risk-coverage/AURC, reference-structure recovery, false-feasible decisions, and active-learning acceleration, with fail-closed input validation.
 - Add contract-v1 JSON Schema, serde-backed envelope/payload types, and semantic validation for source-kind, provenance, uncertainty, digests, measurement calibration, abort guards, and hard-constraint outcomes.
 - Add a shared valid process-proposal JSON fixture and a negative no-abort-guard fixture.
-- Add a machine-readable benchmark registry covering nine scientific, experimental, active-learning, workcell and prospective-metrology lanes; validate it for duplicate IDs, required policy baselines, and nontrivial performance gates.
+- Add a machine-readable benchmark registry covering ten scientific, experimental, active-learning, multi-fidelity routing, workcell and prospective-metrology lanes; validate it for duplicate IDs, required policy baselines, and nontrivial performance gates.
 - Add versioned campaign records and a campaign JSON Schema so completed, failed, and incomplete runs retain evidence and cannot silently change the model, dataset, target, or budget between paired policy comparisons.
 - Keep solver adapters, dataset loading, and instrument drivers out of the metric kernel.
 - Add deterministic unit tests with hand-calculated examples, semantic negative controls, benchmark-registry integrity checks, and matched-campaign compatibility checks.
@@ -186,6 +186,15 @@ For atom manipulation specifically, later hardware benchmarks should use lattice
 - Replay the same query budget across the predeclared acquisition baselines.
 - Measure AF, equal-budget enhancement, uncertainty coverage, OOD behavior, and compute/query cost.
 - Use an ablation to determine whether Symthaea contributes beyond conventional active learning.
+
+### M2A — Multi-fidelity evidence-action routing
+
+- Compare fixed cheapest-first escalation, random eligible action, uncertainty-only escalation, calibrated cost-aware value of information, the full Symthaea router, and a history/retrieval ablation.
+- The new Rust evidence router selects only among actions in one request, evidence domain, decision contract, cost/benefit unit, and budget. Atomistic calculations, workcell simulation and metrology are separate comparison lanes.
+- Calibration of the expected decision-loss reduction must be measured on disjoint validation campaigns before prospective routing; the router is not allowed to fabricate its own value estimates.
+- Run shuffled-value and high-value/out-of-domain negative controls; retain blocked actions, failures, abstentions, and actual cost in the report.
+- Measure validated objective and unique discoveries per total cost, target regret, time-to-target, expected-value calibration, fidelity mix, abstention and domain-rejection rates. Apply the Pareto frontier rather than a single scalar score.
+- Do not count a recommended/selected action as a successful experiment. The selected action is a plan; only its recorded outcome can supply benchmark evidence.
 
 ### M3 — Symtropy process digital twin
 
@@ -220,3 +229,8 @@ For atom manipulation specifically, later hardware benchmarks should use lattice
 8. Open Catalyst Project. [OC20/OC22 datasets, baselines and leaderboards](https://opencatalystproject.org/).
 9. Shao, Hightower, and Schindel (2022). “Credibility Consideration for Digital Twins in Manufacturing.” *Manufacturing Letters*. [https://doi.org/10.1016/j.mfglet.2022.11.009](https://doi.org/10.1016/j.mfglet.2022.11.009).
 10. Frechette, Shao, and Pease (2026). *Digital Twins Workshops Summary Report*, NISTIR 8620. [https://doi.org/10.6028/NIST.IR.8620](https://doi.org/10.6028/NIST.IR.8620).
+
+
+## Multi-fidelity routing artifact (2026-10-20)
+
+The executable contract and decision policy are documented in [ATOMFAB_MULTIFIDELITY_EVIDENCE_ROUTING_2026-10-20.md](ATOMFAB_MULTIFIDELITY_EVIDENCE_ROUTING_2026-10-20.md). Schemas and an explicitly synthetic fixture are included under `crates/domains/symthaea-atomfab`. The router produces recommendations only; it does not execute solvers, process twins, laboratory instruments, or physical actions.
