@@ -617,7 +617,7 @@ mod tests {
                 .expect("valid rankings should compare");
         assert!(predicted.normalized_score < 1.0);
         assert!(predicted.normalized_score > 0.0);
-        assert!(lower_persistence.normalized_score > predicted.normalized_score);
+        assert!(predicted.normalized_score > lower_persistence.normalized_score);
     }
 
     #[test]
