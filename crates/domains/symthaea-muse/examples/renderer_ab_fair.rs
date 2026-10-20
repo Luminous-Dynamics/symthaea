@@ -99,7 +99,8 @@ fn factorial_contrasts(
     let room_effect_at_default_master = subtract_metrics(room_only, baseline);
     let master_effect_at_default_room = subtract_metrics(master_only, baseline);
     let room_master_interaction: [f32; 4] = std::array::from_fn(|i| {
-        combined_metric(combined, i) - combined_metric(room_only, i)
+        combined_metric(combined, i)
+            - combined_metric(room_only, i)
             - combined_metric(master_only, i)
             + combined_metric(baseline, i)
     });
@@ -165,12 +166,14 @@ fn valid_sha256(value: &str) -> bool {
 }
 
 fn valid_git_revision(value: &str) -> bool {
-    (value.len() == 40 || value.len() == 64)
-        && value.bytes().all(|b| b.is_ascii_hexdigit())
+    (value.len() == 40 || value.len() == 64) && value.bytes().all(|b| b.is_ascii_hexdigit())
 }
 
 fn fluidsynth_version(binary: &Path) -> Option<String> {
-    let output = std::process::Command::new(binary).arg("--version").output().ok()?;
+    let output = std::process::Command::new(binary)
+        .arg("--version")
+        .output()
+        .ok()?;
     if !output.status.success() {
         return None;
     }
@@ -236,10 +239,7 @@ fn wav_to_frames(bytes: &[u8]) -> Option<(Vec<[f32; 2]>, u32)> {
     let frames = if ch == 1 {
         samples.iter().map(|&s| [s, s]).collect()
     } else {
-        samples
-            .chunks_exact(ch)
-            .map(|c| [c[0], c[1]])
-            .collect()
+        samples.chunks_exact(ch).map(|c| [c[0], c[1]]).collect()
     };
     if frames.is_empty() {
         return None;
@@ -254,14 +254,14 @@ fn main() {
     // A separate randomized blind study is required to accept/reject profile
     // hypotheses for style identity or listener preference.
     let cohort: &[(Style, u64)] = &[
-        (Style::Classical, 7),       // ClassicalRubato
-        (Style::Tango, 7),           // DanceLocked
-        (Style::JazzBallad, 7),      // JazzLaidBack
-        (Style::Folk, 7),            // FolkLift
-        (Style::Minimalism, 7),      // ProcessExact
+        (Style::Classical, 7),          // ClassicalRubato
+        (Style::Tango, 7),              // DanceLocked
+        (Style::JazzBallad, 7),         // JazzLaidBack
+        (Style::Folk, 7),              // FolkLift
+        (Style::Minimalism, 7),         // ProcessExact
         (Style::HindustaniInspired, 7), // DroneElastic
-        (Style::Cinematic, 7),       // DramaticTiming
-        (Style::SacredChoral, 7),    // ChoralBlend
+        (Style::Cinematic, 7),          // DramaticTiming
+        (Style::SacredChoral, 7),       // ChoralBlend
     ];
 
     let Some((bin, sf)) = fluid_render::available() else {
@@ -278,17 +278,16 @@ fn main() {
     // Evidence identity is caller-bound to the checked-out source revision; this
     // report never claims that the caller-supplied revision authenticates a build.
     let source_revision = std::env::var("SYMTHAEA_GIT_REVISION").ok();
-    let source_revision_valid = source_revision
-        .as_deref()
-        .is_some_and(valid_git_revision);
+    let source_revision_valid = source_revision.as_deref().is_some_and(valid_git_revision);
     let executable_path = std::env::current_exe().unwrap_or_else(|error| {
         eprintln!("ABORT: cannot identify current executable: {error}");
         std::process::exit(2);
     });
-    let (executable_sha256, executable_bytes) = sha256_file(&executable_path).unwrap_or_else(|error| {
-        eprintln!("ABORT: cannot hash current executable: {error}");
-        std::process::exit(2);
-    });
+    let (executable_sha256, executable_bytes) =
+        sha256_file(&executable_path).unwrap_or_else(|error| {
+            eprintln!("ABORT: cannot hash current executable: {error}");
+            std::process::exit(2);
+        });
     let (fluidsynth_sha256, fluidsynth_bytes) = sha256_file(&bin).unwrap_or_else(|error| {
         eprintln!("ABORT: cannot hash FluidSynth executable: {error}");
         std::process::exit(2);
@@ -299,9 +298,7 @@ fn main() {
     });
     let fluidsynth_version = fluidsynth_version(&bin);
     let vcsl_manifest_sha256 = std::env::var("SYMTHAEA_VCSL_MANIFEST_SHA256").ok();
-    let vcsl_manifest_valid = vcsl_manifest_sha256
-        .as_deref()
-        .is_some_and(valid_sha256);
+    let vcsl_manifest_valid = vcsl_manifest_sha256.as_deref().is_some_and(valid_sha256);
 
     // WHICH native renderer is under test. `vcsl::library()` is a process-global
     // OnceLock, so this cannot be toggled mid-run — the three-way comparison is
@@ -346,8 +343,7 @@ fn main() {
 
         // ── Arm A: native additive/sample renderer, mastered in realize_core.
         let grammar_dialect = style.grammar_profile().performance;
-        let renderer_dialect =
-            symthaea_muse::theory_realize::map_grammar_dialect(grammar_dialect);
+        let renderer_dialect = symthaea_muse::theory_realize::map_grammar_dialect(grammar_dialect);
         let comp = symthaea_muse::theory_realize::realize_with_spec_and_dialect(
             &score,
             &spec,
@@ -416,7 +412,10 @@ fn main() {
         // Same MIDI, same SoundFont, same FluidSynth binary/sample rate: this
         // arm is the no-dialect baseline for the profile ablation.
         let Some(neutral_wav) = fluid_render::render_midi_to_wav_with_mastering(
-            &mid, SR, Some(base_color), &neutral_mastering,
+            &mid,
+            SR,
+            Some(base_color),
+            &neutral_mastering,
         ) else {
             let reason = format!("{style:?}/{seed}: default-profile FluidSynth render failed");
             eprintln!("{reason}; skipping");
@@ -457,7 +456,10 @@ fn main() {
         // Factor 1: change only room controls; keep default mastering.
         let color = fluid_render::room_for_dialect(base_color, renderer_dialect);
         let Some(room_wav) = fluid_render::render_midi_to_wav_with_mastering(
-            &mid, SR, Some(color), &neutral_mastering,
+            &mid,
+            SR,
+            Some(color),
+            &neutral_mastering,
         ) else {
             let reason = format!("{style:?}/{seed}: room-only FluidSynth render failed");
             eprintln!("{reason}; skipping");
@@ -497,9 +499,9 @@ fn main() {
 
         // Factor 2: change only mastering; keep slider-driven base room.
         let mastering = auto_master::MasteringConfig::for_dialect(renderer_dialect);
-        let Some(master_wav) = fluid_render::render_midi_to_wav_with_mastering(
-            &mid, SR, Some(base_color), &mastering,
-        ) else {
+        let Some(master_wav) =
+            fluid_render::render_midi_to_wav_with_mastering(&mid, SR, Some(base_color), &mastering)
+        else {
             let reason = format!("{style:?}/{seed}: mastering-only FluidSynth render failed");
             eprintln!("{reason}; skipping");
             failures.push(reason);
