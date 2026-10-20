@@ -586,9 +586,30 @@ mod tests {
                 domain("test", "region-c", "cuisine-c", "stovetop-b"),
             ],
             cases: vec![
-                case("case-dev", TransferSplit::Development, "dev", "family-dev", "grain-a", "outcome-dev"),
-                case("case-val", TransferSplit::Validation, "val", "family-val", "grain-b", "outcome-val"),
-                case("case-test", TransferSplit::Test, "test", "family-test", "grain-c", "outcome-test"),
+                case(
+                    "case-dev",
+                    TransferSplit::Development,
+                    "dev",
+                    "family-dev",
+                    "grain-a",
+                    "outcome-dev",
+                ),
+                case(
+                    "case-val",
+                    TransferSplit::Validation,
+                    "val",
+                    "family-val",
+                    "grain-b",
+                    "outcome-val",
+                ),
+                case(
+                    "case-test",
+                    TransferSplit::Test,
+                    "test",
+                    "family-test",
+                    "grain-c",
+                    "outcome-test",
+                ),
             ],
         }
     }
