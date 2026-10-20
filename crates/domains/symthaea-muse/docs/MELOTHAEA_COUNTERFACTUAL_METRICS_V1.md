@@ -24,11 +24,12 @@ The benchmark covers:
 - Styles: Mazurka and Toccata.
 - Seeds: `[0, 1, 7, 13, 29, 42, 73, 101]`.
 - Reproducibility: exact event signature replay.
+- Provenance: optional source revision from `MUSE_SOURCE_REVISION` or `GITHUB_SHA`, plus the `rustc --version` string when available; missing data is reported as null rather than guessed.
 - Integrity: nonempty output and finite, in-range event fields.
 - Counterfactual: actual style-selected dialect versus `ClassicalRubato`, same score digest.
 - Matching: greedy nearest-onset, one-to-one matching by voice identity and exact frequency, within 250 ms.
 - Pair counts: matched events and unmatched events in each arm are reported rather than hidden.
-- Effect size: onset shift distribution (mean, median, p95), changed-onset fraction, plus median duration, inter-onset interval statistics and event validity counts.
+- Effect size: onset shift distribution (mean, median, p95), changed-onset fraction (a shift must exceed 0.1 ms), plus median duration, inter-onset interval statistics and event validity counts.
 
 Usage:
 
