@@ -255,7 +255,9 @@
         "uncertainty-only",
         "cost-aware acquisition",
         "Symthaea policy",
-        "Symthaea with history/retrieval ablated"
+        "Symthaea with history/retrieval ablated",
+        "calibrated ensemble disagreement",
+        "counterexample-guided falsification"
       ],
       "metrics": [
         "best validated objective at equal cost",
@@ -281,7 +283,9 @@
         "report realized coverage at nominal 50%, 75%, 90%, and 100% operating points; never split equal-uncertainty ties to hit a nominal coverage exactly",
         "publish nondominated policies and per-dimension trade-offs; never use a single weighted score to hide discovery, quality, or cost regressions",
         "bootstrap acceleration intervals require at least 20 predeclared paired seeds and every pair must reach the same frozen target; never drop non-reaching seeds to create a success-only interval",
-        "pin confidence level, resample count and bootstrap seed; a speedup claim requires the 95% percentile-bootstrap lower bound above 1 and no worse validated objective quality at equal total cost"
+        "pin confidence level, resample count and bootstrap seed; a speedup claim requires the 95% percentile-bootstrap lower bound above 1 and no worse validated objective quality at equal total cost",
+        "pin ensemble checkpoints and calibrate disagreement on validation-only data; include inference cost and compare against shuffled-disagreement controls",
+        "counterexample-guided policy must predeclare falsifiable hypotheses and score every proposed counterexample against the reference evaluator; no post-hoc target changes"
       ]
     },
     {
@@ -407,6 +411,14 @@
     {
       "id": "symthaea_ablation",
       "definition": "Same policy with the specific claimed advantage disabled; matched model, budget and seeds."
+    },
+    {
+      "id": "ensemble_disagreement",
+      "definition": "Select among eligible candidates by calibrated disagreement across pinned compatible potential checkpoints; normalize disagreement using held-out validation and charge all model-inference cost."
+    },
+    {
+      "id": "counterexample_guided",
+      "definition": "Select candidates to falsify the current best-ranked structure, model-domain assumptions, or process-feasibility hypothesis; freeze the falsification objective before evaluation and report all counterexamples and failed searches."
     }
   ],
   "performance_claims": {
