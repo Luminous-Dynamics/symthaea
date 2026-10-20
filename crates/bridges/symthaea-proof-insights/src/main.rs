@@ -786,6 +786,19 @@ fn audit_temporal_dataset(
         validate_git_sha(&completion_commit).with_context(|| {
             format!("invalid timeline completion commit on row {}", position + 2)
         })?;
+        if !git_is_ancestor(&root, &completion_commit, &repository_commit)
+            .with_context(|| {
+                format!(
+                    "verify timeline completion commit on row {}",
+                    position + 2
+                )
+            })?
+        {
+            bail!(
+                "timeline completion commit on row {} is not an ancestor of pinned HEAD",
+                position + 2
+            );
+        }
         candidates_by_path
             .entry(normalized)
             .or_default()
