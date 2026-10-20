@@ -194,23 +194,8 @@ fn valid_sha256(value: &str) -> bool {
 fn validate_profile_audit(
     profile: &FidelityProfile,
     audit: &FidelityAudit,
-    value_contract: &DecisionValueContract,
 ) -> (bool, Vec<ExperimentPriorityIssue>) {
     let mut issues = Vec::new();
-    if !nonempty(&value_contract.basis_id) {
-        issues.push(ExperimentPriorityIssue::EmptyDecisionValueBasis);
-    }
-    for (value, field) in [
-        (value_contract.estimator_method_id.as_str(), "estimator_method_id"),
-        (value_contract.estimator_method_revision.as_str(), "estimator_method_revision"),
-    ] {
-        if !nonempty(value) {
-            issues.push(ExperimentPriorityIssue::EmptyDecisionValueEstimatorIdentity { field });
-        }
-    }
-    if !value_contract.semantics_reviewed {
-        issues.push(ExperimentPriorityIssue::DecisionValueEstimatorContractNotReviewed);
-    }
     if profile.profile_id != audit.profile_id || profile.campaign_id != audit.campaign_id {
         issues.push(ExperimentPriorityIssue::ProfileAuditIdentityMismatch);
     }
@@ -579,8 +564,21 @@ pub fn prioritize_next_experiment(
     value_contract: &DecisionValueContract,
     budget_remaining_units: u64,
 ) -> ExperimentPriorityReport {
-    let (audit_valid, mut issues) =
-        validate_profile_audit(profile, audit, value_contract);
+    let (audit_valid, mut issues) = validate_profile_audit(profile, audit);
+    if !nonempty(&value_contract.basis_id) {
+        issues.push(ExperimentPriorityIssue::EmptyDecisionValueBasis);
+    }
+    for (value, field) in [
+        (value_contract.estimator_method_id.as_str(), "estimator_method_id"),
+        (value_contract.estimator_method_revision.as_str(), "estimator_method_revision"),
+    ] {
+        if !nonempty(value) {
+            issues.push(ExperimentPriorityIssue::EmptyDecisionValueEstimatorIdentity { field });
+        }
+    }
+    if !value_contract.semantics_reviewed {
+        issues.push(ExperimentPriorityIssue::DecisionValueEstimatorContractNotReviewed);
+    }
     let requirements: BTreeMap<&str, &super::fidelity_ledger::FidelityRequirement> = profile
         .requirements
         .iter()
@@ -965,6 +963,24 @@ mod tests {
         let report = prioritize_next_experiment(&profile, &audit, &proposals, &value_contract(), 100);
         assert_eq!(report.disposition, ExperimentPriorityDisposition::SelectedMandatoryEvidence);
         assert_eq!(report.selected_proposal_id.as_deref(), Some("tank-run"));
+    }
+
+    #[test]
+    fn unreviewed_optional_value_estimator_does_not_block_mandatory_evidence() {
+        let (profile, audit) = audit(true);
+        let mut contract = value_contract();
+        contract.semantics_reviewed = false;
+        let report = prioritize_next_experiment(
+            &profile,
+            &audit,
+            &[physical("tank-run", Some(80), None)],
+            &contract,
+            100,
+        );
+        assert_eq!(report.disposition, ExperimentPriorityDisposition::SelectedMandatoryEvidence);
+        assert!(report.issues.contains(
+            &ExperimentPriorityIssue::DecisionValueEstimatorContractNotReviewed
+        ));
     }
 
     #[test]
