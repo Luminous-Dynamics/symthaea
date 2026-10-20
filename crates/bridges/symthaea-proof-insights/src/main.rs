@@ -965,7 +965,7 @@ fn validate_temporal_manifest(manifest: &TemporalReplayManifest) -> Result<()> {
                         artifact.artifact_id
                     )
                 })?;
-            if event.position != artifact.target_position.unwrap_or(usize::MAX)
+            if artifact.target_position != Some(event.position)
                 || event.theorem_id.as_str() != artifact.theorem_id.as_deref().unwrap_or_default()
             {
                 bail!(
@@ -1579,7 +1579,8 @@ mod tests {
                     content_end_line: 1,
                     source_file_sha256: source_one.clone(),
                     source_commit: commit_one.clone(),
-                    available_at_position: 0,
+                    available_at_position: Some(0),
+                    target_position: None,
                     theorem_id: Some("Example.first".to_string()),
                 },
                 TemporalEvidenceArtifact {
@@ -1591,7 +1592,8 @@ mod tests {
                     content_end_line: 2,
                     source_file_sha256: source_two.clone(),
                     source_commit: commit_two.clone(),
-                    available_at_position: 0,
+                    available_at_position: None,
+                    target_position: Some(0),
                     theorem_id: Some("Example.first".to_string()),
                 },
                 TemporalEvidenceArtifact {
@@ -1603,7 +1605,8 @@ mod tests {
                     content_end_line: 3,
                     source_file_sha256: source_three.clone(),
                     source_commit: commit_two.clone(),
-                    available_at_position: 1,
+                    available_at_position: Some(1),
+                    target_position: None,
                     theorem_id: Some("Example.second".to_string()),
                 },
                 TemporalEvidenceArtifact {
@@ -1615,7 +1618,8 @@ mod tests {
                     content_end_line: 4,
                     source_file_sha256: source_four.clone(),
                     source_commit: commit_three.clone(),
-                    available_at_position: 1,
+                    available_at_position: None,
+                    target_position: Some(1),
                     theorem_id: Some("Example.second".to_string()),
                 },
             ],
@@ -1663,7 +1667,8 @@ mod tests {
             content_end_line: 8,
             source_file_sha256: "8".repeat(64),
             source_commit: "1".repeat(40),
-            available_at_position: 0,
+            available_at_position: Some(0),
+            target_position: None,
             theorem_id: None,
         });
         manifest.events[1]
@@ -1682,10 +1687,10 @@ mod tests {
             .iter_mut()
             .find(|artifact| artifact.artifact_id == "proof-001")
             .expect("later target proof exists");
-        proof.available_at_position = 0;
+        proof.available_at_position = Some(0);
         let error = validate_temporal_manifest(&manifest)
-            .expect_err("a proof cannot be visible in the timeline before its registered completion position");
-        assert!(format!("{error:#}").contains("hidden proof artifact does not match"));
+            .expect_err("a hidden proof cannot be marked as solver-visible evidence");
+        assert!(format!("{error:#}").contains("evaluator-only proof"));
     }
 
     #[test]
@@ -1695,6 +1700,20 @@ mod tests {
         let error = validate_temporal_manifest(&manifest)
             .expect_err("latest is not an immutable toolchain version");
         assert!(format!("{error:#}").contains("must pin Lean and Mathlib"));
+    }
+
+    #[test]
+    fn temporal_manifest_rejects_hidden_proof_associated_with_wrong_target() {
+        let mut manifest = temporal_manifest_fixture();
+        let proof = manifest
+            .artifacts
+            .iter_mut()
+            .find(|artifact| artifact.artifact_id == "proof-001")
+            .expect("later target proof exists");
+        proof.target_position = Some(0);
+        let error = validate_temporal_manifest(&manifest)
+            .expect_err("a proof body's target association must match its event");
+        assert!(format!("{error:#}").contains("hidden proof artifact does not match"));
     }
 
     #[test]
