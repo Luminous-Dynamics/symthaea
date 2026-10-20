@@ -29,7 +29,7 @@ cargo run -p symthaea-proof-insights -- \
   ./data/benchmarks/proof-insight-transfer-v0/splits.json
 ```
 
-The verifier must reject source-revision, digest, duplicate-ID, or family-assignment mismatches. This confirms agreement with the frozen assignment, not that the split is free of cross-family dependency leakage or pretraining contamination.
+The verifier rejects source-revision, source-fingerprint, split-algorithm/count/digest, duplicate-ID, or family-assignment mismatches. Catalog paths appearing under multiple families also fail closed in the indexer. This confirms agreement with the frozen assignment, not that the split is free of cross-family mathematical-dependency leakage or pretraining contamination.
 
 ## What the JSON captures
 
