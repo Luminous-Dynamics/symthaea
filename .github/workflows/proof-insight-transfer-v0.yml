@@ -443,6 +443,7 @@ jobs:
                       "source_file_sha256": sha("e"),
                       "source_commit": commit("1"),
                       "available_at_position": 0,
+                      "target_position": None,
                       "theorem_id": "Example.first"
                   },
                   {
@@ -454,7 +455,8 @@ jobs:
                       "content_end_line": 2,
                       "source_file_sha256": sha("f"),
                       "source_commit": commit("2"),
-                      "available_at_position": 0,
+                      "available_at_position": None,
+                      "target_position": 0,
                       "theorem_id": "Example.first"
                   },
                   {
@@ -467,6 +469,7 @@ jobs:
                       "source_file_sha256": sha("7"),
                       "source_commit": commit("2"),
                       "available_at_position": 1,
+                      "target_position": None,
                       "theorem_id": "Example.second"
                   },
                   {
@@ -478,7 +481,8 @@ jobs:
                       "content_end_line": 4,
                       "source_file_sha256": sha("8"),
                       "source_commit": commit("3"),
-                      "available_at_position": 1,
+                      "available_at_position": None,
+                      "target_position": 1,
                       "theorem_id": "Example.second"
                   }
               ]
