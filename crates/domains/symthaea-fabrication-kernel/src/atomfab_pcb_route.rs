@@ -153,7 +153,9 @@ pub fn evaluate_corpus_bytes(
         return Err("ATOMFAB_GIT_HEAD must be a 40- or 64-character hexadecimal commit SHA".into());
     }
     if !is_git_sha(actual_checkout_head) {
-        return Err("actual checkout HEAD must be a 40- or 64-character hexadecimal commit SHA".into());
+        return Err(
+            "actual checkout HEAD must be a 40- or 64-character hexadecimal commit SHA".into(),
+        );
     }
     if !declared_git_head.eq_ignore_ascii_case(actual_checkout_head) {
         return Err("ATOMFAB_GIT_HEAD does not match the actual checkout HEAD".into());
@@ -291,7 +293,10 @@ fn validate_case_vocabulary(case: &RouteCase) -> Result<(), String> {
         case.evidence.qualification_claim.as_str(),
         "route_admissibility_only" | "independent_physical_qualification"
     ) {
-        return Err(format!("{}: unsupported qualification-claim class", case.id));
+        return Err(format!(
+            "{}: unsupported qualification-claim class",
+            case.id
+        ));
     }
     for (label, result, allowed) in [
         (
@@ -433,10 +438,7 @@ fn derive_evidence_result(case: &RouteCase) -> GateResult {
     } else if !reasons.is_empty() {
         gate("incomplete", reasons)
     } else {
-        gate(
-            "complete",
-            vec!["DECLARED_EVIDENCE_GATES_SATISFIED".into()],
-        )
+        gate("complete", vec!["DECLARED_EVIDENCE_GATES_SATISFIED".into()])
     }
 }
 
@@ -494,8 +496,7 @@ mod tests {
 
     #[test]
     fn frozen_corpus_matches_independent_route_and_evidence_oracle() {
-        let receipt =
-            evaluate_valid(EMBEDDED_CORPUS.as_bytes()).expect("valid corpus");
+        let receipt = evaluate_valid(EMBEDDED_CORPUS.as_bytes()).expect("valid corpus");
         assert!(receipt.passed(), "receipt: {receipt:#?}");
         assert_eq!(receipt.case_count, EXPECTED_CASE_COUNT);
         assert_eq!(receipt.matched_route_cases, EXPECTED_CASE_COUNT);
@@ -516,7 +517,10 @@ mod tests {
                 ("rejected".into(), 2),
             ])
         );
-        assert_eq!(receipt.corpus_sha256, sha256_hex(EMBEDDED_CORPUS.as_bytes()));
+        assert_eq!(
+            receipt.corpus_sha256,
+            sha256_hex(EMBEDDED_CORPUS.as_bytes())
+        );
     }
 
     #[test]
@@ -572,14 +576,12 @@ mod tests {
 
     #[test]
     fn reordering_cases_preserves_normalized_results() {
-        let original =
-            evaluate_valid(EMBEDDED_CORPUS.as_bytes()).expect("valid corpus");
+        let original = evaluate_valid(EMBEDDED_CORPUS.as_bytes()).expect("valid corpus");
         let mut value = corpus_value();
         let cases = value["cases"].as_array_mut().expect("cases array");
         cases.reverse();
         let reordered_bytes = serde_json::to_vec(&value).expect("serialize reordered corpus");
-        let reordered =
-            evaluate_valid(&reordered_bytes).expect("reordered corpus");
+        let reordered = evaluate_valid(&reordered_bytes).expect("reordered corpus");
         assert!(reordered.passed());
         assert_eq!(original.cases, reordered.cases);
         assert_ne!(original.corpus_sha256, reordered.corpus_sha256);
@@ -595,22 +597,19 @@ mod tests {
             .find(|case| case.case_id == "PCB-ROUTE-016")
             .expect("qualification negative control");
         assert_eq!(case.actual_evidence.disposition, "rejected");
-        assert!(case
-            .actual_evidence
-            .reason_codes
-            .contains(&"PHYSICAL_QUALIFICATION_OUT_OF_SCOPE".to_string()));
+        assert!(
+            case.actual_evidence
+                .reason_codes
+                .contains(&"PHYSICAL_QUALIFICATION_OUT_OF_SCOPE".to_string())
+        );
     }
 
     #[test]
     fn declared_head_must_match_checkout_head() {
         let declared = "a".repeat(40);
         let actual = "b".repeat(40);
-        let error = evaluate_corpus_bytes(
-            EMBEDDED_CORPUS.as_bytes(),
-            &declared,
-            &actual,
-        )
-        .expect_err("head mismatch rejects");
+        let error = evaluate_corpus_bytes(EMBEDDED_CORPUS.as_bytes(), &declared, &actual)
+            .expect_err("head mismatch rejects");
         assert!(error.contains("does not match the actual checkout HEAD"));
     }
 
@@ -621,12 +620,17 @@ mod tests {
             serde_json::Value::String("measured".into());
         let bytes = serde_json::to_vec(&value).expect("serialize changed corpus");
         let receipt = evaluate_valid(&bytes).expect("valid schema with altered label");
-        let case = receipt.cases.iter()
+        let case = receipt
+            .cases
+            .iter()
             .find(|case| case.case_id == "PCB-ROUTE-016")
             .expect("physical qualification control");
         assert_eq!(case.actual_evidence.disposition, "rejected");
-        assert!(case.actual_evidence.reason_codes
-            .contains(&"PHYSICAL_QUALIFICATION_OUT_OF_SCOPE".to_string()));
+        assert!(
+            case.actual_evidence
+                .reason_codes
+                .contains(&"PHYSICAL_QUALIFICATION_OUT_OF_SCOPE".to_string())
+        );
     }
 
     #[test]
