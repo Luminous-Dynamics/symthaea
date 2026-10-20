@@ -173,10 +173,10 @@ impl CampaignRecord {
         if !self.total_cost_value.is_finite() || self.total_cost_value < 0.0 {
             return Err(CampaignError::InvalidCost);
         }
-        if let Some(value) = self.best_validated_objective {
-            if !value.is_finite() {
-                return Err(CampaignError::InvalidObjective);
-            }
+        if let Some(value) = self.best_validated_objective
+            && !value.is_finite()
+        {
+            return Err(CampaignError::InvalidObjective);
         }
 
         match self.terminal_status {
