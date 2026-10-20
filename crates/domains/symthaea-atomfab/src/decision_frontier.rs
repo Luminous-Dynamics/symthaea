@@ -63,6 +63,8 @@ pub enum FrontierError {
     MissingEvidence,
     DuplicatePolicyId,
     MismatchedComparisonContract,
+    UnsupportedSchemaVersion(u16),
+    InvalidReport,
 }
 
 impl fmt::Display for FrontierError {
@@ -99,6 +101,13 @@ impl fmt::Display for FrontierError {
             Self::MismatchedComparisonContract => write!(
                 f,
                 "frontier candidates must share seed, comparison digest, objective contract, tolerance, and cost unit"
+            ),
+            Self::UnsupportedSchemaVersion(version) => {
+                write!(f, "unsupported decision frontier schema version: {version}")
+            }
+            Self::InvalidReport => write!(
+                f,
+                "frontier report metrics and dispositions do not match the canonical recomputation"
             ),
         }
     }
@@ -189,6 +198,50 @@ pub struct DecisionFrontier {
     pub objective_tolerance: f64,
     pub total_cost_unit: String,
     pub entries: Vec<FrontierEntry>,
+}
+
+impl DecisionFrontier {
+    /// Revalidate a serialized frontier by rebuilding its canonical
+    /// dispositions from the retained metrics. This prevents a report consumer
+    /// from trusting a forged "pareto_frontier" label or altered dominated_by
+    /// list merely because the JSON parses.
+    pub fn validate(&self) -> Result<(), FrontierError> {
+        if self.schema_version != DECISION_FRONTIER_SCHEMA_VERSION {
+            return Err(FrontierError::UnsupportedSchemaVersion(self.schema_version));
+        }
+        if self.entries.is_empty() {
+            return Err(FrontierError::EmptyCandidateSet);
+        }
+
+        let candidates: Vec<FrontierCandidate> = self
+            .entries
+            .iter()
+            .map(|entry| FrontierCandidate {
+                policy_id: entry.policy_id.clone(),
+                seed: self.seed,
+                comparison_contract_digest: self.comparison_contract_digest.clone(),
+                objective_name: self.objective_name.clone(),
+                objective_unit: self.objective_unit.clone(),
+                objective_direction: self.objective_direction,
+                objective_tolerance: self.objective_tolerance,
+                validated_discovery_count: entry.validated_discovery_count,
+                best_validated_objective: entry.best_validated_objective,
+                total_cost_units: entry.total_cost_units,
+                total_cost_unit: self.total_cost_unit.clone(),
+                elapsed_seconds: entry.elapsed_seconds,
+                reference_calculation_count: entry.reference_calculation_count,
+                false_feasible_accepts: entry.false_feasible_accepts,
+                hard_constraints_assessed: entry.hard_constraints_assessed,
+                evidence_digest: entry.evidence_digest.clone(),
+            })
+            .collect();
+
+        let canonical = build_decision_frontier(&candidates)?;
+        if canonical != *self {
+            return Err(FrontierError::InvalidReport);
+        }
+        Ok(())
+    }
 }
 
 /// Construct a deterministic Pareto report over a single matched seed.
@@ -459,6 +512,48 @@ mod tests {
         assert_eq!(
             build_decision_frontier(&[first, different_data]),
             Err(FrontierError::MismatchedComparisonContract)
+        );
+    }
+
+    #[test]
+    fn serialized_frontier_revalidates_dispositions_from_retained_metrics() {
+        let candidates = vec![
+            candidate("random", 1, Some(-3.10), 100),
+            candidate("diversity", 2, Some(-3.04), 120),
+            candidate("symthaea", 2, Some(-3.15), 110),
+        ];
+        let mut report = build_decision_frontier(&candidates).unwrap();
+        report.validate().expect("canonical frontier should validate");
+
+        let unsafe_entry = report
+            .entries
+            .iter_mut()
+            .find(|entry| entry.policy_id == "random")
+            .unwrap();
+        unsafe_entry.false_feasible_accepts = 1;
+        assert_eq!(report.validate(), Err(FrontierError::InvalidReport));
+
+        let mut forged_dominance = build_decision_frontier(&candidates).unwrap();
+        let dominated = forged_dominance
+            .entries
+            .iter_mut()
+            .find(|entry| entry.policy_id == "diversity")
+            .unwrap();
+        dominated.disposition = FrontierDisposition::ParetoFrontier;
+        assert_eq!(
+            forged_dominance.validate(),
+            Err(FrontierError::InvalidReport)
+        );
+    }
+
+    #[test]
+    fn serialized_frontier_rejects_unsupported_versions() {
+        let mut report = build_decision_frontier(&[candidate("random", 1, Some(-3.10), 100)])
+            .expect("candidate should produce a frontier");
+        report.schema_version = 99;
+        assert_eq!(
+            report.validate(),
+            Err(FrontierError::UnsupportedSchemaVersion(99))
         );
     }
 
