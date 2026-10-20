@@ -2713,9 +2713,9 @@ async fn midi(
         Some(dialect) => symthaea_muse::midi_export::export_performance_midi_with_dialect(
             &score, &spec, seed, &state, dialect, &path,
         ),
-        None => symthaea_muse::midi_export::export_performance_midi(
-            &score, &spec, seed, &state, &path,
-        ),
+        None => {
+            symthaea_muse::midi_export::export_performance_midi(&score, &spec, seed, &state, &path)
+        }
     };
     export_result.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     let bytes = std::fs::read(&path).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
@@ -2751,9 +2751,9 @@ fn fluidsynth_candidate_wav(
         Some(dialect) => symthaea_muse::midi_export::export_performance_midi_with_dialect(
             score, spec, seed, state, dialect, &path,
         ),
-        None => symthaea_muse::midi_export::export_performance_midi(
-            score, spec, seed, state, &path,
-        ),
+        None => {
+            symthaea_muse::midi_export::export_performance_midi(score, spec, seed, state, &path)
+        }
     };
     export_result.ok()?;
 
