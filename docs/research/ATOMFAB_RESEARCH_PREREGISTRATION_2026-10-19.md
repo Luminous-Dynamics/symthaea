@@ -234,3 +234,18 @@ For atom manipulation specifically, later hardware benchmarks should use lattice
 ## Multi-fidelity routing artifact (2026-10-20)
 
 The executable contract and decision policy are documented in [ATOMFAB_MULTIFIDELITY_EVIDENCE_ROUTING_2026-10-20.md](ATOMFAB_MULTIFIDELITY_EVIDENCE_ROUTING_2026-10-20.md). Schemas and an explicitly synthetic fixture are included under `crates/domains/symthaea-atomfab`. The router produces recommendations only; it does not execute solvers, process twins, laboratory instruments, or physical actions.
+
+
+## Paired acceleration statistics v1 (2026-10-20)
+
+The Rust module `campaign_statistics.rs` implements a deterministic percentile bootstrap for the **median paired acceleration factor**:
+
+`AF(seed) = baseline_total_cost(seed) / candidate_total_cost(seed)`
+
+The input is a pair of traceable `CampaignRecord` values per preregistered seed. Each baseline/candidate pair must validate against the same lane, model, data, evaluator, shared environment, target definition, budget contract, objective and cost unit. Baseline and candidate identities and each policy's configuration must remain stable across seeds. Costs must be finite and positive; seed IDs and run IDs must be unique.
+
+The interval is deliberately fail-closed: the function emits no acceleration interval unless at least 20 pairs are provided and **every paired run is completed and reaches the same frozen target**. Do not filter to successful seeds after looking at results; target failures remain in the campaign table, and the interval is withheld until the preregistered cohort/targeting rule is satisfied. Use the failed/incomplete campaigns to report target reachability separately. It uses a pinned bootstrap PRNG seed, at least 1,000 resamples, a declared confidence level, and linearly interpolated percentile bounds. The generated report has a v1 JSON Schema and semantic validation; independent implementations should recompute the summary from the raw campaign records rather than trusting the summary alone.
+
+This reports **cost-to-target**, not general wall-clock speed, model throughput, experimental yield, or manufacturing rate. Even a lower confidence bound greater than 1 does not establish the overall policy win on its own: report the paired median/interval, failures, and target-reaching coverage, then separately require no worse reference-validated objective quality at equal total cost. If results fail the gate, publish the non-win rather than changing the target, sample set, or statistic.
+
+Artifacts: `src/campaign_statistics.rs`, `schemas/paired-acceleration-summary-v1.schema.json`, and the `active-learning-policy` lane in `benchmarks/benchmark-matrix-v1.json`. This code and its unit tests are not external MLIP comparisons; no speedup has been measured.
