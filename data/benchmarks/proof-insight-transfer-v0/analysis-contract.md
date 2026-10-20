@@ -2,7 +2,7 @@
 
 **Status:** implementation contract only. No run configuration, validation baseline receipt, scored result rows, or mathematical transfer result is being asserted by this file.
 
-The preregistered protocol must be executable before held-out outcomes are examined. The Rust binary `analyze_pitb_results` implements its primary paired analysis and rejects common sources of post-hoc advantage: a changed protocol/split, a baseline not selected on validation, known-exposed family 089 entering the eligible denominator, unequal arm budgets, per-target configuration drift, duplicate exact statement digests, incomplete eight-arm comparisons, missing audit receipts, and inconsistent correctness flags.
+The preregistered protocol must be executable before held-out outcomes are examined. The Rust binary `analyze_pitb_results` implements its primary paired analysis and rejects common sources of post-hoc advantage: a changed protocol/split, a baseline not selected on validation, known-exposed family 089 entering the eligible denominator, unequal arm budgets, per-target configuration drift, duplicate exact statement digests, incomplete nine-arm comparisons, missing audit receipts, and inconsistent correctness flags.
 
 ## Inputs and invocation
 
