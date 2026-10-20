@@ -7,6 +7,7 @@ on:
       - "crates/core/symthaea-core/src/hdc/conjecture_engine/symbolic.rs"
       - "crates/bridges/symthaea-physics-bridge/examples/verify_invariants_formal.rs"
       - "crates/bridges/symthaea-physics-bridge/tests/formal_invariants.rs"
+      - "research/exact-rational-physics-proof/**"
       - "papers/physics-math/ramanujan/proofs/**"
       - ".github/workflows/exact-rational-physics-proof.yml"
   workflow_dispatch:
@@ -47,16 +48,16 @@ jobs:
           rustfmt +1.96.0 --edition 2024 --check crates/bridges/symthaea-physics-bridge/tests/formal_invariants.rs
 
       - name: Test exact-rational symbolic expression
-        run: cargo +1.96.0 test --locked -p symthaea-core --lib exact_rational_tests
+        run: cargo +1.96.0 test --locked --manifest-path research/exact-rational-physics-proof/Cargo.toml -p symthaea-core --lib exact_rational_tests
 
       - name: Run all polynomial invariant proofs, including unscaled Hénon-Heiles
-        run: cargo +1.96.0 test --locked -p symthaea-physics-bridge --test formal_invariants
+        run: cargo +1.96.0 test --locked --manifest-path research/exact-rational-physics-proof/Cargo.toml -p symthaea-exact-rational-physics-proof-verifier
 
       - name: Regenerate exact-head SMT witnesses and receipt
         shell: bash
         run: |
           set -euo pipefail
-          cargo +1.96.0 run --locked --release -p symthaea-physics-bridge --example verify_invariants_formal > exact-rational-proof-results.csv
+          cargo +1.96.0 run --locked --release --manifest-path research/exact-rational-physics-proof/Cargo.toml -p symthaea-exact-rational-physics-proof-verifier > exact-rational-proof-results.csv
           grep -E '^henon_heiles_exact_H,.*unsat,true,' exact-rational-proof-results.csv
           witness="papers/physics-math/ramanujan/proofs/henon_heiles_exact_H.smt2"
           test -s "$witness"
@@ -69,6 +70,7 @@ jobs:
             echo "witness_sha256=$(sha256sum "$witness" | cut -d ' ' -f 1)"
             echo "claim=unscaled Hénon-Heiles Hamiltonian has dH/dt = 0 for the declared Hamiltonian vector field"
             echo "scope=SMT proof of the emitted polynomial obligation; not empirical validation of a physical system"
+            echo "harness_boundary=production symbolic.rs and proof-emitter source included directly; HDC/world integration represented by test-only AST shim, not qualified"
           } > exact-rational-proof-receipt.txt
           cat exact-rational-proof-receipt.txt
 
