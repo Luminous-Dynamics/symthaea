@@ -31,6 +31,12 @@ cargo run -p symthaea-proof-insights -- \
 
 The verifier rejects source-revision, source-fingerprint, split-algorithm/count/digest, duplicate-ID, or family-assignment mismatches. Catalog paths appearing under multiple families also fail closed in the indexer. This confirms agreement with the frozen assignment, not that the split is free of cross-family mathematical-dependency leakage or pretraining contamination.
 
+## Preregistered result analysis
+
+The companion `analyze_pitb_results` binary implements the registered F-vs-validation-selected-baseline comparison. Its strict input contract, content-hash requirements, frozen split checks, validation-only baseline receipt, evidence fields, family-cluster bootstrap, output fields, and limitations are documented in [analysis-contract.md](../../data/benchmarks/proof-insight-transfer-v0/analysis-contract.md).
+
+The analysis tool is deliberately separate from the source indexer and transfer-candidate validator. It will not create result rows, run Lean, or turn a curator annotation into a verified transfer. Only pass `semantic_gate_passed: true` for an arm after the exact target theorem, axiom/dependency policy, statement correspondence, applicable successor checks, and mutation controls have passed and their receipts are retained. Until then, there are no measured transfer results.
+
 ## What the JSON captures
 
 - source commit and repository-relative SHA-256 fingerprints for `README.md`, `CONTENTS.md`, `lean/formalization.yaml`, the Comparator scope notes, every present local artifact linked from `CONTENTS.md`, formalization source files, and present main-result Lean/config artifacts;
