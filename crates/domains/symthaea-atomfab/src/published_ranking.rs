@@ -114,7 +114,8 @@ impl PublishedRankingMetrics {
         }
         if self.candidate_count == 0
             || !self.rbo_persistence.is_finite()
-            || !(0.0..1.0).contains(&self.rbo_persistence)
+            || self.rbo_persistence <= 0.0
+            || self.rbo_persistence >= 1.0
             || !self.extrapolated_rbo.is_finite()
             || !(0.0..=1.0).contains(&self.extrapolated_rbo)
             || !self.kendall_tau_b.is_finite()
@@ -148,7 +149,7 @@ pub fn compare_published_rankings(
     if predicted.len() != reference.len() {
         return Err(PublishedRankingError::LengthMismatch);
     }
-    if !persistence.is_finite() || !(0.0..1.0).contains(&persistence) {
+    if !persistence.is_finite() || persistence <= 0.0 || persistence >= 1.0 {
         return Err(PublishedRankingError::InvalidPersistence);
     }
     if !tie_tolerance.is_finite() || tie_tolerance < 0.0 {
@@ -358,6 +359,17 @@ mod tests {
         assert!((metrics.extrapolated_rbo - 1.0).abs() < 1e-12);
         assert!((metrics.kendall_tau_b - 1.0).abs() < 1e-12);
         assert_eq!(metrics.candidate_count, 3);
+    }
+
+    #[test]
+    fn rbo_persistence_must_be_strictly_between_zero_and_one() {
+        let candidates = energies(&[("a", -3.0), ("b", -2.0)]);
+        for persistence in [0.0, 1.0, f64::NAN, f64::INFINITY] {
+            assert_eq!(
+                compare_published_rankings(&candidates, &candidates, persistence, 0.0),
+                Err(PublishedRankingError::InvalidPersistence)
+            );
+        }
     }
 
     #[test]
