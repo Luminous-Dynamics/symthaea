@@ -67,6 +67,8 @@ struct Obligation<'a> {
     object_type: &'a str,
     predicate: &'a str,
     relation: &'a str,
+    quantifier_scope: &'a str,
+    preconditions: Vec<&'a str>,
 }
 
 fn parse_obligation<'a>(contract: &'a Value, field: &str) -> Result<Obligation<'a>> {
@@ -80,10 +82,11 @@ fn parse_obligation<'a>(contract: &'a Value, field: &str) -> Result<Obligation<'
     if !RELATIONS.contains(&relation) {
         bail!("{field}.relation has unsupported value {relation:?}");
     }
+    let quantifier_scope = required_string(value, "quantifier_scope")?;
     if domain.trim().is_empty()
         || object_type.trim().is_empty()
         || predicate.trim().is_empty()
-        || required_string(value, "quantifier_scope")?.trim().is_empty()
+        || quantifier_scope.trim().is_empty()
     {
         bail!("{field} domain/object_type/predicate/quantifier_scope must be non-empty");
     }
@@ -91,17 +94,23 @@ fn parse_obligation<'a>(contract: &'a Value, field: &str) -> Result<Obligation<'
         .get("preconditions")
         .and_then(Value::as_array)
         .with_context(|| format!("{field}.preconditions must be an array"))?;
-    if preconditions.iter().any(|item| {
-        item.as_str()
-            .is_none_or(|text| text.trim().is_empty())
-    }) {
-        bail!("{field}.preconditions must contain only non-empty strings");
+    let mut parsed_preconditions = Vec::with_capacity(preconditions.len());
+    for item in preconditions {
+        let precondition = item
+            .as_str()
+            .context("obligation precondition must be a string")?;
+        if precondition.trim().is_empty() {
+            bail!("{field}.preconditions must contain only non-empty strings");
+        }
+        parsed_preconditions.push(precondition);
     }
     Ok(Obligation {
         domain,
         object_type,
         predicate,
         relation,
+        quantifier_scope,
+        preconditions: parsed_preconditions,
     })
 }
 
@@ -240,6 +249,26 @@ fn validate_candidate(candidate: &Value) -> Result<()> {
             && (compatibility == "compatible" || !mismatch_codes.contains("inequality_direction"))
         {
             bail!("opposite source/target inequality directions require an inequality_direction mismatch");
+        }
+        if source_obligation.quantifier_scope != target_obligation.quantifier_scope
+            && (compatibility == "compatible" || !mismatch_codes.contains("quantifier_scope"))
+        {
+            bail!("inequality transfer across quantifier scopes requires a quantifier_scope mismatch");
+        }
+    }
+
+    if compatibility == "compatible" {
+        let checked_preconditions: BTreeSet<&str> = candidate
+            .get("preconditions_checked")
+            .and_then(Value::as_array)
+            .map(|items| items.iter().filter_map(Value::as_str).collect())
+            .unwrap_or_default();
+        for required in &source_obligation.preconditions {
+            if !target_obligation.preconditions.contains(required)
+                && !checked_preconditions.contains(required)
+            {
+                bail!("compatible transfer has an unchecked source precondition: {required}");
+            }
         }
     }
 
