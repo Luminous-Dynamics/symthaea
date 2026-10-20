@@ -717,5 +717,4 @@ mod tests {
                 && violation.case_id.as_deref() == Some("case-test")
         }));
     }
-
 }
