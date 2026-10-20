@@ -3110,11 +3110,15 @@ mod tests {
             "theorem first : True := by\n  sorry\ntheorem second : True := by\n  sorry\n";
         fs::write(root.join("lean/Example.lean"), initial_source)
             .expect("write initial source state");
-        // Deliberate source-document mismatch: the CSV will contain two rows,
-        // while README claims three, and the audit must preserve that discrepancy.
+        let other_initial_source = "theorem other : True := by\n  sorry\n";
+        fs::write(root.join("lean/Other.lean"), other_initial_source)
+            .expect("write second source file");
+
+        // Deliberate source-document mismatch: the CSV will contain four rows,
+        // while README claims five, and the audit must preserve that discrepancy.
         fs::write(
             root.join("README.md"),
-            "The proof_timeline.csv currently records 4 theorems in this fixture.\n",
+            "The proof_timeline.csv currently records 5 theorems in this fixture.\n",
         )
         .expect("write deliberately inconsistent timeline README");
         let commit_one = commit(&root, "historical target statements");
@@ -3132,7 +3136,11 @@ mod tests {
 
         let third_source = second_source.replacen("  sorry\n", "  trivial\n", 1);
         fs::write(root.join("lean/Example.lean"), &third_source).expect("complete second proof");
-        let commit_three = commit(&root, "complete second proof");
+        let other_completed_source =
+            other_initial_source.replacen("  sorry\n", "  exact True.intro\n", 1);
+        fs::write(root.join("lean/Other.lean"), &other_completed_source)
+            .expect("complete independent theorem");
+        let commit_three = commit(&root, "complete second and independent proofs");
         let source_three = git_show_file(&root, &commit_three, "lean/Example.lean")
             .expect("read third source revision");
         let source_three_sha = sha(&source_three);
@@ -3146,11 +3154,59 @@ mod tests {
             "id,lean_name,spec_theorem,function,verified,date_proven,commit_hash,commit_message\n\
              tl_0000_first,,lean/Example.lean,Example.first,verified,2026-10-20,{commit_two},complete first proof\n\
              tl_0001_second,,lean/Example.lean,Example.second,verified,2026-10-21,{commit_three},complete second proof\n\
-             tl_0002_missing,,lean/Missing.lean,Example.missing,externally verified,2026-10-22,{commit_three},source intentionally absent\n"
+             tl_0002_missing,,lean/Missing.lean,Example.missing,externally verified,2026-10-22,{commit_three},source intentionally absent\n\
+             tl_0003_other,,lean/Other.lean,Example.other,verified,2026-10-23,{commit_three},complete independent proof\n"
         );
         fs::write(root.join("proof_timeline.csv"), &timeline)
             .expect("write full timeline inventory");
-        let repository_commit = commit(&root, "freeze historical timeline inventory");
+
+        let dataset_rows = [
+            serde_json::json!({
+                "id": "unique-other",
+                "theorem_name": "other",
+                "file_path": "lean/Other.lean",
+                "commit_before": commit_one,
+                "formal_statement": "theorem other : True := by"
+            }),
+            serde_json::json!({
+                "id": "ambiguous-example",
+                "theorem_name": "first",
+                "file_path": "lean/Example.lean",
+                "commit_before": commit_one,
+                "formal_statement": "theorem first : True := by"
+            }),
+            serde_json::json!({
+                "id": "unmatched-path",
+                "theorem_name": "absent",
+                "file_path": "lean/Unlisted.lean",
+                "commit_before": commit_one,
+                "formal_statement": "theorem absent : True := by"
+            }),
+            serde_json::json!({
+                "id": "empty-statement",
+                "theorem_name": "other",
+                "file_path": "lean/Other.lean",
+                "commit_before": commit_one,
+                "formal_statement": ""
+            }),
+            serde_json::json!({
+                "id": "invalid-path",
+                "theorem_name": "outside",
+                "file_path": "../outside.lean",
+                "commit_before": commit_one,
+                "formal_statement": "theorem outside : True := by"
+            })
+        ];
+        let dataset_text = dataset_rows
+            .iter()
+            .map(|row| serde_json::to_string(row).expect("serialize synthetic dataset row"))
+            .collect::<Vec<_>>()
+            .join("\n")
+            + "\n";
+        fs::write(root.join("dataset.jsonl"), &dataset_text)
+            .expect("write synthetic dataset JSONL");
+
+        let repository_commit = commit(&root, "freeze historical timeline and dataset inventory");
 
         let manifest = serde_json::json!({
             "schema_version": "pitb.temporal-replay-manifest.v0",
@@ -3300,8 +3356,8 @@ mod tests {
             &fs::read(&timeline_audit_path).expect("read temporal timeline audit"),
         )
         .expect("parse temporal timeline audit JSON");
-        assert_eq!(timeline_audit["total_timeline_rows"], 3);
-        assert_eq!(timeline_audit["readme_claimed_timeline_row_count"], 4);
+        assert_eq!(timeline_audit["total_timeline_rows"], 4);
+        assert_eq!(timeline_audit["readme_claimed_timeline_row_count"], 5);
         assert_eq!(
             timeline_audit["timeline_row_count_matches_readme_claim"],
             false
@@ -3313,7 +3369,7 @@ mod tests {
                 .as_slice())
         );
         assert_eq!(timeline_audit["unique_completion_commit_count"], 2);
-        assert_eq!(timeline_audit["source_path_present_at_completion_count"], 2);
+        assert_eq!(timeline_audit["source_path_present_at_completion_count"], 3);
         assert_eq!(timeline_audit["source_path_missing_at_completion_count"], 1);
         assert_eq!(timeline_audit["source_path_not_recorded_count"], 0);
         assert_eq!(
@@ -3325,6 +3381,63 @@ mod tests {
             timeline_audit["events"][1]["source_file_sha256"],
             source_three_sha
         );
+
+        let dataset_audit_path = base.join("dataset-audit.json");
+        audit_temporal_dataset(
+            &root,
+            Path::new("proof_timeline.csv"),
+            Path::new("dataset.jsonl"),
+            &dataset_audit_path,
+        )
+        .expect("dataset join auditor must keep ambiguous and unmatched rows explicit");
+        let dataset_audit: serde_json::Value = serde_json::from_slice(
+            &fs::read(&dataset_audit_path).expect("read synthetic dataset join audit"),
+        )
+        .expect("parse synthetic dataset join audit JSON");
+        assert_eq!(dataset_audit["total_timeline_rows"], 4);
+        assert_eq!(dataset_audit["unique_timeline_path_count"], 3);
+        assert_eq!(dataset_audit["total_dataset_records"], 5);
+        assert_eq!(dataset_audit["unique_dataset_id_count"], 5);
+        assert_eq!(dataset_audit["unique_path_join_count"], 2);
+        assert_eq!(dataset_audit["ambiguous_path_join_count"], 1);
+        assert_eq!(dataset_audit["unmatched_path_join_count"], 1);
+        assert_eq!(dataset_audit["invalid_dataset_path_count"], 1);
+        assert_eq!(dataset_audit["commit_before_ancestor_of_head_count"], 5);
+        assert_eq!(dataset_audit["commit_before_missing_commit_object_count"], 0);
+        assert_eq!(dataset_audit["commit_before_invalid_sha_count"], 0);
+        assert_eq!(dataset_audit["commit_before_ancestor_of_completion_count"], 2);
+        let dataset_events = dataset_audit["events"]
+            .as_array()
+            .expect("dataset audit events must be an array");
+        assert_eq!(dataset_events[0]["path_join_status"], "unique_path_match");
+        assert_eq!(
+            dataset_events[0]["statement_match_relation"],
+            "matches_before_and_completion"
+        );
+        assert_eq!(dataset_events[0]["statement_match_at_commit_before"], true);
+        assert_eq!(dataset_events[0]["statement_match_at_completion"], true);
+        assert_eq!(dataset_events[1]["path_join_status"], "ambiguous_path_match");
+        assert_eq!(
+            dataset_events[1]["statement_match_relation"],
+            "not_checked_due_to_ambiguous_path"
+        );
+        assert_eq!(dataset_events[2]["path_join_status"], "no_path_match");
+        assert_eq!(
+            dataset_events[2]["statement_match_relation"],
+            "not_checked_due_to_unmatched_path"
+        );
+        assert_eq!(dataset_events[3]["path_join_status"], "unique_path_match");
+        assert_eq!(
+            dataset_events[3]["statement_match_relation"],
+            "empty_formal_statement"
+        );
+        assert_eq!(dataset_events[3]["statement_match_at_commit_before"], null);
+        assert_eq!(dataset_events[4]["path_join_status"], "invalid_path");
+        assert_eq!(
+            dataset_events[4]["statement_match_relation"],
+            "not_checked_due_to_invalid_path"
+        );
+
         let target_bundle_path = base.join("target-001-bundle.json");
         materialize_temporal_target(&root, &manifest_path, "target-001", &target_bundle_path)
             .expect("only historically available artifacts should be materialized");
