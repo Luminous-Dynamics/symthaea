@@ -525,8 +525,7 @@ mod tests {
 
     #[test]
     fn route_feasibility_is_separate_from_evidence_completeness() {
-        let receipt =
-            evaluate_valid(EMBEDDED_CORPUS.as_bytes()).expect("valid corpus");
+        let receipt = evaluate_valid(EMBEDDED_CORPUS.as_bytes()).expect("valid corpus");
         let via_case = receipt
             .cases
             .iter()
@@ -589,8 +588,7 @@ mod tests {
 
     #[test]
     fn physical_qualification_claim_cannot_be_supported_by_synthetic_evidence() {
-        let receipt =
-            evaluate_valid(EMBEDDED_CORPUS.as_bytes()).expect("valid corpus");
+        let receipt = evaluate_valid(EMBEDDED_CORPUS.as_bytes()).expect("valid corpus");
         let case = receipt
             .cases
             .iter()
