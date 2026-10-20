@@ -1,0 +1,58 @@
+name: Beverage Benchmark Contract
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "crates/domains/symthaea-culinary/**"
+      - "docs/research/BEVERAGE_ENGINEERING_BENCHMARK_V1.md"
+      - "docs/research/beverage-engineering-scenarios-v1.json"
+      - "docs/research/beverage-engineering-scenarios-v1.schema.json"
+      - ".github/workflows/beverage-benchmark.yml"
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-culinary/**"
+      - "docs/research/BEVERAGE_ENGINEERING_BENCHMARK_V1.md"
+      - "docs/research/beverage-engineering-scenarios-v1.json"
+      - "docs/research/beverage-engineering-scenarios-v1.schema.json"
+      - ".github/workflows/beverage-benchmark.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: beverage-benchmark-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  synthetic-contract:
+    name: Synthetic Corpus Contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Format focused runner
+        run: rustfmt --edition 2024 --check crates/domains/symthaea-culinary/src/bin/beverage_benchmark_receipt.rs
+
+      - name: Test receipt contract
+        run: cargo test -p symthaea-culinary --bin beverage_benchmark_receipt
+
+      - name: Emit exact-head receipt
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          cargo run -p symthaea-culinary --bin beverage_benchmark_receipt -- \
+            --corpus docs/research/beverage-engineering-scenarios-v1.json \
+            --schema docs/research/beverage-engineering-scenarios-v1.schema.json \
+            --expected-head "$EXPECTED_HEAD" \
+            --out "$RUNNER_TEMP/beverage-benchmark-receipt.json"
+          cat "$RUNNER_TEMP/beverage-benchmark-receipt.json"
