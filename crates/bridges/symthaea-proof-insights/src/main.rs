@@ -178,6 +178,7 @@ struct TemporalTimelineEvent {
     proof_completion_commit: String,
     statement_sha256: String,
     statement_artifact_id: String,
+    completion_statement_artifact_id: String,
     proof_artifact_id: String,
     visible_artifact_ids: Vec<String>,
 }
@@ -842,6 +843,7 @@ fn validate_temporal_manifest(manifest: &TemporalReplayManifest) -> Result<()> {
         }
         if ![
             "theorem_statement",
+            "completion_statement",
             "proof_body",
             "definition",
             "module_context",
@@ -855,10 +857,10 @@ fn validate_temporal_manifest(manifest: &TemporalReplayManifest) -> Result<()> {
             );
         }
         match artifact.artifact_kind.as_str() {
-            "proof_body" => {
+            "proof_body" | "completion_statement" => {
                 if artifact.available_at_position.is_some() || artifact.target_position.is_none() {
                     bail!(
-                        "evaluator-only proof {} must have target_position and no solver-visible available_at_position",
+                        "evaluator-only artifact {} must have target_position and no solver-visible available_at_position",
                         artifact.artifact_id
                     );
                 }
@@ -939,6 +941,34 @@ fn validate_temporal_manifest(manifest: &TemporalReplayManifest) -> Result<()> {
                 event.target_id
             );
         }
+        if event.completion_statement_artifact_id == event.statement_artifact_id
+            || event.completion_statement_artifact_id == event.proof_artifact_id
+        {
+            bail!("target statement, completion statement, and proof must be distinct artifacts");
+        }
+        let completion_statement = artifacts_by_id
+            .get(event.completion_statement_artifact_id.as_str())
+            .with_context(|| {
+                format!(
+                    "target {} lacks its evaluator-only completion statement artifact",
+                    event.target_id
+                )
+            })?;
+        if completion_statement.artifact_kind != "completion_statement"
+            || completion_statement.theorem_id.as_deref() != Some(event.theorem_id.as_str())
+            || completion_statement.available_at_position.is_some()
+            || completion_statement.target_position != Some(event.position)
+            || completion_statement.source_commit != event.proof_completion_commit
+            || completion_statement.content_sha256 != event.statement_sha256
+            || completion_statement.path != proof.path
+            || completion_statement.source_file_sha256 != proof.source_file_sha256
+            || completion_statement.content_end_line >= proof.content_start_line
+        {
+            bail!(
+                "theorem statement changed between target state and proof completion for {}",
+                event.target_id
+            );
+        }
 
         let mut visible_ids = BTreeSet::new();
         for artifact_id in &event.visible_artifact_ids {
@@ -963,6 +993,12 @@ fn validate_temporal_manifest(manifest: &TemporalReplayManifest) -> Result<()> {
             }
             if artifact_id != &event.statement_artifact_id {
                 match artifact.artifact_kind.as_str() {
+                    "completion_statement" => {
+                        bail!(
+                            "evaluator-only completion statement {} cannot be model-visible",
+                            artifact.artifact_id
+                        );
+                    }
                     "proof_body" => {
                         if artifact
                             .target_position
