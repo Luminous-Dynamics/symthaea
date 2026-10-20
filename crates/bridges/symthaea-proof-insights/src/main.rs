@@ -3231,7 +3231,7 @@ mod tests {
                 "file_path": "lean/Other.lean",
                 "commit_before": "not-a-git-sha",
                 "formal_statement": "theorem other : True := by"
-            })
+            }),
         ];
         let dataset_text = dataset_rows
             .iter()
@@ -3439,9 +3439,15 @@ mod tests {
         assert_eq!(dataset_audit["unmatched_path_join_count"], 1);
         assert_eq!(dataset_audit["invalid_dataset_path_count"], 1);
         assert_eq!(dataset_audit["commit_before_ancestor_of_head_count"], 5);
-        assert_eq!(dataset_audit["commit_before_missing_commit_object_count"], 1);
+        assert_eq!(
+            dataset_audit["commit_before_missing_commit_object_count"],
+            1
+        );
         assert_eq!(dataset_audit["commit_before_invalid_sha_count"], 1);
-        assert_eq!(dataset_audit["commit_before_ancestor_of_completion_count"], 2);
+        assert_eq!(
+            dataset_audit["commit_before_ancestor_of_completion_count"],
+            2
+        );
         let dataset_events = dataset_audit["events"]
             .as_array()
             .expect("dataset audit events must be an array");
@@ -3452,7 +3458,10 @@ mod tests {
         );
         assert_eq!(dataset_events[0]["statement_match_at_commit_before"], true);
         assert_eq!(dataset_events[0]["statement_match_at_completion"], true);
-        assert_eq!(dataset_events[1]["path_join_status"], "ambiguous_path_match");
+        assert_eq!(
+            dataset_events[1]["path_join_status"],
+            "ambiguous_path_match"
+        );
         assert_eq!(
             dataset_events[1]["statement_match_relation"],
             "not_checked_due_to_ambiguous_path"
