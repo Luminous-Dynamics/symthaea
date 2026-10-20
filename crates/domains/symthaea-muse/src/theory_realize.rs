@@ -41,7 +41,8 @@ use symthaea_music_theory::{MusicalIntent, Score as TheoryScore, Style};
 /// [`apply_expressive_model`]'s blend). March, Mazurka, and Toccata timing
 /// profiles are explicit engineering hypotheses awaiting blinded audio
 /// calibration—not evidence of historical authenticity. Folk, Lullaby,
-/// Sarabande, and Minuet add mechanism-routed profiles, still provisional.
+/// Sarabande, Minuet, and Waltz add mechanism-routed profiles, still
+/// provisional.
 /// [`PerformanceDialect::ClassicalRubato`] remains the identity — every
 /// factor exactly 1.0 — so its renders remain bit-identical to pre-dialect behavior.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -91,6 +92,10 @@ pub enum PerformanceDialect {
     /// Minuet prototype: measured triple-dance timing, with restrained phrase
     /// stretch and moderately stable local pulse. Calibration hypothesis only.
     MinuetPoise,
+    /// Waltz prototype: maintain a flowing phrase while mildly restraining
+    /// cadential stretch and timing scatter around the oom-pah-pah pulse.
+    /// Calibration prior, not a universal waltz performance claim.
+    WaltzLilt,
     /// Blues/jazz: laid-back time. Jitter up (1.3x), phrase-final rubato
     /// and the expressive blend both kept — a jazz ballad leans harder
     /// into time than a classical player, never less.
@@ -110,6 +115,7 @@ impl PerformanceDialect {
             PerformanceDialect::LullabySway => 0.65,
             PerformanceDialect::SarabandeGrave => 1.15,
             PerformanceDialect::MinuetPoise => 0.85,
+            PerformanceDialect::WaltzLilt => 0.8,
             PerformanceDialect::DanceLocked => 0.25,
             PerformanceDialect::ProcessExact => 0.1,
         }
@@ -127,6 +133,7 @@ impl PerformanceDialect {
             PerformanceDialect::LullabySway => 0.35,
             PerformanceDialect::SarabandeGrave => 0.9,
             PerformanceDialect::MinuetPoise => 0.7,
+            PerformanceDialect::WaltzLilt => 0.8,
             PerformanceDialect::DanceLocked => 0.25,
             PerformanceDialect::ProcessExact => 0.1,
         }
@@ -142,6 +149,7 @@ impl PerformanceDialect {
             PerformanceDialect::LullabySway => 0.6,
             PerformanceDialect::SarabandeGrave => 1.15,
             PerformanceDialect::MinuetPoise => 0.7,
+            PerformanceDialect::WaltzLilt => 0.75,
             PerformanceDialect::FolkLift => 0.6,
             PerformanceDialect::DanceLocked => 0.25,
             PerformanceDialect::ProcessExact => 0.1,
@@ -158,6 +166,7 @@ impl PerformanceDialect {
             PerformanceDialect::LullabySway => 0.55,
             PerformanceDialect::SarabandeGrave => 0.65,
             PerformanceDialect::MinuetPoise => 0.75,
+            PerformanceDialect::WaltzLilt => 0.8,
             PerformanceDialect::DanceLocked => 0.6,
             PerformanceDialect::ProcessExact => 0.4,
             PerformanceDialect::FolkLift => 1.2,
@@ -179,6 +188,7 @@ impl PerformanceDialect {
             PerformanceDialect::LullabySway => 0.5,
             PerformanceDialect::SarabandeGrave => 0.9,
             PerformanceDialect::MinuetPoise => 0.75,
+            PerformanceDialect::WaltzLilt => 0.8,
             PerformanceDialect::DanceLocked => 0.4,
             PerformanceDialect::ProcessExact => 0.0,
         }
@@ -201,12 +211,13 @@ impl PerformanceDialect {
 /// 4. `FolkPulse` → [`PerformanceDialect::FolkLift`]
 /// 5. `LullabyCradle` → [`PerformanceDialect::LullabySway`]
 /// 6. `Sarabande` / `Minuet` → their own measured triple-dance profiles
-/// 7. a rhythm-cell accompaniment (Habanera/Montuno/BossaComp/CompasGait/
+/// 7. `OomPah` → [`PerformanceDialect::WaltzLilt`]
+/// 8. a rhythm-cell accompaniment (Habanera/Montuno/BossaComp/CompasGait/
 ///    Shuffle), non-straight swing, or a full backbeat kit → groove: with a
 ///    jazz marker (Shuffle, swing ≠ 0.5, or `seventh_chords`) →
 ///    [`PerformanceDialect::JazzLaidBack`], else [`PerformanceDialect::DanceLocked`]
-/// 8. `roll_ornaments` or `drone` → [`PerformanceDialect::FolkLift`]
-/// 9. everything else → [`PerformanceDialect::ClassicalRubato`] (the identity)
+/// 9. `roll_ornaments` or `drone` → [`PerformanceDialect::FolkLift`]
+/// 10. everything else → [`PerformanceDialect::ClassicalRubato`] (the identity)
 ///
 /// Remaining presets use ClassicalRubato as a neutral identity until a separate
 /// rhythmic/performance contract is justified; this baseline is not an assertion
@@ -238,6 +249,9 @@ pub fn dialect_for_spec(spec: &symthaea_music_theory::CompositionSpec) -> Perfor
     }
     if spec.accompaniment_pool.contains(&A::Minuet) {
         return PerformanceDialect::MinuetPoise;
+    }
+    if spec.accompaniment_pool.contains(&A::OomPah) {
+        return PerformanceDialect::WaltzLilt;
     }
     let has_shuffle = spec.accompaniment_pool.contains(&A::Shuffle);
     let has_groove_cell = has_shuffle
@@ -1860,7 +1874,7 @@ mod tests {
         // This is a mechanic-level check, not a perceptual-quality verdict.
         let cases = [
             (Style::Classical, D::ClassicalRubato),
-            (Style::Waltz, D::ClassicalRubato),
+            (Style::Waltz, D::WaltzLilt),
             // Folk's picked pulse is its explicit clock marker.
             (Style::Folk, D::FolkLift),
             (Style::Cinematic, D::ClassicalRubato),
@@ -1949,6 +1963,7 @@ mod tests {
         };
 
         for (style, expected_dialect) in [
+            (Style::Waltz, D::WaltzLilt),
             (Style::Folk, D::FolkLift),
             (Style::ModalFolk, D::FolkLift),
             (Style::Lullaby, D::LullabySway),
@@ -2035,6 +2050,7 @@ mod tests {
     fn style_dialect_hypotheses_are_non_identity_and_explicit() {
         use PerformanceDialect as D;
         let classical = D::ClassicalRubato;
+        let waltz = D::WaltzLilt;
         let folk = D::FolkLift;
         let lullaby = D::LullabySway;
         let sarabande = D::SarabandeGrave;
@@ -2042,6 +2058,13 @@ mod tests {
         let march = D::MarchLocked;
         let mazurka = D::MazurkaLilt;
         let toccata = D::ToccataMotor;
+
+        assert_eq!(waltz.breath_scale(), 0.8);
+        assert_eq!(waltz.climax_scale(), 0.8);
+        assert_eq!(waltz.cadence_scale(), 0.75);
+        assert_eq!(waltz.jitter_scale(), 0.8);
+        assert_eq!(waltz.expressive_blend_scale(), 0.8);
+        assert!(waltz.jitter_scale() < classical.jitter_scale());
 
         assert_eq!(folk.breath_scale(), 1.0);
         assert_eq!(folk.climax_scale(), 1.0);
