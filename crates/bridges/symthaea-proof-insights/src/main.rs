@@ -261,6 +261,50 @@ struct TemporalTimelineAudit {
 }
 
 #[derive(Debug, Serialize)]
+struct TemporalDatasetJoinAudit {
+    schema_version: &'static str,
+    repository_url: String,
+    repository_commit: String,
+    timeline_path: String,
+    timeline_sha256: String,
+    dataset_path: String,
+    dataset_sha256: String,
+    total_timeline_rows: usize,
+    unique_timeline_path_count: usize,
+    total_dataset_records: usize,
+    unique_dataset_id_count: usize,
+    blank_dataset_line_count: usize,
+    unique_path_join_count: usize,
+    ambiguous_path_join_count: usize,
+    unmatched_path_join_count: usize,
+    invalid_dataset_path_count: usize,
+    commit_before_ancestor_of_head_count: usize,
+    commit_before_not_ancestor_of_head_count: usize,
+    commit_before_invalid_sha_count: usize,
+    commit_before_ancestor_of_completion_count: usize,
+    statement_match_relation_counts: BTreeMap<String, usize>,
+    events: Vec<TemporalDatasetJoinAuditEvent>,
+}
+
+#[derive(Debug, Serialize)]
+struct TemporalDatasetJoinAuditEvent {
+    dataset_position: usize,
+    dataset_id: String,
+    theorem_name: String,
+    file_path: String,
+    commit_before: String,
+    statement_sha256: String,
+    path_join_status: String,
+    candidate_timeline_positions: Vec<usize>,
+    matched_completion_commit: Option<String>,
+    commit_before_is_ancestor_of_head: Option<bool>,
+    commit_before_is_ancestor_of_completion: Option<bool>,
+    statement_match_at_commit_before: Option<bool>,
+    statement_match_at_completion: Option<bool>,
+    statement_match_relation: String,
+}
+
+#[derive(Debug, Serialize)]
 struct TemporalTimelineAuditEvent {
     position: usize,
     event_key: String,
@@ -349,6 +393,20 @@ fn main() -> ExitCode {
             Ok(()) => ExitCode::SUCCESS,
             Err(error) => {
                 eprintln!("proof-insights temporal timeline audit: {error:#}");
+                ExitCode::FAILURE
+            }
+        };
+    }
+    if args.len() == 6 && args[1] == "--audit-temporal-dataset" {
+        return match audit_temporal_dataset(
+            Path::new(&args[2]),
+            Path::new(&args[3]),
+            Path::new(&args[4]),
+            Path::new(&args[5]),
+        ) {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(error) => {
+                eprintln!("proof-insights temporal dataset join audit: {error:#}");
                 ExitCode::FAILURE
             }
         };
