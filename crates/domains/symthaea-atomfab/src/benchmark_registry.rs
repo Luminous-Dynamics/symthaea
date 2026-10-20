@@ -383,19 +383,15 @@ mod tests {
                 .unwrap_or_else(|| panic!("missing benchmark lane {lane_id}"));
             assert!(
                 lane.metrics.iter().any(|metric| {
-                    metric.contains("Pareto frontier")
-                        && metric.contains("total cost")
+                    metric.contains("Pareto frontier") && metric.contains("total cost")
                 }),
                 "{lane_id} must report a multi-objective discovery frontier"
             );
             assert!(
-                lane.gates.iter().any(|gate| {
-                    gate.contains("nondominated")
-                        && gate.contains("cost")
-                }),
+                lane.gates
+                    .iter()
+                    .any(|gate| { gate.contains("nondominated") && gate.contains("cost") }),
                 "{lane_id} must explicitly gate Pareto reporting"
             );
         }
-    }
-
-}
+    }}
