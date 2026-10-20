@@ -54,7 +54,8 @@
         "OOD calibration",
         "typed failure-mode counts by model/material family/split/severity, with abstentions reported separately",
         "per-family transferability and declared applicability-domain violations, not only pooled error",
-        "derived-observable error and violation rates (lattice/volume/barrier or task-relevant outputs) by failure category"
+        "derived-observable error and violation rates (lattice/volume/barrier or task-relevant outputs) by failure category",
+        "failure-mode rates scoped by evaluation stratum (e.g., particle size × support surface × temperature regime), with the scope digest retained"
       ],
       "gates": [
         "reproduce a published baseline within its reported tolerance",
@@ -63,7 +64,8 @@
         "report failures and exclusions",
         "retain every tested sample disposition (pass, failed, abstained) and never omit failed/non-converged samples from aggregate denominators",
         "publish critical failure counts and grouped family-holdout results beside MAE/RMSE; a good average cannot compensate for catastrophic failures",
-        "use a frozen failure taxonomy and evaluator digest; summary counts must recompute from record-level evidence with no mixed model/split/family pooling"
+        "use a frozen failure taxonomy and evaluator digest; summary counts must recompute from record-level evidence with no mixed model/split/family pooling",
+        "report each evaluation stratum separately before any cross-stratum aggregate; no result may pool particle sizes, support surfaces or thermodynamic regimes into one hidden rate"
       ]
     },
     {
@@ -185,7 +187,8 @@
         "search cost per unique validated low-energy structure",
         "best validated objective and learning curve at equal cost",
         "Pareto frontier over unique reference-validated low-energy structures, best validated objective, and total cost; do not collapse these dimensions into one weighted score",
-        "typed structural-search failure modes: non-convergence, geometry collapse, interatomic overlap, support/interface breakdown, non-finite force, out-of-domain recommendation, and abstention"
+        "typed structural-search failure modes: non-convergence, geometry collapse, interatomic overlap, support/interface breakdown, non-finite force, out-of-domain recommendation, and abstention",
+        "failure-mode rates scoped by evaluation stratum (e.g., particle size × support surface × temperature regime), with the scope digest retained"
       ],
       "gates": [
         "report energy accuracy and structural exploration as separate score families",
@@ -196,7 +199,8 @@
         "compare search policies at equal reference-calculation budgets and include a strong pretrained potential",
         "do not generalize from the chosen supported-nanoparticle family to universal catalyst performance",
         "report the nondominated policy set per matched seed; hard-constraint violations make an outcome ineligible rather than tradeable against discovery quality or cost",
-        "report failure and abstention distributions by particle size and support surface; do not report a search as efficient by excluding failed relaxations or invalid interfaces"
+        "report failure and abstention distributions by particle size and support surface; do not report a search as efficient by excluding failed relaxations or invalid interfaces",
+        "report each evaluation stratum separately before any cross-stratum aggregate; no result may pool particle sizes, support surfaces or thermodynamic regimes into one hidden rate"
       ]
     },
     {
