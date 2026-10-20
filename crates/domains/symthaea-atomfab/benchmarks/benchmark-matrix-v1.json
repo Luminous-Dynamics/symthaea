@@ -162,6 +162,7 @@
       "metrics": [
         "energy error on matched structures",
         "reference energetic-ordering accuracy on matched structures",
+        "top-weighted finite-prefix ranking overlap (normalized RBO-style) on candidate IDs",
         "reference low-energy structure recovery rate",
         "unique low-energy minima found at equal reference-calculation budget",
         "structural diversity and duplicate-minimum rate under a pinned deduplication tolerance",
