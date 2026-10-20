@@ -758,6 +758,20 @@ mod tests {
             }),
             "speedup claims must combine statistical evidence with equal-cost result quality"
         );
+        assert!(
+            lane.metrics.iter().any(|metric| {
+                metric.contains("paired target-reach rate")
+                    && metric.contains("including failed and incomplete campaigns")
+            }),
+            "the benchmark must separately measure reachability over all paired seeds"
+        );
+        assert!(
+            lane.gates.iter().any(|gate| {
+                gate.contains("failed/incomplete runs count as not reaching target")
+                    && gate.contains("never be omitted")
+            }),
+            "target-attainment metrics must retain failed and incomplete runs"
+        );
         let has_ensemble_disagreement = lane
             .baselines
             .iter()
