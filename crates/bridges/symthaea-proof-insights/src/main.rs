@@ -157,6 +157,7 @@ struct TemporalReplayManifest {
     schema_version: String,
     repository_url: String,
     repository_commit: String,
+    timeline_path: String,
     timeline_sha256: String,
     lean_toolchain: String,
     mathlib_revision: String,
@@ -542,9 +543,21 @@ fn verify_temporal_manifest_file(repository_root: &Path, manifest_path: &Path) -
             actual_head
         );
     }
+    let actual_origin = git_output(&root, &["remote", "get-url", "origin"])?;
+    if normalize_repository_url(&actual_origin) != normalize_repository_url(&manifest.repository_url) {
+        bail!(
+            "temporal repository origin mismatch: manifest pins {}, checkout origin is {}",
+            manifest.repository_url,
+            actual_origin
+        );
+    }
     let status = git_output(&root, &["status", "--porcelain"])?;
     if !status.is_empty() {
         bail!("temporal repository checkout must be clean before validating replay evidence");
+    }
+    let timeline = git_show_file(&root, &manifest.repository_commit, &manifest.timeline_path)?;
+    if format!("{:x}", Sha256::digest(&timeline)) != manifest.timeline_sha256 {
+        bail!("timeline digest does not match {} at the pinned repository commit", manifest.timeline_path);
     }
 
     let mut previous_completion_commit: Option<&str> = None;
@@ -605,7 +618,7 @@ fn verify_temporal_manifest_file(repository_root: &Path, manifest_path: &Path) -
                 );
             }
         }
-        previous_completion_commit = Some(&event.proof_completion_commit);
+        previous_completion_commit = Some(event.proof_completion_commit.as_str());
     }
 
     let mut file_cache: BTreeMap<(String, String), Vec<u8>> = BTreeMap::new();
@@ -676,6 +689,10 @@ fn validate_temporal_manifest(manifest: &TemporalReplayManifest) -> Result<()> {
         bail!("temporal repository URL must be an explicit HTTPS URL");
     }
     validate_git_sha(&manifest.repository_commit).context("invalid pinned repository commit")?;
+    let normalized_timeline_path = normalize_root_relative_path(&manifest.timeline_path)?;
+    if normalized_timeline_path != manifest.timeline_path || manifest.timeline_path.is_empty() {
+        bail!("timeline path must be canonical and repository-relative");
+    }
     validate_sha256_hex(&manifest.timeline_sha256).context("invalid timeline SHA-256")?;
     if manifest.lean_toolchain.trim().is_empty()
         || manifest.lean_toolchain.eq_ignore_ascii_case("latest")
@@ -1469,6 +1486,7 @@ mod tests {
             schema_version: "pitb.temporal-replay-manifest.v0".to_string(),
             repository_url: "https://example.invalid/temporal-fixture".to_string(),
             repository_commit: "5".repeat(40),
+            timeline_path: "proof_timeline.csv".to_string(),
             timeline_sha256: "9".repeat(64),
             lean_toolchain: "leanprover/lean4:v4.34.1".to_string(),
             mathlib_revision: "6".repeat(40),
