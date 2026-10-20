@@ -500,6 +500,7 @@ mod tests {
             Err(FrontierError::InvalidCost)
         );
     }
+
     #[test]
     fn illustrative_fixture_builds_safety_gated_pareto_frontier() {
         let fixture: serde_json::Value = serde_json::from_str(include_str!(
@@ -524,11 +525,21 @@ mod tests {
         let report = build_decision_frontier(&candidates)
             .expect("illustrative candidates share a comparison contract");
         let lookup = |policy: &str| {
-            report.entries.iter().find(|entry| entry.policy_id == policy).unwrap()
+            report
+                .entries
+                .iter()
+                .find(|entry| entry.policy_id == policy)
+                .unwrap()
         };
 
-        assert_eq!(lookup("random").disposition, FrontierDisposition::ParetoFrontier);
-        assert_eq!(lookup("symthaea").disposition, FrontierDisposition::ParetoFrontier);
+        assert_eq!(
+            lookup("random").disposition,
+            FrontierDisposition::ParetoFrontier
+        );
+        assert_eq!(
+            lookup("symthaea").disposition,
+            FrontierDisposition::ParetoFrontier
+        );
         assert_eq!(
             lookup("diversity").disposition,
             FrontierDisposition::Dominated {
@@ -548,4 +559,5 @@ mod tests {
         let round_trip: DecisionFrontier =
             serde_json::from_slice(&result_bytes).expect("report should round-trip");
         assert_eq!(round_trip, report);
-    }}
+    }
+}
