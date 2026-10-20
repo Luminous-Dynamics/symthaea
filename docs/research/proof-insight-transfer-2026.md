@@ -17,6 +17,10 @@ A result counts as useful only when it beats non-neural / standard retrieval bas
 
 The execution contract is now specified in [`data/benchmarks/proof-insight-transfer-v0/evaluation-protocol.md`](../../data/benchmarks/proof-insight-transfer-v0/evaluation-protocol.md). It freezes the paired baseline arms, compute matching, semantic-gate primary endpoint, family-clustered confidence interval, leakage audit, negative controls, and go/no-go decisions before a confirmatory run. It is a protocol, not a result: the dataset and transfer experiments remain unbuilt, and the Rust implementation still requires compilation and tests.
 
+A first manual annotation has now been added under [`candidates/156-borsuk-nine-finite-obstruction.json`](../../data/benchmarks/proof-insight-transfer-v0/candidates/156-borsuk-nine-finite-obstruction.json). It captures a finite-obstruction proof strategy from training family `156`; it is unreviewed, unscored, not in `records.jsonl`, and does not claim a successful transfer. The annotation's statement digest hashes the stored theorem-signature text, not a normalized elaborated Lean expression.
+
+An important split-control lesson is documented in [`exposure-audit.md`](../../data/benchmarks/proof-insight-transfer-v0/exposure-audit.md): family `089` was read before we checked that it belongs to the frozen test split. No record or model result was derived from it, but for this workflow it is now known-exposed and must be excluded from confirmatory scoring. The original split manifest remains unchanged; the adjusted denominator must be reported separately.
+
 ## Why this is the next step
 
 ### Current Symthaea evidence
