@@ -25,6 +25,8 @@ const ANALYSIS_REPORT_SCHEMA: &str = "pitb.analysis-report.v0";
 const EXPECTED_PROTOCOL_ID: &str = "proof-insight-transfer-v0";
 const EXPECTED_UPSTREAM_COMMIT: &str = "1581d4cbdd69a0faf34b2089614fe2a814316a6a";
 const EXPECTED_BOOTSTRAP_REPLICATES: usize = 10_000;
+// Conservative minimum, not a substitute for run-specific simulation-based power.
+const MIN_CONFIRMATORY_FAMILY_CLUSTERS: usize = 20;
 const REQUIRED_EXPOSED_FAMILY: &str = "089";
 const ARMS: [&str; 8] = ["A", "B", "C", "D", "E", "F", "G", "H"];
 const SIMPLE_BASELINES: [&str; 5] = ["A", "B", "C", "D", "E"];
@@ -237,6 +239,7 @@ struct PrimaryComparison {
     clustered_bootstrap_upper_percentage_points: f64,
     target_pairs: usize,
     family_clusters: usize,
+    minimum_family_clusters_for_confirmatory_claim: usize,
     minimum_effect_percentage_points: f64,
     confidence_interval_excludes_zero_positive: bool,
     preregistered_utility_gate_passed: bool,
@@ -312,9 +315,11 @@ fn execute() -> Result<()> {
 
     let interval_positive = lower > 0.0;
     let effect_gate = effect >= 0.10;
-    let passed = interval_positive && effect_gate && clusters >= 2;
-    let gate_decision = if clusters < 2 {
-        "underpowered_fewer_than_two_family_clusters"
+    let passed = interval_positive
+        && effect_gate
+        && clusters >= MIN_CONFIRMATORY_FAMILY_CLUSTERS;
+    let gate_decision = if clusters < MIN_CONFIRMATORY_FAMILY_CLUSTERS {
+        "underpowered_too_few_independent_family_clusters"
     } else if passed {
         "pass_preregistered_utility_gate"
     } else {
@@ -324,8 +329,8 @@ fn execute() -> Result<()> {
 
     let interpretation = if passed {
         "The paired, family-clustered estimate met the preregistered effect and interval gates on this test partition. This is within-benchmark utility only; it is not external/SOTA evidence."
-    } else if clusters < 2 {
-        "Too few eligible family clusters for a meaningful clustered interval. Treat this as an underpowered pilot; do not claim transfer utility."
+    } else if clusters < MIN_CONFIRMATORY_FAMILY_CLUSTERS {
+        "The eligible independent-family count is below the v0 floor of 20. Treat this as an underpowered pilot; the floor itself is not evidence of adequate power, so simulation-based power planning is still required."
     } else {
         "The preregistered utility gate was not met. Report the estimate, interval, denominators, and failures; do not claim a win or relax the gate after seeing test outcomes."
     }
@@ -374,6 +379,7 @@ fn execute() -> Result<()> {
             clustered_bootstrap_upper_percentage_points: upper * 100.0,
             target_pairs: pairs,
             family_clusters: clusters,
+            minimum_family_clusters_for_confirmatory_claim: MIN_CONFIRMATORY_FAMILY_CLUSTERS,
             minimum_effect_percentage_points: 10.0,
             confidence_interval_excludes_zero_positive: interval_positive,
             preregistered_utility_gate_passed: passed,
