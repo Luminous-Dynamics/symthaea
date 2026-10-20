@@ -673,7 +673,7 @@ mod tests {
     }
 
     #[test]
-    fn core_patterns_and_sarabande_only_use_the_voiced_pitches() {
+    fn every_pattern_only_uses_the_voiced_pitches() {
         // The safety property: a pattern may re-time chord tones but can
         // NEVER introduce a pitch the voice leading didn't produce.
         let allowed: std::collections::BTreeSet<u8> = triad().iter().map(|p| p.midi()).collect();
@@ -683,6 +683,13 @@ mod tests {
             Accompaniment::Alberti,
             Accompaniment::OomPah,
             Accompaniment::Comp,
+            Accompaniment::Habanera,
+            Accompaniment::FiveGait,
+            Accompaniment::JigGait,
+            Accompaniment::Shuffle,
+            Accompaniment::Montuno,
+            Accompaniment::CompasGait,
+            Accompaniment::BossaComp,
             Accompaniment::FolkPulse,
             Accompaniment::MarchPulse,
             Accompaniment::Sarabande,
@@ -703,13 +710,22 @@ mod tests {
     }
 
     #[test]
-    fn core_patterns_and_sarabande_stay_within_the_bar() {
+    fn every_pattern_stays_within_the_bar() {
         for pattern in [
             Accompaniment::Block,
             Accompaniment::Arpeggio,
             Accompaniment::Alberti,
             Accompaniment::OomPah,
             Accompaniment::Comp,
+            Accompaniment::Habanera,
+            Accompaniment::FiveGait,
+            Accompaniment::JigGait,
+            Accompaniment::Shuffle,
+            Accompaniment::Montuno,
+            Accompaniment::CompasGait,
+            Accompaniment::BossaComp,
+            Accompaniment::FolkPulse,
+            Accompaniment::MarchPulse,
             Accompaniment::Sarabande,
             Accompaniment::Minuet,
             Accompaniment::MazurkaGait,
