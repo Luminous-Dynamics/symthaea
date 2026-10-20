@@ -689,7 +689,12 @@ fn validate_temporal_manifest(manifest: &TemporalReplayManifest) -> Result<()> {
         if event.statement_artifact_id == event.proof_artifact_id {
             bail!("target statement and hidden proof must be separate artifacts for {}", event.target_id);
         }
-        event_theorems.insert(event.proof_artifact_id.as_str(), event);
+        if event_theorems
+            .insert(event.proof_artifact_id.as_str(), event)
+            .is_some()
+        {
+            bail!("duplicate hidden proof artifact ID in temporal timeline");
+        }
     }
 
     let mut artifacts_by_id = BTreeMap::new();
@@ -1348,6 +1353,170 @@ fn normalize_with_base<'a>(base: impl IntoIterator<Item = &'a str>, path: &str) 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn temporal_manifest_fixture() -> TemporalReplayManifest {
+        let statement_one = "a".repeat(64);
+        let proof_one = "b".repeat(64);
+        let statement_two = "c".repeat(64);
+        let proof_two = "d".repeat(64);
+        let source_one = "e".repeat(64);
+        let source_two = "f".repeat(64);
+        let source_three = "1".repeat(64);
+        let source_four = "2".repeat(64);
+        let commit_one = "1".repeat(40);
+        let commit_two = "2".repeat(40);
+        let commit_three = "3".repeat(40);
+
+        TemporalReplayManifest {
+            schema_version: "pitb.temporal-replay-manifest.v0".to_string(),
+            repository_url: "https://example.invalid/temporal-fixture".to_string(),
+            repository_commit: "5".repeat(40),
+            timeline_sha256: "9".repeat(64),
+            lean_toolchain: "leanprover/lean4:v4.34.1".to_string(),
+            mathlib_revision: "6".repeat(40),
+            events: vec![
+                TemporalTimelineEvent {
+                    position: 0,
+                    target_id: "target-000".to_string(),
+                    theorem_id: "Example.first".to_string(),
+                    target_state_commit: commit_one.clone(),
+                    proof_completion_commit: commit_two.clone(),
+                    statement_sha256: statement_one.clone(),
+                    statement_artifact_id: "statement-000".to_string(),
+                    proof_artifact_id: "proof-000".to_string(),
+                    visible_artifact_ids: vec!["statement-000".to_string()],
+                },
+                TemporalTimelineEvent {
+                    position: 1,
+                    target_id: "target-001".to_string(),
+                    theorem_id: "Example.second".to_string(),
+                    target_state_commit: commit_two.clone(),
+                    proof_completion_commit: commit_three.clone(),
+                    statement_sha256: statement_two.clone(),
+                    statement_artifact_id: "statement-001".to_string(),
+                    proof_artifact_id: "proof-001".to_string(),
+                    visible_artifact_ids: vec![
+                        "statement-000".to_string(),
+                        "proof-000".to_string(),
+                        "statement-001".to_string(),
+                    ],
+                },
+            ],
+            artifacts: vec![
+                TemporalEvidenceArtifact {
+                    artifact_id: "statement-000".to_string(),
+                    path: "lean/Example.lean".to_string(),
+                    artifact_kind: "theorem_statement".to_string(),
+                    content_sha256: statement_one,
+                    content_start_line: 1,
+                    content_end_line: 1,
+                    source_file_sha256: source_one.clone(),
+                    source_commit: commit_one.clone(),
+                    available_at_position: 0,
+                    theorem_id: Some("Example.first".to_string()),
+                },
+                TemporalEvidenceArtifact {
+                    artifact_id: "proof-000".to_string(),
+                    path: "lean/Example.lean".to_string(),
+                    artifact_kind: "proof_body".to_string(),
+                    content_sha256: proof_one,
+                    content_start_line: 2,
+                    content_end_line: 2,
+                    source_file_sha256: source_two.clone(),
+                    source_commit: commit_two.clone(),
+                    available_at_position: 0,
+                    theorem_id: Some("Example.first".to_string()),
+                },
+                TemporalEvidenceArtifact {
+                    artifact_id: "statement-001".to_string(),
+                    path: "lean/Example.lean".to_string(),
+                    artifact_kind: "theorem_statement".to_string(),
+                    content_sha256: statement_two,
+                    content_start_line: 3,
+                    content_end_line: 3,
+                    source_file_sha256: source_three.clone(),
+                    source_commit: commit_two.clone(),
+                    available_at_position: 1,
+                    theorem_id: Some("Example.second".to_string()),
+                },
+                TemporalEvidenceArtifact {
+                    artifact_id: "proof-001".to_string(),
+                    path: "lean/Example.lean".to_string(),
+                    artifact_kind: "proof_body".to_string(),
+                    content_sha256: proof_two,
+                    content_start_line: 4,
+                    content_end_line: 4,
+                    source_file_sha256: source_four.clone(),
+                    source_commit: commit_three.clone(),
+                    available_at_position: 1,
+                    theorem_id: Some("Example.second".to_string()),
+                },
+            ],
+        }
+    }
+
+    #[test]
+    fn temporal_manifest_accepts_historical_context_and_hides_target_proofs() {
+        let manifest = temporal_manifest_fixture();
+        validate_temporal_manifest(&manifest)
+            .expect("valid chronological evidence and hidden proof receipts should pass");
+    }
+
+    #[test]
+    fn temporal_manifest_rejects_visible_future_proof() {
+        let mut manifest = temporal_manifest_fixture();
+        manifest.events[0]
+            .visible_artifact_ids
+            .push("proof-001".to_string());
+        let error = validate_temporal_manifest(&manifest)
+            .expect_err("a proof from the future timeline position must be rejected");
+        assert!(format!("{error:#}").contains("future-evidence leakage"));
+    }
+
+    #[test]
+    fn temporal_manifest_rejects_its_own_hidden_proof() {
+        let mut manifest = temporal_manifest_fixture();
+        manifest.events[0]
+            .visible_artifact_ids
+            .push("proof-000".to_string());
+        let error = validate_temporal_manifest(&manifest)
+            .expect_err("the target proof must not be visible to the solver");
+        assert!(format!("{error:#}").contains("own proof artifact"));
+    }
+
+    #[test]
+    fn temporal_manifest_rejects_exact_future_proof_copies_under_new_ids() {
+        let mut manifest = temporal_manifest_fixture();
+        manifest.artifacts.push(TemporalEvidenceArtifact {
+            artifact_id: "renamed-copy".to_string(),
+            path: "lean/Example.lean".to_string(),
+            artifact_kind: "definition".to_string(),
+            content_sha256: "d".repeat(64),
+            content_start_line: 8,
+            content_end_line: 8,
+            source_file_sha256: "8".repeat(64),
+            source_commit: "1".repeat(40),
+            available_at_position: 0,
+            theorem_id: None,
+        });
+        manifest.events[0]
+            .visible_artifact_ids
+            .push("renamed-copy".to_string());
+        let error = validate_temporal_manifest(&manifest)
+            .expect_err("an exact copy of a future proof must be rejected even when renamed");
+        assert!(format!("{error:#}").contains("exact proof-content leakage"));
+    }
+
+    #[test]
+    fn temporal_manifest_rejects_noncanonical_paths_and_duplicate_ids() {
+        let mut bad_path = temporal_manifest_fixture();
+        bad_path.artifacts[0].path = "../outside.lean".to_string();
+        assert!(validate_temporal_manifest(&bad_path).is_err());
+
+        let mut duplicate = temporal_manifest_fixture();
+        duplicate.artifacts[1].artifact_id = "statement-000".to_string();
+        assert!(validate_temporal_manifest(&duplicate).is_err());
+    }
 
     #[test]
     fn sha256_matches_standard_known_vector() {
