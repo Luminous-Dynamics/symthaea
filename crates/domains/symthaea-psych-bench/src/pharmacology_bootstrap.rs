@@ -404,8 +404,8 @@ pub fn paired_bootstrap_binary_safety_comparison(
         let mut baseline_sample = Vec::with_capacity(sample_size);
         for draw in 0..sample_size {
             let index = rng.index(sample_size);
-            let mut candidate = candidate_aligned[index].clone();
-            let mut baseline = baseline_aligned[index].clone();
+            let mut candidate = (*candidate_aligned[index]).clone();
+            let mut baseline = (*baseline_aligned[index]).clone();
             let new_id = format!("paired-bootstrap-{replicate}-{draw}-{}", candidate.case_id);
             candidate.case_id = new_id.clone();
             baseline.case_id = new_id;
