@@ -647,6 +647,7 @@ mod tests {
                 .expect("fixture candidates must match Rust records");
         let report = build_decision_frontier(&candidates)
             .expect("illustrative candidates share a comparison contract");
+        report.validate().expect("generated frontier should revalidate");
         let lookup = |policy: &str| {
             report
                 .entries
@@ -682,5 +683,8 @@ mod tests {
         let round_trip: DecisionFrontier =
             serde_json::from_slice(&result_bytes).expect("report should round-trip");
         assert_eq!(round_trip, report);
+        round_trip
+            .validate()
+            .expect("round-tripped frontier should revalidate");
     }
 }
