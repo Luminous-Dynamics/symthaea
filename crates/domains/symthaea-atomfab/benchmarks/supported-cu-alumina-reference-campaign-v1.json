@@ -1,0 +1,251 @@
+{
+  "schema_version": 1,
+  "campaign_id": "atomfab-supported-cu-alumina-reference-v1",
+  "status": "proposed_not_executed",
+  "objective": "Reproduce and then extend the published supported-copper-nanoparticle structural-exploration comparison under pinned reference-evaluation budgets.",
+  "claim_ceiling": "Campaign design only. No dataset has been downloaded, no SHA-256 artifact digest has been calculated, no model inference or DFT run has been performed, and no published result has been reproduced by this plan.",
+  "sources": {
+    "benchmark_paper": {
+      "doi": "10.1038/s41524-026-02043-8",
+      "url": "https://doi.org/10.1038/s41524-026-02043-8",
+      "role": "primary reproduction protocol"
+    },
+    "related_dataset_record": {
+      "doi": "10.5281/zenodo.15865800",
+      "url": "https://zenodo.org/records/15865800",
+      "role": "related source for training/validation data, VASP inputs and published global-minimum structures; not assumed to be the benchmark's complete independent evaluation set",
+      "status": "not_materialized"
+    },
+    "related_dataset_artifacts": [
+      {
+        "filename": "dataset.zip",
+        "source_record_md5": "e88745ca2cfd25ef0b152f5fa3ed6bd9",
+        "sha256": null,
+        "bytes": null,
+        "status": "not_downloaded"
+      },
+      {
+        "filename": "global_minima.zip",
+        "source_record_md5": "9788d7f13403450552e4ad1642c6a478",
+        "sha256": null,
+        "bytes": null,
+        "status": "not_downloaded"
+      }
+    ],
+    "published_evaluation_manifest": {
+      "status": "unresolved",
+      "note": "Extract the exact test/candidate/reference structure manifest and supplement used in the 2026 benchmark; do not treat the related Zenodo training/validation archive as an independent test set without evidence."
+    }
+  },
+  "reference_method": {
+    "family": "DFT",
+    "exchange_correlation": "unresolved_until_pinned_from_published_methods",
+    "electronic_structure_code": null,
+    "pseudopotential_or_basis_digest": null,
+    "plane_wave_cutoff": null,
+    "k_point_mesh": null,
+    "electronic_convergence_tolerance": null,
+    "ionic_relaxation_tolerance": null,
+    "dispersion_correction": null,
+    "units": null,
+    "status": "unresolved_before_execution",
+    "gate": "No candidate can be labelled reference-validated until the exact reference settings, code/version, convergence criteria and structure identities are pinned."
+  },
+  "search_protocol": {
+    "algorithm": "genetic_algorithm",
+    "source": "published benchmark paper DOI 10.1038/s41524-026-02043-8",
+    "population_size": 50,
+    "generations": 20,
+    "initial_population": "randomly_generated_structures",
+    "offspring_operators": [
+      "cut_and_splice",
+      "mutation"
+    ],
+    "additional_published_details": "must be extracted and pinned from the paper Methods/Supplement before claiming exact reproduction",
+    "status": "partial_parameters_transcribed_not_reproduced"
+  },
+  "primary_model_baselines": [
+    {
+      "id": "dp-unialcu",
+      "role": "domain_specific_reference_baseline",
+      "checkpoint_digest": null,
+      "license_terms_status": "must_verify",
+      "execution_status": "not_run"
+    },
+    {
+      "id": "mace-omat-medium",
+      "role": "universal_ml_interatomic_potential",
+      "checkpoint_digest": null,
+      "license_terms_status": "must_verify",
+      "execution_status": "not_run"
+    },
+    {
+      "id": "mattersim-v1.0.0-1m",
+      "role": "universal_ml_interatomic_potential",
+      "checkpoint_digest": null,
+      "license_terms_status": "must_verify",
+      "execution_status": "not_run"
+    }
+  ],
+  "secondary_baselines_to_evaluate_after_exact_reproduction": [
+    "DPA2 MPtrj checkpoint (exact revision and terms to pin)",
+    "DPA2 OC20 checkpoint (exact revision and terms to pin)",
+    "DPA3 OMAT24 checkpoint (exact revision and terms to pin)",
+    "MACE-MP medium checkpoint (exact revision and terms to pin)",
+    "random search using the same candidate generator and reference budget",
+    "local-search baseline using the same start structures and stopping budget",
+    "same potential and search with Symthaea acquisition disabled"
+  ],
+  "strata": [
+    {
+      "stratum_id": "cu27-gamma-alumina-100",
+      "nanoparticle": "Cu",
+      "copper_atom_count": 27,
+      "support_surface": "γ-Al2O3(100)",
+      "support_surface_id": "gamma-alumina-100",
+      "expected_model_domain_note": "Published DP-UniAlCu training description used supported nanoparticles up to Cu21; this stratum probes extrapolation for that baseline. Do not assume the same training-domain boundary for other checkpoints without auditing their data.",
+      "split_group_key": "parent_system_and_gamma-alumina-100_cu27",
+      "status": "planned"
+    },
+    {
+      "stratum_id": "cu27-gamma-alumina-110",
+      "nanoparticle": "Cu",
+      "copper_atom_count": 27,
+      "support_surface": "γ-Al2O3(110)",
+      "support_surface_id": "gamma-alumina-110",
+      "expected_model_domain_note": "Published DP-UniAlCu training description used supported nanoparticles up to Cu21; this stratum probes extrapolation for that baseline. Do not assume the same training-domain boundary for other checkpoints without auditing their data.",
+      "split_group_key": "parent_system_and_gamma-alumina-110_cu27",
+      "status": "planned"
+    },
+    {
+      "stratum_id": "cu27-alpha-alumina-0001",
+      "nanoparticle": "Cu",
+      "copper_atom_count": 27,
+      "support_surface": "α-Al2O3(0001)",
+      "support_surface_id": "alpha-alumina-0001",
+      "expected_model_domain_note": "Published DP-UniAlCu training description used supported nanoparticles up to Cu21; this stratum probes extrapolation for that baseline. Do not assume the same training-domain boundary for other checkpoints without auditing their data.",
+      "split_group_key": "parent_system_and_alpha-alumina-0001_cu27",
+      "status": "planned"
+    },
+    {
+      "stratum_id": "cu38-gamma-alumina-100",
+      "nanoparticle": "Cu",
+      "copper_atom_count": 38,
+      "support_surface": "γ-Al2O3(100)",
+      "support_surface_id": "gamma-alumina-100",
+      "expected_model_domain_note": "Published DP-UniAlCu training description used supported nanoparticles up to Cu21; this stratum probes extrapolation for that baseline. Do not assume the same training-domain boundary for other checkpoints without auditing their data.",
+      "split_group_key": "parent_system_and_gamma-alumina-100_cu38",
+      "status": "planned"
+    },
+    {
+      "stratum_id": "cu38-gamma-alumina-110",
+      "nanoparticle": "Cu",
+      "copper_atom_count": 38,
+      "support_surface": "γ-Al2O3(110)",
+      "support_surface_id": "gamma-alumina-110",
+      "expected_model_domain_note": "Published DP-UniAlCu training description used supported nanoparticles up to Cu21; this stratum probes extrapolation for that baseline. Do not assume the same training-domain boundary for other checkpoints without auditing their data.",
+      "split_group_key": "parent_system_and_gamma-alumina-110_cu38",
+      "status": "planned"
+    },
+    {
+      "stratum_id": "cu38-alpha-alumina-0001",
+      "nanoparticle": "Cu",
+      "copper_atom_count": 38,
+      "support_surface": "α-Al2O3(0001)",
+      "support_surface_id": "alpha-alumina-0001",
+      "expected_model_domain_note": "Published DP-UniAlCu training description used supported nanoparticles up to Cu21; this stratum probes extrapolation for that baseline. Do not assume the same training-domain boundary for other checkpoints without auditing their data.",
+      "split_group_key": "parent_system_and_alpha-alumina-0001_cu38",
+      "status": "planned"
+    },
+    {
+      "stratum_id": "cu47-gamma-alumina-100",
+      "nanoparticle": "Cu",
+      "copper_atom_count": 47,
+      "support_surface": "γ-Al2O3(100)",
+      "support_surface_id": "gamma-alumina-100",
+      "expected_model_domain_note": "Published DP-UniAlCu training description used supported nanoparticles up to Cu21; this stratum probes extrapolation for that baseline. Do not assume the same training-domain boundary for other checkpoints without auditing their data.",
+      "split_group_key": "parent_system_and_gamma-alumina-100_cu47",
+      "status": "planned"
+    },
+    {
+      "stratum_id": "cu47-gamma-alumina-110",
+      "nanoparticle": "Cu",
+      "copper_atom_count": 47,
+      "support_surface": "γ-Al2O3(110)",
+      "support_surface_id": "gamma-alumina-110",
+      "expected_model_domain_note": "Published DP-UniAlCu training description used supported nanoparticles up to Cu21; this stratum probes extrapolation for that baseline. Do not assume the same training-domain boundary for other checkpoints without auditing their data.",
+      "split_group_key": "parent_system_and_gamma-alumina-110_cu47",
+      "status": "planned"
+    },
+    {
+      "stratum_id": "cu47-alpha-alumina-0001",
+      "nanoparticle": "Cu",
+      "copper_atom_count": 47,
+      "support_surface": "α-Al2O3(0001)",
+      "support_surface_id": "alpha-alumina-0001",
+      "expected_model_domain_note": "Published DP-UniAlCu training description used supported nanoparticles up to Cu21; this stratum probes extrapolation for that baseline. Do not assume the same training-domain boundary for other checkpoints without auditing their data.",
+      "split_group_key": "parent_system_and_alpha-alumina-0001_cu47",
+      "status": "planned"
+    },
+    {
+      "stratum_id": "cu55-gamma-alumina-100",
+      "nanoparticle": "Cu",
+      "copper_atom_count": 55,
+      "support_surface": "γ-Al2O3(100)",
+      "support_surface_id": "gamma-alumina-100",
+      "expected_model_domain_note": "Published DP-UniAlCu training description used supported nanoparticles up to Cu21; this stratum probes extrapolation for that baseline. Do not assume the same training-domain boundary for other checkpoints without auditing their data.",
+      "split_group_key": "parent_system_and_gamma-alumina-100_cu55",
+      "status": "planned"
+    },
+    {
+      "stratum_id": "cu55-gamma-alumina-110",
+      "nanoparticle": "Cu",
+      "copper_atom_count": 55,
+      "support_surface": "γ-Al2O3(110)",
+      "support_surface_id": "gamma-alumina-110",
+      "expected_model_domain_note": "Published DP-UniAlCu training description used supported nanoparticles up to Cu21; this stratum probes extrapolation for that baseline. Do not assume the same training-domain boundary for other checkpoints without auditing their data.",
+      "split_group_key": "parent_system_and_gamma-alumina-110_cu55",
+      "status": "planned"
+    },
+    {
+      "stratum_id": "cu55-alpha-alumina-0001",
+      "nanoparticle": "Cu",
+      "copper_atom_count": 55,
+      "support_surface": "α-Al2O3(0001)",
+      "support_surface_id": "alpha-alumina-0001",
+      "expected_model_domain_note": "Published DP-UniAlCu training description used supported nanoparticles up to Cu21; this stratum probes extrapolation for that baseline. Do not assume the same training-domain boundary for other checkpoints without auditing their data.",
+      "split_group_key": "parent_system_and_alpha-alumina-0001_cu55",
+      "status": "planned"
+    }
+  ],
+  "required_pins_before_execution": [
+    "exact 2026 benchmark candidate and DFT-reference structure IDs/manifests, or a clearly labelled independently assembled reproduction set",
+    "SHA-256 and byte length for every consumed dataset, structure archive, model checkpoint, evaluator, code revision and configuration",
+    "model license/terms and supported-element/interface compatibility checks",
+    "reference electronic-structure settings and convergence tests",
+    "canonical structure identity and deduplication rules fixed before test results are evaluated",
+    "grouped split by parent system and declared surface/size/temperature stratum; audit potential training-data overlap where feasible",
+    "all GA details beyond population and generations, including RNG seeds and mutation/cut-and-splice settings, transcribed from the source",
+    "cost ledger that includes failed relaxations, reference calculations, model inference, preprocessing, retries and post-processing"
+  ],
+  "metrics": [
+    "MAE/RMSE/max error for binding energy on identical structures with common reference labels",
+    "DFT-refined best binding energy per stratum and difference from the best known reference structure",
+    "unique reference-validated low-energy structures recovered under equal DFT-reference budget",
+    "recovery of known DFT-relaxed global-minimum structures using a frozen structure matching/deduplication tolerance",
+    "structural diversity, duplicate-minimum rate, and candidate-set Jaccard",
+    "ranking agreement only on shared canonical structure IDs, with discovery-set agreement reported separately",
+    "failure-mode counts/rates by stratum and severity, with abstentions separate and failed relaxations retained in denominators",
+    "total cost and cost per unique reference-validated discovery",
+    "all fixed-seed campaign records including failed, incomplete and target-not-reached campaigns"
+  ],
+  "gates": [
+    "First reproduce the published protocol/results within a declared tolerance before claiming any advantage.",
+    "Compare all search policies at equal reference-calculation budget and report total costs, not only model-inference time.",
+    "Keep per-structure energy accuracy separate from structural-discovery quality.",
+    "Do not pool results across particle sizes or support surfaces before reporting each stratum.",
+    "No SOTA claim without exact task, data, checkpoint, evaluator, split, configuration and metric parity with the comparison target.",
+    "Policy comparison stretch target: at least 20 paired fixed-seed campaigns, median acceleration factor >=2 with a 95% bootstrap lower bound >1 only if both methods reach the same frozen objective target and quality at equal cost is no worse. This is a proposed target, not a result.",
+    "A simulation or MLIP output is never a measurement; physical claims require independent metrology and reproducible procedures."
+  ]
+}
