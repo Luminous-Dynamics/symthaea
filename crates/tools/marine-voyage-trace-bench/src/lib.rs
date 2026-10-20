@@ -13,6 +13,7 @@ pub mod uncertainty_comparison;
 pub mod prediction_interval_calibration;
 pub mod shift_claim_gate;
 pub mod paired_policy_replay;
+pub mod experiment_priority;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PowerChannel {
