@@ -98,7 +98,7 @@ fn all_polynomial_invariants_formally_proven() {
                 if name == "henon_heiles_exact_H" {
                     exact_henon_heiles_proven = true;
                 }
-            },
+            }
             // The verifier declares transcendental invariants (Lotka-Volterra)
             // out-of-scope with `skipped,false`. That's honest and expected.
             "false" if cells.get(3) == Some(&"skipped") => skipped_count += 1,
