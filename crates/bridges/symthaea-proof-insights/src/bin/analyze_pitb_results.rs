@@ -31,8 +31,8 @@ const REQUIRED_EXPOSED_FAMILY: &str = "089";
 const EXPECTED_SPLIT_SEED: &str = "pitb-v0-openai-math-2026-10-19";
 const EXPECTED_SPLIT_ALGORITHM: &str =
     "sha256(seed || NUL || family_id), sort by digest then family ID, floor 70% train and floor 85% train+validation";
-const ARMS: [&str; 8] = ["A", "B", "C", "D", "E", "F", "G", "H"];
-const SIMPLE_BASELINES: [&str; 5] = ["A", "B", "C", "D", "E"];
+const ARMS: [&str; 9] = ["A", "B", "C", "D", "E", "F", "G", "H", "I"];
+const BASELINE_SELECTION_ARMS: [&str; 6] = ["A", "B", "C", "D", "E", "I"];
 const TREATMENT_ARM: &str = "F";
 
 #[derive(Debug, Deserialize)]
@@ -687,9 +687,9 @@ fn validate_baseline_receipt(receipt: &BaselineSelectionReceipt) -> Result<()> {
         bail!("unexpected or unspecified validation baseline tie-break rule");
     }
     let score_keys: BTreeSet<&str> = receipt.arm_scores.keys().map(String::as_str).collect();
-    let expected_keys: BTreeSet<&str> = SIMPLE_BASELINES.into_iter().collect();
+    let expected_keys: BTreeSet<&str> = BASELINE_SELECTION_ARMS.into_iter().collect();
     if score_keys != expected_keys {
-        bail!("baseline receipt must include exactly validation scores for arms A through E");
+        bail!("baseline receipt must include exactly validation scores for arms A through E and I");
     }
     for (arm, score) in &receipt.arm_scores {
         if !score.is_finite() || !(0.0..=1.0).contains(score) {
@@ -714,8 +714,8 @@ fn validate_baseline_receipt(receipt: &BaselineSelectionReceipt) -> Result<()> {
             receipt.selected_arm
         );
     }
-    if !SIMPLE_BASELINES.contains(&receipt.selected_arm.as_str()) {
-        bail!("selected baseline must be one of A through E");
+    if !BASELINE_SELECTION_ARMS.contains(&receipt.selected_arm.as_str()) {
+        bail!("selected baseline must be one of A through E or I");
     }
     Ok(())
 }
@@ -1301,7 +1301,7 @@ mod tests {
             frozen_before_test: true,
             test_outcomes_seen_before_selection: false,
             tie_break_rule: "highest score; alphabetical arm ID on exact tie".to_string(),
-            arm_scores: ["A", "B", "C", "D", "E"]
+            arm_scores: ["A", "B", "C", "D", "E", "I"]
                 .into_iter()
                 .map(|arm| (arm.to_string(), 0.5))
                 .collect(),
