@@ -532,8 +532,8 @@ pub fn summarize_target_reachability(
             (false, true) => candidate_only_reached_count += 1,
             (false, false) => neither_reached_count += 1,
         }
-        baseline_target_reached_count += usize::from(*baseline_reached);
-        candidate_target_reached_count += usize::from(*candidate_reached);
+        baseline_target_reached_count += usize::from(u8::from(*baseline_reached));
+        candidate_target_reached_count += usize::from(u8::from(*candidate_reached));
     }
 
     let campaign_pair_count = pairs.len();
@@ -550,8 +550,8 @@ pub fn summarize_target_reachability(
         let mut candidate_success = 0usize;
         for _ in 0..paired_outcomes.len() {
             let index = rng.index(paired_outcomes.len());
-            baseline_success += usize::from(paired_outcomes[index].1);
-            candidate_success += usize::from(paired_outcomes[index].2);
+            baseline_success += usize::from(u8::from(paired_outcomes[index].1));
+            candidate_success += usize::from(u8::from(paired_outcomes[index].2));
         }
         let baseline_rate = baseline_success as f64 / campaign_pair_count as f64;
         let candidate_rate = candidate_success as f64 / campaign_pair_count as f64;
