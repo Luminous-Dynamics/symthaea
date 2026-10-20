@@ -35,6 +35,7 @@
         "theorem_id",
         "position",
         "target_state_commit",
+        "statement_artifact_id",
         "statement_sha256",
         "visible_artifacts"
       ],
@@ -51,6 +52,7 @@
         "theorem_id": {"type": "string", "minLength": 1},
         "position": {"type": "integer", "minimum": 0},
         "target_state_commit": {"$ref": "#/$defs/gitSha"},
+        "statement_artifact_id": {"type": "string", "minLength": 1},
         "statement_sha256": {"$ref": "#/$defs/sha256"},
         "visible_artifacts": {
           "type": "array",
