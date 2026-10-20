@@ -393,15 +393,23 @@
               "transfer_verification": {
                 "type": "object",
                 "additionalProperties": false,
-                "description": "Target-side proof evidence for this transfer attempt. This is distinct from verification of the source theorem. A verified transfer must carry an exact-target receipt.",
+                "description": "Target-side evidence for a transfer attempt; intentionally distinct from verification of the source theorem. A verified transfer must pin the target artifact and statement, show exact-target checking, demonstrate that the formal target matches the intended claim, and record downstream/mutation gates.",
                 "required": [
                   "status",
+                  "target_source_commit",
+                  "target_artifact_path",
+                  "target_artifact_sha256",
                   "target_statement_digest",
                   "checker",
                   "checker_version",
                   "exact_statement_checked",
                   "axiom_policy",
-                  "receipt_sha256"
+                  "receipt_sha256",
+                  "target_statement_correspondence",
+                  "successor_test_status",
+                  "successor_tests",
+                  "mutation_control_status",
+                  "notes"
                 ],
                 "properties": {
                   "status": {
@@ -413,6 +421,18 @@
                       "tool_unavailable",
                       "counterexample_found"
                     ]
+                  },
+                  "target_source_commit": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{40}$"
+                  },
+                  "target_artifact_path": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "target_artifact_sha256": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
                   },
                   "target_statement_digest": {
                     "type": "string",
@@ -452,6 +472,116 @@
                     "type": "string",
                     "pattern": "^[0-9a-f]{64}$"
                   },
+                  "target_statement_correspondence": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "status",
+                      "independent_reviewer_count"
+                    ],
+                    "properties": {
+                      "status": {
+                        "enum": [
+                          "not_reviewed",
+                          "matches_intended_claim",
+                          "mismatch_found",
+                          "disputed",
+                          "not_applicable"
+                        ]
+                      },
+                      "independent_reviewer_count": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 100
+                      },
+                      "notes": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "maxLength": 2000
+                        }
+                      }
+                    }
+                  },
+                  "successor_test_status": {
+                    "enum": [
+                      "not_attempted",
+                      "passed",
+                      "failed",
+                      "not_applicable"
+                    ]
+                  },
+                  "successor_tests": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "test_id",
+                        "source_path",
+                        "test_declaration",
+                        "outcome",
+                        "depends_on_candidate"
+                      ],
+                      "properties": {
+                        "test_id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "source_path": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "test_declaration": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "outcome": {
+                          "enum": [
+                            "passed",
+                            "failed",
+                            "timed_out",
+                            "tool_unavailable",
+                            "unrelated_build_failure",
+                            "not_attempted"
+                          ]
+                        },
+                        "depends_on_candidate": {
+                          "type": "boolean"
+                        },
+                        "failure_relevance": {
+                          "enum": [
+                            "relevant_semantic_regression",
+                            "unrelated",
+                            "unknown",
+                            "not_applicable"
+                          ]
+                        },
+                        "receipt_sha256": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "pattern": "^([0-9a-f]{64})?$"
+                        },
+                        "notes": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "maxLength": 2000
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "mutation_control_status": {
+                    "enum": [
+                      "not_run",
+                      "passed",
+                      "failed",
+                      "not_applicable"
+                    ]
+                  },
                   "notes": {
                     "type": "array",
                     "items": {
@@ -476,13 +606,21 @@
                 },
                 "then": {
                   "required": [
+                    "target_theorem_id",
                     "transfer_verification"
                   ],
                   "properties": {
+                    "target_theorem_id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
                     "directional_contract": {
                       "properties": {
                         "compatibility": {
                           "const": "compatible"
+                        },
+                        "mismatch_codes": {
+                          "maxItems": 0
                         }
                       }
                     },
@@ -493,16 +631,47 @@
                         },
                         "exact_statement_checked": {
                           "const": true
+                        },
+                        "target_statement_correspondence": {
+                          "properties": {
+                            "status": {
+                              "const": "matches_intended_claim"
+                            },
+                            "independent_reviewer_count": {
+                              "minimum": 1
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "independent_reviewer_count"
+                          ]
+                        },
+                        "successor_test_status": {
+                          "enum": [
+                            "passed",
+                            "not_applicable"
+                          ]
+                        },
+                        "mutation_control_status": {
+                          "const": "passed"
                         }
                       },
                       "required": [
                         "status",
+                        "target_source_commit",
+                        "target_artifact_path",
+                        "target_artifact_sha256",
                         "target_statement_digest",
                         "checker",
                         "checker_version",
                         "exact_statement_checked",
                         "axiom_policy",
-                        "receipt_sha256"
+                        "receipt_sha256",
+                        "target_statement_correspondence",
+                        "successor_test_status",
+                        "successor_tests",
+                        "mutation_control_status",
+                        "notes"
                       ]
                     }
                   }
