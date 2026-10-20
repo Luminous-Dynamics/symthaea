@@ -30,7 +30,8 @@
         "simulation_action_authorized": false,
         "feasibility_status": "not_evaluated",
         "hard_constraint_violation": false
-      }
+      },
+      "adapter_fault": "invalid_observation"
     },
     {
       "case_id": "non-finite-observation",
@@ -50,7 +51,8 @@
         "simulation_action_authorized": false,
         "feasibility_status": "not_evaluated",
         "hard_constraint_violation": false
-      }
+      },
+      "adapter_fault": "invalid_observation"
     },
     {
       "case_id": "sensor-drift-outside-calibration",
@@ -95,6 +97,28 @@
       }
     },
     {
+      "case_id": "invalid-planner-gain",
+      "category": "interface_contract",
+      "control": false,
+      "description": "Planner gain lies outside its declared [0, 1] domain.",
+      "source_kind": "synthetic",
+      "adapter_fault": "invalid_gain",
+      "inputs": {
+        "requested_gain": 1.2,
+        "minimum_valid_gain": 0,
+        "maximum_valid_gain": 1
+      },
+      "expected": {
+        "decision": "reject",
+        "reason_codes": [
+          "invalid_gain"
+        ],
+        "simulation_action_authorized": false,
+        "feasibility_status": "not_evaluated",
+        "hard_constraint_violation": false
+      }
+    },
+    {
       "case_id": "tool-obstruction",
       "category": "hard_constraint",
       "control": false,
@@ -132,7 +156,8 @@
         "simulation_action_authorized": false,
         "feasibility_status": "not_evaluated",
         "hard_constraint_violation": false
-      }
+      },
+      "adapter_fault": "actuator_interface_mismatch"
     },
     {
       "case_id": "bridge-timeout",
@@ -152,7 +177,8 @@
         "simulation_action_authorized": false,
         "feasibility_status": "not_evaluated",
         "hard_constraint_violation": false
-      }
+      },
+      "adapter_fault": "bridge_failure"
     },
     {
       "case_id": "malformed-planner-output",
@@ -173,7 +199,8 @@
         "simulation_action_authorized": false,
         "feasibility_status": "not_evaluated",
         "hard_constraint_violation": false
-      }
+      },
+      "adapter_fault": "invalid_output"
     },
     {
       "case_id": "model-out-of-domain",
