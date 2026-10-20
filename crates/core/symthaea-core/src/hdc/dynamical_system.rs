@@ -83,7 +83,7 @@ pub trait Integrator {
 // =============================================================================
 
 /// Result of a numerical simulation, storing the full trajectory.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct SimulationResult {
     /// Time values at each recorded step.
     pub times: Vec<f64>,
@@ -183,7 +183,11 @@ pub fn try_simulate(
         return Err(SimulationError::NonFiniteInitialState { index });
     }
 
-    let raw_steps = (elapsed / dt).ceil();
+    let raw_steps = if elapsed == 0.0 {
+        0.0
+    } else {
+        (elapsed / dt).ceil().max(1.0)
+    };
     if !raw_steps.is_finite() || raw_steps < 0.0 {
         return Err(SimulationError::NonFiniteStepCount);
     }
@@ -252,11 +256,12 @@ pub fn try_simulate(
         states.push(state.clone());
     }
 
+    let steps = times.len() - 1;
     Ok(SimulationResult {
         times,
         states,
         total_time: elapsed,
-        steps: times.len() - 1,
+        steps,
         system_name: system.name().to_string(),
     })
 }
@@ -275,7 +280,7 @@ pub fn try_simulate(
 /// * `dt` - Time step size
 ///
 /// # Panics
-/// Panics if `initial_state.len() != system.state_dim()`.
+/// Panics if the request is invalid or the trajectory exceeds the checked simulator's resource limits.
 pub fn simulate(
     system: &dyn DynamicalSystem,
     integrator: &dyn Integrator,
