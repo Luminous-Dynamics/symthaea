@@ -10,6 +10,7 @@ This benchmark asks a narrow, testable question: when patterns are represented a
 
 1. **Role–filler composition.** Bind a role to a filler and unbind it. Bipolar element-wise binding is self-inverse; exact recovery is an algebraic control.
 2. **Causal ablation.** Replace binding with superposition, then attempt the same unbinding. The reduction in filler similarity estimates the value of the binding operation relative to this simple ablation.
+3. **Antipattern cancellation.** Bundle a pattern with its exact complement and measure whether the result has low similarity to the original instead of preserving a spurious member advantage.
 3. **Order sensitivity.** Encode A→B and B→A using permutation and binding. The two sequences should not collapse into the same representation.
 4. **Basis / embodiment invariance.** Apply the same seeded coordinate permutation to all patterns. Similarities should be preserved, and consistent coordinate re-encoding should commute exactly with binding.
 5. **Noise robustness.** Corrupt a stored pattern at controlled flip rates and retrieve against a fixed prototype library. Report top-1 accuracy and the target-vs-best-competitor similarity margin.
