@@ -310,6 +310,44 @@
         "calibration and sample provenance",
         "independent characterization"
       ]
+    },
+    {
+      "id": "multi-fidelity-evidence-routing",
+      "status": "first_algorithmic_ablation",
+      "goal": "Select the next evidence action for a declared decision, balancing calibrated expected decision-loss reduction against cost without allowing one evidence domain to substitute for another.",
+      "reference": {
+        "name": "Supported-nanoparticle structural-exploration benchmark and materials active-learning strategy benchmark",
+        "doi": "10.1038/s41524-026-02043-8",
+        "url": "https://doi.org/10.1038/s41524-026-02043-8"
+      },
+      "baselines": [
+        "Fixed cheapest-first escalation",
+        "Random selection among eligible actions",
+        "Uncertainty-only escalation",
+        "Cost-aware expected information gain or calibrated value of information",
+        "Symthaea evidence router",
+        "Symthaea router with history/retrieval ablated"
+      ],
+      "metrics": [
+        "best reference-validated objective at equal total cost",
+        "unique reference-validated discoveries per total cost",
+        "target-reaching acceleration only when both paired routes reach the same frozen target",
+        "decision-loss reduction estimate calibration and residual error",
+        "selected-action regret against a retrospective oracle on fully labelled runs",
+        "action/fidelity mix, abstention rate and OOD rejection rate",
+        "failed-action and rework costs included in total cost",
+        "Pareto frontier across validated discoveries, best validated objective, and total cost",
+        "domain/action-kind mismatch, stale-calibration, prerequisite-block and over-budget rejection counts"
+      ],
+      "gates": [
+        "compare routes only within the same request, evidence domain, decision contract, units, and budget",
+        "calibrate expected decision-loss reduction estimates on disjoint validation campaigns before routing a prospective campaign",
+        "atomistic, process-twin, and metrology actions must be benchmarked as separate decision domains; none may be scored as a substitute for another",
+        "run fixed-fidelity, random, uncertainty-only, cost-aware, and Symthaea policies under matched seeds and total-cost accounting",
+        "include a negative control with shuffled value estimates and an OOD action with inflated uncalibrated value; neither may win",
+        "report all failed/incomplete actions, valid abstentions, and target failures; no action selected is not a success unless abstention is the preregistered correct decision",
+        "freeze target, total cost unit/resolution, calibration split, and stopping rule before test campaigns"
+      ]
     }
   ],
   "policy_baselines": [
