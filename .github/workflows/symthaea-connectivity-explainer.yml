@@ -40,7 +40,7 @@ jobs:
         run: |
           cargo run --manifest-path crates/domains/symthaea-connectivity-explainer/Cargo.toml -- \
             crates/domains/symthaea-connectivity-explainer/examples/connectivity-report-synthetic-v1.json \
-            "$RUNNER_TEMP/connectivity-explanation.json"
+            --json "$RUNNER_TEMP/connectivity-explanation.json"
           grep -q '"evidence_class": "synthetic_simulation"' "$RUNNER_TEMP/connectivity-explanation.json"
           grep -q 'live Wi-Fi performance has not been tested' "$RUNNER_TEMP/connectivity-explanation.json"
           grep -q 'FIFO misses 1 essential deadline' "$RUNNER_TEMP/connectivity-explanation.json"
