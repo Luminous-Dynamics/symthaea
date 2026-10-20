@@ -18,10 +18,7 @@ fn read_json(path: &str) -> Result<Value, String> {
 
 fn run() -> Result<(), String> {
     let args: Vec<String> = env::args().collect();
-    if args.len() < 2
-        || args.len() > 4
-        || (args.len() >= 3 && args[2] != "--json")
-    {
+    if args.len() < 2 || args.len() > 4 || (args.len() >= 3 && args[2] != "--json") {
         return Err(format!(
             "usage: {} <multiwindow-report.json> [--json [output.json]]",
             args.first()
