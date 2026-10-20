@@ -196,6 +196,11 @@ impl EvidenceRecord {
                     errors.push(format!("measurement.{label} must be finite when present"));
                 }
             }
+            if (measurement.lower_bound.is_some() || measurement.upper_bound.is_some())
+                && measurement.normalized_unit.is_none()
+            {
+                errors.push("measurement bounds require normalized_unit".into());
+            }
             if let (Some(lower), Some(upper)) =
                 (measurement.lower_bound, measurement.upper_bound)
             {
