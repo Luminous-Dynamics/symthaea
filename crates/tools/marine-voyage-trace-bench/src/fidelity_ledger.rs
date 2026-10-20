@@ -161,6 +161,10 @@ pub struct RequirementProgress {
 pub struct FidelityAudit {
     pub profile_id: String,
     pub campaign_id: String,
+    /// Declared frozen profile identity copied into the audit receipt. Equality is checked, but
+    /// the caller-supplied digest is not cryptographically tied to profile fields by this module.
+    pub profile_manifest_sha256: String,
+    pub cost_basis_id: String,
     pub disposition: FidelityAuditDisposition,
     pub input_receipt_count: usize,
     /// Only unique receipt IDs contribute to attempt counters; duplicate IDs are invalid.
@@ -585,6 +589,8 @@ pub fn audit_fidelity_campaign(
     FidelityAudit {
         profile_id: profile.profile_id.clone(),
         campaign_id: profile.campaign_id.clone(),
+        profile_manifest_sha256: profile.manifest_sha256.clone(),
+        cost_basis_id: profile.cost_basis_id.clone(),
         disposition,
         input_receipt_count: receipts.len(),
         unique_receipt_count,
