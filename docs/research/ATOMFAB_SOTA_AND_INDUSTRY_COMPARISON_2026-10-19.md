@@ -70,9 +70,9 @@ This is important because an apparent improvement can be manufactured unintentio
 The supported-nanoparticle benchmark published in April 2026 makes a second distinction alongside the EOS/minima-hopping results: an interatomic potential may score well on energy prediction for structures it sees, yet the search driven by that potential may fail to discover the right structures. Therefore, every structure-search campaign should publish **two scoreboards**:
 
 1. **Conditional scientific accuracy:** for matched candidate/reference structures, report energy error, energetic-ranking agreement and relevant property error.
-2. **Search discovery quality:** at equal reference-calculation budget, report the number of unique reference-validated low-energy structures found, structural diversity, duplicate-minimum rate, and cost per discovered structure.
+2. **Search discovery quality:** at equal reference-calculation budget, report the number of unique reference-validated low-energy structures found, structural diversity, duplicate-minimum rate, and cost per discovered structure. Also report pairwise energetic-ordering agreement and the new **normalized finite-prefix top-weighted ranking overlap** implemented in the AtomFab Rust kernel. The latter weights shallow prefixes more heavily using a preregistered persistence parameter, requires unique IDs and equal-length rankings, and is explicitly an RBO-style finite-prefix metric—not a claim to implement every extrapolated RBO variant.
 
-Never infer one scoreboard from the other. A model that predicts energies accurately on a selected set can still guide exploration poorly; a broad search that finds many minima can still rank them incorrectly. The new `supported-nanoparticle-search` registry lane is separate from the elemental EOS lane so material family and search protocol remain explicit.
+Never infer one scoreboard from the other. A model that predicts energies accurately on a selected set can still guide exploration poorly; a broad search that finds many minima can still rank them incorrectly. The new `supported-nanoparticle-search` registry lane is separate from the elemental EOS lane so material family and search protocol remain explicit. Its ranking metrics include the finite-prefix overlap score, with duplicate-ID, length, and persistence validation.
 
 ### Track A — Scientific baseline parity
 
