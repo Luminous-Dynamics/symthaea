@@ -41,7 +41,7 @@
     },
     "cases": {
       "type": "array",
-      "minItems": 14,
+      "minItems": 15,
       "items": {
         "type": "object",
         "additionalProperties": false,
@@ -128,6 +128,19 @@
                 "type": "boolean"
               }
             }
+          },
+          "adapter_fault": {
+            "enum": [
+              "invalid_configuration",
+              "invalid_gain",
+              "invalid_observation",
+              "invalid_danger_level",
+              "agent_not_authorized",
+              "encoding_failure",
+              "actuator_interface_mismatch",
+              "bridge_failure",
+              "invalid_output"
+            ]
           }
         }
       }
