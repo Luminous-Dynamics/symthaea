@@ -201,22 +201,25 @@ fn choose_action(policy: Policy, observation: Observation) -> Action {
             let conservative_forecast =
                 (observation.forecast_load + uncertainty * 0.25).clamp(0.0, 1.0);
             let projected_reserve = reserve - 3.0 * (0.055 + 0.025 * conservative_forecast);
+            let reserve_floor = 0.15 + 0.10 * conservative_forecast;
             let projected_load = load + 3.0 * (0.026 + 0.032 * conservative_forecast);
-            projected_reserve < 0.30 || projected_load > 0.68 || reserve < 0.22
+            projected_reserve < reserve_floor || projected_load > 0.68 || reserve < 0.22
         }
         Policy::ShuffledForecastControl => {
             let uncertainty = epistemic_uncertainty(observation.forecast_confidence);
             let false_forecast =
                 (observation.shuffled_forecast_load + uncertainty * 0.25).clamp(0.0, 1.0);
             let projected_reserve = reserve - 3.0 * (0.055 + 0.025 * false_forecast);
+            let reserve_floor = 0.15 + 0.10 * false_forecast;
             let projected_load = load + 3.0 * (0.026 + 0.032 * false_forecast);
-            projected_reserve < 0.30 || projected_load > 0.68 || reserve < 0.22
+            projected_reserve < reserve_floor || projected_load > 0.68 || reserve < 0.22
         }
         Policy::OraclePredictive => {
             let forecast = observation.oracle_forecast_load;
             let projected_reserve = reserve - 3.0 * (0.055 + 0.025 * forecast);
+            let reserve_floor = 0.15 + 0.10 * forecast;
             let projected_load = load + 3.0 * (0.026 + 0.032 * forecast);
-            projected_reserve < 0.30 || projected_load > 0.68 || reserve < 0.22
+            projected_reserve < reserve_floor || projected_load > 0.68 || reserve < 0.22
         }
     };
 
@@ -316,7 +319,7 @@ pub fn run_episode(policy: Policy, scenario: Scenario, seed: u64) -> EpisodeMetr
             reserve += 0.08 * (1.0 - 0.7 * stress);
             let recovery = if stress < 0.25 { 0.055 } else { 0.020 };
             allostatic_load += 0.008 + stress * 0.032 - recovery;
-            if stress < 0.20 && reserve > 0.65 && allostatic_load < 0.25
+            if stress < 0.20 && reserve > 0.30 && allostatic_load < 0.25
                 && forecast_load < 0.25
             {
                 false_alarms += 1;
@@ -415,7 +418,7 @@ mod tests {
     fn predictive_policy_can_act_before_current_stress_rises() {
         let observation = Observation {
             current_stress: 0.05,
-            resource_reserve: 0.50,
+            resource_reserve: 0.45,
             allostatic_load: 0.40,
             forecast_load: 0.90,
             forecast_confidence: 0.90,
