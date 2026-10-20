@@ -71,6 +71,8 @@ jobs:
           grep -E '^henon_heiles_exact_H,.*unsat,true,' exact-rational-proof-results.csv
           witness="papers/physics-math/ramanujan/proofs/henon_heiles_exact_H.smt2"
           test -s "$witness"
+          witness_result="$(z3 -smt2 "$witness" | tail -n 1)"
+          test "$witness_result" = "unsat"
           {
             echo "source_commit=$QUALIFIED_SHA"
             echo "github_event_sha=$GITHUB_SHA"
@@ -82,6 +84,7 @@ jobs:
             echo "z3=$(z3 --version)"
             echo "witness_path=$witness"
             echo "witness_sha256=$(sha256sum "$witness" | cut -d ' ' -f 1)"
+            echo "witness_replay=z3:$witness_result"
             echo "claim=unscaled Hénon-Heiles Hamiltonian has dH/dt = 0 for the declared Hamiltonian vector field"
             echo "scope=SMT proof of the emitted polynomial obligation; not empirical validation of a physical system"
             echo "harness_boundary=production symbolic.rs and proof-emitter source included directly; HDC/world integration represented by test-only AST shim, not qualified"
@@ -91,7 +94,7 @@ jobs:
       - name: Upload proof witness and reproducibility receipt
         uses: actions/upload-artifact@v4
         with:
-          name: exact-rational-physics-proof-${{ github.sha }}
+          name: exact-rational-physics-proof-${{ env.QUALIFIED_SHA }}
           if-no-files-found: error
           path: |
             papers/physics-math/ramanujan/proofs/henon_heiles_exact_H.smt2
