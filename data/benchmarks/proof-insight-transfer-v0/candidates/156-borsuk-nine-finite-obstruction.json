@@ -108,7 +108,32 @@
           "notes": [
             "Both arguments end in contradiction, but the source representation map and finite support-face relation do not supply the graph witness or invariant inequalities required by the target.",
             "Judgment is based on source-level static review; no generated transfer was attempted and this is not a measured trial."
-          ]
+          ],
+          "move_kind": "representation_reduction",
+          "source_obligation": {
+            "domain": "geometric_combinatorics",
+            "object_type": "rank_one_projector_cover",
+            "predicate": "HasTenSmallCover",
+            "relation": "nonexistence",
+            "quantifier_scope": "The fixed rank-one-projector set in the nine-dimensional affine space cannot be covered by ten subsets of strictly smaller diameter.",
+            "preconditions": [
+              "The target cover has exactly ten sets.",
+              "Each cover set lies inside the projector set and has diameter strictly below sqrt(2).",
+              "cover_to_admissible preserves coverage and the strict diameter constraints."
+            ]
+          },
+          "target_obligation": {
+            "domain": "extremal_graph_theory",
+            "object_type": "finite_simple_graph_family",
+            "predicate": "HadwigerInequalityCounterexample",
+            "relation": "counterexample_existence",
+            "quantifier_scope": "For every sufficiently large size bound, construct a finite graph whose chromatic number exceeds its clique-minor number.",
+            "preconditions": [
+              "A graph-witness construction exists for arbitrarily large size bounds.",
+              "The connected-matching and independence-number invariant bounds hold for each witness.",
+              "The matching-minor inequality and chromatic lower bound apply to the same witness graph."
+            ]
+          }
         }
       }
     ]
