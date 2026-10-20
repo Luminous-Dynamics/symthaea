@@ -152,6 +152,7 @@ pub enum PairedReplayIssue {
     EmptyGroupIdentifier { field: &'static str },
     DuplicateGroupIdentifier { field: &'static str, group_id: String },
     TargetLabelBudgetRosterMismatch,
+    TargetLabelGroupOverlapsEvaluation { group_id: String },
     ConditionalGapRequiresMultipleOperatingCases {
         observable_id: String,
         unit_id: String,
@@ -413,6 +414,10 @@ fn push_requirement(encoder: &mut CanonicalEncoder, requirement: &PairedSliceReq
         requirement.maximum_normalized_width_increase,
     );
     encoder.number("slice.maximum_false_safe_rate", requirement.maximum_false_safe_rate);
+    encoder.number(
+        "slice.maximum_missed_feasible_rate",
+        requirement.maximum_missed_feasible_rate,
+    );
     match &requirement.engineering_constraint {
         Some(constraint) => {
             encoder.boolean("slice.constraint.present", true);
@@ -578,6 +583,19 @@ fn validate_profile(profile: &PairedReplayProfile) -> (bool, Vec<PairedReplayIss
                 field: "evaluation_group_ids",
                 group_id: group_id.clone(),
             });
+        }
+    }
+
+    for roster in [
+        &profile.baseline_target_label_group_ids,
+        &profile.candidate_target_label_group_ids,
+    ] {
+        for group_id in roster {
+            if group_ids.contains(group_id.as_str()) {
+                issues.push(PairedReplayIssue::TargetLabelGroupOverlapsEvaluation {
+                    group_id: group_id.clone(),
+                });
+            }
         }
     }
 
@@ -1694,6 +1712,21 @@ mod tests {
         let report = evaluate_paired_replay(&profile, &panel(0.0));
         assert_eq!(report.disposition, PairedReplayDisposition::InvalidProfile);
         assert!(report.issues.contains(&PairedReplayIssue::TargetLabelBudgetRosterMismatch));
+    }
+
+    #[test]
+    fn target_label_groups_overlapping_final_evaluation_are_rejected() {
+        let mut profile = profile();
+        profile.baseline_target_label_group_ids = vec!["group-0".to_string()];
+        profile.candidate_target_label_group_ids = vec!["group-0".to_string()];
+        refresh(&mut profile);
+        let report = evaluate_paired_replay(&profile, &panel(0.0));
+        assert_eq!(report.disposition, PairedReplayDisposition::InvalidProfile);
+        assert!(report.issues.contains(
+            &PairedReplayIssue::TargetLabelGroupOverlapsEvaluation {
+                group_id: "group-0".to_string()
+            }
+        ));
     }
 
     #[test]
