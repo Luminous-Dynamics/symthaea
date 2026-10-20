@@ -20,7 +20,8 @@
     "metrics",
     "gates",
     "published_candidate_refinement",
-    "policy_comparison"
+    "policy_comparison",
+    "published_result_fingerprint"
   ],
   "properties": {
     "schema_version": {
@@ -421,7 +422,10 @@
         "selection_rule",
         "exact_dft_settings_status",
         "duplicates_and_failures",
-        "status"
+        "status",
+        "mutation_operators",
+        "mutation_operator_probability",
+        "global_minimum_claim_ceiling"
       ],
       "properties": {
         "source": {
@@ -464,6 +468,38 @@
         },
         "status": {
           "const": "published_refinement_count_transcribed_other_run_details_unresolved"
+        },
+        "mutation_operators": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "rattle",
+              "mirror"
+            ]
+          },
+          "minItems": 2,
+          "maxItems": 2,
+          "uniqueItems": true
+        },
+        "mutation_operator_probability": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "rattle",
+            "mirror"
+          ],
+          "properties": {
+            "rattle": {
+              "const": 0.5
+            },
+            "mirror": {
+              "const": 0.5
+            }
+          }
+        },
+        "global_minimum_claim_ceiling": {
+          "type": "string",
+          "minLength": 1
         }
       }
     },
@@ -559,6 +595,52 @@
               "const": "proposed_not_achieved"
             }
           }
+        }
+      }
+    },
+    "published_result_fingerprint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "system_count",
+        "model_minimum_binding_energy_winner_counts",
+        "interpretation",
+        "citation_doi"
+      ],
+      "properties": {
+        "status": {
+          "const": "paper_reported_not_reproduced"
+        },
+        "system_count": {
+          "const": 12
+        },
+        "model_minimum_binding_energy_winner_counts": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "dp-unialcu",
+            "mattersim-v1.0.0-1m",
+            "mace-omat-medium"
+          ],
+          "properties": {
+            "dp-unialcu": {
+              "const": 8
+            },
+            "mattersim-v1.0.0-1m": {
+              "const": 3
+            },
+            "mace-omat-medium": {
+              "const": 1
+            }
+          }
+        },
+        "interpretation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "citation_doi": {
+          "const": "10.1038/s41524-026-02043-8"
         }
       }
     }
