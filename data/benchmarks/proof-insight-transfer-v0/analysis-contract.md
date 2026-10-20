@@ -49,7 +49,7 @@ The receipt is a provenance assertion whose exact bytes are hashed into the froz
 
 ## Target outcome JSONL
 
-Each non-empty line is one JSON object with `schema_version = "pitb.target-outcome.v0"`. Keep excluded and unknown targets as rows with `arms: []`, `eligibility` set to `excluded` or `unknown`, and a specific `exclusion_reason`; they remain in the reported accounting but are not scored. Every row must identify its family in the frozen split and declare `split = "test"`.
+Each non-empty line is one JSON object with `schema_version = "pitb.target-outcome.v0"`. Keep excluded and unknown targets as rows with `arms: []`, `eligibility` set to `excluded` or `unknown`, and a specific `exclusion_reason`; they remain in the reported accounting but are not scored. Every row must identify its family in the frozen split and declare `split = "test"`. Across all rows, **every family assigned to the frozen test split must appear at least once**; families with no eligible theorem must still have an explicit `excluded` or `unknown` row and a reason. The analyzer rejects omitted test families, so the result denominator cannot silently shrink to only the easiest or available items.
 
 An `eligible` target must include:
 
