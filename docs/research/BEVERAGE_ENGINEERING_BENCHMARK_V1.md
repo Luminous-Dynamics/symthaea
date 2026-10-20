@@ -162,6 +162,20 @@ The focused harness compiles the exact tracked Rust source files through `tools/
 
 ## 10. UCI wine-quality source auditor
 
+## Independent JSON Schema Draft 2020-12 validation
+
+The isolated harness includes a local schema auditor backed by the pinned `jsonschema` 0.59.0 crate with default file/HTTP reference resolution disabled. It checks the declared Draft 2020-12 dialect, validates the schema against the Draft 2020-12 meta-schema, builds the validator with format checks enabled, and validates the instance. External `$ref`, `$dynamicRef`, and `$recursiveRef` targets are refused to prevent network or arbitrary file reads.
+
+```bash
+cargo test --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin schema_contract_audit
+cargo run --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin schema_contract_audit -- \
+  --schema docs/research/beverage-engineering-scenarios-v1.schema.json \
+  --instance docs/research/beverage-engineering-scenarios-v1.json \
+  --out /tmp/beverage-schema-receipt.json
+```
+
+This is independent of the Rust strict-deserialization and receipt-contract checks. The pinned library supports Draft 2020-12 but is not claimed to pass every case in the official JSON Schema conformance suite. A PASS receipt shows that this local schema and instance passed this validator path, not that domain semantics are scientifically true.
+
 ## Dryad fermentation time-series intake auditor
 
 A third focused Rust executable supports the three long-form tab-separated files in the 2026 Dryad wine-temperature / yeast-ecology dataset (DOI 10.5061/dryad.cfxpnvxp3). It checks the declared columns, resolves columns by name, validates time/treatment/replicate fields, preserves `NA` and `ND` as distinct missingness, summarizes numeric analytes by unit, detects duplicate observation keys, hashes exact input bytes, and generates a JSON receipt.
