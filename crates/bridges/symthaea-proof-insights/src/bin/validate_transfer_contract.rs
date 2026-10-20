@@ -1,4 +1,4 @@
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use serde_json::Value;
 use std::collections::BTreeSet;
 use std::env;
@@ -127,7 +127,12 @@ fn opposite_bound_direction(source: &str, target: &str) -> bool {
 fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
     if args.len() != 2 {
-        bail!("usage: {} <insight-record.json>", args.first().map(String::as_str).unwrap_or("validate_transfer_contract"));
+        bail!(
+            "usage: {} <insight-record.json>",
+            args.first()
+                .map(String::as_str)
+                .unwrap_or("validate_transfer_contract")
+        );
     }
 
     let path = Path::new(&args[1]);
@@ -201,9 +206,7 @@ fn validate_candidate(candidate: &Value) -> Result<()> {
         .context("directional_contract.mismatch_codes must be an array")?;
     let mut mismatch_codes = BTreeSet::new();
     for value in mismatch_values {
-        let code = value
-            .as_str()
-            .context("mismatch code must be a string")?;
+        let code = value.as_str().context("mismatch code must be a string")?;
         if !MISMATCH_CODES.contains(&code) {
             bail!("unsupported mismatch code {code:?}");
         }
@@ -231,19 +234,25 @@ fn validate_candidate(candidate: &Value) -> Result<()> {
     if move_kind == "representation_reduction" {
         if source_obligation.domain != target_obligation.domain {
             if compatibility == "compatible" || !mismatch_codes.contains("domain_mismatch") {
-                bail!("representation reduction across domains requires a domain mismatch disposition");
+                bail!(
+                    "representation reduction across domains requires a domain mismatch disposition"
+                );
             }
         }
         if source_obligation.object_type != target_obligation.object_type {
             if compatibility == "compatible" || !mismatch_codes.contains("object_type") {
-                bail!("representation reduction across object types requires an object_type mismatch");
+                bail!(
+                    "representation reduction across object types requires an object_type mismatch"
+                );
             }
         }
     }
     if move_kind == "inequality_transfer" {
         if source_obligation.predicate != target_obligation.predicate {
             if compatibility == "compatible" || !mismatch_codes.contains("predicate_mismatch") {
-                bail!("inequality transfer across predicates requires a predicate_mismatch disposition");
+                bail!(
+                    "inequality transfer across predicates requires a predicate_mismatch disposition"
+                );
             }
         } else if opposite_bound_direction(source_obligation.relation, target_obligation.relation)
             && (compatibility == "compatible" || !mismatch_codes.contains("inequality_direction"))
@@ -299,7 +308,8 @@ fn validate_candidate(candidate: &Value) -> Result<()> {
             bail!("verified_transfer target_theorem_id must be non-empty");
         }
         validate_target_verification(
-            transfer_verification.context("verified_transfer requires target_verification evidence")?,
+            transfer_verification
+                .context("verified_transfer requires target_verification evidence")?,
         )?;
     }
 
@@ -310,7 +320,11 @@ fn validate_target_verification(evidence: &Value) -> Result<()> {
     if required_string(evidence, "status")? != "passed" {
         bail!("verified transfer requires target verification status passed");
     }
-    if evidence.get("exact_statement_checked").and_then(Value::as_bool) != Some(true) {
+    if evidence
+        .get("exact_statement_checked")
+        .and_then(Value::as_bool)
+        != Some(true)
+    {
         bail!("target verification must check the exact statement");
     }
 
@@ -365,8 +379,10 @@ fn validate_target_verification(evidence: &Value) -> Result<()> {
             .and_then(Value::as_array)
             .context("not_applicable successor status requires notes")?;
         if !notes.iter().any(|note| {
-            note.as_str()
-                .is_some_and(|text| text.to_ascii_lowercase().contains("no applicable successor"))
+            note.as_str().is_some_and(|text| {
+                text.to_ascii_lowercase()
+                    .contains("no applicable successor")
+            })
         }) {
             bail!("not_applicable successor status must explain why no successor test applies");
         }
@@ -468,7 +484,10 @@ mod tests {
     #[test]
     fn rejects_missing_directional_contract() {
         let mut candidate = compatible_candidate();
-        candidate.as_object_mut().unwrap().remove("directional_contract");
+        candidate
+            .as_object_mut()
+            .unwrap()
+            .remove("directional_contract");
         assert!(validate_candidate(&candidate).is_err());
     }
 
