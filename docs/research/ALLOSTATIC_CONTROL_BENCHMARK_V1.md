@@ -95,6 +95,7 @@ This is not yet an SOTA comparison. Relevant external methods must be tested in 
 - Model predictive control and reinforcement-learning combinations: [2026 MPC/RL synthesis survey](https://doi.org/10.1016/j.arcontrol.2026.101045) and [RL-MPC benchmark study](https://doi.org/10.1016/j.apenergy.2021.118346).
 - [Safe-Control-Gym](https://github.com/learnsyslab/safe-control-gym) provides constrained/disturbed CartPole and quadrotor settings with reference controllers including PID, LQR, MPC, PPO/SAC, and safety filters. It is a strong external robotics/control comparison candidate.
 - [Safety-Gymnasium](https://safety-gymnasium.readthedocs.io/en/stable/introduction/about_safety_gymnasium.html) provides safe-RL environments with explicit reward and cost signals. Its cost/violation reporting is a better comparison pattern than a single reward score.
+- The September 2026 preprint [Evaluation Metrics for Safe Reinforcement Learning / SafeRLEval](https://arxiv.org/abs/2609.15315) argues that expected cumulative cost alone hides violation frequency, severity, and consistency across tasks/bounds. Follow its distributional and per-constraint reporting principle: pair aggregate safety cost with violation counts/severity, worst-case/tail metrics, and task/bound-specific results.
 - Practical comparison caution: a real-world building-energy study reported similar costs for simple rule-based, tree, and MPC methods while its RL approach was still training; more complex policies do not automatically win ([2024 study](https://www.sciencedirect.com/science/article/pii/S2666546824001149)).
 
 The v1 harness implements none of these external algorithms. The next comparison should use independently reviewed implementations of rule-based control, MPC, homeostatic RL, and a constrained/safe RL method. Compare on common scenario traces, observations, action spaces, tuning budgets, and compute budgets. For a first external tournament, use Safe-Control-Gym and/or Safety-Gymnasium where a valid adapter is possible, and add allostatic delayed-cost tasks as a clearly labeled supplementary suite. Keep external benchmark execution in an isolated research/evaluation adapter; do not add a Python runtime dependency to production Symthaea merely to run comparison baselines. Our custom toy simulator is not an accepted SOTA suite.
@@ -112,7 +113,7 @@ The v1 harness implements none of these external algorithms. The next comparison
 
 - Keep the 32 development seeds separate from a newly generated and frozen held-out seed set.
 - Use paired scenario/seed comparisons across all policies.
-- Report per-scenario distributions, median and 95th percentile, worst case, failures, and uncertainty intervals; do not report only a pooled mean.
+- Report per-scenario distributions, median and 95th percentile, worst case, failures, frequency/severity of limit violations, and uncertainty intervals; do not report only a pooled mean.
 - Bootstrap paired differences at the episode level (and at the scenario-family level where feasible); publish raw CSV, aggregation code, and frozen seeds.
 - Run ablations: remove cumulative load, ignore forecast confidence, replace forecast by the shuffled control, and disable recovery.
 - Test observation degradation, forecast bias, missing forecasts, slower recovery, resource budget changes, and unannounced regime changes.
