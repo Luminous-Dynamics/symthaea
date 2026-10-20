@@ -52,6 +52,7 @@ jobs:
         run: |
           rustfmt --edition 2024 --check crates/domains/symthaea-culinary/src/bin/beverage_benchmark_receipt.rs
           rustfmt --edition 2024 --check crates/domains/symthaea-culinary/src/bin/wine_quality_source_audit.rs
+          rustfmt --edition 2024 --check crates/domains/symthaea-culinary/src/bin/fermentation_time_series_audit.rs
 
       - name: Test synthetic receipt contract
         run: cargo test --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin beverage_benchmark_receipt
@@ -59,10 +60,14 @@ jobs:
       - name: Test wine source auditor
         run: cargo test --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin wine_quality_source_audit
 
+      - name: Test fermentation time-series intake auditor
+        run: cargo test --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin fermentation_time_series_audit
+
       - name: Clippy focused runners
         run: |
           cargo clippy --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin beverage_benchmark_receipt -- -D warnings
           cargo clippy --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin wine_quality_source_audit -- -D warnings
+          cargo clippy --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin fermentation_time_series_audit -- -D warnings
 
       - name: Emit exact-head receipt
         env:
