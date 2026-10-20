@@ -596,7 +596,10 @@ impl Accumulator {
         true
     }
 
-    fn metrics(&self, scale: f64) -> Option<(f64, f64, f64, f64, f64)> {
+    fn metrics(
+        &self,
+        scale: f64,
+    ) -> Option<(f64, f64, f64, f64, f64, f64, f64)> {
         if self.count == 0 {
             return None;
         }
@@ -607,39 +610,24 @@ impl Accumulator {
         let mean_score = self.score_sum / n;
         let normalized_mean_score = mean_score / scale;
         let (wilson_lower, wilson_upper) = wilson_95(self.covered_count, self.count)?;
-        [
+        let values = [
             coverage,
+            wilson_lower,
+            wilson_upper,
             mean_width,
             normalized_mean_width,
             mean_score,
             normalized_mean_score,
-            wilson_lower,
-            wilson_upper,
-        ]
-        .iter()
-        .all(|value| value.is_finite())
-        .then_some((
+        ];
+        values.iter().all(|value| value.is_finite()).then_some((
             coverage,
             wilson_lower,
             wilson_upper,
             mean_width,
             normalized_mean_width,
+            mean_score,
+            normalized_mean_score,
         ))
-        .and_then(|values| {
-            (mean_score.is_finite() && normalized_mean_score.is_finite()).then_some((
-                values.0,
-                values.1,
-                values.2,
-                values.3,
-                values.4,
-                mean_score,
-                normalized_mean_score,
-            ))
-        })
-        .map(|values| {
-            // Seven intermediate values are collapsed into a stable metrics tuple below.
-            (values.0, values.1, values.2, values.3, values.4)
-        })
     }
 }
 
