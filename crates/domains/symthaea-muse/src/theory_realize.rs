@@ -167,7 +167,7 @@ impl PerformanceDialect {
 /// 4. `roll_ornaments` or `drone` → [`PerformanceDialect::FolkLift`]
 /// 5. everything else → [`PerformanceDialect::ClassicalRubato`] (the identity)
 ///
-/// Known v1 limits (documented, not hidden): March reads as ClassicalRubato
+/// Known remaining limits (documented, not hidden): March reads as ClassicalRubato
 /// (no spec property marks its clock-insistence), and plain Folk/ModalFolk
 /// read as ClassicalRubato (their specs carry none of the folk habit flags
 /// — only Celtic's drone and Irish's rolls are visible at the spec level).
@@ -1822,6 +1822,15 @@ mod tests {
             (Style::Mazurka, D::MazurkaLilt),
             (Style::Toccata, D::ToccataMotor),
         ];
+        // Keep this hand-reviewed oracle exhaustive as Style::ALL grows. Equal
+        // length plus membership of every roster entry also rules out duplicates.
+        assert_eq!(cases.len(), Style::ALL.len(), "every style needs one dialect row");
+        for style in Style::ALL {
+            assert!(
+                cases.iter().any(|(case_style, _)| *case_style == style),
+                "missing dialect audit row for {style:?}"
+            );
+        }
         for (style, expected) in cases {
             assert_eq!(
                 dialect_for_spec(&style.spec()),
