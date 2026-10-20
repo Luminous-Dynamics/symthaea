@@ -523,7 +523,9 @@ mod tests {
             candidate("symthaea", 2, Some(-3.15), 110),
         ];
         let mut report = build_decision_frontier(&candidates).unwrap();
-        report.validate().expect("canonical frontier should validate");
+        report
+            .validate()
+            .expect("canonical frontier should validate");
 
         let unsafe_entry = report
             .entries
@@ -647,7 +649,9 @@ mod tests {
                 .expect("fixture candidates must match Rust records");
         let report = build_decision_frontier(&candidates)
             .expect("illustrative candidates share a comparison contract");
-        report.validate().expect("generated frontier should revalidate");
+        report
+            .validate()
+            .expect("generated frontier should revalidate");
         let lookup = |policy: &str| {
             report
                 .entries
