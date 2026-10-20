@@ -49,3 +49,12 @@ The published paper's comparison should be reproduced with both RBO (p=0.94) and
 A result deserves an industry-comparison claim only after: (a) exact reference protocol reproduction; (b) pinned, license-compatible model/checkpoint/evaluator; (c) comparable task and splits; (d) identical reference-validation budget; (e) total costs and failed runs accounted; (f) independently recomputed metrics from evidence artifacts; and (g) stratum-specific failures remain visible. The 2026 study shows that energy-error rankings and exploration performance can diverge, so neither MAE nor best predicted energy alone can establish superiority. [Benchmark source](https://doi.org/10.1038/s41524-026-02043-8).
 
 No data has been downloaded or model has been run as part of this campaign-plan commit. The plan is ready for reference-source materialization, but its data/checkpoint hashes and exact DFT settings are not yet pinned.
+
+
+## Paired-seed confidence interval implementation
+
+The policy experiment's stretch gate now has a dedicated Rust implementation in `src/campaign_statistics.rs`. It computes the median seed-level cost ratio and a deterministic percentile-bootstrap interval from 20 or more matched campaign pairs. It refuses an interval if any paired campaign is incomplete, fails to reach the shared target, changes the underlying model/data/evaluator/environment/target/budget, repeats a seed, or uses non-positive/non-finite cost. Bootstrap resample count and random seed are explicit and reproducible; the serialized summary is validated against `schemas/paired-acceleration-summary-v1.schema.json`.
+
+This is stricter than computing an interval over only successful seeds after results are observed. All target failures stay reportable campaign outcomes; the speedup interval is withheld if the entire declared paired cohort does not satisfy the target-reaching rule. A lower confidence bound above one is necessary but not sufficient for the stretch claim—the selected policy must also maintain or improve the validated objective at equal total cost.
+
+No benchmark campaign has been executed by adding this metric kernel. It is report-generation infrastructure awaiting exact data/model pins and external baseline runs.
