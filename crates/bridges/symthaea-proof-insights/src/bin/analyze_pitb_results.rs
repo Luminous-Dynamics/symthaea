@@ -722,7 +722,10 @@ fn compute_baseline_scores(targets: &[&TargetOutcome]) -> Result<BTreeMap<String
                 .iter()
                 .find(|arm| arm.arm == arm_id)
                 .with_context(|| {
-                    format!("validation target {} lacks baseline arm {arm_id}", target.target_id)
+                    format!(
+                        "validation target {} lacks baseline arm {arm_id}",
+                        target.target_id
+                    )
                 })?;
             successes += if arm.semantic_gate_passed { 1 } else { 0 };
         }
@@ -752,9 +755,7 @@ fn validate_baseline_scores(
     let selected = computed_scores
         .iter()
         .max_by(|(arm_a, score_a), (arm_b, score_b)| {
-            score_a
-                .total_cmp(score_b)
-                .then_with(|| arm_b.cmp(arm_a))
+            score_a.total_cmp(score_b).then_with(|| arm_b.cmp(arm_a))
         })
         .map(|(arm, _)| arm.as_str())
         .context("computed validation scores are empty")?;
@@ -767,7 +768,10 @@ fn validate_baseline_scores(
     Ok(())
 }
 
-fn validate_baseline_receipt(receipt: &BaselineSelectionReceipt, validation_bytes: &[u8]) -> Result<()> {
+fn validate_baseline_receipt(
+    receipt: &BaselineSelectionReceipt,
+    validation_bytes: &[u8],
+) -> Result<()> {
     if receipt.schema_version != "pitb.baseline-selection.v0" {
         bail!("unsupported baseline-selection receipt schema");
     }
