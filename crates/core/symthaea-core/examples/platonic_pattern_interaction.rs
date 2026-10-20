@@ -18,6 +18,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("role_unbinding_similarity,{:.6}", report.role_unbinding_similarity);
     println!("bundling_ablation_similarity,{:.6}", report.bundling_ablation_similarity);
     println!("binding_ablation_advantage,{:.6}", report.binding_ablation_advantage);
+    println!("antipattern_cancellation_abs_similarity,{:.6}", report.antipattern_cancellation_abs_similarity);
     println!("sequence_order_similarity,{:.6}", report.sequence_order_similarity);
     println!("basis_equivariance_exact,{}", report.basis_equivariance_exact);
 
