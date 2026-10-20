@@ -323,5 +323,14 @@
     },
     "interpretation": "Historical paper-reported finite-search counts for the 12 size×surface cases. Treat as a reproduction fingerprint, not as a guaranteed result under a different random seed; deviations require traceable seed/protocol analysis and must not be silently fitted.",
     "citation_doi": "10.1038/s41524-026-02043-8"
+  },
+  "published_ranking_settings": {
+    "rbo_persistence": 0.94,
+    "rbo_variant": "finite-list extrapolated RBO: (1-p) sum over depth d of p^(d-1) times prefix agreement A_d, plus p^k times A_k",
+    "exact_energy_tie_order": "canonical_structure_id_ascending",
+    "kendall_tau_variant": "tau_b",
+    "kendall_tau_energy_tie_tolerance_eV": 0,
+    "common_candidate_set": "same canonical structure IDs for each model prediction and the DFT-refined reference; compute structural-discovery set overlap separately",
+    "status": "preregistered_for_reproduction"
   }
 }
