@@ -27,6 +27,11 @@ const HEADERS: [&str; 18] = [
     "comparability_disposition",
     "source_url",
     "notes",
+    "normalized_unit_price",
+    "normalized_currency_basis_id",
+    "normalization_receipt_sha256",
+    "normalization_method_ref",
+    "normalized_scope_id",
 ];
 
 const CONTEXT_ONLY: &str = "ContextOnlyNotComparable";
@@ -276,6 +281,34 @@ fn validate_csv(input: &str) -> Result<AuditReport, Vec<String>> {
                         "row {record_number} ({anchor_id}): ComparablePriceEvidence requires a valid positive total_contract_value and currency"
                     ));
                 }
+
+                match cell(row, 18).parse::<f64>() {
+                    Ok(value) if value.is_finite() && value > 0.0 => {}
+                    _ => row_errors.push(format!(
+                        "row {record_number} ({anchor_id}): ComparablePriceEvidence requires positive normalized_unit_price"
+                    )),
+                }
+                if cell(row, 19).is_empty() {
+                    row_errors.push(format!(
+                        "row {record_number} ({anchor_id}): ComparablePriceEvidence requires normalized_currency_basis_id (currency, price year and geography)"
+                    ));
+                }
+                let receipt = cell(row, 20);
+                if receipt.len() != 64 || !receipt.chars().all(|character| character.is_ascii_hexdigit()) {
+                    row_errors.push(format!(
+                        "row {record_number} ({anchor_id}): normalization_receipt_sha256 must contain 64 hexadecimal characters"
+                    ));
+                }
+                if cell(row, 21).is_empty() {
+                    row_errors.push(format!(
+                        "row {record_number} ({anchor_id}): ComparablePriceEvidence requires normalization_method_ref"
+                    ));
+                }
+                if cell(row, 22).is_empty() {
+                    row_errors.push(format!(
+                        "row {record_number} ({anchor_id}): ComparablePriceEvidence requires normalized_scope_id"
+                    ));
+                }
                 if row_errors.is_empty() {
                     comparable_price_records += 1;
                 }
@@ -406,8 +439,8 @@ mod tests {
     fn duplicate_anchor_ids_are_rejected() {
         let input = concat!(
             "anchor_id,country,buyer_or_source,source_record,source_kind,award_or_issue_date,vessel_length_m,vessel_material,vessel_or_propulsion_description,quantity,total_contract_value,currency,price_scope,explicitly_included,unknown_or_unverified,comparability_disposition,source_url,notes\n",
-            "X-1,South Africa,Portal,DATASET,Public data catalog,2026-01-01,,,,,,,,Unknown,DiscoverySourceNotPriceEvidence,https://example.org/data,One\n",
-            "X-1,South Africa,Portal,DATASET2,Public data catalog,2026-01-02,,,,,,,,Unknown,DiscoverySourceNotPriceEvidence,https://example.org/data2,Two\n"
+            "X-1,South Africa,Portal,DATASET,Public data catalog,2026-01-01,,,,,,,,,Unknown,DiscoverySourceNotPriceEvidence,https://example.org/data,One\n",
+            "X-1,South Africa,Portal,DATASET2,Public data catalog,2026-01-02,,,,,,,,,Unknown,DiscoverySourceNotPriceEvidence,https://example.org/data2,Two\n"
         );
         let errors = validate_csv(input).unwrap_err();
         assert!(errors.iter().any(|error| error.contains("duplicate anchor_id")));
