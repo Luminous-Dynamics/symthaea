@@ -640,8 +640,7 @@ mod tests {
     fn minimum_sample_and_configuration_gates_are_enforced() {
         let (baseline, candidate) = make_pairs(&[2.0; 19], true);
         assert_eq!(
-            summarize(&references(&baseline, &candidate), 20, 0.95, 2_000, 3)
-                .unwrap_err(),
+            summarize(&references(&baseline, &candidate), 20, 0.95, 2_000, 3).unwrap_err(),
             PairedAccelerationError::TooFewCampaignPairs {
                 actual: 19,
                 minimum: MINIMUM_CAMPAIGNS_FOR_ACCELERATION_INTERVAL
