@@ -67,7 +67,8 @@ The oracle is not a fair competitor and must never be reported as a deployable b
 - Cumulative exposure (discrete area under allostatic load), mean load, and peak load.
 - Unsafe ticks and missed-limit decisions under the harness's declared synthetic limits.
 - False-alarm maintenance ticks under calm, apparently safe conditions.
-- Resource cost, episode failure indicator, and time from the last disturbance to a declared recovered state.
+- Resource cost, minimum reserve, terminal reserve, and terminal allostatic load as separate future-option proxies.
+- Episode failure indicator and time from the last disturbance to a declared recovered state.
 - Recovery not observed by the end of the horizon is emitted as NA (right-censored), not fabricated as a successful recovery.
 
 A missed-limit counter is an early-warning diagnostic; it is not a proof that a runtime safety constraint was enforced. This first simulator does not yet contain an independent action shield or formal barrier certificate.
@@ -86,15 +87,17 @@ Abstract model steps are not seconds. Cross-environment aggregation requires exp
 
 ## Baselines and current research context
 
-This is not yet an SOTA comparison. Relevant external methods must be tested in the same environments and under identical budgets:
+This is not yet an SOTA comparison. Relevant external methods must be tested in the same environments and under identical budgets. Use established suites where the state/action mapping is defensible rather than inventing scores that cannot be compared with prior work:
 
 - Homeostatic reinforcement learning: [Neurocomputational theories of homeostatic control](https://www.sciencedirect.com/science/article/pii/S1571064519301009).
 - Adaptive reward design: [IJCAI 2026 survey](https://www.ijcai.org/proceedings/2026/863).
 - Control-theoretic safety regulators: [CTR-Net, 2025](https://www.sciencedirect.com/science/article/pii/S2667305325001231).
-- Model predictive control and reinforcement-learning combinations: [RL-MPC benchmark study](https://doi.org/10.1016/j.apenergy.2021.118346).
+- Model predictive control and reinforcement-learning combinations: [2026 MPC/RL synthesis survey](https://doi.org/10.1016/j.arcontrol.2026.101045) and [RL-MPC benchmark study](https://doi.org/10.1016/j.apenergy.2021.118346).
+- [Safe-Control-Gym](https://github.com/learnsyslab/safe-control-gym) provides constrained/disturbed CartPole and quadrotor settings with reference controllers including PID, LQR, MPC, PPO/SAC, and safety filters. It is a strong external robotics/control comparison candidate.
+- [Safety-Gymnasium](https://safety-gymnasium.readthedocs.io/en/stable/introduction/about_safety_gymnasium.html) provides safe-RL environments with explicit reward and cost signals. Its cost/violation reporting is a better comparison pattern than a single reward score.
 - Practical comparison caution: a real-world building-energy study reported similar costs for simple rule-based, tree, and MPC methods while its RL approach was still training; more complex policies do not automatically win ([2024 study](https://www.sciencedirect.com/science/article/pii/S2666546824001149)).
 
-The v1 harness implements none of these external algorithms. The next comparison should use independently reviewed implementations of rule-based control, MPC, homeostatic RL, and a constrained/safe RL method. Compare on common scenario traces, observations, action spaces, tuning budgets, and compute budgets. Reuse established benchmark environments when practical rather than claiming this custom simulator is an accepted SOTA suite.
+The v1 harness implements none of these external algorithms. The next comparison should use independently reviewed implementations of rule-based control, MPC, homeostatic RL, and a constrained/safe RL method. Compare on common scenario traces, observations, action spaces, tuning budgets, and compute budgets. For a first external tournament, use Safe-Control-Gym and/or Safety-Gymnasium where a valid adapter is possible, and add allostatic delayed-cost tasks as a clearly labeled supplementary suite. Keep external benchmark execution in an isolated research/evaluation adapter; do not add a Python runtime dependency to production Symthaea merely to run comparison baselines. Our custom toy simulator is not an accepted SOTA suite.
 
 ## Qualification protocol
 
