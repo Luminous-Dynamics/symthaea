@@ -67,3 +67,13 @@ The current proposed extension pins seeds **101–120** in `policy_comparison.se
 The paired acceleration function receives the manifest explicitly, requires exactly one baseline/candidate pair for every seed in that roster, and writes both the roster and digest into its report. A missing seed, extra seed, duplicated seed, or mismatched roster blocks the interval. A campaign with a failed/non-target run is retained as a failure and blocks this strict target-reaching interval; it must not be silently removed to make the policy look faster. The seed roster and hash are proposal inputs and must remain fixed before outcomes are observed.
 
 The illustrative seed-manifest fixture is a test artifact, not evidence of any completed campaign. The accepted report still requires successful execution on an exact code head, traceable completed campaign records, and independent recomputation of the statistics from those records.
+
+
+## Two tougher challenger policies (planned, not yet implemented)
+
+The policy comparison now includes two additional arms beyond random, diversity, uncertainty, cost-aware and the existing Symthaea ablation:
+
+- **Calibrated ensemble disagreement:** prioritize eligible structures where pinned, compatible interatomic-potential checkpoints disagree after disagreement scales are calibrated on validation-only data. The policy must pay for all model inference and beat shuffled-disagreement controls. Raw disagreement alone is not a calibrated probability of error or a guarantee of useful discoveries.
+- **Counterexample-guided falsification:** explicitly seek candidates that could overturn the current best-ranked structure or falsify an applicability/feasibility assumption. Freeze the hypothesis and scoring rule before a campaign; count every failed or non-falsifying query and the complete cost.
+
+These are **proposed comparison arms**, not implementations or claimed improvements. The point is to set a higher bar than only comparing against random search: AtomFab should outperform specialist heuristics or show why its evidence/history layer adds distinct value. We will keep model choice constant when testing policy value, normalize disagreements appropriately, use matched seed rosters, and compare reference-validated discoveries, best validated objective, failure/abstention rates and total cost separately.
