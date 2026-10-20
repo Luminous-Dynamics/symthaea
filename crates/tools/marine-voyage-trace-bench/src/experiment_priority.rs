@@ -639,6 +639,42 @@ pub fn prioritize_next_experiment(
         status.cheapest_admissible_cost_units = choices.iter().filter_map(|a| a.cost_units).min();
     }
 
+    // Surface every outstanding mandatory requirement that has no admissible option under
+    // the current budget, even when a different mandatory requirement can be selected now.
+    for status in &due {
+        if status.admissible_proposals_within_budget > 0 {
+            continue;
+        }
+        let proposals_for_requirement: Vec<&ProposalAssessment> = assessments
+            .iter()
+            .filter(|assessment| {
+                assessment.requirement_id.as_deref() == Some(status.requirement_id.as_str())
+            })
+            .collect();
+        if proposals_for_requirement.is_empty() {
+            issues.push(ExperimentPriorityIssue::MissingMandatoryProposal {
+                requirement_id: status.requirement_id.clone(),
+            });
+        } else {
+            let budget_blocked_cost = proposals_for_requirement
+                .iter()
+                .filter(|assessment| assessment.disposition == ProposalDisposition::BlockedBudget)
+                .filter_map(|assessment| assessment.cost_units)
+                .min();
+            if let Some(cost) = budget_blocked_cost {
+                issues.push(ExperimentPriorityIssue::MandatoryProposalOverBudget {
+                    requirement_id: status.requirement_id.clone(),
+                    cheapest_cost_units: cost,
+                    budget_units: budget_remaining_units,
+                });
+            } else {
+                issues.push(ExperimentPriorityIssue::NoAdmissibleProposalForRequirement {
+                    requirement_id: status.requirement_id.clone(),
+                });
+            }
+        }
+    }
+
     let (disposition, selected, selected_requirement_id) = if !audit_valid {
         (ExperimentPriorityDisposition::InvalidProfileOrAudit, None, None)
     } else if !due.is_empty() {
@@ -649,40 +685,6 @@ pub fn prioritize_next_experiment(
                 Some(requirement_id),
             )
         } else {
-            for status in &due {
-                let matching_any = proposals.iter().any(|proposal| {
-                    proposal.requirement_id.as_deref() == Some(status.requirement_id.as_str())
-                });
-                if !matching_any {
-                    issues.push(ExperimentPriorityIssue::MissingMandatoryProposal {
-                        requirement_id: status.requirement_id.clone(),
-                    });
-                } else if let Some(cost) = proposals
-                    .iter()
-                    .filter(|proposal| {
-                        proposal.requirement_id.as_deref() == Some(status.requirement_id.as_str())
-                            && proposal.cost_units.is_some()
-                    })
-                    .filter_map(|proposal| proposal.cost_units)
-                    .min()
-                {
-                    if cost > budget_remaining_units {
-                        issues.push(ExperimentPriorityIssue::MandatoryProposalOverBudget {
-                            requirement_id: status.requirement_id.clone(),
-                            cheapest_cost_units: cost,
-                            budget_units: budget_remaining_units,
-                        });
-                    } else {
-                        issues.push(ExperimentPriorityIssue::NoAdmissibleProposalForRequirement {
-                            requirement_id: status.requirement_id.clone(),
-                        });
-                    }
-                } else {
-                    issues.push(ExperimentPriorityIssue::NoAdmissibleProposalForRequirement {
-                        requirement_id: status.requirement_id.clone(),
-                    });
-                }
-            }
             let over_budget = issues.iter().any(|issue| {
                 matches!(issue, ExperimentPriorityIssue::MandatoryProposalOverBudget { .. })
             });
@@ -939,7 +941,7 @@ mod tests {
             &profile,
             &audit,
             &[physical("tank-run", Some(80), None)],
-            "loss-units-v1",
+            &value_contract(),
             100,
         );
         assert_eq!(report.disposition, ExperimentPriorityDisposition::SelectedMandatoryEvidence);
@@ -953,7 +955,7 @@ mod tests {
             &profile,
             &audit,
             &[optional("cheap-screen", Some(1), Some(10_000))],
-            "loss-units-v1",
+            &value_contract(),
             100,
         );
         assert_eq!(
@@ -969,7 +971,7 @@ mod tests {
             &profile,
             &audit,
             &[physical("tank-run", Some(120), None)],
-            "loss-units-v1",
+            &value_contract(),
             100,
         );
         assert_eq!(report.disposition, ExperimentPriorityDisposition::MandatoryEvidenceExceedsBudget);
@@ -996,7 +998,7 @@ mod tests {
             &profile,
             &audit,
             &[optional("unknown", Some(2), None)],
-            "loss-units-v1",
+            &value_contract(),
             10,
         );
         assert_eq!(report.disposition, ExperimentPriorityDisposition::NoBeneficialOptionalProposal);
@@ -1009,7 +1011,7 @@ mod tests {
             &profile,
             &audit,
             &[optional("zero", Some(2), Some(0))],
-            "loss-units-v1",
+            &value_contract(),
             10,
         );
         assert_eq!(report.disposition, ExperimentPriorityDisposition::NoBeneficialOptionalProposal);
