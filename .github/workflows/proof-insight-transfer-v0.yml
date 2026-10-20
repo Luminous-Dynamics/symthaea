@@ -448,7 +448,7 @@ jobs:
                   + repr(differing[:20])
               )
           material = "".join(
-              f"{family_id}\\t{indexed_assignments[family_id]}\\n"
+              f"{family_id}\t{indexed_assignments[family_id]}\n"
               for family_id in sorted(indexed_assignments)
           ).encode("utf-8")
           partition_digest = hashlib.sha256(material).hexdigest()
