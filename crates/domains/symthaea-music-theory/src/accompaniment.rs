@@ -109,6 +109,13 @@ pub enum Accompaniment {
     /// Minuet gait: three measured chord pulses in triple metre, with the
     /// strongest attack on beat one and light answers on beats two and three.
     Minuet,
+    /// Mazurka gait: two short eighth-note attacks followed by two quarter-note
+    /// attacks; the primary secondary accent alternates between beats two and
+    /// three across bars, avoiding a waltz-like invariant downbeat hierarchy.
+    MazurkaGait,
+    /// Toccata motor: continuous sixteenth-note chord-tone passagework, using a
+    /// compact up/down figure with stronger quarter-note pulse points.
+    ToccataMotion,
 }
 
 /// Which half of the two-bar son-clave cycle a given bar falls on. The
@@ -462,6 +469,63 @@ impl Accompaniment {
                     }
                 }
             }
+            Accompaniment::MazurkaGait => {
+                // Four-note 3/4 cell: eighth, eighth, quarter, quarter. The
+                // secondary accent shifts between beats two and three by
+                // absolute bar index, so the cell persists across phrases.
+                let bar_index = (bar_onset.beats() / meter_beats.max(1e-9)).round() as i64;
+                let accent_second = if bar_index.rem_euclid(2) == 0 { 1.0 } else { 0.72 };
+                let accent_third = if bar_index.rem_euclid(2) == 0 { 0.72 } else { 1.0 };
+                let events = [
+                    (0, 1, 1, 2, 0.68_f32),
+                    (1, 2, 1, 2, 0.52_f32),
+                    (1, 1, 1, 1, accent_second),
+                    (2, 1, 1, 1, accent_third),
+                ];
+                for (on_n, on_d, dur_n, dur_d, accent) in events {
+                    let onset = Duration::new(on_n, on_d);
+                    if onset.beats() >= meter_beats - 1e-9 {
+                        continue;
+                    }
+                    for &pitch in voiced {
+                        push(
+                            score,
+                            pitch,
+                            bar_onset + onset,
+                            Duration::new(dur_n, dur_d),
+                            velocity * accent,
+                        );
+                    }
+                }
+            }
+            Accompaniment::ToccataMotion => {
+                // An eight-step chord-tone figure repeated across the bar.
+                // The figure turns back after rising; accents land on quarter beats.
+                let sixteenth = Duration::new(1, 4);
+                let figure = [0_usize, 1, 2, 1, 0, 1, 2, 1];
+                let steps = (meter_beats * 4.0).round() as i64;
+                for step in 0..steps {
+                    let onset = sixteenth.scale(step, 1);
+                    if onset.beats() >= meter_beats - 1e-9 {
+                        continue;
+                    }
+                    let pitch_index = figure[(step as usize) % figure.len()] % ascending.len();
+                    let accent = if step % 4 == 0 {
+                        1.0
+                    } else if step % 2 == 0 {
+                        0.84
+                    } else {
+                        0.72
+                    };
+                    push(
+                        score,
+                        ascending[pitch_index],
+                        bar_onset + onset,
+                        sixteenth,
+                        velocity * accent,
+                    );
+                }
+            }
         }
     }
 }
@@ -566,6 +630,8 @@ mod tests {
             Accompaniment::Comp,
             Accompaniment::Sarabande,
             Accompaniment::Minuet,
+            Accompaniment::MazurkaGait,
+            Accompaniment::ToccataMotion,
         ] {
             for meter in [3.0, 4.0] {
                 for n in realize(pattern, meter) {
@@ -589,6 +655,8 @@ mod tests {
             Accompaniment::Comp,
             Accompaniment::Sarabande,
             Accompaniment::Minuet,
+            Accompaniment::MazurkaGait,
+            Accompaniment::ToccataMotion,
         ] {
             for meter in [3.0, 4.0] {
                 for n in realize(pattern, meter) {
@@ -894,4 +962,51 @@ mod tests {
             assert!(n.onset.beats() < 3.0, "no event may start beyond the bar");
         }
     }
+
+    #[test]
+    fn mazurka_gait_uses_short_short_long_long_and_shifts_the_secondary_accent() {
+        let first = realize_at_bar(Accompaniment::MazurkaGait, 3.0, 0);
+        let second = realize_at_bar(Accompaniment::MazurkaGait, 3.0, 1);
+        assert_eq!(first.len(), 12);
+        assert_eq!(onsets_within_bar(&first, 0, 3.0), vec![0.0, 0.5, 1.0, 2.0]);
+        assert_eq!(onsets_within_bar(&second, 1, 3.0), vec![0.0, 0.5, 1.0, 2.0]);
+
+        let duration_at = |notes: &[ScoreNote], bar_index: i64, beat: f64| {
+            let absolute_beat = bar_index as f64 * 3.0 + beat;
+            notes.iter()
+                .find(|n| (n.onset.beats() - absolute_beat).abs() < 1e-9)
+                .unwrap().duration
+        };
+        assert_eq!(duration_at(&first, 0, 0.0), Duration::eighth());
+        assert_eq!(duration_at(&first, 0, 0.5), Duration::eighth());
+        assert_eq!(duration_at(&first, 0, 1.0), Duration::quarter());
+        assert_eq!(duration_at(&first, 0, 2.0), Duration::quarter());
+
+        let velocity_at = |notes: &[ScoreNote], bar_index: i64, beat: f64| {
+            let absolute_beat = bar_index as f64 * 3.0 + beat;
+            notes.iter()
+                .find(|n| (n.onset.beats() - absolute_beat).abs() < 1e-9)
+                .unwrap().velocity
+        };
+        assert!(velocity_at(&first, 0, 1.0) > velocity_at(&first, 0, 2.0));
+        assert!(velocity_at(&second, 1, 2.0) > velocity_at(&second, 1, 1.0));
+    }
+
+    #[test]
+    fn toccata_motion_is_a_full_bar_of_sixteenth_note_passagework() {
+        let notes = realize(Accompaniment::ToccataMotion, 4.0);
+        assert_eq!(notes.len(), 16);
+        for (step, note) in notes.iter().enumerate() {
+            assert_eq!(note.onset, Duration::new(step as i64, 4));
+            assert_eq!(note.duration, Duration::new(1, 4));
+            assert!(note.velocity > 0.0 && note.velocity <= 0.5);
+        }
+        let downbeat_velocities: Vec<_> = notes.iter()
+            .filter(|note| (note.onset.beats().fract()).abs() < 1e-9)
+            .map(|note| note.velocity)
+            .collect();
+        assert_eq!(downbeat_velocities.len(), 4);
+        assert!(downbeat_velocities.iter().all(|velocity| (*velocity - 0.5).abs() < 1e-9));
+    }
+
 }

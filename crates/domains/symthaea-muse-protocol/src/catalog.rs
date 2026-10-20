@@ -1,6 +1,6 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! The public Muse 152 taxonomy.
+//! The public Muse 153 taxonomy.
 //!
 //! Catalog entries and callable composer presets are deliberately separate.
 //! `composer_style` is present only when the current engine can route the entry;
@@ -807,8 +807,8 @@ macro_rules! style {
     };
 }
 
-/// The complete, stable Muse 152 registry. IDs are public catalog identities.
-pub const CATALOG: [CanonicalStyle; 152] = [
+/// The complete, stable Muse 153 registry. IDs are public catalog identities.
+pub const CATALOG: [CanonicalStyle; 153] = [
     style!(
         1,
         "Classical",
@@ -853,7 +853,7 @@ pub const CATALOG: [CanonicalStyle; 152] = [
     style!(12, "Sarabande", BaroqueEarlyDance, "Sarabande", Developing),
     style!(13, "Gigue", BaroqueEarlyDance),
     style!(14, "Allemande", BaroqueEarlyDance),
-    style!(15, "Toccata", BaroqueEarlyDance),
+    style!(15, "Toccata", BaroqueEarlyDance, "Toccata", Developing),
     style!(16, "French Overture", BaroqueEarlyDance),
     style!(17, "Sonata", DevelopmentalLargeForms, "Sonata", Developing),
     style!(
@@ -1116,6 +1116,7 @@ pub const CATALOG: [CanonicalStyle; 152] = [
     style!(150, "Horror Score", DramaticScreenStage),
     style!(151, "Science-Fiction Score", DramaticScreenStage),
     style!(152, "Adaptive Game Score", DramaticScreenStage),
+    style!(153, "Mazurka", EuropeanNorthAtlanticFolk, "Mazurka", ExpertReviewRequired),
 ];
 
 pub fn catalog_entry(id: u16) -> Option<&'static CanonicalStyle> {
@@ -1183,13 +1184,12 @@ mod tests {
     use std::collections::HashSet;
 
     #[test]
-    fn catalog_is_exactly_nineteen_by_eight() {
-        assert_eq!(CATALOG.len(), 152);
+    fn catalog_has_153_contiguous_ids_and_no_empty_constellation() {
+        assert_eq!(CATALOG.len(), 153);
         for constellation in Constellation::ALL {
-            assert_eq!(
-                catalog_for_constellation(constellation).count(),
-                8,
-                "{}",
+            assert!(
+                catalog_for_constellation(constellation).count() >= 8,
+                "{} must retain its original eight entries",
                 constellation.name()
             );
         }
@@ -1208,12 +1208,12 @@ mod tests {
     #[test]
     fn all_current_composer_styles_are_mapped_once() {
         let implemented: Vec<_> = implemented_catalog().collect();
-        assert_eq!(implemented.len(), 35);
+        assert_eq!(implemented.len(), 37);
         let names: HashSet<_> = implemented
             .iter()
             .filter_map(|entry| entry.composer_style)
             .collect();
-        assert_eq!(names.len(), 35);
+        assert_eq!(names.len(), 37);
         assert!(
             implemented
                 .iter()
@@ -1240,7 +1240,7 @@ mod tests {
             })
             .collect::<Vec<_>>();
 
-        assert_eq!(culturally_rooted.len(), 64);
+        assert_eq!(culturally_rooted.len(), 65);
         for entry in culturally_rooted {
             assert!(
                 entry.requires_expert_review,
@@ -1259,6 +1259,10 @@ mod tests {
     #[test]
     fn new_composer_styles_are_mapped_to_their_matching_routes() {
         assert_eq!(catalog_entry(10).unwrap().composer_style, Some("MinuetAndTrio"));
+        assert_eq!(catalog_entry(15).unwrap().composer_style, Some("Toccata"));
+        assert_eq!(catalog_entry(153).unwrap().composer_style, Some("Mazurka"));
+        assert_eq!(catalog_entry(153).unwrap().status, StyleStatus::ExpertReviewRequired);
+        assert!(catalog_entry(153).unwrap().requires_expert_review);
         assert_eq!(catalog_entry(12).unwrap().composer_style, Some("Sarabande"));
         assert_eq!(catalog_entry(18).unwrap().composer_style, Some("Rondo"));
         assert_eq!(

@@ -269,6 +269,13 @@ pub enum Style {
     Sarabande,
     /// Da-capo minuet movement: measured A, contrasting Trio B, and A return.
     MinuetAndTrio,
+    /// Mazurka: three-beat dance profile with a short-short-long-long motif and
+    /// shifting second-/third-beat accents. Developing; not an authenticity claim.
+    Mazurka,
+    /// Toccata: keyboard-oriented motoric passagework with continuous sixteenth-note
+    /// chord-tone motion and a sequence-bearing contrasting section. Developing;
+    /// this is not a complete historical toccata-fugue realizer.
+    Toccata,
 }
 
 impl Style {
@@ -279,7 +286,7 @@ impl Style {
     /// exhaustiveness tests) should iterate this rather than hand-listing
     /// variants, which is exactly the drift risk `grammar_family`'s own doc
     /// comment below warns against for `HOME_STYLES`-style duplication.
-    pub const ALL: [Style; 35] = [
+    pub const ALL: [Style; 37] = [
         Style::Classical,
         Style::Waltz,
         Style::Folk,
@@ -315,6 +322,8 @@ impl Style {
         Style::Lineage,
         Style::Sarabande,
         Style::MinuetAndTrio,
+        Style::Mazurka,
+        Style::Toccata,
     ];
 
     /// The compositional grammar family this style specializes — the single
@@ -355,7 +364,9 @@ impl Style {
             | Style::Rondo
             | Style::ThemeAndVariations
             | Style::Sarabande
-            | Style::MinuetAndTrio => PeriodSentence,
+            | Style::MinuetAndTrio
+            | Style::Mazurka
+            | Style::Toccata => PeriodSentence,
             Style::Fugue => Contrapuntal,
             Style::Passacaglia | Style::Erosion | Style::Lineage => GroundVariation,
             Style::Tango
@@ -467,7 +478,8 @@ impl Style {
             | Style::Lineage
             | Style::BaroqueSuite
             | Style::Sarabande
-            | Style::MinuetAndTrio => 3,
+            | Style::MinuetAndTrio
+            | Style::Mazurka => 3,
             Style::Celtic => 6,    // the jig's 3+3 lilt
             Style::Flamenco => 12, // the compás's 3+3+2+2+2 cycle
             _ => 4,
@@ -512,6 +524,8 @@ impl Style {
             Style::Lineage => (58.0, 92.0),
             Style::Sarabande => (42.0, 72.0),
             Style::MinuetAndTrio => (82.0, 124.0),
+            Style::Mazurka => (82.0, 126.0),
+            Style::Toccata => (96.0, 160.0),
         }
     }
 
@@ -643,6 +657,75 @@ impl Style {
             full_drone: false,
         };
         match self {
+            Style::Mazurka => {
+                // Derive shared utility fields from Waltz, then replace the
+                // features that define this recipe. Authenticity is unclaimed.
+                let mut spec = Style::Waltz.spec();
+                spec.name = "Mazurka".into();
+                spec.mode = None;
+                spec.meter = 3;
+                spec.tempo_range = (82.0, 126.0);
+                spec.motifs_calm = vec![
+                    vec![(1, 1, 2), (3, 1, 2), (5, 1, 1), (3, 1, 1)],
+                    vec![(1, 1, 2), (2, 1, 2), (4, 1, 1), (2, 1, 1)],
+                ];
+                spec.motifs_medium = vec![
+                    vec![(1, 1, 2), (2, 1, 2), (3, 1, 1), (5, 1, 1)],
+                    vec![(5, 1, 2), (4, 1, 2), (3, 1, 1), (2, 1, 1)],
+                ];
+                spec.motifs_busy = vec![
+                    vec![
+                        (1, 1, 2), (2, 1, 2), (3, 1, 2),
+                        (5, 1, 2), (4, 1, 2), (3, 1, 2),
+                    ],
+                    vec![
+                        (5, 1, 2), (4, 1, 2), (3, 1, 2),
+                        (2, 1, 2), (1, 1, 2), (3, 1, 2),
+                    ],
+                ];
+                spec.progression = ProgressionSpec::Archetype(vec![1, 4, 5, 1]);
+                spec.accompaniment_pool = vec![A::MazurkaGait];
+                spec.form_pool = vec![FormKind::Ternary];
+                spec.ensemble_pool = s(&[["piano", "piano", "cello"]]);
+                spec.rhetoric = PhraseRhetoric::Classic;
+                spec
+            }
+            Style::Toccata => {
+                // The signature behavior is continuous keyboard-like motion,
+                // not a timbre tag.
+                let mut spec = Style::Classical.spec();
+                spec.name = "Toccata".into();
+                spec.mode = None;
+                spec.meter = 4;
+                spec.tempo_range = (96.0, 160.0);
+                spec.motifs_calm = vec![
+                    vec![(1, 1, 1), (3, 1, 1), (5, 1, 1), (3, 1, 1)],
+                ];
+                spec.motifs_medium = vec![
+                    vec![
+                        (1, 1, 2), (2, 1, 2), (3, 1, 2), (5, 1, 2),
+                        (4, 1, 2), (3, 1, 2), (2, 1, 2), (1, 1, 2),
+                    ],
+                ];
+                spec.motifs_busy = vec![
+                    vec![
+                        (1, 1, 4), (3, 1, 4), (2, 1, 4), (4, 1, 4),
+                        (3, 1, 4), (5, 1, 4), (4, 1, 4), (6, 1, 4),
+                        (5, 1, 4), (7, 1, 4), (6, 1, 4), (4, 1, 4),
+                        (5, 1, 4), (3, 1, 4), (2, 1, 4), (1, 1, 4),
+                    ],
+                ];
+                spec.progression = ProgressionSpec::Archetype(vec![1, 5, 4, 5]);
+                spec.accompaniment_pool = vec![A::ToccataMotion];
+                spec.form_pool = vec![FormKind::Ternary];
+                spec.ensemble_pool = s(&[
+                    ["harpsichord", "organ", "cello"],
+                    ["organ", "harpsichord", "cello"],
+                ]);
+                spec.texture.harmonic_sequence = true;
+                spec.texture.held_arrivals = false;
+                spec
+            }
             Style::Classical => CompositionSpec {
                 name: "Classical".into(),
                 attitude: None,
@@ -3863,4 +3946,31 @@ mod tests {
             seen
         );
     }
+
+    #[test]
+    fn mazurka_and_toccata_profiles_declare_distinct_rhythmic_mechanisms() {
+        use crate::accompaniment::Accompaniment;
+
+        let mazurka = Style::Mazurka.spec();
+        assert_eq!(Style::Mazurka.meter(), 3);
+        assert_eq!(mazurka.meter, 3);
+        assert_eq!(mazurka.accompaniment_pool, vec![Accompaniment::MazurkaGait]);
+        assert_eq!(mazurka.form_pool, vec![crate::spec::FormKind::Ternary]);
+
+        let toccata = Style::Toccata.spec();
+        assert_eq!(Style::Toccata.meter(), 4);
+        assert_eq!(toccata.meter, 4);
+        assert_eq!(
+            toccata.accompaniment_pool,
+            vec![Accompaniment::ToccataMotion]
+        );
+        assert_eq!(toccata.tempo_range, (96.0, 160.0));
+        assert!(toccata.texture.harmonic_sequence);
+        assert!(!toccata.texture.held_arrivals);
+
+        assert_ne!(mazurka.name, Style::Waltz.spec().name);
+        assert_ne!(toccata.name, Style::Classical.spec().name);
+        assert_eq!(Style::ALL.len(), 37);
+    }
+
 }
