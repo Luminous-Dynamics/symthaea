@@ -173,9 +173,9 @@ fn forecast_signal(scenario: Scenario, tick: usize, seed: u64) -> f64 {
                 0.10
             }
         }
-        Scenario::RegimeShift => {
-            if tick < HORIZON / 2 { 0.08 } else { 0.72 }
-        }
+        // The regime shift is deliberately unannounced: the warning stream
+        // stays at baseline even when the true disturbance changes at mid-horizon.
+        Scenario::RegimeShift => 0.08,
     };
     let jitter = (unit_noise(seed.wrapping_add(313), tick) - 0.5) * 0.04;
     (base + jitter).clamp(0.0, 1.0)
@@ -564,6 +564,14 @@ mod tests {
         let warning = forecast_signal(Scenario::Acute, 5, 0);
         let current_stress = environmental_load(Scenario::Acute, 5, 0);
         assert!(warning > current_stress + 0.5);
+    }
+
+    #[test]
+    fn regime_shift_has_no_advance_warning() {
+        for tick in 0..HORIZON {
+            assert!(forecast_signal(Scenario::RegimeShift, tick, 7) < 0.11);
+        }
+        assert!(environmental_load(Scenario::RegimeShift, HORIZON / 2, 7) > 0.65);
     }
 
     #[test]
