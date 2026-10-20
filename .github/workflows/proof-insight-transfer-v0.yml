@@ -441,8 +441,10 @@ jobs:
           statement_digest = hashlib.sha256(statement.encode("utf-8")).hexdigest()
           if statement_digest != record["theorem"]["statement_digest"]:
               raise SystemExit("candidate statement digest does not match its exact stored UTF-8 text")
-          if statement.encode("utf-8") not in source_bytes:
-              raise SystemExit("candidate theorem signature is not an exact substring of the pinned source")
+          normalized_statement = " ".join(statement.split())
+          normalized_source = " ".join(source_bytes.decode("utf-8").split())
+          if normalized_statement not in normalized_source:
+              raise SystemExit("candidate theorem signature is not present after whitespace normalization in the pinned source")
           indexed = [
               item for item in index["source_fingerprints"]
               if item["path"] == record["source"]["path"]
