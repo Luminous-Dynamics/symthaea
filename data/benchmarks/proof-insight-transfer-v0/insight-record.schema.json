@@ -335,6 +335,59 @@
                   "rejected",
                   "not_attempted"
                 ]
+              },
+              "directional_contract": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "compatibility",
+                  "mismatch_codes",
+                  "source_move_requires",
+                  "target_goal_requires"
+                ],
+                "properties": {
+                  "compatibility": {
+                    "enum": [
+                      "compatible",
+                      "incompatible",
+                      "partial",
+                      "unknown"
+                    ]
+                  },
+                  "mismatch_codes": {
+                    "type": "array",
+                    "uniqueItems": true,
+                    "items": {
+                      "enum": [
+                        "object_type",
+                        "premise_unavailable",
+                        "inequality_direction",
+                        "quantifier_scope",
+                        "precondition_mismatch",
+                        "domain_mismatch",
+                        "proof_dependency_mismatch",
+                        "unknown"
+                      ]
+                    }
+                  },
+                  "source_move_requires": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 2000
+                  },
+                  "target_goal_requires": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 2000
+                  },
+                  "notes": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "maxLength": 2000
+                    }
+                  }
+                }
               }
             }
           }
