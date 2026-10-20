@@ -16,7 +16,8 @@ The example hand-derives `dE/dt = Σ (∂E/∂xᵢ)·(dxᵢ/dt)` via `SymExpr::d
 |------|-----------|--------|
 | `harmonic_oscillator.smt2` | `E = x² + v²` | **unsat** |
 | `kepler_angular_momentum.smt2` | `L = x·vy − y·vx` | **unsat** |
-| `henon_heiles_6H.smt2` | `6H` (Hénon-Heiles ×6 rescale) | **unsat** |
+| `henon_heiles_6H.smt2` | `6H` (Hénon-Heiles ×6 rescale; regression control) | **unsat** |
+| `henon_heiles_exact_H.smt2` | Original `H` with exact rational `1/2` and `1/3` coefficients | **unsat** (Z3 4.13.0, exact-head run) |
 | `mystery_ode.smt2` | `H = ½(px² + py²) + x² + y² + xy` | **unsat** |
 | `duffing_4E.smt2` | `4E = 2v² + 2x² + x⁴` (Duffing conservative, ×4) | **unsat** |
 | `quartic_anharmonic_4E.smt2` | `4E = 2v² + x⁴` (pure quartic, ×4) | **unsat** |
@@ -24,20 +25,24 @@ The example hand-derives `dE/dt = Σ (∂E/∂xᵢ)·(dxᵢ/dt)` via `SymExpr::d
 | `isotropic_2d_angular_momentum.smt2` | `L = x·vy − y·vx` (same system, 2nd invariant) | **unsat** |
 | `linear_coupled_2E.smt2` | `2E = v1² + v2² + 2x1² + 2x2² − 2·x1·x2` (2-mode, ×2) | **unsat** |
 
-Nine committed formal proof witnesses across six distinct dynamical systems, including a system with two independent invariants (2D isotropic harmonic oscillator: energy + angular momentum). The draft source additionally emits an exact-rational Hénon-Heiles obligation; it is pending exact-head solver verification and is not counted in these nine yet.
+Ten committed formal proof witnesses across six distinct dynamical systems, including a system with two independent invariants (2D isotropic harmonic oscillator: energy + angular momentum). The unscaled Hénon-Heiles Hamiltonian now has its own exact-rational witness; the scaled `6H` witness remains as a regression control.
 
 ## Why the committed Hénon-Heiles witness uses 6H
 
 The standard Hamiltonian is `H = ½(px² + py²) + ½(x² + y²) + x²y − y³/3`. The legacy serializer stores constants as `f64`; `1/3` becomes `0.3333333333333333`, which SMT-LIB2 interprets as a different exact rational. The committed `henon_heiles_6H.smt2` therefore clears the fractional coefficients by proving the equivalent scaled invariant.
 
-The current source now adds an explicit `SymExpr::Rational(numerator, denominator)` representation and emits a second, unscaled `henon_heiles_exact_H` proof obligation. **That new obligation is not counted in the verified witness table above until a fresh exact-head run returns `unsat` and the generated SMT-LIB2 file is committed and independently re-checked.** The existing scaled witness remains the currently committed Hénon-Heiles proof artifact.
+The source now represents rational constants explicitly and emits exact SMT-LIB2 real rational terms (for example `(/ 1.0 3.0)`). The new `henon_heiles_exact_H.smt2` witness was generated from exact source head `03476c730f5dc19bea0e38d4a71dd0ac72730ca0`; Z3 4.13.0 returned `unsat`. The committed witness SHA-256 is `2b2228a76ed50f67ae87a7726115ca2d68c242936a2d0a03f474806fd8542728`. The scaled witness remains a separate regression control. An independent second-solver comparison is still desirable and is not claimed here.
 
 ## Independent re-verification
 
 Any SMT-LIB2-compliant solver closes each file. With Z3:
 
 ```bash
-# verify one:
+# verify the exact-rational Hénon-Heiles witness:
+z3 -smt2 papers/physics-math/ramanujan/proofs/henon_heiles_exact_H.smt2
+# expected output: unsat
+
+# verify another witness:
 z3 -smt2 papers/physics-math/ramanujan/proofs/harmonic_oscillator.smt2
 # expected output: unsat
 
