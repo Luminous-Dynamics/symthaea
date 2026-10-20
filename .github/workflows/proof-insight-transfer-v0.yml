@@ -423,6 +423,41 @@ jobs:
           index = json.loads(index_path.read_text())
           split_manifest = json.loads(split_path.read_text())
 
+          # Independently compare the generated family assignments with the
+          # frozen manifest, not merely the summary counts or declared digest.
+          indexed_families = index["families"]
+          frozen_families = split_manifest["families"]
+          indexed_assignments = {
+              item["family_id"]: item["split"] for item in indexed_families
+          }
+          frozen_assignments = {
+              item["family_id"]: item["split"] for item in frozen_families
+          }
+          if len(indexed_families) != 372 or len(indexed_assignments) != 372:
+              raise SystemExit("generated index must contain 372 unique family assignments")
+          if len(frozen_families) != 372 or len(frozen_assignments) != 372:
+              raise SystemExit("frozen split must contain 372 unique family assignments")
+          if indexed_assignments != frozen_assignments:
+              differing = sorted(
+                  family_id
+                  for family_id in set(indexed_assignments) | set(frozen_assignments)
+                  if indexed_assignments.get(family_id) != frozen_assignments.get(family_id)
+              )
+              raise SystemExit(
+                  "generated family assignments differ from frozen splits.json: "
+                  + repr(differing[:20])
+              )
+          material = "".join(
+              f"{family_id}\\t{indexed_assignments[family_id]}\\n"
+              for family_id in sorted(indexed_assignments)
+          ).encode("utf-8")
+          partition_digest = hashlib.sha256(material).hexdigest()
+          if partition_digest != split_manifest["split_plan"]["partition_digest_sha256"]:
+              raise SystemExit("independently recomputed split digest differs from splits.json")
+          if partition_digest != index["family_split_plan"]["partition_digest_sha256"]:
+              raise SystemExit("generated index partition digest differs from independently recomputed digest")
+          print(f"PITB_FROZEN_SPLIT_REPRODUCTION_PASS: {partition_digest}")
+
           relative = Path(record["source"]["path"])
           if relative.is_absolute() or ".." in relative.parts:
               raise SystemExit("candidate source path must remain repository-relative")
