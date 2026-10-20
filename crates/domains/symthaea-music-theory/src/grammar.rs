@@ -215,7 +215,9 @@ pub fn compose_with_grammar_plan(
                     Some(crate::spec::Attitude::Grief) => 0.85,
                     _ => 1.0,
                 };
-            let score = crate::fugue::realize_fugue(key, tempo, spec.meter, &motif, intent.seed);
+            let mut score =
+                crate::fugue::realize_fugue(key, tempo, spec.meter, &motif, intent.seed);
+            crate::composer::apply_dedicated_energy_envelope(&mut score, intent.energy);
             GrammarRealization {
                 score,
                 form: None,
