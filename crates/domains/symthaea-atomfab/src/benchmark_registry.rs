@@ -523,6 +523,14 @@ mod tests {
             policy_extension["paired_campaign_count"],
             serde_json::json!(20)
         );
+        assert_eq!(
+            policy_extension["seed_manifest"]["seeds"],
+            serde_json::json!([101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120])
+        );
+        assert_eq!(
+            policy_extension["seed_manifest"]["sha256"],
+            "c8dd76e3828125d3984e95bef0cd50603cee2bef7933f1fec178866dd973ba59"
+        );
         assert_eq!(policy_extension["same_seed_across_policies"], true);
         assert_eq!(
             policy_extension["stretch_gate"]["status"],
