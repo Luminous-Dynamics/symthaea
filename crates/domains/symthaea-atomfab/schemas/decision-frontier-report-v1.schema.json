@@ -65,6 +65,14 @@
       "additionalProperties": false,
       "required": [
         "policy_id",
+        "validated_discovery_count",
+        "best_validated_objective",
+        "total_cost_units",
+        "elapsed_seconds",
+        "reference_calculation_count",
+        "false_feasible_accepts",
+        "hard_constraints_assessed",
+        "evidence_digest",
         "disposition"
       ],
       "properties": {
@@ -128,6 +136,38 @@
               }
             }
           ]
+        },
+        "validated_discovery_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "best_validated_objective": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "total_cost_units": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "elapsed_seconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "reference_calculation_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "false_feasible_accepts": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "hard_constraints_assessed": {
+          "type": "boolean"
+        },
+        "evidence_digest": {
+          "$ref": "#/$defs/sha256"
         }
       }
     }
