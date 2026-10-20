@@ -68,8 +68,7 @@ impl Law {
         {
             return None;
         }
-        if self.family != LawFamily::InversePower
-            && (!self.scale.is_finite() || self.scale <= 0.0)
+        if self.family != LawFamily::InversePower && (!self.scale.is_finite() || self.scale <= 0.0)
         {
             return None;
         }
@@ -79,9 +78,7 @@ impl Law {
             LawFamily::ScreenedInversePower => {
                 self.amplitude * (-x / self.scale).exp() / x.powf(self.exponent)
             }
-            LawFamily::Saturating => {
-                self.amplitude / (1.0 + (x / self.scale).powf(self.exponent))
-            }
+            LawFamily::Saturating => self.amplitude / (1.0 + (x / self.scale).powf(self.exponent)),
         };
         value.is_finite().then_some(value)
     }
@@ -365,16 +362,13 @@ fn query_points(policy: QueryPolicy, seed: u64) -> Vec<f64> {
     let mut points = match policy {
         QueryPolicy::FixedGrid => (0..n)
             .map(|i| {
-                TRAIN_X_MIN
-                    + (i as f64 + 1.0) * (TRAIN_X_MAX - TRAIN_X_MIN) / (n as f64 + 1.0)
+                TRAIN_X_MIN + (i as f64 + 1.0) * (TRAIN_X_MAX - TRAIN_X_MIN) / (n as f64 + 1.0)
             })
             .collect::<Vec<_>>(),
         QueryPolicy::SeededRandom => {
             let mut state = seed ^ 0x4558_5045_5249_4d45;
             (0..n)
-                .map(|_| {
-                    TRAIN_X_MIN + uniform01(&mut state) * (TRAIN_X_MAX - TRAIN_X_MIN)
-                })
+                .map(|_| TRAIN_X_MIN + uniform01(&mut state) * (TRAIN_X_MAX - TRAIN_X_MIN))
                 .collect::<Vec<_>>()
         }
     };
@@ -421,8 +415,7 @@ fn normalized_rmse(predicted: &[f64], observed: &[f64]) -> Option<f64> {
         .sum::<f64>()
         / predicted.len() as f64;
     let scale = (observed.iter().map(|y| y * y).sum::<f64>() / observed.len() as f64).sqrt();
-    (mse.is_finite() && scale.is_finite() && scale > 0.0)
-        .then_some(mse.sqrt() / scale.max(1.0e-12))
+    (mse.is_finite() && scale.is_finite() && scale > 0.0).then_some(mse.sqrt() / scale.max(1.0e-12))
 }
 
 fn bic_for(law: Law, observations: &[Observation]) -> Option<f64> {
@@ -599,10 +592,7 @@ pub fn run_reference_benchmark() -> BenchmarkReport {
             rows.push(evaluate_case(world, policy).expect("fixed reference case must evaluate"));
         }
     }
-    let policies = [
-        QueryPolicy::FixedGrid,
-        QueryPolicy::SeededRandom,
-    ]
+    let policies = [QueryPolicy::FixedGrid, QueryPolicy::SeededRandom]
     .into_iter()
     .map(|policy| summarize(policy, &rows).expect("each policy has reference cases"))
     .collect();
@@ -663,8 +653,7 @@ mod tests {
             scale: 2.0,
         };
         assert!(
-            (screened.predict(2.0).unwrap() - std::f64::consts::E.recip() / 2.0).abs()
-                < 1.0e-12
+            (screened.predict(2.0).unwrap() - std::f64::consts::E.recip() / 2.0).abs() < 1.0e-12
         );
 
         let saturating = Law {
@@ -687,9 +676,30 @@ mod tests {
         assert!(law.predict(0.0).is_none());
         assert!(law.predict(f64::NAN).is_none());
         assert!(law.predict(f64::INFINITY).is_none());
-        assert!(Law { amplitude: f64::NAN, ..law }.predict(1.0).is_none());
-        assert!(Law { exponent: 0.0, ..law }.predict(1.0).is_none());
-        assert!(Law { scale: f64::NAN, ..law }.predict(1.0).is_some());
+        assert!(
+            Law {
+                amplitude: f64::NAN,
+                ..law
+            }
+            .predict(1.0)
+            .is_none()
+        );
+        assert!(
+            Law {
+                exponent: 0.0,
+                ..law
+            }
+            .predict(1.0)
+            .is_none()
+        );
+        assert!(
+            Law {
+                scale: f64::NAN,
+                ..law
+            }
+            .predict(1.0)
+            .is_some()
+        );
         assert!(
             Law {
                 family: LawFamily::ScreenedInversePower,
@@ -833,8 +843,14 @@ mod tests {
     #[test]
     fn report_preserves_per_case_metrics_and_fixed_budgets() {
         let report = run_reference_benchmark();
-        assert_eq!(report.body.training_query_budget_per_case, TRAIN_QUERY_BUDGET);
-        assert_eq!(report.body.holdout_point_count_per_case, HOLDOUT_POINT_COUNT);
+        assert_eq!(
+            report.body.training_query_budget_per_case,
+            TRAIN_QUERY_BUDGET
+        );
+        assert_eq!(
+            report.body.holdout_point_count_per_case,
+            HOLDOUT_POINT_COUNT
+        );
         assert_eq!(report.body.policies.len(), 2);
         for row in &report.body.cases {
             assert_eq!(row.query_count, TRAIN_QUERY_BUDGET);
