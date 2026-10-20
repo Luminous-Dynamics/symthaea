@@ -107,7 +107,10 @@ pub enum ProposalIssue {
     NonPositiveDecisionValue { value: i64 },
     UnregisteredRequirement { requirement_id: String },
     RequirementMismatch { requirement_id: String, field: &'static str },
-    BudgetExceeded { cost_units: u64, budget_units: u64 },
+    BudgetExceeded {
+        end_to_end_cost_units: u64,
+        budget_units: u64,
+    },
     DuplicateProposalId { proposal_id: String, count: usize },
 }
 
@@ -153,7 +156,7 @@ pub enum ExperimentPriorityIssue {
     MissingMandatoryProposal { requirement_id: String },
     MandatoryProposalOverBudget {
         requirement_id: String,
-        cheapest_cost_units: u64,
+        cheapest_end_to_end_cost_units: u64,
         budget_units: u64,
     },
     NoAdmissibleProposalForRequirement { requirement_id: String },
@@ -169,7 +172,7 @@ pub struct MandatoryRequirementStatus {
     pub completed_successes: u32,
     pub remaining_successes: u32,
     pub admissible_proposals_within_budget: usize,
-    pub cheapest_admissible_cost_units: Option<u64>,
+    pub cheapest_admissible_end_to_end_cost_units: Option<u64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -482,7 +485,7 @@ fn assess_proposal(
     if let Some(cost) = budget_cost {
         if cost > budget_remaining_units {
             issues.push(ProposalIssue::BudgetExceeded {
-                cost_units: cost,
+                end_to_end_cost_units: cost,
                 budget_units: budget_remaining_units,
             });
         }
@@ -674,7 +677,7 @@ pub fn prioritize_next_experiment(
                 completed_successes: progress.completed_successes,
                 remaining_successes: requirement.required_successes - progress.completed_successes,
                 admissible_proposals_within_budget: 0,
-                cheapest_admissible_cost_units: None,
+                cheapest_admissible_end_to_end_cost_units: None,
             });
         }
     }
@@ -720,7 +723,10 @@ pub fn prioritize_next_experiment(
             })
             .collect();
         status.admissible_proposals_within_budget = choices.len();
-        status.cheapest_admissible_cost_units = choices.iter().filter_map(|a| a.cost_units).min();
+        status.cheapest_admissible_end_to_end_cost_units = choices
+            .iter()
+            .filter_map(|assessment| assessment.estimated_end_to_end_cost_units)
+            .min();
     }
 
     // Surface every outstanding mandatory requirement that has no admissible option under
@@ -743,12 +749,12 @@ pub fn prioritize_next_experiment(
             let budget_blocked_cost = proposals_for_requirement
                 .iter()
                 .filter(|assessment| assessment.disposition == ProposalDisposition::BlockedBudget)
-                .filter_map(|assessment| assessment.cost_units)
+                .filter_map(|assessment| assessment.estimated_end_to_end_cost_units)
                 .min();
             if let Some(cost) = budget_blocked_cost {
                 issues.push(ExperimentPriorityIssue::MandatoryProposalOverBudget {
                     requirement_id: status.requirement_id.clone(),
-                    cheapest_cost_units: cost,
+                    cheapest_end_to_end_cost_units: cost,
                     budget_units: budget_remaining_units,
                 });
             } else {
@@ -1098,6 +1104,30 @@ mod tests {
             report.disposition,
             ExperimentPriorityDisposition::MandatoryRequirementHasNoAdmissibleProposal
         );
+    }
+
+    #[test]
+    fn required_deferred_validation_cost_can_make_mandatory_chain_over_budget() {
+        let (profile, audit) = audit(true);
+        let mut proposal = physical("tank-run-needs-confirmation", Some(50), None);
+        proposal.requires_deferred_validation = true;
+        proposal.deferred_validation_cost_units = Some(60);
+        let report = prioritize_next_experiment(
+            &profile,
+            &audit,
+            &[proposal],
+            &value_contract(),
+            100,
+        );
+        assert_eq!(report.disposition, ExperimentPriorityDisposition::MandatoryEvidenceExceedsBudget);
+        assert!(report.issues.iter().any(|issue| matches!(
+            issue,
+            ExperimentPriorityIssue::MandatoryProposalOverBudget {
+                cheapest_end_to_end_cost_units: 110,
+                budget_units: 100,
+                ..
+            }
+        )));
     }
 
     #[test]
