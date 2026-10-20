@@ -324,6 +324,7 @@ impl Style {
             | Style::Folk
             | Style::Cinematic
             | Style::Playful
+            | Style::March
             | Style::Nocturne
             | Style::Lullaby
             | Style::ModalFolk
