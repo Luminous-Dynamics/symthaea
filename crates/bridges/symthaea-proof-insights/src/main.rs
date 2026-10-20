@@ -1637,6 +1637,29 @@ mod tests {
     }
 
     #[test]
+    fn temporal_manifest_rejects_a_proof_marked_available_before_completion() {
+        let mut manifest = temporal_manifest_fixture();
+        let proof = manifest
+            .artifacts
+            .iter_mut()
+            .find(|artifact| artifact.artifact_id == "proof-001")
+            .expect("later target proof exists");
+        proof.available_at_position = 0;
+        let error = validate_temporal_manifest(&manifest)
+            .expect_err("a proof cannot be visible in the timeline before its registered completion position");
+        assert!(format!("{error:#}").contains("hidden proof artifact does not match"));
+    }
+
+    #[test]
+    fn temporal_manifest_rejects_an_unpinned_toolchain_label() {
+        let mut manifest = temporal_manifest_fixture();
+        manifest.lean_toolchain = "latest".to_string();
+        let error = validate_temporal_manifest(&manifest)
+            .expect_err("latest is not an immutable toolchain version");
+        assert!(format!("{error:#}").contains("must pin Lean and Mathlib"));
+    }
+
+    #[test]
     fn temporal_manifest_rejects_noncanonical_paths_and_duplicate_ids() {
         let mut bad_path = temporal_manifest_fixture();
         bad_path.artifacts[0].path = "../outside.lean".to_string();
