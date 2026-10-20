@@ -28,7 +28,7 @@ use sha2::{Digest, Sha256};
 const EXPECTED_UPSTREAM_REPOSITORY: &str = "https://github.com/openai/math";
 const EXPECTED_MANIFEST_VERSION: &str = "v0.4";
 const FAMILY_SPLIT_SEED: &str = "pitb-v0-openai-math-2026-10-19";
-const FAMILY_SPLIT_ALGORITHM: &str = "sha256(seed || NUL || family_id), rank, 70/15/15";
+const FAMILY_SPLIT_ALGORITHM: &str = "sha256(seed || NUL || family_id), sort by digest then family ID, floor 70% train and floor 85% train+validation";
 
 #[derive(Debug, Deserialize)]
 struct UpstreamManifest {
@@ -425,16 +425,62 @@ fn verify_split_files(generated_path: &Path, frozen_path: &Path) -> Result<()> {
         bail!("source revision mismatch: generated index {generated_commit}, frozen manifest {frozen_commit}");
     }
 
-    let generated_digest = generated
-        .get("family_split_plan").and_then(|value| value.get("partition_digest_sha256"))
+    let generated_plan = generated.get("family_split_plan")
+        .context("generated index has no family_split_plan")?;
+    let frozen_plan = frozen.get("split_plan")
+        .context("frozen manifest has no split_plan")?;
+    for field in ["seed", "algorithm", "train_percent", "validation_percent", "test_percent"] {
+        if generated_plan.get(field) != frozen_plan.get(field) {
+            bail!("split-plan metadata mismatch in field {field}");
+        }
+    }
+    let frozen_counts = frozen_plan.get("counts")
+        .context("frozen split plan has no counts object")?;
+    for (generated_field, frozen_field) in [
+        ("train_family_count", "train"),
+        ("validation_family_count", "validation"),
+        ("test_family_count", "test"),
+    ] {
+        if generated_plan.get(generated_field) != frozen_counts.get(frozen_field) {
+            bail!("split-plan count mismatch: generated {generated_field}, frozen counts.{frozen_field}");
+        }
+    }
+    let generated_digest = generated_plan.get("partition_digest_sha256")
         .and_then(serde_json::Value::as_str)
-        .context("generated index has no family_split_plan.partition_digest_sha256")?;
-    let frozen_digest = frozen
-        .get("split_plan").and_then(|value| value.get("partition_digest_sha256"))
+        .context("generated index has no partition digest")?;
+    let frozen_digest = frozen_plan.get("partition_digest_sha256")
         .and_then(serde_json::Value::as_str)
-        .context("frozen manifest has no split_plan.partition_digest_sha256")?;
+        .context("frozen manifest has no partition digest")?;
     if generated_digest != frozen_digest {
         bail!("family split digest mismatch: generated {generated_digest}, frozen {frozen_digest}");
+    }
+
+    let fingerprint_map = |value: &serde_json::Value| -> Result<BTreeMap<String, (String, u64)>> {
+        let fingerprints = value.get("source_fingerprints")
+            .and_then(serde_json::Value::as_array)
+            .context("source_fingerprints must be an array")?;
+        let mut result = BTreeMap::new();
+        for item in fingerprints {
+            let path = item.get("path").and_then(serde_json::Value::as_str)
+                .context("fingerprint missing path")?;
+            let digest = item.get("sha256").and_then(serde_json::Value::as_str)
+                .context("fingerprint missing sha256")?;
+            let bytes = item.get("bytes").and_then(serde_json::Value::as_u64)
+                .context("fingerprint missing byte count")?;
+            if result.insert(path.to_owned(), (digest.to_owned(), bytes)).is_some() {
+                bail!("duplicate source fingerprint path: {path}");
+            }
+        }
+        Ok(result)
+    };
+    let generated_fingerprints = fingerprint_map(&generated)?;
+    let frozen_fingerprints = fingerprint_map(&frozen)?;
+    for (path, expected) in &frozen_fingerprints {
+        let actual = generated_fingerprints.get(path)
+            .with_context(|| format!("generated index is missing pinned source fingerprint: {path}"))?;
+        if actual != expected {
+            bail!("source fingerprint mismatch for {path}");
+        }
     }
 
     let rows = |value: &serde_json::Value, field: &str| -> Result<BTreeMap<String, String>> {
@@ -886,10 +932,10 @@ mod tests {
         ));
 
         let generated = format!(
-            r#"{{"upstream_commit":"abc","family_split_plan":{{"partition_digest_sha256":"{digest}"}},"families":[{{"family_id":"001","split":"train"}}]}}"#
+            r#"{{"upstream_commit":"abc","source_fingerprints":[{{"path":"README.md","sha256":"aaa","bytes":1}}],"family_split_plan":{{"seed":"seed","algorithm":"algo","train_percent":70,"validation_percent":15,"test_percent":15,"train_family_count":1,"validation_family_count":0,"test_family_count":0,"partition_digest_sha256":"{digest}"}},"families":[{{"family_id":"001","split":"train"}}]}}"#
         );
         let frozen = format!(
-            r#"{{"upstream":{{"commit":"abc"}},"split_plan":{{"partition_digest_sha256":"{digest}"}},"families":[{{"family_id":"001","split":"train"}}]}}"#
+            r#"{{"upstream":{{"commit":"abc"}},"source_fingerprints":[{{"path":"README.md","sha256":"aaa","bytes":1}}],"split_plan":{{"seed":"seed","algorithm":"algo","train_percent":70,"validation_percent":15,"test_percent":15,"counts":{{"train":1,"validation":0,"test":0}},"partition_digest_sha256":"{digest}"}},"families":[{{"family_id":"001","split":"train"}}]}}"#
         );
         fs::write(&generated_path, &generated).expect("write generated fixture");
         fs::write(&frozen_path, &frozen).expect("write frozen fixture");
