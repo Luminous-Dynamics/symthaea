@@ -822,6 +822,17 @@ mod tests {
             91,
         )
         .unwrap();
+        let schema: serde_json::Value = serde_json::from_str(include_str!(
+            "../schemas/paired-target-reachability-summary-v1.schema.json"
+        ))
+        .unwrap();
+        assert_eq!(schema["properties"]["schema_version"]["const"], 1);
+        assert_eq!(schema["properties"]["predeclared_seeds"]["minItems"], 20);
+        assert_eq!(schema["properties"]["bootstrap_resamples"]["minimum"], 1_000);
+        let encoded = serde_json::to_string(&summary).unwrap();
+        let decoded: PairedTargetReachabilitySummary = serde_json::from_str(&encoded).unwrap();
+        decoded.validate().unwrap();
+        assert_eq!(decoded, summary);
         assert_eq!(summary.campaign_pair_count, 20);
         assert_eq!(summary.baseline_target_reached_count, 14);
         assert_eq!(summary.candidate_target_reached_count, 17);
