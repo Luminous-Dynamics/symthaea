@@ -37,23 +37,24 @@
 //!   mood induction, pharmacological ablation/challenge, injection challenge,
 //!   allostatic stress, live-loop ablation, behavioral knockout, consciousness pharmacology
 //!
+//! ## Pharmacology evidence records
+//!
+//! The pharmacology_evidence module defines provenance-first records for
+//! evidence about known, characterized compounds. It preserves raw measurements,
+//! makes normalization explicit, validates key invariants, and supports
+//! deterministic content digests. These records are a research data contract,
+//! not drug recommendations or evidence that any compound is safe.
+//!
 //! ## Usage
 //!
-//! ```rust,ignore
-//! use symthaea_psych_bench::harness::{PsychBenchmark, BenchmarkConfig};
-//! use symthaea_psych_bench::benchmarks::worm::NBackBenchmark;
-//!
-//! let config = BenchmarkConfig::default();
-//! let bench = NBackBenchmark;
-//! let result = bench.run(&config);
-//! println!("{}", result.summary());
-//! ```
+//! See the crate examples and benchmark harness documentation for usage.
 
 #![deny(unsafe_code)]
 
 pub mod adapter;
 pub mod benchmarks;
 pub mod harness;
+pub mod pharmacology_evidence;
 pub mod substrate_transfer;
 pub mod wm;
 
