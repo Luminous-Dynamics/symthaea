@@ -3946,4 +3946,31 @@ mod tests {
             seen
         );
     }
+
+    #[test]
+    fn mazurka_and_toccata_profiles_declare_distinct_rhythmic_mechanisms() {
+        use crate::accompaniment::Accompaniment;
+
+        let mazurka = Style::Mazurka.spec();
+        assert_eq!(Style::Mazurka.meter(), 3);
+        assert_eq!(mazurka.meter, 3);
+        assert_eq!(mazurka.accompaniment_pool, vec![Accompaniment::MazurkaGait]);
+        assert_eq!(mazurka.form_pool, vec![crate::spec::FormKind::Ternary]);
+
+        let toccata = Style::Toccata.spec();
+        assert_eq!(Style::Toccata.meter(), 4);
+        assert_eq!(toccata.meter, 4);
+        assert_eq!(
+            toccata.accompaniment_pool,
+            vec![Accompaniment::ToccataMotion]
+        );
+        assert_eq!(toccata.tempo_range, (96.0, 160.0));
+        assert!(toccata.texture.harmonic_sequence);
+        assert!(!toccata.texture.held_arrivals);
+
+        assert_ne!(mazurka.name, Style::Waltz.spec().name);
+        assert_ne!(toccata.name, Style::Classical.spec().name);
+        assert_eq!(Style::ALL.len(), 37);
+    }
+
 }
