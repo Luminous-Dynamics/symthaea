@@ -1490,6 +1490,67 @@ fn validate_power_report(
         }
     }
 
+    // Re-run the frozen validation-only simulations before accepting the receipt.
+    // A content hash pins a report; it does not prove the report's numbers were
+    // actually computed from the pinned family sizes, seed, and decision rule.
+    for (effect_index, effect_pp) in expected_effects.iter().copied().enumerate() {
+        for (icc_index, icc) in expected_iccs.iter().copied().enumerate() {
+            let observed = report
+                .scenarios
+                .iter()
+                .find(|scenario| {
+                    (scenario.true_treatment_effect_percentage_points - effect_pp).abs()
+                        <= 1e-12
+                        && (scenario.assumed_family_icc - icc).abs() <= 1e-12
+                })
+                .context("power report lacks a required effect/ICC scenario")?;
+            let scenario_seed = config.bootstrap_seed.wrapping_add(
+                (effect_index * expected_iccs.len() + icc_index) as u64
+                    * 0x9E37_79B9_7F4A_7C15,
+            );
+            let expected = simulate_power_scenario(
+                &expected_family_rows,
+                *selected_rate,
+                effect_pp / 100.0,
+                icc,
+                report.study_simulations,
+                report.bootstrap_replicates_per_simulated_study,
+                scenario_seed,
+            )?;
+            if observed.status != expected.status
+                || observed.utility_gate_passes != expected.utility_gate_passes
+                || !same_optional_probability(
+                    observed.estimated_utility_gate_power,
+                    expected.estimated_utility_gate_power,
+                )
+                || !same_optional_probability(
+                    observed.monte_carlo_standard_error,
+                    expected.monte_carlo_standard_error,
+                )
+                || !same_optional_probability(
+                    observed.estimated_power_lower_95,
+                    expected.estimated_power_lower_95,
+                )
+                || !same_optional_probability(
+                    observed.estimated_power_upper_95,
+                    expected.estimated_power_upper_95,
+                )
+                || !same_optional_probability(
+                    observed.mean_observed_effect_percentage_points,
+                    expected.mean_observed_effect_percentage_points,
+                )
+                || !same_optional_probability(
+                    observed.mean_lower_95ci_percentage_points,
+                    expected.mean_lower_95ci_percentage_points,
+                )
+            {
+                bail!(
+                    "power report scenario +{effect_pp}pp/ICC {icc} cannot be reproduced from the pinned validation rows and seed"
+                );
+            }
+        }
+    }
+
     let max_null_power = report
         .scenarios
         .iter()
