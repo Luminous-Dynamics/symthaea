@@ -650,7 +650,7 @@ fn execute_power(args: &BTreeMap<String, String>) -> Result<()> {
         && null_effect_false_claim_probability_upper_95_max.is_some_and(|rate| rate <= 0.05);
 
     let interpretation = if power_gate_passed {
-        "The validation-derived design met the preregistered simulation gate for a +20pp effect at ICC 0.20 and the empirical zero-effect false-claim gate. This is a design-planning result, not evidence that insight transfer succeeds."
+        "The validation-derived design met the preregistered Monte Carlo confidence-bound gates for a +20pp effect at ICC 0.20 and the zero-effect false-claim scenario. This is a design-planning result, not evidence that insight transfer succeeds."
     } else if family_target_counts.len() < MIN_CONFIRMATORY_FAMILY_CLUSTERS {
         "The validation-derived eligible sample has fewer than 20 independent families. The design is underpowered by the frozen project floor and cannot support a confirmatory claim."
     } else {
@@ -658,11 +658,12 @@ fn execute_power(args: &BTreeMap<String, String>) -> Result<()> {
     }
     .to_string();
 
+    let design_digest = run_design_sha256(&config)?;
     let report = PowerReport {
         schema_version: "pitb.power-report.v0".to_string(),
         protocol_id: config.protocol_id,
         protocol_sha256: config.protocol_sha256,
-        run_design_sha256: run_design_sha256(&config)?,
+        run_design_sha256: design_digest,
         validation_results_sha256: sha256_hex(&validation_bytes),
         baseline_selection_receipt_sha256: config.baseline_selection_receipt_sha256,
         split_manifest_sha256: config.split_manifest_sha256,
@@ -2182,6 +2183,7 @@ mod tests {
                 max_wall_ms: 300_000,
                 max_cost_microusd: 500_000,
             },
+            power_report_sha256: None,
         }
     }
 
