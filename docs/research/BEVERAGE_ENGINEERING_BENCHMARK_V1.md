@@ -153,7 +153,23 @@ The receipt binds the raw corpus and schema bytes with SHA-256, includes the exa
 
 **Qualification limit:** this first runner does not implement the full JSON Schema Draft 2020-12 specification. It checks a narrow set of safety-relevant schema invariants and then deserializes into strict Rust types. An independent standards-compliant JSON Schema validator remains required. Passing receipt checks establishes contract integrity only, not that any scientific result is valid. The test binary must be built, formatted, tested, and run against the exact intended head before the receipt can be called qualified.
 
-## 10. Build sequence
+## 10. UCI wine-quality source auditor
+
+The second Rust executable audits a locally obtained red or white UCI Wine Quality CSV using the semicolon-delimited 12-column format. It computes the SHA-256 of the exact raw bytes; validates the declared header and column order; accounts for each parsed data row as valid or invalid; rejects missing, nonnumeric, nonfinite and semantically out-of-range values; and emits column summaries plus the quality-score distribution.
+
+Example use after downloading and reviewing the current UCI terms:
+
+```bash
+cargo test -p symthaea-culinary --bin wine_quality_source_audit
+cargo run -p symthaea-culinary --bin wine_quality_source_audit -- \
+  --input /path/to/winequality-red.csv \
+  --color red \
+  --out /tmp/wine-quality-audit.json
+```
+
+The `color` is explicit metadata because the source files are separate and do not contain a color column. The tool labels source identity as caller-declared rather than authenticated. It does not bundle, redistribute, or download source data; it does not assert the file is genuinely from UCI merely because it parses. Review the dataset page and terms before any redistribution, preserve the raw input digest, and keep any future train/test split manifest separate from this intake receipt. The dataset supports a static chemistry-to-quality-score baseline only; absent batch/vintage/site identifiers prevent claims of production transfer.
+
+## 11. Build sequence
 
 
 Phase A — corpus and contract: parse the scenario corpus, verify schema and unique IDs, emit deterministic expected/actual receipts and fail-closed outcomes. The current PR proposes this specification and corpus only.
@@ -166,7 +182,7 @@ Phase D — prospective validation: pre-register model, data cutoff, target, int
 
 Phase E — decision and plant twin integration: evaluate value of information and Pareto trade-offs with real, versioned cost/resource inputs.
 
-## 11. Research anchors
+## 12. Research anchors
 
 - Theßeling et al. (2024), Predicting and improving complex beer flavor through machine learning, Nature Communications 15, 2368. https://www.nature.com/articles/s41467-024-46346-0
 - Dazzarola et al. (2026), Toward a digital twin for beer quality control: development of a digital model integrating industrial process data and model-based fermentation descriptors, Journal of Food Engineering 403, 112726. https://doi.org/10.1016/j.jfoodeng.2025.112726
