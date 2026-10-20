@@ -78,7 +78,7 @@ jobs:
             .schema == "atomfab-pcb-route-receipt-v0.3"
             and .corpus_schema == "atomfab-pcb-route-corpus-v0.3"
             and .corpus_version == "0.3.0"
-            and .corpus_sha256 | test("^[0-9a-f]{64}$")
+            and (.corpus_sha256 | test("^[0-9a-f]{64}$"))
           ' atomfab-pcb-route-receipt.json
           jq -e --arg head "$(git rev-parse HEAD)" '
             .git_head == $head
