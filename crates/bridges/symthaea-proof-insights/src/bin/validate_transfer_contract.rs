@@ -332,6 +332,40 @@ mod tests {
     }
 
     #[test]
+    fn accepts_verified_transfer_with_target_side_evidence() {
+        let mut candidate = compatible_candidate();
+        candidate["status"] = json!("verified_transfer");
+        candidate["target_theorem_id"] = json!("OAI.Synthetic.target");
+        candidate["transfer_verification"] = json!({
+            "status": "passed",
+            "target_source_commit": "a".repeat(40),
+            "target_artifact_path": "lean/Synthetic/Target.lean",
+            "target_artifact_sha256": "b".repeat(64),
+            "target_statement_digest": "c".repeat(64),
+            "checker": "Lean 4 kernel",
+            "checker_version": "4.34.1",
+            "exact_statement_checked": true,
+            "axiom_policy": "declared_classical",
+            "receipt_sha256": "d".repeat(64),
+            "target_statement_correspondence": {
+                "status": "matches_intended_claim",
+                "independent_reviewer_count": 1
+            },
+            "successor_test_status": "passed",
+            "successor_tests": [{
+                "test_id": "synthetic-dependent-successor",
+                "source_path": "lean/Synthetic/Target.lean",
+                "test_declaration": "Synthetic.successor",
+                "outcome": "passed",
+                "depends_on_candidate": true
+            }],
+            "mutation_control_status": "passed",
+            "notes": ["Synthetic fixture only"]
+        });
+        assert!(validate_candidate(&candidate).is_ok());
+    }
+
+    #[test]
     fn record_requires_transfer_candidate_array() {
         assert!(validate_record(&json!({"insight": {}})).is_err());
     }
