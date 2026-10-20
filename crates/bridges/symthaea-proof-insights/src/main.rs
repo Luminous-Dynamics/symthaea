@@ -20,7 +20,7 @@ use std::{
     process::{Command, ExitCode},
 };
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -193,7 +193,9 @@ fn execute_from_args() -> Result<()> {
     if args.len() != 4 {
         bail!(
             "usage: {} <openai-math-checkout> <expected-40-char-commit> <output-json>",
-            args.first().map(String::as_str).unwrap_or("symthaea-proof-insights")
+            args.first()
+                .map(String::as_str)
+                .unwrap_or("symthaea-proof-insights")
         );
     }
 
@@ -202,7 +204,9 @@ fn execute_from_args() -> Result<()> {
         .with_context(|| format!("cannot resolve source root {}", args[1]))?;
     let expected_commit = args[2].trim().to_ascii_lowercase();
     if expected_commit.len() != 40
-        || !expected_commit.chars().all(|character| character.is_ascii_hexdigit())
+        || !expected_commit
+            .chars()
+            .all(|character| character.is_ascii_hexdigit())
     {
         bail!("expected commit must be a 40-character hexadecimal Git commit SHA");
     }
@@ -264,7 +268,9 @@ fn execute_from_args() -> Result<()> {
     for source in &manifest.sources {
         let repository_relative_path = normalize_lean_relative_path(&source.id)
             .with_context(|| format!("invalid formalization source path: {}", source.id))?;
-        let mapped_family_id = source_path_to_family.get(&repository_relative_path).cloned();
+        let mapped_family_id = source_path_to_family
+            .get(&repository_relative_path)
+            .cloned();
         if mapped_family_id.is_none() {
             unmapped_source_ids.push(source.id.clone());
         }
@@ -464,35 +470,57 @@ fn execute_from_args() -> Result<()> {
 }
 
 fn verify_split_files(generated_path: &Path, frozen_path: &Path) -> Result<()> {
-    let generated_text = fs::read_to_string(generated_path)
-        .with_context(|| format!("cannot read generated source index {}", generated_path.display()))?;
-    let frozen_text = fs::read_to_string(frozen_path)
-        .with_context(|| format!("cannot read frozen split manifest {}", frozen_path.display()))?;
+    let generated_text = fs::read_to_string(generated_path).with_context(|| {
+        format!(
+            "cannot read generated source index {}",
+            generated_path.display()
+        )
+    })?;
+    let frozen_text = fs::read_to_string(frozen_path).with_context(|| {
+        format!(
+            "cannot read frozen split manifest {}",
+            frozen_path.display()
+        )
+    })?;
     let generated: serde_json::Value =
         serde_json::from_str(&generated_text).context("generated index is not valid JSON")?;
     let frozen: serde_json::Value =
         serde_json::from_str(&frozen_text).context("frozen split manifest is not valid JSON")?;
 
     let generated_commit = generated
-        .get("upstream_commit").and_then(serde_json::Value::as_str)
+        .get("upstream_commit")
+        .and_then(serde_json::Value::as_str)
         .context("generated index is missing upstream_commit")?;
     let frozen_commit = frozen
-        .get("upstream").and_then(|value| value.get("commit")).and_then(serde_json::Value::as_str)
+        .get("upstream")
+        .and_then(|value| value.get("commit"))
+        .and_then(serde_json::Value::as_str)
         .context("frozen split manifest is missing upstream.commit")?;
     if generated_commit != frozen_commit {
-        bail!("source revision mismatch: generated index {generated_commit}, frozen manifest {frozen_commit}");
+        bail!(
+            "source revision mismatch: generated index {generated_commit}, frozen manifest {frozen_commit}"
+        );
     }
 
-    let generated_plan = generated.get("family_split_plan")
+    let generated_plan = generated
+        .get("family_split_plan")
         .context("generated index has no family_split_plan")?;
-    let frozen_plan = frozen.get("split_plan")
+    let frozen_plan = frozen
+        .get("split_plan")
         .context("frozen manifest has no split_plan")?;
-    for field in ["seed", "algorithm", "train_percent", "validation_percent", "test_percent"] {
+    for field in [
+        "seed",
+        "algorithm",
+        "train_percent",
+        "validation_percent",
+        "test_percent",
+    ] {
         if generated_plan.get(field) != frozen_plan.get(field) {
             bail!("split-plan metadata mismatch in field {field}");
         }
     }
-    let frozen_counts = frozen_plan.get("counts")
+    let frozen_counts = frozen_plan
+        .get("counts")
         .context("frozen split plan has no counts object")?;
     for (generated_field, frozen_field) in [
         ("train_family_count", "train"),
@@ -500,13 +528,17 @@ fn verify_split_files(generated_path: &Path, frozen_path: &Path) -> Result<()> {
         ("test_family_count", "test"),
     ] {
         if generated_plan.get(generated_field) != frozen_counts.get(frozen_field) {
-            bail!("split-plan count mismatch: generated {generated_field}, frozen counts.{frozen_field}");
+            bail!(
+                "split-plan count mismatch: generated {generated_field}, frozen counts.{frozen_field}"
+            );
         }
     }
-    let generated_digest = generated_plan.get("partition_digest_sha256")
+    let generated_digest = generated_plan
+        .get("partition_digest_sha256")
         .and_then(serde_json::Value::as_str)
         .context("generated index has no partition digest")?;
-    let frozen_digest = frozen_plan.get("partition_digest_sha256")
+    let frozen_digest = frozen_plan
+        .get("partition_digest_sha256")
         .and_then(serde_json::Value::as_str)
         .context("frozen manifest has no partition digest")?;
     if generated_digest != frozen_digest {
@@ -514,18 +546,28 @@ fn verify_split_files(generated_path: &Path, frozen_path: &Path) -> Result<()> {
     }
 
     let fingerprint_map = |value: &serde_json::Value| -> Result<BTreeMap<String, (String, u64)>> {
-        let fingerprints = value.get("source_fingerprints")
+        let fingerprints = value
+            .get("source_fingerprints")
             .and_then(serde_json::Value::as_array)
             .context("source_fingerprints must be an array")?;
         let mut result = BTreeMap::new();
         for item in fingerprints {
-            let path = item.get("path").and_then(serde_json::Value::as_str)
+            let path = item
+                .get("path")
+                .and_then(serde_json::Value::as_str)
                 .context("fingerprint missing path")?;
-            let digest = item.get("sha256").and_then(serde_json::Value::as_str)
+            let digest = item
+                .get("sha256")
+                .and_then(serde_json::Value::as_str)
                 .context("fingerprint missing sha256")?;
-            let bytes = item.get("bytes").and_then(serde_json::Value::as_u64)
+            let bytes = item
+                .get("bytes")
+                .and_then(serde_json::Value::as_u64)
                 .context("fingerprint missing byte count")?;
-            if result.insert(path.to_owned(), (digest.to_owned(), bytes)).is_some() {
+            if result
+                .insert(path.to_owned(), (digest.to_owned(), bytes))
+                .is_some()
+            {
                 bail!("duplicate source fingerprint path: {path}");
             }
         }
@@ -534,21 +576,28 @@ fn verify_split_files(generated_path: &Path, frozen_path: &Path) -> Result<()> {
     let generated_fingerprints = fingerprint_map(&generated)?;
     let frozen_fingerprints = fingerprint_map(&frozen)?;
     for (path, expected) in &frozen_fingerprints {
-        let actual = generated_fingerprints.get(path)
-            .with_context(|| format!("generated index is missing pinned source fingerprint: {path}"))?;
+        let actual = generated_fingerprints.get(path).with_context(|| {
+            format!("generated index is missing pinned source fingerprint: {path}")
+        })?;
         if actual != expected {
             bail!("source fingerprint mismatch for {path}");
         }
     }
 
     let rows = |value: &serde_json::Value, field: &str| -> Result<BTreeMap<String, String>> {
-        let entries = value.get(field).and_then(serde_json::Value::as_array)
+        let entries = value
+            .get(field)
+            .and_then(serde_json::Value::as_array)
             .with_context(|| format!("missing array field {field}"))?;
         let mut result = BTreeMap::new();
         for entry in entries {
-            let id = entry.get("family_id").and_then(serde_json::Value::as_str)
+            let id = entry
+                .get("family_id")
+                .and_then(serde_json::Value::as_str)
                 .context("family record missing family_id")?;
-            let split = entry.get("split").and_then(serde_json::Value::as_str)
+            let split = entry
+                .get("split")
+                .and_then(serde_json::Value::as_str)
                 .context("family record missing split")?;
             if result.insert(id.to_owned(), split.to_owned()).is_some() {
                 bail!("duplicate family ID {id} in {field}");
@@ -559,17 +608,30 @@ fn verify_split_files(generated_path: &Path, frozen_path: &Path) -> Result<()> {
     let generated_rows = rows(&generated, "families")?;
     let frozen_rows = rows(&frozen, "families")?;
     if generated_rows != frozen_rows {
-        let generated_only: Vec<_> = generated_rows.keys().filter(|key| !frozen_rows.contains_key(*key)).cloned().collect();
-        let frozen_only: Vec<_> = frozen_rows.keys().filter(|key| !generated_rows.contains_key(*key)).cloned().collect();
+        let generated_only: Vec<_> = generated_rows
+            .keys()
+            .filter(|key| !frozen_rows.contains_key(*key))
+            .cloned()
+            .collect();
+        let frozen_only: Vec<_> = frozen_rows
+            .keys()
+            .filter(|key| !generated_rows.contains_key(*key))
+            .cloned()
+            .collect();
         bail!(
             "family assignment mismatch (generated {}, frozen {}); generated-only IDs: {:?}; frozen-only IDs: {:?}",
-            generated_rows.len(), frozen_rows.len(), generated_only, frozen_only
+            generated_rows.len(),
+            frozen_rows.len(),
+            generated_only,
+            frozen_only
         );
     }
 
     eprintln!(
         "PASS: {} family assignments match frozen digest {} for source {}",
-        generated_rows.len(), frozen_digest, generated_commit
+        generated_rows.len(),
+        frozen_digest,
+        generated_commit
     );
     Ok(())
 }
@@ -662,8 +724,8 @@ fn inventory_catalogue_links(
 fn extract_families(contents: &str) -> Result<Vec<FamilyRecord>> {
     // The pinned CONTENTS.md presents each result family as **NNN. Title**.
     // Anything outside this known catalogue shape is treated as a failure.
-    let header_regex = Regex::new(r"\*\*(\d{3})\.\s*([^*]+?)\*\*")
-        .context("compile family-header expression")?;
+    let header_regex =
+        Regex::new(r"\*\*(\d{3})\.\s*([^*]+?)\*\*").context("compile family-header expression")?;
     let link_regex =
         Regex::new(r"\[[^\]]*\]\(([^)]+)\)").context("compile Markdown-link expression")?;
     let headers: Vec<_> = header_regex.captures_iter(contents).collect();
@@ -707,9 +769,7 @@ fn extract_families(contents: &str) -> Result<Vec<FamilyRecord>> {
     Ok(families)
 }
 
-fn map_source_paths_to_families(
-    families: &[FamilyRecord],
-) -> Result<BTreeMap<String, String>> {
+fn map_source_paths_to_families(families: &[FamilyRecord]) -> Result<BTreeMap<String, String>> {
     let mut source_path_to_family: BTreeMap<String, String> = BTreeMap::new();
     for family in families {
         for linked_path in &family.linked_paths {
@@ -724,8 +784,7 @@ fn map_source_paths_to_families(
                 }
                 Some(_) => {}
                 None => {
-                    source_path_to_family
-                        .insert(linked_path.clone(), family.family_id.clone());
+                    source_path_to_family.insert(linked_path.clone(), family.family_id.clone());
                 }
             }
         }
@@ -783,9 +842,7 @@ fn assign_family_splits(families: &mut [FamilyRecord]) -> Result<FamilySplitPlan
             (hasher.finalize().to_vec(), family.family_id.clone())
         })
         .collect();
-    ranked.sort_by(|left, right| {
-        left.0.cmp(&right.0).then_with(|| left.1.cmp(&right.1))
-    });
+    ranked.sort_by(|left, right| left.0.cmp(&right.0).then_with(|| left.1.cmp(&right.1)));
 
     let total = ranked.len();
     let train_count = total * 70 / 100;
@@ -843,10 +900,7 @@ fn normalize_root_relative_path(path: &str) -> Result<String> {
     normalize_with_base(std::iter::empty::<&str>(), path)
 }
 
-fn normalize_with_base<'a>(
-    base: impl IntoIterator<Item = &'a str>,
-    path: &str,
-) -> Result<String> {
+fn normalize_with_base<'a>(base: impl IntoIterator<Item = &'a str>, path: &str) -> Result<String> {
     if path.contains("://") {
         bail!("URL is not a repository-relative artifact path: {path}");
     }
@@ -922,9 +976,11 @@ mod tests {
         assert_eq!(families.len(), 2);
         assert_eq!(families[0].family_id, "001");
         assert_eq!(families[0].title, "First family.");
-        assert!(families[0]
-            .linked_paths
-            .contains(&"preprints/first/paper.pdf".to_owned()));
+        assert!(
+            families[0]
+                .linked_paths
+                .contains(&"preprints/first/paper.pdf".to_owned())
+        );
         assert_eq!(families[1].family_id, "002");
     }
 
@@ -962,9 +1018,15 @@ mod tests {
 "#;
         let families = extract_families(contents).expect("parse catalogue");
         let map = map_source_paths_to_families(&families).expect("map distinct paths");
-        assert_eq!(map.get("preprints/first/paper.pdf").map(String::as_str), Some("001"));
+        assert_eq!(
+            map.get("preprints/first/paper.pdf").map(String::as_str),
+            Some("001")
+        );
         assert_eq!(map.get("lean/docs/001.md").map(String::as_str), Some("001"));
-        assert_eq!(map.get("preprints/second/paper.pdf").map(String::as_str), Some("002"));
+        assert_eq!(
+            map.get("preprints/second/paper.pdf").map(String::as_str),
+            Some("002")
+        );
     }
 
     #[test]
@@ -1012,7 +1074,10 @@ mod tests {
         assert_eq!(plan.validation_family_count, 15);
         assert_eq!(plan.test_family_count, 15);
         assert_eq!(plan.seed, second_plan.seed);
-        assert_eq!(plan.partition_digest_sha256, second_plan.partition_digest_sha256);
+        assert_eq!(
+            plan.partition_digest_sha256,
+            second_plan.partition_digest_sha256
+        );
         assert_eq!(first_map.len(), 100);
     }
 
@@ -1020,7 +1085,10 @@ mod tests {
     fn frozen_split_verifier_accepts_exact_rows_and_rejects_mutations() {
         use std::time::{SystemTime, UNIX_EPOCH};
 
-        let digest = format!("{:x}", Sha256::digest([48_u8, 48, 49, 9, 116, 114, 97, 105, 110, 10]));
+        let digest = format!(
+            "{:x}",
+            Sha256::digest([48_u8, 48, 49, 9, 116, 114, 97, 105, 110, 10])
+        );
         let nonce = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("system clock is after Unix epoch")
