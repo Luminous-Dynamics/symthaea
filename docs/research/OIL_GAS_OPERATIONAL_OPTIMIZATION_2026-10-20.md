@@ -61,7 +61,7 @@ The new stdlib-only Rust crate, symthaea-industrial-optimization, provides two e
 2. optimize_robust_portfolio: exhaustive search for small frozen cases, maximizing the sum of lower scenario estimates under the same budget.
 3. pareto_frontier: exhaustive cost-versus-conservative-abatement frontier. It includes the zero-cost baseline and returns nondominated cost/floor points; expected/ceiling estimates remain visible as annotations, with a narrow scenario span used only to choose a representative when multiple portfolios have identical cost and floor. This is a two-objective frontier, not a full lifecycle Pareto frontier.
 
-Both reject malformed scenario ordering and require positive capex (so the ratio baseline remains defined), exclude candidates marked ineligible for planning, enforce one intervention per declared source group, and use deterministic output ordering. Embedded example values are invented mechanics fixtures, not field data or industry averages.
+All strategies reject malformed scenario ordering and require positive capex (so the ratio baseline remains defined), exclude candidates marked ineligible for planning, enforce one intervention per declared source group, and use deterministic output ordering. Embedded example values are invented mechanics fixtures, not field data or industry averages.
 
 The exact and frontier solvers are intentionally capped at 20 candidate interventions (at most 1,048,576 subsets). The greedy baseline accepts more candidates but remains only a simple ratio heuristic. None of these functions infer emissions, establish that an intervention is safe, or model interactions between different source groups.
 
