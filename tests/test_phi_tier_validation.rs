@@ -14,8 +14,8 @@
 //! ## Method
 //!
 //! 1. Generate systems with known topologies (star, ring, random, modular)
-//! 2. Compute Exact Φ (ground truth) for n=4-8 nodes
-//! 3. Compute Heuristic Φ for same systems
+//! 2. Compute the exhaustive HDC similarity-proxy score for n=4-8 components
+//! 3. Compute the sampled HDC similarity-proxy score for the same representations
 //! 4. Calculate Pearson correlation
 //! 5. Report an internal proxy-agreement threshold
 //!
@@ -249,30 +249,30 @@ fn test_heuristic_vs_exact_correlation() {
     println!();
 
     // Validation thresholds
-    let heuristic_validated = heuristic_pearson > 0.70 || heuristic_spearman > 0.70;
-    let spectral_validated = spectral_pearson > 0.70 || spectral_spearman > 0.70;
+    let heuristic_internal_agreement_target_met = heuristic_pearson > 0.70 || heuristic_spearman > 0.70;
+    let spectral_matches_proxy_target = spectral_pearson > 0.70 || spectral_spearman > 0.70;
 
     println!("========================================");
-    println!("VALIDATION RESULTS");
+    println!("INTERNAL PROXY-AGREEMENT RESULTS");
     println!("========================================\n");
 
     println!(
-        "Heuristic Tier: {}",
-        if heuristic_validated {
-            "✅ VALIDATED"
+        "Sampled HDC proxy: {}",
+        if heuristic_internal_agreement_target_met {
+            "✅ INTERNAL TARGET MET"
         } else {
-            "❌ NOT VALIDATED"
+            "❌ INTERNAL TARGET NOT MET"
         }
     );
-    println!("  (Threshold: r > 0.70 or ρ > 0.70)");
+    println!("  (Internal proxy-agreement target: r > 0.70 or ρ > 0.70)");
     println!();
 
     println!(
-        "Spectral Tier:  {}",
-        if spectral_validated {
+        "Spectral connectivity diagnostic: {}",
+        if spectral_matches_proxy_target {
             "✅ VALIDATED"
         } else {
-            "❌ NOT VALIDATED (as expected)"
+            "❌ NOT AN IIT MEASURE"
         }
     );
     println!("  (Spectral measures λ₂ mixing time, NOT IIT Φ)");
@@ -343,7 +343,7 @@ fn test_heuristic_vs_exact_correlation() {
 #[test]
 fn test_exhaustive_proxy_topology_discrimination() {
     println!("\n========================================");
-    println!("EXACT TIER: Topology Discrimination Test");
+    println!("EXHAUSTIVE HDC PROXY: Representation Discrimination Test");
     println!("========================================\n");
 
     // This tests only whether the exhaustive HDC similarity proxy distinguishes
@@ -371,7 +371,7 @@ fn test_exhaustive_proxy_topology_discrimination() {
     let random_mean: f64 = random_phis.iter().sum::<f64>() / trials as f64;
     let modular_mean: f64 = modular_phis.iter().sum::<f64>() / trials as f64;
 
-    println!("Mean Exact Φ over {} trials (n={}):", trials, n);
+    println!("Mean exhaustive HDC proxy scores over {} trials (n={}):", trials, n);
     println!("  Star:    {:.4} ± {:.4}", star_mean, std_dev(&star_phis));
     println!("  Ring:    {:.4} ± {:.4}", ring_mean, std_dev(&ring_phis));
     println!(
@@ -386,8 +386,8 @@ fn test_exhaustive_proxy_topology_discrimination() {
     );
     println!();
 
-    // The exact tier should show SOME discrimination between topologies
-    // Even if our HDC implementation differs from pure IIT, topologies should differ
+    // This HDC proxy should show some discrimination between generated representation families.
+    // This is an implementation sanity check, not a claim about formal IIT.
     let max_phi = star_mean.max(ring_mean).max(random_mean).max(modular_mean);
     let min_phi = star_mean.min(ring_mean).min(random_mean).min(modular_mean);
     let discrimination = max_phi - min_phi;
@@ -403,7 +403,7 @@ fn test_exhaustive_proxy_topology_discrimination() {
         discrimination
     );
 
-    println!("\n✅ Exact tier discriminates between topologies");
+    println!("\n✅ Exhaustive HDC proxy discriminates between generated representations");
 }
 
 #[test]
