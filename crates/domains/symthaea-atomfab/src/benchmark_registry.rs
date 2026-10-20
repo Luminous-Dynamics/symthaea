@@ -219,11 +219,17 @@ mod tests {
         assert_eq!(registry.benchmark_lanes.len(), 9);
         assert!(registry.benchmark_lanes.iter().any(|lane| lane.id == "experimental-reality-gap"));
         assert!(registry.benchmark_lanes.iter().any(|lane| lane.id == "symtropy-workcell"));
+        let nanoparticle_lane = registry
+            .benchmark_lanes
+            .iter()
+            .find(|lane| lane.id == "supported-nanoparticle-search")
+            .expect("supported nanoparticle lane should be registered");
         assert!(
-            registry
-                .benchmark_lanes
+            nanoparticle_lane
+                .metrics
                 .iter()
-                .any(|lane| lane.id == "supported-nanoparticle-search")
+                .any(|metric| metric.contains("p=0.94")),
+            "ranking persistence must be preregistered"
         );
     }
 
