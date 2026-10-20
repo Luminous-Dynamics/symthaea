@@ -96,6 +96,7 @@
         "proof_completion_commit",
         "statement_sha256",
         "statement_artifact_id",
+        "completion_statement_artifact_id",
         "proof_artifact_id",
         "visible_artifact_ids"
       ],
@@ -136,6 +137,10 @@
             "type": "string",
             "minLength": 1
           }
+        },
+        "completion_statement_artifact_id": {
+          "type": "string",
+          "minLength": 1
         }
       }
     },
@@ -168,6 +173,7 @@
         "artifact_kind": {
           "enum": [
             "theorem_statement",
+            "completion_statement",
             "proof_body",
             "definition",
             "module_context"
@@ -216,7 +222,10 @@
           "if": {
             "properties": {
               "artifact_kind": {
-                "const": "proof_body"
+                "enum": [
+                  "proof_body",
+                  "completion_statement"
+                ]
               }
             },
             "required": [
