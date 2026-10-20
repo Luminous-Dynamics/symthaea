@@ -109,7 +109,10 @@ impl fmt::Display for FailureModeError {
                 write!(f, "failure record field must not be empty: {field}")
             }
             Self::InvalidDigest(field) => {
-                write!(f, "failure record field is not a lowercase SHA-256 digest: {field}")
+                write!(
+                    f,
+                    "failure record field is not a lowercase SHA-256 digest: {field}"
+                )
             }
             Self::DuplicateRecordId => write!(f, "failure record IDs must be unique"),
             Self::MismatchedEvaluationScope => write!(
@@ -121,7 +124,10 @@ impl fmt::Display for FailureModeError {
                 "pass requires no failure mode or severity; failed/abstained require both"
             ),
             Self::UnsupportedSchemaVersion(version) => {
-                write!(f, "unsupported failure-mode summary schema version: {version}")
+                write!(
+                    f,
+                    "unsupported failure-mode summary schema version: {version}"
+                )
             }
             Self::InvalidSummary => write!(
                 f,
@@ -192,7 +198,9 @@ impl FailureModeSummary {
     /// Validate a persisted summary by rebuilding it from the exact records.
     pub fn validate(&self, records: &[FailureRecord]) -> Result<(), FailureModeError> {
         if self.schema_version != FAILURE_MODE_SCHEMA_VERSION {
-            return Err(FailureModeError::UnsupportedSchemaVersion(self.schema_version));
+            return Err(FailureModeError::UnsupportedSchemaVersion(
+                self.schema_version,
+            ));
         }
         let canonical = summarize_failure_modes(records)?;
         if canonical != *self {
@@ -275,10 +283,15 @@ pub fn summarize_failure_modes(
         }
     }
 
-    let mut record_ids: Vec<String> = records.iter().map(|record| record.record_id.clone()).collect();
+    let mut record_ids: Vec<String> = records
+        .iter()
+        .map(|record| record.record_id.clone())
+        .collect();
     record_ids.sort();
-    let mut evidence_digests: Vec<String> =
-        records.iter().map(|record| record.evidence_digest.clone()).collect();
+    let mut evidence_digests: Vec<String> = records
+        .iter()
+        .map(|record| record.evidence_digest.clone())
+        .collect();
     evidence_digests.sort();
 
     Ok(FailureModeSummary {
@@ -322,10 +335,9 @@ mod tests {
 
     #[test]
     fn fixture_keeps_failure_modes_and_abstentions_separate() {
-        let fixture: serde_json::Value = serde_json::from_str(include_str!(
-            "../fixtures/failure-mode-records-v1.json"
-        ))
-        .expect("failure fixture must parse");
+        let fixture: serde_json::Value =
+            serde_json::from_str(include_str!("../fixtures/failure-mode-records-v1.json"))
+                .expect("failure fixture must parse");
         let _record_schema: serde_json::Value = serde_json::from_str(include_str!(
             "../schemas/failure-mode-records-v1.schema.json"
         ))
@@ -334,32 +346,50 @@ mod tests {
             "../schemas/failure-mode-summary-v1.schema.json"
         ))
         .expect("failure summary schema must parse");
-        let records: Vec<FailureRecord> =
-            serde_json::from_value(fixture["records"].clone())
-                .expect("failure records should match Rust contract");
+        let records: Vec<FailureRecord> = serde_json::from_value(fixture["records"].clone())
+            .expect("failure records should match Rust contract");
         let summary = summarize_failure_modes(&records).expect("fixture scope is matched");
         assert_eq!(summary.total_assessed, 4);
         assert_eq!(summary.passed_count, 1);
         assert_eq!(summary.failed_count, 2);
         assert_eq!(summary.abstained_count, 1);
         assert_eq!(summary.critical_failure_count, 1);
-        assert_eq!(summary.failure_mode_counts.get(&FailureMode::NonFiniteForce), Some(&1));
-        assert_eq!(summary.failure_mode_counts.get(&FailureMode::EnergyOrderingViolation), Some(&1));
-        assert_eq!(summary.abstention_reason_counts.get(&FailureMode::OutOfDomain), Some(&1));
-        assert_eq!(summary.severity_counts.get(&FailureSeverity::Critical), Some(&1));
+        assert_eq!(
+            summary
+                .failure_mode_counts
+                .get(&FailureMode::NonFiniteForce),
+            Some(&1)
+        );
+        assert_eq!(
+            summary
+                .failure_mode_counts
+                .get(&FailureMode::EnergyOrderingViolation),
+            Some(&1)
+        );
+        assert_eq!(
+            summary
+                .abstention_reason_counts
+                .get(&FailureMode::OutOfDomain),
+            Some(&1)
+        );
+        assert_eq!(
+            summary.severity_counts.get(&FailureSeverity::Critical),
+            Some(&1)
+        );
         summary.validate(&records).expect("summary must recompute");
 
         let mut forged = summary.clone();
         forged.critical_failure_count = 0;
-        assert_eq!(forged.validate(&records), Err(FailureModeError::InvalidSummary));
+        assert_eq!(
+            forged.validate(&records),
+            Err(FailureModeError::InvalidSummary)
+        );
     }
 
     #[test]
     fn summaries_do_not_pool_models_families_or_splits() {
-        let fixture: serde_json::Value = serde_json::from_str(include_str!(
-            "../fixtures/failure-mode-records-v1.json"
-        ))
-        .unwrap();
+        let fixture: serde_json::Value =
+            serde_json::from_str(include_str!("../fixtures/failure-mode-records-v1.json")).unwrap();
         let records: Vec<FailureRecord> =
             serde_json::from_value(fixture["records"].clone()).unwrap();
         let mut other_model = records.clone();
