@@ -724,7 +724,7 @@ fn compute_baseline_scores(targets: &[&TargetOutcome]) -> Result<BTreeMap<String
                 .with_context(|| {
                     format!("validation target {} lacks baseline arm {arm_id}", target.target_id)
                 })?;
-            successes += usize::from(arm.semantic_gate_passed);
+            successes += if arm.semantic_gate_passed { 1 } else { 0 };
         }
         scores.insert(arm_id.to_string(), successes as f64 / targets.len() as f64);
     }
