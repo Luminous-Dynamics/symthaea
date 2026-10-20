@@ -129,6 +129,8 @@ pub enum ExperimentPriorityIssue {
     EmptyDecisionValueEstimatorIdentity { field: &'static str },
     DecisionValueEstimatorContractNotReviewed,
     ProfileAuditIdentityMismatch,
+    ProfileAuditManifestMismatch,
+    ProfileAuditCostBasisMismatch,
     ProfileDigestInvalid,
     CostCannotBeAudited,
     AuditInvalid,
@@ -208,6 +210,12 @@ fn validate_profile_audit(
     }
     if profile.profile_id != audit.profile_id || profile.campaign_id != audit.campaign_id {
         issues.push(ExperimentPriorityIssue::ProfileAuditIdentityMismatch);
+    }
+    if profile.manifest_sha256 != audit.profile_manifest_sha256 {
+        issues.push(ExperimentPriorityIssue::ProfileAuditManifestMismatch);
+    }
+    if profile.cost_basis_id != audit.cost_basis_id {
+        issues.push(ExperimentPriorityIssue::ProfileAuditCostBasisMismatch);
     }
     if !valid_sha256(&profile.manifest_sha256) {
         issues.push(ExperimentPriorityIssue::ProfileDigestInvalid);
@@ -1073,6 +1081,49 @@ mod tests {
         let mut proposal = optional("stale-utility", Some(2), Some(100));
         proposal.decision_value_evidence_sha256 = Some("not-a-digest".to_string());
         let report = prioritize_next_experiment(&profile, &audit, &[proposal], &value_contract(), 10);
+        assert_eq!(report.disposition, ExperimentPriorityDisposition::NoBeneficialOptionalProposal);
+    }
+
+    #[test]
+    fn audit_from_different_manifest_fails_closed() {
+        let (profile, mut audit) = audit(false);
+        audit.profile_manifest_sha256 = "e".repeat(64);
+        let report = prioritize_next_experiment(
+            &profile,
+            &audit,
+            &[],
+            &value_contract(),
+            10,
+        );
+        assert_eq!(report.disposition, ExperimentPriorityDisposition::InvalidProfileOrAudit);
+    }
+
+    #[test]
+    fn audit_from_different_cost_basis_fails_closed() {
+        let (profile, mut audit) = audit(false);
+        audit.cost_basis_id = "wrong-units".to_string();
+        let report = prioritize_next_experiment(
+            &profile,
+            &audit,
+            &[],
+            &value_contract(),
+            10,
+        );
+        assert_eq!(report.disposition, ExperimentPriorityDisposition::InvalidProfileOrAudit);
+    }
+
+    #[test]
+    fn unlike_decision_value_estimators_cannot_be_compared() {
+        let (profile, audit) = audit(false);
+        let mut proposal = optional("wrong-estimator", Some(2), Some(100));
+        proposal.decision_value_method_id = Some("different-estimator".to_string());
+        let report = prioritize_next_experiment(
+            &profile,
+            &audit,
+            &[proposal],
+            &value_contract(),
+            10,
+        );
         assert_eq!(report.disposition, ExperimentPriorityDisposition::NoBeneficialOptionalProposal);
     }
 
