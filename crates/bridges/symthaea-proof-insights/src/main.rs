@@ -870,7 +870,7 @@ mod tests {
     fn frozen_split_verifier_accepts_exact_rows_and_rejects_mutations() {
         use std::time::{SystemTime, UNIX_EPOCH};
 
-        let digest = format!("{:x}", Sha256::digest(b"001\\ttrain\\n"));
+        let digest = format!("{:x}", Sha256::digest([48_u8, 48, 49, 9, 116, 114, 97, 105, 110, 10]));
         let nonce = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("system clock is after Unix epoch")
@@ -895,7 +895,7 @@ mod tests {
         fs::write(&frozen_path, &frozen).expect("write frozen fixture");
         assert!(verify_split_files(&generated_path, &frozen_path).is_ok());
 
-        let mutated = generated.replace("\\"split\\":\\"train\\"".replace('\\', '\\').as_str(), "\\"split\\":\\"test\\"".replace('\\', '\\').as_str());
+        let mutated = generated.replace(r#""split":"train""#, r#""split":"test""#);
         fs::write(&generated_path, mutated).expect("write mutation fixture");
         assert!(verify_split_files(&generated_path, &frozen_path).is_err());
 
