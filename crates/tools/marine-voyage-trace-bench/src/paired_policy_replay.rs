@@ -783,10 +783,10 @@ impl SliceAccumulator {
             observation.candidate_upper,
             observation.observed_value,
         ).unwrap_or(false);
-        self.baseline_cover_count += usize::from(baseline_covers);
-        self.candidate_cover_count += usize::from(candidate_covers);
+        self.baseline_cover_count += baseline_covers as usize;
+        self.candidate_cover_count += candidate_covers as usize;
         self.coverage_delta.add(
-            f64::from(candidate_covers) - f64::from(baseline_covers),
+            (candidate_covers as u8 as f64) - (baseline_covers as u8 as f64),
         );
 
         let baseline_width = observation.baseline_upper - observation.baseline_lower;
@@ -824,13 +824,13 @@ impl SliceAccumulator {
                 constraint,
             );
             self.baseline_false_safe_count +=
-                usize::from(baseline_predicted_safe && !actual_safe);
+                (baseline_predicted_safe && !actual_safe) as usize;
             self.candidate_false_safe_count +=
-                usize::from(candidate_predicted_safe && !actual_safe);
+                (candidate_predicted_safe && !actual_safe) as usize;
             self.baseline_missed_feasible_count +=
-                usize::from(!baseline_predicted_safe && actual_safe);
+                (!baseline_predicted_safe && actual_safe) as usize;
             self.candidate_missed_feasible_count +=
-                usize::from(!candidate_predicted_safe && actual_safe);
+                (!candidate_predicted_safe && actual_safe) as usize;
         }
 
         match observation.applicability {
