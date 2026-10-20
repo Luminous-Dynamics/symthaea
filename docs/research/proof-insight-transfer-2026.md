@@ -33,6 +33,7 @@ These numbers are not directly comparable to leaderboard miniF2F scores: the han
 - Retrieval matters in formal proving, but random theorem splits can leak nearby proof patterns. LeanDojo documents family-/premise-aware generalization concerns and a Lean 4 benchmark with 122,517 theorems/proofs.
 - DeepSeek-Prover-V2 reports 88.9% pass ratio on miniF2F-test and 49/658 PutnamBench problems in its 2025 paper. Treat those as **published results under that paper's setup**, not a guarantee about the October 2026 global frontier.
 - The 2026 ACL paper *Discover and Prove* introduces hard-mode variants where the model must first discover an answer instead of being handed the answer in the formal statement. It reports 36 formally proved PutnamBench theorems in hard mode and emphasizes the gap between informal answer discovery and formal proof completion.
+- **Constructive solving is a separate, harder task:** ICML 2026's FPS/D-FPS framework makes the answer an unknown witness tied to proof obligations and uses Restricted Propositional Equivalence (RPE) to score semantic answer equivalence. Its released benchmarks contain 387 FormalMath500, 375 MiniF2F-Solving, and 324 PutnamBench-Solving items. Their published D-FPS Hybrid-CoT/DeepSeek-V3.2 solved rates are 48.58%, 57.33%, and 1.54%, respectively; these are setup-specific reference rows, not directly comparable to ordinary theorem-proving scores. ([paper](https://proceedings.mlr.press/v306/liu26gl.html), [implementation/results](https://github.com/Purewhite2019/formal_problem_solving_main))
 - **Latest research-grade comparator (14 October 2026):** First Proof Batch 3 tested five systems on ten specialist research-math problems. Thirty expert reviewers scored correctness, exposition, and attribution. ProofCouncil reached 9/10 correct and GPT-6 Astra 7/10; only 4/10 Astra solutions had adequate citations, versus 7/10 for ProofCouncil. Negative scoring penalized wrong answers, and the open-weight entrant's submissions all contained major errors. This is not numerically comparable to Lean benchmarks, but shows why research-grade evaluation must measure correctness, exposition, attribution, and abstention separately. (https://1stproof.org/third-batch-press-release.html)
 - OpenAI's pinned public `math` snapshot (`1581d4cbdd69a0faf34b2089614fe2a814316a6a`) has 719 manuscripts in 372 related-result families and reports roughly 42% of top-line results formalized. The indexer cross-checks the README's declared family count against parsed catalog headers and fingerprints the README, family map, formalization catalog, and Comparator scope notes. Its deterministic family split is a pre-screen assignment—not a guarantee against cross-family mathematical dependence or pretraining contamination. The repository maintainers warn that some Comparator configurations validate supporting results rather than the paper's headline theorem.
 - **A critical evaluation finding:** the ACL 2026 industry-track paper *Benchmarking Testing in Automated Theorem Proving* proposes T², evaluating generated theorem statements by compiling dependent successor theorems. In its 2,206-problem setup, the best reported model reached 38.9% testing accuracy despite strong compilation results. This is a reason to measure semantic/downstream correctness, not just “Lean accepted.” (https://aclanthology.org/2026.acl-industry.150/)
@@ -98,6 +99,12 @@ Report separate results for:
 
 This prevents a gain in one easy-to-measure metric from disguising regressions elsewhere.
 
+### 6. From supplied propositions to constructive mathematical problem-solving
+
+In ordinary theorem proving, the proposition is already known and the system searches for a proof. In constructive problem-solving, the answer itself is an unknown witness: Symthaea must derive an object and then prove that it satisfies every stated conclusion. Treat this as a distinct benchmark track rather than conflating “found a plausible answer,” “typechecked a term,” and “proved the requested conditions.”
+
+Use FPS/D-FPS-style task records with explicit unknowns, formal types, candidate witnesses, per-conclusion proof obligations, and RPE or stronger formal equivalence checks. A witness that typechecks but fails the requested conclusions is not solved; two differently represented answers may still be equivalent. This track directly tests whether proof-derived insights help *discover* useful mathematics rather than only close a pre-specified goal.
+
 ## Proposed architecture
 
 Use existing components before adding new infrastructure:
@@ -108,8 +115,9 @@ Use existing components before adding new infrastructure:
 4. **Insight record store (new, typed JSON schema):** store strategy contracts and evidence anchors. Keep the graph authoritative; vector embeddings are optional retrieval indexes.
 5. **Candidate retrieval (baseline portfolio):** compare BM25/lexical, typed AST features, dependency graph, available embedding search, and HDC representation. No representation wins by architectural preference; it must win a frozen benchmark.
 6. **Transfer planner (new):** state a target lemma/goal, map preconditions, predict which proof obligation should improve, include a negative control, and produce Lean code only through a pinned bridge.
-7. **Trust gate (reuse):** check the exact theorem and expected proposition, audit `sorryAx` and declared axioms under an explicit policy, and preserve checker/toolchain receipts. Failed, timed-out, not-attempted, and accepted are distinct outcomes.
-8. **Evaluator (new):** run family-held-out comparisons, report confidence intervals and resource use, archive raw result files, and fail closed when provenance or evaluation data are missing.
+7. **Constructive task adapter (new):** represent unknown witnesses and their formal types, enumerate the target conclusions that the witness must satisfy, and record a separate status for candidate generation, typechecking, each proof obligation, and answer equivalence (RPE or a formal equivalence proof).
+8. **Trust gate (reuse):** check the exact theorem and expected proposition, audit `sorryAx` and declared axioms under an explicit policy, and preserve checker/toolchain receipts. Failed, timed-out, not-attempted, and accepted are distinct outcomes.
+9. **Evaluator (new):** run family-held-out comparisons, report confidence intervals and resource use, archive raw result files, and fail closed when provenance or evaluation data are missing.
 
 Potential new code should start under the existing Lean bridge / proof-audit boundaries. Do not pull heavyweight main-crate cognitive dependencies into the bridge merely to access a 16K HDC vector. The previous cascade-selection null is a warning against architecture-led integration.
 
@@ -157,6 +165,7 @@ Thresholds below are **proposed go/no-go goals**, not measured results. Pilot es
 | Abstention quality | Risk-versus-coverage curve: incorrect or unsupported assertions as the system answers more transfer requests | At matched coverage, beat the no-abstention baseline on unsupported-claim rate; report false-abstention rate separately |
 | Structural retrieval | Expert-labelled relevant strategy in Recall@10, grouped by theorem family | ≥15% relative lift over strongest simple baseline before scale-up |
 | Verified transfer lift | Absolute change in target theorems with checker-accepted, exact-statement proofs vs strongest matched baseline | ≥10 percentage points on a sufficiently powered family-held-out evaluation; 95% interval for lift excludes zero |
+| Constructive witness discovery | Fraction of tasks where a derived witness is type-correct, every requested conclusion is proved, and the answer passes RPE/formal equivalence | Establish baseline separately on FormalMath500, MiniF2F-Solving, and PutnamBench-Solving; report “candidate”, “typechecked”, and “solved” as separate stages |
 | Falsification controls | Rejection of seeded wrong-target, vacuous, `sorry`, undeclared-axiom, and violated-precondition cases | 100% of frozen deterministic gate fixtures rejected |
 | Semantic/downstream correctness | Fraction of generated theorem statements that pass reviewed statement correspondence plus relevant dependent-successor tests | Establish a T²-style baseline first; target ≥10 percentage-point lift over a matched baseline, with confidence intervals and mutation-control results |
 | Counterexample utility | Rate of seeded false conjectures found within a declared finite search budget | Establish baseline first; report precision/recall separately |
@@ -174,6 +183,7 @@ Use established suites for proving competence, but do not confuse them with the 
 - **LeanDojo Benchmark 4:** premise selection and generalization to new premises in Mathlib.
 - **OpenAI `math` artifacts:** source material for proof-insight provenance and cross-family analysis, not a standardized leaderboard by themselves.
 - **PITB:** cross-family strategy transfer and quality of mathematical insight records.
+- **FPS / D-FPS:** constructive witness discovery with RPE answer equivalence; use as a separate track because solving is not equivalent to proving a supplied proposition.
 
 The dated public comparison points located for this design include DeepSeek-Prover-V2 (its paper reports 88.9% miniF2F-test pass ratio and 49/658 PutnamBench problems), the 2026 *Discover and Prove* hard-mode results, T² semantic testing, and First Proof Batch 3's human-reviewed research-level evaluation. These are different tasks and must remain separate rows in reports.
 
@@ -239,6 +249,8 @@ Negative results must be preserved. A system that accurately says “no transfer
 - LeanDojo: *Theorem Proving with Retrieval-Augmented Language Models*, NeurIPS 2023: https://arxiv.org/abs/2306.15626
 - DeepSeek-Prover-V2, 2025: https://arxiv.org/abs/2504.21801
 - Liu et al., *Discover and Prove: An Open-source Agentic Framework for Hard Mode Automated Theorem Proving in Lean 4*, ACL 2026: https://aclanthology.org/2026.acl-long.3/
+- Liu et al., *Beyond Theorem Proving: Formulation, Framework and Benchmark for Formal Problem-Solving*, ICML 2026: https://proceedings.mlr.press/v306/liu26gl.html
+- FPS/D-FPS source code, data, and evaluation tables: https://github.com/Purewhite2019/formal_problem_solving_main
 - Kim et al., *Benchmarking Testing in Automated Theorem Proving*, ACL 2026 Industry Track (T² downstream semantic tests): https://aclanthology.org/2026.acl-industry.150/
 - First Proof Project, *Third Batch Press Release*, 14 October 2026: https://1stproof.org/third-batch-press-release.html
 - OpenAI, *Our First Proof submissions*, 20 February 2026: https://openai.com/index/first-proof-submissions/
