@@ -398,6 +398,32 @@ mod tests {
     }
 
     #[test]
+    fn scientific_lanes_require_structured_failure_mode_reporting() {
+        let registry = load_embedded_registry().expect("checked-in JSON should parse");
+        for lane_id in ["scientific-ms25", "supported-nanoparticle-search"] {
+            let lane = registry
+                .benchmark_lanes
+                .iter()
+                .find(|lane| lane.id == lane_id)
+                .unwrap_or_else(|| panic!("missing benchmark lane {lane_id}"));
+            assert!(
+                lane.metrics.iter().any(|metric| {
+                    metric.contains("failure-mode")
+                        && metric.contains("material family")
+                }),
+                "{lane_id} must report typed failure modes by material family"
+            );
+            assert!(
+                lane.gates.iter().any(|gate| {
+                    gate.contains("failed/non-converged")
+                        || gate.contains("failed relaxations")
+                }),
+                "{lane_id} must keep failed evaluations in the denominator"
+            );
+        }
+    }
+
+    #[test]
     fn evidence_routing_lane_requires_calibrated_multifidelity_comparisons() {
         let registry = load_embedded_registry().expect("checked-in JSON should parse");
         let lane = registry
