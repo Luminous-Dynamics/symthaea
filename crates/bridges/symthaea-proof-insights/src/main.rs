@@ -159,7 +159,10 @@ struct TemporalReplayManifest {
     repository_commit: String,
     timeline_path: String,
     timeline_sha256: String,
+    lean_toolchain_path: String,
     lean_toolchain: String,
+    mathlib_manifest_path: String,
+    mathlib_manifest_sha256: String,
     mathlib_revision: String,
     events: Vec<TemporalTimelineEvent>,
     artifacts: Vec<TemporalEvidenceArtifact>,
@@ -566,6 +569,40 @@ fn verify_temporal_manifest_file(repository_root: &Path, manifest_path: &Path) -
         );
     }
 
+    let toolchain_bytes =
+        git_show_file(&root, &manifest.repository_commit, &manifest.lean_toolchain_path)?;
+    let toolchain_at_commit = std::str::from_utf8(&toolchain_bytes)
+        .context("pinned Lean toolchain file is not UTF-8")?
+        .trim();
+    if toolchain_at_commit != manifest.lean_toolchain {
+        bail!(
+            "Lean toolchain file {} declares {}, but manifest pins {}",
+            manifest.lean_toolchain_path,
+            toolchain_at_commit,
+            manifest.lean_toolchain
+        );
+    }
+
+    let mathlib_manifest =
+        git_show_file(&root, &manifest.repository_commit, &manifest.mathlib_manifest_path)?;
+    if format!("{:x}", Sha256::digest(&mathlib_manifest)) != manifest.mathlib_manifest_sha256 {
+        bail!(
+            "Mathlib manifest digest does not match {} at the pinned repository commit",
+            manifest.mathlib_manifest_path
+        );
+    }
+    let parsed_mathlib_manifest: serde_json::Value =
+        serde_json::from_slice(&mathlib_manifest).context("parse pinned Mathlib dependency manifest")?;
+    let recorded_mathlib_revision = find_mathlib_revision(&parsed_mathlib_manifest)
+        .context("pinned dependency manifest contains no identifiable Mathlib package revision")?;
+    if !recorded_mathlib_revision.eq_ignore_ascii_case(&manifest.mathlib_revision) {
+        bail!(
+            "Mathlib revision mismatch: manifest pins {}, dependency file declares {}",
+            manifest.mathlib_revision,
+            recorded_mathlib_revision
+        );
+    }
+
     let mut previous_completion_commit: Option<&str> = None;
     for event in &manifest.events {
         if !git_is_ancestor(
@@ -700,6 +737,17 @@ fn validate_temporal_manifest(manifest: &TemporalReplayManifest) -> Result<()> {
         bail!("timeline path must be canonical and repository-relative");
     }
     validate_sha256_hex(&manifest.timeline_sha256).context("invalid timeline SHA-256")?;
+    for (label, path) in [
+        ("Lean toolchain", manifest.lean_toolchain_path.as_str()),
+        ("Mathlib manifest", manifest.mathlib_manifest_path.as_str()),
+    ] {
+        let normalized = normalize_root_relative_path(path)?;
+        if path.is_empty() || normalized != path {
+            bail!("{label} path must be canonical and repository-relative");
+        }
+    }
+    validate_sha256_hex(&manifest.mathlib_manifest_sha256)
+        .context("invalid Mathlib manifest SHA-256")?;
     if manifest.lean_toolchain.trim().is_empty()
         || manifest.lean_toolchain.eq_ignore_ascii_case("latest")
         || manifest.mathlib_revision.trim().is_empty()
@@ -977,6 +1025,32 @@ fn validate_temporal_manifest(manifest: &TemporalReplayManifest) -> Result<()> {
     }
 
     Ok(())
+}
+
+fn find_mathlib_revision(value: &serde_json::Value) -> Option<&str> {
+    match value {
+        serde_json::Value::Object(object) => {
+            let is_mathlib_package = object
+                .get("name")
+                .and_then(serde_json::Value::as_str)
+                .is_some_and(|name| name.eq_ignore_ascii_case("mathlib"))
+                || object
+                    .get("url")
+                    .and_then(serde_json::Value::as_str)
+                    .is_some_and(|url| url.to_ascii_lowercase().contains("mathlib4"));
+            if is_mathlib_package {
+                if let Some(revision) = ["rev", "revision", "inputRev", "input_rev"]
+                    .iter()
+                    .find_map(|key| object.get(*key).and_then(serde_json::Value::as_str))
+                {
+                    return Some(revision);
+                }
+            }
+            object.values().find_map(find_mathlib_revision)
+        }
+        serde_json::Value::Array(values) => values.iter().find_map(find_mathlib_revision),
+        _ => None,
+    }
 }
 
 fn normalize_repository_url(url: &str) -> String {
@@ -1539,7 +1613,10 @@ mod tests {
             repository_commit: "5".repeat(40),
             timeline_path: "proof_timeline.csv".to_string(),
             timeline_sha256: "9".repeat(64),
+            lean_toolchain_path: "lean-toolchain".to_string(),
             lean_toolchain: "leanprover/lean4:v4.34.1".to_string(),
+            mathlib_manifest_path: "lake-manifest.json".to_string(),
+            mathlib_manifest_sha256: "8".repeat(64),
             mathlib_revision: "6".repeat(40),
             events: vec![
                 TemporalTimelineEvent {
