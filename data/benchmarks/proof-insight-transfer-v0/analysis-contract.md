@@ -9,7 +9,7 @@ The preregistered protocol must be executable before held-out outcomes are exami
 Run from the staged `symthaea-proof-insights` crate directory after the source indexer and independent semantic/proof auditors are available:
 
 ```bash
-cargo run --locked --bin analyze_pitb_results -- --config /path/to/frozen-run-config.json --validation-results /path/to/validation-target-outcomes.jsonl --results /path/to/test-target-outcomes.jsonl --protocol /path/to/evaluation-protocol.md --splits /path/to/splits.json --baseline-receipt /path/to/baseline-selection-receipt.json --out /path/to/analysis-report.json
+cargo run --locked --bin analyze_pitb_results -- --mode analyze --config /path/to/frozen-run-config.json --validation-results /path/to/validation-target-outcomes.jsonl --results /path/to/test-target-outcomes.jsonl --power-report /path/to/power-report.json --protocol /path/to/evaluation-protocol.md --splits /path/to/splits.json --baseline-receipt /path/to/baseline-selection-receipt.json --out /path/to/analysis-report.json
 ```
 
 Inputs are fail-closed. `--protocol` is hashed as raw bytes and must match the digest in the frozen run config. The exact `splits.json` bytes and the split artifact's `split_plan.partition_digest_sha256` must match too. The baseline-selection receipt is likewise content-hashed. Keep all five input artifacts, the output report, and the per-target receipt bundle together.
@@ -23,6 +23,7 @@ The run config uses `schema_version = "pitb.run-config.v0"` and contains:
 - `split_manifest_sha256`: SHA-256 of the exact frozen `splits.json` file.
 - `partition_digest_sha256`: `e7ac417556cbd47cee1ddd51b98f9684fadfc8cd097587ae3beacc4dfb59f970` for the current frozen partition.
 - `baseline_selection_receipt_sha256`: SHA-256 of the validation-only selection receipt.
+- `power_report_sha256`: SHA-256 of the full validation-only power report; required before analyze mode will read held-out test outcomes.
 - `known_exposed_family_ids`: must include `089`; every family in this list is barred from the confirmatory eligible denominator.
 - `bootstrap_replicates`: exactly `10000`, per the protocol.
 - `bootstrap_seed`: fixed integer seed, frozen before held-out outcomes are inspected.
@@ -71,6 +72,25 @@ The tool recomputes the validation-only baseline and eligible family-size distri
 The 95% Monte Carlo lower confidence bound for the +20pp/ICC 0.20 gate-pass probability must be at least 80%, and the 95% Monte Carlo upper confidence bound for the worst zero-effect false-claim rate must be no greater than 5%. If there are fewer than 20 eligible validation families or the design fails these gates, expand the separately sourced eligible set or report an underpowered pilot. A scenario implying a success rate above 100% is reported as infeasible rather than clipped.
 
 The model uses a beta-binomial family random effect for baseline success. The treatment arm shares family difficulty and is calibrated to its scenario's marginal success rate; arm outcomes are conditionally independent within each target. Thus the simulator does not assume additional positive within-target pairing correlation. It reports that modelling assumption, the family-size distribution, the validation-results digest, the seed, the outer study count, the bootstrap repetitions, gate-pass fractions, Monte Carlo standard errors, and Wilson 95% confidence bounds for each simulated power/false-claim probability. These simulations are design planning, not evidence of measured transfer utility.
+
+### Freeze the report into the final run config
+
+Power planning is a two-stage provenance operation, not a manually checked box.
+
+1. Run `--mode power` with the base `pitb.run-config.v0` that omits `power_report_sha256`. The power report records `run_design_sha256`, a canonical digest computed after clearing that optional field, so there is no circular hash dependency.
+2. Check the power command's independent decision line and inspect its JSON report. It must say `gate=pass`; a no-go or infeasible +20pp scenario must block the confirmatory run.
+3. Hash the resulting report and add that digest to the **final frozen config before any test outcome is generated or opened**:
+
+```bash
+power_digest="$(sha256sum /path/to/power-report.json | cut -d ' ' -f 1)"
+jq --arg digest "$power_digest" '. + {power_report_sha256: $digest}' \
+  /path/to/base-run-config.json > /path/to/frozen-run-config.json
+```
+
+4. Confirm `power_report_sha256` equals the raw report SHA-256, then run analyze mode with that config and the same `--power-report`. Before scoring, the analyzer recomputes every power scenario deterministically from the raw validation outcomes, family sizes, seed, and simulation settings, verifies the report's source/run-design/receipt hashes, and rejects a report whose numerical results cannot be reproduced or whose confidence-bound gates fail.
+
+Changing the analyzer source, validation outcomes, family-size distribution, seed, budgets, protocol, or split invalidates the relevant hashes. Regenerate the design receipt and power report from validation data; do not amend them after looking at the held-out test results. The power simulation is run a second time before test scoring to make the receipt reproducible rather than trusting a user-edited `power_gate_passed: true` field.
+
 
 ## Target outcome JSONL
 
