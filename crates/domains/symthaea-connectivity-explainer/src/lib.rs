@@ -816,6 +816,24 @@ mod tests {
                         "baseline":{"task_count":3,"completed_tasks":1},
                         "candidate_fair_share":{"task_count":3,"completed_tasks":3}
                     }
+                ],
+                "task_results": [
+                    [
+                        {"task_id":"online-essential-small-b","mode":"online","priority":"essential","arm":"baseline","arrival_window":0,"deadline_window":0,"expires_after_window":4,"service_bytes":3000,"delivered_bytes":0,"outcome":"failed","completion_window":null,"terminal_window":0,"failure_reason":"deadline"},
+                        {"task_id":"online-interactive-small-c","mode":"online","priority":"interactive","arm":"baseline","arrival_window":0,"deadline_window":1,"expires_after_window":4,"service_bytes":4000,"delivered_bytes":3000,"outcome":"failed","completion_window":null,"terminal_window":1,"failure_reason":"deadline"},
+                        {"task_id":"online-bulk-large-a","mode":"online","priority":"bulk","arm":"baseline","arrival_window":0,"deadline_window":4,"expires_after_window":4,"service_bytes":20000,"delivered_bytes":20000,"outcome":"succeeded","completion_window":2,"terminal_window":2,"failure_reason":null},
+                        {"task_id":"partition-essential-small-b","mode":"wan_partition","priority":"essential","arm":"baseline","arrival_window":0,"deadline_window":0,"expires_after_window":4,"service_bytes":3000,"delivered_bytes":0,"outcome":"failed","completion_window":null,"terminal_window":0,"failure_reason":"deadline"},
+                        {"task_id":"partition-interactive-small-c","mode":"wan_partition","priority":"interactive","arm":"baseline","arrival_window":0,"deadline_window":1,"expires_after_window":4,"service_bytes":4000,"delivered_bytes":3000,"outcome":"failed","completion_window":null,"terminal_window":1,"failure_reason":"deadline"},
+                        {"task_id":"partition-bulk-large-a","mode":"wan_partition","priority":"bulk","arm":"baseline","arrival_window":0,"deadline_window":4,"expires_after_window":4,"service_bytes":20000,"delivered_bytes":20000,"outcome":"succeeded","completion_window":2,"terminal_window":2,"failure_reason":null}
+                    ],
+                    [
+                        {"task_id":"online-essential-small-b","mode":"online","priority":"essential","arm":"candidate","arrival_window":0,"deadline_window":0,"expires_after_window":4,"service_bytes":3000,"delivered_bytes":3000,"outcome":"succeeded","completion_window":0,"terminal_window":0,"failure_reason":null},
+                        {"task_id":"online-interactive-small-c","mode":"online","priority":"interactive","arm":"candidate","arrival_window":0,"deadline_window":1,"expires_after_window":4,"service_bytes":4000,"delivered_bytes":4000,"outcome":"succeeded","completion_window":1,"terminal_window":1,"failure_reason":null},
+                        {"task_id":"online-bulk-large-a","mode":"online","priority":"bulk","arm":"candidate","arrival_window":0,"deadline_window":4,"expires_after_window":4,"service_bytes":20000,"delivered_bytes":20000,"outcome":"succeeded","completion_window":2,"terminal_window":2,"failure_reason":null},
+                        {"task_id":"partition-essential-small-b","mode":"wan_partition","priority":"essential","arm":"candidate","arrival_window":0,"deadline_window":0,"expires_after_window":4,"service_bytes":3000,"delivered_bytes":3000,"outcome":"succeeded","completion_window":0,"terminal_window":0,"failure_reason":null},
+                        {"task_id":"partition-interactive-small-c","mode":"wan_partition","priority":"interactive","arm":"candidate","arrival_window":0,"deadline_window":1,"expires_after_window":4,"service_bytes":4000,"delivered_bytes":4000,"outcome":"succeeded","completion_window":1,"terminal_window":1,"failure_reason":null},
+                        {"task_id":"partition-bulk-large-a","mode":"wan_partition","priority":"bulk","arm":"candidate","arrival_window":0,"deadline_window":4,"expires_after_window":4,"service_bytes":20000,"delivered_bytes":20000,"outcome":"succeeded","completion_window":2,"terminal_window":2,"failure_reason":null}
+                    ]
                 ]
             }
         })
