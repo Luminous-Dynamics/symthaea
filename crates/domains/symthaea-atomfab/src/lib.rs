@@ -9,6 +9,7 @@
 
 pub mod benchmark_registry;
 pub mod campaign;
+pub mod campaign_statistics;
 pub mod contract;
 pub mod decision_frontier;
 pub mod evidence_router;
