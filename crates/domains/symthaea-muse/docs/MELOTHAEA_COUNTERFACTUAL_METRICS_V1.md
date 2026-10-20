@@ -24,12 +24,12 @@ The benchmark covers:
 - Styles: Mazurka and Toccata.
 - Seeds: `[0, 1, 7, 13, 29, 42, 73, 101]`.
 - Reproducibility: exact event signature replay.
-- Evaluator negative control: repeat the exact same `ClassicalRubato` arm; the report fails unless its replay is bit-identical, every event is matched, and measured onset change is zero.
+- Evaluator negative control: repeat the exact same `ClassicalRubato` arm; the report fails unless its replay is bit-identical, every event is matched, and measured onset change is zero. Unit tests also verify that the ordered aligner detects a 1-second systematic timing shift instead of dropping those notes as unmatched.
 - Provenance: optional source revision from `MUSE_SOURCE_REVISION` or `GITHUB_SHA`, plus the `rustc --version` string when available; missing data is reported as null rather than guessed.
 - Integrity: nonempty output and finite, in-range event fields.
 - Counterfactual: actual style-selected dialect versus `ClassicalRubato`, same score digest.
-- Matching: greedy nearest-onset, one-to-one matching by voice identity and exact frequency, within 250 ms.
-- Pair counts: matched events and unmatched events in each arm are reported rather than hidden.
+- Matching: order-preserving longest-common-subsequence alignment by voice identity and exact frequency. No fixed time window is used, so large cumulative rubato shifts remain measurable; unmatched events are reported.
+- Pair counts: matched and unmatched events in each arm are reported rather than hidden. Both arms must preserve at least 90% of events under ordered pitch/voice alignment; lower coverage fails the mechanics gate rather than permitting a sparse false-positive comparison.
 - Effect size: onset shift distribution (mean, median, p95), changed-onset fraction (a shift must exceed 0.1 ms), plus median duration, inter-onset interval statistics and event validity counts.
 
 Usage:
@@ -49,7 +49,7 @@ A mechanics pass means:
 2. nonempty and valid performed event streams in both arms;
 3. at least one matched onset differs from the baseline.
 
-It does **not** show that the timing shift is perceptually meaningful, historically authentic, stylistically recognizable, or preferred. The matching procedure is a transparent descriptor-based heuristic, not formal note identity; unmatched events remain visible, and a 250 ms match window can leave large shifts unmatched. The report is descriptive and should not be used as a reward model.
+It does **not** show that the timing shift is perceptually meaningful, historically authentic, stylistically recognizable, or preferred. The matching procedure aligns note pitch sequences while preserving order; repeated pitches can remain ambiguous, so it is a descriptive heuristic rather than formal note identity. The 90% match-coverage threshold is a mechanical guard, not an artistic-quality score. The report must not be used as a reward model.
 
 ## Next gates
 
