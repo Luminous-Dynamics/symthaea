@@ -802,31 +802,24 @@ pub fn validate_cookware_lifetime(
 
             if event.kind == CookwareLifecycleEventKind::StageAssessment {
                 let required_prior_event = match event.stage {
-                    CookwareLifecycleStage::PostMaintenance => {
-                        Some(CookwareLifecycleEventKind::MaintenanceCompleted)
-                    }
-                    CookwareLifecycleStage::PostRepair => {
-                        Some(CookwareLifecycleEventKind::RepairCompleted)
-                    }
+                    CookwareLifecycleStage::PostMaintenance => Some((
+                        CookwareLifecycleEventKind::MaintenanceCompleted,
+                        CookwareLifetimeViolationCode::MissingMaintenanceEvent,
+                        "post-maintenance assessment requires an earlier maintenance event",
+                    )),
+                    CookwareLifecycleStage::PostRepair => Some((
+                        CookwareLifecycleEventKind::RepairCompleted,
+                        CookwareLifetimeViolationCode::MissingRepairEvent,
+                        "post-repair assessment requires an earlier repair event",
+                    )),
                     _ => None,
                 };
-                if let Some(required_kind) = required_prior_event {
+                if let Some((required_kind, code, detail)) = required_prior_event {
                     let has_prior_event = timeline.iter().take(index).any(|prior| {
                         prior.kind == required_kind
                             && prior.sequence_index < event.sequence_index
                     });
                     if !has_prior_event {
-                        let (code, detail) = match required_kind {
-                            CookwareLifecycleEventKind::MaintenanceCompleted => (
-                                CookwareLifetimeViolationCode::MissingMaintenanceEvent,
-                                "post-maintenance assessment requires an earlier maintenance event",
-                            ),
-                            CookwareLifecycleEventKind::RepairCompleted => (
-                                CookwareLifetimeViolationCode::MissingRepairEvent,
-                                "post-repair assessment requires an earlier repair event",
-                            ),
-                            _ => unreachable!("only maintenance/repair prerequisite kinds are selected"),
-                        };
                         add_violation(
                             &mut violations,
                             code,
@@ -1238,6 +1231,43 @@ mod tests {
         let report = validate_cookware_lifetime(&manifest);
         assert!(report.violations.iter().any(|violation| {
             violation.code == CookwareLifetimeViolationCode::RetiredUnitHasLaterEvents
+        }));
+    }
+
+    #[test]
+    fn post_maintenance_and_repair_assessments_require_interventions() {
+        let mut manifest = fixture();
+        let mut post_maintenance = assessment(
+            "candidate-post-maintenance",
+            "candidate-unit-1",
+            "candidate-pan",
+            3,
+            CookwareLifecycleStage::PostMaintenance,
+            CookwareLifecycleCondition::InService,
+            manifest.events[2].cumulative_cycles,
+            "unknown-maintenance-run",
+        );
+        post_maintenance.run_id = Some("unknown-maintenance-run".into());
+        let mut post_repair = assessment(
+            "candidate-post-repair",
+            "candidate-unit-1",
+            "candidate-pan",
+            4,
+            CookwareLifecycleStage::PostRepair,
+            CookwareLifecycleCondition::InService,
+            manifest.events[2].cumulative_cycles,
+            "unknown-repair-run",
+        );
+        post_repair.run_id = Some("unknown-repair-run".into());
+        manifest.events.push(post_maintenance);
+        manifest.events.push(post_repair);
+
+        let report = validate_cookware_lifetime(&manifest);
+        assert!(report.violations.iter().any(|violation| {
+            violation.code == CookwareLifetimeViolationCode::MissingMaintenanceEvent
+        }));
+        assert!(report.violations.iter().any(|violation| {
+            violation.code == CookwareLifetimeViolationCode::MissingRepairEvent
         }));
     }
 
