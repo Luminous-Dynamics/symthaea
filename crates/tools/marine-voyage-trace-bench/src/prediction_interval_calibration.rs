@@ -920,6 +920,7 @@ pub fn evaluate_calibration(
         }
     }
 
+    let mut missing_group_slices: BTreeSet<SliceKey> = BTreeSet::new();
     for group_id in &eval_groups {
         if !seen_evaluation_groups.contains(group_id) {
             issues.push(CalibrationIssue::MissingEvaluationGroup {
@@ -943,6 +944,7 @@ pub fn evaluate_calibration(
                     unit_id: key.2.clone(),
                     nominal_coverage_bp: key.3,
                 });
+                missing_group_slices.insert(key.clone());
                 missing_required_coverage = true;
             }
         }
@@ -952,8 +954,10 @@ pub fn evaluate_calibration(
     let mut threshold_failure = false;
     for (key, requirement) in &requirements {
         let accumulator = accumulators.get(key).copied().unwrap_or_default();
-        let enough = accumulator.count >= requirement.minimum_observations;
-        if !enough {
+        let enough_observations = accumulator.count >= requirement.minimum_observations;
+        let complete_group_coverage = !missing_group_slices.contains(key);
+        let enough = enough_observations && complete_group_coverage;
+        if !enough_observations {
             issues.push(CalibrationIssue::InsufficientCoverage {
                 operating_case_id: key.0.clone(),
                 observable_id: key.1.clone(),
@@ -1211,6 +1215,22 @@ mod tests {
         assert_eq!(report.disposition, CalibrationDisposition::InvalidObservations);
         assert_eq!(report.duplicated_observation_record_count, 2);
         assert_eq!(report.slices[0].observation_count, 1);
+    }
+
+    #[test]
+    fn slice_gate_is_indeterminate_when_declared_groups_are_missing_even_if_minimum_count_is_met() {
+        let mut p = profile();
+        p.required_slices[0].minimum_observations = 1;
+        p.profile_manifest_sha256 = canonical_calibration_profile_sha256(&p);
+        let only_one_group = vec![
+            observation("obs-1", "eval-A", 8.0, 12.0, 10.0),
+        ];
+        let report = evaluate_calibration(&p, &only_one_group);
+        assert_eq!(report.disposition, CalibrationDisposition::IncompleteCoverage);
+        assert_eq!(report.slices[0].observation_count, 1);
+        assert_eq!(report.slices[0].coverage_gate_met, None);
+        assert_eq!(report.slices[0].interval_score_gate_met, None);
+        assert_eq!(report.slices[0].thresholds_met, None);
     }
 
     #[test]
