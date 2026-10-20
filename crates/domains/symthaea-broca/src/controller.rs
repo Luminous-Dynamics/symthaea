@@ -23,6 +23,11 @@ use symthaea_core::hdc::{
     ContinuousHV, HDC_DIMENSION, HdcLtcUnifiedNetwork, UnifiedConfig, UnifiedNetworkConfig,
 };
 
+use crate::semantic_embeddings::{
+    EmbeddingCoverageStats, SemanticEmbeddingConfig, SemanticQuarkBasis,
+};
+use crate::tokenizer::BpeTokenizer;
+
 /// GPU-resident pre-normalized embedding matrix for accelerated logit computation.
 /// Converts 4,096 × 16,384 individual cosine similarities into a single matrix-vector
 /// multiply on GPU (or optimized CPU tensor ops via candle).
@@ -384,6 +389,29 @@ impl LanguageController {
             #[cfg(feature = "highway-projection")]
             highway,
         }
+    }
+
+    /// Create a controller whose token embeddings combine lexical-semantic
+    /// composition with a genesis-seeded fallback.
+    ///
+    /// This is an opt-in initialization experiment; checkpoint loading should
+    /// continue restoring checkpoint embeddings verbatim. The default constructor remains genesis-seeded for compatibility.
+    pub fn new_with_semantic_embeddings(
+        genesis: &GenesisSeed,
+        config: &LanguageControllerConfig,
+        tokenizer: &BpeTokenizer,
+        embedding_config: &SemanticEmbeddingConfig,
+    ) -> (Self, EmbeddingCoverageStats) {
+        let mut effective_config = config.clone();
+        effective_config.vocab_size = tokenizer.vocab_size();
+
+        let basis = SemanticQuarkBasis::new(genesis);
+        let (embeddings, stats) =
+            basis.build_embeddings(tokenizer, genesis, embedding_config);
+
+        let mut controller = Self::new(genesis, &effective_config);
+        controller.restore_token_embeddings(embeddings);
+        (controller, stats)
     }
 
     /// Build GPU/candle embedding cache from token embeddings.
