@@ -407,7 +407,10 @@ mod tests {
             "../schemas/supported-cu-alumina-reference-campaign-v1.schema.json"
         ))
         .expect("first reference campaign schema must parse");
-        assert_eq!(schema["$schema"], "https://json-schema.org/draft/2020-12/schema");
+        assert_eq!(
+            schema["$schema"],
+            "https://json-schema.org/draft/2020-12/schema"
+        );
         assert_eq!(plan["schema_version"], 1);
         assert_eq!(plan["status"], "proposed_not_executed");
         assert_eq!(
