@@ -258,7 +258,10 @@ fn master_wav(path: &Path, mastering: &crate::auto_master::MasteringConfig) -> O
                 .collect::<Result<Vec<_>, _>>()
                 .ok()?
         }
-        hound::SampleFormat::Float => reader.samples::<f32>().collect::<Result<Vec<_>, _>>().ok()?,
+        hound::SampleFormat::Float => reader
+            .samples::<f32>()
+            .collect::<Result<Vec<_>, _>>()
+            .ok()?,
     };
     let channels = spec_in.channels as usize;
     if samples.is_empty()
@@ -281,11 +284,7 @@ fn master_wav(path: &Path, mastering: &crate::auto_master::MasteringConfig) -> O
             .map(|c| [c[0], c[1]])
             .collect(),
     };
-    crate::auto_master::auto_master(
-        &mut frames,
-        spec_in.sample_rate,
-        mastering,
-    );
+    crate::auto_master::auto_master(&mut frames, spec_in.sample_rate, mastering);
 
     // Re-encode as stereo regardless of input channel count: `frames` is always
     // stereo after the conversion above, so writing `spec_in.channels` would
@@ -403,11 +402,8 @@ mod tests {
             w.write_sample((s * 32767.0) as i16).unwrap();
         }
         w.finalize().unwrap();
-        let bytes = master_wav(
-            &quiet,
-            &crate::auto_master::MasteringConfig::default(),
-        )
-        .expect("real audio masters");
+        let bytes = master_wav(&quiet, &crate::auto_master::MasteringConfig::default())
+            .expect("real audio masters");
         let mut r = hound::WavReader::new(std::io::Cursor::new(bytes)).unwrap();
         let out_spec = r.spec();
         // `master_wav` always emits stereo: it upmixes mono before mastering,
@@ -452,10 +448,8 @@ mod tests {
     }
     #[test]
     fn mastering_rejects_non_finite_float_samples() {
-        let path = std::env::temp_dir().join(format!(
-            "muse_nonfinite_input_{}.wav",
-            std::process::id()
-        ));
+        let path =
+            std::env::temp_dir().join(format!("muse_nonfinite_input_{}.wav", std::process::id()));
         let spec = hound::WavSpec {
             channels: 2,
             sample_rate: 48000,
@@ -478,14 +472,10 @@ mod tests {
 
     #[test]
     fn mastering_rejects_truncated_pcm_instead_of_dropping_samples() {
-        let valid_path = std::env::temp_dir().join(format!(
-            "muse_truncated_valid_{}.wav",
-            std::process::id()
-        ));
-        let truncated_path = std::env::temp_dir().join(format!(
-            "muse_truncated_input_{}.wav",
-            std::process::id()
-        ));
+        let valid_path =
+            std::env::temp_dir().join(format!("muse_truncated_valid_{}.wav", std::process::id()));
+        let truncated_path =
+            std::env::temp_dir().join(format!("muse_truncated_input_{}.wav", std::process::id()));
         let spec = hound::WavSpec {
             channels: 2,
             sample_rate: 48000,
@@ -515,5 +505,4 @@ mod tests {
         std::fs::remove_file(&valid_path).ok();
         std::fs::remove_file(&truncated_path).ok();
     }
-
 }
