@@ -218,6 +218,7 @@ fn append_metric_values(
     let values = [
         ("coverage", report.coverage),
         ("sensitivity", report.sensitivity),
+        ("end_to_end_hazard_sensitivity", report.end_to_end_hazard_sensitivity),
         ("specificity", report.specificity),
         ("precision", report.precision),
         ("negative_predictive_value", report.negative_predictive_value),
