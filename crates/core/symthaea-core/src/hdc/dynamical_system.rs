@@ -1407,9 +1407,12 @@ mod tests {
         let initial = [1.0, 0.0];
         let t_end = 10.0;
         let integrator = Rk45Integrator::new(1.0e-12);
-        let result = try_simulate(&osc, &integrator, &initial, 0.0, t_end, 0.01)
+        let result = try_simulate(&osc, &integrator, &initial, 0.0, t_end, 0.5)
             .expect("valid adaptive simulation should complete");
 
+        // The requested interval is intentionally coarse so the tolerance forces
+        // smaller accepted substeps; the clock must advance by those accepted steps.
+        assert!(result.steps > 20);
         assert_eq!(result.times.last().copied(), Some(t_end));
         let expected_x = t_end.cos();
         let expected_v = -t_end.sin();
