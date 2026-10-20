@@ -1200,7 +1200,7 @@ mod workcell_fault_corpus_tests {
         let cases = corpus["cases"]
             .as_array()
             .expect("corpus cases must be an array");
-        assert!(cases.len() >= 14, "v1 requires the frozen fault/control cases");
+        assert!(cases.len() >= 15, "v1 requires the frozen fault/control cases");
 
         let mut ids = BTreeSet::new();
         let mut accepted_controls = 0usize;
@@ -1261,6 +1261,7 @@ mod workcell_fault_corpus_tests {
             "non-finite-observation",
             "sensor-drift-outside-calibration",
             "actuator-saturation",
+            "invalid-planner-gain",
             "tool-obstruction",
             "actuator-count-mismatch",
             "bridge-timeout",
