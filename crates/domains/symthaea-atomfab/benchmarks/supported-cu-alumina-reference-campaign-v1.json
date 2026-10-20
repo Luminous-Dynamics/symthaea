@@ -116,7 +116,9 @@
     "MACE-MP medium checkpoint (exact revision and terms to pin)",
     "random search using the same candidate generator and reference budget",
     "local-search baseline using the same start structures and stopping budget",
-    "same potential and search with Symthaea acquisition disabled"
+    "same potential and search with Symthaea acquisition disabled",
+    "MatterSim v1.0.0-5M checkpoint (exact revision and use terms to pin)",
+    "MACE-UniAlCu fine-tuned/domain-specific checkpoint if its exact training split, checkpoint provenance and use terms can be reconstructed"
   ],
   "strata": [
     {
