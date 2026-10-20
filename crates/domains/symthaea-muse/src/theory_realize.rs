@@ -79,6 +79,10 @@ pub enum PerformanceDialect {
     /// tighter timing variation (0.45x). A calibration hypothesis, not a
     /// historical performance-practice claim.
     MarchLocked,
+    /// Lullaby prototype: reduce timing scatter and climax/cadence gestures
+    /// for the sparse cradle accompaniment. Calibration prior, not a universal
+    /// claim about lullaby performance practice.
+    LullabySway,
     /// Blues/jazz: laid-back time. Jitter up (1.3x), phrase-final rubato
     /// and the expressive blend both kept — a jazz ballad leans harder
     /// into time than a classical player, never less.
@@ -95,6 +99,7 @@ impl PerformanceDialect {
             PerformanceDialect::MazurkaLilt => 0.9,
             PerformanceDialect::ToccataMotor => 0.15,
             PerformanceDialect::MarchLocked => 0.12,
+            PerformanceDialect::LullabySway => 0.65,
             PerformanceDialect::DanceLocked => 0.25,
             PerformanceDialect::ProcessExact => 0.1,
         }
@@ -109,6 +114,7 @@ impl PerformanceDialect {
             PerformanceDialect::MazurkaLilt => 0.9,
             PerformanceDialect::ToccataMotor => 0.15,
             PerformanceDialect::MarchLocked => 0.12,
+            PerformanceDialect::LullabySway => 0.35,
             PerformanceDialect::DanceLocked => 0.25,
             PerformanceDialect::ProcessExact => 0.1,
         }
@@ -121,6 +127,7 @@ impl PerformanceDialect {
             PerformanceDialect::MazurkaLilt => 0.8,
             PerformanceDialect::ToccataMotor => 0.2,
             PerformanceDialect::MarchLocked => 0.18,
+            PerformanceDialect::LullabySway => 0.6,
             PerformanceDialect::FolkLift => 0.6,
             PerformanceDialect::DanceLocked => 0.25,
             PerformanceDialect::ProcessExact => 0.1,
@@ -134,6 +141,7 @@ impl PerformanceDialect {
             PerformanceDialect::MazurkaLilt => 1.15,
             PerformanceDialect::ToccataMotor => 0.45,
             PerformanceDialect::MarchLocked => 0.45,
+            PerformanceDialect::LullabySway => 0.55,
             PerformanceDialect::DanceLocked => 0.6,
             PerformanceDialect::ProcessExact => 0.4,
             PerformanceDialect::FolkLift => 1.2,
@@ -152,6 +160,7 @@ impl PerformanceDialect {
             PerformanceDialect::MazurkaLilt => 0.9,
             PerformanceDialect::ToccataMotor => 0.35,
             PerformanceDialect::MarchLocked => 0.45,
+            PerformanceDialect::LullabySway => 0.5,
             PerformanceDialect::DanceLocked => 0.4,
             PerformanceDialect::ProcessExact => 0.0,
         }
@@ -172,12 +181,13 @@ impl PerformanceDialect {
 ///    style-specific dialects (before any generic groove-family matching)
 /// 3. `MarchPulse` → [`PerformanceDialect::MarchLocked`]
 /// 4. `FolkPulse` → [`PerformanceDialect::FolkLift`]
-/// 5. a rhythm-cell accompaniment (Habanera/Montuno/BossaComp/CompasGait/
+/// 5. `LullabyCradle` → [`PerformanceDialect::LullabySway`]
+/// 6. a rhythm-cell accompaniment (Habanera/Montuno/BossaComp/CompasGait/
 ///    Shuffle), non-straight swing, or a full backbeat kit → groove: with a
 ///    jazz marker (Shuffle, swing ≠ 0.5, or `seventh_chords`) →
 ///    [`PerformanceDialect::JazzLaidBack`], else [`PerformanceDialect::DanceLocked`]
-/// 6. `roll_ornaments` or `drone` → [`PerformanceDialect::FolkLift`]
-/// 7. everything else → [`PerformanceDialect::ClassicalRubato`] (the identity)
+/// 7. `roll_ornaments` or `drone` → [`PerformanceDialect::FolkLift`]
+/// 8. everything else → [`PerformanceDialect::ClassicalRubato`] (the identity)
 ///
 /// Remaining presets use ClassicalRubato as a neutral identity until a separate
 /// rhythmic/performance contract is justified; this baseline is not an assertion
@@ -200,6 +210,9 @@ pub fn dialect_for_spec(spec: &symthaea_music_theory::CompositionSpec) -> Perfor
     }
     if spec.accompaniment_pool.contains(&A::FolkPulse) {
         return PerformanceDialect::FolkLift;
+    }
+    if spec.accompaniment_pool.contains(&A::LullabyCradle) {
+        return PerformanceDialect::LullabySway;
     }
     let has_shuffle = spec.accompaniment_pool.contains(&A::Shuffle);
     let has_groove_cell = has_shuffle
@@ -1829,7 +1842,7 @@ mod tests {
             (Style::Playful, D::DanceLocked), // full backbeat kit
             (Style::Nocturne, D::ClassicalRubato),
             (Style::March, D::MarchLocked),
-            (Style::Lullaby, D::ClassicalRubato),
+            (Style::Lullaby, D::LullabySway),
             (Style::ModalFolk, D::FolkLift), // shares the picked-pulse contract
             (Style::Fugue, D::ClassicalRubato),
             (Style::Passacaglia, D::ClassicalRubato),
@@ -1913,6 +1926,7 @@ mod tests {
         for (style, expected_dialect) in [
             (Style::Folk, D::FolkLift),
             (Style::ModalFolk, D::FolkLift),
+            (Style::Lullaby, D::LullabySway),
             (Style::March, D::MarchLocked),
             (Style::Mazurka, D::MazurkaLilt),
             (Style::Toccata, D::ToccataMotor),
@@ -1995,6 +2009,7 @@ mod tests {
         use PerformanceDialect as D;
         let classical = D::ClassicalRubato;
         let folk = D::FolkLift;
+        let lullaby = D::LullabySway;
         let march = D::MarchLocked;
         let mazurka = D::MazurkaLilt;
         let toccata = D::ToccataMotor;
@@ -2005,6 +2020,13 @@ mod tests {
         assert_eq!(folk.jitter_scale(), 1.2);
         assert_eq!(folk.expressive_blend_scale(), 1.0);
         assert!(folk.jitter_scale() > classical.jitter_scale());
+
+        assert_eq!(lullaby.breath_scale(), 0.65);
+        assert_eq!(lullaby.climax_scale(), 0.35);
+        assert_eq!(lullaby.cadence_scale(), 0.6);
+        assert_eq!(lullaby.jitter_scale(), 0.55);
+        assert_eq!(lullaby.expressive_blend_scale(), 0.5);
+        assert!(lullaby.jitter_scale() < classical.jitter_scale());
 
         assert_eq!(march.breath_scale(), 0.12);
         assert_eq!(march.climax_scale(), 0.12);
