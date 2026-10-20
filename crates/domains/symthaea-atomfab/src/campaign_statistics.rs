@@ -796,7 +796,7 @@ mod tests {
             summarize(&references(&baseline, &candidate), 20, 0.95, 2_000, 3).unwrap_err(),
             PairedAccelerationError::InvalidCampaign(CampaignError::MismatchedPolicies)
         );
-    } 
+    }
 
     #[test]
     fn target_reachability_retains_failed_runs_and_reports_paired_discordance() {
