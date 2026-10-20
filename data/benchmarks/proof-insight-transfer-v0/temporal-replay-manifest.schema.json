@@ -136,6 +136,7 @@
         "source_file_sha256",
         "source_commit",
         "available_at_position",
+        "target_position",
         "theorem_id"
       ],
       "properties": {
@@ -174,7 +175,10 @@
           "$ref": "#/$defs/gitSha"
         },
         "available_at_position": {
-          "type": "integer",
+          "type": [
+            "integer",
+            "null"
+          ],
           "minimum": 0
         },
         "theorem_id": {
@@ -182,8 +186,51 @@
             "string",
             "null"
           ]
+        },
+        "target_position": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "artifact_kind": {
+                "const": "proof_body"
+              }
+            },
+            "required": [
+              "artifact_kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "available_at_position": {
+                "type": "null"
+              },
+              "target_position": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "available_at_position": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "target_position": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
     }
   }
 }
