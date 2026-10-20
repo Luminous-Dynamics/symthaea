@@ -365,6 +365,7 @@ fn execute_analysis(args: &BTreeMap<String, String>) -> Result<()> {
     let config_bytes = read_arg(args, "--config")?;
     let results_bytes = read_arg(args, "--results")?;
     let validation_bytes = read_arg(args, "--validation-results")?;
+    let power_report_bytes = read_arg(args, "--power-report")?;
     let protocol_bytes = read_arg(args, "--protocol")?;
     let split_bytes = read_arg(args, "--splits")?;
     let receipt_bytes = read_arg(args, "--baseline-receipt")?;
@@ -372,6 +373,13 @@ fn execute_analysis(args: &BTreeMap<String, String>) -> Result<()> {
     let config: RunConfig =
         serde_json::from_slice(&config_bytes).context("parse frozen run config JSON")?;
     validate_config(&config, &protocol_bytes, &split_bytes, &receipt_bytes)?;
+    let expected_power_digest = config
+        .power_report_sha256
+        .as_deref()
+        .context("frozen run config lacks power_report_sha256; run validation-only power planning before test analysis")?;
+    if expected_power_digest != sha256_hex(&power_report_bytes) {
+        bail!("power report digest does not match the frozen run config");
+    }
 
     let split_manifest: SplitManifest =
         serde_json::from_slice(&split_bytes).context("parse frozen split manifest JSON")?;
@@ -393,6 +401,17 @@ fn execute_analysis(args: &BTreeMap<String, String>) -> Result<()> {
     }
     let validation_scores = compute_baseline_scores(&eligible_validation)?;
     validate_baseline_scores(&receipt, &validation_scores)?;
+    let power_report: PowerReport = serde_json::from_slice(&power_report_bytes)
+        .context("parse frozen power-planning report JSON")?;
+    validate_power_report(
+        &power_report,
+        &config,
+        &validation_bytes,
+        &split_manifest,
+        &receipt,
+        &eligible_validation,
+        &validation_scores,
+    )?;
     let selected_baseline = receipt.selected_arm.clone();
 
     let results_digest = sha256_hex(&results_bytes);
@@ -441,6 +460,7 @@ fn execute_analysis(args: &BTreeMap<String, String>) -> Result<()> {
         protocol_id: config.protocol_id,
         protocol_sha256: config.protocol_sha256,
         run_config_sha256: sha256_hex(&config_bytes),
+        power_report_sha256: sha256_hex(&power_report_bytes),
         validation_results_sha256: sha256_hex(&validation_bytes),
         results_jsonl_sha256: results_digest,
         analyzer_source_sha256: sha256_hex(include_bytes!("analyze_pitb_results.rs")),
@@ -639,10 +659,10 @@ fn execute_power(args: &BTreeMap<String, String>) -> Result<()> {
     .to_string();
 
     let report = PowerReport {
-        schema_version: "pitb.power-report.v0",
+        schema_version: "pitb.power-report.v0".to_string(),
         protocol_id: config.protocol_id,
         protocol_sha256: config.protocol_sha256,
-        run_config_sha256: sha256_hex(&config_bytes),
+        run_design_sha256: run_design_sha256(&config)?,
         validation_results_sha256: sha256_hex(&validation_bytes),
         baseline_selection_receipt_sha256: config.baseline_selection_receipt_sha256,
         split_manifest_sha256: config.split_manifest_sha256,
