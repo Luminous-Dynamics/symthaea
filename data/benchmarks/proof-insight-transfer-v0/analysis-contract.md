@@ -50,6 +50,28 @@ The receipt's exact bytes are hashed into the frozen config, and its validation-
 
 Arm I is the strong premise-retrieval comparator. Freeze its implementation/commit, corpus snapshot, index digest, candidate count, and remote/local model identifier before test outcomes. The LeanSearch v2 paper's retrieval and downstream metrics are context only: use its adapter only when it actually supports the exact target tasks; otherwise use the named, pinned same-corpus global-premise implementation and report that implementation separately. Do not state that the paper's scores have been reproduced unless they have been rerun under the published setup.
 
+## Validation-derived power planning
+
+Before the held-out run, invoke the Rust analyzer in `power` mode using validation data only:
+
+```bash
+cargo run --locked --bin analyze_pitb_results -- --mode power \
+  --config /path/to/frozen-run-config.json \
+  --validation-results /path/to/validation-target-outcomes.jsonl \
+  --protocol /path/to/evaluation-protocol.md \
+  --splits /path/to/splits.json \
+  --baseline-receipt /path/to/baseline-selection-receipt.json \
+  --power-simulations 2000 \
+  --power-bootstrap-replicates 1000 \
+  --out /path/to/power-report.json
+```
+
+The tool recomputes the validation-only baseline and eligible family-size distribution from the content-hashed raw validation JSONL; it does not accept a manually typed baseline rate or target-size vector. It simulates the full primary decision rule (observed effect at least +10pp, family-cluster bootstrap lower bound above zero, and at least 20 eligible independent families) across true effects of 0, +10, +15, and +20 percentage points and assumed baseline family ICCs of 0, 0.05, 0.10, and 0.20.
+
+The +20pp/ICC 0.20 scenario must estimate at least 80% gate-pass probability, and the worst zero-effect false-claim rate must be no greater than 5%. If there are fewer than 20 eligible validation families or the design fails these gates, expand the separately sourced eligible set or report an underpowered pilot. A scenario implying a success rate above 100% is reported as infeasible rather than clipped.
+
+The model uses a beta-binomial family random effect for baseline success. The treatment arm shares family difficulty and is calibrated to its scenario's marginal success rate; arm outcomes are conditionally independent within each target. Thus the simulator does not assume additional positive within-target pairing correlation. It reports that modelling assumption, the family-size distribution, the validation-results digest, the seed, the outer study count, the bootstrap repetitions, gate-pass fractions, and Monte Carlo standard errors. These simulations are design planning, not evidence of measured transfer utility.
+
 ## Target outcome JSONL
 
 Each non-empty line is one JSON object with `schema_version = "pitb.target-outcome.v0"`. Keep excluded and unknown targets as rows with `arms: []`, `eligibility` set to `excluded` or `unknown`, and a specific `exclusion_reason`; they remain in the reported accounting but are not scored. Every row must identify its family in the frozen split and declare `split = "test"`. Across all rows, **every family assigned to the frozen validation and test splits must appear at least once**; families with no eligible theorem must still have an explicit `excluded` or `unknown` row and a reason. The analyzer rejects omitted validation/test families, so neither the baseline-selection denominator nor the test denominator can silently shrink to only easy or available items.
