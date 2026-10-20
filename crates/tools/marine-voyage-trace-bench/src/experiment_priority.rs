@@ -984,6 +984,24 @@ mod tests {
     }
 
     #[test]
+    fn malformed_utility_cannot_outvote_a_cheaper_mandatory_trial() {
+        let (profile, audit) = audit(true);
+        let mut inflated_but_unverified = physical("unverified-value", Some(90), Some(1_000_000));
+        inflated_but_unverified.decision_value_evidence_sha256 = Some("not-a-digest".to_string());
+        let cheaper_unknown = physical("cheap-mandatory", Some(20), None);
+        let report = prioritize_next_experiment(
+            &profile,
+            &audit,
+            &[inflated_but_unverified, cheaper_unknown],
+            &value_contract(),
+            100,
+        );
+        assert_eq!(report.disposition, ExperimentPriorityDisposition::SelectedMandatoryEvidence);
+        assert_eq!(report.selected_proposal_id.as_deref(), Some("cheap-mandatory"));
+        assert_eq!(report.selected_decision_value_lower_bound_units, None);
+    }
+
+    #[test]
     fn mandatory_unknown_utility_is_still_selectable_as_required_evidence() {
         let (profile, audit) = audit(true);
         let report = prioritize_next_experiment(
