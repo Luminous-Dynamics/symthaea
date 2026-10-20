@@ -33,6 +33,7 @@ This directory defines a proposed benchmark format. **It currently contains no d
 10. No HDC/embedding field is authoritative for truth. Vector indexes, if added, are derived cache data and must be ablatable.
 11. The frozen split manifest was generated from the pinned catalog with an independent implementation of SHA-256 ranking. It has not yet been matched against a compiled Rust indexer output; run the crate and `--verify-splits` before relying on it as an engineering-verified artifact.
 12. Follow `evaluation-protocol.md`: select settings and the strongest baseline among A–E and I on validation families only, freeze the primary contrast and compute budget before the test run, preserve all exclusions, and report paired family-level outcomes with uncertainty. Do not make SOTA claims from this pre-screen split alone.
+13. Run the analyzer's `--mode power` using raw validation JSONL before held-out scoring. It recomputes baseline scores and eligible-family sizes, then simulates the primary gate over 0/+10/+15/+20pp effects and ICC 0/0.05/0.10/0.20. Require the registered +20pp/ICC 0.20 power and zero-effect false-claim gates; otherwise expand the external set or label the study a pilot.
 
 ## No claims yet
 
