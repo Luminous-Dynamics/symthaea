@@ -102,6 +102,12 @@ This follows the *distinction* used in ITTC uncertainty/verification/validation 
 
 A 2026 MARSTRUCT study reports 24 sets of calculations from 22 codes and 15 institutions across three ship types for wave-induced motions and global loads. It is a useful reminder that validation depends on hull type, method family and response quantity; it is not directly comparable to the calm-water DTC resistance cases: https://www.sciencedirect.com/science/article/pii/S0951833926002443.
 
+
+
+## Held-out prediction-interval calibration
+
+The separate prediction_interval_calibration module evaluates central predictive intervals using empirical coverage, Wilson 95% coverage bounds, normalized width and the central interval score. It is not a probabilistic reinterpretation of the conservative bounds accepted by uncertainty_comparison. It requires disjoint calibration/evaluation group rosters, a frozen model attestation, fixed model/prediction/data digests, and at most one observation per declared independent group per slice. Groups may belong to only the conditions they actually measured; each required slice independently needs its frozen minimum count, and all declared evaluation groups must be accounted for somewhere in the benchmark. Borderline/out-of-domain/unknown applicability cannot pass. Read the full protocol and benchmark gates in [PREDICTION_INTERVAL_CALIBRATION.md](PREDICTION_INTERVAL_CALIBRATION.md). The authored stress controls also include a 10-regime synthetic panel where pooled coverage is exactly 95% but one critical regime covers only 50%; the required result is a failed per-slice gate. A separate no-shift control expects every regime gate to pass. These are evaluator semantics, not real marine-model results. The included fixtures are synthetic; Rust tests have not been run in this environment.
+
 ## Claim ceiling
 
 A Complete result means only that the canonical trace passed this crate's metadata, time-coverage, numeric and integration gates. It does not validate the measurement system, prove a hydrodynamic improvement, show corrected speed-power performance, establish lifecycle emissions, demonstrate vessel safety, or certify compliance.
