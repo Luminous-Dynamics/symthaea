@@ -102,3 +102,17 @@ The published study considers supported Cu structures with cluster size N = 1–
 The paper describes the DP-UniAlCu training set as 147,464 structures across Cu, alumina and supported-nanoparticle systems, including supported nanoparticle sizes through Cu21. The Cu27–Cu55 strata therefore probe size extrapolation for that domain-specific baseline; every other checkpoint needs its own training-data/domain audit. The paper also reports MACE-OMAT and MatterSim-v1.0.0-1M qualitatively reproducing DP-UniAlCu mean-square-displacement behavior in the studied MD setups at roughly two orders of magnitude higher cost. That is a task- and implementation-specific cost comparison, not a universal throughput guarantee. [Paper and results](https://www.nature.com/articles/s41524-026-02043-8).
 
 For the reproduction, first match the paper's exact model checkpoints, GA operators, initial structures, DFT refinement setup and per-stratum budget. Recompute the 8/3/1 published best-known-minimum counts as a reproduction fingerprint, but never interpret them as a substitute for energy/force accuracy on matched structures, unique reference-validated discoveries, hit rate across seeds, or total cost. The eight-policy Symthaea experiment is a distinct follow-on and must be scored separately from the exact paper reproduction.
+
+
+## Separate target-attainment reporting from conditional acceleration
+
+A policy can reach the target less often yet look fast when analysis is restricted to its successful runs. The cost-to-target acceleration report therefore remains strict and returns no interval if any predeclared pair misses the common target. That gate alone, however, should not make the failed cohort disappear from analysis.
+
+The new `summarize_target_reachability` Rust function reports the fraction reaching the target for each policy and the paired candidate-minus-baseline difference, with a deterministic percentile-bootstrap interval over the full 20-seed manifest. It also reports the four paired outcomes (both reached, baseline only, candidate only, neither) so policy discordance is visible. Failed and incomplete campaign records are validated and count as not reaching the target; they are not filtered. The report carries the fixed seed roster and digest, and has its own versioned JSON Schema.
+
+The benchmark now has two distinct estimands:
+
+1. **Target attainment:** over every predeclared seed, including failures and incomplete runs. This measures reliability/probability of reaching the common objective.
+2. **Conditional cost-to-target AF:** only reported when all preregistered matched pairs reached the same target. This measures cost for the fully target-reaching cohort and makes no standalone claim about the probability of success.
+
+A stretch win needs both: a statistically defensible target-attainment profile and the predeclared acceleration/quality gate. The reachability interval is not a replacement for objective quality or total cost. Unit tests cover mixed failures, exact roster enforcement, deterministic paired resampling, summary validation and schema round-trip. Until the exact-head CI completes, those tests remain authored source, not validated results.
