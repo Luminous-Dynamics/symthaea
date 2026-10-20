@@ -76,7 +76,16 @@ Never combine these into a single untraceable leaderboard score. If a project-le
 
 ## Physical DTC admission checklist
 
-The 2026 DTC shallow-water article page says experimental data are publicly available. That statement alone does not create an admitted dataset. Before a physical benchmark can run, an independent intake review must record:
+The 2026 DTC shallow-water article gives more useful experimental-design detail than the abstract alone:
+- The physical model was 1:60 scale (model M2189) and the signals were sampled at 100 Hz.
+- Resistance tests covered about four to six speeds per depth, with Froude number approximately 0.053–0.174 and depth Froude number approximately 0.13–0.59.
+- The authors used steady-state windows after low-pass filtering and repeated selected test configurations to assess repeatability and measurement uncertainty.
+- The paper reports expanded uncertainty of the mean resistance force below 1%, while standard deviation in individual time records was about 9% of the mean. These quantify different things: **do not turn each 100 Hz sample into an independent test**, and do not substitute within-record variability for the expanded uncertainty of the run mean.
+- The paper reports that open-water propeller characteristics changed comparatively little with water depth, while hull–propeller interaction became evident in self-propulsion tests. This suggests a stronger benchmark tests the *coupled hull/propulsor response*, rather than attempting to generalize from bare-hull resistance alone.
+
+Source: Chillcce et al. (published online 27 March 2026), *Duisburg test case: post-Panamax container ship for benchmarking resistance and propulsion under shallow water conditions*, https://doi.org/10.1080/09377255.2026.2644800. The publisher's searchable article text exposes tables and a “Figures & data” section, but I have not retrieved and inspected the underlying raw experimental artifact, direct download, license, or checksums. Therefore these are article-reported design facts, not admitted raw data.
+
+The article says experimental data are publicly available. That statement alone does not create an admitted dataset. Before a physical benchmark can run, an independent intake review must record:
 
 - Exact source URL/version, raw artifact bytes and reproducible SHA-256 checksums.
 - Rights/reuse basis and limitations for each file.
