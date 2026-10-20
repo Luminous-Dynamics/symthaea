@@ -77,3 +77,19 @@ The policy comparison now includes two additional arms beyond random, diversity,
 - **Counterexample-guided falsification:** explicitly seek candidates that could overturn the current best-ranked structure or falsify an applicability/feasibility assumption. Freeze the hypothesis and scoring rule before a campaign; count every failed or non-falsifying query and the complete cost.
 
 These are **proposed comparison arms**, not implementations or claimed improvements. The point is to set a higher bar than only comparing against random search: AtomFab should outperform specialist heuristics or show why its evidence/history layer adds distinct value. We will keep model choice constant when testing policy value, normalize disagreements appropriately, use matched seed rosters, and compare reference-validated discoveries, best validated objective, failure/abstention rates and total cost separately.
+
+
+## Source-archive roles and leakage boundary (verified metadata; not downloaded)
+
+The related [Zenodo record 10.5281/zenodo.15865800](https://zenodo.org/records/15865800) lists four artifacts: `dataset.zip` (source MD5 `e88745ca2cfd25ef0b152f5fa3ed6bd9`), `global_minima.zip` (`9788d7f13403450552e4ad1642c6a478`), `dptrain_inputs.zip` (`2a9308f54b666b4653137825d1175226`) and `vasp_inputs.zip` (`6fe4f25a0496085c76cd2fddecef4edb`). Zenodo describes the record as providing training/validation structures, training inputs, VASP inputs, and global-minimum configurations. These are verified source-record MD5 metadata, **not our computed SHA-256 values**; none of the four archives is marked downloaded/materialized in the campaign plan. [Source record](https://zenodo.org/records/15865800)
+
+The plan now classifies each artifact by its scientific role and independent-test disposition:
+
+- `dataset.zip`: training/validation source. Do not treat it as held-out evaluation for DP-UniAlCu or any other model trained on these structures.
+- `global_minima.zip`: published reference structures. It is useful for protocol/reference recovery, but does not become an independent test merely by being in a separate ZIP; audit structure and training-set overlap first.
+- `dptrain_inputs.zip`: training configuration evidence, not an evaluation set.
+- `vasp_inputs.zip`: inputs for reference calculations; pin the calculation method and input digests before comparing outputs.
+
+The 2026 benchmark's exact candidate/reference evaluation manifest remains unresolved and must be recovered from the paper/supplement or replaced with a clearly labelled independent reproduction set. For every baseline, report three separate result classes: training/archive-overlap diagnostics, reproduction of published references, and genuinely held-out evaluation. A structure known to be in a model's training data may support reproduction checks, but not an independent generalization claim. This gate is part of the campaign schema and Rust registry test now.
+
+The file-size and SHA-256 fields remain null until the archive bytes are actually materialized and hashed locally. The plan makes no claim to have downloaded or recomputed anything.
