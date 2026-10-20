@@ -243,6 +243,9 @@ struct TemporalTimelineAudit {
     repository_commit: String,
     timeline_path: String,
     timeline_sha256: String,
+    repository_readme_sha256: String,
+    readme_claimed_timeline_row_count: Option<usize>,
+    timeline_row_count_matches_readme_claim: Option<bool>,
     lean_toolchain: String,
     lean_toolchain_sha256: String,
     mathlib_manifest_path: String,
@@ -666,6 +669,23 @@ fn audit_temporal_timeline(
     }
     let timeline_bytes = git_show_file(&root, &repository_commit, timeline_path)?;
     let timeline_sha256 = format!("{:x}", Sha256::digest(&timeline_bytes));
+    let readme_bytes = git_show_file(&root, &repository_commit, "README.md")?;
+    let readme_sha256 = format!("{:x}", Sha256::digest(&readme_bytes));
+    let readme_text = std::str::from_utf8(&readme_bytes)
+        .context("pinned repository README must be UTF-8")?;
+    let readme_count_pattern = Regex::new(
+        r"(?i)proof_timeline\.csv[^\n]*?([0-9,]+)\s+theorems",
+    )
+    .context("compile timeline README count pattern")?;
+    let readme_claimed_timeline_row_count = readme_count_pattern
+        .captures(readme_text)
+        .map(|captures| {
+            captures[1]
+                .replace(',', "")
+                .parse::<usize>()
+                .context("README timeline theorem count is not an integer")
+        })
+        .transpose()?;
     let mut reader = csv::ReaderBuilder::new()
         .has_headers(true)
         .flexible(false)
@@ -837,6 +857,10 @@ fn audit_temporal_timeline(
         repository_commit,
         timeline_path: timeline_path.to_owned(),
         timeline_sha256,
+        repository_readme_sha256: readme_sha256,
+        timeline_row_count_matches_readme_claim: readme_claimed_timeline_row_count
+            .map(|claimed| claimed == events.len()),
+        readme_claimed_timeline_row_count,
         lean_toolchain,
         lean_toolchain_sha256: format!("{:x}", Sha256::digest(&toolchain_bytes)),
         mathlib_manifest_path: mathlib_manifest_path.to_owned(),
