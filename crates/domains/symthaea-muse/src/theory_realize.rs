@@ -1105,16 +1105,40 @@ pub fn perform_with_spec(
     seed: u64,
     state: &MusicalState,
 ) -> Vec<PerformedVoice> {
-    let ensemble = resolve_spec_ensemble(spec, seed);
-    performance_voices(score, ensemble, spec, state)
-        .into_iter()
-        .map(|pv| PerformedVoice {
-            name: pv.name.to_string(),
-            instrument: format!("{:?}", pv.instrument),
-            notes: pv.notes,
-        })
-        .collect()
+    perform_with_spec_and_dialect(score, spec, seed, state, dialect_for_spec(spec))
 }
+
+/// Perform a score with an explicit performance dialect, without synthesizing
+/// audio. This is the controlled-comparison counterpart to `perform_with_spec`:
+/// hold the score, ensemble seed, spec swing, return color and cognitive state
+/// fixed while changing only the dialect. Useful for counterfactual benchmarks
+/// and interactive playback previews.
+///
+/// The dialect overrides the spec-derived performance mapping only; this does
+/// not change composition, instrumentation, score tempo, or other spec fields.
+pub fn perform_with_spec_and_dialect(
+    score: &TheoryScore,
+    spec: &symthaea_music_theory::CompositionSpec,
+    seed: u64,
+    state: &MusicalState,
+    dialect: PerformanceDialect,
+) -> Vec<PerformedVoice> {
+    let ensemble = resolve_spec_ensemble(spec, seed);
+    performance_voices_with_dialect(
+        score,
+        ensemble,
+        spec.texture.swing as f64,
+        state,
+        spec.texture.return_color,
+        dialect,
+    )
+    .into_iter()
+    .map(|pv| PerformedVoice {
+        name: pv.name.to_string(),
+        instrument: format!("{:?}", pv.instrument),
+        notes: pv.notes,
+    })
+    .collect()
 
 /// Resolve a spec's instrument names into the four performed voices
 /// (melody, harmony, bass, counter). Unknown names fall back LOUDLY
