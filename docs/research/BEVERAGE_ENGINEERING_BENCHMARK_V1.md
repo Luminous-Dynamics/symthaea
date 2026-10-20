@@ -101,6 +101,19 @@ Every forecast task with suitable inputs should compare:
 
 Every candidate gets the same input information, held-out examples, target definition and hard gates. Do not compare a hybrid model with richer sensors against a baseline that was denied those sensors and attribute the entire gain to the algorithm.
 
+### Published wine-fermentation baseline that changes the strategy
+
+A 2026 open-access comparison of knowledge-based and ML fermentation models is a direct caution against assuming that a more complex ML model wins. The paper reports:
+- Knowledge-based kinetic model: average dynamic-prediction NRMSE around 6%.
+- ML models with an expanded dataset: NRMSE around 7.6%.
+- A hybrid knowledge-based + residual-network model: overall test NRMSE around 5%.
+- A deep-learning surrogate trained on synthetic outputs from the mechanistic model: around 0.6% NRMSE against the knowledge-based model on a synthetic test set, with about 30× faster simulation.
+
+These figures are results reported by that particular study, not a universal leaderboard and not independently reproduced here. In particular, the 0.6% surrogate result measures fidelity to a mechanistic simulator under its test setup; it does **not** mean 0.6% error against real fermentation outcomes. The study supports a more promising strategy than raw end-to-end ML: reproduce the mechanistic baseline, quantify its residual failure regions, test a bounded residual learner, and qualify any fast surrogate against both the simulator and real held-out measurements.
+
+Reference: Campo-Manzanares et al., *Critical assessment of machine learning approaches for classification, dynamic prediction and surrogate modeling in food fermentation* (Food Research International, 2026), https://doi.org/10.1016/j.foodres.2026.118403.
+
+
 ## 6. Metrics and proposed targets
 
 Report exact endpoint units, sample and batch counts, target missingness, metric denominator, group-level results and uncertainty. Choose metrics to fit each task:
