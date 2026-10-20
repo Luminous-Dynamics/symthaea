@@ -409,7 +409,8 @@
                   "successor_test_status",
                   "successor_tests",
                   "mutation_control_status",
-                  "notes"
+                  "notes",
+                  "mutation_controls"
                 ],
                 "properties": {
                   "status": {
@@ -588,8 +589,150 @@
                       "type": "string",
                       "maxLength": 2000
                     }
+                  },
+                  "mutation_controls": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "mutation_id",
+                        "description",
+                        "expected_detection",
+                        "observed_detection",
+                        "status"
+                      ],
+                      "properties": {
+                        "mutation_id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "description": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 2000
+                        },
+                        "expected_detection": {
+                          "type": "boolean"
+                        },
+                        "observed_detection": {
+                          "type": "boolean"
+                        },
+                        "status": {
+                          "enum": [
+                            "detected_as_expected",
+                            "missed",
+                            "unexpected_failure",
+                            "not_run"
+                          ]
+                        },
+                        "notes": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "maxLength": 2000
+                          }
+                        }
+                      }
+                    }
                   }
-                }
+                },
+                "allOf": [
+                  {
+                    "if": {
+                      "properties": {
+                        "successor_test_status": {
+                          "const": "passed"
+                        }
+                      },
+                      "required": [
+                        "successor_test_status"
+                      ]
+                    },
+                    "then": {
+                      "properties": {
+                        "successor_tests": {
+                          "contains": {
+                            "type": "object",
+                            "properties": {
+                              "outcome": {
+                                "const": "passed"
+                              },
+                              "depends_on_candidate": {
+                                "const": true
+                              }
+                            },
+                            "required": [
+                              "outcome",
+                              "depends_on_candidate"
+                            ]
+                          },
+                          "minContains": 1
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "if": {
+                      "properties": {
+                        "successor_test_status": {
+                          "const": "not_applicable"
+                        }
+                      },
+                      "required": [
+                        "successor_test_status"
+                      ]
+                    },
+                    "then": {
+                      "properties": {
+                        "notes": {
+                          "contains": {
+                            "type": "string",
+                            "pattern": "no applicable successor"
+                          },
+                          "minContains": 1
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "if": {
+                      "properties": {
+                        "mutation_control_status": {
+                          "const": "passed"
+                        }
+                      },
+                      "required": [
+                        "mutation_control_status"
+                      ]
+                    },
+                    "then": {
+                      "properties": {
+                        "mutation_controls": {
+                          "minItems": 1,
+                          "items": {
+                            "properties": {
+                              "expected_detection": {
+                                "const": true
+                              },
+                              "observed_detection": {
+                                "const": true
+                              },
+                              "status": {
+                                "const": "detected_as_expected"
+                              }
+                            },
+                            "required": [
+                              "expected_detection",
+                              "observed_detection",
+                              "status"
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  }
+                ]
               }
             },
             "allOf": [
