@@ -829,25 +829,29 @@ fn audit_temporal_timeline(
                         raw_path
                     );
                 }
-                match git_show_file(&root, &completion_commit, &normalized) {
-                    Ok(bytes) => {
-                        source_path_present_at_completion_count += 1;
-                        (
-                            Some(normalized),
-                            "present_at_completion".to_string(),
-                            Some(format!("{:x}", Sha256::digest(&bytes))),
-                            Some(bytes.len() as u64),
-                        )
-                    }
-                    Err(_) => {
-                        source_path_missing_at_completion_count += 1;
-                        (
-                            Some(normalized),
-                            "missing_at_completion".to_string(),
-                            None,
-                            None,
-                        )
-                    }
+                if git_path_exists_at_commit(&root, &completion_commit, &normalized)? {
+                    let bytes = git_show_file(&root, &completion_commit, &normalized)
+                        .with_context(|| {
+                            format!(
+                                "read source file {} at verified completion commit {}",
+                                normalized, completion_commit
+                            )
+                        })?;
+                    source_path_present_at_completion_count += 1;
+                    (
+                        Some(normalized),
+                        "present_at_completion".to_string(),
+                        Some(format!("{:x}", Sha256::digest(&bytes))),
+                        Some(bytes.len() as u64),
+                    )
+                } else {
+                    source_path_missing_at_completion_count += 1;
+                    (
+                        Some(normalized),
+                        "missing_at_completion".to_string(),
+                        None,
+                        None,
+                    )
                 }
             };
 
@@ -1873,6 +1877,24 @@ fn git_is_ancestor(root: &Path, ancestor: &str, descendant: &str) -> Result<bool
             String::from_utf8_lossy(&output.stderr).trim()
         )
     }
+}
+
+fn git_path_exists_at_commit(root: &Path, commit: &str, path: &str) -> Result<bool> {
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(root)
+        .args(["ls-tree", "--full-tree", "-r", "--name-only", commit, "--", path])
+        .output()
+        .with_context(|| format!("failed to list historical Git path {commit}:{path}"))?;
+    if !output.status.success() {
+        bail!(
+            "git ls-tree for {commit}:{path} failed: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        );
+    }
+    let entries = std::str::from_utf8(&output.stdout)
+        .context("git ls-tree returned non-UTF-8 historical paths")?;
+    Ok(entries.lines().any(|entry| entry == path))
 }
 
 fn git_show_file(root: &Path, commit: &str, path: &str) -> Result<Vec<u8>> {
