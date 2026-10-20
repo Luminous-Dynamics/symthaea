@@ -11,7 +11,7 @@
 //! caller must provide an exact 40- or 64-character Git commit SHA; an unbound
 //! result is not emitted as a passing receipt.
 
-use std::{env, fs, process::ExitCode};
+use std::{env, fs, process::{Command, ExitCode}};
 use symthaea_fabrication_kernel::atomfab_pcb_route::{
     evaluate_corpus_bytes, EMBEDDED_CORPUS,
 };
@@ -25,6 +25,29 @@ fn main() -> ExitCode {
         }
     };
 
+    let git_output = match Command::new("git").args(["rev-parse", "HEAD"]).output() {
+        Ok(output) if output.status.success() => output,
+        Ok(output) => {
+            eprintln!("git rev-parse HEAD failed: {}", String::from_utf8_lossy(&output.stderr));
+            return ExitCode::from(2);
+        }
+        Err(error) => {
+            eprintln!("failed to execute git rev-parse HEAD: {error}");
+            return ExitCode::from(2);
+        }
+    };
+    let actual_git_head = match String::from_utf8(git_output.stdout) {
+        Ok(value) => value.trim().to_string(),
+        Err(error) => {
+            eprintln!("git rev-parse HEAD returned non-UTF-8 output: {error}");
+            return ExitCode::from(2);
+        }
+    };
+    if !git_head.trim().eq_ignore_ascii_case(&actual_git_head) {
+        eprintln!("ATOMFAB_GIT_HEAD does not match actual checkout HEAD");
+        return ExitCode::from(2);
+    }
+
     let corpus_bytes = match env::args_os().nth(1) {
         Some(path) => match fs::read(&path) {
             Ok(bytes) => bytes,
@@ -36,7 +59,7 @@ fn main() -> ExitCode {
         None => EMBEDDED_CORPUS.as_bytes().to_vec(),
     };
 
-    let receipt = match evaluate_corpus_bytes(&corpus_bytes, &git_head) {
+    let receipt = match evaluate_corpus_bytes(&corpus_bytes, &git_head, &actual_git_head) {
         Ok(receipt) => receipt,
         Err(error) => {
             eprintln!("AtomFab corpus rejected: {error}");
