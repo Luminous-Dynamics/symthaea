@@ -19,6 +19,7 @@
 use std::collections::BTreeSet;
 use std::env;
 use std::fs;
+use std::io::Read;
 use std::process::ExitCode;
 
 use serde::Serialize;
@@ -296,9 +297,28 @@ fn valid_sha1(value: &str) -> bool {
 
 fn executable_digest() -> Result<(String, u64), String> {
     let path = env::current_exe().map_err(|error| format!("current_exe: {error}"))?;
-    let bytes = fs::read(&path).map_err(|error| format!("read executable {}: {error}", path.display()))?;
-    let size = u64::try_from(bytes.len()).map_err(|error| format!("executable size: {error}"))?;
-    Ok((format!("{:x}", Sha256::digest(&bytes)), size))
+    let mut file =
+        fs::File::open(&path).map_err(|error| format!("open executable {}: {error}", path.display()))?;
+    let mut hasher = Sha256::new();
+    let mut buffer = [0_u8; 64 * 1024];
+    let mut byte_count = 0_u64;
+
+    loop {
+        let read_count = file
+            .read(&mut buffer)
+            .map_err(|error| format!("read executable {}: {error}", path.display()))?;
+        if read_count == 0 {
+            break;
+        }
+        hasher.update(&buffer[..read_count]);
+        let read_count =
+            u64::try_from(read_count).map_err(|error| format!("executable read size: {error}"))?;
+        byte_count = byte_count
+            .checked_add(read_count)
+            .ok_or_else(|| "executable byte count overflow".to_owned())?;
+    }
+
+    Ok((format!("{:x}", hasher.finalize()), byte_count))
 }
 
 fn main() -> ExitCode {
