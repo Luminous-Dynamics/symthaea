@@ -1823,14 +1823,14 @@ mod tests {
         let cases = [
             (Style::Classical, D::ClassicalRubato),
             (Style::Waltz, D::ClassicalRubato),
-            // Both styles declare a picked folk-pulse mechanism.
+            // Folk's picked pulse is its explicit clock marker.
             (Style::Folk, D::FolkLift),
             (Style::Cinematic, D::ClassicalRubato),
             (Style::Playful, D::DanceLocked), // full backbeat kit
             (Style::Nocturne, D::ClassicalRubato),
             (Style::March, D::MarchLocked),
             (Style::Lullaby, D::ClassicalRubato),
-            (Style::ModalFolk, D::FolkLift),
+            (Style::ModalFolk, D::FolkLift), // shares the picked-pulse contract
             (Style::Fugue, D::ClassicalRubato),
             (Style::Passacaglia, D::ClassicalRubato),
             (Style::Tango, D::DanceLocked),  // Habanera rhythm cell
