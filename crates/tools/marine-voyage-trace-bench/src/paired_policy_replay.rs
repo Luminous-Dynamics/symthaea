@@ -49,6 +49,8 @@ pub struct PairedSliceRequirement {
     pub minimum_pairs: usize,
     /// Positive, predeclared scale in the observable unit.
     pub normalization_scale: f64,
+    /// Minimum candidate empirical coverage in this operating slice, irrespective of baseline.
+    pub minimum_candidate_coverage: f64,
     /// Maximum tolerated coverage drop: baseline coverage - candidate coverage.
     pub maximum_coverage_drop: f64,
     /// Maximum tolerated increase in normalized central interval score.
@@ -236,6 +238,12 @@ pub enum PairedReplayIssue {
         unit_id: String,
         nominal_coverage_bp: u16,
     },
+    CandidateCoverageBelowMinimum {
+        operating_case_id: String,
+        observable_id: String,
+        unit_id: String,
+        nominal_coverage_bp: u16,
+    },
     CoverageDropExceeded {
         operating_case_id: String,
         observable_id: String,
@@ -414,6 +422,7 @@ fn push_requirement(encoder: &mut CanonicalEncoder, requirement: &PairedSliceReq
     encoder.usize("slice.nominal_coverage_bp", requirement.nominal_coverage_bp as usize);
     encoder.usize("slice.minimum_pairs", requirement.minimum_pairs);
     encoder.number("slice.normalization_scale", requirement.normalization_scale);
+    encoder.number("slice.minimum_candidate_coverage", requirement.minimum_candidate_coverage);
     encoder.number("slice.maximum_coverage_drop", requirement.maximum_coverage_drop);
     encoder.number(
         "slice.maximum_normalized_score_increase",
@@ -694,6 +703,7 @@ fn validate_profile(profile: &PairedReplayProfile) -> (bool, Vec<PairedReplayIss
             });
         }
         for (value, field) in [
+            (requirement.minimum_candidate_coverage, "minimum_candidate_coverage"),
             (requirement.maximum_coverage_drop, "maximum_coverage_drop"),
             (requirement.maximum_false_safe_rate, "maximum_false_safe_rate"),
             (requirement.maximum_missed_feasible_rate, "maximum_missed_feasible_rate"),
@@ -1230,7 +1240,17 @@ pub fn evaluate_paired_replay(
         domain_not_established |= !applicability_gate_met;
 
         let enough = pair_count >= requirement.minimum_pairs && pair_count > 0;
-        let coverage_gate_met = coverage_delta.map(|delta| delta >= -requirement.maximum_coverage_drop);
+        let relative_coverage_gate_met =
+            coverage_delta.map(|delta| delta >= -requirement.maximum_coverage_drop);
+        let absolute_candidate_coverage_gate_met = candidate_coverage
+            .map(|coverage| coverage >= requirement.minimum_candidate_coverage);
+        let coverage_gate_met = match (
+            relative_coverage_gate_met,
+            absolute_candidate_coverage_gate_met,
+        ) {
+            (Some(relative), Some(absolute)) => Some(relative && absolute),
+            _ => None,
+        };
         let score_gate_met = normalized_score_delta
             .map(|delta| delta <= requirement.maximum_normalized_score_increase);
         let width_gate_met = normalized_width_delta
@@ -1268,7 +1288,16 @@ pub fn evaluate_paired_replay(
         };
 
         if enough && applicability_gate_met {
-            if coverage_gate_met == Some(false) {
+            if absolute_candidate_coverage_gate_met == Some(false) {
+                issues.push(PairedReplayIssue::CandidateCoverageBelowMinimum {
+                    operating_case_id: key.0.clone(),
+                    observable_id: key.1.clone(),
+                    unit_id: key.2.clone(),
+                    nominal_coverage_bp: key.3,
+                });
+                regression_found = true;
+            }
+            if relative_coverage_gate_met == Some(false) {
                 issues.push(PairedReplayIssue::CoverageDropExceeded {
                     operating_case_id: key.0.clone(),
                     observable_id: key.1.clone(),
@@ -1538,6 +1567,7 @@ mod tests {
             nominal_coverage_bp: 9_000,
             minimum_pairs: 3,
             normalization_scale: 10.0,
+            minimum_candidate_coverage: 0.90,
             maximum_coverage_drop: 0.05,
             maximum_normalized_score_increase: 0.2,
             maximum_normalized_width_increase: 0.2,
@@ -1626,6 +1656,24 @@ mod tests {
         assert_eq!(report.disposition, PairedReplayDisposition::PassDeclaredNonDegradation);
         assert_eq!(report.scored_pair_count, 12);
         assert!(report.slices.iter().all(|s| s.normalized_mean_interval_score_delta == Some(-0.05)));
+    }
+
+    #[test]
+    fn two_equally_undercovering_policies_cannot_pass_relative_non_degradation() {
+        let profile = profile();
+        let mut rows = panel(0.0);
+        for row in &mut rows {
+            row.baseline_lower = row.observed_value + 2.0;
+            row.baseline_upper = row.observed_value + 3.0;
+            row.candidate_lower = row.observed_value + 2.0;
+            row.candidate_upper = row.observed_value + 3.0;
+        }
+        let report = evaluate_paired_replay(&profile, &rows);
+        assert_eq!(report.disposition, PairedReplayDisposition::FailDeclaredRegression);
+        assert!(report.issues.iter().any(|issue| matches!(
+            issue,
+            PairedReplayIssue::CandidateCoverageBelowMinimum { .. }
+        )));
     }
 
     #[test]
