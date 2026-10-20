@@ -34,6 +34,7 @@ This directory defines a proposed benchmark format. **It currently contains no d
 11. The frozen split manifest was generated from the pinned catalog with an independent implementation of SHA-256 ranking. It has not yet been matched against a compiled Rust indexer output; run the crate and `--verify-splits` before relying on it as an engineering-verified artifact.
 12. Follow `evaluation-protocol.md`: select settings and the strongest baseline among A–E and I on validation families only, freeze the primary contrast and compute budget before the test run, preserve all exclusions, and report paired family-level outcomes with uncertainty. Do not make SOTA claims from this pre-screen split alone.
 13. Run the analyzer's `--mode power` using raw validation JSONL before held-out scoring. It recomputes baseline scores and eligible-family sizes, then simulates the primary gate over 0/+10/+15/+20pp effects and ICC 0/0.05/0.10/0.20. Require the registered +20pp/ICC 0.20 power and zero-effect false-claim gates; otherwise expand the external set or label the study a pilot.
+14. After `--mode power` emits a passing report, hash the report and add its digest as `power_report_sha256` to the final frozen run config. Then pass that same file using `--power-report` to analyze mode; the analyzer independently reruns the validation-only scenarios before it will score test rows. See the [executable analysis contract](analysis-contract.md) for the exact two-stage commands and no-go behavior.
 
 ## No claims yet
 
