@@ -312,6 +312,32 @@
       "requires_same_frozen_target_for_both_policies": true,
       "requires_validated_objective_quality_no_worse_at_equal_total_cost": true,
       "status": "proposed_not_achieved"
+    },
+    "seed_manifest": {
+      "schema_version": 1,
+      "seeds": [
+        101,
+        102,
+        103,
+        104,
+        105,
+        106,
+        107,
+        108,
+        109,
+        110,
+        111,
+        112,
+        113,
+        114,
+        115,
+        116,
+        117,
+        118,
+        119,
+        120
+      ],
+      "sha256": "c8dd76e3828125d3984e95bef0cd50603cee2bef7933f1fec178866dd973ba59"
     }
   },
   "published_result_fingerprint": {
