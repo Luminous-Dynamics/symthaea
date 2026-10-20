@@ -79,8 +79,8 @@ if ! cmp -s "$tmpdir/summary-a.csv" "$tmpdir/summary-b.csv" ||
 fi
 
 # Summary must contain 5 scenarios × 6 policies × 2 shield settings.
-if ! awk -F, 'NR == 1 { if (NF != 18) failed = 1; next }
-  { if (NF != 18) failed = 1; rows++ }
+if ! awk -F, 'NR == 1 { if (NF != 19) failed = 1; next }
+  { if (NF != 19) failed = 1; rows++ }
   END { if (NR != 61 || rows != 60 || failed) exit 1 }
 ' "$tmpdir/summary-a.csv"; then
   printf 'FAIL: summary schema or condition coverage is invalid\n' >&2
