@@ -72,6 +72,7 @@ impl Policy {
 pub enum Action {
     Push,
     Maintain,
+    EmergencyRecover,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -247,8 +248,54 @@ fn choose_action(policy: Policy, observation: Observation) -> Action {
     }
 }
 
+/// Predict the one-step state under the benchmark's declared transition model.
+fn projected_state(action: Action, reserve: f64, load: f64, stress: f64) -> (f64, f64) {
+    match action {
+        Action::Push => (
+            reserve - (0.055 + 0.025 * stress),
+            load + 0.008 + stress * 0.032 + 0.018,
+        ),
+        Action::Maintain => (
+            reserve + 0.08 * (1.0 - 0.7 * stress),
+            load + 0.008 + stress * 0.032
+                - if stress < 0.25 { 0.055 } else { 0.020 },
+        ),
+        Action::EmergencyRecover => (
+            reserve + 0.10 * (1.0 - 0.5 * stress),
+            load + 0.008 + stress * 0.032 - 0.10,
+        ),
+    }
+}
+
+fn satisfies_one_step_viability(action: Action, reserve: f64, load: f64, stress: f64) -> bool {
+    let (next_reserve, next_load) = projected_state(action, reserve, load, stress);
+    next_reserve >= 0.15 && next_load <= 0.88
+}
+
+/// Model-perfect one-step shield for the synthetic environment. This is not a
+/// formal guarantee outside the declared transition model or when state estimates
+/// and action effects are wrong.
+fn apply_safety_shield(
+    proposed: Action,
+    reserve: f64,
+    load: f64,
+    stress: f64,
+) -> (Action, bool, bool) {
+    if satisfies_one_step_viability(proposed, reserve, load, stress) {
+        return (proposed, false, false);
+    }
+    if satisfies_one_step_viability(Action::Maintain, reserve, load, stress) {
+        return (Action::Maintain, true, false);
+    }
+    if satisfies_one_step_viability(Action::EmergencyRecover, reserve, load, stress) {
+        return (Action::EmergencyRecover, true, false);
+    }
+    (Action::EmergencyRecover, true, true)
+}
+
 #[derive(Clone, Debug)]
 pub struct EpisodeMetrics {
+    pub shielded: bool,
     pub task_reward: f64,
     pub cumulative_exposure: f64,
     pub mean_load: f64,
@@ -257,10 +304,21 @@ pub struct EpisodeMetrics {
     pub terminal_reserve: f64,
     pub terminal_load: f64,
     pub unsafe_ticks: usize,
+    pub unsafe_episode: bool,
+    /// Sum of normalized constraint-violation magnitudes over abstract time steps.
+    pub violation_exposure: f64,
+    /// Largest normalized single-step violation, in [0, 1].
+    pub max_violation_severity: f64,
+    /// Number of raw Push proposals whose predicted next state crossed a declared limit.
     pub missed_limits: usize,
+    /// Actions vetoed/replaced by the independent one-step viability filter.
+    pub shield_vetoes: usize,
+    /// Steps for which no available action was predicted to satisfy both one-step limits.
+    pub no_safe_action_ticks: usize,
     pub false_alarms: usize,
     pub push_steps: usize,
     pub maintain_steps: usize,
+    pub emergency_recover_steps: usize,
     pub resource_cost: f64,
     pub failed: bool,
     /// None means recovery was not observed before the fixed horizon ended.
@@ -268,6 +326,15 @@ pub struct EpisodeMetrics {
 }
 
 pub fn run_episode(policy: Policy, scenario: Scenario, seed: u64) -> EpisodeMetrics {
+    run_episode_with_shield(policy, scenario, seed, false)
+}
+
+pub fn run_episode_with_shield(
+    policy: Policy,
+    scenario: Scenario,
+    seed: u64,
+    shielded: bool,
+) -> EpisodeMetrics {
     let mut reserve: f64 = 0.85;
     let mut minimum_reserve: f64 = reserve;
     let mut allostatic_load: f64 = 0.0;
@@ -275,10 +342,15 @@ pub fn run_episode(policy: Policy, scenario: Scenario, seed: u64) -> EpisodeMetr
     let mut cumulative_load = 0.0;
     let mut peak_load: f64 = 0.0;
     let mut unsafe_ticks = 0;
+    let mut violation_exposure = 0.0;
+    let mut max_violation_severity: f64 = 0.0;
     let mut missed_limits = 0;
+    let mut shield_vetoes = 0;
+    let mut no_safe_action_ticks = 0;
     let mut false_alarms = 0;
     let mut push_steps = 0;
     let mut maintain_steps = 0;
+    let mut emergency_recover_steps = 0;
     let mut resource_cost = 0.0;
     let mut failed = false;
     let mut last_disturbance = None;
@@ -320,31 +392,56 @@ pub fn run_episode(policy: Policy, scenario: Scenario, seed: u64) -> EpisodeMetr
             shuffled_forecast_confidence,
             oracle_forecast_load,
         };
-        let action = choose_action(policy, observation);
-        let push_cost = 0.055 + 0.025 * stress;
-
-        if action == Action::Push {
-            let projected_reserve = reserve - push_cost;
-            let projected_load = allostatic_load + 0.008 + stress * 0.032 + 0.018;
-            if projected_reserve < 0.15 || projected_load > 0.88 {
-                missed_limits += 1;
-            }
-            reserve -= push_cost;
-            resource_cost += push_cost;
-            task_reward += 1.0 - 0.12 * stress;
-            push_steps += 1;
-            allostatic_load += 0.008 + stress * 0.032 + 0.018;
+        let proposed_action = choose_action(policy, observation);
+        let projected = projected_state(proposed_action, reserve, allostatic_load, stress);
+        if proposed_action == Action::Push && (projected.0 < 0.15 || projected.1 > 0.88) {
+            missed_limits += 1;
+        }
+        let (action, vetoed, no_safe_action) = if shielded {
+            apply_safety_shield(proposed_action, reserve, allostatic_load, stress)
         } else {
-            task_reward += 0.12;
-            maintain_steps += 1;
-            reserve += 0.08 * (1.0 - 0.7 * stress);
-            let recovery = if stress < 0.25 { 0.055 } else { 0.020 };
-            allostatic_load += 0.008 + stress * 0.032 - recovery;
-            if stress < 0.20 && reserve > 0.30 && allostatic_load < 0.25
-                && forecast_load < 0.25
-            {
-                false_alarms += 1;
+            (proposed_action, false, false)
+        };
+        if vetoed {
+            shield_vetoes += 1;
+        }
+        if no_safe_action {
+            no_safe_action_ticks += 1;
+        }
+
+        match action {
+            Action::Push => {
+                let push_cost = 0.055 + 0.025 * stress;
+                reserve -= push_cost;
+                resource_cost += push_cost;
+                task_reward += 1.0 - 0.12 * stress;
+                push_steps += 1;
+                allostatic_load += 0.008 + stress * 0.032 + 0.018;
             }
+            Action::Maintain => {
+                task_reward += 0.12;
+                maintain_steps += 1;
+                reserve += 0.08 * (1.0 - 0.7 * stress);
+                let recovery = if stress < 0.25 { 0.055 } else { 0.020 };
+                allostatic_load += 0.008 + stress * 0.032 - recovery;
+            }
+            Action::EmergencyRecover => {
+                // A conservative, task-interrupting recovery action reserved for
+                // the independent shield; ordinary policies never request it.
+                task_reward += 0.02;
+                emergency_recover_steps += 1;
+                reserve += 0.10 * (1.0 - 0.5 * stress);
+                allostatic_load += 0.008 + stress * 0.032 - 0.10;
+            }
+        }
+
+        if action != Action::Push
+            && stress < 0.20
+            && reserve > 0.30
+            && allostatic_load < 0.25
+            && forecast_load < 0.25
+        {
+            false_alarms += 1;
         }
 
         reserve = reserve.clamp(0.0, 1.0);
@@ -352,6 +449,11 @@ pub fn run_episode(policy: Policy, scenario: Scenario, seed: u64) -> EpisodeMetr
         allostatic_load = allostatic_load.clamp(0.0, 1.0);
         cumulative_load += allostatic_load;
         peak_load = peak_load.max(allostatic_load);
+        let reserve_severity = ((0.15 - reserve).max(0.0) / 0.15).clamp(0.0, 1.0);
+        let load_severity = ((allostatic_load - 0.88).max(0.0) / 0.12).clamp(0.0, 1.0);
+        let step_severity = reserve_severity.max(load_severity);
+        violation_exposure += reserve_severity + load_severity;
+        max_violation_severity = max_violation_severity.max(step_severity);
         if reserve < 0.15 || allostatic_load > 0.88 {
             unsafe_ticks += 1;
         }
@@ -372,6 +474,7 @@ pub fn run_episode(policy: Policy, scenario: Scenario, seed: u64) -> EpisodeMetr
     });
 
     EpisodeMetrics {
+        shielded,
         task_reward,
         cumulative_exposure: cumulative_load,
         mean_load: cumulative_load / HORIZON as f64,
@@ -380,10 +483,16 @@ pub fn run_episode(policy: Policy, scenario: Scenario, seed: u64) -> EpisodeMetr
         terminal_reserve: reserve,
         terminal_load: allostatic_load,
         unsafe_ticks,
+        unsafe_episode: unsafe_ticks > 0,
+        violation_exposure,
+        max_violation_severity,
         missed_limits,
+        shield_vetoes,
+        no_safe_action_ticks,
         false_alarms,
         push_steps,
         maintain_steps,
+        emergency_recover_steps,
         resource_cost,
         failed,
         recovery_steps,
@@ -479,16 +588,29 @@ mod tests {
         for scenario in Scenario::all() {
             for seed in 0..32 {
                 for policy in Policy::all() {
-                    let result = run_episode(policy, scenario, seed);
-                    assert!(result.task_reward.is_finite());
+                    for shielded in [false, true] {
+                        let result = run_episode_with_shield(policy, scenario, seed, shielded);
+                        assert!(result.task_reward.is_finite());
                     assert!(result.cumulative_exposure.is_finite());
                     assert!((0.0..=1.0).contains(&result.mean_load));
                     assert!((0.0..=1.0).contains(&result.peak_load));
                     assert!((0.0..=1.0).contains(&result.minimum_reserve));
                     assert!((0.0..=1.0).contains(&result.terminal_reserve));
-                    assert!((0.0..=1.0).contains(&result.terminal_load));
-                    assert!(result.unsafe_ticks <= HORIZON);
-                    assert!(result.push_steps + result.maintain_steps == HORIZON);
+                        assert!((0.0..=1.0).contains(&result.terminal_load));
+                        assert!(result.violation_exposure.is_finite());
+                        assert!((0.0..=1.0).contains(&result.max_violation_severity));
+                        assert!(result.unsafe_ticks <= HORIZON);
+                        assert!(
+                            result.push_steps + result.maintain_steps + result.emergency_recover_steps
+                                == HORIZON
+                        );
+                        if shielded {
+                            assert_eq!(
+                                result.unsafe_ticks, 0,
+                                "model-perfect shield should maintain one-step viability: {scenario:?} {policy:?} seed={seed}"
+                            );
+                        }
+                    }
                 }
             }
         }
