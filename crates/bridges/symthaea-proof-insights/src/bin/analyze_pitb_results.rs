@@ -29,8 +29,7 @@ const EXPECTED_BOOTSTRAP_REPLICATES: usize = 10_000;
 const MIN_CONFIRMATORY_FAMILY_CLUSTERS: usize = 20;
 const REQUIRED_EXPOSED_FAMILY: &str = "089";
 const EXPECTED_SPLIT_SEED: &str = "pitb-v0-openai-math-2026-10-19";
-const EXPECTED_SPLIT_ALGORITHM: &str =
-    "sha256(seed || NUL || family_id), sort by digest then family ID, floor 70% train and floor 85% train+validation";
+const EXPECTED_SPLIT_ALGORITHM: &str = "sha256(seed || NUL || family_id), sort by digest then family ID, floor 70% train and floor 85% train+validation";
 const ARMS: [&str; 9] = ["A", "B", "C", "D", "E", "F", "G", "H", "I"];
 const BASELINE_SELECTION_ARMS: [&str; 6] = ["A", "B", "C", "D", "E", "I"];
 const TREATMENT_ARM: &str = "F";
@@ -553,10 +552,7 @@ fn validate_config(
     Ok(())
 }
 
-fn validate_frozen_partition(
-    manifest: &SplitManifest,
-    expected_config_digest: &str,
-) -> Result<()> {
+fn validate_frozen_partition(manifest: &SplitManifest, expected_config_digest: &str) -> Result<()> {
     if manifest.upstream.commit != EXPECTED_UPSTREAM_COMMIT {
         bail!(
             "unexpected upstream commit {}; expected {}",
@@ -574,7 +570,12 @@ fn validate_frozen_partition(
     if plan.seed != EXPECTED_SPLIT_SEED || plan.algorithm != EXPECTED_SPLIT_ALGORITHM {
         bail!("frozen split seed or assignment algorithm differs from the registered version");
     }
-    if (plan.train_percent, plan.validation_percent, plan.test_percent) != (70, 15, 15) {
+    if (
+        plan.train_percent,
+        plan.validation_percent,
+        plan.test_percent,
+    ) != (70, 15, 15)
+    {
         bail!("frozen split percentages must remain exactly 70/15/15");
     }
     if (plan.counts.train, plan.counts.validation, plan.counts.test) != (260, 56, 56) {
@@ -608,9 +609,7 @@ fn validate_frozen_partition(
 
     let recomputed_digest = partition_digest_sha256(&manifest.families);
     if recomputed_digest != plan.partition_digest_sha256 {
-        bail!(
-            "partition digest in manifest is incorrect: recomputed {recomputed_digest}"
-        );
+        bail!("partition digest in manifest is incorrect: recomputed {recomputed_digest}");
     }
     if recomputed_digest != expected_config_digest {
         bail!("partition digest does not match the frozen run config");
