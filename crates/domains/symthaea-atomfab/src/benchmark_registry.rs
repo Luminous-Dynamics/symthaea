@@ -347,4 +347,30 @@ mod tests {
             .push(registry.policy_baselines[0].clone());
         assert_eq!(registry.validate(), Err(RegistryError::DuplicatePolicyId));
     }
+    #[test]
+    fn workcell_lane_requires_the_frozen_fault_corpus_parity_gate() {
+        let registry = load_embedded_registry().expect("checked-in JSON should parse");
+        let workcell = registry
+            .benchmark_lanes
+            .iter()
+            .find(|lane| lane.id == "symtropy-workcell")
+            .expect("workcell lane should be registered");
+
+        assert!(
+            workcell.metrics.iter().any(|metric| {
+                metric.contains("decision/reason-code parity")
+                    && metric.contains("atomfab-workcell-fault-corpus-v1")
+            }),
+            "workcell lane must measure cross-repository fault-corpus parity"
+        );
+        assert!(
+            workcell.gates.iter().any(|gate| {
+                gate.contains("all 15 corpus cases")
+                    && gate.contains("zero false-feasible accepts")
+                    && gate.contains("accepted in-domain controls")
+            }),
+            "workcell lane must include fail-closed corpus execution and valid controls"
+        );
+    }
+
 }
