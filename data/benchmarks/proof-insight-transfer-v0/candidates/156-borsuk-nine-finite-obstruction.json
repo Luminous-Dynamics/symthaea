@@ -1,0 +1,156 @@
+{
+  "schema_version": "pitb.insight-record.v0",
+  "record_id": "candidate-openai-math-156-borsuk-finite-obstruction-v0",
+  "source": {
+    "repository_url": "https://github.com/openai/math",
+    "commit": "1581d4cbdd69a0faf34b2089614fe2a814316a6a",
+    "path": "preprints/A-nine-dimensional-counterexample-to-Borsuks-covering-assertion-September-23-2026/paper.pdf",
+    "sha256": "e7ffa6f812d97395aa7794f4dc0f394ea36f24b00ced0acad29157c4c3bcca87",
+    "family_id": "156",
+    "license_status": "needs_review",
+    "upstream_record_status": "formalized_main_result"
+  },
+  "theorem": {
+    "theorem_id": "OAI.BorsukNine.main_theorem",
+    "statement_text": "IsCompact projectorSet ∧\n    projectorSet ⊆ traceOneSymmetric ∧\n    Metric.diam projectorSet = Real.sqrt 2 ∧\n    ¬ HasTenSmallCover",
+    "statement_digest": "9d891d7c8f24fa3c4414b53da4560e980af90262536cdaccd37d3a064a3e0c9b",
+    "domain": [
+      "geometric combinatorics",
+      "finite obstruction",
+      "Euclidean geometry",
+      "counterexample construction"
+    ],
+    "claim_status": "formalized_main_result",
+    "assumptions": []
+  },
+  "artifact": {
+    "kind": "lean_file",
+    "path": "lean/OAI/Geometry/Borsuk/Counterexample.lean",
+    "sha256": "d0eba420bfb1ea328656febc8f52fdc9709831729d114ce1785d2fff18da9ae8",
+    "lean_toolchain": "leanprover/lean4:v4.34.1",
+    "mathlib_revision": "d13f23b723b8a846827a245b89c10fc7d3f11612",
+    "verification_scope": "Pinned source contains OAI.BorsukNine.main_theorem and the representation-to-finite-obstruction proof chain. Definitions and supporting obligations also live in Model.lean, Projectors/Within.lean, and FiniteCases/Cases145.lean. This record does not claim this authoring session rebuilt the project or reran Comparator.",
+    "verification_command": "cd lean && lake env comparator ComparatorChallenges/BorsukNine.json (not run in this authoring session)"
+  },
+  "insight": {
+    "move_id": "finite-obstruction-through-faithful-representation",
+    "obstacle": "A geometric non-covering claim is not directly in the form required by the finite combinatorial obstruction theorem.",
+    "strategy": "Translate a hypothetical cover into the explicitly modeled Admissible representation; derive a finite support-face incidence system; show that it satisfies the hypotheses of a forbidden finite-configuration theorem; conclude by contradiction. Keep the geometric-to-combinatorial bridge as a separately audited lemma rather than treating the combinatorial contradiction as self-justifying.",
+    "preconditions": [
+      "A cover-to-representation map is defined and preserves the exact cover count and diameter constraints.",
+      "The translated representation satisfies every hypothesis of the finite obstruction theorem, including the support-face incidence conditions.",
+      "The target problem admits a finite combinatorial encoding with the same relevant forbidden-configuration structure.",
+      "Cardinality and dimension-specific assumptions are checked afresh; the current theorem is a specific ten-set / rank-one-projector construction."
+    ],
+    "transformation": {
+      "before_state": "A hypothetical cover of the geometric projector set has not yet been converted into an object accepted by the finite obstruction theorem.",
+      "after_state": "Use cover_to_admissible to construct Admissible data; Admissible.support_ten_system derives FiniteObstruction.TenSystem; FiniteObstruction.no_ten_system rules out the resulting object and hence the hypothesized cover.",
+      "expected_obligation_change": "Split the proof into (1) faithful representation, (2) preservation of incidence/support constraints, and (3) a finite no-go theorem. A new domain needs new obligations for all three steps; similarity of prose is not enough."
+    },
+    "evidence": [
+      {
+        "source_path": "lean/OAI/Geometry/Borsuk/Counterexample.lean",
+        "locator": "theorem Admissible.support_ten_system",
+        "evidence_kind": "lean_declaration",
+        "excerpt": "FiniteObstruction.TenSystem",
+        "supports": "A candidate Admissible object induces a finite support-face system with the required combinatorial properties."
+      },
+      {
+        "source_path": "lean/OAI/Geometry/Borsuk/Counterexample.lean",
+        "locator": "theorem no_admissible_ten",
+        "evidence_kind": "proof_step",
+        "excerpt": "FiniteObstruction.no_ten_system hf.support_ten_system",
+        "supports": "The support-system construction and the finite no-ten-system result contradict existence of an Admissible ten-configuration."
+      },
+      {
+        "source_path": "lean/OAI/Geometry/Borsuk/Counterexample.lean",
+        "locator": "theorem main_theorem",
+        "evidence_kind": "proof_step",
+        "excerpt": "no_admissible_ten (cover_to_admissible h)",
+        "supports": "The main theorem uses the cover-to-Admissible bridge to discharge the non-covering conclusion."
+      },
+      {
+        "source_path": "lean/OAI/Geometry/Borsuk/Model.lean",
+        "locator": "def HasTenSmallCover",
+        "evidence_kind": "lean_declaration",
+        "excerpt": "∃ C : Fin 10 → Set Matrix4",
+        "supports": "The target property fixes a cover with ten sets, each contained in the projector set and with diameter strictly below √2."
+      }
+    ],
+    "failure_boundaries": [
+      "If cover_to_admissible does not preserve coverage, membership, or the strict diameter bound, the final contradiction does not establish the intended geometric claim.",
+      "A finite obstruction result cannot be transferred to a different number of sets, dimension, incidence rule, or geometry without proving its hypotheses for that target.",
+      "The current finite case structure is tailored to the rank-one projectors in ℝ⁴ and ten sets; no extension to arbitrary dimensions is established.",
+      "The proof of the combinatorial obstruction may carry substantial domain-specific case analysis; the high-level strategy alone does not provide such a certificate."
+    ],
+    "transfer_candidates": []
+  },
+  "verification": {
+    "status": "not_attempted",
+    "exact_statement_checked": false,
+    "checker": null,
+    "checker_version": null,
+    "exact_statement_digest": null,
+    "axiom_policy": "unknown",
+    "notes": [
+      "The pinned catalog lists OAI.BorsukNine.main_theorem as a main-result declaration and ComparatorChallenges/BorsukNine.json names it as the target.",
+      "Comparator's declared permitted axioms are not evidence that this session ran the checker or inspected the actual used-axiom set.",
+      "No Lean compilation, proof-audit receipt, or comparator run was performed here."
+    ]
+  },
+  "semantic_validation": {
+    "status": "not_attempted",
+    "statement_correspondence": {
+      "status": "not_reviewed",
+      "independent_reviewer_count": 0,
+      "notes": [
+        "lean/docs/156.md describes a nine-dimensional counterexample via rank-one orthogonal projectors in ℝ⁴, trace-one symmetric matrices, diameter √2, and impossibility of a ten-set smaller-diameter cover; the mapping has not received independent review in this pilot."
+      ]
+    },
+    "successor_tests": [],
+    "mutation_controls": [
+      {
+        "mutation_id": "pinned-statement-digest-mismatch",
+        "description": "Change the recorded statement digest while leaving the frozen source and manifest unchanged; the provenance/eligibility gate should reject the record. This is a planned fixture, not an observed test.",
+        "expected_detection": true,
+        "observed_detection": false,
+        "status": "not_run",
+        "notes": [
+          "Must be implemented and executed by the benchmark gate before this candidate can become eligible."
+        ]
+      }
+    ]
+  },
+  "constructive_transfer": {
+    "status": "not_applicable",
+    "unknowns": [],
+    "candidate_witness": {
+      "status": "absent",
+      "representation": null,
+      "formal_term_digest": null,
+      "notes": [
+        "This record extracts a proof strategy for a supplied theorem; it does not attempt an unknown-answer/witness task."
+      ]
+    },
+    "proof_obligations": [],
+    "answer_equivalence": {
+      "method": "none",
+      "status": "not_applicable",
+      "score": null,
+      "notes": [
+        "Constructive witness discovery is outside this candidate's task definition."
+      ]
+    }
+  },
+  "review": {
+    "status": "unreviewed",
+    "independent_review_count": 0,
+    "review_notes": [
+      "Candidate-only annotation; not part of records.jsonl and not scored.",
+      "Family 156 is assigned to train in the frozen split manifest; this selection was checked before inspecting the proof for this candidate.",
+      "statement_digest is SHA-256 of the exact UTF-8 bytes stored in theorem.statement_text, extracted from the pinned theorem signature. It is not a normalized/elaborated Lean expression digest.",
+      "The manuscript license state remains needs_review; no manuscript text is reproduced beyond short technical locators/excerpts from the public Lean source.",
+      "The strategy is a research hypothesis for transfer, not evidence that transfer has succeeded."
+    ]
+  }
+}
