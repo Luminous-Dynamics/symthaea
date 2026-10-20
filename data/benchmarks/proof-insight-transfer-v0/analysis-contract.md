@@ -9,7 +9,7 @@ The preregistered protocol must be executable before held-out outcomes are exami
 Run from the staged `symthaea-proof-insights` crate directory after the source indexer and independent semantic/proof auditors are available:
 
 ```bash
-cargo run --locked --bin analyze_pitb_results -- --config /path/to/frozen-run-config.json --results /path/to/target-outcomes.jsonl --protocol /path/to/evaluation-protocol.md --splits /path/to/splits.json --baseline-receipt /path/to/baseline-selection-receipt.json --out /path/to/analysis-report.json
+cargo run --locked --bin analyze_pitb_results -- --config /path/to/frozen-run-config.json --validation-results /path/to/validation-target-outcomes.jsonl --results /path/to/test-target-outcomes.jsonl --protocol /path/to/evaluation-protocol.md --splits /path/to/splits.json --baseline-receipt /path/to/baseline-selection-receipt.json --out /path/to/analysis-report.json
 ```
 
 Inputs are fail-closed. `--protocol` is hashed as raw bytes and must match the digest in the frozen run config. The exact `splits.json` bytes and the split artifact's `split_plan.partition_digest_sha256` must match too. The baseline-selection receipt is likewise content-hashed. Keep all five input artifacts, the output report, and the per-target receipt bundle together.
@@ -39,13 +39,14 @@ Use `schema_version = "pitb.baseline-selection.v0"` with:
 
 - `selected_split = "validation"`;
 - `metric = "semantic_gate_success_rate"`;
+- `validation_results_sha256`: SHA-256 of the exact validation-outcomes JSONL file passed using `--validation-results`.
 - `arm_scores` containing **exactly** A, B, C, D, E, and I;
 - `selected_arm` equal to the highest score across A–E and I, with exact ties broken by alphabetical arm ID;
 - `tie_break_rule = "highest score; alphabetical arm ID on exact tie"`;
 - `frozen_before_test = true`;
 - `test_outcomes_seen_before_selection = false`.
 
-The receipt is a provenance assertion whose exact bytes are hashed into the frozen config. Keep the underlying validation outcomes and selection code beside it so a reviewer can recompute the scores. The test analyzer verifies the declared score/selection consistency, but cannot infer from a boolean that a hidden test partition was never inspected.
+The receipt's exact bytes are hashed into the frozen config, and its validation-results digest must match the raw JSONL passed to `--validation-results`. The analyzer independently verifies all validation family outcome/exclusion rows, computes each baseline's semantic-gate success rate from the eligible matched validation targets, compares the computed scores to the receipt, and verifies that the selected arm is the true highest scorer (alphabetical ID breaks an exact tie). This removes the prior trust-on-assertion weakness where a hand-edited score table could choose the baseline. Retain the raw validation JSONL and receipt; they are included in the report provenance.
 
 Arm I is the strong premise-retrieval comparator. Freeze its implementation/commit, corpus snapshot, index digest, candidate count, and remote/local model identifier before test outcomes. The LeanSearch v2 paper's retrieval and downstream metrics are context only: use its adapter only when it actually supports the exact target tasks; otherwise use the named, pinned same-corpus global-premise implementation and report that implementation separately. Do not state that the paper's scores have been reproduced unless they have been rerun under the published setup.
 
@@ -75,7 +76,7 @@ The analyzer rejects duplicate eligible statement digests instead of silently tr
 
 ## Report and decision rule
 
-The JSON report records hashes of the run config and raw JSONL, input protocol/split/selection-receipt digests, upstream commit, denominator accounting, per-arm raw checker and semantic-gate success rates, total/mean use and cost-per-verified-solve, **per-family aggregates** (eligible target count, treatment and baseline successes, signed paired-delta sum, and family effect), the selected primary comparison, and the explicit external-replication status `not_evaluated`. The per-family aggregates make the point estimate and target-weighted family-cluster bootstrap reproducible without exposing or collapsing the family grouping.
+The JSON report records hashes of the run config, validation JSONL, test JSONL, and the embedded analyzer source; input protocol/split/selection-receipt digests, upstream commit, eligible/excluded/unknown validation and test accounting, the outcome-derived A–E/I validation score table, per-arm raw checker and semantic-gate success rates, total/mean use and cost-per-verified-solve, **per-family aggregates** (eligible target count, treatment and baseline successes, signed paired-delta sum, and family effect), the selected primary comparison, and the explicit external-replication status `not_evaluated`. The per-family aggregates make the point estimate and target-weighted family-cluster bootstrap reproducible without exposing or collapsing the family grouping.
 
 The primary effect is the signed percentage-point difference:
 
