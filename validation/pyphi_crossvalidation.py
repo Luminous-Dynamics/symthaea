@@ -71,10 +71,10 @@ class ValidationResult:
 class ValidationReport:
     """Complete cross-validation report."""
     results: List[ValidationResult] = field(default_factory=list)
-    correlation: float = 0.0
-    mean_absolute_error: float = 0.0
-    max_absolute_error: float = 0.0
-    agreement_within_10_percent: float = 0.0
+    correlation: Optional[float] = None
+    mean_absolute_error: Optional[float] = None
+    max_absolute_error: Optional[float] = None
+    agreement_within_10_percent: Optional[float] = None
     n_validated: int = 0
     n_failed: int = 0
 
@@ -252,7 +252,7 @@ class PyPhiValidator:
 
     def compute_pyphi_phi(self, topology: TopologySpec) -> Tuple[float, float]:
         """
-        Compute exact Φ using PyPhi.
+        Compute the PyPhi reference value with an explicitly selected IIT 3.0 formalism.
 
         Args:
             topology: Topology specification
@@ -350,7 +350,7 @@ class PyPhiValidator:
             pyphi_phi=None
         )
 
-        # HDC calculation (always possible)
+        # HDC adapter intentionally fails closed until it uses the same causal model.
         try:
             hdc_phi, hdc_std, hdc_time = self.compute_hdc_phi(topology)
             result.hdc_phi = hdc_phi
@@ -391,9 +391,9 @@ class PyPhiValidator:
             result = self.validate_topology(topology)
             report.results.append(result)
 
-            if result.pyphi_phi is not None:
+            if result.hdc_phi is not None and result.pyphi_phi is not None:
                 report.n_validated += 1
-            elif result.error_message:
+            else:
                 report.n_failed += 1
 
         # Compute aggregate metrics
