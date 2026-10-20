@@ -837,6 +837,12 @@ fn audit_temporal_dataset(
         let raw_file_path = required_text("file_path")?;
         let commit_before = required_text("commit_before")?.to_ascii_lowercase();
         let formal_statement = required_text("formal_statement")?;
+        if formal_statement.trim().is_empty() {
+            bail!(
+                "dataset row {} has an empty formal_statement",
+                dataset_position + 1
+            );
+        }
         let statement_sha256 = format!("{:x}", Sha256::digest(formal_statement.as_bytes()));
         dataset_ids.insert(dataset_id.clone());
 
