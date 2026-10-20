@@ -9,7 +9,7 @@ The preregistered protocol must be executable before held-out outcomes are exami
 Run from the staged `symthaea-proof-insights` crate directory after the source indexer and independent semantic/proof auditors are available:
 
 ```bash
-cargo run --locked --bin analyze_pitb_results -- --mode analyze --config /path/to/frozen-run-config.json --validation-results /path/to/validation-target-outcomes.jsonl --results /path/to/test-target-outcomes.jsonl --power-report /path/to/power-report.json --protocol /path/to/evaluation-protocol.md --splits /path/to/splits.json --baseline-receipt /path/to/baseline-selection-receipt.json --out /path/to/analysis-report.json
+cargo run --release --locked --bin analyze_pitb_results -- --mode analyze --config /path/to/frozen-run-config.json --validation-results /path/to/validation-target-outcomes.jsonl --results /path/to/test-target-outcomes.jsonl --power-report /path/to/power-report.json --protocol /path/to/evaluation-protocol.md --splits /path/to/splits.json --baseline-receipt /path/to/baseline-selection-receipt.json --out /path/to/analysis-report.json
 ```
 
 Inputs are fail-closed. `--protocol` is hashed as raw bytes and must match the digest in the frozen run config. The exact `splits.json` bytes and the split artifact's `split_plan.partition_digest_sha256` must match too. The baseline-selection receipt is likewise content-hashed. Keep all five input artifacts, the output report, and the per-target receipt bundle together.
@@ -56,7 +56,7 @@ Arm I is the strong premise-retrieval comparator. Freeze its implementation/comm
 Before the held-out run, invoke the Rust analyzer in `power` mode using validation data only:
 
 ```bash
-cargo run --locked --bin analyze_pitb_results -- --mode power \
+cargo run --release --locked --bin analyze_pitb_results -- --mode power \
   --config /path/to/frozen-run-config.json \
   --validation-results /path/to/validation-target-outcomes.jsonl \
   --protocol /path/to/evaluation-protocol.md \
