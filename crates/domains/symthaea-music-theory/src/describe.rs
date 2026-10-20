@@ -707,6 +707,10 @@ fn accompaniment_sentence(pattern: crate::accompaniment::Accompaniment) -> Optio
             "The accompaniment's syncopated chords chain together with zero gaps — floating, \
              legato harmony instead of punctuated stabs."
         }
+        A::MarchPulse => {
+            "The accompaniment keeps a square four-beat march pulse, with firm attacks on \
+             beats one and three and lighter answers on beats two and four."
+        }
     };
     Some(s.into())
 }
