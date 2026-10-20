@@ -517,7 +517,8 @@
         "costs_to_include",
         "policies",
         "outcomes",
-        "stretch_gate"
+        "stretch_gate",
+        "seed_manifest"
       ],
       "properties": {
         "status": {
@@ -594,6 +595,33 @@
             },
             "status": {
               "const": "proposed_not_achieved"
+            }
+          }
+        },
+        "seed_manifest": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "schema_version",
+            "seeds",
+            "sha256"
+          ],
+          "properties": {
+            "schema_version": {
+              "const": 1
+            },
+            "seeds": {
+              "type": "array",
+              "minItems": 20,
+              "uniqueItems": true,
+              "items": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
             }
           }
         }
