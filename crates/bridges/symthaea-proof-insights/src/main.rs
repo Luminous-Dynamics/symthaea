@@ -190,7 +190,8 @@ struct TemporalEvidenceArtifact {
     content_end_line: usize,
     source_file_sha256: String,
     source_commit: String,
-    available_at_position: usize,
+    available_at_position: Option<usize>,
+    target_position: Option<usize>,
     theorem_id: Option<String>,
 }
 
@@ -799,17 +800,39 @@ fn validate_temporal_manifest(manifest: &TemporalReplayManifest) -> Result<()> {
                 artifact.artifact_id
             );
         }
-        if artifact.available_at_position
-            > manifest
-                .events
-                .last()
-                .map(|event| event.position)
-                .unwrap_or(0)
-        {
-            bail!(
-                "artifact {} appears after the last registered timeline event",
-                artifact.artifact_id
-            );
+        match artifact.artifact_kind.as_str() {
+            "proof_body" => {
+                if artifact.available_at_position.is_some() || artifact.target_position.is_none() {
+                    bail!(
+                        "evaluator-only proof {} must have target_position and no solver-visible available_at_position",
+                        artifact.artifact_id
+                    );
+                }
+                if artifact.target_position.is_some_and(|position| {
+                    !manifest.events.iter().any(|event| event.position == position)
+                }) {
+                    bail!(
+                        "proof artifact {} is associated with an unregistered target position",
+                        artifact.artifact_id
+                    );
+                }
+            }
+            _ => {
+                if artifact.available_at_position.is_none() || artifact.target_position.is_some() {
+                    bail!(
+                        "solver-visible artifact {} must have available_at_position and no target_position",
+                        artifact.artifact_id
+                    );
+                }
+                if artifact.available_at_position.is_some_and(|position| {
+                    position > manifest.events.last().map(|event| event.position).unwrap_or(0)
+                }) {
+                    bail!(
+                        "artifact {} appears after the last registered timeline event",
+                        artifact.artifact_id
+                    );
+                }
+            }
         }
     }
 
@@ -824,7 +847,8 @@ fn validate_temporal_manifest(manifest: &TemporalReplayManifest) -> Result<()> {
             })?;
         if statement.artifact_kind != "theorem_statement"
             || statement.theorem_id.as_deref() != Some(event.theorem_id.as_str())
-            || statement.available_at_position > event.position
+            || statement.available_at_position.is_none_or(|position| position > event.position)
+            || statement.target_position.is_some()
             || statement.content_sha256 != event.statement_sha256
         {
             bail!(
@@ -842,7 +866,8 @@ fn validate_temporal_manifest(manifest: &TemporalReplayManifest) -> Result<()> {
             })?;
         if proof.artifact_kind != "proof_body"
             || proof.theorem_id.as_deref() != Some(event.theorem_id.as_str())
-            || proof.available_at_position != event.position
+            || proof.available_at_position.is_some()
+            || proof.target_position != Some(event.position)
             || proof.source_commit != event.proof_completion_commit
         {
             bail!(
@@ -872,14 +897,27 @@ fn validate_temporal_manifest(manifest: &TemporalReplayManifest) -> Result<()> {
                     event.target_id
                 );
             }
-            if artifact_id != &event.statement_artifact_id
-                && artifact.available_at_position >= event.position
-            {
-                bail!(
-                    "future-evidence leakage: artifact {} was not available before target {}",
-                    artifact.artifact_id,
-                    event.target_id
-                );
+            if artifact_id != &event.statement_artifact_id {
+                match artifact.artifact_kind.as_str() {
+                    "proof_body" => {
+                        if artifact.target_position.is_none_or(|position| position >= event.position) {
+                            bail!(
+                                "future-proof leakage: proof {} is not from an earlier completed target than {}",
+                                artifact.artifact_id,
+                                event.target_id
+                            );
+                        }
+                    }
+                    _ => {
+                        if artifact.available_at_position.is_none_or(|position| position >= event.position) {
+                            bail!(
+                                "future-evidence leakage: artifact {} was not available before target {}",
+                                artifact.artifact_id,
+                                event.target_id
+                            );
+                        }
+                    }
+                }
             }
         }
         if !visible_ids.contains(event.statement_artifact_id.as_str()) {
@@ -927,7 +965,7 @@ fn validate_temporal_manifest(manifest: &TemporalReplayManifest) -> Result<()> {
                         artifact.artifact_id
                     )
                 })?;
-            if event.position != artifact.available_at_position
+            if event.position != artifact.target_position.unwrap_or(usize::MAX)
                 || event.theorem_id.as_str() != artifact.theorem_id.as_deref().unwrap_or_default()
             {
                 bail!(
