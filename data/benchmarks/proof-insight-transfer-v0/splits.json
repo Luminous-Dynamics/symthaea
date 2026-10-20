@@ -1,0 +1,3621 @@
+{
+  "schema_version": "symthaea.proof-insight-transfer.splits.v0",
+  "generated_by": "independent deterministic source review; verify against symthaea-proof-insights before benchmark use",
+  "upstream": {
+    "repository": "https://github.com/openai/math",
+    "commit": "1581d4cbdd69a0faf34b2089614fe2a814316a6a"
+  },
+  "source_fingerprints": [
+    {
+      "path": "README.md",
+      "sha256": "5e8878ee04866f52ec942852552b9c28db278f65691c7ab49a87c9e93a9199fd",
+      "bytes": 4190
+    },
+    {
+      "path": "CONTENTS.md",
+      "sha256": "cc7c0b8a1cdedd845a777e77cf682657308503daf8346c1349e06e9259d063c2",
+      "bytes": 638727
+    },
+    {
+      "path": "lean/formalization.yaml",
+      "sha256": "5a8a164259591208886cd018416e61552665265ec9e20cff636f9d51117c2278",
+      "bytes": 79482
+    },
+    {
+      "path": "lean/ComparatorChallenges/README.md",
+      "sha256": "2ed835b3c59709be6feffe0dec54fc9783fb26aa22d35517475a82ef5199c555",
+      "bytes": 1060
+    }
+  ],
+  "catalogue_claims": {
+    "manuscripts": 719,
+    "families": 372,
+    "parsed_family_headers": 372,
+    "linked_path_count": 961
+  },
+  "split_plan": {
+    "seed": "pitb-v0-openai-math-2026-10-19",
+    "algorithm": "sha256(seed || NUL || family_id), sort by digest then family ID, floor 70% train and floor 85% train+validation",
+    "train_percent": 70,
+    "validation_percent": 15,
+    "test_percent": 15,
+    "counts": {
+      "train": 260,
+      "validation": 56,
+      "test": 56
+    },
+    "partition_digest_sha256": "e7ac417556cbd47cee1ddd51b98f9684fadfc8cd097587ae3beacc4dfb59f970"
+  },
+  "leakage_notes": [
+    "Assignments are frozen at the related-result-family level; all paths listed under a family inherit its split.",
+    "This does not eliminate cross-family mathematical dependencies or possible model pretraining exposure.",
+    "This is a pre-screen assignment, not a qualified benchmark. Preserve exclusions and unknown eligibility without reshuffling splits."
+  ],
+  "families": [
+    {
+      "family_id": "001",
+      "title": "Milne’s rationality conjecture and algebraic specialization.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/Milnes-rationality-conjecture-for-abelian-varieties-October-7-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "002",
+      "title": "The full BSD formula from low Selmer corank.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/Exact-Birch-Swinnerton-Dyer-Formula-from-Low-Selmer-Corank-October-7-2026/exact-bsd-low-selmer-corank.pdf",
+        "preprints/The-Selmer-converse-for-elliptic-curves-at-every-prime-October-7-2026/main.pdf",
+        "preprints/The-two-primary-Birch-Swinnerton-Dyer-formula-in-Selmer-corank-at-most-one-October-6-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "003",
+      "title": "The quasi-Riemann hypothesis.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/003.md",
+        "preprints/The-Quasi-Riemann-Hypothesis-October-5-2026/paper2.pdf",
+        "preprints/The-Quasi-Riemann-Hypothesis-September-30-2026/paper.pdf",
+        "preprints/Uniform-exclusion-of-Landau-Siegel-zeros-October-1-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "004",
+      "title": "Hilbert’s tenth problem over ℚ.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/A-pointwise-2-converse-for-elliptic-curves-with-rational-two-torsion-October-7-2026/paper.pdf",
+        "preprints/Hilberts-tenth-problem-over-the-rational-numbers-October-6-2026/main.pdf"
+      ]
+    },
+    {
+      "family_id": "005",
+      "title": "Irrationality of Catalan’s constant.",
+      "split": "test",
+      "linked_paths": [
+        "lean/docs/005.md",
+        "preprints/Catalans-constant-is-irrational-September-24-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "006",
+      "title": "Goldfeld’s conjecture: densities and mean analytic rank.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/Goldfelds-analytic-density-conjecture-and-the-2-converse-for-elliptic-curves-October-7-2026/paper.pdf",
+        "preprints/The-mean-analytic-rank-of-quadratic-twists-of-elliptic-curves-October-6-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "007",
+      "title": "Ordinary two-point correlations and the corrected Elliott conjecture.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/007.md",
+        "preprints/Ordinary-two-point-correlations-of-multiplicative-functions-September-24-2026/final.pdf"
+      ]
+    },
+    {
+      "family_id": "008",
+      "title": "The Deligne–Drinfeld conjecture.",
+      "split": "test",
+      "linked_paths": [
+        "lean/docs/008.md",
+        "preprints/The-Deligne-Drinfeld-conjecture-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "009",
+      "title": "Function-field reconstruction from Milnor K-theory and Galois data.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/009.md",
+        "preprints/Reconstruction-from-Milnor-K-theory-modulo-the-characteristic-October-5-2026/paper.pdf",
+        "preprints/Reconstruction-of-Function-Fields-from-Mod-ell-Milnor-K-Theory-October-5-2026/mod-ell-bogomolov-pop.pdf",
+        "preprints/The-Bogomolov-Pop-reconstruction-theorem-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "010",
+      "title": "Unrestricted pro-modularity at the prime two.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/Fontaine-Mazur-modularity-at-the-prime-2-October-6-2026/paper.pdf",
+        "preprints/The-Dimension-of-the-Two-Adic-Hecke-Algebra-at-Odd-Level-October-5-2026/two-adic-hecke.pdf",
+        "preprints/Unrestricted-pro-modularity-at-the-prime-two-October-6-2026/two-adic-promodularity.pdf"
+      ]
+    },
+    {
+      "family_id": "011",
+      "title": "Prime-factor statistics of $`p-1`$.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/Prime-Predecessors-with-an-Even-Number-of-Prime-Factors-September-17-2026/paper.pdf",
+        "preprints/The-Poisson-Dirichlet-Law-for-Prime-Predecessors-September-24-2026/paper.pdf",
+        "preprints/Weighted-Dilation-Graphs-Smooth-Shifted-Primes-and-Totient-Fibers-September-24-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "012",
+      "title": "Independent largest prime factors of consecutive integers.",
+      "split": "validation",
+      "linked_paths": [
+        "lean/docs/012.md",
+        "preprints/The-joint-Dickman-law-for-consecutive-integers-September-24-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "013",
+      "title": "Ostmann’s inverse Goldbach conjecture.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/013.md",
+        "preprints/the-additive-indecomposability-of-the-primes-September-24-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "014",
+      "title": "Restricted geometric Langlands, global Arthur enhancements, and generic Ramanujan.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/Constructible-tame-Hecke-eigensheaves-in-positive-characteristic-October-5-2026/constructible-tame-hecke-eigensheaves-positive-characteristic.pdf",
+        "preprints/Frobenius-Structures-on-Tame-Hecke-Eigensheaves-October-5-2026/tame-hecke-frobenius.pdf",
+        "preprints/Global-Arthur-Enhancements-of-Cuspidal-Excursion-Parameters-October-5-2026/manuscript.pdf",
+        "preprints/Ramanujan-Arthur-Decompositions-of-Cuspidal-Functions-at-Full-Finite-Level-September-24-2026/paper.pdf",
+        "preprints/Rationality-of-the-Canonical-Unramified-Arthur-Filtration-September-24-2026/paper.pdf",
+        "preprints/Tame-Hecke-Eigensheaves-with-Several-Marked-Points-October-5-2026/Tame-Hecke-Eigensheaves-with-Several-Marked-Points.pdf",
+        "preprints/Temperedness-at-ramified-places-for-globally-generic-exceptional-groups-October-5-2026/ramified-ramanujan.pdf",
+        "preprints/The-Restricted-Geometric-Langlands-Equivalence-in-Positive-Characteristic-September-24-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "015",
+      "title": "Torus-packet equidistribution in prime, quartic, and sextic degrees.",
+      "split": "validation",
+      "linked_paths": [
+        "lean/docs/015.md",
+        "preprints/Equidistribution-of-Prime-Degree-Torus-Packets-with-Arbitrary-Local-Type-September-24-2026/paper.pdf",
+        "preprints/Equidistribution-of-Primitive-Quartic-Torus-Packets-for-Arbitrary-Orders-October-5-2026/quartic-torus-packets.pdf",
+        "preprints/Equidistribution-of-Primitive-Sextic-Torus-Packets-October-5-2026/primitive-sextic-torus-packets.pdf"
+      ]
+    },
+    {
+      "family_id": "016",
+      "title": "Zilber–Pink in abelian varieties and the Siegel threefold.",
+      "split": "test",
+      "linked_paths": [
+        "preprints/Elliptic-Squares-and-Zilber-Pink-for-Curves-in-A2-September-24-2026/paper.pdf",
+        "preprints/Quaternionic-Division-Points-on-Curves-in-the-Siegel-Threefold-September-24-2026/paper.pdf",
+        "preprints/The-Abelian-Zilber-Pink-Conjecture-September-24-2026/paper.pdf",
+        "preprints/The-E-times-CM-Component-of-Zilber-Pink-for-Curves-in-A2-September-24-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "017",
+      "title": "The irrationality exponent of <i>π</i> is 2.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/017.md",
+        "preprints/The-irrationality-exponent-of-pi-is-2-September-24-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "018",
+      "title": "The Margulis–Platonov conjecture over global fields.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/The-Margulis-Platonov-conjecture-over-global-function-fields-October-5-2026/margulis-platonov-global-function-fields.pdf",
+        "preprints/The-Margulis-Platonov-conjecture-over-number-fields-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "019",
+      "title": "The local <i>p</i>-adic section conjecture and global consequences.",
+      "split": "test",
+      "linked_paths": [
+        "preprints/Etale-covers-with-a-prescribed-exterior-sheet-September-24-2026/main.pdf",
+        "preprints/The-p-adic-section-conjecture-October-6-2026/main.pdf"
+      ]
+    },
+    {
+      "family_id": "020",
+      "title": "Squarefree quartics and power-free polynomial values.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/020.md",
+        "preprints/Squarefree-values-of-quartics-and-power-free-values-of-polynomials-September-24-2026/manuscript.pdf"
+      ]
+    },
+    {
+      "family_id": "021",
+      "title": "A quadratic bound for Jacobsthal’s function.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/021.md",
+        "preprints/A-quadratic-bound-for-Jacobsthals-function-September-25-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "022",
+      "title": "The weak inhomogeneous Duffin–Schaeffer conjecture.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/The-weak-inhomogeneous-Duffin-Schaeffer-conjecture-September-25-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "023",
+      "title": "Patterson's first moment for cubic Gauss sums.",
+      "split": "validation",
+      "linked_paths": [
+        "lean/docs/023.md",
+        "preprints/An-unconditional-first-moment-for-cubic-Gauss-sums-September-25-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "024",
+      "title": "An asymptotic formula for the number of totients.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/024.md",
+        "preprints/An-asymptotic-formula-for-the-number-of-totients-September-25-2026/An-asymptotic-formula-for-the-number-of-totients-September-25-2026.pdf"
+      ]
+    },
+    {
+      "family_id": "025",
+      "title": "Short Egyptian fractions.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/025.md",
+        "preprints/Short-Egyptian-fractions-September-25-2026/Short-Egyptian-fractions-September-25-2026.pdf"
+      ]
+    },
+    {
+      "family_id": "026",
+      "title": "Positive lower density of large prime gaps.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/026.md",
+        "preprints/Positive-lower-density-of-large-prime-gaps-September-25-2026/main.pdf"
+      ]
+    },
+    {
+      "family_id": "027",
+      "title": "Potential integral density on curve character varieties.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/027.md",
+        "preprints/Integral-points-on-character-varieties-of-curves-September-25-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "028",
+      "title": "Uniformly bounded components of Gaussian-prime graphs.",
+      "split": "validation",
+      "linked_paths": [
+        "lean/docs/028.md",
+        "preprints/Bounded-Step-Walks-on-Gaussian-Primes-September-26-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "029",
+      "title": "Primitive roots for every admissible integer base.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/Primitive-roots-for-every-admissible-integer-base-October-4-2026/primitive-roots-all-integer-bases.pdf",
+        "preprints/Simultaneous-primitive-roots-a-conditional-lower-bound-for-prime-bases-October-4-2026/simultaneous-primitive-roots-conditional-lower-bound-prime-bases.pdf"
+      ]
+    },
+    {
+      "family_id": "030",
+      "title": "Modularity of elliptic curves over imaginary quadratic fields.",
+      "split": "validation",
+      "linked_paths": [
+        "preprints/Modularity-of-elliptic-curves-over-imaginary-quadratic-fields-October-4-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "031",
+      "title": "Uchida’s conjecture for open homomorphisms of Galois groups.",
+      "split": "validation",
+      "linked_paths": [
+        "preprints/Open-Homomorphisms-of-Global-Solvably-Closed-Galois-Groups-October-5-2026/open-homomorphisms-solvably-closed-galois-groups.pdf"
+      ]
+    },
+    {
+      "family_id": "032",
+      "title": "The rational Hodge conjecture for CM abelian varieties.",
+      "split": "test",
+      "linked_paths": [
+        "preprints/A-Conditional-Reduction-for-Algebraic-Kuga-Satake-Correspondences-September-10-2026/paper.pdf",
+        "preprints/Abelian-covers-Gale-correspondences-and-the-Hodge-conjecture-for-powers-October-6-2026/paper.pdf",
+        "preprints/Algebraic-Kuga-Satake-correspondences-and-Hodge-conjectures-on-a-K3-quadratic-locus-September-30-2026/paper.pdf",
+        "preprints/The-rational-Hodge-conjecture-for-CM-abelian-varieties-October-6-2026/paper.pdf",
+        "preprints/Weil-classes-and-Hodge-classes-on-abelian-powers-October-6-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "033",
+      "title": "Iitaka subadditivity, variation, and logarithmic additivity.",
+      "split": "test",
+      "linked_paths": [
+        "lean/docs/033.md",
+        "preprints/B-semiampleness-for-compact-log-smooth-Kahler-fibrations-September-10-2026/paper.pdf",
+        "preprints/Logarithmic-Kodaira-dimension-and-whole-fiber-variation-September-26-2026/paper.pdf",
+        "preprints/Orbifold-and-logarithmic-Iitaka-subadditivity-September-26-2026/paper.pdf",
+        "preprints/Projective-Hodge-lines-and-ordinary-Iitaka-subadditivity-September-27-2026/paper.pdf",
+        "preprints/The-reverse-logarithmic-Kodaira-inequality-and-additivity-September-26-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "034",
+      "title": "Log abundance for compact Kähler spaces under logarithmic Iitaka subadditivity.",
+      "split": "validation",
+      "linked_paths": [
+        "preprints/Abundance-after-nonvanishing-for-compact-Kahler-fourfolds-September-27-2026/paper.pdf",
+        "preprints/Arithmetic-Stein-degree-bounds-for-log-Calabi-Yau-pairs-September-25-2026/paper.pdf",
+        "preprints/Conditional-good-minimal-models-for-compact-Kahler-fourfolds-October-6-2026/paper.pdf",
+        "preprints/Fourfold-nonvanishing-by-minimal-metrics-and-moving-jets-September-27-2026/paper.pdf",
+        "preprints/Lifting-sections-from-the-reduced-support-of-an-adjoint-September-27-2026/paper.pdf",
+        "preprints/Log-abundance-for-compact-Kahler-spaces-under-logarithmic-Iitaka-subadditivity-October-6-2026/main.pdf",
+        "preprints/Log-abundance-in-characteristic-zero-September-24-2026/paper.pdf",
+        "preprints/Minimal-metrics-and-interior-injectivity-for-nef-adjoints-September-27-2026/paper.pdf",
+        "preprints/Relative-denominators-and-effective-systems-for-log-Calabi-Yau-fibrations-September-27-2026/paper.pdf",
+        "preprints/Schnell-fiber-spaces-and-good-canonical-models-September-24-2026/paper.pdf",
+        "preprints/Uniform-Pluricanonical-Iitaka-Fibrations-October-3-2026/paper.pdf",
+        "preprints/Uniform-effective-log-Iitaka-fibrations-for-fourfolds-September-26-2026/paper.pdf",
+        "preprints/Uniform-indices-for-semi-log-canonical-log-Calabi-Yau-pairs-October-5-2026/uniform-slc-index.pdf",
+        "preprints/Uniform-log-Iitaka-fibrations-and-bounded-moduli-denominators-October-4-2026/uniform-log-iitaka.pdf"
+      ]
+    },
+    {
+      "family_id": "035",
+      "title": "Log-canonical threefold abundance in numerical dimension one.",
+      "split": "test",
+      "linked_paths": [
+        "preprints/Abundance-in-numerical-dimension-one-for-terminal-threefolds-in-positive-characteristic-September-24-2026/paper.pdf",
+        "preprints/Log-abundance-in-numerical-dimension-one-for-threefolds-in-positive-characteristic-October-5-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "036",
+      "title": "Numerical semiampleness and generalized minimal models.",
+      "split": "test",
+      "linked_paths": [
+        "preprints/Minimal-models-and-Mori-fibre-spaces-for-generalized-log-canonical-Q-pairs-September-24-2026/paper.pdf",
+        "preprints/Minimal-models-in-numerical-dimension-one-September-24-2026/paper.pdf",
+        "preprints/Numerical-Semiampleness-of-Nef-Adjoint-Divisors-October-3-2026/paper.pdf",
+        "preprints/Numerical-semiampleness-of-nef-adjoint-classes-on-compact-Kahler-manifolds-October-6-2026/numerical-generalized-abundance.pdf"
+      ]
+    },
+    {
+      "family_id": "037",
+      "title": "The ordinary-double-point volume gap.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/The-normalized-volume-gap-in-dimension-four-September-24-2026/paper.pdf",
+        "preprints/The-ordinary-double-point-gap-in-every-dimension-September-24-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "038",
+      "title": "Fujita’s freeness conjecture.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/Fujitas-freeness-conjecture-September-23-2026/Fujitas-freeness-conjecture-September-23-2026.pdf"
+      ]
+    },
+    {
+      "family_id": "039",
+      "title": "Nagata’s conjecture and maximal Seshadri constants.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/039.md",
+        "preprints/Maximal-Multipoint-Seshadri-Constants-in-Higher-Dimensions-October-5-2026/main.pdf",
+        "preprints/Maximal-Seshadri-Constants-on-Arbitrary-Polarized-Surfaces-September-23-2026/main.pdf",
+        "preprints/Maximal-multipoint-Seshadri-constants-in-positive-characteristic-October-5-2026/seshadri-positive-characteristic.pdf",
+        "preprints/Nagatas-Conjecture-for-Plane-Curves-September-23-2026/main.pdf"
+      ]
+    },
+    {
+      "family_id": "040",
+      "title": "Bloch’s conjecture for complex surfaces.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/Blochs-Conjecture-for-Surfaces-with-pg-equals-q-equals-0-September-24-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "041",
+      "title": "Hyperkähler SYZ and projective-space bases.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/Projective-Space-Bases-of-Lagrangian-Fibrations-September-23-2026/main.pdf",
+        "preprints/The-Strong-Hyperkahler-SYZ-Conjecture-September-23-2026/main.pdf"
+      ]
+    },
+    {
+      "family_id": "042",
+      "title": "Oka classification for minimal compact complex surfaces: Kodaira dimension zero and class VII.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/Every-complex-K3-surface-is-Oka-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "043",
+      "title": "<i>P</i> = <i>W</i> for fixed-determinant SL<sub><i>n</i></sub> moduli spaces.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/P-equals-W-in-composite-rank-for-fixed-determinant-September-24-2026/P-equals-W-in-composite-rank-for-fixed-determinant-September-24-2026.pdf"
+      ]
+    },
+    {
+      "family_id": "044",
+      "title": "The equivariant cohomological Hikita conjecture.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/The-equivariant-cohomological-Hikita-conjecture-for-arbitrary-quivers-September-24-2026/main.pdf"
+      ]
+    },
+    {
+      "family_id": "046",
+      "title": "Shafarevich counterexamples in dimension two and with large fundamental group.",
+      "split": "validation",
+      "linked_paths": [
+        "preprints/A-projective-fourfold-with-large-fundamental-group-and-non-Stein-universal-cover-October-5-2026/large-fundamental-group-non-stein.pdf",
+        "preprints/A-surface-counterexample-to-Shafarevich-holomorphic-convexity-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "047",
+      "title": "Zariski cancellation and affine fibrations over the complex numbers.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/047.md",
+        "preprints/An-explicit-failure-of-complex-affine-space-cancellation-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "048",
+      "title": "A characteristic-zero counterexample to Lipman–Zariski.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/A-singular-normal-affine-surface-with-free-tangent-sheaf-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "049",
+      "title": "A stable-coordinate counterexample in four variables.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/049.md",
+        "preprints/A-stable-coordinate-that-is-not-a-coordinate-in-four-variables-October-5-2026/stable-coordinate-four-variables.pdf",
+        "preprints/An-explicit-noncoordinate-polynomial-with-affine-three-space-zero-fibre-September-24-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "050",
+      "title": "A counterexample to Griffiths’ positivity conjecture.",
+      "split": "test",
+      "linked_paths": [
+        "lean/docs/050.md",
+        "preprints/ample-rank-two-bundles-on-the-quadric-surface-without-griffiths-positive-metrics-September-24-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "051",
+      "title": "Kobayashi’s canonical-ampleness conjecture.",
+      "split": "test",
+      "linked_paths": [
+        "preprints/Canonical-ampleness-of-compact-hyperbolic-Kahler-manifolds-September-23-2026/canonical-ampleness.pdf"
+      ]
+    },
+    {
+      "family_id": "052",
+      "title": "Tangent splittings and product decompositions.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/052.md",
+        "preprints/Integrability-of-split-tangent-bundles-on-rationally-connected-manifolds-September-23-2026/main.pdf",
+        "preprints/Universal-cover-splitting-for-compact-Kahler-manifolds-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "053",
+      "title": "A counterexample to Pixton completeness in Chow.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/A-high-arity-counterexample-to-Pixton-completeness-in-Chow-September-24-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "054",
+      "title": "Irrational cubic fourfolds with Hodge-theoretic and categorical K3 associations.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/Irrational-cubic-fourfolds-with-geometric-K3-categories-September-24-2026/Irrational-cubic-fourfolds-with-geometric-K3-categories-September-24-2026.pdf"
+      ]
+    },
+    {
+      "family_id": "055",
+      "title": "Gepner symmetry and large-volume stability on threefolds.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/A-Gepner-stability-condition-on-every-smooth-quintic-threefold-September-24-2026/paper.pdf",
+        "preprints/Prescribed-large-volume-charges-on-threefolds-with-trivial-canonical-bundle-September-24-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "056",
+      "title": "Termination of projective and Kähler fourfold minimal model programs.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/Finite-ordinary-minimal-model-programs-on-compact-Kahler-fourfolds-October-6-2026/paper.pdf",
+        "preprints/Finite-ordinary-minimal-model-programs-on-compact-Kahler-fourfolds-September-24-2026/paper.pdf",
+        "preprints/Termination-for-projective-log-canonical-fourfolds-with-rational-boundary-September-24-2026/paper.pdf",
+        "preprints/Termination-of-generalized-canonical-flips-on-compact-Kahler-fourfolds-October-6-2026/termination-generalized-terminal-flips-compact-kahler-fourfolds.pdf",
+        "preprints/Termination-of-generalized-log-canonical-flips-on-compact-Kahler-fourfolds-October-7-2026/termination-generalized-lc-kahler-fourfolds.pdf"
+      ]
+    },
+    {
+      "family_id": "057",
+      "title": "Fundamental groups of special complex varieties and root orbifolds.",
+      "split": "test",
+      "linked_paths": [
+        "preprints/A-conditional-abelianity-theorem-for-special-fourfold-pairs-with-a-half-weight-divisor-October-5-2026/main.pdf",
+        "preprints/The-abelianity-conjecture-for-special-compact-Kahler-manifolds-September-23-2026/paper.pdf",
+        "preprints/Two-step-monodromy-of-special-quasi-projective-varieties-September-24-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "058",
+      "title": "Semialgebraic universal covers and bounded domains.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/058.md",
+        "preprints/Semialgebraic-universal-covers-of-normal-projective-varieties-September-24-2026/paper.pdf",
+        "preprints/Symmetry-of-semialgebraic-bounded-domains-with-compact-quotient-September-24-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "059",
+      "title": "Counterexamples to Zariski’s multiplicity conjecture.",
+      "split": "test",
+      "linked_paths": [
+        "preprints/Ambiently-homeomorphic-isolated-hypersurface-germs-in-C4-with-multiplicities-four-and-five-September-27-2026/paper.pdf",
+        "preprints/Ambiently-homeomorphic-isolated-hypersurfaces-of-multiplicities-two-and-three-September-24-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "060",
+      "title": "The Global Spherical Shell conjecture.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/Global-Spherical-Shells-on-Minimal-Surfaces-of-Class-VII-September-24-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "062",
+      "title": "Projective contact classification and the LeBrun–Salamon conjecture.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/Contact-Fano-manifolds-and-the-LeBrun-Salamon-conjecture-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "063",
+      "title": "The generalized Mukai conjecture.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/The-Generalized-Mukai-Conjecture-September-24-2026/article.pdf"
+      ]
+    },
+    {
+      "family_id": "064",
+      "title": "Topological triviality of <i>μ</i>-constant surface singularities.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/Topological-triviality-of-mu-constant-families-of-surface-singularities-September-24-2026/main.pdf"
+      ]
+    },
+    {
+      "family_id": "065",
+      "title": "Virasoro constraints for complete intersections and projective-bundle towers.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/Virasoro-Constraints-for-Projective-Complete-Intersections-September-24-2026/article.pdf",
+        "preprints/Virasoro-Constraints-under-Projectivization-October-5-2026/virasoro-constraints-under-projectivization.pdf"
+      ]
+    },
+    {
+      "family_id": "066",
+      "title": "Bounded klt complements for Fano contractions.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/066.md",
+        "preprints/Bounded-klt-complements-for-Fano-contractions-September-25-2026/Bounded-klt-complements-for-Fano-contractions-September-25-2026.pdf",
+        "preprints/Uniform-Cartier-sections-for-Fano-type-contractions-September-25-2026/Uniform-Cartier-sections-for-Fano-type-contractions-September-25-2026.pdf"
+      ]
+    },
+    {
+      "family_id": "067",
+      "title": "The Campana–Peternell conjecture in dimension six.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/The-Campana-Peternell-conjecture-in-dimension-six-September-25-2026/main.pdf"
+      ]
+    },
+    {
+      "family_id": "068",
+      "title": "Anticanonical nonvanishing in every dimension.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/Anticanonical-nonvanishing-from-smooth-semipositivity-September-26-2026/main.pdf",
+        "preprints/Bounded-anticanonical-metrics-on-klt-pairs-and-torus-quotients-September-26-2026/main.pdf",
+        "preprints/Cohomological-transfer-and-equivariant-anticanonical-sections-September-26-2026/main.pdf",
+        "preprints/Exact-orders-and-invariant-anticanonical-linear-systems-September-26-2026/main.pdf",
+        "preprints/Integrable-metrics-and-effectivity-with-controlled-boundary-September-26-2026/main.pdf",
+        "preprints/Invariant-anticanonical-indices-and-conversion-of-twisted-differentials-September-26-2026/main.pdf",
+        "preprints/Metric-descent-and-rank-preserving-contractions-September-26-2026/main.pdf"
+      ]
+    },
+    {
+      "family_id": "069",
+      "title": "Global quantum geometric Langlands at irrational level.",
+      "split": "validation",
+      "linked_paths": [
+        "preprints/Global-quantum-geometric-Langlands-at-irrational-level-October-4-2026/quantum-langlands.pdf"
+      ]
+    },
+    {
+      "family_id": "071",
+      "title": "Koebe’s circle-domain conjecture.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/071.md",
+        "preprints/Koebes-Circle-Domain-Conjecture-September-23-2026/paper.pdf",
+        "preprints/Removable-Boundaries-and-Rigidity-of-Circle-Domains-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "072",
+      "title": "Brennan's conjecture and the integral-means spectrum.",
+      "split": "test",
+      "linked_paths": [
+        "lean/docs/072.md",
+        "preprints/A-strict-inverse-first-power-bound-for-univalent-functions-September-24-2026/paper.pdf",
+        "preprints/Brennans-conjecture-and-sharp-inverse-square-integral-means-September-24-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "073",
+      "title": "The Falconer distance conjecture.",
+      "split": "test",
+      "linked_paths": [
+        "lean/docs/073.md",
+        "preprints/The-Falconer-distance-conjecture-in-all-dimensions-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "074",
+      "title": "Kakeya in three and four dimensions.",
+      "split": "test",
+      "linked_paths": [
+        "preprints/Every-four-dimensional-Kakeya-set-has-full-Hausdorff-dimension-September-24-2026/paper.pdf",
+        "preprints/The-Kakeya-maximal-conjecture-in-three-dimensions-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "075",
+      "title": "The $`L\\log L`$ Fourier-convergence conjecture.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/075.md",
+        "preprints/Almost-everywhere-Fourier-convergence-in-L-log-L-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "076",
+      "title": "Real ultraflat Littlewood polynomials and unbounded binary merit factors.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/076.md",
+        "preprints/Asymptotically-minimal-maxima-of-real-Littlewood-polynomials-September-23-2026/paper.pdf",
+        "preprints/Nearly-minimal-maxima-and-positive-minima-of-Littlewood-polynomials-October-5-2026/littlewood-lower-envelope.pdf",
+        "preprints/Ultraflat-real-Littlewood-polynomials-October-5-2026/ultraflat-real-littlewood-polynomials.pdf"
+      ]
+    },
+    {
+      "family_id": "077",
+      "title": "Fourier restriction for positively curved surfaces.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/Diagonal-Fourier-extension-for-positively-curved-surfaces-in-three-dimensions-September-24-2026/Diagonal-Fourier-extension-for-positively-curved-surfaces-in-three-dimensions-September-24-2026.pdf",
+        "preprints/Elliptic-capacity-propagation-and-Fourier-restriction-to-the-sphere-September-24-2026/Elliptic-capacity-propagation-and-Fourier-restriction-to-the-sphere-September-24-2026.pdf"
+      ]
+    },
+    {
+      "family_id": "078",
+      "title": "The three-dimensional Bochner–Riesz conjecture.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/Bochner-Riesz-Multipliers-in-Three-Dimensions-September-24-2026/Bochner-Riesz-Multipliers-in-Three-Dimensions-September-24-2026.pdf"
+      ]
+    },
+    {
+      "family_id": "079",
+      "title": "Local smoothing in three dimensions.",
+      "split": "validation",
+      "linked_paths": [
+        "preprints/Critical-local-smoothing-for-the-three-dimensional-wave-equation-September-24-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "080",
+      "title": "The exact Sobolev endpoint for Schrödinger convergence.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/Endpoint-convergence-for-the-planar-Schrodinger-equation-September-24-2026/paper.pdf",
+        "preprints/Endpoint-pointwise-convergence-for-the-Schrodinger-equation-in-higher-dimensions-September-24-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "081",
+      "title": "Riesz transforms and rectifiability in higher codimension.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/081.md",
+        "preprints/Riesz-transforms-and-uniform-rectifiability-in-higher-codimension-September-24-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "082",
+      "title": "Annular variation and dyadic absolute bounds for the triangular Hilbert transform.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/082.md",
+        "preprints/An-L3-bound-for-the-dyadic-triangular-Hilbert-form-October-5-2026/dyadic-triangular-hilbert.pdf",
+        "preprints/Annular-variation-of-the-triangular-Hilbert-transform-at-the-symmetric-point-October-5-2026/annular-variation.pdf",
+        "preprints/The-maximal-triangular-Hilbert-transform-at-the-symmetric-point-September-24-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "083",
+      "title": "Hilbert transforms along Lipschitz directions.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/083.md",
+        "preprints/A-uniform-Hilbert-transform-estimate-for-Lipschitz-directions-September-25-2026/main.pdf"
+      ]
+    },
+    {
+      "family_id": "084",
+      "title": "The geometric case of the Erdős similarity conjecture.",
+      "split": "test",
+      "linked_paths": [
+        "lean/docs/084.md",
+        "preprints/The-dyadic-case-of-the-Erdos-similarity-conjecture-September-25-2026/paper.pdf",
+        "preprints/The-geometric-case-of-the-Erdos-similarity-conjecture-October-5-2026/geometric-erdos-similarity.pdf"
+      ]
+    },
+    {
+      "family_id": "085",
+      "title": "Endpoint Sobolev regularity of centered disk averages.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/085.md",
+        "preprints/An-Endpoint-Gradient-Bound-for-the-Centered-Disk-Maximal-Operator-September-26-2026/article.pdf"
+      ]
+    },
+    {
+      "family_id": "086",
+      "title": "An <i>L</i><sup>3</sup> bound for the trilinear Hilbert transform.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/An-L3-bound-for-the-trilinear-Hilbert-transform-October-5-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "087",
+      "title": "The Mahler conjectures, functional inequalities and polar-product symplectic width.",
+      "split": "test",
+      "linked_paths": [
+        "lean/docs/087.md",
+        "preprints/Symplectic-Balls-in-Symmetric-Polar-Products-September-22-2026/paper.pdf",
+        "preprints/The-Mahler-Conjecture-for-General-Convex-Bodies-September-22-2026/paper.pdf",
+        "preprints/The-symmetric-Mahler-conjecture-and-its-equality-cases-September-22-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "088",
+      "title": "Sharp projection-body inequalities and a counterexample to simplex maximization.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/088.md",
+        "preprints/A-product-counterexample-to-the-simplex-maximum-for-projection-body-volume-September-24-2026/paper.pdf",
+        "preprints/Pettys-projection-volume-conjecture-in-dimensions-at-least-four-September-24-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "089",
+      "title": "Bounded-distortion <i>L</i><sub>1</sub> embeddings of planar and bounded-treewidth graphs.",
+      "split": "test",
+      "linked_paths": [
+        "lean/docs/089.md",
+        "preprints/L1-Embeddings-of-Graphs-of-Bounded-Treewidth-September-23-2026/paper.pdf",
+        "preprints/Planar-Graph-Metrics-Embed-into-L1-with-Constant-Distortion-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "090",
+      "title": "Triangular-lattice optimality, long-range Riesz and Coulomb energies, and spherical logarithmic energy.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/090.md",
+        "preprints/A-sharp-Fourier-certificate-for-planar-circle-packing-September-23-2026/paper.pdf",
+        "preprints/An-atomic-certificate-for-triangular-lattice-universal-optimality-September-26-2026/paper.pdf",
+        "preprints/Triangular-minimality-for-planar-Coulomb-renormalized-energy-September-23-2026/paper.pdf",
+        "preprints/Universal-optimality-of-the-triangular-lattice-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "091",
+      "title": "Logarithmic and <i>L</i><sub><i>p</i></sub> Brunn–Minkowski inequalities and the B-conjecture.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/091.md",
+        "preprints/The-logarithmic-Brunn-Minkowski-conjecture-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "092",
+      "title": "The optimal order of convex-body covering density.",
+      "split": "validation",
+      "linked_paths": [
+        "lean/docs/092.md",
+        "preprints/A-single-lattice-covering-bound-of-order-n-log-n-September-23-2026/paper.pdf",
+        "preprints/Translative-covering-densities-of-order-n-log-n-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "093",
+      "title": "Dimension-free logarithmic Sobolev inequality for subgaussian log-concave measures.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/A-dimension-free-logarithmic-Sobolev-inequality-for-subgaussian-log-concave-measures-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "094",
+      "title": "Subpolynomial dimension reduction in <i>L</i><sub><i>p</i></sub>.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/094.md",
+        "preprints/Subpolynomial-dimension-reduction-in-Lp-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "095",
+      "title": "Hyperbolicity cones without semidefinite lifts.",
+      "split": "validation",
+      "linked_paths": [
+        "lean/docs/095.md",
+        "preprints/A-Nonspectrahedral-Hyperbolicity-Cone-September-24-2026/nonspectrahedral-hyperbolicity-cone.pdf",
+        "preprints/An-Exact-Semidefinite-Lift-of-a-Nonspectrahedral-Hyperbolicity-Cone-October-5-2026/Exact-Semidefinite-Lift-of-a-Nonspectrahedral-Hyperbolicity-Cone.pdf",
+        "preprints/Hyperbolicity-Cones-Without-Semidefinite-Lifts-October-5-2026/nonliftable-hyperbolicity.pdf"
+      ]
+    },
+    {
+      "family_id": "096",
+      "title": "The Gaussian propeller conjecture in every dimension.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/096.md",
+        "preprints/The-Gaussian-Propeller-Bound-in-Every-Dimension-September-24-2026/main.pdf"
+      ]
+    },
+    {
+      "family_id": "097",
+      "title": "The Euclidean Steinitz–Bergström bound.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/097.md",
+        "preprints/The-Euclidean-Steinitz-Bergstrom-theorem-September-24-2026/The-Euclidean-Steinitz-Bergstrom-theorem-September-24-2026.pdf"
+      ]
+    },
+    {
+      "family_id": "098",
+      "title": "Compact counterexamples to bi-Lipschitz dimension reduction.",
+      "split": "test",
+      "linked_paths": [
+        "lean/docs/098.md",
+        "preprints/A-doubling-Hilbert-subset-with-no-finite-dimensional-bi-Lipschitz-embedding-September-25-2026/main.pdf"
+      ]
+    },
+    {
+      "family_id": "099",
+      "title": "The sharp exponential scale of edit-distance distortion.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/099.md",
+        "preprints/Edit-Distance-in-l1-Matching-Bounds-up-to-Constants-in-the-Exponent-September-27-2026/paper.pdf",
+        "preprints/Finite-Circle-Obstructions-Binary-Codes-and-Histogram-Embeddings-for-Edit-Distance-September-27-2026/paper.pdf",
+        "preprints/Tree-Constructions-for-the-l1-Distortion-of-Binary-Edit-Distance-September-27-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "100",
+      "title": "Cylinder coverings below the half-area bound.",
+      "split": "validation",
+      "linked_paths": [
+        "lean/docs/100.md",
+        "preprints/Finite-angular-cylinder-covers-below-the-half-area-bound-September-27-2026/main.pdf",
+        "preprints/Finite-cylinder-approximation-of-ruled-sets-September-27-2026/main.pdf",
+        "preprints/Finite-triangular-approximation-of-radial-sweeps-September-27-2026/main.pdf",
+        "preprints/Slope-field-perturbations-of-the-two-cylinder-covering-September-27-2026/main.pdf"
+      ]
+    },
+    {
+      "family_id": "101",
+      "title": "The sharp simplex conjecture for isotropic constants.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/A-sharp-entropy-bound-and-the-simplex-inequality-for-isotropic-constants-October-5-2026/isotropic-simplex.pdf"
+      ]
+    },
+    {
+      "family_id": "102",
+      "title": "The Unique Games Conjecture and optimal approximation thresholds.",
+      "split": "test",
+      "linked_paths": [
+        "lean/docs/102.md",
+        "preprints/A-Direct-Proof-of-Optimal-Max-Cut-Hardness-September-23-2026/paper.pdf",
+        "preprints/Constant-factor-hardness-of-Min-UnCut-September-23-2026/paper.pdf",
+        "preprints/Constant-factor-hardness-of-directed-feedback-vertex-set-September-23-2026/paper.pdf",
+        "preprints/The-Factor-Two-Hardness-Threshold-for-Vertex-Cover-September-23-2026/paper.pdf",
+        "preprints/The-Unique-Games-Theorem-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "103",
+      "title": "Exact derandomization of logarithmic space: $`\\mathsf L=\\mathsf{RL}=\\mathsf{BPL}`$.",
+      "split": "test",
+      "linked_paths": [
+        "lean/docs/103.md",
+        "preprints/Exact-Derandomization-of-Logarithmic-Space-L-equals-RL-equals-BPL-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "104",
+      "title": "Quasipolynomial algorithms for mean-payoff, stochastic and parity games.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/104.md",
+        "preprints/Deterministic-quasipolynomial-time-mean-payoff-games-September-25-2026/paper.pdf",
+        "preprints/Mean-payoff-parity-games-in-quasipolynomial-time-October-5-2026/mean-payoff-parity.pdf",
+        "preprints/Randomized-quasipolynomial-time-mean-payoff-games-September-25-2026/paper.pdf",
+        "preprints/Turn-Based-Stochastic-Mean-Payoff-Games-in-Deterministic-Quasipolynomial-Time-October-5-2026/stochastic-mean-payoff-games.pdf"
+      ]
+    },
+    {
+      "family_id": "105",
+      "title": "Perfect completeness for 2-to-1 games.",
+      "split": "validation",
+      "linked_paths": [
+        "lean/docs/105.md",
+        "preprints/Perfect-completeness-for-2-to-1-games-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "106",
+      "title": "Hardness of coloring three-colorable graphs.",
+      "split": "validation",
+      "linked_paths": [
+        "lean/docs/106.md",
+        "preprints/Hardness-of-finding-large-independent-sets-in-three-colorable-graphs-September-24-2026/Hardness-of-finding-large-independent-sets-in-three-colorable-graphs-September-24-2026.pdf"
+      ]
+    },
+    {
+      "family_id": "107",
+      "title": "Matrix multiplication with exponent at most 9/4.",
+      "split": "validation",
+      "linked_paths": [
+        "lean/docs/107.md",
+        "preprints/Complex-Matrix-Multiplication-Below-2.258-and-Rectangular-Bounds-September-24-2026/Complex-Matrix-Multiplication-Below-2.258-and-Rectangular-Bounds-September-24-2026.pdf",
+        "preprints/Matrix-Multiplication-Nine-Fourths-October-2-2026/paper.pdf",
+        "preprints/Staggered-extraction-for-exact-matrix-multiplication-over-every-field-September-24-2026/Staggered-extraction-for-exact-matrix-multiplication-over-every-field-September-24-2026.pdf"
+      ]
+    },
+    {
+      "family_id": "108",
+      "title": "A cubic permanent–determinant lower bound.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/108.md",
+        "preprints/A-cubic-lower-bound-for-border-determinantal-complexity-of-the-permanent-September-24-2026/A-cubic-lower-bound-for-border-determinantal-complexity-of-the-permanent-September-24-2026.pdf"
+      ]
+    },
+    {
+      "family_id": "109",
+      "title": "Integer multiplication below $`n\\log n`$.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/Integer-multiplication-below-n-log-n-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "110",
+      "title": "Optimal-order randomized <i>k</i>-server on arbitrary metrics.",
+      "split": "validation",
+      "linked_paths": [
+        "lean/docs/110.md",
+        "preprints/Squared-logarithmic-randomized-k-server-on-arbitrary-metrics-September-24-2026/Squared-logarithmic-randomized-k-server-on-arbitrary-metrics-September-24-2026.pdf",
+        "preprints/Uniform-computation-of-the-squared-logarithmic-k-server-bound-September-24-2026/Uniform-computation-of-the-squared-logarithmic-k-server-bound-September-24-2026.pdf"
+      ]
+    },
+    {
+      "family_id": "111",
+      "title": "One-sample matroid prophet inequalities against an almighty adversary.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/111.md",
+        "preprints/One-Sample-Suffices-for-Matroid-Prophet-Inequalities-against-an-Almighty-Adversary-September-23-2026/final.pdf"
+      ]
+    },
+    {
+      "family_id": "112",
+      "title": "Beyond the square-root exponent for depth-three circuits.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/112.md",
+        "preprints/Beyond-the-Square-Root-Exponent-for-Depth-Three-Boolean-Circuits-September-23-2026/main.pdf"
+      ]
+    },
+    {
+      "family_id": "113",
+      "title": "Approximate counting and entropy of perfect matchings.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/113.md",
+        "preprints/A-Fully-Polynomial-Randomized-Approximation-Scheme-for-Perfect-Matchings-in-General-Graphs-September-23-2026/main.pdf",
+        "preprints/Entropy-and-Face-Dimension-of-the-Perfect-Matching-Polytope-September-23-2026/main.pdf"
+      ]
+    },
+    {
+      "family_id": "114",
+      "title": "Approximate counting of common integer polymatroid bases.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/114.md",
+        "preprints/An-FPRAS-for-Common-Integer-Polymatroid-Bases-with-Binary-Capacities-October-5-2026/polymatroid-fpras.pdf",
+        "preprints/Approximate-counting-of-common-bases-of-two-matroids-September-23-2026/main.pdf"
+      ]
+    },
+    {
+      "family_id": "115",
+      "title": "Sampling and counting contingency tables with arbitrary margins.",
+      "split": "test",
+      "linked_paths": [
+        "lean/docs/115.md",
+        "preprints/An-FPRAS-for-Cell-Bounded-Contingency-Tables-September-24-2026/main.pdf",
+        "preprints/Exact-Uniform-Sampling-of-Contingency-Tables-with-Arbitrary-Margins-September-24-2026/main.pdf"
+      ]
+    },
+    {
+      "family_id": "116",
+      "title": "Uniform black-box noncommutative identity testing across characteristics.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/116.md",
+        "preprints/One-Rational-Matrix-Hitting-Point-for-Noncommutative-Formulas-September-24-2026/One-Rational-Matrix-Hitting-Point-for-Noncommutative-Formulas-September-24-2026.pdf",
+        "preprints/Polynomial-Hitting-Lists-for-Noncommutative-Rational-Formulas-September-24-2026/Polynomial-Hitting-Lists-for-Noncommutative-Rational-Formulas-September-24-2026.pdf",
+        "preprints/Uniform-Matrix-Hitting-Points-in-Every-Positive-Characteristic-October-4-2026/uniform-matrix-hitting-points-positive-characteristic.pdf"
+      ]
+    },
+    {
+      "family_id": "117",
+      "title": "Uniform sparsest cut: hardness and semidefinite gaps.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/117.md",
+        "preprints/Constant-factor-hardness-of-uniform-sparsest-cut-September-24-2026/Constant-factor-hardness-of-uniform-sparsest-cut-September-24-2026.pdf",
+        "preprints/Near-square-root-logarithmic-integrality-gaps-for-uniform-sparsest-cut-September-24-2026/Near-square-root-logarithmic-integrality-gaps-for-uniform-sparsest-cut-September-24-2026.pdf"
+      ]
+    },
+    {
+      "family_id": "118",
+      "title": "Bin packing and unbounded configuration-LP gaps.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/118.md",
+        "preprints/Additive-hardness-and-unbounded-configuration-gaps-in-bin-packing-September-24-2026/Additive-hardness-and-unbounded-configuration-gaps-in-bin-packing-September-24-2026.pdf"
+      ]
+    },
+    {
+      "family_id": "119",
+      "title": "The Courtade–Kumar and Hellinger conjectures.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/119.md",
+        "preprints/Hellinger-contraction-with-arbitrary-Boolean-output-bias-September-24-2026/main.pdf",
+        "preprints/Sharp-binary-information-contraction-on-the-discrete-cube-September-24-2026/main.pdf"
+      ]
+    },
+    {
+      "family_id": "120",
+      "title": "Almost-linear-time exact matching and prescribed-degree factors in general graphs.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/Almost-Linear-Time-Maximum-Cardinality-Matching-in-Sparse-General-Graphs-September-24-2026/main.pdf"
+      ]
+    },
+    {
+      "family_id": "121",
+      "title": "Almost-linear approximation of edit distance.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/121.md",
+        "preprints/An-Almost-Linear-Approximation-Scheme-for-Edit-Distance-September-24-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "122",
+      "title": "Quantitative trace-reconstruction bounds with a uniform decoder.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/122.md",
+        "preprints/A-latest-anchor-induction-with-spectrally-compact-masks-for-worst-case-trace-reconstruction-October-5-2026/paper.pdf",
+        "preprints/Uniform-quasipolynomial-time-trace-reconstruction-October-5-2026/uniform-trace-reconstruction.pdf",
+        "preprints/quantitative-lower-bounds-for-trace-reconstruction-September-24-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "124",
+      "title": "Polynomial-time scheduling on three identical machines.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/124.md",
+        "preprints/A-polynomial-time-algorithm-for-three-machine-unit-job-scheduling-September-24-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "125",
+      "title": "The metric <i>k</i>-median approximation threshold and recovery.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/125.md",
+        "preprints/Single-Exponential-Recovery-and-Bounded-Price-Strictness-for-Metric-k-Median-September-24-2026/paper.pdf",
+        "preprints/The-Approximation-Threshold-for-Metric-k-Median-September-24-2026/main.pdf"
+      ]
+    },
+    {
+      "family_id": "126",
+      "title": "Exponential semidefinite complexity of perfect matching.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/126.md",
+        "preprints/Exponential-PSD-rank-of-positively-shifted-matching-matrices-October-5-2026/shifted-matching-psd.pdf"
+      ]
+    },
+    {
+      "family_id": "127",
+      "title": "Average sensitivity of polynomial threshold functions.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/127.md",
+        "preprints/Average-Sensitivity-of-Polynomial-Threshold-Functions-September-25-2026/main.pdf"
+      ]
+    },
+    {
+      "family_id": "128",
+      "title": "A factor-two approximation for shortest common superstring.",
+      "split": "validation",
+      "linked_paths": [
+        "lean/docs/128.md",
+        "preprints/A-Polynomial-Time-2-Approximation-for-Shortest-Common-Superstring-September-24-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "129",
+      "title": "Exponential state costs for two-way automata.",
+      "split": "test",
+      "linked_paths": [
+        "lean/docs/129.md",
+        "preprints/An-exponential-state-lower-bound-for-two-way-nondeterministic-complementation-September-25-2026/paper.pdf",
+        "preprints/An-exponential-two-way-deterministic-state-lower-bound-for-one-way-liveness-September-25-2026/main.pdf"
+      ]
+    },
+    {
+      "family_id": "130",
+      "title": "Exact Fourier transforms below $`n\\log n`$.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/130.md",
+        "preprints/An-explicit-power-saving-for-the-exact-discrete-Fourier-transform-September-25-2026/main.pdf",
+        "preprints/Finite-tensor-savings-and-exact-Fourier-circuits-September-25-2026/main.pdf"
+      ]
+    },
+    {
+      "family_id": "131",
+      "title": "Rapid mixing of graph switches for every degree sequence.",
+      "split": "validation",
+      "linked_paths": [
+        "lean/docs/131.md",
+        "preprints/Polynomial-Mixing-of-the-Switch-Chain-for-Every-Graphical-Degree-Sequence-September-25-2026/main.pdf"
+      ]
+    },
+    {
+      "family_id": "132",
+      "title": "A superquadratic separation of sensitivity and block sensitivity.",
+      "split": "validation",
+      "linked_paths": [
+        "lean/docs/132.md",
+        "preprints/A-superquadratic-separation-between-sensitivity-and-block-sensitivity-September-25-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "133",
+      "title": "The computational complexity of Weisfeiler–Leman refinement.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/133.md",
+        "preprints/Parity-lifts-and-bounded-treewidth-witnesses-for-Weisfeiler-Leman-equivalence-September-25-2026/paper.pdf",
+        "preprints/The-complexity-of-identifying-a-graph-by-Weisfeiler-Leman-refinement-September-25-2026/paper.pdf",
+        "preprints/Unconditional-time-lower-bounds-for-Weisfeiler-Leman-equivalence-September-25-2026/paper.pdf",
+        "preprints/Variable-dimension-Weisfeiler-Leman-equivalence-on-general-and-subcubic-graphs-September-25-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "134",
+      "title": "Generalized star height at most three.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/134.md",
+        "preprints/Finite-Monoid-Computations-and-a-Uniform-Generalized-Star-Height-Bound-September-25-2026/Finite-Monoid-Computations-and-a-Uniform-Generalized-Star-Height-Bound-September-25-2026.pdf",
+        "preprints/Generalized-Star-Height-at-Most-Four-September-25-2026/Generalized-Star-Height-at-Most-Four-September-25-2026.pdf",
+        "preprints/Generalized-Star-Height-at-Most-Three-September-25-2026/article.pdf"
+      ]
+    },
+    {
+      "family_id": "135",
+      "title": "Homogeneous depth-five lower bounds for iterated matrix multiplication.",
+      "split": "test",
+      "linked_paths": [
+        "lean/docs/135.md",
+        "preprints/Homogeneous-depth-five-lower-bounds-for-iterated-matrix-multiplication-September-25-2026/Homogeneous-depth-five-lower-bounds-for-iterated-matrix-multiplication-September-25-2026.pdf"
+      ]
+    },
+    {
+      "family_id": "136",
+      "title": "A quasilinear PCP theorem for PPAD.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/The-PCP-for-PPAD-conjecture-a-quasilinear-reduction-September-25-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "137",
+      "title": "One-tape time simulation in two-fifths-power space.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/137.md",
+        "preprints/Simulating-One-Tape-Time-in-Two-Fifths-Power-Space-September-25-2026/article.pdf"
+      ]
+    },
+    {
+      "family_id": "138",
+      "title": "Subset Sum in $`O(2^{0.49n})`$ time.",
+      "split": "validation",
+      "linked_paths": [
+        "preprints/A-Low-Space-Algorithm-for-Worst-Case-Subset-Sum-September-26-2026/paper.pdf",
+        "preprints/Subset-Sum-in-Time-2-power-0-49n-October-4-2026/subset-sum.pdf"
+      ]
+    },
+    {
+      "family_id": "139",
+      "title": "Subpolynomial query complexity for log-concave sampling.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/139.md",
+        "preprints/Subpolynomial-query-complexity-for-well-conditioned-log-concave-sampling-September-26-2026/article.pdf"
+      ]
+    },
+    {
+      "family_id": "140",
+      "title": "Memory–sample lower bounds for noiseless Gaussian regression.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/140.md",
+        "preprints/Localization-costs-and-information-growth-for-exact-Gaussian-observations-September-27-2026/paper.pdf",
+        "preprints/Memory-and-precision-in-noiseless-Gaussian-regression-September-27-2026/paper.pdf",
+        "preprints/Posterior-replicas-and-conditional-information-in-Gaussian-regression-September-27-2026/paper.pdf",
+        "preprints/Projection-moments-positive-cap-domination-and-Riesz-estimates-on-the-sphere-September-27-2026/paper.pdf",
+        "preprints/Replacing-Gaussian-observations-in-memory-constrained-inference-September-27-2026/paper.pdf",
+        "preprints/Subsphere-methods-for-memory-sample-lower-bounds-in-noiseless-Gaussian-regression-September-27-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "141",
+      "title": "Existential–universal real sentences in the counting hierarchy.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/Existential-universal-real-sentences-in-the-counting-hierarchy-October-4-2026/etr-counting-hierarchy.pdf"
+      ]
+    },
+    {
+      "family_id": "142",
+      "title": "Deterministic polynomial factorization over prime fields.",
+      "split": "validation",
+      "linked_paths": [
+        "preprints/Deterministic-Polynomial-Factorization-over-Prime-Fields-October-4-2026/Deterministic-Polynomial-Factorization-over-Prime-Fields.pdf"
+      ]
+    },
+    {
+      "family_id": "143",
+      "title": "Hilbert's sixteenth problem: uniform bounds for limit cycles.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/143.md",
+        "preprints/two-limit-cycles-for-quintic-lienard-systems-September-24-2026/two-limit-cycles-for-quintic-lienard-systems-September-24-2026.pdf",
+        "preprints/uniform-bounds-for-planar-polynomial-limit-cycles-September-24-2026/uniform-bounds-for-planar-polynomial-limit-cycles-September-24-2026.pdf"
+      ]
+    },
+    {
+      "family_id": "144",
+      "title": "Banach’s simple Lebesgue-spectrum problem.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/144.md",
+        "preprints/A-smooth-three-torus-diffeomorphism-with-simple-Lebesgue-spectrum-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "145",
+      "title": "Rokhlin’s multiple-mixing problem.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/145.md",
+        "preprints/Rokhlins-multiple-mixing-problem-for-one-transformation-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "146",
+      "title": "Positive metric entropy for the standard map.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/146.md",
+        "preprints/Positive-Metric-Entropy-for-the-Standard-Map-at-Large-Parameters-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "147",
+      "title": "The near-boundary Birkhoff conjecture.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/Continuous-Phase-Foliations-Create-Analytic-Caustic-Collars-September-24-2026/paper.pdf",
+        "preprints/Rigidity-of-Smooth-Billiards-with-a-Continuous-Caustic-Collar-September-24-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "148",
+      "title": "The entropy-rate dimension formula for self-similar measures.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/148.md",
+        "preprints/The-entropy-rate-dimension-formula-for-self-similar-measures-on-the-line-September-24-2026/main.pdf"
+      ]
+    },
+    {
+      "family_id": "149",
+      "title": "Classwise permanence for weakly reversible mass-action systems.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/149.md",
+        "preprints/Boundedness-and-persistence-of-weakly-reversible-mass-action-systems-September-25-2026/paper.pdf",
+        "preprints/Uniform-Permanence-in-Weakly-Reversible-Mass-Action-Systems-October-5-2026/permanence.pdf"
+      ]
+    },
+    {
+      "family_id": "150",
+      "title": "Weak mixing of triangular billiards with an irrational angle.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/150.md",
+        "preprints/Ergodicity-of-triangular-billiards-with-an-irrational-angle-September-25-2026/Ergodicity-of-triangular-billiards-with-an-irrational-angle-September-25-2026.pdf",
+        "preprints/Weak-mixing-of-triangular-billiards-with-an-irrational-angle-October-5-2026/weak-mixing-triangular-billiards.pdf"
+      ]
+    },
+    {
+      "family_id": "151",
+      "title": "A <i>C</i><sup>1</sup> counterexample to the entropy conjecture.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/151.md",
+        "preprints/A-C1-Counterexample-to-the-Entropy-Conjecture-September-25-2026/article.pdf"
+      ]
+    },
+    {
+      "family_id": "152",
+      "title": "Zero entropy does not guarantee a smooth positive-volume model.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/152.md",
+        "preprints/A-finite-entropy-system-without-a-smooth-positive-volume-model-September-25-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "153",
+      "title": "Arithmetic classification and non-Pisot singularity for Bernoulli convolutions.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/Arithmetic-classification-and-non-Pisot-singularity-for-Bernoulli-convolutions-October-3-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "154",
+      "title": "Pointwise multiple ergodic averages for mixing transformations.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/Pointwise-Multiple-Ergodic-Averages-for-Mixing-Transformations-October-4-2026/multiple-ergodic-averages.pdf",
+        "preprints/Pointwise-convergence-of-fourfold-ergodic-averages-for-mixing-transformations-October-4-2026/fourfold-ergodic-averages.pdf",
+        "preprints/Pointwise-convergence-of-triple-ergodic-averages-for-mixing-transformations-October-4-2026/pointwise-triple-ergodic-averages-mixing-transformations.pdf",
+        "preprints/Triple-ergodic-averages-with-distinct-integer-slopes-October-4-2026/triple-ergodic-distinct-slopes.pdf"
+      ]
+    },
+    {
+      "family_id": "155",
+      "title": "A counterexample to periodic tiling in dimension three.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/155.md",
+        "preprints/A-translational-tile-with-no-fully-periodic-tiling-in-dimension-three-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "156",
+      "title": "Borsuk's conjecture fails in dimension nine.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/156.md",
+        "preprints/A-nine-dimensional-counterexample-to-Borsuks-covering-assertion-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "157",
+      "title": "Graph coloring, clique minors, and Colin de Verdière invariants.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/157.md",
+        "preprints/A-counterexample-to-Hadwigers-conjecture-September-23-2026/paper.pdf",
+        "preprints/A-counterexample-to-the-Colin-de-Verdiere-chromatic-conjecture-September-23-2026/paper.pdf",
+        "preprints/A-linear-list-coloring-bound-in-terms-of-the-Hadwiger-number-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "158",
+      "title": "The Euclidean plane cannot be colored with five colors.",
+      "split": "test",
+      "linked_paths": [
+        "lean/docs/158.md",
+        "preprints/The-Euclidean-plane-is-not-five-colorable-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "159",
+      "title": "Erdős’s reciprocal-sum conjecture and quasipolynomial Szemerédi bounds.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/159.md",
+        "preprints/Quasipolynomial-Bounds-for-Arithmetic-Progressions-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "160",
+      "title": "Superexponential van der Waerden numbers.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/160.md",
+        "preprints/Quantitative-Superexponential-Bounds-for-van-der-Waerden-Numbers-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "161",
+      "title": "Counterexamples to Sidorenko’s conjecture and the forcing conjecture.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/161.md",
+        "preprints/A-counterexample-to-Sidorenkos-conjecture-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "162",
+      "title": "Counterexamples to Ryser’s covering conjecture.",
+      "split": "validation",
+      "linked_paths": [
+        "lean/docs/162.md",
+        "preprints/A-Counterexample-to-Rysers-Covering-Conjecture-September-23-2026/paper.pdf",
+        "preprints/Balanced-Counterexamples-to-Rysers-Conjecture-at-Prime-Orders-September-27-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "164",
+      "title": "Hindman’s finite sums and products conjecture.",
+      "split": "test",
+      "linked_paths": [
+        "preprints/Monochromatic-finite-sums-and-products-in-the-positive-integers-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "165",
+      "title": "The Harary–Hill and Zarankiewicz crossing-number formulas.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/165.md",
+        "preprints/The-crossing-number-of-complete-bipartite-graphs-September-23-2026/paper.pdf",
+        "preprints/The-crossing-number-of-complete-graphs-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "166",
+      "title": "The higher-dimensional Erdős distinct-distances conjecture.",
+      "split": "validation",
+      "linked_paths": [
+        "preprints/The-higher-dimensional-Erdos-distinct-distances-conjecture-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "167",
+      "title": "Planar distinct distances and unit-distance bounds.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/167.md",
+        "preprints/A-power-saving-for-planar-unit-distances-September-23-2026/paper.pdf",
+        "preprints/The-weak-pinned-planar-distance-theorem-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "168",
+      "title": "Combinatorial invariance of Kazhdan–Lusztig polynomials.",
+      "split": "validation",
+      "linked_paths": [
+        "lean/docs/168.md",
+        "preprints/Combinatorial-Invariance-of-Kazhdan-Lusztig-Polynomials-September-24-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "169",
+      "title": "Shareshian–Wachs elementary positivity.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/169.md",
+        "preprints/Elementary-Positivity-of-Chromatic-Quasisymmetric-Functions-September-24-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "170",
+      "title": "Sharp logarithmic exponents for off-diagonal Ramsey numbers.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/170.md",
+        "preprints/Sharp-Logarithmic-Exponents-for-Fixed-Off-Diagonal-Ramsey-Numbers-September-24-2026/paper.pdf",
+        "preprints/The-Sharp-Logarithmic-Exponent-of-r-5-t-September-24-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "171",
+      "title": "The hypercube Ramsey conjecture.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/The-hypercube-Ramsey-number-has-linear-order-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "172",
+      "title": "Classification of finite Euclidean Ramsey configurations.",
+      "split": "validation",
+      "linked_paths": [
+        "lean/docs/172.md",
+        "preprints/A-classification-of-finite-Euclidean-Ramsey-configurations-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "173",
+      "title": "Seymour’s second-neighborhood conjecture.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/173.md",
+        "preprints/A-proof-of-Seymours-second-neighborhood-conjecture-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "174",
+      "title": "Deterministic construction of strong thin spanning trees.",
+      "split": "validation",
+      "linked_paths": [
+        "lean/docs/174.md",
+        "preprints/A-polynomial-time-construction-of-strong-thin-trees-September-23-2026/paper.pdf",
+        "preprints/The-strong-thin-tree-conjecture-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "175",
+      "title": "Talagrand’s expectation thresholds, discrete convexity, and graph decompositions.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/175.md",
+        "preprints/Graph-Decompositions-at-the-Integral-Expectation-Threshold-October-5-2026/graph-threshold-decompositions.pdf",
+        "preprints/Integral-and-fractional-expectation-thresholds-are-equivalent-September-23-2026/paper.pdf",
+        "preprints/Talagrands-discrete-convexity-conjecture-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "176",
+      "title": "The second Kahn–Kalai conjecture with an edge-count bound.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/176.md",
+        "preprints/The-second-Kahn-Kalai-conjecture-September-24-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "177",
+      "title": "Bounded-degree coboundary expanders.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/177.md",
+        "preprints/Bounded-degree-coboundary-expanders-in-every-dimension-September-24-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "178",
+      "title": "Deterministic nonbipartite Ramanujan graphs in every fixed degree.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/Deterministic-nonbipartite-Ramanujan-graphs-in-every-fixed-degree-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "179",
+      "title": "The circulant Hadamard and Barker-sequence conjectures.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/179.md",
+        "preprints/The-circulant-Hadamard-conjecture-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "180",
+      "title": "Barnette’s Hamiltonian-cycle conjecture.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/180.md",
+        "preprints/Paired-states-and-Hamiltonian-cycles-in-cubic-bipartite-planar-graphs-September-24-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "181",
+      "title": "The Erdős–Gallai cycle-decomposition conjecture.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/181.md",
+        "preprints/A-linear-cycle-and-edge-decomposition-of-every-graph-September-24-2026/main.pdf"
+      ]
+    },
+    {
+      "family_id": "182",
+      "title": "Power savings for intersective polynomial differences and prime arguments.",
+      "split": "test",
+      "linked_paths": [
+        "lean/docs/182.md",
+        "preprints/A-Power-Saving-for-Polynomial-Differences-at-Prime-Arguments-October-5-2026/prime-argument-polynomial-differences.pdf",
+        "preprints/A-power-saving-for-intersective-polynomial-differences-with-an-exponent-depending-only-on-the-degree-October-5-2026/power-saving-intersective-polynomial-differences.pdf",
+        "preprints/A-power-saving-for-square-difference-free-sets-September-24-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "183",
+      "title": "Power savings for planar halving lines and <i>k</i>-sets.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/183.md",
+        "preprints/A-power-saving-for-planar-halving-lines-September-25-2026/main.pdf"
+      ]
+    },
+    {
+      "family_id": "184",
+      "title": "Correspondence coloring with a fixed forbidden subgraph.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/184.md",
+        "preprints/A-Logarithmic-Independence-Bound-for-Clique-Free-Graphs-September-25-2026/paper.pdf",
+        "preprints/Correspondence-Coloring-Graphs-with-a-Forbidden-Clique-October-5-2026/correspondence-coloring-forbidden-clique.pdf"
+      ]
+    },
+    {
+      "family_id": "185",
+      "title": "Counterexamples to infinite matroid intersection and packing/covering.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/185.md",
+        "preprints/A-Counterexample-to-the-Infinite-Matroid-Packing-Covering-Conjecture-September-24-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "186",
+      "title": "Uniform influence and sharp thresholds for graph and hypergraph properties.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/186.md",
+        "preprints/A-Sharp-Threshold-Bound-for-Monotone-Graph-Properties-September-25-2026/paper.pdf",
+        "preprints/A-uniform-influence-bound-for-hypergraph-properties-October-5-2026/hypergraph-influences.pdf"
+      ]
+    },
+    {
+      "family_id": "187",
+      "title": "Snaky in 21 Maker moves.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/187.md",
+        "preprints/Snaky-in-21-Maker-moves-September-25-2026/article.pdf"
+      ]
+    },
+    {
+      "family_id": "188",
+      "title": "The sharp terminal leave in random triangle removal.",
+      "split": "test",
+      "linked_paths": [
+        "lean/docs/188.md",
+        "preprints/The-Sharp-Terminal-Leave-in-Random-Triangle-Removal-September-25-2026/The-Sharp-Terminal-Leave-in-Random-Triangle-Removal-September-25-2026.pdf"
+      ]
+    },
+    {
+      "family_id": "189",
+      "title": "Cycle–clique Ramsey numbers.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/189.md",
+        "preprints/Cycle-clique-Ramsey-numbers-September-25-2026/Cycle-clique-Ramsey-numbers-September-25-2026.pdf"
+      ]
+    },
+    {
+      "family_id": "190",
+      "title": "Polynomial removal fails for ordered binary matrices.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/190.md",
+        "preprints/Polynomial-removal-fails-for-ordered-binary-matrices-September-25-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "191",
+      "title": "A power improvement in the Heilbronn triangle lower bound.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/191.md",
+        "preprints/A-power-improvement-in-the-Heilbronn-triangle-lower-bound-September-25-2026/main.pdf"
+      ]
+    },
+    {
+      "family_id": "192",
+      "title": "Boolean functions violate the square-root degree bound by arbitrary factors.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/192.md",
+        "preprints/Unbounded-Violations-of-the-Square-Root-Degree-Bound-September-26-2026/Unbounded-Violations-of-the-Square-Root-Degree-Bound-September-26-2026.pdf"
+      ]
+    },
+    {
+      "family_id": "193",
+      "title": "Serre’s intersection-multiplicity conjecture.",
+      "split": "validation",
+      "linked_paths": [
+        "preprints/Positivity-of-Serres-Intersection-Multiplicity-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "194",
+      "title": "Lech’s multiplicity conjecture.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/194.md",
+        "preprints/Lechs-multiplicity-conjecture-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "195",
+      "title": "A counterexample to the small Cohen–Macaulay module conjecture.",
+      "split": "test",
+      "linked_paths": [
+        "lean/docs/195.md",
+        "preprints/A-Complete-Local-Domain-Without-a-Small-Cohen-Macaulay-Module-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "196",
+      "title": "A counterexample to Kaplansky’s zero-divisor conjecture.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/196.md",
+        "preprints/A-Torsion-Free-Group-Algebra-with-Zero-Divisors-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "197",
+      "title": "A torsion-free group algebra that is not directly finite.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/197.md",
+        "preprints/A-Counterexample-to-Kaplanskys-Direct-Finiteness-Conjecture-in-Characteristic-Two-September-23-2026/paper.pdf",
+        "preprints/A-Counterexample-to-Kaplanskys-Direct-Finiteness-Conjecture-in-Odd-Characteristic-September-26-2026/paper.pdf",
+        "preprints/A-Counterexample-to-the-Group-Ring-Determinant-Conjecture-September-23-2026/paper.pdf",
+        "preprints/A-Torsion-Free-Group-Algebra-That-Is-Not-Directly-Finite-October-4-2026/direct-finiteness.pdf"
+      ]
+    },
+    {
+      "family_id": "198",
+      "title": "A counterexample to finitistic-dimension finiteness.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/198.md",
+        "preprints/An-algebra-of-infinite-little-finitistic-dimension-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "199",
+      "title": "Counterexamples to Auslander–Reiten, Tachikawa and related homological conjectures.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/199.md",
+        "preprints/A-counterexample-to-Tachikawas-second-conjecture-September-23-2026/paper.pdf",
+        "preprints/An-explicit-counterexample-to-the-Auslander-Reiten-conjecture-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "200",
+      "title": "Eisenbud–Green–Harris and lex-plus-powers.",
+      "split": "validation",
+      "linked_paths": [
+        "preprints/Commuting-Division-Coefficient-Forms-and-the-Artinian-Eisenbud-Green-Harris-Conjecture-September-23-2026/paper.pdf",
+        "preprints/The-Artinian-Lex-Plus-Powers-Betti-Theorem-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "201",
+      "title": "A counterexample to Kurosh’s division-ring problem.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/A-Counterexample-to-Kuroshs-Division-Ring-Problem-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "202",
+      "title": "The blockwise Alperin weight conjecture.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/The-Blockwise-Alperin-Weight-Conjecture-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "203",
+      "title": "Donovan's conjecture over fields and complete mixed-characteristic DVRs.",
+      "split": "validation",
+      "linked_paths": [
+        "preprints/Donovans-Conjecture-over-Algebraic-Closures-of-Prime-Fields-September-24-2026/main.pdf",
+        "preprints/Integral-Donovan-Finiteness-over-Witt-Vectors-September-25-2026/main.pdf"
+      ]
+    },
+    {
+      "family_id": "204",
+      "title": "Tensor saturation for even spin groups.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/Tensor-Saturation-for-Even-Spin-Groups-September-24-2026/Tensor-Saturation-for-Even-Spin-Groups-September-24-2026.pdf"
+      ]
+    },
+    {
+      "family_id": "205",
+      "title": "Saxl’s conjecture and universal tensor squares.",
+      "split": "test",
+      "linked_paths": [
+        "lean/docs/205.md",
+        "preprints/A-Cyclic-Polytabloid-Proof-of-Saxls-Conjecture-September-24-2026/paper.pdf",
+        "preprints/Universal-Tensor-Squares-for-Symmetric-Groups-September-24-2026/main.pdf"
+      ]
+    },
+    {
+      "family_id": "206",
+      "title": "Finite lattice representation and undecidability.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/206.md",
+        "preprints/A-Negative-Solution-to-the-Finite-Lattice-Representation-Problem-September-24-2026/paper.pdf",
+        "preprints/Finite-Congruence-Lattices-Characterization-and-Undecidability-September-24-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "207",
+      "title": "The ℓ¹-Bass conjecture for all discrete groups.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/207.md",
+        "preprints/The-Bass-trace-conjecture-for-complex-group-rings-September-24-2026/The-Bass-trace-conjecture-for-complex-group-rings-September-24-2026.pdf",
+        "preprints/The-l1-Bass-Conjecture-for-Discrete-Groups-October-5-2026/l1-bass-conjecture.pdf"
+      ]
+    },
+    {
+      "family_id": "208",
+      "title": "Finite symmetric tensor categories and the Verlinde tower.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/Fiber-functors-for-finite-symmetric-tensor-categories-in-positive-characteristic-September-24-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "209",
+      "title": "Integral counterexamples to Gersten’s conjecture.",
+      "split": "validation",
+      "linked_paths": [
+        "preprints/An-Integral-Counterexample-to-Gerstens-Conjecture-September-25-2026/An-Integral-Counterexample-to-Gerstens-Conjecture-September-25-2026.pdf",
+        "preprints/An-Integral-Degree-Three-Gersten-Counterexample-September-26-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "210",
+      "title": "Foulkes' conjecture for sixth powers and quadratic stabilization.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/210.md",
+        "preprints/Foulkes-Conjecture-for-the-Sixth-Symmetric-Power-September-25-2026/main.pdf",
+        "preprints/Quadratic-Stabilization-of-the-Canonical-Foulkes-Howe-Map-September-25-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "211",
+      "title": "The geometric phase diagram, diffusion, and spectra of random planar maps.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/211.md",
+        "preprints/A-Linear-Clock-for-Random-Walk-on-Tree-Weighted-Planar-Maps-October-5-2026/linear-clock-random-walk-tree-weighted-planar-maps.pdf",
+        "preprints/Brownian-continuum-random-tree-limits-of-finite-Fortuin-Kasteleyn-maps-above-four-September-24-2026/main.pdf",
+        "preprints/Canonical-conformal-limits-of-subcritical-FK-planar-maps-September-24-2026/main.pdf",
+        "preprints/Metric-measure-limits-of-subcritical-FK-and-spanning-tree-planar-maps-September-24-2026/main.pdf",
+        "preprints/Random-Walks-on-Critical-FK-Ising-Maps-and-Liouville-Brownian-Motion-October-5-2026/fk-ising-walk-limit.pdf",
+        "preprints/Spectral-convergence-for-critical-FK-Ising-planar-maps-October-5-2026/spectral-convergence-critical-fk-ising-planar-maps.pdf",
+        "preprints/The-critical-Liouville-quantum-sphere-and-geometric-limits-of-FK-maps-at-q-equals-4-September-24-2026/main.pdf"
+      ]
+    },
+    {
+      "family_id": "212",
+      "title": "Planar first-passage geometry and the absence of bigeodesics.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/212.md",
+        "preprints/No-bigeodesics-in-planar-first-passage-percolation-September-24-2026/main.pdf",
+        "preprints/Strict-convexity-and-differentiability-of-the-planar-exponential-first-passage-limit-shape-September-24-2026/main.pdf"
+      ]
+    },
+    {
+      "family_id": "213",
+      "title": "Critical percolation on every quasi-transitive graph.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/213.md",
+        "preprints/Critical-bond-and-site-percolation-on-the-cubic-lattice-September-24-2026/paper.pdf",
+        "preprints/No-percolation-at-criticality-on-quasi-transitive-graphs-September-24-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "214",
+      "title": "The Benjamini–Schramm nonuniqueness conjecture.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/214.md",
+        "preprints/Nonuniqueness-of-percolation-on-nonamenable-quasi-transitive-graphs-September-24-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "215",
+      "title": "Canonical $`O(3)`$ continuum limit and exact $`O(4)`$ mass asymptotics.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/215.md",
+        "preprints/An-Isolated-Particle-Pole-for-the-Two-Dimensional-O3-Spin-Field-October-4-2026/o3-particle-pole.pdf",
+        "preprints/Exact-mass-asymptotics-for-the-two-dimensional-O4-lattice-model-October-5-2026/exact-mass-o4.pdf",
+        "preprints/Exponential-decay-in-two-dimensional-classical-On-models-September-23-2026/paper.pdf",
+        "preprints/Sharp-mass-bounds-for-the-two-dimensional-O4-model-September-23-2026/paper.pdf",
+        "preprints/The-canonical-massive-continuum-limit-of-the-two-dimensional-O3-model-October-4-2026/massive-continuum-o3.pdf"
+      ]
+    },
+    {
+      "family_id": "216",
+      "title": "Critical and near-critical XY scaling and BKT universality.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/BKT-universality-for-height-and-planar-spin-fields-September-24-2026/paper.pdf",
+        "preprints/Critical-Center-Magnetization-in-the-Planar-XY-Model-October-5-2026/paper.pdf",
+        "preprints/Essential-Singularity-of-the-Correlation-Length-in-the-Planar-XY-Model-October-5-2026/paper.pdf",
+        "preprints/The-Critical-Spin-Field-of-the-Planar-XY-Model-October-5-2026/paper.pdf",
+        "preprints/The-critical-correlation-exponent-of-the-planar-XY-model-September-24-2026/paper.pdf",
+        "preprints/The-critical-logarithmic-correction-for-the-planar-XY-model-October-5-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "217",
+      "title": "The low-temperature Sherrington–Kirkpatrick fluctuation law.",
+      "split": "validation",
+      "linked_paths": [
+        "preprints/The-low-temperature-Sherrington-Kirkpatrick-fluctuation-scale-September-24-2026/The-low-temperature-Sherrington-Kirkpatrick-fluctuation-scale-September-24-2026.pdf",
+        "preprints/The-low-temperature-Sherrington-Kirkpatrick-free-energy-limiting-law-September-24-2026/The-low-temperature-Sherrington-Kirkpatrick-free-energy-limiting-law-September-24-2026.pdf"
+      ]
+    },
+    {
+      "family_id": "218",
+      "title": "Conformal universality for weakly interacting and random-bond Ising models.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/218.md",
+        "preprints/Buffered-comparison-and-stopping-band-resolution-in-critical-Ising-September-23-2026/paper.pdf",
+        "preprints/Conformal-universality-of-bulk-Ising-correlations-under-weak-interactions-September-23-2026/paper.pdf",
+        "preprints/Logarithmic-Relative-Fluctuations-in-the-Weakly-Disordered-Planar-Ising-Model-October-5-2026/critical-relative-second-moment-weak-random-bond-ising.pdf",
+        "preprints/Quenched-SLE3-Universality-for-the-Weak-Random-Bond-Ising-Model-October-5-2026/quenched-sle3-weak-random-bond-ising.pdf",
+        "preprints/Quenched-SLE3-limits-for-general-weak-random-bond-Ising-models-October-5-2026/general-weak-random-bond-ising.pdf",
+        "preprints/SLE3-universality-for-weak-finite-range-Ising-interactions-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "219",
+      "title": "GOE bulk universality for regular graphs with weak Anderson disorder.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/Fixed-energy-universality-for-weak-Anderson-disorder-on-random-regular-graphs-October-5-2026/fixed-energy-universality-weak-anderson-disorder-random-regular-graphs.pdf",
+        "preprints/GOE-bulk-universality-for-fixed-degree-random-regular-graphs-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "220",
+      "title": "Directional zero–one laws beyond iid environments and iid ballisticity.",
+      "split": "validation",
+      "linked_paths": [
+        "lean/docs/220.md",
+        "preprints/A-directional-zero-one-law-for-finite-range-dependent-random-environments-October-5-2026/directional-zero-one-finite-range.pdf",
+        "preprints/A-directional-zero-one-law-under-strict-ellipticity-September-23-2026/paper.pdf",
+        "preprints/Directional-transience-implies-ballisticity-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "221",
+      "title": "The Mézard–Parisi formula for diluted spin glasses.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/221.md",
+        "preprints/The-Mezard-Parisi-formula-for-diluted-spin-glasses-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "222",
+      "title": "Perceptron free energies and microscopic jamming exponents.",
+      "split": "test",
+      "linked_paths": [
+        "lean/docs/222.md",
+        "preprints/Microscopic-jamming-in-the-negative-spherical-perceptron-September-24-2026/Microscopic-jamming-in-the-negative-spherical-perceptron-September-24-2026.pdf",
+        "preprints/The-free-energy-of-the-Ising-random-perceptron-September-24-2026/The-free-energy-of-the-Ising-random-perceptron-September-24-2026.pdf",
+        "preprints/The-free-energy-of-the-spherical-random-perceptron-September-24-2026/The-free-energy-of-the-spherical-random-perceptron-September-24-2026.pdf",
+        "preprints/The-spherical-perceptron-with-bi-orthogonally-invariant-disorder-September-24-2026/The-spherical-perceptron-with-bi-orthogonally-invariant-disorder-September-24-2026.pdf"
+      ]
+    },
+    {
+      "family_id": "223",
+      "title": "Random-cluster interfaces: critical, disordered, thermal, and natural-time scaling.",
+      "split": "validation",
+      "linked_paths": [
+        "preprints/Conformal-Limits-of-Critical-Square-Lattice-Random-Cluster-Interfaces-October-5-2026/paper.pdf",
+        "preprints/Natural-Occupation-Measures-for-Critical-Square-Lattice-FK-Interfaces-October-5-2026/natural-occupation-measures-critical-square-lattice-fk-interfaces.pdf",
+        "preprints/Quenched-SLE-Universality-for-Weakly-Disordered-FK-Ising-Interfaces-October-5-2026/quenched-fk-ising.pdf",
+        "preprints/Self-dual-random-cluster-interfaces-below-one-September-23-2026/paper.pdf",
+        "preprints/Square-lattice-FK-interfaces-and-nested-loops-for-1-leq-q-lt-4-September-23-2026/paper.pdf",
+        "preprints/Thermal-FK-Ising-interfaces-and-massive-SLE-October-5-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "224",
+      "title": "Critical and quenched near-critical universality for Poisson–Voronoi percolation.",
+      "split": "validation",
+      "linked_paths": [
+        "preprints/A-Pivotal-Amplitude-for-Voronoi-Percolation-from-Cardys-Formula-October-5-2026/voronoi-pivotal-amplitude.pdf",
+        "preprints/Cardys-formula-for-critical-Poisson-Voronoi-percolation-September-23-2026/paper.pdf",
+        "preprints/From-critical-crossings-to-quenched-near-critical-universality-in-Voronoi-percolation-October-5-2026/critical-crossings-quenched-near-critical-universality-voronoi-percolation.pdf"
+      ]
+    },
+    {
+      "family_id": "225",
+      "title": "Gaussian free field limits throughout the balanced six-vertex regime.",
+      "split": "test",
+      "linked_paths": [
+        "preprints/The-Gaussian-free-field-limit-of-the-balanced-six-vertex-model-with-variance-multiplier-1-over-arcsin-c-over-2-September-23-2026/The-Gaussian-free-field-limit-of-the-balanced-six-vertex-model-with-variance-multiplier-1-over-arcsin-c-over-2-September-23-2026.pdf"
+      ]
+    },
+    {
+      "family_id": "226",
+      "title": "The double-dimer loop ensemble converges to CLE<sub>4</sub>.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/The-curve-scaling-limit-of-half-plane-double-dimers-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "227",
+      "title": "Critical SK autocorrelation processes and dynamics across the temperature transition.",
+      "split": "validation",
+      "linked_paths": [
+        "lean/docs/227.md",
+        "preprints/A-spectral-gap-throughout-the-high-temperature-Sherrington-Kirkpatrick-phase-September-24-2026/main.pdf",
+        "preprints/A-typical-start-upper-bound-for-low-temperature-SK-Glauber-dynamics-September-24-2026/paper.pdf",
+        "preprints/Critical-mixing-in-the-Sherrington-Kirkpatrick-model-September-25-2026/paper.pdf",
+        "preprints/Critical-slowing-down-in-the-Sherrington-Kirkpatrick-model-September-24-2026/paper.pdf",
+        "preprints/Cutoff-throughout-the-high-temperature-Sherrington-Kirkpatrick-phase-September-24-2026/paper.pdf",
+        "preprints/Functional-universality-of-critical-SK-autocorrelations-October-5-2026/critical-sk-autocorrelations.pdf",
+        "preprints/Stretched-exponential-barriers-for-typical-SK-initial-states-September-24-2026/paper.pdf",
+        "preprints/Universality-of-critical-quench-autocorrelations-in-the-Sherrington-Kirkpatrick-model-October-5-2026/main.pdf"
+      ]
+    },
+    {
+      "family_id": "228",
+      "title": "Continuum phase transitions for radial pair potentials.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/228.md",
+        "preprints/A-continuum-temperature-singularity-for-a-radial-pair-potential-September-24-2026/paper.pdf",
+        "preprints/A-radial-continuum-phase-transition-with-algebraic-decay-September-24-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "229",
+      "title": "Exact three- and four-state reconstruction thresholds and four-state tree capacity.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/229.md",
+        "preprints/A-Capacity-Criterion-for-Four-State-Potts-Reconstruction-on-Trees-October-5-2026/four-state-capacity.pdf",
+        "preprints/The-Reconstruction-Threshold-for-the-Ferromagnetic-Four-State-Potts-Model-October-5-2026/four-state-potts.pdf",
+        "preprints/The-exact-reconstruction-threshold-for-the-three-state-symmetric-channel-September-25-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "230",
+      "title": "Exact Hausdorff gauges for SLE.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/230.md",
+        "preprints/An-exact-Hausdorff-gauge-for-SLE-September-25-2026/An-exact-Hausdorff-gauge-for-SLE-September-25-2026.pdf",
+        "preprints/An-explicit-exact-Hausdorff-gauge-for-SLE-September-26-2026/An-explicit-exact-Hausdorff-gauge-for-SLE-September-26-2026.pdf"
+      ]
+    },
+    {
+      "family_id": "231",
+      "title": "The free uniform spanning forest is a factor of IID.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/231.md",
+        "preprints/The-free-uniform-spanning-forest-is-a-factor-of-IID-September-25-2026/The-free-uniform-spanning-forest-is-a-factor-of-IID-September-25-2026.pdf"
+      ]
+    },
+    {
+      "family_id": "232",
+      "title": "Gaussian fields and interfaces for triangular-lattice Lipschitz heights.",
+      "split": "validation",
+      "linked_paths": [
+        "preprints/Gaussian-free-field-limits-of-weighted-integer-Lipschitz-heights-October-6-2026/paper.pdf",
+        "preprints/The-Gaussian-free-field-limit-of-integer-Lipschitz-heights-with-two-arc-boundary-data-October-6-2026/paper.pdf",
+        "preprints/Uniform-real-Lipschitz-surfaces-on-the-triangular-lattice-October-6-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "233",
+      "title": "The joint critical Ashkin–Teller current limit.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/The-joint-scaling-limit-of-critical-Ashkin-Teller-currents-October-6-2026/main.pdf"
+      ]
+    },
+    {
+      "family_id": "234",
+      "title": "All-temperature pressure of orthogonally invariant Ising spin glasses.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/234.md",
+        "preprints/All-temperature-pressure-for-orthogonally-invariant-Ising-spin-glasses-September-25-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "235",
+      "title": "Limiting random SAT thresholds, sharp variance and computability.",
+      "split": "test",
+      "linked_paths": [
+        "lean/docs/235.md",
+        "preprints/A-Limiting-Satisfiability-Threshold-for-Every-Fixed-Clause-Size-September-25-2026/article.pdf",
+        "preprints/Computing-the-Random-3-SAT-Threshold-September-27-2026/article.pdf",
+        "preprints/Linear-Variance-of-the-Random-3-SAT-Hitting-Time-October-5-2026/linear-variance-of-the-random-3-sat-hitting-time.pdf",
+        "preprints/Variance-of-the-Random-k-SAT-Hitting-Time-September-27-2026/article.pdf"
+      ]
+    },
+    {
+      "family_id": "236",
+      "title": "The exact factor-of-IID threshold for free Ising spins on trees.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/236.md",
+        "preprints/The-sharp-factor-of-IID-threshold-for-the-free-Ising-model-on-regular-trees-September-26-2026/article.pdf"
+      ]
+    },
+    {
+      "family_id": "237",
+      "title": "The three-quarter exponent for honeycomb self-avoiding walk.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/237.md",
+        "preprints/Cap-selected-amplitudes-and-triangle-chords-for-honeycomb-walks-September-26-2026/main.pdf",
+        "preprints/Critical-honeycomb-chords-with-prescribed-boundary-endpoints-September-26-2026/main.pdf",
+        "preprints/Critical-strip-crossing-mass-on-the-honeycomb-lattice-September-26-2026/main.pdf",
+        "preprints/Cylinder-amplitudes-and-logarithmic-bridge-length-windows-on-the-honeycomb-lattice-September-26-2026/main.pdf",
+        "preprints/Cylinder-loop-weights-and-planar-nesting-September-26-2026/main.pdf",
+        "preprints/Disk-transfer-representations-and-confined-bridge-mass-September-26-2026/main.pdf",
+        "preprints/Marked-polygon-correlations-and-one-arc-bounds-September-26-2026/main.pdf",
+        "preprints/Mass-and-covering-exponents-for-fixed-length-honeycomb-walks-September-26-2026/main.pdf",
+        "preprints/Polynomial-vacuum-representations-and-bridge-mass-for-honeycomb-walks-September-26-2026/main.pdf",
+        "preprints/Radial-transfer-estimates-and-polygon-length-laws-for-honeycomb-walks-September-26-2026/main.pdf",
+        "preprints/Renewal-and-changes-of-law-for-critical-honeycomb-walks-September-26-2026/main.pdf",
+        "preprints/Signed-cylinder-propagation-and-marked-polygons-on-the-honeycomb-lattice-September-26-2026/main.pdf",
+        "preprints/Uniform-marked-polygon-estimates-and-sharp-finite-bridge-moments-September-26-2026/main.pdf"
+      ]
+    },
+    {
+      "family_id": "238",
+      "title": "Optimal logarithmic mixing of the Thorp shuffle.",
+      "split": "test",
+      "linked_paths": [
+        "lean/docs/238.md",
+        "preprints/A-strict-four-row-permanent-inequality-and-permutation-moments-September-26-2026/main.pdf",
+        "preprints/Compatibility-entropy-and-the-spectrum-of-a-Thorp-sweep-September-26-2026/paper.pdf",
+        "preprints/Conditional-coordinate-sweeps-and-analytic-transfer-September-26-2026/main.pdf",
+        "preprints/Conditional-information-under-deterministic-coordinate-sweeps-September-26-2026/main.pdf",
+        "preprints/Conditional-permutations-in-a-revealed-switching-environment-September-26-2026/paper.pdf",
+        "preprints/From-partial-permutation-information-to-Fourier-bounds-September-26-2026/main.pdf",
+        "preprints/Optimal-order-mixing-of-the-Thorp-shuffle-September-26-2026/paper.pdf",
+        "preprints/Random-coordinate-frames-and-partial-permutation-laws-September-26-2026/main.pdf",
+        "preprints/Random-subspace-tests-and-trace-smoothing-for-coordinate-sweeps-September-26-2026/paper.pdf",
+        "preprints/Routing-densities-and-representation-contraction-for-Thorp-sweeps-September-26-2026/paper.pdf",
+        "preprints/Row-column-symmetry-and-contraction-of-coordinate-sweeps-September-26-2026/paper.pdf",
+        "preprints/Signed-tensor-densities-and-diagram-budgets-for-coordinate-sweeps-September-26-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "239",
+      "title": "Sharp singularity rates for symmetric random sign matrices.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/The-sharp-exponential-rate-of-singularity-for-symmetric-Bernoulli-matrices-October-3-2026/symmetric-bernoulli-singularity.pdf",
+        "preprints/The-sharp-singularity-rate-for-biased-symmetric-sign-matrices-October-4-2026/biased-symmetric-sign-singularity.pdf"
+      ]
+    },
+    {
+      "family_id": "240",
+      "title": "Shelah's eventual categoricity and the prescribed-threshold obstruction.",
+      "split": "test",
+      "linked_paths": [
+        "lean/docs/240.md",
+        "preprints/A-CH-Obstruction-to-a-Prescribed-Categoricity-Threshold-September-24-2026/paper.pdf",
+        "preprints/Eventual-Categoricity-for-Abstract-Elementary-Classes-September-24-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "241",
+      "title": "Rigidity of the Turing degrees.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/241.md",
+        "preprints/Rigidity-of-the-Turing-degrees-September-24-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "242",
+      "title": "Single-fold Diophantine representations and undecidability under an at-most-one-solution promise.",
+      "split": "test",
+      "linked_paths": [
+        "lean/docs/242.md",
+        "preprints/Single-fold-Diophantine-representations-September-24-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "243",
+      "title": "Separating choiceless counting from polynomial time and witnessed choice.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/243.md",
+        "preprints/Choiceless-polynomial-time-with-counting-does-not-capture-polynomial-time-September-23-2026/paper.pdf",
+        "preprints/Witnessed-symmetric-choice-is-strictly-stronger-than-choiceless-polynomial-time-with-counting-September-24-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "244",
+      "title": "The Partition Principle does not imply Choice.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/244.md",
+        "preprints/The-Partition-Principle-does-not-imply-Choice-September-24-2026/partition-principle-without-choice.pdf"
+      ]
+    },
+    {
+      "family_id": "245",
+      "title": "Weak normalization implies strong normalization in pure type systems.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/245.md",
+        "preprints/Weak-and-strong-normalization-in-pure-type-systems-September-25-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "246",
+      "title": "Cannon's conjecture.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/246.md",
+        "preprints/A-Modulus-Proof-of-Cannons-Conjecture-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "247",
+      "title": "An infinite finitely presented residually finite 2-group and a finitely presented nil algebra.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/247.md",
+        "preprints/An-infinite-finitely-presented-periodic-group-September-23-2026/paper.pdf",
+        "preprints/An-infinite-finitely-presented-residually-finite-2-group-October-5-2026/residually-finite-torsion.pdf"
+      ]
+    },
+    {
+      "family_id": "248",
+      "title": "Thompson's group <i>F</i> is nonamenable.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/248.md",
+        "preprints/Thompsons-group-F-is-nonamenable-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "249",
+      "title": "A finitely generated Eilenberg–Ganea counterexample.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/249.md",
+        "preprints/A-finitely-generated-counterexample-to-the-Eilenberg-Ganea-conjecture-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "250",
+      "title": "Boone–Higman embeddings with higher finiteness.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/250.md",
+        "preprints/A-universal-group-of-type-F-infinity-September-23-2026/paper.pdf",
+        "preprints/Finite-algebraic-envelopes-and-the-Boone-Higman-conjecture-September-23-2026/paper.pdf",
+        "preprints/Simple-F-infinity-overgroups-of-groups-with-decidable-word-problem-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "251",
+      "title": "Amenability, unitarizability, and strong Ulam stability.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/251.md",
+        "preprints/Strong-Ulam-Stability-Characterizes-Amenability-October-5-2026/strong-ulam-stability.pdf",
+        "preprints/Unitarizability-Implies-Amenability-for-Countable-Groups-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "252",
+      "title": "A torsion-free hyperbolic group that is neither residually finite nor linear over any field.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/252.md",
+        "preprints/a-torsion-free-hyperbolic-group-that-is-not-residually-finite-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "253",
+      "title": "An infinite finitely presented simple amenable group.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/253.md",
+        "preprints/An-Infinite-Finitely-Presented-Simple-Amenable-Group-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "254",
+      "title": "Classifying spaces and geometric obstructions for Artin groups.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/254.md",
+        "preprints/An-Artin-group-with-no-geometric-CAT-0-action-September-23-2026/paper.pdf",
+        "preprints/Harmonic-heights-and-the-Artin-K-pi-1-conjecture-September-23-2026/paper.pdf",
+        "preprints/Parabolic-intersections-in-Artin-groups-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "255",
+      "title": "Quasi-isometric recognition of virtually polycyclic groups.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/255.md",
+        "preprints/quasi-isometric-recognition-of-virtually-polycyclic-groups-September-24-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "256",
+      "title": "Nonsingular systems of equations over arbitrary groups.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/256.md",
+        "preprints/Nonsingular-systems-of-equations-over-arbitrary-groups-October-5-2026/nonsingular-systems-over-arbitrary-groups.pdf",
+        "preprints/The-Kervaire-Theorem-for-Groups-September-24-2026/The-Kervaire-Theorem-for-Groups-September-24-2026.pdf"
+      ]
+    },
+    {
+      "family_id": "257",
+      "title": "A hyperbolic group without a geometric CAT(0) action.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/257.md",
+        "preprints/A-hyperbolic-group-with-no-geometric-CAT0-action-September-25-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "258",
+      "title": "Gersten’s conjecture and virtual compact specialness of one-relator groups.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/Baumslag-Solitar-free-one-relator-groups-are-hyperbolic-September-25-2026/paper.pdf",
+        "preprints/Virtual-compact-specialness-of-hyperbolic-one-relator-groups-September-25-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "259",
+      "title": "A group without fixed price.",
+      "split": "test",
+      "linked_paths": [
+        "preprints/A-group-without-fixed-price-October-5-2026/unequal-costs-rank-100-amalgam.pdf"
+      ]
+    },
+    {
+      "family_id": "260",
+      "title": "Spacetime Penrose inequalities: enclosing area, charge, rotation, and anti-de Sitter extensions.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/260.md",
+        "preprints/A-Charged-Reduction-of-the-Spacetime-Penrose-Inequality-in-Spatial-Dimensions-at-Least-Four-October-5-2026/paper.pdf",
+        "preprints/A-local-Penrose-inequality-for-conformal-perturbations-of-Schwarzschild-anti-de-Sitter-data-October-5-2026/paper.pdf",
+        "preprints/Area-controlled-end-replacement-and-the-Bondi-Penrose-inequality-in-the-CKS-class-September-27-2026/paper.pdf",
+        "preprints/Boundary-graph-deformations-for-the-spacetime-Penrose-inequality-September-27-2026/paper.pdf",
+        "preprints/Conformal-flow-and-the-Riemannian-Penrose-inequality-with-minimizing-frontiers-September-27-2026/paper.pdf",
+        "preprints/Electromagnetic-tails-and-the-Kerr-Newman-Penrose-inequality-October-5-2026/paper.pdf",
+        "preprints/Equality-and-rigidity-in-the-spacetime-Penrose-inequality-September-27-2026/paper.pdf",
+        "preprints/Spacetime-Penrose-inequalities-enclosing-area-charge-and-rigidity-October-5-2026/paper.pdf",
+        "preprints/The-Kerr-Newman-Penrose-Inequality-for-Axisymmetric-Electrovacuum-Exteriors-October-5-2026/paper.pdf",
+        "preprints/The-Penrose-inequality-for-maximal-asymptotically-hyperbolic-initial-data-October-5-2026/paper.pdf",
+        "preprints/The-nonmaximal-anti-de-Sitter-Penrose-Inequality-and-original-data-rigidity-October-5-2026/paper.pdf",
+        "preprints/The-spacetime-Penrose-inequality-and-enclosing-area-September-27-2026/paper.pdf",
+        "preprints/The-spacetime-Penrose-inequality-with-charge-and-original-data-rigidity-October-5-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "261",
+      "title": "Localization and delocalization in the Anderson model.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/261.md",
+        "preprints/Absolutely-Continuous-Spectrum-for-Weak-Disorder-Anderson-Models-in-Dimensions-at-Least-Three-September-23-2026/paper.pdf",
+        "preprints/Pure-Point-Spectrum-for-the-Two-Dimensional-Anderson-Model-at-Every-Positive-Disorder-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "262",
+      "title": "Sharp finite-matrix Lieb–Thirring inequalities and all equality cases.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/262.md",
+        "preprints/Equality-cases-in-the-sharp-one-dimensional-matrix-Lieb-Thirring-inequality-October-5-2026/sharp-one-dimensional-lieb-thirring-inequalities-matrix-potentials.pdf",
+        "preprints/Sharp-One-Dimensional-Lieb-Thirring-Constants-September-23-2026/paper.pdf",
+        "preprints/Sharp-one-dimensional-Lieb-Thirring-inequalities-for-matrix-potentials-October-5-2026/sharp-matrix-lieb-thirring.pdf"
+      ]
+    },
+    {
+      "family_id": "263",
+      "title": "The ionization and generalized ionization conjectures.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/263.md",
+        "preprints/Generalized-ionization-energies-for-full-Coulomb-atoms-September-24-2026/paper.pdf",
+        "preprints/Generalized-outer-electron-radii-of-neutral-Coulomb-atoms-September-24-2026/paper.pdf",
+        "preprints/Uniform-excess-charge-for-Coulomb-molecules-and-the-outer-radius-of-neutral-atoms-September-24-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "264",
+      "title": "Strong cosmic censorship near two-ended Kerr data.",
+      "split": "test",
+      "linked_paths": [
+        "preprints/Generic-C1-Future-Inextendibility-Near-Rotating-Subextremal-Kerr-Spacetimes-September-23-2026/paper.pdf",
+        "preprints/Generic-Future-Inextendibility-with-Square-Integrable-Connection-Near-a-Fixed-Kerr-Spacetime-September-23-2026/paper.pdf",
+        "preprints/Quantitative-Near-Kerr-Evolution-and-Generic-C2-Future-Inextendibility-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "265",
+      "title": "Area laws and tensor networks for two-dimensional gapped systems.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/A-two-dimensional-area-law-from-a-global-spectral-gap-September-24-2026/paper.pdf",
+        "preprints/Polynomial-PEPS-approximation-of-gapped-square-grid-ground-states-September-24-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "266",
+      "title": "Exactly three mutually unbiased bases in dimension six.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/266.md",
+        "preprints/Exact-Fourier-certificates-for-complex-Hadamard-matrices-of-order-six-September-24-2026/Exact-Fourier-certificates-for-complex-Hadamard-matrices-of-order-six-September-24-2026.pdf",
+        "preprints/The-maximum-number-of-mutually-unbiased-bases-in-dimension-six-September-24-2026/The-maximum-number-of-mutually-unbiased-bases-in-dimension-six-September-24-2026.pdf"
+      ]
+    },
+    {
+      "family_id": "267",
+      "title": "Positive-temperature Bose–Einstein condensation and exact quantum depletion.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/267.md",
+        "preprints/A-density-uniform-condensate-bound-for-dilute-Bose-gases-September-27-2026/paper.pdf",
+        "preprints/Bose-Einstein-condensation-at-positive-temperature-in-the-dilute-hard-sphere-gas-October-5-2026/positive-temperature-hard-spheres.pdf",
+        "preprints/Ground-state-condensation-in-the-dilute-hard-sphere-gas-September-24-2026/paper.pdf",
+        "preprints/Quantum-Depletion-and-Momentum-Distribution-in-the-Dilute-Hard-Sphere-Bose-Gas-October-5-2026/Quantum-Depletion-in-the-Dilute-Hard-Sphere-Bose-Gas.pdf",
+        "preprints/Quantum-Depletion-for-Fixed-Bounded-Repulsive-Potentials-October-5-2026/fixed-repulsion-quantum-depletion.pdf"
+      ]
+    },
+    {
+      "family_id": "268",
+      "title": "The spin-one Haldane gap.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/A-boundary-field-gap-for-the-spin-one-Heisenberg-chain-September-24-2026/paper.pdf",
+        "preprints/The-periodic-spin-one-Haldane-gap-September-24-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "269",
+      "title": "Uniform Laughlin gap and stability under bounded scalar disorder.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/269.md",
+        "preprints/A-Fock-space-inequality-and-the-Laughlin-spectral-gap-September-24-2026/A-Fock-space-inequality-and-the-Laughlin-spectral-gap-September-24-2026.pdf",
+        "preprints/Uniform-Stability-of-the-Spherical-Laughlin-Gap-October-5-2026/uniform-stability-spherical-laughlin-gap.pdf"
+      ]
+    },
+    {
+      "family_id": "270",
+      "title": "Threshold and positive-energy bound states of the BFSS matrix model.",
+      "split": "validation",
+      "linked_paths": [
+        "preprints/Positive-eigenvalues-of-the-relative-SU-2-BFSS-Hamiltonian-October-5-2026/positive-eigenvalues-relative-su2-bfss.pdf",
+        "preprints/The-unique-threshold-bound-state-of-the-SU-N-BFSS-model-September-24-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "271",
+      "title": "Bloch's law, its lattice correction, and the spherical magnetization law.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/271.md",
+        "preprints/Blochs-Law-for-Finite-Range-Heisenberg-Ferromagnets-in-Three-Dimensions-October-5-2026/bloch-law-heisenberg.pdf",
+        "preprints/Spontaneous-magnetization-in-the-quantum-Heisenberg-ferromagnet-September-24-2026/paper.pdf",
+        "preprints/The-first-lattice-correction-to-Blochs-law-October-5-2026/first-lattice-correction-bloch-law.pdf",
+        "preprints/The-spherical-magnetization-law-for-the-three-dimensional-quantum-Heisenberg-ferromagnet-October-5-2026/spherical-magnetization.pdf"
+      ]
+    },
+    {
+      "family_id": "272",
+      "title": "Entanglement without distillable secret key.",
+      "split": "test",
+      "linked_paths": [
+        "lean/docs/272.md",
+        "preprints/Entanglement-with-zero-distillable-secret-key-in-local-dimension-ten-September-27-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "273",
+      "title": "The entropy photon-number inequality.",
+      "split": "validation",
+      "linked_paths": [
+        "lean/docs/273.md",
+        "preprints/The-entropy-photon-number-inequality-September-24-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "274",
+      "title": "Parity is not in QAC<sup>0</sup>.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/274.md",
+        "preprints/Product-projection-localization-and-the-QAC0-parity-lower-bound-September-24-2026/paper.pdf",
+        "preprints/Regular-trajectories-pruning-and-quantum-parity-September-24-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "275",
+      "title": "QMA-hardness of continuum Coulomb energy.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/275.md",
+        "preprints/Continuum-Coulomb-hardness-with-binary-nuclear-charges-September-24-2026/Continuum-Coulomb-hardness-with-binary-nuclear-charges-September-24-2026.pdf",
+        "preprints/QMA-hardness-of-continuum-Coulomb-energy-with-unit-nuclear-charges-September-24-2026/QMA-hardness-of-continuum-Coulomb-energy-with-unit-nuclear-charges-September-24-2026.pdf"
+      ]
+    },
+    {
+      "family_id": "276",
+      "title": "Classical capacity of generalized amplitude damping.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/276.md",
+        "preprints/Classical-capacity-and-entropy-inequalities-for-generalized-amplitude-damping-September-24-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "277",
+      "title": "Threshold repetition for entangled games.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/277.md",
+        "preprints/Threshold-parallel-repetition-for-finite-dimensional-entangled-games-September-25-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "278",
+      "title": "Failure of Kohn–Sham ensemble representation.",
+      "split": "test",
+      "linked_paths": [
+        "preprints/A-Coulomb-Ground-State-Density-without-Kohn-Sham-Ensemble-Representation-September-25-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "279",
+      "title": "Exact quantum factoring over a fixed finite gate set.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/279.md",
+        "preprints/Exact-quantum-factoring-over-a-fixed-finite-gate-set-September-25-2026/main.pdf"
+      ]
+    },
+    {
+      "family_id": "280",
+      "title": "Unitary vertex operator algebras and conformal nets.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/280.md",
+        "preprints/Strongly-rational-unitary-vertex-operator-algebras-and-conformal-nets-September-25-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "281",
+      "title": "QAOA attains the SK optimum in the thermodynamic-first limit.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/281.md",
+        "preprints/Full-support-of-the-zero-temperature-Sherrington-Kirkpatrick-order-parameter-September-27-2026/main.pdf",
+        "preprints/QAOA-attains-the-SK-ground-state-energy-in-the-thermodynamic-first-limit-September-25-2026/QAOA-attains-the-SK-ground-state-energy-in-the-thermodynamic-first-limit-September-25-2026.pdf"
+      ]
+    },
+    {
+      "family_id": "282",
+      "title": "From scale symmetry to local conformal symmetry in four-dimensional QFT.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/Scale-and-conformal-symmetry-in-four-dimensional-operational-quantum-field-theory-September-26-2026/main.pdf"
+      ]
+    },
+    {
+      "family_id": "283",
+      "title": "Polynomial-time unitary synthesis from a Boolean oracle.",
+      "split": "validation",
+      "linked_paths": [
+        "preprints/Polynomial-Time-Unitary-Synthesis-from-a-Boolean-Oracle-October-5-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "284",
+      "title": "The optimal quartic separation between randomized and quantum queries.",
+      "split": "validation",
+      "linked_paths": [
+        "preprints/A-Nearly-Quartic-Separation-Between-Randomized-and-Quantum-Query-Complexity-October-5-2026/quartic-query-separation.pdf"
+      ]
+    },
+    {
+      "family_id": "285",
+      "title": "Counterexamples to Baum–Connes and Kadison–Kaplansky.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/A-Torsion-Free-Counterexample-to-Reduced-Baum-Connes-Injectivity-September-23-2026/paper.pdf",
+        "preprints/A-Torsion-Free-Counterexample-to-the-Kadison-Kaplansky-Projection-Conjecture-September-23-2026/paper.pdf",
+        "preprints/An-Irrational-Trace-Counterexample-to-Reduced-Baum-Connes-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "286",
+      "title": "Rigidity and arithmetic of lattice von Neumann algebras.",
+      "split": "validation",
+      "linked_paths": [
+        "preprints/Arithmeticity-of-twisted-finite-correspondences-for-lattices-over-local-fields-September-23-2026/paper.pdf",
+        "preprints/The-arithmetic-category-and-stable-recovery-of-lattice-factors-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "287",
+      "title": "Isomorphism of the free group factors.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/287.md",
+        "preprints/An-isomorphism-of-the-free-group-factors-September-23-2026/An-isomorphism-of-the-free-group-factors-September-23-2026.pdf"
+      ]
+    },
+    {
+      "family_id": "288",
+      "title": "Kadison's similarity conjecture.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/288.md",
+        "preprints/Kadisons-similarity-theorem-through-uniform-derivation-estimates-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "289",
+      "title": "Strong Kadison–Kastler stability and its spatial boundaries.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/289.md",
+        "preprints/Close-Separable-Cstar-Algebras-Without-Spatial-Conjugacy-October-5-2026/paper.pdf",
+        "preprints/Near-Inclusions-of-von-Neumann-Algebras-Without-Small-Spatial-Embeddings-October-5-2026/near-inclusions.pdf",
+        "preprints/Universal-strong-Kadison-Kastler-stability-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "290",
+      "title": "Relative bicentralizers and modular spectral recovery.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/290.md",
+        "preprints/Bounded-recovery-for-modular-spectral-averages-September-23-2026/Bounded-recovery-for-modular-spectral-averages-September-23-2026.pdf",
+        "preprints/Expected-amenable-subalgebras-preserving-core-commutants-September-23-2026/Expected-amenable-subalgebras-preserving-core-commutants-September-23-2026.pdf"
+      ]
+    },
+    {
+      "family_id": "291",
+      "title": "Cuntz comparison, nuclear dimension, and equivariant Jiang–Su stability.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/291.md",
+        "preprints/Cuntz-comparison-and-Jiang-Su-absorption-September-23-2026/paper.pdf",
+        "preprints/Equivariant-Jiang-Su-Stability-for-Amenable-Actions-in-the-Unital-Stably-Finite-Case-October-5-2026/paper.pdf",
+        "preprints/Nuclear-dimension-and-Jiang-Su-stability-without-elementary-subquotients-September-23-2026/paper.pdf",
+        "preprints/Tracial-projection-methods-and-uniform-property-Gamma-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "292",
+      "title": "Kirchberg's $`\\mathcal O_2`$ norm-ultrapower embedding problem.",
+      "split": "test",
+      "linked_paths": [
+        "lean/docs/292.md",
+        "preprints/An-explicit-obstruction-to-nuclear-norm-ultrapower-embeddings-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "293",
+      "title": "Invariant projections, hyperinvariant subspaces, and transitive algebras.",
+      "split": "test",
+      "linked_paths": [
+        "lean/docs/293.md",
+        "preprints/Backward-intertwiners-and-a-transitive-commutant-September-27-2026/paper.pdf",
+        "preprints/Invariant-projection-counterexamples-for-every-irrational-rotation-September-27-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "294",
+      "title": "Kaplansky's quasitrace conjecture and failure of tensor-product stable finiteness.",
+      "split": "test",
+      "linked_paths": [
+        "lean/docs/294.md",
+        "preprints/A-counterexample-to-Kaplanskys-quasitrace-conjecture-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "295",
+      "title": "The Kadison–Ringrose cohomology conjecture.",
+      "split": "test",
+      "linked_paths": [
+        "lean/docs/295.md",
+        "preprints/Vanishing-of-higher-bounded-Hochschild-cohomology-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "296",
+      "title": "The generator problem for finite factors.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/296.md",
+        "preprints/Relative-generation-and-the-generator-problem-for-finite-factors-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "297",
+      "title": "A ZFC counterexample to Naimark's problem.",
+      "split": "test",
+      "linked_paths": [
+        "lean/docs/297.md",
+        "preprints/A-counterexample-to-Naimarks-problem-in-ZFC-September-24-2026/naimark-counterexample-zfc.pdf"
+      ]
+    },
+    {
+      "family_id": "298",
+      "title": "Two notions of free entropy differ even when both are finite.",
+      "split": "test",
+      "linked_paths": [
+        "lean/docs/298.md",
+        "preprints/A-finite-entropy-separation-of-microstates-and-nonmicrostates-free-entropy-September-25-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "299",
+      "title": "The Kirchberg–Rørdam character criterion and infinite tensor-power Jiang–Su stability.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/299.md",
+        "preprints/The-Kirchberg-Rordam-character-criterion-September-25-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "300",
+      "title": "Approximation and quadratic strong-operator paving.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/Approximation-Paving-over-Arbitrary-Maximal-Abelian-Subalgebras-September-25-2026/Approximation-Paving-over-Arbitrary-Maximal-Abelian-Subalgebras-September-25-2026.pdf",
+        "preprints/Quadratic-Strong-Operator-Paving-over-Arbitrary-Maximal-Abelian-Subalgebras-September-25-2026/Quadratic-Strong-Operator-Paving-over-Arbitrary-Maximal-Abelian-Subalgebras-September-25-2026.pdf"
+      ]
+    },
+    {
+      "family_id": "301",
+      "title": "Trace cones and Razak–Jacelon stabilization.",
+      "split": "test",
+      "linked_paths": [
+        "lean/docs/301.md",
+        "preprints/The-trace-cone-classifies-Razak-Jacelon-stabilizations-September-25-2026/The-trace-cone-classifies-Razak-Jacelon-stabilizations-September-25-2026.pdf"
+      ]
+    },
+    {
+      "family_id": "302",
+      "title": "Radius of comparison equals half the mean dimension.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/Filtered-products-and-boundary-preserving-compression-in-complex-cobordism-September-25-2026/paper.pdf",
+        "preprints/Radius-of-comparison-equals-half-the-mean-dimension-September-25-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "303",
+      "title": "Weak pure infiniteness and Cuntz-algebra absorption.",
+      "split": "validation",
+      "linked_paths": [
+        "lean/docs/303.md",
+        "preprints/Weak-pure-infiniteness-and-O-infinity-absorption-September-25-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "304",
+      "title": "The Hilbert–Smith conjecture in every dimension.",
+      "split": "validation",
+      "linked_paths": [
+        "preprints/The-Hilbert-Smith-conjecture-in-every-finite-dimension-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "305",
+      "title": "Four-dimensional disk embedding and Wall's conjecture.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/A-PD4-group-without-an-aspherical-manifold-model-September-24-2026/paper.pdf",
+        "preprints/A-boundary-only-obstruction-to-four-dimensional-disk-embedding-September-24-2026/paper.pdf",
+        "preprints/A-marked-tensor-obstruction-to-four-dimensional-disk-embedding-September-24-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "306",
+      "title": "The purely cosmetic surgery conjecture.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/Purely-Cosmetic-Surgery-on-Knots-in-the-Three-Sphere-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "307",
+      "title": "Failure of rational injectivity for maximal coarse assembly.",
+      "split": "validation",
+      "linked_paths": [
+        "lean/docs/307.md",
+        "preprints/A-counterexample-to-the-coarse-Novikov-conjecture-September-23-2026/paper.pdf",
+        "preprints/Failure-of-rational-injectivity-for-maximal-coarse-assembly-October-5-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "308",
+      "title": "Finite Smith–Toda complexes at every height.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/A-finite-Smith-Toda-complex-V4-at-the-prime-1009-September-23-2026/paper.pdf",
+        "preprints/Finite-Smith-Toda-Complexes-at-Varying-Primes-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "309",
+      "title": "The Kervaire invariant problem at the prime three.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/The-Kervaire-Invariant-Problem-at-the-Prime-Three-September-24-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "310",
+      "title": "Quillen's conjecture in rational homology.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/Rational-homology-and-Quillens-conjecture-September-24-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "311",
+      "title": "The Hovey–Strickland and Chai conjectures.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/Stabilizer-Orbits-and-Thick-Tensor-Ideals-of-Dualizable-Kn-Local-Spectra-September-24-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "312",
+      "title": "The Grothendieck homotopy hypothesis.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/312.md",
+        "preprints/The-Grothendieck-homotopy-hypothesis-via-elementary-expansions-September-24-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "313",
+      "title": "Finite generation for the $`K(n)`$-local sphere.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/Finite-generation-for-the-Kn-local-sphere-September-24-2026/Finite-generation-for-the-Kn-local-sphere-September-24-2026.pdf"
+      ]
+    },
+    {
+      "family_id": "314",
+      "title": "Cyclic length and chromatic fixed-point loss.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/Cyclic-Length-and-Chromatic-Fixed-Point-Loss-September-24-2026/Cyclic-Length-and-Chromatic-Fixed-Point-Loss-September-24-2026.pdf"
+      ]
+    },
+    {
+      "family_id": "315",
+      "title": "The four-dimensional Singer conjecture.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/The-Singer-conjecture-in-dimension-four-September-25-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "316",
+      "title": "Curtis’s conjecture.",
+      "split": "validation",
+      "linked_paths": [
+        "preprints/The-Stable-Hurewicz-Image-of-the-Sphere-at-Two-September-25-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "317",
+      "title": "Thomason model structures in all strict higher dimensions.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/317.md",
+        "preprints/Thomason-Model-Structures-in-Every-Strict-Higher-Dimension-September-25-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "318",
+      "title": "Chromatic splitting: filtrations and counterexamples.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/A-rational-obstruction-to-strong-chromatic-splitting-at-height-three-September-25-2026/paper.pdf",
+        "preprints/Counterexamples-to-weak-chromatic-splitting-sphere-kernels-and-descent-exponents-September-27-2026/paper.pdf",
+        "preprints/Failure-of-finite-assembly-for-a-chromatic-overlap-at-the-prime-three-September-25-2026/paper.pdf",
+        "preprints/Filtered-chromatic-splitting-at-generic-primes-September-25-2026/paper.pdf",
+        "preprints/The-height-three-chromatic-overlap-an-explicit-filtration-and-its-attachments-September-27-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "319",
+      "title": "Counterexamples to finite generation at chromatic height two.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/Counterexamples-to-the-Hahn-Wilson-conjecture-at-height-two-September-26-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "320",
+      "title": "Nonhomeomorphic closed aspherical four-manifolds.",
+      "split": "test",
+      "linked_paths": [
+        "preprints/Nonhomeomorphic-closed-aspherical-four-manifolds-with-the-same-homotopy-type-October-4-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "321",
+      "title": "A counterexample to Wall's finite D(2) problem.",
+      "split": "test",
+      "linked_paths": [
+        "preprints/A-Counterexample-to-Walls-D2-Problem-October-6-2026/wall-d2-counterexample.pdf"
+      ]
+    },
+    {
+      "family_id": "322",
+      "title": "Tingley’s sphere-isometry problem.",
+      "split": "validation",
+      "linked_paths": [
+        "lean/docs/322.md",
+        "preprints/A-positive-solution-to-Tingleys-problem-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "323",
+      "title": "Independence of the separable quotient problem.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/323.md",
+        "preprints/Relative-independence-of-the-separable-quotient-problem-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "324",
+      "title": "Lipschitz equivalent Banach spaces need not be linearly isomorphic.",
+      "split": "validation",
+      "linked_paths": [
+        "lean/docs/324.md",
+        "preprints/Bi-Lipschitz-Absorption-of-c0-Without-a-Linear-Copy-of-c0-September-26-2026/paper.pdf",
+        "preprints/Lipschitz-Equivalent-Separable-Banach-Spaces-Need-Not-Be-Linearly-Isomorphic-September-24-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "325",
+      "title": "The complete Crouzeix conjecture.",
+      "split": "test",
+      "linked_paths": [
+        "lean/docs/325.md",
+        "preprints/A-direct-proof-of-the-complete-Crouzeix-inequality-September-26-2026/paper.pdf",
+        "preprints/The-complete-Crouzeix-theorem-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "326",
+      "title": "The cotype–cotype conjecture under the approximation property.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/326.md",
+        "preprints/The-cotype-cotype-conjecture-under-the-approximation-property-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "327",
+      "title": "Markov type characterizes superreflexivity.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/327.md",
+        "preprints/Nontrivial-Markov-Type-Forces-Superreflexivity-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "328",
+      "title": "Nonexpansive fixed points in reflexive Banach spaces.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/328.md",
+        "preprints/Fixed-Points-of-Nonexpansive-Maps-in-Reflexive-Banach-Spaces-September-24-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "329",
+      "title": "A counterexample to metric-entropy duality.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/329.md",
+        "preprints/Counterexamples-to-the-duality-conjecture-for-metric-entropy-September-24-2026/main.pdf"
+      ]
+    },
+    {
+      "family_id": "330",
+      "title": "A uniformly discrete counterexample to bounded approximation in Lipschitz-free spaces.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/330.md",
+        "preprints/Failure-of-Bounded-Approximation-in-a-Lipschitz-Free-Space-over-a-Uniformly-Discrete-Metric-Space-September-26-2026/main.pdf"
+      ]
+    },
+    {
+      "family_id": "331",
+      "title": "Reflexive midpoint convexity and diamond distortion.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/331.md",
+        "preprints/Asymptotic-midpoint-uniform-convexity-and-unbounded-diamond-distortion-in-a-reflexive-tree-space-September-27-2026/manuscript.pdf",
+        "preprints/Diamond-distortion-from-midpoint-and-tree-energies-September-27-2026/manuscript.pdf",
+        "preprints/Exact-asymptotic-moduli-in-a-Daugavet-subspace-of-L1-September-27-2026/manuscript.pdf",
+        "preprints/Independent-products-in-real-L1-asymptotic-midpoint-convexity-without-AUC-renormings-September-27-2026/manuscript.pdf",
+        "preprints/Midpoint-convexity-from-bounded-tree-potentials-and-path-costs-September-27-2026/manuscript.pdf",
+        "preprints/Midpoint-convexity-from-two-recursive-potentials-September-27-2026/manuscript.pdf",
+        "preprints/Midpoint-lenses-in-segment-spaces-September-27-2026/manuscript.pdf"
+      ]
+    },
+    {
+      "family_id": "332",
+      "title": "Metric Markov cotype of <i>ℓ</i><sub>1</sub> and Hilbert-space Lipschitz extension.",
+      "split": "validation",
+      "linked_paths": [
+        "preprints/Metric-Markov-Cotype-Two-of-l1-October-5-2026/l1-markov-cotype.pdf"
+      ]
+    },
+    {
+      "family_id": "333",
+      "title": "Smooth isometric immersions of surfaces into ℝ<sup>4</sup>.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/333.md",
+        "preprints/Smooth-isometric-immersions-of-closed-surfaces-into-Euclidean-four-space-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "334",
+      "title": "A smooth surface metric with no local isometric immersion in ℝ<sup>3</sup>.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/334.md",
+        "preprints/A-Smooth-Metric-with-No-Local-Isometric-Immersion-into-Three-Space-September-24-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "335",
+      "title": "Gromov’s integral scalar-curvature bound for simplicial volume.",
+      "split": "test",
+      "linked_paths": [
+        "preprints/An-integral-scalar-curvature-bound-for-real-simplicial-volume-October-5-2026/v126-proof.pdf",
+        "preprints/Positive-scalar-curvature-forces-rational-inessentiality-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "336",
+      "title": "Spectral scalar curvature, Urysohn width, and macroscopic dimension.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/Positive-scalar-curvature-and-uniform-codimension-two-width-September-23-2026/paper.pdf",
+        "preprints/Spectral-scalar-curvature-and-Urysohn-width-in-dimension-three-October-5-2026/spectral-urysohn-three-manifolds.pdf",
+        "preprints/Spectral-scalar-curvature-and-uniform-Urysohn-width-October-5-2026/main.pdf"
+      ]
+    },
+    {
+      "family_id": "337",
+      "title": "Sharp Cartan–Hadamard isoperimetry and rigidity.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/337.md",
+        "preprints/Generalized-Cartan-Hadamard-isoperimetry-and-Euclidean-equality-rigidity-September-23-2026/paper.pdf",
+        "preprints/Sharp-integral-fillings-in-CAT(0"
+      ]
+    },
+    {
+      "family_id": "338",
+      "title": "Yau's uniformization conjecture.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/Uniformization-of-complete-Kahler-manifolds-with-positive-bisectional-curvature-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "339",
+      "title": "Katok's entropy rigidity conjecture.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/Entropy-equality-and-local-symmetry-in-negative-curvature-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "340",
+      "title": "A counterexample to the nearby Lagrangian conjecture.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/A-counterexample-to-the-nearby-Lagrangian-conjecture-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "341",
+      "title": "Donaldson's hypersymplectic deformation conjecture.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/Deforming-hypersymplectic-four-manifolds-to-hyperkahler-triples-October-7-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "342",
+      "title": "Donaldson's tamed-to-compatible conjecture.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/342.md",
+        "preprints/Taming-implies-compatibility-on-four-manifolds-October-6-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "343",
+      "title": "Symplectic ball packing in higher dimensions.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/343.md",
+        "preprints/Symplectic-Ball-Packings-in-Higher-Dimensions-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "344",
+      "title": "The metric Blaschke conjecture.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/The-metric-Blaschke-theorem-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "345",
+      "title": "Infinitely many closed geodesics on Riemannian spheres and closed three-manifolds.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/Infinitely-many-closed-geodesic-images-on-every-Riemannian-sphere-September-24-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "346",
+      "title": "Sharp singular-set bounds for stationary integral varifolds.",
+      "split": "validation",
+      "linked_paths": [
+        "preprints/A-Codimension-One-Bound-for-the-Singular-Set-of-a-Stationary-Integral-Varifold-October-5-2026/varifold-singular-dimension.pdf",
+        "preprints/Almost-everywhere-regularity-of-stationary-integral-varifolds-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "347",
+      "title": "Counterexamples to stable-Morse and strong Arnold fixed-point bounds.",
+      "split": "validation",
+      "linked_paths": [
+        "lean/docs/347.md",
+        "preprints/A-degenerate-counterexample-to-the-critical-number-Arnold-bound-September-23-2026/paper.pdf",
+        "preprints/A-nondegenerate-counterexample-to-the-Morse-number-Arnold-bound-September-23-2026/paper.pdf",
+        "preprints/Hamiltonian-Fixed-Points-Below-the-Stable-Morse-Number-October-5-2026/paper.pdf",
+        "preprints/Hamiltonian-Fixed-Points-Below-the-Stable-Morse-Number-in-Dimension-Twenty-Two-October-5-2026/hamiltonian-fixed-points-below-stable-morse-number.pdf",
+        "preprints/Sharpness-of-the-Cyclic-Integral-Floer-Bound-Below-the-Stable-Morse-Number-October-5-2026/sharp-cyclic-integral-floer-bound-below-stable-morse-number.pdf"
+      ]
+    },
+    {
+      "family_id": "348",
+      "title": "Nonnegative-curvature Einstein classification and an <i>L</i><sup>2</sup> topological gap.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/348.md",
+        "preprints/An-L2-Einstein-Gap-for-Nonnegatively-Curved-Four-Manifolds-October-5-2026/einstein-gap.pdf",
+        "preprints/Positively-curved-Einstein-four-manifolds-September-23-2026/paper.pdf",
+        "preprints/Zero-Plane-Rigidity-for-Einstein-Four-Manifolds-October-4-2026/einstein-boundary.pdf"
+      ]
+    },
+    {
+      "family_id": "349",
+      "title": "The Solomon–Yau least-volume conjecture.",
+      "split": "test",
+      "linked_paths": [
+        "preprints/The-Solomon-Yau-least-volume-theorem-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "350",
+      "title": "Yau’s nodal bounds: surfaces and higher dimensions.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/350.md",
+        "preprints/Power-law-violations-of-Yaus-nodal-upper-bound-September-23-2026/paper.pdf",
+        "preprints/Sharp-nodal-length-on-smooth-surfaces-September-23-2026/paper.pdf",
+        "preprints/Smooth-counterexamples-to-Yaus-nodal-upper-bound-in-dimensions-three-and-four-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "351",
+      "title": "Scalar curvature and finite-time Ricci-flow singularities.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/A-closed-Ricci-flow-with-bounded-scalar-curvature-and-finite-time-curvature-blowup-September-24-2026/paper.pdf",
+        "preprints/Bounded-scalar-curvature-and-smooth-extension-of-four-dimensional-Ricci-flow-September-24-2026/paper.pdf",
+        "preprints/Path-selection-and-an-elliptic-inequality-on-degenerating-Ricci-flat-trees-September-24-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "352",
+      "title": "A finite-time singularity of Calabi flow.",
+      "split": "test",
+      "linked_paths": [
+        "preprints/A-finite-time-singularity-of-Calabi-flow-on-projective-space-September-24-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "353",
+      "title": "Affine Bernstein rigidity through dimension nine and a smooth dimension-ten counterexample.",
+      "split": "test",
+      "linked_paths": [
+        "lean/docs/353.md",
+        "preprints/Smooth-Nonquadratic-Affine-Maximal-Graph-in-Dimension-Ten-October-5-2026/affine-maximal-dimension-ten.pdf",
+        "preprints/The-affine-Bernstein-theorem-in-dimensions-three-through-nine-September-24-2026/main.pdf"
+      ]
+    },
+    {
+      "family_id": "354",
+      "title": "The isoperimetric profile of the cubic three-torus.",
+      "split": "validation",
+      "linked_paths": [
+        "lean/docs/354.md",
+        "preprints/The-Isoperimetric-Conjecture-for-the-Cubic-Flat-Three-Torus-September-24-2026/article.pdf"
+      ]
+    },
+    {
+      "family_id": "355",
+      "title": "Unique tangent flows at the first surface singularity.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/Tangent-flow-uniqueness-2026-09-24/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "356",
+      "title": "Gigli’s characterization of Alexandrov curvature.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/356.md",
+        "preprints/Giglis-distributional-curvature-characterization-of-Alexandrov-spaces-September-24-2026/main.pdf",
+        "preprints/Weak-Hessian-bounds-along-every-geodesic-in-RCD-spaces-September-24-2026/weak-hessian-geodesics.pdf"
+      ]
+    },
+    {
+      "family_id": "357",
+      "title": "Bi-Lipschitz coordinates at every regular RCD point.",
+      "split": "validation",
+      "linked_paths": [
+        "preprints/Bi-Lipschitz-Coordinates-at-Regular-Points-of-Noncollapsed-RCD-Spaces-September-25-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "358",
+      "title": "A three-manifold without conjugate points or nonpositive curvature.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/358.md",
+        "preprints/A-Three-Manifold-Without-Conjugate-Points-and-Without-a-Nonpositively-Curved-Metric-September-24-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "359",
+      "title": "Negative Kähler curvature without bounded holomorphic coordinates.",
+      "split": "validation",
+      "linked_paths": [
+        "lean/docs/359.md",
+        "preprints/A-negatively-pinched-Kahler-threefold-without-bounded-holomorphic-coordinates-September-25-2026/paper.pdf",
+        "preprints/One-sided-negative-sectional-curvature-and-the-holomorphic-Liouville-property-September-25-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "360",
+      "title": "Weak MTW curvature gives convexity and regular optimal transport.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/360.md",
+        "preprints/Global-Support-and-Convex-Injectivity-Domains-under-Weak-MTW-September-25-2026/paper.pdf",
+        "preprints/Uniform-Bi-Holder-Transport-from-Weak-MTW-September-25-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "361",
+      "title": "Failure of integer-degree harmonic dimension comparison.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/361.md",
+        "preprints/A-Three-Dimensional-Counterexample-to-Integer-Degree-Harmonic-Dimension-Comparison-September-26-2026/paper.pdf",
+        "preprints/A-counterexample-to-integer-degree-harmonic-dimension-comparison-September-25-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "362",
+      "title": "Global smoothness for relativistic Vlasov–Maxwell.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/362.md",
+        "preprints/Global-classical-solutions-of-the-three-dimensional-relativistic-Vlasov-Maxwell-system-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "363",
+      "title": "Nonuniqueness with local conservation for the hard-sphere Boltzmann equation.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/363.md",
+        "preprints/Nonuniqueness-for-the-periodic-hard-sphere-Boltzmann-equation-September-23-2026/paper.pdf",
+        "preprints/Nonuniqueness-with-local-conservation-for-the-hard-sphere-Boltzmann-equation-October-5-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "364",
+      "title": "Kinetic limits and fluctuations over the Boltzmann lifespan.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/Hard-sphere-fluctuations-on-the-regular-Boltzmann-lifespan-September-23-2026/paper.pdf",
+        "preprints/The-Boltzmann-Grad-limit-for-stable-radial-potentials-on-regular-kinetic-intervals-September-23-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "365",
+      "title": "Joint metric and connection recovery from one boundary patch.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/365.md",
+        "preprints/Determination-of-a-metric-and-a-unitary-connection-from-one-boundary-patch-October-5-2026/paper.pdf",
+        "preprints/Nonuniqueness-for-Bounded-Measurable-Scalar-Conductivities-in-Three-Dimensions-September-23-2026/paper.pdf",
+        "preprints/Smooth-Anisotropic-Uniqueness-in-the-Calderon-Problem-from-One-Boundary-Patch-September-24-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "366",
+      "title": "The planar Mumford–Shah regularity conjecture and local weak-<i>L</i><sup>4</sup> gradient bounds.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/Interior-regularity-of-planar-Mumford-Shah-minimizers-September-24-2026/Interior-regularity-of-planar-Mumford-Shah-minimizers-September-24-2026.pdf"
+      ]
+    },
+    {
+      "family_id": "367",
+      "title": "The critical dimension for the one-phase Bernoulli problem.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/367.md",
+        "preprints/The-critical-dimension-for-one-phase-Bernoulli-minimizers-September-24-2026/The-critical-dimension-for-one-phase-Bernoulli-minimizers-September-24-2026.pdf"
+      ]
+    },
+    {
+      "family_id": "368",
+      "title": "The three-dimensional Ball–Evans approximation problem.",
+      "split": "validation",
+      "linked_paths": [
+        "preprints/Strong-diffeomorphic-approximation-in-three-dimensions-for-1-le-p-le-2-September-24-2026/main.pdf",
+        "preprints/Strong-diffeomorphic-approximation-in-three-dimensions-for-p-gt-2-September-24-2026/main.pdf"
+      ]
+    },
+    {
+      "family_id": "369",
+      "title": "The hot spots conjecture for simply connected planar domains.",
+      "split": "test",
+      "linked_paths": [
+        "lean/docs/369.md",
+        "preprints/Strict-hot-spots-and-absence-of-interior-critical-points-on-smooth-simply-connected-planar-domains-September-24-2026/main.pdf"
+      ]
+    },
+    {
+      "family_id": "370",
+      "title": "The Lane–Emden and Hénon–Lane–Emden conjectures.",
+      "split": "test",
+      "linked_paths": [
+        "lean/docs/370.md",
+        "preprints/The-Subcritical-Henon-Lane-Emden-Conjecture-September-24-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "371",
+      "title": "Stable blowup for the defocusing Schrödinger equation.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/371.md",
+        "preprints/Stable-Self-Similar-Blowup-for-a-Supercritical-Defocusing-Schrodinger-Equation-on-the-Torus-September-24-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "372",
+      "title": "Global uniqueness in smooth isotropic elasticity.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/372.md",
+        "preprints/Global-Uniqueness-for-the-Smooth-Isotropic-Elasticity-Inverse-Problem-September-24-2026/article.pdf"
+      ]
+    },
+    {
+      "family_id": "373",
+      "title": "Nonattainment of the three-marginal Coulomb Monge problem.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/373.md",
+        "preprints/A-counterexample-to-the-Monge-ansatz-for-the-three-marginal-Coulomb-cost-September-25-2026/paper.pdf"
+      ]
+    },
+    {
+      "family_id": "374",
+      "title": "Sharp one-third stability of Brenier maps.",
+      "split": "validation",
+      "linked_paths": [
+        "lean/docs/374.md",
+        "preprints/Sharp-One-Third-Stability-of-Brenier-Maps-September-25-2026/article.pdf"
+      ]
+    },
+    {
+      "family_id": "375",
+      "title": "De Giorgi's conjecture in dimension eight.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/De-Giorgis-conjecture-in-dimension-eight-September-26-2026/article.pdf"
+      ]
+    },
+    {
+      "family_id": "376",
+      "title": "Universal computation in forced Navier–Stokes flows.",
+      "split": "train",
+      "linked_paths": [
+        "lean/docs/376.md",
+        "preprints/A-Fixed-Particle-Test-for-Computation-in-a-Forced-Viscous-Flow-September-27-2026/manuscript.pdf",
+        "preprints/Computation-under-Rapidly-Vanishing-Navier-Stokes-Forcing-September-27-2026/manuscript.pdf",
+        "preprints/Finite-Instructions-and-Solenoidal-Shear-Flows-September-27-2026/manuscript.pdf",
+        "preprints/Geometric-Programs-for-Solenoidal-Forcing-September-27-2026/manuscript.pdf",
+        "preprints/Incompressible-Box-Transport-and-Finite-Computation-October-6-2026/manuscript.pdf",
+        "preprints/Prefix-Instructions-and-Incompressible-Flows-September-27-2026/manuscript.pdf",
+        "preprints/Scalar-Potentials-and-Slow-Clocks-for-Forced-Fluid-Computation-September-27-2026/manuscript.pdf",
+        "preprints/Universal-Computation-with-Eventually-Stationary-Navier-Stokes-Forcing-September-27-2026/manuscript.pdf",
+        "preprints/Velocity-Field-Detection-of-Computation-in-Forced-Navier-Stokes-Flows-September-27-2026/manuscript.pdf"
+      ]
+    },
+    {
+      "family_id": "377",
+      "title": "Interior $`C^{1,\\alpha}`$ regularity for infinity-harmonic functions.",
+      "split": "train",
+      "linked_paths": [
+        "preprints/Uniform-Interior-C1alpha-Estimates-for-Infinity-Harmonic-Functions-October-4-2026/interior-c1-infinity-harmonic.pdf"
+      ]
+    }
+  ]
+}
