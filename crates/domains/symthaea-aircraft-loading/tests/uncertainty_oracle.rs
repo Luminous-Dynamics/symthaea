@@ -100,7 +100,10 @@ fn interval_envelope_contains_all_64_independent_endpoint_combinations() {
     assert!(envelope.minimum_total_moment_kg_m <= 2_898.0);
     assert!(envelope.maximum_total_moment_kg_m >= 3_310.0);
     assert_eq!(envelope.scenario_id, loading.scenario_id);
-    assert_eq!(envelope.configuration_revision, aircraft.configuration_revision);
+    assert_eq!(
+        envelope.configuration_revision,
+        aircraft.configuration_revision
+    );
 
     for empty_mass in [990.0, 1_010.0] {
         for empty_moment in [2_400.0, 2_600.0] {

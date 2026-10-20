@@ -221,7 +221,6 @@ pub struct AuditReport {
     pub profile_source_authenticated: bool,
 }
 
-
 /// Declared bounded uncertainty for one loaded item and its effective station arm.
 ///
 /// Bounds must contain the nominal item mass and the profile's nominal station arm. Arm
@@ -340,7 +339,6 @@ impl fmt::Display for AuditInputError {
 
 impl Error for AuditInputError {}
 
-
 /// Analyze uncertainty bounds for one take-off loading scenario.
 ///
 /// The nominal profile/scenario are first checked by `audit_loading`; this function then propagates
@@ -384,7 +382,10 @@ pub fn analyze_loading_uncertainty(
                 "item mass and arm intervals must be finite, positive/ordered as applicable",
             ));
         }
-        if bounds_by_item.insert(bounds.item_id.clone(), bounds).is_some() {
+        if bounds_by_item
+            .insert(bounds.item_id.clone(), bounds)
+            .is_some()
+        {
             return Err(AuditInputError::InvalidUncertainty(
                 "item uncertainty identifiers must be unique",
             ));
@@ -399,11 +400,12 @@ pub fn analyze_loading_uncertainty(
     let mut joined =
         BTreeMap::<String, (&LoadedItem, &LoadingStation, &ItemLoadUncertainty)>::new();
     for item in &scenario.items {
-        let bounds = bounds_by_item.remove(&item.item_id).ok_or(
-            AuditInputError::InvalidUncertainty(
-                "every scenario item must have exactly one uncertainty declaration",
-            ),
-        )?;
+        let bounds =
+            bounds_by_item
+                .remove(&item.item_id)
+                .ok_or(AuditInputError::InvalidUncertainty(
+                    "every scenario item must have exactly one uncertainty declaration",
+                ))?;
         let station = stations
             .get(&item.station_id)
             .copied()
@@ -457,7 +459,10 @@ pub fn analyze_loading_uncertainty(
     if quotient_corners.iter().any(|value| !value.is_finite()) {
         return Err(AuditInputError::NumericOverflow);
     }
-    let cg_min = quotient_corners.iter().copied().fold(f64::INFINITY, f64::min);
+    let cg_min = quotient_corners
+        .iter()
+        .copied()
+        .fold(f64::INFINITY, f64::min);
     let cg_max = quotient_corners
         .iter()
         .copied()
@@ -508,10 +513,7 @@ fn product_interval(
         return Err(AuditInputError::NumericOverflow);
     }
     let minimum = corners.iter().copied().fold(f64::INFINITY, f64::min);
-    let maximum = corners
-        .iter()
-        .copied()
-        .fold(f64::NEG_INFINITY, f64::max);
+    let maximum = corners.iter().copied().fold(f64::NEG_INFINITY, f64::max);
     Ok((outward_down(minimum)?, outward_up(maximum)?))
 }
 
