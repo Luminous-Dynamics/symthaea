@@ -3,7 +3,7 @@
 **Date:** 2026-10-20  
 **Protocol:** [evaluation-protocol.md](evaluation-protocol.md)  
 **Source snapshot:** OpenAI `math` at `1581d4cbdd69a0faf34b2089614fe2a814316a6a`  
-**Status:** two unscored candidate annotations; one direct transfer hypothesis rejected; no measured benchmark result.
+**Status:** two unscored candidate annotations; two direct transfer hypotheses rejected; no measured benchmark result.
 
 ## Why this pilot exists
 
@@ -41,6 +41,12 @@ The formal chain is:
 4. Use the strict inequality (h(G)<\chi(G)) to refute the universal Hadwiger inequality.
 
 The reusable *hypothesis* here is not “use a finite obstruction” but “separate expensive witness construction from a reusable invariant-comparison bridge and a small strict-inequality discharge.” A transfer requires the target to supply compatible invariants and the bridge's premises. This record is candidate-only; it does not claim the session rebuilt Lean, reran Comparator, or discovered a new theorem.
+
+## Second direct-transfer control — family 157 → family 184: rejected
+
+**Target:** family `184`, “Correspondence coloring with a fixed forbidden subgraph” (**train**). Its `CliqueFreeLog.logarithmic_independence_bound` theorem requires a lower bound on the independence number in terms of graph order and average degree for clique-free graphs.
+
+The source lemma `card_le_twice_chromaticNumber_of_indepNum` assumes `indepNum G ≤ 2` and derives `|V(G)| ≤ 2χ(G)`: it uses an **upper bound** on independent-set size to lower-bound chromatic number. It cannot be reversed to prove a lower bound on the same independence number under different hypotheses. The target instead uses a weighted optimizer, degree cutoff, and maximum-degree independence argument. Disposition: reject direct transfer with `inequality_direction`, `predicate_mismatch`, `precondition_mismatch`, `domain_mismatch`, and `quantifier_scope` codes. No tactic or source lemma was applied to the target. The typed record is in [`candidates/157-hadwiger-invariant-chain.json`](candidates/157-hadwiger-invariant-chain.json); these are curator-level negative controls, not empirical prover failures.
 
 ## Integrity and exposure controls
 
