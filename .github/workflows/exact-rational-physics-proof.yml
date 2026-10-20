@@ -15,6 +15,11 @@ on:
 permissions:
   contents: read
 
+env:
+  # PR workflows normally check out a synthetic merge commit. This gate
+  # deliberately qualifies the contributor's exact head SHA instead.
+  QUALIFIED_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+
 concurrency:
   group: exact-rational-physics-proof-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
@@ -25,6 +30,11 @@ jobs:
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.QUALIFIED_SHA }}
+
+      - name: Assert exact qualification subject
+        run: test "$(git rev-parse HEAD)" = "$QUALIFIED_SHA"
 
       - name: Install pinned Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -62,7 +72,11 @@ jobs:
           witness="papers/physics-math/ramanujan/proofs/henon_heiles_exact_H.smt2"
           test -s "$witness"
           {
-            echo "source_commit=$GITHUB_SHA"
+            echo "source_commit=$QUALIFIED_SHA"
+            echo "github_event_sha=$GITHUB_SHA"
+            echo "run_id=$GITHUB_RUN_ID"
+            echo "run_attempt=$GITHUB_RUN_ATTEMPT"
+            echo "runner_os=$RUNNER_OS"
             echo "rustc=$(rustc +1.96.0 --version)"
             echo "cargo=$(cargo +1.96.0 --version)"
             echo "z3=$(z3 --version)"
