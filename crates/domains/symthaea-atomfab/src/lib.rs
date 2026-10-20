@@ -57,6 +57,18 @@ pub struct TopWeightedOverlapSummary {
     pub persistence: f64,
 }
 
+/// Separate discovery-set agreement from ranking agreement among shared candidates.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct MatchedRankingSummary {
+    pub predicted_candidate_count: usize,
+    pub reference_candidate_count: usize,
+    pub shared_candidate_count: usize,
+    /// Jaccard overlap of the predicted and reference candidate sets, in [0, 1].
+    pub candidate_jaccard: f64,
+    /// Ranking overlap calculated only after restricting both rankings to shared IDs.
+    pub shared_candidate_ranking: TopWeightedOverlapSummary,
+}
+
 /// One process-feasibility prediction compared with an independent reference.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FeasibilityComparison {
@@ -142,6 +154,7 @@ pub enum BenchmarkError {
     InvalidPersistence,
     RankingLengthMismatch,
     DuplicateRankingId { ranking: &'static str, index: usize },
+    NoSharedRankingCandidates,
     NoComparablePairs,
     ZeroReferenceStructures,
     InvalidRecoveryCounts,
@@ -180,6 +193,9 @@ impl fmt::Display for BenchmarkError {
                     f,
                     "{ranking} ranking repeats an identifier at index {index}"
                 )
+            }
+            Self::NoSharedRankingCandidates => {
+                write!(f, "ranking agreement is undefined because no candidate IDs are shared")
             }
             Self::NoComparablePairs => write!(f, "no non-tied reference pairs are available"),
             Self::ZeroReferenceStructures => {
@@ -504,6 +520,22 @@ pub fn summarize_feasibility(
     })
 }
 
+fn validate_unique_ranking(
+    ranking_name: &'static str,
+    ranking: &[u64],
+) -> Result<(), BenchmarkError> {
+    let mut seen = HashSet::new();
+    for (index, identifier) in ranking.iter().copied().enumerate() {
+        if !seen.insert(identifier) {
+            return Err(BenchmarkError::DuplicateRankingId {
+                ranking: ranking_name,
+                index,
+            });
+        }
+    }
+    Ok(())
+}
+
 /// Compute normalized finite-prefix top-weighted overlap for ranked candidate IDs.
 ///
 /// Both rankings must contain the same number of unique candidate identifiers
@@ -531,20 +563,8 @@ pub fn top_weighted_ranking_overlap(
         return Err(BenchmarkError::InvalidPersistence);
     }
 
-    for (ranking_name, ranking) in [
-        ("predicted", predicted_ranking),
-        ("reference", reference_ranking),
-    ] {
-        let mut seen = HashSet::new();
-        for (index, identifier) in ranking.iter().copied().enumerate() {
-            if !seen.insert(identifier) {
-                return Err(BenchmarkError::DuplicateRankingId {
-                    ranking: ranking_name,
-                    index,
-                });
-            }
-        }
-    }
+    validate_unique_ranking("predicted", predicted_ranking)?;
+    validate_unique_ranking("reference", reference_ranking)?;
 
     // At prefix depth d, a candidate contributes to the overlap exactly when
     // both its predicted and reference rank are <= d. Count each shared ID at
@@ -591,6 +611,61 @@ pub fn top_weighted_ranking_overlap(
         evaluated_depths: predicted_ranking.len(),
         normalized_score,
         persistence,
+    })
+}
+
+/// Compare candidate discovery agreement separately from ranking agreement.
+///
+/// Candidate-set Jaccard is calculated on the original sets. The top-weighted
+/// ranking overlap is then calculated on each ranking filtered to the intersection
+/// of canonical candidate IDs. This avoids treating newly discovered or missing
+/// candidates as if they were ranking errors. Structure canonicalization and ID
+/// stability remain caller-owned preconditions.
+pub fn matched_candidate_ranking_overlap(
+    predicted_ranking: &[u64],
+    reference_ranking: &[u64],
+    persistence: f64,
+) -> Result<MatchedRankingSummary, BenchmarkError> {
+    if predicted_ranking.is_empty() || reference_ranking.is_empty() {
+        return Err(BenchmarkError::EmptyInput);
+    }
+    if !persistence.is_finite() || persistence <= 0.0 || persistence >= 1.0 {
+        return Err(BenchmarkError::InvalidPersistence);
+    }
+    validate_unique_ranking("predicted", predicted_ranking)?;
+    validate_unique_ranking("reference", reference_ranking)?;
+
+    let predicted_ids: HashSet<u64> = predicted_ranking.iter().copied().collect();
+    let reference_ids: HashSet<u64> = reference_ranking.iter().copied().collect();
+    let shared_candidate_count = predicted_ids.intersection(&reference_ids).count();
+    if shared_candidate_count == 0 {
+        return Err(BenchmarkError::NoSharedRankingCandidates);
+    }
+
+    let union_count = predicted_ids.len() + reference_ids.len() - shared_candidate_count;
+    let candidate_jaccard = shared_candidate_count as f64 / union_count as f64;
+    let predicted_shared: Vec<u64> = predicted_ranking
+        .iter()
+        .copied()
+        .filter(|identifier| reference_ids.contains(identifier))
+        .collect();
+    let reference_shared: Vec<u64> = reference_ranking
+        .iter()
+        .copied()
+        .filter(|identifier| predicted_ids.contains(identifier))
+        .collect();
+    let shared_candidate_ranking =
+        top_weighted_ranking_overlap(&predicted_shared, &reference_shared, persistence)?;
+
+    if !candidate_jaccard.is_finite() || !(0.0..=1.0).contains(&candidate_jaccard) {
+        return Err(BenchmarkError::NonFiniteMetric);
+    }
+    Ok(MatchedRankingSummary {
+        predicted_candidate_count: predicted_ranking.len(),
+        reference_candidate_count: reference_ranking.len(),
+        shared_candidate_count,
+        candidate_jaccard,
+        shared_candidate_ranking,
     })
 }
 
@@ -1006,6 +1081,37 @@ mod tests {
         assert_eq!(summary.evaluated_depths, 20_000);
         assert!(summary.normalized_score.is_finite());
         assert!((0.0..=1.0).contains(&summary.normalized_score));
+    }
+
+    #[test]
+    fn matched_ranking_overlap_separates_discovery_from_ranking() {
+        let summary = matched_candidate_ranking_overlap(&[1, 2, 3], &[1, 2, 4], 0.94)
+            .expect("a non-empty shared candidate set should compare");
+        assert_eq!(summary.predicted_candidate_count, 3);
+        assert_eq!(summary.reference_candidate_count, 3);
+        assert_eq!(summary.shared_candidate_count, 2);
+        assert!((summary.candidate_jaccard - 0.5).abs() < 1e-12);
+        assert!((summary.shared_candidate_ranking.normalized_score - 1.0).abs() < 1e-12);
+
+        let inverted = matched_candidate_ranking_overlap(&[1, 2, 3], &[2, 1, 4], 0.94)
+            .expect("shared IDs should remain comparable");
+        assert!((inverted.candidate_jaccard - summary.candidate_jaccard).abs() < 1e-12);
+        assert!(inverted.shared_candidate_ranking.normalized_score < 1.0);
+    }
+
+    #[test]
+    fn matched_ranking_overlap_rejects_no_shared_candidates_and_duplicate_ids() {
+        assert_eq!(
+            matched_candidate_ranking_overlap(&[1, 2], &[3, 4], 0.94),
+            Err(BenchmarkError::NoSharedRankingCandidates)
+        );
+        assert_eq!(
+            matched_candidate_ranking_overlap(&[1, 1], &[1, 2], 0.94),
+            Err(BenchmarkError::DuplicateRankingId {
+                ranking: "predicted",
+                index: 1,
+            })
+        );
     }
 
     #[test]
