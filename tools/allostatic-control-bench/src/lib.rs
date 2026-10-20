@@ -405,6 +405,13 @@ mod tests {
     }
 
     #[test]
+    fn synthetic_warning_can_precede_the_actual_disturbance() {
+        let warning = forecast_signal(Scenario::Acute, 5, 0);
+        let current_stress = environmental_load(Scenario::Acute, 5, 0);
+        assert!(warning > current_stress + 0.5);
+    }
+
+    #[test]
     fn predictive_policy_can_act_before_current_stress_rises() {
         let observation = Observation {
             current_stress: 0.05,
