@@ -409,31 +409,29 @@ pub fn run_episode_with_shield(
             no_safe_action_ticks += 1;
         }
 
+        // Reward/accounting is action-specific; state evolution uses the same
+        // declared transition function used by the shield's one-step prediction.
         match action {
             Action::Push => {
-                let push_cost = 0.055 + 0.025 * stress;
-                reserve -= push_cost;
-                resource_cost += push_cost;
+                resource_cost += 0.055 + 0.025 * stress;
                 task_reward += 1.0 - 0.12 * stress;
                 push_steps += 1;
-                allostatic_load += 0.008 + stress * 0.032 + 0.018;
             }
             Action::Maintain => {
                 task_reward += 0.12;
                 maintain_steps += 1;
-                reserve += 0.08 * (1.0 - 0.7 * stress);
-                let recovery = if stress < 0.25 { 0.055 } else { 0.020 };
-                allostatic_load += 0.008 + stress * 0.032 - recovery;
             }
             Action::EmergencyRecover => {
                 // A conservative, task-interrupting recovery action reserved for
-                // the independent shield; ordinary policies never request it.
+                // the shield; ordinary policies never request it.
                 task_reward += 0.02;
                 emergency_recover_steps += 1;
-                reserve += 0.10 * (1.0 - 0.5 * stress);
-                allostatic_load += 0.008 + stress * 0.032 - 0.10;
             }
         }
+        let (next_reserve, next_load) =
+            projected_state(action, reserve, allostatic_load, stress);
+        reserve = next_reserve;
+        allostatic_load = next_load;
 
         if action != Action::Push
             && stress < 0.20
