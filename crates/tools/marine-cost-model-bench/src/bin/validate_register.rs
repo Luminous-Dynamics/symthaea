@@ -8,7 +8,7 @@ use std::env;
 use std::fs;
 use std::process::ExitCode;
 
-const HEADERS: [&str; 18] = [
+const HEADERS: [&str; 23] = [
     "anchor_id",
     "country",
     "buyer_or_source",
@@ -155,7 +155,7 @@ fn validate_csv(input: &str) -> Result<AuditReport, Vec<String>> {
     }
     let header = &rows[0];
     let actual: Vec<&str> = header.iter().map(String::as_str).collect();
-    if actual != HEADERS {
+    if actual.as_slice() != HEADERS.as_slice() {
         return Err(vec![format!(
             "header mismatch; expected exact v0 schema with {} columns, found {}",
             HEADERS.len(),
@@ -385,15 +385,59 @@ fn main() -> ExitCode {
 mod tests {
     use super::*;
 
+    fn empty_row() -> Vec<String> {
+        vec![String::new(); HEADERS.len()]
+    }
+
+    fn register_row(disposition: &str) -> Vec<String> {
+        let mut row = empty_row();
+        row[0] = "X-1".to_owned();
+        row[1] = "South Africa".to_owned();
+        row[2] = "Buyer".to_owned();
+        row[3] = "AWARD-1".to_owned();
+        row[4] = "Contract award".to_owned();
+        row[5] = "2026-01-01".to_owned();
+        row[8] = "6m utility workboat".to_owned();
+        row[15] = disposition.to_owned();
+        row[16] = "https://example.org/award".to_owned();
+        row[17] = "Test fixture".to_owned();
+        row
+    }
+
+    fn csv_for_rows(rows: &[Vec<String>]) -> String {
+        let mut output = format!("{}\\n", HEADERS.join(","));
+        for row in rows {
+            output.push_str(&row.join(","));
+            output.push('\\n');
+        }
+        output
+    }
+
+    fn fully_normalized_row() -> Vec<String> {
+        let mut row = register_row(COMPARABLE);
+        row[9] = "1".to_owned();
+        row[10] = "100000".to_owned();
+        row[11] = "ZAR".to_owned();
+        row[12] = "Delivered and commissioned vessel".to_owned();
+        row[13] = "Hull; propulsion; safety outfit".to_owned();
+        row[14] = "None".to_owned();
+        row[18] = "100000".to_owned();
+        row[19] = "ZAR-2026-SA-yard-gate-v1".to_owned();
+        row[20] = "a".repeat(64);
+        row[21] = "normalization-method-v1".to_owned();
+        row[22] = "delivered-commissioned-vessel-v1".to_owned();
+        row
+    }
+
     #[test]
     fn csv_parser_handles_quoted_commas_and_escaped_quotes() {
-        let rows = parse_csv("a,b\n\"hello, world\",\"say \"\"yes\"\"\"\n").unwrap();
-        assert_eq!(rows[1], vec!["hello, world", "say \"yes\""]);
+        let rows = parse_csv("a,b\\n\\"hello, world\\",\\"say \\"\\"yes\\"\\"\\"\\n").unwrap();
+        assert_eq!(rows[1], vec!["hello, world", "say \\"yes\\""]);
     }
 
     #[test]
     fn csv_parser_rejects_unterminated_quotes() {
-        assert!(parse_csv("a,b\n\"unfinished,b\n").is_err());
+        assert!(parse_csv("a,b\\n\\"unfinished,b\\n").is_err());
     }
 
     #[test]
@@ -406,53 +450,65 @@ mod tests {
     }
 
     #[test]
+    fn complete_normalized_record_is_admitted_as_one_price_point() {
+        let input = csv_for_rows(&[fully_normalized_row()]);
+        let report = validate_csv(&input).unwrap();
+        assert_eq!(report.records, 1);
+        assert_eq!(report.comparable_price_records, 1);
+        assert_eq!(report.non_comparable_records, 0);
+    }
+
+    #[test]
     fn comparable_price_without_quantity_is_rejected() {
-        let input = concat!(
-            "anchor_id,country,buyer_or_source,source_record,source_kind,award_or_issue_date,vessel_length_m,vessel_material,vessel_or_propulsion_description,quantity,total_contract_value,currency,price_scope,explicitly_included,unknown_or_unverified,comparability_disposition,source_url,notes\n",
-            "X-1,South Africa,Buyer,AWARD-1,Contract award,2026-01-01,6,Aluminium,Workboat,,100000,ZAR,Delivered vessel,Hull and engine,None,ComparablePriceEvidence,https://example.org/award,Test fixture\n"
-        );
-        let errors = validate_csv(input).unwrap_err();
+        let mut row = fully_normalized_row();
+        row[9] = String::new();
+        let errors = validate_csv(&csv_for_rows(&[row])).unwrap_err();
         assert!(errors.iter().any(|error| error.contains("known positive numeric quantity")));
     }
 
     #[test]
     fn blank_price_cannot_be_admitted_as_comparable() {
-        let input = concat!(
-            "anchor_id,country,buyer_or_source,source_record,source_kind,award_or_issue_date,vessel_length_m,vessel_material,vessel_or_propulsion_description,quantity,total_contract_value,currency,price_scope,explicitly_included,unknown_or_unverified,comparability_disposition,source_url,notes\n",
-            "X-1,South Africa,Buyer,AWARD-1,Contract award,2026-01-01,6,Aluminium,Workboat,1,,ZAR,Delivered vessel,Hull and engine,None,ComparablePriceEvidence,https://example.org/award,Test fixture\n"
-        );
-        let errors = validate_csv(input).unwrap_err();
-        assert!(errors.iter().any(|error| error.contains("requires a valid positive total_contract_value")));
+        let mut row = fully_normalized_row();
+        row[10] = String::new();
+        let errors = validate_csv(&csv_for_rows(&[row])).unwrap_err();
+        assert!(errors.iter().any(|error| error.contains("valid positive total_contract_value")));
+    }
+
+    #[test]
+    fn missing_normalization_receipt_or_basis_is_rejected() {
+        let mut row = fully_normalized_row();
+        row[19] = String::new();
+        row[20] = "not-a-digest".to_owned();
+        let errors = validate_csv(&csv_for_rows(&[row])).unwrap_err();
+        assert!(errors.iter().any(|error| error.contains("normalized_currency_basis_id")));
+        assert!(errors.iter().any(|error| error.contains("normalization_receipt_sha256")));
     }
 
     #[test]
     fn discovery_record_cannot_claim_a_price() {
-        let input = concat!(
-            "anchor_id,country,buyer_or_source,source_record,source_kind,award_or_issue_date,vessel_length_m,vessel_material,vessel_or_propulsion_description,quantity,total_contract_value,currency,price_scope,explicitly_included,unknown_or_unverified,comparability_disposition,source_url,notes\n",
-            "X-1,South Africa,Portal,DATASET,Public data catalog,2026-01-01,,,,,1000,ZAR,Dataset only,Procurement data,Unknown,DiscoverySourceNotPriceEvidence,https://example.org/data,Test fixture\n"
-        );
-        let errors = validate_csv(input).unwrap_err();
+        let mut row = register_row(DISCOVERY_ONLY);
+        row[10] = "1000".to_owned();
+        row[11] = "ZAR".to_owned();
+        let errors = validate_csv(&csv_for_rows(&[row])).unwrap_err();
         assert!(errors.iter().any(|error| error.contains("cannot declare total_contract_value")));
     }
 
     #[test]
     fn duplicate_anchor_ids_are_rejected() {
-        let input = concat!(
-            "anchor_id,country,buyer_or_source,source_record,source_kind,award_or_issue_date,vessel_length_m,vessel_material,vessel_or_propulsion_description,quantity,total_contract_value,currency,price_scope,explicitly_included,unknown_or_unverified,comparability_disposition,source_url,notes\n",
-            "X-1,South Africa,Portal,DATASET,Public data catalog,2026-01-01,,,,,,,,,Unknown,DiscoverySourceNotPriceEvidence,https://example.org/data,One\n",
-            "X-1,South Africa,Portal,DATASET2,Public data catalog,2026-01-02,,,,,,,,,Unknown,DiscoverySourceNotPriceEvidence,https://example.org/data2,Two\n"
-        );
-        let errors = validate_csv(input).unwrap_err();
+        let first = register_row(CONTEXT_ONLY);
+        let mut second = register_row(CONTEXT_ONLY);
+        second[3] = "DATASET-2".to_owned();
+        second[16] = "https://example.org/data-2".to_owned();
+        let errors = validate_csv(&csv_for_rows(&[first, second])).unwrap_err();
         assert!(errors.iter().any(|error| error.contains("duplicate anchor_id")));
     }
 
     #[test]
     fn spec_only_row_cannot_include_an_award_value() {
-        let input = concat!(
-            "anchor_id,country,buyer_or_source,source_record,source_kind,award_or_issue_date,vessel_length_m,vessel_material,vessel_or_propulsion_description,quantity,total_contract_value,currency,price_scope,explicitly_included,unknown_or_unverified,comparability_disposition,source_url,notes\n",
-            "X-1,South Africa,Buyer,TENDER-1,Request for tender,2026-01-01,5,RIB,Boat,1,1000,ZAR,Blank bid price,Boat,Unknown,SpecificationOnlyNoPrice,https://example.org/tender,Test fixture\n"
-        );
-        let errors = validate_csv(input).unwrap_err();
+        let mut row = register_row(SPEC_ONLY);
+        row[10] = "1000".to_owned();
+        row[11] = "ZAR".to_owned();
+        let errors = validate_csv(&csv_for_rows(&[row])).unwrap_err();
         assert!(errors.iter().any(|error| error.contains("cannot declare total_contract_value")));
     }
 }
