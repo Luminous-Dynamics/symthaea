@@ -572,6 +572,7 @@ jobs:
                   "theorem_id": "Example.second",
                   "position": 1,
                   "target_state_commit": commit("2"),
+                  "statement_artifact_id": "statement-001",
                   "statement_sha256": sha("c"),
                   "visible_artifacts": [
                       {
