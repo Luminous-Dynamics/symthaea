@@ -114,6 +114,7 @@ pub enum ShiftGateIssue {
     UnexpectedAbstention { group_id: String },
     NoUnsupportedGroupsDeclared,
     DependenceTreatmentNotReviewed,
+    DependenceAdjustedCalibrationNotBound,
     SparseRegimeCannotEstablishClaim,
 }
 
@@ -588,12 +589,14 @@ pub fn assess_shift_claim(
             }
             ShiftFamily::SupportGap => assess_support_gap(profile, &mut issues),
             ShiftFamily::DependentSamples => {
-                if profile.dependence_treatment_reviewed {
-                    ShiftGateDisposition::EligibleForDeclaredClaim
-                } else {
+                if !profile.dependence_treatment_reviewed {
                     issues.push(ShiftGateIssue::DependenceTreatmentNotReviewed);
-                    ShiftGateDisposition::IndeterminateDependenceReview
+                } else {
+                    // The calibration report does not bind a dependence-adjusted variance method
+                    // or block/bootstrap receipt. A review flag alone cannot qualify its Wilson CI.
+                    issues.push(ShiftGateIssue::DependenceAdjustedCalibrationNotBound);
                 }
+                ShiftGateDisposition::IndeterminateDependenceReview
             }
             ShiftFamily::SparseOrMissing => {
                 issues.push(ShiftGateIssue::SparseRegimeCannotEstablishClaim);
@@ -643,6 +646,10 @@ fn assess_support_gap(
     profile: &ShiftClaimProfile,
     issues: &mut Vec<ShiftGateIssue>,
 ) -> ShiftGateDisposition {
+    if !profile.shift_assumptions_reviewed {
+        issues.push(ShiftGateIssue::AssumptionsNotReviewed);
+        return ShiftGateDisposition::IndeterminateInsufficientEvidence;
+    }
     if profile.correction != ShiftCorrection::SupportAwareSelective {
         issues.push(ShiftGateIssue::MethodIncompatibleWithShift {
             family: profile.shift_family,
@@ -878,6 +885,31 @@ mod tests {
             compute_shift_profile_manifest_sha256(&a),
             compute_shift_profile_manifest_sha256(&b)
         );
+    }
+
+    #[test]
+    fn dependence_review_flag_alone_does_not_qualify_independent_group_wilson_bounds() {
+        let profile = profile(ShiftFamily::DependentSamples, ShiftCorrection::UnmodifiedBaseline);
+        let report = assess_shift_claim(&profile, &passing_calibration());
+        assert_eq!(report.disposition, ShiftGateDisposition::IndeterminateDependenceReview);
+        assert!(report.issues.contains(
+            &ShiftGateIssue::DependenceAdjustedCalibrationNotBound
+        ));
+    }
+
+    #[test]
+    fn support_gap_requires_reviewed_support_assumptions() {
+        let mut profile = profile(
+            ShiftFamily::SupportGap,
+            ShiftCorrection::SupportAwareSelective,
+        );
+        profile.shift_assumptions_reviewed = false;
+        profile.unsupported_group_ids = vec!["regime-new-hull".to_string()];
+        profile.abstained_group_ids = vec!["regime-new-hull".to_string()];
+        refresh_digest(&mut profile);
+        let report = assess_shift_claim(&profile, &passing_calibration());
+        assert_eq!(report.disposition, ShiftGateDisposition::IndeterminateInsufficientEvidence);
+        assert!(report.issues.contains(&ShiftGateIssue::AssumptionsNotReviewed));
     }
 
     #[test]
