@@ -623,11 +623,11 @@ fn validate_baseline_receipt(receipt: &BaselineSelectionReceipt) -> Result<()> {
     Ok(())
 }
 
-fn validate_outcomes(
-    outcomes: &[TargetOutcome],
+fn validate_outcomes<'a>(
+    outcomes: &'a [TargetOutcome],
     config: &RunConfig,
     frozen_families: &BTreeMap<String, String>,
-) -> Result<Vec<&TargetOutcome>> {
+) -> Result<Vec<&'a TargetOutcome>> {
     let mut target_ids = BTreeSet::new();
     let mut eligible_statement_digests = BTreeSet::new();
     let mut arm_config_digests: BTreeMap<String, String> = BTreeMap::new();
