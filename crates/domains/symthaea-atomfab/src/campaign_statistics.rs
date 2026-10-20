@@ -500,7 +500,8 @@ pub fn summarize_target_reachability(
         if !seen_seeds.insert(baseline.seed) {
             return Err(PairedAccelerationError::DuplicateSeed);
         }
-        if !seen_runs.insert(baseline.run_id.clone()) || !seen_runs.insert(candidate.run_id.clone()) {
+        if !seen_runs.insert(baseline.run_id.clone()) || !seen_runs.insert(candidate.run_id.clone())
+        {
             return Err(PairedAccelerationError::MismatchedCohort);
         }
         paired_outcomes.push((
