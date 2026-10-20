@@ -885,6 +885,8 @@ mod tests {
         let audit = compare_uncertainty_intervals(&profile, &obs);
         assert_eq!(audit.disposition, IntervalComparisonDisposition::DomainNotEstablished);
         assert!(has_issue(&audit, &IntervalComparisonIssue::OutOfDomain { observation_id: "sample-1".to_owned() }));
+        assert!(!audit.slices[0].domain_established);
+        assert_eq!(audit.slices[0].gate_met, Some(false));
     }
 
     #[test]
@@ -974,6 +976,42 @@ mod tests {
         obs.reverse();
         let second = compare_uncertainty_intervals(&profile, &obs);
         assert_eq!(first, second);
+    }
+
+    #[test]
+    fn sha256_matches_standard_known_answer() {
+        assert_eq!(
+            sha256_hex(b"abc"),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+    }
+
+    #[test]
+    fn canonical_profile_digest_is_invariant_to_requirement_order() {
+        let mut p = profile();
+        let mut second = requirement();
+        second.operating_case_id = "depth-ratio-4.0".to_owned();
+        second.condition_sha256 = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_owned();
+        p.required_slices.push(second);
+        p.profile_manifest_sha256 = canonical_interval_profile_sha256(&p);
+        let expected = canonical_interval_profile_sha256(&p);
+        p.required_slices.reverse();
+        assert_eq!(canonical_interval_profile_sha256(&p), expected);
+    }
+
+    #[test]
+    fn wrong_dataset_or_model_digest_is_invalid() {
+        let profile = profile();
+        let mut observations = vec![
+            observation("sample-1", (90.0, 100.0, 110.0), (100.0, 105.0, 110.0)),
+            observation("sample-2", (190.0, 200.0, 210.0), (200.0, 205.0, 210.0)),
+        ];
+        observations[0].dataset_manifest_sha256 = "f".repeat(64);
+        observations[1].model_configuration_sha256 = "e".repeat(64);
+        let audit = compare_uncertainty_intervals(&profile, &observations);
+        assert_eq!(audit.disposition, IntervalComparisonDisposition::InvalidObservations);
+        assert!(has_issue(&audit, &IntervalComparisonIssue::DatasetManifestMismatch { observation_id: "sample-1".to_owned() }));
+        assert!(has_issue(&audit, &IntervalComparisonIssue::ModelConfigurationMismatch { observation_id: "sample-2".to_owned() }));
     }
 
     #[test]
