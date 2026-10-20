@@ -433,4 +433,55 @@ mod tests {
         let free = candidate("free", 1, Some(-3.1), 0);
         assert_eq!(build_decision_frontier(&[free]), Err(FrontierError::InvalidCost));
     }
+    #[test]
+    fn illustrative_fixture_builds_safety_gated_pareto_frontier() {
+        let fixture: serde_json::Value = serde_json::from_str(include_str!(
+            "../fixtures/decision-frontier-candidates-v1.json"
+        ))
+        .expect("illustrative fixture must be valid JSON");
+        assert_eq!(fixture["schema_version"], 1);
+        assert_eq!(fixture["fixture_kind"], "illustrative_not_result");
+
+        let _candidate_schema: serde_json::Value = serde_json::from_str(include_str!(
+            "../schemas/decision-frontier-candidates-v1.schema.json"
+        ))
+        .expect("candidate schema must be valid JSON");
+        let _report_schema: serde_json::Value = serde_json::from_str(include_str!(
+            "../schemas/decision-frontier-report-v1.schema.json"
+        ))
+        .expect("report schema must be valid JSON");
+
+        let candidates: Vec<FrontierCandidate> = serde_json::from_value(
+            fixture["candidates"].clone()
+        )
+        .expect("fixture candidates must match Rust records");
+        let report = build_decision_frontier(&candidates)
+            .expect("illustrative candidates share a comparison contract");
+        let lookup = |policy: &str| {
+            report.entries.iter().find(|entry| entry.policy_id == policy).unwrap()
+        };
+
+        assert_eq!(lookup("random").disposition, FrontierDisposition::ParetoFrontier);
+        assert_eq!(lookup("symthaea").disposition, FrontierDisposition::ParetoFrontier);
+        assert_eq!(
+            lookup("diversity").disposition,
+            FrontierDisposition::Dominated {
+                dominated_by: vec!["symthaea".to_owned()]
+            }
+        );
+        assert!(matches!(
+            lookup("unsafe").disposition,
+            FrontierDisposition::Ineligible { .. }
+        ));
+        assert!(matches!(
+            lookup("unassessed").disposition,
+            FrontierDisposition::Ineligible { .. }
+        ));
+
+        let result_bytes = serde_json::to_vec(&report).expect("report should serialize");
+        let round_trip: DecisionFrontier =
+            serde_json::from_slice(&result_bytes).expect("report should round-trip");
+        assert_eq!(round_trip, report);
+    }
+
 }
