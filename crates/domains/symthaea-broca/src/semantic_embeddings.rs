@@ -15,7 +15,7 @@
 //! ## Three-Tier Composition
 //!
 //! - **Tier 1**: Direct decomposition from LexicalGrounding (~200 words)
-//! - **Tier 2**: Morphological decomposition via prefix/suffix analysis (~500 tokens)
+//! - **Tier 2**: Prefix/suffix candidates admitted only when a reduced stem is lexically grounded
 //! - **Tier 3**: Genesis-seeded fallback (remaining tokens)
 //!
 //! ## Integration
@@ -58,7 +58,7 @@ pub struct EmbeddingCoverageStats {
     pub total_tokens: usize,
     /// Tokens matched via LexicalGrounding (full word match).
     pub tier1_direct: usize,
-    /// Tokens matched via morphological prefix/suffix decomposition.
+    /// Tokens accepted through bounded affix reduction to a lexically grounded stem.
     pub tier2_morphological: usize,
     /// Tokens with no semantic decomposition (genesis fallback).
     pub tier3_genesis: usize,
@@ -148,13 +148,13 @@ impl SemanticQuarkBasis {
             }
         }
 
-        // Tier 2: Morphological decomposition (prefix/suffix analysis)
-        let morpheme_primes = morpheme_decompose(&clean);
-        if !morpheme_primes.is_empty() {
+        // Tier 2: only admit morphology when affix stripping reaches a lexically
+        // grounded stem. Surface substring matches alone are too ambiguous.
+        if let Some(morpheme_primes) = self.grounded_morpheme_decompose(&clean) {
             return Some(self.compose_from_primes(&morpheme_primes));
         }
 
-        None // Tier 3: no semantic decomposition available
+        None // Tier 3: no grounded semantic decomposition available
     }
 
     /// Compose a ContinuousHV from a list of semantic primes.
@@ -181,6 +181,50 @@ impl SemanticQuarkBasis {
 
         let refs: Vec<&ContinuousHV> = bound.iter().collect();
         ContinuousHV::bundle(&refs).normalize()
+    }
+
+    /// Decompose a token through a bounded affix search, but admit it only when
+    /// an affix-stripped stem (or conservative spelling variant) exists in the
+    /// lexical grounding table. The current result is a linear HDC approximation;
+    /// it does not claim to represent full syntactic scope.
+    fn grounded_morpheme_decompose(&self, token: &str) -> Option<Vec<SemanticPrime>> {
+        let clean = token.trim().to_lowercase();
+        if clean.chars().count() < 4 || !clean.chars().all(|ch| ch.is_ascii_alphabetic()) {
+            return None;
+        }
+
+        let mut frontier = vec![(clean.clone(), Vec::<(MorphemeSide, SemanticPrime)>::new())];
+        for depth in 0..=MAX_MORPHEME_DEPTH {
+            let mut next_frontier = Vec::new();
+            for (stem, affixes) in frontier {
+                if stem != clean {
+                    for variant in lexical_stem_variants(&stem) {
+                        if let Some(root_primes) = self.lexicon.decompose(&variant) {
+                            let mut result = root_primes.to_vec();
+                            // Canonical linearization; this is not a full scope parse.
+                            for side in [MorphemeSide::Suffix, MorphemeSide::Prefix] {
+                                for (_, prime) in affixes.iter().rev().filter(|(s, _)| *s == side) {
+                                    result.push(prime.clone());
+                                }
+                            }
+                            if !result.is_empty() {
+                                return Some(result);
+                            }
+                        }
+                    }
+                }
+                if depth == MAX_MORPHEME_DEPTH {
+                    continue;
+                }
+                for (reduced, side, prime) in reduce_morphological_affixes(&stem) {
+                    let mut path = affixes.clone();
+                    path.push((side, prime));
+                    next_frontier.push((reduced, path));
+                }
+            }
+            frontier = next_frontier;
+        }
+        None
     }
 
     /// Compose a structured semantic molecule from Role-Filler pairs.
@@ -239,9 +283,9 @@ impl SemanticQuarkBasis {
                             None
                         }
                     } else {
-                        // Tier 2: morphological
-                        let morph = morpheme_decompose(&clean);
-                        if !morph.is_empty() {
+                        // Tier 2: lexically grounded morphology. A suffix/prefix
+                        // match without a known stem must not manufacture semantics.
+                        if let Some(morph) = self.grounded_morpheme_decompose(&clean) {
                             stats.tier2_morphological += 1;
                             Some(self.compose_from_primes(&morph))
                         } else {
@@ -283,9 +327,84 @@ impl SemanticQuarkBasis {
 // Morphological decomposition (Tier 2)
 // ============================================================================
 
-/// Decompose a token string into semantic primes via prefix/suffix analysis.
-///
-/// Extracted and adapted from NsmSemanticGate::morpheme_primes_for_token.
+/// Maximum number of prefix/suffix reductions considered for one token.
+const MAX_MORPHEME_DEPTH: usize = 3;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum MorphemeSide {
+    Prefix,
+    Suffix,
+}
+
+fn is_candidate_stem(stem: &str) -> bool {
+    stem.chars().count() >= 3 && stem.chars().all(|ch| ch.is_ascii_alphabetic())
+}
+
+/// Conservative English spelling candidates. Each spelling still has to be present
+/// in LexicalGrounding; this function does not assign meaning by itself.
+fn lexical_stem_variants(stem: &str) -> Vec<String> {
+    let mut variants = vec![stem.to_string()];
+    if let Some(base) = stem.strip_suffix('i') {
+        variants.push(format!("{base}y"));
+    }
+    let chars: Vec<char> = stem.chars().collect();
+    if chars.len() >= 4 {
+        let last = chars.len() - 1;
+        if chars[last] == chars[last - 1] && chars[last].is_ascii_alphabetic() {
+            variants.push(chars[..last].iter().collect());
+        }
+    }
+    variants
+}
+
+fn reduce_morphological_affixes(token: &str) -> Vec<(String, MorphemeSide, SemanticPrime)> {
+    let mut reductions = Vec::new();
+    for prefix in [
+        "super", "hyper", "under", "inter", "after", "fore", "post", "over",
+        "mini", "dis", "non", "pre", "sub", "co", "un", "re",
+    ] {
+        if let Some(stem) = token.strip_prefix(prefix) {
+            if is_candidate_stem(stem) {
+                let prime = match prefix {
+                    "un" | "dis" | "non" => SemanticPrime::Not,
+                    "re" => SemanticPrime::Do,
+                    "pre" | "fore" => SemanticPrime::Before,
+                    "post" | "after" => SemanticPrime::After,
+                    "over" | "super" | "hyper" => SemanticPrime::Big,
+                    "under" | "sub" | "mini" => SemanticPrime::Small,
+                    "inter" | "co" => SemanticPrime::With,
+                    _ => continue,
+                };
+                reductions.push((stem.to_string(), MorphemeSide::Prefix, prime));
+            }
+        }
+    }
+    for suffix in [
+        "wards", "tion", "ness", "able", "ible", "ment", "ing", "ful", "ous",
+        "ist", "ity", "ism", "less", "ward", "ly", "er", "or", "ed",
+    ] {
+        if let Some(stem) = token.strip_suffix(suffix) {
+            if is_candidate_stem(stem) {
+                let prime = match suffix {
+                    "ing" | "tion" | "ment" => SemanticPrime::Do,
+                    "ly" | "ful" | "ous" => SemanticPrime::KindOf,
+                    "er" | "or" | "ist" => SemanticPrime::Someone,
+                    "ness" | "ity" | "ism" => SemanticPrime::Something,
+                    "able" | "ible" => SemanticPrime::Can,
+                    "less" => SemanticPrime::Not,
+                    "ward" | "wards" => SemanticPrime::Move,
+                    "ed" => SemanticPrime::Before,
+                    _ => continue,
+                };
+                reductions.push((stem.to_string(), MorphemeSide::Suffix, prime));
+            }
+        }
+    }
+    reductions
+}
+
+/// Surface-affix hints retained for diagnostics and compatibility only.
+/// Production embedding paths require a lexically grounded reduced stem.
 pub fn morpheme_decompose(token: &str) -> Vec<SemanticPrime> {
     let mut primes = Vec::new();
     let lower = token.to_lowercase();
@@ -481,6 +600,46 @@ mod tests {
         let primes = morpheme_decompose("unhappiness");
         assert!(primes.contains(&SemanticPrime::Not)); // un-
         assert!(primes.contains(&SemanticPrime::Something)); // -ness
+    }
+
+    #[test]
+    fn test_grounded_morphology_preserves_known_root_semantics() {
+        let basis = SemanticQuarkBasis::new(&test_genesis());
+        let happy_primes = basis.lexicon.decompose("happy").expect("happy is grounded");
+
+        for token in ["unhappy", "unhappiness"] {
+            let composed = basis
+                .grounded_morpheme_decompose(token)
+                .unwrap_or_else(|| panic!("{token} should have a grounded morphological analysis"));
+            assert!(
+                happy_primes.iter().all(|prime| composed.contains(prime)),
+                "{token} must retain the grounded root's semantic primes"
+            );
+            assert!(
+                composed.contains(&SemanticPrime::Not),
+                "{token} should retain the negating prefix"
+            );
+        }
+
+        let happiness = basis
+            .grounded_morpheme_decompose("happiness")
+            .expect("happiness should reduce to the grounded happy stem");
+        assert!(happiness.contains(&SemanticPrime::Something));
+    }
+
+    #[test]
+    fn test_grounded_morphology_rejects_affix_lookalikes_without_known_stems() {
+        let basis = SemanticQuarkBasis::new(&test_genesis());
+        for token in ["unicorn", "disaster", "king", "thing", "wonder"] {
+            assert!(
+                !morpheme_decompose(token).is_empty(),
+                "{token} should exercise the raw surface-affix heuristic"
+            );
+            assert!(
+                basis.grounded_morpheme_decompose(token).is_none(),
+                "{token} must not get semantic primes from affix spelling alone"
+            );
+        }
     }
 
     #[test]
