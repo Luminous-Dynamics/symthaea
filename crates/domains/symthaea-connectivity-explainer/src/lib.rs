@@ -744,6 +744,24 @@ pub fn render_human(explanation: &Explanation) -> String {
     }
     out.push('\n');
 
+    out.push_str("TASKS THAT CHANGED OUTCOME OR PROGRESS\n");
+    if explanation.task_comparisons.is_empty() {
+        out.push_str("  No changed task-level outcomes were available in the paired receipt.\n");
+    } else {
+        for task in &explanation.task_comparisons {
+            let _ = writeln!(out, "  - {}", task.explanation);
+        }
+        if explanation.task_comparisons_truncated {
+            let _ = writeln!(
+                out,
+                "  Showing {} of {} changed task outcomes; inspect the full JSON for the remaining records.",
+                explanation.task_comparisons.len(),
+                explanation.task_comparisons_total
+            );
+        }
+    }
+    out.push('\n');
+
     out.push_str("KEY FINDINGS\n");
     if explanation.findings.is_empty() {
         out.push_str("  No additional rule-based findings were emitted from this report.\n");
@@ -950,6 +968,48 @@ mod tests {
         assert!(rendered.contains("Scenario SHA-256: aaaaaaaaaa"));
         assert!(!rendered.contains("Recommended NEXT STEP"));
         assert!(rendered.contains("RECOMMENDED NEXT STEP"));
+    }
+
+    #[test]
+    fn task_level_explanation_binds_partial_bytes_to_deadline_context() {
+        let explanation = explain_report(&report()).unwrap();
+        assert_eq!(explanation.task_comparisons_total, 4);
+        assert!(!explanation.task_comparisons_truncated);
+        let essential = explanation
+            .task_comparisons
+            .iter()
+            .find(|task| task.task_id == "online-essential-small-b")
+            .unwrap();
+        assert_eq!(essential.deadline_window, 0);
+        assert_eq!(essential.baseline_delivered_bytes, 0);
+        assert_eq!(essential.candidate_delivered_bytes, 3000);
+        assert_eq!(essential.baseline_failure_reason.as_deref(), Some("deadline"));
+        assert!(essential.explanation.contains("needed 3000 bytes by window 0"));
+        assert!(essential.explanation.contains("FIFO delivered 0/3000 bytes and missed its deadline"));
+        assert!(essential.explanation.contains("completed in window 0"));
+        let rendered = render_human(&explanation);
+        assert!(rendered.contains("TASKS THAT CHANGED OUTCOME OR PROGRESS"));
+        assert!(rendered.contains("online-essential-small-b"));
+    }
+
+    #[test]
+    fn task_pair_metadata_mismatch_fails_closed() {
+        let mut value = report();
+        value["multiwindow_recovery"]["task_results"][1][0]["deadline_window"] = json!(2);
+        let error = explain_report(&value).unwrap_err();
+        assert!(error.contains("metadata differs"));
+    }
+
+    #[test]
+    fn missing_task_rows_are_disclosed_not_assumed_clean() {
+        let mut value = report();
+        value["multiwindow_recovery"]
+            .as_object_mut()
+            .unwrap()
+            .remove("task_results");
+        let explanation = explain_report(&value).unwrap();
+        assert!(explanation.task_comparisons.is_empty());
+        assert!(explanation.limitations.iter().any(|item| item.contains("Task-level paired receipts were absent")));
     }
 
     #[test]
