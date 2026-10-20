@@ -1162,25 +1162,16 @@ mod tests {
         let first = test_target("090", "target-090-a", true, false);
         let second = test_target("091", "target-091-a", true, false);
         let targets = vec![&first, &second];
-        let aggregates =
-            compute_family_aggregates(&targets, "A").expect("matched target outcomes");
+        let aggregates = compute_family_aggregates(&targets, "A").expect("matched target outcomes");
         assert_eq!(aggregates.len(), 2);
         assert_eq!(aggregates[0].target_count, 1);
         assert_eq!(aggregates[0].paired_delta_sum, 1);
         assert_eq!(aggregates[0].paired_effect_percentage_points, 100.0);
 
-        let left = paired_cluster_bootstrap(
-            &aggregates,
-            EXPECTED_BOOTSTRAP_REPLICATES,
-            20261020,
-        )
-        .expect("valid family bootstrap");
-        let right = paired_cluster_bootstrap(
-            &aggregates,
-            EXPECTED_BOOTSTRAP_REPLICATES,
-            20261020,
-        )
-        .expect("same seed is repeatable");
+        let left = paired_cluster_bootstrap(&aggregates, EXPECTED_BOOTSTRAP_REPLICATES, 20261020)
+            .expect("valid family bootstrap");
+        let right = paired_cluster_bootstrap(&aggregates, EXPECTED_BOOTSTRAP_REPLICATES, 20261020)
+            .expect("same seed is repeatable");
         assert_eq!(left, right);
         assert_eq!(left, (1.0, 1.0, 1.0, 2, 2));
     }
@@ -1189,10 +1180,8 @@ mod tests {
     fn known_exposed_family_cannot_enter_confirmatory_denominator() {
         let target = test_target(REQUIRED_EXPOSED_FAMILY, "target-exposed", false, false);
         let config = test_config();
-        let frozen_families = BTreeMap::from([(
-            REQUIRED_EXPOSED_FAMILY.to_string(),
-            "test".to_string(),
-        )]);
+        let frozen_families =
+            BTreeMap::from([(REQUIRED_EXPOSED_FAMILY.to_string(), "test".to_string())]);
         let error = validate_outcomes(&[target], &config, &frozen_families)
             .expect_err("known-exposed family must be rejected");
         assert!(error.to_string().contains("known-exposed family 089"));
@@ -1203,11 +1192,14 @@ mod tests {
         let mut target = test_target("090", "target-budget-mismatch", false, false);
         target.arms[0].budget.max_tokens += 1;
         let config = test_config();
-        let frozen_families =
-            BTreeMap::from([("090".to_string(), "test".to_string())]);
+        let frozen_families = BTreeMap::from([("090".to_string(), "test".to_string())]);
         let error = validate_outcomes(&[target], &config, &frozen_families)
             .expect_err("unequal arm budget must be rejected");
-        assert!(error.to_string().contains("different from the frozen matched budget"));
+        assert!(
+            error
+                .to_string()
+                .contains("different from the frozen matched budget")
+        );
     }
 
     fn test_config() -> RunConfig {
