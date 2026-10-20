@@ -487,10 +487,7 @@ mod tests {
                 .contains("Finite stochastic GA search cannot establish")
         );
         let ranking = &plan["published_ranking_settings"];
-        assert_eq!(
-            ranking["rbo_persistence"],
-            serde_json::json!(0.94)
-        );
+        assert_eq!(ranking["rbo_persistence"], serde_json::json!(0.94));
         assert_eq!(ranking["kendall_tau_variant"], "tau_b");
         assert_eq!(
             ranking["kendall_tau_energy_tie_tolerance_eV"],
