@@ -106,12 +106,15 @@
         "reference uncertainty-aware normalized error",
         "interval coverage",
         "abstention risk-coverage curve",
-        "error by material/environment family"
+        "error by material/environment family",
+        "risk-coverage curve and stepwise AURC for uncertainty-based abstention",
+        "AURC against random-uncertainty and shuffled-uncertainty negative controls at identical retained coverages"
       ],
       "gates": [
         "respect experimental reference uncertainty",
         "separate in-domain from OOD cases",
-        "do not label simulation outputs as measurement"
+        "do not label simulation outputs as measurement",
+        "freeze uncertainty construction and any abstention threshold on validation data; report the complete risk-coverage curve and AURC on a disjoint test set"
       ]
     },
     {
@@ -227,14 +230,17 @@
         "EF",
         "decision regret",
         "queries and time to target",
-        "risk-coverage curve"
+        "risk-coverage curve",
+        "risk-coverage AURC at matched coverage and budget",
+        "coverage and false-feasible count alongside selective risk; abstention is not free success"
       ],
       "gates": [
         "freeze target and budget before campaigns",
         "at least 20 fixed seeds for a strong comparative claim when feasible",
         "matched target costs",
         "report full curves and confidence intervals",
-        "no win unless quality is at least as good at equal budget"
+        "no win unless quality is at least as good at equal budget",
+        "compare uncertainty-ranked selection against random-score and shuffled-score negative controls; report retained coverage and risk together"
       ]
     },
     {
