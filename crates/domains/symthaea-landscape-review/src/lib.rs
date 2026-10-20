@@ -69,7 +69,7 @@ pub enum ArtifactRole {
     SourceDataset,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
 pub enum EvidenceClass {
     Observed,
@@ -80,7 +80,7 @@ pub enum EvidenceClass {
     Missing,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
 pub enum MetricState {
     Available,
