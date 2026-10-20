@@ -1,0 +1,10 @@
+[package]
+name = "symthaea-core"
+version = "0.5.0"
+edition = "2024"
+publish = false
+description = "Test-only host shim for isolated Symthaea symbolic proof verification."
+
+[lib]
+name = "symthaea_core"
+path = "src/lib.rs"
