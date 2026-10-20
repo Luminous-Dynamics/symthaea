@@ -282,6 +282,250 @@ impl SplitMix64 {
     }
 }
 
+
+/// A paired confidence interval for the candidate-minus-baseline metric
+/// difference on identical, case-aligned resamples.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PairedMetricDifference {
+    pub metric: String,
+    pub candidate_point_estimate: Option<f64>,
+    pub baseline_point_estimate: Option<f64>,
+    pub candidate_minus_baseline: Option<f64>,
+    pub lower_bound: Option<f64>,
+    pub upper_bound: Option<f64>,
+    pub valid_replicates: usize,
+    pub requested_replicates: usize,
+    pub status: IntervalStatus,
+}
+
+/// Paired comparison report. A positive difference is not always an
+/// improvement: sensitivity/AUROC should rise, while Brier/ECE should fall.
+/// Interpret directions per metric and prespecify a primary endpoint.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PairedBootstrapComparisonReport {
+    pub schema_version: String,
+    pub evaluation_id: String,
+    pub split_id: String,
+    pub seed: u64,
+    pub replicates: usize,
+    pub minimum_valid_replicates: usize,
+    pub confidence_level: f64,
+    pub candidate_case_count: usize,
+    pub matched_case_count: usize,
+    pub differences: BTreeMap<String, PairedMetricDifference>,
+    pub notes: Vec<String>,
+}
+
+/// Compare a candidate with a baseline on the same named test cases. It rejects
+/// duplicate/missing case IDs or label mismatches, then draws matched pairs
+/// together on every resample. This supports paired confidence intervals for
+/// metric differences rather than comparing two independent CIs.
+///
+/// Rows must represent independent sampling units. For scaffold-, study-, or
+/// publication-clustered data, sample matched groups, not individual rows.
+pub fn paired_bootstrap_binary_safety_comparison(
+    evaluation_config: &BinarySafetyMetricConfig,
+    candidate_cases: &[BinarySafetyEvaluationCase],
+    baseline_cases: &[BinarySafetyEvaluationCase],
+    bootstrap_config: &BootstrapConfig,
+) -> Result<PairedBootstrapComparisonReport, Vec<String>> {
+    let mut errors = Vec::new();
+    validate_bootstrap_config(bootstrap_config, &mut errors);
+    if candidate_cases.is_empty() || baseline_cases.is_empty() {
+        errors.push("paired bootstrap requires non-empty candidate and baseline cases".into());
+    }
+
+    let candidate_by_id = index_cases(candidate_cases, "candidate", &mut errors);
+    let baseline_by_id = index_cases(baseline_cases, "baseline", &mut errors);
+    if candidate_by_id.len() != baseline_by_id.len() {
+        errors.push(format!(
+            "candidate and baseline case counts differ: {} versus {}",
+            candidate_by_id.len(),
+            baseline_by_id.len()
+        ));
+    }
+
+    for (case_id, candidate) in &candidate_by_id {
+        match baseline_by_id.get(case_id) {
+            None => errors.push(format!("baseline is missing case_id {case_id:?}")),
+            Some(baseline) if baseline.ground_truth_hazard != candidate.ground_truth_hazard => {
+                errors.push(format!("ground-truth label mismatch for case_id {case_id:?}"));
+            }
+            Some(_) => {}
+        }
+    }
+    for case_id in baseline_by_id.keys() {
+        if !candidate_by_id.contains_key(case_id) {
+            errors.push(format!("candidate is missing case_id {case_id:?}"));
+        }
+    }
+    if !errors.is_empty() {
+        errors.sort();
+        errors.dedup();
+        return Err(errors);
+    }
+
+    // BTreeMap ordering provides deterministic pair alignment independent of
+    // caller vector order.
+    let candidate_aligned: Vec<&BinarySafetyEvaluationCase> =
+        candidate_by_id.values().copied().collect();
+    let baseline_aligned: Vec<&BinarySafetyEvaluationCase> = candidate_by_id
+        .keys()
+        .map(|id| baseline_by_id[id])
+        .collect();
+
+    let candidate_point = evaluate_binary_safety(evaluation_config, candidate_cases)
+        .map_err(|errors| errors.into_iter().map(|e| format!("invalid candidate: {e}")).collect::<Vec<_>>())?;
+    let baseline_point = evaluate_binary_safety(evaluation_config, baseline_cases)
+        .map_err(|errors| errors.into_iter().map(|e| format!("invalid baseline: {e}")).collect::<Vec<_>>())?;
+
+    let point_differences: BTreeMap<String, Option<f64>> = metric_names()
+        .iter()
+        .map(|name| {
+            let difference = match (metric_value(&candidate_point, name), metric_value(&baseline_point, name)) {
+                (Some(candidate), Some(baseline)) => Some(candidate - baseline),
+                _ => None,
+            };
+            ((*name).to_string(), difference)
+        })
+        .collect();
+
+    let mut samples: BTreeMap<String, Vec<f64>> = metric_names()
+        .into_iter()
+        .map(|name| (name.to_string(), Vec::with_capacity(bootstrap_config.replicates)))
+        .collect();
+    let mut rng = SplitMix64::new(bootstrap_config.seed);
+    let sample_size = candidate_aligned.len();
+
+    for replicate in 0..bootstrap_config.replicates {
+        let mut candidate_sample = Vec::with_capacity(sample_size);
+        let mut baseline_sample = Vec::with_capacity(sample_size);
+        for draw in 0..sample_size {
+            let index = rng.index(sample_size);
+            let mut candidate = candidate_aligned[index].clone();
+            let mut baseline = baseline_aligned[index].clone();
+            let new_id = format!("paired-bootstrap-{replicate}-{draw}-{}", candidate.case_id);
+            candidate.case_id = new_id.clone();
+            baseline.case_id = new_id;
+            candidate_sample.push(candidate);
+            baseline_sample.push(baseline);
+        }
+
+        let candidate_metrics = evaluate_binary_safety(evaluation_config, &candidate_sample)
+            .map_err(|errors| errors.into_iter().map(|e| format!("candidate resample {replicate}: {e}")).collect::<Vec<_>>())?;
+        let baseline_metrics = evaluate_binary_safety(evaluation_config, &baseline_sample)
+            .map_err(|errors| errors.into_iter().map(|e| format!("baseline resample {replicate}: {e}")).collect::<Vec<_>>())?;
+
+        for name in metric_names() {
+            if let (Some(candidate), Some(baseline)) =
+                (metric_value(&candidate_metrics, name), metric_value(&baseline_metrics, name))
+            {
+                samples.entry(name.to_string()).or_default().push(candidate - baseline);
+            }
+        }
+    }
+
+    let alpha = 1.0 - bootstrap_config.confidence_level;
+    let mut differences = BTreeMap::new();
+    for name in metric_names() {
+        let values = samples.remove(*name).unwrap_or_default();
+        let valid = values.len();
+        let status = if valid == 0 {
+            IntervalStatus::UndefinedOnAllReplicates
+        } else if valid < bootstrap_config.minimum_valid_replicates {
+            IntervalStatus::InsufficientValidReplicates
+        } else {
+            IntervalStatus::Estimated
+        };
+        let (lower_bound, upper_bound) = if status == IntervalStatus::Estimated {
+            (percentile(&values, alpha / 2.0), percentile(&values, 1.0 - alpha / 2.0))
+        } else {
+            (None, None)
+        };
+
+        let point_candidate = metric_value(&candidate_point, name);
+        let point_baseline = metric_value(&baseline_point, name);
+        differences.insert(name.to_string(), PairedMetricDifference {
+            metric: name.to_string(),
+            candidate_point_estimate: point_candidate,
+            baseline_point_estimate: point_baseline,
+            candidate_minus_baseline: point_differences.get(*name).copied().flatten(),
+            lower_bound,
+            upper_bound,
+            valid_replicates: valid,
+            requested_replicates: bootstrap_config.replicates,
+            status,
+        });
+    }
+
+    Ok(PairedBootstrapComparisonReport {
+        schema_version: BOOTSTRAP_SCHEMA_VERSION.to_string(),
+        evaluation_id: candidate_point.evaluation_id,
+        split_id: candidate_point.split_id,
+        seed: bootstrap_config.seed,
+        replicates: bootstrap_config.replicates,
+        minimum_valid_replicates: bootstrap_config.minimum_valid_replicates,
+        confidence_level: bootstrap_config.confidence_level,
+        candidate_case_count: candidate_cases.len(),
+        matched_case_count: candidate_aligned.len(),
+        differences,
+        notes: vec![
+            "Differences are candidate minus baseline; improvement direction depends on the metric.".to_string(),
+            "Primary endpoints and multiple-comparison handling must be declared before inspecting the locked test set.".to_string(),
+            "Paired resampling estimates metric-difference uncertainty but does not correct leakage, label error, or distribution shift.".to_string(),
+            "For clustered chemical/study/publication data, resample matched independent groups rather than individual rows.".to_string(),
+        ],
+    })
+}
+
+fn validate_bootstrap_config(config: &BootstrapConfig, errors: &mut Vec<String>) {
+    if config.replicates == 0 {
+        errors.push("bootstrap replicates must be greater than zero".into());
+    }
+    if config.minimum_valid_replicates == 0 || config.minimum_valid_replicates > config.replicates {
+        errors.push("minimum_valid_replicates must be within 1..=replicates".into());
+    }
+    if !config.confidence_level.is_finite()
+        || !(0.0 < config.confidence_level && config.confidence_level < 1.0)
+    {
+        errors.push("confidence_level must be finite and strictly within (0, 1)".into());
+    }
+}
+
+fn index_cases<'a>(
+    cases: &'a [BinarySafetyEvaluationCase],
+    role: &str,
+    errors: &mut Vec<String>,
+) -> BTreeMap<&'a str, &'a BinarySafetyEvaluationCase> {
+    let mut indexed = BTreeMap::new();
+    for case in cases {
+        if case.case_id.trim().is_empty() {
+            errors.push(format!("{role} contains empty case_id"));
+            continue;
+        }
+        if indexed.insert(case.case_id.as_str(), case).is_some() {
+            errors.push(format!("{role} has duplicate case_id {:?}", case.case_id));
+        }
+    }
+    indexed
+}
+
+fn metric_value(report: &BinarySafetyMetricReport, metric: &str) -> Option<f64> {
+    match metric {
+        "coverage" => report.coverage,
+        "sensitivity" => report.sensitivity,
+        "specificity" => report.specificity,
+        "precision" => report.precision,
+        "negative_predictive_value" => report.negative_predictive_value,
+        "balanced_accuracy" => report.balanced_accuracy,
+        "auroc" => report.auroc,
+        "average_precision" => report.average_precision,
+        "brier_score" => report.brier_score,
+        "expected_calibration_error" => report.expected_calibration_error,
+        _ => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
