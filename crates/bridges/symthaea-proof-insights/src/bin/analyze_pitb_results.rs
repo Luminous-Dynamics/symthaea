@@ -50,7 +50,8 @@ struct RunConfig {
     checker_version: String,
     budget: Budget,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-RunConfig check no-op
+    power_report_sha256: Option<String>,
+}
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
