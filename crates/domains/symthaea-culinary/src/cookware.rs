@@ -197,6 +197,7 @@ pub enum CookwareViolationCode {
     DuplicateRunOrder,
     InsufficientBlocks,
     InsufficientIndependentUnits,
+    CookwareUnitIdentityConflict,
     DuplicateObservation,
     MissingRequiredMetric,
     MissingEvidenceReference,
@@ -427,6 +428,7 @@ pub fn validate_cookware_benchmark(
     let mut blocks: BTreeMap<&str, BTreeMap<&str, &CookwareRunV1>> = BTreeMap::new();
     let mut run_counts: BTreeMap<&str, u32> = BTreeMap::new();
     let mut unit_sets: BTreeMap<&str, BTreeSet<&str>> = BTreeMap::new();
+    let mut unit_owners: BTreeMap<&str, &str> = BTreeMap::new();
 
     for run in &manifest.runs {
         if !nonempty(&run.run_id)
@@ -542,6 +544,23 @@ pub fn validate_cookware_benchmark(
             .entry(run.candidate_id.as_str())
             .or_default()
             .insert(run.cookware_unit_id.as_str());
+        if let Some(owner) = unit_owners.insert(
+            run.cookware_unit_id.as_str(),
+            run.candidate_id.as_str(),
+        ) {
+            if owner != run.candidate_id {
+                violation(
+                    &mut violations,
+                    CookwareViolationCode::CookwareUnitIdentityConflict,
+                    Some(&run.candidate_id),
+                    Some(&run.run_id),
+                    format!(
+                        "physical cookware unit {} is also assigned to candidate {}",
+                        run.cookware_unit_id, owner
+                    ),
+                );
+            }
+        }
 
         let mut observed_metrics = BTreeSet::new();
         for observation in &run.observations {
@@ -716,6 +735,15 @@ pub fn validate_cookware_benchmark(
             );
         }
         let mut dimensions = BTreeSet::new();
+        if record.ratings.is_empty() {
+            violation(
+                &mut violations,
+                CookwareViolationCode::MissingRequiredValue,
+                Some(&record.candidate_id),
+                None,
+                "craft experience record must contain at least one declared dimension",
+            );
+        }
         for rating in &record.ratings {
             if !(1..=7).contains(&rating.rating_1_to_7) {
                 violation(
