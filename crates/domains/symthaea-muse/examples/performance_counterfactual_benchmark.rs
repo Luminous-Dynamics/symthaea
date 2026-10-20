@@ -13,6 +13,7 @@
 
 use std::collections::HashSet;
 use std::path::PathBuf;
+use std::process::Command;
 
 use serde::Serialize;
 use sha2::{Digest, Sha256};
@@ -25,6 +26,7 @@ use symthaea_music_theory::{MusicalIntent, Style, compose_with_spec};
 
 const SEEDS: [u64; 8] = [0, 1, 7, 13, 29, 42, 73, 101];
 const MATCH_WINDOW_SECS: f32 = 0.250;
+const CHANGED_ONSET_EPSILON_MS: f64 = 0.1;
 const REPORT_SCHEMA: u32 = 1;
 
 #[derive(Debug, Serialize)]
@@ -33,6 +35,8 @@ struct Report {
     experiment: &'static str,
     status: &'static str,
     source_controls: &'static str,
+    source_revision: Option<String>,
+    rustc_version: Option<String>,
     human_quality: &'static str,
     audio_rendered: bool,
     seeds: Vec<u64>,
@@ -92,6 +96,20 @@ struct Event {
     voice: String,
     pitch_bits: u32,
     start: f32,
+}
+
+fn source_revision() -> Option<String> {
+    std::env::var("MUSE_SOURCE_REVISION")
+        .ok()
+        .or_else(|| std::env::var("GITHUB_SHA").ok())
+}
+
+fn rustc_version() -> Option<String> {
+    let output = Command::new("rustc").arg("--version").output().ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    String::from_utf8(output.stdout).ok().map(|s| s.trim().to_string())
 }
 
 fn sha256_hex(bytes: &[u8]) -> String {
@@ -250,7 +268,10 @@ fn case(style: Style, seed: u64, state: &MusicalState) -> CaseReport {
     let control_events = flatten(&control_voices);
     let (matched, unmatched_actual, unmatched_control, mut shifts) =
         compare(&actual_events, &control_events);
-    let changed_onsets = shifts.iter().filter(|d| **d > 1e-3).count();
+    let changed_onsets = shifts
+        .iter()
+        .filter(|d| **d > CHANGED_ONSET_EPSILON_MS)
+        .count();
     let changed_onset_fraction = (matched > 0).then(|| changed_onsets as f64 / matched as f64);
     let mean_abs_onset_shift_ms = if shifts.is_empty() {
         None
@@ -329,6 +350,8 @@ fn main() {
         experiment: "melothaea_style_performance_counterfactual_v1",
         status: if passed { "mechanics_pass" } else { "mechanics_fail" },
         source_controls: "same score digest, seed, resolved ensemble rule, swing, return-color policy and MusicalState; actual style-derived dialect versus explicit ClassicalRubato",
+        source_revision: source_revision(),
+        rustc_version: rustc_version(),
         human_quality: "not_measured",
         audio_rendered: false,
         seeds: SEEDS.to_vec(),
@@ -348,5 +371,34 @@ fn main() {
     }
     if !passed {
         std::process::exit(2);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn event_matcher_requires_same_voice_and_pitch_and_never_reuses_events() {
+        let actual = [
+            Event { voice: "Melody".into(), pitch_bits: 440.0_f32.to_bits(), start: 0.010 },
+            Event { voice: "Melody".into(), pitch_bits: 880.0_f32.to_bits(), start: 1.000 },
+        ];
+        let control = [
+            Event { voice: "Melody".into(), pitch_bits: 440.0_f32.to_bits(), start: 0.012 },
+            Event { voice: "Bass".into(), pitch_bits: 440.0_f32.to_bits(), start: 0.013 },
+        ];
+        let (matched, unmatched_actual, unmatched_control, shifts) = compare(&actual, &control);
+        assert_eq!(matched, 1);
+        assert_eq!(unmatched_actual, 1);
+        assert_eq!(unmatched_control, 1);
+        assert!((shifts[0] - 2.0).abs() < 1e-3, "{shifts:?}");
+    }
+
+    #[test]
+    fn quantile_is_explicit_for_empty_samples_and_uses_sorted_values() {
+        assert_eq!(quantile(&mut [], 0.5), None);
+        let mut values = [9.0, 1.0, 5.0];
+        assert_eq!(quantile(&mut values, 0.5), Some(5.0));
     }
 }
