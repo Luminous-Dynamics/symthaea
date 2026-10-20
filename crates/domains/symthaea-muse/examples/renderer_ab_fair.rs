@@ -257,7 +257,7 @@ fn main() {
         (Style::Classical, 7),          // ClassicalRubato
         (Style::Tango, 7),              // DanceLocked
         (Style::JazzBallad, 7),         // JazzLaidBack
-        (Style::Folk, 7),              // FolkLift
+        (Style::Folk, 7),               // FolkLift
         (Style::Minimalism, 7),         // ProcessExact
         (Style::HindustaniInspired, 7), // DroneElastic
         (Style::Cinematic, 7),          // DramaticTiming
