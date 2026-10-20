@@ -56,6 +56,7 @@ pub mod benchmarks;
 pub mod harness;
 pub mod pharmacology_evidence;
 pub mod pharmacology_prediction;
+pub mod pharmacology_metrics;
 pub mod substrate_transfer;
 pub mod wm;
 
