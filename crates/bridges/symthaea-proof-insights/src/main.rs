@@ -647,11 +647,15 @@ fn audit_temporal_timeline(
     timeline_path: &Path,
     output_path: &Path,
 ) -> Result<()> {
-    let root = repository_root
-        .canonicalize()
-        .with_context(|| format!("cannot resolve timeline repository {}", repository_root.display()))?;
+    let root = repository_root.canonicalize().with_context(|| {
+        format!(
+            "cannot resolve timeline repository {}",
+            repository_root.display()
+        )
+    })?;
     let repository_commit = git_output(&root, &["rev-parse", "HEAD"])?;
-    validate_git_sha(&repository_commit).context("repository HEAD must be a full Git commit SHA")?;
+    validate_git_sha(&repository_commit)
+        .context("repository HEAD must be a full Git commit SHA")?;
     let repository_url = git_output(&root, &["remote", "get-url", "origin"])?;
     if !repository_url.starts_with("https://") {
         bail!("timeline repository origin must be an explicit HTTPS URL");
@@ -671,12 +675,10 @@ fn audit_temporal_timeline(
     let timeline_sha256 = format!("{:x}", Sha256::digest(&timeline_bytes));
     let readme_bytes = git_show_file(&root, &repository_commit, "README.md")?;
     let readme_sha256 = format!("{:x}", Sha256::digest(&readme_bytes));
-    let readme_text = std::str::from_utf8(&readme_bytes)
-        .context("pinned repository README must be UTF-8")?;
-    let readme_count_pattern = Regex::new(
-        r"(?i)proof_timeline\.csv[^\n]*?([0-9,]+)\s+theorems",
-    )
-    .context("compile timeline README count pattern")?;
+    let readme_text =
+        std::str::from_utf8(&readme_bytes).context("pinned repository README must be UTF-8")?;
+    let readme_count_pattern = Regex::new(r"(?i)proof_timeline\.csv[^\n]*?([0-9,]+)\s+theorems")
+        .context("compile timeline README count pattern")?;
     let readme_claimed_timeline_row_count = readme_count_pattern
         .captures(readme_text)
         .map(|captures| {
@@ -690,7 +692,10 @@ fn audit_temporal_timeline(
         .has_headers(true)
         .flexible(false)
         .from_reader(timeline_bytes.as_slice());
-    let headers = reader.headers().context("read timeline CSV headers")?.clone();
+    let headers = reader
+        .headers()
+        .context("read timeline CSV headers")?
+        .clone();
     for required in [
         "id",
         "lean_name",
@@ -729,13 +734,13 @@ fn audit_temporal_timeline(
         bail!("timeline repository must pin a concrete Lean toolchain");
     }
     let mathlib_manifest_path = "lake-manifest.json";
-    let mathlib_manifest_bytes =
-        git_show_file(&root, &repository_commit, mathlib_manifest_path)?;
+    let mathlib_manifest_bytes = git_show_file(&root, &repository_commit, mathlib_manifest_path)?;
     let mathlib_manifest: serde_json::Value =
         serde_json::from_slice(&mathlib_manifest_bytes).context("parse pinned Lake manifest")?;
     let mathlib_revision = find_mathlib_revision(&mathlib_manifest)
         .context("Lake manifest contains no identifiable Mathlib revision")?;
-    validate_git_sha(&mathlib_revision).context("Lake manifest Mathlib revision is not a full SHA")?;
+    validate_git_sha(&mathlib_revision)
+        .context("Lake manifest Mathlib revision is not a full SHA")?;
 
     let mut events = Vec::new();
     let mut timeline_ids = BTreeSet::new();
@@ -748,7 +753,8 @@ fn audit_temporal_timeline(
     let mut previous_completion_commit: Option<String> = None;
 
     for (zero_based_position, row_result) in reader.records().enumerate() {
-        let row = row_result.with_context(|| format!("parse timeline CSV row {}", zero_based_position + 2))?;
+        let row = row_result
+            .with_context(|| format!("parse timeline CSV row {}", zero_based_position + 2))?;
         let get = |index: usize| row.get(index).unwrap_or("").trim();
         let raw_id = get(id_col);
         let event_key = if raw_id.is_empty() {
@@ -761,17 +767,24 @@ fn audit_temporal_timeline(
         };
         let completion_commit = get(commit_col).to_ascii_lowercase();
         validate_git_sha(&completion_commit).with_context(|| {
-            format!("timeline row {} has an invalid completion commit", zero_based_position + 2)
+            format!(
+                "timeline row {} has an invalid completion commit",
+                zero_based_position + 2
+            )
         })?;
-        let completion_commit_ancestor_verified = match verified_commit_cache.get(&completion_commit) {
-            Some(verified) => *verified,
-            None => {
-                let verified = git_is_ancestor(&root, &completion_commit, &repository_commit)
-                    .with_context(|| format!("verify completion commit for timeline row {event_key}"))?;
-                verified_commit_cache.insert(completion_commit.clone(), verified);
-                verified
-            }
-        };
+        let completion_commit_ancestor_verified =
+            match verified_commit_cache.get(&completion_commit) {
+                Some(verified) => *verified,
+                None => {
+                    let verified =
+                        git_is_ancestor(&root, &completion_commit, &repository_commit)
+                            .with_context(|| {
+                                format!("verify completion commit for timeline row {event_key}")
+                            })?;
+                    verified_commit_cache.insert(completion_commit.clone(), verified);
+                    verified
+                }
+            };
         if !completion_commit_ancestor_verified {
             bail!(
                 "completion commit {} for timeline row {} is not an ancestor of pinned HEAD",
@@ -792,7 +805,10 @@ fn audit_temporal_timeline(
 
         let verified_status = get(verified_col).to_owned();
         if verified_status.is_empty() {
-            bail!("timeline row {} has an empty verified/status field", event_key);
+            bail!(
+                "timeline row {} has an empty verified/status field",
+                event_key
+            );
         }
         *verification_status_counts
             .entry(verified_status.clone())
@@ -804,8 +820,9 @@ fn audit_temporal_timeline(
                 source_path_not_recorded_count += 1;
                 (None, "not_recorded".to_string(), None, None)
             } else {
-                let normalized = normalize_root_relative_path(raw_path)
-                    .with_context(|| format!("unsafe spec theorem path on timeline row {event_key}"))?;
+                let normalized = normalize_root_relative_path(raw_path).with_context(|| {
+                    format!("unsafe spec theorem path on timeline row {event_key}")
+                })?;
                 if normalized != raw_path {
                     bail!(
                         "spec theorem path on timeline row {} is not canonical: {}",
@@ -825,7 +842,12 @@ fn audit_temporal_timeline(
                     }
                     Err(_) => {
                         source_path_missing_at_completion_count += 1;
-                        (Some(normalized), "missing_at_completion".to_string(), None, None)
+                        (
+                            Some(normalized),
+                            "missing_at_completion".to_string(),
+                            None,
+                            None,
+                        )
                     }
                 }
             };
@@ -875,7 +897,8 @@ fn audit_temporal_timeline(
         events,
     };
 
-    let output_parent = output_path.parent()
+    let output_parent = output_path
+        .parent()
         .filter(|parent| !parent.as_os_str().is_empty())
         .unwrap_or_else(|| Path::new("."));
     if !output_parent.is_dir() {
@@ -884,10 +907,13 @@ fn audit_temporal_timeline(
             output_parent.display()
         );
     }
-    let canonical_parent = output_parent.canonicalize()
+    let canonical_parent = output_parent
+        .canonicalize()
         .with_context(|| format!("canonicalize output directory {}", output_parent.display()))?;
     let resolved_output = canonical_parent.join(
-        output_path.file_name().context("timeline audit output path must have a file name")?
+        output_path
+            .file_name()
+            .context("timeline audit output path must have a file name")?
     );
     if resolved_output.starts_with(&root) {
         bail!("timeline audit output must be outside the pinned repository checkout");
@@ -898,10 +924,15 @@ fn audit_temporal_timeline(
         bail!("refusing to overwrite a symlink as temporal timeline audit output");
     }
 
-    let mut serialized = serde_json::to_vec_pretty(&audit).context("serialize temporal timeline audit")?;
+    let mut serialized =
+        serde_json::to_vec_pretty(&audit).context("serialize temporal timeline audit")?;
     serialized.push(b'\n');
-    fs::write(&resolved_output, &serialized)
-        .with_context(|| format!("write temporal timeline audit {}", resolved_output.display()))?;
+    fs::write(&resolved_output, &serialized).with_context(|| {
+        format!(
+            "write temporal timeline audit {}",
+            resolved_output.display()
+        )
+    })?;
     println!(
         "PITB_TEMPORAL_TIMELINE_AUDIT_PASS: rows={} unique_completion_commits={} source_present={} source_missing={} source_not_recorded={} timeline_sha256={} output={}",
         audit.total_timeline_rows,
@@ -2584,7 +2615,8 @@ mod tests {
              tl_0000_first,,lean/Example.lean,Example.first,verified,2026-10-20,{commit_two},complete first proof\n\
              tl_0001_second,,lean/Example.lean,Example.second,verified,2026-10-21,{commit_three},complete second proof\n"
         );
-        fs::write(root.join("proof_timeline.csv"), &timeline).expect("write full timeline inventory");
+        fs::write(root.join("proof_timeline.csv"), &timeline)
+            .expect("write full timeline inventory");
         let repository_commit = commit(&root, "freeze historical timeline inventory");
 
         let manifest = serde_json::json!({
@@ -2729,12 +2761,8 @@ mod tests {
         verify_temporal_manifest_file(&root, &manifest_path)
             .expect("pinned chronological history and exact artifact bytes should verify");
         let timeline_audit_path = base.join("timeline-audit.json");
-        audit_temporal_timeline(
-            &root,
-            Path::new("proof_timeline.csv"),
-            &timeline_audit_path,
-        )
-        .expect("timeline auditor must preserve and validate historical rows");
+        audit_temporal_timeline(&root, Path::new("proof_timeline.csv"), &timeline_audit_path)
+            .expect("timeline auditor must preserve and validate historical rows");
         let timeline_audit: serde_json::Value = serde_json::from_slice(
             &fs::read(&timeline_audit_path).expect("read temporal timeline audit"),
         )
