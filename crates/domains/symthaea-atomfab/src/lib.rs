@@ -162,9 +162,10 @@ impl fmt::Display for BenchmarkError {
                     "sample {index} has a lower interval bound above its upper bound"
                 )
             }
-            Self::InvalidUncertainty { index } => {
-                write!(f, "sample {index} has an invalid (negative or non-finite) uncertainty")
-            }
+            Self::InvalidUncertainty { index } => write!(
+                f,
+                "sample {index} has an invalid (negative or non-finite) uncertainty"
+            ),
             Self::InvalidTieTolerance => write!(f, "tie tolerance must be finite and non-negative"),
             Self::InvalidPersistence => write!(
                 f,
@@ -341,7 +342,7 @@ pub fn summarize_risk_coverage(
             return Err(BenchmarkError::InvalidUncertainty { index });
         }
         let error = sample.predicted - sample.reference;
-        if !error.is_finite() || !error.abs().is_finite() {
+        if !error.is_finite() {
             return Err(BenchmarkError::NonFiniteMetric);
         }
     }
@@ -364,7 +365,8 @@ pub fn summarize_risk_coverage(
         let threshold = ordered[accepted_count].uncertainty;
         let previous_count = accepted_count;
         while accepted_count < count && ordered[accepted_count].uncertainty == threshold {
-            let error = (ordered[accepted_count].predicted - ordered[accepted_count].reference).abs();
+            let error =
+                (ordered[accepted_count].predicted - ordered[accepted_count].reference).abs();
             absolute_error_total += error;
             max_absolute_error = max_absolute_error.max(error);
             if !absolute_error_total.is_finite() {
@@ -730,7 +732,8 @@ mod tests {
         assert!((summary.points[1].mean_absolute_error - 1.5).abs() < 1e-12);
         assert_eq!(summary.points[2].accepted_count, 3);
         assert!((summary.points[2].mean_absolute_error - (13.0 / 3.0)).abs() < 1e-12);
-        let expected_area = (1.0 / 3.0) * 1.0 + (1.0 / 3.0) * 1.5 + (1.0 / 3.0) * (13.0 / 3.0);
+        let expected_area =
+            (1.0 / 3.0) * 1.0 + (1.0 / 3.0) * 1.5 + (1.0 / 3.0) * (13.0 / 3.0);
         assert!((summary.area_under_curve - expected_area).abs() < 1e-12);
     }
 
@@ -752,7 +755,8 @@ mod tests {
             uncertainty: 0.8,
         };
         let first = summarize_risk_coverage(&[a, b, c]).expect("valid samples");
-        let second = summarize_risk_coverage(&[c, b, a]).expect("permutation should not change result");
+        let second = summarize_risk_coverage(&[c, b, a])
+            .expect("permutation should not change result");
         assert_eq!(first, second);
         assert_eq!(first.points.len(), 2);
         assert_eq!(first.points[0].accepted_count, 2);
@@ -787,7 +791,10 @@ mod tests {
 
     #[test]
     fn risk_coverage_rejects_empty_negative_uncertainty_and_non_finite_values() {
-        assert_eq!(summarize_risk_coverage(&[]), Err(BenchmarkError::EmptyInput));
+        assert_eq!(
+            summarize_risk_coverage(&[]),
+            Err(BenchmarkError::EmptyInput)
+        );
         assert_eq!(
             summarize_risk_coverage(&[UncertaintyComparison {
                 predicted: 0.0,
