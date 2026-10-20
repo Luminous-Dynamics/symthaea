@@ -862,7 +862,45 @@ mod tests {
         assert_eq!(plan.validation_family_count, 15);
         assert_eq!(plan.test_family_count, 15);
         assert_eq!(plan.seed, second_plan.seed);
+        assert_eq!(plan.partition_digest_sha256, second_plan.partition_digest_sha256);
         assert_eq!(first_map.len(), 100);
+    }
+
+    #[test]
+    fn frozen_split_verifier_accepts_exact_rows_and_rejects_mutations() {
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let digest = format!("{:x}", Sha256::digest(b"001\\ttrain\\n"));
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system clock is after Unix epoch")
+            .as_nanos();
+        let base = std::env::temp_dir();
+        let generated_path = base.join(format!(
+            "symthaea-proof-insights-generated-{}-{nonce}.json",
+            std::process::id()
+        ));
+        let frozen_path = base.join(format!(
+            "symthaea-proof-insights-frozen-{}-{nonce}.json",
+            std::process::id()
+        ));
+
+        let generated = format!(
+            r#"{{"upstream_commit":"abc","family_split_plan":{{"partition_digest_sha256":"{digest}"}},"families":[{{"family_id":"001","split":"train"}}]}}"#
+        );
+        let frozen = format!(
+            r#"{{"upstream":{{"commit":"abc"}},"split_plan":{{"partition_digest_sha256":"{digest}"}},"families":[{{"family_id":"001","split":"train"}}]}}"#
+        );
+        fs::write(&generated_path, &generated).expect("write generated fixture");
+        fs::write(&frozen_path, &frozen).expect("write frozen fixture");
+        assert!(verify_split_files(&generated_path, &frozen_path).is_ok());
+
+        let mutated = generated.replace("\\"split\\":\\"train\\"".replace('\\', '\\').as_str(), "\\"split\\":\\"test\\"".replace('\\', '\\').as_str());
+        fs::write(&generated_path, mutated).expect("write mutation fixture");
+        assert!(verify_split_files(&generated_path, &frozen_path).is_err());
+
+        fs::remove_file(&generated_path).expect("remove generated fixture");
+        fs::remove_file(&frozen_path).expect("remove frozen fixture");
     }
 
     #[test]
