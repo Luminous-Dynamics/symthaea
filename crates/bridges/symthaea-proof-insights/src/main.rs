@@ -2515,8 +2515,8 @@ mod tests {
             ],
         );
 
-        let timeline = "position,target_id\n0,target-000\n1,target-001\n";
-        fs::write(root.join("proof_timeline.csv"), timeline).expect("write timeline");
+        let mut timeline = "position,target_id\n0,target-000\n1,target-001\n".to_string();
+        fs::write(root.join("proof_timeline.csv"), &timeline).expect("write timeline");
         fs::write(root.join("lean-toolchain"), "leanprover/lean4:v4.34.1\n")
             .expect("write pinned Lean toolchain");
         let mathlib_revision = "6".repeat(40);
@@ -2555,10 +2555,18 @@ mod tests {
         let statement_two_sha = sha(exact_line_span(&source_two, 3, 3).expect("line 3"));
         let proof_two_sha = sha(exact_line_span(&source_three, 4, 4).expect("line 4"));
 
+        timeline = format!(
+            "id,lean_name,spec_theorem,function,verified,date_proven,commit_hash,commit_message\n\
+             tl_0000_first,,lean/Example.lean,Example.first,verified,2026-10-20,{commit_two},complete first proof\n\
+             tl_0001_second,,lean/Example.lean,Example.second,verified,2026-10-21,{commit_three},complete second proof\n"
+        );
+        fs::write(root.join("proof_timeline.csv"), &timeline).expect("write full timeline inventory");
+        let repository_commit = commit(&root, "freeze historical timeline inventory");
+
         let manifest = serde_json::json!({
             "schema_version": "pitb.temporal-replay-manifest.v0",
             "repository_url": "https://example.invalid/temporal-fixture",
-            "repository_commit": commit_three,
+            "repository_commit": repository_commit,
             "timeline_path": "proof_timeline.csv",
             "timeline_sha256": sha(timeline.as_bytes()),
             "lean_toolchain_path": "lean-toolchain",
@@ -2696,6 +2704,27 @@ mod tests {
 
         verify_temporal_manifest_file(&root, &manifest_path)
             .expect("pinned chronological history and exact artifact bytes should verify");
+        let timeline_audit_path = base.join("timeline-audit.json");
+        audit_temporal_timeline(
+            &root,
+            Path::new("proof_timeline.csv"),
+            &timeline_audit_path,
+        )
+        .expect("timeline auditor must preserve and validate historical rows");
+        let timeline_audit: serde_json::Value = serde_json::from_slice(
+            &fs::read(&timeline_audit_path).expect("read temporal timeline audit"),
+        )
+        .expect("parse temporal timeline audit JSON");
+        assert_eq!(timeline_audit["total_timeline_rows"], 2);
+        assert_eq!(timeline_audit["unique_completion_commit_count"], 2);
+        assert_eq!(timeline_audit["source_path_present_at_completion_count"], 2);
+        assert_eq!(timeline_audit["source_path_missing_at_completion_count"], 0);
+        assert_eq!(timeline_audit["source_path_not_recorded_count"], 0);
+        assert_eq!(timeline_audit["events"][0]["event_key"], "tl_0000_first");
+        assert_eq!(
+            timeline_audit["events"][1]["source_file_sha256"],
+            source_three_sha
+        );
         let target_bundle_path = base.join("target-001-bundle.json");
         materialize_temporal_target(&root, &manifest_path, "target-001", &target_bundle_path)
             .expect("only historically available artifacts should be materialized");
