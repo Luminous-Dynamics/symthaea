@@ -5,9 +5,10 @@ This directory defines a proposed benchmark format. **It currently contains no d
 ## Files
 
 - `insight-record.schema.json` — JSON Schema Draft 2020-12 for one provenance-linked insight record, including a separate semantic-validation section for informal-statement review, dependent-successor outcomes, and mutation controls.
-- Future `manifest.json` — pinned source snapshot and inclusion/exclusion accounting.
+- `splits.json` — frozen 372-family pre-screen assignment, pinned to OpenAI math commit `1581d4cbdd69a0faf34b2089614fe2a814316a6a`, with source fingerprints and a partition digest.
+- Future `manifest.json` — indexed source artifacts and inclusion/exclusion/unknown accounting produced by the Rust indexer.
 - Future `records.jsonl` — one schema-conformant JSON object per line, only after source evidence has been inspected and rights reviewed.
-- The source indexer's `family_split_plan` and each family's `split` field — deterministic pre-screen train/validation/test assignment (70/15/15). Future `splits.json` should be materialized from this assignment and hashed before suitability screening or model evaluation.
+- The indexer emits its own `family_split_plan` and each family's `split`; compare them to `splits.json` with `--verify-splits` before creating any benchmark examples.
 
 ## Required discipline
 
@@ -20,6 +21,7 @@ This directory defines a proposed benchmark format. **It currently contains no d
 7. Add semantic statement checks: confirm the formal statement faithfully encodes the intended claim, then use dependent-successor tests where meaningful downstream declarations exist. Include mutation controls so tests are shown to detect deliberately incorrect target variants.
 8. Keep failed, timed-out, out-of-scope, and not-attempted states distinct. No silent drops.
 9. No HDC/embedding field is authoritative for truth. Vector indexes, if added, are derived cache data and must be ablatable.
+10. The frozen split manifest was generated from the pinned catalog with an independent implementation of SHA-256 ranking. It has not yet been matched against a compiled Rust indexer output; run the crate and `--verify-splits` before relying on it as an engineering-verified artifact.
 
 ## No claims yet
 
