@@ -11,6 +11,9 @@
     "repository_commit",
     "timeline_path",
     "timeline_sha256",
+    "repository_readme_sha256",
+    "readme_claimed_timeline_row_count",
+    "timeline_row_count_matches_readme_claim",
     "lean_toolchain",
     "lean_toolchain_sha256",
     "mathlib_manifest_path",
@@ -35,6 +38,19 @@
     "repository_commit": {"$ref": "#/$defs/gitSha"},
     "timeline_path": {"$ref": "#/$defs/repositoryPath"},
     "timeline_sha256": {"$ref": "#/$defs/sha256"},
+    "repository_readme_sha256": {"$ref": "#/$defs/sha256"},
+    "readme_claimed_timeline_row_count": {
+      "oneOf": [
+        {"type": "integer", "minimum": 1},
+        {"type": "null"}
+      ]
+    },
+    "timeline_row_count_matches_readme_claim": {
+      "oneOf": [
+        {"type": "boolean"},
+        {"type": "null"}
+      ]
+    },
     "lean_toolchain": {"type": "string", "minLength": 1},
     "lean_toolchain_sha256": {"$ref": "#/$defs/sha256"},
     "mathlib_manifest_path": {"$ref": "#/$defs/repositoryPath"},
