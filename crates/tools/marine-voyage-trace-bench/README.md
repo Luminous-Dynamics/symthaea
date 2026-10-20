@@ -108,6 +108,12 @@ A 2026 MARSTRUCT study reports 24 sets of calculations from 22 codes and 15 inst
 
 The separate prediction_interval_calibration module evaluates central predictive intervals using empirical coverage, Wilson 95% coverage bounds, normalized width and the central interval score. It is not a probabilistic reinterpretation of the conservative bounds accepted by uncertainty_comparison. It requires disjoint calibration/evaluation group rosters, a frozen model attestation, fixed model/prediction/data digests, and at most one observation per declared independent group per slice. Groups may belong to only the conditions they actually measured; each required slice independently needs its frozen minimum count, and all declared evaluation groups must be accounted for somewhere in the benchmark. Borderline/out-of-domain/unknown applicability cannot pass. Read the full protocol and benchmark gates in [PREDICTION_INTERVAL_CALIBRATION.md](PREDICTION_INTERVAL_CALIBRATION.md). The included fixtures are synthetic; Rust tests have not been run in this environment.
 
+
+
+## Conditional calibration under hydrodynamic regime shift
+
+The research protocol in [MARINE_SHIFT_ROBUSTNESS.md](MARINE_SHIFT_ROBUSTNESS.md) defines paired baselines and adversarial scenarios for IID calibration, covariate shift, subgroup undercoverage, joint covariate/outcome shift, support gaps, bias/drift and no-shift controls. It composes with `prediction_interval_calibration` for per-slice coverage and interval-score metrics, without claiming universal distribution-shift guarantees or copying another conformal predictor. This is a protocol draft; no shift benchmark has yet been run and DTC raw data are not admitted.
+
 ## Claim ceiling
 
 A Complete result means only that the canonical trace passed this crate's metadata, time-coverage, numeric and integration gates. It does not validate the measurement system, prove a hydrodynamic improvement, show corrected speed-power performance, establish lifecycle emissions, demonstrate vessel safety, or certify compliance.
