@@ -408,15 +408,13 @@ mod tests {
                 .unwrap_or_else(|| panic!("missing benchmark lane {lane_id}"));
             assert!(
                 lane.metrics.iter().any(|metric| {
-                    metric.contains("failure-mode")
-                        && metric.contains("material family")
+                    metric.contains("failure-mode") && metric.contains("material family")
                 }),
                 "{lane_id} must report typed failure modes by material family"
             );
             assert!(
                 lane.gates.iter().any(|gate| {
-                    gate.contains("failed/non-converged")
-                        || gate.contains("failed relaxations")
+                    gate.contains("failed/non-converged") || gate.contains("failed relaxations")
                 }),
                 "{lane_id} must keep failed evaluations in the denominator"
             );
