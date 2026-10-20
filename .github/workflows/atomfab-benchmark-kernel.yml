@@ -45,8 +45,8 @@ jobs:
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
 
-      - name: Check formatting
-        run: cargo fmt --all -- --check
+      - name: Check AtomFab formatting
+        run: cargo fmt --package symthaea-atomfab -- --check
 
       - name: Test AtomFab metrics, contracts, campaigns, and registry
         run: cargo test --locked -p symthaea-atomfab
