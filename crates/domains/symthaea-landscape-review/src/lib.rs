@@ -672,7 +672,7 @@ fn validate_evaluation_plan(
     scope: &str,
     alternative_id: &str,
     violations: &mut Vec<ReviewViolation>,
-) {
+) -> Option<String> {
     if value.get("schema").and_then(Value::as_str) != Some(EVALUATION_PLAN_SCHEMA)
         || value.get("schema_uri").and_then(Value::as_str) != Some(EVALUATION_PLAN_SCHEMA_URI)
         || reference.schema_uri != EVALUATION_PLAN_SCHEMA_URI
@@ -685,6 +685,7 @@ fn validate_evaluation_plan(
     if value.get("project_scope").and_then(Value::as_str) != Some(scope) {
         push_violation(violations, "evaluation-scope-mismatch", Some(alternative_id), Some(&reference.sha256), Some("project_scope"), "Evaluation plan scope must match the project snapshot and review scope.");
     }
+    value.get("evaluation_id").and_then(Value::as_str).map(str::to_string)
 }
 
 fn validate_scenario_manifest(
@@ -693,6 +694,7 @@ fn validate_scenario_manifest(
     project_digest: &str,
     project: &ProjectMetadata,
     evaluation_plan: Option<&ArtifactRef>,
+    evaluation_plan_id: Option<&str>,
     alternative_id: &str,
     violations: &mut Vec<ReviewViolation>,
 ) -> Option<String> {
@@ -720,19 +722,19 @@ fn validate_scenario_manifest(
     if purpose == "synthetic-benchmark" && project.geometry_status != "synthetic-benchmark" {
         push_violation(violations, "synthetic-purpose-project-status-mismatch", Some(alternative_id), Some(&reference.sha256), Some("purpose"), "A synthetic-benchmark scenario must use a project snapshot explicitly marked synthetic-benchmark.");
     }
+    if design.and_then(|v| v.get("feature_count")).and_then(Value::as_u64) != Some(project.feature_count as u64) {
+        push_violation(violations, "scenario-feature-count-mismatch", Some(alternative_id), Some(&reference.sha256), Some("design_snapshot.feature_count"), "Scenario manifest feature count must equal the pinned project snapshot feature count.");
+    }
     match (evaluation_plan, value.get("evaluation_plan")) {
         (Some(plan_ref), Some(manifest_plan)) => {
-            if manifest_plan.get("sha256").and_then(Value::as_str) != Some(plan_ref.sha256.as_str())
-                || manifest_plan.get("evaluation_id").and_then(Value::as_str) != plan_payload_id_hint(manifest_plan).as_deref()
+            let manifest_digest = manifest_plan.get("sha256").and_then(Value::as_str);
+            let manifest_id = manifest_plan.get("evaluation_id").and_then(Value::as_str);
+            if manifest_digest != Some(plan_ref.sha256.as_str())
+                || manifest_id.is_none()
+                || evaluation_plan_id.is_some_and(|expected_id| manifest_id != Some(expected_id))
+                || manifest_plan.get("schema_uri").and_then(Value::as_str) != Some(EVALUATION_PLAN_SCHEMA_URI)
             {
-                // The digest comparison is authoritative here. The second comparison
-                // confirms a non-empty ID exists without trying to duplicate the
-                // full evaluation-plan validator.
-                if manifest_plan.get("sha256").and_then(Value::as_str) != Some(plan_ref.sha256.as_str())
-                    || manifest_plan.get("evaluation_id").and_then(Value::as_str).map(str::trim).unwrap_or("").is_empty()
-                {
-                    push_violation(violations, "scenario-evaluation-plan-mismatch", Some(alternative_id), Some(&reference.sha256), Some("evaluation_plan"), "Scenario's optional evaluation plan reference must match the pinned plan digest and carry an ID.");
-                }
+                push_violation(violations, "scenario-evaluation-plan-mismatch", Some(alternative_id), Some(&reference.sha256), Some("evaluation_plan"), "Scenario's optional evaluation-plan reference must match the exact pinned plan digest, schema URI, and evaluation ID.");
             }
         }
         (Some(_), None) => {
@@ -744,10 +746,6 @@ fn validate_scenario_manifest(
         (None, None) => {}
     }
     Some(purpose)
-}
-
-fn plan_payload_id_hint(value: &Value) -> Option<String> {
-    value.get("evaluation_id").and_then(Value::as_str).map(str::to_string)
 }
 
 fn validate_observation_batch(
