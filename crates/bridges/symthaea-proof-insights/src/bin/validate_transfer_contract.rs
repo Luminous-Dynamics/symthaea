@@ -158,6 +158,7 @@ fn validate_candidate(candidate: &Value) -> Result<()> {
         .get("directional_contract")
         .and_then(Value::as_object)
         .context("directional_contract must be an object")?;
+    let contract_value = Value::Object(contract.clone());
     let compatibility = contract
         .get("compatibility")
         .and_then(Value::as_str)
@@ -178,12 +179,12 @@ fn validate_candidate(candidate: &Value) -> Result<()> {
         bail!("source move and target goal requirements must be non-empty");
     }
 
-    let move_kind = required_string(&Value::Object(contract.clone()), "move_kind")?;
+    let move_kind = required_string(&contract_value, "move_kind")?;
     if !MOVE_KINDS.contains(&move_kind) {
         bail!("unsupported proof move kind {move_kind:?}");
     }
-    let source_obligation = parse_obligation(&Value::Object(contract.clone()), "source_obligation")?;
-    let target_obligation = parse_obligation(&Value::Object(contract.clone()), "target_obligation")?;
+    let source_obligation = parse_obligation(&contract_value, "source_obligation")?;
+    let target_obligation = parse_obligation(&contract_value, "target_obligation")?;
 
     let mismatch_values = contract
         .get("mismatch_codes")
@@ -401,6 +402,23 @@ mod tests {
             "directional_contract": {
                 "compatibility": "compatible",
                 "mismatch_codes": [],
+                "move_kind": "other",
+                "source_obligation": {
+                    "domain": "synthetic-only",
+                    "object_type": "synthetic-object",
+                    "predicate": "synthetic-source",
+                    "relation": "equality",
+                    "quantifier_scope": "synthetic fixture",
+                    "preconditions": []
+                },
+                "target_obligation": {
+                    "domain": "synthetic-only",
+                    "object_type": "synthetic-object",
+                    "predicate": "synthetic-target",
+                    "relation": "equality",
+                    "quantifier_scope": "synthetic fixture",
+                    "preconditions": []
+                },
                 "source_move_requires": "A synthetic precondition",
                 "target_goal_requires": "A synthetic goal",
                 "notes": ["No mathematical transfer is asserted"]
@@ -453,6 +471,33 @@ mod tests {
     fn rejects_unknown_compatibility_without_unknown_mismatch() {
         let mut candidate = compatible_candidate();
         candidate["directional_contract"]["compatibility"] = json!("unknown");
+        assert!(validate_candidate(&candidate).is_err());
+    }
+
+    #[test]
+    fn rejects_opposite_inequality_direction_when_marked_compatible() {
+        let mut candidate = compatible_candidate();
+        let contract = &mut candidate["directional_contract"];
+        contract["move_kind"] = json!("inequality_transfer");
+        contract["source_obligation"]["predicate"] = json!("independence_number");
+        contract["source_obligation"]["relation"] = json!("upper_bound");
+        contract["target_obligation"]["predicate"] = json!("independence_number");
+        contract["target_obligation"]["relation"] = json!("lower_bound");
+        assert!(validate_candidate(&candidate).is_err());
+
+        contract["compatibility"] = json!("incompatible");
+        contract["mismatch_codes"] = json!(["inequality_direction"]);
+        candidate["status"] = json!("rejected");
+        assert!(validate_candidate(&candidate).is_ok());
+    }
+
+    #[test]
+    fn rejects_representation_reduction_across_domains_if_marked_compatible() {
+        let mut candidate = compatible_candidate();
+        let contract = &mut candidate["directional_contract"];
+        contract["move_kind"] = json!("representation_reduction");
+        contract["source_obligation"]["domain"] = json!("geometry");
+        contract["target_obligation"]["domain"] = json!("graph theory");
         assert!(validate_candidate(&candidate).is_err());
     }
 
