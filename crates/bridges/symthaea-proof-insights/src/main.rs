@@ -1704,6 +1704,200 @@ mod tests {
     }
 
     #[test]
+    fn temporal_manifest_replays_against_real_pinned_git_bytes() {
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        fn git(root: &Path, arguments: &[&str]) -> String {
+            let output = Command::new("git")
+                .arg("-C")
+                .arg(root)
+                .args(arguments)
+                .output()
+                .expect("git process launches");
+            assert!(
+                output.status.success(),
+                "git {} failed: {}",
+                arguments.join(" "),
+                String::from_utf8_lossy(&output.stderr)
+            );
+            String::from_utf8_lossy(&output.stdout).trim().to_owned()
+        }
+
+        fn commit(root: &Path, message: &str) -> String {
+            git(root, &["add", "-A"]);
+            git(root, &["commit", "-m", message]);
+            git(root, &["rev-parse", "HEAD"])
+        }
+
+        fn sha(bytes: &[u8]) -> String {
+            format!("{:x}", Sha256::digest(bytes))
+        }
+
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock after epoch")
+            .as_nanos();
+        let base = env::temp_dir().join(format!(
+            "pitb-temporal-git-replay-{}-{nonce}",
+            std::process::id()
+        ));
+        let root = base.join("repo");
+        let manifest_path = base.join("temporal-manifest.json");
+        fs::create_dir_all(root.join("lean")).expect("create fixture repository");
+        git(&root, &["init", "-q"]);
+        git(&root, &["config", "user.name", "PITB Test"]);
+        git(&root, &["config", "user.email", "pitb-test@example.invalid"]);
+        git(
+            &root,
+            &["remote", "add", "origin", "https://example.invalid/temporal-fixture"],
+        );
+
+        let timeline = "position,target_id\n0,target-000\n1,target-001\n";
+        fs::write(root.join("proof_timeline.csv"), timeline).expect("write timeline");
+        fs::write(root.join("lean-toolchain"), "leanprover/lean4:v4.34.1\n")
+            .expect("write pinned Lean toolchain");
+        let mathlib_revision = "6".repeat(40);
+        let lake_manifest = format!(
+            "{{\"packages\":[{{\"name\":\"mathlib\",\"url\":\"https://github.com/leanprover-community/mathlib4\",\"rev\":\"{mathlib_revision}\"}}]}}\n"
+        );
+        fs::write(root.join("lake-manifest.json"), &lake_manifest)
+            .expect("write pinned Lake manifest");
+
+        let initial_source = "theorem first : True := by\n  sorry\ntheorem second : True := by\n  sorry\n";
+        fs::write(root.join("lean/Example.lean"), initial_source)
+            .expect("write initial source state");
+        let commit_one = commit(&root, "historical target statements");
+        let source_one = git_show_file(&root, &commit_one, "lean/Example.lean")
+            .expect("read first source revision");
+        let source_one_sha = sha(&source_one);
+
+        let second_source = initial_source.replacen("  sorry\n", "  trivial\n", 1);
+        fs::write(root.join("lean/Example.lean"), &second_source)
+            .expect("complete first proof only");
+        let commit_two = commit(&root, "complete first proof");
+        let source_two = git_show_file(&root, &commit_two, "lean/Example.lean")
+            .expect("read second source revision");
+        let source_two_sha = sha(&source_two);
+
+        let third_source = second_source.replacen("  sorry\n", "  trivial\n", 1);
+        fs::write(root.join("lean/Example.lean"), &third_source)
+            .expect("complete second proof");
+        let commit_three = commit(&root, "complete second proof");
+        let source_three = git_show_file(&root, &commit_three, "lean/Example.lean")
+            .expect("read third source revision");
+        let source_three_sha = sha(&source_three);
+
+        let statement_one_sha = sha(exact_line_span(&source_one, 1, 1).expect("line 1"));
+        let proof_one_sha = sha(exact_line_span(&source_two, 2, 2).expect("line 2"));
+        let statement_two_sha = sha(exact_line_span(&source_two, 3, 3).expect("line 3"));
+        let proof_two_sha = sha(exact_line_span(&source_three, 4, 4).expect("line 4"));
+
+        let manifest = serde_json::json!({
+            "schema_version": "pitb.temporal-replay-manifest.v0",
+            "repository_url": "https://example.invalid/temporal-fixture",
+            "repository_commit": commit_three,
+            "timeline_path": "proof_timeline.csv",
+            "timeline_sha256": sha(timeline.as_bytes()),
+            "lean_toolchain_path": "lean-toolchain",
+            "lean_toolchain": "leanprover/lean4:v4.34.1",
+            "mathlib_manifest_path": "lake-manifest.json",
+            "mathlib_manifest_sha256": sha(lake_manifest.as_bytes()),
+            "mathlib_revision": mathlib_revision,
+            "events": [
+                {
+                    "position": 0,
+                    "target_id": "target-000",
+                    "theorem_id": "Example.first",
+                    "target_state_commit": commit_one,
+                    "proof_completion_commit": commit_two,
+                    "statement_sha256": statement_one_sha,
+                    "statement_artifact_id": "statement-000",
+                    "proof_artifact_id": "proof-000",
+                    "visible_artifact_ids": ["statement-000"]
+                },
+                {
+                    "position": 1,
+                    "target_id": "target-001",
+                    "theorem_id": "Example.second",
+                    "target_state_commit": commit_two,
+                    "proof_completion_commit": commit_three,
+                    "statement_sha256": statement_two_sha,
+                    "statement_artifact_id": "statement-001",
+                    "proof_artifact_id": "proof-001",
+                    "visible_artifact_ids": ["statement-000", "proof-000", "statement-001"]
+                }
+            ],
+            "artifacts": [
+                {
+                    "artifact_id": "statement-000",
+                    "path": "lean/Example.lean",
+                    "artifact_kind": "theorem_statement",
+                    "content_sha256": statement_one_sha,
+                    "content_start_line": 1,
+                    "content_end_line": 1,
+                    "source_file_sha256": source_one_sha,
+                    "source_commit": commit_one,
+                    "available_at_position": 0,
+                    "target_position": null,
+                    "theorem_id": "Example.first"
+                },
+                {
+                    "artifact_id": "proof-000",
+                    "path": "lean/Example.lean",
+                    "artifact_kind": "proof_body",
+                    "content_sha256": proof_one_sha,
+                    "content_start_line": 2,
+                    "content_end_line": 2,
+                    "source_file_sha256": source_two_sha,
+                    "source_commit": commit_two,
+                    "available_at_position": null,
+                    "target_position": 0,
+                    "theorem_id": "Example.first"
+                },
+                {
+                    "artifact_id": "statement-001",
+                    "path": "lean/Example.lean",
+                    "artifact_kind": "theorem_statement",
+                    "content_sha256": statement_two_sha,
+                    "content_start_line": 3,
+                    "content_end_line": 3,
+                    "source_file_sha256": source_two_sha,
+                    "source_commit": commit_two,
+                    "available_at_position": 1,
+                    "target_position": null,
+                    "theorem_id": "Example.second"
+                },
+                {
+                    "artifact_id": "proof-001",
+                    "path": "lean/Example.lean",
+                    "artifact_kind": "proof_body",
+                    "content_sha256": proof_two_sha,
+                    "content_start_line": 4,
+                    "content_end_line": 4,
+                    "source_file_sha256": source_three_sha,
+                    "source_commit": commit_three,
+                    "available_at_position": null,
+                    "target_position": 1,
+                    "theorem_id": "Example.second"
+                }
+            ]
+        });
+        fs::write(
+            &manifest_path,
+            serde_json::to_vec_pretty(&manifest).expect("serialize temporal manifest"),
+        )
+        .expect("write temporal manifest fixture");
+
+        verify_temporal_manifest_file(&root, &manifest_path)
+            .expect("pinned chronological history and exact artifact bytes should verify");
+        assert!(
+            git(&root, &["status", "--porcelain"]).is_empty(),
+            "fixture checkout must remain clean after verification"
+        );
+        fs::remove_dir_all(base).expect("remove temporary replay fixture");
+    }
+
+    #[test]
     fn temporal_manifest_accepts_historical_context_and_hides_target_proofs() {
         let manifest = temporal_manifest_fixture();
         validate_temporal_manifest(&manifest)
