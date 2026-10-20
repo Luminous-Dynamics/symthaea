@@ -148,6 +148,30 @@ fn is_http_url(value: &str) -> bool {
         && value.len() > (if value.starts_with("https://") { 8 } else { 7 })
 }
 
+fn is_iso_calendar_date(value: &str) -> bool {
+    let bytes = value.as_bytes();
+    if bytes.len() != 10 || bytes[4] != b'-' || bytes[7] != b'-' {
+        return false;
+    }
+    if !bytes.iter().enumerate().all(|(index, byte)| {
+        index == 4 || index == 7 || byte.is_ascii_digit()
+    }) {
+        return false;
+    }
+    let year = match value[0..4].parse::<u32>() { Ok(value) if value > 0 => value, _ => return false };
+    let month = match value[5..7].parse::<u32>() { Ok(value) => value, _ => return false };
+    let day = match value[8..10].parse::<u32>() { Ok(value) => value, _ => return false };
+    let leap = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+    let days_in_month = match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 if leap => 29,
+        2 => 28,
+        _ => return false,
+    };
+    (1..=days_in_month).contains(&day)
+}
+
 fn validate_csv(input: &str) -> Result<AuditReport, Vec<String>> {
     let rows = parse_csv(input).map_err(|error| vec![format!("CSV parse error: {error}")])?;
     if rows.is_empty() {
@@ -248,8 +272,12 @@ fn validate_csv(input: &str) -> Result<AuditReport, Vec<String>> {
                     Ok(value) => value.is_finite() && value > 0.0 && !currency.is_empty(),
                     Err(_) => false,
                 };
+                if !is_iso_calendar_date(cell(row, 5)) {
+                    row_errors.push(format!(
+                        "row {record_number} ({anchor_id}): ComparablePriceEvidence requires a valid YYYY-MM-DD award_or_issue_date"
+                    ));
+                }
                 for (index, field_name) in [
-                    (5, "award_or_issue_date"),
                     (8, "vessel_or_propulsion_description"),
                     (9, "quantity"),
                     (12, "price_scope"),
@@ -458,6 +486,14 @@ mod tests {
         assert_eq!(report.records, 1);
         assert_eq!(report.comparable_price_records, 1);
         assert_eq!(report.non_comparable_records, 0);
+    }
+
+    #[test]
+    fn comparable_price_requires_valid_calendar_date() {
+        let mut row = fully_normalized_row();
+        row[5] = "2026-02-29".to_owned();
+        let errors = validate_csv(&csv_for_rows(&[row])).unwrap_err();
+        assert!(errors.iter().any(|error| error.contains("valid YYYY-MM-DD")));
     }
 
     #[test]
