@@ -696,6 +696,84 @@ jobs:
               f"timeline_sha256={audit['timeline_sha256']}"
           )
           PY
+      - name: Audit pinned Dalek dataset-to-timeline joins
+        shell: bash
+        run: |
+          set -euo pipefail
+          dalek_sha="9fdbfd066420aebcf61a70b06eba57a108c41340"
+          dalek="$RUNNER_TEMP/dalek-lean-bench"
+          audit="$RUNNER_TEMP/dalek-temporal-dataset-audit.json"
+          test "$(git -C "$dalek" rev-parse HEAD)" = "$dalek_sha"
+          test -z "$(git -C "$dalek" status --porcelain)"
+          cd "$(dirname "$PITB_MANIFEST")"
+          cargo run --release --locked --bin symthaea-proof-insights -- \
+            --audit-temporal-dataset "$dalek" proof_timeline.csv dataset.jsonl "$audit"
+          python - "$audit" "$dalek" "$GITHUB_WORKSPACE" <<'PY'
+          import hashlib
+          import json
+          import sys
+          from pathlib import Path
+          from jsonschema import Draft202012Validator, FormatChecker
+
+          audit_path, dalek, workspace = map(Path, sys.argv[1:])
+          audit = json.loads(audit_path.read_text())
+          schema_path = workspace / "data/benchmarks/proof-insight-transfer-v0/temporal-dataset-join-audit.schema.json"
+          schema = json.loads(schema_path.read_text())
+          Draft202012Validator.check_schema(schema)
+          Draft202012Validator(schema, format_checker=FormatChecker()).validate(audit)
+
+          expected_commit = "9fdbfd066420aebcf61a70b06eba57a108c41340"
+          if audit["repository_commit"] != expected_commit:
+              raise SystemExit("dataset join audit references an unexpected repository commit")
+          if audit["total_timeline_rows"] != 248:
+              raise SystemExit("dataset join audit expected exactly 248 timeline rows")
+          if audit["total_dataset_records"] != 146 or len(audit["events"]) != 146:
+              raise SystemExit("pinned Dalek dataset.jsonl must contain exactly 146 records")
+          if audit["unique_path_join_count"] != 39:
+              raise SystemExit("unexpected count of dataset records with exactly one timeline-path match")
+          if audit["ambiguous_path_join_count"] != 58:
+              raise SystemExit("unexpected count of dataset records with multiple timeline-path matches")
+          if audit["unmatched_path_join_count"] != 49:
+              raise SystemExit("unexpected count of dataset records with no timeline-path match")
+          if audit["invalid_dataset_path_count"] != 0:
+              raise SystemExit("pinned dataset contains an unsafe/noncanonical repository path")
+          if (
+              audit["unique_path_join_count"]
+              + audit["ambiguous_path_join_count"]
+              + audit["unmatched_path_join_count"]
+              + audit["invalid_dataset_path_count"]
+          ) != audit["total_dataset_records"]:
+              raise SystemExit("dataset join accounting does not cover all records")
+          dataset_bytes = (dalek / audit["dataset_path"]).read_bytes()
+          if hashlib.sha256(dataset_bytes).hexdigest() != audit["dataset_sha256"]:
+              raise SystemExit("dataset JSONL digest differs from the pinned checkout bytes")
+          if sum(audit["statement_match_relation_counts"].values()) != audit["total_dataset_records"]:
+              raise SystemExit("statement-match relation accounting does not cover all dataset records")
+          by_status = {event["path_join_status"]: 0 for event in audit["events"]}
+          for event in audit["events"]:
+              by_status[event["path_join_status"]] += 1
+              if event["path_join_status"] == "unique_path_match":
+                  if len(event["candidate_timeline_positions"]) != 1 or not event["matched_completion_commit"]:
+                      raise SystemExit("unique path join does not identify exactly one completion event")
+              elif event["path_join_status"] == "ambiguous_path_match":
+                  if len(event["candidate_timeline_positions"]) < 2 or event["matched_completion_commit"] is not None:
+                      raise SystemExit("ambiguous path join was incorrectly resolved")
+              else:
+                  if event["candidate_timeline_positions"] or event["matched_completion_commit"] is not None:
+                      raise SystemExit("unmatched/invalid path retained a false timeline assignment")
+          print(
+              "PITB_DALEK_DATASET_JOIN_AUDIT_PASS: "
+              f"records={audit['total_dataset_records']} "
+              f"unique_path={audit['unique_path_join_count']} "
+              f"ambiguous_path={audit['ambiguous_path_join_count']} "
+              f"unmatched_path={audit['unmatched_path_join_count']} "
+              f"before_commit_ancestor={audit['commit_before_ancestor_of_head_count']} "
+              f"before_commit_nonancestor={audit['commit_before_not_ancestor_of_head_count']} "
+              f"before_commit_missing_object={audit['commit_before_missing_commit_object_count']} "
+              f"statement_relations={json.dumps(audit['statement_match_relation_counts'], sort_keys=True)} "
+              f"dataset_sha256={audit['dataset_sha256']}"
+          )
+          PY
       - name: Index pinned OpenAI math snapshot twice
         shell: bash
         run: |
@@ -829,5 +907,6 @@ jobs:
             ${{ runner.temp }}/proof-insight-source-index-*.json
             ${{ runner.temp }}/proof-insight-isolated/Cargo.lock
             ${{ runner.temp }}/dalek-temporal-timeline-audit.json
+            ${{ runner.temp }}/dalek-temporal-dataset-audit.json
           if-no-files-found: error
           retention-days: 30
