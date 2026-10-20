@@ -145,7 +145,9 @@ pub fn evaluate_package_corpus_bytes(
         return Err("ATOMFAB_GIT_HEAD must be a 40- or 64-character hexadecimal commit SHA".into());
     }
     if !is_hex_digest(actual_checkout_head) || !matches!(actual_checkout_head.len(), 40 | 64) {
-        return Err("actual checkout HEAD must be a 40- or 64-character hexadecimal commit SHA".into());
+        return Err(
+            "actual checkout HEAD must be a 40- or 64-character hexadecimal commit SHA".into(),
+        );
     }
     if !declared_git_head.eq_ignore_ascii_case(actual_checkout_head) {
         return Err("ATOMFAB_GIT_HEAD does not match the actual checkout HEAD".into());
