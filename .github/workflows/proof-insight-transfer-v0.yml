@@ -1,0 +1,72 @@
+name: Proof Insight Transfer Indexer V0
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/bridges/symthaea-proof-insights/**"
+      - "data/benchmarks/proof-insight-transfer-v0/**"
+      - "docs/research/proof-insight-transfer-2026.md"
+      - ".github/workflows/proof-insight-transfer-v0.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  proof-insight-indexer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.96.0
+          components: rustfmt, clippy
+      - name: Check exact-package formatting
+        run: cargo fmt --manifest-path Cargo.toml -p symthaea-proof-insights -- --check
+      - name: Run indexer unit tests
+        run: cargo test --locked --manifest-path Cargo.toml -p symthaea-proof-insights
+      - name: Run strict Clippy
+        run: cargo clippy --locked --manifest-path Cargo.toml -p symthaea-proof-insights --all-targets -- -D warnings
+      - name: Index pinned OpenAI math snapshot twice
+        shell: bash
+        run: |
+          set -euo pipefail
+          upstream_sha="1581d4cbdd69a0faf34b2089614fe2a814316a6a"
+          upstream="$RUNNER_TEMP/openai-math"
+          first="$RUNNER_TEMP/proof-insight-source-index-1.json"
+          second="$RUNNER_TEMP/proof-insight-source-index-2.json"
+          git clone --quiet https://github.com/openai/math.git "$upstream"
+          git -C "$upstream" checkout --quiet --detach "$upstream_sha"
+          test "$(git -C "$upstream" rev-parse HEAD)" = "$upstream_sha"
+          test -z "$(git -C "$upstream" status --porcelain)"
+          cargo run --locked --manifest-path Cargo.toml -p symthaea-proof-insights -- "$upstream" "$upstream_sha" "$first"
+          cargo run --locked --manifest-path Cargo.toml -p symthaea-proof-insights -- "$upstream" "$upstream_sha" "$second"
+          cmp "$first" "$second"
+          jq -e --arg sha "$upstream_sha" '
+            .upstream_commit == $sha and
+            .catalogue_claims.readme_claimed_family_count == 372 and
+            .catalogue_claims.parsed_family_header_count == 372 and
+            .family_split_plan.train_family_count == 260 and
+            .family_split_plan.validation_family_count == 56 and
+            .family_split_plan.test_family_count == 56 and
+            .summary.formalization_source_count == 173 and
+            .summary.main_result_declaration_count == 200 and
+            (.source_fingerprints | any(.path == "README.md")) and
+            (.source_fingerprints | any(.path == "CONTENTS.md")) and
+            (.source_fingerprints | any(.path == "lean/formalization.yaml")) and
+            (.source_fingerprints | any(.path == "lean/ComparatorChallenges/README.md"))
+          ' "$first" >/dev/null
+          test -z "$(git -C "$upstream" status --porcelain)"
+          echo "PITB_PINNED_SOURCE_INDEX_PASS: $upstream_sha"
+      - name: Upload exact-source index and receipts
+        uses: actions/upload-artifact@v4
+        with:
+          name: proof-insight-transfer-v0-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/proof-insight-source-index-*.json
+          if-no-files-found: error
+          retention-days: 30
