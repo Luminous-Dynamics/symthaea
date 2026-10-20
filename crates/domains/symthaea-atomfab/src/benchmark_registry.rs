@@ -406,21 +406,20 @@ mod tests {
             .find(|lane| lane.id == "multi-fidelity-evidence-routing")
             .expect("multi-fidelity evidence-routing lane should be registered");
         assert!(
-            lane.baselines.iter().any(|baseline| {
-                baseline.contains("Fixed cheapest-first")
-            }),
+            lane.baselines
+                .iter()
+                .any(|baseline| { baseline.contains("Fixed cheapest-first") }),
             "router benchmark must include a conventional fixed-fidelity baseline"
         );
         assert!(
-            lane.metrics.iter().any(|metric| {
-                metric.contains("decision-loss reduction estimate calibration")
-            }),
+            lane.metrics
+                .iter()
+                .any(|metric| { metric.contains("decision-loss reduction estimate calibration") }),
             "router benchmark must score calibration of its value estimates"
         );
         assert!(
             lane.gates.iter().any(|gate| {
-                gate.contains("same request, evidence domain")
-                    && gate.contains("budget")
+                gate.contains("same request, evidence domain") && gate.contains("budget")
             }),
             "router benchmark must prevent unlike-domain or unlike-budget comparisons"
         );
@@ -431,6 +430,4 @@ mod tests {
             }),
             "router benchmark must resist value-estimate gaming"
         );
-    }
-
-}
+    }}
