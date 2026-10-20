@@ -340,12 +340,20 @@ fn main() -> ExitCode {
 
 fn execute() -> Result<()> {
     let args = parse_args(env::args().skip(1).collect())?;
-    let config_bytes = read_arg(&args, "--config")?;
-    let results_bytes = read_arg(&args, "--results")?;
-    let validation_bytes = read_arg(&args, "--validation-results")?;
-    let protocol_bytes = read_arg(&args, "--protocol")?;
-    let split_bytes = read_arg(&args, "--splits")?;
-    let receipt_bytes = read_arg(&args, "--baseline-receipt")?;
+    match args.get("--mode").map(String::as_str).unwrap_or("analyze") {
+        "analyze" => execute_analysis(&args),
+        "power" => execute_power(&args),
+        mode => bail!("unsupported mode {mode}; expected analyze or power"),
+    }
+}
+
+fn execute_analysis(args: &BTreeMap<String, String>) -> Result<()> {
+    let config_bytes = read_arg(args, "--config")?;
+    let results_bytes = read_arg(args, "--results")?;
+    let validation_bytes = read_arg(args, "--validation-results")?;
+    let protocol_bytes = read_arg(args, "--protocol")?;
+    let split_bytes = read_arg(args, "--splits")?;
+    let receipt_bytes = read_arg(args, "--baseline-receipt")?;
 
     let config: RunConfig =
         serde_json::from_slice(&config_bytes).context("parse frozen run config JSON")?;
