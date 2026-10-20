@@ -12,6 +12,7 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     env,
     fs,
+    path::{Component, Path},
     process::ExitCode,
 };
 
@@ -101,7 +102,29 @@ struct TargetOutcome {
     split: String,
     eligibility: Eligibility,
     #[serde(default)]
+    source_commit: Option<String>,
+    #[serde(default)]
+    theorem_id: Option<String>,
+    #[serde(default)]
+    artifact_path: Option<String>,
+    #[serde(default)]
+    artifact_sha256: Option<String>,
+    #[serde(default)]
+    lean_toolchain: Option<String>,
+    #[serde(default)]
+    mathlib_revision: Option<String>,
+    #[serde(default)]
     statement_sha256: Option<String>,
+    #[serde(default)]
+    eligibility_receipt_sha256: Option<String>,
+    #[serde(default)]
+    statement_review_receipt_sha256: Option<String>,
+    #[serde(default)]
+    proof_audit_receipt_sha256: Option<String>,
+    #[serde(default)]
+    successor_test_receipt_sha256: Option<String>,
+    #[serde(default)]
+    mutation_receipt_sha256: Option<String>,
     #[serde(default)]
     exclusion_reason: Option<String>,
     arms: Vec<ArmOutcome>,
@@ -142,6 +165,10 @@ struct ArmOutcome {
     wall_ms: u64,
     cost_microusd: u64,
     config_sha256: String,
+    input_sha256: String,
+    retrieval_log_sha256: String,
+    checker_receipt_sha256: String,
+    semantic_gate_receipt_sha256: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -150,6 +177,7 @@ struct AnalysisReport {
     protocol_id: String,
     protocol_sha256: String,
     run_config_sha256: String,
+    results_jsonl_sha256: String,
     split_manifest_sha256: String,
     partition_digest_sha256: String,
     baseline_selection_receipt_sha256: String,
@@ -301,11 +329,12 @@ fn execute() -> Result<()> {
         protocol_id: config.protocol_id,
         protocol_sha256: config.protocol_sha256,
         run_config_sha256: sha256_hex(&config_bytes),
+        results_jsonl_sha256: sha256_hex(&results_bytes),
         split_manifest_sha256: config.split_manifest_sha256,
         partition_digest_sha256: config.partition_digest_sha256,
         baseline_selection_receipt_sha256: config.baseline_selection_receipt_sha256,
         upstream_commit: split_manifest.upstream.commit,
-        selected_baseline_arm: selected_baseline,
+        selected_baseline_arm: selected_baseline.clone(),
         treatment_arm: TREATMENT_ARM,
         total_test_families_in_frozen_split: split_manifest
             .families
@@ -641,6 +670,44 @@ fn validate_outcomes(
                 if target.family_id.trim().is_empty() {
                     bail!("eligible target {} has an empty family id", target.target_id);
                 }
+                let source_commit = target
+                    .source_commit
+                    .as_deref()
+                    .context("eligible target lacks pinned source commit")?;
+                if source_commit != EXPECTED_UPSTREAM_COMMIT {
+                    bail!(
+                        "target {} source commit {} differs from frozen upstream {}",
+                        target.target_id,
+                        source_commit,
+                        EXPECTED_UPSTREAM_COMMIT
+                    );
+                }
+                let theorem_id = target.theorem_id.as_deref().unwrap_or_default().trim();
+                let artifact_path = target.artifact_path.as_deref().context(
+                    "eligible target lacks repository-relative artifact path",
+                )?;
+                if theorem_id.is_empty()
+                    || target.lean_toolchain.as_deref().unwrap_or_default().trim().is_empty()
+                    || target.mathlib_revision.as_deref().unwrap_or_default().trim().is_empty()
+                {
+                    bail!(
+                        "eligible target {} must identify theorem, Lean toolchain and Mathlib revision",
+                        target.target_id
+                    );
+                }
+                validate_repo_relative_path(artifact_path)
+                    .with_context(|| format!("target {} artifact path", target.target_id))?;
+                for (label, digest) in [
+                    ("artifact", target.artifact_sha256.as_deref()),
+                    ("eligibility receipt", target.eligibility_receipt_sha256.as_deref()),
+                    ("statement review receipt", target.statement_review_receipt_sha256.as_deref()),
+                    ("proof audit receipt", target.proof_audit_receipt_sha256.as_deref()),
+                    ("successor-test receipt", target.successor_test_receipt_sha256.as_deref()),
+                    ("mutation receipt", target.mutation_receipt_sha256.as_deref()),
+                ] {
+                    validate_sha256(digest.context(label)?)
+                        .with_context(|| format!("target {} {label} digest", target.target_id))?;
+                }
                 validate_arm_set(target, config, &mut arm_config_digests)?;
                 eligible.push(target);
             }
@@ -697,8 +764,16 @@ fn validate_arm_set(
                 arm.arm
             );
         }
-        validate_sha256(&arm.config_sha256)
-            .with_context(|| format!("target {} arm {} config digest", target.target_id, arm.arm))?;
+        for (label, digest) in [
+            ("config", arm.config_sha256.as_str()),
+            ("input", arm.input_sha256.as_str()),
+            ("retrieval log", arm.retrieval_log_sha256.as_str()),
+            ("checker receipt", arm.checker_receipt_sha256.as_str()),
+            ("semantic-gate receipt", arm.semantic_gate_receipt_sha256.as_str()),
+        ] {
+            validate_sha256(digest)
+                .with_context(|| format!("target {} arm {} {label} digest", target.target_id, arm.arm))?;
+        }
         if let Some(previous) = arm_config_digests.insert(arm.arm.clone(), arm.config_sha256.clone()) {
             if previous != arm.config_sha256 {
                 bail!(
@@ -895,6 +970,19 @@ fn quantile(sorted_values: &[f64], probability: f64) -> f64 {
         + fraction * (sorted_values[upper_index] - sorted_values[lower_index])
 }
 
+fn validate_repo_relative_path(value: &str) -> Result<()> {
+    let path = Path::new(value);
+    if value.trim().is_empty() || path.is_absolute() || value.contains('\\') {
+        bail!("expected a non-empty repository-relative POSIX path");
+    }
+    if path.components().any(|component| {
+        matches!(component, Component::ParentDir | Component::RootDir | Component::Prefix(_))
+    }) {
+        bail!("path may not escape the repository root");
+    }
+    Ok(())
+}
+
 fn validate_sha256(value: &str) -> Result<()> {
     if value.len() != 64 || !value.chars().all(|character| character.is_ascii_hexdigit()) {
         bail!("expected a 64-character SHA-256 hex digest");
@@ -973,6 +1061,14 @@ mod tests {
     fn mismatched_statement_digests_are_not_silently_normalized() {
         assert!(validate_sha256("not-a-digest").is_err());
         assert!(validate_sha256(&"a".repeat(64)).is_ok());
+    }
+
+    #[test]
+    fn repository_paths_cannot_escape_the_checkout() {
+        assert!(validate_repo_relative_path("lean/OAI/Target.lean").is_ok());
+        assert!(validate_repo_relative_path("../outside.lean").is_err());
+        assert!(validate_repo_relative_path("/absolute/path.lean").is_err());
+        assert!(validate_repo_relative_path("lean\\..\\outside.lean").is_err());
     }
 
 }
