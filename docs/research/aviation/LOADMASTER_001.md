@@ -33,7 +33,7 @@ The crate now has a separate `analyze_loading_uncertainty` function, with explic
 
 The center-of-gravity interval is computed by interval division over independent total-moment and total-mass bounds. This intentionally ignores correlations between numerator and denominator, so the interval can be wider than the physically attainable values. That is acceptable for an uncertainty screen but could make the result uninformative; it must not be interpreted as CG-envelope approval. Comparing the result against mass-dependent approved CG bands and accounting for correlated measurement/calibration errors remain separate follow-on work.
 
-An independent integration oracle enumerates all 64 endpoint combinations of the two-item synthetic fixture and checks the mass, moment and CG values all lie inside the returned bounds. Additional negative controls reject missing intervals and ranges that exclude the nominal profile/item values. The new test target is authored but awaits exact-head CI validation.
+An independent integration oracle enumerates all 64 endpoint combinations of the two-item synthetic fixture and checks the mass, moment and CG values all lie inside the returned bounds. Additional negative controls reject missing intervals and ranges that exclude the nominal profile/item values. These checks passed on exact code head `bd8a31dfabbb45c3805598a12c7949e4f559da39` in [workflow 39423836970](https://github.com/Luminous-Dynamics/symthaea/actions/runs/39423836970); subsequent edits to this paragraph are documentation-only.
 
 ## 3. Safety and evidence boundary
 
