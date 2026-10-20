@@ -192,7 +192,8 @@
         "published reference-search reproduction on 12 explicit strata: Cu27/Cu38/Cu47/Cu55 × γ-Al2O3(100)/γ-Al2O3(110)/α-Al2O3(0001)",
         "reference-method/checkpoint/data-manifest completeness and checksum coverage before claim-bearing execution",
         "paper-compatible budget: 50 lowest-energy candidates per MLIP locally DFT-optimized per stratum; record the original candidate pool, failed refinements, duplicates and resulting unique validated discoveries",
-        "distinct budget for the policy-extension phase: matched per-policy reference budget over at least 20 paired seeds, with router/preprocessing/retry costs included"
+        "distinct budget for the policy-extension phase: matched per-policy reference budget over at least 20 paired seeds, with router/preprocessing/retry costs included",
+        "paper-reported search-winner fingerprint by model across 12 size×surface systems, reported as reference context rather than a deterministic requirement under different stochastic seeds"
       ],
       "gates": [
         "report energy accuracy and structural exploration as separate score families",
@@ -209,7 +210,9 @@
         "preserve the 12 per-size/per-surface strata; keep the 2025 related Zenodo training/validation/global-minima archive distinct from the exact 2026 benchmark evaluation manifest",
         "no claim-bearing run until exact DFT settings, candidate/reference structure manifest, model checkpoints, licenses, evaluator version and SHA-256 artifact digests are pinned",
         "report the published reproduction phase separately from the policy-extension phase; do not infer exact candidate counts from population × generations when code-level duplicate/offspring accounting has not been pinned",
-        "for the extension stretch claim, use paired seeds and identical frozen targets; if either policy fails to reach the target, target-reaching acceleration is undefined for that pair and the failure remains in the report"
+        "for the extension stretch claim, use paired seeds and identical frozen targets; if either policy fails to reach the target, target-reaching acceleration is undefined for that pair and the failure remains in the report",
+        "never label a finite GA best-known structure as the true global minimum unless exhaustive/certifying evidence supports that claim; record random seeds and deviations from paper-reported winner counts without tuning the evaluator",
+        "pin both mutation operators and their probabilities, including rattle/mirror weighting, before exact reproduction"
       ]
     },
     {
