@@ -163,7 +163,7 @@ fn choose_action(policy: Policy, observation: Observation) -> Action {
     let push_cost = 0.055 + 0.025 * stress;
 
     let maintain = match policy {
-        Policy::TaskOnly => reserve < 0.12 || load >= 0.97,
+        Policy::TaskOnly => reserve < 0.12,
         Policy::StressReactive => stress >= 0.78 || reserve < 0.22,
         Policy::AllostaticReactive => load >= 0.58 || reserve < 0.22,
         Policy::PredictiveViability => {
@@ -171,19 +171,21 @@ fn choose_action(policy: Policy, observation: Observation) -> Action {
             let conservative_forecast =
                 (observation.forecast_load + uncertainty * 0.25).clamp(0.0, 1.0);
             let projected_reserve = reserve - 3.0 * (0.055 + 0.025 * conservative_forecast);
-            let projected_load = load + 3.0 * (0.015 + 0.032 * conservative_forecast);
+            let projected_load = load + 3.0 * (0.026 + 0.032 * conservative_forecast);
             projected_reserve < 0.30 || projected_load > 0.68 || reserve < 0.22
         }
         Policy::ShuffledForecastControl => {
-            let false_forecast = observation.shuffled_forecast_load;
+            let uncertainty = epistemic_uncertainty(observation.forecast_confidence);
+            let false_forecast =
+                (observation.shuffled_forecast_load + uncertainty * 0.25).clamp(0.0, 1.0);
             let projected_reserve = reserve - 3.0 * (0.055 + 0.025 * false_forecast);
-            let projected_load = load + 3.0 * (0.015 + 0.032 * false_forecast);
+            let projected_load = load + 3.0 * (0.026 + 0.032 * false_forecast);
             projected_reserve < 0.30 || projected_load > 0.68 || reserve < 0.22
         }
         Policy::OraclePredictive => {
             let forecast = observation.oracle_forecast_load;
             let projected_reserve = reserve - 3.0 * (0.055 + 0.025 * forecast);
-            let projected_load = load + 3.0 * (0.015 + 0.032 * forecast);
+            let projected_load = load + 3.0 * (0.026 + 0.032 * forecast);
             projected_reserve < 0.30 || projected_load > 0.68 || reserve < 0.22
         }
     };
