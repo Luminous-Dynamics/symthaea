@@ -575,7 +575,7 @@
         },
         "outcomes": {
           "type": "array",
-          "minItems": 6,
+          "minItems": 7,
           "items": {
             "type": "string"
           }
