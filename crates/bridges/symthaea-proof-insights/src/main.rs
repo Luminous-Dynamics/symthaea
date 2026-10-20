@@ -2610,7 +2610,7 @@ mod tests {
         // while README claims three, and the audit must preserve that discrepancy.
         fs::write(
             root.join("README.md"),
-            "The proof_timeline.csv currently records 3 theorems in this fixture.\n",
+            "The proof_timeline.csv currently records 4 theorems in this fixture.\n",
         )
         .expect("write deliberately inconsistent timeline README");
         let commit_one = commit(&root, "historical target statements");
@@ -2641,7 +2641,8 @@ mod tests {
         timeline = format!(
             "id,lean_name,spec_theorem,function,verified,date_proven,commit_hash,commit_message\n\
              tl_0000_first,,lean/Example.lean,Example.first,verified,2026-10-20,{commit_two},complete first proof\n\
-             tl_0001_second,,lean/Example.lean,Example.second,verified,2026-10-21,{commit_three},complete second proof\n"
+             tl_0001_second,,lean/Example.lean,Example.second,verified,2026-10-21,{commit_three},complete second proof\n\
+             tl_0002_missing,,lean/Missing.lean,Example.missing,externally verified,2026-10-22,{commit_three},source intentionally absent\n"
         );
         fs::write(root.join("proof_timeline.csv"), &timeline)
             .expect("write full timeline inventory");
@@ -2795,8 +2796,8 @@ mod tests {
             &fs::read(&timeline_audit_path).expect("read temporal timeline audit"),
         )
         .expect("parse temporal timeline audit JSON");
-        assert_eq!(timeline_audit["total_timeline_rows"], 2);
-        assert_eq!(timeline_audit["readme_claimed_timeline_row_count"], 3);
+        assert_eq!(timeline_audit["total_timeline_rows"], 3);
+        assert_eq!(timeline_audit["readme_claimed_timeline_row_count"], 4);
         assert_eq!(timeline_audit["timeline_row_count_matches_readme_claim"], false);
         assert_eq!(timeline_audit["repository_readme_sha256"], sha(
             git_show_file(&root, &repository_commit, "README.md")
@@ -2805,8 +2806,12 @@ mod tests {
         ));
         assert_eq!(timeline_audit["unique_completion_commit_count"], 2);
         assert_eq!(timeline_audit["source_path_present_at_completion_count"], 2);
-        assert_eq!(timeline_audit["source_path_missing_at_completion_count"], 0);
+        assert_eq!(timeline_audit["source_path_missing_at_completion_count"], 1);
         assert_eq!(timeline_audit["source_path_not_recorded_count"], 0);
+        assert_eq!(
+            timeline_audit["events"][2]["source_file_status"],
+            "missing_at_completion"
+        );
         assert_eq!(timeline_audit["events"][0]["event_key"], "tl_0000_first");
         assert_eq!(
             timeline_audit["events"][1]["source_file_sha256"],
