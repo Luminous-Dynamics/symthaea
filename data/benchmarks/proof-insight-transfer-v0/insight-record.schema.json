@@ -14,6 +14,7 @@
     "insight",
     "verification",
     "semantic_validation",
+    "constructive_transfer",
     "review"
   ],
   "properties": {
@@ -603,6 +604,179 @@
                   "type": "string",
                   "maxLength": 2000
                 }
+              }
+            }
+          }
+        }
+      }
+    },
+    "constructive_transfer": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Optional research track for problems where the mathematical answer/witness must be discovered, not merely prove a supplied proposition.",
+      "required": [
+        "status",
+        "unknowns",
+        "candidate_witness",
+        "proof_obligations",
+        "answer_equivalence"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "not_attempted",
+            "not_applicable",
+            "candidate",
+            "witness_proposed",
+            "witness_formally_verified",
+            "failed",
+            "timed_out",
+            "tool_unavailable"
+          ]
+        },
+        "unknowns": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "formal_type"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "formal_type": {
+                "type": "string",
+                "minLength": 1
+              },
+              "intended_role": {
+                "type": "string",
+                "maxLength": 1000
+              }
+            }
+          }
+        },
+        "candidate_witness": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "representation"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "absent",
+                "candidate_only",
+                "typechecked",
+                "obligations_discharged",
+                "rejected"
+              ]
+            },
+            "representation": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "maxLength": 10000
+            },
+            "formal_term_digest": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^([0-9a-f]{64})?$"
+            },
+            "notes": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "maxLength": 2000
+              }
+            }
+          }
+        },
+        "proof_obligations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "statement_digest",
+              "status"
+            ],
+            "properties": {
+              "statement_digest": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "status": {
+                "enum": [
+                  "not_attempted",
+                  "passed",
+                  "failed",
+                  "timed_out",
+                  "tool_unavailable",
+                  "not_applicable"
+                ]
+              },
+              "checker": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "receipt_sha256": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "pattern": "^([0-9a-f]{64})?$"
+              }
+            }
+          }
+        },
+        "answer_equivalence": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "method",
+            "status"
+          ],
+          "properties": {
+            "method": {
+              "enum": [
+                "none",
+                "restricted_propositional_equivalence",
+                "formal_equivalence",
+                "expert_review"
+              ]
+            },
+            "status": {
+              "enum": [
+                "not_attempted",
+                "equivalent",
+                "not_equivalent",
+                "disputed",
+                "not_applicable"
+              ]
+            },
+            "score": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0,
+              "maximum": 1
+            },
+            "notes": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "maxLength": 2000
               }
             }
           }
