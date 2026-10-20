@@ -20,6 +20,22 @@ This separates transfer from hindsight. It also measures whether a strategy surv
 - **VeriSoftBench** evaluates 500 theorem tasks from 23 real-world Lean repositories. Its project page reports a best result of 41% with curated dependency context versus 35% with the raw repository, demonstrating that context selection is itself a large variable. PITB must use a matched context budget and should not confuse an insight treatment with a context-curation advantage. [Benchmark and comparisons](https://utopia-group.github.io/VeriSoftBench/).
 - **LeanSearch v2** reports strong global-premise retrieval results: nDCG@10 0.62 on its single-query retrieval benchmark and 46.1% retrieval of known premise groups within ten candidates on its 69-query research-Mathlib benchmark; its controlled downstream experiment reported 20% proof success versus 16% for the next-best retriever and 4% without retrieval. These are paper-specific results and must not be numerically compared as though they were obtained on the temporal track. They justify retaining a strong, pinned premise-retrieval arm. [Paper and artifact link](https://arxiv.org/abs/2605.13137).
 
+## Preliminary source audit: Dalek pin
+
+The first pinned source audit is now implemented in the Rust research tool; it is deliberately separate from generating a solver-visible target manifest. The reproducible source pin is Dalek Lean Bench commit `9fdbfd066420aebcf61a70b06eba57a108c41340`, with toolchain `leanprover/lean4:v4.28.0-rc1` and the Mathlib revision read from the pinned `lake-manifest.json`.
+
+A read-only parse of the tracked `proof_timeline.csv` at that commit found **248 nonblank data rows**, not 249; 243 rows have a nonempty `spec_theorem` path, 5 paths are blank, 243 IDs are nonempty and unique, and the rows reference 91 distinct completion commits. Statuses split into 235 `verified` and 13 `externally verified`. The pinned README claims 249 timeline theorems. This discrepancy is a data-quality finding, not a reason to fabricate a row: the new audit report records both numbers and sets `timeline_row_count_matches_readme_claim=false`. CI pins the source commit, checks commit ancestry for every row, recomputes the timeline digest, validates the audit output schema, and asserts that all 248 input rows are accounted for.
+
+The audit command (from the isolated crate environment used in the repository workflow) is:
+
+```bash
+cargo run --release --locked --bin symthaea-proof-insights -- \
+  --audit-temporal-timeline /path/to/clean-dalek-checkout \
+  proof_timeline.csv /path/to/output/dalek-temporal-timeline-audit.json
+```
+
+This only inventories chronology, hashes and source-path availability. It does **not** prove the historical projects build, does not create the per-target `sorry` mutations, and does not count as a model evaluation. The existing audit also found that the upstream evaluator masks target/future proofs against a HEAD checkout rather than checking out every row's original repository state, so PITB's strict historical replay remains a separate follow-up requirement. See [the detailed pinned source audit](dalek-temporal-data-audit-2026-10-20.md) for statement drift and dataset/timeline join risks.
+
 ## Track design
 
 ### A target-specific, content-addressed solver bundle
