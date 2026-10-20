@@ -175,7 +175,7 @@ Choose numerical targets for trace/space, drilling, yield, cycle time, cost and 
 
 **Phase 0 — software-first (start immediately)**
 - Extend existing MFG-PROC and productive-closure owners; do not create a competing ontology.
-- The initial 16-case corpus is `docs/research/fixtures/ATOMFAB_PCB_ROUTE_CORPUS_V0_2.json`; `symthaea-fabrication-kernel::atomfab_pcb_route` provides an independent Rust route/evidence evaluator and an exact-HEAD-bound receipt runner.
+- The initial 16-case corpus is `docs/research/fixtures/ATOMFAB_PCB_ROUTE_CORPUS_V0_3.json`; `symthaea-fabrication-kernel::atomfab_pcb_route` provides an independent Rust route/evidence evaluator and a receipt runner that checks the declared SHA against `git rev-parse HEAD`.
 - Bind native design, fabrication exports, BOM, process plan, as-built identity and test receipts.
 - Add offline deterministic validation and an independent oracle before machine adapters.
 
@@ -223,7 +223,7 @@ Choose numerical targets for trace/space, drilling, yield, cycle time, cost and 
 
 ## Initial corpus check
 
-The version-0.2 corpus contains 16 unique synthetic cases, with route outcomes of 12 `feasible`, 3 `infeasible`, and 1 `unresolved`; independent evidence outcomes are 6 `complete`, 8 `incomplete`, and 2 `rejected`. The new Rust module recomputes these outcomes without using expected labels as inputs to the decision logic. Tests were added for full-corpus matching, duplicated IDs, wrong counts, expectation mutation, input-order normalization, route/evidence separation, and rejection of synthetic-evidence overclaims. These tests have not yet been run locally in this work session; no CI or physical-process qualification is claimed.
+The version-0.3 corpus contains 16 unique synthetic cases, with route outcomes of 12 `feasible`, 3 `infeasible`, and 1 `unresolved`; independent evidence outcomes are 6 `complete`, 8 `incomplete`, and 2 `rejected`. The Rust module recomputes outcomes without using expected labels as decision inputs. It rejects every v0.3 physical-qualification claim because this corpus has no bound physical measurement records or calibration objects; changing a source label to `measured` cannot promote the claim. The CLI compares `ATOMFAB_GIT_HEAD` with `git rev-parse HEAD` before producing a receipt. Tests cover full-corpus matching, duplicate IDs, wrong counts, mutated expected output, input-order normalization, route/evidence separation, synthetic overclaim, measured-label overclaim, and head mismatch. The tests have not been run locally in this work session; no CI or physical-process qualification is claimed.
 
 The execution work is tracked by [COMPUTE-MFG-001C #8223](https://github.com/Luminous-Dynamics/symthaea/issues/8223) and the Symtropy workcell benchmark [PCB-CELL-001 #2385](https://github.com/Luminous-Dynamics/symtropy/issues/2385).
 
