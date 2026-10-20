@@ -18,6 +18,7 @@
 
 use std::collections::BTreeSet;
 use std::env;
+use std::fs;
 use std::process::ExitCode;
 
 use serde::Serialize;
@@ -95,6 +96,8 @@ struct InteractionDiagnostics {
 #[derive(Debug, Clone, Serialize)]
 struct SeedReceipt {
     seed: u64,
+    /// Full symbolic input, not merely a seed label.
+    intent: MusicalIntent,
     conditions: Vec<ConditionReceipt>,
     interaction: InteractionDiagnostics,
 }
@@ -104,6 +107,12 @@ struct BenchmarkReceipt {
     schema_version: u32,
     benchmark_id: &'static str,
     source_revision_claim: String,
+    /// Caller-supplied toolchain label; not independent compiler attestation.
+    rustc_version_claim: String,
+    executable_sha256: String,
+    executable_byte_count: u64,
+    operating_system: &'static str,
+    target_architecture: &'static str,
     evidence_boundary: &'static str,
     seed_set: Vec<u64>,
     pair_definition: &'static str,
@@ -260,6 +269,7 @@ fn run_seed(seed: u64) -> Result<SeedReceipt, String> {
 
     Ok(SeedReceipt {
         seed,
+        intent: intent(seed),
         conditions: receipts,
         interaction: InteractionDiagnostics {
             note_count_factorial_delta: ab.note_count as i64
@@ -284,6 +294,13 @@ fn valid_sha1(value: &str) -> bool {
     value.len() == 40 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
 
+fn executable_digest() -> Result<(String, u64), String> {
+    let path = env::current_exe().map_err(|error| format!("current_exe: {error}"))?;
+    let bytes = fs::read(&path).map_err(|error| format!("read executable {}: {error}", path.display()))?;
+    let size = u64::try_from(bytes.len()).map_err(|error| format!("executable size: {error}"))?;
+    Ok((format!("{:x}", Sha256::digest(&bytes)), size))
+}
+
 fn main() -> ExitCode {
     let revision = env::var("SYMTHAEA_GIT_REVISION").unwrap_or_default();
     if !valid_sha1(&revision) {
@@ -292,6 +309,19 @@ fn main() -> ExitCode {
         );
         return ExitCode::FAILURE;
     }
+
+    let rustc_version = env::var("SYMTHAEA_RUSTC_VERSION").unwrap_or_default();
+    if !rustc_version.starts_with("rustc ") {
+        eprintln!("FAIL: set SYMTHAEA_RUSTC_VERSION to the exact `rustc --version` output; this is a caller claim, not independent attestation.");
+        return ExitCode::FAILURE;
+    }
+    let (executable_sha256, executable_byte_count) = match executable_digest() {
+        Ok(identity) => identity,
+        Err(error) => {
+            eprintln!("FAIL: {error}");
+            return ExitCode::FAILURE;
+        }
+    };
 
     let mut seed_receipts = Vec::with_capacity(SEEDS.len());
     for seed in SEEDS {
@@ -312,6 +342,11 @@ fn main() -> ExitCode {
         schema_version: SCHEMA_VERSION,
         benchmark_id: "MUSE-STYLE-INTERACTION-001",
         source_revision_claim: revision,
+        rustc_version_claim: rustc_version,
+        executable_sha256,
+        executable_byte_count,
+        operating_system: std::env::consts::OS,
+        target_architecture: std::env::consts::ARCH,
         evidence_boundary: "symbolic diagnostics only; not audio quality, style authenticity, or human preference",
         seed_set: SEEDS.to_vec(),
         pair_definition: "Classical structural owner with independent Shuffle-accompaniment and Dorian-mode interventions",
