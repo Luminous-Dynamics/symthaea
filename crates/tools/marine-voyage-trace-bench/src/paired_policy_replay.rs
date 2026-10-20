@@ -1251,12 +1251,28 @@ pub fn evaluate_paired_replay(
         });
     }
 
+    for gap in &conditional_coverage_gaps {
+        if let Some(observed) = gap.candidate_gap {
+            if observed > profile.maximum_conditional_coverage_gap {
+                issues.push(PairedReplayIssue::ConditionalCoverageGapExceeded {
+                    observable_id: gap.observable_id.clone(),
+                    unit_id: gap.unit_id.clone(),
+                    nominal_coverage_bp: gap.nominal_coverage_bp,
+                    maximum: format!("{:.6}", profile.maximum_conditional_coverage_gap),
+                    observed: format!("{observed:.6}"),
+                });
+                regression_found = true;
+            }
+        }
+    }
+
     issues.sort();
     issues.dedup();
 
     let invalid_observation = issues.iter().any(|issue| matches!(
         issue,
-        PairedReplayIssue::InvalidObservationDigest { .. }
+        PairedReplayIssue::NonFiniteMetric { .. }
+            | PairedReplayIssue::InvalidObservationDigest { .. }
             | PairedReplayIssue::EmptyObservationField { .. }
             | PairedReplayIssue::DuplicateObservationId { .. }
             | PairedReplayIssue::DuplicateGroupSlicePair { .. }
@@ -1461,6 +1477,24 @@ mod tests {
             gap.candidate_gap.is_some_and(|value| value > 0.0)
         }));
         assert_eq!(report.disposition, PairedReplayDisposition::FailDeclaredRegression);
+    }
+
+    #[test]
+    fn conditional_coverage_gap_has_its_own_frozen_acceptance_gate() {
+        let mut profile = profile();
+        profile.maximum_conditional_coverage_gap = 0.10;
+        refresh(&mut profile);
+        let mut rows = panel(0.0);
+        for row in rows.iter_mut().filter(|r| r.operating_case_id == "shallow").take(4) {
+            row.candidate_lower = row.observed_value + 10.0;
+            row.candidate_upper = row.observed_value + 11.0;
+        }
+        let report = evaluate_paired_replay(&profile, &rows);
+        assert_eq!(report.disposition, PairedReplayDisposition::FailDeclaredRegression);
+        assert!(report.issues.iter().any(|issue| matches!(
+            issue,
+            PairedReplayIssue::ConditionalCoverageGapExceeded { .. }
+        )));
     }
 
     #[test]
