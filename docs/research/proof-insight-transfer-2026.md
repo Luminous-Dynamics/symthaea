@@ -21,6 +21,8 @@ A first manual annotation has now been added under [`candidates/156-borsuk-nine-
 
 An important split-control lesson is documented in [`exposure-audit.md`](../../data/benchmarks/proof-insight-transfer-v0/exposure-audit.md): family `089` was read before we checked that it belongs to the frozen test split. No record or model result was derived from it, but for this workflow it is now known-exposed and must be excluded from confirmatory scoring. The original split manifest remains unchanged; the adjusted denominator must be reported separately.
 
+The next change captures negative transfer as structured evidence. The candidate schema now requires a `directional_contract` for every transfer proposal, with a compatibility class and mismatch codes; a claimed verified transfer must be compatible, while a rejected candidate must be incompatible or partial. [`transfer-adjudications.md`](../../data/benchmarks/proof-insight-transfer-v0/transfer-adjudications.md) records two static negative controls, including a graph-invariant example where the source's upper bound on independence number cannot prove a target lower bound. This creates a future metric for transfer calibration and false acceptance—not a claim that an automated matcher or proof run has passed.
+
 ## Why this is the next step
 
 ### Current Symthaea evidence
