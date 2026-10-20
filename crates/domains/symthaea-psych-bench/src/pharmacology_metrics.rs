@@ -51,6 +51,17 @@ pub struct ConfusionCounts {
     pub false_negative: usize,
 }
 
+/// Wilson score confidence interval for a binomial proportion. This interval
+/// remains non-degenerate at 0/n and n/n, unlike a naive percentile bootstrap.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct WilsonInterval {
+    pub successes: usize,
+    pub trials: usize,
+    pub confidence_level: f64,
+    pub lower_bound: f64,
+    pub upper_bound: f64,
+}
+
 /// Metrics that may be undefined for a small/degenerate set are represented as
 /// None rather than silently replaced with a misleading zero.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -71,10 +82,21 @@ pub struct BinarySafetyMetricReport {
     pub positive_ground_truth_cases: usize,
     pub negative_ground_truth_cases: usize,
     pub confusion: ConfusionCounts,
+    /// Conditional sensitivity among cases the model chose to answer.
     pub sensitivity: Option<f64>,
+    /// Hazard detection among all known positive cases; abstained positives
+    /// count as not automatically detected.
+    pub end_to_end_hazard_sensitivity: Option<f64>,
+    /// Two-sided 95% Wilson interval for conditional sensitivity.
+    pub sensitivity_wilson_95: Option<WilsonInterval>,
+    /// Two-sided 95% Wilson interval for end-to-end automatic hazard detection.
+    pub end_to_end_hazard_sensitivity_wilson_95: Option<WilsonInterval>,
     pub specificity: Option<f64>,
+    pub specificity_wilson_95: Option<WilsonInterval>,
     pub precision: Option<f64>,
+    pub precision_wilson_95: Option<WilsonInterval>,
     pub negative_predictive_value: Option<f64>,
+    pub negative_predictive_value_wilson_95: Option<WilsonInterval>,
     pub balanced_accuracy: Option<f64>,
     pub auroc: Option<f64>,
     /// Non-interpolated average precision, used as a threshold-swept PR metric.
@@ -209,6 +231,32 @@ pub fn evaluate_binary_safety(
         confusion.true_negative,
         confusion.true_negative + confusion.false_negative,
     );
+    let all_ground_truth_positives =
+        confusion.true_positive + confusion.false_negative + abstained_positive_cases;
+    let end_to_end_hazard_sensitivity =
+        ratio(confusion.true_positive, all_ground_truth_positives);
+    let sensitivity_wilson_95 = wilson_interval(
+        confusion.true_positive,
+        confusion.true_positive + confusion.false_negative,
+        0.95,
+    );
+    let end_to_end_hazard_sensitivity_wilson_95 =
+        wilson_interval(confusion.true_positive, all_ground_truth_positives, 0.95);
+    let specificity_wilson_95 = wilson_interval(
+        confusion.true_negative,
+        confusion.true_negative + confusion.false_positive,
+        0.95,
+    );
+    let precision_wilson_95 = wilson_interval(
+        confusion.true_positive,
+        confusion.true_positive + confusion.false_positive,
+        0.95,
+    );
+    let negative_predictive_value_wilson_95 = wilson_interval(
+        confusion.true_negative,
+        confusion.true_negative + confusion.false_negative,
+        0.95,
+    );
     let balanced_accuracy = match (sensitivity, specificity) {
         (Some(sensitivity), Some(specificity)) => Some((sensitivity + specificity) / 2.0),
         _ => None,
@@ -235,7 +283,8 @@ pub fn evaluate_binary_safety(
     let brier_score = ratio_float(brier_sum, predicted_cases);
 
     let mut notes = vec![
-        "All probability-based quality metrics exclude abstentions; coverage and abstained class counts must be read alongside them.".to_string(),
+        "Conditional sensitivity/specificity exclude abstentions; end_to_end_hazard_sensitivity counts abstained positive cases as not automatically detected.".to_string(),
+        "Wilson intervals are reported for binomial safety rates because percentile bootstrap intervals may be degenerate when a small sample has zero observed misses.".to_string(),
         "This report measures predictions on the supplied labels and split only; it is not a safety certification or causal conclusion.".to_string(),
         "Expected calibration error depends on the prespecified equal-width bin count; report Brier score and reliability plots as complementary checks.".to_string(),
     ];
@@ -264,9 +313,15 @@ pub fn evaluate_binary_safety(
         negative_ground_truth_cases,
         confusion,
         sensitivity,
+        end_to_end_hazard_sensitivity,
+        sensitivity_wilson_95,
+        end_to_end_hazard_sensitivity_wilson_95,
         specificity,
+        specificity_wilson_95,
         precision,
+        precision_wilson_95,
         negative_predictive_value,
+        negative_predictive_value_wilson_95,
         balanced_accuracy,
         auroc,
         average_precision,
@@ -336,6 +391,42 @@ fn ranking_metrics(predictions: &[(f64, bool)]) -> (Option<f64>, Option<f64>) {
         start = end;
     }
     (auroc, Some(ap))
+}
+
+/// Wilson score interval using the normal quantile for the requested
+/// two-sided confidence level. For 95%, z = 1.959963984540054.
+/// Returns None when there are no observed trials.
+fn wilson_interval(
+    successes: usize,
+    trials: usize,
+    confidence_level: f64,
+) -> Option<WilsonInterval> {
+    if trials == 0
+        || !confidence_level.is_finite()
+        || !(0.0 < confidence_level && confidence_level < 1.0)
+        || successes > trials
+    {
+        return None;
+    }
+    // The initial safety benchmark uses a predeclared 95% interval. Avoid
+    // silently approximating arbitrary confidence levels with the wrong z.
+    if (confidence_level - 0.95).abs() > f64::EPSILON {
+        return None;
+    }
+    let z = 1.959_963_984_540_054_f64;
+    let n = trials as f64;
+    let p = successes as f64 / n;
+    let z2 = z * z;
+    let denominator = 1.0 + z2 / n;
+    let center = (p + z2 / (2.0 * n)) / denominator;
+    let half_width = z * ((p * (1.0 - p) / n + z2 / (4.0 * n * n)).sqrt()) / denominator;
+    Some(WilsonInterval {
+        successes,
+        trials,
+        confidence_level,
+        lower_bound: (center - half_width).max(0.0),
+        upper_bound: (center + half_width).min(1.0),
+    })
 }
 
 fn ratio(numerator: usize, denominator: usize) -> Option<f64> {
@@ -412,6 +503,9 @@ mod tests {
         assert_eq!(report.confusion.true_positive, 2);
         assert_eq!(report.confusion.true_negative, 2);
         assert_eq!(report.sensitivity, Some(1.0));
+        assert_eq!(report.end_to_end_hazard_sensitivity, Some(1.0));
+        assert!(report.sensitivity_wilson_95.expect("Wilson CI").lower_bound < 1.0);
+        assert!(report.end_to_end_hazard_sensitivity_wilson_95.expect("end-to-end Wilson CI").lower_bound < 1.0);
         assert_eq!(report.specificity, Some(1.0));
         assert_eq!(report.auroc, Some(1.0));
         assert_eq!(report.average_precision, Some(1.0));
@@ -442,6 +536,10 @@ mod tests {
         assert_eq!(report.abstained_cases, 1);
         assert_eq!(report.abstained_positive_cases, 1);
         assert_eq!(report.coverage, Some(2.0 / 3.0));
+        assert_eq!(report.sensitivity, Some(1.0));
+        assert_eq!(report.end_to_end_hazard_sensitivity, Some(0.5));
+        assert_eq!(report.end_to_end_hazard_sensitivity_wilson_95.expect("Wilson CI").successes, 1);
+        assert_eq!(report.end_to_end_hazard_sensitivity_wilson_95.expect("Wilson CI").trials, 2);
         assert!(report.notes.iter().any(|note| note.contains("human review")));
     }
 
