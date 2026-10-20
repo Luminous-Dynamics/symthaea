@@ -253,66 +253,72 @@ fn task_string(value: &Value, key: &str, task_id: &str) -> Result<String, String
         .ok_or_else(|| format!("task_results/{task_id}/{key}: required string is missing"))
 }
 
+#[derive(Clone, Copy, Debug)]
+struct TaskArmSummary<'a> {
+    delivered_bytes: u64,
+    outcome: &'a str,
+    completion_window: Option<u64>,
+    failure_reason: Option<&'a str>,
+}
+
 fn task_completion_explanation(
     task_id: &str,
     priority: &str,
     service_bytes: u64,
     deadline_window: u64,
-    baseline_delivered: u64,
-    candidate_delivered: u64,
-    baseline_outcome: &str,
-    candidate_outcome: &str,
-    baseline_completion: Option<u64>,
-    candidate_completion: Option<u64>,
-    baseline_failure: Option<&str>,
-    candidate_failure: Option<&str>,
+    baseline: TaskArmSummary<'_>,
+    candidate: TaskArmSummary<'_>,
 ) -> String {
-    match (baseline_outcome, candidate_outcome) {
+    match (baseline.outcome, candidate.outcome) {
         ("failed", "succeeded") => {
-            let failure = match baseline_failure {
+            let failure = match baseline.failure_reason {
                 Some("deadline") => format!("missed its deadline at window {deadline_window}"),
                 Some("expired") => "expired before completion".to_owned(),
                 Some(reason) => format!("failed ({reason})"),
                 None => "failed before completion".to_owned(),
             };
             format!(
-                "Task {task_id} ({priority}) needed {service_bytes} bytes by window {deadline_window}. FIFO delivered {baseline_delivered}/{service_bytes} bytes and {failure}; fair-share delivered {candidate_delivered}/{service_bytes} bytes and completed{}.",
-                candidate_completion
-                    .map_or_else(String::new, |window| format!(" in window {window}"))
+                "Task {task_id} ({priority}) needed {service_bytes} bytes by window {deadline_window}. FIFO delivered {}/{service_bytes} bytes and {failure}; fair-share delivered {}/{service_bytes} bytes and completed{}.",
+                baseline.delivered_bytes,
+                candidate.delivered_bytes,
+                candidate.completion_window.map_or_else(String::new, |window| format!(" in window {window}"))
             )
         }
         ("succeeded", "failed") => {
-            let failure = match candidate_failure {
+            let failure = match candidate.failure_reason {
                 Some("deadline") => format!("missed its deadline at window {deadline_window}"),
                 Some("expired") => "expired before completion".to_owned(),
                 Some(reason) => format!("failed ({reason})"),
                 None => "failed before completion".to_owned(),
             };
             format!(
-                "REGRESSION: task {task_id} ({priority}) needed {service_bytes} bytes by window {deadline_window}. FIFO completed it{} after delivering {baseline_delivered} bytes, but fair-share delivered {candidate_delivered}/{service_bytes} bytes and {failure}.",
-                baseline_completion
-                    .map_or_else(String::new, |window| format!(" in window {window}"))
+                "REGRESSION: task {task_id} ({priority}) needed {service_bytes} bytes by window {deadline_window}. FIFO completed it{} after delivering {} bytes, but fair-share delivered {}/{service_bytes} bytes and {failure}.",
+                baseline.completion_window.map_or_else(String::new, |window| format!(" in window {window}")),
+                baseline.delivered_bytes,
+                candidate.delivered_bytes
             )
         }
-        ("failed", "failed") if candidate_delivered > baseline_delivered => {
+        ("failed", "failed") if candidate.delivered_bytes > baseline.delivered_bytes => {
             format!(
-                "Task {task_id} ({priority}) did not finish by its deadline in either policy. Fair-share delivered more partial progress ({candidate_delivered}/{service_bytes} bytes) than FIFO ({baseline_delivered}/{service_bytes}); this is not a successful task outcome."
+                "Task {task_id} ({priority}) did not finish by its deadline in either policy. Fair-share delivered more partial progress ({}/{service_bytes} bytes) than FIFO ({}/{service_bytes}); this is not a successful task outcome.",
+                candidate.delivered_bytes,
+                baseline.delivered_bytes
             )
         }
         ("failed", "failed") => {
-            let baseline_reason = baseline_failure.unwrap_or("unknown reason");
-            let candidate_reason = candidate_failure.unwrap_or("unknown reason");
+            let baseline_reason = baseline.failure_reason.unwrap_or("unknown reason");
+            let candidate_reason = candidate.failure_reason.unwrap_or("unknown reason");
             format!(
-                "Task {task_id} ({priority}) failed under both policies. FIFO delivered {baseline_delivered}/{service_bytes} bytes ({baseline_reason}); fair-share delivered {candidate_delivered}/{service_bytes} bytes ({candidate_reason})."
+                "Task {task_id} ({priority}) failed under both policies. FIFO delivered {}/{service_bytes} bytes ({baseline_reason}); fair-share delivered {}/{service_bytes} bytes ({candidate_reason}).",
+                baseline.delivered_bytes,
+                candidate.delivered_bytes
             )
         }
         ("succeeded", "succeeded") => {
             format!(
                 "Task {task_id} ({priority}) completed under both policies: FIFO in window {}, fair-share in window {}.",
-                baseline_completion
-                    .map_or_else(|| "not recorded".to_owned(), |window| window.to_string()),
-                candidate_completion
-                    .map_or_else(|| "not recorded".to_owned(), |window| window.to_string())
+                baseline.completion_window.map_or_else(|| "not recorded".to_owned(), |window| window.to_string()),
+                candidate.completion_window.map_or_else(|| "not recorded".to_owned(), |window| window.to_string())
             )
         }
         _ => format!(
@@ -477,14 +483,18 @@ fn parse_task_comparisons(
                 &priority,
                 service_bytes,
                 deadline_window,
-                baseline_delivered,
-                candidate_delivered,
-                &baseline_outcome,
-                &candidate_outcome,
-                baseline_completion,
-                candidate_completion,
-                baseline_failure.as_deref(),
-                candidate_failure.as_deref(),
+                TaskArmSummary {
+                    delivered_bytes: baseline_delivered,
+                    outcome: &baseline_outcome,
+                    completion_window: baseline_completion,
+                    failure_reason: baseline_failure.as_deref(),
+                },
+                TaskArmSummary {
+                    delivered_bytes: candidate_delivered,
+                    outcome: &candidate_outcome,
+                    completion_window: candidate_completion,
+                    failure_reason: candidate_failure.as_deref(),
+                },
             );
             comparisons.push(TaskComparison {
                 task_id: task_id.clone(),
