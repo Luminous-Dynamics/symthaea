@@ -62,16 +62,22 @@ pub trait DynamicalSystem: Send + Sync {
 
 /// An ODE integrator that advances a dynamical system by one time step.
 pub trait Integrator {
+    /// Validate integrator configuration before a checked simulation starts.
+    fn validate(&self) -> Result<(), SimulationError> {
+        Ok(())
+    }
+
     /// Advance the system by one step of size `dt`.
     ///
     /// # Arguments
     /// * `system` - The dynamical system to integrate
     /// * `state` - Current state vector
     /// * `t` - Current time
-    /// * `dt` - Time step size
+    /// * `dt` - Requested step size
     ///
     /// # Returns
-    /// New state vector at time t + dt
+    /// New state vector at time t + dt. Adaptive integrators should implement
+    /// step_with_dt so callers can observe the accepted step size.
     fn step(&self, system: &dyn DynamicalSystem, state: &[f64], t: f64, dt: f64) -> Vec<f64>;
 
     /// Advance a state and return both the new state and the accepted time step.
@@ -151,6 +157,7 @@ pub enum SimulationError {
         actual: usize,
     },
     NonFiniteIntegratorState { step: usize, index: usize },
+    InvalidIntegratorConfiguration,
     InvalidIntegratorStepSize { step: usize },
     TimeDidNotAdvance { step: usize },
 }
@@ -172,6 +179,7 @@ pub fn try_simulate(
     t_end: f64,
     dt: f64,
 ) -> Result<SimulationResult, SimulationError> {
+    integrator.validate()?;
     if !t_start.is_finite() || !t_end.is_finite() {
         return Err(SimulationError::NonFiniteTimeBounds);
     }
@@ -452,6 +460,14 @@ impl Rk45Integrator {
         t: f64,
         dt: f64,
     ) -> (Vec<f64>, f64, f64) {
+        assert!(
+            self.validate().is_ok(),
+            "RK45 requires finite tol > 0 and finite 0 < dt_min <= dt_max"
+        );
+        assert!(
+            t.is_finite() && dt.is_finite() && dt > 0.0,
+            "RK45 requires finite time and a positive finite requested timestep"
+        );
         let dim = state.len();
         let mut h = dt.min(self.dt_max);
 
@@ -546,9 +562,61 @@ impl Rk45Integrator {
 }
 
 impl Integrator for Rk45Integrator {
+    fn validate(&self) -> Result<(), SimulationError> {
+        if !self.tol.is_finite()
+            || self.tol <= 0.0
+            || !self.dt_min.is_finite()
+            || self.dt_min <= 0.0
+            || !self.dt_max.is_finite()
+            || self.dt_max < self.dt_min
+        {
+            return Err(SimulationError::InvalidIntegratorConfiguration);
+        }
+        Ok(())
+    }
+
     fn step(&self, system: &dyn DynamicalSystem, state: &[f64], t: f64, dt: f64) -> Vec<f64> {
-        let (new_state, _actual_dt, _error) = self.adaptive_step(system, state, t, dt);
-        new_state
+        if self.validate().is_err() || !t.is_finite() || !dt.is_finite() || dt < 0.0 {
+            panic!("RK45 received an invalid integration request or configuration");
+        }
+        if dt == 0.0 {
+            return state.to_vec();
+        }
+
+        let target_t = t + dt;
+        if !target_t.is_finite() || target_t <= t {
+            panic!("RK45 step cannot advance the requested time interval");
+        }
+
+        let mut current_state = state.to_vec();
+        let mut current_t = t;
+        for _ in 0..MAX_SIMULATION_STEPS {
+            let remaining = target_t - current_t;
+            if remaining <= 0.0 {
+                return current_state;
+            }
+
+            let (next_state, accepted_dt, _error) =
+                self.adaptive_step(system, &current_state, current_t, remaining);
+            if !accepted_dt.is_finite() || accepted_dt <= 0.0 || accepted_dt > remaining {
+                panic!("RK45 returned an invalid accepted timestep");
+            }
+            if next_state.len() != state.len() || next_state.iter().any(|value| !value.is_finite()) {
+                panic!("RK45 returned an invalid state vector");
+            }
+
+            let next_t = if accepted_dt >= remaining {
+                target_t
+            } else {
+                current_t + accepted_dt
+            };
+            if !next_t.is_finite() || next_t <= current_t {
+                panic!("RK45 timestep failed to advance time");
+            }
+            current_state = next_state;
+            current_t = next_t;
+        }
+        panic!("RK45 exceeded the maximum accepted-step budget");
     }
 
     fn step_with_dt(
