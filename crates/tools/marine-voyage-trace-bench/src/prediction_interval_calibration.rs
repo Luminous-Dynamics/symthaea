@@ -28,9 +28,10 @@ pub struct CalibrationSliceRequirement {
     /// Nominal central interval coverage in basis points; 9_500 means 95%.
     pub nominal_coverage_bp: u16,
     pub minimum_observations: usize,
-    /// Frozen acceptance band for empirical coverage, in basis points.
-    pub minimum_empirical_coverage_bp: u16,
-    pub maximum_empirical_coverage_bp: u16,
+    /// The Wilson 95% lower endpoint must be at least this value, in basis points.
+    pub minimum_wilson_95_lower_bp: u16,
+    /// The Wilson 95% upper endpoint must be no greater than this value, in basis points.
+    pub maximum_wilson_95_upper_bp: u16,
     /// Positive, predeclared scale in the observable unit.
     pub normalization_scale: f64,
     /// Maximum mean central-interval score divided by normalization_scale.
@@ -325,8 +326,8 @@ pub fn canonical_calibration_profile_sha256(profile: &CalibrationProfile) -> Str
         slice_key(a)
             .cmp(&slice_key(b))
             .then_with(|| a.minimum_observations.cmp(&b.minimum_observations))
-            .then_with(|| a.minimum_empirical_coverage_bp.cmp(&b.minimum_empirical_coverage_bp))
-            .then_with(|| a.maximum_empirical_coverage_bp.cmp(&b.maximum_empirical_coverage_bp))
+            .then_with(|| a.minimum_wilson_95_lower_bp.cmp(&b.minimum_wilson_95_lower_bp))
+            .then_with(|| a.maximum_wilson_95_upper_bp.cmp(&b.maximum_wilson_95_upper_bp))
             .then_with(|| a.normalization_scale.total_cmp(&b.normalization_scale))
             .then_with(|| {
                 a.max_normalized_mean_interval_score
@@ -342,12 +343,12 @@ pub fn canonical_calibration_profile_sha256(profile: &CalibrationProfile) -> Str
         item.number("nominal_coverage_bp", requirement.nominal_coverage_bp as u64);
         item.count("minimum_observations", requirement.minimum_observations);
         item.number(
-            "minimum_empirical_coverage_bp",
-            requirement.minimum_empirical_coverage_bp as u64,
+            "minimum_wilson_95_lower_bp",
+            requirement.minimum_wilson_95_lower_bp as u64,
         );
         item.number(
-            "maximum_empirical_coverage_bp",
-            requirement.maximum_empirical_coverage_bp as u64,
+            "maximum_wilson_95_upper_bp",
+            requirement.maximum_wilson_95_upper_bp as u64,
         );
         item.float("normalization_scale", requirement.normalization_scale);
         item.float(
@@ -500,9 +501,9 @@ fn validate_profile(
             });
             invalid = true;
         }
-        if requirement.minimum_empirical_coverage_bp > COVERAGE_BASIS_POINTS
-            || requirement.maximum_empirical_coverage_bp > COVERAGE_BASIS_POINTS
-            || requirement.minimum_empirical_coverage_bp > requirement.maximum_empirical_coverage_bp
+        if requirement.minimum_wilson_95_lower_bp > COVERAGE_BASIS_POINTS
+            || requirement.maximum_wilson_95_upper_bp > COVERAGE_BASIS_POINTS
+            || requirement.minimum_wilson_95_lower_bp > requirement.maximum_wilson_95_upper_bp
         {
             issues.push(CalibrationIssue::InvalidRequirementField {
                 operating_case_id: key.0.clone(),
@@ -958,12 +959,14 @@ pub fn evaluate_calibration(
         let coverage_gate_met = if !enough || empirical_coverage.is_none() {
             None
         } else {
-            let n = accumulator.count as u128;
-            let covered = accumulator.covered_count as u128;
-            let lower_ok = covered * COVERAGE_BASIS_POINTS as u128
-                >= requirement.minimum_empirical_coverage_bp as u128 * n;
-            let upper_ok = covered * COVERAGE_BASIS_POINTS as u128
-                <= requirement.maximum_empirical_coverage_bp as u128 * n;
+            let lower_ok = wilson_95_lower.is_some_and(|value| {
+                value * COVERAGE_BASIS_POINTS as f64
+                    >= requirement.minimum_wilson_95_lower_bp as f64
+            });
+            let upper_ok = wilson_95_upper.is_some_and(|value| {
+                value * COVERAGE_BASIS_POINTS as f64
+                    <= requirement.maximum_wilson_95_upper_bp as f64
+            });
             Some(lower_ok && upper_ok)
         };
         let interval_score_gate_met = if !enough || normalized_mean_interval_score.is_none() {
@@ -1060,8 +1063,10 @@ mod tests {
             unit_id: "N".to_owned(),
             nominal_coverage_bp: 9_000,
             minimum_observations: 2,
-            minimum_empirical_coverage_bp: 8_500,
-            maximum_empirical_coverage_bp: 10_000,
+            // Broad bounds keep this tiny fixture focused on evaluator arithmetic.
+            // Real profiles must preregister evidence-appropriate Wilson bounds.
+            minimum_wilson_95_lower_bp: 0,
+            maximum_wilson_95_upper_bp: 10_000,
             normalization_scale: 100.0,
             max_normalized_mean_interval_score: 10.0,
         }
@@ -1137,14 +1142,14 @@ mod tests {
 
     #[test]
     fn central_interval_score_penalizes_both_width_and_misses() {
-        let mut obs = vec![
+        let obs = vec![
             observation("obs-1", "eval-A", 0.0, 10.0, 5.0),
             observation("obs-2", "eval-B", 0.0, 10.0, 11.0),
         ];
         // A profile with the same frozen groups, but a lower coverage gate, lets the
         // known-answer score be inspected without turning this fixture into a passing model.
         let mut p = profile();
-        p.required_slices[0].minimum_empirical_coverage_bp = 0;
+        p.required_slices[0].minimum_wilson_95_lower_bp = 0;
         p.required_slices[0].max_normalized_mean_interval_score = 10.0;
         p.profile_manifest_sha256 = canonical_calibration_profile_sha256(&p);
         let report = evaluate_calibration(&p, &obs);
@@ -1152,7 +1157,6 @@ mod tests {
         // Nominal 90% means alpha=0.1 and a miss incurs 20 times the miss distance.
         assert_eq!(report.slices[0].mean_interval_score, Some(20.0));
         assert_eq!(report.slices[0].normalized_mean_interval_score, Some(0.2));
-        obs.clear();
     }
 
     #[test]
@@ -1272,6 +1276,22 @@ mod tests {
         let report = evaluate_calibration(&profile(), &two_covered()[..1]);
         assert_eq!(report.disposition, CalibrationDisposition::IncompleteCoverage);
         assert_eq!(report.slices[0].thresholds_met, None);
+    }
+
+    #[test]
+    fn coverage_gate_requires_wilson_interval_inside_frozen_band() {
+        let mut p = profile();
+        p.required_slices[0].minimum_wilson_95_lower_bp = 8_500;
+        p.required_slices[0].maximum_wilson_95_upper_bp = 10_000;
+        p.profile_manifest_sha256 = canonical_calibration_profile_sha256(&p);
+        let report = evaluate_calibration(&p, &two_covered());
+        assert_eq!(report.slices[0].empirical_coverage, Some(1.0));
+        assert!(report.slices[0].wilson_95_lower.unwrap() < 0.85);
+        assert_eq!(report.slices[0].coverage_gate_met, Some(false));
+        assert_eq!(
+            report.disposition,
+            CalibrationDisposition::FailDeclaredCalibrationThresholds
+        );
     }
 
     #[test]
