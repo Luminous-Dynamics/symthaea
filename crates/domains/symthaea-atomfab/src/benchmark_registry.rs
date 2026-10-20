@@ -310,4 +310,3 @@ mod tests {
         assert_eq!(registry.validate(), Err(RegistryError::DuplicatePolicyId));
     }
 }
-
