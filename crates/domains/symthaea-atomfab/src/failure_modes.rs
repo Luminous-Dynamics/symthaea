@@ -415,7 +415,7 @@ mod tests {
         );
 
         let mut other_split = records;
-        other_split[0].split = EvaluationSplit::FamilyHoldout;
+        other_split[0].split = EvaluationSplit::Test;
         assert_eq!(
             summarize_failure_modes(&other_split),
             Err(FailureModeError::MismatchedEvaluationScope)
