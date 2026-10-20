@@ -292,7 +292,7 @@ pub fn evaluate_binary_safety(
         notes.push("Abstained cases require a human review path and must not be counted as correct predictions.".to_string());
     }
     if positive_ground_truth_cases == 0 || negative_ground_truth_cases == 0 {
-        notes.push("Only one ground-truth class received a prediction; AUROC is undefined on the predicted subset.".to_string());
+        notes.push("The answered subset has fewer than two ground-truth classes; AUROC and average precision are undefined on this subset.".to_string());
     }
 
     Ok(BinarySafetyMetricReport {
