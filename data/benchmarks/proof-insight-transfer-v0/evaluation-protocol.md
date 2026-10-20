@@ -51,6 +51,14 @@ Select retrieval parameters and the strongest simple baseline using **validation
 
 For all arms, pin the model identifier/version, system prompt, tool permissions, Lean/Mathlib revisions, retry policy, random seeds where exposed, and time of run. Match task-level budgets: model-call cap, token cap, wall-clock limit, and monetary/API limit must be written into the run manifest before evaluation. Cap context at the same token budget across arms; report actual tokens and cost too. Any arm that receives more compute or privileged hints is a separate, clearly labelled experiment.
 
+### Typed transfer-contract gate
+
+Every transfer candidate must carry a machine-readable `directional_contract`: compatibility class, mismatch codes, source-move requirements, and target-goal requirements. Allowed mismatch categories include object-type mismatch, unavailable premise, inequality-direction mismatch, quantifier-scope mismatch, missing preconditions, domain mismatch, and proof-dependency mismatch. The schema prevents `verified_transfer` unless compatibility is `compatible`; a curated `rejected` candidate must be `incompatible` or `partial`.
+
+Treat this as a testable filter rather than decoration. The static pilot dispositions are documented in [`transfer-adjudications.md`](transfer-adjudications.md): a finite support-face obstruction for a geometric covering problem does not construct the graph witness required by the Hadwiger counterexample, and an upper bound on independence number cannot be reversed to prove a lower bound on independence number. These are curator judgments, not model-run results.
+
+Before claiming transfer utility, require 100% rejection of the frozen finite negative-control suite, including incompatible inequality direction, wrong object type, missing premise, incompatible quantifier scope, and missing dependency. Also report false rejection on expert-labelled positive controls; a matcher that rejects everything does not pass. Report transfer acceptance/rejection precision and recall separately from verified solve rate.
+
 ## 4. Primary endpoint and scoring
 
 **Primary endpoint:** family-clustered, paired absolute difference in *verified exact-target proof success* between F (typed insight) and the strongest simple baseline selected on validation (A–E). The exact primary contrast and direction must be written to the run manifest before touching the held-out test partition.
@@ -98,7 +106,7 @@ Before calling a result generalization evidence, add a leakage audit: normalized
 
 ## 7. Mutation suite and negative controls
 
-Freeze negative fixtures before running the model. Include (where meaningful): tautological statement substitution; dropped/strengthened/weakened critical hypothesis; mismatched statement digest; unrelated successor test that does not depend on the candidate; dependency/axiom-policy violation; `sorry`/placeholder proof; corrupt source digest; duplicate or cross-family source path; and a source revision mismatch.
+Freeze negative fixtures before running the model. Include (where meaningful): tautological statement substitution; dropped/strengthened/weakened critical hypothesis; mismatched statement digest; unrelated successor test that does not depend on the candidate; dependency/axiom-policy violation; `sorry`/placeholder proof; corrupt source digest; duplicate or cross-family source path; and a source revision mismatch; incompatible source/target object types; and an upper-bound premise offered for a lower-bound goal (or vice versa).
 
 The gate should reject **100% of this finite, versioned fixture suite** before a benchmark run is accepted. This is a finite test-suite requirement, not a claim of 100% semantic correctness on arbitrary mathematics. Each fixture has an expected failure code, and each observed result must be stored with a receipt/hash.
 
