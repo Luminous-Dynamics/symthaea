@@ -17,6 +17,8 @@ The central design rule is: **simplify the language, never simplify away the evi
 
 No prose is invented from unconstrained generation in v1. The output uses reviewed templates over structured, validated report fields. This makes the wording predictable, testable, translatable and suitable for a future HDC similarity/retrieval layer. Hyperdimensional computing may help retrieve a relevant explanation pattern from a reviewed library, but HDC similarity is not proof that a diagnosis is true and must not alter the underlying claims.
 
+When paired task-level receipts are supplied, the explainer goes beyond aggregate counts: it compares the same task in both arms, checks that demand/deadline metadata matches, and explains the difference using requested bytes, delivered bytes, deadline/expiry window, terminal window and failure reason. It shows up to 50 changed tasks in the explanation and records the total/truncation flag; malformed or mismatched task pairs fail closed. Without task rows, it explicitly says task-level causality is unavailable rather than inventing a reason.
+
 ## Evidence-aware language
 
 The explainer recognizes these declared evidence classes:
@@ -32,7 +34,7 @@ The function refuses absent required fields, invalid completion counts, and mism
 
 Given the checked-in synthetic fixture, the explainer says the candidate completes more tasks in the workload shown and separately flags FIFO's essential and interactive deadline misses. It also says this is not a physical Wi-Fi result, that a byte grant is not measured 802.11 airtime fairness, and that real application success, TCP/QUIC behavior, radio retries, latency, calibrated energy, prices and provider permissions remain unproven.
 
-Run inside the Symthaea workspace:
+Run inside the Symthaea workspace. The default command prints a plain-language report that has sections for evidence class, outcomes by scenario, per-priority completion/deadline results, changed task outcomes, limitations, next step and provenance:
 
 ```sh
 cargo run -p symthaea-connectivity-explainer -- \
