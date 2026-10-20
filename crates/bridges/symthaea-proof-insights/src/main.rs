@@ -895,7 +895,7 @@ fn audit_temporal_dataset(
             }
         };
 
-        let mut path_join_status = String::new();
+        let path_join_status;
         let mut candidate_timeline_positions = Vec::new();
         let mut matched_completion_commit = None;
         let mut commit_before_is_ancestor_of_completion = None;
@@ -1227,7 +1227,8 @@ fn audit_temporal_timeline(
     let mathlib_manifest: serde_json::Value =
         serde_json::from_slice(&mathlib_manifest_bytes).context("parse pinned Lake manifest")?;
     let mathlib_revision = find_mathlib_revision(&mathlib_manifest)
-        .context("Lake manifest contains no identifiable Mathlib revision")?;
+        .context("Lake manifest contains no identifiable Mathlib revision")?
+        .to_owned();
     validate_git_sha(&mathlib_revision)
         .context("Lake manifest Mathlib revision is not a full SHA")?;
 
@@ -3471,7 +3472,10 @@ mod tests {
             dataset_events[3]["statement_match_relation"],
             "empty_formal_statement"
         );
-        assert_eq!(dataset_events[3]["statement_match_at_commit_before"], null);
+        assert_eq!(
+            dataset_events[3]["statement_match_at_commit_before"],
+            serde_json::Value::Null
+        );
         assert_eq!(dataset_events[4]["path_join_status"], "invalid_path");
         assert_eq!(
             dataset_events[4]["statement_match_relation"],
@@ -3482,7 +3486,10 @@ mod tests {
             dataset_events[5]["statement_match_relation"],
             "completion_match_pre_state_unavailable"
         );
-        assert_eq!(dataset_events[6]["commit_before_object_exists"], null);
+        assert_eq!(
+            dataset_events[6]["commit_before_object_exists"],
+            serde_json::Value::Null
+        );
         assert_eq!(
             dataset_events[6]["statement_match_relation"],
             "completion_match_pre_state_unavailable"
