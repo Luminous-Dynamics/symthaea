@@ -41,8 +41,8 @@ use symthaea_music_theory::{MusicalIntent, Score as TheoryScore, Style};
 /// [`apply_expressive_model`]'s blend). March, Mazurka, and Toccata timing
 /// profiles are explicit engineering hypotheses awaiting blinded audio
 /// calibration—not evidence of historical authenticity. Folk, Lullaby,
-/// Sarabande, Minuet, Waltz, Celtic jig, nocturne, and chorale rhetoric add
-/// routed profiles, still provisional.
+/// Sarabande, Minuet, Waltz, Celtic jig, nocturne, chorale, and planing
+/// textures add routed profiles, still provisional.
 /// [`PerformanceDialect::ClassicalRubato`] remains the identity — every
 /// factor exactly 1.0 — so its renders remain bit-identical to pre-dialect behavior.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -109,6 +109,11 @@ pub enum PerformanceDialect {
     /// stretching stays restrained because the phrase rhetoric already writes
     /// the fermata-like hold into the score.
     ChoraleAnchored,
+    /// Impressionist planing prototype: preserve phrase breath but soften
+    /// climax/cadence gravity and reduce local timing scatter, allowing the
+    /// parallel harmonic color to float rather than push toward resolution.
+    /// Calibration prior only.
+    ImpressionistFloat,
     /// Blues/jazz: laid-back time. Jitter up (1.3x), phrase-final rubato
     /// and the expressive blend both kept — a jazz ballad leans harder
     /// into time than a classical player, never less.
@@ -132,6 +137,7 @@ impl PerformanceDialect {
             PerformanceDialect::JigDrive => 0.8,
             PerformanceDialect::NocturneBreath => 1.15,
             PerformanceDialect::ChoraleAnchored => 0.75,
+            PerformanceDialect::ImpressionistFloat => 1.1,
             PerformanceDialect::DanceLocked => 0.25,
             PerformanceDialect::ProcessExact => 0.1,
         }
@@ -153,6 +159,7 @@ impl PerformanceDialect {
             PerformanceDialect::JigDrive => 0.8,
             PerformanceDialect::NocturneBreath => 1.1,
             PerformanceDialect::ChoraleAnchored => 0.65,
+            PerformanceDialect::ImpressionistFloat => 0.8,
             PerformanceDialect::DanceLocked => 0.25,
             PerformanceDialect::ProcessExact => 0.1,
         }
@@ -172,6 +179,7 @@ impl PerformanceDialect {
             PerformanceDialect::JigDrive => 0.55,
             PerformanceDialect::NocturneBreath => 1.1,
             PerformanceDialect::ChoraleAnchored => 0.75,
+            PerformanceDialect::ImpressionistFloat => 0.65,
             PerformanceDialect::FolkLift => 0.6,
             PerformanceDialect::DanceLocked => 0.25,
             PerformanceDialect::ProcessExact => 0.1,
@@ -192,6 +200,7 @@ impl PerformanceDialect {
             PerformanceDialect::JigDrive => 0.85,
             PerformanceDialect::NocturneBreath => 0.9,
             PerformanceDialect::ChoraleAnchored => 0.4,
+            PerformanceDialect::ImpressionistFloat => 0.9,
             PerformanceDialect::DanceLocked => 0.6,
             PerformanceDialect::ProcessExact => 0.4,
             PerformanceDialect::FolkLift => 1.2,
@@ -217,6 +226,7 @@ impl PerformanceDialect {
             PerformanceDialect::JigDrive => 0.85,
             PerformanceDialect::NocturneBreath => 1.05,
             PerformanceDialect::ChoraleAnchored => 0.6,
+            PerformanceDialect::ImpressionistFloat => 0.75,
             PerformanceDialect::DanceLocked => 0.4,
             PerformanceDialect::ProcessExact => 0.0,
         }
@@ -233,24 +243,25 @@ impl PerformanceDialect {
 /// a groove with a drone is still a groove):
 ///
 /// 1. `harmonic_stasis`/`full_drone`/`additive_process` → [`PerformanceDialect::ProcessExact`]
-/// 2. explicit Mazurka/Toccata accompaniment mechanisms → their provisional
+/// 2. `planing` → [`PerformanceDialect::ImpressionistFloat`]
+/// 3. explicit Mazurka/Toccata accompaniment mechanisms → their provisional
 ///    style-specific dialects (before any generic groove-family matching)
-/// 3. `MarchPulse` → [`PerformanceDialect::MarchLocked`]
-/// 4. `FolkPulse` → [`PerformanceDialect::FolkLift`]
-/// 5. `LullabyCradle` → [`PerformanceDialect::LullabySway`]
-/// 6. `Sarabande` / `Minuet` → their own measured triple-dance profiles
-/// 7. `OomPah` → [`PerformanceDialect::WaltzLilt`]
-/// 8. `JigGait` → [`PerformanceDialect::JigDrive`] before the drone fallback
-/// 9. a rhythm-cell accompaniment (Habanera/Montuno/BossaComp/CompasGait/
+/// 4. `MarchPulse` → [`PerformanceDialect::MarchLocked`]
+/// 5. `FolkPulse` → [`PerformanceDialect::FolkLift`]
+/// 6. `LullabyCradle` → [`PerformanceDialect::LullabySway`]
+/// 7. `Sarabande` / `Minuet` → their own measured triple-dance profiles
+/// 8. `OomPah` → [`PerformanceDialect::WaltzLilt`]
+/// 9. `JigGait` → [`PerformanceDialect::JigDrive`] before the drone fallback
+/// 10. a rhythm-cell accompaniment (Habanera/Montuno/BossaComp/CompasGait/
 ///    Shuffle), non-straight swing, or a full backbeat kit → groove: with a
 ///    jazz marker (Shuffle, swing ≠ 0.5, or `seventh_chords`) →
 ///    [`PerformanceDialect::JazzLaidBack`], else [`PerformanceDialect::DanceLocked`]
-/// 10. `roll_ornaments` or `drone` → [`PerformanceDialect::FolkLift`]
-/// 11. `PhraseRhetoric::Chorale` → [`PerformanceDialect::ChoraleAnchored`]
+/// 11. `roll_ornaments` or `drone` → [`PerformanceDialect::FolkLift`]
+/// 12. `PhraseRhetoric::Chorale` → [`PerformanceDialect::ChoraleAnchored`]
 ///     (reduce extra performance-layer stretch around the written hold)
-/// 12. `PhraseRhetoric::Singing` → [`PerformanceDialect::NocturneBreath`]
+/// 13. `PhraseRhetoric::Singing` → [`PerformanceDialect::NocturneBreath`]
 ///     (after stronger rhythm/process/folk markers)
-/// 13. everything else → [`PerformanceDialect::ClassicalRubato`] (the identity)
+/// 14. everything else → [`PerformanceDialect::ClassicalRubato`] (the identity)
 ///
 /// Remaining presets use ClassicalRubato as a neutral identity until a separate
 /// rhythmic/performance contract is justified; this baseline is not an assertion
@@ -261,6 +272,9 @@ pub fn dialect_for_spec(spec: &symthaea_music_theory::CompositionSpec) -> Perfor
     let t = &spec.texture;
     if t.harmonic_stasis || t.full_drone || t.additive_process {
         return PerformanceDialect::ProcessExact;
+    }
+    if t.planing {
+        return PerformanceDialect::ImpressionistFloat;
     }
     if spec.accompaniment_pool.contains(&A::MazurkaGait) {
         return PerformanceDialect::MazurkaLilt;
@@ -1930,7 +1944,7 @@ mod tests {
             (Style::Tango, D::DanceLocked),  // Habanera rhythm cell
             (Style::Celtic, D::JigDrive),    // 3+3 jig cell takes priority over drone
             (Style::Blues, D::JazzLaidBack), // Shuffle cell + swung eighths
-            (Style::Impressionism, D::ClassicalRubato),
+            (Style::Impressionism, D::ImpressionistFloat),
             (Style::SacredChoral, D::ChoraleAnchored),
             (Style::Minimalism, D::ProcessExact), // additive process
             (Style::JazzBallad, D::JazzLaidBack), // swing 0.58 + 7th chords
@@ -2007,6 +2021,7 @@ mod tests {
         for (style, expected_dialect) in [
             (Style::Waltz, D::WaltzLilt),
             (Style::Nocturne, D::NocturneBreath),
+            (Style::Impressionism, D::ImpressionistFloat),
             (Style::SacredChoral, D::ChoraleAnchored),
             (Style::Folk, D::FolkLift),
             (Style::ModalFolk, D::FolkLift),
@@ -2095,6 +2110,7 @@ mod tests {
     fn style_dialect_hypotheses_are_non_identity_and_explicit() {
         use PerformanceDialect as D;
         let classical = D::ClassicalRubato;
+        let impressionist = D::ImpressionistFloat;
         let chorale = D::ChoraleAnchored;
         let nocturne = D::NocturneBreath;
         let waltz = D::WaltzLilt;
@@ -2114,6 +2130,14 @@ mod tests {
         assert_eq!(jig.expressive_blend_scale(), 0.85);
         assert!(jig.cadence_scale() < classical.cadence_scale());
         assert!(jig.jitter_scale() < D::FolkLift.jitter_scale());
+
+        assert_eq!(impressionist.breath_scale(), 1.1);
+        assert_eq!(impressionist.climax_scale(), 0.8);
+        assert_eq!(impressionist.cadence_scale(), 0.65);
+        assert_eq!(impressionist.jitter_scale(), 0.9);
+        assert_eq!(impressionist.expressive_blend_scale(), 0.75);
+        assert!(impressionist.cadence_scale() < classical.cadence_scale());
+        assert!(impressionist.breath_scale() > classical.breath_scale());
 
         assert_eq!(chorale.breath_scale(), 0.75);
         assert_eq!(chorale.climax_scale(), 0.65);
