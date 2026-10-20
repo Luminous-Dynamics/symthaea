@@ -1,0 +1,146 @@
+# Marine conditional-calibration and regime-shift benchmark (V0)
+
+Status: protocol proposal; no benchmark results claimed.
+
+## Purpose
+
+This benchmark is the adversarial sequel to the pointwise validation scorecard and central prediction-interval calibration evaluator. It asks whether a method's coverage, interval score and engineering decision remain trustworthy when operating conditions differ from the calibration distribution.
+
+A pooled nominal-coverage result is insufficient. A model can achieve good aggregate coverage while systematically under-covering a critical regime. Conversely, broad intervals can achieve coverage without providing useful information. Both failures must remain visible.
+
+This document specifies a benchmark, not an implementation of conformal prediction, a CFD solver, a method for deriving physical uncertainty bounds, or a release authority. Use the runtime scorer in `prediction_interval_calibration.rs` for the already implemented per-slice coverage/score contract. Implement additional shift diagnostics only behind this distinct benchmark owner and after review; do not duplicate an existing conformal/uncertainty owner.
+
+## Recent research basis
+
+1. Braun, Holzmüller, Jordan & Bach (ICML 2026), *Conditional Coverage Diagnostics for Conformal Prediction*, introduce excess risk of target coverage (ERT). Their paper notes that marginal conformal guarantees alone do not diagnose local/conditional coverage and reports greater statistical power than simpler coverage-gap diagnostics in their experiments. This is a research metric to compare against, not a claim that this crate implements ERT: https://proceedings.mlr.press/v306/braun26c.html
+2. Han & Qu (2026), *The Label Complexity of Class-Conditional Coverage under Distribution Shift*, reports a marginal-coverage/per-class-coverage disconnect and an identifiability limit under joint covariate-and-outcome shift with only source labels and unlabeled target observations. This motivates a negative control: under unidentifiable shift, an honest policy must be able to say Indeterminate or request target labels, not claim a guarantee from unlabeled covariates alone: https://arxiv.org/abs/2607.18088
+3. Laghuvarapu, Deb & Sun (UAI 2026), *KMM-CP*, studies kernel mean matching for covariate-shift correction and selective correction in regions with sufficient support overlap. Its reported >50% coverage-gap reduction is an outcome on its evaluated molecular-property benchmarks, not an expected marine result: https://proceedings.mlr.press/v337/laghuvarapu26a.html
+4. ITTC's 2024 procedure *Uncertainty Analysis in CFD, Examples for Resistance and Flow* explicitly frames V&V around a specified code, geometry, conditions and available benchmark information. Marine evidence must preserve the actual response variable and operating condition: https://ittc.info/media/11954/75-03-02-01.pdf
+5. The 2026 Duisburg Test Case (DTC) paper reports calm-water resistance and self-propulsion model experiments for a post-Panamax container ship at water-depth/draught ratios h/T=4.0, 2.0, and 1.2. It is a promising regime-shift target, but the raw files, rights, uncertainty fields, units and group mapping are not admitted here: https://doi.org/10.1080/09377255.2026.2644800
+
+## Baseline reproducibility audit — new exclusion rule
+
+Do not promote a recent method into the SOTA baseline set merely because the paper is accepted or its summary is attractive. Reproduce its exact algorithm, membership/tie-breaking rules, split protocol and score definition under one common, leakage-free evaluation before using it to select our own method.
+
+A particularly useful caution surfaced during this research: the public repository accompanying Lee (UAI 2026), *Diagnosing Conformal Prediction Failures Under Distribution Shift*, now labels its statistical audit as in progress and explicitly says the historical numerical results have not been reproduced under a corrected common protocol. Its current README reports that the historical scripts used differing adaptive-prediction-set membership rules, fit preprocessing using test information and reused calibration labels for early stopping; the recovered refits reported different (negative) concentration/drop correlations on the recovered panel. The author also states that the original 50-seed predictions remain unrecovered. These are statements from the repository's present audit, not an independent determination of the paper's final status: https://github.com/ChorokLeeDev/conformal-covid-uai2026
+
+Consequently:
+- The SHAP-concentration idea is **not** a qualified marine baseline, and its classifier-specific diagnostic must not be transferred to continuous resistance regression without a separate hypothesis and test.
+- Treat ERT (conditional-coverage diagnostics) and KMM-CP (covariate-shift correction) as research baselines to validate and fairly reproduce, not magic robustness guarantees.
+- Keep the upstream reference revision, license, code digest, data digest, method semantics, preprocessing fit groups, calibration/tuning/test group IDs, tie-breaking/membership rule and expected output hashes in each baseline receipt.
+- Run a no-information / no-shift control and deliberately leaky/wrong-membership negative controls to ensure the harness detects a “good” result produced by methodology drift.
+- Publish a baseline audit table with **reproduced / partially reproduced / not reproduced / not applicable** status before ranking any candidate as SOTA.
+
+This reproductions gate is a research-integrity requirement; it does not change the external literature's status or show that any method wins on marine data.
+
+## Shift taxonomy — do not conflate these cases
+
+| Shift family | What changes | Which evidence can support a correction? | Required honest behavior |
+|---|---|---|---|
+| IID/exchangeable control | Nothing material by design | Ordinary held-out calibration groups | Baselines should not invent benefits from adaptation |
+| Covariate shift | Condition mix changes while the conditional outcome/error law is assumed stable | Support overlap plus a justified density-ratio or weighting estimate | Evaluate weighted methods only under their stated assumption |
+| Heteroscedasticity | Error spread differs by speed, depth, load, trim or observable | Relevant calibration evidence in each stratum or a validated model | Show local undercoverage; don't let high-coverage strata mask it |
+| Conditional/subgroup miss | A subset under-covers while pooled coverage appears acceptable | Conditional diagnostics and enough group-labelled evaluation data | Report worst-stratum undercoverage and subgroup uncertainty |
+| Joint covariate-and-outcome shift | Both conditions and error law can change | Target labels/measurements or defensible external constraints | No label-free universal conditional-coverage promise |
+| Support gap / new regime | Target conditions lie outside calibration support | New reference data, validated physics, or explicit limits | Return OutOfDomain/Indeterminate or abstain |
+| Systematic bias/drift | Center prediction moves relative to truth over time/campaign | Independent residual monitoring and new calibration evidence | Don't repair the interval by silently calling bias random noise |
+| Dependent samples | Repeated waves/frames/runs share a campaign or environmental history | Group-aware analysis / reviewed dependence model | Count independent experimental groups, not raw rows |
+| Sparse/missing/invalid evidence | A critical slice lacks sufficient or valid labels | Additional qualified measurement | Keep the slice incomplete or indeterminate |
+| No-shift negative control | Adaptation is applied without a real distribution change | Same held-out truth, paired policy replay | Report unnecessary width/cost or degradation |
+
+Hydrodynamic coordinates to retain include depth/draught, speed/Froude number, displacement/loading, trim, hull/appendage/propulsor generation, water conditions, measured observable, scale, solver/method revision and evidence origin. A depth ratio by itself is not a complete applicability descriptor. Model-scale validity cannot be silently promoted to full-scale accuracy.
+
+## Arms and equal-budget protocol
+
+Use exactly the same frozen source calibration groups and held-out evaluation cases for each comparable arm:
+
+1. Plain split/residual-quantile interval (baseline).
+2. Group/Mondrian residual quantiles where group counts are sufficient and the grouping was prespecified.
+3. Importance-weighted conformal only for a preregistered covariate-shift case with validated support-overlap assumptions.
+4. A selective support-aware correction that can reject/abstain outside overlap.
+5. The candidate adaptive method.
+6. An oracle using hidden labels/truth, only as an explicitly non-deployable upper bound.
+
+Freeze each method revision, prediction artifact, group assignments, scenario-generator version, seed manifest, split manifest, nominal levels, cost basis and evaluation manifest before opening the final outcomes. Calibration, tuning and final confirmation must be disjoint at the level of the independent experimental group, not merely disjoint rows. For methods with a different target-label budget, report that budget rather than declaring their coverage improvement free.
+
+No method is expected to win on all shifts. Report where assumptions hold and fail. A density-ratio correction must not run as if the ratio is trustworthy where support overlap is poor; a source-only method must not claim to identify arbitrary joint shift.
+
+## Metrics — separate, per shift stratum
+
+- Empirical coverage and Wilson 95% bounds at declared nominal 50%, 80%, 90% and 95% levels.
+- One-sided undercoverage and overcoverage; pooled coverage; worst-stratum coverage; max conditional-coverage gap; conditional diagnostics such as ERT when reproduced by a qualified implementation.
+- Mean width and the proper central interval score; compare them at equal target coverage / equal label budget where applicable.
+- False-safe / false-feasible and missed-feasible outcomes for every hard engineering constraint.
+- Applicability, support-overlap, unknown and abstention/Indeterminate rates.
+- Per-group paired score differences, wall time, solver/measurement cost and target-label burden.
+- Every attempted, failed, invalid, missing or censored sample remains in accounting.
+- Deterministic replay, split leakage, stale digest, changed model/method, duplicate group and malformed-interval controls.
+
+Never combine these into a single untraceable leaderboard score. If a project-level decision requires utility weights, publish the weights as a separate decision contract and retain the full underlying metrics.
+
+## Preregistered acceptance goals (not results)
+
+- Zero false passes on known-answer support-gap, joint-shift, stale-profile, duplicate-group, invalid-interval and false-feasible controls.
+- No per-slice pass may be inferred from pooled coverage alone.
+- For known covariate shift with sufficient overlap, compare weighted calibration and plain split calibration on the same outcomes. Claim improvement only when preregistered paired effects and uncertainty support it without violating sharpness, false-safe or cost gates.
+- Under unidentifiable joint shift and no target labels, allow only bounded claims, Indeterminate or target-label requests—not a universal coverage guarantee.
+- Test a no-shift control; adaptation must not be presumed beneficial.
+- Eventual 95% coverage studies target at least 10,000 independent held-out groups per major predeclared stratum, with the design justified for the intended confidence width. Smaller deterministic fixtures qualify software semantics only.
+- Use at least three separately versioned synthetic generators (e.g., smooth, heteroscedastic and regime-boundary), and reserve a final unmodified confirmation corpus.
+- Physical superiority requires rights-reviewed raw reference data, qualified uncertainty semantics, condition-grouped hold-out, physical verification/validation, and independent expert review.
+
+## Physical DTC admission checklist
+
+The 2026 DTC shallow-water article gives more useful experimental-design detail than the abstract alone:
+- The physical model was 1:60 scale (model M2189) and the signals were sampled at 100 Hz.
+- Resistance tests covered about four to six speeds per depth, with Froude number approximately 0.053–0.174 and depth Froude number approximately 0.13–0.59.
+- The authors used steady-state windows after low-pass filtering and repeated selected test configurations to assess repeatability and measurement uncertainty.
+- The paper reports expanded uncertainty of the mean resistance force below 1%, while standard deviation in individual time records was about 9% of the mean. These quantify different things: **do not turn each 100 Hz sample into an independent test**, and do not substitute within-record variability for the expanded uncertainty of the run mean.
+- The paper reports that open-water propeller characteristics changed comparatively little with water depth, while hull–propeller interaction became evident in self-propulsion tests. This suggests a stronger benchmark tests the *coupled hull/propulsor response*, rather than attempting to generalize from bare-hull resistance alone.
+
+Source: Chillcce et al. (published online 27 March 2026), *Duisburg test case: post-Panamax container ship for benchmarking resistance and propulsion under shallow water conditions*, https://doi.org/10.1080/09377255.2026.2644800. The publisher's searchable article text exposes tables and a “Figures & data” section, but I have not retrieved and inspected the underlying raw experimental artifact, direct download, license, or checksums. Therefore these are article-reported design facts, not admitted raw data.
+
+The article says experimental data are publicly available. That statement alone does not create an admitted dataset. Before a physical benchmark can run, an independent intake review must record:
+
+- Exact source URL/version, raw artifact bytes and reproducible SHA-256 checksums.
+- Rights/reuse basis and limitations for each file.
+- Original measured observable, units, measurement chain, uncertainty method, and any omitted uncertainty terms.
+- Water depth, draught, speed/Froude number, loading, trim, hull/propeller configuration, model scale and test-condition identifiers.
+- Experimental/campaign group IDs, dependence concerns, missing/invalid/censored outcomes and calibration metadata.
+- The exact train/calibration/hold-out split at group level, model-freeze time and proof that the hold-out was not used for tuning.
+- Separation of raw experimental measurements, corrected trial estimates, CFD outputs, synthetic fixtures and derived values.
+
+Until those checks pass, use only synthetic fixtures for software tests and keep every DTC physical-performance claim blocked.
+
+## Full-scale external-validation complement: JoRes
+
+DTC is a useful controlled **model-scale** shallow-water dataset. It should be complemented by a separate full-scale/generalization tier, not presented as a same-hull scale-transfer pair. The JoRes programme was created to join model tests, CFD, full-scale sea trials and long-term ship monitoring for ship energy-efficiency validation.
+
+The public project site says results are available after registration and lists several potentially useful case families:
+- **JoRes3 Cruise Liner:** deep- and shallow-water trials; the project matrix lists propeller torque and thrust measurements and long-term monitoring. Flanders Hydraulics specifically describes its full-scale speed/power tests and zig-zag tests at two water depths, with varying weather conditions.
+- **JoRes5 Bulk Carrier:** trials with and without an energy-saving device (ESD); a JoRes update says the hull condition was the same for the two trial sets, making it a potentially useful intervention case. Trial/weather/measurement corrections are still required before causal attribution.
+- **MV Regal and Lucy Ashton:** additional full-scale ship performance cases; their missions/configurations differ, so do not pool them into a single hull-family score.
+
+Sources:
+- JoRes project and ship-scale validation-case matrix: https://jores.net/
+- JoRes Bulk Carrier ESD news / data release description: https://jores.net/news/127/detail
+- Flanders Hydraulics full-scale shallow-water data description: https://www.waterbouwkundiglaboratorium.be/en/publications-and-data
+- Flanders Hydraulics data-request form, explicitly listing “Full scale shallow water speed/power trial data”: https://www.waterbouwkundiglaboratorium.be/en/publications-and-data/benchmark-data/requesting-benchmark-data
+
+These pages establish that a potential access route exists, not that our team has downloaded or secured the files. Access involves registration and/or a request workflow. The generic JoRes website terms state that website information does not itself grant licenses to intellectual property, while other terms discuss reuse of contributions and downloaded extracts subject to third-party rights and notices. Those general terms are not a dataset-specific reuse decision; inspect the specific file/case rights and any access agreement before use. Before admission, preserve access terms and the exact permission basis, download the raw artifacts, compute and verify byte checksums, inspect measurement/correction/uncertainty metadata and align case identities. No figures, screenshots, paper tables or search snippets should be substituted for raw evidence.
+
+### How to use the two tiers
+
+1. **Tier A — controlled model-scale physics:** DTC shallow-water resistance, propeller open-water and self-propulsion measurements at h/T = 4.0, 2.0, 1.2. Test held-out depth regimes within this exact hull/method family; preserve repeated test-run identities.
+2. **Tier B — full-scale operating generalization:** JoRes3 and other individually qualified trial/monitoring cases. Evaluate speed–power response under depth/weather variation using the declared trial corrections and uncertainty model. Do not infer that one vessel is the physical ground truth for another hull.
+3. **Tier C — intervention evidence:** JoRes5 with/without ESD can test whether predicted changes align with a matched physical intervention. Use the baseline/candidate configuration, hull condition, propulsor/ESD state, trial order, route, weather, loading, metrology/calibration and corrections as explicit confounder gates.
+
+Do **not** treat Tier A and Tier B as one pooled metric, do not train on a Tier B case and then call that case an independent cross-scale hold-out, and do not label JoRes as a direct DTC scale pair. Strong scale-transfer claims need a same-hull/same-configuration model/full-scale evidence chain, relevant corrections and independently reviewed uncertainty. A model-scale result plus an unrelated full-scale vessel is a robustness/generalization test, not a direct proof of scale laws.
+
+## Implementation boundary
+
+This protocol should initially reuse the frozen per-slice predictive interval evaluator in `prediction_interval_calibration.rs`. A follow-up runtime evaluator is justified only for genuinely new outputs (paired policy deltas, max conditional coverage gap and shift-assumption/abstention accounting). Do not copy conformal algorithms from research packages into production Rust without licensing, maintenance and independent correctness review. Do not add a second selector: experiment-choice policy remains under #7641 / #7803.
+
+## Claim ceiling
+
+A passing software fixture says only that the protocol/evaluator handled its declared synthetic scenarios. It does not guarantee conditional coverage under arbitrary shift, validate a marine model, demonstrate lower drag/energy, establish full-scale performance, or authorize a vessel to operate.
