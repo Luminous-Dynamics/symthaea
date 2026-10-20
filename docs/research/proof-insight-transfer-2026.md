@@ -186,8 +186,10 @@ Before publishing any claim of “state of the art,” perform a dated source re
 ### Milestone 0 — research contract and source indexer (started)
 - Freeze the research contract, baselines, metrics, risks, and no-claim boundaries in this document.
 - Add `symthaea-proof-insights`, a Rust-first indexer that pins the OpenAI math checkout to an expected commit, rejects dirty worktrees, fingerprints the source catalog and Comparator scope notes, extracts family links, and emits explicit matched/unmatched formalization-source accounting.
-- Unit tests are authored for family extraction, path normalization, duplicate-family rejection, and parsing a minimal YAML manifest.
-- **Verification boundary:** the authoring environment lacked a local Rust toolchain and direct GitHub network access, so the Rust tests have not yet been executed. The indexer is not claimed to compile or pass tests until an actual local/CI run confirms it. The JSON Schema has been JSON-parsed and structurally smoke-checked, not passed through an independent JSON Schema validator.
+- Add `data/benchmarks/proof-insight-transfer-v0/splits.json`: frozen deterministic 70/15/15 family assignments for the pinned 372-family catalog (260/56/56), 961 unique internal paths across family records, source SHA-256 fingerprints, and a partition digest. The SHA-256 implementation was checked against the standard `abc` test vector; the split is an independent manifest until matched against Rust-generated output.
+- Add a `--verify-splits` mode to the Rust indexer to compare generated and frozen family IDs/assignments, source commit, and partition digest.
+- Unit tests are authored for family extraction, path normalization, duplicate-family rejection, catalogue-claim consistency, and deterministic split assignment.
+- **Verification boundary:** the authoring environment lacked a local Rust toolchain, so the Rust tests and indexer have not yet been executed. The independent static split manifest's hash implementation passes the standard SHA-256 `abc` vector, but the manifest has not yet been matched against Rust output. The JSON Schema has been JSON-parsed and structurally smoke-checked, not passed through an independent JSON Schema validator.
 
 ### Milestone 1 — validate and close data-integrity gaps
 - Run `cargo test -p symthaea-proof-insights` in a Rust-enabled checkout, then execute the indexer against the pinned upstream snapshot.
