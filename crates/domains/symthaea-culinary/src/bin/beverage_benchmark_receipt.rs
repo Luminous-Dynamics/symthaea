@@ -409,7 +409,12 @@ mod tests {
             .insert("injected_pass".to_owned(), json!(true));
         let bytes = serde_json::to_vec(&corpus).expect("serialize modified corpus");
         let result = validate_inputs(&bytes, real_schema());
-        assert!(result.errors.iter().any(|e| e.starts_with("corpus_json_or_shape_invalid")));
+        assert!(
+            result
+                .errors
+                .iter()
+                .any(|e| e.starts_with("corpus_json_or_shape_invalid"))
+        );
     }
 
     #[test]
@@ -434,7 +439,12 @@ mod tests {
         let result = validate_inputs(b"{invalid", real_schema());
         assert!(!result.passed());
         assert_eq!(result.scenario_count, 0);
-        assert!(result.errors.iter().any(|e| e.starts_with("corpus_json_or_shape_invalid")));
+        assert!(
+            result
+                .errors
+                .iter()
+                .any(|e| e.starts_with("corpus_json_or_shape_invalid"))
+        );
     }
 
     #[test]
