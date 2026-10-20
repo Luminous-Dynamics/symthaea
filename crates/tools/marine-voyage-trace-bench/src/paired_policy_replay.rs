@@ -74,10 +74,12 @@ pub struct PairedReplayProfile {
     pub baseline_method_revision: String,
     pub candidate_method_id: String,
     pub candidate_method_revision: String,
-    /// Attestation that methods, splits, scoring contract and thresholds were frozen before
-    /// the final confirmation outcomes were inspected.
+    /// Target-labelled independent group rosters consumed by the methods. Exact equality is
+    /// required for paired comparisons that claim an equal target-label budget.
     pub baseline_target_label_group_ids: Vec<String>,
     pub candidate_target_label_group_ids: Vec<String>,
+    /// Attestation that methods, splits, scoring contract and thresholds were frozen before
+    /// the final confirmation outcomes were inspected.
     pub final_confirmation_frozen_before_outcomes: bool,
     /// Maximum allowed difference between highest and lowest candidate coverage across
     /// operating cases for the same observable, unit and nominal coverage level.
@@ -1682,6 +1684,39 @@ mod tests {
         let rows = panel(0.0);
         let report = evaluate_paired_replay(&profile, &rows);
         assert_eq!(report.disposition, PairedReplayDisposition::InvalidProfile);
+    }
+
+    #[test]
+    fn unequal_target_label_group_rosters_invalidate_comparison() {
+        let mut profile = profile();
+        profile.candidate_target_label_group_ids = vec!["label-3".to_string()];
+        refresh(&mut profile);
+        let report = evaluate_paired_replay(&profile, &panel(0.0));
+        assert_eq!(report.disposition, PairedReplayDisposition::InvalidProfile);
+        assert!(report.issues.contains(&PairedReplayIssue::TargetLabelBudgetRosterMismatch));
+    }
+
+    #[test]
+    fn paired_confidence_interval_is_reported_for_thirty_independent_groups() {
+        let mut profile = profile();
+        profile.evaluation_group_ids = (0..40).map(|i| format!("group-{i}")).collect();
+        for requirement in &mut profile.required_slices {
+            requirement.minimum_pairs = 30;
+        }
+        refresh(&mut profile);
+        let mut rows = Vec::new();
+        for i in 0..40 {
+            rows.push(observation(i, "deep", 50.0 + i as f64, 0.0));
+            rows.push(observation(i, "shallow", 60.0 + i as f64, 0.0));
+        }
+        let report = evaluate_paired_replay(&profile, &rows);
+        assert_eq!(report.disposition, PairedReplayDisposition::PassDeclaredNonDegradation);
+        assert!(report.slices.iter().all(|slice| {
+            slice.score_delta_ci95_lower.is_some()
+                && slice.score_delta_ci95_upper.is_some()
+                && slice.coverage_delta_ci95_lower.is_some()
+                && slice.width_delta_ci95_upper.is_some()
+        }));
     }
 
     #[test]
