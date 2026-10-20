@@ -17,6 +17,10 @@
 //!   `LAYERS` below): form shape (12d), harmonic trajectory (8d), a
 //!   per-voice-role register/count profile as an orchestration proxy (12d), a
 //!   rhythmic-duration histogram (5d), and melodic contour (3d).
+//! - **Dynamic response**: the causal sensitivity matrix also hashes the
+//!   per-note velocity vector separately. This lets it detect energy controls
+//!   on dedicated forms without conflating louder output with greater
+//!   structural diversity or claiming velocity is part of the exact hash.
 //!
 //! ## A note on "performance realization"
 //! `symthaea-muse::theory_realize` (a DOWNSTREAM crate — it depends on this
@@ -187,13 +191,13 @@ enum Sensitivity {
 }
 
 impl Sensitivity {
-    fn classify(max_overall_dist: f64, exact_hash_ever_changed: bool) -> Self {
+    fn classify(max_overall_dist: f64, observed_output_ever_changed: bool) -> Self {
         // Thresholds are fractions of the pilot's own same-style median
         // distance scale (~0.19 in the original run) — reused here as the
         // empirical "normal variation" yardstick rather than an arbitrary
         // absolute cutoff.
         const NORMAL_SCALE: f64 = 0.19;
-        if !exact_hash_ever_changed && max_overall_dist < 0.01 {
+        if !observed_output_ever_changed && max_overall_dist < 0.01 {
             Sensitivity::None
         } else if max_overall_dist < 0.25 * NORMAL_SCALE {
             Sensitivity::Low
@@ -225,6 +229,19 @@ fn causal_sensitivity_matrix() -> Vec<(Style, &'static str, Sensitivity, Vec<&'s
     const BASE_ENERGY: f32 = 0.5;
     const BASE_BARS: usize = 16;
 
+    fn velocity_fingerprint(score: &symthaea_music_theory::Score) -> u64 {
+        // FNV-1a over ordered f32 bit patterns: deliberately separate from the
+        // exact structural event hash, which strips velocity by design.
+        let mut hash = 0xcbf2_9ce4_8422_2325u64;
+        for note in &score.notes {
+            for byte in note.velocity.to_bits().to_le_bytes() {
+                hash ^= u64::from(byte);
+                hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+            }
+        }
+        hash
+    }
+
     fn compose_raw(
         style: Style,
         tonic: i32,
@@ -233,7 +250,7 @@ fn causal_sensitivity_matrix() -> Vec<(Style, &'static str, Sensitivity, Vec<&'s
         arousal: f32,
         energy: f32,
         bars: usize,
-    ) -> (u64, [f64; STRUCT_DIMS]) {
+    ) -> (u64, u64, [f64; STRUCT_DIMS]) {
         let intent = MusicalIntent {
             valence,
             arousal,
@@ -245,13 +262,14 @@ fn causal_sensitivity_matrix() -> Vec<(Style, &'static str, Sensitivity, Vec<&'s
         let (score, form) = compose_with_spec_and_form(&intent, &style.spec());
         (
             exact_fingerprint(&score),
+            velocity_fingerprint(&score),
             structural_fingerprint(&score, &form),
         )
     }
 
     let mut rows = Vec::new();
     for &style in STYLES {
-        let (base_hash, base_struct) = compose_raw(
+        let (base_hash, base_velocity_hash, base_struct) = compose_raw(
             style,
             BASE_TONIC,
             BASE_SEED,
@@ -409,12 +427,18 @@ fn causal_sensitivity_matrix() -> Vec<(Style, &'static str, Sensitivity, Vec<&'s
 
         for (pname, points) in params {
             let mut max_overall = 0.0f64;
-            let mut hash_changed = false;
+            let mut output_changed = false;
+            let mut velocity_changed = false;
             let mut layers_touched: [bool; NUM_LAYERS] = [false; NUM_LAYERS];
             for (tonic, seed, valence, arousal, energy, bars) in points {
-                let (h, s) = compose_raw(style, tonic, seed, valence, arousal, energy, bars);
+                let (h, velocity_hash, s) =
+                    compose_raw(style, tonic, seed, valence, arousal, energy, bars);
                 if h != base_hash {
-                    hash_changed = true;
+                    output_changed = true;
+                }
+                if velocity_hash != base_velocity_hash {
+                    velocity_changed = true;
+                    output_changed = true;
                 }
                 let overall = dist(&base_struct, &s);
                 if overall > max_overall {
@@ -427,13 +451,16 @@ fn causal_sensitivity_matrix() -> Vec<(Style, &'static str, Sensitivity, Vec<&'s
                     }
                 }
             }
-            let sens = Sensitivity::classify(max_overall, hash_changed);
-            let touched: Vec<&'static str> = LAYERS
+            let sens = Sensitivity::classify(max_overall, output_changed);
+            let mut touched: Vec<&'static str> = LAYERS
                 .iter()
                 .zip(layers_touched.iter())
                 .filter(|&(_, &t)| t)
                 .map(|(&(name, _, _), _)| name)
                 .collect();
+            if velocity_changed {
+                touched.push("velocity");
+            }
             rows.push((style, pname, sens, touched));
         }
     }
