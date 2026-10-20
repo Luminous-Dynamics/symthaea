@@ -23,6 +23,7 @@ const MISMATCH_CODES: &[&str] = &[
     "precondition_mismatch",
     "domain_mismatch",
     "proof_dependency_mismatch",
+    "predicate_mismatch",
     "unknown",
 ];
 const AXIOM_POLICIES: &[&str] = &[
@@ -32,6 +33,87 @@ const AXIOM_POLICIES: &[&str] = &[
     "custom",
     "unknown",
 ];
+const MOVE_KINDS: &[&str] = &[
+    "inequality_transfer",
+    "representation_reduction",
+    "witness_construction",
+    "induction",
+    "normalization",
+    "decomposition",
+    "duality",
+    "invariant_composition",
+    "other",
+];
+const RELATIONS: &[&str] = &[
+    "upper_bound",
+    "strict_upper_bound",
+    "lower_bound",
+    "strict_lower_bound",
+    "equality",
+    "inequality",
+    "existence",
+    "nonexistence",
+    "implication",
+    "equivalence",
+    "subset",
+    "superset",
+    "counterexample_existence",
+    "other",
+];
+
+#[derive(Debug)]
+struct Obligation<'a> {
+    domain: &'a str,
+    object_type: &'a str,
+    predicate: &'a str,
+    relation: &'a str,
+}
+
+fn parse_obligation<'a>(contract: &'a Value, field: &str) -> Result<Obligation<'a>> {
+    let value = contract
+        .get(field)
+        .with_context(|| format!("directional_contract missing {field}"))?;
+    let domain = required_string(value, "domain")?;
+    let object_type = required_string(value, "object_type")?;
+    let predicate = required_string(value, "predicate")?;
+    let relation = required_string(value, "relation")?;
+    if !RELATIONS.contains(&relation) {
+        bail!("{field}.relation has unsupported value {relation:?}");
+    }
+    if domain.trim().is_empty()
+        || object_type.trim().is_empty()
+        || predicate.trim().is_empty()
+        || required_string(value, "quantifier_scope")?.trim().is_empty()
+    {
+        bail!("{field} domain/object_type/predicate/quantifier_scope must be non-empty");
+    }
+    let preconditions = value
+        .get("preconditions")
+        .and_then(Value::as_array)
+        .with_context(|| format!("{field}.preconditions must be an array"))?;
+    if preconditions.iter().any(|item| {
+        item.as_str()
+            .is_none_or(|text| text.trim().is_empty())
+    }) {
+        bail!("{field}.preconditions must contain only non-empty strings");
+    }
+    Ok(Obligation {
+        domain,
+        object_type,
+        predicate,
+        relation,
+    })
+}
+
+fn opposite_bound_direction(source: &str, target: &str) -> bool {
+    matches!(
+        (source, target),
+        ("upper_bound", "lower_bound")
+            | ("lower_bound", "upper_bound")
+            | ("strict_upper_bound", "strict_lower_bound")
+            | ("strict_lower_bound", "strict_upper_bound")
+    )
+}
 
 fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
@@ -96,6 +178,13 @@ fn validate_candidate(candidate: &Value) -> Result<()> {
         bail!("source move and target goal requirements must be non-empty");
     }
 
+    let move_kind = required_string(&Value::Object(contract.clone()), "move_kind")?;
+    if !MOVE_KINDS.contains(&move_kind) {
+        bail!("unsupported proof move kind {move_kind:?}");
+    }
+    let source_obligation = parse_obligation(&Value::Object(contract.clone()), "source_obligation")?;
+    let target_obligation = parse_obligation(&Value::Object(contract.clone()), "target_obligation")?;
+
     let mismatch_values = contract
         .get("mismatch_codes")
         .and_then(Value::as_array)
@@ -127,6 +216,30 @@ fn validate_candidate(candidate: &Value) -> Result<()> {
             bail!("unknown compatibility must include the unknown mismatch code");
         }
         _ => {}
+    }
+
+    if move_kind == "representation_reduction" {
+        if source_obligation.domain != target_obligation.domain {
+            if compatibility == "compatible" || !mismatch_codes.contains("domain_mismatch") {
+                bail!("representation reduction across domains requires a domain mismatch disposition");
+            }
+        }
+        if source_obligation.object_type != target_obligation.object_type {
+            if compatibility == "compatible" || !mismatch_codes.contains("object_type") {
+                bail!("representation reduction across object types requires an object_type mismatch");
+            }
+        }
+    }
+    if move_kind == "inequality_transfer" {
+        if source_obligation.predicate != target_obligation.predicate {
+            if compatibility == "compatible" || !mismatch_codes.contains("predicate_mismatch") {
+                bail!("inequality transfer across predicates requires a predicate_mismatch disposition");
+            }
+        } else if opposite_bound_direction(source_obligation.relation, target_obligation.relation)
+            && (compatibility == "compatible" || !mismatch_codes.contains("inequality_direction"))
+        {
+            bail!("opposite source/target inequality directions require an inequality_direction mismatch");
+        }
     }
 
     if status == "preconditions_satisfied" && compatibility != "compatible" {
