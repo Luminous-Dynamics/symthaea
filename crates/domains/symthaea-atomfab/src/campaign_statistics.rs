@@ -11,6 +11,7 @@
 
 use crate::campaign::{CampaignError, CampaignRecord, validate_target_reached_pair};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 use std::error::Error;
 use std::fmt;
@@ -18,6 +19,64 @@ use std::fmt;
 pub const PAIRED_ACCELERATION_STATS_VERSION: u16 = 1;
 pub const MINIMUM_CAMPAIGNS_FOR_ACCELERATION_INTERVAL: usize = 20;
 pub const MINIMUM_BOOTSTRAP_RESAMPLES: usize = 1_000;
+pub const SEED_MANIFEST_SCHEMA_VERSION: u16 = 1;
+
+/// Canonical, versioned roster of seeds fixed before outcome inspection.
+///
+/// Hash preimage: UTF-8 bytes of `atomfab-seed-manifest-v1\\n` followed by
+/// every unique seed in ascending decimal form, one per line. Pin this digest
+/// in the preregistration before any outcomes are examined.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SeedManifestV1 {
+    pub schema_version: u16,
+    pub seeds: Vec<u64>,
+    pub sha256: String,
+}
+
+impl SeedManifestV1 {
+    pub fn from_seeds(seeds: &[u64]) -> Result<Self, PairedAccelerationError> {
+        if seeds.len() < MINIMUM_CAMPAIGNS_FOR_ACCELERATION_INTERVAL {
+            return Err(PairedAccelerationError::TooFewCampaignPairs {
+                actual: seeds.len(),
+                minimum: MINIMUM_CAMPAIGNS_FOR_ACCELERATION_INTERVAL,
+            });
+        }
+        let mut canonical = seeds.to_vec();
+        canonical.sort_unstable();
+        if canonical.windows(2).any(|pair| pair[0] == pair[1]) {
+            return Err(PairedAccelerationError::DuplicateSeed);
+        }
+        let sha256 = seed_manifest_sha256(&canonical);
+        Ok(Self {
+            schema_version: SEED_MANIFEST_SCHEMA_VERSION,
+            seeds: canonical,
+            sha256,
+        })
+    }
+
+    pub fn validate(&self) -> Result<(), PairedAccelerationError> {
+        if self.schema_version != SEED_MANIFEST_SCHEMA_VERSION
+            || self.seeds.len() < MINIMUM_CAMPAIGNS_FOR_ACCELERATION_INTERVAL
+            || self.seeds.windows(2).any(|pair| pair[0] >= pair[1])
+        {
+            return Err(PairedAccelerationError::InvalidSeedManifest);
+        }
+        if self.sha256 != seed_manifest_sha256(&self.seeds) {
+            return Err(PairedAccelerationError::SeedManifestMismatch);
+        }
+        Ok(())
+    }
+}
+
+fn seed_manifest_sha256(seeds: &[u64]) -> String {
+    let mut canonical = String::from("atomfab-seed-manifest-v1\\n");
+    for seed in seeds {
+        canonical.push_str(&seed.to_string());
+        canonical.push('\\n');
+    }
+    format!("{:x}", Sha256::digest(canonical.as_bytes()))
+}
 
 /// Deterministic summary of matched target-reaching campaign pairs.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -26,6 +85,8 @@ pub struct PairedAccelerationSummary {
     pub schema_version: u16,
     pub baseline_policy_id: String,
     pub candidate_policy_id: String,
+    pub predeclared_seeds: Vec<u64>,
+    pub seed_manifest_sha256: String,
     pub campaign_pair_count: usize,
     pub bootstrap_resamples: usize,
     pub bootstrap_seed: u64,
@@ -46,6 +107,9 @@ pub enum PairedAccelerationError {
     TooFewCampaignPairs { actual: usize, minimum: usize },
     TooFewBootstrapResamples { actual: usize, minimum: usize },
     InvalidConfidenceLevel,
+    InvalidSeedManifest,
+    SeedManifestMismatch,
+    SeedRosterMismatch,
     DuplicateSeed,
     MismatchedCohort,
     TargetNotReached,
@@ -70,6 +134,9 @@ impl fmt::Display for PairedAccelerationError {
             Self::InvalidConfidenceLevel => {
                 write!(f, "confidence level must be finite and strictly between zero and one")
             }
+            Self::InvalidSeedManifest => write!(f, "seed manifest must be sorted, unique, versioned, and contain at least 20 seeds"),
+            Self::SeedManifestMismatch => write!(f, "seed manifest SHA-256 does not match its canonical seed roster"),
+            Self::SeedRosterMismatch => write!(f, "observed campaign seed roster does not exactly match the predeclared manifest"),
             Self::DuplicateSeed => write!(f, "each preregistered seed may appear only once"),
             Self::MismatchedCohort => write!(
                 f,
@@ -114,6 +181,7 @@ impl From<CampaignError> for PairedAccelerationError {
 /// sequence so the summary can be independently recomputed from the same records.
 pub fn bootstrap_median_acceleration(
     pairs: &[(&CampaignRecord, &CampaignRecord)],
+    seed_manifest: &SeedManifestV1,
     confidence_level: f64,
     bootstrap_resamples: usize,
     bootstrap_seed: u64,
@@ -121,11 +189,15 @@ pub fn bootstrap_median_acceleration(
     if pairs.is_empty() {
         return Err(PairedAccelerationError::EmptyPairs);
     }
+    seed_manifest.validate()?;
     if pairs.len() < MINIMUM_CAMPAIGNS_FOR_ACCELERATION_INTERVAL {
         return Err(PairedAccelerationError::TooFewCampaignPairs {
             actual: pairs.len(),
             minimum: MINIMUM_CAMPAIGNS_FOR_ACCELERATION_INTERVAL,
         });
+    }
+    if pairs.len() != seed_manifest.seeds.len() {
+        return Err(PairedAccelerationError::SeedRosterMismatch);
     }
     if bootstrap_resamples < MINIMUM_BOOTSTRAP_RESAMPLES {
         return Err(PairedAccelerationError::TooFewBootstrapResamples {
@@ -180,6 +252,10 @@ pub fn bootstrap_median_acceleration(
 
     // Canonical order makes the output invariant to the input list's ordering.
     ordered.sort_by_key(|(seed, _)| *seed);
+    let observed_seeds = ordered.iter().map(|(seed, _)| *seed).collect::<Vec<_>>();
+    if observed_seeds != seed_manifest.seeds {
+        return Err(PairedAccelerationError::SeedRosterMismatch);
+    }
     let factors = ordered.iter().map(|(_, factor)| *factor).collect::<Vec<_>>();
     let median_acceleration_factor = median(&factors);
 
@@ -213,6 +289,8 @@ pub fn bootstrap_median_acceleration(
         schema_version: PAIRED_ACCELERATION_STATS_VERSION,
         baseline_policy_id,
         candidate_policy_id,
+        predeclared_seeds: seed_manifest.seeds.clone(),
+        seed_manifest_sha256: seed_manifest.sha256.clone(),
         campaign_pair_count: pairs.len(),
         bootstrap_resamples,
         bootstrap_seed,
@@ -234,6 +312,7 @@ impl PairedAccelerationSummary {
             || self.candidate_policy_id.trim().is_empty()
             || self.baseline_policy_id == self.candidate_policy_id
             || self.campaign_pair_count < MINIMUM_CAMPAIGNS_FOR_ACCELERATION_INTERVAL
+            || self.predeclared_seeds.len() != self.campaign_pair_count
             || self.bootstrap_resamples < MINIMUM_BOOTSTRAP_RESAMPLES
             || !self.confidence_level.is_finite()
             || !(0.0..1.0).contains(&self.confidence_level)
@@ -253,6 +332,14 @@ impl PairedAccelerationSummary {
         {
             return Err(PairedAccelerationError::InvalidSummary);
         }
+        let manifest = SeedManifestV1 {
+            schema_version: SEED_MANIFEST_SCHEMA_VERSION,
+            seeds: self.predeclared_seeds.clone(),
+            sha256: self.seed_manifest_sha256.clone(),
+        };
+        manifest
+            .validate()
+            .map_err(|_| PairedAccelerationError::InvalidSummary)?;
         Ok(())
     }
 }
@@ -380,11 +467,33 @@ mod tests {
         baseline.iter().zip(candidate).collect()
     }
 
+    fn seed_manifest(count: usize) -> SeedManifestV1 {
+        let seeds = (1..=count as u64).collect::<Vec<_>>();
+        SeedManifestV1::from_seeds(&seeds).unwrap()
+    }
+
+    fn summarize(
+        pairs: &[(&CampaignRecord, &CampaignRecord)],
+        count: usize,
+        confidence: f64,
+        resamples: usize,
+        seed: u64,
+    ) -> Result<PairedAccelerationSummary, PairedAccelerationError> {
+        bootstrap_median_acceleration(
+            pairs,
+            &seed_manifest(count),
+            confidence,
+            resamples,
+            seed,
+        )
+    }
+
     #[test]
     fn constant_two_x_acceleration_has_exact_interval() {
         let (baseline, candidate) = make_pairs(&[2.0; 20], true);
-        let summary = bootstrap_median_acceleration(
+        let summary = summarize(
             &references(&baseline, &candidate),
+            20,
             0.95,
             2_000,
             17,
@@ -403,13 +512,13 @@ mod tests {
         let ratios = (0..20).map(|index| 0.8 + index as f64 * 0.07).collect::<Vec<_>>();
         let (baseline, candidate) = make_pairs(&ratios, true);
         let pairs = references(&baseline, &candidate);
-        let forward = bootstrap_median_acceleration(&pairs, 0.95, 4_000, 123).unwrap();
+        let forward = summarize(&pairs, 20, 0.95, 4_000, 123).unwrap();
         let reversed = pairs.iter().rev().copied().collect::<Vec<_>>();
-        let backward = bootstrap_median_acceleration(&reversed, 0.95, 4_000, 123).unwrap();
+        let backward = summarize(&reversed, 20, 0.95, 4_000, 123).unwrap();
         assert_eq!(forward, backward);
         assert_eq!(
             forward,
-            bootstrap_median_acceleration(&pairs, 0.95, 4_000, 123).unwrap()
+            summarize(&pairs, 20, 0.95, 4_000, 123).unwrap()
         );
     }
 
@@ -420,8 +529,9 @@ mod tests {
         baseline[7].terminal_status = CampaignStatus::Failed;
         baseline[7].target_reached = false;
         baseline[7].failure_reasons = vec!["budget_exhausted".to_owned()];
-        let err = bootstrap_median_acceleration(
+        let err = summarize(
             &references(&baseline, &candidate),
+            20,
             0.95,
             2_000,
             1,
@@ -436,14 +546,14 @@ mod tests {
         let mut pairs = references(&baseline, &candidate);
         pairs[1] = (&baseline[0], &candidate[0]);
         assert_eq!(
-            bootstrap_median_acceleration(&pairs, 0.95, 2_000, 3).unwrap_err(),
+            summarize(&pairs, 20, 0.95, 2_000, 3).unwrap_err(),
             PairedAccelerationError::DuplicateSeed
         );
 
         let (baseline, mut candidate) = make_pairs(&[2.0; 20], true);
         candidate[5].model_digest = "7".repeat(64);
         assert_eq!(
-            bootstrap_median_acceleration(&references(&baseline, &candidate), 0.95, 2_000, 3)
+            summarize(&references(&baseline, &candidate), 19, 0.95, 2_000, 3)
                 .unwrap_err(),
             PairedAccelerationError::InvalidCampaign(CampaignError::MismatchedPolicies)
         );
@@ -489,10 +599,29 @@ mod tests {
     }
 
     #[test]
+    fn seed_manifest_is_canonical_and_roster_mismatch_blocks_summary() {
+        let manifest = SeedManifestV1::from_seeds(&(101..=120).rev().collect::<Vec<_>>())
+            .unwrap();
+        assert_eq!(
+            manifest.sha256,
+            "c8dd76e3828125d3984e95bef0cd50603cee2bef7933f1fec178866dd973ba59"
+        );
+        assert_eq!(manifest.seeds, (101..=120).collect::<Vec<_>>());
+        manifest.validate().unwrap();
+
+        let (baseline, candidate) = make_pairs(&[2.0; 20], true);
+        let pairs = references(&baseline, &candidate);
+        assert_eq!(
+            bootstrap_median_acceleration(&pairs, &manifest, 0.95, 2_000, 17).unwrap_err(),
+            PairedAccelerationError::SeedRosterMismatch
+        );
+    }
+
+    #[test]
     fn minimum_sample_and_configuration_gates_are_enforced() {
         let (baseline, candidate) = make_pairs(&[2.0; 19], true);
         assert_eq!(
-            bootstrap_median_acceleration(&references(&baseline, &candidate), 0.95, 2_000, 3)
+            summarize(&references(&baseline, &candidate), 20, 0.95, 2_000, 3)
                 .unwrap_err(),
             PairedAccelerationError::TooFewCampaignPairs {
                 actual: 19,
@@ -503,11 +632,11 @@ mod tests {
         let (baseline, candidate) = make_pairs(&[2.0; 20], true);
         let pairs = references(&baseline, &candidate);
         assert_eq!(
-            bootstrap_median_acceleration(&pairs, 1.0, 2_000, 3).unwrap_err(),
+            summarize(&pairs, 20, 1.0, 2_000, 3).unwrap_err(),
             PairedAccelerationError::InvalidConfidenceLevel
         );
         assert_eq!(
-            bootstrap_median_acceleration(&pairs, 0.95, 999, 3).unwrap_err(),
+            summarize(&pairs, 20, 0.95, 999, 3).unwrap_err(),
             PairedAccelerationError::TooFewBootstrapResamples {
                 actual: 999,
                 minimum: MINIMUM_BOOTSTRAP_RESAMPLES
