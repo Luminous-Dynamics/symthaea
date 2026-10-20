@@ -39,13 +39,15 @@ Use `schema_version = "pitb.baseline-selection.v0"` with:
 
 - `selected_split = "validation"`;
 - `metric = "semantic_gate_success_rate"`;
-- `arm_scores` containing **exactly** A, B, C, D, and E;
-- `selected_arm` equal to the highest score, with exact ties broken by alphabetical arm ID;
+- `arm_scores` containing **exactly** A, B, C, D, E, and I;
+- `selected_arm` equal to the highest score across A–E and I, with exact ties broken by alphabetical arm ID;
 - `tie_break_rule = "highest score; alphabetical arm ID on exact tie"`;
 - `frozen_before_test = true`;
 - `test_outcomes_seen_before_selection = false`.
 
 The receipt is a provenance assertion whose exact bytes are hashed into the frozen config. Keep the underlying validation outcomes and selection code beside it so a reviewer can recompute the scores. The test analyzer verifies the declared score/selection consistency, but cannot infer from a boolean that a hidden test partition was never inspected.
+
+Arm I is the strong premise-retrieval comparator. Freeze its implementation/commit, corpus snapshot, index digest, candidate count, and remote/local model identifier before test outcomes. The LeanSearch v2 paper's retrieval and downstream metrics are context only: use its adapter only when it actually supports the exact target tasks; otherwise use the named, pinned same-corpus global-premise implementation and report that implementation separately. Do not state that the paper's scores have been reproduced unless they have been rerun under the published setup.
 
 ## Target outcome JSONL
 
@@ -80,7 +82,7 @@ The primary effect is the signed percentage-point difference:
 ```text
 semantic-gate success rate (F: typed insight)
   minus
-semantic-gate success rate (validation-selected baseline in A-E)
+semantic-gate success rate (validation-selected baseline in A-E or I)
 ```
 
 The 95% percentile interval uses exactly 10,000 deterministic paired bootstrap replicates, resampling **families** with replacement and retaining each sampled family's aggregate paired-delta sum and target count. The implementation uses SplitMix64 seeded from the frozen run config and linearly interpolated 2.5th/97.5th percentiles. The preregistered utility gate passes only when the point estimate is at least +10 percentage points, the lower confidence bound is above zero, and at least 20 eligible independent family clusters are present. Fewer than 20 clusters forces an `underpowered_too_few_independent_family_clusters` decision regardless of the estimate or interval. Twenty is a conservative project-specific floor, not proof of adequate power; simulation-based power planning for the actual baseline rate and cluster-size distribution is still mandatory. A missing gate is never fixed by post-hoc baseline substitution or a relaxed interval.
