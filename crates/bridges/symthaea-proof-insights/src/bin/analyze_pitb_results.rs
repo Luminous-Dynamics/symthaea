@@ -613,8 +613,7 @@ fn execute_power(args: &BTreeMap<String, String>) -> Result<()> {
     let estimated_power_at_20pp_and_icc_020_lower_95 =
         twenty_point_scenario.and_then(|scenario| scenario.estimated_power_lower_95);
     let power_gate_passed = family_target_counts.len() >= MIN_CONFIRMATORY_FAMILY_CLUSTERS
-        && estimated_power_at_20pp_and_icc_020_lower_95
-            .is_some_and(|power| power >= 0.80)
+        && estimated_power_at_20pp_and_icc_020_lower_95.is_some_and(|power| power >= 0.80)
         && null_effect_false_claim_probability_upper_95_max.is_some_and(|rate| rate <= 0.05);
 
     let interpretation = if power_gate_passed {
@@ -709,9 +708,11 @@ fn wilson_interval(successes: usize, trials: usize) -> (f64, f64) {
     let z_squared = z * z;
     let denominator = 1.0 + z_squared / n;
     let center = (p + z_squared / (2.0 * n)) / denominator;
-    let half_width =
-        z * (p * (1.0 - p) / n + z_squared / (4.0 * n * n)).sqrt() / denominator;
-    ((center - half_width).max(0.0), (center + half_width).min(1.0))
+    let half_width = z * (p * (1.0 - p) / n + z_squared / (4.0 * n * n)).sqrt() / denominator;
+    (
+        (center - half_width).max(0.0),
+        (center + half_width).min(1.0),
+    )
 }
 
 fn simulate_power_scenario(
