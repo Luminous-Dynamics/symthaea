@@ -53,6 +53,7 @@ jobs:
           rustfmt --edition 2024 --check crates/domains/symthaea-culinary/src/bin/beverage_benchmark_receipt.rs
           rustfmt --edition 2024 --check crates/domains/symthaea-culinary/src/bin/wine_quality_source_audit.rs
           rustfmt --edition 2024 --check crates/domains/symthaea-culinary/src/bin/fermentation_time_series_audit.rs
+          rustfmt --edition 2024 --check tools/beverage-benchmark-harness/src/bin/schema_contract_audit.rs
 
       - name: Test synthetic receipt contract
         run: cargo test --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin beverage_benchmark_receipt
@@ -63,11 +64,23 @@ jobs:
       - name: Test fermentation time-series intake auditor
         run: cargo test --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin fermentation_time_series_audit
 
+      - name: Test full Draft 2020-12 schema auditor
+        run: cargo test --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin schema_contract_audit
+
+      - name: Independently validate synthetic corpus schema
+        run: |
+          cargo run --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin schema_contract_audit -- \
+            --schema docs/research/beverage-engineering-scenarios-v1.schema.json \
+            --instance docs/research/beverage-engineering-scenarios-v1.json \
+            --out "$RUNNER_TEMP/beverage-schema-receipt.json"
+          cat "$RUNNER_TEMP/beverage-schema-receipt.json"
+
       - name: Clippy focused runners
         run: |
           cargo clippy --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin beverage_benchmark_receipt -- -D warnings
           cargo clippy --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin wine_quality_source_audit -- -D warnings
           cargo clippy --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin fermentation_time_series_audit -- -D warnings
+          cargo clippy --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin schema_contract_audit -- -D warnings
 
       - name: Emit exact-head receipt
         env:
