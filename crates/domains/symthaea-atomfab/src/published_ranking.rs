@@ -305,6 +305,25 @@ mod tests {
     }
 
     #[test]
+    fn serialized_metrics_match_the_versioned_report_schema() {
+        let schema: serde_json::Value = serde_json::from_str(include_str!(
+            "../schemas/published-ranking-metrics-v1.schema.json"
+        ))
+        .expect("published ranking metric schema must parse");
+        assert_eq!(schema["properties"]["schema_version"]["const"], 1);
+        assert_eq!(schema["properties"]["rbo_persistence"]["exclusiveMinimum"], 0);
+        assert_eq!(schema["properties"]["extrapolated_rbo"]["maximum"], 1);
+        assert_eq!(schema["properties"]["kendall_tau_b"]["minimum"], -1);
+
+        let predicted = energies(&[("a", -2.0), ("b", -1.0)]);
+        let report = compare_published_rankings(&predicted, &predicted, 0.94, 0.0).unwrap();
+        let json = serde_json::to_value(&report).unwrap();
+        let round_trip: PublishedRankingMetrics = serde_json::from_value(json).unwrap();
+        assert_eq!(round_trip, report);
+        round_trip.validate().unwrap();
+    }
+
+    #[test]
     fn identical_rankings_have_unit_rbo_and_tau() {
         let predicted = energies(&[("a", -3.0), ("b", -2.0), ("c", -1.0)]);
         let reference = predicted.clone();
