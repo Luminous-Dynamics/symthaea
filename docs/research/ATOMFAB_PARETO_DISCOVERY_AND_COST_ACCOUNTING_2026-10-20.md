@@ -39,6 +39,13 @@ For a first benchmark, freeze task-specific structure identities, relaxation set
 - Compare against a pinned domain-specific baseline (DP-UniAlCu where access and terms permit), pinned universal baselines (e.g., MACE-OMAT and MatterSim versions compatible with the task), randomized/local search, and the same potential with Symthaea's selection logic disabled.
 - Do not claim state-of-the-art superiority until the exact task, source data, checkpoint, calculation settings, evaluator, compute budget, and baseline results are independently reproduced.
 
+
+## Published ranking parity: RBO and Kendall tau-b
+
+The 2026 paper reports both rank-biased overlap (RBO, with persistence p=0.94) and Kendall's tau for model-vs-DFT energy rankings over the same DFT-refined candidate set. AtomFab's existing normalized finite-prefix RBO-style metric intentionally implements a different finite-prefix contract, so it must not be labelled as the paper's exact RBO result. A new pure Rust module, `published_ranking.rs`, separately computes finite-list extrapolated RBO and tie-aware Kendall tau-b on the identical canonical candidate universe. Exact RBO ties break by canonical structure ID; Kendall tau-b uses the frozen energy tie tolerance. Discovery-set Jaccard remains separate: the ranking metrics are undefined for different candidate sets, not a substitute for measuring unique discoveries. [Xu et al. (2026), Methods and Table 2](https://doi.org/10.1038/s41524-026-02043-8).
+
+Artifacts: `crates/domains/symthaea-atomfab/src/published_ranking.rs` and `schemas/published-ranking-metrics-v1.schema.json`. Hand-calculated tests cover identical rankings (RBO=1, tau-b=1), reversed rankings, energy ties, mismatched candidate IDs, duplicates, and non-finite energies. Exact-head CI still needs to validate this new module before it is counted as passed.
+
 ## Implementation
 
 - Rust module: `decision_frontier.rs`
