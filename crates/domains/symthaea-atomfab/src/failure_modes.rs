@@ -215,8 +215,9 @@ impl FailureModeSummary {
     }
 }
 
-/// Summarize one matched model/family/split campaign scope, never a mixture of
-/// unlike models or evaluation partitions. Counts retain their denominators;
+/// Summarize one matched model/family/stratum/split campaign scope, never a
+/// mixture of unlike models, support surfaces, particle sizes or evaluation
+/// partitions. Counts retain their denominators;
 /// no aggregate mean may hide a critical failure. Abstentions are not failures,
 /// though their reasons remain visible.
 pub fn summarize_failure_modes(
