@@ -7,18 +7,22 @@ on:
       - "Cargo.toml"
       - "Cargo.lock"
       - "crates/domains/symthaea-culinary/**"
+      - "tools/beverage-benchmark-harness/**"
       - "docs/research/BEVERAGE_ENGINEERING_BENCHMARK_V1.md"
       - "docs/research/beverage-engineering-scenarios-v1.json"
       - "docs/research/beverage-engineering-scenarios-v1.schema.json"
+      - "docs/research/beverage-data-sources-v1.json"
       - ".github/workflows/beverage-benchmark.yml"
   pull_request:
     paths:
       - "Cargo.toml"
       - "Cargo.lock"
       - "crates/domains/symthaea-culinary/**"
+      - "tools/beverage-benchmark-harness/**"
       - "docs/research/BEVERAGE_ENGINEERING_BENCHMARK_V1.md"
       - "docs/research/beverage-engineering-scenarios-v1.json"
       - "docs/research/beverage-engineering-scenarios-v1.schema.json"
+      - "docs/research/beverage-data-sources-v1.json"
       - ".github/workflows/beverage-benchmark.yml"
   workflow_dispatch:
 
