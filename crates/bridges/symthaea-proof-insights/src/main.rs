@@ -1685,6 +1685,7 @@ mod tests {
                     proof_completion_commit: commit_two.clone(),
                     statement_sha256: statement_one.clone(),
                     statement_artifact_id: "statement-000".to_string(),
+                    completion_statement_artifact_id: "completion-statement-000".to_string(),
                     proof_artifact_id: "proof-000".to_string(),
                     visible_artifact_ids: vec!["statement-000".to_string()],
                 },
@@ -1696,6 +1697,7 @@ mod tests {
                     proof_completion_commit: commit_three.clone(),
                     statement_sha256: statement_two.clone(),
                     statement_artifact_id: "statement-001".to_string(),
+                    completion_statement_artifact_id: "completion-statement-001".to_string(),
                     proof_artifact_id: "proof-001".to_string(),
                     visible_artifact_ids: vec![
                         "statement-000".to_string(),
@@ -1732,6 +1734,19 @@ mod tests {
                     theorem_id: Some("Example.first".to_string()),
                 },
                 TemporalEvidenceArtifact {
+                    artifact_id: "completion-statement-000".to_string(),
+                    path: "lean/Example.lean".to_string(),
+                    artifact_kind: "completion_statement".to_string(),
+                    content_sha256: statement_one.clone(),
+                    content_start_line: 1,
+                    content_end_line: 1,
+                    source_file_sha256: source_two.clone(),
+                    source_commit: commit_two.clone(),
+                    available_at_position: None,
+                    target_position: Some(0),
+                    theorem_id: Some("Example.first".to_string()),
+                },
+                TemporalEvidenceArtifact {
                     artifact_id: "statement-001".to_string(),
                     path: "lean/Example.lean".to_string(),
                     artifact_kind: "theorem_statement".to_string(),
@@ -1742,6 +1757,19 @@ mod tests {
                     source_commit: commit_two.clone(),
                     available_at_position: Some(1),
                     target_position: None,
+                    theorem_id: Some("Example.second".to_string()),
+                },
+                TemporalEvidenceArtifact {
+                    artifact_id: "completion-statement-001".to_string(),
+                    path: "lean/Example.lean".to_string(),
+                    artifact_kind: "completion_statement".to_string(),
+                    content_sha256: statement_two.clone(),
+                    content_start_line: 3,
+                    content_end_line: 3,
+                    source_file_sha256: source_four.clone(),
+                    source_commit: commit_three.clone(),
+                    available_at_position: None,
+                    target_position: Some(1),
                     theorem_id: Some("Example.second".to_string()),
                 },
                 TemporalEvidenceArtifact {
@@ -1878,6 +1906,7 @@ mod tests {
                     "proof_completion_commit": commit_two,
                     "statement_sha256": statement_one_sha,
                     "statement_artifact_id": "statement-000",
+                    "completion_statement_artifact_id": "completion-statement-000",
                     "proof_artifact_id": "proof-000",
                     "visible_artifact_ids": ["statement-000"]
                 },
@@ -1889,6 +1918,7 @@ mod tests {
                     "proof_completion_commit": commit_three,
                     "statement_sha256": statement_two_sha,
                     "statement_artifact_id": "statement-001",
+                    "completion_statement_artifact_id": "completion-statement-001",
                     "proof_artifact_id": "proof-001",
                     "visible_artifact_ids": ["statement-000", "proof-000", "statement-001"]
                 }
@@ -1921,6 +1951,19 @@ mod tests {
                     "theorem_id": "Example.first"
                 },
                 {
+                    "artifact_id": "completion-statement-000",
+                    "path": "lean/Example.lean",
+                    "artifact_kind": "completion_statement",
+                    "content_sha256": statement_one_sha,
+                    "content_start_line": 1,
+                    "content_end_line": 1,
+                    "source_file_sha256": source_two_sha,
+                    "source_commit": commit_two,
+                    "available_at_position": null,
+                    "target_position": 0,
+                    "theorem_id": "Example.first"
+                },
+                {
                     "artifact_id": "statement-001",
                     "path": "lean/Example.lean",
                     "artifact_kind": "theorem_statement",
@@ -1931,6 +1974,19 @@ mod tests {
                     "source_commit": commit_two,
                     "available_at_position": 1,
                     "target_position": null,
+                    "theorem_id": "Example.second"
+                },
+                {
+                    "artifact_id": "completion-statement-001",
+                    "path": "lean/Example.lean",
+                    "artifact_kind": "completion_statement",
+                    "content_sha256": statement_two_sha,
+                    "content_start_line": 3,
+                    "content_end_line": 3,
+                    "source_file_sha256": source_three_sha,
+                    "source_commit": commit_three,
+                    "available_at_position": null,
+                    "target_position": 1,
                     "theorem_id": "Example.second"
                 },
                 {
