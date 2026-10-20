@@ -308,14 +308,15 @@ fn dominates(left: &FrontierCandidate, right: &FrontierCandidate) -> bool {
         left.best_validated_objective,
         right.best_validated_objective,
     ) {
-        (None, None) => true,
+        (None, None) | (Some(_), None) => true,
         (Some(a), Some(b)) => match left.objective_direction {
             ObjectiveDirection::Maximize => a >= b,
             ObjectiveDirection::Minimize => a <= b,
         },
-        // Validation enforces that no objective exists when discoveries are zero,
-        // so this mismatch can only occur if a future caller bypasses validation.
-        _ => false,
+        // A candidate without validated discoveries cannot dominate one that
+        // has a validated objective; the inverse is allowed because the
+        // discovery-count dimension already favors the candidate with results.
+        (None, Some(_)) => false,
     };
     let objective_better = match (
         left.best_validated_objective,
@@ -501,6 +502,35 @@ mod tests {
         );
     }
 
+
+    #[test]
+    fn a_validated_discovery_can_dominate_a_zero_discovery_policy() {
+        let empty = candidate("empty", 0, None, 100);
+        let discovered = candidate("discovered", 1, Some(-3.10), 80);
+        let report = build_decision_frontier(&[empty, discovered])
+            .expect("zero-discovery policies remain comparable on defined dimensions");
+        assert_eq!(
+            report
+                .entries
+                .iter()
+                .find(|entry| entry.policy_id == "empty")
+                .unwrap()
+                .disposition,
+            FrontierDisposition::Dominated {
+                dominated_by: vec!["discovered".to_owned()]
+            }
+        );
+        assert_eq!(
+            report
+                .entries
+                .iter()
+                .find(|entry| entry.policy_id == "discovered")
+                .unwrap()
+                .disposition,
+            FrontierDisposition::ParetoFrontier
+        );
+    }
+
     #[test]
     fn illustrative_fixture_builds_safety_gated_pareto_frontier() {
         let fixture: serde_json::Value = serde_json::from_str(include_str!(
@@ -547,12 +577,12 @@ mod tests {
             }
         );
         assert!(matches!(
-            lookup("unsafe").disposition,
-            FrontierDisposition::Ineligible { .. }
+            &lookup("unsafe").disposition,
+            &FrontierDisposition::Ineligible { .. }
         ));
         assert!(matches!(
-            lookup("unassessed").disposition,
-            FrontierDisposition::Ineligible { .. }
+            &lookup("unassessed").disposition,
+            &FrontierDisposition::Ineligible { .. }
         ));
 
         let result_bytes = serde_json::to_vec(&report).expect("report should serialize");
