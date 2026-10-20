@@ -98,7 +98,7 @@
         },
         "related_dataset_artifacts": {
           "type": "array",
-          "minItems": 2,
+          "minItems": 4,
           "items": {
             "type": "object",
             "required": [
@@ -106,7 +106,9 @@
               "source_record_md5",
               "sha256",
               "bytes",
-              "status"
+              "status",
+              "evaluation_role",
+              "independent_test_disposition"
             ],
             "properties": {
               "filename": {
@@ -135,10 +137,26 @@
                   "not_downloaded",
                   "materialized"
                 ]
+              },
+              "evaluation_role": {
+                "enum": [
+                  "training_validation_source",
+                  "published_reference_structure_source",
+                  "training_configuration_source",
+                  "reference_calculation_input_source"
+                ]
+              },
+              "independent_test_disposition": {
+                "enum": [
+                  "not_independent_for_models_trained_on_archive",
+                  "audit_overlap_before_test_use",
+                  "not_evaluation_data"
+                ]
               }
             },
             "additionalProperties": false
-          }
+          },
+          "uniqueItems": false
         },
         "published_evaluation_manifest": {
           "type": "object",
