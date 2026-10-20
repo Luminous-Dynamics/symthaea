@@ -8,7 +8,7 @@
 AtomFab must not collapse discovery count, best validated material objective, and cost into one hand-tuned scalar. A weighted score can hide a policy that discovers more structures but produces worse minima, or a policy that finds a good result only by spending more. The new Rust decision-frontier kernel instead reports nondominated policies in three declared dimensions:
 
 1. **Discovery breadth:** maximize unique structures that passed the frozen reference validator.
-2. **Validated objective:** optimize the best objective among those discoveries in its declared direction and unit, with a preregistered tie tolerance.
+2. **Validated objective:** optimize the best objective among those discoveries in its declared direction and unit; the preregistered tolerance defines a meaningful improvement threshold, while no-worse comparisons remain direction-correct to keep dominance transitive.
 3. **Total cost:** minimize integer fixed-resolution cost units, with an explicit unit.
 
 Wall time and the number of reference calculations remain visible in each candidate record but are not silently converted into extra weighted objectives. A benchmark may add a distinct time-efficiency analysis when the hardware/environment is fixed. This preserves interpretability instead of inventing a universal scalar.
