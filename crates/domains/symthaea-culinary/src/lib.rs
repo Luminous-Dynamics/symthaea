@@ -34,6 +34,7 @@
 
 pub mod balance;
 pub mod cookware;
+pub mod cookware_lifetime;
 pub mod data;
 pub mod dynamics;
 pub mod flavor_network;
