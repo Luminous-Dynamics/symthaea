@@ -318,9 +318,12 @@ fn derive_route_result(case: &RouteCase) -> GateResult {
         reasons.push("DUPLICATE_REQUIREMENT_CAPABILITY".into());
     }
 
-    let route_set: BTreeSet<&str> = route_caps.iter().map(String::as_str).collect();
-    for capability in required_caps.iter().collect::<BTreeSet<_>>() {
-        if !route_set.contains(capability.as_str()) {
+    let route_set: BTreeSet<String> = route_caps.iter().cloned().collect();
+    let mut unique_requirements = required_caps.clone();
+    unique_requirements.sort();
+    unique_requirements.dedup();
+    for capability in unique_requirements {
+        if !route_set.contains(&capability) {
             reasons.push(format!("CAPABILITY_MISSING:{capability}"));
         }
     }
