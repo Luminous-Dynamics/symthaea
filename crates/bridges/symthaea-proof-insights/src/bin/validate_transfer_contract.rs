@@ -232,19 +232,19 @@ fn validate_candidate(candidate: &Value) -> Result<()> {
     }
 
     if move_kind == "representation_reduction" {
-        if source_obligation.domain != target_obligation.domain {
-            if compatibility == "compatible" || !mismatch_codes.contains("domain_mismatch") {
-                bail!(
-                    "representation reduction across domains requires a domain mismatch disposition"
-                );
-            }
+        if source_obligation.domain != target_obligation.domain
+            && (compatibility == "compatible" || !mismatch_codes.contains("domain_mismatch"))
+        {
+            bail!(
+                "representation reduction across domains requires a domain mismatch disposition"
+            );
         }
-        if source_obligation.object_type != target_obligation.object_type {
-            if compatibility == "compatible" || !mismatch_codes.contains("object_type") {
-                bail!(
-                    "representation reduction across object types requires an object_type mismatch"
-                );
-            }
+        if source_obligation.object_type != target_obligation.object_type
+            && (compatibility == "compatible" || !mismatch_codes.contains("object_type"))
+        {
+            bail!(
+                "representation reduction across object types requires an object_type mismatch"
+            );
         }
     }
     if move_kind == "inequality_transfer" {
