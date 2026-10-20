@@ -65,3 +65,12 @@ analyze_leaderboard requires model-ID and independent-unit-ID inventories from a
 ### Calibration-efficiency non-inferiority gate
 
 The calibration module evaluates one preregistered contrast: candidate model at a smaller calibration budget versus a reference at the larger budget, on exactly matched held-out participants. It requires an explicit unit such as labelled_examples or minutes and reports the budget reduction, paired score interval and one of SupportsNonInferiority, EvidenceOfInferiority or Inconclusive against a declared absolute margin. It does not search budgets on the final test set, train/adapt a model, or establish clinical benefit. The synthetic tests are authored; Rust compilation/execution remains unverified.
+
+
+### Preregistered robustness battery
+
+The `robustness` module compares pre-aggregated decoder scores over a frozen clean-plus-perturbation scenario inventory. It requires a complete model × scenario grid, rejects duplicate/unexpected rows, and reports equal-weighted mean perturbed score, worst-case scenario score, per-scenario candidate-versus-baseline deltas, and degradation from each model's clean reference. A candidate must be evaluated against both a mean-score floor and a worst-case degradation limit; the latter prevents a high average from hiding a severe failure in one scenario.
+
+The scenario families include channel dropout, amplitude scaling, additive artifact, packet loss, temporal jitter, session shift, reference shift, and montage shift. Scenario definitions and severity levels must be selected and frozen before final test results are inspected; severity is an ordinal level within each family, not a universal physical unit. All score rows must use the same held-out evaluation units and upstream aggregation protocol.
+
+This module reports point estimates only. It does not create realistic EEG perturbations or calculate confidence intervals. Use paired unit-level bootstrap inference separately, and record each perturbation's construction and parameter values in the benchmark manifest. Suggested research gate: at matched task-success level, aim for at least 30% fewer false activations under a preregistered channel-loss/artifact/drift battery, while also reporting worst-case balanced accuracy, abstention coverage/risk, and per-participant outcomes. This is a target, not a measured result. The five new robustness-specific fixtures are authored but remain uncompiled and unexecuted until a Rust toolchain is available.
