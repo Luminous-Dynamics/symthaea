@@ -6,7 +6,11 @@ use std::path::Path;
 use std::process::Command;
 
 fn command_line(program: OsString, args: &[&str], cwd: &Path) -> Option<String> {
-    let output = Command::new(program).args(args).current_dir(cwd).output().ok()?;
+    let output = Command::new(program)
+        .args(args)
+        .current_dir(cwd)
+        .output()
+        .ok()?;
     if !output.status.success() {
         return None;
     }
@@ -45,7 +49,13 @@ fn hash_evaluator_sources(manifest_dir: &Path) -> Option<String> {
 fn main() {
     println!("cargo:rerun-if-env-changed=RUSTC");
     println!("cargo:rerun-if-env-changed=CARGO");
-    for path in ["Cargo.toml", "Cargo.lock", "build.rs", "src/lib.rs", "src/main.rs"] {
+    for path in [
+        "Cargo.toml",
+        "Cargo.lock",
+        "build.rs",
+        "src/lib.rs",
+        "src/main.rs",
+    ] {
         println!("cargo:rerun-if-changed={path}");
     }
 
@@ -54,19 +64,15 @@ fn main() {
         .expect("Cargo sets CARGO_MANIFEST_DIR");
 
     let rustc = env::var_os("RUSTC").unwrap_or_else(|| OsString::from("rustc"));
-    let rustc_identity = command_line(rustc, &["-Vv"], &manifest_dir)
-        .unwrap_or_else(|| "unavailable".to_owned());
+    let rustc_identity =
+        command_line(rustc, &["-Vv"], &manifest_dir).unwrap_or_else(|| "unavailable".to_owned());
 
     let cargo = env::var_os("CARGO").unwrap_or_else(|| OsString::from("cargo"));
     let cargo_identity = command_line(cargo, &["--version"], &manifest_dir)
         .unwrap_or_else(|| "unavailable".to_owned());
 
-    let source_commit = command_line(
-        OsString::from("git"),
-        &["rev-parse", "HEAD"],
-        &manifest_dir,
-    )
-    .unwrap_or_else(|| "unavailable".to_owned());
+    let source_commit = command_line(OsString::from("git"), &["rev-parse", "HEAD"], &manifest_dir)
+        .unwrap_or_else(|| "unavailable".to_owned());
 
     let source_tree_state = match command_line(
         OsString::from("git"),
@@ -78,8 +84,8 @@ fn main() {
         None => "unavailable",
     };
 
-    let source_sha256 = hash_evaluator_sources(&manifest_dir)
-        .unwrap_or_else(|| "unavailable".to_owned());
+    let source_sha256 =
+        hash_evaluator_sources(&manifest_dir).unwrap_or_else(|| "unavailable".to_owned());
 
     let lock_sha256 = fs::read(manifest_dir.join("Cargo.lock"))
         .map(|bytes| sha256_hex(&bytes))
