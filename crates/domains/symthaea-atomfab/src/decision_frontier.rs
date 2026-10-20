@@ -120,11 +120,6 @@ impl FrontierCandidate {
             (_, Some(value)) if !value.is_finite() => return Err(FrontierError::InvalidObjective),
             _ => {}
         }
-        if self.reference_calculation_count > u64::MAX {
-            // Keep the field explicit in the contract; this branch intentionally
-            // has no practical path on current Rust targets.
-            return Err(FrontierError::InvalidCost);
-        }
         Ok(())
     }
 }
