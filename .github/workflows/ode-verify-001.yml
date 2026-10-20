@@ -1,0 +1,39 @@
+name: ODE Verification 001
+
+on:
+  pull_request:
+    paths:
+      - "crates/core/symthaea-core/src/hdc/dynamical_system.rs"
+      - "research/ode-verify-001/**"
+      - ".github/workflows/ode-verify-001.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ode-verify-001-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  isolated-numerical-suite:
+    name: Isolated ODE tests and strict Clippy
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Format
+        run: cargo fmt --manifest-path research/ode-verify-001/Cargo.toml -- --check
+
+      - name: Unit and numerical verification tests
+        run: cargo test --locked --manifest-path research/ode-verify-001/Cargo.toml
+
+      - name: Strict Clippy
+        run: cargo clippy --locked --manifest-path research/ode-verify-001/Cargo.toml --all-targets -- -D warnings
