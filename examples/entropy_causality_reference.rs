@@ -263,20 +263,51 @@ fn xor_synergy(noise: f64) -> Network {
     )
 }
 
+fn and_circuit(noise: f64) -> Network {
+    Network::new(
+        vec![
+            Rule::Copy { from: 0 },
+            Rule::Copy { from: 1 },
+            Rule::And { left: 0, right: 1 },
+        ],
+        noise,
+    )
+}
+
+fn feed_forward_chain(nodes: usize, noise: f64) -> Network {
+    assert!(nodes >= 2);
+    Network::new(
+        (0..nodes)
+            .map(|i| Rule::Copy { from: if i == 0 { 0 } else { i - 1 } })
+            .collect(),
+        noise,
+    )
+}
+
 fn main() {
-    let cases = [
-        ("independent_max_noise", self_memory(3, 0.5)),
-        ("recurrent_ring_no_noise", directed_ring(3, 0.0)),
-        ("common_driver_no_noise", common_driver(3, 0.0)),
-        ("xor_synergy_no_noise", xor_synergy(0.0)),
-        ("ring_noise_10pct", directed_ring(3, 0.1)),
+    let mut cases: Vec<(String, Network)> = vec![
+        ("independent_max_noise".to_string(), self_memory(3, 0.5)),
+        ("recurrent_ring_no_noise".to_string(), directed_ring(3, 0.0)),
+        ("common_driver_no_noise".to_string(), common_driver(3, 0.0)),
+        ("feed_forward_chain_no_noise".to_string(), feed_forward_chain(4, 0.0)),
+        ("xor_synergy_no_noise".to_string(), xor_synergy(0.0)),
+        ("and_synergy_no_noise".to_string(), and_circuit(0.0)),
     ];
 
-    println!("network\tnodes\tH_next_bits\tH_next_given_prev_bits\tI_prev_next_bits\tmin_cut_sensitivity_tv");
+    // Sweep noise explicitly instead of assuming entropy and integration share
+    // one monotonic relationship.
+    for noise in [0.0, 0.05, 0.10, 0.20, 0.35, 0.50] {
+        cases.push((
+            format!("ring_noise_{:.2}", noise),
+            directed_ring(3, noise),
+        ));
+    }
+
+    println!("network\\tnodes\\tH_next_bits\\tH_next_given_prev_bits\\tI_prev_next_bits\\tmin_cut_sensitivity_tv");
     for (name, network) in cases {
         let m = measure(&network);
         println!(
-            "{name}\t{}\t{:.6}\t{:.6}\t{:.6}\t{:.6}",
+            "{name}\\t{}\\t{:.6}\\t{:.6}\\t{:.6}\\t{:.6}",
             m.nodes,
             m.state_entropy_bits,
             m.transition_entropy_bits,
@@ -336,6 +367,28 @@ mod tests {
         close(metrics.transition_entropy_bits, 4.0, 1e-12);
         close(metrics.mutual_information_bits, 0.0, 1e-12);
         close(metrics.min_cut_sensitivity, 0.0, 1e-12);
+    }
+
+    #[test]
+    fn common_driver_has_dependence_without_mutual_causation_between_children() {
+        let metrics = measure(&common_driver(3, 0.0));
+        close(metrics.state_entropy_bits, 1.0, 1e-12);
+        close(metrics.transition_entropy_bits, 0.0, 1e-12);
+        close(metrics.mutual_information_bits, 1.0, 1e-12);
+        close(metrics.min_cut_sensitivity, 0.5, 1e-12);
+    }
+
+    #[test]
+    fn feed_forward_chain_and_and_circuit_are_enumerated_exactly() {
+        let chain = measure(&feed_forward_chain(4, 0.0));
+        close(chain.state_entropy_bits, 3.0, 1e-12);
+        close(chain.transition_entropy_bits, 0.0, 1e-12);
+        close(chain.mutual_information_bits, 3.0, 1e-12);
+
+        let and = measure(&and_circuit(0.0));
+        close(and.state_entropy_bits, 2.0, 1e-12);
+        close(and.transition_entropy_bits, 0.0, 1e-12);
+        close(and.mutual_information_bits, 2.0, 1e-12);
     }
 
     #[test]
