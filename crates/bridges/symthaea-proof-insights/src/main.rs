@@ -9,6 +9,7 @@
 //!
 //! Usage:
 //!   cargo run -p symthaea-proof-insights -- /path/to/openai/math 1581d4cbdd69a0faf34b2089614fe2a814316a6a ./proof-insight-source-index.json
+//!   cargo run -p symthaea-proof-insights -- --verify-splits ./proof-insight-source-index.json ./data/benchmarks/proof-insight-transfer-v0/splits.json
 
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -120,6 +121,7 @@ struct FamilySplitPlan {
     train_family_count: usize,
     validation_family_count: usize,
     test_family_count: usize,
+    partition_digest_sha256: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -155,6 +157,16 @@ struct SourceIndex {
 }
 
 fn main() -> ExitCode {
+    let args: Vec<String> = env::args().collect();
+    if args.len() == 4 && args[1] == "--verify-splits" {
+        return match verify_split_files(Path::new(&args[2]), Path::new(&args[3])) {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(error) => {
+                eprintln!("proof-insights split verification: {error:#}");
+                ExitCode::FAILURE
+            }
+        };
+    }
     if let Err(error) = execute_from_args() {
         eprintln!("proof-insights indexer: {error:#}");
         ExitCode::FAILURE
@@ -393,6 +405,71 @@ fn execute_from_args() -> Result<()> {
     Ok(())
 }
 
+fn verify_split_files(generated_path: &Path, frozen_path: &Path) -> Result<()> {
+    let generated_text = fs::read_to_string(generated_path)
+        .with_context(|| format!("cannot read generated source index {}", generated_path.display()))?;
+    let frozen_text = fs::read_to_string(frozen_path)
+        .with_context(|| format!("cannot read frozen split manifest {}", frozen_path.display()))?;
+    let generated: serde_json::Value =
+        serde_json::from_str(&generated_text).context("generated index is not valid JSON")?;
+    let frozen: serde_json::Value =
+        serde_json::from_str(&frozen_text).context("frozen split manifest is not valid JSON")?;
+
+    let generated_commit = generated
+        .get("upstream_commit").and_then(serde_json::Value::as_str)
+        .context("generated index is missing upstream_commit")?;
+    let frozen_commit = frozen
+        .get("upstream").and_then(|value| value.get("commit")).and_then(serde_json::Value::as_str)
+        .context("frozen split manifest is missing upstream.commit")?;
+    if generated_commit != frozen_commit {
+        bail!("source revision mismatch: generated index {generated_commit}, frozen manifest {frozen_commit}");
+    }
+
+    let generated_digest = generated
+        .get("family_split_plan").and_then(|value| value.get("partition_digest_sha256"))
+        .and_then(serde_json::Value::as_str)
+        .context("generated index has no family_split_plan.partition_digest_sha256")?;
+    let frozen_digest = frozen
+        .get("split_plan").and_then(|value| value.get("partition_digest_sha256"))
+        .and_then(serde_json::Value::as_str)
+        .context("frozen manifest has no split_plan.partition_digest_sha256")?;
+    if generated_digest != frozen_digest {
+        bail!("family split digest mismatch: generated {generated_digest}, frozen {frozen_digest}");
+    }
+
+    let rows = |value: &serde_json::Value, field: &str| -> Result<BTreeMap<String, String>> {
+        let entries = value.get(field).and_then(serde_json::Value::as_array)
+            .with_context(|| format!("missing array field {field}"))?;
+        let mut result = BTreeMap::new();
+        for entry in entries {
+            let id = entry.get("family_id").and_then(serde_json::Value::as_str)
+                .context("family record missing family_id")?;
+            let split = entry.get("split").and_then(serde_json::Value::as_str)
+                .context("family record missing split")?;
+            if result.insert(id.to_owned(), split.to_owned()).is_some() {
+                bail!("duplicate family ID {id} in {field}");
+            }
+        }
+        Ok(result)
+    };
+    let generated_rows = rows(&generated, "families")?;
+    let frozen_rows = rows(&frozen, "families")?;
+    if generated_rows != frozen_rows {
+        let generated_only: Vec<_> = generated_rows.keys().filter(|key| !frozen_rows.contains_key(*key)).cloned().collect();
+        let frozen_only: Vec<_> = frozen_rows.keys().filter(|key| !generated_rows.contains_key(*key)).cloned().collect();
+        bail!(
+            "family assignment mismatch (generated {}, frozen {}); generated-only IDs: {:?}; frozen-only IDs: {:?}",
+            generated_rows.len(), frozen_rows.len(), generated_only, frozen_only
+        );
+    }
+
+    eprintln!(
+        "PASS: {} family assignments match frozen digest {} for source {}",
+        generated_rows.len(), frozen_digest, generated_commit
+    );
+    Ok(())
+}
+
 fn git_output(root: &Path, arguments: &[&str]) -> Result<String> {
     let output = Command::new("git")
         .arg("-C")
@@ -589,6 +666,20 @@ fn assign_family_splits(families: &mut [FamilyRecord]) -> Result<FamilySplitPlan
             .context("family missing from deterministic split assignment")?;
     }
 
+    let mut partition_rows: Vec<(&str, &str)> = families
+        .iter()
+        .map(|family| (family.family_id.as_str(), family.split.as_str()))
+        .collect();
+    partition_rows.sort_unstable_by(|left, right| left.0.cmp(right.0));
+    let mut partition_material = String::new();
+    for (family_id, split) in partition_rows {
+        partition_material.push_str(family_id);
+        partition_material.push('\\t');
+        partition_material.push_str(split);
+        partition_material.push('\\n');
+    }
+    let partition_digest_sha256 = format!("{:x}", Sha256::digest(partition_material.as_bytes()));
+
     Ok(FamilySplitPlan {
         seed: FAMILY_SPLIT_SEED,
         algorithm: FAMILY_SPLIT_ALGORITHM,
@@ -598,6 +689,7 @@ fn assign_family_splits(families: &mut [FamilyRecord]) -> Result<FamilySplitPlan
         train_family_count: train_count,
         validation_family_count: validation_end - train_count,
         test_family_count: total - validation_end,
+        partition_digest_sha256,
     })
 }
 
