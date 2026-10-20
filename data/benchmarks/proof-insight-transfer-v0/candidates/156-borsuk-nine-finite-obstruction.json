@@ -94,7 +94,22 @@
           "No shared representation map, incidence invariant, or target subgoal supporting the source move was identified in this static review."
         ],
         "status": "rejected",
-        "target_theorem_id": "OAI.HadwigerCounterexample.not_hadwiger_conjecture"
+        "target_theorem_id": "OAI.HadwigerCounterexample.not_hadwiger_conjecture",
+        "directional_contract": {
+          "compatibility": "incompatible",
+          "mismatch_codes": [
+            "object_type",
+            "premise_unavailable",
+            "domain_mismatch",
+            "precondition_mismatch"
+          ],
+          "source_move_requires": "A hypothetical small-diameter cover of rank-one orthogonal projectors must be transformed into Admissible data and then a finite support-face incidence system satisfying the ten-system obstruction hypotheses.",
+          "target_goal_requires": "Construct arbitrarily large finite simple graphs with independence number at most two and small connected-matching number, then apply a matching–minor inequality and a chromatic lower bound to obtain h(G) < chi(G).",
+          "notes": [
+            "Both arguments end in contradiction, but the source representation map and finite support-face relation do not supply the graph witness or invariant inequalities required by the target.",
+            "Judgment is based on source-level static review; no generated transfer was attempted and this is not a measured trial."
+          ]
+        }
       }
     ]
   },
