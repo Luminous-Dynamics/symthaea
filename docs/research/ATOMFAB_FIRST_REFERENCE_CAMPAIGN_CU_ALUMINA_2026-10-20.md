@@ -13,7 +13,7 @@ The campaign explicitly freezes 12 reportable strata: Cu27, Cu38, Cu47 and Cu55 
 
 A machine-readable design is at `benchmarks/supported-cu-alumina-reference-campaign-v1.json` with its schema in `schemas/supported-cu-alumina-reference-campaign-v1.schema.json`.
 
-The published GA settings above are transcribed from the 2026 paper. Other settings required for exact reproduction—DFT code/build, pseudopotentials, cutoffs, k-points, relaxation thresholds, structure matching tolerance, exact candidate/reference structure manifest and RNG details—remain explicitly unresolved until extracted from the publication Methods/Supplement and data. No placeholders are being treated as experimental facts.
+The published GA settings above are transcribed from the 2026 paper. The Methods specify rattle and mirror mutations with equal probability. Other settings required for exact reproduction—DFT code/build, pseudopotentials, cutoffs, k-points, relaxation thresholds, structure matching tolerance, exact candidate/reference structure manifest and RNG details—remain explicitly unresolved until extracted from the publication Methods/Supplement and data. No placeholders are being treated as experimental facts.
 
 The related 2025 Zenodo record contains training/validation structures, VASP inputs and global-minimum configurations. It lists `dataset.zip` MD5 `e88745ca2cfd25ef0b152f5fa3ed6bd9` and `global_minima.zip` MD5 `9788d7f13403450552e4ad1642c6a478`. These are source-record MD5 checksums, not our computed SHA-256 digests, and are not evidence that the archive is the 2026 paper's complete independent test set. We must materialize the source, verify these record checksums, compute SHA-256/byte length locally, identify licensing, and freeze the exact evaluation-file manifest before claim-bearing runs. [Zenodo record](https://zenodo.org/records/15865800).
 
@@ -31,6 +31,13 @@ Do not confuse that reproduction budget with our **extension**: compare acquisit
 4. Count failed relaxations, invalid starting structures, duplicates and rework costs. The numerator is unique **reference-validated** low-energy discoveries—not the number of generated candidates or a model-predicted minimum.
 5. Report Pareto frontier (validated discovery breadth, best validated objective, total cost), prediction errors on matched structures, typed failure modes by stratum, and abstentions separately. Do not roll these into a single weighted score.
 6. Begin the policy-effect campaign with at least 20 paired fixed seeds. The proposed stretch gate of median acceleration factor ≥2 and 95% bootstrap lower bound >1 applies only if both policies reach the same frozen objective target and the chosen policy's validated result quality is no worse at equal total cost. This is a target, not an achieved result.
+
+
+## Historical result fingerprint, not a truth claim
+
+The 2026 paper reports that among its 12 nanoparticle-size/surface cases, DP-UniAlCu produced the lowest-binding-energy structure in eight, MatterSim-v1.0.0-1M in three, and MACE-OMAT in one. The manifest records these counts as a **paper-reported reproduction fingerprint**, not a deterministic acceptance requirement under unknown/different random seeds. If a repeated run differs, preserve the random seed, candidate pool, all failures and reference refinements and compare distributions; do not tune the evaluator to force an 8/3/1 match. [Xu et al. (2026)](https://doi.org/10.1038/s41524-026-02043-8).
+
+The paper itself notes that finite stochastic searches are unlikely to establish true global minima. AtomFab therefore uses “published/reference DFT-refined best-known minimum” unless a separate exhaustive or certifying procedure supports a genuine global-optimum claim. The benchmark objective is to improve the evidence-backed best-known result at matched cost, not to make an unprovable global-optimality claim.
 
 ## Decision criteria
 
