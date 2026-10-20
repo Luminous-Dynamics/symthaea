@@ -150,7 +150,7 @@ impl PatternVector {
         let mut state = seed;
         for index in 0..flips {
             let remaining = self.dimension() - index;
-            let selected = index + (next_u64(&mut state) as usize % remaining);
+            let selected = index + (next_u64(&mut state) % remaining as u64) as usize;
             indices.swap(index, selected);
             result.values[indices[index]] *= -1;
         }
@@ -224,7 +224,7 @@ fn seeded_permutation(dimension: usize, seed: u64) -> Vec<usize> {
     let mut mapping: Vec<usize> = (0..dimension).collect();
     let mut state = seed;
     for index in (1..dimension).rev() {
-        let selected = next_u64(&mut state) as usize % (index + 1);
+        let selected = (next_u64(&mut state) % (index as u64 + 1)) as usize;
         mapping.swap(index, selected);
     }
     mapping
@@ -344,6 +344,7 @@ pub struct PatternInteractionReport {
     pub role_unbinding_similarity: f64,
     pub bundling_ablation_similarity: f64,
     pub binding_ablation_advantage: f64,
+    pub antipattern_cancellation_abs_similarity: f64,
     pub sequence_order_similarity: f64,
     pub basis_equivariance_exact: bool,
     pub noise_results: Vec<NoiseRetrievalResult>,
@@ -371,6 +372,11 @@ pub fn run_pattern_interaction_suite(
     )?;
     let ablated_filler = naive_bundle.unbind(&role)?;
     let bundling_ablation_similarity = filler.similarity(&ablated_filler)?;
+    let cancellation_bundle = PatternVector::bundle(
+        &[role.clone(), role.opposite()],
+        derived_seed(seed, 2, 2),
+    )?;
+    let antipattern_cancellation_abs_similarity = role.similarity(&cancellation_bundle)?.abs();
 
     let seq_ab = role.bind(&filler.permute(1));
     let seq_ba = filler.bind(&role.permute(1));
@@ -463,6 +469,7 @@ pub fn run_pattern_interaction_suite(
         role_unbinding_similarity,
         bundling_ablation_similarity,
         binding_ablation_advantage: role_unbinding_similarity - bundling_ablation_similarity,
+        antipattern_cancellation_abs_similarity,
         sequence_order_similarity,
         basis_equivariance_exact,
         noise_results,
@@ -564,6 +571,7 @@ mod tests {
         let report = run_pattern_interaction_suite(42, &config).expect("suite");
         assert_eq!(report.role_unbinding_similarity, 1.0);
         assert!(report.binding_ablation_advantage > 0.25);
+        assert!(report.antipattern_cancellation_abs_similarity < 0.15);
         assert!(report.basis_equivariance_exact);
         assert!(report.sequence_order_similarity.abs() < 0.15);
     }
