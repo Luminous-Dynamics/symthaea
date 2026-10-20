@@ -261,10 +261,10 @@ fn validate_csv(input: &str) -> Result<AuditReport, Vec<String>> {
                         ));
                     }
                 }
-                match cell(row, 9).parse::<f64>() {
-                    Ok(value) if value.is_finite() && value > 0.0 => {}
+                match cell(row, 9).parse::<u32>() {
+                    Ok(value) if value > 0 => {}
                     _ => row_errors.push(format!(
-                        "row {record_number} ({anchor_id}): ComparablePriceEvidence requires a known positive numeric quantity"
+                        "row {record_number} ({anchor_id}): ComparablePriceEvidence requires a known positive integer vessel quantity"
                     )),
                 }
                 let unresolved = cell(row, 14);
@@ -466,6 +466,14 @@ mod tests {
         row[9] = String::new();
         let errors = validate_csv(&csv_for_rows(&[row])).unwrap_err();
         assert!(errors.iter().any(|error| error.contains("known positive numeric quantity")));
+    }
+
+    #[test]
+    fn fractional_vessel_quantity_is_rejected() {
+        let mut row = fully_normalized_row();
+        row[9] = "1.5".to_owned();
+        let errors = validate_csv(&csv_for_rows(&[row])).unwrap_err();
+        assert!(errors.iter().any(|error| error.contains("positive integer vessel quantity")));
     }
 
     #[test]
