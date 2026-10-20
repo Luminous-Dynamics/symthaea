@@ -169,7 +169,145 @@
         "evidence_digest": {
           "$ref": "#/$defs/sha256"
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "validated_discovery_count": {
+                "const": 0
+              }
+            },
+            "required": [
+              "validated_discovery_count"
+            ]
+          },
+          "then": {
+            "properties": {
+              "best_validated_objective": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "validated_discovery_count": {
+                "minimum": 1
+              }
+            },
+            "required": [
+              "validated_discovery_count"
+            ]
+          },
+          "then": {
+            "properties": {
+              "best_validated_objective": {
+                "type": "number"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "false_feasible_accepts": {
+                "minimum": 1
+              }
+            },
+            "required": [
+              "false_feasible_accepts"
+            ]
+          },
+          "then": {
+            "properties": {
+              "disposition": {
+                "properties": {
+                  "status": {
+                    "const": "ineligible"
+                  },
+                  "reasons": {
+                    "contains": {
+                      "const": "false_feasible_accepts_nonzero"
+                    }
+                  }
+                },
+                "required": [
+                  "status",
+                  "reasons"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "hard_constraints_assessed": {
+                "const": false
+              }
+            },
+            "required": [
+              "hard_constraints_assessed"
+            ]
+          },
+          "then": {
+            "properties": {
+              "disposition": {
+                "properties": {
+                  "status": {
+                    "const": "ineligible"
+                  },
+                  "reasons": {
+                    "contains": {
+                      "const": "hard_constraints_not_assessed"
+                    }
+                  }
+                },
+                "required": [
+                  "status",
+                  "reasons"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "disposition": {
+                "properties": {
+                  "status": {
+                    "enum": [
+                      "pareto_frontier",
+                      "dominated"
+                    ]
+                  }
+                }
+              }
+            },
+            "required": [
+              "disposition"
+            ]
+          },
+          "then": {
+            "properties": {
+              "false_feasible_accepts": {
+                "const": 0
+              },
+              "hard_constraints_assessed": {
+                "const": true
+              }
+            },
+            "required": [
+              "false_feasible_accepts",
+              "hard_constraints_assessed"
+            ]
+          }
+        }
+      ]
     }
-  }
+  },
+  "$comment": "Structural validation is complemented by DecisionFrontier::validate, which rebuilds the Pareto classifications from the retained metrics and rejects forged dispositions. Cross-field constraints below prevent common safety/evidence inconsistencies in independent JSON Schema consumers."
 }
