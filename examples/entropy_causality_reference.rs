@@ -10,7 +10,7 @@
 
 use std::f64::consts::LN_2;
 
-const MAX_NODES: usize = 12;
+const MAX_NODES: usize = 8;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Rule {
