@@ -1771,7 +1771,7 @@ mod tests {
             .expect("read first source revision");
         let source_one_sha = sha(&source_one);
 
-        let second_source = initial_source.replacen("  sorry\n", "  trivial\n", 1);
+        let second_source = initial_source.replacen("  sorry\n", "  exact True.intro\n", 1);
         fs::write(root.join("lean/Example.lean"), &second_source)
             .expect("complete first proof only");
         let commit_two = commit(&root, "complete first proof");
