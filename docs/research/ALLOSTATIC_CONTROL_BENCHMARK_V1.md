@@ -46,7 +46,7 @@ The crate has no third-party dependencies. The executable emits a row-per-episod
 | Repeated | Test incomplete recovery between disturbances |
 | Regime shift | Test forecast uncertainty and changed operating conditions |
 
-These profiles are synthetic and intentionally small. They are not an industry benchmark, a physiological calibration, or evidence of real-world safety.
+These profiles are synthetic and intentionally small. They are not an industry benchmark, a physiological calibration, or evidence of real-world safety. The candidate forecaster receives an exogenous, noisy warning stream: acute, chronic, and repeated-disturbance profiles can supply lead signals, while the regime shift is unannounced until it occurs. The candidate controller does not read realized future loads; only the explicitly labeled oracle condition does. Forecast confidence is independently varied and controls forecast-noise scale. This isolates decision-rule value from perfect future information, but does not test how a real forecasting model learns or generalizes.
 
 ### Controller conditions
 
@@ -55,9 +55,9 @@ These profiles are synthetic and intentionally small. They are not an industry b
 | Task-only | Maximize immediate task progress, rest only near depletion | Loss-only baseline |
 | Stress-reactive | Rest based on current stress and a resource floor | Instantaneous-response baseline |
 | Allostatic-reactive | Rest based on accumulated load and a resource floor | Cumulative-load baseline |
-| Predictive viability | Use a noisy forecast, its confidence, projected reserve and projected load | Candidate method |
-| Shuffled-forecast control | Same decision structure with a time-shifted forecast | Tests whether useful forecast content matters |
-| Oracle predictive | Predictive method given the simulator's true short-horizon forecast | Diagnostic upper bound only; not deployable |
+| Predictive viability | Use a noisy external warning stream, its confidence, projected reserve and projected load | Candidate method |
+| Shuffled-forecast control | Same decision structure/noise scale with time-shifted warning content | Tests whether timely forecast content matters |
+| Oracle predictive | Predictive method given the simulator's true future short-horizon load | Diagnostic upper bound only; not deployable |
 
 The oracle is not a fair competitor and must never be reported as a deployable baseline. The shuffled forecast is a negative control. Neither should count as independent evidence that predictive control generalizes.
 
