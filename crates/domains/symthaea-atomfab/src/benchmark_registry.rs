@@ -103,16 +103,32 @@ pub enum RegistryError {
 impl fmt::Display for RegistryError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::UnsupportedSchemaVersion => write!(f, "unsupported benchmark registry schema version"),
+            Self::UnsupportedSchemaVersion => {
+                write!(f, "unsupported benchmark registry schema version")
+            }
             Self::MissingMetadata => write!(f, "benchmark registry metadata is incomplete"),
-            Self::MissingResultClass => write!(f, "benchmark registry must distinguish every claim class"),
+            Self::MissingResultClass => {
+                write!(f, "benchmark registry must distinguish every claim class")
+            }
             Self::EmptyLaneSet => write!(f, "benchmark registry must contain at least one lane"),
             Self::DuplicateLaneId => write!(f, "benchmark lane identifiers must be unique"),
-            Self::IncompleteLane => write!(f, "every benchmark lane needs a reference, goal, baselines, metrics and gates"),
+            Self::IncompleteLane => write!(
+                f,
+                "every benchmark lane needs a reference, goal, baselines, metrics and gates"
+            ),
             Self::DuplicatePolicyId => write!(f, "benchmark policy identifiers must be unique"),
-            Self::MissingRequiredPolicy => write!(f, "registry must include random and Symthaea policy baselines"),
-            Self::InvalidAccelerationGate => write!(f, "acceleration gate must require AF > 1 and at least two campaigns"),
-            Self::InvalidFeasibilityGate => write!(f, "false-feasible gate must require zero accepted hard-constraint violations"),
+            Self::MissingRequiredPolicy => write!(
+                f,
+                "registry must include random and Symthaea policy baselines"
+            ),
+            Self::InvalidAccelerationGate => write!(
+                f,
+                "acceleration gate must require AF > 1 and at least two campaigns"
+            ),
+            Self::InvalidFeasibilityGate => write!(
+                f,
+                "false-feasible gate must require zero accepted hard-constraint violations"
+            ),
         }
     }
 }
@@ -141,7 +157,12 @@ impl BenchmarkRegistry {
             "measurement",
             "independently_reproduced",
         ] {
-            if !self.claim_policy.distinguish_result_classes.iter().any(|item| item == class) {
+            if !self
+                .claim_policy
+                .distinguish_result_classes
+                .iter()
+                .any(|item| item == class)
+            {
                 return Err(RegistryError::MissingResultClass);
             }
         }
@@ -178,8 +199,14 @@ impl BenchmarkRegistry {
                 return Err(RegistryError::DuplicatePolicyId);
             }
         }
-        if !self.policy_baselines.iter().any(|policy| policy.id == "random")
-            || !self.policy_baselines.iter().any(|policy| policy.id == "symthaea_full")
+        if !self
+            .policy_baselines
+            .iter()
+            .any(|policy| policy.id == "random")
+            || !self
+                .policy_baselines
+                .iter()
+                .any(|policy| policy.id == "symthaea_full")
         {
             return Err(RegistryError::MissingRequiredPolicy);
         }
@@ -215,10 +242,22 @@ mod tests {
     #[test]
     fn embedded_registry_parses_and_passes_integrity_checks() {
         let registry = load_embedded_registry().expect("checked-in JSON should parse");
-        registry.validate().expect("registry should be internally consistent");
+        registry
+            .validate()
+            .expect("registry should be internally consistent");
         assert_eq!(registry.benchmark_lanes.len(), 9);
-        assert!(registry.benchmark_lanes.iter().any(|lane| lane.id == "experimental-reality-gap"));
-        assert!(registry.benchmark_lanes.iter().any(|lane| lane.id == "symtropy-workcell"));
+        assert!(
+            registry
+                .benchmark_lanes
+                .iter()
+                .any(|lane| lane.id == "experimental-reality-gap")
+        );
+        assert!(
+            registry
+                .benchmark_lanes
+                .iter()
+                .any(|lane| lane.id == "symtropy-workcell")
+        );
         let nanoparticle_lane = registry
             .benchmark_lanes
             .iter()
@@ -236,22 +275,39 @@ mod tests {
     #[test]
     fn registry_requires_nontrivial_acceleration_and_zero_false_feasible_gate() {
         let mut registry = load_embedded_registry().expect("checked-in JSON should parse");
-        registry.performance_claims.accelerations.stretch_target_median_af = 1.0;
-        assert_eq!(registry.validate(), Err(RegistryError::InvalidAccelerationGate));
+        registry
+            .performance_claims
+            .accelerations
+            .stretch_target_median_af = 1.0;
+        assert_eq!(
+            registry.validate(),
+            Err(RegistryError::InvalidAccelerationGate)
+        );
 
         let mut registry = load_embedded_registry().expect("checked-in JSON should parse");
-        registry.performance_claims.process_feasibility.maximum_false_feasible_accepts_on_frozen_adversarial_suite = 1;
-        assert_eq!(registry.validate(), Err(RegistryError::InvalidFeasibilityGate));
+        registry
+            .performance_claims
+            .process_feasibility
+            .maximum_false_feasible_accepts_on_frozen_adversarial_suite = 1;
+        assert_eq!(
+            registry.validate(),
+            Err(RegistryError::InvalidFeasibilityGate)
+        );
     }
 
     #[test]
     fn registry_rejects_duplicate_lane_and_policy_identifiers() {
         let mut registry = load_embedded_registry().expect("checked-in JSON should parse");
-        registry.benchmark_lanes.push(registry.benchmark_lanes[0].clone());
+        registry
+            .benchmark_lanes
+            .push(registry.benchmark_lanes[0].clone());
         assert_eq!(registry.validate(), Err(RegistryError::DuplicateLaneId));
 
         let mut registry = load_embedded_registry().expect("checked-in JSON should parse");
-        registry.policy_baselines.push(registry.policy_baselines[0].clone());
+        registry
+            .policy_baselines
+            .push(registry.policy_baselines[0].clone());
         assert_eq!(registry.validate(), Err(RegistryError::DuplicatePolicyId));
     }
 }
+
