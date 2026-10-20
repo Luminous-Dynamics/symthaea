@@ -23,6 +23,7 @@ const RUN_CONFIG_SCHEMA: &str = "pitb.run-config.v0";
 const RUN_RESULTS_SCHEMA: &str = "pitb.target-outcome.v0";
 const ANALYSIS_REPORT_SCHEMA: &str = "pitb.analysis-report.v0";
 const EXPECTED_PROTOCOL_ID: &str = "proof-insight-transfer-v0";
+const EXPECTED_UPSTREAM_COMMIT: &str = "1581d4cbdd69a0faf34b2089614fe2a814316a6a";
 const EXPECTED_BOOTSTRAP_REPLICATES: usize = 10_000;
 const REQUIRED_EXPOSED_FAMILY: &str = "089";
 const ARMS: [&str; 8] = ["A", "B", "C", "D", "E", "F", "G", "H"];
@@ -106,7 +107,7 @@ struct TargetOutcome {
     arms: Vec<ArmOutcome>,
 }
 
-#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Deserialize, PartialEq, Eq, Clone, Copy)]
 #[serde(rename_all = "snake_case")]
 enum Eligibility {
     Eligible,
@@ -234,7 +235,7 @@ fn execute() -> Result<()> {
         serde_json::from_slice(&split_bytes).context("parse frozen split manifest JSON")?;
     let receipt: BaselineSelectionReceipt =
         serde_json::from_slice(&receipt_bytes).context("parse baseline selection receipt JSON")?;
-    validate_baseline_receipt(&receipt, &config)?;
+    validate_baseline_receipt(&receipt)?;
     let selected_baseline = receipt.selected_arm.clone();
 
     let result_text = String::from_utf8(results_bytes).context("results JSONL must be UTF-8")?;
@@ -444,8 +445,56 @@ fn validate_config(
     }
     let split_manifest: SplitManifest =
         serde_json::from_slice(split_bytes).context("parse frozen split manifest JSON")?;
+    if split_manifest.upstream.commit != EXPECTED_UPSTREAM_COMMIT {
+        bail!(
+            "unexpected upstream commit {}; expected {}",
+            split_manifest.upstream.commit,
+            EXPECTED_UPSTREAM_COMMIT
+        );
+    }
+    if split_manifest.families.len() != 372 {
+        bail!(
+            "frozen split must contain exactly 372 families, got {}",
+            split_manifest.families.len()
+        );
+    }
+    let mut family_ids = BTreeSet::new();
+    let mut split_counts: BTreeMap<&str, usize> = BTreeMap::new();
+    for family in &split_manifest.families {
+        if !family_ids.insert(family.family_id.as_str()) {
+            bail!("duplicate family id in frozen split: {}", family.family_id);
+        }
+        if !["train", "validation", "test"].contains(&family.split.as_str()) {
+            bail!(
+                "unknown split label {} for family {}",
+                family.split,
+                family.family_id
+            );
+        }
+        *split_counts.entry(family.split.as_str()).or_default() += 1;
+    }
+    for (split, expected_count) in [("train", 260), ("validation", 56), ("test", 56)] {
+        if split_counts.get(split).copied().unwrap_or_default() != expected_count {
+            bail!(
+                "frozen split count mismatch for {split}: expected {expected_count}, got {}",
+                split_counts.get(split).copied().unwrap_or_default()
+            );
+        }
+    }
     if config.partition_digest_sha256 != split_manifest.split_plan.partition_digest_sha256 {
         bail!("partition digest does not match the frozen split manifest");
+    }
+    let exposed_splits: BTreeMap<&str, &str> = split_manifest
+        .families
+        .iter()
+        .map(|family| (family.family_id.as_str(), family.split.as_str()))
+        .collect();
+    for exposed in &config.known_exposed_family_ids {
+        if exposed_splits.get(exposed.as_str()).copied() != Some("test") {
+            bail!(
+                "known-exposed family {exposed} is absent from or not assigned to the frozen test split"
+            );
+        }
     }
     if config.bootstrap_replicates != EXPECTED_BOOTSTRAP_REPLICATES {
         bail!(
@@ -477,7 +526,7 @@ fn validate_config(
     Ok(())
 }
 
-fn validate_baseline_receipt(receipt: &BaselineSelectionReceipt, config: &RunConfig) -> Result<()> {
+fn validate_baseline_receipt(receipt: &BaselineSelectionReceipt) -> Result<()> {
     if receipt.schema_version != "pitb.baseline-selection.v0" {
         bail!("unsupported baseline-selection receipt schema");
     }
@@ -520,10 +569,6 @@ fn validate_baseline_receipt(receipt: &BaselineSelectionReceipt, config: &RunCon
     }
     if !SIMPLE_BASELINES.contains(&receipt.selected_arm.as_str()) {
         bail!("selected baseline must be one of A through E");
-    }
-    if config.known_exposed_family_ids.contains(&REQUIRED_EXPOSED_FAMILY.to_string()) {
-        // Required for this fixed v0 exposure decision; future protocol versions
-        // should evolve this policy through a new protocol/config schema.
     }
     Ok(())
 }
@@ -793,8 +838,8 @@ fn paired_cluster_bootstrap(
             .iter()
             .find(|arm| arm.arm == baseline_arm)
             .context("selected baseline arm missing after validation")?;
-        let delta = i8::from(treatment.semantic_gate_passed)
-            - i8::from(baseline.semantic_gate_passed);
+        let delta = (if treatment.semantic_gate_passed { 1_i8 } else { 0_i8 })
+            - (if baseline.semantic_gate_passed { 1_i8 } else { 0_i8 });
         deltas_by_family
             .entry(target.family_id.clone())
             .or_default()
@@ -920,9 +965,7 @@ mod tests {
                 .map(|arm| (arm.to_string(), 0.5))
                 .collect(),
         };
-        let mut config = test_config();
-        config.known_exposed_family_ids = vec![REQUIRED_EXPOSED_FAMILY.to_string()];
-        validate_baseline_receipt(&receipt, &config)
+        validate_baseline_receipt(&receipt)
             .expect("alphabetically first tied baseline should pass");
     }
 
@@ -932,25 +975,4 @@ mod tests {
         assert!(validate_sha256(&"a".repeat(64)).is_ok());
     }
 
-    fn test_config() -> RunConfig {
-        RunConfig {
-            schema_version: RUN_CONFIG_SCHEMA.to_string(),
-            protocol_id: EXPECTED_PROTOCOL_ID.to_string(),
-            protocol_sha256: "a".repeat(64),
-            split_manifest_sha256: "b".repeat(64),
-            partition_digest_sha256: "c".repeat(64),
-            baseline_selection_receipt_sha256: "d".repeat(64),
-            known_exposed_family_ids: vec![REQUIRED_EXPOSED_FAMILY.to_string()],
-            bootstrap_replicates: EXPECTED_BOOTSTRAP_REPLICATES,
-            bootstrap_seed: 20261020,
-            model_version: "synthetic-model".to_string(),
-            checker_version: "synthetic-checker".to_string(),
-            budget: Budget {
-                max_model_calls: 8,
-                max_tokens: 16_000,
-                max_wall_ms: 300_000,
-                max_cost_microusd: 500_000,
-            },
-        }
-    }
 }
