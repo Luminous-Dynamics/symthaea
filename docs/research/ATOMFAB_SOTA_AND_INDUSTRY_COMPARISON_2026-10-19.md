@@ -114,6 +114,8 @@ These targets must be preregistered, and thresholds should be chosen per task be
 | Core scientific metrics | Report energy/force errors and task-level observables; no aggregate-only claim. |
 | Off-equilibrium correctness | Correctly report structure recovery and energetic ordering; measure EOS deviations separately. |
 | Experimental prediction | Report normalized/absolute errors and interval coverage against experimental references, including reference uncertainty and out-of-domain cases. |
+| Selective prediction | Report the full risk-coverage curve and stepwise AURC; compare uncertainty-ranked abstention against random-score and shuffled-score controls at identical retained coverage. |
+| Abstention accounting | Report accepted coverage, error among accepted cases, false-feasible count/rate, and missed-feasible cases together; abstaining on everything cannot count as success. |
 | Active learning | Stretch target: median AF ≥ 2 across at least 20 fixed-seed campaigns, with 95% bootstrap lower bound > 1, while objective quality at equal budget is not worse than the strongest matched baseline. |
 | Decision quality | Lower decision regret and/or higher validated objective at equal budget versus the best conventional acquisition baseline; publish non-wins as well. |
 | False-feasible safety | Zero accepted hard-constraint violations on a frozen adversarial suite; if no candidate is accepted, false-feasible rate is undefined, not zero. |
@@ -122,6 +124,12 @@ These targets must be preregistered, and thresholds should be chosen per task be
 | Independent reproducibility | A clean checkout with pinned artifacts reconstructs every accepted score; missing artifacts or mismatched digests fail closed. |
 
 A 2× AF is a deliberately achievable research stretch target, not a claim to beat the best literature results. The self-driving-lab literature reports a median AF around 6 across surveyed studies, but protocols and search spaces vary substantially; direct comparison requires reproducing a matched task. Where justified, a stronger later goal is to outperform the best matched baseline's AF/EF while preserving physical validity and reliability.
+
+## Selective-risk benchmark protocol
+
+AtomFab now includes a pure Rust `summarize_risk_coverage` kernel. For each candidate prediction, record the scalar prediction, reference value, and a non-negative uncertainty score. Samples are sorted by uncertainty; ties enter as a group so input ordering cannot change the curve. Report a stepwise AURC in the supplied error units, the full set of curve points, and coverage at each preregistered operational threshold. Freeze uncertainty construction and thresholds on validation data only.
+
+The negative controls are deliberately simple: shuffle uncertainty scores across the same held-out samples and compare with a random score under the same retained coverage. A selective model only demonstrates useful uncertainty if low-uncertainty subsets reduce held-out risk relative to these controls while retaining meaningful coverage. Report false-feasible and missed-feasible counts separately; the scalar-error curve does not replace physical feasibility validation.
 
 ## What we must not claim
 
