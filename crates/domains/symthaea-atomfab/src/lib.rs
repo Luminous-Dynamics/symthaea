@@ -9,6 +9,7 @@
 
 pub mod benchmark_registry;
 pub mod campaign;
+pub mod decision_frontier;
 pub mod contract;
 
 use std::collections::HashSet;
