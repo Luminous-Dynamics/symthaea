@@ -2000,6 +2000,46 @@ mod tests {
         );
     }
 
+    #[test]
+    fn power_simulation_is_reproducible_for_a_frozen_seed() {
+        let families: Vec<FamilyTargetCount> = (0..24)
+            .map(|index| FamilyTargetCount {
+                family_id: format!("family-{index:02}"),
+                eligible_target_count: if index % 3 == 0 { 2 } else { 1 },
+            })
+            .collect();
+        let left = simulate_power_scenario(&families, 0.25, 0.20, 0.10, 64, 100, 20261020)
+            .expect("synthetic power scenario should run");
+        let right = simulate_power_scenario(&families, 0.25, 0.20, 0.10, 64, 100, 20261020)
+            .expect("repeating a frozen seed must be deterministic");
+        assert_eq!(left.status, "estimated");
+        assert_eq!(left.utility_gate_passes, right.utility_gate_passes);
+        assert_eq!(left.estimated_utility_gate_power, right.estimated_utility_gate_power);
+        assert_eq!(left.mean_observed_effect_percentage_points, right.mean_observed_effect_percentage_points);
+        assert_eq!(left.mean_lower_95ci_percentage_points, right.mean_lower_95ci_percentage_points);
+        assert!(left.estimated_utility_gate_power.is_some_and(|power| (0.0..=1.0).contains(&power)));
+    }
+
+    #[test]
+    fn treatment_family_probabilities_preserve_the_marginal_alternative_rate() {
+        let baseline = 0.25;
+        let treatment = 0.45;
+        let latent_baseline_rates = [0.0, 0.5];
+        let mean_treatment = latent_baseline_rates
+            .iter()
+            .map(|family_rate| {
+                treatment_rate_given_baseline_family(*family_rate, baseline, treatment)
+            })
+            .sum::<f64>()
+            / latent_baseline_rates.len() as f64;
+        assert!((mean_treatment - treatment).abs() < 1e-12);
+        assert!(latent_baseline_rates.iter().all(|family_rate| {
+            let treatment_family_rate =
+                treatment_rate_given_baseline_family(*family_rate, baseline, treatment);
+            (0.0..=1.0).contains(&treatment_family_rate)
+        }));
+    }
+
     fn test_config() -> RunConfig {
         RunConfig {
             schema_version: RUN_CONFIG_SCHEMA.to_string(),
