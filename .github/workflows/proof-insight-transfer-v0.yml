@@ -157,6 +157,23 @@ jobs:
                       "directional_contract": {
                           "compatibility": "compatible",
                           "mismatch_codes": [],
+                          "move_kind": "other",
+                          "source_obligation": {
+                              "domain": "synthetic-only",
+                              "object_type": "synthetic-object",
+                              "predicate": "synthetic-source",
+                              "relation": "equality",
+                              "quantifier_scope": "synthetic fixture",
+                              "preconditions": []
+                          },
+                          "target_obligation": {
+                              "domain": "synthetic-only",
+                              "object_type": "synthetic-object",
+                              "predicate": "synthetic-target",
+                              "relation": "equality",
+                              "quantifier_scope": "synthetic fixture",
+                              "preconditions": []
+                          },
                           "source_move_requires": "Synthetic source requirement",
                           "target_goal_requires": "Synthetic target requirement",
                           "notes": ["No mathematical transfer is asserted"]
