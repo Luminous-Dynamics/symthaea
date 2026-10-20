@@ -370,6 +370,7 @@
                         "precondition_mismatch",
                         "domain_mismatch",
                         "proof_dependency_mismatch",
+                        "predicate_mismatch",
                         "unknown"
                       ]
                     }
