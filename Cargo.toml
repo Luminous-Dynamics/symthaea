@@ -31,6 +31,10 @@ exclude = [
     # live modules. Excluded so the workspace stops compiling a dead island;
     # the adopt path (foveation RealVentralPipeline) still works via path dep.
     "crates/domains/symthaea-perception",
+    # Docs-only scaffold as of 2026-10-20: README exists but there is no
+    # Cargo.toml or src tree yet. Keep it out of the workspace until the
+    # independent verifier implementation is added.
+    "crates/domains/symthaea-rea-evidence-verifier",
 ]
 default-members = [
     "xtask",
