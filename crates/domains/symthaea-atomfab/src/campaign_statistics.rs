@@ -553,7 +553,7 @@ mod tests {
         let (baseline, mut candidate) = make_pairs(&[2.0; 20], true);
         candidate[5].model_digest = "7".repeat(64);
         assert_eq!(
-            summarize(&references(&baseline, &candidate), 19, 0.95, 2_000, 3)
+            summarize(&references(&baseline, &candidate), 20, 0.95, 2_000, 3)
                 .unwrap_err(),
             PairedAccelerationError::InvalidCampaign(CampaignError::MismatchedPolicies)
         );
@@ -562,8 +562,9 @@ mod tests {
     #[test]
     fn summary_round_trips_and_rejects_internally_inconsistent_reports() {
         let (baseline, candidate) = make_pairs(&[2.0; 20], true);
-        let summary = bootstrap_median_acceleration(
+        let summary = summarize(
             &references(&baseline, &candidate),
+            20,
             0.95,
             2_000,
             17,
@@ -581,6 +582,22 @@ mod tests {
         ))
         .unwrap();
         assert_eq!(schema["properties"]["schema_version"]["const"], 1);
+        assert_eq!(schema["properties"]["predeclared_seeds"]["minItems"], 20);
+        assert_eq!(schema["properties"]["seed_manifest_sha256"]["pattern"], "^[0-9a-f]{64}$");
+
+        let seed_schema: serde_json::Value = serde_json::from_str(include_str!(
+            "../schemas/seed-manifest-v1.schema.json"
+        ))
+        .unwrap();
+        assert_eq!(seed_schema["properties"]["schema_version"]["const"], 1);
+        assert_eq!(seed_schema["properties"]["seeds"]["minItems"], 20);
+
+        let seed_fixture: SeedManifestV1 = serde_json::from_str(include_str!(
+            "../fixtures/seed-manifest-v1.json"
+        ))
+        .unwrap();
+        seed_fixture.validate().unwrap();
+        assert_eq!(seed_fixture.seeds, (101..=120).collect::<Vec<_>>());
         assert_eq!(
             schema["properties"]["campaign_pair_count"]["minimum"],
             MINIMUM_CAMPAIGNS_FOR_ACCELERATION_INTERVAL
