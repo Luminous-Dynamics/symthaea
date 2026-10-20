@@ -538,9 +538,9 @@ fn main() {
             continue;
         }
 
-        let Some(wav) = fluid_render::render_midi_to_wav_with_mastering(
-            &mid, SR, Some(color), &mastering,
-        ) else {
+        let Some(wav) =
+            fluid_render::render_midi_to_wav_with_mastering(&mid, SR, Some(color), &mastering)
+        else {
             let reason = format!("{style:?}/{seed}: dialect-profile FluidSynth render failed");
             eprintln!("{reason}; skipping");
             failures.push(reason);
@@ -577,10 +577,12 @@ fn main() {
             }));
             continue;
         }
-        if [neutral_sr, room_sr, master_sr, fsr].iter().any(|&rate| rate != SR) {
-            let reason = format!(
-                "{style:?}/{seed}: a FluidSynth arm returned an unexpected sample rate"
-            );
+        if [neutral_sr, room_sr, master_sr, fsr]
+            .iter()
+            .any(|&rate| rate != SR)
+        {
+            let reason =
+                format!("{style:?}/{seed}: a FluidSynth arm returned an unexpected sample rate");
             eprintln!("{reason}; skipping");
             failures.push(reason);
             rows.push(serde_json::json!({
@@ -594,12 +596,40 @@ fn main() {
         }
 
         if ![
-            a.lufs, a.peak_db, a.crest_db, a.low, a.mid, a.high,
-            neutral.lufs, neutral.peak_db, neutral.crest_db, neutral.low, neutral.mid, neutral.high,
-            room_only.lufs, room_only.peak_db, room_only.crest_db, room_only.low, room_only.mid, room_only.high,
-            master_only.lufs, master_only.peak_db, master_only.crest_db, master_only.low, master_only.mid, master_only.high,
-            b.lufs, b.peak_db, b.crest_db, b.low, b.mid, b.high,
-        ].iter().all(|value| value.is_finite()) {
+            a.lufs,
+            a.peak_db,
+            a.crest_db,
+            a.low,
+            a.mid,
+            a.high,
+            neutral.lufs,
+            neutral.peak_db,
+            neutral.crest_db,
+            neutral.low,
+            neutral.mid,
+            neutral.high,
+            room_only.lufs,
+            room_only.peak_db,
+            room_only.crest_db,
+            room_only.low,
+            room_only.mid,
+            room_only.high,
+            master_only.lufs,
+            master_only.peak_db,
+            master_only.crest_db,
+            master_only.low,
+            master_only.mid,
+            master_only.high,
+            b.lufs,
+            b.peak_db,
+            b.crest_db,
+            b.low,
+            b.mid,
+            b.high,
+        ]
+        .iter()
+        .all(|value| value.is_finite())
+        {
             let reason = format!("{style:?}/{seed}: non-finite metric; row invalid");
             eprintln!("{reason}; skipping");
             failures.push(reason);
@@ -662,19 +692,18 @@ fn main() {
             color.chorus_level
         );
         let profile_fingerprint_sha256 = sha256_bytes(profile_material.as_bytes());
-        let profile_controls_differ_from_default =
-            color.reverb_room != base_color.reverb_room
-                || color.reverb_level != base_color.reverb_level
-                || color.reverb_damp != base_color.reverb_damp
-                || color.chorus_level != base_color.chorus_level
-                || mastering.target_lufs != neutral_mastering.target_lufs
-                || mastering.limiter_ceiling_db != neutral_mastering.limiter_ceiling_db
-                || mastering.section_leveling_db != neutral_mastering.section_leveling_db
-                || mastering.target_low_ratio != neutral_mastering.target_low_ratio
-                || mastering.target_mid_ratio != neutral_mastering.target_mid_ratio
-                || mastering.target_high_ratio != neutral_mastering.target_high_ratio
-                || mastering.eq_max_correction_db != neutral_mastering.eq_max_correction_db
-                || mastering.eq_max_high_boost_db != neutral_mastering.eq_max_high_boost_db;
+        let profile_controls_differ_from_default = color.reverb_room != base_color.reverb_room
+            || color.reverb_level != base_color.reverb_level
+            || color.reverb_damp != base_color.reverb_damp
+            || color.chorus_level != base_color.chorus_level
+            || mastering.target_lufs != neutral_mastering.target_lufs
+            || mastering.limiter_ceiling_db != neutral_mastering.limiter_ceiling_db
+            || mastering.section_leveling_db != neutral_mastering.section_leveling_db
+            || mastering.target_low_ratio != neutral_mastering.target_low_ratio
+            || mastering.target_mid_ratio != neutral_mastering.target_mid_ratio
+            || mastering.target_high_ratio != neutral_mastering.target_high_ratio
+            || mastering.eq_max_correction_db != neutral_mastering.eq_max_correction_db
+            || mastering.eq_max_high_boost_db != neutral_mastering.eq_max_high_boost_db;
         rows.push(serde_json::json!({
             "style": format!("{style:?}"),
             "seed": seed,
@@ -809,8 +838,7 @@ fn main() {
                 "mean profile−default FluidSynth: ΔLUFS {mean_profile_lufs:+.2}, Δcrest {mean_profile_crest:+.2} dB, Δhigh {mean_profile_high:+.3}, Δlow {mean_profile_low:+.3}"
             );
         }
-        let consistent_crest =
-            deltas.iter().all(|d| d.1 > 0.0) || deltas.iter().all(|d| d.1 < 0.0);
+        let consistent_crest = deltas.iter().all(|d| d.1 > 0.0) || deltas.iter().all(|d| d.1 < 0.0);
         println!(
             "Δcrest sign consistent across all pieces: {}",
             if consistent_crest { "YES" } else { "no" }
@@ -891,13 +919,16 @@ fn main() {
             "A caller-supplied source revision plus file digests is not a signed build attestation."
         ]
     });
-    let manifest_bytes = serde_json::to_vec_pretty(&manifest)
-        .expect("serialize evidence manifest");
+    let manifest_bytes = serde_json::to_vec_pretty(&manifest).expect("serialize evidence manifest");
     std::fs::write(&manifest_path, &manifest_bytes).expect("write evidence manifest");
     println!(
         "Evidence manifest: {} (status={})",
         manifest_path.display(),
-        if run_complete { "complete" } else { "incomplete" }
+        if run_complete {
+            "complete"
+        } else {
+            "incomplete"
+        }
     );
     if !run_complete {
         eprintln!(
@@ -908,7 +939,6 @@ fn main() {
         std::process::exit(1);
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -943,15 +973,16 @@ mod tests {
         let room_effect = [0.5, 2.0, 0.02, -0.01];
         let master_effect = [0.4, -0.5, -0.01, 0.03];
         let interaction = [0.2, 0.25, 0.005, -0.004];
-        let add = |a: [f32; 4], b: [f32; 4]| -> [f32; 4] {
-            std::array::from_fn(|i| a[i] + b[i])
-        };
+        let add = |a: [f32; 4], b: [f32; 4]| -> [f32; 4] { std::array::from_fn(|i| a[i] + b[i]) };
         let baseline = arm("default", baseline_metrics);
         let room = arm("room-only", add(baseline_metrics, room_effect));
         let master = arm("master-only", add(baseline_metrics, master_effect));
         let combined = arm(
             "combined",
-            add(add(add(baseline_metrics, room_effect), master_effect), interaction),
+            add(
+                add(add(baseline_metrics, room_effect), master_effect),
+                interaction,
+            ),
         );
 
         let result = factorial_contrasts(&baseline, &room, &master, &combined);
