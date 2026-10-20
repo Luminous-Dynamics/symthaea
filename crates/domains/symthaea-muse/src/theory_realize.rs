@@ -42,8 +42,8 @@ use symthaea_music_theory::{MusicalIntent, Score as TheoryScore, Style};
 /// profiles are explicit engineering hypotheses awaiting blinded audio
 /// calibration—not evidence of historical authenticity. Folk, Lullaby,
 /// Sarabande, Minuet, Waltz, Celtic jig, nocturne, chorale, planing,
-/// Tango, compás, cinematic build, bossa flow, and montuno cycle add routed
-/// profiles, still provisional.
+/// Tango, compás, cinematic build, bossa flow, montuno cycle, and modal-arc
+/// styles add routed profiles, still provisional.
 /// [`PerformanceDialect::ClassicalRubato`] remains the identity — every
 /// factor exactly 1.0 — so its renders remain bit-identical to pre-dialect behavior.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -135,6 +135,11 @@ pub enum PerformanceDialect {
     /// piano vamp; keep accent shaping, but minimize local onset drift.
     /// This is a calibration prior, not an authenticity claim.
     MontunoCycle,
+    /// Modal-arc prototype: allow flexible melodic breath over a continuous
+    /// drone, avoid imposing conventional cadential gravity, and preserve
+    /// local expressivity across the existing exposition→pulse→intensification
+    /// stages. This is not a claim to reproduce a complete raga tradition.
+    ModalArcElastic,
     /// Blues/jazz: laid-back time. Jitter up (1.3x), phrase-final rubato
     /// and the expressive blend both kept — a jazz ballad leans harder
     /// into time than a classical player, never less.
@@ -164,6 +169,7 @@ impl PerformanceDialect {
             PerformanceDialect::CinematicArc => 1.1,
             PerformanceDialect::BossaFlow => 0.85,
             PerformanceDialect::MontunoCycle => 0.2,
+            PerformanceDialect::ModalArcElastic => 1.2,
             PerformanceDialect::DanceLocked => 0.25,
             PerformanceDialect::ProcessExact => 0.1,
         }
@@ -191,6 +197,7 @@ impl PerformanceDialect {
             PerformanceDialect::CinematicArc => 1.2,
             PerformanceDialect::BossaFlow => 0.85,
             PerformanceDialect::MontunoCycle => 0.35,
+            PerformanceDialect::ModalArcElastic => 1.1,
             PerformanceDialect::DanceLocked => 0.25,
             PerformanceDialect::ProcessExact => 0.1,
         }
@@ -216,6 +223,7 @@ impl PerformanceDialect {
             PerformanceDialect::CinematicArc => 1.1,
             PerformanceDialect::BossaFlow => 0.7,
             PerformanceDialect::MontunoCycle => 0.2,
+            PerformanceDialect::ModalArcElastic => 0.4,
             PerformanceDialect::FolkLift => 0.6,
             PerformanceDialect::DanceLocked => 0.25,
             PerformanceDialect::ProcessExact => 0.1,
@@ -242,6 +250,7 @@ impl PerformanceDialect {
             PerformanceDialect::CinematicArc => 0.9,
             PerformanceDialect::BossaFlow => 0.55,
             PerformanceDialect::MontunoCycle => 0.35,
+            PerformanceDialect::ModalArcElastic => 1.25,
             PerformanceDialect::DanceLocked => 0.6,
             PerformanceDialect::ProcessExact => 0.4,
             PerformanceDialect::FolkLift => 1.2,
@@ -273,6 +282,7 @@ impl PerformanceDialect {
             PerformanceDialect::CinematicArc => 1.1,
             PerformanceDialect::BossaFlow => 0.8,
             PerformanceDialect::MontunoCycle => 0.65,
+            PerformanceDialect::ModalArcElastic => 1.05,
             PerformanceDialect::DanceLocked => 0.4,
             PerformanceDialect::ProcessExact => 0.0,
         }
@@ -288,32 +298,34 @@ impl PerformanceDialect {
 /// priority order (a process piece with a pulse is still a process piece;
 /// a groove with a drone is still a groove):
 ///
-/// 1. `harmonic_stasis`/`full_drone`/`additive_process` → [`PerformanceDialect::ProcessExact`]
-/// 2. `planing` → [`PerformanceDialect::ImpressionistFloat`]
-/// 3. explicit Mazurka/Toccata accompaniment mechanisms → their provisional
+/// 1. `harmonic_stasis`/`additive_process` → [`PerformanceDialect::ProcessExact`]
+/// 2. `full_drone` → [`PerformanceDialect::ModalArcElastic`] for the
+///    existing staged modal-arc realization, not ProcessExact
+/// 3. `planing` → [`PerformanceDialect::ImpressionistFloat`]
+/// 4. explicit Mazurka/Toccata accompaniment mechanisms → their provisional
 ///    style-specific dialects (before any generic groove-family matching)
-/// 4. `MarchPulse` → [`PerformanceDialect::MarchLocked`]
-/// 5. `FolkPulse` → [`PerformanceDialect::FolkLift`]
-/// 6. `LullabyCradle` → [`PerformanceDialect::LullabySway`]
-/// 7. `Sarabande` / `Minuet` → their own measured triple-dance profiles
-/// 8. `OomPah` → [`PerformanceDialect::WaltzLilt`]
-/// 9. `JigGait` → [`PerformanceDialect::JigDrive`] before the drone fallback
-/// 10. `Habanera` → [`PerformanceDialect::TangoRubato`], and `CompasGait` →
+/// 5. `MarchPulse` → [`PerformanceDialect::MarchLocked`]
+/// 6. `FolkPulse` → [`PerformanceDialect::FolkLift`]
+/// 7. `LullabyCradle` → [`PerformanceDialect::LullabySway`]
+/// 8. `Sarabande` / `Minuet` → their own measured triple-dance profiles
+/// 9. `OomPah` → [`PerformanceDialect::WaltzLilt`]
+/// 10. `JigGait` → [`PerformanceDialect::JigDrive`] before the generic drone fallback
+/// 11. `Habanera` → [`PerformanceDialect::TangoRubato`], and `CompasGait` →
 ///     [`PerformanceDialect::CompasDrive`]
-/// 11. `BossaComp` → [`PerformanceDialect::BossaFlow`], `Montuno` →
+/// 12. `BossaComp` → [`PerformanceDialect::BossaFlow`], `Montuno` →
 ///     [`PerformanceDialect::MontunoCycle`]
-/// 12. `DevelopmentDna::Intensifying` → [`PerformanceDialect::CinematicArc`]
+/// 13. `DevelopmentDna::Intensifying` → [`PerformanceDialect::CinematicArc`]
 ///     after the more specific rhythm-cell routes
-/// 13. remaining rhythm cells (Shuffle), non-straight swing, or a full
+/// 14. remaining rhythm cells (Shuffle), non-straight swing, or a full
 ///     backbeat kit → groove: with a jazz marker (Shuffle, swing ≠ 0.5, or
 ///     `seventh_chords`) → [`PerformanceDialect::JazzLaidBack`], else
 ///     [`PerformanceDialect::DanceLocked`]
-/// 14. `roll_ornaments` or `drone` → [`PerformanceDialect::FolkLift`]
-/// 15. `PhraseRhetoric::Chorale` → [`PerformanceDialect::ChoraleAnchored`]
+/// 15. `roll_ornaments` or `drone` → [`PerformanceDialect::FolkLift`]
+/// 16. `PhraseRhetoric::Chorale` → [`PerformanceDialect::ChoraleAnchored`]
 ///     (reduce extra performance-layer stretch around the written hold)
-/// 16. `PhraseRhetoric::Singing` → [`PerformanceDialect::NocturneBreath`]
+/// 17. `PhraseRhetoric::Singing` → [`PerformanceDialect::NocturneBreath`]
 ///     (after stronger rhythm/process/folk markers)
-/// 17. everything else → [`PerformanceDialect::ClassicalRubato`] (the identity)
+/// 18. everything else → [`PerformanceDialect::ClassicalRubato`] (the identity)
 ///
 /// Remaining presets use ClassicalRubato as a neutral identity until a separate
 /// rhythmic/performance contract is justified; this baseline is not an assertion
@@ -322,8 +334,11 @@ pub fn dialect_for_spec(spec: &symthaea_music_theory::CompositionSpec) -> Perfor
     use symthaea_music_theory::Accompaniment as A;
     use symthaea_music_theory::DrumPolicy;
     let t = &spec.texture;
-    if t.harmonic_stasis || t.full_drone || t.additive_process {
+    if t.harmonic_stasis || t.additive_process {
         return PerformanceDialect::ProcessExact;
+    }
+    if t.full_drone {
+        return PerformanceDialect::ModalArcElastic;
     }
     if t.planing {
         return PerformanceDialect::ImpressionistFloat;
@@ -2025,7 +2040,7 @@ mod tests {
             (Style::BossaNova, D::BossaFlow), // connected BossaComp cell
             (Style::Opera, D::ClassicalRubato),
             (Style::IrishTraditional, D::FolkLift), // roll ornaments
-            (Style::HindustaniInspired, D::ProcessExact), // full drone
+            (Style::HindustaniInspired, D::ModalArcElastic), // staged modal arc
             // Six routes added by the style-completion tranche retain the
             // ClassicalRubato identity until their own timing contracts are
             // independently justified.
@@ -2054,6 +2069,21 @@ mod tests {
                 "{style:?} must derive {expected:?}"
             );
         }
+        assert_eq!(
+            Style::HindustaniInspired.grammar_profile().performance,
+            symthaea_music_theory::PerformanceDialect::DroneElastic,
+            "the modal-arc grammar's declared performance is elastic"
+        );
+        assert_eq!(
+            dialect_for_spec(&Style::Ambient.spec()),
+            D::ProcessExact,
+            "ambient harmonic stasis remains process-exact"
+        );
+        assert_eq!(
+            dialect_for_spec(&Style::Minimalism.spec()),
+            D::ProcessExact,
+            "additive minimalism remains process-exact"
+        );
     }
 
     #[test]
@@ -2092,6 +2122,7 @@ mod tests {
             (Style::Cinematic, D::CinematicArc),
             (Style::BossaNova, D::BossaFlow),
             (Style::AfroCuban, D::MontunoCycle),
+            (Style::HindustaniInspired, D::ModalArcElastic),
             (Style::Tango, D::TangoRubato),
             (Style::Flamenco, D::CompasDrive),
             (Style::SacredChoral, D::ChoraleAnchored),
@@ -2185,6 +2216,7 @@ mod tests {
         let cinematic = D::CinematicArc;
         let bossa = D::BossaFlow;
         let montuno = D::MontunoCycle;
+        let modal_arc = D::ModalArcElastic;
         let tango = D::TangoRubato;
         let compas = D::CompasDrive;
         let impressionist = D::ImpressionistFloat;
@@ -2221,6 +2253,14 @@ mod tests {
         assert_eq!(bossa.jitter_scale(), 0.55);
         assert_eq!(bossa.expressive_blend_scale(), 0.8);
         assert!(bossa.jitter_scale() < D::JazzLaidBack.jitter_scale());
+
+        assert_eq!(modal_arc.breath_scale(), 1.2);
+        assert_eq!(modal_arc.climax_scale(), 1.1);
+        assert_eq!(modal_arc.cadence_scale(), 0.4);
+        assert_eq!(modal_arc.jitter_scale(), 1.25);
+        assert_eq!(modal_arc.expressive_blend_scale(), 1.05);
+        assert!(modal_arc.jitter_scale() > classical.jitter_scale());
+        assert!(modal_arc.cadence_scale() < classical.cadence_scale());
 
         assert_eq!(montuno.breath_scale(), 0.2);
         assert_eq!(montuno.climax_scale(), 0.35);
