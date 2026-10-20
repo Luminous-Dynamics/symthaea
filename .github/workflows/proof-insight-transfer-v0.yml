@@ -26,12 +26,61 @@ jobs:
         with:
           toolchain: 1.96.0
           components: rustfmt, clippy
+      - name: Stage indexer as an isolated validation crate
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import re
+          import shutil
+          import tomllib
+          from pathlib import Path
+
+          root = Path.cwd()
+          crate_dir = root / "crates/bridges/symthaea-proof-insights"
+          crate_manifest_path = crate_dir / "Cargo.toml"
+          crate_text = crate_manifest_path.read_text()
+          crate = tomllib.loads(crate_text)
+          workspace = tomllib.loads((root / "Cargo.toml").read_text())
+          workspace_deps = workspace["workspace"]["dependencies"]
+          package_text = crate_text.split("[dependencies]", 1)[0].rstrip() + "\n\n[dependencies]\n"
+
+          def toml_value(value):
+              if isinstance(value, str):
+                  return json.dumps(value)
+              if isinstance(value, bool):
+                  return "true" if value else "false"
+              if isinstance(value, int):
+                  return str(value)
+              if isinstance(value, list):
+                  return "[" + ", ".join(toml_value(item) for item in value) + "]"
+              if isinstance(value, dict):
+                  return "{ " + ", ".join(f"{key} = {toml_value(item)}" for key, item in value.items()) + " }"
+              raise TypeError(f"unsupported TOML value: {type(value)!r}")
+
+          dependency_lines = []
+          for name, spec in crate.get("dependencies", {}).items():
+              if isinstance(spec, dict) and spec.get("workspace") is True:
+                  spec = workspace_deps[name]
+              dependency_lines.append(f"{name} = {toml_value(spec)}")
+
+          staged = Path(__import__("os").environ["RUNNER_TEMP"]) / "proof-insight-isolated"
+          if staged.exists():
+              shutil.rmtree(staged)
+          (staged / "src").mkdir(parents=True)
+          (staged / "Cargo.toml").write_text(package_text + "\n".join(dependency_lines) + "\n")
+          shutil.copy2(crate_dir / "src/main.rs", staged / "src/main.rs")
+          shutil.copy2(root / "Cargo.lock", staged / "Cargo.lock")
+          print(f"Staged isolated crate {crate['package']['name']} at {staged}")
+          PY
+          echo "PITB_MANIFEST=$RUNNER_TEMP/proof-insight-isolated/Cargo.toml" >> "$GITHUB_ENV"
       - name: Check exact-package formatting
-        run: cargo fmt --manifest-path Cargo.toml -p symthaea-proof-insights -- --check
+        run: cargo fmt --manifest-path "$PITB_MANIFEST" -- --check
       - name: Run indexer unit tests
-        run: cargo test --locked --manifest-path Cargo.toml -p symthaea-proof-insights
+        run: cargo test --locked --manifest-path "$PITB_MANIFEST"
       - name: Run strict Clippy
-        run: cargo clippy --locked --manifest-path Cargo.toml -p symthaea-proof-insights --all-targets -- -D warnings
+        run: cargo clippy --locked --manifest-path "$PITB_MANIFEST" --all-targets -- -D warnings
       - name: Install independent Draft 2020-12 validator
         uses: actions/setup-python@v5
         with:
@@ -170,8 +219,8 @@ jobs:
           git -C "$upstream" checkout --quiet --detach "$upstream_sha"
           test "$(git -C "$upstream" rev-parse HEAD)" = "$upstream_sha"
           test -z "$(git -C "$upstream" status --porcelain)"
-          cargo run --locked --manifest-path Cargo.toml -p symthaea-proof-insights -- "$upstream" "$upstream_sha" "$first"
-          cargo run --locked --manifest-path Cargo.toml -p symthaea-proof-insights -- "$upstream" "$upstream_sha" "$second"
+          cargo run --locked --manifest-path "$PITB_MANIFEST" -- "$upstream" "$upstream_sha" "$first"
+          cargo run --locked --manifest-path "$PITB_MANIFEST" -- "$upstream" "$upstream_sha" "$second"
           cmp "$first" "$second"
           jq -e --arg sha "$upstream_sha" '
             .upstream_commit == $sha and
