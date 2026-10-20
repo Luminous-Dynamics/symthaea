@@ -58,6 +58,8 @@ pub struct PairedSliceRequirement {
     /// Maximum candidate false-safe rate; denominator is all valid pairs in this slice.
     pub maximum_false_safe_rate: f64,
     pub maximum_missed_feasible_rate: f64,
+    /// True only after an engineer has reviewed the threshold and safe-side semantics.
+    pub engineering_constraint_reviewed: bool,
     pub engineering_constraint: Option<EngineeringConstraint>,
 }
 
@@ -78,6 +80,9 @@ pub struct PairedReplayProfile {
     /// required for paired comparisons that claim an equal target-label budget.
     pub baseline_target_label_group_ids: Vec<String>,
     pub candidate_target_label_group_ids: Vec<String>,
+    /// Attestation that methods, splits, scoring contract and thresholds were frozen before
+    /// the final confirmation outcomes were inspected.
+    pub central_interval_semantics_reviewed: bool,
     /// Attestation that methods, splits, scoring contract and thresholds were frozen before
     /// the final confirmation outcomes were inspected.
     pub final_confirmation_frozen_before_outcomes: bool,
@@ -137,6 +142,11 @@ pub enum PairedReplayIssue {
     InvalidProfileDigest { field: &'static str },
     ProfileManifestDigestMismatch,
     ModelNotFrozenBeforeFinalConfirmation,
+    CentralIntervalSemanticsNotReviewed,
+    EngineeringConstraintNotReviewed {
+        operating_case_id: String,
+        observable_id: String,
+    },
     NoRequiredSlices,
     DuplicateRequiredSlice {
         operating_case_id: String,
@@ -418,6 +428,10 @@ fn push_requirement(encoder: &mut CanonicalEncoder, requirement: &PairedSliceReq
         "slice.maximum_missed_feasible_rate",
         requirement.maximum_missed_feasible_rate,
     );
+    encoder.boolean(
+        "slice.engineering_constraint_reviewed",
+        requirement.engineering_constraint_reviewed,
+    );
     match &requirement.engineering_constraint {
         Some(constraint) => {
             encoder.boolean("slice.constraint.present", true);
@@ -459,6 +473,10 @@ pub fn canonical_paired_replay_profile_sha256(profile: &PairedReplayProfile) -> 
     encoder.text("candidate_method_revision", &profile.candidate_method_revision);
     encoder.strings("baseline_target_label_group_ids", &profile.baseline_target_label_group_ids);
     encoder.strings("candidate_target_label_group_ids", &profile.candidate_target_label_group_ids);
+    encoder.boolean(
+        "central_interval_semantics_reviewed",
+        profile.central_interval_semantics_reviewed,
+    );
     encoder.boolean(
         "final_confirmation_frozen_before_outcomes",
         profile.final_confirmation_frozen_before_outcomes,
@@ -534,6 +552,9 @@ fn validate_profile(profile: &PairedReplayProfile) -> (bool, Vec<PairedReplayIss
     }
     if !profile.final_confirmation_frozen_before_outcomes {
         issues.push(PairedReplayIssue::ModelNotFrozenBeforeFinalConfirmation);
+    }
+    if !profile.central_interval_semantics_reviewed {
+        issues.push(PairedReplayIssue::CentralIntervalSemanticsNotReviewed);
     }
     if !profile.maximum_conditional_coverage_gap.is_finite()
         || !(0.0..=1.0).contains(&profile.maximum_conditional_coverage_gap)
@@ -702,6 +723,14 @@ fn validate_profile(profile: &PairedReplayProfile) -> (bool, Vec<PairedReplayIss
                     field,
                 });
             }
+        }
+        if requirement.engineering_constraint.is_some()
+            && !requirement.engineering_constraint_reviewed
+        {
+            issues.push(PairedReplayIssue::EngineeringConstraintNotReviewed {
+                operating_case_id: requirement.operating_case_id.clone(),
+                observable_id: requirement.observable_id.clone(),
+            });
         }
         if requirement
             .engineering_constraint
@@ -1514,6 +1543,7 @@ mod tests {
             maximum_normalized_width_increase: 0.2,
             maximum_false_safe_rate: 0.0,
             maximum_missed_feasible_rate: 1.0,
+            engineering_constraint_reviewed: true,
             engineering_constraint: Some(EngineeringConstraint {
                 direction: ConstraintDirection::MaximumAllowed,
                 limit: 100.0,
@@ -1536,6 +1566,7 @@ mod tests {
             candidate_method_revision: "r1".to_string(),
             baseline_target_label_group_ids: vec!["label-1".to_string(), "label-2".to_string()],
             candidate_target_label_group_ids: vec!["label-1".to_string(), "label-2".to_string()],
+            central_interval_semantics_reviewed: true,
             final_confirmation_frozen_before_outcomes: true,
             maximum_conditional_coverage_gap: 0.50,
             evaluation_group_ids: (0..6).map(|i| format!("group-{i}")).collect(),
@@ -1702,6 +1733,31 @@ mod tests {
         let rows = panel(0.0);
         let report = evaluate_paired_replay(&profile, &rows);
         assert_eq!(report.disposition, PairedReplayDisposition::InvalidProfile);
+    }
+
+    #[test]
+    fn unreviewed_interval_semantics_invalidate_comparison() {
+        let mut profile = profile();
+        profile.central_interval_semantics_reviewed = false;
+        refresh(&mut profile);
+        let report = evaluate_paired_replay(&profile, &panel(0.0));
+        assert_eq!(report.disposition, PairedReplayDisposition::InvalidProfile);
+        assert!(report.issues.contains(
+            &PairedReplayIssue::CentralIntervalSemanticsNotReviewed
+        ));
+    }
+
+    #[test]
+    fn unreviewed_engineering_limit_cannot_authorize_safety_decision_gate() {
+        let mut profile = profile();
+        profile.required_slices[0].engineering_constraint_reviewed = false;
+        refresh(&mut profile);
+        let report = evaluate_paired_replay(&profile, &panel(0.0));
+        assert_eq!(report.disposition, PairedReplayDisposition::InvalidProfile);
+        assert!(report.issues.iter().any(|issue| matches!(
+            issue,
+            PairedReplayIssue::EngineeringConstraintNotReviewed { .. }
+        )));
     }
 
     #[test]
