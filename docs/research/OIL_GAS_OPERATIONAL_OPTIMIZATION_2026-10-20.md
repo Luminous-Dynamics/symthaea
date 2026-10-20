@@ -17,8 +17,8 @@ Do not compare a prototype to a straw-man industry baseline.
   Source: https://www.iea.org/reports/global-methane-tracker-2026/key-findings
 - OGMP 2.0's 2026 report describes 163 member companies in 90 countries, covering 43% of global oil and gas production; 69% of their reported emissions were based on measurement-derived data. Its Level 5 approach reconciles source-level inventories with independent site-level measurement; site-level data complement, rather than replace, source-level information.  
   Sources: https://www.ogmpartnership.org/events/ogmp-20-2026-report-measurement-mitigation-better-methane-data-enabling-action and https://www.ogmpartnership.org/frequently-asked-questions
-- DOE/NETL's open-source PARETO framework already optimizes produced-water infrastructure, treatment, distribution, and beneficial reuse. NETL's NEWTS data resource describes more than 400,000 energy-related wastewater samples. We should benchmark against and interoperate with PARETO, not claim that a new optimizer invents water-network optimization.  
-  Sources: https://github.com/project-pareto/project-pareto and https://netl.doe.gov/centers-of-excellence/oil-gas
+- DOE/NETL's open-source PARETO framework already optimizes produced-water infrastructure, treatment, distribution, and beneficial reuse. Its repository lists release 1.2 (May 2026) as the latest release, and its issue tracker includes work on optimization failure feedback and scenario validation (issue #371, opened September 2026). This makes reproducible scenario handling and clear infeasibility explanations part of a credible comparison—not optional polish. NETL's NEWTS data resource describes more than 400,000 energy-related wastewater samples. We should benchmark against and interoperate with PARETO, not claim that a new optimizer invents water-network optimization.  
+  Sources: https://github.com/project-pareto/project-pareto, https://github.com/project-pareto/project-pareto/issues/371, and https://netl.doe.gov/centers-of-excellence/oil-gas
 - Established vendors already provide connected drilling, production optimization, autonomous workflows, process simulation, and digital twins. SLB describes integrated digital operations across reservoir, drilling, production, and facility workflows. AspenTech markets Aspen HYSYS for process modeling and dynamic studies. Our prototype must be compared against the relevant installed workflow and its data quality, not marketing copy or generic dashboards.  
   Sources: https://www.slb.com/solutions/digital-operations and https://www.aspentech.com/en/products/engineering/aspen-hysys
 
@@ -65,6 +65,24 @@ All strategies reject malformed scenario ordering and require positive capex (so
 
 The exact and frontier solvers are intentionally capped at 20 candidate interventions (at most 1,048,576 subsets). The greedy baseline accepts more candidates but remains only a simple ratio heuristic. None of these functions infer emissions, establish that an intervention is safe, or model interactions between different source groups.
 
+
+## Sol-Atlas integration: do not collapse distinct methane evidence
+
+Compose existing Sol-Atlas work rather than create a parallel flare-ingestion pipeline:
+- Gas-flaring opportunity-screening contract: https://github.com/Luminous-Dynamics/sol-atlas-leptos/issues/93
+- Distinct flare/plume/source methane evidence contract: https://github.com/Luminous-Dynamics/sol-atlas-leptos/issues/96
+
+Those contracts make a crucial semantic distinction:
+- Annual flare-volume estimates (for example, m³/year) are not methane-leakage measurements.
+- An instantaneous satellite plume estimate (for example, kg CH4/hour for one observation) is not an annual source inventory.
+- A source-level aggregate/time series is another data product and must preserve its method and temporal basis.
+- A missing plume or satellite non-detection is not a zero-emissions observation.
+- A candidate site match, nearby pipeline, or nearby grid is not proof of shared identity, spare capacity, connection rights, recoverable gas, economic viability, or permitted operation.
+
+Candidate optimization must consume only a typed, evidence-qualified intervention packet. Carry source snapshot digests, quantity kind, units, observation window, uncertainty type, quality flags, geospatial resolution, license/use gate, candidate site relation, unresolved conflicts and claim ceiling through to the output. No production use of Carbon Mapper or UNEP IMEO/MARS datasets should start until current access and commercial/non-commercial terms have been reviewed. A signed calculation receipt establishes lineage and attestation, not the physical truth of the input data.
+
+References: https://www.worldbank.org/en/programs/gasflaringreduction/global-flaring-data ; https://api.carbonmapper.org/api/v1/docs ; https://carbonmapper.org/articles/product-guide ; https://methanedata.unep.org/dict-mars-plumes
+
 ## Benchmark design and targets
 
 All comparisons must freeze the data version, units, time basis, baseline workflow, random seed where applicable, model/configuration hashes, decision constraints, and evaluation script. Keep training/calibration cases separate from held-out evaluation cases. Report negative results and uncertainty.
@@ -78,7 +96,7 @@ All comparisons must freeze the data version, units, time basis, baseline workfl
 | Integrity analytics | Current inspection/condition-monitoring workflow and a naive/static rule baseline | Detection lead time, recall at a fixed false-alert burden, localization error, calibration, downtime | Improve an agreed metric on held-out labelled events while reporting missed detections and false positives |
 | Cross-asset resilience | Current planning workflow | Service interruption, common-mode failures, recovery time, total lifecycle cost and environmental effects | Improve the pre-registered Pareto frontier without weakening safety, environmental, or evidence constraints |
 
-The 10% target above is a proposed engineering hurdle, not a measured result, market benchmark, or forecast. It should be adjusted before evaluation only if the dataset and statistical power justify the change; the final target must be frozen before testing. A result on synthetic fixtures establishes optimizer behavior only.
+The 10% target above is a proposed engineering hurdle, not a measured result, market benchmark, or forecast. It is meaningful only when the baseline and candidate are evaluated on held-out cases using independently supported abatement outcomes and comparable measurement uncertainty. Freeze it before testing; do not score uncalibrated model-generated scenario floors as actual abatement. A result on synthetic fixtures establishes optimizer behavior only.
 
 ## Adversarial cases that the benchmark must include
 
