@@ -190,7 +190,9 @@
         "typed structural-search failure modes: non-convergence, geometry collapse, interatomic overlap, support/interface breakdown, non-finite force, out-of-domain recommendation, and abstention",
         "failure-mode rates scoped by evaluation stratum (e.g., particle size × support surface × temperature regime), with the scope digest retained",
         "published reference-search reproduction on 12 explicit strata: Cu27/Cu38/Cu47/Cu55 × γ-Al2O3(100)/γ-Al2O3(110)/α-Al2O3(0001)",
-        "reference-method/checkpoint/data-manifest completeness and checksum coverage before claim-bearing execution"
+        "reference-method/checkpoint/data-manifest completeness and checksum coverage before claim-bearing execution",
+        "paper-compatible budget: 50 lowest-energy candidates per MLIP locally DFT-optimized per stratum; record the original candidate pool, failed refinements, duplicates and resulting unique validated discoveries",
+        "distinct budget for the policy-extension phase: matched per-policy reference budget over at least 20 paired seeds, with router/preprocessing/retry costs included"
       ],
       "gates": [
         "report energy accuracy and structural exploration as separate score families",
@@ -205,7 +207,9 @@
         "report each evaluation stratum separately before any cross-stratum aggregate; no result may pool particle sizes, support surfaces or thermodynamic regimes into one hidden rate",
         "reproduce the published GA/reference protocol, including population 50, 20 generations, random initial population, cut-and-splice and mutation, after pinning every remaining method setting",
         "preserve the 12 per-size/per-surface strata; keep the 2025 related Zenodo training/validation/global-minima archive distinct from the exact 2026 benchmark evaluation manifest",
-        "no claim-bearing run until exact DFT settings, candidate/reference structure manifest, model checkpoints, licenses, evaluator version and SHA-256 artifact digests are pinned"
+        "no claim-bearing run until exact DFT settings, candidate/reference structure manifest, model checkpoints, licenses, evaluator version and SHA-256 artifact digests are pinned",
+        "report the published reproduction phase separately from the policy-extension phase; do not infer exact candidate counts from population × generations when code-level duplicate/offspring accounting has not been pinned",
+        "for the extension stretch claim, use paired seeds and identical frozen targets; if either policy fails to reach the target, target-reaching acceleration is undefined for that pair and the failure remains in the report"
       ]
     },
     {
