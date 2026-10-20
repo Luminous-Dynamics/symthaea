@@ -140,6 +140,13 @@ pub enum CalibrationIssue {
     ModelConfigurationMismatch { observation_id: String },
     UndeclaredEvaluationGroup { observation_id: String },
     MissingEvaluationGroup { evaluation_group_id: String },
+    MissingEvaluationGroupSlice {
+        evaluation_group_id: String,
+        operating_case_id: String,
+        observable_id: String,
+        unit_id: String,
+        nominal_coverage_bp: u16,
+    },
     UndeclaredSlice {
         observation_id: String,
         operating_case_id: String,
@@ -746,6 +753,7 @@ pub fn evaluate_calibration(
         .map(|s| s.trim().to_owned())
         .collect();
     let mut seen_evaluation_groups = BTreeSet::new();
+    let mut seen_evaluation_group_slices: BTreeSet<GroupSliceKey> = BTreeSet::new();
     let mut sorted_observations: Vec<&CalibrationObservation> = observations
         .iter()
         .filter(|o| {
@@ -887,7 +895,15 @@ pub fn evaluate_calibration(
             continue;
         }
 
-        seen_evaluation_groups.insert(observation.evaluation_group_id.trim().to_owned());
+        let group_id = observation.evaluation_group_id.trim().to_owned();
+        seen_evaluation_groups.insert(group_id.clone());
+        seen_evaluation_group_slices.insert((
+            group_id,
+            key.0.clone(),
+            key.1.clone(),
+            key.2.clone(),
+            key.3,
+        ));
         if observation.applicability != ApplicabilityStatus::WithinDeclaredEnvelope {
             issues.push(CalibrationIssue::ApplicabilityNotEstablished {
                 observation_id: id.clone(),
@@ -910,6 +926,25 @@ pub fn evaluate_calibration(
                 evaluation_group_id: group_id.clone(),
             });
             missing_required_coverage = true;
+        }
+        for key in requirements.keys() {
+            let group_slice_key = (
+                group_id.clone(),
+                key.0.clone(),
+                key.1.clone(),
+                key.2.clone(),
+                key.3,
+            );
+            if !seen_evaluation_group_slices.contains(&group_slice_key) {
+                issues.push(CalibrationIssue::MissingEvaluationGroupSlice {
+                    evaluation_group_id: group_id.clone(),
+                    operating_case_id: key.0.clone(),
+                    observable_id: key.1.clone(),
+                    unit_id: key.2.clone(),
+                    nominal_coverage_bp: key.3,
+                });
+                missing_required_coverage = true;
+            }
         }
     }
 
@@ -1176,6 +1211,25 @@ mod tests {
         assert_eq!(report.disposition, CalibrationDisposition::InvalidObservations);
         assert_eq!(report.duplicated_observation_record_count, 2);
         assert_eq!(report.slices[0].observation_count, 1);
+    }
+
+    #[test]
+    fn every_declared_evaluation_group_must_cover_every_required_slice() {
+        let mut p = profile();
+        let mut second = requirement();
+        second.operating_case_id = "depth-ratio-4.0".to_owned();
+        p.required_slices.push(second);
+        p.profile_manifest_sha256 = canonical_calibration_profile_sha256(&p);
+        let observations = two_covered();
+        let report = evaluate_calibration(&p, &observations);
+        assert_eq!(report.disposition, CalibrationDisposition::IncompleteCoverage);
+        assert!(has_issue(&report, &CalibrationIssue::MissingEvaluationGroupSlice {
+            evaluation_group_id: "eval-A".to_owned(),
+            operating_case_id: "depth-ratio-4.0".to_owned(),
+            observable_id: "resistance".to_owned(),
+            unit_id: "N".to_owned(),
+            nominal_coverage_bp: 9_000,
+        }));
     }
 
     #[test]
