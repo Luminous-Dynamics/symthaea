@@ -933,7 +933,13 @@ fn audit_temporal_dataset(
                             Some(before_is_completion_ancestor);
                         if before_is_completion_ancestor {
                             commit_before_ancestor_of_completion_count += 1;
-                            if git_path_exists_at_commit(&root, &commit_before, &raw_file_path)? {
+                            if !formal_statement_is_empty
+                                && git_path_exists_at_commit(
+                                    &root,
+                                    &commit_before,
+                                    &raw_file_path,
+                                )?
+                            {
                                 let before_source =
                                     git_show_file(&root, &commit_before, &raw_file_path)?;
                                 let normalized_statement = normalize_whitespace(&formal_statement);
@@ -949,7 +955,12 @@ fn audit_temporal_dataset(
                         }
                     }
 
-                    if git_path_exists_at_commit(&root, &matched.completion_commit, &raw_file_path)?
+                    if !formal_statement_is_empty
+                        && git_path_exists_at_commit(
+                            &root,
+                            &matched.completion_commit,
+                            &raw_file_path,
+                        )?
                     {
                         let completion_source =
                             git_show_file(&root, &matched.completion_commit, &raw_file_path)?;
