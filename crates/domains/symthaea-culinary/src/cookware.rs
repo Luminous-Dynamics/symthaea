@@ -400,7 +400,8 @@ pub fn validate_cookware_benchmark(
                     CookwareViolationCode::MissingFoodContactQualification,
                     Some(&candidate.candidate_id),
                     None,
-                    "food-contact suitability claim requires a qualification reference for this declared use and jurisdiction",
+                    "food-contact suitability claim requires a qualification reference for this",
+                    "declared use and jurisdiction",
                 );
             }
         }
@@ -623,7 +624,8 @@ pub fn validate_cookware_benchmark(
                     Some(&run.candidate_id),
                     Some(&run.run_id),
                     format!(
-                        "required metric {:?} must be instrument-observed for an empirical comparison",
+                        "required metric {:?} must be instrument-observed for an empirical",
+                        "comparison",
                         observation.metric
                     ),
                 );
