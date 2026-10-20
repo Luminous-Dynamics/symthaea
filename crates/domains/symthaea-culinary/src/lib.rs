@@ -33,6 +33,7 @@
 //! No external dependencies; all data is embedded (see `data/PROVENANCE.md`).
 
 pub mod balance;
+pub mod cookware;
 pub mod data;
 pub mod dynamics;
 pub mod flavor_network;
