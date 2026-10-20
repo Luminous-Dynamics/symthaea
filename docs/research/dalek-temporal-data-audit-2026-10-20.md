@@ -55,6 +55,8 @@ The temporal replay manifest now distinguishes three independent pieces of evide
 
 The Rust verifier also checks the pinned repository HEAD/origin, timeline digest, actual `lean-toolchain` bytes, the pinned Mathlib revision extracted from the committed Lake manifest, Git ancestry, full source-file digests, exact line-span digests, future-proof visibility, and exact-content aliases. A local Git integration test exercises these checks over a synthetic three-commit history.
 
+Two additional read-only commands now reproduce the source audit in CI and upload exact JSON receipts. `--audit-temporal-timeline` accounts for all 248 CSV rows and explicitly records the README claim of 249 versus the actual 248 data rows. `--audit-temporal-dataset` joins the pinned 146-row `dataset.jsonl` against the timeline by exact file path without making arbitrary selections: at this pin it expects 39 unique path matches, 58 ambiguous matches, and 49 unmatched records. It hashes each record's formal statement and, when the path join is unique and commit evidence permits, checks whether that statement occurs in the source file at `commit_before` and at the matching completion commit. This detects likely statement drift but does not prove elaborated-expression equivalence. Each audit report is validated against a strict Draft 2020-12 schema and is provenance-only, not a model evaluation.
+
 This is a provenance and statement-stability gate. It does **not** establish semantic equivalence when the statement changes; it rejects that case so a separate expert review can decide whether the task is worth remapping.
 
 ## Next external-track acceptance gates
