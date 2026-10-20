@@ -199,6 +199,7 @@ fn metric_names() -> &'static [&'static str] {
     &[
         "coverage",
         "sensitivity",
+        "end_to_end_hazard_sensitivity",
         "specificity",
         "precision",
         "negative_predictive_value",
@@ -514,6 +515,7 @@ fn metric_value(report: &BinarySafetyMetricReport, metric: &str) -> Option<f64> 
     match metric {
         "coverage" => report.coverage,
         "sensitivity" => report.sensitivity,
+        "end_to_end_hazard_sensitivity" => report.end_to_end_hazard_sensitivity,
         "specificity" => report.specificity,
         "precision" => report.precision,
         "negative_predictive_value" => report.negative_predictive_value,
