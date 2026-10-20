@@ -372,5 +372,4 @@ mod tests {
             "workcell lane must include fail-closed corpus execution and valid controls"
         );
     }
-
 }
