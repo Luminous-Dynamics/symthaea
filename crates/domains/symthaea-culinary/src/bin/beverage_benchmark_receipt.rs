@@ -7,12 +7,11 @@
 //! quality, fermentation kinetics, food safety, sensory outcomes, or SOTA claims.
 
 use serde::Deserialize;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::{
     collections::BTreeSet,
-    env,
-    fs,
+    env, fs,
     path::PathBuf,
     process::{Command, ExitCode},
 };
@@ -198,7 +197,9 @@ fn validate_inputs(corpus_bytes: &[u8], schema_bytes: &[u8]) -> CheckResult {
     let mut names = BTreeSet::new();
     for (index, scenario) in corpus.scenarios.iter().enumerate() {
         let prefix = format!("scenario_{}", index + 1);
-        let valid_id = scenario.id.strip_prefix("BEV-")
+        let valid_id = scenario
+            .id
+            .strip_prefix("BEV-")
             .is_some_and(|suffix| suffix.len() == 3 && suffix.bytes().all(|b| b.is_ascii_digit()));
         if !valid_id {
             errors.push(format!("{prefix}_id_invalid"));
@@ -209,10 +210,16 @@ fn validate_inputs(corpus_bytes: &[u8], schema_bytes: &[u8]) -> CheckResult {
         if scenario.name.trim().is_empty() || !names.insert(scenario.name.as_str()) {
             errors.push(format!("{prefix}_name_empty_or_duplicate"));
         }
-        if !product_values.as_ref().is_some_and(|values| values.contains(&scenario.product)) {
+        if !product_values
+            .as_ref()
+            .is_some_and(|values| values.contains(&scenario.product))
+        {
             errors.push(format!("{prefix}_product_not_in_schema_enum"));
         }
-        if !disposition_values.as_ref().is_some_and(|values| values.contains(&scenario.expected_disposition)) {
+        if !disposition_values
+            .as_ref()
+            .is_some_and(|values| values.contains(&scenario.expected_disposition))
+        {
             errors.push(format!("{prefix}_disposition_not_in_schema_enum"));
         }
         if scenario.task.trim().is_empty() {
@@ -224,7 +231,11 @@ fn validate_inputs(corpus_bytes: &[u8], schema_bytes: &[u8]) -> CheckResult {
         if scenario.guards.is_empty() || scenario.guards.iter().any(|item| item.trim().is_empty()) {
             errors.push(format!("{prefix}_guards_empty_or_blank"));
         }
-        if scenario.primary_metrics.iter().any(|item| item.trim().is_empty()) {
+        if scenario
+            .primary_metrics
+            .iter()
+            .any(|item| item.trim().is_empty())
+        {
             errors.push(format!("{prefix}_primary_metric_blank"));
         }
         if scenario.claim_ceiling.trim().is_empty() {
@@ -267,7 +278,9 @@ fn parse_args() -> Result<(PathBuf, PathBuf, String, PathBuf), String> {
     let mut args = env::args().skip(1);
 
     while let Some(flag) = args.next() {
-        let value = args.next().ok_or_else(|| format!("missing_value_for_{flag}"))?;
+        let value = args
+            .next()
+            .ok_or_else(|| format!("missing_value_for_{flag}"))?;
         match flag.as_str() {
             "--corpus" => corpus = Some(PathBuf::from(value)),
             "--schema" => schema = Some(PathBuf::from(value)),
@@ -288,15 +301,17 @@ fn parse_args() -> Result<(PathBuf, PathBuf, String, PathBuf), String> {
 fn run() -> Result<ExitCode, String> {
     let (corpus_path, schema_path, expected_head, output_path) = parse_args()?;
     let actual_head = git_head()?;
-    let corpus_bytes = fs::read(&corpus_path)
-        .map_err(|error| format!("corpus_read_failed: {error}"))?;
-    let schema_bytes = fs::read(&schema_path)
-        .map_err(|error| format!("schema_read_failed: {error}"))?;
+    let corpus_bytes =
+        fs::read(&corpus_path).map_err(|error| format!("corpus_read_failed: {error}"))?;
+    let schema_bytes =
+        fs::read(&schema_path).map_err(|error| format!("schema_read_failed: {error}"))?;
 
     let mut check = validate_inputs(&corpus_bytes, &schema_bytes);
     let valid_head = head_matches(&expected_head, &actual_head);
     if !valid_head {
-        check.errors.push("exact_head_mismatch_or_invalid_expected_head".to_owned());
+        check
+            .errors
+            .push("exact_head_mismatch_or_invalid_expected_head".to_owned());
     }
 
     let passed = check.passed();
@@ -320,7 +335,11 @@ fn run() -> Result<ExitCode, String> {
     fs::write(&output_path, serialized)
         .map_err(|error| format!("receipt_write_failed: {error}"))?;
 
-    if passed { Ok(ExitCode::SUCCESS) } else { Ok(ExitCode::FAILURE) }
+    if passed {
+        Ok(ExitCode::SUCCESS)
+    } else {
+        Ok(ExitCode::FAILURE)
+    }
 }
 
 fn main() -> ExitCode {
@@ -367,16 +386,27 @@ mod tests {
     #[test]
     fn missing_claim_ceiling_fails_closed() {
         let mut corpus: Value = serde_json::from_slice(real_corpus()).expect("valid corpus json");
-        corpus["scenarios"][0].as_object_mut().expect("scenario object").remove("claim_ceiling");
+        corpus["scenarios"][0]
+            .as_object_mut()
+            .expect("scenario object")
+            .remove("claim_ceiling");
         let bytes = serde_json::to_vec(&corpus).expect("serialize modified corpus");
         let result = validate_inputs(&bytes, real_schema());
-        assert!(result.errors.iter().any(|e| e.starts_with("corpus_json_or_shape_invalid")));
+        assert!(
+            result
+                .errors
+                .iter()
+                .any(|e| e.starts_with("corpus_json_or_shape_invalid"))
+        );
     }
 
     #[test]
     fn unknown_fields_fail_closed() {
         let mut corpus: Value = serde_json::from_slice(real_corpus()).expect("valid corpus json");
-        corpus.as_object_mut().expect("corpus object").insert("injected_pass".to_owned(), json!(true));
+        corpus
+            .as_object_mut()
+            .expect("corpus object")
+            .insert("injected_pass".to_owned(), json!(true));
         let bytes = serde_json::to_vec(&corpus).expect("serialize modified corpus");
         let result = validate_inputs(&bytes, real_schema());
         assert!(result.errors.iter().any(|e| e.starts_with("corpus_json_or_shape_invalid")));
@@ -385,9 +415,18 @@ mod tests {
     #[test]
     fn schema_enum_drift_fails_closed() {
         let mut schema: Value = serde_json::from_slice(real_schema()).expect("valid schema json");
-        schema["properties"]["scenarios"]["items"]["properties"]["product"]["enum"] = json!(["beer"]);
-        let result = validate_inputs(real_corpus(), &serde_json::to_vec(&schema).expect("serialize schema"));
-        assert!(result.errors.iter().any(|e| e.ends_with("_not_in_schema_enum")));
+        schema["properties"]["scenarios"]["items"]["properties"]["product"]["enum"] =
+            json!(["beer"]);
+        let result = validate_inputs(
+            real_corpus(),
+            &serde_json::to_vec(&schema).expect("serialize schema"),
+        );
+        assert!(
+            result
+                .errors
+                .iter()
+                .any(|e| e.ends_with("_not_in_schema_enum"))
+        );
     }
 
     #[test]
@@ -415,6 +454,11 @@ mod tests {
         corpus["status"] = json!("measured_industrial_data");
         let bytes = serde_json::to_vec(&corpus).expect("serialize modified corpus");
         let result = validate_inputs(&bytes, real_schema());
-        assert!(result.errors.iter().any(|e| e == "corpus_evidence_status_mismatch"));
+        assert!(
+            result
+                .errors
+                .iter()
+                .any(|e| e == "corpus_evidence_status_mismatch")
+        );
     }
 }
