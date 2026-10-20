@@ -90,7 +90,61 @@
       "Rational constants and the minimum graph size are proof-critical; changing them requires rechecking every inequality.",
       "This record abstracts the proof architecture; it does not reproduce or shorten the substantial analytic/probabilistic graph-construction argument."
     ],
-    "transfer_candidates": []
+    "transfer_candidates": [
+      {
+        "target_family_id": "184",
+        "target_theorem_id": "OAI.CliqueFreeLog.logarithmic_independence_bound",
+        "rationale": "Rejected after checking that family 184 is a distinct train family. The source fact indepNum(G) ≤ 2 yields a lower bound on chromatic number via |V| ≤ 2χ(G); the target asks for a lower bound on indepNum(G) for clique-free graphs as a function of order and average degree. The source's premise bounds the same invariant in the opposite direction and does not discharge the target theorem's optimizer/degree-cutoff obligations.",
+        "preconditions_checked": [
+          "Confirmed family 184 is assigned to train before inspecting CliqueFree/Main.lean.",
+          "Read HadwigerMatching/ChromaticBound.lean: card_le_twice_chromaticNumber_of_indepNum assumes indepNum G ≤ 2 and concludes Fintype.card V ≤ 2 * chromaticNumber G.",
+          "Read CliqueFree/Main.lean: logarithmic_independence_bound assumes CliqueFree r and average degree ≥ 2 and concludes a positive logarithmic lower bound on indepNum G.",
+          "No target proof obligation is discharged by reversing the source upper bound on indepNum; no tactic or lemma transfer was attempted."
+        ],
+        "status": "rejected",
+        "directional_contract": {
+          "compatibility": "incompatible",
+          "mismatch_codes": [
+            "inequality_direction",
+            "predicate_mismatch",
+            "precondition_mismatch",
+            "domain_mismatch"
+          ],
+          "source_move_requires": "Use the source's premise indepNum(G) ≤ 2 to derive |V(G)| ≤ 2χ(G), a chromatic-number lower bound. The key independent-set fact is an upper bound on indepNum(G).",
+          "target_goal_requires": "For each r ≥ 4, show that there is c > 0 such that every finite r-clique-free graph G with average degree d ≥ 2 satisfies c·|V(G)|·log(d)/d ≤ indepNum(G), a lower bound on indepNum(G).",
+          "notes": [
+            "Same broad graph-theory vocabulary does not imply a reusable invariant move: source upper-bounds independence number, while target must lower-bound it under different hypotheses.",
+            "Static curator adjudication only; this is not an empirical failed proof attempt."
+          ],
+          "move_kind": "inequality_transfer",
+          "source_obligation": {
+            "domain": "extremal_graph_theory",
+            "object_type": "finite_simple_graph",
+            "predicate": "G.indepNum",
+            "relation": "upper_bound",
+            "quantifier_scope": "For any finite simple graph G with indepNum(G) ≤ 2; this permits a lower bound on chromatic number from graph order.",
+            "preconditions": [
+              "G is a finite simple graph.",
+              "G.indepNum ≤ 2."
+            ]
+          },
+          "target_obligation": {
+            "domain": "clique_free_extremal_graph_theory",
+            "object_type": "finite_simple_graph",
+            "predicate": "G.indepNum",
+            "relation": "lower_bound",
+            "quantifier_scope": "For every integer r ≥ 4, finite simple graph G, and average degree d ≥ 2 with G.CliqueFree r, a positive constant c(r) satisfies c·|V(G)|·log(d)/d ≤ indepNum(G).",
+            "preconditions": [
+              "r ≥ 4.",
+              "G is a finite simple graph.",
+              "G.CliqueFree r.",
+              "averageDegree(G) ≥ 2.",
+              "A positive constant is established through the target's weighted optimizer and degree-cutoff argument."
+            ]
+          }
+        }
+      }
+    ]
   },
   "verification": {
     "status": "not_attempted",
