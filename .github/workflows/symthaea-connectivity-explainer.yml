@@ -1,0 +1,46 @@
+name: symthaea-connectivity-explainer
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-connectivity-explainer/**"
+      - "docs/SYMTHAEA_CONNECTIVITY_EXPLAINER_V1.md"
+      - ".github/workflows/symthaea-connectivity-explainer.yml"
+  push:
+    branches: [main, feat/connectivity-evidence-explainer-v1]
+    paths:
+      - "crates/domains/symthaea-connectivity-explainer/**"
+      - "docs/SYMTHAEA_CONNECTIVITY_EXPLAINER_V1.md"
+      - ".github/workflows/symthaea-connectivity-explainer.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  explain-connectivity:
+    name: Verify evidence-grounded explanations
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        with:
+          toolchain: 1.99.0
+          components: clippy,rustfmt
+      - name: Check formatting
+        run: cargo fmt --manifest-path crates/domains/symthaea-connectivity-explainer/Cargo.toml -- --check
+      - name: Test explanation boundaries
+        run: cargo test --manifest-path crates/domains/symthaea-connectivity-explainer/Cargo.toml --all-targets
+      - name: Clippy with warnings denied
+        run: cargo clippy --manifest-path crates/domains/symthaea-connectivity-explainer/Cargo.toml --all-targets -- -D warnings
+      - name: Render the synthetic fixture
+        run: |
+          cargo run --manifest-path crates/domains/symthaea-connectivity-explainer/Cargo.toml -- \
+            crates/domains/symthaea-connectivity-explainer/examples/connectivity-report-synthetic-v1.json \
+            "$RUNNER_TEMP/connectivity-explanation.json"
+          grep -q '"evidence_class": "synthetic_simulation"' "$RUNNER_TEMP/connectivity-explanation.json"
+          grep -q 'live Wi-Fi performance has not been tested' "$RUNNER_TEMP/connectivity-explanation.json"
+          grep -q 'FIFO misses 1 essential deadline' "$RUNNER_TEMP/connectivity-explanation.json"
