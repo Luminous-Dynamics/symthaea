@@ -45,6 +45,7 @@
         "evaluator_digest",
         "evaluation_scope_digest",
         "material_family",
+        "evaluation_stratum",
         "split",
         "parent_system_id",
         "sample_id",
@@ -151,6 +152,10 @@
         },
         "evidence_digest": {
           "$ref": "#/$defs/sha256"
+        },
+        "evaluation_stratum": {
+          "type": "string",
+          "minLength": 1
         }
       },
       "allOf": [
