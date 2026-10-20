@@ -541,8 +541,12 @@ fn execute_power(args: &BTreeMap<String, String>) -> Result<()> {
         .map(|family| (family.family_id.clone(), family.split.clone()))
         .collect();
     let validation_outcomes = parse_target_jsonl(&validation_bytes, "validation")?;
-    let eligible_validation =
-        validate_outcomes(&validation_outcomes, &config, &frozen_families, "validation")?;
+    let eligible_validation = validate_outcomes(
+        &validation_outcomes,
+        &config,
+        &frozen_families,
+        "validation",
+    )?;
     if eligible_validation.is_empty() {
         bail!("no eligible validation targets supplied for power planning");
     }
@@ -571,9 +575,9 @@ fn execute_power(args: &BTreeMap<String, String>) -> Result<()> {
     let mut scenarios = Vec::with_capacity(effect_grid.len() * icc_grid.len());
     for (effect_index, effect) in effect_grid.iter().copied().enumerate() {
         for (icc_index, icc) in icc_grid.iter().copied().enumerate() {
-            let scenario_seed = config
-                .bootstrap_seed
-                .wrapping_add((effect_index * icc_grid.len() + icc_index) as u64 * 0x9E37_79B9_7F4A_7C15);
+            let scenario_seed = config.bootstrap_seed.wrapping_add(
+                (effect_index * icc_grid.len() + icc_index) as u64 * 0x9E37_79B9_7F4A_7C15,
+            );
             scenarios.push(simulate_power_scenario(
                 &family_target_counts,
                 baseline_rate,
@@ -599,8 +603,7 @@ fn execute_power(args: &BTreeMap<String, String>) -> Result<()> {
         })
         .and_then(|scenario| scenario.estimated_utility_gate_power);
     let power_gate_passed = family_target_counts.len() >= MIN_CONFIRMATORY_FAMILY_CLUSTERS
-        && estimated_power_at_20pp_and_icc_020
-            .is_some_and(|power| power >= 0.80)
+        && estimated_power_at_20pp_and_icc_020.is_some_and(|power| power >= 0.80)
         && null_effect_false_claim_probability_max.is_some_and(|rate| rate <= 0.05);
 
     let interpretation = if power_gate_passed {
@@ -653,8 +656,7 @@ fn execute_power(args: &BTreeMap<String, String>) -> Result<()> {
     let out_path = args.get("--out").context("missing --out path")?;
     let mut serialized = serde_json::to_vec_pretty(&report).context("serialize power report")?;
     serialized.push(b'\n');
-    fs::write(out_path, serialized)
-        .with_context(|| format!("write power report to {out_path}"))?;
+    fs::write(out_path, serialized).with_context(|| format!("write power report to {out_path}"))?;
     println!(
         "PITB_POWER_PLAN_COMPLETE baseline={} validation_targets={} eligible_families={} p0={:.3} simulations={} bootstrap_replicates={} power20pp_icc020={} null_false_claim_max={} gate={}",
         report.selected_baseline_arm,
@@ -663,13 +665,19 @@ fn execute_power(args: &BTreeMap<String, String>) -> Result<()> {
         report.validation_baseline_semantic_success_rate,
         report.study_simulations,
         report.bootstrap_replicates_per_simulated_study,
-        report.estimated_power_at_20pp_and_icc_020
+        report
+            .estimated_power_at_20pp_and_icc_020
             .map(|value| format!("{value:.3}"))
             .unwrap_or_else(|| "infeasible_or_unestimated".to_string()),
-        report.null_effect_false_claim_probability_max
+        report
+            .null_effect_false_claim_probability_max
             .map(|value| format!("{value:.3}"))
             .unwrap_or_else(|| "unestimated".to_string()),
-        if report.power_gate_passed { "pass" } else { "no_go" }
+        if report.power_gate_passed {
+            "pass"
+        } else {
+            "no_go"
+        }
     );
     Ok(())
 }
@@ -733,13 +741,13 @@ fn simulate_power_scenario(
             icc,
             &mut rng,
         );
-        let total_delta: i64 = simulated_families.iter().map(|family| family.paired_delta_sum).sum();
+        let total_delta: i64 = simulated_families
+            .iter()
+            .map(|family| family.paired_delta_sum)
+            .sum();
         let observed_effect = total_delta as f64 / total_targets as f64;
-        let lower = simulated_cluster_bootstrap_lower(
-            &simulated_families,
-            bootstrap_replicates,
-            &mut rng,
-        );
+        let lower =
+            simulated_cluster_bootstrap_lower(&simulated_families, bootstrap_replicates, &mut rng);
         sum_effect += observed_effect;
         sum_lower += lower;
         if clusters >= MIN_CONFIRMATORY_FAMILY_CLUSTERS && observed_effect >= 0.10 && lower > 0.0 {
@@ -823,9 +831,7 @@ fn sample_gamma(shape: f64, rng: &mut SplitMix64) -> f64 {
         }
         let v = v0 * v0 * v0;
         let u = rng.uniform01();
-        if u < 1.0 - 0.0331 * x.powi(4)
-            || u.ln() < 0.5 * x * x + d * (1.0 - v + v.ln())
-        {
+        if u < 1.0 - 0.0331 * x.powi(4) || u.ln() < 0.5 * x * x + d * (1.0 - v + v.ln()) {
             return d * v;
         }
     }
@@ -893,7 +899,10 @@ fn parse_args(args: Vec<String>) -> Result<BTreeMap<String, String>> {
         }
     }
 
-    let mode = parsed.get("--mode").map(String::as_str).unwrap_or("analyze");
+    let mode = parsed
+        .get("--mode")
+        .map(String::as_str)
+        .unwrap_or("analyze");
     if !["analyze", "power"].contains(&mode) {
         bail!("unsupported mode {mode}; expected analyze or power");
     }
@@ -939,7 +948,9 @@ fn parse_args(args: Vec<String>) -> Result<BTreeMap<String, String>> {
                 bail!("confirmatory power planning requires at least 1000 simulated studies");
             }
             if bootstrap_replicates < 500 {
-                bail!("power planning requires at least 500 bootstrap replicates per simulated study");
+                bail!(
+                    "power planning requires at least 500 bootstrap replicates per simulated study"
+                );
             }
         }
         _ => unreachable!("mode was validated above"),
