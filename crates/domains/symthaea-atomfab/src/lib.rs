@@ -1180,7 +1180,6 @@ mod tests {
     }
 }
 
-
 #[cfg(test)]
 mod workcell_fault_corpus_tests {
     use serde_json::Value;
@@ -1188,10 +1187,9 @@ mod workcell_fault_corpus_tests {
 
     #[test]
     fn frozen_workcell_fault_corpus_has_unique_ids_and_fail_closed_oracles() {
-        let corpus: Value = serde_json::from_str(include_str!(
-            "../fixtures/workcell-fault-corpus-v1.json"
-        ))
-        .expect("shared workcell fault corpus must be valid JSON");
+        let corpus: Value =
+            serde_json::from_str(include_str!("../fixtures/workcell-fault-corpus-v1.json"))
+                .expect("shared workcell fault corpus must be valid JSON");
 
         assert_eq!(corpus["schema_version"], 1);
         assert_eq!(corpus["corpus_id"], "atomfab-workcell-fault-corpus-v1");
@@ -1200,7 +1198,10 @@ mod workcell_fault_corpus_tests {
         let cases = corpus["cases"]
             .as_array()
             .expect("corpus cases must be an array");
-        assert!(cases.len() >= 15, "v1 requires the frozen fault/control cases");
+        assert!(
+            cases.len() >= 15,
+            "v1 requires the frozen fault/control cases"
+        );
 
         let mut ids = BTreeSet::new();
         let mut accepted_controls = 0usize;
@@ -1230,7 +1231,9 @@ mod workcell_fault_corpus_tests {
                     "non-accepting case {id} must not authorize a simulation action"
                 );
                 assert!(
-                    expected["reason_codes"].as_array().is_some_and(|codes| !codes.is_empty()),
+                    expected["reason_codes"]
+                        .as_array()
+                        .is_some_and(|codes| !codes.is_empty()),
                     "non-accepting case {id} must explain its disposition"
                 );
             }
@@ -1241,7 +1244,10 @@ mod workcell_fault_corpus_tests {
                 );
             }
             if hard_violation {
-                assert_ne!(decision, "accept", "hard-constraint violation accepted: {id}");
+                assert_ne!(
+                    decision, "accept",
+                    "hard-constraint violation accepted: {id}"
+                );
                 assert_eq!(
                     feasibility, "infeasible",
                     "hard-constraint violation must remain visible: {id}"
@@ -1273,7 +1279,10 @@ mod workcell_fault_corpus_tests {
             "bounded-sensor-drift-control",
             "valid-simulation-control",
         ] {
-            assert!(ids.contains(required), "required v1 case is missing: {required}");
+            assert!(
+                ids.contains(required),
+                "required v1 case is missing: {required}"
+            );
         }
         assert!(
             accepted_controls >= 2,
