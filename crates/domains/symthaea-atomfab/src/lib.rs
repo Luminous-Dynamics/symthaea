@@ -365,9 +365,12 @@ pub fn summarize_feasibility(
 
 /// Compute normalized finite-prefix top-weighted overlap for ranked candidate IDs.
 ///
-/// Both rankings must contain the same number of unique candidate identifiers.
-/// At each depth, overlap is the fraction of top-depth candidates shared by both
-/// rankings. The score is the persistence-weighted average across depths using
+/// Both rankings must contain the same number of unique candidate identifiers
+/// drawn from a common, canonically identified candidate universe. The function
+/// can validate uniqueness and length, but cannot prove that callers assigned
+/// the same identifier to equivalent structures. At each depth, overlap is the
+/// fraction of top-depth candidates shared by both rankings. The score is the
+/// persistence-weighted average across depths using
 /// weights proportional to `(1 - p) * p^(depth - 1)`. Values near one indicate
 /// similar top-ranked lists. Larger persistence values give deeper prefixes
 /// more weight. The score is descriptive and does not establish physical
