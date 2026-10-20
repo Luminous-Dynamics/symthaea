@@ -555,7 +555,7 @@ mod tests {
         let mut value = corpus_value();
         value["case_count"] = serde_json::json!(15);
         let bytes = serde_json::to_vec(&value).expect("serialize changed corpus");
-        let error = evaluate_corpus_bytes(&bytes, &valid_head()).expect_err("count mismatch rejects");
+        let error = evaluate_valid(&bytes).expect_err("count mismatch rejects");
         assert!(error.contains("case count mismatch"));
     }
 
@@ -565,7 +565,7 @@ mod tests {
         value["cases"][0]["expected"]["route"]["disposition"] =
             serde_json::Value::String("infeasible".into());
         let bytes = serde_json::to_vec(&value).expect("serialize changed corpus");
-        let receipt = evaluate_corpus_bytes(&bytes, &valid_head()).expect("parse valid schema");
+        let receipt = evaluate_valid(&bytes).expect("parse valid schema");
         assert!(!receipt.passed());
         assert_eq!(receipt.matched_route_cases, EXPECTED_CASE_COUNT - 1);
     }
@@ -573,7 +573,7 @@ mod tests {
     #[test]
     fn reordering_cases_preserves_normalized_results() {
         let original =
-            evaluate_corpus_bytes(EMBEDDED_CORPUS.as_bytes(), &valid_head()).expect("valid corpus");
+            evaluate_valid(EMBEDDED_CORPUS.as_bytes()).expect("valid corpus");
         let mut value = corpus_value();
         let cases = value["cases"].as_array_mut().expect("cases array");
         cases.reverse();
@@ -588,7 +588,7 @@ mod tests {
     #[test]
     fn physical_qualification_claim_cannot_be_supported_by_synthetic_evidence() {
         let receipt =
-            evaluate_corpus_bytes(EMBEDDED_CORPUS.as_bytes(), &valid_head()).expect("valid corpus");
+            evaluate_valid(EMBEDDED_CORPUS.as_bytes()).expect("valid corpus");
         let case = receipt
             .cases
             .iter()
