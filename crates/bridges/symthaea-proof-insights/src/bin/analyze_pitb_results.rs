@@ -28,6 +28,9 @@ const EXPECTED_BOOTSTRAP_REPLICATES: usize = 10_000;
 // Conservative minimum, not a substitute for run-specific simulation-based power.
 const MIN_CONFIRMATORY_FAMILY_CLUSTERS: usize = 20;
 const REQUIRED_EXPOSED_FAMILY: &str = "089";
+const EXPECTED_SPLIT_SEED: &str = "pitb-v0-openai-math-2026-10-19";
+const EXPECTED_SPLIT_ALGORITHM: &str =
+    "sha256(seed || NUL || family_id), sort by digest then family ID, floor 70% train and floor 85% train+validation";
 const ARMS: [&str; 8] = ["A", "B", "C", "D", "E", "F", "G", "H"];
 const SIMPLE_BASELINES: [&str; 5] = ["A", "B", "C", "D", "E"];
 const TREATMENT_ARM: &str = "F";
@@ -85,7 +88,20 @@ struct UpstreamMetadata {
 
 #[derive(Debug, Deserialize)]
 struct SplitPlan {
+    seed: String,
+    algorithm: String,
+    train_percent: u8,
+    validation_percent: u8,
+    test_percent: u8,
+    counts: SplitCounts,
     partition_digest_sha256: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct SplitCounts {
+    train: usize,
+    validation: usize,
+    test: usize,
 }
 
 #[derive(Debug, Deserialize)]
@@ -493,45 +509,8 @@ fn validate_config(
     }
     let split_manifest: SplitManifest =
         serde_json::from_slice(split_bytes).context("parse frozen split manifest JSON")?;
-    if split_manifest.upstream.commit != EXPECTED_UPSTREAM_COMMIT {
-        bail!(
-            "unexpected upstream commit {}; expected {}",
-            split_manifest.upstream.commit,
-            EXPECTED_UPSTREAM_COMMIT
-        );
-    }
-    if split_manifest.families.len() != 372 {
-        bail!(
-            "frozen split must contain exactly 372 families, got {}",
-            split_manifest.families.len()
-        );
-    }
-    let mut family_ids = BTreeSet::new();
-    let mut split_counts: BTreeMap<&str, usize> = BTreeMap::new();
-    for family in &split_manifest.families {
-        if !family_ids.insert(family.family_id.as_str()) {
-            bail!("duplicate family id in frozen split: {}", family.family_id);
-        }
-        if !["train", "validation", "test"].contains(&family.split.as_str()) {
-            bail!(
-                "unknown split label {} for family {}",
-                family.split,
-                family.family_id
-            );
-        }
-        *split_counts.entry(family.split.as_str()).or_default() += 1;
-    }
-    for (split, expected_count) in [("train", 260), ("validation", 56), ("test", 56)] {
-        if split_counts.get(split).copied().unwrap_or_default() != expected_count {
-            bail!(
-                "frozen split count mismatch for {split}: expected {expected_count}, got {}",
-                split_counts.get(split).copied().unwrap_or_default()
-            );
-        }
-    }
-    if config.partition_digest_sha256 != split_manifest.split_plan.partition_digest_sha256 {
-        bail!("partition digest does not match the frozen split manifest");
-    }
+    validate_frozen_partition(&split_manifest, &config.partition_digest_sha256)?;
+
     let exposed_splits: BTreeMap<&str, &str> = split_manifest
         .families
         .iter()
@@ -572,6 +551,126 @@ fn validate_config(
         bail!("known_exposed_family_ids contains duplicates");
     }
     Ok(())
+}
+
+fn validate_frozen_partition(
+    manifest: &SplitManifest,
+    expected_config_digest: &str,
+) -> Result<()> {
+    if manifest.upstream.commit != EXPECTED_UPSTREAM_COMMIT {
+        bail!(
+            "unexpected upstream commit {}; expected {}",
+            manifest.upstream.commit,
+            EXPECTED_UPSTREAM_COMMIT
+        );
+    }
+    if manifest.families.len() != 372 {
+        bail!(
+            "frozen split must contain exactly 372 families, got {}",
+            manifest.families.len()
+        );
+    }
+    let plan = &manifest.split_plan;
+    if plan.seed != EXPECTED_SPLIT_SEED || plan.algorithm != EXPECTED_SPLIT_ALGORITHM {
+        bail!("frozen split seed or assignment algorithm differs from the registered version");
+    }
+    if (plan.train_percent, plan.validation_percent, plan.test_percent) != (70, 15, 15) {
+        bail!("frozen split percentages must remain exactly 70/15/15");
+    }
+    if (plan.counts.train, plan.counts.validation, plan.counts.test) != (260, 56, 56) {
+        bail!("frozen split plan count metadata differs from the expected 260/56/56 partition");
+    }
+
+    let expected = expected_split_assignments(&manifest.families, &plan.seed)?;
+    let mut counts: BTreeMap<&str, usize> = BTreeMap::new();
+    for family in &manifest.families {
+        let expected_split = expected
+            .get(&family.family_id)
+            .with_context(|| format!("no computed assignment for family {}", family.family_id))?;
+        if &family.split != expected_split {
+            bail!(
+                "family {} has split {}, but deterministic assignment requires {}",
+                family.family_id,
+                family.split,
+                expected_split
+            );
+        }
+        *counts.entry(family.split.as_str()).or_default() += 1;
+    }
+    for (split, expected_count) in [("train", 260), ("validation", 56), ("test", 56)] {
+        if counts.get(split).copied().unwrap_or_default() != expected_count {
+            bail!(
+                "frozen split count mismatch for {split}: expected {expected_count}, got {}",
+                counts.get(split).copied().unwrap_or_default()
+            );
+        }
+    }
+
+    let recomputed_digest = partition_digest_sha256(&manifest.families);
+    if recomputed_digest != plan.partition_digest_sha256 {
+        bail!(
+            "partition digest in manifest is incorrect: recomputed {recomputed_digest}"
+        );
+    }
+    if recomputed_digest != expected_config_digest {
+        bail!("partition digest does not match the frozen run config");
+    }
+    Ok(())
+}
+
+fn expected_split_assignments(
+    families: &[SplitFamily],
+    seed: &str,
+) -> Result<BTreeMap<String, String>> {
+    let mut unique_ids = BTreeSet::new();
+    let mut ranked: Vec<(Vec<u8>, String)> = Vec::with_capacity(families.len());
+    for family in families {
+        if family.family_id.trim().is_empty() {
+            bail!("frozen family IDs must not be empty");
+        }
+        if !unique_ids.insert(family.family_id.as_str()) {
+            bail!("duplicate family ID in frozen split: {}", family.family_id);
+        }
+        let mut hasher = Sha256::new();
+        hasher.update(seed.as_bytes());
+        hasher.update([0]);
+        hasher.update(family.family_id.as_bytes());
+        ranked.push((hasher.finalize().to_vec(), family.family_id.clone()));
+    }
+    ranked.sort_by(|left, right| left.0.cmp(&right.0).then_with(|| left.1.cmp(&right.1)));
+
+    let train_count = ranked.len() * 70 / 100;
+    let validation_end = ranked.len() * 85 / 100;
+    Ok(ranked
+        .into_iter()
+        .enumerate()
+        .map(|(index, (_, family_id))| {
+            let split = if index < train_count {
+                "train"
+            } else if index < validation_end {
+                "validation"
+            } else {
+                "test"
+            };
+            (family_id, split.to_string())
+        })
+        .collect())
+}
+
+fn partition_digest_sha256(families: &[SplitFamily]) -> String {
+    let mut rows: Vec<(&str, &str)> = families
+        .iter()
+        .map(|family| (family.family_id.as_str(), family.split.as_str()))
+        .collect();
+    rows.sort_unstable_by(|left, right| left.0.cmp(right.0));
+    let mut material = String::new();
+    for (family_id, split) in rows {
+        material.push_str(family_id);
+        material.push('\t');
+        material.push_str(split);
+        material.push('\n');
+    }
+    sha256_hex(material.as_bytes())
 }
 
 fn validate_baseline_receipt(receipt: &BaselineSelectionReceipt) -> Result<()> {
