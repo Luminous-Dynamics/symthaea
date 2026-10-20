@@ -15,6 +15,7 @@ This benchmark asks a narrow, testable question: when patterns are represented a
 4. **Basis / embodiment invariance.** Apply the same seeded coordinate permutation to all patterns. Similarities should be preserved, and consistent coordinate re-encoding should commute exactly with binding.
 5. **Noise robustness.** Corrupt a stored pattern at controlled flip rates and retrieve against a fixed prototype library. Report top-1 accuracy and the target-vs-best-competitor similarity margin.
 6. **Superposition capacity.** Bundle K stored patterns and compare mean member similarity, maximum distractor similarity, and top-1 member recall as K increases.
+7. **Associative capacity.** Bind distinct role/filler pairs, bundle all pairs into one memory trace, query by unbinding one role, and measure target similarity, strongest distractor similarity, and top-1 retrieval as the number of relations increases. This is the most direct abstract-pattern test of whether composition preserves relationships under interference.
 
 Every random pattern and noise mask is deterministic for the supplied seed. The report exposes random-chance retrieval as a baseline. Use multiple independent seeds for publication-quality comparisons; the included default seed is for reproducibility, not statistical evidence.
 
