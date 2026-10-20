@@ -28,8 +28,8 @@ fn run() -> Result<(), String> {
     }
 
     let input = read_json(&args[1])?;
-    let explanation = explain_report(&input)
-        .map_err(|error| format!("explanation refused: {error}"))?;
+    let explanation =
+        explain_report(&input).map_err(|error| format!("explanation refused: {error}"))?;
     let output = serde_json::to_vec_pretty(&explanation)
         .map_err(|error| format!("cannot serialize explanation: {error}"))?;
 
@@ -42,7 +42,9 @@ fn run() -> Result<(), String> {
             String::from_utf8(output).map_err(|error| error.to_string())?
         );
     }
-    println!("Template-driven explanation only; source evidence class and limitations are preserved.");
+    println!(
+        "Template-driven explanation only; source evidence class and limitations are preserved."
+    );
     Ok(())
 }
 
