@@ -691,9 +691,10 @@ fn validate_outcomes(
                     );
                 }
                 let theorem_id = target.theorem_id.as_deref().unwrap_or_default().trim();
-                let artifact_path = target.artifact_path.as_deref().context(
-                    "eligible target lacks repository-relative artifact path",
-                )?;
+                let artifact_path = target
+                    .artifact_path
+                    .as_deref()
+                    .context("eligible target lacks repository-relative artifact path")?;
                 if theorem_id.is_empty()
                     || target
                         .lean_toolchain
@@ -803,7 +804,10 @@ fn validate_arm_set(
             ("input", arm.input_sha256.as_str()),
             ("retrieval log", arm.retrieval_log_sha256.as_str()),
             ("checker receipt", arm.checker_receipt_sha256.as_str()),
-            ("semantic-gate receipt", arm.semantic_gate_receipt_sha256.as_str()),
+            (
+                "semantic-gate receipt",
+                arm.semantic_gate_receipt_sha256.as_str(),
+            ),
         ] {
             validate_sha256(digest).with_context(|| {
                 format!("target {} arm {} {label} digest", target.target_id, arm.arm)
@@ -885,7 +889,8 @@ fn same_budget(left: &Budget, right: &Budget) -> bool {
 }
 
 fn compute_arm_metrics(targets: &[&TargetOutcome]) -> Vec<ArmMetrics> {
-    ARMS.iter().map(|arm_name| {
+    ARMS.iter()
+        .map(|arm_name| {
             let arms: Vec<&ArmOutcome> = targets
                 .iter()
                 .flat_map(|target| target.arms.iter())
