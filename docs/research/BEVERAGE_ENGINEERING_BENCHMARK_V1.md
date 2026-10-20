@@ -166,7 +166,7 @@ Phase D — prospective validation: pre-register model, data cutoff, target, int
 
 Phase E — decision and plant twin integration: evaluate value of information and Pareto trade-offs with real, versioned cost/resource inputs.
 
-## 10. Research anchors
+## 11. Research anchors
 
 - Theßeling et al. (2024), Predicting and improving complex beer flavor through machine learning, Nature Communications 15, 2368. https://www.nature.com/articles/s41467-024-46346-0
 - Dazzarola et al. (2026), Toward a digital twin for beer quality control: development of a digital model integrating industrial process data and model-based fermentation descriptors, Journal of Food Engineering 403, 112726. https://doi.org/10.1016/j.jfoodeng.2025.112726
