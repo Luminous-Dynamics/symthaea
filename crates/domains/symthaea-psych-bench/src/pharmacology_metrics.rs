@@ -68,8 +68,8 @@ pub struct BinarySafetyMetricReport {
     pub abstained_positive_cases: usize,
     pub abstained_negative_cases: usize,
     pub coverage: Option<f64>,
-    pub predicted_positive_cases: usize,
-    pub predicted_negative_cases: usize,
+    pub positive_ground_truth_cases: usize,
+    pub negative_ground_truth_cases: usize,
     pub confusion: ConfusionCounts,
     pub sensitivity: Option<f64>,
     pub specificity: Option<f64>,
@@ -111,8 +111,8 @@ pub fn evaluate_binary_safety(
     if !config.hazard_threshold.is_finite() || !(0.0..=1.0).contains(&config.hazard_threshold) {
         errors.push("hazard_threshold must be finite and within [0, 1]".into());
     }
-    if config.calibration_bins == 0 {
-        errors.push("calibration_bins must be greater than zero".into());
+    if config.calibration_bins == 0 || config.calibration_bins > 1_000 {
+        errors.push("calibration_bins must be within 1..=1000".into());
     }
     if cases.is_empty() {
         errors.push("evaluation requires at least one case".into());
@@ -173,7 +173,7 @@ pub fn evaluate_binary_safety(
                 };
                 bins[bin_index].count += 1;
                 bins[bin_index].probability_sum += probability;
-                bins[bin_index].positive_count += usize::from(case.ground_truth_hazard);
+                bins[bin_index].positive_count += if case.ground_truth_hazard { 1 } else { 0 };
 
                 let predicted_hazard = probability >= config.hazard_threshold;
                 match (predicted_hazard, case.ground_truth_hazard) {
@@ -189,9 +189,9 @@ pub fn evaluate_binary_safety(
     let total_cases = cases.len();
     let predicted_cases = predicted.len();
     let abstained_cases = total_cases - predicted_cases;
-    let predicted_positive_cases =
+    let positive_ground_truth_cases =
         predicted.iter().filter(|(_, label)| *label).count();
-    let predicted_negative_cases = predicted_cases - predicted_positive_cases;
+    let negative_ground_truth_cases = predicted_cases - positive_ground_truth_cases;
 
     let sensitivity = ratio(
         confusion.true_positive,
@@ -242,7 +242,7 @@ pub fn evaluate_binary_safety(
     if abstained_cases > 0 {
         notes.push("Abstained cases require a human review path and must not be counted as correct predictions.".to_string());
     }
-    if predicted_positive_cases == 0 || predicted_negative_cases == 0 {
+    if positive_ground_truth_cases == 0 || negative_ground_truth_cases == 0 {
         notes.push("Only one ground-truth class received a prediction; AUROC is undefined on the predicted subset.".to_string());
     }
 
@@ -260,8 +260,8 @@ pub fn evaluate_binary_safety(
         abstained_positive_cases,
         abstained_negative_cases,
         coverage,
-        predicted_positive_cases,
-        predicted_negative_cases,
+        positive_ground_truth_cases,
+        negative_ground_truth_cases,
         confusion,
         sensitivity,
         specificity,
@@ -404,6 +404,8 @@ mod tests {
         let report = evaluate_binary_safety(&config(), &cases).expect("evaluation");
         assert_eq!(report.total_cases, 4);
         assert_eq!(report.predicted_cases, 4);
+        assert_eq!(report.positive_ground_truth_cases, 2);
+        assert_eq!(report.negative_ground_truth_cases, 2);
         assert_eq!(report.abstained_cases, 0);
         assert_eq!(report.confusion.true_positive, 2);
         assert_eq!(report.confusion.true_negative, 2);
