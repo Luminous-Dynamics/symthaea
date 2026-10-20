@@ -671,7 +671,7 @@ mod tests {
         let candidate = balanced_cases();
         let mut baseline = candidate.clone();
         baseline[0].case_id = "different-id".to_string();
-        baseline[1].ground_truth_hazard = !baseline[1].ground_truth_hazard;
+        baseline[1].ground_truth_hazard = false; // Candidate case p2 is positive.
         let errors = paired_bootstrap_binary_safety_comparison(
             &eval_config(),
             &candidate,
