@@ -9,6 +9,7 @@ source_files=(
   "tools/allostatic-control-bench/Cargo.toml"
   "tools/allostatic-control-bench/src/lib.rs"
   "tools/allostatic-control-bench/src/main.rs"
+  "tools/allostatic-control-bench/qualify.sh"
   "docs/research/ALLOSTATIC_CONTROL_BENCHMARK_V1.md"
 )
 expected_head="${1:-$(git rev-parse HEAD)}"
@@ -38,6 +39,27 @@ cargo run --release --manifest-path "$manifest" > "$tmpdir/run-a.csv"
 cargo run --release --manifest-path "$manifest" > "$tmpdir/run-b.csv"
 if ! cmp -s "$tmpdir/run-a.csv" "$tmpdir/run-b.csv"; then
   printf 'FAIL: repeated benchmark output is not byte-identical\n' >&2
+  exit 1
+fi
+
+# Require the full scenario × seed × policy Cartesian product and a stable schema.
+if ! awk -F, '
+  NR == 1 { if (NF != 18) failed = 1; next }
+  {
+    if (NF != 18) failed = 1
+    if ($1 != "calm" && $1 != "acute" && $1 != "chronic" &&
+        $1 != "repeated" && $1 != "regime_shift") failed = 1
+    if ($2 !~ /^[0-9]+$/ || $2 < 0 || $2 >= 32) failed = 1
+    if ($3 != "task_only" && $3 != "stress_reactive" &&
+        $3 != "allostatic_reactive" && $3 != "predictive_viability" &&
+        $3 != "shuffled_forecast_control" && $3 != "oracle_predictive") failed = 1
+    key = $1 SUBSEP $2 SUBSEP $3
+    if (seen[key]++) failed = 1
+    rows++
+  }
+  END { if (NR != 961 || rows != 960 || failed) exit 1 }
+' "$tmpdir/run-a.csv"; then
+  printf 'FAIL: CSV schema or scenario/seed/policy coverage is invalid\n' >&2
   exit 1
 fi
 
