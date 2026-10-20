@@ -232,6 +232,26 @@ fn validate_target_verification(evidence: &Value) -> Result<()> {
     if required_string(evidence, "mutation_control_status")? != "passed" {
         bail!("verified transfer requires passed mutation controls");
     }
+    let mutation_controls = evidence
+        .get("mutation_controls")
+        .and_then(Value::as_array)
+        .context("target verification mutation_controls must be an array")?;
+    if mutation_controls.is_empty() {
+        bail!("verified transfer requires at least one mutation-control receipt");
+    }
+    let mut mutation_ids = BTreeSet::new();
+    for mutation in mutation_controls {
+        let mutation_id = required_string(mutation, "mutation_id")?;
+        if mutation_id.trim().is_empty() || !mutation_ids.insert(mutation_id) {
+            bail!("mutation-control IDs must be non-empty and unique");
+        }
+        if required_string(mutation, "status")? != "detected_as_expected"
+            || mutation.get("expected_detection").and_then(Value::as_bool) != Some(true)
+            || mutation.get("observed_detection").and_then(Value::as_bool) != Some(true)
+        {
+            bail!("verified transfer requires every mutation control to be detected as expected");
+        }
+    }
     Ok(())
 }
 
@@ -360,6 +380,13 @@ mod tests {
                 "depends_on_candidate": true
             }],
             "mutation_control_status": "passed",
+            "mutation_controls": [{
+                "mutation_id": "synthetic-mutated-target",
+                "description": "Synthetic target statement mutation",
+                "expected_detection": true,
+                "observed_detection": true,
+                "status": "detected_as_expected"
+            }],
             "notes": ["Synthetic fixture only"]
         });
         assert!(validate_candidate(&candidate).is_ok());
