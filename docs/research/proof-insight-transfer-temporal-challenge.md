@@ -22,6 +22,28 @@ This separates transfer from hindsight. It also measures whether a strategy surv
 
 ## Track design
 
+### A target-specific, content-addressed solver bundle
+
+The Rust indexer exposes two separate operations. The first validates the **whole** historical manifest against the clean, pinned Git checkout and every declared source-line/file digest. The second reruns that audit, then writes a target-specific bundle outside the checkout containing only the listed visible artifacts. Current/future proof bodies and completion-time statement copies are evaluator-only and are never emitted. The bundle carries its own payload digest; the schema excludes evaluator-only completion statements and rejects path traversal and unknown authority fields.
+
+After preparing a validated manifest and a clean checkout at its declared repository commit:
+
+```bash
+# Audit all timeline, ancestry, source bytes, and hidden-proof constraints.
+cargo run --locked --bin symthaea-proof-insights -- \
+  --verify-temporal-manifest /path/to/clean-repository \
+  /path/to/temporal-replay-manifest.json
+
+# Materialize exactly the artifacts whitelisted for one target.
+# The output directory must already exist and must be outside the checkout.
+cargo run --release --locked --bin symthaea-proof-insights -- \
+  --materialize-temporal-target /path/to/clean-repository \
+  /path/to/temporal-replay-manifest.json target-001 \
+  /path/to/output/target-001-bundle.json
+```
+
+Treat the bundle as the model-visible input boundary, not as a trusted answer. Recompute the payload digest before use, retain the exact outer file hash in the target-run receipt, and provide no evaluator manifest or hidden-proof path to the solver. The Rust end-to-end fixture exercises both early and later targets, checks that an earlier proof can be visible to a later target, and asserts that the current proof text and proof identifier remain absent.
+
 ### T1 — chronological replay on a frozen repository
 
 Use a separately pinned Dalek Lean Bench snapshot as the first implementation target. Record the upstream commit, timeline digest, each target's source commit and theorem locator, the toolchain/Mathlib/Aeneas revisions, and hashes of the generated repository state.
