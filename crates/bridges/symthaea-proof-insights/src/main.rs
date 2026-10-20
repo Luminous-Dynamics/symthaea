@@ -936,6 +936,11 @@ fn validate_temporal_manifest(manifest: &TemporalReplayManifest) -> Result<()> {
     Ok(())
 }
 
+fn normalize_repository_url(url: &str) -> String {
+    let normalized = url.trim().trim_end_matches('/').to_ascii_lowercase();
+    normalized.strip_suffix(".git").unwrap_or(&normalized).to_owned()
+}
+
 fn validate_git_sha(value: &str) -> Result<()> {
     if value.len() != 40 || !value.chars().all(|character| character.is_ascii_hexdigit()) {
         bail!("expected a full 40-character Git SHA");
