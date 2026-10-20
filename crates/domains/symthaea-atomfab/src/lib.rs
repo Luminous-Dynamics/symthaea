@@ -1179,3 +1179,104 @@ mod tests {
         );
     }
 }
+
+
+#[cfg(test)]
+mod workcell_fault_corpus_tests {
+    use serde_json::Value;
+    use std::collections::BTreeSet;
+
+    #[test]
+    fn frozen_workcell_fault_corpus_has_unique_ids_and_fail_closed_oracles() {
+        let corpus: Value = serde_json::from_str(include_str!(
+            "../fixtures/workcell-fault-corpus-v1.json"
+        ))
+        .expect("shared workcell fault corpus must be valid JSON");
+
+        assert_eq!(corpus["schema_version"], 1);
+        assert_eq!(corpus["corpus_id"], "atomfab-workcell-fault-corpus-v1");
+        assert_eq!(corpus["status"], "frozen_software_regression_suite");
+
+        let cases = corpus["cases"]
+            .as_array()
+            .expect("corpus cases must be an array");
+        assert!(cases.len() >= 14, "v1 requires the frozen fault/control cases");
+
+        let mut ids = BTreeSet::new();
+        let mut accepted_controls = 0usize;
+        for case in cases {
+            let id = case["case_id"]
+                .as_str()
+                .expect("every case needs an identifier");
+            assert!(ids.insert(id.to_owned()), "duplicate case identifier: {id}");
+
+            let expected = &case["expected"];
+            let decision = expected["decision"]
+                .as_str()
+                .expect("every case needs an expected decision");
+            let action_authorized = expected["simulation_action_authorized"]
+                .as_bool()
+                .expect("every case needs an action-authorization oracle");
+            let feasibility = expected["feasibility_status"]
+                .as_str()
+                .expect("every case needs a feasibility disposition");
+            let hard_violation = expected["hard_constraint_violation"]
+                .as_bool()
+                .expect("every case needs a hard-constraint oracle");
+
+            if decision != "accept" {
+                assert!(
+                    !action_authorized,
+                    "non-accepting case {id} must not authorize a simulation action"
+                );
+                assert!(
+                    expected["reason_codes"].as_array().is_some_and(|codes| !codes.is_empty()),
+                    "non-accepting case {id} must explain its disposition"
+                );
+            }
+            if feasibility == "feasible" {
+                assert_eq!(
+                    decision, "accept",
+                    "case {id} cannot be feasible without an accepted decision"
+                );
+            }
+            if hard_violation {
+                assert_ne!(decision, "accept", "hard-constraint violation accepted: {id}");
+                assert_eq!(
+                    feasibility, "infeasible",
+                    "hard-constraint violation must remain visible: {id}"
+                );
+            }
+            if case["control"].as_bool() == Some(true) && decision == "accept" {
+                assert!(
+                    action_authorized,
+                    "accepted control {id} should authorize only the simulated action"
+                );
+                accepted_controls += 1;
+            }
+        }
+
+        for required in [
+            "stale-observation",
+            "non-finite-observation",
+            "sensor-drift-outside-calibration",
+            "actuator-saturation",
+            "tool-obstruction",
+            "actuator-count-mismatch",
+            "bridge-timeout",
+            "malformed-planner-output",
+            "model-out-of-domain",
+            "replay-divergence",
+            "synthetic-as-measurement",
+            "physical-actuation-without-interlock",
+            "bounded-sensor-drift-control",
+            "valid-simulation-control",
+        ] {
+            assert!(ids.contains(required), "required v1 case is missing: {required}");
+        }
+        assert!(
+            accepted_controls >= 2,
+            "the corpus needs accepted controls so reject-all cannot pass"
+        );
+    }
+}
