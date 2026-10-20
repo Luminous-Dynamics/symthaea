@@ -11,10 +11,11 @@
 //! caller must provide an exact 40- or 64-character Git commit SHA; an unbound
 //! result is not emitted as a passing receipt.
 
-use std::{env, fs, process::{Command, ExitCode}};
-use symthaea_fabrication_kernel::atomfab_pcb_route::{
-    evaluate_corpus_bytes, EMBEDDED_CORPUS,
+use std::{
+    env, fs,
+    process::{Command, ExitCode},
 };
+use symthaea_fabrication_kernel::atomfab_pcb_route::{EMBEDDED_CORPUS, evaluate_corpus_bytes};
 
 fn main() -> ExitCode {
     let git_head = match env::var("ATOMFAB_GIT_HEAD") {
@@ -28,7 +29,10 @@ fn main() -> ExitCode {
     let git_output = match Command::new("git").args(["rev-parse", "HEAD"]).output() {
         Ok(output) if output.status.success() => output,
         Ok(output) => {
-            eprintln!("git rev-parse HEAD failed: {}", String::from_utf8_lossy(&output.stderr));
+            eprintln!(
+                "git rev-parse HEAD failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            );
             return ExitCode::from(2);
         }
         Err(error) => {
