@@ -879,8 +879,7 @@ fn git_show_file(root: &Path, commit: &str, path: &str) -> Result<Vec<u8>> {
 
 fn exact_line_span(source: &[u8], start_line: usize, end_line: usize) -> Result<&[u8]> {
     let text = std::str::from_utf8(source).context("pinned source file is not UTF-8")?;
-    let lines: Vec<&str> = text.split_inclusive('
-').collect();
+    let lines: Vec<&str> = text.split_inclusive('\n').collect();
     if start_line == 0 || end_line < start_line || end_line > lines.len() {
         bail!("line range {start_line}-{end_line} is outside {} source lines", lines.len());
     }
