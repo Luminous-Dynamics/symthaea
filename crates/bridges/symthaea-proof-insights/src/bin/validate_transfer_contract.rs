@@ -471,10 +471,6 @@ mod tests {
         })
     }
 
-    fn record_with(candidate: Value) -> Value {
-        json!({"insight": {"transfer_candidates": [candidate]}})
-    }
-
     #[test]
     fn accepts_candidate_with_consistent_compatible_contract() {
         let candidate = compatible_candidate();
@@ -525,16 +521,21 @@ mod tests {
     #[test]
     fn rejects_opposite_inequality_direction_when_marked_compatible() {
         let mut candidate = compatible_candidate();
-        let contract = &mut candidate["directional_contract"];
-        contract["move_kind"] = json!("inequality_transfer");
-        contract["source_obligation"]["predicate"] = json!("independence_number");
-        contract["source_obligation"]["relation"] = json!("upper_bound");
-        contract["target_obligation"]["predicate"] = json!("independence_number");
-        contract["target_obligation"]["relation"] = json!("lower_bound");
+        {
+            let contract = &mut candidate["directional_contract"];
+            contract["move_kind"] = json!("inequality_transfer");
+            contract["source_obligation"]["predicate"] = json!("independence_number");
+            contract["source_obligation"]["relation"] = json!("upper_bound");
+            contract["target_obligation"]["predicate"] = json!("independence_number");
+            contract["target_obligation"]["relation"] = json!("lower_bound");
+        }
         assert!(validate_candidate(&candidate).is_err());
 
-        contract["compatibility"] = json!("incompatible");
-        contract["mismatch_codes"] = json!(["inequality_direction"]);
+        {
+            let contract = &mut candidate["directional_contract"];
+            contract["compatibility"] = json!("incompatible");
+            contract["mismatch_codes"] = json!(["inequality_direction"]);
+        }
         candidate["status"] = json!("rejected");
         assert!(validate_candidate(&candidate).is_ok());
     }
@@ -547,6 +548,41 @@ mod tests {
         contract["source_obligation"]["domain"] = json!("geometry");
         contract["target_obligation"]["domain"] = json!("graph theory");
         assert!(validate_candidate(&candidate).is_err());
+    }
+
+    #[test]
+    fn rejects_unchecked_source_precondition() {
+        let mut candidate = compatible_candidate();
+        candidate["directional_contract"]["source_obligation"]["preconditions"] =
+            json!(["the graph is finite"]);
+        assert!(validate_candidate(&candidate).is_err());
+
+        candidate["preconditions_checked"] = json!(["the graph is finite"]);
+        assert!(validate_candidate(&candidate).is_ok());
+    }
+
+    #[test]
+    fn rejects_inequality_transfer_across_quantifier_scopes_if_marked_compatible() {
+        let mut candidate = compatible_candidate();
+        {
+            let contract = &mut candidate["directional_contract"];
+            contract["move_kind"] = json!("inequality_transfer");
+            contract["source_obligation"]["predicate"] = json!("independence_number");
+            contract["source_obligation"]["relation"] = json!("upper_bound");
+            contract["source_obligation"]["quantifier_scope"] = json!("for all graphs of size n");
+            contract["target_obligation"]["predicate"] = json!("independence_number");
+            contract["target_obligation"]["relation"] = json!("upper_bound");
+            contract["target_obligation"]["quantifier_scope"] = json!("for all triangle-free graphs");
+        }
+        assert!(validate_candidate(&candidate).is_err());
+
+        {
+            let contract = &mut candidate["directional_contract"];
+            contract["compatibility"] = json!("incompatible");
+            contract["mismatch_codes"] = json!(["quantifier_scope"]);
+        }
+        candidate["status"] = json!("rejected");
+        assert!(validate_candidate(&candidate).is_ok());
     }
 
     #[test]
