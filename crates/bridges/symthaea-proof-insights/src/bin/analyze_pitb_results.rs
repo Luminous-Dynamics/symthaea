@@ -598,17 +598,24 @@ fn execute_power(args: &BTreeMap<String, String>) -> Result<()> {
         .filter(|scenario| scenario.true_treatment_effect_percentage_points == 0.0)
         .filter_map(|scenario| scenario.estimated_utility_gate_power)
         .reduce(f64::max);
-    let estimated_power_at_20pp_and_icc_020 = scenarios
+    let null_effect_false_claim_probability_upper_95_max = scenarios
         .iter()
-        .find(|scenario| {
-            (scenario.true_treatment_effect_percentage_points - 20.0).abs() < f64::EPSILON
-                && (scenario.assumed_family_icc - 0.20).abs() < f64::EPSILON
-                && scenario.status == "estimated"
-        })
-        .and_then(|scenario| scenario.estimated_utility_gate_power);
+        .filter(|scenario| scenario.true_treatment_effect_percentage_points == 0.0)
+        .filter_map(|scenario| scenario.estimated_power_upper_95)
+        .reduce(f64::max);
+    let twenty_point_scenario = scenarios.iter().find(|scenario| {
+        (scenario.true_treatment_effect_percentage_points - 20.0).abs() < f64::EPSILON
+            && (scenario.assumed_family_icc - 0.20).abs() < f64::EPSILON
+            && scenario.status == "estimated"
+    });
+    let estimated_power_at_20pp_and_icc_020 =
+        twenty_point_scenario.and_then(|scenario| scenario.estimated_utility_gate_power);
+    let estimated_power_at_20pp_and_icc_020_lower_95 =
+        twenty_point_scenario.and_then(|scenario| scenario.estimated_power_lower_95);
     let power_gate_passed = family_target_counts.len() >= MIN_CONFIRMATORY_FAMILY_CLUSTERS
-        && estimated_power_at_20pp_and_icc_020.is_some_and(|power| power >= 0.80)
-        && null_effect_false_claim_probability_max.is_some_and(|rate| rate <= 0.05);
+        && estimated_power_at_20pp_and_icc_020_lower_95
+            .is_some_and(|power| power >= 0.80)
+        && null_effect_false_claim_probability_upper_95_max.is_some_and(|rate| rate <= 0.05);
 
     let interpretation = if power_gate_passed {
         "The validation-derived design met the preregistered simulation gate for a +20pp effect at ICC 0.20 and the empirical zero-effect false-claim gate. This is a design-planning result, not evidence that insight transfer succeeds."
@@ -645,7 +652,9 @@ fn execute_power(args: &BTreeMap<String, String>) -> Result<()> {
         required_power_at_20pp_and_icc_020: 0.80,
         maximum_false_claim_probability_at_zero_effect: 0.05,
         null_effect_false_claim_probability_max,
+        null_effect_false_claim_probability_upper_95_max,
         estimated_power_at_20pp_and_icc_020,
+        estimated_power_at_20pp_and_icc_020_lower_95,
         power_gate_passed,
         scenarios,
         model_assumptions: vec![
@@ -662,7 +671,7 @@ fn execute_power(args: &BTreeMap<String, String>) -> Result<()> {
     serialized.push(b'\n');
     fs::write(out_path, serialized).with_context(|| format!("write power report to {out_path}"))?;
     println!(
-        "PITB_POWER_PLAN_COMPLETE baseline={} validation_targets={} eligible_families={} p0={:.3} simulations={} bootstrap_replicates={} power20pp_icc020={} null_false_claim_max={} gate={}",
+        "PITB_POWER_PLAN_COMPLETE baseline={} validation_targets={} eligible_families={} p0={:.3} simulations={} bootstrap_replicates={} power20pp_icc020={} lower95={} null_false_claim_upper95={} gate={}",
         report.selected_baseline_arm,
         report.eligible_validation_target_count,
         report.eligible_validation_family_count,
@@ -674,7 +683,11 @@ fn execute_power(args: &BTreeMap<String, String>) -> Result<()> {
             .map(|value| format!("{value:.3}"))
             .unwrap_or_else(|| "infeasible_or_unestimated".to_string()),
         report
-            .null_effect_false_claim_probability_max
+            .estimated_power_at_20pp_and_icc_020_lower_95
+            .map(|value| format!("{value:.3}"))
+            .unwrap_or_else(|| "unestimated".to_string()),
+        report
+            .null_effect_false_claim_probability_upper_95_max
             .map(|value| format!("{value:.3}"))
             .unwrap_or_else(|| "unestimated".to_string()),
         if report.power_gate_passed {
@@ -684,6 +697,21 @@ fn execute_power(args: &BTreeMap<String, String>) -> Result<()> {
         }
     );
     Ok(())
+}
+
+fn wilson_interval(successes: usize, trials: usize) -> (f64, f64) {
+    if trials == 0 {
+        return (0.0, 1.0);
+    }
+    let n = trials as f64;
+    let p = successes as f64 / n;
+    let z = 1.959_963_984_540_054_f64;
+    let z_squared = z * z;
+    let denominator = 1.0 + z_squared / n;
+    let center = (p + z_squared / (2.0 * n)) / denominator;
+    let half_width =
+        z * (p * (1.0 - p) / n + z_squared / (4.0 * n * n)).sqrt() / denominator;
+    ((center - half_width).max(0.0), (center + half_width).min(1.0))
 }
 
 fn simulate_power_scenario(
