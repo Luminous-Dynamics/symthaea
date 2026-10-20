@@ -144,7 +144,11 @@ impl CorpusReceipt {
 /// Structural/corpus-integrity failures return Err. Fixture expectation
 /// mismatches are captured in a failed receipt, allowing negative controls to
 /// be observed and reported rather than silently disappearing.
-pub fn evaluate_corpus_bytes(\n    bytes: &[u8],\n    declared_git_head: &str,\n    actual_checkout_head: &str,\n) -> Result<CorpusReceipt, String> {
+pub fn evaluate_corpus_bytes(
+    bytes: &[u8],
+    declared_git_head: &str,
+    actual_checkout_head: &str,
+) -> Result<CorpusReceipt, String> {
     if !is_git_sha(declared_git_head) {
         return Err("ATOMFAB_GIT_HEAD must be a 40- or 64-character hexadecimal commit SHA".into());
     }
@@ -479,6 +483,11 @@ mod tests {
         "a".repeat(40)
     }
 
+    fn evaluate_valid(bytes: &[u8]) -> Result<CorpusReceipt, String> {
+        let head = valid_head();
+        evaluate_corpus_bytes(bytes, &head, &head)
+    }
+
     fn corpus_value() -> Value {
         serde_json::from_str(EMBEDDED_CORPUS).expect("embedded corpus parses")
     }
@@ -513,7 +522,7 @@ mod tests {
     #[test]
     fn route_feasibility_is_separate_from_evidence_completeness() {
         let receipt =
-            evaluate_corpus_bytes(EMBEDDED_CORPUS.as_bytes(), &valid_head()).expect("valid corpus");
+            evaluate_valid(EMBEDDED_CORPUS.as_bytes()).expect("valid corpus");
         let via_case = receipt
             .cases
             .iter()
@@ -537,7 +546,7 @@ mod tests {
         let first = value["cases"][0].clone();
         value["cases"][1]["id"] = first["id"].clone();
         let bytes = serde_json::to_vec(&value).expect("serialize changed corpus");
-        let error = evaluate_corpus_bytes(&bytes, &valid_head()).expect_err("duplicate ID rejects");
+        let error = evaluate_valid(&bytes).expect_err("duplicate ID rejects");
         assert!(error.contains("duplicate case ID"));
     }
 
@@ -570,7 +579,7 @@ mod tests {
         cases.reverse();
         let reordered_bytes = serde_json::to_vec(&value).expect("serialize reordered corpus");
         let reordered =
-            evaluate_corpus_bytes(&reordered_bytes, &valid_head()).expect("reordered corpus");
+            evaluate_valid(&reordered_bytes).expect("reordered corpus");
         assert!(reordered.passed());
         assert_eq!(original.cases, reordered.cases);
         assert_ne!(original.corpus_sha256, reordered.corpus_sha256);
