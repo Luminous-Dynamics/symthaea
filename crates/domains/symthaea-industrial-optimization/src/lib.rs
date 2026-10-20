@@ -13,7 +13,7 @@
 //! planning. Scenario floors are not statistical confidence bounds unless the
 //! caller has independently established that interpretation.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
 pub const MAX_EXACT_CANDIDATES: usize = 20;
@@ -89,13 +89,6 @@ impl fmt::Display for BenchmarkError {
 impl std::error::Error for BenchmarkError {}
 
 fn validate(candidates: &[Intervention]) -> Result<(), BenchmarkError> {
-    if candidates.len() > MAX_EXACT_CANDIDATES {
-        return Err(BenchmarkError::TooManyCandidates {
-            actual: candidates.len(),
-            maximum: MAX_EXACT_CANDIDATES,
-        });
-    }
-
     let mut ids = BTreeSet::new();
     for (index, candidate) in candidates.iter().enumerate() {
         if candidate.id.trim().is_empty() {
@@ -181,6 +174,12 @@ pub fn optimize_robust_portfolio(
     candidates: &[Intervention],
     budget_usd: u64,
 ) -> Result<Portfolio, BenchmarkError> {
+    if candidates.len() > MAX_EXACT_CANDIDATES {
+        return Err(BenchmarkError::TooManyCandidates {
+            actual: candidates.len(),
+            maximum: MAX_EXACT_CANDIDATES,
+        });
+    }
     validate(candidates)?;
 
     let subset_count = 1_u64 << candidates.len();
@@ -224,6 +223,117 @@ pub fn optimize_robust_portfolio(
     }
 
     Ok(best)
+}
+
+
+/// Return the nondominated trade-off frontier between capital cost (minimize)
+/// and conservative scenario-floor abatement (maximize).
+///
+/// Expected and ceiling estimates remain visible in each returned portfolio,
+/// but they do not secretly override the primary robustness objective. When
+/// several portfolios occupy the same (capex, floor) point, prefer the
+/// narrowest scenario span, then the higher expected estimate, then stable
+/// lexicographic IDs. This returns one representative per objective point.
+///
+/// As with the exact optimizer, this uses exhaustive subset enumeration and is
+/// limited to MAX_EXACT_CANDIDATES. It does not model intervention interactions
+/// between different source groups.
+pub fn pareto_frontier(
+    candidates: &[Intervention],
+    budget_usd: u64,
+) -> Result<Vec<Portfolio>, BenchmarkError> {
+    if candidates.len() > MAX_EXACT_CANDIDATES {
+        return Err(BenchmarkError::TooManyCandidates {
+            actual: candidates.len(),
+            maximum: MAX_EXACT_CANDIDATES,
+        });
+    }
+    validate(candidates)?;
+
+    let subset_count = 1_u64 << candidates.len();
+    let mut best_at_point: BTreeMap<(u64, u64), Portfolio> = BTreeMap::new();
+
+    // Include the empty portfolio as the zero-cost, zero-abatement baseline.
+    for mask in 0..subset_count {
+        let mut indexes = Vec::new();
+        let mut source_groups = BTreeSet::new();
+        let mut capex = 0_u64;
+        let mut feasible = true;
+
+        for (index, candidate) in candidates.iter().enumerate() {
+            if mask & (1_u64 << index) == 0 {
+                continue;
+            }
+            if !candidate.eligible_for_planning
+                || !source_groups.insert(candidate.source_group.as_str())
+            {
+                feasible = false;
+                break;
+            }
+            let Some(next_capex) = capex.checked_add(candidate.capex_usd) else {
+                feasible = false;
+                break;
+            };
+            capex = next_capex;
+            if capex > budget_usd {
+                feasible = false;
+                break;
+            }
+            indexes.push(index);
+        }
+
+        if !feasible {
+            continue;
+        }
+        let portfolio = portfolio_from_indices(candidates, &indexes)?;
+        let key = (
+            portfolio.capex_usd,
+            portfolio.floor_tonnes_ch4_per_year,
+        );
+        match best_at_point.get(&key) {
+            None => {
+                best_at_point.insert(key, portfolio);
+            }
+            Some(incumbent) => {
+                let candidate_span = portfolio.ceiling_tonnes_ch4_per_year
+                    - portfolio.floor_tonnes_ch4_per_year;
+                let incumbent_span = incumbent.ceiling_tonnes_ch4_per_year
+                    - incumbent.floor_tonnes_ch4_per_year;
+                let candidate_preferred = candidate_span < incumbent_span
+                    || (candidate_span == incumbent_span
+                        && portfolio.expected_tonnes_ch4_per_year
+                            > incumbent.expected_tonnes_ch4_per_year)
+                    || (candidate_span == incumbent_span
+                        && portfolio.expected_tonnes_ch4_per_year
+                            == incumbent.expected_tonnes_ch4_per_year
+                        && portfolio.selected_ids < incumbent.selected_ids);
+                if candidate_preferred {
+                    best_at_point.insert(key, portfolio);
+                }
+            }
+        }
+    }
+
+    let mut points: Vec<Portfolio> = best_at_point.into_values().collect();
+    points.sort_by(|a, b| {
+        a.capex_usd
+            .cmp(&b.capex_usd)
+            .then_with(|| b.floor_tonnes_ch4_per_year.cmp(&a.floor_tonnes_ch4_per_year))
+            .then_with(|| b.expected_tonnes_ch4_per_year.cmp(&a.expected_tonnes_ch4_per_year))
+            .then_with(|| a.selected_ids.cmp(&b.selected_ids))
+    });
+
+    // Once points are ordered by ascending cost, any point whose floor is no
+    // greater than a cheaper point is dominated in the cost/floor plane.
+    let mut frontier = Vec::new();
+    let mut best_floor: Option<u64> = None;
+    for point in points {
+        if best_floor.is_none_or(|floor| point.floor_tonnes_ch4_per_year > floor) {
+            best_floor = Some(point.floor_tonnes_ch4_per_year);
+            frontier.push(point);
+        }
+    }
+    Ok(frontier)
 }
 
 /// Simple benchmark baseline: greedily rank eligible interventions by expected
@@ -412,6 +522,64 @@ mod tests {
             optimize_robust_portfolio(&candidates, 2),
             Err(BenchmarkError::ArithmeticOverflow)
         );
+    }
+
+
+    #[test]
+    fn greedy_baseline_supports_more_candidates_than_exact_search() {
+        let candidates: Vec<Intervention> = (0..=MAX_EXACT_CANDIDATES)
+            .map(|index| {
+                item(
+                    &format!("candidate-{index}"),
+                    &format!("source-{index}"),
+                    1,
+                    1,
+                    1,
+                    1,
+                    true,
+                )
+            })
+            .collect();
+
+        let result = greedy_expected_per_dollar(&candidates, (MAX_EXACT_CANDIDATES + 1) as u64)
+            .unwrap();
+        assert_eq!(result.selected_ids.len(), MAX_EXACT_CANDIDATES + 1);
+    }
+
+    #[test]
+    fn frontier_keeps_cost_abatement_tradeoffs_and_prunes_dominated_points() {
+        let candidates = vec![
+            item("cheap", "source-a", 10, 3, 4, 6, true),
+            item("mid", "source-b", 20, 6, 8, 10, true),
+            item("dominated", "source-c", 30, 5, 12, 14, true),
+            item("high-value", "source-d", 30, 8, 10, 12, true),
+            item("same-floor-more-cost", "source-e", 40, 8, 13, 16, true),
+            item("premium", "source-f", 50, 12, 15, 20, true),
+        ];
+
+        let frontier = pareto_frontier(&candidates, 50).unwrap();
+        let coordinates: Vec<(u64, u64)> = frontier
+            .iter()
+            .map(|p| (p.capex_usd, p.floor_tonnes_ch4_per_year))
+            .collect();
+
+        assert_eq!(coordinates, vec![(10, 3), (20, 6), (30, 8), (50, 12)]);
+        assert!(!frontier.iter().any(|p| p.selected_ids.contains(&"dominated".to_owned())));
+        assert!(!frontier.iter().any(|p| p.selected_ids.contains(&"same-floor-more-cost".to_owned())));
+    }
+
+    #[test]
+    fn frontier_respects_source_exclusivity_and_budget() {
+        let candidates = vec![
+            item("repair", "same-source", 10, 2, 4, 5, true),
+            item("replace", "same-source", 15, 4, 5, 8, true),
+            item("too-expensive", "other-source", 100, 50, 60, 70, true),
+        ];
+
+        let frontier = pareto_frontier(&candidates, 20).unwrap();
+        assert!(frontier.iter().all(|p| p.capex_usd <= 20));
+        assert!(frontier.iter().all(|p| p.selected_ids.len() <= 1));
+        assert_eq!(frontier.last().unwrap().floor_tonnes_ch4_per_year, 4);
     }
 
     #[test]
