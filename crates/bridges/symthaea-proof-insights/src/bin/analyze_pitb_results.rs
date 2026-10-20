@@ -196,6 +196,7 @@ struct AnalysisReport {
     protocol_id: String,
     protocol_sha256: String,
     run_config_sha256: String,
+    power_report_sha256: String,
     validation_results_sha256: String,
     results_jsonl_sha256: String,
     analyzer_source_sha256: String,
@@ -332,6 +333,13 @@ struct PowerReport {
 struct SimulatedFamily {
     target_count: usize,
     paired_delta_sum: i64,
+}
+
+fn run_design_sha256(config: &RunConfig) -> Result<String> {
+    let mut design = config.clone();
+    design.power_report_sha256 = None;
+    let bytes = serde_json::to_vec(&design).context("serialize canonical run design")?;
+    Ok(sha256_hex(&bytes))
 }
 
 fn main() -> ExitCode {
