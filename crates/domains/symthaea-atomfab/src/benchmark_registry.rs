@@ -418,6 +418,19 @@ mod tests {
                 }),
                 "{lane_id} must keep failed evaluations in the denominator"
             );
+            assert!(
+                lane.metrics.iter().any(|metric| {
+                    metric.contains("evaluation stratum") && metric.contains("support surface")
+                }),
+                "{lane_id} must preserve condition-specific failure rates"
+            );
+            assert!(
+                lane.gates.iter().any(|gate| {
+                    gate.contains("particle sizes, support surfaces")
+                        && gate.contains("one hidden rate")
+                }),
+                "{lane_id} must prevent pooled rates from hiding condition-specific failures"
+            );
         }
     }
 
