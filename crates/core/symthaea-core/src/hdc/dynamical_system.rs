@@ -1355,6 +1355,15 @@ mod tests {
                 maximum_steps: MAX_SIMULATION_STEPS
             })
         );
+
+        let invalid_rk45 = Rk45Integrator {
+            tol: f64::NAN,
+            ..Rk45Integrator::default()
+        };
+        assert_eq!(
+            try_simulate(&osc, &invalid_rk45, &initial, 0.0, 1.0, 0.1),
+            Err(SimulationError::InvalidIntegratorConfiguration)
+        );
     }
 
     #[test]
@@ -1413,6 +1422,21 @@ mod tests {
             (result.final_state()[1] - expected_v).abs() < 1.0e-8,
             "adaptive RK45 v error was {:.3e}",
             (result.final_state()[1] - expected_v).abs()
+        );
+
+        // The legacy one-step API must also advance across the full requested
+        // interval, not just one accepted adaptive substep.
+        let short_end = 0.1;
+        let one_step = integrator.step(&osc, &initial, 0.0, short_end);
+        assert!(
+            (one_step[0] - short_end.cos()).abs() < 1.0e-8,
+            "direct RK45 x error was {:.3e}",
+            (one_step[0] - short_end.cos()).abs()
+        );
+        assert!(
+            (one_step[1] + short_end.sin()).abs() < 1.0e-8,
+            "direct RK45 v error was {:.3e}",
+            (one_step[1] + short_end.sin()).abs()
         );
     }
 
