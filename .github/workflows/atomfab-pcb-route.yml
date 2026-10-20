@@ -64,16 +64,54 @@ jobs:
                 ["PHYSICAL_QUALIFICATION_OUT_OF_SCOPE"]
           ' docs/research/fixtures/ATOMFAB_PCB_ROUTE_CORPUS_V0_3.json
 
-      - name: Format check for fabrication kernel package
-        run: cargo fmt --manifest-path crates/domains/symthaea-fabrication-kernel/Cargo.toml -- --check
+      # The workspace currently cannot resolve metadata because a globbed
+      # member has no Cargo.toml (tracked in issues #7048 / #6971). Do not
+      # weaken that gate or make a workspace-wide edit in this feature PR.
+      # Format the exact changed Rust files, then compile/test this pure module
+      # through a temporary standalone harness that uses the same source file.
+      - name: Format exact AtomFab Rust sources
+        run: |
+          rustfmt --edition 2024 --check \
+            crates/domains/symthaea-fabrication-kernel/src/atomfab_pcb_route.rs \
+            crates/domains/symthaea-fabrication-kernel/examples/atomfab_pcb_route_corpus.rs
 
-      - name: Unit tests for independent route/evidence oracle
-        run: cargo test -p symthaea-fabrication-kernel --lib atomfab_pcb_route
+      - name: Prepare isolated exact-source harness
+        run: |
+          export HARNESS_DIR="${RUNNER_TEMP}/atomfab-pcb-route-check"
+          mkdir -p "${HARNESS_DIR}/src" "${HARNESS_DIR}/examples"
+          cat > "${HARNESS_DIR}/Cargo.toml" <<EOF
+          [package]
+          name = "symthaea-fabrication-kernel-atomfab-check"
+          version = "0.1.0"
+          edition = "2024"
+
+          [lib]
+          name = "symthaea_fabrication_kernel"
+          path = "src/lib.rs"
+
+          [[example]]
+          name = "atomfab_pcb_route_corpus"
+          path = "examples/atomfab_pcb_route_corpus.rs"
+
+          [dependencies]
+          serde = { version = "1.0", features = ["derive"] }
+          serde_json = "1.0"
+          sha2 = "0.10"
+          EOF
+          cat > "${HARNESS_DIR}/src/lib.rs" <<EOF
+          #[path = "${GITHUB_WORKSPACE}/crates/domains/symthaea-fabrication-kernel/src/atomfab_pcb_route.rs"]
+          pub mod atomfab_pcb_route;
+          EOF
+          cp crates/domains/symthaea-fabrication-kernel/examples/atomfab_pcb_route_corpus.rs "${HARNESS_DIR}/examples/atomfab_pcb_route_corpus.rs"
+
+      - name: Unit tests for exact-source independent route/evidence oracle
+        run: |
+          cargo test --manifest-path "${RUNNER_TEMP}/atomfab-pcb-route-check/Cargo.toml" --lib atomfab_pcb_route
 
       - name: Produce exact-head-bound receipt
         run: |
           export ATOMFAB_GIT_HEAD="$(git rev-parse HEAD)"
-          cargo run --quiet -p symthaea-fabrication-kernel --example atomfab_pcb_route_corpus > atomfab-pcb-route-receipt.json
+          cargo run --quiet --manifest-path "${RUNNER_TEMP}/atomfab-pcb-route-check/Cargo.toml" --example atomfab_pcb_route_corpus > atomfab-pcb-route-receipt.json
           jq -e --arg head "$(git rev-parse HEAD)" '
             .schema == "atomfab-pcb-route-receipt-v0.3"
             and .corpus_schema == "atomfab-pcb-route-corpus-v0.3"
