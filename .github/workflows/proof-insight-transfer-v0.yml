@@ -379,6 +379,136 @@ jobs:
               raise SystemExit(f"schema negative control {index} unexpectedly passed")
           print(f"PITB Draft 2020-12 schema: PASS; synthetic positive control: PASS; {len(mutants)} negative controls rejected, including transfer-contract invariants")
           PY
+      - name: Validate temporal replay manifest schema and mutation controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import copy
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator, FormatChecker, ValidationError
+
+          schema_path = Path("data/benchmarks/proof-insight-transfer-v0/temporal-replay-manifest.schema.json")
+          schema = json.loads(schema_path.read_text())
+          Draft202012Validator.check_schema(schema)
+          validator = Draft202012Validator(schema, format_checker=FormatChecker())
+
+          def sha(char, length=64):
+              return char * length
+
+          def commit(char):
+              return char * 40
+
+          manifest = {
+              "schema_version": "pitb.temporal-replay-manifest.v0",
+              "repository_url": "https://example.invalid/temporal-fixture",
+              "repository_commit": commit("5"),
+              "timeline_sha256": sha("9"),
+              "lean_toolchain": "leanprover/lean4:v4.34.1",
+              "mathlib_revision": commit("6"),
+              "events": [
+                  {
+                      "position": 0,
+                      "target_id": "target-000",
+                      "theorem_id": "Example.first",
+                      "target_state_commit": commit("1"),
+                      "proof_completion_commit": commit("2"),
+                      "statement_sha256": sha("a"),
+                      "statement_artifact_id": "statement-000",
+                      "proof_artifact_id": "proof-000",
+                      "visible_artifact_ids": ["statement-000"]
+                  },
+                  {
+                      "position": 1,
+                      "target_id": "target-001",
+                      "theorem_id": "Example.second",
+                      "target_state_commit": commit("2"),
+                      "proof_completion_commit": commit("3"),
+                      "statement_sha256": sha("c"),
+                      "statement_artifact_id": "statement-001",
+                      "proof_artifact_id": "proof-001",
+                      "visible_artifact_ids": ["statement-000", "proof-000", "statement-001"]
+                  }
+              ],
+              "artifacts": [
+                  {
+                      "artifact_id": "statement-000",
+                      "path": "lean/Example.lean",
+                      "artifact_kind": "theorem_statement",
+                      "content_sha256": sha("a"),
+                      "content_start_line": 1,
+                      "content_end_line": 1,
+                      "source_file_sha256": sha("e"),
+                      "source_commit": commit("1"),
+                      "available_at_position": 0,
+                      "theorem_id": "Example.first"
+                  },
+                  {
+                      "artifact_id": "proof-000",
+                      "path": "lean/Example.lean",
+                      "artifact_kind": "proof_body",
+                      "content_sha256": sha("b"),
+                      "content_start_line": 2,
+                      "content_end_line": 2,
+                      "source_file_sha256": sha("f"),
+                      "source_commit": commit("2"),
+                      "available_at_position": 0,
+                      "theorem_id": "Example.first"
+                  },
+                  {
+                      "artifact_id": "statement-001",
+                      "path": "lean/Example.lean",
+                      "artifact_kind": "theorem_statement",
+                      "content_sha256": sha("c"),
+                      "content_start_line": 3,
+                      "content_end_line": 3,
+                      "source_file_sha256": sha("7"),
+                      "source_commit": commit("2"),
+                      "available_at_position": 1,
+                      "theorem_id": "Example.second"
+                  },
+                  {
+                      "artifact_id": "proof-001",
+                      "path": "lean/Example.lean",
+                      "artifact_kind": "proof_body",
+                      "content_sha256": sha("d"),
+                      "content_start_line": 4,
+                      "content_end_line": 4,
+                      "source_file_sha256": sha("8"),
+                      "source_commit": commit("3"),
+                      "available_at_position": 1,
+                      "theorem_id": "Example.second"
+                  }
+              ]
+          }
+          validator.validate(manifest)
+
+          mutants = []
+          bad_digest = copy.deepcopy(manifest)
+          bad_digest["timeline_sha256"] = "not-a-sha256"
+          mutants.append(bad_digest)
+
+          traversal_path = copy.deepcopy(manifest)
+          traversal_path["artifacts"][0]["path"] = "../outside.lean"
+          mutants.append(traversal_path)
+
+          unknown_authority_field = copy.deepcopy(manifest)
+          unknown_authority_field["trusted"] = True
+          mutants.append(unknown_authority_field)
+
+          for number, mutant in enumerate(mutants, start=1):
+              try:
+                  validator.validate(mutant)
+              except ValidationError:
+                  continue
+              raise SystemExit(f"temporal manifest negative control {number} unexpectedly passed")
+
+          print(
+              "PITB_TEMPORAL_SCHEMA_PASS: Draft 2020-12 positive fixture accepted; "
+              f"{len(mutants)} malformed-manifest controls rejected"
+          )
+          PY
       - name: Index pinned OpenAI math snapshot twice
         shell: bash
         run: |
