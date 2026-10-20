@@ -270,6 +270,20 @@ mod tests {
                 .any(|metric| metric.contains("p=0.94")),
             "ranking persistence must be preregistered"
         );
+        assert!(
+            nanoparticle_lane
+                .metrics
+                .iter()
+                .any(|metric| metric.contains("restricted to shared canonical candidate IDs")),
+            "ranking quality must be measured on matched canonical structures"
+        );
+        assert!(
+            nanoparticle_lane
+                .metrics
+                .iter()
+                .any(|metric| metric.starts_with("candidate-set Jaccard")),
+            "discovery-set agreement must be reported separately"
+        );
         let reality_gap = registry
             .benchmark_lanes
             .iter()
