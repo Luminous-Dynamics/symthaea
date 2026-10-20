@@ -1113,3 +1113,4 @@ mod tests {
         assert!(validate_repo_relative_path("/absolute/path.lean").is_err());
         assert!(validate_repo_relative_path("lean\\..\\outside.lean").is_err());
     }
+}
