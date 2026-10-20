@@ -148,7 +148,39 @@ pub fn environmental_load(scenario: Scenario, tick: usize, seed: u64) -> f64 {
     (base + jitter).clamp(0.0, 1.0)
 }
 
-fn forecast_mean(scenario: Scenario, start: usize, seed: u64) -> f64 {
+/// Synthetic external warning stream. It is scenario input, not computed by
+/// reading the realized future environment. Acute/chronic/repeated scenarios
+/// provide controlled lead signals; regime_shift is deliberately unannounced.
+fn forecast_signal(scenario: Scenario, tick: usize, seed: u64) -> f64 {
+    let base = match scenario {
+        Scenario::Calm => 0.06,
+        Scenario::Acute => {
+            if (5..12).contains(&tick) { 0.92 } else { 0.07 }
+        }
+        Scenario::Chronic => {
+            if (3..35).contains(&tick) { 0.58 } else { 0.09 }
+        }
+        Scenario::Repeated => {
+            if (2..7).contains(&tick)
+                || (11..16).contains(&tick)
+                || (20..25).contains(&tick)
+                || (29..34).contains(&tick)
+            {
+                0.82
+            } else {
+                0.10
+            }
+        }
+        Scenario::RegimeShift => {
+            if tick < HORIZON / 2 { 0.08 } else { 0.72 }
+        }
+    };
+    let jitter = (unit_noise(seed.wrapping_add(313), tick) - 0.5) * 0.04;
+    (base + jitter).clamp(0.0, 1.0)
+}
+
+/// Perfect short-horizon look-ahead, available only to the diagnostic oracle.
+fn oracle_forecast_mean(scenario: Scenario, start: usize, seed: u64) -> f64 {
     let mut values = [0.0; 3];
     for (index, value) in values.iter_mut().enumerate() {
         *value = environmental_load(scenario, start + index, seed);
@@ -238,19 +270,22 @@ pub fn run_episode(policy: Policy, scenario: Scenario, seed: u64) -> EpisodeMetr
             last_disturbance = Some(tick);
         }
 
-        // A noisy forecast, its confidence, a deliberately shuffled control and
-        // a perfect-information oracle are separate inputs.
-        let true_forecast = forecast_mean(scenario, tick + 1, seed);
-        let forecast_noise = (unit_noise(seed.wrapping_add(91), tick) - 0.5) * 0.18;
-        let forecast_load = (true_forecast + forecast_noise).clamp(0.0, 1.0);
-        let forecast_confidence = if scenario == Scenario::RegimeShift && tick >= HORIZON / 2 {
-            0.45
-        } else {
-            0.85
-        };
+        // Candidate policies receive a noisy exogenous warning stream. Confidence
+        // controls forecast noise but does not expose the scenario or future state.
+        // Only OraclePredictive receives actual future environment values.
+        let forecast_confidence =
+            0.65 + 0.30 * unit_noise(seed.wrapping_add(777), tick);
+        let forecast_noise_scale = 0.10 + 0.35 * (1.0 - forecast_confidence);
+        let forecast_noise =
+            (unit_noise(seed.wrapping_add(91), tick) - 0.5) * forecast_noise_scale;
+        let forecast_load =
+            (forecast_signal(scenario, tick, seed) + forecast_noise).clamp(0.0, 1.0);
         let shuffled_start = (tick + 13) % HORIZON;
-        let shuffled_forecast_load = forecast_mean(scenario, shuffled_start, seed);
-        let oracle_forecast_load = true_forecast;
+        let shuffled_noise =
+            (unit_noise(seed.wrapping_add(91), shuffled_start) - 0.5) * forecast_noise_scale;
+        let shuffled_forecast_load =
+            (forecast_signal(scenario, shuffled_start, seed) + shuffled_noise).clamp(0.0, 1.0);
+        let oracle_forecast_load = oracle_forecast_mean(scenario, tick + 1, seed);
 
         let observation = Observation {
             current_stress: stress,
