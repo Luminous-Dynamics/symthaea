@@ -249,3 +249,12 @@ The interval is deliberately fail-closed: the function emits no acceleration int
 This reports **cost-to-target**, not general wall-clock speed, model throughput, experimental yield, or manufacturing rate. Even a lower confidence bound greater than 1 does not establish the overall policy win on its own: report the paired median/interval, failures, and target-reaching coverage, then separately require no worse reference-validated objective quality at equal total cost. If results fail the gate, publish the non-win rather than changing the target, sample set, or statistic.
 
 Artifacts: `src/campaign_statistics.rs`, `schemas/paired-acceleration-summary-v1.schema.json`, and the `active-learning-policy` lane in `benchmarks/benchmark-matrix-v1.json`. This code and its unit tests are not external MLIP comparisons; no speedup has been measured.
+
+
+### Frozen seed roster and statistical claim boundary
+
+The current proposed extension pins seeds **101–120** in `policy_comparison.seed_manifest`. Its canonical SHA-256 is `c8dd76e3828125d3984e95bef0cd50603cee2bef7933f1fec178866dd973ba59`, computed over UTF-8 bytes of `atomfab-seed-manifest-v1\n` followed by each unique seed in ascending decimal form, one seed per line. The Rust `SeedManifestV1` checks this digest and rejects duplicate/unsorted rosters.
+
+The paired acceleration function receives the manifest explicitly, requires exactly one baseline/candidate pair for every seed in that roster, and writes both the roster and digest into its report. A missing seed, extra seed, duplicated seed, or mismatched roster blocks the interval. A campaign with a failed/non-target run is retained as a failure and blocks this strict target-reaching interval; it must not be silently removed to make the policy look faster. The seed roster and hash are proposal inputs and must remain fixed before outcomes are observed.
+
+The illustrative seed-manifest fixture is a test artifact, not evidence of any completed campaign. The accepted report still requires successful execution on an exact code head, traceable completed campaign records, and independent recomputation of the statistics from those records.
