@@ -763,7 +763,8 @@ fn audit_temporal_dataset(
     let mut candidates_by_path: BTreeMap<String, Vec<TimelinePathCandidate>> = BTreeMap::new();
     let mut timeline_row_count = 0_usize;
     for (position, row_result) in timeline_reader.records().enumerate() {
-        let row = row_result.with_context(|| format!("parse timeline join row {}", position + 2))?;
+        let row =
+            row_result.with_context(|| format!("parse timeline join row {}", position + 2))?;
         timeline_row_count += 1;
         let path = row.get(path_col).unwrap_or("").trim();
         if path.is_empty() {
@@ -772,15 +773,19 @@ fn audit_temporal_dataset(
         let normalized = normalize_root_relative_path(path)
             .with_context(|| format!("unsafe timeline spec path on row {}", position + 2))?;
         if normalized != path {
-            bail!("timeline spec path is not canonical on row {}", position + 2);
+            bail!(
+                "timeline spec path is not canonical on row {}",
+                position + 2
+            );
         }
         let completion_commit = row
             .get(commit_col)
             .unwrap_or("")
             .trim()
             .to_ascii_lowercase();
-        validate_git_sha(&completion_commit)
-            .with_context(|| format!("invalid timeline completion commit on row {}", position + 2))?;
+        validate_git_sha(&completion_commit).with_context(|| {
+            format!("invalid timeline completion commit on row {}", position + 2)
+        })?;
         candidates_by_path
             .entry(normalized)
             .or_default()
@@ -791,8 +796,8 @@ fn audit_temporal_dataset(
     }
 
     let unique_timeline_path_count = candidates_by_path.len();
-    let mut dataset_text = std::str::from_utf8(&dataset_bytes)
-        .context("dataset JSONL is not UTF-8")?;
+    let mut dataset_text =
+        std::str::from_utf8(&dataset_bytes).context("dataset JSONL is not UTF-8")?;
     if dataset_text.starts_with('\u{feff}') {
         dataset_text = &dataset_text['\u{feff}'.len_utf8()..];
     }
@@ -925,11 +930,7 @@ fn audit_temporal_dataset(
                     if let Some(true) = commit_before_object_exists {
                         let before_is_completion_ancestor =
                             if commit_before_is_ancestor_of_head == Some(true) {
-                                git_is_ancestor(
-                                    &root,
-                                    &commit_before,
-                                    &matched.completion_commit,
-                                )?
+                                git_is_ancestor(&root, &commit_before, &matched.completion_commit)?
                             } else {
                                 false
                             };
@@ -945,25 +946,18 @@ fn audit_temporal_dataset(
                                     std::str::from_utf8(&before_source)
                                         .context("dataset pre-state Lean source is not UTF-8")?,
                                 );
-                                statement_match_at_commit_before = Some(
-                                    normalized_before_source.contains(&normalized_statement),
-                                );
+                                statement_match_at_commit_before =
+                                    Some(normalized_before_source.contains(&normalized_statement));
                             }
                         } else {
                             statement_match_at_commit_before = None;
                         }
                     }
 
-                    if git_path_exists_at_commit(
-                        &root,
-                        &matched.completion_commit,
-                        &raw_file_path,
-                    )? {
-                        let completion_source = git_show_file(
-                            &root,
-                            &matched.completion_commit,
-                            &raw_file_path,
-                        )?;
+                    if git_path_exists_at_commit(&root, &matched.completion_commit, &raw_file_path)?
+                    {
+                        let completion_source =
+                            git_show_file(&root, &matched.completion_commit, &raw_file_path)?;
                         let normalized_statement = normalize_whitespace(&formal_statement);
                         let normalized_completion_source = normalize_whitespace(
                             std::str::from_utf8(&completion_source)
@@ -1032,7 +1026,9 @@ fn audit_temporal_dataset(
     if events.is_empty() {
         bail!("temporal dataset audit found zero dataset records");
     }
-    let status_count_total = unique_path_join_count + ambiguous_path_join_count + unmatched_path_join_count
+    let status_count_total = unique_path_join_count
+        + ambiguous_path_join_count
+        + unmatched_path_join_count
         + invalid_dataset_path_count;
     if status_count_total != events.len() {
         bail!(
@@ -1097,14 +1093,11 @@ fn audit_temporal_dataset(
     {
         bail!("refusing to overwrite a symlink as temporal dataset audit output");
     }
-    let mut encoded = serde_json::to_vec_pretty(&audit).context("serialize temporal dataset audit")?;
+    let mut encoded =
+        serde_json::to_vec_pretty(&audit).context("serialize temporal dataset audit")?;
     encoded.push(b'\n');
-    fs::write(&resolved_output, encoded).with_context(|| {
-        format!(
-            "write temporal dataset audit {}",
-            resolved_output.display()
-        )
-    })?;
+    fs::write(&resolved_output, encoded)
+        .with_context(|| format!("write temporal dataset audit {}", resolved_output.display()))?;
     println!(
         "PITB_TEMPORAL_DATASET_AUDIT_PASS: rows={} unique_path_join={} ambiguous_path_join={} unmatched_path_join={} invalid_path={} statements={} report_sha256={}",
         audit.total_dataset_records,
@@ -1112,8 +1105,13 @@ fn audit_temporal_dataset(
         audit.ambiguous_path_join_count,
         audit.unmatched_path_join_count,
         audit.invalid_dataset_path_count,
-        audit.statement_match_relation_counts.values().sum::<usize>(),
-        sha256_hex(&serde_json::to_vec(&audit).context("serialize canonical temporal dataset audit")?),
+        audit
+            .statement_match_relation_counts
+            .values()
+            .sum::<usize>(),
+        sha256_hex(
+            &serde_json::to_vec(&audit).context("serialize canonical temporal dataset audit")?
+        ),
     );
     Ok(())
 }
@@ -3303,11 +3301,9 @@ mod tests {
         );
         assert_eq!(
             timeline_audit["repository_readme_sha256"],
-            sha(
-                git_show_file(&root, &repository_commit, "README.md")
-                    .expect("read pinned README bytes")
-                    .as_slice()
-            )
+            sha(git_show_file(&root, &repository_commit, "README.md")
+                .expect("read pinned README bytes")
+                .as_slice())
         );
         assert_eq!(timeline_audit["unique_completion_commit_count"], 2);
         assert_eq!(timeline_audit["source_path_present_at_completion_count"], 2);
