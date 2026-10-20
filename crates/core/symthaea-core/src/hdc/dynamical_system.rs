@@ -113,6 +113,154 @@ impl SimulationResult {
 // SIMULATE FUNCTION
 // =============================================================================
 
+/// Maximum number of integration steps retained by the checked simulator.
+pub const MAX_SIMULATION_STEPS: usize = 1_000_000;
+
+/// Maximum number of state scalars retained across a complete trajectory.
+pub const MAX_TRAJECTORY_STATE_VALUES: usize = 10_000_000;
+
+/// Errors returned when a simulation request or integrator output is invalid.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SimulationError {
+    NonFiniteTimeBounds,
+    ReversedTimeRange,
+    InvalidTimeStep,
+    NonFiniteTimeSpan,
+    NonFiniteStepCount,
+    StepBudgetExceeded { maximum_steps: usize },
+    TrajectoryBudgetExceeded { maximum_state_values: usize },
+    StateDimensionMismatch { expected: usize, actual: usize },
+    NonFiniteInitialState { index: usize },
+    InvalidIntegratorStateDimension {
+        step: usize,
+        expected: usize,
+        actual: usize,
+    },
+    NonFiniteIntegratorState { step: usize, index: usize },
+    TimeDidNotAdvance { step: usize },
+}
+
+/// Checked simulation entry point.
+///
+/// Rejects invalid/non-finite inputs and integrator outputs, and bounds trajectory
+/// memory before allocation. A zero-duration run is valid and returns the initial
+/// state. The step budget applies to requested fixed-step samples; adaptive
+/// integrators may take internal substeps according to their own contract.
+///
+/// This validates the numerical integration boundary; it does not establish that
+/// the selected equations or parameters accurately represent a physical system.
+pub fn try_simulate(
+    system: &dyn DynamicalSystem,
+    integrator: &dyn Integrator,
+    initial_state: &[f64],
+    t_start: f64,
+    t_end: f64,
+    dt: f64,
+) -> Result<SimulationResult, SimulationError> {
+    if !t_start.is_finite() || !t_end.is_finite() {
+        return Err(SimulationError::NonFiniteTimeBounds);
+    }
+    if t_end < t_start {
+        return Err(SimulationError::ReversedTimeRange);
+    }
+    if !dt.is_finite() || dt <= 0.0 {
+        return Err(SimulationError::InvalidTimeStep);
+    }
+
+    let elapsed = t_end - t_start;
+    if !elapsed.is_finite() {
+        return Err(SimulationError::NonFiniteTimeSpan);
+    }
+
+    let expected_dim = system.state_dim();
+    if initial_state.len() != expected_dim {
+        return Err(SimulationError::StateDimensionMismatch {
+            expected: expected_dim,
+            actual: initial_state.len(),
+        });
+    }
+    if let Some(index) = initial_state.iter().position(|value| !value.is_finite()) {
+        return Err(SimulationError::NonFiniteInitialState { index });
+    }
+
+    let raw_steps = (elapsed / dt).ceil();
+    if !raw_steps.is_finite() || raw_steps < 0.0 {
+        return Err(SimulationError::NonFiniteStepCount);
+    }
+    if raw_steps > MAX_SIMULATION_STEPS as f64 {
+        return Err(SimulationError::StepBudgetExceeded {
+            maximum_steps: MAX_SIMULATION_STEPS,
+        });
+    }
+    let n_steps = raw_steps as usize;
+    let sample_count = n_steps
+        .checked_add(1)
+        .ok_or(SimulationError::NonFiniteStepCount)?;
+    let state_value_count = sample_count
+        .checked_mul(expected_dim)
+        .ok_or(SimulationError::TrajectoryBudgetExceeded {
+            maximum_state_values: MAX_TRAJECTORY_STATE_VALUES,
+        })?;
+    if state_value_count > MAX_TRAJECTORY_STATE_VALUES {
+        return Err(SimulationError::TrajectoryBudgetExceeded {
+            maximum_state_values: MAX_TRAJECTORY_STATE_VALUES,
+        });
+    }
+
+    let mut times = Vec::with_capacity(sample_count);
+    let mut states = Vec::with_capacity(sample_count);
+    let mut state = initial_state.to_vec();
+    let mut t = t_start;
+
+    times.push(t);
+    states.push(state.clone());
+
+    for step in 0..n_steps {
+        let remaining = t_end - t;
+        let step_dt = dt.min(remaining);
+        if !step_dt.is_finite() || step_dt <= 0.0 {
+            return Err(SimulationError::TimeDidNotAdvance { step: step + 1 });
+        }
+
+        let next_state = integrator.step(system, &state, t, step_dt);
+        if next_state.len() != expected_dim {
+            return Err(SimulationError::InvalidIntegratorStateDimension {
+                step: step + 1,
+                expected: expected_dim,
+                actual: next_state.len(),
+            });
+        }
+        if let Some(index) = next_state.iter().position(|value| !value.is_finite()) {
+            return Err(SimulationError::NonFiniteIntegratorState {
+                step: step + 1,
+                index,
+            });
+        }
+
+        let next_t = if step_dt >= remaining {
+            t_end
+        } else {
+            t + step_dt
+        };
+        if !next_t.is_finite() || next_t <= t {
+            return Err(SimulationError::TimeDidNotAdvance { step: step + 1 });
+        }
+
+        state = next_state;
+        t = next_t;
+        times.push(t);
+        states.push(state.clone());
+    }
+
+    Ok(SimulationResult {
+        times,
+        states,
+        total_time: elapsed,
+        steps: times.len() - 1,
+        system_name: system.name().to_string(),
+    })
+}
+
 /// Run a full simulation of a dynamical system.
 ///
 /// Integrates from `t_start` to `t_end` using the given integrator and step
@@ -136,47 +284,8 @@ pub fn simulate(
     t_end: f64,
     dt: f64,
 ) -> SimulationResult {
-    assert_eq!(
-        initial_state.len(),
-        system.state_dim(),
-        "Initial state dimension {} does not match system dimension {}",
-        initial_state.len(),
-        system.state_dim()
-    );
-
-    let n_steps = ((t_end - t_start) / dt).ceil() as usize;
-    let mut times = Vec::with_capacity(n_steps + 1);
-    let mut states = Vec::with_capacity(n_steps + 1);
-
-    let mut state = initial_state.to_vec();
-    let mut t = t_start;
-
-    times.push(t);
-    states.push(state.clone());
-
-    for _ in 0..n_steps {
-        // Clamp the last step so we do not overshoot t_end
-        let step_dt = dt.min(t_end - t);
-        if step_dt <= 0.0 {
-            break;
-        }
-
-        state = integrator.step(system, &state, t, step_dt);
-        t += step_dt;
-
-        times.push(t);
-        states.push(state.clone());
-    }
-
-    let steps = times.len() - 1;
-
-    SimulationResult {
-        times,
-        states,
-        total_time: t_end - t_start,
-        steps,
-        system_name: system.name().to_string(),
-    }
+    try_simulate(system, integrator, initial_state, t_start, t_end, dt)
+        .unwrap_or_else(|error| panic!("Simulation failed: {error:?}"))
 }
 
 // =============================================================================
@@ -1062,6 +1171,137 @@ pub fn trajectory_to_hvs(result: &SimulationResult) -> Vec<ContinuousHV> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    struct FixedOutputIntegrator {
+        output: Vec<f64>,
+    }
+
+    impl Integrator for FixedOutputIntegrator {
+        fn step(
+            &self,
+            _system: &dyn DynamicalSystem,
+            _state: &[f64],
+            _t: f64,
+            _dt: f64,
+        ) -> Vec<f64> {
+            self.output.clone()
+        }
+
+        fn name(&self) -> &str {
+            "FixedOutput"
+        }
+    }
+
+    #[test]
+    fn checked_simulation_rejects_invalid_time_inputs() {
+        let osc = HarmonicOscillator::simple(1.0);
+        let integrator = Rk4Integrator;
+        let initial = [1.0, 0.0];
+
+        for invalid_dt in [0.0, -0.1, f64::NAN, f64::INFINITY] {
+            assert_eq!(
+                try_simulate(&osc, &integrator, &initial, 0.0, 1.0, invalid_dt),
+                Err(SimulationError::InvalidTimeStep)
+            );
+        }
+        assert_eq!(
+            try_simulate(&osc, &integrator, &initial, f64::NAN, 1.0, 0.1),
+            Err(SimulationError::NonFiniteTimeBounds)
+        );
+        assert_eq!(
+            try_simulate(&osc, &integrator, &initial, 1.0, 0.0, 0.1),
+            Err(SimulationError::ReversedTimeRange)
+        );
+        assert_eq!(
+            try_simulate(&osc, &integrator, &initial, -f64::MAX, f64::MAX, 0.1),
+            Err(SimulationError::NonFiniteTimeSpan)
+        );
+        assert_eq!(
+            try_simulate(&osc, &integrator, &initial, 0.0, 1.0, 1.0e-12),
+            Err(SimulationError::StepBudgetExceeded {
+                maximum_steps: MAX_SIMULATION_STEPS
+            })
+        );
+    }
+
+    #[test]
+    fn checked_simulation_rejects_invalid_states_and_integrator_outputs() {
+        let osc = HarmonicOscillator::simple(1.0);
+        let integrator = Rk4Integrator;
+
+        assert_eq!(
+            try_simulate(&osc, &integrator, &[f64::NAN, 0.0], 0.0, 1.0, 0.1),
+            Err(SimulationError::NonFiniteInitialState { index: 0 })
+        );
+        assert_eq!(
+            try_simulate(&osc, &integrator, &[1.0], 0.0, 1.0, 0.1),
+            Err(SimulationError::StateDimensionMismatch {
+                expected: 2,
+                actual: 1
+            })
+        );
+
+        let wrong_dimension = FixedOutputIntegrator { output: vec![1.0] };
+        assert_eq!(
+            try_simulate(&osc, &wrong_dimension, &[1.0, 0.0], 0.0, 0.1, 0.1),
+            Err(SimulationError::InvalidIntegratorStateDimension {
+                step: 1,
+                expected: 2,
+                actual: 1
+            })
+        );
+        let non_finite = FixedOutputIntegrator {
+            output: vec![f64::INFINITY, 0.0],
+        };
+        assert_eq!(
+            try_simulate(&osc, &non_finite, &[1.0, 0.0], 0.0, 0.1, 0.1),
+            Err(SimulationError::NonFiniteIntegratorState { step: 1, index: 0 })
+        );
+    }
+
+    #[test]
+    fn checked_simulation_accepts_zero_duration() {
+        let osc = HarmonicOscillator::simple(1.0);
+        let result = try_simulate(&osc, &Rk4Integrator, &[1.0, 0.0], 2.0, 2.0, 0.1)
+            .expect("zero-duration request should be valid");
+        assert_eq!(result.steps, 0);
+        assert_eq!(result.times, vec![2.0]);
+        assert_eq!(result.states, vec![vec![1.0, 0.0]]);
+    }
+
+    #[test]
+    fn rk4_exhibits_fourth_order_convergence_on_harmonic_oscillator() {
+        let osc = HarmonicOscillator::simple(1.0);
+        let initial = [1.0, 0.0];
+        let exact = [1.0f64.cos(), -1.0f64.sin()];
+
+        let error_at = |dt: f64| {
+            let result = try_simulate(&osc, &Rk4Integrator, &initial, 0.0, 1.0, dt)
+                .expect("valid convergence-study request");
+            result
+                .final_state()
+                .iter()
+                .zip(exact.iter())
+                .map(|(actual, target)| (actual - target).powi(2))
+                .sum::<f64>()
+                .sqrt()
+        };
+
+        let coarse = error_at(0.2);
+        let medium = error_at(0.1);
+        let fine = error_at(0.05);
+        let first_ratio = coarse / medium;
+        let second_ratio = medium / fine;
+
+        assert!(
+            (12.0..20.0).contains(&first_ratio),
+            "RK4 coarse/medium error ratio {first_ratio:.3} does not support fourth-order convergence"
+        );
+        assert!(
+            (12.0..20.0).contains(&second_ratio),
+            "RK4 medium/fine error ratio {second_ratio:.3} does not support fourth-order convergence"
+        );
+    }
 
     // -------------------------------------------------------------------------
     // Harmonic oscillator: energy conservation
