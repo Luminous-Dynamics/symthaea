@@ -9,6 +9,7 @@
     "schema_version",
     "repository_url",
     "repository_commit",
+    "timeline_path",
     "timeline_sha256",
     "lean_toolchain",
     "mathlib_revision",
@@ -52,6 +53,11 @@
       "items": {
         "$ref": "#/$defs/artifact"
       }
+    },
+    "timeline_path": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.?(/|$)).+$"
     }
   },
   "$defs": {
