@@ -191,10 +191,21 @@ struct AnalysisReport {
     known_exposed_family_ids: Vec<String>,
     bootstrap_replicates: usize,
     bootstrap_seed: u64,
+    family_aggregates: Vec<FamilyAggregate>,
     arm_metrics: Vec<ArmMetrics>,
     primary_comparison: PrimaryComparison,
     external_replication: &'static str,
     interpretation: String,
+}
+
+#[derive(Debug, Serialize)]
+struct FamilyAggregate {
+    family_id: String,
+    target_count: usize,
+    treatment_semantic_gate_successes: usize,
+    baseline_semantic_gate_successes: usize,
+    paired_delta_sum: i64,
+    paired_effect_percentage_points: f64,
 }
 
 #[derive(Debug, Serialize)]
@@ -217,6 +228,7 @@ struct ArmMetrics {
 #[derive(Debug, Serialize)]
 struct PrimaryComparison {
     metric: &'static str,
+    confidence_interval_method: &'static str,
     baseline_arm: String,
     treatment_arm: &'static str,
     paired_absolute_effect_percentage_points: f64,
@@ -290,10 +302,10 @@ fn execute() -> Result<()> {
         .map(|target| target.family_id.as_str())
         .collect::<BTreeSet<_>>()
         .len();
+    let family_aggregates = compute_family_aggregates(&eligible, &selected_baseline)?;
     let arm_metrics = compute_arm_metrics(&eligible);
     let (effect, lower, upper, pairs, clusters) = paired_cluster_bootstrap(
-        &eligible,
-        &selected_baseline,
+        &family_aggregates,
         config.bootstrap_replicates,
         config.bootstrap_seed,
     )?;
@@ -349,9 +361,11 @@ fn execute() -> Result<()> {
         known_exposed_family_ids: config.known_exposed_family_ids,
         bootstrap_replicates: config.bootstrap_replicates,
         bootstrap_seed: config.bootstrap_seed,
+        family_aggregates,
         arm_metrics,
         primary_comparison: PrimaryComparison {
             metric: "semantic_gate_verified_exact_target_success",
+            confidence_interval_method: "paired target-delta percentile bootstrap; resample families with replacement; SplitMix64; linear-interpolated 2.5th/97.5th quantiles",
             baseline_arm: selected_baseline,
             treatment_arm: TREATMENT_ARM,
             paired_absolute_effect_percentage_points: effect * 100.0,
@@ -933,13 +947,11 @@ fn ratio(numerator: usize, denominator: usize) -> f64 {
     numerator as f64 / denominator as f64
 }
 
-fn paired_cluster_bootstrap(
+fn compute_family_aggregates(
     targets: &[&TargetOutcome],
     baseline_arm: &str,
-    replicates: usize,
-    seed: u64,
-) -> Result<(f64, f64, f64, usize, usize)> {
-    let mut deltas_by_family: BTreeMap<String, Vec<i8>> = BTreeMap::new();
+) -> Result<Vec<FamilyAggregate>> {
+    let mut aggregates: BTreeMap<String, FamilyAggregate> = BTreeMap::new();
     for target in targets {
         let treatment = target
             .arms
@@ -951,56 +963,76 @@ fn paired_cluster_bootstrap(
             .iter()
             .find(|arm| arm.arm == baseline_arm)
             .context("selected baseline arm missing after validation")?;
-        let delta = (if treatment.semantic_gate_passed {
-            1_i8
-        } else {
-            0_i8
-        }) - (if baseline.semantic_gate_passed {
-            1_i8
-        } else {
-            0_i8
-        });
-        deltas_by_family
+        let treatment_success = treatment.semantic_gate_passed;
+        let baseline_success = baseline.semantic_gate_passed;
+        let delta = (if treatment_success { 1_i64 } else { 0_i64 })
+            - (if baseline_success { 1_i64 } else { 0_i64 });
+        let aggregate = aggregates
             .entry(target.family_id.clone())
-            .or_default()
-            .push(delta);
+            .or_insert_with(|| FamilyAggregate {
+                family_id: target.family_id.clone(),
+                target_count: 0,
+                treatment_semantic_gate_successes: 0,
+                baseline_semantic_gate_successes: 0,
+                paired_delta_sum: 0,
+                paired_effect_percentage_points: 0.0,
+            });
+        aggregate.target_count += 1;
+        aggregate.treatment_semantic_gate_successes += usize::from(treatment_success);
+        aggregate.baseline_semantic_gate_successes += usize::from(baseline_success);
+        aggregate.paired_delta_sum += delta;
     }
-    if deltas_by_family.is_empty() {
+    for aggregate in aggregates.values_mut() {
+        if aggregate.target_count == 0 {
+            bail!(
+                "family {} has no eligible target pairs",
+                aggregate.family_id
+            );
+        }
+        aggregate.paired_effect_percentage_points =
+            aggregate.paired_delta_sum as f64 / aggregate.target_count as f64 * 100.0;
+    }
+    Ok(aggregates.into_values().collect())
+}
+
+fn paired_cluster_bootstrap(
+    families: &[FamilyAggregate],
+    replicates: usize,
+    seed: u64,
+) -> Result<(f64, f64, f64, usize, usize)> {
+    if families.is_empty() {
         bail!("no family clusters available for bootstrap");
     }
-
-    let all_deltas: Vec<i8> = deltas_by_family
-        .values()
-        .flat_map(|deltas| deltas.iter().copied())
-        .collect();
-    let estimate = mean_delta(&all_deltas);
-    let families: Vec<&Vec<i8>> = deltas_by_family.values().collect();
+    if replicates != EXPECTED_BOOTSTRAP_REPLICATES {
+        bail!(
+            "protocol requires exactly {EXPECTED_BOOTSTRAP_REPLICATES} bootstrap replicates, got {replicates}"
+        );
+    }
+    let total_delta: i64 = families.iter().map(|family| family.paired_delta_sum).sum();
+    let total_pairs: usize = families.iter().map(|family| family.target_count).sum();
+    if total_pairs == 0 {
+        bail!("no target pairs available for bootstrap");
+    }
+    let estimate = total_delta as f64 / total_pairs as f64;
     let mut rng = SplitMix64 { state: seed };
     let mut bootstrapped = Vec::with_capacity(replicates);
     for _ in 0..replicates {
         let mut sum = 0_i64;
         let mut n = 0_usize;
         for _ in 0..families.len() {
-            let sampled = families[rng.index(families.len())];
-            sum += sampled.iter().map(|delta| i64::from(*delta)).sum::<i64>();
-            n += sampled.len();
+            let sampled = &families[rng.index(families.len())];
+            sum += sampled.paired_delta_sum;
+            n += sampled.target_count;
+        }
+        if n == 0 {
+            bail!("bootstrap replicate contained no target pairs");
         }
         bootstrapped.push(sum as f64 / n as f64);
     }
     bootstrapped.sort_by(f64::total_cmp);
     let lower = quantile(&bootstrapped, 0.025);
     let upper = quantile(&bootstrapped, 0.975);
-    Ok((
-        estimate,
-        lower,
-        upper,
-        all_deltas.len(),
-        deltas_by_family.len(),
-    ))
-}
-
-fn mean_delta(deltas: &[i8]) -> f64 {
-    deltas.iter().map(|delta| f64::from(*delta)).sum::<f64>() / deltas.len() as f64
+    Ok((estimate, lower, upper, total_pairs, families.len()))
 }
 
 fn quantile(sorted_values: &[f64], probability: f64) -> f64 {
