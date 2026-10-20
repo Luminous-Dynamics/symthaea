@@ -7,6 +7,8 @@
   "required": [
     "schema_version",
     "baseline_policy_id",
+    "predeclared_seeds",
+    "seed_manifest_sha256",
     "candidate_policy_id",
     "campaign_pair_count",
     "bootstrap_resamples",
@@ -71,6 +73,19 @@
     "candidate_slower_count": {
       "type": "integer",
       "minimum": 0
+    },
+    "predeclared_seeds": {
+      "type": "array",
+      "minItems": 20,
+      "uniqueItems": true,
+      "items": {
+        "type": "integer",
+        "minimum": 0
+      }
+    },
+    "seed_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
     }
   }
 }
