@@ -125,6 +125,8 @@ pub struct Explanation {
     pub findings: Vec<String>,
     pub modes: Vec<ModeExplanation>,
     pub task_comparisons: Vec<TaskComparison>,
+    pub task_comparisons_total: u64,
+    pub task_comparisons_truncated: bool,
     pub limitations: Vec<String>,
     pub recommended_next_step: String,
     pub scenario_sha256: Option<String>,
@@ -636,6 +638,23 @@ pub fn explain_report(report: &Value) -> Result<Explanation, String> {
     if missing_priority_data {
         limitations.push("Per-priority outcome rows were absent, so essential or interactive deadline regressions cannot be ruled out from this explanation.".to_owned());
     }
+    let (task_comparisons, task_comparisons_total, task_comparisons_truncated) =
+        match parse_task_comparisons(root)? {
+            Some((items, total, truncated)) => (items, total, truncated),
+            None => {
+                limitations.push(
+                    "Task-level paired receipts were absent, so this explanation cannot attribute a specific task outcome to a deadline, partial-byte total, or terminal window.".to_owned(),
+                );
+                (Vec::new(), 0, false)
+            }
+        };
+    if task_comparisons_truncated {
+        limitations.push(format!(
+            "Only the first {} changed task outcomes are shown; {} changed task outcomes exist in the paired receipt.",
+            task_comparisons.len(),
+            task_comparisons_total
+        ));
+    }
     let recommended_next_step = match evidence_class {
         EvidenceClass::SyntheticSimulation | EvidenceClass::Unknown => "Run a matched experiment on an owner-authorized isolated AP testbed. Bind the AP firmware/radio configuration, workload profile and harness revision; collect available counters plus application-verified paired task outcomes; review each priority/mode denominator.".to_owned(),
         _ => "Inspect the exact testbed manifest, calibration record and raw paired trials; repeat across devices, days and sites before claiming general performance or savings.".to_owned(),
@@ -649,6 +668,9 @@ pub fn explain_report(report: &Value) -> Result<Explanation, String> {
         simple_explanation: "Imagine a fixed byte budget in each abstract time window. FIFO serves older work first; fair-share distributes bytes between peers while reserving capacity for essential requests. Short urgent tasks can finish sooner in some workloads, but the simulation does not model the Wi-Fi radio itself.".to_owned(),
         findings,
         modes,
+        task_comparisons,
+        task_comparisons_total,
+        task_comparisons_truncated,
         limitations,
         recommended_next_step,
         scenario_sha256: valid_sha(root.get("scenario_sha256")),
