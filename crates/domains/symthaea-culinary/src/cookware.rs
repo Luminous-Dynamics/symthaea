@@ -660,7 +660,7 @@ pub fn validate_cookware_benchmark(
 
     for candidate_id in candidates.keys() {
         let count = run_counts.get(candidate_id).copied().unwrap_or(0);
-        let units = unit_sets.get(candidate_id).map_or(0, BTreeSet::len) as u32;
+        let units = unit_sets.get(candidate_id).map_or(0, |set| set.len()) as u32;
         if count < protocol.minimum_blocks_per_candidate {
             violation(
                 &mut violations,
@@ -1024,4 +1024,16 @@ mod tests {
             .iter()
             .any(|item| item.code == CookwareViolationCode::MissingReferenceCandidate));
     }
+
+    #[test]
+    fn physical_unit_cannot_be_claimed_by_two_design_candidates() {
+        let mut input = manifest();
+        input.runs[1].cookware_unit_id = "ref-unit-1".to_owned();
+        let report = validate_cookware_benchmark(&input);
+        assert!(report.violations.iter().any(|item| {
+            item.code == CookwareViolationCode::CookwareUnitIdentityConflict
+                && item.run_id.as_deref() == Some("candidate-pan-block-1")
+        }));
+    }
+
 }
