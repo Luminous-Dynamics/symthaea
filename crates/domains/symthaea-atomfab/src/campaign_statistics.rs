@@ -840,7 +840,7 @@ mod tests {
         assert_eq!(summary.baseline_only_reached_count, 1);
         assert_eq!(summary.candidate_only_reached_count, 4);
         assert_eq!(summary.neither_reached_count, 2);
-        assert_eq!(summary.reach_rate_difference, 0.15);
+        assert!((summary.reach_rate_difference - 0.15).abs() < 1e-12);
         summary.validate().unwrap();
     }
 
