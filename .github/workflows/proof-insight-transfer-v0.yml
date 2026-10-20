@@ -223,6 +223,13 @@ jobs:
                   "depends_on_candidate": True
               }],
               "mutation_control_status": "passed",
+              "mutation_controls": [{
+                  "mutation_id": "synthetic-mutated-target",
+                  "description": "Synthetic target statement mutation",
+                  "expected_detection": True,
+                  "observed_detection": True,
+                  "status": "detected_as_expected"
+              }],
               "notes": ["Synthetic-only schema fixture; no real transfer is asserted"]
           }
           verified_record = copy.deepcopy(record)
