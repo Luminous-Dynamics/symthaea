@@ -2083,7 +2083,7 @@ mod tests {
         proof.available_at_position = Some(0);
         let error = validate_temporal_manifest(&manifest)
             .expect_err("a hidden proof cannot be marked as solver-visible evidence");
-        assert!(format!("{error:#}").contains("evaluator-only proof"));
+        assert!(format!("{error:#}").contains("evaluator-only artifact"));
     }
 
     #[test]
