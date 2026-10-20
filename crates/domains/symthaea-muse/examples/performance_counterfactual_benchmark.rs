@@ -216,10 +216,10 @@ fn metrics(voices: &[PerformedVoice]) -> ArmMetrics {
 /// pitches are disambiguated by preserving order; ties are resolved
 /// deterministically by preferring the actual-arm predecessor.
 fn compare(actual: &[Event], control: &[Event]) -> (usize, usize, usize, Vec<f64>) {
-    let mut voice_names: Vec<&str> = actual
+    let mut voice_names: Vec<String> = actual
         .iter()
-        .map(|event| event.voice.as_str())
-        .chain(control.iter().map(|event| event.voice.as_str()))
+        .map(|event| event.voice.clone())
+        .chain(control.iter().map(|event| event.voice.clone()))
         .collect();
     voice_names.sort_unstable();
     voice_names.dedup();
@@ -228,9 +228,16 @@ fn compare(actual: &[Event], control: &[Event]) -> (usize, usize, usize, Vec<f64
     let mut unmatched_actual = 0usize;
     let mut unmatched_control = 0usize;
 
-    for voice in voice_names {
-        let a: Vec<&Event> = actual.iter().filter(|event| event.voice == voice).collect();
-        let b: Vec<&Event> = control.iter().filter(|event| event.voice == voice).collect();
+    for voice_name in voice_names {
+        let voice = voice_name.as_str();
+        let a: Vec<&Event> = actual
+            .iter()
+            .filter(|event| event.voice.as_str() == voice)
+            .collect();
+        let b: Vec<&Event> = control
+            .iter()
+            .filter(|event| event.voice.as_str() == voice)
+            .collect();
         let (n, m) = (a.len(), b.len());
         let width = m + 1;
         let mut dp = vec![0usize; (n + 1) * (m + 1)];
