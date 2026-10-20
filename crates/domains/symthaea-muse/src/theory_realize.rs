@@ -108,6 +108,7 @@ impl PerformanceDialect {
             | PerformanceDialect::JazzLaidBack => 1.0,
             PerformanceDialect::MazurkaLilt => 0.9,
             PerformanceDialect::ToccataMotor => 0.15,
+            PerformanceDialect::MarchLocked => 0.12,
             PerformanceDialect::DanceLocked => 0.25,
             PerformanceDialect::ProcessExact => 0.1,
         }
