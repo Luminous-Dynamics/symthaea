@@ -700,6 +700,399 @@ fn execute_from_args() -> Result<()> {
     Ok(())
 }
 
+fn audit_temporal_dataset(
+    repository_root: &Path,
+    timeline_path: &Path,
+    dataset_path: &Path,
+    output_path: &Path,
+) -> Result<()> {
+    let root = repository_root.canonicalize().with_context(|| {
+        format!(
+            "cannot resolve temporal dataset repository {}",
+            repository_root.display()
+        )
+    })?;
+    let repository_commit = git_output(&root, &["rev-parse", "HEAD"])?;
+    validate_git_sha(&repository_commit).context("repository HEAD must be a full commit SHA")?;
+    let repository_url = git_output(&root, &["remote", "get-url", "origin"])?;
+    if !repository_url.starts_with("https://") {
+        bail!("temporal dataset repository origin must be an HTTPS URL");
+    }
+    if !git_output(&root, &["status", "--porcelain"])?.is_empty() {
+        bail!("temporal dataset repository checkout must be clean before audit");
+    }
+
+    let timeline_relative = timeline_path
+        .to_str()
+        .context("timeline path must be UTF-8")?;
+    let timeline_relative = normalize_root_relative_path(timeline_relative)?;
+    let dataset_relative = dataset_path
+        .to_str()
+        .context("dataset path must be UTF-8")?;
+    let dataset_relative = normalize_root_relative_path(dataset_relative)?;
+    let timeline_bytes = git_show_file(&root, &repository_commit, &timeline_relative)?;
+    let dataset_bytes = git_show_file(&root, &repository_commit, &dataset_relative)?;
+    let timeline_sha256 = format!("{:x}", Sha256::digest(&timeline_bytes));
+    let dataset_sha256 = format!("{:x}", Sha256::digest(&dataset_bytes));
+
+    let mut timeline_reader = csv::ReaderBuilder::new()
+        .has_headers(true)
+        .flexible(false)
+        .from_reader(timeline_bytes.as_slice());
+    let timeline_headers = timeline_reader
+        .headers()
+        .context("read temporal dataset audit timeline headers")?
+        .clone();
+    let path_col = timeline_headers
+        .iter()
+        .position(|header| header == "spec_theorem")
+        .context("timeline CSV lacks spec_theorem column")?;
+    let commit_col = timeline_headers
+        .iter()
+        .position(|header| header == "commit_hash")
+        .context("timeline CSV lacks commit_hash column")?;
+
+    #[derive(Clone)]
+    struct TimelinePathCandidate {
+        position: usize,
+        completion_commit: String,
+    }
+
+    let mut candidates_by_path: BTreeMap<String, Vec<TimelinePathCandidate>> = BTreeMap::new();
+    let mut timeline_row_count = 0_usize;
+    for (position, row_result) in timeline_reader.records().enumerate() {
+        let row = row_result.with_context(|| format!("parse timeline join row {}", position + 2))?;
+        timeline_row_count += 1;
+        let path = row.get(path_col).unwrap_or("").trim();
+        if path.is_empty() {
+            continue;
+        }
+        let normalized = normalize_root_relative_path(path)
+            .with_context(|| format!("unsafe timeline spec path on row {}", position + 2))?;
+        if normalized != path {
+            bail!("timeline spec path is not canonical on row {}", position + 2);
+        }
+        let completion_commit = row
+            .get(commit_col)
+            .unwrap_or("")
+            .trim()
+            .to_ascii_lowercase();
+        validate_git_sha(&completion_commit)
+            .with_context(|| format!("invalid timeline completion commit on row {}", position + 2))?;
+        candidates_by_path
+            .entry(normalized)
+            .or_default()
+            .push(TimelinePathCandidate {
+                position,
+                completion_commit,
+            });
+    }
+
+    let unique_timeline_path_count = candidates_by_path.len();
+    let mut dataset_text = std::str::from_utf8(&dataset_bytes)
+        .context("dataset JSONL is not UTF-8")?;
+    if dataset_text.starts_with('\u{feff}') {
+        dataset_text = &dataset_text['\u{feff}'.len_utf8()..];
+    }
+
+    let mut events = Vec::new();
+    let mut dataset_ids = BTreeSet::new();
+    let mut blank_dataset_line_count = 0_usize;
+    let mut unique_path_join_count = 0_usize;
+    let mut ambiguous_path_join_count = 0_usize;
+    let mut unmatched_path_join_count = 0_usize;
+    let mut invalid_dataset_path_count = 0_usize;
+    let mut commit_before_ancestor_of_head_count = 0_usize;
+    let mut commit_before_not_ancestor_of_head_count = 0_usize;
+    let mut commit_before_invalid_sha_count = 0_usize;
+    let mut commit_before_ancestor_of_completion_count = 0_usize;
+    let mut statement_match_relation_counts = BTreeMap::new();
+    let mut head_ancestry_cache: BTreeMap<String, bool> = BTreeMap::new();
+    let mut commit_existence_cache: BTreeMap<String, bool> = BTreeMap::new();
+
+    for (dataset_position, line) in dataset_text.lines().enumerate() {
+        if line.trim().is_empty() {
+            blank_dataset_line_count += 1;
+            continue;
+        }
+        let record: serde_json::Value = serde_json::from_str(line)
+            .with_context(|| format!("parse dataset JSONL line {}", dataset_position + 1))?;
+        let required_text = |field: &str| -> Result<String> {
+            record
+                .get(field)
+                .and_then(serde_json::Value::as_str)
+                .map(str::to_owned)
+                .with_context(|| {
+                    format!(
+                        "dataset row {} lacks string field {field}",
+                        dataset_position + 1
+                    )
+                })
+        };
+        let dataset_id = required_text("id")?;
+        let theorem_name = required_text("theorem_name")?;
+        let raw_file_path = required_text("file_path")?;
+        let commit_before = required_text("commit_before")?.to_ascii_lowercase();
+        let formal_statement = required_text("formal_statement")?;
+        let statement_sha256 = format!("{:x}", Sha256::digest(formal_statement.as_bytes()));
+        dataset_ids.insert(dataset_id.clone());
+
+        let mut path_join_status = String::new();
+        let mut candidate_timeline_positions = Vec::new();
+        let mut matched_completion_commit = None;
+        let mut commit_before_is_ancestor_of_completion = None;
+        let mut statement_match_at_commit_before = None;
+        let mut statement_match_at_completion = None;
+        let mut statement_match_relation = String::new();
+
+        let normalized_dataset_path = match normalize_root_relative_path(&raw_file_path) {
+            Ok(normalized) if normalized == raw_file_path => Some(normalized),
+            _ => None,
+        };
+        let candidate_matches = normalized_dataset_path
+            .as_ref()
+            .and_then(|path| candidates_by_path.get(path));
+        if normalized_dataset_path.is_none() {
+            invalid_dataset_path_count += 1;
+            path_join_status = "invalid_path".to_string();
+        } else {
+            match candidate_matches {
+                None | Some(ref candidates) if candidates.is_empty() => {
+                    unmatched_path_join_count += 1;
+                    path_join_status = "no_path_match".to_string();
+                }
+                Some(candidates) if candidates.len() == 1 => {
+                    unique_path_join_count += 1;
+                    path_join_status = "unique_path_match".to_string();
+                    let matched = &candidates[0];
+                    candidate_timeline_positions.push(matched.position);
+                    matched_completion_commit = Some(matched.completion_commit.clone());
+
+                    let before_exists = validate_git_sha(&commit_before).is_ok()
+                        && *commit_existence_cache.entry(commit_before.clone()).or_insert_with(|| {
+                            git_commit_exists(&root, &commit_before).unwrap_or(false)
+                        });
+                    if !validate_git_sha(&commit_before).is_ok() {
+                        commit_before_invalid_sha_count += 1;
+                    } else {
+                        let before_is_head_ancestor =
+                            *head_ancestry_cache.entry(commit_before.clone()).or_insert_with(|| {
+                                if !before_exists {
+                                    false
+                                } else {
+                                    git_is_ancestor(&root, &commit_before, &repository_commit)
+                                        .unwrap_or(false)
+                                }
+                            });
+                        if before_is_head_ancestor {
+                            commit_before_ancestor_of_head_count += 1;
+                        } else {
+                            commit_before_not_ancestor_of_head_count += 1;
+                        }
+
+                        let before_is_completion_ancestor = before_exists
+                            && git_is_ancestor(
+                                &root,
+                                &commit_before,
+                                &matched.completion_commit,
+                            )?;
+                        commit_before_is_ancestor_of_completion =
+                            Some(before_is_completion_ancestor);
+                        if before_is_completion_ancestor {
+                            commit_before_ancestor_of_completion_count += 1;
+                            if git_path_exists_at_commit(&root, &commit_before, &raw_file_path)? {
+                                let before_source =
+                                    git_show_file(&root, &commit_before, &raw_file_path)?;
+                                let normalized_statement = normalize_whitespace(&formal_statement);
+                                let normalized_before_source = normalize_whitespace(
+                                    std::str::from_utf8(&before_source)
+                                        .context("dataset pre-state Lean source is not UTF-8")?,
+                                );
+                                statement_match_at_commit_before = Some(
+                                    normalized_before_source.contains(&normalized_statement),
+                                );
+                            }
+                        }
+
+                        if git_path_exists_at_commit(
+                            &root,
+                            &matched.completion_commit,
+                            &raw_file_path,
+                        )? {
+                            let completion_source = git_show_file(
+                                &root,
+                                &matched.completion_commit,
+                                &raw_file_path,
+                            )?;
+                            let normalized_statement = normalize_whitespace(&formal_statement);
+                            let normalized_completion_source = normalize_whitespace(
+                                std::str::from_utf8(&completion_source)
+                                    .context("dataset completion Lean source is not UTF-8")?,
+                            );
+                            statement_match_at_completion =
+                                Some(normalized_completion_source.contains(&normalized_statement));
+                        }
+
+                        statement_match_relation = match (
+                            statement_match_at_commit_before,
+                            statement_match_at_completion,
+                        ) {
+                            (Some(true), Some(true)) => "matches_before_and_completion",
+                            (Some(true), Some(false)) => "matches_pre_state_only",
+                            (Some(false), Some(true)) => "matches_completion_only",
+                            (Some(false), Some(false)) => "matches_neither_state",
+                            (None, Some(true)) => "completion_match_pre_state_unavailable",
+                            (Some(true), None) => "pre_state_match_completion_unavailable",
+                            (Some(false), None) => "pre_state_nonmatch_completion_unavailable",
+                            (None, Some(false)) => "completion_nonmatch_pre_state_unavailable",
+                            (None, None) => "statement_check_unavailable",
+                        }
+                        .to_string();
+                    }
+                }
+                Some(candidates) => {
+                    ambiguous_path_join_count += 1;
+                    path_join_status = "ambiguous_path_match".to_string();
+                    candidate_timeline_positions
+                        .extend(candidates.iter().map(|candidate| candidate.position));
+                    statement_match_relation = "not_checked_due_to_ambiguous_path".to_string();
+                }
+            }
+        }
+        if statement_match_relation.is_empty() {
+            statement_match_relation = match path_join_status.as_str() {
+                "invalid_path" => "not_checked_due_to_invalid_path",
+                "no_path_match" => "not_checked_due_to_unmatched_path",
+                other => other,
+            }
+            .to_string();
+        }
+        *statement_match_relation_counts
+            .entry(statement_match_relation.clone())
+            .or_insert(0) += 1;
+
+        let commit_before_is_ancestor_of_head =
+            if validate_git_sha(&commit_before).is_ok() {
+                Some(
+                    *head_ancestry_cache.entry(commit_before.clone()).or_insert_with(|| {
+                        let exists = *commit_existence_cache.entry(commit_before.clone()).or_insert_with(|| {
+                            git_commit_exists(&root, &commit_before).unwrap_or(false)
+                        });
+                        exists
+                            && git_is_ancestor(&root, &commit_before, &repository_commit)
+                                .unwrap_or(false)
+                    }),
+                )
+            } else {
+                None
+            };
+
+        events.push(TemporalDatasetJoinAuditEvent {
+            dataset_position,
+            dataset_id,
+            theorem_name,
+            file_path: raw_file_path,
+            commit_before,
+            statement_sha256,
+            path_join_status,
+            candidate_timeline_positions,
+            matched_completion_commit,
+            commit_before_is_ancestor_of_head,
+            commit_before_is_ancestor_of_completion,
+            statement_match_at_commit_before,
+            statement_match_at_completion,
+            statement_match_relation,
+        });
+    }
+
+    if events.is_empty() {
+        bail!("temporal dataset audit found zero dataset records");
+    }
+    let status_count_total = unique_path_join_count + ambiguous_path_join_count + unmatched_path_join_count
+        + invalid_dataset_path_count;
+    if status_count_total != events.len() {
+        bail!(
+            "temporal dataset path-join accounting mismatch: {} statuses for {} rows",
+            status_count_total,
+            events.len()
+        );
+    }
+
+    let audit = TemporalDatasetJoinAudit {
+        schema_version: "pitb.temporal-dataset-join-audit.v0",
+        repository_url,
+        repository_commit,
+        timeline_path: timeline_relative,
+        timeline_sha256,
+        dataset_path: dataset_relative,
+        dataset_sha256,
+        total_timeline_rows: timeline_row_count,
+        unique_timeline_path_count,
+        total_dataset_records: events.len(),
+        unique_dataset_id_count: dataset_ids.len(),
+        blank_dataset_line_count,
+        unique_path_join_count,
+        ambiguous_path_join_count,
+        unmatched_path_join_count,
+        invalid_dataset_path_count,
+        commit_before_ancestor_of_head_count,
+        commit_before_not_ancestor_of_head_count,
+        commit_before_invalid_sha_count,
+        commit_before_ancestor_of_completion_count,
+        statement_match_relation_counts,
+        events,
+    };
+
+    let output_parent = output_path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    if !output_parent.is_dir() {
+        bail!(
+            "temporal dataset audit output directory must already exist: {}",
+            output_parent.display()
+        );
+    }
+    let canonical_parent = output_parent.canonicalize().with_context(|| {
+        format!(
+            "canonicalize temporal dataset audit output directory {}",
+            output_parent.display()
+        )
+    })?;
+    let resolved_output = canonical_parent.join(
+        output_path
+            .file_name()
+            .context("temporal dataset audit output must have a file name")?,
+    );
+    if resolved_output.starts_with(&root) {
+        bail!("temporal dataset audit output must be outside the repository checkout");
+    }
+    if fs::symlink_metadata(&resolved_output)
+        .is_ok_and(|metadata| metadata.file_type().is_symlink())
+    {
+        bail!("refusing to overwrite a symlink as temporal dataset audit output");
+    }
+    let mut encoded = serde_json::to_vec_pretty(&audit).context("serialize temporal dataset audit")?;
+    encoded.push(b'\n');
+    fs::write(&resolved_output, encoded).with_context(|| {
+        format!(
+            "write temporal dataset audit {}",
+            resolved_output.display()
+        )
+    })?;
+    println!(
+        "PITB_TEMPORAL_DATASET_AUDIT_PASS: rows={} unique_path_join={} ambiguous_path_join={} unmatched_path_join={} invalid_path={} statements={} report_sha256={}",
+        audit.total_dataset_records,
+        audit.unique_path_join_count,
+        audit.ambiguous_path_join_count,
+        audit.unmatched_path_join_count,
+        audit.invalid_dataset_path_count,
+        audit.statement_match_relation_counts.values().sum::<usize>(),
+        sha256_hex(&serde_json::to_vec(&audit).context("serialize canonical temporal dataset audit")?),
+    );
+    Ok(())
+}
+
 fn audit_temporal_timeline(
     repository_root: &Path,
     timeline_path: &Path,
@@ -1937,6 +2330,17 @@ fn git_is_ancestor(root: &Path, ancestor: &str, descendant: &str) -> Result<bool
     }
 }
 
+fn git_commit_exists(root: &Path, commit: &str) -> Result<bool> {
+    let revision = format!("{commit}^{{commit}}");
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(root)
+        .args(["cat-file", "-e", revision.as_str()])
+        .output()
+        .with_context(|| format!("failed to test historical commit object {commit}"))?;
+    Ok(output.status.success())
+}
+
 fn git_path_exists_at_commit(root: &Path, commit: &str, path: &str) -> Result<bool> {
     let output = Command::new("git")
         .arg("-C")
@@ -2428,6 +2832,10 @@ fn assign_family_splits(families: &mut [FamilyRecord]) -> Result<FamilySplitPlan
 
 fn normalize_lean_relative_path(path: &str) -> Result<String> {
     normalize_with_base(["lean"], path)
+}
+
+fn normalize_whitespace(text: &str) -> String {
+    text.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
 fn normalize_root_relative_path(path: &str) -> Result<String> {
