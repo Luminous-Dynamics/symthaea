@@ -38,9 +38,9 @@ use symthaea_music_theory::{MusicalIntent, Score as TheoryScore, Style};
 /// field: each variant scales the existing performance machinery
 /// ([`Rubato::from_score`]'s structural pauses,
 /// [`crate::performance::humanize_score_note`]'s timing SD, and
-/// [`apply_expressive_model`]'s blend). The two style-specific variants added
-/// for Mazurka and Toccata are explicit engineering hypotheses awaiting
-/// blinded audio calibration—not evidence of historical authenticity.
+/// [`apply_expressive_model`]'s blend). March, Mazurka, and Toccata timing
+/// profiles are explicit engineering hypotheses awaiting blinded audio
+/// calibration—not evidence of historical authenticity.
 /// [`PerformanceDialect::ClassicalRubato`] remains the identity — every
 /// factor exactly 1.0 — so its renders remain bit-identical to pre-dialect behavior.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -74,6 +74,11 @@ pub enum PerformanceDialect {
     /// jitter so the continuous passagework has a stable motor. Still allow
     /// expressive articulation; this is not mechanically quantized audio.
     ToccataMotor,
+    /// March prototype: preserve a squared clock with restrained phrase
+    /// stretching (0.12x), moderate accent-model shaping (0.45x), and
+    /// tighter timing variation (0.45x). A calibration hypothesis, not a
+    /// historical performance-practice claim.
+    MarchLocked,
     /// Blues/jazz: laid-back time. Jitter up (1.3x), phrase-final rubato
     /// and the expressive blend both kept — a jazz ballad leans harder
     /// into time than a classical player, never less.
@@ -89,6 +94,7 @@ impl PerformanceDialect {
             | PerformanceDialect::JazzLaidBack => 1.0,
             PerformanceDialect::MazurkaLilt => 0.9,
             PerformanceDialect::ToccataMotor => 0.15,
+            PerformanceDialect::MarchLocked => 0.12,
             PerformanceDialect::DanceLocked => 0.25,
             PerformanceDialect::ProcessExact => 0.1,
         }
@@ -113,6 +119,7 @@ impl PerformanceDialect {
             PerformanceDialect::ClassicalRubato | PerformanceDialect::JazzLaidBack => 1.0,
             PerformanceDialect::MazurkaLilt => 0.8,
             PerformanceDialect::ToccataMotor => 0.2,
+            PerformanceDialect::MarchLocked => 0.18,
             PerformanceDialect::FolkLift => 0.6,
             PerformanceDialect::DanceLocked => 0.25,
             PerformanceDialect::ProcessExact => 0.1,
@@ -125,6 +132,7 @@ impl PerformanceDialect {
             PerformanceDialect::ClassicalRubato => 1.0,
             PerformanceDialect::MazurkaLilt => 1.15,
             PerformanceDialect::ToccataMotor => 0.45,
+            PerformanceDialect::MarchLocked => 0.45,
             PerformanceDialect::DanceLocked => 0.6,
             PerformanceDialect::ProcessExact => 0.4,
             PerformanceDialect::FolkLift => 1.2,
@@ -142,6 +150,7 @@ impl PerformanceDialect {
             | PerformanceDialect::JazzLaidBack => 1.0,
             PerformanceDialect::MazurkaLilt => 0.9,
             PerformanceDialect::ToccataMotor => 0.35,
+            PerformanceDialect::MarchLocked => 0.45,
             PerformanceDialect::DanceLocked => 0.4,
             PerformanceDialect::ProcessExact => 0.0,
         }
@@ -160,17 +169,17 @@ impl PerformanceDialect {
 /// 1. `harmonic_stasis`/`full_drone`/`additive_process` → [`PerformanceDialect::ProcessExact`]
 /// 2. explicit Mazurka/Toccata accompaniment mechanisms → their provisional
 ///    style-specific dialects (before any generic groove-family matching)
-/// 3. a rhythm-cell accompaniment (Habanera/Montuno/BossaComp/CompasGait/
+/// 3. `MarchPulse` → [`PerformanceDialect::MarchLocked`]
+/// 4. a rhythm-cell accompaniment (Habanera/Montuno/BossaComp/CompasGait/
 ///    Shuffle), non-straight swing, or a full backbeat kit → groove: with a
 ///    jazz marker (Shuffle, swing ≠ 0.5, or `seventh_chords`) →
 ///    [`PerformanceDialect::JazzLaidBack`], else [`PerformanceDialect::DanceLocked`]
-/// 4. `roll_ornaments` or `drone` → [`PerformanceDialect::FolkLift`]
-/// 5. everything else → [`PerformanceDialect::ClassicalRubato`] (the identity)
+/// 5. `roll_ornaments` or `drone` → [`PerformanceDialect::FolkLift`]
+/// 6. everything else → [`PerformanceDialect::ClassicalRubato`] (the identity)
 ///
-/// Known remaining limits (documented, not hidden): March reads as ClassicalRubato
-/// (no spec property marks its clock-insistence), and plain Folk/ModalFolk
-/// read as ClassicalRubato (their specs carry none of the folk habit flags
-/// — only Celtic's drone and Irish's rolls are visible at the spec level).
+/// Known remaining limits (documented, not hidden): plain Folk/ModalFolk read
+/// as ClassicalRubato (their specs carry none of the folk habit flags — only
+/// Celtic's drone and Irish's rolls are visible at the spec level).
 pub fn dialect_for_spec(spec: &symthaea_music_theory::CompositionSpec) -> PerformanceDialect {
     use symthaea_music_theory::Accompaniment as A;
     use symthaea_music_theory::DrumPolicy;
@@ -183,6 +192,9 @@ pub fn dialect_for_spec(spec: &symthaea_music_theory::CompositionSpec) -> Perfor
     }
     if spec.accompaniment_pool.contains(&A::ToccataMotion) {
         return PerformanceDialect::ToccataMotor;
+    }
+    if spec.accompaniment_pool.contains(&A::MarchPulse) {
+        return PerformanceDialect::MarchLocked;
     }
     let has_shuffle = spec.accompaniment_pool.contains(&A::Shuffle);
     let has_groove_cell = has_shuffle
@@ -1812,7 +1824,7 @@ mod tests {
             (Style::Cinematic, D::ClassicalRubato),
             (Style::Playful, D::DanceLocked), // full backbeat kit
             (Style::Nocturne, D::ClassicalRubato),
-            (Style::March, D::ClassicalRubato), // v1 limit: no clock marker
+            (Style::March, D::MarchLocked),
             (Style::Lullaby, D::ClassicalRubato),
             (Style::ModalFolk, D::ClassicalRubato),
             (Style::Fugue, D::ClassicalRubato),
@@ -1894,8 +1906,11 @@ mod tests {
                 .collect::<Vec<_>>()
         };
 
-        for (style, expected_dialect) in
-            [(Style::Mazurka, D::MazurkaLilt), (Style::Toccata, D::ToccataMotor)]
+        for (style, expected_dialect) in [
+            (Style::March, D::MarchLocked),
+            (Style::Mazurka, D::MazurkaLilt),
+            (Style::Toccata, D::ToccataMotor),
+        ]
         {
             let spec = style.spec();
             assert_eq!(dialect_for_spec(&spec), expected_dialect, "{style:?}");
@@ -1973,8 +1988,17 @@ mod tests {
     fn style_dialect_hypotheses_are_non_identity_and_explicit() {
         use PerformanceDialect as D;
         let classical = D::ClassicalRubato;
+        let march = D::MarchLocked;
         let mazurka = D::MazurkaLilt;
         let toccata = D::ToccataMotor;
+
+        assert_eq!(march.breath_scale(), 0.12);
+        assert_eq!(march.climax_scale(), 0.12);
+        assert_eq!(march.cadence_scale(), 0.18);
+        assert_eq!(march.jitter_scale(), 0.45);
+        assert_eq!(march.expressive_blend_scale(), 0.45);
+        assert!(march.jitter_scale() < classical.jitter_scale());
+        assert!(march.cadence_scale() < classical.cadence_scale());
 
         assert_eq!(mazurka.breath_scale(), 0.9);
         assert_eq!(mazurka.climax_scale(), 0.9);
