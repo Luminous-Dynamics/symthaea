@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/crates/domains/symthaea-atomfab/schemas/decision-frontier-candidates-v1.schema.json",
+  "title": "AtomFab Decision Frontier Candidate Fixture v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "fixture_kind",
+    "note",
+    "candidates"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "fixture_kind": {
+      "const": "illustrative_not_result"
+    },
+    "note": {
+      "type": "string",
+      "minLength": 1
+    },
+    "candidates": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/candidate"
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policy_id",
+        "seed",
+        "comparison_contract_digest",
+        "objective_name",
+        "objective_unit",
+        "objective_direction",
+        "objective_tolerance",
+        "validated_discovery_count",
+        "best_validated_objective",
+        "total_cost_units",
+        "total_cost_unit",
+        "elapsed_seconds",
+        "reference_calculation_count",
+        "false_feasible_accepts",
+        "hard_constraints_assessed",
+        "evidence_digest"
+      ],
+      "properties": {
+        "policy_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "seed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "comparison_contract_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "objective_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "objective_unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "objective_direction": {
+          "enum": [
+            "maximize",
+            "minimize"
+          ]
+        },
+        "objective_tolerance": {
+          "type": "number",
+          "minimum": 0
+        },
+        "validated_discovery_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "best_validated_objective": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "total_cost_units": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "total_cost_unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "elapsed_seconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "reference_calculation_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "false_feasible_accepts": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "hard_constraints_assessed": {
+          "type": "boolean"
+        },
+        "evidence_digest": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    }
+  },
+  "$comment": "Cross-field checks are enforced by the Rust semantic validator: objective/discovery consistency, shared comparison contract, unique policy IDs, and safety eligibility."
+}
