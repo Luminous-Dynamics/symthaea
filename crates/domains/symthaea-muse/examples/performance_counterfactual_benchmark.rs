@@ -52,6 +52,9 @@ struct CaseReport {
     selected_dialect: String,
     control_dialect: String,
     replay_exact: bool,
+    negative_control_replay_exact: bool,
+    negative_control_changed_onsets: usize,
+    negative_control_unmatched_events: usize,
     actual: ArmMetrics,
     control: ArmMetrics,
     matched_events: usize,
@@ -261,11 +264,33 @@ fn case(style: Style, seed: u64, state: &MusicalState) -> CaseReport {
         state,
         PerformanceDialect::ClassicalRubato,
     );
+    let control_replay_voices = perform_with_spec_and_dialect(
+        &score,
+        &spec,
+        seed,
+        state,
+        PerformanceDialect::ClassicalRubato,
+    );
     let replay_exact = event_signature(&actual_voices) == event_signature(&replay_voices);
+    let negative_control_replay_exact =
+        event_signature(&control_voices) == event_signature(&control_replay_voices);
     let actual_metrics = metrics(&actual_voices);
     let control_metrics = metrics(&control_voices);
     let actual_events = flatten(&actual_voices);
     let control_events = flatten(&control_voices);
+    let control_replay_events = flatten(&control_replay_voices);
+    let (negative_matched, negative_unmatched_control, negative_unmatched_replay, mut negative_shifts) =
+        compare(&control_events, &control_replay_events);
+    let negative_control_changed_onsets = negative_shifts
+        .iter()
+        .filter(|d| **d > CHANGED_ONSET_EPSILON_MS)
+        .count();
+    let negative_control_unmatched_events =
+        negative_unmatched_control + negative_unmatched_replay;
+    let negative_control_match_is_clean = negative_control_replay_exact
+        && negative_matched == control_events.len()
+        && negative_control_unmatched_events == 0
+        && negative_control_changed_onsets == 0;
     let (matched, unmatched_actual, unmatched_control, mut shifts) =
         compare(&actual_events, &control_events);
     let changed_onsets = shifts
@@ -284,7 +309,8 @@ fn case(style: Style, seed: u64, state: &MusicalState) -> CaseReport {
         && control_metrics.invalid_events == 0
         && actual_metrics.events > 0
         && control_metrics.events > 0;
-    let status = if replay_exact && valid && matched > 0 && changed_onsets > 0 {
+    let status = if replay_exact && negative_control_match_is_clean
+        && valid && matched > 0 && changed_onsets > 0 {
         "mechanics_pass"
     } else {
         "mechanics_fail"
@@ -296,6 +322,9 @@ fn case(style: Style, seed: u64, state: &MusicalState) -> CaseReport {
         selected_dialect: format!("{:?}", dialect_for_spec(&spec)),
         control_dialect: "ClassicalRubato".into(),
         replay_exact,
+        negative_control_replay_exact,
+        negative_control_changed_onsets,
+        negative_control_unmatched_events,
         actual: actual_metrics,
         control: control_metrics,
         matched_events: matched,
