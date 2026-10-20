@@ -683,5 +683,10 @@ mod tests {
             }),
             "speedup claims must combine statistical evidence with equal-cost result quality"
         );
+        assert!(
+            lane.baselines.iter().any(|baseline| baseline.contains("ensemble disagreement"))
+                && lane.baselines.iter().any(|baseline| baseline.contains("counterexample-guided")),
+            "policy comparisons must include strong disagreement and falsification challengers"
+        );
     }
 }
