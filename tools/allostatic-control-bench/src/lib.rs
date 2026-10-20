@@ -200,25 +200,33 @@ fn choose_action(policy: Policy, observation: Observation) -> Action {
             let uncertainty = epistemic_uncertainty(observation.forecast_confidence);
             let conservative_forecast =
                 (observation.forecast_load + uncertainty * 0.25).clamp(0.0, 1.0);
-            let projected_reserve = reserve - 3.0 * (0.055 + 0.025 * conservative_forecast);
+            // Extend the planning horizon only as forecast risk rises. A fixed
+            // three-step horizon over-rests in calm conditions because decisions
+            // are re-evaluated after every action.
+            let horizon = 1.0 + 2.0 * conservative_forecast;
+            let projected_reserve =
+                reserve - horizon * (0.055 + 0.025 * conservative_forecast);
             let reserve_floor = 0.15 + 0.10 * conservative_forecast;
-            let projected_load = load + 3.0 * (0.026 + 0.032 * conservative_forecast);
+            let projected_load =
+                load + horizon * (0.026 + 0.032 * conservative_forecast);
             projected_reserve < reserve_floor || projected_load > 0.68 || reserve < 0.22
         }
         Policy::ShuffledForecastControl => {
             let uncertainty = epistemic_uncertainty(observation.forecast_confidence);
             let false_forecast =
                 (observation.shuffled_forecast_load + uncertainty * 0.25).clamp(0.0, 1.0);
-            let projected_reserve = reserve - 3.0 * (0.055 + 0.025 * false_forecast);
+            let horizon = 1.0 + 2.0 * false_forecast;
+            let projected_reserve = reserve - horizon * (0.055 + 0.025 * false_forecast);
             let reserve_floor = 0.15 + 0.10 * false_forecast;
-            let projected_load = load + 3.0 * (0.026 + 0.032 * false_forecast);
+            let projected_load = load + horizon * (0.026 + 0.032 * false_forecast);
             projected_reserve < reserve_floor || projected_load > 0.68 || reserve < 0.22
         }
         Policy::OraclePredictive => {
             let forecast = observation.oracle_forecast_load;
-            let projected_reserve = reserve - 3.0 * (0.055 + 0.025 * forecast);
+            let horizon = 1.0 + 2.0 * forecast;
+            let projected_reserve = reserve - horizon * (0.055 + 0.025 * forecast);
             let reserve_floor = 0.15 + 0.10 * forecast;
-            let projected_load = load + 3.0 * (0.026 + 0.032 * forecast);
+            let projected_load = load + horizon * (0.026 + 0.032 * forecast);
             projected_reserve < reserve_floor || projected_load > 0.68 || reserve < 0.22
         }
     };
