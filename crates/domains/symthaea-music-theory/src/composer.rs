@@ -221,6 +221,22 @@ pub fn ground_audition_for(
     Some(ground_audition_impl(spec, intent, key, meter, &motif).1)
 }
 
+/// Apply the dedicated-form response to the requested energy axis.
+/// The neutral setting is 0.6, preserving legacy output exactly. At other
+/// values, absolute velocity shifts while the form's pitches, timing, and
+/// relative dynamic shape are retained except where [0, 1] saturation applies.
+pub(crate) fn apply_dedicated_energy_envelope(score: &mut Score, energy: f32) {
+    let energy = if energy.is_finite() {
+        energy.clamp(0.0, 1.0)
+    } else {
+        0.6
+    };
+    let gain = 0.7 + 0.5 * energy;
+    for note in &mut score.notes {
+        note.velocity = (note.velocity * gain).clamp(0.0, 1.0);
+    }
+}
+
 /// Compose a Sonata-form score while retaining its exact plan and obligation
 /// evidence. Returns `None` when the resolved form for this seed is not Sonata.
 ///
@@ -262,14 +278,16 @@ pub fn compose_sonata_with_plan(
     } else {
         motif
     };
-    Some(crate::sonata::realize_sonata_with_plan(
+    let mut realization = crate::sonata::realize_sonata_with_plan(
         key,
         tempo,
         meter_beats,
         &motif,
         intent.seed,
         intent,
-    ))
+    );
+    apply_dedicated_energy_envelope(&mut realization.score, intent.energy);
+    Some(realization)
 }
 
 pub fn compose_with_spec(intent: &MusicalIntent, spec: &crate::spec::CompositionSpec) -> Score {
@@ -411,20 +429,19 @@ fn compose_with_spec_and_form_and_grammar_impl(
     // takes only what a fugue needs — the key, the tempo, and the
     // hook-grafted subject (the piece's name, stated by every voice).
     if spec.form_kind(intent.seed) == crate::spec::FormKind::Fugue {
-        return (
-            crate::fugue::realize_fugue(key, tempo, meter, &motif, intent.seed),
-            None,
-        );
+        let mut score = crate::fugue::realize_fugue(key, tempo, meter, &motif, intent.seed);
+        apply_dedicated_energy_envelope(&mut score, intent.energy);
+        return (score, None);
     }
     // Progressive Folk/Rock's habit: a genuine mid-piece METER CHANGE. No
     // single `meter_beats` scalar can represent more than one meter, so
     // this bypasses the period pipeline exactly like the fugue/
     // ground-music families do — see `crate::prog_suite`.
     if spec.form_kind(intent.seed) == crate::spec::FormKind::ProgSuite {
-        return (
-            crate::prog_suite::realize_prog_suite(key, tempo, &motif, intent.seed, intent, spec),
-            None,
-        );
+        let mut score =
+            crate::prog_suite::realize_prog_suite(key, tempo, &motif, intent.seed, intent, spec);
+        apply_dedicated_energy_envelope(&mut score, intent.energy);
+        return (score, None);
     }
     // Sonata's habit: tonal CONFLICT AND RESOLUTION — a second subject
     // introduced in a foreign key that the recapitulation brings home.
@@ -444,10 +461,10 @@ fn compose_with_spec_and_form_and_grammar_impl(
     // not a melody-plus-accompaniment realization, so this bypasses the
     // period pipeline too — see `crate::renaissance`.
     if spec.form_kind(intent.seed) == crate::spec::FormKind::Renaissance {
-        return (
-            crate::renaissance::realize_renaissance(key, tempo, meter, &motif, intent.seed),
-            None,
-        );
+        let mut score =
+            crate::renaissance::realize_renaissance(key, tempo, meter, &motif, intent.seed);
+        apply_dedicated_energy_envelope(&mut score, intent.energy);
+        return (score, None);
     }
     // Opera/Art Song's habit: two INDEPENDENT melodic identities (Theme A
     // in Melody, Theme B in CounterMelody) in structured conversation —
@@ -456,10 +473,9 @@ fn compose_with_spec_and_form_and_grammar_impl(
     // themes internally (unlike the other bypass forms), so it doesn't
     // consume the spec-derived `motif` at all — see `crate::opera`.
     if spec.form_kind(intent.seed) == crate::spec::FormKind::Opera {
-        return (
-            crate::opera::realize_opera(key, tempo, meter_beats, intent.seed, intent),
-            None,
-        );
+        let mut score = crate::opera::realize_opera(key, tempo, meter_beats, intent.seed, intent);
+        apply_dedicated_energy_envelope(&mut score, intent.energy);
+        return (score, None);
     }
     // Same reasoning for the ground-music family: the ground is the form.
     // All three grammars first AUDITION candidate subjects (the same bank
@@ -499,6 +515,7 @@ fn compose_with_spec_and_form_and_grammar_impl(
                 false,
             ),
         };
+        apply_dedicated_energy_envelope(&mut score, intent.energy);
         return (score, None);
     }
     let bars = intent.bars.max(1);
