@@ -46,6 +46,7 @@ pub mod rng;
 pub mod spec;
 pub mod thermal;
 pub mod thresholds;
+pub mod transfer;
 pub mod validate;
 
 pub use balance::{BalanceScore, TasteProfile, balance_score};
