@@ -500,6 +500,15 @@ pub(crate) fn instruments_for(style: Style, seed: u64) -> (Instrument, Instrumen
         Style::HindustaniInspired => {
             &[(Instrument::Sitar, Instrument::Pad, Instrument::UprightBass)]
         }
+        // Mazurka prototype: piano character with cello grounding.
+        // This is a renderer choice, not an authenticity claim.
+        Style::Mazurka => &[(Instrument::Piano, Instrument::Piano, Instrument::Cello)],
+        // Toccata's keyboard vocabulary is represented explicitly: rotate
+        // harpsichord/organ lead and harmony roles under a cello bass.
+        Style::Toccata => &[
+            (Instrument::Harpsichord, Instrument::Organ, Instrument::Cello),
+            (Instrument::Organ, Instrument::Harpsichord, Instrument::Cello),
+        ],
     };
     pool[(seed % pool.len() as u64) as usize]
 }
