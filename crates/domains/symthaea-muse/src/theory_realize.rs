@@ -41,7 +41,8 @@ use symthaea_music_theory::{MusicalIntent, Score as TheoryScore, Style};
 /// [`apply_expressive_model`]'s blend). March, Mazurka, and Toccata timing
 /// profiles are explicit engineering hypotheses awaiting blinded audio
 /// calibration—not evidence of historical authenticity. Folk, Lullaby,
-/// Sarabande, and Minuet add mechanism-routed profiles, still provisional.
+/// Sarabande, Minuet, and Waltz add mechanism-routed profiles, still
+/// provisional.
 /// [`PerformanceDialect::ClassicalRubato`] remains the identity — every
 /// factor exactly 1.0 — so its renders remain bit-identical to pre-dialect behavior.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
