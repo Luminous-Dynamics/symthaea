@@ -21,7 +21,8 @@
     "gates",
     "published_candidate_refinement",
     "policy_comparison",
-    "published_result_fingerprint"
+    "published_result_fingerprint",
+    "published_ranking_settings"
   ],
   "properties": {
     "schema_version": {
@@ -641,6 +642,44 @@
         },
         "citation_doi": {
           "const": "10.1038/s41524-026-02043-8"
+        }
+      }
+    },
+    "published_ranking_settings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rbo_persistence",
+        "rbo_variant",
+        "exact_energy_tie_order",
+        "kendall_tau_variant",
+        "kendall_tau_energy_tie_tolerance_eV",
+        "common_candidate_set",
+        "status"
+      ],
+      "properties": {
+        "rbo_persistence": {
+          "const": 0.94
+        },
+        "rbo_variant": {
+          "type": "string",
+          "minLength": 1
+        },
+        "exact_energy_tie_order": {
+          "const": "canonical_structure_id_ascending"
+        },
+        "kendall_tau_variant": {
+          "const": "tau_b"
+        },
+        "kendall_tau_energy_tie_tolerance_eV": {
+          "const": 0
+        },
+        "common_candidate_set": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "const": "preregistered_for_reproduction"
         }
       }
     }
