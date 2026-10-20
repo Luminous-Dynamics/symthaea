@@ -177,12 +177,21 @@ fn is_iso_calendar_date(value: &str) -> bool {
 }
 
 fn is_utc_timestamp(value: &str) -> bool {
-    value.len() == 20
-        && value.as_bytes().get(10) == Some(&b'T')
-        && value.as_bytes().get(13) == Some(&b':')
-        && value.as_bytes().get(16) == Some(&b':')
-        && value.ends_with('Z')
-        && is_iso_calendar_date(&value[..10])
+    let bytes = value.as_bytes();
+    if bytes.len() != 20
+        || bytes[10] != b'T'
+        || bytes[13] != b':'
+        || bytes[16] != b':'
+        || bytes[19] != b'Z'
+    {
+        return false;
+    }
+    if !bytes.iter().enumerate().all(|(index, byte)| {
+        matches!(index, 4 | 7 | 10 | 13 | 16 | 19) || byte.is_ascii_digit()
+    }) {
+        return false;
+    }
+    is_iso_calendar_date(&value[..10])
         && value[11..13].parse::<u32>().is_ok_and(|hour| hour <= 23)
         && value[14..16].parse::<u32>().is_ok_and(|minute| minute <= 59)
         && value[17..19].parse::<u32>().is_ok_and(|second| second <= 60)
@@ -581,6 +590,11 @@ mod tests {
         row[11] = "ZAR".to_owned();
         let errors = validate_csv(&csv_for_rows(&[row])).unwrap_err();
         assert!(errors.iter().any(|error| error.contains("cannot declare total_contract_value")));
+    }
+
+    #[test]
+    fn timestamp_validator_rejects_non_ascii_without_panicking() {
+        assert!(!is_utc_timestamp("2026-10-20T2🙂:00:00Z"));
     }
 
     #[test]
