@@ -780,6 +780,14 @@ mod tests {
     use super::*;
 
     #[test]
+    fn sha256_matches_standard_known_vector() {
+        assert_eq!(
+            format!("{:x}", Sha256::digest(b"abc")),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+    }
+
+    #[test]
     fn source_paths_are_normalized_relative_to_lean() {
         assert_eq!(
             normalize_lean_relative_path("../preprints/a/paper.pdf").unwrap(),
