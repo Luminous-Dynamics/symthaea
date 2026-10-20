@@ -114,6 +114,8 @@ The gate should reject **100% of this finite, versioned fixture suite** before a
 
 ## 9. Run manifest minimum
 
+Include [`exposure-audit.md`](exposure-audit.md) in the run manifest. Family `089` was inspected during exploratory source selection before its `test` assignment was checked; it is known-exposed for this workflow and must remain excluded from the confirmatory test denominator without rewriting the frozen split. Report original and adjusted counts.
+
 Each run must persist: protocol version and digest; source commit and family split digest; eligible/excluded/unknown item accounting; target statement digest; related-family ID; proof-insight record digests and source locators; model/tool versions and all budgets; prompt/retrieval configuration; random seeds; per-arm inputs actually surfaced; checker output; axiom/dependency receipt; semantic/mutation test results; wall-clock/tokens/cost; failures and abstentions; annotator rubric/reliability; analysis code version; raw per-target outcomes; and the final analysis receipt. Freeze config and hash the manifest before running; append results rather than rewriting history.
 
 ## References
