@@ -24,6 +24,7 @@ The benchmark covers:
 - Styles: Mazurka and Toccata.
 - Seeds: `[0, 1, 7, 13, 29, 42, 73, 101]`.
 - Reproducibility: exact event signature replay.
+- Evaluator negative control: repeat the exact same `ClassicalRubato` arm; the report fails unless its replay is bit-identical, every event is matched, and measured onset change is zero.
 - Provenance: optional source revision from `MUSE_SOURCE_REVISION` or `GITHUB_SHA`, plus the `rustc --version` string when available; missing data is reported as null rather than guessed.
 - Integrity: nonempty output and finite, in-range event fields.
 - Counterfactual: actual style-selected dialect versus `ClassicalRubato`, same score digest.
