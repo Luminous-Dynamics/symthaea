@@ -436,23 +436,26 @@ impl Style {
     /// wiring fix, and out of scope for this pass.
     pub fn supported_intent_axes(self) -> &'static [&'static str] {
         const ALL: &[&str] = &["valence", "arousal", "energy", "bars"];
-        // Fugue/ProgFolk/Sonata/Opera: energy+bars dead (bypass pipeline),
-        // but neither pins a mode and neither shows arousal dead, so
-        // valence+arousal remain live.
-        const NO_ENERGY_BARS: &[&str] = &["valence", "arousal"];
-        // Ground-form presets and RenaissancePolyphony: energy+bars dead
-        // (bypass pipeline) AND valence+arousal dead (pinned mode forecloses
-        // both usual levers). These styles' four advertised axes are inert.
+        // These forms bypass the period pipeline, so bars still does not
+        // resize their bespoke structures. Dedicated-form energy now scales
+        // the dynamic envelope; valence and arousal continue to affect key
+        // and motif selection.
+        const NO_BARS: &[&str] = &["valence", "arousal", "energy"];
+        // Ground-form presets and RenaissancePolyphony: the structure is
+        // bespoke and currently does not respond to valence, arousal, or bars;
+        // energy is live through the dedicated velocity envelope.
+        const NO_VALENCE_AROUSAL_BARS: &[&str] = &["energy"];
+        // Kept for any future style that genuinely has no causal response.
         const NONE_LIVE: &[&str] = &[];
         // Mode-pinned styles where only valence is dead (arousal/energy/
         // bars all still go through the shared period pipeline normally).
         const NO_VALENCE: &[&str] = &["arousal", "energy", "bars"];
         match self {
-            Style::Fugue | Style::ProgFolk | Style::Sonata | Style::Opera => NO_ENERGY_BARS,
+            Style::Fugue | Style::ProgFolk | Style::Sonata | Style::Opera => NO_BARS,
             Style::Passacaglia
             | Style::Erosion
             | Style::Lineage
-            | Style::RenaissancePolyphony => NONE_LIVE,
+            | Style::RenaissancePolyphony => NO_VALENCE_AROUSAL_BARS,
             Style::ModalFolk
             | Style::Tango
             | Style::Celtic
@@ -3791,9 +3794,10 @@ mod tests {
     }
 
     #[test]
-    fn supported_intent_axes_matches_the_causal_diversity_validation_census() {
-        // Ground truth from examples/diversity_census.rs's one-factor-at-a-
-        // time sensitivity matrix (26 of 174 style/parameter cells dead).
+    fn supported_intent_axes_matches_the_score_response_contract() {
+        // These are controls with a causal effect on symbolic score output.
+        // The structural-diversity census deliberately excludes velocity, so
+        // its structural fingerprint must remain separate from this axis contract.
         // A default (unlisted) style supports all four axes.
         assert_eq!(
             Style::Classical.supported_intent_axes(),
@@ -3818,15 +3822,17 @@ mod tests {
                 "{style:?} should have only valence dead"
             );
         }
-        // Bypass-grammar styles without a pinned mode: energy+bars dead.
+        // Dedicated forms still do not resize their structures from bars,
+        // but energy now has a direct velocity-envelope effect.
         for style in [Style::Fugue, Style::ProgFolk, Style::Sonata, Style::Opera] {
             assert_eq!(
                 style.supported_intent_axes(),
-                &["valence", "arousal"],
-                "{style:?} should have energy+bars dead"
+                &["valence", "arousal", "energy"],
+                "{style:?} has live energy but no bar-count contract"
             );
         }
-        // Ground-form styles that pin their modal identity and own their structure.
+        // Ground forms and RenaissancePolyphony pin their modal/structural
+        // identity; only the new dedicated energy envelope is currently live.
         for style in [
             Style::Passacaglia,
             Style::Erosion,
@@ -3835,8 +3841,8 @@ mod tests {
         ] {
             assert_eq!(
                 style.supported_intent_axes(),
-                &[] as &[&str],
-                "{style:?} should have all four intent axes dead"
+                &["energy"],
+                "{style:?} should expose energy and quarantine inactive axes"
             );
         }
     }
