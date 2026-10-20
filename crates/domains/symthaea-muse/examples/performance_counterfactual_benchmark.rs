@@ -279,7 +279,7 @@ fn case(style: Style, seed: u64, state: &MusicalState) -> CaseReport {
     let actual_events = flatten(&actual_voices);
     let control_events = flatten(&control_voices);
     let control_replay_events = flatten(&control_replay_voices);
-    let (negative_matched, negative_unmatched_control, negative_unmatched_replay, mut negative_shifts) =
+    let (negative_matched, negative_unmatched_control, negative_unmatched_replay, negative_shifts) =
         compare(&control_events, &control_replay_events);
     let negative_control_changed_onsets = negative_shifts
         .iter()
@@ -422,6 +422,20 @@ mod tests {
         assert_eq!(unmatched_actual, 1);
         assert_eq!(unmatched_control, 1);
         assert!((shifts[0] - 2.0).abs() < 1e-3, "{shifts:?}");
+    }
+
+    #[test]
+    fn identical_event_stream_is_a_zero_effect_negative_control() {
+        let stream = [
+            Event { voice: "Melody".into(), pitch_bits: 440.0_f32.to_bits(), start: 0.010 },
+            Event { voice: "Melody".into(), pitch_bits: 440.0_f32.to_bits(), start: 0.510 },
+            Event { voice: "Bass".into(), pitch_bits: 220.0_f32.to_bits(), start: 0.010 },
+        ];
+        let (matched, unmatched_a, unmatched_b, shifts) = compare(&stream, &stream);
+        assert_eq!(matched, stream.len());
+        assert_eq!(unmatched_a, 0);
+        assert_eq!(unmatched_b, 0);
+        assert!(shifts.iter().all(|shift| *shift == 0.0), "{shifts:?}");
     }
 
     #[test]
