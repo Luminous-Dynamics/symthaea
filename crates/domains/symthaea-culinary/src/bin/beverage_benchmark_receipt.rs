@@ -71,8 +71,14 @@ impl CheckResult {
 }
 
 fn hex_sha256(bytes: &[u8]) -> String {
+    use std::fmt::Write as _;
+
     let digest = Sha256::digest(bytes);
-    digest.iter().map(|byte| format!("{byte:02x}")).collect()
+    let mut output = String::with_capacity(64);
+    for byte in digest {
+        write!(&mut output, "{byte:02x}").expect("writing to a String cannot fail");
+    }
+    output
 }
 
 fn string_set(value: Option<&Value>) -> Option<BTreeSet<String>> {
@@ -84,7 +90,7 @@ fn string_set(value: Option<&Value>) -> Option<BTreeSet<String>> {
     Some(set)
 }
 
-fn schema_enum<'a>(schema: &'a Value, field: &str) -> Option<BTreeSet<String>> {
+fn schema_enum(schema: &Value, field: &str) -> Option<BTreeSet<String>> {
     string_set(
         schema
             .get("properties")?
@@ -234,6 +240,12 @@ fn validate_inputs(corpus_bytes: &[u8], schema_bytes: &[u8]) -> CheckResult {
     }
 }
 
+fn head_matches(expected_head: &str, actual_head: &str) -> bool {
+    expected_head.len() == 40
+        && expected_head.bytes().all(|byte| byte.is_ascii_hexdigit())
+        && expected_head == actual_head
+}
+
 fn git_head() -> Result<String, String> {
     let output = Command::new("git")
         .args(["rev-parse", "HEAD"])
@@ -282,9 +294,7 @@ fn run() -> Result<ExitCode, String> {
         .map_err(|error| format!("schema_read_failed: {error}"))?;
 
     let mut check = validate_inputs(&corpus_bytes, &schema_bytes);
-    let valid_head = expected_head.len() == 40
-        && expected_head.bytes().all(|byte| byte.is_ascii_hexdigit())
-        && expected_head == actual_head;
+    let valid_head = head_matches(&expected_head, &actual_head);
     if !valid_head {
         check.errors.push("exact_head_mismatch_or_invalid_expected_head".to_owned());
     }
@@ -386,6 +396,17 @@ mod tests {
         assert!(!result.passed());
         assert_eq!(result.scenario_count, 0);
         assert!(result.errors.iter().any(|e| e.starts_with("corpus_json_or_shape_invalid")));
+    }
+
+    #[test]
+    fn exact_head_gate_rejects_wrong_or_malformed_head() {
+        let head = "0123456789abcdef0123456789abcdef01234567";
+        assert!(head_matches(head, head));
+        assert!(!head_matches("not-a-commit", head));
+        assert!(!head_matches(
+            "1123456789abcdef0123456789abcdef01234567",
+            head
+        ));
     }
 
     #[test]
