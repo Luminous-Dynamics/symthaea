@@ -1768,10 +1768,18 @@ mod tests {
         fs::create_dir_all(root.join("lean")).expect("create fixture repository");
         git(&root, &["init", "-q"]);
         git(&root, &["config", "user.name", "PITB Test"]);
-        git(&root, &["config", "user.email", "pitb-test@example.invalid"]);
         git(
             &root,
             &["config", "user.email", "pitb-test@example.invalid"],
+        );
+        git(
+            &root,
+            &[
+                "remote",
+                "add",
+                "origin",
+                "https://example.invalid/temporal-fixture",
+            ],
         );
 
         let timeline = "position,target_id\n0,target-000\n1,target-001\n";
