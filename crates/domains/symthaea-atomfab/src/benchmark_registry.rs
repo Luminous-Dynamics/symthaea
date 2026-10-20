@@ -216,9 +216,15 @@ mod tests {
     fn embedded_registry_parses_and_passes_integrity_checks() {
         let registry = load_embedded_registry().expect("checked-in JSON should parse");
         registry.validate().expect("registry should be internally consistent");
-        assert_eq!(registry.benchmark_lanes.len(), 8);
+        assert_eq!(registry.benchmark_lanes.len(), 9);
         assert!(registry.benchmark_lanes.iter().any(|lane| lane.id == "experimental-reality-gap"));
         assert!(registry.benchmark_lanes.iter().any(|lane| lane.id == "symtropy-workcell"));
+        assert!(
+            registry
+                .benchmark_lanes
+                .iter()
+                .any(|lane| lane.id == "supported-nanoparticle-search")
+        );
     }
 
     #[test]
