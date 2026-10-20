@@ -641,4 +641,37 @@ mod tests {
             "router benchmark must resist value-estimate gaming"
         );
     }
+    #[test]
+    fn active_learning_lane_requires_paired_bootstrap_acceleration_statistics() {
+        let registry = load_embedded_registry().expect("checked-in JSON should parse");
+        let lane = registry
+            .benchmark_lanes
+            .iter()
+            .find(|lane| lane.id == "active-learning-policy")
+            .expect("active-learning lane should be registered");
+
+        assert!(
+            lane.metrics.iter().any(|metric| {
+                metric.contains("paired median acceleration factor")
+                    && metric.contains("percentile bootstrap interval")
+                    && metric.contains("predeclared matched seeds")
+            }),
+            "active learning must report paired seed-level acceleration with an interval"
+        );
+        assert!(
+            lane.gates.iter().any(|gate| {
+                gate.contains("every pair must reach the same frozen target")
+                    && gate.contains("never drop non-reaching seeds")
+            }),
+            "non-reaching pairs must not be silently excluded from the acceleration interval"
+        );
+        assert!(
+            lane.gates.iter().any(|gate| {
+                gate.contains("95% percentile-bootstrap lower bound above 1")
+                    && gate.contains("no worse validated objective quality")
+            }),
+            "speedup claims must combine statistical evidence with equal-cost result quality"
+        );
+    }
+
 }
