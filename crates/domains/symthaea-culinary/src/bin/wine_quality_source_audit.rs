@@ -10,17 +10,12 @@
 use serde::Serialize;
 use serde_json::to_vec_pretty;
 use sha2::{Digest, Sha256};
-use std::{
-    collections::BTreeMap,
-    env,
-    fs,
-    path::PathBuf,
-    process::ExitCode,
-};
+use std::{collections::BTreeMap, env, fs, path::PathBuf, process::ExitCode};
 
 const SOURCE_URI: &str = "https://archive.ics.uci.edu/dataset/186/wine%2Bquality";
 const SOURCE_DOI: &str = "https://doi.org/10.24432/C56S3T";
-const REPORTED_LICENSE: &str = "CC BY 4.0 (as stated by UCI; verify current record before redistribution)";
+const REPORTED_LICENSE: &str =
+    "CC BY 4.0 (as stated by UCI; verify current record before redistribution)";
 const EXPECTED_COLUMNS: [&str; 12] = [
     "fixed acidity",
     "volatile acidity",
@@ -193,7 +188,11 @@ fn audit_csv(bytes: &[u8], color: &str, filename: &str) -> AuditReceipt {
             .iter()
             .zip(EXPECTED_COLUMNS.iter())
             .all(|(actual, expected)| actual == expected);
-    if !header_valid && !errors.iter().any(|e| e.starts_with("csv_header_parse_error:")) {
+    if !header_valid
+        && !errors
+            .iter()
+            .any(|e| e.starts_with("csv_header_parse_error:"))
+    {
         errors.push("header_mismatch_or_wrong_column_order".to_owned());
     }
 
@@ -213,7 +212,9 @@ fn audit_csv(bytes: &[u8], color: &str, filename: &str) -> AuditReceipt {
                         for (accumulator, value) in accumulators.iter_mut().zip(values.iter()) {
                             accumulator.add(*value);
                         }
-                        *quality_score_counts.entry(values[11] as i64).or_insert(0_u64) += 1;
+                        *quality_score_counts
+                            .entry(values[11] as i64)
+                            .or_insert(0_u64) += 1;
                     }
                     Err(row_errors) => {
                         rows_invalid += 1;
@@ -273,7 +274,9 @@ fn parse_args() -> Result<(PathBuf, String, PathBuf), String> {
     let mut args = env::args().skip(1);
 
     while let Some(flag) = args.next() {
-        let value = args.next().ok_or_else(|| format!("missing_value_for_{flag}"))?;
+        let value = args
+            .next()
+            .ok_or_else(|| format!("missing_value_for_{flag}"))?;
         match flag.as_str() {
             "--input" => input = Some(PathBuf::from(value)),
             "--color" => color = Some(value),
@@ -300,7 +303,8 @@ fn run() -> Result<ExitCode, String> {
     let passed = receipt.status == "PASS_AUDIT";
     let serialized = to_vec_pretty(&receipt)
         .map_err(|error| format!("receipt_serialization_failed: {error}"))?;
-    fs::write(&output_path, serialized).map_err(|error| format!("receipt_write_failed: {error}"))?;
+    fs::write(&output_path, serialized)
+        .map_err(|error| format!("receipt_write_failed: {error}"))?;
     if passed {
         Ok(ExitCode::SUCCESS)
     } else {
@@ -349,7 +353,12 @@ mod tests {
         assert_eq!(receipt.status, "FAIL");
         assert_eq!(receipt.rows_total, 1);
         assert_eq!(receipt.rows_invalid, 1);
-        assert!(receipt.errors.iter().any(|error| error.contains("non_finite_value:pH")));
+        assert!(
+            receipt
+                .errors
+                .iter()
+                .any(|error| error.contains("non_finite_value:pH"))
+        );
     }
 
     #[test]
@@ -366,7 +375,12 @@ mod tests {
         let bytes = format!("{HEADER}\n7.4;0.7;0.0;1.9;0.076;11;34;0.9978;3.51;0.56;9.4;5.5\n");
         let receipt = audit_csv(bytes.as_bytes(), "red", "bad-quality.csv");
         assert_eq!(receipt.status, "FAIL");
-        assert!(receipt.errors.iter().any(|error| error.contains("quality_must_be_integer_0_to_10")));
+        assert!(
+            receipt
+                .errors
+                .iter()
+                .any(|error| error.contains("quality_must_be_integer_0_to_10"))
+        );
     }
 
     #[test]
@@ -374,7 +388,12 @@ mod tests {
         let bytes = format!("{HEADER}\n{ROW_1}\n");
         let receipt = audit_csv(bytes.as_bytes(), "rose", "unknown-color.csv");
         assert_eq!(receipt.status, "FAIL");
-        assert!(receipt.errors.iter().any(|error| error == "declared_color_must_be_red_or_white"));
+        assert!(
+            receipt
+                .errors
+                .iter()
+                .any(|error| error == "declared_color_must_be_red_or_white")
+        );
     }
 
     #[test]
