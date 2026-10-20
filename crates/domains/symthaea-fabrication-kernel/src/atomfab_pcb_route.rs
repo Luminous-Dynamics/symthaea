@@ -11,11 +11,11 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 
-pub const CORPUS_SCHEMA: &str = "atomfab-pcb-route-corpus-v0.2";
-pub const CORPUS_VERSION: &str = "0.2.0";
+pub const CORPUS_SCHEMA: &str = "atomfab-pcb-route-corpus-v0.3";
+pub const CORPUS_VERSION: &str = "0.3.0";
 pub const EXPECTED_CASE_COUNT: usize = 16;
 pub const EMBEDDED_CORPUS: &str =
-    include_str!("../../../../docs/research/fixtures/ATOMFAB_PCB_ROUTE_CORPUS_V0_2.json");
+    include_str!("../../../../docs/research/fixtures/ATOMFAB_PCB_ROUTE_CORPUS_V0_3.json");
 
 const CORPUS_AUTHORITY: &str =
     "synthetic_route_and_evidence_gate_only_no_fabrication_or_execution_authority";
@@ -144,9 +144,15 @@ impl CorpusReceipt {
 /// Structural/corpus-integrity failures return Err. Fixture expectation
 /// mismatches are captured in a failed receipt, allowing negative controls to
 /// be observed and reported rather than silently disappearing.
-pub fn evaluate_corpus_bytes(bytes: &[u8], git_head: &str) -> Result<CorpusReceipt, String> {
-    if !is_git_sha(git_head) {
+pub fn evaluate_corpus_bytes(\n    bytes: &[u8],\n    declared_git_head: &str,\n    actual_checkout_head: &str,\n) -> Result<CorpusReceipt, String> {
+    if !is_git_sha(declared_git_head) {
         return Err("ATOMFAB_GIT_HEAD must be a 40- or 64-character hexadecimal commit SHA".into());
+    }
+    if !is_git_sha(actual_checkout_head) {
+        return Err("actual checkout HEAD must be a 40- or 64-character hexadecimal commit SHA".into());
+    }
+    if !declared_git_head.eq_ignore_ascii_case(actual_checkout_head) {
+        return Err("ATOMFAB_GIT_HEAD does not match the actual checkout HEAD".into());
     }
 
     let corpus: Corpus = serde_json::from_slice(bytes)
@@ -244,11 +250,11 @@ pub fn evaluate_corpus_bytes(bytes: &[u8], git_head: &str) -> Result<CorpusRecei
     };
 
     Ok(CorpusReceipt {
-        schema: "atomfab-pcb-route-receipt-v0.2".into(),
+        schema: "atomfab-pcb-route-receipt-v0.3".into(),
         corpus_schema: corpus.schema,
         corpus_version: corpus.version,
         corpus_sha256: sha256_hex(bytes),
-        git_head: git_head.to_ascii_lowercase(),
+        git_head: actual_checkout_head.to_ascii_lowercase(),
         exact_head_bound: true,
         authority: CORPUS_AUTHORITY.into(),
         case_count: corpus.cases.len(),
@@ -407,10 +413,11 @@ fn derive_evidence_result(case: &RouteCase) -> GateResult {
     if evidence.provenance != "complete" {
         incomplete.push("PROVENANCE_INCOMPLETE".to_string());
     }
-    if evidence.qualification_claim == "independent_physical_qualification"
-        && evidence.evidence_source_class != "measured"
-    {
-        rejected.push("UNSUPPORTED_PHYSICAL_QUALIFICATION_CLAIM".to_string());
+    if evidence.qualification_claim == "independent_physical_qualification" {
+        // This synthetic v0.3 corpus has no independently bound physical
+        // measurement objects, calibration certificates, or uncertainty
+        // analysis. A string label such as "measured" cannot qualify a part.
+        rejected.push("PHYSICAL_QUALIFICATION_OUT_OF_SCOPE".to_string());
     }
 
     // Show every declared issue. Rejection takes precedence, but never hides
@@ -479,7 +486,7 @@ mod tests {
     #[test]
     fn frozen_corpus_matches_independent_route_and_evidence_oracle() {
         let receipt =
-            evaluate_corpus_bytes(EMBEDDED_CORPUS.as_bytes(), &valid_head()).expect("valid corpus");
+            evaluate_valid(EMBEDDED_CORPUS.as_bytes()).expect("valid corpus");
         assert!(receipt.passed(), "receipt: {receipt:#?}");
         assert_eq!(receipt.case_count, EXPECTED_CASE_COUNT);
         assert_eq!(receipt.matched_route_cases, EXPECTED_CASE_COUNT);
@@ -582,13 +589,42 @@ mod tests {
         assert!(case
             .actual_evidence
             .reason_codes
-            .contains(&"UNSUPPORTED_PHYSICAL_QUALIFICATION_CLAIM".to_string()));
+            .contains(&"PHYSICAL_QUALIFICATION_OUT_OF_SCOPE".to_string()));
+    }
+
+    #[test]
+    fn declared_head_must_match_checkout_head() {
+        let declared = "a".repeat(40);
+        let actual = "b".repeat(40);
+        let error = evaluate_corpus_bytes(
+            EMBEDDED_CORPUS.as_bytes(),
+            &declared,
+            &actual,
+        )
+        .expect_err("head mismatch rejects");
+        assert!(error.contains("does not match the actual checkout HEAD"));
+    }
+
+    #[test]
+    fn measured_label_alone_still_cannot_qualify_physical_output() {
+        let mut value = corpus_value();
+        value["cases"][15]["evidence"]["evidence_source_class"] =
+            serde_json::Value::String("measured".into());
+        let bytes = serde_json::to_vec(&value).expect("serialize changed corpus");
+        let receipt = evaluate_valid(&bytes).expect("valid schema with altered label");
+        let case = receipt.cases.iter()
+            .find(|case| case.case_id == "PCB-ROUTE-016")
+            .expect("physical qualification control");
+        assert_eq!(case.actual_evidence.disposition, "rejected");
+        assert!(case.actual_evidence.reason_codes
+            .contains(&"PHYSICAL_QUALIFICATION_OUT_OF_SCOPE".to_string()));
     }
 
     #[test]
     fn invalid_git_head_is_rejected() {
-        let error =
-            evaluate_corpus_bytes(EMBEDDED_CORPUS.as_bytes(), "not-a-commit").expect_err("invalid head");
+        let actual_head = valid_head();
+        let error = evaluate_corpus_bytes(EMBEDDED_CORPUS.as_bytes(), "not-a-commit", &actual_head)
+            .expect_err("invalid declared head");
         assert!(error.contains("ATOMFAB_GIT_HEAD"));
     }
 }
