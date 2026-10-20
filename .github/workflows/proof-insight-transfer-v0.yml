@@ -78,17 +78,30 @@ jobs:
           PY
           echo "PITB_MANIFEST=$RUNNER_TEMP/proof-insight-isolated/Cargo.toml" >> "$GITHUB_ENV"
       - name: Check exact-package formatting
-        run: cargo fmt --manifest-path "$PITB_MANIFEST" -- --check
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$(dirname "$PITB_MANIFEST")"
+          cargo fmt -- --check
       - name: Run indexer unit tests
-        run: cargo test --locked --manifest-path "$PITB_MANIFEST"
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$(dirname "$PITB_MANIFEST")"
+          cargo test --locked
       - name: Validate checked-in transfer candidates
         shell: bash
         run: |
           set -euo pipefail
-          cargo run --locked --manifest-path "$PITB_MANIFEST" --bin validate_transfer_contract -- data/benchmarks/proof-insight-transfer-v0/candidates/156-borsuk-nine-finite-obstruction.json
-          cargo run --locked --manifest-path "$PITB_MANIFEST" --bin validate_transfer_contract -- data/benchmarks/proof-insight-transfer-v0/candidates/157-hadwiger-invariant-chain.json
-- name: Run strict Clippy
-        run: cargo clippy --locked --manifest-path "$PITB_MANIFEST" --all-targets -- -D warnings
+          cd "$(dirname "$PITB_MANIFEST")"
+          cargo run --locked --bin validate_transfer_contract -- "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/candidates/156-borsuk-nine-finite-obstruction.json"
+          cargo run --locked --bin validate_transfer_contract -- "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/candidates/157-hadwiger-invariant-chain.json"
+      - name: Run strict Clippy
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$(dirname "$PITB_MANIFEST")"
+          cargo clippy --locked --all-targets -- -D warnings
       - name: Install independent Draft 2020-12 validator
         uses: actions/setup-python@v5
         with:
@@ -324,8 +337,9 @@ jobs:
           git -C "$upstream" checkout --quiet --detach "$upstream_sha"
           test "$(git -C "$upstream" rev-parse HEAD)" = "$upstream_sha"
           test -z "$(git -C "$upstream" status --porcelain)"
-          cargo run --locked --manifest-path "$PITB_MANIFEST" -- "$upstream" "$upstream_sha" "$first"
-          cargo run --locked --manifest-path "$PITB_MANIFEST" -- "$upstream" "$upstream_sha" "$second"
+          cd "$(dirname "$PITB_MANIFEST")"
+          cargo run --locked --bin symthaea-proof-insights -- "$upstream" "$upstream_sha" "$first"
+          cargo run --locked --bin symthaea-proof-insights -- "$upstream" "$upstream_sha" "$second"
           cmp "$first" "$second"
           jq -e --arg sha "$upstream_sha" '
             .upstream_commit == $sha and
