@@ -145,7 +145,7 @@ fn cell<'a>(row: &'a [String], index: usize) -> &'a str {
 fn is_http_url(value: &str) -> bool {
     (value.starts_with("https://") || value.starts_with("http://"))
         && !value.chars().any(char::is_whitespace)
-        && value.len() > if value.starts_with("https://") { 8 } else { 7 }
+        && value.len() > (if value.starts_with("https://") { 8 } else { 7 })
 }
 
 fn validate_csv(input: &str) -> Result<AuditReport, Vec<String>> {
@@ -320,12 +320,6 @@ fn validate_csv(input: &str) -> Result<AuditReport, Vec<String>> {
 
         if row_errors.is_empty() {
             valid_records += 1;
-            if disposition == CONTEXT_ONLY
-                || disposition == SPEC_ONLY
-                || disposition == DISCOVERY_ONLY
-            {
-                // These rows can be valid register entries but never admitted price points.
-            }
         } else {
             errors.extend(row_errors);
         }
