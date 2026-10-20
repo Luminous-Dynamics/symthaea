@@ -629,6 +629,7 @@ fn validate_outcomes<'a>(
     let mut target_ids = BTreeSet::new();
     let mut eligible_statement_digests = BTreeSet::new();
     let mut arm_config_digests: BTreeMap<String, String> = BTreeMap::new();
+    let mut represented_families = BTreeSet::new();
     let mut eligible = Vec::new();
 
     for target in outcomes {
@@ -659,6 +660,7 @@ fn validate_outcomes<'a>(
                 target.family_id
             );
         }
+        represented_families.insert(target.family_id.as_str());
 
         match target.eligibility {
             Eligibility::Eligible => {
@@ -783,6 +785,20 @@ fn validate_outcomes<'a>(
                 }
             }
         }
+    }
+
+    let missing_test_families: Vec<&str> = frozen_families
+        .iter()
+        .filter(|(family_id, split)| {
+            split.as_str() == "test" && !represented_families.contains(family_id.as_str())
+        })
+        .map(|(family_id, _)| family_id.as_str())
+        .collect();
+    if !missing_test_families.is_empty() {
+        bail!(
+            "frozen test families lack an explicit outcome/exclusion row: {}",
+            missing_test_families.join(", ")
+        );
     }
     Ok(eligible)
 }
@@ -1182,6 +1198,20 @@ mod tests {
         let error = validate_outcomes(&[target], &config, &frozen_families)
             .expect_err("known-exposed family must be rejected");
         assert!(error.to_string().contains("known-exposed family 089"));
+    }
+
+    #[test]
+    fn every_frozen_test_family_needs_an_outcome_or_exclusion_row() {
+        let target = test_target("090", "target-090", false, false);
+        let config = test_config();
+        let frozen_families = BTreeMap::from([
+            ("090".to_string(), "test".to_string()),
+            ("091".to_string(), "test".to_string()),
+        ]);
+        let error = validate_outcomes(&[target], &config, &frozen_families)
+            .expect_err("missing test family must be surfaced rather than dropped");
+        assert!(error.to_string().contains("091"));
+        assert!(error.to_string().contains("explicit outcome/exclusion row"));
     }
 
     #[test]
