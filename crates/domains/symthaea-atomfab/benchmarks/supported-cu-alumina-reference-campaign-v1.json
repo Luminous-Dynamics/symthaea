@@ -276,7 +276,8 @@
     "Policy comparison stretch target: at least 20 paired fixed-seed campaigns, median acceleration factor >=2 with a 95% bootstrap lower bound >1 only if both methods reach the same frozen objective target and quality at equal cost is no worse. This is a proposed target, not a result.",
     "A simulation or MLIP output is never a measurement; physical claims require independent metrology and reproducible procedures.",
     "Compute the median paired AF and a deterministic percentile-bootstrap interval with a pinned PRNG seed and at least 1,000 resamples; every predeclared pair must reach the same frozen target, and failed/incomplete campaigns stay visible rather than being success-filtered.",
-    "never report a structure present in a baseline model's training data as held-out model performance; label it as a training-data diagnostic or published-reference reproduction instead"
+    "never report a structure present in a baseline model's training data as held-out model performance; label it as a training-data diagnostic or published-reference reproduction instead",
+    "Report paired target-attainment over all predeclared seeds, including failed/incomplete runs as not reaching target, separately from the conditional cost-to-target acceleration interval."
   ],
   "published_candidate_refinement": {
     "source": "Methods section of DOI 10.1038/s41524-026-02043-8",
@@ -333,7 +334,14 @@
       "cost_per_unique_validated_discovery",
       "failure_modes_by_stratum",
       "abstention_rate",
-      "decision_value_calibration"
+      "decision_value_calibration",
+      "baseline_target_reach_rate",
+      "candidate_target_reach_rate",
+      "paired_candidate_minus_baseline_target_reach_rate_difference_and_bootstrap_interval",
+      "both_baseline_and_candidate_reached_count",
+      "baseline_only_reached_count",
+      "candidate_only_reached_count",
+      "neither_reached_count"
     ],
     "stretch_gate": {
       "median_acceleration_factor_at_least": 2,
