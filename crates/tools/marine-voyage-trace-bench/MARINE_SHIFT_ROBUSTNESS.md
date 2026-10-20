@@ -18,6 +18,21 @@ This document specifies a benchmark, not an implementation of conformal predicti
 4. ITTC's 2024 procedure *Uncertainty Analysis in CFD, Examples for Resistance and Flow* explicitly frames V&V around a specified code, geometry, conditions and available benchmark information. Marine evidence must preserve the actual response variable and operating condition: https://ittc.info/media/11954/75-03-02-01.pdf
 5. The 2026 Duisburg Test Case (DTC) paper reports calm-water resistance and self-propulsion model experiments for a post-Panamax container ship at water-depth/draught ratios h/T=4.0, 2.0, and 1.2. It is a promising regime-shift target, but the raw files, rights, uncertainty fields, units and group mapping are not admitted here: https://doi.org/10.1080/09377255.2026.2644800
 
+## Baseline reproducibility audit — new exclusion rule
+
+Do not promote a recent method into the SOTA baseline set merely because the paper is accepted or its summary is attractive. Reproduce its exact algorithm, membership/tie-breaking rules, split protocol and score definition under one common, leakage-free evaluation before using it to select our own method.
+
+A particularly useful caution surfaced during this research: the public repository accompanying Lee (UAI 2026), *Diagnosing Conformal Prediction Failures Under Distribution Shift*, now labels its statistical audit as in progress and explicitly says the historical numerical results have not been reproduced under a corrected common protocol. Its current README reports that the historical scripts used differing adaptive-prediction-set membership rules, fit preprocessing using test information and reused calibration labels for early stopping; the recovered refits reported different (negative) concentration/drop correlations on the recovered panel. The author also states that the original 50-seed predictions remain unrecovered. These are statements from the repository's present audit, not an independent determination of the paper's final status: https://github.com/ChorokLeeDev/conformal-covid-uai2026
+
+Consequently:
+- The SHAP-concentration idea is **not** a qualified marine baseline, and its classifier-specific diagnostic must not be transferred to continuous resistance regression without a separate hypothesis and test.
+- Treat ERT (conditional-coverage diagnostics) and KMM-CP (covariate-shift correction) as research baselines to validate and fairly reproduce, not magic robustness guarantees.
+- Keep the upstream reference revision, license, code digest, data digest, method semantics, preprocessing fit groups, calibration/tuning/test group IDs, tie-breaking/membership rule and expected output hashes in each baseline receipt.
+- Run a no-information / no-shift control and deliberately leaky/wrong-membership negative controls to ensure the harness detects a “good” result produced by methodology drift.
+- Publish a baseline audit table with **reproduced / partially reproduced / not reproduced / not applicable** status before ranking any candidate as SOTA.
+
+This reproductions gate is a research-integrity requirement; it does not change the external literature's status or show that any method wins on marine data.
+
 ## Shift taxonomy — do not conflate these cases
 
 | Shift family | What changes | Which evidence can support a correction? | Required honest behavior |
