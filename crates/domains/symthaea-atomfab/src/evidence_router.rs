@@ -469,6 +469,18 @@ mod tests {
             "../schemas/evidence-route-report-v1.schema.json"
         ))
         .expect("evidence route output schema must be valid JSON");
+        let domain_rules = _input_schema["$defs"]["proposal"]["allOf"]
+            .as_array()
+            .expect("action schema must declare evidence-domain compatibility");
+        assert_eq!(domain_rules.len(), 3);
+        assert_eq!(
+            domain_rules[0]["if"]["properties"]["domain"]["const"],
+            "atomistic"
+        );
+        assert_eq!(
+            domain_rules[1]["then"]["properties"]["action_kind"]["const"],
+            "workcell_simulation"
+        );
 
         let proposals: Vec<EvidenceActionProposal> =
             serde_json::from_value(fixture["proposals"].clone())
