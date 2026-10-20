@@ -1,0 +1,106 @@
+{
+  "schema_version": "beverage-data-sources-v1",
+  "status": "source_triage_not_a_download_or_rights_clearance_receipt",
+  "source_records": [
+    {
+      "id": "BEER-CHEM-SENSORY-2024",
+      "title": "Data from: Predicting and improving complex beer flavor through machine learning",
+      "uri": "https://zenodo.org/records/10653704",
+      "related_paper": "https://www.nature.com/articles/s41467-024-46346-0",
+      "domain": [
+        "beer",
+        "chemistry",
+        "trained_sensory_panel"
+      ],
+      "stated_scope": "Associated supplementary data and analysis scripts for a study of 250 commercial beers; article reports over 200 chemical features and trained-panel descriptors.",
+      "rights_status": "CHECK_EXACT_RECORD_AND_FILE_TERMS_BEFORE_INGESTION",
+      "restricted_components": [
+        "RateBeer review scores are stated as restricted in the paper; exclude without separate permission."
+      ],
+      "use_gate": "Record exact file names, license/terms, SHA-256, stable sample identifiers, units and missingness before adapter implementation.",
+      "claims_not_supported": [
+        "new-brewery generalization unless group identifiers support it",
+        "fermentation trajectory forecasting",
+        "plant control",
+        "universal consumer preference"
+      ]
+    },
+    {
+      "id": "UCI-WINE-QUALITY-186",
+      "title": "Wine Quality",
+      "uri": "https://archive.ics.uci.edu/dataset/186/wine%2Bquality",
+      "doi": "https://doi.org/10.24432/C56S3T",
+      "license": "CC BY 4.0 as stated by UCI",
+      "domain": [
+        "wine",
+        "physicochemical_features",
+        "quality_score"
+      ],
+      "sample_count": 4898,
+      "predictor_count": 11,
+      "target": "quality score",
+      "rights_status": "PUBLIC_REPOSITORY_LICENSE_REPORTED_CC_BY_4_0",
+      "use_gate": "Record exact archive version and SHA-256; preserve red/white label; use only for a separate static chemistry-to-score baseline.",
+      "known_missing_context": [
+        "brand",
+        "grape type",
+        "vineyard",
+        "vintage",
+        "production site",
+        "process time series"
+      ],
+      "claims_not_supported": [
+        "vintage/site generalization",
+        "fermentation control",
+        "terroir causality",
+        "brand-level preference"
+      ]
+    },
+    {
+      "id": "BIER-BENCHMARK-2025",
+      "title": "2025 Water, Energy, and Emissions Benchmarking Summary",
+      "uri": "https://www.bieroundtable.com/2025-water-energy-and-emissions-benchmarking-summary-bier",
+      "domain": [
+        "brewery",
+        "distillery",
+        "winery",
+        "bottling",
+        "water",
+        "energy",
+        "emissions"
+      ],
+      "published_scope": "BIER reports over 1600 facilities across the 2020, 2022 and 2024 reporting years, stratified by facility type.",
+      "rights_status": "PUBLIC_SUMMARY; CHECK_REPORT_TERMS_BEFORE_REPRODUCTION",
+      "use_gate": "Use as a facility-type-aware comparison reference; do not assume the public summary is a row-level training dataset.",
+      "claims_not_supported": [
+        "causal savings attributable to our optimizer",
+        "universal per-liter target across facility types"
+      ]
+    },
+    {
+      "id": "PUBLIC-FERMENTATION-SENSOR-GAP-AUDIT",
+      "title": "Standardized alcoholic-fermentation sensor time-series candidates",
+      "uri": "https://doi.org/10.1007/s13197-025-06528-0",
+      "domain": [
+        "beer",
+        "wine",
+        "spirits",
+        "fermentation_time_series",
+        "sensor_monitoring"
+      ],
+      "rights_status": "DISCOVERY_TASK",
+      "stated_gap": "A 2026 review identifies a lack of public standardized fermentation sensor datasets and limited industrial validation.",
+      "use_gate": "Audit and record candidate datasets; this review finding is not proof that no relevant public dataset exists.",
+      "required_fields_for_fit": [
+        "batch_or_lot_id",
+        "timestamp",
+        "prediction_cutoff",
+        "sensor_identity_and_units",
+        "calibration_context",
+        "process_events",
+        "target_measurement_and_method",
+        "rights_and_attribution"
+      ]
+    }
+  ]
+}
