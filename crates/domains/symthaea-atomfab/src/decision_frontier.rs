@@ -387,8 +387,7 @@ mod tests {
             candidate("diversity", 2, Some(-3.04), 120),
             candidate("symthaea", 2, Some(-3.15), 110),
         ];
-        let report =
-            build_decision_frontier(&candidates).expect("matched candidates should pass");
+        let report = build_decision_frontier(&candidates).expect("matched candidates should pass");
         let lookup = |policy: &str| {
             report
                 .entries
@@ -501,7 +500,6 @@ mod tests {
             Err(FrontierError::InvalidCost)
         );
     }
-
 
     #[test]
     fn a_validated_discovery_can_dominate_a_zero_discovery_policy() {
