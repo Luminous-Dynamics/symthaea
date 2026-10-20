@@ -164,6 +164,23 @@ jobs:
           Draft202012Validator.check_schema(schema)
           validator = Draft202012Validator(schema, format_checker=FormatChecker())
 
+          # Validate every checked-in candidate, not just a synthetic fixture.
+          # Candidates must remain unreviewed/unscored unless their evidence gates
+          # are actually passed; schema validity is only structural validation.
+          candidate_dir = Path("data/benchmarks/proof-insight-transfer-v0/candidates")
+          candidate_files = sorted(candidate_dir.glob("*.json"))
+          if not candidate_files:
+              raise SystemExit("no checked-in candidate records were found")
+          for candidate_path in candidate_files:
+              candidate = json.loads(candidate_path.read_text())
+              try:
+                  validator.validate(candidate)
+              except ValidationError as error:
+                  raise SystemExit(
+                      f"candidate schema validation failed for {candidate_path}: {error.message}"
+                  ) from error
+          print(f"PITB_CANDIDATE_SCHEMA_PASS: {len(candidate_files)} candidate record(s)")
+
           # Deliberately synthetic schema probe: not a benchmark dataset row and
           # not evidence that any manuscript theorem has been formalized.
           digest = "0" * 64
