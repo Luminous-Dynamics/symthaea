@@ -63,6 +63,8 @@ Before claiming transfer utility, require 100% rejection of the frozen finite ne
 
 **Primary endpoint:** family-clustered, paired absolute difference in *verified exact-target proof success* between F (typed insight) and the strongest simple baseline selected on validation (A–E). The exact primary contrast and direction must be written to the run manifest before touching the held-out test partition.
 
+The target transfer has its own verification record, separate from the source theorem's verification. A `verified_transfer` label requires a pinned target source commit and artifact hash, exact target statement digest, checker/version and receipt, explicit axiom policy, independent review that the formal target matches the intended claim, a passed dependent-successor test (or a documented not-applicable decision), passed mutation controls, and a compatible directional contract with no mismatch codes. Source-proof verification alone does not discharge these target-side obligations.
+
 A target is a success only if all applicable checks pass:
 
 1. the exact pinned target declaration is proven by the configured checker;
