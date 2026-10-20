@@ -398,6 +398,32 @@ mod tests {
     }
 
     #[test]
+    fn supported_nanoparticle_lane_requires_published_ranking_metrics() {
+        let registry = load_embedded_registry().expect("checked-in JSON should parse");
+        let lane = registry
+            .benchmark_lanes
+            .iter()
+            .find(|lane| lane.id == "supported-nanoparticle-search")
+            .expect("supported nanoparticle lane should exist");
+        assert!(
+            lane.metrics.iter().any(|metric| {
+                metric.contains("extrapolated RBO")
+                    && metric.contains("Kendall tau-b")
+                    && metric.contains("identical canonical candidate IDs")
+            }),
+            "nanoparticle lane must expose published-model ranking metrics"
+        );
+        assert!(
+            lane.gates.iter().any(|gate| {
+                gate.contains("RBO p=0.94")
+                    && gate.contains("Kendall tau-b")
+                    && gate.contains("same reference-DFT-refined candidate universe")
+            }),
+            "nanoparticle lane must preserve the paper's candidate-set comparison"
+        );
+    }
+
+    #[test]
     fn supported_cu_alumina_campaign_plan_pins_strata_without_faking_digests() {
         let plan: serde_json::Value = serde_json::from_str(include_str!(
             "../benchmarks/supported-cu-alumina-reference-campaign-v1.json"
