@@ -842,12 +842,7 @@ fn audit_temporal_dataset(
         let raw_file_path = required_text("file_path")?;
         let commit_before = required_text("commit_before")?.to_ascii_lowercase();
         let formal_statement = required_text("formal_statement")?;
-        if formal_statement.trim().is_empty() {
-            bail!(
-                "dataset row {} has an empty formal_statement",
-                dataset_position + 1
-            );
-        }
+        let formal_statement_is_empty = formal_statement.trim().is_empty();
         let statement_sha256 = format!("{:x}", Sha256::digest(formal_statement.as_bytes()));
         dataset_ids.insert(dataset_id.clone());
 
@@ -967,21 +962,25 @@ fn audit_temporal_dataset(
                             Some(normalized_completion_source.contains(&normalized_statement));
                     }
 
-                    statement_match_relation = match (
-                        statement_match_at_commit_before,
-                        statement_match_at_completion,
-                    ) {
-                        (Some(true), Some(true)) => "matches_before_and_completion",
-                        (Some(true), Some(false)) => "matches_pre_state_only",
-                        (Some(false), Some(true)) => "matches_completion_only",
-                        (Some(false), Some(false)) => "matches_neither_state",
-                        (None, Some(true)) => "completion_match_pre_state_unavailable",
-                        (Some(true), None) => "pre_state_match_completion_unavailable",
-                        (Some(false), None) => "pre_state_nonmatch_completion_unavailable",
-                        (None, Some(false)) => "completion_nonmatch_pre_state_unavailable",
-                        (None, None) => "statement_check_unavailable",
-                    }
-                    .to_string();
+                    statement_match_relation = if formal_statement_is_empty {
+                        "empty_formal_statement".to_string()
+                    } else {
+                        match (
+                            statement_match_at_commit_before,
+                            statement_match_at_completion,
+                        ) {
+                            (Some(true), Some(true)) => "matches_before_and_completion",
+                            (Some(true), Some(false)) => "matches_pre_state_only",
+                            (Some(false), Some(true)) => "matches_completion_only",
+                            (Some(false), Some(false)) => "matches_neither_state",
+                            (None, Some(true)) => "completion_match_pre_state_unavailable",
+                            (Some(true), None) => "pre_state_match_completion_unavailable",
+                            (Some(false), None) => "pre_state_nonmatch_completion_unavailable",
+                            (None, Some(false)) => "completion_nonmatch_pre_state_unavailable",
+                            (None, None) => "statement_check_unavailable",
+                        }
+                        .to_string()
+                    };
                 }
                 Some(candidates) => {
                     ambiguous_path_join_count += 1;
