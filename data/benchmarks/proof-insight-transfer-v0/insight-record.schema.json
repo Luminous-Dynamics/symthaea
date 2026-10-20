@@ -300,7 +300,8 @@
             "required": [
               "target_family_id",
               "rationale",
-              "status"
+              "status",
+              "directional_contract"
             ],
             "properties": {
               "target_family_id": {
@@ -389,7 +390,58 @@
                   }
                 }
               }
-            }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "status": {
+                      "const": "verified_transfer"
+                    }
+                  },
+                  "required": [
+                    "status"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "directional_contract": {
+                      "properties": {
+                        "compatibility": {
+                          "const": "compatible"
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "status": {
+                      "const": "rejected"
+                    }
+                  },
+                  "required": [
+                    "status"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "directional_contract": {
+                      "properties": {
+                        "compatibility": {
+                          "enum": [
+                            "incompatible",
+                            "partial"
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            ]
           }
         }
       }
