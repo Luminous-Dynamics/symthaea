@@ -196,10 +196,17 @@ pub enum ContractError {
 impl std::fmt::Display for ContractError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::UnsupportedSchemaVersion(v) => write!(f, "unsupported AtomFab schema version: {v}"),
+            Self::UnsupportedSchemaVersion(v) => {
+                write!(f, "unsupported AtomFab schema version: {v}")
+            }
             Self::EmptyField(field) => write!(f, "required AtomFab field is empty: {field}"),
-            Self::InvalidSha256(field) => write!(f, "field is not a lowercase SHA-256 digest: {field}"),
-            Self::InvalidTimestamp => write!(f, "created_at must be an RFC 3339 timestamp with a timezone"),
+            Self::InvalidSha256(field) => {
+                write!(f, "field is not a lowercase SHA-256 digest: {field}")
+            }
+            Self::InvalidTimestamp => write!(
+                f,
+                "created_at must be an RFC 3339 timestamp with a timezone"
+            ),
             Self::InvalidEstimate(field) => write!(f, "invalid quantity estimate: {field}"),
             Self::InvalidUncertainty(field) => write!(f, "invalid uncertainty: {field}"),
             Self::InvalidPayload(field) => write!(f, "invalid payload: {field}"),
@@ -256,7 +263,9 @@ impl ContractEnvelope {
                 require_non_empty(objective, "objective")?;
                 require_non_empty(material_family, "material_family")?;
                 if target_properties.is_empty() && hard_constraints.is_empty() {
-                    return Err(ContractError::InvalidPayload("intent has no targets or constraints"));
+                    return Err(ContractError::InvalidPayload(
+                        "intent has no targets or constraints",
+                    ));
                 }
                 for constraint in target_properties {
                     validate_constraint(constraint)?;
@@ -273,19 +282,26 @@ impl ContractEnvelope {
                 observables,
                 ..
             } => {
-                if !matches!(self.source_kind, SourceKind::Predicted | SourceKind::Simulated) {
+                if !matches!(
+                    self.source_kind,
+                    SourceKind::Predicted | SourceKind::Simulated
+                ) {
                     return Err(ContractError::InvalidSourceKind);
                 }
                 require_non_empty(structure_fingerprint, "structure_fingerprint")?;
                 require_non_empty(solver_id, "solver_id")?;
                 if composition.is_empty() || composition.values().any(|count| *count == 0) {
-                    return Err(ContractError::InvalidPayload("composition must contain positive element counts"));
+                    return Err(ContractError::InvalidPayload(
+                        "composition must contain positive element counts",
+                    ));
                 }
                 for element in composition.keys() {
                     require_non_empty(element, "composition.element")?;
                 }
                 if energy_per_atom.is_none() && observables.is_empty() {
-                    return Err(ContractError::InvalidPayload("evaluation has no energy or observables"));
+                    return Err(ContractError::InvalidPayload(
+                        "evaluation has no energy or observables",
+                    ));
                 }
                 if let Some(energy) = energy_per_atom {
                     validate_estimate(energy, "energy_per_atom")?;
@@ -305,10 +321,14 @@ impl ContractEnvelope {
                 }
                 require_non_empty(equipment_class, "equipment_class")?;
                 if actions.is_empty() {
-                    return Err(ContractError::InvalidPayload("process proposal has no actions"));
+                    return Err(ContractError::InvalidPayload(
+                        "process proposal has no actions",
+                    ));
                 }
                 if abort_guards.is_empty() {
-                    return Err(ContractError::InvalidPayload("process proposal has no abort guards"));
+                    return Err(ContractError::InvalidPayload(
+                        "process proposal has no abort guards",
+                    ));
                 }
                 for value in preconditions {
                     require_non_empty(value, "precondition")?;
@@ -339,16 +359,26 @@ impl ContractEnvelope {
                     validate_named_estimate(metric)?;
                 }
                 match status {
-                    TwinStatus::Feasible if !hard_constraints_satisfied || !violations.is_empty() => {
-                        return Err(ContractError::InvalidPayload("feasible twin result has failed hard constraints"));
+                    TwinStatus::Feasible
+                        if !hard_constraints_satisfied || !violations.is_empty() =>
+                    {
+                        return Err(ContractError::InvalidPayload(
+                            "feasible twin result has failed hard constraints",
+                        ));
                     }
-                    TwinStatus::Infeasible if *hard_constraints_satisfied || violations.is_empty() => {
-                        return Err(ContractError::InvalidPayload("infeasible twin result lacks a violation"));
+                    TwinStatus::Infeasible
+                        if *hard_constraints_satisfied || violations.is_empty() =>
+                    {
+                        return Err(ContractError::InvalidPayload(
+                            "infeasible twin result lacks a violation",
+                        ));
                     }
                     TwinStatus::Unknown | TwinStatus::OutOfDomain
                         if *hard_constraints_satisfied || self.limitations.is_empty() =>
                     {
-                        return Err(ContractError::InvalidPayload("unknown/out-of-domain twin result needs limitations and cannot satisfy hard constraints"));
+                        return Err(ContractError::InvalidPayload(
+                            "unknown/out-of-domain twin result needs limitations and cannot satisfy hard constraints",
+                        ));
                     }
                     _ => {}
                 }
@@ -378,9 +408,13 @@ impl ContractEnvelope {
                     validate_named_estimate(reading)?;
                 }
             }
-            AtomFabPayload::DecisionRecord { outcome, reasons, .. } => {
+            AtomFabPayload::DecisionRecord {
+                outcome, reasons, ..
+            } => {
                 if reasons.is_empty() {
-                    return Err(ContractError::InvalidPayload("decision must state at least one reason"));
+                    return Err(ContractError::InvalidPayload(
+                        "decision must state at least one reason",
+                    ));
                 }
                 for reason in reasons {
                     require_non_empty(reason, "decision.reason")?;
@@ -388,7 +422,9 @@ impl ContractEnvelope {
                 if *outcome == DecisionOutcome::Accept
                     && (self.parent_digest.is_none() || self.evidence_refs.is_empty())
                 {
-                    return Err(ContractError::InvalidPayload("accept decision requires a parent digest and evidence references"));
+                    return Err(ContractError::InvalidPayload(
+                        "accept decision requires a parent digest and evidence references",
+                    ));
                 }
             }
         }
@@ -418,7 +454,10 @@ fn looks_like_rfc3339(value: &str) -> bool {
     chrono::DateTime::parse_from_rfc3339(value).is_ok()
 }
 
-fn validate_estimate(estimate: &QuantityEstimate, field: &'static str) -> Result<(), ContractError> {
+fn validate_estimate(
+    estimate: &QuantityEstimate,
+    field: &'static str,
+) -> Result<(), ContractError> {
     if !estimate.value.is_finite() || estimate.unit.trim().is_empty() {
         return Err(ContractError::InvalidEstimate(field));
     }
@@ -448,10 +487,14 @@ fn validate_constraint(value: &PropertyConstraint) -> Result<(), ContractError> 
         (ConstraintOperator::EqualWithin, Some(tolerance))
             if tolerance.is_finite() && tolerance >= 0.0 => {}
         (ConstraintOperator::EqualWithin, _) => {
-            return Err(ContractError::InvalidPayload("EqualWithin constraint needs a finite non-negative tolerance"));
+            return Err(ContractError::InvalidPayload(
+                "EqualWithin constraint needs a finite non-negative tolerance",
+            ));
         }
         (_, Some(tolerance)) if !tolerance.is_finite() || tolerance < 0.0 => {
-            return Err(ContractError::InvalidPayload("constraint tolerance must be finite and non-negative"));
+            return Err(ContractError::InvalidPayload(
+                "constraint tolerance must be finite and non-negative",
+            ));
         }
         _ => {}
     }
@@ -512,7 +555,9 @@ mod tests {
             "../fixtures/contract-v1-process-proposal.json"
         ))
         .expect("shared contract fixture should deserialize");
-        envelope.validate().expect("shared contract fixture should validate");
+        envelope
+            .validate()
+            .expect("shared contract fixture should validate");
     }
 
     #[test]
@@ -523,7 +568,9 @@ mod tests {
         .expect("negative fixture is structurally valid JSON and Rust data");
         assert_eq!(
             envelope.validate(),
-            Err(ContractError::InvalidPayload("process proposal has no abort guards"))
+            Err(ContractError::InvalidPayload(
+                "process proposal has no abort guards"
+            ))
         );
     }
 
@@ -534,7 +581,9 @@ mod tests {
         let json = serde_json::to_string(&envelope).expect("serialization should succeed");
         let decoded: ContractEnvelope =
             serde_json::from_str(&json).expect("known record type should deserialize");
-        decoded.validate().expect("round-tripped contract should pass");
+        decoded
+            .validate()
+            .expect("round-tripped contract should pass");
         assert_eq!(decoded, envelope);
     }
 
@@ -576,7 +625,9 @@ mod tests {
         }
         assert_eq!(
             envelope.validate(),
-            Err(ContractError::InvalidPayload("process proposal has no abort guards"))
+            Err(ContractError::InvalidPayload(
+                "process proposal has no abort guards"
+            ))
         );
     }
 
@@ -608,8 +659,13 @@ mod tests {
         );
         assert_eq!(envelope.validate(), Err(ContractError::InvalidSourceKind));
         envelope.source_kind = SourceKind::Measured;
-        envelope.validate().expect("measured record with calibration should pass");
-        if let AtomFabPayload::MeasurementRecord { calibration_digest, .. } = &mut envelope.payload {
+        envelope
+            .validate()
+            .expect("measured record with calibration should pass");
+        if let AtomFabPayload::MeasurementRecord {
+            calibration_digest, ..
+        } = &mut envelope.payload
+        {
             *calibration_digest = "missing-calibration".to_owned();
         }
         assert_eq!(
@@ -622,7 +678,11 @@ mod tests {
     fn rejects_non_finite_values_and_uncertainty_unit_mismatch() {
         let mut envelope = valid_process_proposal();
         if let AtomFabPayload::ProcessProposal { actions, .. } = &mut envelope.payload {
-            actions[0].parameters.get_mut("travel_m").expect("parameter").value = f64::NAN;
+            actions[0]
+                .parameters
+                .get_mut("travel_m")
+                .expect("parameter")
+                .value = f64::NAN;
         }
         assert_eq!(
             envelope.validate(),
@@ -631,14 +691,17 @@ mod tests {
 
         let mut envelope = valid_process_proposal();
         if let AtomFabPayload::ProcessProposal { actions, .. } = &mut envelope.payload {
-            actions[0].parameters.get_mut("travel_m").expect("parameter").uncertainty =
-                Some(Uncertainty {
-                    standard_uncertainty: 0.001,
-                    unit: "mm".to_owned(),
-                    method: "repeatability".to_owned(),
-                    calibrated: true,
-                    valid_domain: "fixture domain".to_owned(),
-                });
+            actions[0]
+                .parameters
+                .get_mut("travel_m")
+                .expect("parameter")
+                .uncertainty = Some(Uncertainty {
+                standard_uncertainty: 0.001,
+                unit: "mm".to_owned(),
+                method: "repeatability".to_owned(),
+                calibrated: true,
+                valid_domain: "fixture domain".to_owned(),
+            });
         }
         assert_eq!(
             envelope.validate(),
@@ -668,7 +731,9 @@ mod tests {
             sha256: "e".repeat(64),
             role: "accepted_reference".to_owned(),
         });
-        envelope.validate().expect("traceable accepted decision should pass");
+        envelope
+            .validate()
+            .expect("traceable accepted decision should pass");
     }
 
     #[test]
@@ -700,6 +765,9 @@ mod tests {
             *hard_constraints_satisfied = false;
             violations.push("travel_limit".to_owned());
         }
-        envelope.validate().expect("explicitly infeasible twin result should pass");
+        envelope
+            .validate()
+            .expect("explicitly infeasible twin result should pass");
     }
 }
+
