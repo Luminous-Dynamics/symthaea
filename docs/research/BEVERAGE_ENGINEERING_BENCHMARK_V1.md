@@ -30,6 +30,25 @@ Initial tasks:
 
 Out of scope: automatic actuator control; alcohol-consumption recommendations; proof of food safety, legal compliance, origin authenticity or shelf life; claims that a chemical score equals human preference; and field-scale benefits inferred from synthetic fixtures.
 
+## Initial public-data triage
+
+The first source inventory is intentionally conservative; it distinguishes a source that exists from a source that is licensed, downloaded, parsed, or fit for a particular scientific claim.
+
+| Candidate | Good initial use | Limitation / gate |
+|---|---|---|
+| Schreurs et al. beer flavor data, Zenodo record 10653704 | Chemistry-to-panel sensory and published-model replication candidate; associated article reports chemical features and trained-panel descriptors for 250 beers | Audit the exact record/file license and checksum before ingestion. RateBeer review scores are explicitly restricted in the paper and are excluded unless separate permission is obtained. The reported random, style-stratified split supports a like-for-like replication only; it does not establish brewery/site transfer. |
+| UCI Wine Quality, dataset 186, DOI 10.24432/C56S3T | Simple chemistry-to-quality baseline over 4,898 red/white Vinho Verde samples; the repository states CC BY 4.0 | No brand, grape, vineyard, vintage, or process-time metadata. It cannot support vintage holdout, process control or terroir causality. Group leakage risk is unresolved because the required lot IDs are absent. |
+| BIER 2025 Water, Energy, and Emissions Benchmarking | Facility-type-aware industry reference for normalized brewery, distillery, winery and bottling resource metrics | The public summary describes over 1,600 facilities over 2020/2022/2024 reporting years. It is an industry benchmarking reference, not assumed to be a freely reusable row-level training dataset. |
+| Standardized alcoholic-fermentation sensor time series | Highest-priority data-gap audit: sensor, batch, timestamp, process events and laboratory targets | A 2026 review identifies a shortage of public standardized sensor datasets and weak industrial validation. This initial search does not prove that no suitable dataset exists; record all searched sources and stop conditions. |
+
+Recommended first experiment:
+1. Replicate a published chemistry-to-trained-panel beer task from the Zenodo-associated data after checking file-level rights, columns, missingness and stable sample IDs. Exclude restricted consumer-review data by default.
+2. Run the UCI wine chemistry task only as a separate baseline family with its own split manifest and explicit claim ceiling.
+3. Treat the two datasets as different tasks; do not pool their scores into one leaderboard.
+4. Prioritize a process-time-series partner dataset for the first true forecasting / intervention-value experiment. Public finished-product chemistry datasets cannot stand in for fermentation trajectories.
+
+Sources: https://zenodo.org/records/10653704 ; https://archive.ics.uci.edu/dataset/186/wine%2Bquality ; https://www.bieroundtable.com/2025-water-energy-and-emissions-benchmarking-summary-bier ; https://doi.org/10.1007/s13197-025-06528-0
+
 ## 3. Evidence types and target separation
 
 Every value must declare an evidence class:
