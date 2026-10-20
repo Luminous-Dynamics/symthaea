@@ -831,15 +831,14 @@ fn validate_arm_set(
                 format!("target {} arm {} {label} digest", target.target_id, arm.arm)
             })?;
         }
-        if let Some(previous) =
-            arm_config_digests.insert(arm.arm.clone(), arm.config_sha256.clone())
-        {
-            if previous != arm.config_sha256 {
+        match arm_config_digests.insert(arm.arm.clone(), arm.config_sha256.clone()) {
+            Some(previous) if previous != arm.config_sha256 => {
                 bail!(
                     "arm {} changed configuration across held-out targets",
                     arm.arm
                 );
             }
+            _ => {}
         }
         if arm.model_calls_used > config.budget.max_model_calls
             || arm.tokens_used > config.budget.max_tokens
