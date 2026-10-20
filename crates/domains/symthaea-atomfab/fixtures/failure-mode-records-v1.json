@@ -18,7 +18,8 @@
       "disposition": "pass",
       "failure_mode": null,
       "severity": null,
-      "evidence_digest": "1111111111111111111111111111111111111111111111111111111111111111"
+      "evidence_digest": "1111111111111111111111111111111111111111111111111111111111111111",
+      "evaluation_stratum": "cu27_gamma_alumina_100_fixture"
     },
     {
       "record_id": "record-nonfinite-force-002",
@@ -35,7 +36,8 @@
       "disposition": "failed",
       "failure_mode": "non_finite_force",
       "severity": "critical",
-      "evidence_digest": "2222222222222222222222222222222222222222222222222222222222222222"
+      "evidence_digest": "2222222222222222222222222222222222222222222222222222222222222222",
+      "evaluation_stratum": "cu27_gamma_alumina_100_fixture"
     },
     {
       "record_id": "record-ordering-003",
@@ -52,7 +54,8 @@
       "disposition": "failed",
       "failure_mode": "energy_ordering_violation",
       "severity": "degraded",
-      "evidence_digest": "3333333333333333333333333333333333333333333333333333333333333333"
+      "evidence_digest": "3333333333333333333333333333333333333333333333333333333333333333",
+      "evaluation_stratum": "cu27_gamma_alumina_100_fixture"
     },
     {
       "record_id": "record-ood-abstention-004",
@@ -69,7 +72,8 @@
       "disposition": "abstained",
       "failure_mode": "out_of_domain",
       "severity": "informational",
-      "evidence_digest": "4444444444444444444444444444444444444444444444444444444444444444"
+      "evidence_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+      "evaluation_stratum": "cu27_gamma_alumina_100_fixture"
     }
   ]
 }
