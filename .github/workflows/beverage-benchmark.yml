@@ -4,6 +4,8 @@ on:
   push:
     branches: [main]
     paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
       - "crates/domains/symthaea-culinary/**"
       - "docs/research/BEVERAGE_ENGINEERING_BENCHMARK_V1.md"
       - "docs/research/beverage-engineering-scenarios-v1.json"
@@ -45,6 +47,9 @@ jobs:
 
       - name: Test receipt contract
         run: cargo test -p symthaea-culinary --bin beverage_benchmark_receipt
+
+      - name: Clippy focused runner
+        run: cargo clippy -p symthaea-culinary --bin beverage_benchmark_receipt -- -D warnings
 
       - name: Emit exact-head receipt
         env:
