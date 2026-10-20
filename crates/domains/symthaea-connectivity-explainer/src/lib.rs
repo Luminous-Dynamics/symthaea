@@ -293,13 +293,12 @@ pub fn explain_report(report: &Value) -> Result<Explanation, String> {
         if let (Some(b), Some(c)) = (
             optional_u64(baseline, "completed_task_jain_fairness_ppm"),
             optional_u64(candidate, "completed_task_jain_fairness_ppm"),
-        ) {
-            if c < b {
-                findings.push(format!(
-                    "Completed-task fairness falls in {label} (Jain index {b} to {c} parts per million). Inspect per-peer outcomes.",
-                    label = mode_label(mode)
-                ));
-            }
+        ) && c < b
+        {
+            findings.push(format!(
+                "Completed-task fairness falls in {label} (Jain index {b} to {c} parts per million). Inspect per-peer outcomes.",
+                label = mode_label(mode)
+            ));
         }
         let by_priority = match parse_priority_rows(row)? {
             Some(rows) => {
