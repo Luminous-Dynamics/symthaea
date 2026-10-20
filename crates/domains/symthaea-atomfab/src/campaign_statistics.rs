@@ -360,7 +360,6 @@ impl PairedAccelerationSummary {
     }
 }
 
-
 /// Paired target-attainment statistics that retain failed/non-reaching runs.
 ///
 /// Unlike cost-to-target AF, this estimator accepts completed, failed, or
@@ -501,12 +500,14 @@ pub fn summarize_target_reachability(
         if !seen_seeds.insert(baseline.seed) {
             return Err(PairedAccelerationError::DuplicateSeed);
         }
-        if !seen_runs.insert(baseline.run_id.clone())
-            || !seen_runs.insert(candidate.run_id.clone())
-        {
+        if !seen_runs.insert(baseline.run_id.clone()) || !seen_runs.insert(candidate.run_id.clone()) {
             return Err(PairedAccelerationError::MismatchedCohort);
         }
-        paired_outcomes.push((baseline.seed, baseline.target_reached, candidate.target_reached));
+        paired_outcomes.push((
+            baseline.seed,
+            baseline.target_reached,
+            candidate.target_reached,
+        ));
     }
 
     paired_outcomes.sort_by_key(|(seed, _, _)| *seed);
@@ -795,8 +796,7 @@ mod tests {
             summarize(&references(&baseline, &candidate), 20, 0.95, 2_000, 3).unwrap_err(),
             PairedAccelerationError::InvalidCampaign(CampaignError::MismatchedPolicies)
         );
-    }
-
+    } 
 
     #[test]
     fn target_reachability_retains_failed_runs_and_reports_paired_discordance() {
@@ -828,7 +828,10 @@ mod tests {
         .unwrap();
         assert_eq!(schema["properties"]["schema_version"]["const"], 1);
         assert_eq!(schema["properties"]["predeclared_seeds"]["minItems"], 20);
-        assert_eq!(schema["properties"]["bootstrap_resamples"]["minimum"], 1_000);
+        assert_eq!(
+            schema["properties"]["bootstrap_resamples"]["minimum"],
+            1_000
+        );
         let encoded = serde_json::to_string(&summary).unwrap();
         let decoded: PairedTargetReachabilitySummary = serde_json::from_str(&encoded).unwrap();
         decoded.validate().unwrap();
@@ -864,12 +867,11 @@ mod tests {
             candidate[index].failure_reasons = vec!["budget_exhausted".to_owned()];
         }
         let pairs = references(&baseline, &candidate);
-        let first = summarize_target_reachability(&pairs, &seed_manifest(20), 0.95, 3_000, 7)
-            .unwrap();
+        let first =
+            summarize_target_reachability(&pairs, &seed_manifest(20), 0.95, 3_000, 7).unwrap();
         let reversed = pairs.iter().rev().copied().collect::<Vec<_>>();
         let second =
-            summarize_target_reachability(&reversed, &seed_manifest(20), 0.95, 3_000, 7)
-                .unwrap();
+            summarize_target_reachability(&reversed, &seed_manifest(20), 0.95, 3_000, 7).unwrap();
         assert_eq!(first, second);
     }
 
