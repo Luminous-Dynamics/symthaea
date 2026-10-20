@@ -16,7 +16,7 @@
 //! UNSAT proof. This binary closes that gap: for each of the committed
 //! invariants, it hand-builds the SMT-LIB2 obligation ∃x: dE/dt ≠ 0,
 //! feeds it to Z3, captures the `unsat` certificate, and writes the query
-//! to `papers/ramanujan/proofs/*.smt2` so an independent verifier with any
+//! to `papers/physics-math/ramanujan/proofs/*.smt2` so an independent
 //! SMT-LIB2-compliant solver can re-check.
 //!
 //! ## Run
@@ -27,9 +27,9 @@
 //! ```
 //!
 //! Emits CSV to stdout and writes witness files to
-//! `papers/ramanujan/proofs/` (overridable via `SYMTHAEA_Z3_DUMP_DIR`).
+//! `papers/physics-math/ramanujan/proofs/` (overridable via `SYMTHAEA_Z3_DUMP_DIR`).
 //!
-//! This binary is run by `papers/ramanujan/reproduce.sh --verify-proofs`
+//! This binary is run by `papers/physics-math/ramanujan/reproduce.sh --verify-proofs`
 //! as the independent-witness step.
 
 use std::env;
@@ -59,6 +59,17 @@ fn sym_to_smt(expr: &SymExpr) -> Option<String> {
             } else {
                 Some(format!("{}", c))
             }
+        }
+        SymExpr::Rational(numerator, denominator) => {
+            if *denominator == 0 {
+                return None;
+            }
+            let numerator_smt = if *numerator < 0 {
+                format!("(- {})", numerator.unsigned_abs())
+            } else {
+                numerator.to_string()
+            };
+            Some(format!("(/ {} {})", numerator_smt, denominator))
         }
         SymExpr::Add(a, b) => Some(format!("(+ {} {})", sym_to_smt(a)?, sym_to_smt(b)?)),
         SymExpr::Mul(a, b) => Some(format!("(* {} {})", sym_to_smt(a)?, sym_to_smt(b)?)),
@@ -93,7 +104,7 @@ fn variables_in(expr: &SymExpr, out: &mut Vec<String>) {
                 out.push(n.clone());
             }
         }
-        SymExpr::Const(_) => {}
+        SymExpr::Const(_) | SymExpr::Rational(_, _) => {}
         SymExpr::Add(a, b) | SymExpr::Mul(a, b) => {
             variables_in(a, out);
             variables_in(b, out);
@@ -127,6 +138,9 @@ fn v(name: &str) -> SymExpr {
 }
 fn c(x: f64) -> SymExpr {
     SymExpr::Const(x)
+}
+fn rat(numerator: i64, denominator: u64) -> SymExpr {
+    SymExpr::Rational(numerator, denominator)
 }
 fn add(a: SymExpr, b: SymExpr) -> SymExpr {
     SymExpr::Add(Box::new(a), Box::new(b))
@@ -184,6 +198,33 @@ fn problems() -> Vec<Problem> {
                 add(
                     mul(c(6.0), mul(pow(v("x"), 2.0), v("y"))),
                     neg(mul(c(2.0), pow(v("y"), 3.0))),
+                ),
+            ),
+            dynamics: vec![
+                ("x", v("px")),
+                ("y", v("py")),
+                ("px", neg(add(v("x"), mul(c(2.0), mul(v("x"), v("y")))))),
+                (
+                    "py",
+                    neg(add(v("y"), add(pow(v("x"), 2.0), neg(pow(v("y"), 2.0))))),
+                ),
+            ],
+            formally_verifiable: true,
+        },
+        Problem {
+            // The original, unscaled Hénon-Heiles Hamiltonian. Exact rational
+            // literals keep 1/2 and 1/3 as mathematical rationals in SMT-LIB2;
+            // the companion *_6H problem remains as a rescaling regression.
+            name: "henon_heiles_exact_H",
+            description: "H = 1/2(px² + py²) + 1/2(x² + y²) + x²y - y³/3 (exact rational literals)",
+            energy: add(
+                add(
+                    mul(rat(1, 2), add(pow(v("px"), 2.0), pow(v("py"), 2.0))),
+                    mul(rat(1, 2), add(pow(v("x"), 2.0), pow(v("y"), 2.0))),
+                ),
+                add(
+                    mul(pow(v("x"), 2.0), v("y")),
+                    neg(mul(rat(1, 3), pow(v("y"), 3.0))),
                 ),
             ),
             dynamics: vec![
@@ -376,7 +417,7 @@ fn run_z3(smt: &str) -> Result<String, String> {
 fn dump_dir() -> PathBuf {
     env::var("SYMTHAEA_Z3_DUMP_DIR")
         .map(PathBuf::from)
-        .unwrap_or_else(|_| PathBuf::from("papers/ramanujan/proofs"))
+        .unwrap_or_else(|_| PathBuf::from("papers/physics-math/ramanujan/proofs"))
 }
 
 fn main() -> ExitCode {
@@ -461,5 +502,31 @@ fn main() -> ExitCode {
         ExitCode::from(1)
     } else {
         ExitCode::SUCCESS
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{build_obligation, problems, rat, sym_to_smt};
+    use symthaea_core::hdc::conjecture_engine::SymExpr;
+
+    #[test]
+    fn rational_literals_serialize_as_exact_smt_rationals() {
+        assert_eq!(sym_to_smt(&rat(1, 3)).as_deref(), Some("(/ 1 3)"));
+        assert_eq!(sym_to_smt(&rat(1, 2)).as_deref(), Some("(/ 1 2)"));
+        assert_eq!(sym_to_smt(&rat(-1, 3)).as_deref(), Some("(/ (- 1) 3)"));
+        assert_eq!(sym_to_smt(&SymExpr::Rational(1, 0)), None);
+    }
+
+    #[test]
+    fn exact_henon_heiles_obligation_preserves_original_rational_coefficients() {
+        let problem = problems()
+            .into_iter()
+            .find(|problem| problem.name == "henon_heiles_exact_H")
+            .expect("exact Hénon-Heiles fixture");
+        let smt = build_obligation(&problem).expect("supported polynomial obligation");
+        assert!(smt.contains("(/ 1 2)"));
+        assert!(smt.contains("(/ 1 3)"));
+        assert!(!smt.contains("0.3333333333333333"));
     }
 }
