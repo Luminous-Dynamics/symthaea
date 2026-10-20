@@ -1,0 +1,119 @@
+name: AtomFab PCB Route Corpus
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-fabrication-kernel/Cargo.toml"
+      - "crates/domains/symthaea-fabrication-kernel/src/atomfab_pcb_route.rs"
+      - "crates/domains/symthaea-fabrication-kernel/examples/atomfab_pcb_route_corpus.rs"
+      - "docs/research/ATOMFAB_PCB_PRODUCTIVE_CLOSURE.md"
+      - "docs/research/fixtures/ATOMFAB_PCB_ROUTE_CORPUS_V0_3.json"
+      - ".github/workflows/atomfab-pcb-route.yml"
+  push:
+    branches: [main]
+    paths:
+      - "crates/domains/symthaea-fabrication-kernel/Cargo.toml"
+      - "crates/domains/symthaea-fabrication-kernel/src/atomfab_pcb_route.rs"
+      - "crates/domains/symthaea-fabrication-kernel/examples/atomfab_pcb_route_corpus.rs"
+      - "docs/research/ATOMFAB_PCB_PRODUCTIVE_CLOSURE.md"
+      - "docs/research/fixtures/ATOMFAB_PCB_ROUTE_CORPUS_V0_3.json"
+      - ".github/workflows/atomfab-pcb-route.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: atomfab-pcb-route-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+jobs:
+  route-corpus:
+    name: Route oracle, adversarial tests, receipt
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Validate frozen v0.3 corpus schema and cardinality
+        run: |
+          jq empty docs/research/fixtures/ATOMFAB_PCB_ROUTE_CORPUS_V0_3.json
+          jq -e '
+            .schema == "atomfab-pcb-route-corpus-v0.3"
+            and .version == "0.3.0"
+            and .case_count == 16
+            and (.cases | length) == 16
+            and ([.cases[].id] | unique | length) == 16
+            and .authority == "synthetic_route_and_evidence_gate_only_no_fabrication_or_execution_authority"
+            and .evidence_boundary.all_case_inputs_are_synthetic
+            and .evidence_boundary.route_feasibility_does_not_mean_physical_part_conforms
+            and .evidence_boundary.evidence_completeness_does_not_mean_physical_qualification
+            and .evidence_boundary.route_or_evidence_result_does_not_authorize_execution
+            and .evidence_boundary.synthetic_evidence_cannot_establish_physical_qualification
+            and ([.cases[].expected.route.disposition] | group_by(.) | map({key: .[0], value: length}) | from_entries) ==
+                {"feasible": 12, "infeasible": 3, "unresolved": 1}
+            and ([.cases[].expected.evidence.disposition] | group_by(.) | map({key: .[0], value: length}) | from_entries) ==
+                {"complete": 6, "incomplete": 8, "rejected": 2}
+            and ([.cases[] | select(.id == "PCB-ROUTE-016")][0].expected.evidence.reason_codes) ==
+                ["PHYSICAL_QUALIFICATION_OUT_OF_SCOPE"]
+          ' docs/research/fixtures/ATOMFAB_PCB_ROUTE_CORPUS_V0_3.json
+
+      - name: Format check for fabrication kernel package
+        run: cargo fmt --manifest-path crates/domains/symthaea-fabrication-kernel/Cargo.toml -- --check
+
+      - name: Unit tests for independent route/evidence oracle
+        run: cargo test -p symthaea-fabrication-kernel --lib atomfab_pcb_route
+
+      - name: Produce exact-head-bound receipt
+        run: |
+          export ATOMFAB_GIT_HEAD="$(git rev-parse HEAD)"
+          cargo run --quiet -p symthaea-fabrication-kernel --example atomfab_pcb_route_corpus > atomfab-pcb-route-receipt.json
+          jq -e --arg head "$(git rev-parse HEAD)" '
+            .schema == "atomfab-pcb-route-receipt-v0.3"
+            and .corpus_schema == "atomfab-pcb-route-corpus-v0.3"
+            and .corpus_version == "0.3.0"
+            and .corpus_sha256 | test("^[0-9a-f]{64}$")
+          ' atomfab-pcb-route-receipt.json
+          jq -e --arg head "$(git rev-parse HEAD)" '
+            .git_head == $head
+            and .exact_head_bound
+            and .case_count == 16
+            and .matched_route_cases == 16
+            and .matched_evidence_cases == 16
+            and .status == "passed"
+            and .authority == "synthetic_route_and_evidence_gate_only_no_fabrication_or_execution_authority"
+          ' atomfab-pcb-route-receipt.json
+
+      - name: Verify deterministic receipt and refuse an incorrect head
+        run: |
+          export ATOMFAB_GIT_HEAD="$(git rev-parse HEAD)"
+          cargo run --quiet -p symthaea-fabrication-kernel --example atomfab_pcb_route_corpus > receipt-repeat.json
+          cmp atomfab-pcb-route-receipt.json receipt-repeat.json
+
+          export ATOMFAB_GIT_HEAD="$(printf '0%.0s' $(seq 1 40))"
+          if cargo run --quiet -p symthaea-fabrication-kernel --example atomfab_pcb_route_corpus >/dev/null 2>&1; then
+            echo "mismatched Git HEAD unexpectedly produced a receipt"
+            exit 1
+          fi
+
+      - name: Hash source, corpus, and receipt
+        run: |
+          sha256sum \
+            crates/domains/symthaea-fabrication-kernel/src/atomfab_pcb_route.rs \
+            crates/domains/symthaea-fabrication-kernel/examples/atomfab_pcb_route_corpus.rs \
+            docs/research/fixtures/ATOMFAB_PCB_ROUTE_CORPUS_V0_3.json \
+            atomfab-pcb-route-receipt.json > atomfab-pcb-route-receipt.sha256
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: atomfab-pcb-route-corpus-receipt
+          path: |
+            atomfab-pcb-route-receipt.json
+            atomfab-pcb-route-receipt.sha256
+          if-no-files-found: error
