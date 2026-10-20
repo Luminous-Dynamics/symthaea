@@ -707,6 +707,22 @@ fn accompaniment_sentence(pattern: crate::accompaniment::Accompaniment) -> Optio
             "The accompaniment's syncopated chords chain together with zero gaps — floating, \
              legato harmony instead of punctuated stabs."
         }
+        A::Sarabande => {
+            "The accompaniment marks a measured triple dance, with the defining accent on \
+             beat two rather than the waltz's first-beat emphasis."
+        }
+        A::Minuet => {
+            "The accompaniment marks three measured beats: a firm first beat and lighter \
+             answers on beats two and three."
+        }
+        A::MazurkaGait => {
+            "The accompaniment uses a short-short-long-long 3/4 cell, with its secondary \
+             accent shifting between beats two and three across bars."
+        }
+        A::ToccataMotion => {
+            "The accompaniment keeps continuous sixteenth-note chord-tone motion, anchored \
+             by stronger quarter-note pulse points."
+        }
         A::MarchPulse => {
             "The accompaniment keeps a square four-beat march pulse, with firm attacks on \
              beats one and three and lighter answers on beats two and four."
