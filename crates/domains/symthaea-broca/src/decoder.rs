@@ -389,17 +389,17 @@ mod tests {
     }
 
     #[test]
-    fn missing_serialized_epistemic_status_defaults_to_unknown() {
+    fn missing_serialized_translation_status_defaults_to_unknown() {
         let value = serde_json::json!({
-            "decoder": "structured",
-            "intent": "answer",
-            "roles": [],
-            "intensity": 0.0,
+            "translator": "legacy",
+            "source_decoder": "structured",
+            "grounding_surface": "",
+            "text": "legacy output",
             "confidence": 0.0,
-            "surface": ""
+            "evidence_level": "deterministic"
         });
-        let readout: StructuredReadout = serde_json::from_value(value).unwrap();
-        assert_eq!(readout.epistemic_status, EpistemicDisposition::Unknown);
+        let translation: StructuredTranslation = serde_json::from_value(value).unwrap();
+        assert_eq!(translation.epistemic_status, EpistemicDisposition::Unknown);
     }
 
     #[test]
