@@ -120,7 +120,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("seed,template,perturbation,homing,permeability,final_error,mean_error,recovery_day,wall_ms");
     for record in &records {
         println!(
-            "{},{},{},{},{:.2},{:.6},{:.6},{},{}",
+            "{},{},\"{}\",{},{:.2},{:.6},{:.6},{},{}",
             record.seed,
             record.template_family,
             record.perturbation,
@@ -144,7 +144,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         let mean = values.iter().sum::<f64>() / n;
         let variance = values.iter().map(|value| (value - mean).powi(2)).sum::<f64>() / n;
         println!(
-            "{},{},{},{:.2},{},{:.6},{:.6}",
+            "{},\"{}\",{},{:.2},{},{:.6},{:.6}",
             family, perturbation, homing, permeability_milli as f64 / 1000.0,
             values.len(), mean, variance.sqrt()
         );
