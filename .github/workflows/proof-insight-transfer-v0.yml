@@ -83,12 +83,49 @@ jobs:
           set -euo pipefail
           cd "$(dirname "$PITB_MANIFEST")"
           cargo fmt -- --check
-      - name: Run indexer unit tests
+      - name: Run isolated indexer tests and freeze the derived lock
         shell: bash
         run: |
           set -euo pipefail
           cd "$(dirname "$PITB_MANIFEST")"
-          cargo test --locked
+          # The workspace lock contains every member of the large workspace.
+          # Staging this single package necessarily prunes unrelated workspace
+          # package entries. Let Cargo perform that pruning once in RUNNER_TEMP,
+          # then ensure every resolved registry package/version/source already
+          # existed in the repository's reviewed Cargo.lock.
+          cargo test
+          python - <<'PY'
+          import os
+          import tomllib
+          from pathlib import Path
+
+          staged = tomllib.loads(Path("Cargo.lock").read_text())
+          workspace_path = Path(os.environ["GITHUB_WORKSPACE"]) / "Cargo.lock"
+          workspace = tomllib.loads(workspace_path.read_text())
+
+          def registry_packages(lock):
+              return {
+                  (entry["name"], entry["version"], entry.get("source"))
+                  for entry in lock["package"]
+                  if entry.get("source", "").startswith("registry+")
+              }
+
+          staged_packages = registry_packages(staged)
+          workspace_packages = registry_packages(workspace)
+          unexpected = sorted(staged_packages - workspace_packages)
+          if unexpected:
+              raise SystemExit(
+                  "isolated validation resolved registry packages absent from the reviewed workspace lock: "
+                  + repr(unexpected)
+              )
+          if not staged_packages:
+              raise SystemExit("isolated validation lock unexpectedly contains no registry packages")
+          print(
+              "PITB_ISOLATED_LOCK_PASS: "
+              f"{len(staged_packages)} registry package versions are present in the reviewed workspace lock"
+          )
+          PY
+          # Later test/lint/index steps use --locked against this exact temp lock.
       - name: Validate checked-in transfer candidates
         shell: bash
         run: |
@@ -361,6 +398,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: proof-insight-transfer-v0-${{ github.event.pull_request.head.sha || github.sha }}
-          path: ${{ runner.temp }}/proof-insight-source-index-*.json
+          path: |
+            ${{ runner.temp }}/proof-insight-source-index-*.json
+            ${{ runner.temp }}/proof-insight-isolated/Cargo.lock
           if-no-files-found: error
           retention-days: 30
