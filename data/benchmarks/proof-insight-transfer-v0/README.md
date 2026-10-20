@@ -5,6 +5,7 @@ This directory defines a proposed benchmark format. **It currently contains no d
 ## Files
 
 - `insight-record.schema.json` — JSON Schema Draft 2020-12 for one provenance-linked insight record, including semantic-validation evidence and a constructive-solving track for unknown witnesses, proof obligations, and answer equivalence (RPE or formal/expert checking).
+- `temporal-replay-manifest.schema.json` — JSON Schema Draft 2020-12 for the evaluator-side chronological repository replay manifest; it is a format/guardrail, not a generated Dalek dataset or a measured result.
 - `splits.json` — frozen 372-family pre-screen assignment, pinned to OpenAI math commit `1581d4cbdd69a0faf34b2089614fe2a814316a6a`, with source fingerprints and a partition digest.
 - `evaluation-protocol.md` — pre-registered baseline arms, primary endpoint, equal-budget rules, statistics, leakage controls, mutation gates, run-manifest contract, and go/no-go decisions.
 - [`../../docs/research/proof-insight-transfer-sota-gap-analysis-2026-10-20.md`](../../../docs/research/proof-insight-transfer-sota-gap-analysis-2026-10-20.md) — 2026 comparison with LeanSearch v2, T², TheoremBench, VeriSoftBench and First Proof; proposes benchmark targets and the next experiments without claiming results.
@@ -14,8 +15,10 @@ This directory defines a proposed benchmark format. **It currently contains no d
 - `candidates/156-borsuk-nine-finite-obstruction.json` — training-family strategy annotation plus a curator-rejected transfer to family 157, with machine-readable compatibility codes; not a scored record.
 - `candidates/157-hadwiger-invariant-chain.json` — unreviewed strategy annotation for separating witness construction from an invariant-comparison bridge; not a scored record.
 - `candidates/025-short-egyptian-greedy-residue.json` — unreviewed training-family strategy annotation for exact ceiling–residue decomposition, a strictly decreasing numerator, and a separate proof of denominator ordering; no transfer attempt or score is claimed.
+- [`../../docs/research/proof-insight-transfer-temporal-challenge.md`](../../../docs/research/proof-insight-transfer-temporal-challenge.md) — separately reported chronological repository-replay design and the manifest-validation command; no temporal task set has been generated or scored.
 - `pilot-report-2026-10-20.md` — pilot source audit, direct-transfer rejection, provenance notes, and next acceptance gates.
 - `crates/bridges/symthaea-proof-insights/src/bin/validate_transfer_contract.rs` — fail-closed consistency checker for typed source/target obligations, inequality direction, domain/object-type compatibility, and target-side proof receipts; its rules do not establish mathematical truth.
+- `crates/bridges/symthaea-proof-insights/src/main.rs` — `--verify-temporal-manifest` validates time-indexed artifact visibility, hidden-proof exclusion, pinned Git ancestry, full source-file digests, and exact source line-span digests. Its synthetic unit tests are not external benchmark results.
 - Future `manifest.json` — indexed source artifacts and inclusion/exclusion/unknown accounting produced by the Rust indexer.
 - Future `records.jsonl` — one schema-conformant JSON object per line, only after source evidence has been inspected and rights reviewed.
 - The indexer emits its own `family_split_plan` and each family's `split`; compare them to `splits.json` with `--verify-splits` before creating any benchmark examples.
