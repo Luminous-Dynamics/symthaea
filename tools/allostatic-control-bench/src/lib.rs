@@ -201,6 +201,9 @@ pub struct EpisodeMetrics {
     pub cumulative_exposure: f64,
     pub mean_load: f64,
     pub peak_load: f64,
+    pub minimum_reserve: f64,
+    pub terminal_reserve: f64,
+    pub terminal_load: f64,
     pub unsafe_ticks: usize,
     pub missed_limits: usize,
     pub false_alarms: usize,
@@ -214,6 +217,7 @@ pub struct EpisodeMetrics {
 
 pub fn run_episode(policy: Policy, scenario: Scenario, seed: u64) -> EpisodeMetrics {
     let mut reserve: f64 = 0.85;
+    let mut minimum_reserve: f64 = reserve;
     let mut allostatic_load: f64 = 0.0;
     let mut task_reward = 0.0;
     let mut cumulative_load = 0.0;
@@ -285,6 +289,7 @@ pub fn run_episode(policy: Policy, scenario: Scenario, seed: u64) -> EpisodeMetr
         }
 
         reserve = reserve.clamp(0.0, 1.0);
+        minimum_reserve = minimum_reserve.min(reserve);
         allostatic_load = allostatic_load.clamp(0.0, 1.0);
         cumulative_load += allostatic_load;
         peak_load = peak_load.max(allostatic_load);
@@ -312,6 +317,9 @@ pub fn run_episode(policy: Policy, scenario: Scenario, seed: u64) -> EpisodeMetr
         cumulative_exposure: cumulative_load,
         mean_load: cumulative_load / HORIZON as f64,
         peak_load,
+        minimum_reserve,
+        terminal_reserve: reserve,
+        terminal_load: allostatic_load,
         unsafe_ticks,
         missed_limits,
         false_alarms,
@@ -387,6 +395,9 @@ mod tests {
                     assert!(result.cumulative_exposure.is_finite());
                     assert!((0.0..=1.0).contains(&result.mean_load));
                     assert!((0.0..=1.0).contains(&result.peak_load));
+                    assert!((0.0..=1.0).contains(&result.minimum_reserve));
+                    assert!((0.0..=1.0).contains(&result.terminal_reserve));
+                    assert!((0.0..=1.0).contains(&result.terminal_load));
                     assert!(result.unsafe_ticks <= HORIZON);
                     assert!(result.push_steps + result.maintain_steps == HORIZON);
                 }
