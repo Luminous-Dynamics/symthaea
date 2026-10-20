@@ -73,7 +73,7 @@ The analyzer rejects duplicate eligible statement digests instead of silently tr
 
 ## Report and decision rule
 
-The JSON report records hashes of the run config and raw JSONL, input protocol/split/selection-receipt digests, upstream commit, denominator accounting, per-arm raw checker and semantic-gate success rates, total/mean use and cost-per-verified-solve, the selected primary comparison, and the explicit external-replication status `not_evaluated`.
+The JSON report records hashes of the run config and raw JSONL, input protocol/split/selection-receipt digests, upstream commit, denominator accounting, per-arm raw checker and semantic-gate success rates, total/mean use and cost-per-verified-solve, **per-family aggregates** (eligible target count, treatment and baseline successes, signed paired-delta sum, and family effect), the selected primary comparison, and the explicit external-replication status `not_evaluated`. The per-family aggregates make the point estimate and target-weighted family-cluster bootstrap reproducible without exposing or collapsing the family grouping.
 
 The primary effect is the signed percentage-point difference:
 
@@ -83,7 +83,7 @@ semantic-gate success rate (F: typed insight)
 semantic-gate success rate (validation-selected baseline in A-E)
 ```
 
-The 95% percentile interval uses 10,000 deterministic paired bootstrap replicates, resampling **families** with replacement and retaining all target pairs within each sampled family. The preregistered utility gate passes only when the point estimate is at least +10 percentage points, the lower confidence bound is above zero, and at least two family clusters are present. A missing gate is never fixed by post-hoc baseline substitution or a relaxed interval.
+The 95% percentile interval uses exactly 10,000 deterministic paired bootstrap replicates, resampling **families** with replacement and retaining each sampled family's aggregate paired-delta sum and target count. The implementation uses SplitMix64 seeded from the frozen run config and linearly interpolated 2.5th/97.5th percentiles. The preregistered utility gate passes only when the point estimate is at least +10 percentage points, the lower confidence bound is above zero, and at least two family clusters are present. A missing gate is never fixed by post-hoc baseline substitution or a relaxed interval.
 
 A passing result supports only a within-benchmark utility claim on the supplied eligible targets. It does not establish external validity, absence of pretraining contamination, or superiority over the entire field. A separate exposure-resistant external challenge set and independent replication remain required.
 
