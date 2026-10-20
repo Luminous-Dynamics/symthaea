@@ -934,11 +934,7 @@ fn audit_temporal_dataset(
                         if before_is_completion_ancestor {
                             commit_before_ancestor_of_completion_count += 1;
                             if !formal_statement_is_empty
-                                && git_path_exists_at_commit(
-                                    &root,
-                                    &commit_before,
-                                    &raw_file_path,
-                                )?
+                                && git_path_exists_at_commit(&root, &commit_before, &raw_file_path)?
                             {
                                 let before_source =
                                     git_show_file(&root, &commit_before, &raw_file_path)?;
