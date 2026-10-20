@@ -657,12 +657,19 @@ jobs:
           expected_commit = "9fdbfd066420aebcf61a70b06eba57a108c41340"
           if audit["repository_commit"] != expected_commit:
               raise SystemExit("Dalek timeline audit references an unexpected repository commit")
-          if audit["total_timeline_rows"] != 249 or len(audit["events"]) != 249:
-              raise SystemExit("pinned Dalek timeline no longer contains the preregistered 249 rows")
-          if [event["position"] for event in audit["events"]] != list(range(249)):
+          if audit["total_timeline_rows"] != 248 or len(audit["events"]) != 248:
+              raise SystemExit("pinned Dalek proof_timeline.csv must contain exactly 248 data rows at this commit")
+          if [event["position"] for event in audit["events"]] != list(range(248)):
               raise SystemExit("timeline positions are not contiguous and in source order")
-          if len({event["event_key"] for event in audit["events"]}) != 249:
+          if len({event["event_key"] for event in audit["events"]}) != 248:
               raise SystemExit("timeline audit event keys are not unique")
+          # The pinned README claims 249 entries, but the actual tracked CSV has
+          # 248 data rows (ids through tl_0247). Preserve and report this mismatch;
+          # do not silently pretend the README and CSV agree.
+          if audit["readme_claimed_timeline_row_count"] != 249:
+              raise SystemExit("pinned Dalek README timeline count claim unexpectedly changed")
+          if audit["timeline_row_count_matches_readme_claim"] is not False:
+              raise SystemExit("expected README/CSV row-count discrepancy was not captured in the audit")
           if not all(event["completion_commit_ancestor_verified"] is True for event in audit["events"]):
               raise SystemExit("one or more timeline completion commits are not ancestry-verified")
           source_counts = (
@@ -670,16 +677,19 @@ jobs:
               + audit["source_path_missing_at_completion_count"]
               + audit["source_path_not_recorded_count"]
           )
-          if source_counts != 249:
-              raise SystemExit("timeline source-path accounting does not cover all 249 rows")
-          if sum(audit["verification_status_counts"].values()) != 249:
-              raise SystemExit("timeline verification-status accounting does not cover all 249 rows")
+          if source_counts != 248:
+              raise SystemExit("timeline source-path accounting does not cover all 248 rows")
+          if sum(audit["verification_status_counts"].values()) != 248:
+              raise SystemExit("timeline verification-status accounting does not cover all 248 rows")
           timeline_bytes = (dalek / audit["timeline_path"]).read_bytes()
           if hashlib.sha256(timeline_bytes).hexdigest() != audit["timeline_sha256"]:
               raise SystemExit("timeline digest differs from the exact pinned checkout bytes")
           print(
               "PITB_DALEK_TIMELINE_AUDIT_PASS: "
-              f"rows=249 completion_commits={audit['unique_completion_commit_count']} "
+              f"rows={audit['total_timeline_rows']} "
+              f"readme_claim={audit['readme_claimed_timeline_row_count']} "
+              f"readme_matches={audit['timeline_row_count_matches_readme_claim']} "
+              f"completion_commits={audit['unique_completion_commit_count']} "
               f"source_present={audit['source_path_present_at_completion_count']} "
               f"source_missing={audit['source_path_missing_at_completion_count']} "
               f"source_not_recorded={audit['source_path_not_recorded_count']} "
