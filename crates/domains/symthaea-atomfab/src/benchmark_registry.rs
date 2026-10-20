@@ -535,6 +535,34 @@ mod tests {
             "c8dd76e3828125d3984e95bef0cd50603cee2bef7933f1fec178866dd973ba59"
         );
         assert_eq!(policy_extension["same_seed_across_policies"], true);
+        let policy_ids = policy_extension["policies"]
+            .as_array()
+            .expect("policy comparison must enumerate its planned arms");
+        assert_eq!(policy_ids.len(), 8);
+        for required in [
+            "random",
+            "diversity_only",
+            "uncertainty_only",
+            "cost_aware",
+            "symthaea_full",
+            "symthaea_without_history",
+            "ensemble_disagreement",
+            "counterexample_guided",
+        ] {
+            assert!(
+                policy_ids.iter().any(|value| value.as_str() == Some(required)),
+                "reference campaign is missing policy arm {required}"
+            );
+        }
+        let campaign_schema: serde_json::Value = serde_json::from_str(include_str!(
+            "../schemas/supported-cu-alumina-reference-campaign-v1.schema.json"
+        ))
+        .expect("supported-Cu campaign schema should parse");
+        assert_eq!(
+            campaign_schema["properties"]["policy_comparison"]["properties"]["policies"]
+                ["minItems"],
+            8
+        );
         assert_eq!(
             policy_extension["stretch_gate"]["status"],
             "proposed_not_achieved"
