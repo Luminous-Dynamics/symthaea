@@ -353,7 +353,7 @@ fn assess_proposal(
         issues.push(ProposalIssue::MissingOrZeroCost);
     }
 
-    let deferred_cost_contract_valid = match (
+    let mut deferred_cost_contract_valid = match (
         proposal.requires_deferred_validation,
         proposal.deferred_validation_cost_units,
     ) {
@@ -385,6 +385,13 @@ fn assess_proposal(
         (Some(immediate), true) => Some(immediate),
         _ => None,
     };
+    if proposal.requires_deferred_validation
+        && proposal.cost_units.is_some()
+        && proposal.deferred_validation_cost_units.is_some()
+        && estimated_end_to_end_cost_units.is_none()
+    {
+        deferred_cost_contract_valid = false;
+    }
 
     if let Some(requirement_id) = &proposal.requirement_id {
         if let Some(requirement) = requirements.get(requirement_id.as_str()) {
@@ -471,11 +478,7 @@ fn assess_proposal(
                 | ProposalIssue::RequirementMismatch { .. }
         )
     });
-    let budget_cost = if is_mandatory {
-        proposal.cost_units
-    } else {
-        estimated_end_to_end_cost_units
-    };
+    let budget_cost = estimated_end_to_end_cost_units;
     if let Some(cost) = budget_cost {
         if cost > budget_remaining_units {
             issues.push(ProposalIssue::BudgetExceeded {
@@ -506,14 +509,14 @@ fn assess_proposal(
         }
     } else if over_budget {
         ProposalDisposition::BlockedBudget
+    } else if !deferred_cost_contract_valid {
+        ProposalDisposition::BlockedDeferredValidationCost
     } else if is_mandatory
         && eligible_class == Some(ProposalDisposition::EligibleForMandatoryRequirement)
     {
         ProposalDisposition::EligibleForMandatoryRequirement
     } else if eligible_class == Some(ProposalDisposition::EligibleForOptionalRanking) {
-        if !deferred_cost_contract_valid {
-            ProposalDisposition::BlockedDeferredValidationCost
-        } else if !utility_is_structurally_valid {
+        if !utility_is_structurally_valid {
             if issues.iter().any(|issue| matches!(issue, ProposalIssue::NonPositiveDecisionValue { .. })) {
                 ProposalDisposition::BlockedNonPositiveDecisionValue
             } else {
@@ -1187,6 +1190,45 @@ mod tests {
         let report = prioritize_next_experiment(&profile, &audit, &proposals, &value_contract(), 10);
         assert_eq!(report.disposition, ExperimentPriorityDisposition::NoBeneficialOptionalProposal);
         assert!(report.assessments.iter().all(|item| item.disposition == ProposalDisposition::BlockedDuplicateProposalId));
+    }
+
+    #[test]
+    fn deferred_confirmation_cost_changes_optional_experiment_ranking() {
+        let (profile, audit) = audit(false);
+        let mut cheap_screen = optional("cheap-screen", Some(2), Some(100));
+        cheap_screen.requires_deferred_validation = true;
+        cheap_screen.deferred_validation_cost_units = Some(98);
+        let higher_fidelity = physical("higher-fidelity", Some(10), Some(20));
+        let report = prioritize_next_experiment(
+            &profile,
+            &audit,
+            &[cheap_screen, higher_fidelity],
+            &value_contract(),
+            200,
+        );
+        assert_eq!(report.disposition, ExperimentPriorityDisposition::SelectedOptionalExperiment);
+        assert_eq!(report.selected_proposal_id.as_deref(), Some("higher-fidelity"));
+        assert_eq!(report.selected_cost_units, Some(10));
+        assert_eq!(report.selected_end_to_end_cost_units, Some(10));
+    }
+
+    #[test]
+    fn unknown_deferred_validation_cost_blocks_optional_ranking() {
+        let (profile, audit) = audit(false);
+        let mut proposal = optional("screen-with-unknown-confirmation", Some(1), Some(1_000_000));
+        proposal.requires_deferred_validation = true;
+        proposal.deferred_validation_cost_units = None;
+        let report = prioritize_next_experiment(
+            &profile,
+            &audit,
+            &[proposal],
+            &value_contract(),
+            100,
+        );
+        assert_eq!(report.disposition, ExperimentPriorityDisposition::NoBeneficialOptionalProposal);
+        assert!(report.assessments.iter().any(|assessment| {
+            assessment.disposition == ProposalDisposition::BlockedDeferredValidationCost
+        }));
     }
 
     #[test]
