@@ -981,10 +981,7 @@ fn verify_temporal_target_bundle(bundle_path: &Path) -> Result<()> {
     validate_git_sha(&payload.repository_commit).context("invalid bundle repository commit")?;
     validate_git_sha(&payload.target_state_commit).context("invalid target-state commit")?;
     validate_sha256_hex(&payload.statement_sha256).context("invalid target statement digest")?;
-    if payload.target_id.trim().is_empty()
-        || payload.theorem_id.trim().is_empty()
-        || payload.position == usize::MAX
-    {
+    if payload.target_id.trim().is_empty() || payload.theorem_id.trim().is_empty() {
         bail!("temporal target bundle contains invalid target metadata");
     }
     if payload.visible_artifacts.is_empty() {
@@ -2378,6 +2375,21 @@ mod tests {
             serde_json::to_vec_pretty(&manifest).expect("serialize temporal manifest"),
         )
         .expect("write temporal manifest fixture");
+
+        let tampered_source_manifest_path = base.join("tampered-source-manifest.json");
+        let mut tampered_source_manifest = manifest.clone();
+        tampered_source_manifest["artifacts"][0]["source_file_sha256"] =
+            serde_json::Value::String("0".repeat(64));
+        fs::write(
+            &tampered_source_manifest_path,
+            serde_json::to_vec_pretty(&tampered_source_manifest)
+                .expect("serialize source-digest mutant"),
+        )
+        .expect("write source-digest mutant");
+        let source_digest_error =
+            verify_temporal_manifest_file(&root, &tampered_source_manifest_path)
+                .expect_err("source-file mutation must be rejected against historical Git bytes");
+        assert!(format!("{source_digest_error:#}").contains("source-file digest mismatch"));
 
         verify_temporal_manifest_file(&root, &manifest_path)
             .expect("pinned chronological history and exact artifact bytes should verify");
