@@ -23,7 +23,7 @@ A profile declares:
 - station ID, arm, and aggregate station-load cap;
 - mass-dependent forward/aft CG envelope slices.
 
-A scenario declares matching aircraft/configuration identity and a list of uniquely identified items, each with kind, station, positive mass, and (for cargo, occupants, and ballast) a securement-evidence locator. Inputs are SI units. Calculations reject non-finite values and overflow. Unknown station IDs and profile revisions fail the audit rather than being guessed.
+A scenario declares matching aircraft/configuration identity and a list of uniquely identified items, each with kind, station, positive mass, and (for cargo, occupants, and ballast) a securement-evidence locator. Inputs are SI units. Calculations reject non-finite values, overflow and detectable floating-point precision loss; the independent integration oracle covers 900 bounded integer mass/arm combinations and an exact inclusive-boundary case. Unknown station IDs and profile revisions fail the audit rather than being guessed.
 
 A CG band's mass interval is inclusive. If no band matches, or more than one band matches, the CG test is **not assessable**; the engine must not pick a convenient band. Numeric exceedances take precedence in the disposition even if other evidence is missing, so a known hard failure is never hidden by an unknown.
 
@@ -56,7 +56,7 @@ This supports a shared **mission contract** across aircraft, road/rail/ship link
 ### v0.1 numerical correctness
 1. **Zero false-safe outcomes** across boundary-oriented fixtures and a separately implemented oracle.
 2. 100% agreement on mass, moment, CG, station caps, and disposition for exhaustive bounded test grids.
-3. 100% fail-closed behavior for mismatched revisions, unsupported loading phases, unknown stations, malformed source digests, invalid/non-finite mass, overflow, uncovered envelope bands, and ambiguous bands.
+3. 100% fail-closed behavior for mismatched revisions, unsupported loading phases, unknown stations, malformed source digests, invalid/non-finite mass, overflow, detectable floating-point precision loss, uncovered envelope bands, and ambiguous bands.
 4. Deterministic report equality when item order changes.
 5. Explicit units and provenance in every report; zero use of generic/default aircraft limits.
 
