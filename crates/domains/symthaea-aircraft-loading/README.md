@@ -4,7 +4,7 @@ A dependency-free Rust research prototype for deterministic mass, moment, statio
 
 ## Scope
 
-This is the first building block for a broader **loading-master** workflow: it audits one declared loading state against one exact aircraft configuration revision. It is deliberately not an aircraft dispatch, load-release, or flight-safety system.
+This is the first building block for a broader **loading-master** workflow: it audits one declared loading state against one exact aircraft configuration revision. Version 0.1 accepts only an explicit Takeoff phase; Ramp, Taxi, and Landing states are rejected until phase-specific limits/calculations exist. It is deliberately not an aircraft dispatch, load-release, or flight-safety system.
 
 - Inputs use SI-style aviation units: kilograms, metres, and kilogram-metres.
 - It rejects profile/configuration mismatches, malformed SHA-256 syntax, duplicate IDs, unknown stations, non-finite values, and arithmetic overflow.
