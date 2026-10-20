@@ -11,7 +11,7 @@
 
 Treat loading as a **configuration-bound, evidence-carrying engineering problem**, not a spreadsheet with a single total-weight cell. The load plan must be evaluated against the exact aircraft variant, serial/configuration revision, approved weight-and-balance source, station definitions, and relevant operational phase. A number without provenance is not a safe number; a geometrically feasible placement without securement evidence is not a safe load; a passing local leg does not prove that the multimodal mission can be completed.
 
-The initial Rust crate `symthaea-aircraft-loading` audits a single declared mass state: empty mass/moment + item masses at declared stations, station caps, maximum take-off mass, and one uniquely applicable declared CG envelope band. It returns `BlockedByDeclaredLimit`, `NotAssessable`, or `WithinDeclaredEnvelopeForHumanReview`. The final state is explicitly **human-review-only**, never a load release.
+The initial Rust crate `symthaea-aircraft-loading` audits a single declared mass state: empty mass/moment + item masses at declared stations, station caps, maximum take-off mass, and one uniquely applicable declared CG envelope band. It accepts only `LoadingPhase::Takeoff`; Ramp, Taxi, and Landing states are rejected until phase-specific profiles and calculations exist. It returns `BlockedByDeclaredLimit`, `NotAssessable`, or `WithinDeclaredEnvelopeForHumanReview`. The final state is explicitly **human-review-only**, never a load release.
 
 ## 2. Initial audit contract
 
@@ -56,7 +56,7 @@ This supports a shared **mission contract** across aircraft, road/rail/ship link
 ### v0.1 numerical correctness
 1. **Zero false-safe outcomes** across boundary-oriented fixtures and a separately implemented oracle.
 2. 100% agreement on mass, moment, CG, station caps, and disposition for exhaustive bounded test grids.
-3. 100% fail-closed behavior for mismatched revisions, unknown stations, malformed source digests, invalid/non-finite mass, overflow, uncovered envelope bands, and ambiguous bands.
+3. 100% fail-closed behavior for mismatched revisions, unsupported loading phases, unknown stations, malformed source digests, invalid/non-finite mass, overflow, uncovered envelope bands, and ambiguous bands.
 4. Deterministic report equality when item order changes.
 5. Explicit units and provenance in every report; zero use of generic/default aircraft limits.
 
