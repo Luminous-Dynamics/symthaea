@@ -853,6 +853,45 @@ mod tests {
     }
 
     #[test]
+    fn no_action_is_oracle_when_all_realized_actions_increase_loss() {
+        let proposals = vec![
+            proposal("static", EvidenceActionKind::StaticScreen, 10, 2),
+            proposal("dft", EvidenceActionKind::DftReference, 80, 40),
+        ];
+        let route = route_evidence_actions(&proposals).unwrap();
+        let outcomes = vec![
+            outcome(
+                "static",
+                EvidenceOutcomeSource::Reference,
+                EvidenceOutcomeStatus::Completed,
+                -2,
+                2,
+                '1',
+            ),
+            outcome(
+                "dft",
+                EvidenceOutcomeSource::Reference,
+                EvidenceOutcomeStatus::Completed,
+                -1,
+                40,
+                '2',
+            ),
+        ];
+        let summary = score_evidence_route(&route, &outcomes).unwrap();
+        assert_eq!(summary.selected_action_id.as_deref(), Some("static"));
+        assert_eq!(
+            summary.selected_efficiency,
+            Some(EvidenceEfficiencyRatio {
+                benefit_units: -2,
+                cost_units: 2
+            })
+        );
+        assert_eq!(summary.oracle_action_id, None);
+        assert_eq!(summary.oracle_efficiency, None);
+        summary.validate(&route).unwrap();
+    }
+
+    #[test]
     fn retrospective_scoring_fails_closed_on_missing_or_mixed_outcomes() {
         let proposals = vec![
             proposal("static", EvidenceActionKind::StaticScreen, 10, 2),
