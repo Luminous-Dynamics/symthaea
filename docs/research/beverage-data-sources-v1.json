@@ -115,6 +115,131 @@
         "target_measurement_and_method",
         "rights_and_attribution"
       ]
+    },
+    {
+      "id": "WINE-TEMPERATURE-DRYAD-2026",
+      "title": "Fermentation temperature as a strategy to limit Hanseniaspora uvarum proliferation during spontaneous wine fermentation",
+      "uri": "https://datadryad.org/dataset/doi:10.5061/dryad.cfxpnvxp3",
+      "doi": "https://doi.org/10.5061/dryad.cfxpnvxp3",
+      "publisher": "Dryad; Onetto, McCarthy and Schmidt",
+      "publication_date": "2026-08-22",
+      "collection_period": "2024-01-01 to 2025-12-01",
+      "location": "Adelaide, South Australia, Australia",
+      "license": "CC0 as stated in Dryad README",
+      "domain": [
+        "wine",
+        "fermentation_time_series",
+        "yeast_ecology",
+        "temperature_response",
+        "microbial_community"
+      ],
+      "dataset_tables": [
+        {
+          "file": "Onetto2026_Figure1_raw_data_final.txt",
+          "rows": 175,
+          "variables": 8,
+          "described_target": "Growth of Hanseniaspora uvarum and Saccharomyces cerevisiae, alone and co-inoculated, in chemically defined grape juice; long-form fields include time, treatment temperature, inoculation, analyte, units, replicate and value."
+        },
+        {
+          "file": "Onetto2026_Figure2_raw_data_final.txt",
+          "rows": 121,
+          "variables": 7,
+          "described_target": "Microbial dynamics of spontaneous Chardonnay must fermentation at 17, 23 and 25 °C."
+        },
+        {
+          "file": "Onetto2026_FigureS1_raw_data_final.txt",
+          "rows": 334,
+          "variables": 6,
+          "described_target": "Freeze-thaw effects on spontaneous Chardonnay fermentation and yeast population; fields include treatment, time_hours, analyte, units, replicate and value."
+        }
+      ],
+      "rights_status": "CC0_STATED_BY_SOURCE_RECORD; VERIFY_DOWNLOAD_AND_PRESERVE_ATTRIBUTION",
+      "use_gate": "Download exact files and README; record file SHA-256, delimiters/headers, NA and ND semantics, units, treatment/replicate structure, analyte families, and whether replicates are biological or technical. Group splits at the fermentation/treatment unit; never treat each time row as independent.",
+      "claims_not_supported": [
+        "generalization across wineries or vintages",
+        "industrial sensor prediction",
+        "consumer sensory preference",
+        "universal temperature optimum",
+        "automatic process control"
+      ],
+      "caveats": [
+        "The web preview exposed file names and metadata but returned 403 for direct file streams; exact source bytes and hashes have not been captured in this pass.",
+        "175, 121 and 334 are the raw table row counts, not counts of independent fermentation batches."
+      ]
+    },
+    {
+      "id": "WINE-KINETICS-FRONTIERS-2026",
+      "title": "Evaluation of wine fermentation dynamics through kinetic analysis",
+      "uri": "https://www.frontiersin.org/journals/sustainable-food-systems/articles/10.3389/fsufs.2026.1821488/full",
+      "doi": "https://doi.org/10.3389/fsufs.2026.1821488",
+      "publisher": "Frontiers in Sustainable Food Systems",
+      "publication_date": "2026-05-19",
+      "license": "Article states Creative Commons Attribution (CC BY); inspect supplementary files/terms individually",
+      "domain": [
+        "wine",
+        "fermentation_kinetics",
+        "brix_time_series",
+        "ethanol_time_series",
+        "kinetic_model_reproduction"
+      ],
+      "stated_scope": "Published Brix and ethanol time courses over 0–168 h across selected yeast-inoculum, 20/25/30 °C, initial-sugar and yeast-pre-propagation conditions; paper reports triplicate experiments and propagated uncertainty.",
+      "rights_status": "OPEN_ACCESS_ARTICLE_CC_BY_STATED; SUPPLEMENTARY_FILES_AND_EXTRACTED_DATA_TO_BE_REVIEWED",
+      "use_gate": "Acquire article and supplementary material, preserve table definitions and uncertainty, reconstruct reported kinetic quantities, and compare simple and nonlinear baselines. Do not count triplicates or timepoints as independent external batches.",
+      "claims_not_supported": [
+        "industrial brewery/winery transfer",
+        "site/vintage transfer",
+        "flavor or sensory preference",
+        "universal temperature optimum",
+        "safety certification"
+      ]
+    },
+    {
+      "id": "LAGER-TRANSCRIPTOME-GSE79",
+      "title": "Lager beer fermentation time course transcriptome",
+      "uri": "https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE79",
+      "discovery_mirror": "https://www.omicsdi.org/dataset/geo/GSE79",
+      "stated_scope": "Archived production-scale lager fermentation yeast transcriptome measured at 12 time points.",
+      "domain": [
+        "beer",
+        "yeast_transcriptomics",
+        "biological_state_time_series"
+      ],
+      "rights_status": "PUBLIC_ARCHIVE_CANDIDATE; VERIFY GEO RECORD AND TERMS",
+      "use_gate": "Pin official GEO sample/platform records and raw/processed file hashes. Treat transcript counts/expressions as biological-state observations; do not conflate with inline temperature, gravity, ethanol, quality or sensory targets.",
+      "claims_not_supported": [
+        "direct finished-beer quality prediction without target linkage",
+        "industrial controller evaluation",
+        "generalization from one time course to multiple breweries"
+      ]
+    },
+    {
+      "id": "SYNTHETIC-BEER-FAULTS-ZENODO-2026",
+      "title": "Synthetic Beer Fermentation Dataset Generation and Hybrid MSPC-ML Case Study in R",
+      "uri": "https://zenodo.org/records/21917783",
+      "publisher": "Zenodo record; Francesch-Domenech, Fernandez-Calviño, Naya-Fernández and Tarrío",
+      "domain": [
+        "beer",
+        "synthetic_fermentation",
+        "fault_injection",
+        "anomaly_detection"
+      ],
+      "evidence_class": "SYNTHETIC",
+      "stated_scope": "Research code and synthetic beer-fermentation data generation, fault injection, PCA-based multivariate statistical process control, XGBoost classification and SHAP interpretation.",
+      "rights_status": "CHECK_EXACT_RECORD_LICENSE_BEFORE_REDISTRIBUTION",
+      "use_gate": "Use for evaluator smoke tests and synthetic anomaly-detector comparisons only after record/license audit; keep synthetic provenance encoded in every output.",
+      "claims_not_supported": [
+        "real-world fault prevalence",
+        "real plant anomaly detection performance",
+        "biological model validity",
+        "resource savings"
+      ]
     }
+  ],
+  "research_notes": [
+    "Public process-related time-course data exist in research repositories; the gap is not absolute absence but fragmented formats, limited numbers of independent fermentation units, heterogeneous targets, and few standardized industrial sensor streams with aligned batch IDs and quality outcomes.",
+    "Primary intake candidate: Dryad 2026 CC0 wine-temperature/yeast-ecology files, after raw-byte and replicate-structure audit.",
+    "Separate curve-reproduction candidate: 2026 Frontiers wine-kinetics article and supplement; table/uncertainty reproduction is not external validation.",
+    "Transcriptome time courses are biological evidence, not direct process-sensor or final-quality targets.",
+    "Synthetic fermentation data are for pipeline and fault-injection tests only."
   ]
 }
