@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "registry_id": "atomfab-benchmark-matrix-v1",
-  "reviewed_on": "2026-10-19",
+  "reviewed_on": "2026-10-20",
   "status": "planned_not_executed",
   "purpose": "Compare AtomFab's decision and evidence layer with current specialist models, public scientific benchmarks, conventional acquisition policies, and process-twin baselines.",
   "claim_policy": {
@@ -140,6 +140,43 @@
         "separate equilibrium and far-from-equilibrium reports",
         "count failed and duplicated searches",
         "validate energetic rankings against the declared reference method"
+      ]
+    },
+    {
+      "id": "supported-nanoparticle-search",
+      "status": "planned_after_reference-lane",
+      "goal": "Separate energy-prediction accuracy from structural exploration quality for supported nanoparticle searches, measuring whether a potential-guided search finds diverse, physically valid low-energy structures rather than merely assigning accurate energies to a limited set of structures.",
+      "reference": {
+        "name": "2026 supported-nanoparticle uMLIP structural-exploration benchmark / UniAlCu",
+        "doi": "10.1038/s41524-026-02043-8",
+        "url": "https://doi.org/10.1038/s41524-026-02043-8",
+        "scope": "Supported nanoparticle systems; exact compositions, support surfaces, configurations, data license and reference method must be pinned before execution."
+      },
+      "baselines": [
+        "Published reference protocol and DFT-relaxed structures for the chosen systems.",
+        "A strong pinned universal interatomic potential compatible with the selected elements and interfaces.",
+        "A simple randomized or local-search baseline with the same starting candidates, DFT budget and stopping rule.",
+        "The same potential and search algorithm with Symthaea candidate selection disabled.",
+        "Ablation where ranking uses predicted energy only, without structural-diversity or uncertainty criteria."
+      ],
+      "metrics": [
+        "energy error on matched structures",
+        "reference energetic-ordering accuracy on matched structures",
+        "reference low-energy structure recovery rate",
+        "unique low-energy minima found at equal reference-calculation budget",
+        "structural diversity and duplicate-minimum rate under a pinned deduplication tolerance",
+        "fraction of candidates satisfying geometry and interface validity constraints",
+        "energy error conditional on structure recovery",
+        "search cost per unique validated low-energy structure",
+        "best validated objective and learning curve at equal cost"
+      ],
+      "gates": [
+        "report energy accuracy and structural exploration as separate score families",
+        "pin particle composition, support surface, slab construction, relaxation settings and structural deduplication method before testing",
+        "group related configurations by parent nanoparticle/support system when defining held-out splits",
+        "count failed relaxations, duplicate minima, and invalid interfaces rather than silently excluding them",
+        "compare search policies at equal reference-calculation budgets and include a strong pretrained potential",
+        "do not generalize from the chosen supported-nanoparticle family to universal catalyst performance"
       ]
     },
     {
