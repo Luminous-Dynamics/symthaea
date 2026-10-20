@@ -57,12 +57,13 @@ Use models to propose and rank hypotheses, detect anomalies, or explore candidat
 
 The new stdlib-only Rust crate, symthaea-industrial-optimization, provides two explicitly limited portfolio strategies:
 
-1. greedy_expected_per_dollar: an interpretable expected-value-per-capex baseline.
+1. greedy_expected_per_dollar: an interpretable expected-value-per-capex baseline. This baseline does not have the exact solver's 20-candidate cap.
 2. optimize_robust_portfolio: exhaustive search for small frozen cases, maximizing the sum of lower scenario estimates under the same budget.
+3. pareto_frontier: exhaustive cost-versus-conservative-abatement frontier. It includes the zero-cost baseline and returns nondominated cost/floor points; expected/ceiling estimates remain visible as annotations, with a narrow scenario span used only to choose a representative when multiple portfolios have identical cost and floor. This is a two-objective frontier, not a full lifecycle Pareto frontier.
 
 Both reject malformed scenario ordering and require positive capex (so the ratio baseline remains defined), exclude candidates marked ineligible for planning, enforce one intervention per declared source group, and use deterministic output ordering. Embedded example values are invented mechanics fixtures, not field data or industry averages.
 
-The exact solver is intentionally capped at 20 candidate interventions (at most 1,048,576 subsets). It does not infer emissions, establish that an intervention is safe, or model interactions between different source groups.
+The exact and frontier solvers are intentionally capped at 20 candidate interventions (at most 1,048,576 subsets). The greedy baseline accepts more candidates but remains only a simple ratio heuristic. None of these functions infer emissions, establish that an intervention is safe, or model interactions between different source groups.
 
 ## Benchmark design and targets
 
@@ -82,17 +83,19 @@ The 10% target above is a proposed engineering hurdle, not a measured result, ma
 ## Adversarial cases that the benchmark must include
 
 1. Two candidate actions claim the same metered emissions source; the optimizer must not add their abatement.
-2. A candidate has high expected abatement but an inadequate or unsubstantiated lower scenario; show how the decision changes without treating the floor as statistical confidence.
-3. A candidate is unqualified or explicitly ineligible; it must never be selected.
-4. Cost or abatement arithmetic overflows; return an error or reject the combination rather than wrap.
-5. Missing or non-finite real measurements, stale timestamps, unit mismatches, and gaps in source coverage; mark unresolved instead of converting them to zero.
-6. More than 20 candidates; use a future scalable solver or explicit refusal, not unbounded exhaustive enumeration.
-7. The same proposed repair changes production, energy, and emissions simultaneously; prevent duplicated benefits across separate objective ledgers.
-8. A treatment option shifts contaminants into concentrate or waste; total material disposition remains visible.
-9. One power, water, measurement, or gas-handling dependency creates a common-mode failure across multiple assets.
-10. A scenario appears better only under one cost/price assumption; report sensitivity and break-even regions.
-11. A model recommendation violates a permit, process envelope, or hard safety constraint; it remains infeasible even if economics are attractive.
-12. A site-level methane estimate conflicts with source-level estimates; trigger reconciliation and uncertainty accounting rather than choosing whichever estimate is convenient.
+2. Two different interventions occupy the same cost/floor point but have different scenario widths; representative selection must be deterministic and favor the narrower range.
+3. A low-cost/low-abatement point, a mid-cost/higher-abatement point, and a higher-cost point with no floor improvement; ensure dominated points are omitted.
+4. A candidate has high expected abatement but an inadequate or unsubstantiated lower scenario; show how the decision changes without treating the floor as statistical confidence.
+5. A candidate is unqualified or explicitly ineligible; it must never be selected.
+6. Cost or abatement arithmetic overflows; return an error or reject the combination rather than wrap.
+7. Missing or non-finite real measurements, stale timestamps, unit mismatches, and gaps in source coverage; mark unresolved instead of converting them to zero.
+8. More than 20 candidates; exact search must refuse explicitly, while the greedy baseline remains available.
+9. The same proposed repair changes production, energy, and emissions simultaneously; prevent duplicated benefits across separate objective ledgers.
+10. A treatment option shifts contaminants into concentrate or waste; total material disposition remains visible.
+11. One power, water, measurement, or gas-handling dependency creates a common-mode failure across multiple assets.
+12. A scenario appears better only under one cost/price assumption; report sensitivity and break-even regions.
+13. A model recommendation violates a permit, process envelope, or hard safety constraint; it remains infeasible even if economics are attractive.
+14. A site-level methane estimate conflicts with source-level estimates; trigger reconciliation and uncertainty accounting rather than choosing whichever estimate is convenient.
 
 ## Next stages across the four projects
 
