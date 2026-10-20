@@ -36,12 +36,10 @@ macro_rules! palette {
 /// agree exactly (both are the 29 `symthaea_music_theory::Style` Debug names),
 /// so the switch changed the picker without changing what gets composed.
 ///
-/// They can still drift: adding an engine style updates the catalog (whose 1:1
-/// mapping IS enforced, by `catalog_entries_all_resolve_to_real_engine_styles`
-/// in muse_studio) but would silently leave this hand-maintained list behind,
-/// and Listen would then cycle a different set than Create offers. If that
-/// matters, derive this from `catalog::implemented_catalog()` and keep only the
-/// ordering here.
+/// The roster is intentionally ordered for the Listen experience, but it must
+/// cover the same set of routes as the executable public catalog. The test
+/// below compares the sets directly so a newly implemented engine style cannot
+/// silently remain absent from Listen while appearing in Create.
 pub const LISTEN_STYLES: &[&str] = &[
     "Classical",
     "Nocturne",
@@ -72,6 +70,14 @@ pub const LISTEN_STYLES: &[&str] = &[
     "Opera",
     "IrishTraditional",
     "HindustaniInspired",
+    "Rondo",
+    "ThemeAndVariations",
+    "Erosion",
+    "Lineage",
+    "Sarabande",
+    "MinuetAndTrio",
+    "Mazurka",
+    "Toccata",
 ];
 
 pub fn palette_for(style: &str) -> Palette {
@@ -105,6 +111,14 @@ pub fn palette_for(style: &str) -> Palette {
         "Opera" => palette!("176,96,182", "112,52,120", "#180c1c", "#0e0710"),
         "IrishTraditional" => palette!("110,184,96", "62,128,52", "#0e1c0c", "#081007"),
         "HindustaniInspired" => palette!("224,168,72", "164,116,40", "#201708", "#130e05"),
+        "Rondo" => palette!("222,184,95", "144,112,54", "#211a0c", "#110e08"),
+        "ThemeAndVariations" => palette!("190,154,224", "130,94,168", "#201528", "#100c14"),
+        "Erosion" => palette!("163,156,144", "103,96,88", "#1d1a17", "#0e0d0c"),
+        "Lineage" => palette!("116,194,142", "54,132,88", "#102218", "#080f0b"),
+        "Sarabande" => palette!("222,154,120", "148,68,58", "#25140f", "#120a08"),
+        "MinuetAndTrio" => palette!("174,198,224", "112,142,174", "#18202c", "#0d1118"),
+        "Mazurka" => palette!("236,122,94", "180,70,48", "#28130f", "#150a08"),
+        "Toccata" => palette!("102,218,201", "218,176,92", "#0e2424", "#071211"),
         _ => palette!("232,196,138", "217,160,91", "#241e16", "#16130f"), // Classical fallback
     }
 }
@@ -165,4 +179,56 @@ pub fn today_seed() -> u64 {
 pub fn today_style() -> &'static str {
     let seed = today_seed();
     DISCOVERY_STYLES[(seed as usize) % DISCOVERY_STYLES.len()]
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashSet;
+
+    #[test]
+    fn listen_roster_matches_composable_catalog_routes_exactly() {
+        let listen: HashSet<&str> = LISTEN_STYLES.iter().copied().collect();
+        assert_eq!(
+            listen.len(),
+            LISTEN_STYLES.len(),
+            "LISTEN_STYLES must not contain duplicate routes"
+        );
+
+        let catalog: HashSet<&str> =
+            symthaea_muse_protocol::catalog::implemented_catalog()
+                .filter_map(|entry| entry.composer_style)
+                .collect();
+        assert_eq!(
+            catalog.len(),
+            LISTEN_STYLES.len(),
+            "the Listen roster and composer catalog must expose the same number of routes"
+        );
+        assert_eq!(
+            listen, catalog,
+            "every executable catalog style must be reachable in Listen, and no unknown style may be listed"
+        );
+    }
+
+    #[test]
+    fn every_listen_style_has_an_explicit_unique_palette() {
+        let fallback = palette_for("__unknown_style__");
+        let accents: HashSet<&str> = LISTEN_STYLES
+            .iter()
+            .map(|style| {
+                let palette = palette_for(style);
+                assert_ne!(
+                    palette.a, fallback.a,
+                    "{style} falls through to the Classical palette"
+                );
+                palette.a
+            })
+            .collect();
+        assert_eq!(
+            accents.len(),
+            LISTEN_STYLES.len(),
+            "each selectable style needs a distinct accent color"
+        );
+    }
 }
