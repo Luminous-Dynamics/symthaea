@@ -156,9 +156,21 @@ pub struct IntervalComparisonResult {
     pub reference_lower: f64,
     pub reference_nominal: f64,
     pub reference_upper: f64,
+    pub reference_semantics: IntervalSemantics,
+    pub reference_source_id: String,
+    pub reference_source_revision: String,
+    pub reference_source_reference_sha256: String,
+    pub reference_method_id: String,
+    pub reference_method_revision: String,
     pub simulation_lower: f64,
     pub simulation_nominal: f64,
     pub simulation_upper: f64,
+    pub simulation_semantics: IntervalSemantics,
+    pub simulation_source_id: String,
+    pub simulation_source_revision: String,
+    pub simulation_source_reference_sha256: String,
+    pub simulation_method_id: String,
+    pub simulation_method_revision: String,
     /// Simulation nominal minus reference nominal. This is descriptive residual only.
     pub nominal_residual: f64,
     pub intervals_overlap: bool,
@@ -697,9 +709,21 @@ pub fn compare_uncertainty_intervals(
             reference_lower: reference.lower,
             reference_nominal: reference.nominal,
             reference_upper: reference.upper,
+            reference_semantics: reference.semantics,
+            reference_source_id: reference.source_id.clone(),
+            reference_source_revision: reference.source_revision.clone(),
+            reference_source_reference_sha256: reference.source_reference_sha256.clone(),
+            reference_method_id: reference.method_id.clone(),
+            reference_method_revision: reference.method_revision.clone(),
             simulation_lower: simulation.lower,
             simulation_nominal: simulation.nominal,
             simulation_upper: simulation.upper,
+            simulation_semantics: simulation.semantics,
+            simulation_source_id: simulation.source_id.clone(),
+            simulation_source_revision: simulation.source_revision.clone(),
+            simulation_source_reference_sha256: simulation.source_reference_sha256.clone(),
+            simulation_method_id: simulation.method_id.clone(),
+            simulation_method_revision: simulation.method_revision.clone(),
             nominal_residual,
             intervals_overlap: overlap,
             interval_gap: gap,
@@ -860,6 +884,9 @@ mod tests {
         assert_eq!(audit.disposition, IntervalComparisonDisposition::CompatibleAtDeclaredPoints);
         assert!(audit.results.iter().all(|r| r.intervals_overlap && r.interval_gap == 0.0));
         assert!(audit.results.iter().all(|r| (r.nominal_residual - 12.0).abs() < 1e-12));
+        assert!(audit.results.iter().all(|r| r.reference_method_id == "measurement-bound"));
+        assert!(audit.results.iter().all(|r| r.simulation_method_id == "mesh-study"));
+        assert!(audit.results.iter().all(|r| r.reference_source_reference_sha256 == SOURCE));
     }
 
     #[test]
