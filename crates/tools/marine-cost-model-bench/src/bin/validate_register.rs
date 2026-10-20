@@ -8,7 +8,7 @@ use std::env;
 use std::fs;
 use std::process::ExitCode;
 
-const HEADERS: [&str; 23] = [
+const HEADERS: [&str; 27] = [
     "anchor_id",
     "country",
     "buyer_or_source",
@@ -32,6 +32,10 @@ const HEADERS: [&str; 23] = [
     "normalization_receipt_sha256",
     "normalization_method_ref",
     "normalized_scope_id",
+    "retrieved_at",
+    "source_artifact_sha256",
+    "source_rights_ref",
+    "normalization_receipt_ref",
 ];
 
 const CONTEXT_ONLY: &str = "ContextOnlyNotComparable";
@@ -170,6 +174,22 @@ fn is_iso_calendar_date(value: &str) -> bool {
         _ => return false,
     };
     (1..=days_in_month).contains(&day)
+}
+
+fn is_utc_timestamp(value: &str) -> bool {
+    value.len() == 20
+        && value.as_bytes().get(10) == Some(&b'T')
+        && value.as_bytes().get(13) == Some(&b':')
+        && value.as_bytes().get(16) == Some(&b':')
+        && value.ends_with('Z')
+        && is_iso_calendar_date(&value[..10])
+        && value[11..13].parse::<u32>().is_ok_and(|hour| hour <= 23)
+        && value[14..16].parse::<u32>().is_ok_and(|minute| minute <= 59)
+        && value[17..19].parse::<u32>().is_ok_and(|second| second <= 60)
+}
+
+fn is_sha256(value: &str) -> bool {
+    value.len() == 64 && value.chars().all(|character| character.is_ascii_hexdigit())
 }
 
 fn validate_csv(input: &str) -> Result<AuditReport, Vec<String>> {
@@ -337,6 +357,26 @@ fn validate_csv(input: &str) -> Result<AuditReport, Vec<String>> {
                         "row {record_number} ({anchor_id}): ComparablePriceEvidence requires normalized_scope_id"
                     ));
                 }
+                if !is_utc_timestamp(cell(row, 23)) {
+                    row_errors.push(format!(
+                        "row {record_number} ({anchor_id}): ComparablePriceEvidence requires retrieved_at in YYYY-MM-DDTHH:MM:SSZ format"
+                    ));
+                }
+                if !is_sha256(cell(row, 24)) {
+                    row_errors.push(format!(
+                        "row {record_number} ({anchor_id}): source_artifact_sha256 must contain 64 hexadecimal characters"
+                    ));
+                }
+                if cell(row, 25).is_empty() {
+                    row_errors.push(format!(
+                        "row {record_number} ({anchor_id}): ComparablePriceEvidence requires source_rights_ref"
+                    ));
+                }
+                if cell(row, 26).is_empty() {
+                    row_errors.push(format!(
+                        "row {record_number} ({anchor_id}): ComparablePriceEvidence requires normalization_receipt_ref"
+                    ));
+                }
                 if row_errors.is_empty() {
                     comparable_price_records += 1;
                 }
@@ -447,6 +487,10 @@ mod tests {
         row[18] = "100000".to_owned();
         row[19] = "ZAR-2026-SA-yard-gate-v1".to_owned();
         row[20] = "a".repeat(64);
+        row[23] = "2026-10-20T20:00:00Z".to_owned();
+        row[24] = "b".repeat(64);
+        row[25] = "https://example.org/license".to_owned();
+        row[26] = "https://example.org/normalization-receipt.json".to_owned();
         row[21] = "normalization-method-v1".to_owned();
         row[22] = "delivered-commissioned-vessel-v1".to_owned();
         row
@@ -501,7 +545,7 @@ mod tests {
         let mut row = fully_normalized_row();
         row[9] = String::new();
         let errors = validate_csv(&csv_for_rows(&[row])).unwrap_err();
-        assert!(errors.iter().any(|error| error.contains("known positive numeric quantity")));
+        assert!(errors.iter().any(|error| error.contains("known positive integer vessel quantity")));
     }
 
     #[test]
@@ -537,6 +581,20 @@ mod tests {
         row[11] = "ZAR".to_owned();
         let errors = validate_csv(&csv_for_rows(&[row])).unwrap_err();
         assert!(errors.iter().any(|error| error.contains("cannot declare total_contract_value")));
+    }
+
+    #[test]
+    fn comparable_price_requires_source_digest_retrieval_time_rights_and_receipt_ref() {
+        let mut row = fully_normalized_row();
+        row[23] = "not-a-timestamp".to_owned();
+        row[24] = "missing-digest".to_owned();
+        row[25] = String::new();
+        row[26] = String::new();
+        let errors = validate_csv(&csv_for_rows(&[row])).unwrap_err();
+        assert!(errors.iter().any(|error| error.contains("retrieved_at")));
+        assert!(errors.iter().any(|error| error.contains("source_artifact_sha256")));
+        assert!(errors.iter().any(|error| error.contains("source_rights_ref")));
+        assert!(errors.iter().any(|error| error.contains("normalization_receipt_ref")));
     }
 
     #[test]
