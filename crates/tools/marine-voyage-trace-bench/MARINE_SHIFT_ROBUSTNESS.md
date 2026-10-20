@@ -97,6 +97,31 @@ The article says experimental data are publicly available. That statement alone 
 
 Until those checks pass, use only synthetic fixtures for software tests and keep every DTC physical-performance claim blocked.
 
+## Full-scale external-validation complement: JoRes
+
+DTC is a useful controlled **model-scale** shallow-water dataset. It should be complemented by a separate full-scale/generalization tier, not presented as a same-hull scale-transfer pair. The JoRes programme was created to join model tests, CFD, full-scale sea trials and long-term ship monitoring for ship energy-efficiency validation.
+
+The public project site says results are available after registration and lists several potentially useful case families:
+- **JoRes3 Cruise Liner:** deep- and shallow-water trials; the project matrix lists propeller torque and thrust measurements and long-term monitoring. Flanders Hydraulics specifically describes its full-scale speed/power tests and zig-zag tests at two water depths, with varying weather conditions.
+- **JoRes5 Bulk Carrier:** trials with and without an energy-saving device (ESD); a JoRes update says the hull condition was the same for the two trial sets, making it a potentially useful intervention case. Trial/weather/measurement corrections are still required before causal attribution.
+- **MV Regal and Lucy Ashton:** additional full-scale ship performance cases; their missions/configurations differ, so do not pool them into a single hull-family score.
+
+Sources:
+- JoRes project and ship-scale validation-case matrix: https://jores.net/
+- JoRes Bulk Carrier ESD news / data release description: https://jores.net/news/127/detail
+- Flanders Hydraulics full-scale shallow-water data description: https://www.waterbouwkundiglaboratorium.be/en/publications-and-data
+- Flanders Hydraulics data-request form, explicitly listing “Full scale shallow water speed/power trial data”: https://www.waterbouwkundiglaboratorium.be/en/publications-and-data/benchmark-data/requesting-benchmark-data
+
+These pages establish that a potential access route exists, not that our team has downloaded or secured the files. Access involves registration and/or a request workflow. Before admission, preserve access terms and the exact permission basis, download the raw artifacts, compute and verify byte checksums, inspect measurement/correction/uncertainty metadata and align case identities. No figures, screenshots, paper tables or search snippets should be substituted for raw evidence.
+
+### How to use the two tiers
+
+1. **Tier A — controlled model-scale physics:** DTC shallow-water resistance, propeller open-water and self-propulsion measurements at h/T = 4.0, 2.0, 1.2. Test held-out depth regimes within this exact hull/method family; preserve repeated test-run identities.
+2. **Tier B — full-scale operating generalization:** JoRes3 and other individually qualified trial/monitoring cases. Evaluate speed–power response under depth/weather variation using the declared trial corrections and uncertainty model. Do not infer that one vessel is the physical ground truth for another hull.
+3. **Tier C — intervention evidence:** JoRes5 with/without ESD can test whether predicted changes align with a matched physical intervention. Use the baseline/candidate configuration, hull condition, propulsor/ESD state, trial order, route, weather, loading, metrology/calibration and corrections as explicit confounder gates.
+
+Do **not** treat Tier A and Tier B as one pooled metric, do not train on a Tier B case and then call that case an independent cross-scale hold-out, and do not label JoRes as a direct DTC scale pair. Strong scale-transfer claims need a same-hull/same-configuration model/full-scale evidence chain, relevant corrections and independently reviewed uncertainty. A model-scale result plus an unrelated full-scale vessel is a robustness/generalization test, not a direct proof of scale laws.
+
 ## Implementation boundary
 
 This protocol should initially reuse the frozen per-slice predictive interval evaluator in `prediction_interval_calibration.rs`. A follow-up runtime evaluator is justified only for genuinely new outputs (paired policy deltas, max conditional coverage gap and shift-assumption/abstention accounting). Do not copy conformal algorithms from research packages into production Rust without licensing, maintenance and independent correctness review. Do not add a second selector: experiment-choice policy remains under #7641 / #7803.
