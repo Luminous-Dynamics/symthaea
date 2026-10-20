@@ -399,14 +399,12 @@ mod tests {
         out_of_domain.model_in_domain = false;
         let mut over_budget = proposal("over-budget", EvidenceActionKind::DftReference, 500, 101);
         over_budget.max_cost_units = 100;
-        let report = route_evidence_actions(&[
-            safe,
-            uncalibrated,
-            out_of_domain,
-            over_budget,
-        ])
-        .expect("the request contract is shared");
-        assert_eq!(report.selected_action_id.as_deref(), Some("calibrated-static"));
+        let report = route_evidence_actions(&[safe, uncalibrated, out_of_domain, over_budget])
+            .expect("the request contract is shared");
+        assert_eq!(
+            report.selected_action_id.as_deref(),
+            Some("calibrated-static")
+        );
         for id in ["uncalibrated-dft", "ood-universal", "over-budget"] {
             let entry = report
                 .entries
