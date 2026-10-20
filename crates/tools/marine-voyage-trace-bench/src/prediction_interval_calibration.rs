@@ -50,6 +50,8 @@ pub struct CalibrationProfile {
     pub model_frozen_before_holdout: bool,
     pub interval_method_id: String,
     pub interval_method_revision: String,
+    /// True only after a reviewer has checked the interval method's stated central-coverage semantics.
+    pub interval_method_reviewed: bool,
     /// Canonical digest of all acceptance-relevant profile content except this field.
     pub profile_manifest_sha256: String,
     /// Predeclared independent group identities; repeated rows within a group are not
@@ -100,6 +102,7 @@ pub enum CalibrationIssue {
     ProfileManifestDigestMismatch,
     CalibrationAndEvaluationManifestMatch,
     ModelNotFrozenBeforeHoldout,
+    IntervalMethodNotReviewed,
     EmptyGroupIdentifier { role: &'static str },
     DuplicateGroupIdentifier { role: &'static str, group_id: String },
     CalibrationEvaluationGroupOverlap { group_id: String },
@@ -306,6 +309,7 @@ pub fn canonical_calibration_profile_sha256(profile: &CalibrationProfile) -> Str
     encoder.boolean("model_frozen_before_holdout", profile.model_frozen_before_holdout);
     encoder.text("interval_method_id", profile.interval_method_id.trim());
     encoder.text("interval_method_revision", profile.interval_method_revision.trim());
+    encoder.boolean("interval_method_reviewed", profile.interval_method_reviewed);
 
     let mut calibration_groups = profile.calibration_group_ids.clone();
     calibration_groups.sort();
@@ -407,6 +411,10 @@ fn validate_profile(
     }
     if !profile.model_frozen_before_holdout {
         issues.push(CalibrationIssue::ModelNotFrozenBeforeHoldout);
+        invalid = true;
+    }
+    if !profile.interval_method_reviewed {
+        issues.push(CalibrationIssue::IntervalMethodNotReviewed);
         invalid = true;
     }
     if profile.required_slices.is_empty() {
@@ -1083,6 +1091,7 @@ mod tests {
             model_frozen_before_holdout: true,
             interval_method_id: "central-residual-quantile".to_owned(),
             interval_method_revision: "r1".to_owned(),
+            interval_method_reviewed: true,
             profile_manifest_sha256: String::new(),
             calibration_group_ids: vec!["cal-A".to_owned(), "cal-B".to_owned()],
             evaluation_group_ids: vec!["eval-A".to_owned(), "eval-B".to_owned()],
@@ -1146,11 +1155,11 @@ mod tests {
             observation("obs-1", "eval-A", 0.0, 10.0, 5.0),
             observation("obs-2", "eval-B", 0.0, 10.0, 11.0),
         ];
-        // A profile with the same frozen groups, but a lower coverage gate, lets the
-        // known-answer score be inspected without turning this fixture into a passing model.
+        // The permissive coverage gate lets the known-answer score be inspected; the
+        // deliberately tight score threshold makes this fixture fail rather than pass.
         let mut p = profile();
         p.required_slices[0].minimum_wilson_95_lower_bp = 0;
-        p.required_slices[0].max_normalized_mean_interval_score = 10.0;
+        p.required_slices[0].max_normalized_mean_interval_score = 0.15;
         p.profile_manifest_sha256 = canonical_calibration_profile_sha256(&p);
         let report = evaluate_calibration(&p, &obs);
         assert_eq!(report.slices[0].covered_count, 1);
@@ -1222,6 +1231,16 @@ mod tests {
             assert_eq!(report.disposition, CalibrationDisposition::InvalidObservations);
             assert_eq!(report.slices[0].observation_count, 1);
         }
+    }
+
+    #[test]
+    fn unreviewed_interval_method_cannot_pass() {
+        let mut p = profile();
+        p.interval_method_reviewed = false;
+        p.profile_manifest_sha256 = canonical_calibration_profile_sha256(&p);
+        let report = evaluate_calibration(&p, &two_covered());
+        assert_eq!(report.disposition, CalibrationDisposition::InvalidProfile);
+        assert!(has_issue(&report, &CalibrationIssue::IntervalMethodNotReviewed));
     }
 
     #[test]
