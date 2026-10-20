@@ -8,6 +8,8 @@ This directory defines a proposed benchmark format. **It currently contains no d
 - `splits.json` — frozen 372-family pre-screen assignment, pinned to OpenAI math commit `1581d4cbdd69a0faf34b2089614fe2a814316a6a`, with source fingerprints and a partition digest.
 - `evaluation-protocol.md` — pre-registered baseline arms, primary endpoint, equal-budget rules, statistics, leakage controls, mutation gates, run-manifest contract, and go/no-go decisions.
 - `exposure-audit.md` — records a known exploratory inspection of test family `089`; that family remains in the immutable split manifest but must be excluded from confirmatory test denominators.
+- `transfer-adjudications.md` — records two static cross-family negative controls and the typed compatibility/inequality-direction gate. They are curated annotations, not measured model failures.
+- `candidates/156-borsuk-nine-finite-obstruction.json` — records a rejected direct transfer with machine-readable compatibility codes.
 - `candidates/156-borsuk-nine-finite-obstruction.json` — one training-family candidate annotation, not a scored benchmark record. Source/statement hashes are pinned, but independent review, Lean checking, and actual transfer are outstanding.
 - Future `manifest.json` — indexed source artifacts and inclusion/exclusion/unknown accounting produced by the Rust indexer.
 - Future `records.jsonl` — one schema-conformant JSON object per line, only after source evidence has been inspected and rights reviewed.
