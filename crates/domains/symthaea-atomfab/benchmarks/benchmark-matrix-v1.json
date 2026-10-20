@@ -267,7 +267,9 @@
         "risk-coverage curve",
         "risk-coverage AURC at matched coverage and budget",
         "coverage and false-feasible count alongside selective risk; abstention is not free success",
-        "matched-seed Pareto frontier over validated objective quality, unique reference-validated discoveries, and declared total cost"
+        "matched-seed Pareto frontier over validated objective quality, unique reference-validated discoveries, and declared total cost",
+        "paired median acceleration factor and percentile bootstrap interval across all predeclared matched seeds",
+        "number of predeclared seed pairs reaching the same target under both policies; non-reaching pairs block target-reaching confidence intervals"
       ],
       "gates": [
         "freeze target and budget before campaigns",
@@ -277,7 +279,9 @@
         "no win unless quality is at least as good at equal budget",
         "compare uncertainty-ranked selection against random-score and shuffled-score negative controls; report retained coverage and risk together",
         "report realized coverage at nominal 50%, 75%, 90%, and 100% operating points; never split equal-uncertainty ties to hit a nominal coverage exactly",
-        "publish nondominated policies and per-dimension trade-offs; never use a single weighted score to hide discovery, quality, or cost regressions"
+        "publish nondominated policies and per-dimension trade-offs; never use a single weighted score to hide discovery, quality, or cost regressions",
+        "bootstrap acceleration intervals require at least 20 predeclared paired seeds and every pair must reach the same frozen target; never drop non-reaching seeds to create a success-only interval",
+        "pin confidence level, resample count and bootstrap seed; a speedup claim requires the 95% percentile-bootstrap lower bound above 1 and no worse validated objective quality at equal total cost"
       ]
     },
     {
