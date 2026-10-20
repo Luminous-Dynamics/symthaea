@@ -70,6 +70,7 @@ struct BaselineSelectionReceipt {
     frozen_before_test: bool,
     test_outcomes_seen_before_selection: bool,
     tie_break_rule: String,
+    validation_results_sha256: String,
     arm_scores: BTreeMap<String, f64>,
 }
 
@@ -275,6 +276,7 @@ fn execute() -> Result<()> {
     let args = parse_args(env::args().skip(1).collect())?;
     let config_bytes = read_arg(&args, "--config")?;
     let results_bytes = read_arg(&args, "--results")?;
+    let validation_bytes = read_arg(&args, "--validation-results")?;
     let protocol_bytes = read_arg(&args, "--protocol")?;
     let split_bytes = read_arg(&args, "--splits")?;
     let receipt_bytes = read_arg(&args, "--baseline-receipt")?;
@@ -287,30 +289,27 @@ fn execute() -> Result<()> {
         serde_json::from_slice(&split_bytes).context("parse frozen split manifest JSON")?;
     let receipt: BaselineSelectionReceipt =
         serde_json::from_slice(&receipt_bytes).context("parse baseline selection receipt JSON")?;
-    validate_baseline_receipt(&receipt)?;
-    let selected_baseline = receipt.selected_arm.clone();
-
-    let results_digest = sha256_hex(&results_bytes);
-    let result_text = String::from_utf8(results_bytes).context("results JSONL must be UTF-8")?;
-    let mut outcomes = Vec::new();
-    for (line_index, line) in result_text.lines().enumerate() {
-        if line.trim().is_empty() {
-            continue;
-        }
-        let row: TargetOutcome = serde_json::from_str(line)
-            .with_context(|| format!("parse results JSONL line {}", line_index + 1))?;
-        outcomes.push(row);
-    }
-    if outcomes.is_empty() {
-        bail!("no target outcome rows supplied; no analysis can be claimed");
-    }
+    validate_baseline_receipt(&receipt, &validation_bytes)?;
 
     let families: BTreeMap<String, String> = split_manifest
         .families
         .iter()
         .map(|family| (family.family_id.clone(), family.split.clone()))
         .collect();
-    let eligible = validate_outcomes(&outcomes, &config, &families)?;
+
+    let validation_outcomes = parse_target_jsonl(&validation_bytes, "validation")?;
+    let eligible_validation =
+        validate_outcomes(&validation_outcomes, &config, &families, "validation")?;
+    if eligible_validation.is_empty() {
+        bail!("no eligible validation targets supplied to select the baseline");
+    }
+    let validation_scores = compute_baseline_scores(&eligible_validation)?;
+    validate_baseline_scores(&receipt, &validation_scores)?;
+    let selected_baseline = receipt.selected_arm.clone();
+
+    let results_digest = sha256_hex(&results_bytes);
+    let outcomes = parse_target_jsonl(&results_bytes, "test")?;
+    let eligible = validate_outcomes(&outcomes, &config, &families, "test")?;
     if eligible.is_empty() {
         bail!("no eligible held-out targets remain; report exclusions, do not compute a win");
     }
@@ -432,6 +431,7 @@ fn parse_args(args: Vec<String>) -> Result<BTreeMap<String, String>> {
         if ![
             "--config",
             "--results",
+            "--validation-results",
             "--protocol",
             "--splits",
             "--baseline-receipt",
@@ -451,6 +451,7 @@ fn parse_args(args: Vec<String>) -> Result<BTreeMap<String, String>> {
     for required in [
         "--config",
         "--results",
+        "--validation-results",
         "--protocol",
         "--splits",
         "--baseline-receipt",
@@ -672,7 +673,7 @@ fn partition_digest_sha256(families: &[SplitFamily]) -> String {
     sha256_hex(material.as_bytes())
 }
 
-fn validate_baseline_receipt(receipt: &BaselineSelectionReceipt) -> Result<()> {
+fn validate_baseline_receipt(receipt: &BaselineSelectionReceipt, validation_bytes: &[u8]) -> Result<()> {
     if receipt.schema_version != "pitb.baseline-selection.v0" {
         bail!("unsupported baseline-selection receipt schema");
     }
@@ -684,6 +685,11 @@ fn validate_baseline_receipt(receipt: &BaselineSelectionReceipt) -> Result<()> {
     }
     if receipt.tie_break_rule != "highest score; alphabetical arm ID on exact tie" {
         bail!("unexpected or unspecified validation baseline tie-break rule");
+    }
+    validate_sha256(&receipt.validation_results_sha256)
+        .context("invalid validation_results_sha256 in baseline receipt")?;
+    if receipt.validation_results_sha256 != sha256_hex(validation_bytes) {
+        bail!("validation outcome digest does not match the baseline-selection receipt");
     }
     let score_keys: BTreeSet<&str> = receipt.arm_scores.keys().map(String::as_str).collect();
     let expected_keys: BTreeSet<&str> = BASELINE_SELECTION_ARMS.into_iter().collect();
@@ -723,6 +729,7 @@ fn validate_outcomes<'a>(
     outcomes: &'a [TargetOutcome],
     config: &RunConfig,
     frozen_families: &BTreeMap<String, String>,
+    required_split: &str,
 ) -> Result<Vec<&'a TargetOutcome>> {
     let mut target_ids = BTreeSet::new();
     let mut eligible_statement_digests = BTreeSet::new();
@@ -741,9 +748,9 @@ fn validate_outcomes<'a>(
         if target.target_id.trim().is_empty() || !target_ids.insert(target.target_id.as_str()) {
             bail!("empty or duplicate target_id {}", target.target_id);
         }
-        if target.split != "test" {
+        if target.split != required_split {
             bail!(
-                "target {} is assigned to {}, but this analyzer accepts test rows only",
+                "target {} is assigned to {}, but this analysis stage accepts {required_split} rows only",
                 target.target_id,
                 target.split
             );
@@ -751,9 +758,9 @@ fn validate_outcomes<'a>(
         let frozen_split = frozen_families
             .get(&target.family_id)
             .with_context(|| format!("unknown family_id {}", target.family_id))?;
-        if frozen_split != "test" {
+        if frozen_split != required_split {
             bail!(
-                "target {} family {} is assigned to {frozen_split}, not test",
+                "target {} family {} is assigned to {frozen_split}, not {required_split}",
                 target.target_id,
                 target.family_id
             );
@@ -885,17 +892,17 @@ fn validate_outcomes<'a>(
         }
     }
 
-    let missing_test_families: Vec<&str> = frozen_families
+    let missing_families: Vec<&str> = frozen_families
         .iter()
         .filter(|(family_id, split)| {
-            split.as_str() == "test" && !represented_families.contains(family_id.as_str())
+            split.as_str() == required_split && !represented_families.contains(family_id.as_str())
         })
         .map(|(family_id, _)| family_id.as_str())
         .collect();
-    if !missing_test_families.is_empty() {
+    if !missing_families.is_empty() {
         bail!(
-            "frozen test families lack an explicit outcome/exclusion row: {}",
-            missing_test_families.join(", ")
+            "frozen {required_split} families lack an explicit outcome/exclusion row: {}",
+            missing_families.join(", ")
         );
     }
     Ok(eligible)
@@ -1305,8 +1312,11 @@ mod tests {
                 .map(|arm| (arm.to_string(), 0.5))
                 .collect(),
         };
-        validate_baseline_receipt(&receipt)
-            .expect("alphabetically first tied baseline should pass");
+        let validation_bytes = b"synthetic validation rows".as_slice();
+        let mut receipt = receipt;
+        receipt.validation_results_sha256 = sha256_hex(validation_bytes);
+        validate_baseline_receipt(&receipt, validation_bytes)
+            .expect("valid baseline receipt and validation hash should pass");
     }
 
     #[test]
