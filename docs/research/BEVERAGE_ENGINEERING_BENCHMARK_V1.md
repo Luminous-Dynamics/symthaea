@@ -113,6 +113,16 @@ These figures are results reported by that particular study, not a universal lea
 
 Reference: Campo-Manzanares et al., *Critical assessment of machine learning approaches for classification, dynamic prediction and surrogate modeling in food fermentation* (Food Research International, 2026), https://doi.org/10.1016/j.foodres.2026.118403.
 
+### A fair benchmark ladder from these published results
+
+1. **Reproduction gate:** recover the paper's target definitions, training/test grouping and data transformations, then reproduce the knowledge-based, ML and hybrid values before claiming a gain.
+2. **Empirical stretch target:** on a truly equivalent task and test design, target at most 4.5% overall test NRMSE versus the paper's reported approximately 5% hybrid result. Require paired uncertainty intervals and subgroup reporting. This target is invalid if targets, group split, input measurements or normalizers differ.
+3. **Surrogate-fidelity target:** aim for at most 1% NRMSE against the parent mechanistic model on held-out parameter/condition combinations and at least 30× speedup on the same hardware and time boundary. This measures simulator approximation only; the parent simulator must separately pass empirical validation.
+4. **Transfer gate:** report external batch/site/season performance only when the dataset has enough independent groups and those groups were excluded from training/model selection. If the source lacks such IDs—as some public tables do—state that transfer is not testable rather than inventing a split.
+5. **Decision gate:** require a prospective, budget-matched experiment to demonstrate value of information or reduced regret; improved curve fit alone does not justify a process recommendation.
+
+All numeric targets above are proposals derived from a published comparator, not results achieved by this project.
+
 
 ## 6. Metrics and proposed targets
 
