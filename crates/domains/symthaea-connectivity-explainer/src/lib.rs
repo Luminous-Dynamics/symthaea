@@ -1,0 +1,460 @@
+//! Deterministic, evidence-grounded plain-language explanations for connectivity reports.
+//!
+//! This crate is intentionally not a generative model. It maps structured
+//! outcomes into reviewed templates, preserves the declared evidence class,
+//! refuses missing denominators, and discloses which questions the data cannot
+//! answer. Future HDC retrieval may select reviewed explanation patterns; it
+//! must not invent evidence or upgrade the status of a claim.
+
+#![forbid(unsafe_code)]
+
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+
+pub const EXPLAINER_VERSION: &str = "symthaea.connectivity-explainer.v1";
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EvidenceClass {
+    SyntheticSimulation,
+    BenchObservedSnapshot,
+    LabMeasurement,
+    FieldPilot,
+    ReliabilityQualification,
+    Unknown,
+}
+
+impl EvidenceClass {
+    fn from_label(value: Option<&str>) -> Self {
+        match value {
+            Some("synthetic_simulation") => Self::SyntheticSimulation,
+            Some("bench_observed_snapshot") => Self::BenchObservedSnapshot,
+            Some("lab_measurement" | "lab_screening") => Self::LabMeasurement,
+            Some("field_pilot") => Self::FieldPilot,
+            Some("reliability_qualification") => Self::ReliabilityQualification,
+            _ => Self::Unknown,
+        }
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::SyntheticSimulation => "synthetic simulation",
+            Self::BenchObservedSnapshot => "observed benchmark snapshot",
+            Self::LabMeasurement => "lab measurement",
+            Self::FieldPilot => "field pilot",
+            Self::ReliabilityQualification => "reliability qualification",
+            Self::Unknown => "unknown evidence class",
+        }
+    }
+
+    fn caveat(self) -> &'static str {
+        match self {
+            Self::SyntheticSimulation => "This is a model result, not a physical-network measurement.",
+            Self::BenchObservedSnapshot => "This is a diagnostic snapshot; by itself it does not prove application task success or instrument calibration.",
+            Self::LabMeasurement => "The record is labelled as lab evidence; this explanation does not independently authenticate its instruments or measurements.",
+            Self::FieldPilot => "The record is labelled as field-pilot evidence; conclusions apply only to the recorded sites, population, hardware and trial conditions.",
+            Self::ReliabilityQualification => "The record is labelled as reliability-qualification evidence; inspect its protocol, raw receipts and statistical assumptions before generalizing.",
+            Self::Unknown => "The evidence class is missing or unrecognized; do not infer measured performance from this report.",
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct PriorityOutcome {
+    pub priority: String,
+    pub tasks: u64,
+    pub baseline_completed: u64,
+    pub candidate_completed: u64,
+    pub baseline_deadline_misses: Option<u64>,
+    pub candidate_deadline_misses: Option<u64>,
+    pub plain_explanation: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct ModeExplanation {
+    pub mode: String,
+    pub plain_label: String,
+    pub task_count: u64,
+    pub baseline_completed: u64,
+    pub candidate_completed: u64,
+    pub completion_difference: i64,
+    pub plain_explanation: String,
+    pub by_priority: Vec<PriorityOutcome>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct Explanation {
+    pub schema_version: String,
+    pub evidence_class: EvidenceClass,
+    pub evidence_label: String,
+    pub headline: String,
+    pub simple_explanation: String,
+    pub findings: Vec<String>,
+    pub modes: Vec<ModeExplanation>,
+    pub limitations: Vec<String>,
+    pub recommended_next_step: String,
+    pub scenario_sha256: Option<String>,
+    pub profile_sha256: Option<String>,
+}
+
+fn required_u64(value: &Value, key: &str, path: &str) -> Result<u64, String> {
+    value
+        .get(key)
+        .and_then(Value::as_u64)
+        .ok_or_else(|| format!("{path}/{key}: required non-negative integer is missing or invalid"))
+}
+
+fn optional_u64(value: &Value, key: &str) -> Option<u64> {
+    value.get(key).and_then(Value::as_u64)
+}
+
+fn valid_sha(value: Option<&Value>) -> Option<String> {
+    value
+        .and_then(Value::as_str)
+        .filter(|text| text.len() == 64 && text.bytes().all(|byte| byte.is_ascii_hexdigit()))
+        .map(str::to_owned)
+}
+
+fn mode_label(mode: &str) -> &'static str {
+    match mode {
+        "online" => "normal connectivity",
+        "wan_partition" => "Internet outage while the local network remains available",
+        "route_recovery" => "Internet recovery and queued-work delivery",
+        _ => "declared scenario",
+    }
+}
+
+fn task_noun(count: u64) -> &'static str {
+    if count == 1 { "task" } else { "tasks" }
+}
+
+fn completion_delta(candidate: u64, baseline: u64) -> Result<i64, String> {
+    i64::try_from(i128::from(candidate) - i128::from(baseline))
+        .map_err(|_| "completion difference outside supported range".to_owned())
+}
+
+fn parse_priority_rows(row: &Value) -> Result<Option<Vec<PriorityOutcome>>, String> {
+    let Some(baseline_rows) = row.get("baseline_by_priority").and_then(Value::as_array) else {
+        return Ok(None);
+    };
+    let Some(candidate_rows) = row.get("candidate_by_priority").and_then(Value::as_array) else {
+        return Ok(None);
+    };
+
+    let mut outcomes = Vec::new();
+    for baseline in baseline_rows {
+        let priority = baseline
+            .get("priority")
+            .and_then(Value::as_str)
+            .ok_or_else(|| "baseline priority row is missing its label".to_owned())?;
+        let candidate = candidate_rows
+            .iter()
+            .find(|item| item.get("priority").and_then(Value::as_str) == Some(priority))
+            .ok_or_else(|| format!("candidate priority row is missing {priority}"))?;
+        let tasks = required_u64(baseline, "task_count", "baseline_by_priority")?;
+        let candidate_tasks = required_u64(candidate, "task_count", "candidate_by_priority")?;
+        if tasks != candidate_tasks {
+            return Err(format!("priority {priority} has mismatched trial denominators"));
+        }
+        let baseline_completed = required_u64(baseline, "completed_tasks", "baseline_by_priority")?;
+        let candidate_completed = required_u64(candidate, "completed_tasks", "candidate_by_priority")?;
+        if baseline_completed > tasks || candidate_completed > tasks {
+            return Err(format!("priority {priority} completion exceeds its denominator"));
+        }
+        let baseline_misses = optional_u64(baseline, "deadline_misses");
+        let candidate_misses = optional_u64(candidate, "deadline_misses");
+        let delta = completion_delta(candidate_completed, baseline_completed)?;
+        let plain_explanation = if delta > 0 {
+            format!(
+                "Fair-share completes {} more {priority} {} than FIFO in this scenario ({candidate_completed}/{tasks} versus {baseline_completed}/{tasks}).",
+                delta,
+                task_noun(delta as u64)
+            )
+        } else if delta < 0 {
+            format!(
+                "Fair-share completes {} fewer {priority} {} than FIFO in this scenario; treat this as a regression.",
+                delta.unsigned_abs(),
+                task_noun(delta.unsigned_abs())
+            )
+        } else {
+            format!("Both policies complete {baseline_completed}/{tasks} {priority} tasks in this scenario.")
+        };
+        outcomes.push(PriorityOutcome {
+            priority: priority.to_owned(),
+            tasks,
+            baseline_completed,
+            candidate_completed,
+            baseline_deadline_misses: baseline_misses,
+            candidate_deadline_misses: candidate_misses,
+            plain_explanation,
+        });
+    }
+    outcomes.sort_by(|a, b| a.priority.cmp(&b.priority));
+    Ok(Some(outcomes))
+}
+
+/// Explain a recovery simulation report at household, operator and review level.
+///
+/// Expects a report containing multiwindow_recovery.evidence_class and
+/// multiwindow_recovery.per_mode. Each mode remains separate: those episodes
+/// do not represent one simultaneous shared radio budget.
+pub fn explain_report(report: &Value) -> Result<Explanation, String> {
+    let root = report
+        .get("multiwindow_recovery")
+        .filter(|value| value.is_object())
+        .ok_or_else(|| "multiwindow_recovery: required report object is missing".to_owned())?;
+    let evidence_class =
+        EvidenceClass::from_label(root.get("evidence_class").and_then(Value::as_str));
+    let rows = root
+        .get("per_mode")
+        .and_then(Value::as_array)
+        .filter(|rows| !rows.is_empty())
+        .ok_or_else(|| "multiwindow_recovery/per_mode: non-empty array is required".to_owned())?;
+
+    let mut modes = Vec::new();
+    let mut findings = Vec::new();
+    let mut missing_priority_data = false;
+    for row in rows {
+        let mode = row
+            .get("mode")
+            .and_then(Value::as_str)
+            .ok_or_else(|| "per_mode/*/mode: scenario label is missing".to_owned())?;
+        let baseline = row
+            .get("baseline")
+            .filter(|value| value.is_object())
+            .ok_or_else(|| format!("per_mode/{mode}/baseline: required object is missing"))?;
+        let candidate = row
+            .get("candidate_fair_share")
+            .filter(|value| value.is_object())
+            .ok_or_else(|| format!("per_mode/{mode}/candidate_fair_share: required object is missing"))?;
+        let baseline_tasks = required_u64(baseline, "task_count", mode)?;
+        let candidate_tasks = required_u64(candidate, "task_count", mode)?;
+        if baseline_tasks != candidate_tasks {
+            return Err(format!("per_mode/{mode}: baseline and candidate denominators differ; paired explanation refused"));
+        }
+        let baseline_completed = required_u64(baseline, "completed_tasks", mode)?;
+        let candidate_completed = required_u64(candidate, "completed_tasks", mode)?;
+        if baseline_completed > baseline_tasks || candidate_completed > candidate_tasks {
+            return Err(format!("per_mode/{mode}: completed count exceeds task denominator"));
+        }
+        let delta = completion_delta(candidate_completed, baseline_completed)?;
+        let plain_explanation = if baseline_tasks == 0 {
+            format!("No tasks were declared for {mode_label(mode)}.")
+        } else if delta > 0 {
+            format!(
+                "In {label}, fair-share completes {delta} more {} than FIFO ({candidate_completed}/{candidate_tasks} versus {baseline_completed}/{baseline_tasks}).",
+                task_noun(delta as u64),
+                label = mode_label(mode)
+            )
+        } else if delta < 0 {
+            format!(
+                "In {label}, fair-share completes {} fewer {} than FIFO. Treat it as a regression, not an improvement.",
+                delta.unsigned_abs(),
+                task_noun(delta.unsigned_abs()),
+                label = mode_label(mode)
+            )
+        } else {
+            format!(
+                "In {label}, both policies complete {baseline_completed}/{baseline_tasks} tasks.",
+                label = mode_label(mode)
+            )
+        };
+        if delta < 0 {
+            findings.push(format!("Task completion regresses in {label}.", label = mode_label(mode)));
+        }
+        if let (Some(b), Some(c)) = (
+            optional_u64(baseline, "completed_task_jain_fairness_ppm"),
+            optional_u64(candidate, "completed_task_jain_fairness_ppm"),
+        ) {
+            if c < b {
+                findings.push(format!(
+                    "Completed-task fairness falls in {label} (Jain index {b} to {c} parts per million). Inspect per-peer outcomes.",
+                    label = mode_label(mode)
+                ));
+            }
+        }
+        let by_priority = match parse_priority_rows(row)? {
+            Some(rows) => {
+                for priority in &rows {
+                    if priority.baseline_deadline_misses.unwrap_or(0) > 0 {
+                        findings.push(format!(
+                            "FIFO misses {} {} deadline(s) in {label}.",
+                            priority.baseline_deadline_misses.unwrap_or(0),
+                            priority.priority,
+                            label = mode_label(mode)
+                        ));
+                    }
+                    if priority.candidate_deadline_misses.unwrap_or(0) > 0 {
+                        findings.push(format!(
+                            "Fair-share misses {} {} deadline(s) in {label}.",
+                            priority.candidate_deadline_misses.unwrap_or(0),
+                            priority.priority,
+                            label = mode_label(mode)
+                        ));
+                    }
+                    if priority.candidate_completed < priority.baseline_completed {
+                        findings.push(format!(
+                            "Fair-share completes fewer {} tasks in {label}.",
+                            priority.priority,
+                            label = mode_label(mode)
+                        ));
+                    }
+                }
+                rows
+            }
+            None => {
+                missing_priority_data = true;
+                Vec::new()
+            }
+        };
+
+        modes.push(ModeExplanation {
+            mode: mode.to_owned(),
+            plain_label: mode_label(mode).to_owned(),
+            task_count: baseline_tasks,
+            baseline_completed,
+            candidate_completed,
+            completion_difference: delta,
+            plain_explanation,
+            by_priority,
+        });
+    }
+    modes.sort_by(|a, b| a.mode.cmp(&b.mode));
+    findings.sort();
+    findings.dedup();
+
+    let headline = match evidence_class {
+        EvidenceClass::SyntheticSimulation => "The modeled workload may favor fair-share in the cases shown; live Wi-Fi performance has not been tested.",
+        EvidenceClass::BenchObservedSnapshot => "A diagnostic snapshot was recorded; a snapshot alone cannot show whether user tasks succeeded.",
+        EvidenceClass::LabMeasurement | EvidenceClass::FieldPilot | EvidenceClass::ReliabilityQualification => "This report declares measured evidence; review the raw paired trials and protocol before generalizing.",
+        EvidenceClass::Unknown => "The evidence class is unknown; treat performance conclusions as unverified.",
+    }.to_owned();
+
+    let mut limitations = vec![
+        evidence_class.caveat().to_owned(),
+        "Each mode is an independent simulation episode; do not add its counts together as if all modes shared one simultaneous radio budget.".to_owned(),
+        "A byte allocation is not measured 802.11 airtime fairness.".to_owned(),
+        "This report alone does not establish real application success, TCP/QUIC behavior, radio retries, measured latency, calibrated energy, tariff savings, consent, or provider/regulatory permission.".to_owned(),
+    ];
+    if missing_priority_data {
+        limitations.push("Per-priority outcome rows were absent, so essential or interactive deadline regressions cannot be ruled out from this explanation.".to_owned());
+    }
+    let recommended_next_step = match evidence_class {
+        EvidenceClass::SyntheticSimulation | EvidenceClass::Unknown => "Run a matched experiment on an owner-authorized isolated AP testbed. Bind the AP firmware/radio configuration, workload profile and harness revision; collect available counters plus application-verified paired task outcomes; review each priority/mode denominator.".to_owned(),
+        _ => "Inspect the exact testbed manifest, calibration record and raw paired trials; repeat across devices, days and sites before claiming general performance or savings.".to_owned(),
+    };
+
+    Ok(Explanation {
+        schema_version: EXPLAINER_VERSION.to_owned(),
+        evidence_class,
+        evidence_label: evidence_class.label().to_owned(),
+        headline,
+        simple_explanation: "Imagine a fixed byte budget in each abstract time window. FIFO serves older work first; fair-share distributes bytes between peers while reserving capacity for essential requests. Short urgent tasks can finish sooner in some workloads, but the simulation does not model the Wi-Fi radio itself.".to_owned(),
+        findings,
+        modes,
+        limitations,
+        recommended_next_step,
+        scenario_sha256: valid_sha(root.get("scenario_sha256")),
+        profile_sha256: valid_sha(report.pointer("/source/profile_sha256"))
+            .or_else(|| valid_sha(report.get("profile_sha256"))),
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::{Value, json};
+
+    fn report() -> Value {
+        json!({
+            "multiwindow_recovery": {
+                "evidence_class":"synthetic_simulation",
+                "scenario_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "per_mode":[
+                    {
+                        "mode":"online",
+                        "baseline":{"task_count":3,"completed_tasks":1,"completed_task_jain_fairness_ppm":333333},
+                        "candidate_fair_share":{"task_count":3,"completed_tasks":3,"completed_task_jain_fairness_ppm":1000000},
+                        "baseline_by_priority":[
+                            {"priority":"essential","task_count":1,"completed_tasks":0,"deadline_misses":1,"expiry_misses":0},
+                            {"priority":"interactive","task_count":1,"completed_tasks":0,"deadline_misses":1,"expiry_misses":0},
+                            {"priority":"bulk","task_count":1,"completed_tasks":1,"deadline_misses":0,"expiry_misses":0}
+                        ],
+                        "candidate_by_priority":[
+                            {"priority":"essential","task_count":1,"completed_tasks":1,"deadline_misses":0,"expiry_misses":0},
+                            {"priority":"interactive","task_count":1,"completed_tasks":1,"deadline_misses":0,"expiry_misses":0},
+                            {"priority":"bulk","task_count":1,"completed_tasks":1,"deadline_misses":0,"expiry_misses":0}
+                        ]
+                    },
+                    {
+                        "mode":"wan_partition",
+                        "baseline":{"task_count":3,"completed_tasks":1},
+                        "candidate_fair_share":{"task_count":3,"completed_tasks":3}
+                    }
+                ]
+            }
+        })
+    }
+
+    #[test]
+    fn explicit_simulation_boundary_is_preserved() {
+        let explanation = explain_report(&report()).unwrap();
+        assert_eq!(explanation.evidence_class, EvidenceClass::SyntheticSimulation);
+        assert!(explanation.headline.contains("live Wi-Fi performance has not been tested"));
+        assert!(explanation.limitations.iter().any(|item| item.contains("airtime")));
+    }
+
+    #[test]
+    fn mode_episodes_are_not_summed() {
+        let explanation = explain_report(&report()).unwrap();
+        assert_eq!(explanation.modes.len(), 2);
+        assert!(explanation.limitations.iter().any(|item| item.contains("independent simulation episode")));
+    }
+
+    #[test]
+    fn essential_deadline_misses_are_visible() {
+        let explanation = explain_report(&report()).unwrap();
+        assert!(explanation.findings.iter().any(|item| item.contains("FIFO misses 1 essential deadline")));
+        let online = explanation.modes.iter().find(|item| item.mode == "online").unwrap();
+        let essential = online.by_priority.iter().find(|item| item.priority == "essential").unwrap();
+        assert_eq!(essential.baseline_deadline_misses, Some(1));
+        assert_eq!(essential.candidate_completed, 1);
+    }
+
+    #[test]
+    fn unknown_evidence_class_is_not_promoted() {
+        let mut value = report();
+        value["multiwindow_recovery"]["evidence_class"] = json!("unrecognized");
+        let explanation = explain_report(&value).unwrap();
+        assert_eq!(explanation.evidence_class, EvidenceClass::Unknown);
+        assert!(explanation.headline.contains("unverified"));
+    }
+
+    #[test]
+    fn missing_numbers_and_denominator_mismatches_fail_closed() {
+        let mut value = report();
+        value["multiwindow_recovery"]["per_mode"][0]["baseline"]["completed_tasks"] = Value::Null;
+        assert!(explain_report(&value).unwrap_err().contains("missing or invalid"));
+
+        let mut value = report();
+        value["multiwindow_recovery"]["per_mode"][0]["candidate_fair_share"]["task_count"] = json!(2);
+        assert!(explain_report(&value).unwrap_err().contains("denominators differ"));
+    }
+
+    #[test]
+    fn absent_priority_data_is_disclosed_not_filled_in() {
+        let mut value = report();
+        value["multiwindow_recovery"]["per_mode"][0].as_object_mut().unwrap().remove("baseline_by_priority");
+        let explanation = explain_report(&value).unwrap();
+        assert!(explanation.limitations.iter().any(|item| item.contains("Per-priority outcome rows were absent")));
+    }
+
+    #[test]
+    fn serialized_explanation_is_deterministic() {
+        let value = report();
+        assert_eq!(
+            serde_json::to_vec(&explain_report(&value).unwrap()).unwrap(),
+            serde_json::to_vec(&explain_report(&value).unwrap()).unwrap()
+        );
+    }
+}
