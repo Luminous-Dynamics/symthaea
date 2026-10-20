@@ -590,17 +590,43 @@ mod tests {
             );
             assert_eq!(model["execution_status"], "not_run");
         }
-        for artifact in plan["sources"]["related_dataset_artifacts"]
+        let artifacts = plan["sources"]["related_dataset_artifacts"]
             .as_array()
-            .unwrap()
-        {
+            .unwrap();
+        assert_eq!(artifacts.len(), 4, "all related Zenodo source artifacts must be inventoried");
+        let expected_roles = [
+            ("dataset.zip", "training_validation_source", "not_independent_for_models_trained_on_archive"),
+            ("global_minima.zip", "published_reference_structure_source", "audit_overlap_before_test_use"),
+            ("dptrain_inputs.zip", "training_configuration_source", "not_evaluation_data"),
+            ("vasp_inputs.zip", "reference_calculation_input_source", "not_evaluation_data"),
+        ];
+        for (filename, role, disposition) in expected_roles {
+            let artifact = artifacts
+                .iter()
+                .find(|artifact| artifact["filename"] == filename)
+                .unwrap_or_else(|| panic!("missing source artifact {filename}"));
+            assert_eq!(artifact["evaluation_role"], role);
+            assert_eq!(artifact["independent_test_disposition"], disposition);
             assert_eq!(
                 artifact["sha256"],
                 serde_json::Value::Null,
                 "source MD5 must not be misrepresented as our computed SHA-256"
             );
+            assert_eq!(artifact["bytes"], serde_json::Value::Null);
             assert_eq!(artifact["status"], "not_downloaded");
+            assert!(
+                artifact["source_record_md5"]
+                    .as_str()
+                    .is_some_and(|value| value.len() == 32),
+                "source MD5 metadata must remain a separate 32-hex field"
+            );
         }
+        assert!(
+            plan["sources"]["published_evaluation_manifest"]["note"]
+                .as_str()
+                .unwrap()
+                .contains("do not treat it as the complete independent evaluation set")
+        );
     }
 
     #[test]
