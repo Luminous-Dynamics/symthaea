@@ -9,8 +9,9 @@ This directory defines a proposed benchmark format. **It currently contains no d
 - `evaluation-protocol.md` — pre-registered baseline arms, primary endpoint, equal-budget rules, statistics, leakage controls, mutation gates, run-manifest contract, and go/no-go decisions.
 - `exposure-audit.md` — records a known exploratory inspection of test family `089`; that family remains in the immutable split manifest but must be excluded from confirmatory test denominators.
 - `transfer-adjudications.md` — records two static cross-family negative controls and the typed compatibility/inequality-direction gate. They are curated annotations, not measured model failures.
-- `candidates/156-borsuk-nine-finite-obstruction.json` — records a rejected direct transfer with machine-readable compatibility codes.
-- `candidates/156-borsuk-nine-finite-obstruction.json` — one training-family candidate annotation, not a scored benchmark record. Source/statement hashes are pinned, but independent review, Lean checking, and actual transfer are outstanding.
+- `candidates/156-borsuk-nine-finite-obstruction.json` — training-family strategy annotation plus a curator-rejected transfer to family 157, with machine-readable compatibility codes; not a scored record.
+- `candidates/157-hadwiger-invariant-chain.json` — unreviewed strategy annotation for separating witness construction from an invariant-comparison bridge; not a scored record.
+- `pilot-report-2026-10-20.md` — pilot source audit, direct-transfer rejection, provenance notes, and next acceptance gates.
 - `crates/bridges/symthaea-proof-insights/src/bin/validate_transfer_contract.rs` — fail-closed consistency checker for typed source/target obligations, inequality direction, domain/object-type compatibility, and target-side proof receipts; its rules do not establish mathematical truth.
 - Future `manifest.json` — indexed source artifacts and inclusion/exclusion/unknown accounting produced by the Rust indexer.
 - Future `records.jsonl` — one schema-conformant JSON object per line, only after source evidence has been inspected and rights reviewed.
