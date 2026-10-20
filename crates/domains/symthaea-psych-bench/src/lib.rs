@@ -58,6 +58,7 @@ pub mod pharmacology_evidence;
 pub mod pharmacology_prediction;
 pub mod pharmacology_metrics;
 pub mod pharmacology_manifest;
+pub mod pharmacology_bootstrap;
 pub mod substrate_transfer;
 pub mod wm;
 
