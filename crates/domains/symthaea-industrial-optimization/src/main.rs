@@ -4,7 +4,7 @@
 //! below are invented test fixtures, not field measurements or industry averages.
 
 use symthaea_industrial_optimization::{
-    AbatementEstimate, Intervention, greedy_expected_per_dollar, optimize_robust_portfolio,
+    AbatementEstimate, Intervention, greedy_expected_per_dollar, optimize_robust_portfolio, pareto_frontier,
 };
 
 fn item(
@@ -57,10 +57,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let budget_usd = 250_000;
     let greedy = greedy_expected_per_dollar(&candidates, budget_usd)?;
     let robust = optimize_robust_portfolio(&candidates, budget_usd)?;
+    let frontier = pareto_frontier(&candidates, budget_usd)?;
 
     println!("capital budget USD: {budget_usd}");
     print_portfolio("\nGreedy baseline (expected abatement per dollar):", &greedy);
     print_portfolio("\nExact robust baseline (scenario-floor abatement):", &robust);
+    println!("\nCost vs conservative-abatement Pareto frontier:");
+    for (index, portfolio) in frontier.iter().enumerate() {
+        print_portfolio(&format!("  frontier point {}", index + 1), portfolio);
+    }
     println!("\nInterpretation: the two strategies optimize different objectives.");
     println!("These outputs validate portfolio-selection mechanics only; they establish");
     println!("nothing about actual methane emissions, intervention efficacy, cost, or safety.");
