@@ -343,6 +343,9 @@
                 "required": [
                   "compatibility",
                   "mismatch_codes",
+                  "move_kind",
+                  "source_obligation",
+                  "target_obligation",
                   "source_move_requires",
                   "target_goal_requires"
                 ],
@@ -386,6 +389,141 @@
                     "items": {
                       "type": "string",
                       "maxLength": 2000
+                    }
+                  },
+                  "move_kind": {
+                    "enum": [
+                      "inequality_transfer",
+                      "representation_reduction",
+                      "witness_construction",
+                      "induction",
+                      "normalization",
+                      "decomposition",
+                      "duality",
+                      "invariant_composition",
+                      "other"
+                    ]
+                  },
+                  "source_obligation": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "domain",
+                      "object_type",
+                      "predicate",
+                      "relation",
+                      "quantifier_scope",
+                      "preconditions"
+                    ],
+                    "properties": {
+                      "domain": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 300
+                      },
+                      "object_type": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 300
+                      },
+                      "predicate": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 500
+                      },
+                      "relation": {
+                        "enum": [
+                          "upper_bound",
+                          "strict_upper_bound",
+                          "lower_bound",
+                          "strict_lower_bound",
+                          "equality",
+                          "inequality",
+                          "existence",
+                          "nonexistence",
+                          "implication",
+                          "equivalence",
+                          "subset",
+                          "superset",
+                          "counterexample_existence",
+                          "other"
+                        ]
+                      },
+                      "quantifier_scope": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 1000
+                      },
+                      "preconditions": {
+                        "type": "array",
+                        "uniqueItems": true,
+                        "items": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 1000
+                        }
+                      }
+                    }
+                  },
+                  "target_obligation": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "domain",
+                      "object_type",
+                      "predicate",
+                      "relation",
+                      "quantifier_scope",
+                      "preconditions"
+                    ],
+                    "properties": {
+                      "domain": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 300
+                      },
+                      "object_type": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 300
+                      },
+                      "predicate": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 500
+                      },
+                      "relation": {
+                        "enum": [
+                          "upper_bound",
+                          "strict_upper_bound",
+                          "lower_bound",
+                          "strict_lower_bound",
+                          "equality",
+                          "inequality",
+                          "existence",
+                          "nonexistence",
+                          "implication",
+                          "equivalence",
+                          "subset",
+                          "superset",
+                          "counterexample_existence",
+                          "other"
+                        ]
+                      },
+                      "quantifier_scope": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 1000
+                      },
+                      "preconditions": {
+                        "type": "array",
+                        "uniqueItems": true,
+                        "items": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 1000
+                        }
+                      }
                     }
                   }
                 }
