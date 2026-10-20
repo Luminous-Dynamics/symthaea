@@ -190,7 +190,7 @@ pub fn evaluate_binary_safety(
     let predicted_cases = predicted.len();
     let abstained_cases = total_cases - predicted_cases;
     let positive_ground_truth_cases =
-        predicted.iter().filter(|(_, label)| *label).count();
+        predicted.iter().filter(|item| item.1).count();
     let negative_ground_truth_cases = predicted_cases - positive_ground_truth_cases;
 
     let sensitivity = ratio(
@@ -284,7 +284,7 @@ struct CalibrationBin {
 }
 
 fn ranking_metrics(predictions: &[(f64, bool)]) -> (Option<f64>, Option<f64>) {
-    let positives = predictions.iter().filter(|(_, label)| *label).count();
+    let positives = predictions.iter().filter(|item| item.1).count();
     let negatives = predictions.len() - positives;
     if positives == 0 || negatives == 0 {
         return (None, if positives == 0 { None } else { Some(1.0) });
@@ -301,7 +301,7 @@ fn ranking_metrics(predictions: &[(f64, bool)]) -> (Option<f64>, Option<f64>) {
             end += 1;
         }
         let average_rank = ((start + 1 + end) as f64) / 2.0;
-        let tied_positives = ascending[start..end].iter().filter(|(_, label)| *label).count();
+        let tied_positives = ascending[start..end].iter().filter(|item| item.1).count();
         positive_rank_sum += average_rank * tied_positives as f64;
         start = end;
     }
@@ -324,7 +324,7 @@ fn ranking_metrics(predictions: &[(f64, bool)]) -> (Option<f64>, Option<f64>) {
         while end < descending.len() && descending[end].0 == descending[start].0 {
             end += 1;
         }
-        let group_positives = descending[start..end].iter().filter(|(_, label)| *label).count();
+        let group_positives = descending[start..end].iter().filter(|item| item.1).count();
         seen_positive += group_positives;
         seen_total += end - start;
         let recall = seen_positive as f64 / positives as f64;
