@@ -246,7 +246,8 @@
     "Do not pool results across particle sizes or support surfaces before reporting each stratum.",
     "No SOTA claim without exact task, data, checkpoint, evaluator, split, configuration and metric parity with the comparison target.",
     "Policy comparison stretch target: at least 20 paired fixed-seed campaigns, median acceleration factor >=2 with a 95% bootstrap lower bound >1 only if both methods reach the same frozen objective target and quality at equal cost is no worse. This is a proposed target, not a result.",
-    "A simulation or MLIP output is never a measurement; physical claims require independent metrology and reproducible procedures."
+    "A simulation or MLIP output is never a measurement; physical claims require independent metrology and reproducible procedures.",
+    "Compute the median paired AF and a deterministic percentile-bootstrap interval with a pinned PRNG seed and at least 1,000 resamples; every predeclared pair must reach the same frozen target, and failed/incomplete campaigns stay visible rather than being success-filtered."
   ],
   "published_candidate_refinement": {
     "source": "Methods section of DOI 10.1038/s41524-026-02043-8",
