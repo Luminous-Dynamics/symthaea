@@ -22,19 +22,41 @@
         "source_record_md5": "e88745ca2cfd25ef0b152f5fa3ed6bd9",
         "sha256": null,
         "bytes": null,
-        "status": "not_downloaded"
+        "status": "not_downloaded",
+        "evaluation_role": "training_validation_source",
+        "independent_test_disposition": "not_independent_for_models_trained_on_archive"
       },
       {
         "filename": "global_minima.zip",
         "source_record_md5": "9788d7f13403450552e4ad1642c6a478",
         "sha256": null,
         "bytes": null,
-        "status": "not_downloaded"
+        "status": "not_downloaded",
+        "evaluation_role": "published_reference_structure_source",
+        "independent_test_disposition": "audit_overlap_before_test_use"
+      },
+      {
+        "filename": "dptrain_inputs.zip",
+        "source_record_md5": "2a9308f54b666b4653137825d1175226",
+        "sha256": null,
+        "bytes": null,
+        "status": "not_downloaded",
+        "evaluation_role": "training_configuration_source",
+        "independent_test_disposition": "not_evaluation_data"
+      },
+      {
+        "filename": "vasp_inputs.zip",
+        "source_record_md5": "6fe4f25a0496085c76cd2fddecef4edb",
+        "sha256": null,
+        "bytes": null,
+        "status": "not_downloaded",
+        "evaluation_role": "reference_calculation_input_source",
+        "independent_test_disposition": "not_evaluation_data"
       }
     ],
     "published_evaluation_manifest": {
       "status": "unresolved",
-      "note": "Extract the exact test/candidate/reference structure manifest and supplement used in the 2026 benchmark; do not treat the related Zenodo training/validation archive as an independent test set without evidence."
+      "note": "Resolve the exact test/candidate/reference structure manifest and supplement used in the 2026 benchmark before execution. The related Zenodo archive contains training/validation structures, training inputs, VASP inputs, and published global minima; do not treat it as the complete independent evaluation set. For each model, audit training-data overlap before assigning independent-test status."
     }
   },
   "reference_method": {
@@ -226,7 +248,10 @@
     "canonical structure identity and deduplication rules fixed before test results are evaluated",
     "grouped split by parent system and declared surface/size/temperature stratum; audit potential training-data overlap where feasible",
     "all GA details beyond population and generations, including RNG seeds and mutation/cut-and-splice settings, transcribed from the source",
-    "cost ledger that includes failed relaxations, reference calculations, model inference, preprocessing, retries and post-processing"
+    "cost ledger that includes failed relaxations, reference calculations, model inference, preprocessing, retries and post-processing",
+    "resolve the exact 2026 benchmark candidate/test/reference structure manifest and supplement; the related Zenodo source archive is not assumed to be the independent evaluation set",
+    "for each baseline checkpoint, audit training-data/structure overlap; report archive-overlap diagnostics, published-reference reproduction, and held-out evaluation as separate result classes",
+    "materialize all four related source archives only when needed; recompute SHA-256 and exact byte length locally while preserving source-record MD5 in a separate field"
   ],
   "metrics": [
     "MAE/RMSE/max error for binding energy on identical structures with common reference labels",
@@ -237,7 +262,8 @@
     "ranking agreement only on shared canonical structure IDs, with discovery-set agreement reported separately",
     "failure-mode counts/rates by stratum and severity, with abstentions separate and failed relaxations retained in denominators",
     "total cost and cost per unique reference-validated discovery",
-    "all fixed-seed campaign records including failed, incomplete and target-not-reached campaigns"
+    "all fixed-seed campaign records including failed, incomplete and target-not-reached campaigns",
+    "held-out discovery metrics only on groups with audited model-training overlap; archive-overlap diagnostics and published-reference reproduction are separate result classes"
   ],
   "gates": [
     "First reproduce the published protocol/results within a declared tolerance before claiming any advantage.",
@@ -247,7 +273,8 @@
     "No SOTA claim without exact task, data, checkpoint, evaluator, split, configuration and metric parity with the comparison target.",
     "Policy comparison stretch target: at least 20 paired fixed-seed campaigns, median acceleration factor >=2 with a 95% bootstrap lower bound >1 only if both methods reach the same frozen objective target and quality at equal cost is no worse. This is a proposed target, not a result.",
     "A simulation or MLIP output is never a measurement; physical claims require independent metrology and reproducible procedures.",
-    "Compute the median paired AF and a deterministic percentile-bootstrap interval with a pinned PRNG seed and at least 1,000 resamples; every predeclared pair must reach the same frozen target, and failed/incomplete campaigns stay visible rather than being success-filtered."
+    "Compute the median paired AF and a deterministic percentile-bootstrap interval with a pinned PRNG seed and at least 1,000 resamples; every predeclared pair must reach the same frozen target, and failed/incomplete campaigns stay visible rather than being success-filtered.",
+    "never report a structure present in a baseline model's training data as held-out model performance; label it as a training-data diagnostic or published-reference reproduction instead"
   ],
   "published_candidate_refinement": {
     "source": "Methods section of DOI 10.1038/s41524-026-02043-8",
