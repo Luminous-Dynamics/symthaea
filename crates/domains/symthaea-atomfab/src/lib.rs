@@ -130,9 +130,17 @@ impl fmt::Display for BenchmarkError {
                 write!(f, "sample {index} has a lower interval bound above its upper bound")
             }
             Self::InvalidTieTolerance => write!(f, "tie tolerance must be finite and non-negative"),
-            Self::InvalidPersistence => write!(f, "ranking persistence must be finite and strictly between zero and one"),
-            Self::RankingLengthMismatch => write!(f, "predicted and reference rankings must have the same non-zero length"),
-            Self::DuplicateRankingId { ranking, index } => write!(f, "{ranking} ranking repeats an identifier at index {index}"),
+            Self::InvalidPersistence => write!(
+                f,
+                "ranking persistence must be finite and strictly between zero and one"
+            ),
+            Self::RankingLengthMismatch => write!(
+                f,
+                "predicted and reference rankings must have the same non-zero length"
+            ),
+            Self::DuplicateRankingId { ranking, index } => {
+                write!(f, "{ranking} ranking repeats an identifier at index {index}")
+            }
             Self::NoComparablePairs => write!(f, "no non-tied reference pairs are available"),
             Self::ZeroReferenceStructures => write!(f, "reference structure count must be greater than zero"),
             Self::InvalidRecoveryCounts => write!(f, "recovered structure count cannot exceed reference count"),
