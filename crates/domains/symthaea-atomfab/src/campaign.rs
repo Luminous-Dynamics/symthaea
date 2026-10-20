@@ -80,21 +80,56 @@ pub enum CampaignError {
 impl fmt::Display for CampaignError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::UnsupportedSchemaVersion => write!(f, "unsupported campaign record schema version"),
+            Self::UnsupportedSchemaVersion => {
+                write!(f, "unsupported campaign record schema version")
+            }
             Self::EmptyRequiredField(name) => write!(f, "campaign field must not be empty: {name}"),
-            Self::InvalidDigest(name) => write!(f, "campaign field must be a lowercase SHA-256 digest: {name}"),
-            Self::InvalidBudget => write!(f, "campaign evaluation usage must not exceed its positive budget"),
-            Self::InvalidElapsedTime => write!(f, "campaign elapsed time must be finite and non-negative"),
-            Self::InvalidCost => write!(f, "campaign cost must be finite and non-negative and have a unit"),
-            Self::InvalidCostTolerance => write!(f, "cost-comparison tolerance must be finite and non-negative"),
-            Self::InvalidObjective => write!(f, "completed campaign needs a finite objective value"),
-            Self::CompletedRunMissingEvidence => write!(f, "completed campaign needs traceable evidence"),
-            Self::CompletedRunHasFailureReason => write!(f, "completed campaign cannot contain terminal failure reasons"),
-            Self::FailedRunMissingReason => write!(f, "failed or incomplete campaign needs a failure reason"),
-            Self::TargetReachedOnNonCompletedRun => write!(f, "only a completed campaign may claim to reach target"),
-            Self::MismatchedPolicies => write!(f, "policy runs are not matched on their benchmark contract"),
-            Self::TargetNotReached => write!(f, "both completed policy runs must reach the preregistered target for AF"),
-            Self::UnequalEvaluationUse => write!(f, "equal-evaluation comparison requires the same evaluation count"),
+            Self::InvalidDigest(name) => write!(
+                f,
+                "campaign field must be a lowercase SHA-256 digest: {name}"
+            ),
+            Self::InvalidBudget => write!(
+                f,
+                "campaign evaluation usage must not exceed its positive budget"
+            ),
+            Self::InvalidElapsedTime => {
+                write!(f, "campaign elapsed time must be finite and non-negative")
+            }
+            Self::InvalidCost => write!(
+                f,
+                "campaign cost must be finite and non-negative and have a unit"
+            ),
+            Self::InvalidCostTolerance => write!(
+                f,
+                "cost-comparison tolerance must be finite and non-negative"
+            ),
+            Self::InvalidObjective => {
+                write!(f, "completed campaign needs a finite objective value")
+            }
+            Self::CompletedRunMissingEvidence => {
+                write!(f, "completed campaign needs traceable evidence")
+            }
+            Self::CompletedRunHasFailureReason => write!(
+                f,
+                "completed campaign cannot contain terminal failure reasons"
+            ),
+            Self::FailedRunMissingReason => {
+                write!(f, "failed or incomplete campaign needs a failure reason")
+            }
+            Self::TargetReachedOnNonCompletedRun => {
+                write!(f, "only a completed campaign may claim to reach target")
+            }
+            Self::MismatchedPolicies => {
+                write!(f, "policy runs are not matched on their benchmark contract")
+            }
+            Self::TargetNotReached => write!(
+                f,
+                "both completed policy runs must reach the preregistered target for AF"
+            ),
+            Self::UnequalEvaluationUse => write!(
+                f,
+                "equal-evaluation comparison requires the same evaluation count"
+            ),
         }
     }
 }
@@ -161,7 +196,10 @@ impl CampaignRecord {
             }
             CampaignStatus::Failed | CampaignStatus::Incomplete => {
                 if self.failure_reasons.is_empty()
-                    || self.failure_reasons.iter().any(|reason| reason.trim().is_empty())
+                    || self
+                        .failure_reasons
+                        .iter()
+                        .any(|reason| reason.trim().is_empty())
                 {
                     return Err(CampaignError::FailedRunMissingReason);
                 }
@@ -318,11 +356,16 @@ mod tests {
     #[test]
     fn completed_campaign_requires_traceable_finite_result() {
         let record = completed("random");
-        record.validate().expect("valid campaign record should pass");
+        record
+            .validate()
+            .expect("valid campaign record should pass");
 
         let mut no_evidence = completed("random");
         no_evidence.evidence.clear();
-        assert_eq!(no_evidence.validate(), Err(CampaignError::CompletedRunMissingEvidence));
+        assert_eq!(
+            no_evidence.validate(),
+            Err(CampaignError::CompletedRunMissingEvidence)
+        );
 
         let mut nonfinite = completed("random");
         nonfinite.best_validated_objective = Some(f64::NAN);
@@ -342,14 +385,22 @@ mod tests {
         record.terminal_status = CampaignStatus::Failed;
         record.target_reached = false;
         record.failure_reasons = vec!["solver_failed".to_owned()];
-        record.validate().expect("failed run should remain recordable");
+        record
+            .validate()
+            .expect("failed run should remain recordable");
 
         record.failure_reasons.clear();
-        assert_eq!(record.validate(), Err(CampaignError::FailedRunMissingReason));
+        assert_eq!(
+            record.validate(),
+            Err(CampaignError::FailedRunMissingReason)
+        );
 
         record.failure_reasons = vec!["solver_failed".to_owned()];
         record.target_reached = true;
-        assert_eq!(record.validate(), Err(CampaignError::TargetReachedOnNonCompletedRun));
+        assert_eq!(
+            record.validate(),
+            Err(CampaignError::TargetReachedOnNonCompletedRun)
+        );
     }
 
     #[test]
@@ -358,15 +409,19 @@ mod tests {
         let json = serde_json::to_string(&record).expect("record should serialize");
         let decoded: CampaignRecord =
             serde_json::from_str(&json).expect("record should deserialize");
-        decoded.validate().expect("round-tripped record should validate");
+        decoded
+            .validate()
+            .expect("round-tripped record should validate");
         assert_eq!(decoded, record);
 
-        let schema: serde_json::Value = serde_json::from_str(include_str!(
-            "../schemas/campaign-record-v1.schema.json"
-        ))
-        .expect("campaign JSON schema should parse");
+        let schema: serde_json::Value =
+            serde_json::from_str(include_str!("../schemas/campaign-record-v1.schema.json"))
+                .expect("campaign JSON schema should parse");
         assert_eq!(schema["properties"]["schema_version"]["const"], 1);
-        assert_eq!(schema["$schema"], "https://json-schema.org/draft/2020-12/schema");
+        assert_eq!(
+            schema["$schema"],
+            "https://json-schema.org/draft/2020-12/schema"
+        );
     }
 
     #[test]
@@ -451,6 +506,10 @@ mod tests {
 
         let mut record = completed("random");
         record.dataset_digest = "not-a-digest".to_owned();
-        assert_eq!(record.validate(), Err(CampaignError::InvalidDigest("dataset_digest")));
+        assert_eq!(
+            record.validate(),
+            Err(CampaignError::InvalidDigest("dataset_digest"))
+        );
     }
 }
+
