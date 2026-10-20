@@ -2025,10 +2025,22 @@ mod tests {
             .expect("repeating a frozen seed must be deterministic");
         assert_eq!(left.status, "estimated");
         assert_eq!(left.utility_gate_passes, right.utility_gate_passes);
-        assert_eq!(left.estimated_utility_gate_power, right.estimated_utility_gate_power);
-        assert_eq!(left.mean_observed_effect_percentage_points, right.mean_observed_effect_percentage_points);
-        assert_eq!(left.mean_lower_95ci_percentage_points, right.mean_lower_95ci_percentage_points);
-        assert!(left.estimated_utility_gate_power.is_some_and(|power| (0.0..=1.0).contains(&power)));
+        assert_eq!(
+            left.estimated_utility_gate_power,
+            right.estimated_utility_gate_power
+        );
+        assert_eq!(
+            left.mean_observed_effect_percentage_points,
+            right.mean_observed_effect_percentage_points
+        );
+        assert_eq!(
+            left.mean_lower_95ci_percentage_points,
+            right.mean_lower_95ci_percentage_points
+        );
+        assert!(
+            left.estimated_utility_gate_power
+                .is_some_and(|power| (0.0..=1.0).contains(&power))
+        );
     }
 
     #[test]
