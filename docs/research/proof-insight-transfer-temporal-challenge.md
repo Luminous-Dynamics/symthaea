@@ -85,6 +85,22 @@ The thresholds above are **proposed project gates**, not established industry st
 4. **Safety is measured, not implied.** The system must identify when analogies fail and abstain on incompatible contracts; verified proof success and rejection-quality are distinct outcomes.
 5. **Useful work beats raw pass rate.** Publish incremental verified solves and their uncertainty per unit cost, including failed attempts and timeouts, not just a headline pass percentage.
 
+## Executable temporal evidence gate
+
+The Rust indexer now exposes a first-pass evaluator-side linter for a `pitb.temporal-replay-manifest.v0` JSON manifest:
+
+```bash
+cargo run -p symthaea-proof-insights -- \
+  --verify-temporal-manifest \
+  /path/to/clean/pinned-repository-checkout \
+  /path/to/evaluator-only-temporal-manifest.json
+```
+
+The manifest shape is specified in [`temporal-replay-manifest.schema.json`](../../data/benchmarks/proof-insight-transfer-v0/temporal-replay-manifest.schema.json). Each event records a monotonically ordered target, the commit representing target-time state, its later proof-completion commit, the exact statement artifact, the evaluator-only proof artifact, and the artifact IDs made visible to the solver. Each artifact pins a repository-relative path, artifact-level SHA-256, inclusive one-based source line span, complete source-file SHA-256, source commit, artifact kind, and first-available timeline position.
+
+The validator fails closed on repeated IDs/positions, non-canonical paths, malformed digests, missing statement/proof artifacts, target-proof exposure, any non-target artifact unavailable before the target, a visible digest identical to a target/future proof digest (including a renamed copy), an unexpected dirty checkout, or a checkout whose HEAD differs from the pinned commit. It additionally verifies Git ancestry: all declared evidence is in the pinned history, previously completed proofs precede the next target state, and every visible artifact's source commit is an ancestor of the target-time state. Finally, it checks the complete file digest and exact line-span digest with `git show` at each declared source commit.
+
+This is a **manifest/source provenance gate**, not a complete benchmark run. It does not auto-extract Lean declarations, certify statement semantics, or establish that every possible semantic paraphrase of a future proof has been excluded. The manifest is evaluator-side and may contain hidden-proof IDs and digests; it must never be passed directly to the model. Only a separate target-specific rendering of the visible artifact IDs may be given to the solver. A real pinned Dalek manifest and a dry-run build of historical target states are still required before the track can be considered operational.
 ## Implementation sequence
 
 1. Pin a clean Dalek Lean Bench commit, license metadata, Lean toolchain and timeline CSV digest; first add a dry-run verifier that proves each target's pre/post timeline boundary without making model calls.
