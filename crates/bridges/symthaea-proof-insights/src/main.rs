@@ -2585,6 +2585,13 @@ mod tests {
             "theorem first : True := by\n  sorry\ntheorem second : True := by\n  sorry\n";
         fs::write(root.join("lean/Example.lean"), initial_source)
             .expect("write initial source state");
+        // Deliberate source-document mismatch: the CSV will contain two rows,
+        // while README claims three, and the audit must preserve that discrepancy.
+        fs::write(
+            root.join("README.md"),
+            "The proof_timeline.csv currently records 3 theorems in this fixture.\n",
+        )
+        .expect("write deliberately inconsistent timeline README");
         let commit_one = commit(&root, "historical target statements");
         let source_one = git_show_file(&root, &commit_one, "lean/Example.lean")
             .expect("read first source revision");
@@ -2768,6 +2775,13 @@ mod tests {
         )
         .expect("parse temporal timeline audit JSON");
         assert_eq!(timeline_audit["total_timeline_rows"], 2);
+        assert_eq!(timeline_audit["readme_claimed_timeline_row_count"], 3);
+        assert_eq!(timeline_audit["timeline_row_count_matches_readme_claim"], false);
+        assert_eq!(timeline_audit["repository_readme_sha256"], sha(
+            git_show_file(&root, &repository_commit, "README.md")
+                .expect("read pinned README bytes")
+                .as_slice()
+        ));
         assert_eq!(timeline_audit["unique_completion_commit_count"], 2);
         assert_eq!(timeline_audit["source_path_present_at_completion_count"], 2);
         assert_eq!(timeline_audit["source_path_missing_at_completion_count"], 0);
