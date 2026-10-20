@@ -177,6 +177,8 @@ pub struct IntervalSliceScore {
     pub required_observation_count: usize,
     pub overlap_count: usize,
     pub nonoverlap_count: usize,
+    pub within_declared_envelope_count: usize,
+    pub domain_established: bool,
     pub maximum_normalized_interval_gap: Option<f64>,
     pub maximum_absolute_nominal_residual: Option<f64>,
     pub gate_met: Option<bool>,
@@ -541,11 +543,13 @@ pub fn compare_uncertainty_intervals(
     }
     let mut counts: BTreeMap<(String, String), usize> = BTreeMap::new();
     let mut overlap_counts: BTreeMap<(String, String), usize> = BTreeMap::new();
+    let mut within_domain_counts: BTreeMap<(String, String), usize> = BTreeMap::new();
     let mut max_gap: BTreeMap<(String, String), f64> = BTreeMap::new();
     let mut max_nominal_residual: BTreeMap<(String, String), f64> = BTreeMap::new();
     for key in requirements.keys() {
         counts.insert(key.clone(), 0);
         overlap_counts.insert(key.clone(), 0);
+        within_domain_counts.insert(key.clone(), 0);
         max_gap.insert(key.clone(), 0.0);
         max_nominal_residual.insert(key.clone(), 0.0);
     }
@@ -674,6 +678,9 @@ pub fn compare_uncertainty_intervals(
             interval_gate_failed = true;
         }
         *counts.entry(key.clone()).or_default() += 1;
+        if observation.applicability == ApplicabilityStatus::WithinDeclaredEnvelope {
+            *within_domain_counts.entry(key.clone()).or_default() += 1;
+        }
         if overlap {
             *overlap_counts.entry(key.clone()).or_default() += 1;
         }
@@ -706,6 +713,7 @@ pub fn compare_uncertainty_intervals(
     for (key, requirement) in &requirements {
         let count = *counts.get(key).unwrap_or(&0);
         let overlaps = *overlap_counts.get(key).unwrap_or(&0);
+        let within_domain = *within_domain_counts.get(key).unwrap_or(&0);
         let observed_max_gap = *max_gap.get(key).unwrap_or(&0.0);
         let observed_max_residual = *max_nominal_residual.get(key).unwrap_or(&0.0);
         if count < requirement.minimum_observations {
@@ -722,7 +730,7 @@ pub fn compare_uncertainty_intervals(
         } else {
             let meets_gap = observed_max_gap <= requirement.max_normalized_interval_gap;
             let meets_overlap = !requirement.require_interval_overlap || overlaps == count;
-            Some(meets_gap && meets_overlap)
+            Some(within_domain == count && meets_gap && meets_overlap)
         };
         slices.push(IntervalSliceScore {
             operating_case_id: key.0.clone(),
@@ -732,6 +740,8 @@ pub fn compare_uncertainty_intervals(
             required_observation_count: requirement.minimum_observations,
             overlap_count: overlaps,
             nonoverlap_count: count.saturating_sub(overlaps),
+            within_declared_envelope_count: within_domain,
+            domain_established: within_domain == count,
             maximum_normalized_interval_gap: (count > 0).then_some(observed_max_gap),
             maximum_absolute_nominal_residual: (count > 0).then_some(observed_max_residual),
             gate_met,
