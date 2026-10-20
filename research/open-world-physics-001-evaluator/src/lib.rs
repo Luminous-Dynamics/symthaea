@@ -593,9 +593,9 @@ pub fn run_reference_benchmark() -> BenchmarkReport {
         }
     }
     let policies = [QueryPolicy::FixedGrid, QueryPolicy::SeededRandom]
-    .into_iter()
-    .map(|policy| summarize(policy, &rows).expect("each policy has reference cases"))
-    .collect();
+        .into_iter()
+        .map(|policy| summarize(policy, &rows).expect("each policy has reference cases"))
+        .collect();
 
     let body = ReportBody {
         schema: REPORT_SCHEMA.to_owned(),
