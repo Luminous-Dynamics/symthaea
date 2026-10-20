@@ -132,7 +132,29 @@ Required outcomes:
 - Sol-Atlas: versioned, resolution-aware source-region, crop, water, climate, logistics and energy context. Maps and climate correlations do not prove beverage sensory outcomes.
 - Mycelix: batch/lot identity, parent-child transformation provenance, rights/consent, custody and claim-specific verification. Hashes do not authenticate the underlying physical truth.
 
-## 9. Build sequence
+## 9. Executable synthetic-corpus receipt
+
+The first Rust executable is intentionally hosted in the existing `symthaea-culinary` crate to reuse its workspace dependencies and avoid an overlapping standalone culinary package.
+
+From the repository root, after checking out the exact commit you intend to qualify:
+
+```bash
+EXPECTED_HEAD="$(git rev-parse HEAD)"
+cargo fmt --all -- --check
+cargo test -p symthaea-culinary --bin beverage_benchmark_receipt
+cargo run -p symthaea-culinary --bin beverage_benchmark_receipt -- \
+  --corpus docs/research/beverage-engineering-scenarios-v1.json \
+  --schema docs/research/beverage-engineering-scenarios-v1.schema.json \
+  --expected-head "$EXPECTED_HEAD" \
+  --out /tmp/beverage-benchmark-receipt.json
+```
+
+The receipt binds the raw corpus and schema bytes with SHA-256, includes the exact checked-out Git HEAD, rejects malformed input and unknown fields, checks unique scenario identifiers/names, verifies declared product/disposition values against schema enums, requires the corpus to remain explicitly synthetic, and emits a deterministic `PASS` or `FAIL` JSON report. The CLI exits non-zero on a failed contract.
+
+**Qualification limit:** this first runner does not implement the full JSON Schema Draft 2020-12 specification. It checks a narrow set of safety-relevant schema invariants and then deserializes into strict Rust types. An independent standards-compliant JSON Schema validator remains required. Passing receipt checks establishes contract integrity only, not that any scientific result is valid. The test binary must be built, formatted, tested, and run against the exact intended head before the receipt can be called qualified.
+
+## 10. Build sequence
+
 
 Phase A — corpus and contract: parse the scenario corpus, verify schema and unique IDs, emit deterministic expected/actual receipts and fail-closed outcomes. The current PR proposes this specification and corpus only.
 
