@@ -49,8 +49,12 @@ pub struct ExperimentProposal {
     pub source_reference_sha256: String,
     pub evidence_use_status: EvidenceUseStatus,
     pub cost_basis_id: String,
-    /// Missing/zero cost is never interpreted as free.
+    /// Cost of the immediate proposed run; missing/zero is never interpreted as free.
     pub cost_units: Option<u64>,
+    /// Whether this proposal is only useful if a later higher-fidelity / physical validation runs.
+    pub requires_deferred_validation: bool,
+    /// Required when deferred validation is required. Uses the same cost basis as the immediate run.
+    pub deferred_validation_cost_units: Option<u64>,
     pub support_status: ProposalSupportStatus,
     /// Conservative lower bound on expected decision-loss reduction in the declared value unit.
     /// This is an externally computed and reviewed quantity; it is not model uncertainty itself.
@@ -76,6 +80,7 @@ pub enum ProposalDisposition {
     BlockedUtilityUnknownOrUnreviewed,
     BlockedNonPositiveDecisionValue,
     BlockedBudget,
+    BlockedDeferredValidationCost,
     BlockedUnregisteredRequirement,
     BlockedRequirementMismatch,
     BlockedDuplicateProposalId,
@@ -86,6 +91,10 @@ pub enum ProposalIssue {
     EmptyIdentity { field: &'static str },
     InvalidDigest { field: &'static str },
     MissingOrZeroCost,
+    DeferredValidationCostUnknown,
+    DeferredValidationCostInvalid,
+    UnexpectedDeferredValidationCost,
+    EndToEndCostOverflow,
     CostBasisMismatch,
     CampaignMismatch,
     RightsNotPermitted { status: EvidenceUseStatus },
@@ -109,6 +118,8 @@ pub struct ProposalAssessment {
     pub is_mandatory: bool,
     pub requirement_id: Option<String>,
     pub cost_units: Option<u64>,
+    /// Immediate cost plus required later confirmation cost, when known and representable.
+    pub estimated_end_to_end_cost_units: Option<u64>,
     pub decision_value_lower_bound_units: Option<i64>,
     /// False means the value estimate is unavailable or its contract/evidence did not validate.
     pub decision_value_usable: bool,
@@ -176,6 +187,7 @@ pub struct ExperimentPriorityReport {
     pub selected_proposal_id: Option<String>,
     pub selected_requirement_id: Option<String>,
     pub selected_cost_units: Option<u64>,
+    pub selected_end_to_end_cost_units: Option<u64>,
     pub selected_decision_value_lower_bound_units: Option<i64>,
     pub selected_value_per_cost_numerator: Option<u64>,
     pub selected_value_per_cost_denominator: Option<u64>,
@@ -339,14 +351,40 @@ fn assess_proposal(
     }
     if proposal.cost_units.is_none_or(|cost| cost == 0) {
         issues.push(ProposalIssue::MissingOrZeroCost);
-    } else if let Some(cost) = proposal.cost_units {
-        if cost > budget_remaining_units {
-            issues.push(ProposalIssue::BudgetExceeded {
-                cost_units: cost,
-                budget_units: budget_remaining_units,
-            });
-        }
     }
+
+    let deferred_cost_contract_valid = match (
+        proposal.requires_deferred_validation,
+        proposal.deferred_validation_cost_units,
+    ) {
+        (true, None) => {
+            issues.push(ProposalIssue::DeferredValidationCostUnknown);
+            false
+        }
+        (true, Some(0)) => {
+            issues.push(ProposalIssue::DeferredValidationCostInvalid);
+            false
+        }
+        (true, Some(_)) => true,
+        (false, Some(cost)) if cost > 0 => {
+            issues.push(ProposalIssue::UnexpectedDeferredValidationCost);
+            false
+        }
+        (false, _) => true,
+    };
+    let estimated_end_to_end_cost_units = match (proposal.cost_units, deferred_cost_contract_valid) {
+        (Some(immediate), true) if proposal.requires_deferred_validation => {
+            match immediate.checked_add(proposal.deferred_validation_cost_units.unwrap_or(0)) {
+                Some(total) => Some(total),
+                None => {
+                    issues.push(ProposalIssue::EndToEndCostOverflow);
+                    None
+                }
+            }
+        }
+        (Some(immediate), true) => Some(immediate),
+        _ => None,
+    };
 
     if let Some(requirement_id) = &proposal.requirement_id {
         if let Some(requirement) = requirements.get(requirement_id.as_str()) {
@@ -433,6 +471,19 @@ fn assess_proposal(
                 | ProposalIssue::RequirementMismatch { .. }
         )
     });
+    let budget_cost = if is_mandatory {
+        proposal.cost_units
+    } else {
+        estimated_end_to_end_cost_units
+    };
+    if let Some(cost) = budget_cost {
+        if cost > budget_remaining_units {
+            issues.push(ProposalIssue::BudgetExceeded {
+                cost_units: cost,
+                budget_units: budget_remaining_units,
+            });
+        }
+    }
     let over_budget = issues
         .iter()
         .any(|issue| matches!(issue, ProposalIssue::BudgetExceeded { .. }));
@@ -460,7 +511,9 @@ fn assess_proposal(
     {
         ProposalDisposition::EligibleForMandatoryRequirement
     } else if eligible_class == Some(ProposalDisposition::EligibleForOptionalRanking) {
-        if !utility_is_structurally_valid {
+        if !deferred_cost_contract_valid {
+            ProposalDisposition::BlockedDeferredValidationCost
+        } else if !utility_is_structurally_valid {
             if issues.iter().any(|issue| matches!(issue, ProposalIssue::NonPositiveDecisionValue { .. })) {
                 ProposalDisposition::BlockedNonPositiveDecisionValue
             } else {
@@ -481,8 +534,9 @@ fn assess_proposal(
         is_mandatory,
         requirement_id: proposal.requirement_id.clone(),
         cost_units: proposal.cost_units,
+        estimated_end_to_end_cost_units,
         decision_value_lower_bound_units: proposal.decision_value_lower_bound_units,
-        decision_value_usable: utility_is_structurally_valid,
+        decision_value_usable: utility_is_structurally_valid && deferred_cost_contract_valid,
         issues,
     }
 }
@@ -498,8 +552,16 @@ fn ratio_order(a: &ProposalAssessment, b: &ProposalAssessment) -> Ordering {
     } else {
         0
     };
-    let a_cost = a.cost_units.unwrap_or(u64::MAX).max(1);
-    let b_cost = b.cost_units.unwrap_or(u64::MAX).max(1);
+    let a_cost = a
+        .estimated_end_to_end_cost_units
+        .or(a.cost_units)
+        .unwrap_or(u64::MAX)
+        .max(1);
+    let b_cost = b
+        .estimated_end_to_end_cost_units
+        .or(b.cost_units)
+        .unwrap_or(u64::MAX)
+        .max(1);
 
     match (a_value > 0, b_value > 0) {
         (true, true) => {
@@ -753,10 +815,13 @@ pub fn prioritize_next_experiment(
 
     let selected_value = selected
         .as_ref()
+        .filter(|proposal| proposal.decision_value_usable)
         .and_then(|proposal| proposal.decision_value_lower_bound_units)
         .filter(|value| *value > 0)
         .map(|value| value as u64);
     let selected_cost = selected.as_ref().and_then(|proposal| proposal.cost_units);
+    let selected_end_to_end_cost =
+        selected.as_ref().and_then(|proposal| proposal.estimated_end_to_end_cost_units);
     ExperimentPriorityReport {
         profile_id: profile.profile_id.clone(),
         campaign_id: profile.campaign_id.clone(),
@@ -771,11 +836,10 @@ pub fn prioritize_next_experiment(
         selected_proposal_id: selected.as_ref().map(|proposal| proposal.proposal_id.clone()),
         selected_requirement_id,
         selected_cost_units: selected_cost,
-        selected_decision_value_lower_bound_units: selected
-            .as_ref()
-            .and_then(|proposal| proposal.decision_value_lower_bound_units),
+        selected_end_to_end_cost_units: selected_end_to_end_cost,
+        selected_decision_value_lower_bound_units: selected_value.map(|value| value as i64),
         selected_value_per_cost_numerator: selected_value,
-        selected_value_per_cost_denominator: selected_cost,
+        selected_value_per_cost_denominator: selected_end_to_end_cost,
         assessments,
         issues: {
             issues.sort();
@@ -916,6 +980,8 @@ mod tests {
             evidence_use_status: EvidenceUseStatus::PermittedForDeclaredUse,
             cost_basis_id: "lab-hours-v1".to_string(),
             cost_units: cost,
+            requires_deferred_validation: false,
+            deferred_validation_cost_units: None,
             support_status: ProposalSupportStatus::WithinDeclaredEnvelope,
             decision_value_lower_bound_units: value,
             decision_value_basis_id: "loss-units-v1".to_string(),
