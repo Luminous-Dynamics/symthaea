@@ -1841,6 +1841,110 @@ mod tests {
     }
 
     #[test]
+    fn style_dialect_changes_reach_real_performed_events_across_fixed_seeds() {
+        use PerformanceDialect as D;
+
+        const SEEDS: [u64; 8] = [0, 1, 7, 13, 29, 42, 73, 101];
+        let state = MusicalState::default();
+        let signature = |voices: &[PerformanceVoice]| {
+            voices
+                .iter()
+                .map(|voice| {
+                    (
+                        voice.name.to_string(),
+                        voice
+                            .notes
+                            .iter()
+                            .map(|note| {
+                                (
+                                    note.frequency,
+                                    note.start_time,
+                                    note.duration,
+                                    note.velocity,
+                                )
+                            })
+                            .collect::<Vec<_>>(),
+                    )
+                })
+                .collect::<Vec<_>>()
+        };
+
+        for (style, expected_dialect) in
+            [(Style::Mazurka, D::MazurkaLilt), (Style::Toccata, D::ToccataMotor)]
+        {
+            let spec = style.spec();
+            assert_eq!(dialect_for_spec(&spec), expected_dialect, "{style:?}");
+
+            for seed in SEEDS {
+                let intent = MusicalIntent {
+                    seed,
+                    arousal: 0.7,
+                    ..Default::default()
+                };
+                let score = symthaea_music_theory::compose_with_spec(&intent, &spec);
+                assert!(!score.notes.is_empty(), "{style:?} seed={seed}: empty score");
+                let ensemble = resolve_spec_ensemble(&spec, seed);
+
+                // Exercise the actual spec-driven path. The only control arm
+                // change is the performance dialect; score, ensemble, swing,
+                // return-color setting, and cognitive state are held fixed.
+                let actual = performance_voices(&score, ensemble, &spec, &state);
+                let replay = performance_voices(&score, ensemble, &spec, &state);
+                let baseline = performance_voices_with_dialect(
+                    &score,
+                    ensemble,
+                    spec.texture.swing as f64,
+                    &state,
+                    spec.texture.return_color,
+                    D::ClassicalRubato,
+                );
+
+                let actual_signature = signature(&actual);
+                assert_eq!(
+                    actual_signature,
+                    signature(&replay),
+                    "{style:?} seed={seed}: same source and seed must replay exactly"
+                );
+
+                for (voice_name, notes) in &actual_signature {
+                    assert!(!notes.is_empty(), "{style:?} {voice_name} seed={seed}");
+                    for (frequency, start, duration, velocity) in notes {
+                        assert!(frequency.is_finite() && *frequency > 0.0);
+                        assert!(start.is_finite() && *start >= 0.0);
+                        assert!(duration.is_finite() && *duration > 0.0);
+                        assert!(velocity.is_finite() && (0.0..=1.0).contains(velocity));
+                    }
+                }
+
+                // Count observable timing changes against a same-score,
+                // same-ensemble ClassicalRubato counterfactual. Note counts
+                // can legitimately differ if the post-jitter overlap guard
+                // removes a collision, so compare matched voice/event prefixes
+                // and separately require at least one matched onset to move.
+                let baseline_signature = signature(&baseline);
+                let mut compared_onsets = 0usize;
+                let mut changed_onsets = 0usize;
+                for ((actual_name, actual_notes), (base_name, base_notes)) in
+                    actual_signature.iter().zip(baseline_signature.iter())
+                {
+                    assert_eq!(actual_name, base_name, "{style:?} seed={seed}");
+                    for (actual_note, base_note) in actual_notes.iter().zip(base_notes.iter()) {
+                        compared_onsets += 1;
+                        if (actual_note.1 - base_note.1).abs() > 1e-6 {
+                            changed_onsets += 1;
+                        }
+                    }
+                }
+                assert!(compared_onsets > 0, "{style:?} seed={seed}: no matched events");
+                assert!(
+                    changed_onsets > 0,
+                    "{style:?} seed={seed}: declared {expected_dialect:?} had no observable timing effect"
+                );
+            }
+        }
+    }
+
+    #[test]
     fn style_dialect_hypotheses_are_non_identity_and_explicit() {
         use PerformanceDialect as D;
         let classical = D::ClassicalRubato;
