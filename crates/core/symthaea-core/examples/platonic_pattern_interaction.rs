@@ -18,7 +18,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("role_unbinding_similarity,{:.6}", report.role_unbinding_similarity);
     println!("bundling_ablation_similarity,{:.6}", report.bundling_ablation_similarity);
     println!("binding_ablation_advantage,{:.6}", report.binding_ablation_advantage);
-    println!("antipattern_cancellation_abs_similarity,{:.6}", report.antipattern_cancellation_abs_similarity);
+    println!(
+        "antipattern_cancellation_abs_similarity,{:.6}",
+        report.antipattern_cancellation_abs_similarity
+    );
     println!("sequence_order_similarity,{:.6}", report.sequence_order_similarity);
     println!("basis_equivariance_exact,{}", report.basis_equivariance_exact);
 
@@ -43,9 +46,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         );
     }
 
-    Ok(())
-}
-
     println!();
     println!("associations,mean_target_similarity,mean_max_distractor_similarity,recall_at_1");
     for result in &report.associative_capacity_results {
@@ -57,3 +57,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             result.recall_at_1
         );
     }
+
+    Ok(())
+}
