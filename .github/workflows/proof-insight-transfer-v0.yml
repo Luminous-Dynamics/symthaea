@@ -502,6 +502,15 @@ jobs:
           traversal_timeline["timeline_path"] = "../outside.csv"
           mutants.append(traversal_timeline)
 
+          proof_marked_solver_visible = copy.deepcopy(manifest)
+          proof_marked_solver_visible["artifacts"][1]["available_at_position"] = 0
+          mutants.append(proof_marked_solver_visible)
+
+          theorem_marked_evaluator_only = copy.deepcopy(manifest)
+          theorem_marked_evaluator_only["artifacts"][0]["available_at_position"] = None
+          theorem_marked_evaluator_only["artifacts"][0]["target_position"] = 0
+          mutants.append(theorem_marked_evaluator_only)
+
           unknown_authority_field = copy.deepcopy(manifest)
           unknown_authority_field["trusted"] = True
           mutants.append(unknown_authority_field)
