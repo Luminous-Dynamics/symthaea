@@ -486,6 +486,26 @@ mod tests {
                 .unwrap()
                 .contains("Finite stochastic GA search cannot establish")
         );
+        let ranking = &plan["published_ranking_settings"];
+        assert_eq!(
+            ranking["rbo_persistence"],
+            serde_json::json!(0.94)
+        );
+        assert_eq!(ranking["kendall_tau_variant"], "tau_b");
+        assert_eq!(
+            ranking["kendall_tau_energy_tie_tolerance_eV"],
+            serde_json::json!(0.0)
+        );
+        assert_eq!(
+            ranking["exact_energy_tie_order"],
+            "canonical_structure_id_ascending"
+        );
+        assert!(
+            ranking["common_candidate_set"]
+                .as_str()
+                .unwrap()
+                .contains("same canonical structure IDs")
+        );
         let fingerprint = &plan["published_result_fingerprint"];
         assert_eq!(fingerprint["status"], "paper_reported_not_reproduced");
         assert_eq!(fingerprint["system_count"], serde_json::json!(12));
