@@ -83,7 +83,14 @@
       "The current finite case structure is tailored to the rank-one projectors in ℝ⁴ and ten sets; no extension to arbitrary dimensions is established.",
       "The proof of the combinatorial obstruction may carry substantial domain-specific case analysis; the high-level strategy alone does not provide such a certificate."
     ],
-    "transfer_candidates": []
+    "transfer_candidates": [
+      {
+        "target_family_id": "157",
+        "rationale": "Metadata-only candidate for review: the frozen catalog title is “Graph coloring, clique minors, and Colin de Verdière invariants,” a distinct graph-theoretic family where a finite combinatorial obstruction may be relevant. This is a hypothesis based on catalog metadata only; no target proof or Lean artifact has been inspected here, and no structural correspondence is asserted.",
+        "preconditions_checked": [],
+        "status": "untriaged"
+      }
+    ]
   },
   "verification": {
     "status": "not_attempted",
@@ -150,7 +157,8 @@
       "Family 156 is assigned to train in the frozen split manifest; this selection was checked before inspecting the proof for this candidate.",
       "statement_digest is SHA-256 of the exact UTF-8 bytes stored in theorem.statement_text, extracted from the pinned theorem signature. It is not a normalized/elaborated Lean expression digest.",
       "The manuscript license state remains needs_review; no manuscript text is reproduced beyond short technical locators/excerpts from the public Lean source.",
-      "The strategy is a research hypothesis for transfer, not evidence that transfer has succeeded."
+      "The strategy is a research hypothesis for transfer, not evidence that transfer has succeeded.",
+      "Untriaged target family 157 was selected from the frozen catalog metadata after confirming it is a distinct train family; no target proof was inspected and this is not a transfer attempt."
     ]
   }
 }
