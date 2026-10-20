@@ -425,6 +425,38 @@ mod tests {
             plan["search_protocol"]["offspring_operators"],
             serde_json::json!(["cut_and_splice", "mutation"])
         );
+        let refinement = &plan["published_candidate_refinement"];
+        assert_eq!(
+            refinement["selected_candidates_per_model_per_stratum"],
+            serde_json::json!(50)
+        );
+        assert_eq!(
+            refinement["dft_refined_candidates_per_stratum"],
+            serde_json::json!(150)
+        );
+        assert_eq!(
+            refinement["implied_total_dft_refinements_across_all_strata"],
+            serde_json::json!(1800)
+        );
+        assert_eq!(
+            refinement["exact_dft_settings_status"],
+            "unresolved_before_execution"
+        );
+        let policy_extension = &plan["policy_comparison"];
+        assert_eq!(
+            policy_extension["paired_campaign_count"],
+            serde_json::json!(20)
+        );
+        assert_eq!(policy_extension["same_seed_across_policies"], true);
+        assert_eq!(
+            policy_extension["stretch_gate"]["status"],
+            "proposed_not_achieved"
+        );
+        assert_eq!(
+            policy_extension["stretch_gate"]["requires_same_frozen_target_for_both_policies"],
+            true
+        );
+
         let strata = plan["strata"]
             .as_array()
             .expect("campaign strata must be an array");
