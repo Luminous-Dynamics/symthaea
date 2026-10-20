@@ -17,6 +17,7 @@ pub mod audit_evidence;
 pub mod authority_epoch;
 pub mod automatic_rollback;
 pub mod autonomy_loop;
+pub mod atomfab_pcb_route;
 pub mod blueprint;
 pub mod bsp;
 pub mod building;
