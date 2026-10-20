@@ -2365,10 +2365,19 @@ fn git_commit_exists(root: &Path, commit: &str) -> Result<bool> {
     let output = Command::new("git")
         .arg("-C")
         .arg(root)
-        .args(["cat-file", "-e", revision.as_str()])
+        .args(["rev-parse", "--verify", "--quiet", revision.as_str()])
         .output()
-        .with_context(|| format!("failed to test historical commit object {commit}"))?;
-    Ok(output.status.success())
+        .with_context(|| format!("failed to resolve historical commit object {commit}"))?;
+    if output.status.success() {
+        Ok(true)
+    } else if output.status.code() == Some(1) {
+        Ok(false)
+    } else {
+        bail!(
+            "git rev-parse failed while checking historical commit object {commit}: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        )
+    }
 }
 
 fn git_path_exists_at_commit(root: &Path, commit: &str, path: &str) -> Result<bool> {
