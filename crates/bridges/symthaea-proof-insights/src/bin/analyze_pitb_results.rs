@@ -1469,9 +1469,10 @@ fn validate_power_report(
                 let standard_error = scenario
                     .monte_carlo_standard_error
                     .context("estimated power scenario has no Monte Carlo standard error")?;
-                if [power, lower, upper, standard_error].iter().any(|value| {
-                    !value.is_finite() || *value < 0.0 || *value > 1.0
-                }) || lower > power + 1e-12
+                if [power, lower, upper, standard_error]
+                    .iter()
+                    .any(|value| !value.is_finite() || *value < 0.0 || *value > 1.0)
+                    || lower > power + 1e-12
                     || power > upper + 1e-12
                     || scenario.utility_gate_passes > report.study_simulations
                 {
@@ -1499,14 +1500,12 @@ fn validate_power_report(
                 .scenarios
                 .iter()
                 .find(|scenario| {
-                    (scenario.true_treatment_effect_percentage_points - effect_pp).abs()
-                        <= 1e-12
+                    (scenario.true_treatment_effect_percentage_points - effect_pp).abs() <= 1e-12
                         && (scenario.assumed_family_icc - icc).abs() <= 1e-12
                 })
                 .context("power report lacks a required effect/ICC scenario")?;
             let scenario_seed = config.bootstrap_seed.wrapping_add(
-                (effect_index * expected_iccs.len() + icc_index) as u64
-                    * 0x9E37_79B9_7F4A_7C15,
+                (effect_index * expected_iccs.len() + icc_index) as u64 * 0x9E37_79B9_7F4A_7C15,
             );
             let expected = simulate_power_scenario(
                 &expected_family_rows,
@@ -1563,19 +1562,24 @@ fn validate_power_report(
         .filter(|scenario| scenario.true_treatment_effect_percentage_points.abs() <= 1e-12)
         .filter_map(|scenario| scenario.estimated_power_upper_95)
         .reduce(f64::max);
-    if !same_optional_probability(report.null_effect_false_claim_probability_max, max_null_power)
-        || !same_optional_probability(
-            report.null_effect_false_claim_probability_upper_95_max,
-            max_null_upper,
-        )
-    {
+    if !same_optional_probability(
+        report.null_effect_false_claim_probability_max,
+        max_null_power,
+    ) || !same_optional_probability(
+        report.null_effect_false_claim_probability_upper_95_max,
+        max_null_upper,
+    ) {
         bail!("power report null-effect false-claim maxima do not match its scenario rows");
     }
 
-    let worst_case = report.scenarios.iter().find(|scenario| {
-        (scenario.true_treatment_effect_percentage_points - 20.0).abs() <= 1e-12
-            && (scenario.assumed_family_icc - 0.20).abs() <= 1e-12
-    }).context("power report lacks the +20pp/ICC 0.20 design scenario")?;
+    let worst_case = report
+        .scenarios
+        .iter()
+        .find(|scenario| {
+            (scenario.true_treatment_effect_percentage_points - 20.0).abs() <= 1e-12
+                && (scenario.assumed_family_icc - 0.20).abs() <= 1e-12
+        })
+        .context("power report lacks the +20pp/ICC 0.20 design scenario")?;
     if !same_optional_probability(
         report.estimated_power_at_20pp_and_icc_020,
         worst_case.estimated_utility_gate_power,
