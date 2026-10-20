@@ -451,8 +451,9 @@ impl Rk45Integrator {
 
     /// Take one adaptive step, returning (new_state, actual_dt, error_estimate).
     ///
-    /// This is the core method; the `Integrator` trait's `step` wraps it with
-    /// a fixed-dt interface for compatibility with `simulate()`.
+    /// This is the core method. The checked simulation driver uses
+    /// `step_with_dt` to advance by each accepted substep; the legacy `step`
+    /// method repeats adaptive substeps until the full requested interval elapses.
     pub fn adaptive_step(
         &self,
         system: &dyn DynamicalSystem,
