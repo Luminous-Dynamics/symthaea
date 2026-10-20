@@ -409,10 +409,8 @@ mod tests {
 
     #[test]
     fn malformed_disposition_and_duplicate_id_are_rejected() {
-        let fixture: serde_json::Value = serde_json::from_str(include_str!(
-            "../fixtures/failure-mode-records-v1.json"
-        ))
-        .unwrap();
+        let fixture: serde_json::Value =
+            serde_json::from_str(include_str!("../fixtures/failure-mode-records-v1.json")).unwrap();
         let mut records: Vec<FailureRecord> =
             serde_json::from_value(fixture["records"].clone()).unwrap();
         records[0].failure_mode = Some(FailureMode::GeometryCollapse);
