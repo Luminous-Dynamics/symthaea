@@ -258,7 +258,7 @@ fn write_paired_deltas(groups: &BTreeMap<ConditionKey, EpisodesBySeed>, path: &s
             continue;
         }
         let unshielded_rows = groups
-            .get(&(scenario.clone(), policy.clone(), false))
+            .get(&(scenario.to_string(), policy.to_string(), false))
             .ok_or_else(|| invalid_data(format!("missing unshielded pair for {scenario}/{policy}")))?;
         if shielded_rows.len() != unshielded_rows.len() {
             return Err(invalid_data(format!("paired sample count mismatch for {scenario}/{policy}")).into());
