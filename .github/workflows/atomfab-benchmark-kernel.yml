@@ -49,13 +49,13 @@ jobs:
         run: cargo fmt --package symthaea-atomfab -- --check
 
       - name: Test AtomFab metrics, contracts, campaigns, and registry
-        run: cargo test -p symthaea-atomfab
+        run: cargo test --locked -p symthaea-atomfab
 
-      - name: Capture Cargo lockfile resolution delta
+      - name: Verify Cargo.lock remains unchanged
         if: always()
         run: |
-          git diff -- Cargo.lock
-          git status --short Cargo.lock
+          git diff --exit-code -- Cargo.lock
+          test -z "$(git status --short -- Cargo.lock)"
 
       - name: Validate embedded benchmark registry
         run: cargo run --locked -p symthaea-atomfab --bin atomfab-validate-registry
