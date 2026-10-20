@@ -1971,8 +1971,6 @@ mod tests {
             (Style::Celtic, D::JigDrive),    // 3+3 jig cell takes priority over drone
             (Style::Blues, D::JazzLaidBack), // Shuffle cell + swung eighths
             (Style::Impressionism, D::ImpressionistFloat),
-            (Style::Tango, D::TangoRubato),
-            (Style::Flamenco, D::CompasDrive),
             (Style::SacredChoral, D::ChoraleAnchored),
             (Style::Minimalism, D::ProcessExact), // additive process
             (Style::JazzBallad, D::JazzLaidBack), // swing 0.58 + 7th chords
@@ -2050,6 +2048,8 @@ mod tests {
             (Style::Waltz, D::WaltzLilt),
             (Style::Nocturne, D::NocturneBreath),
             (Style::Impressionism, D::ImpressionistFloat),
+            (Style::Tango, D::TangoRubato),
+            (Style::Flamenco, D::CompasDrive),
             (Style::SacredChoral, D::ChoraleAnchored),
             (Style::Folk, D::FolkLift),
             (Style::ModalFolk, D::FolkLift),
