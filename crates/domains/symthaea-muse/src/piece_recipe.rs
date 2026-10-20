@@ -786,8 +786,7 @@ mod tests {
             Style::Tango.spec(),
             RendererRecipe::new("native", 48_000, "0.1.0", "0.1.0"),
         );
-        recipe.renderer.performance_dialect =
-            Some(Style::Tango.grammar_profile().performance);
+        recipe.renderer.performance_dialect = Some(Style::Tango.grammar_profile().performance);
 
         let encoded = serde_json::to_value(&recipe).unwrap();
         assert_eq!(encoded["schema_version"], PIECE_RECIPE_SCHEMA_VERSION);
@@ -809,5 +808,4 @@ mod tests {
         assert_eq!(restored_legacy.schema_version, 3);
         assert_eq!(restored_legacy.renderer.performance_dialect, None);
     }
-
 }
