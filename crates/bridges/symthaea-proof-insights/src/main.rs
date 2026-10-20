@@ -2437,6 +2437,17 @@ mod tests {
         assert!(!first_bundle_text.contains("exact True.intro"));
         assert!(!first_bundle_text.contains("proof-000"));
 
+        let forbidden_output_path = root.join("must-not-be-created.json");
+        let output_error = materialize_temporal_target(
+            &root,
+            &manifest_path,
+            "target-001",
+            &forbidden_output_path,
+        )
+        .expect_err("materialization output must remain outside the checked-out repository");
+        assert!(format!("{output_error:#}").contains("outside the pinned repository checkout"));
+        assert!(!forbidden_output_path.exists());
+
         assert!(
             git(&root, &["status", "--porcelain"]).is_empty(),
             "fixture checkout must remain clean after verification"
