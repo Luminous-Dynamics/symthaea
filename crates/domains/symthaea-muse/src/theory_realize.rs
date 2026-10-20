@@ -42,7 +42,7 @@ use symthaea_music_theory::{MusicalIntent, Score as TheoryScore, Style};
 /// profiles are explicit engineering hypotheses awaiting blinded audio
 /// calibration—not evidence of historical authenticity. Folk, Lullaby,
 /// Sarabande, Minuet, Waltz, Celtic jig, nocturne, chorale, planing,
-/// Tango, and compás add routed profiles, still provisional.
+/// Tango, compás, and cinematic build add routed profiles, still provisional.
 /// [`PerformanceDialect::ClassicalRubato`] remains the identity — every
 /// factor exactly 1.0 — so its renders remain bit-identical to pre-dialect behavior.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -122,6 +122,10 @@ pub enum PerformanceDialect {
     /// 12-beat cycle while retaining some expressive accent shaping.
     /// Calibration hypothesis, not an authenticity claim.
     CompasDrive,
+    /// Cinematic build prototype: slightly broaden phrase and climax emphasis
+    /// so the performed timing supports the existing intensifying score arc.
+    /// The score's development and crescendo remain the primary mechanism.
+    CinematicArc,
     /// Blues/jazz: laid-back time. Jitter up (1.3x), phrase-final rubato
     /// and the expressive blend both kept — a jazz ballad leans harder
     /// into time than a classical player, never less.
@@ -148,6 +152,7 @@ impl PerformanceDialect {
             PerformanceDialect::ImpressionistFloat => 1.1,
             PerformanceDialect::TangoRubato => 0.9,
             PerformanceDialect::CompasDrive => 0.4,
+            PerformanceDialect::CinematicArc => 1.1,
             PerformanceDialect::DanceLocked => 0.25,
             PerformanceDialect::ProcessExact => 0.1,
         }
@@ -172,6 +177,7 @@ impl PerformanceDialect {
             PerformanceDialect::ImpressionistFloat => 0.8,
             PerformanceDialect::TangoRubato => 1.1,
             PerformanceDialect::CompasDrive => 0.55,
+            PerformanceDialect::CinematicArc => 1.2,
             PerformanceDialect::DanceLocked => 0.25,
             PerformanceDialect::ProcessExact => 0.1,
         }
@@ -194,6 +200,7 @@ impl PerformanceDialect {
             PerformanceDialect::ImpressionistFloat => 0.65,
             PerformanceDialect::TangoRubato => 0.85,
             PerformanceDialect::CompasDrive => 0.45,
+            PerformanceDialect::CinematicArc => 1.1,
             PerformanceDialect::FolkLift => 0.6,
             PerformanceDialect::DanceLocked => 0.25,
             PerformanceDialect::ProcessExact => 0.1,
@@ -217,6 +224,7 @@ impl PerformanceDialect {
             PerformanceDialect::ImpressionistFloat => 0.9,
             PerformanceDialect::TangoRubato => 0.8,
             PerformanceDialect::CompasDrive => 0.4,
+            PerformanceDialect::CinematicArc => 0.9,
             PerformanceDialect::DanceLocked => 0.6,
             PerformanceDialect::ProcessExact => 0.4,
             PerformanceDialect::FolkLift => 1.2,
@@ -245,6 +253,7 @@ impl PerformanceDialect {
             PerformanceDialect::ImpressionistFloat => 0.75,
             PerformanceDialect::TangoRubato => 1.1,
             PerformanceDialect::CompasDrive => 0.65,
+            PerformanceDialect::CinematicArc => 1.1,
             PerformanceDialect::DanceLocked => 0.4,
             PerformanceDialect::ProcessExact => 0.0,
         }
@@ -272,16 +281,18 @@ impl PerformanceDialect {
 /// 9. `JigGait` → [`PerformanceDialect::JigDrive`] before the drone fallback
 /// 10. `Habanera` → [`PerformanceDialect::TangoRubato`], and `CompasGait` →
 ///     [`PerformanceDialect::CompasDrive`]
-/// 11. remaining rhythm cells (Montuno/BossaComp/Shuffle), non-straight
+/// 11. `DevelopmentDna::Intensifying` → [`PerformanceDialect::CinematicArc`]
+///     after the more specific Flamenco compás route
+/// 12. remaining rhythm cells (Montuno/BossaComp/Shuffle), non-straight
 ///     swing, or a full backbeat kit → groove: with a jazz marker (Shuffle,
 ///     swing ≠ 0.5, or `seventh_chords`) → [`PerformanceDialect::JazzLaidBack`],
 ///     else [`PerformanceDialect::DanceLocked`]
-/// 12. `roll_ornaments` or `drone` → [`PerformanceDialect::FolkLift`]
-/// 13. `PhraseRhetoric::Chorale` → [`PerformanceDialect::ChoraleAnchored`]
+/// 13. `roll_ornaments` or `drone` → [`PerformanceDialect::FolkLift`]
+/// 14. `PhraseRhetoric::Chorale` → [`PerformanceDialect::ChoraleAnchored`]
 ///     (reduce extra performance-layer stretch around the written hold)
-/// 14. `PhraseRhetoric::Singing` → [`PerformanceDialect::NocturneBreath`]
+/// 15. `PhraseRhetoric::Singing` → [`PerformanceDialect::NocturneBreath`]
 ///     (after stronger rhythm/process/folk markers)
-/// 15. everything else → [`PerformanceDialect::ClassicalRubato`] (the identity)
+/// 16. everything else → [`PerformanceDialect::ClassicalRubato`] (the identity)
 ///
 /// Remaining presets use ClassicalRubato as a neutral identity until a separate
 /// rhythmic/performance contract is justified; this baseline is not an assertion
@@ -328,6 +339,9 @@ pub fn dialect_for_spec(spec: &symthaea_music_theory::CompositionSpec) -> Perfor
     }
     if spec.accompaniment_pool.contains(&A::CompasGait) {
         return PerformanceDialect::CompasDrive;
+    }
+    if spec.development == symthaea_music_theory::spec::DevelopmentDna::Intensifying {
+        return PerformanceDialect::CinematicArc;
     }
     let has_shuffle = spec.accompaniment_pool.contains(&A::Shuffle);
     let has_groove_cell = has_shuffle
@@ -1959,7 +1973,7 @@ mod tests {
             (Style::Waltz, D::WaltzLilt),
             // Folk's picked pulse is its explicit clock marker.
             (Style::Folk, D::FolkLift),
-            (Style::Cinematic, D::ClassicalRubato),
+            (Style::Cinematic, D::CinematicArc),
             (Style::Playful, D::DanceLocked), // full backbeat kit
             (Style::Nocturne, D::NocturneBreath),
             (Style::March, D::MarchLocked),
@@ -2048,6 +2062,7 @@ mod tests {
             (Style::Waltz, D::WaltzLilt),
             (Style::Nocturne, D::NocturneBreath),
             (Style::Impressionism, D::ImpressionistFloat),
+            (Style::Cinematic, D::CinematicArc),
             (Style::Tango, D::TangoRubato),
             (Style::Flamenco, D::CompasDrive),
             (Style::SacredChoral, D::ChoraleAnchored),
@@ -2138,6 +2153,7 @@ mod tests {
     fn style_dialect_hypotheses_are_non_identity_and_explicit() {
         use PerformanceDialect as D;
         let classical = D::ClassicalRubato;
+        let cinematic = D::CinematicArc;
         let tango = D::TangoRubato;
         let compas = D::CompasDrive;
         let impressionist = D::ImpressionistFloat;
@@ -2160,6 +2176,13 @@ mod tests {
         assert_eq!(jig.expressive_blend_scale(), 0.85);
         assert!(jig.cadence_scale() < classical.cadence_scale());
         assert!(jig.jitter_scale() < D::FolkLift.jitter_scale());
+
+        assert_eq!(cinematic.breath_scale(), 1.1);
+        assert_eq!(cinematic.climax_scale(), 1.2);
+        assert_eq!(cinematic.cadence_scale(), 1.1);
+        assert_eq!(cinematic.jitter_scale(), 0.9);
+        assert_eq!(cinematic.expressive_blend_scale(), 1.1);
+        assert!(cinematic.climax_scale() > classical.climax_scale());
 
         assert_eq!(tango.breath_scale(), 0.9);
         assert_eq!(tango.climax_scale(), 1.1);
