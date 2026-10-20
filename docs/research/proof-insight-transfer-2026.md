@@ -200,13 +200,14 @@ Before publishing any claim of “state of the art,” perform a dated source re
 - Add `symthaea-proof-insights`, a Rust-first indexer that pins the OpenAI math checkout to an expected commit, rejects dirty worktrees, fingerprints the source catalog and Comparator scope notes, extracts family links, and emits explicit matched/unmatched formalization-source accounting.
 - Add `data/benchmarks/proof-insight-transfer-v0/splits.json`: frozen deterministic 70/15/15 family assignments for the pinned 372-family catalog (260/56/56), 961 unique internal paths across family records, source SHA-256 fingerprints, and a partition digest. The SHA-256 implementation was checked against the standard `abc` test vector; the split is an independent manifest until matched against Rust-generated output.
 - Add a `--verify-splits` mode to the Rust indexer to compare generated and frozen family IDs/assignments, source commit, and partition digest.
-- Unit tests are authored for family extraction, path normalization, duplicate-family rejection, catalogue-claim consistency, and deterministic split assignment.
-- **Verification boundary:** the authoring environment lacked a local Rust toolchain, so the Rust tests and indexer have not yet been executed. The independent static split manifest's hash implementation passes the standard SHA-256 `abc` vector, but the manifest has not yet been matched against Rust output. The JSON Schema has been JSON-parsed and structurally smoke-checked, not passed through an independent JSON Schema validator.
+- The indexer now inventories every distinct local path linked from the catalogue. Present files contribute exact-byte SHA-256/byte counts to the canonical fingerprint set; missing links remain explicit rows with null digests and summary counts. Conflicting fingerprints for one path fail closed.
+- Unit tests cover family extraction, path normalization, duplicate-family rejection, catalogue-claim consistency, deterministic splits, and synthetic present/missing catalogue-link inventory.
+- A dedicated `.github/workflows/proof-insight-transfer-v0.yml` runs the target crate's formatting, unit tests and Clippy; re-indexes the pinned OpenAI Math snapshot twice and compares deterministic outputs; and validates the insight-record schema with a full Draft 2020-12 validator plus synthetic positive/negative controls. The run must still be checked at the final exact PR head before claiming qualification.
 
 ### Milestone 1 — validate and close data-integrity gaps
-- Run `cargo test -p symthaea-proof-insights` in a Rust-enabled checkout, then execute the indexer against the pinned upstream snapshot.
-- Inspect every unmatched formalization-source path, and compare output family/source/declaration counts against the upstream files; add negative fixtures for missing artifacts, duplicate paths, unknown manifest versions, dirty worktrees, and mismatched commits.
-- Independently validate the insight-record JSON Schema and validate generated records against it.
+- Confirm the dedicated exact-head workflow passes on the final revision, then inspect catalogue-link and formalization-source missing/unmatched inventories from the generated report.
+- Compare output family/source/declaration/link counts and the partition digest against pinned source files; keep missing links, unknown version, path traversal, dirty worktree, duplicate family/path, mismatched commit and digest controls as explicit rejection tests.
+- Retain the independent Draft 2020-12 schema validator and synthetic negative controls in CI; later validate a manually reviewed pilot of real insight records.
 - Acceptance: all catalog entries accounted for as included/excluded/unknown; no silent omissions; exact source commit and file digests present; clean-room rerun yields identical output bytes.
 
 ### Milestone 2 — manually audited pilot
