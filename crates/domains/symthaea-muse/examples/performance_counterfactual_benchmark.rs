@@ -83,8 +83,8 @@ struct Summary {
     total_changed_onsets: usize,
     matched_event_fraction: Option<f64>,
     changed_onset_fraction: Option<f64>,
-    median_abs_onset_shift_ms: Option<f64>,
-    p95_abs_onset_shift_ms: Option<f64>,
+    median_case_median_abs_onset_shift_ms: Option<f64>,
+    p95_case_median_abs_onset_shift_ms: Option<f64>,
 }
 
 #[derive(Clone, Copy)]
@@ -310,8 +310,8 @@ fn summarize(cases: &[CaseReport]) -> Summary {
             .then(|| total_matched_events as f64 / total_actual_events as f64),
         changed_onset_fraction: (total_matched_events > 0)
             .then(|| total_changed_onsets as f64 / total_matched_events as f64),
-        median_abs_onset_shift_ms: quantile(&mut shifts, 0.5),
-        p95_abs_onset_shift_ms: quantile(&mut shifts, 0.95),
+        median_case_median_abs_onset_shift_ms: quantile(&mut shifts, 0.5),
+        p95_case_median_abs_onset_shift_ms: quantile(&mut shifts, 0.95),
     }
 }
 
