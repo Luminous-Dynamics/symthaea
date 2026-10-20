@@ -1,0 +1,409 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/crates/domains/symthaea-atomfab/schemas/supported-cu-alumina-reference-campaign-v1.schema.json",
+  "title": "AtomFab Supported Cu/Alumina Reference Campaign Plan v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "campaign_id",
+    "status",
+    "objective",
+    "claim_ceiling",
+    "sources",
+    "reference_method",
+    "search_protocol",
+    "primary_model_baselines",
+    "secondary_baselines_to_evaluate_after_exact_reproduction",
+    "strata",
+    "required_pins_before_execution",
+    "metrics",
+    "gates"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "campaign_id": {
+      "const": "atomfab-supported-cu-alumina-reference-v1"
+    },
+    "status": {
+      "const": "proposed_not_executed"
+    },
+    "objective": {
+      "type": "string",
+      "minLength": 1
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sources": {
+      "type": "object",
+      "required": [
+        "benchmark_paper",
+        "related_dataset_record",
+        "related_dataset_artifacts",
+        "published_evaluation_manifest"
+      ],
+      "properties": {
+        "benchmark_paper": {
+          "type": "object",
+          "required": [
+            "doi",
+            "url",
+            "role"
+          ],
+          "properties": {
+            "doi": {
+              "const": "10.1038/s41524-026-02043-8"
+            },
+            "url": {
+              "type": "string",
+              "format": "uri"
+            },
+            "role": {
+              "type": "string"
+            }
+          }
+        },
+        "related_dataset_record": {
+          "type": "object",
+          "required": [
+            "doi",
+            "url",
+            "role",
+            "status"
+          ],
+          "properties": {
+            "doi": {
+              "const": "10.5281/zenodo.15865800"
+            },
+            "url": {
+              "type": "string",
+              "format": "uri"
+            },
+            "role": {
+              "type": "string"
+            },
+            "status": {
+              "const": "not_materialized"
+            }
+          },
+          "additionalProperties": false
+        },
+        "related_dataset_artifacts": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "object",
+            "required": [
+              "filename",
+              "source_record_md5",
+              "sha256",
+              "bytes",
+              "status"
+            ],
+            "properties": {
+              "filename": {
+                "type": "string"
+              },
+              "source_record_md5": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{32}$"
+              },
+              "sha256": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "bytes": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "status": {
+                "enum": [
+                  "not_downloaded",
+                  "materialized"
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "published_evaluation_manifest": {
+          "type": "object",
+          "required": [
+            "status",
+            "note"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "unresolved",
+                "pinned"
+              ]
+            },
+            "note": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "reference_method": {
+      "type": "object",
+      "required": [
+        "family",
+        "exchange_correlation",
+        "electronic_structure_code",
+        "pseudopotential_or_basis_digest",
+        "plane_wave_cutoff",
+        "k_point_mesh",
+        "electronic_convergence_tolerance",
+        "ionic_relaxation_tolerance",
+        "dispersion_correction",
+        "units",
+        "status",
+        "gate"
+      ],
+      "properties": {
+        "family": {
+          "const": "DFT"
+        },
+        "exchange_correlation": {
+          "type": "string"
+        },
+        "electronic_structure_code": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "pseudopotential_or_basis_digest": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "plane_wave_cutoff": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "k_point_mesh": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "electronic_convergence_tolerance": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "ionic_relaxation_tolerance": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "dispersion_correction": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "units": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "status": {
+          "enum": [
+            "unresolved_before_execution",
+            "pinned"
+          ]
+        },
+        "gate": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "search_protocol": {
+      "type": "object",
+      "required": [
+        "algorithm",
+        "source",
+        "population_size",
+        "generations",
+        "initial_population",
+        "offspring_operators",
+        "additional_published_details",
+        "status"
+      ],
+      "properties": {
+        "algorithm": {
+          "const": "genetic_algorithm"
+        },
+        "source": {
+          "type": "string"
+        },
+        "population_size": {
+          "const": 50
+        },
+        "generations": {
+          "const": 20
+        },
+        "initial_population": {
+          "const": "randomly_generated_structures"
+        },
+        "offspring_operators": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "enum": [
+              "cut_and_splice",
+              "mutation"
+            ]
+          }
+        },
+        "additional_published_details": {
+          "type": "string"
+        },
+        "status": {
+          "const": "partial_parameters_transcribed_not_reproduced"
+        }
+      },
+      "additionalProperties": false
+    },
+    "primary_model_baselines": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "role",
+          "checkpoint_digest",
+          "license_terms_status",
+          "execution_status"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "checkpoint_digest": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "license_terms_status": {
+            "type": "string"
+          },
+          "execution_status": {
+            "const": "not_run"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "secondary_baselines_to_evaluate_after_exact_reproduction": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "strata": {
+      "type": "array",
+      "minItems": 12,
+      "items": {
+        "type": "object",
+        "required": [
+          "stratum_id",
+          "nanoparticle",
+          "copper_atom_count",
+          "support_surface",
+          "support_surface_id",
+          "expected_model_domain_note",
+          "split_group_key",
+          "status"
+        ],
+        "properties": {
+          "stratum_id": {
+            "type": "string"
+          },
+          "nanoparticle": {
+            "const": "Cu"
+          },
+          "copper_atom_count": {
+            "enum": [
+              27,
+              38,
+              47,
+              55
+            ]
+          },
+          "support_surface": {
+            "enum": [
+              "γ-Al2O3(100)",
+              "γ-Al2O3(110)",
+              "α-Al2O3(0001)"
+            ]
+          },
+          "support_surface_id": {
+            "type": "string"
+          },
+          "expected_model_domain_note": {
+            "type": "string"
+          },
+          "split_group_key": {
+            "type": "string"
+          },
+          "status": {
+            "const": "planned"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "required_pins_before_execution": {
+      "type": "array",
+      "minItems": 8,
+      "items": {
+        "type": "string"
+      }
+    },
+    "metrics": {
+      "type": "array",
+      "minItems": 8,
+      "items": {
+        "type": "string"
+      }
+    },
+    "gates": {
+      "type": "array",
+      "minItems": 7,
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "$comment": "This is an unexecuted campaign plan. The schema intentionally permits missing SHA-256 file/checkpoint digests only because status is proposed_not_executed. An executable manifest must use a distinct status/schema and require all pins."
+}
