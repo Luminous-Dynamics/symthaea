@@ -24,6 +24,7 @@
     "invalid_dataset_path_count",
     "commit_before_ancestor_of_head_count",
     "commit_before_not_ancestor_of_head_count",
+    "commit_before_missing_commit_object_count",
     "commit_before_invalid_sha_count",
     "commit_before_ancestor_of_completion_count",
     "statement_match_relation_counts",
@@ -53,6 +54,7 @@
     "invalid_dataset_path_count": {"type": "integer", "minimum": 0},
     "commit_before_ancestor_of_head_count": {"type": "integer", "minimum": 0},
     "commit_before_not_ancestor_of_head_count": {"type": "integer", "minimum": 0},
+    "commit_before_missing_commit_object_count": {"type": "integer", "minimum": 0},
     "commit_before_invalid_sha_count": {"type": "integer", "minimum": 0},
     "commit_before_ancestor_of_completion_count": {"type": "integer", "minimum": 0},
     "statement_match_relation_counts": {
@@ -102,6 +104,7 @@
         "file_path",
         "commit_before",
         "statement_sha256",
+        "commit_before_object_exists",
         "path_join_status",
         "candidate_timeline_positions",
         "matched_completion_commit",
@@ -114,10 +117,11 @@
       "properties": {
         "dataset_position": {"type": "integer", "minimum": 0},
         "dataset_id": {"type": "string", "minLength": 1},
-        "theorem_name": {"type": "string", "minLength": 1},
-        "file_path": {"type": "string", "minLength": 1},
-        "commit_before": {"type": "string", "minLength": 1},
+        "theorem_name": {"type": "string"},
+        "file_path": {"type": "string"},
+        "commit_before": {"type": "string"},
         "statement_sha256": {"$ref": "#/$defs/sha256"},
+        "commit_before_object_exists": {"$ref": "#/$defs/nullableBoolean"},
         "path_join_status": {
           "enum": [
             "unique_path_match",
@@ -147,6 +151,7 @@
             "not_checked_due_to_unmatched_path",
             "not_checked_due_to_invalid_path",
             "statement_check_unavailable",
+            "empty_formal_statement",
             "matches_before_and_completion",
             "matches_pre_state_only",
             "matches_completion_only",
