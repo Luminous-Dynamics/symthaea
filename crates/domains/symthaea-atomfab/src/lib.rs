@@ -66,7 +66,8 @@ pub struct MatchedRankingSummary {
     /// Jaccard overlap of the predicted and reference candidate sets, in [0, 1].
     pub candidate_jaccard: f64,
     /// Ranking overlap calculated only after restricting both rankings to shared IDs.
-    pub shared_candidate_ranking: TopWeightedOverlapSummary,
+    /// None means no candidate IDs were shared, so ranking agreement is undefined.
+    pub shared_candidate_ranking: Option<TopWeightedOverlapSummary>,
 }
 
 /// One process-feasibility prediction compared with an independent reference.
@@ -154,7 +155,6 @@ pub enum BenchmarkError {
     InvalidPersistence,
     RankingLengthMismatch,
     DuplicateRankingId { ranking: &'static str, index: usize },
-    NoSharedRankingCandidates,
     NoComparablePairs,
     ZeroReferenceStructures,
     InvalidRecoveryCounts,
@@ -194,10 +194,6 @@ impl fmt::Display for BenchmarkError {
                     "{ranking} ranking repeats an identifier at index {index}"
                 )
             }
-            Self::NoSharedRankingCandidates => write!(
-                f,
-                "ranking agreement is undefined because no candidate IDs are shared"
-            ),
             Self::NoComparablePairs => write!(f, "no non-tied reference pairs are available"),
             Self::ZeroReferenceStructures => {
                 write!(f, "reference structure count must be greater than zero")
@@ -639,9 +635,6 @@ pub fn matched_candidate_ranking_overlap(
     let predicted_ids: HashSet<u64> = predicted_ranking.iter().copied().collect();
     let reference_ids: HashSet<u64> = reference_ranking.iter().copied().collect();
     let shared_candidate_count = predicted_ids.intersection(&reference_ids).count();
-    if shared_candidate_count == 0 {
-        return Err(BenchmarkError::NoSharedRankingCandidates);
-    }
 
     let union_count = predicted_ids.len() + reference_ids.len() - shared_candidate_count;
     let candidate_jaccard = shared_candidate_count as f64 / union_count as f64;
@@ -655,8 +648,15 @@ pub fn matched_candidate_ranking_overlap(
         .copied()
         .filter(|identifier| predicted_ids.contains(identifier))
         .collect();
-    let shared_candidate_ranking =
-        top_weighted_ranking_overlap(&predicted_shared, &reference_shared, persistence)?;
+    let shared_candidate_ranking = if shared_candidate_count == 0 {
+        None
+    } else {
+        Some(top_weighted_ranking_overlap(
+            &predicted_shared,
+            &reference_shared,
+            persistence,
+        )?)
+    };
 
     if !candidate_jaccard.is_finite() || !(0.0..=1.0).contains(&candidate_jaccard) {
         return Err(BenchmarkError::NonFiniteMetric);
@@ -1091,20 +1091,36 @@ mod tests {
         assert_eq!(summary.reference_candidate_count, 3);
         assert_eq!(summary.shared_candidate_count, 2);
         assert!((summary.candidate_jaccard - 0.5).abs() < 1e-12);
-        assert!((summary.shared_candidate_ranking.normalized_score - 1.0).abs() < 1e-12);
+        assert!(
+            (summary
+                .shared_candidate_ranking
+                .expect("shared candidate set has a defined ranking")
+                .normalized_score
+                - 1.0)
+                .abs()
+                < 1e-12
+        );
 
         let inverted = matched_candidate_ranking_overlap(&[1, 2, 3], &[2, 1, 4], 0.94)
             .expect("shared IDs should remain comparable");
         assert!((inverted.candidate_jaccard - summary.candidate_jaccard).abs() < 1e-12);
-        assert!(inverted.shared_candidate_ranking.normalized_score < 1.0);
+        assert!(
+            inverted
+                .shared_candidate_ranking
+                .expect("shared candidate set has a defined ranking")
+                .normalized_score
+                < 1.0
+        );
     }
 
     #[test]
-    fn matched_ranking_overlap_rejects_no_shared_candidates_and_duplicate_ids() {
-        assert_eq!(
-            matched_candidate_ranking_overlap(&[1, 2], &[3, 4], 0.94),
-            Err(BenchmarkError::NoSharedRankingCandidates)
-        );
+    fn matched_ranking_overlap_keeps_discovery_jaccard_when_no_candidates_are_shared() {
+        let summary = matched_candidate_ranking_overlap(&[1, 2], &[3, 4], 0.94)
+            .expect("disjoint non-empty candidate sets still have defined Jaccard");
+        assert_eq!(summary.shared_candidate_count, 0);
+        assert_eq!(summary.candidate_jaccard, 0.0);
+        assert_eq!(summary.shared_candidate_ranking, None);
+
         assert_eq!(
             matched_candidate_ranking_overlap(&[1, 1], &[1, 2], 0.94),
             Err(BenchmarkError::DuplicateRankingId {
