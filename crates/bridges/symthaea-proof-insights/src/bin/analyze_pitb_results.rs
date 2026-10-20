@@ -510,6 +510,360 @@ fn execute_analysis(args: &BTreeMap<String, String>) -> Result<()> {
     Ok(())
 }
 
+fn execute_power(args: &BTreeMap<String, String>) -> Result<()> {
+    let config_bytes = read_arg(args, "--config")?;
+    let validation_bytes = read_arg(args, "--validation-results")?;
+    let protocol_bytes = read_arg(args, "--protocol")?;
+    let split_bytes = read_arg(args, "--splits")?;
+    let receipt_bytes = read_arg(args, "--baseline-receipt")?;
+    let simulations = args
+        .get("--power-simulations")
+        .context("missing --power-simulations")?
+        .parse::<usize>()
+        .context("parse --power-simulations")?;
+    let bootstrap_replicates = args
+        .get("--power-bootstrap-replicates")
+        .context("missing --power-bootstrap-replicates")?
+        .parse::<usize>()
+        .context("parse --power-bootstrap-replicates")?;
+
+    let config: RunConfig =
+        serde_json::from_slice(&config_bytes).context("parse frozen run config JSON")?;
+    validate_config(&config, &protocol_bytes, &split_bytes, &receipt_bytes)?;
+    let split_manifest: SplitManifest =
+        serde_json::from_slice(&split_bytes).context("parse frozen split manifest JSON")?;
+    let receipt: BaselineSelectionReceipt =
+        serde_json::from_slice(&receipt_bytes).context("parse baseline-selection receipt JSON")?;
+    validate_baseline_receipt(&receipt, &validation_bytes)?;
+    let frozen_families: BTreeMap<String, String> = split_manifest
+        .families
+        .iter()
+        .map(|family| (family.family_id.clone(), family.split.clone()))
+        .collect();
+    let validation_outcomes = parse_target_jsonl(&validation_bytes, "validation")?;
+    let eligible_validation =
+        validate_outcomes(&validation_outcomes, &config, &frozen_families, "validation")?;
+    if eligible_validation.is_empty() {
+        bail!("no eligible validation targets supplied for power planning");
+    }
+    let baseline_scores = compute_baseline_scores(&eligible_validation)?;
+    validate_baseline_scores(&receipt, &baseline_scores)?;
+    let baseline_rate = *baseline_scores
+        .get(&receipt.selected_arm)
+        .context("selected validation baseline has no computed score")?;
+    let mut family_sizes: BTreeMap<String, usize> = BTreeMap::new();
+    for target in &eligible_validation {
+        *family_sizes.entry(target.family_id.clone()).or_default() += 1;
+    }
+    if family_sizes.is_empty() || family_sizes.values().any(|count| *count == 0) {
+        bail!("validation-derived family-size distribution is empty or invalid");
+    }
+    let family_target_counts: Vec<FamilyTargetCount> = family_sizes
+        .into_iter()
+        .map(|(family_id, eligible_target_count)| FamilyTargetCount {
+            family_id,
+            eligible_target_count,
+        })
+        .collect();
+
+    let effect_grid = [0.0_f64, 0.10, 0.15, 0.20];
+    let icc_grid = [0.0_f64, 0.05, 0.10, 0.20];
+    let mut scenarios = Vec::with_capacity(effect_grid.len() * icc_grid.len());
+    for (effect_index, effect) in effect_grid.iter().copied().enumerate() {
+        for (icc_index, icc) in icc_grid.iter().copied().enumerate() {
+            let scenario_seed = config
+                .bootstrap_seed
+                .wrapping_add((effect_index * icc_grid.len() + icc_index) as u64 * 0x9E37_79B9_7F4A_7C15);
+            scenarios.push(simulate_power_scenario(
+                &family_target_counts,
+                baseline_rate,
+                effect,
+                icc,
+                simulations,
+                bootstrap_replicates,
+                scenario_seed,
+            )?);
+        }
+    }
+    let null_effect_false_claim_probability_max = scenarios
+        .iter()
+        .filter(|scenario| scenario.true_treatment_effect_percentage_points == 0.0)
+        .filter_map(|scenario| scenario.estimated_utility_gate_power)
+        .reduce(f64::max);
+    let estimated_power_at_20pp_and_icc_020 = scenarios
+        .iter()
+        .find(|scenario| {
+            (scenario.true_treatment_effect_percentage_points - 20.0).abs() < f64::EPSILON
+                && (scenario.assumed_family_icc - 0.20).abs() < f64::EPSILON
+                && scenario.status == "estimated"
+        })
+        .and_then(|scenario| scenario.estimated_utility_gate_power);
+    let power_gate_passed = family_target_counts.len() >= MIN_CONFIRMATORY_FAMILY_CLUSTERS
+        && estimated_power_at_20pp_and_icc_020
+            .is_some_and(|power| power >= 0.80)
+        && null_effect_false_claim_probability_max.is_some_and(|rate| rate <= 0.05);
+
+    let interpretation = if power_gate_passed {
+        "The validation-derived design met the preregistered simulation gate for a +20pp effect at ICC 0.20 and the empirical zero-effect false-claim gate. This is a design-planning result, not evidence that insight transfer succeeds."
+    } else if family_target_counts.len() < MIN_CONFIRMATORY_FAMILY_CLUSTERS {
+        "The validation-derived eligible sample has fewer than 20 independent families. The design is underpowered by the frozen project floor and cannot support a confirmatory claim."
+    } else {
+        "The simulated design did not meet all preregistered power-planning gates, or the +20pp scenario was infeasible at the observed baseline. Expand the separately sourced eligible set or report the eventual experiment as a pilot; do not lower the gates."
+    }
+    .to_string();
+
+    let report = PowerReport {
+        schema_version: "pitb.power-report.v0",
+        protocol_id: config.protocol_id,
+        protocol_sha256: config.protocol_sha256,
+        run_config_sha256: sha256_hex(&config_bytes),
+        validation_results_sha256: sha256_hex(&validation_bytes),
+        baseline_selection_receipt_sha256: config.baseline_selection_receipt_sha256,
+        split_manifest_sha256: config.split_manifest_sha256,
+        partition_digest_sha256: config.partition_digest_sha256,
+        analyzer_source_sha256: sha256_hex(include_bytes!("analyze_pitb_results.rs")),
+        upstream_commit: split_manifest.upstream.commit,
+        selected_baseline_arm: receipt.selected_arm,
+        eligible_validation_target_count: eligible_validation.len(),
+        eligible_validation_family_count: family_target_counts.len(),
+        validation_baseline_semantic_success_rate: baseline_rate,
+        family_target_counts,
+        assumed_family_icc_grid: icc_grid.to_vec(),
+        true_effect_grid_percentage_points: effect_grid.map(|value| value * 100.0).to_vec(),
+        study_simulations: simulations,
+        bootstrap_replicates_per_simulated_study: bootstrap_replicates,
+        simulation_seed: config.bootstrap_seed,
+        confirmatory_minimum_family_count: MIN_CONFIRMATORY_FAMILY_CLUSTERS,
+        utility_effect_threshold_percentage_points: 10.0,
+        required_power_at_20pp_and_icc_020: 0.80,
+        maximum_false_claim_probability_at_zero_effect: 0.05,
+        null_effect_false_claim_probability_max,
+        estimated_power_at_20pp_and_icc_020,
+        power_gate_passed,
+        scenarios,
+        model_assumptions: vec![
+            "Family sizes are taken from eligible validation outcomes and reused as the projected evaluation-family-size distribution; test eligibility may differ.".to_string(),
+            "A beta-binomial family random effect induces the specified baseline Bernoulli ICC; treatment success shares the same latent family difficulty with its marginal success rate shifted by the scenario effect.".to_string(),
+            "Arm outcomes are sampled independently conditional on family difficulty, so additional within-target pairing correlation is not assumed; this is an explicit approximation, not an empirically estimated ICC.".to_string(),
+            "Each simulated study uses the same target-weighted paired effect, family-with-replacement bootstrap, linear-interpolated percentile lower bound, +10pp point-estimate gate, positive lower-bound gate, and 20-family floor as the confirmatory analyzer. Bootstrap resample count is separately reported.".to_string(),
+            "Power estimates and their Monte Carlo standard errors are design simulations only. They do not constitute measured proof-insight utility or an SOTA comparison.".to_string(),
+        ],
+        interpretation,
+    };
+    let out_path = args.get("--out").context("missing --out path")?;
+    let mut serialized = serde_json::to_vec_pretty(&report).context("serialize power report")?;
+    serialized.push(b'\n');
+    fs::write(out_path, serialized)
+        .with_context(|| format!("write power report to {out_path}"))?;
+    println!(
+        "PITB_POWER_PLAN_COMPLETE baseline={} validation_targets={} eligible_families={} p0={:.3} simulations={} bootstrap_replicates={} power20pp_icc020={} null_false_claim_max={} gate={}",
+        report.selected_baseline_arm,
+        report.eligible_validation_target_count,
+        report.eligible_validation_family_count,
+        report.validation_baseline_semantic_success_rate,
+        report.study_simulations,
+        report.bootstrap_replicates_per_simulated_study,
+        report.estimated_power_at_20pp_and_icc_020
+            .map(|value| format!("{value:.3}"))
+            .unwrap_or_else(|| "infeasible_or_unestimated".to_string()),
+        report.null_effect_false_claim_probability_max
+            .map(|value| format!("{value:.3}"))
+            .unwrap_or_else(|| "unestimated".to_string()),
+        if report.power_gate_passed { "pass" } else { "no_go" }
+    );
+    Ok(())
+}
+
+fn simulate_power_scenario(
+    family_target_counts: &[FamilyTargetCount],
+    baseline_rate: f64,
+    true_effect: f64,
+    icc: f64,
+    simulations: usize,
+    bootstrap_replicates: usize,
+    seed: u64,
+) -> Result<PowerScenario> {
+    if family_target_counts.is_empty() {
+        bail!("power simulation requires at least one eligible family");
+    }
+    if !(0.0..1.0).contains(&icc) {
+        bail!("family ICC must lie in [0,1)");
+    }
+    if !baseline_rate.is_finite()
+        || !(0.0..=1.0).contains(&baseline_rate)
+        || !true_effect.is_finite()
+        || !(0.0..=1.0).contains(&true_effect)
+    {
+        bail!("baseline rate and true effect must be finite probabilities");
+    }
+    if simulations == 0 || bootstrap_replicates == 0 {
+        bail!("simulation and bootstrap replicate counts must be positive");
+    }
+    let treatment_rate = baseline_rate + true_effect;
+    if treatment_rate > 1.0 {
+        return Ok(PowerScenario {
+            status: "infeasible_effect_above_ceiling".to_string(),
+            true_treatment_effect_percentage_points: true_effect * 100.0,
+            assumed_family_icc: icc,
+            study_simulations: simulations,
+            bootstrap_replicates_per_simulated_study: bootstrap_replicates,
+            utility_gate_passes: 0,
+            estimated_utility_gate_power: None,
+            monte_carlo_standard_error: None,
+            mean_observed_effect_percentage_points: None,
+            mean_lower_95ci_percentage_points: None,
+            interpretation: "The requested positive effect would imply a treatment success rate above 100% at this validation baseline.".to_string(),
+        });
+    }
+
+    let clusters = family_target_counts.len();
+    let total_targets: usize = family_target_counts
+        .iter()
+        .map(|family| family.eligible_target_count)
+        .sum();
+    let mut rng = SplitMix64 { state: seed };
+    let mut passes = 0_usize;
+    let mut sum_effect = 0.0;
+    let mut sum_lower = 0.0;
+    for _ in 0..simulations {
+        let simulated_families = simulate_matched_study(
+            family_target_counts,
+            baseline_rate,
+            treatment_rate,
+            icc,
+            &mut rng,
+        );
+        let total_delta: i64 = simulated_families.iter().map(|family| family.paired_delta_sum).sum();
+        let observed_effect = total_delta as f64 / total_targets as f64;
+        let lower = simulated_cluster_bootstrap_lower(
+            &simulated_families,
+            bootstrap_replicates,
+            &mut rng,
+        );
+        sum_effect += observed_effect;
+        sum_lower += lower;
+        if clusters >= MIN_CONFIRMATORY_FAMILY_CLUSTERS && observed_effect >= 0.10 && lower > 0.0 {
+            passes += 1;
+        }
+    }
+    let power = passes as f64 / simulations as f64;
+    Ok(PowerScenario {
+        status: "estimated".to_string(),
+        true_treatment_effect_percentage_points: true_effect * 100.0,
+        assumed_family_icc: icc,
+        study_simulations: simulations,
+        bootstrap_replicates_per_simulated_study: bootstrap_replicates,
+        utility_gate_passes: passes,
+        estimated_utility_gate_power: Some(power),
+        monte_carlo_standard_error: Some((power * (1.0 - power) / simulations as f64).sqrt()),
+        mean_observed_effect_percentage_points: Some(sum_effect / simulations as f64 * 100.0),
+        mean_lower_95ci_percentage_points: Some(sum_lower / simulations as f64 * 100.0),
+        interpretation: if clusters < MIN_CONFIRMATORY_FAMILY_CLUSTERS {
+            "Power is structurally zero for the confirmatory gate because the eligible validation design contains fewer than 20 independent family clusters.".to_string()
+        } else {
+            "Estimated fraction of synthetic matched studies passing the complete primary utility gate under the declared baseline, effect, ICC, and validation-derived family sizes.".to_string()
+        },
+    })
+}
+
+fn simulate_matched_study(
+    family_target_counts: &[FamilyTargetCount],
+    baseline_rate: f64,
+    treatment_rate: f64,
+    icc: f64,
+    rng: &mut SplitMix64,
+) -> Vec<SimulatedFamily> {
+    family_target_counts
+        .iter()
+        .map(|family| {
+            let baseline_family_rate = sample_family_rate(baseline_rate, icc, rng);
+            let treatment_family_rate = treatment_rate_given_baseline_family(
+                baseline_family_rate,
+                baseline_rate,
+                treatment_rate,
+            );
+            let mut delta_sum = 0_i64;
+            for _ in 0..family.eligible_target_count {
+                let baseline_success = rng.uniform01() < baseline_family_rate;
+                let treatment_success = rng.uniform01() < treatment_family_rate;
+                delta_sum += i64::from(treatment_success) - i64::from(baseline_success);
+            }
+            SimulatedFamily {
+                target_count: family.eligible_target_count,
+                paired_delta_sum: delta_sum,
+            }
+        })
+        .collect()
+}
+
+fn sample_family_rate(mean: f64, icc: f64, rng: &mut SplitMix64) -> f64 {
+    if mean <= 0.0 || mean >= 1.0 || icc <= 0.0 {
+        return mean;
+    }
+    let concentration = 1.0 / icc - 1.0;
+    let alpha = mean * concentration;
+    let beta = (1.0 - mean) * concentration;
+    let x = sample_gamma(alpha, rng);
+    let y = sample_gamma(beta, rng);
+    if x + y <= 0.0 { mean } else { x / (x + y) }
+}
+
+fn sample_gamma(shape: f64, rng: &mut SplitMix64) -> f64 {
+    if shape < 1.0 {
+        return sample_gamma(shape + 1.0, rng) * rng.uniform01().powf(1.0 / shape);
+    }
+    let d = shape - 1.0 / 3.0;
+    let c = 1.0 / (9.0 * d).sqrt();
+    loop {
+        let x = rng.normal();
+        let v0 = 1.0 + c * x;
+        if v0 <= 0.0 {
+            continue;
+        }
+        let v = v0 * v0 * v0;
+        let u = rng.uniform01();
+        if u < 1.0 - 0.0331 * x.powi(4)
+            || u.ln() < 0.5 * x * x + d * (1.0 - v + v.ln())
+        {
+            return d * v;
+        }
+    }
+}
+
+fn treatment_rate_given_baseline_family(
+    baseline_family_rate: f64,
+    baseline_rate: f64,
+    treatment_rate: f64,
+) -> f64 {
+    if treatment_rate >= baseline_rate && baseline_rate < 1.0 {
+        1.0 - (1.0 - baseline_family_rate) * (1.0 - treatment_rate) / (1.0 - baseline_rate)
+    } else if treatment_rate < baseline_rate && baseline_rate > 0.0 {
+        baseline_family_rate * treatment_rate / baseline_rate
+    } else {
+        treatment_rate
+    }
+}
+
+fn simulated_cluster_bootstrap_lower(
+    families: &[SimulatedFamily],
+    replicates: usize,
+    rng: &mut SplitMix64,
+) -> f64 {
+    let mut values = Vec::with_capacity(replicates);
+    for _ in 0..replicates {
+        let mut delta_sum = 0_i64;
+        let mut target_count = 0_usize;
+        for _ in 0..families.len() {
+            let sampled = &families[rng.index(families.len())];
+            delta_sum += sampled.paired_delta_sum;
+            target_count += sampled.target_count;
+        }
+        values.push(delta_sum as f64 / target_count as f64);
+    }
+    values.sort_by(f64::total_cmp);
+    quantile(&values, 0.025)
+}
+
 fn parse_args(args: Vec<String>) -> Result<BTreeMap<String, String>> {
     let mut parsed = BTreeMap::new();
     let mut iter = args.into_iter();
