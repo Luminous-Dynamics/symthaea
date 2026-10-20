@@ -95,6 +95,10 @@ Research-level informal proof quality is another separate track. Blindly score c
 
 This is a protocol template; the alpha level, power assumptions, eligibility denominator, model budget, and any deviation must be recorded in the final run manifest **before** inspecting confirmatory test results.
 
+## Protocol amendment log
+
+- **2026-10-20, before any confirmatory model outcomes were collected or inspected:** added a conservative minimum of 20 eligible independent test-family clusters for a confirmatory utility claim and made simulation-based power planning mandatory. This is an additional no-go condition, not a relaxation of the +10 percentage-point effect or positive 95% interval gates. The floor is project-specific and not itself evidence of adequate power. The current file bytes, not an earlier commit of this document, must be hashed into the frozen run configuration. Git history preserves the prior draft and this amendment.
+
 ## 6. Leakage and external validity
 
 Family-level splitting blocks only direct within-family exposure under the catalog's declared mapping. It does **not** block:
