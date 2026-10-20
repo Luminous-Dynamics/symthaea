@@ -134,10 +134,18 @@ pub enum FrontierDisposition {
     Ineligible { reasons: Vec<String> },
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct FrontierEntry {
     pub policy_id: String,
+    pub validated_discovery_count: u64,
+    pub best_validated_objective: Option<f64>,
+    pub total_cost_units: u64,
+    pub elapsed_seconds: f64,
+    pub reference_calculation_count: u64,
+    pub false_feasible_accepts: u64,
+    pub hard_constraints_assessed: bool,
+    pub evidence_digest: String,
     pub disposition: FrontierDisposition,
 }
 
@@ -215,6 +223,14 @@ pub fn build_decision_frontier(
         };
         entries.push(FrontierEntry {
             policy_id: candidate.policy_id.clone(),
+            validated_discovery_count: candidate.validated_discovery_count,
+            best_validated_objective: candidate.best_validated_objective,
+            total_cost_units: candidate.total_cost_units,
+            elapsed_seconds: candidate.elapsed_seconds,
+            reference_calculation_count: candidate.reference_calculation_count,
+            false_feasible_accepts: candidate.false_feasible_accepts,
+            hard_constraints_assessed: candidate.hard_constraints_assessed,
+            evidence_digest: candidate.evidence_digest.clone(),
             disposition,
         });
     }
@@ -267,8 +283,8 @@ fn dominates(left: &FrontierCandidate, right: &FrontierCandidate) -> bool {
     ) {
         (None, None) => true,
         (Some(a), Some(b)) => match left.objective_direction {
-            ObjectiveDirection::Maximize => a >= b || (b - a) <= left.objective_tolerance,
-            ObjectiveDirection::Minimize => a <= b || (a - b) <= left.objective_tolerance,
+            ObjectiveDirection::Maximize => a >= b,
+            ObjectiveDirection::Minimize => a <= b,
         },
         // Validation enforces that no objective exists when discoveries are zero,
         // so this mismatch can only occur if a future caller bypasses validation.
