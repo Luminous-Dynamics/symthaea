@@ -15,7 +15,7 @@ Keep three claims distinct:
 
 Passing (1) does not establish (2); passing (2) does not establish (3). Never describe a random family split of public source material as proof of pretraining independence. The source is public and may have been seen during model training; exposure is generally unknown.
 
-The indexed 372-family split is a **pre-screen assignment**, not 372 eligible theorem tasks. Preserve all eligible, excluded, unknown, missing-artifact, and not-attempted counts. Do not silently remove hard, incomplete, or awkward records.
+The indexed 372-family split is a **pre-screen assignment**, not 372 eligible theorem tasks. Preserve all eligible, excluded, unknown, missing-artifact, and not-attempted counts. Every family assigned to the frozen test split must have at least one explicit outcome row; when a family has no eligible formal target, retain an `excluded` or `unknown` row with the reason. Do not silently omit hard, incomplete, awkward, or unavailable test families from the analysis input.
 
 ## 2. Eligibility and evidence gates
 
@@ -97,7 +97,7 @@ This is a protocol template; the alpha level, power assumptions, eligibility den
 
 ## Protocol amendment log
 
-- **2026-10-20, before any confirmatory model outcomes were collected or inspected:** added a conservative minimum of 20 eligible independent test-family clusters for a confirmatory utility claim and made simulation-based power planning mandatory. This is an additional no-go condition, not a relaxation of the +10 percentage-point effect or positive 95% interval gates. The floor is project-specific and not itself evidence of adequate power. The current file bytes, not an earlier commit of this document, must be hashed into the frozen run configuration. Git history preserves the prior draft and this amendment.
+- **2026-10-20, before any confirmatory model outcomes were collected or inspected:** added a conservative minimum of 20 eligible independent test-family clusters for a confirmatory utility claim and made simulation-based power planning mandatory. This is an additional no-go condition, not a relaxation of the +10 percentage-point effect or positive 95% interval gates. The floor is project-specific and not itself evidence of adequate power. The same pre-outcome amendment requires explicit outcome/exclusion rows for every frozen test family to prevent silent denominator shrinkage. The current file bytes, not an earlier commit of this document, must be hashed into the frozen run configuration. Git history preserves the prior draft and this amendment.
 
 ## 6. Leakage and external validity
 
