@@ -51,6 +51,7 @@ pub enum PairedAccelerationError {
     TargetNotReached,
     InvalidCost,
     NonFiniteStatistic,
+    InvalidSummary,
     InvalidCampaign(CampaignError),
 }
 
@@ -85,6 +86,7 @@ impl fmt::Display for PairedAccelerationError {
             Self::NonFiniteStatistic => {
                 write!(f, "bootstrap produced a non-finite statistic")
             }
+            Self::InvalidSummary => write!(f, "paired acceleration summary is internally inconsistent"),
             Self::InvalidCampaign(error) => write!(f, "invalid campaign record: {error}"),
         }
     }
@@ -219,6 +221,37 @@ pub fn bootstrap_median_acceleration(
         tied_cost_count,
         candidate_slower_count,
     })
+}
+
+impl PairedAccelerationSummary {
+    /// Validate the report after deserialization or before publishing it.
+    pub fn validate(&self) -> Result<(), PairedAccelerationError> {
+        if self.schema_version != PAIRED_ACCELERATION_STATS_VERSION
+            || self.baseline_policy_id.trim().is_empty()
+            || self.candidate_policy_id.trim().is_empty()
+            || self.baseline_policy_id == self.candidate_policy_id
+            || self.campaign_pair_count < MINIMUM_CAMPAIGNS_FOR_ACCELERATION_INTERVAL
+            || self.bootstrap_resamples < MINIMUM_BOOTSTRAP_RESAMPLES
+            || !self.confidence_level.is_finite()
+            || !(0.0..1.0).contains(&self.confidence_level)
+            || !self.median_acceleration_factor.is_finite()
+            || self.median_acceleration_factor <= 0.0
+            || !self.lower_confidence_bound.is_finite()
+            || self.lower_confidence_bound <= 0.0
+            || !self.upper_confidence_bound.is_finite()
+            || self.upper_confidence_bound <= 0.0
+            || self.lower_confidence_bound > self.median_acceleration_factor
+            || self.median_acceleration_factor > self.upper_confidence_bound
+            || self
+                .candidate_faster_count
+                .checked_add(self.tied_cost_count)
+                .and_then(|count| count.checked_add(self.candidate_slower_count))
+                != Some(self.campaign_pair_count)
+        {
+            return Err(PairedAccelerationError::InvalidSummary);
+        }
+        Ok(())
+    }
 }
 
 fn same_policy_cohort(first: &CampaignRecord, current: &CampaignRecord) -> bool {
@@ -410,6 +443,31 @@ mod tests {
             bootstrap_median_acceleration(&references(&baseline, &candidate), 0.95, 2_000, 3)
                 .unwrap_err(),
             PairedAccelerationError::InvalidCampaign(CampaignError::MismatchedPolicies)
+        );
+    }
+
+    #[test]
+    fn summary_round_trips_and_rejects_internally_inconsistent_reports() {
+        let (baseline, candidate) = make_pairs(&[2.0; 20], true);
+        let summary = bootstrap_median_acceleration(
+            &references(&baseline, &candidate),
+            0.95,
+            2_000,
+            17,
+        )
+        .unwrap();
+        summary.validate().unwrap();
+
+        let encoded = serde_json::to_string(&summary).unwrap();
+        let decoded: PairedAccelerationSummary = serde_json::from_str(&encoded).unwrap();
+        decoded.validate().unwrap();
+        assert_eq!(decoded, summary);
+
+        let mut invalid = summary;
+        invalid.candidate_slower_count = 1;
+        assert_eq!(
+            invalid.validate().unwrap_err(),
+            PairedAccelerationError::InvalidSummary
         );
     }
 
