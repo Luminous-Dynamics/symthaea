@@ -42,14 +42,15 @@ jobs:
           toolchain: 1.96.0
           components: rustfmt
 
-      - name: Install pinned Z3
+      - name: Install pinned SMT solvers
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends curl unzip
+          sudo apt-get install -y --no-install-recommends curl unzip cvc5=1.1.2-1build1
           curl -fsSLo /tmp/z3.zip https://github.com/Z3Prover/z3/releases/download/z3-4.13.0/z3-4.13.0-x64-glibc-2.35.zip
           sudo unzip -q /tmp/z3.zip -d /opt
           sudo ln -sf /opt/z3-4.13.0-x64-glibc-2.35/bin/z3 /usr/local/bin/z3
           z3 --version
+          cvc5 --version
 
       - name: Check formatting for changed Rust source
         run: |
@@ -73,6 +74,8 @@ jobs:
           test -s "$witness"
           witness_result="$(z3 -smt2 "$witness" | tail -n 1)"
           test "$witness_result" = "unsat"
+          second_solver_result="$(cvc5 "$witness" | tail -n 1)"
+          test "$second_solver_result" = "unsat"
           {
             echo "source_commit=$QUALIFIED_SHA"
             echo "github_event_sha=$GITHUB_SHA"
@@ -82,9 +85,10 @@ jobs:
             echo "rustc=$(rustc +1.96.0 --version)"
             echo "cargo=$(cargo +1.96.0 --version)"
             echo "z3=$(z3 --version)"
+            echo "cvc5=$(cvc5 --version | head -n 1)"
             echo "witness_path=$witness"
             echo "witness_sha256=$(sha256sum "$witness" | cut -d ' ' -f 1)"
-            echo "witness_replay=z3:$witness_result"
+            echo "witness_replay=z3:$witness_result,cvc5:$second_solver_result"
             echo "claim=unscaled Hénon-Heiles Hamiltonian has dH/dt = 0 for the declared Hamiltonian vector field"
             echo "scope=SMT proof of the emitted polynomial obligation; not empirical validation of a physical system"
             echo "harness_boundary=production symbolic.rs and proof-emitter source included directly; HDC/world integration represented by test-only AST shim, not qualified"
