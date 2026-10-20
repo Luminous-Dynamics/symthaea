@@ -1,0 +1,160 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/landscape-review-report-v0.schema.json",
+  "title": "Symthaea Landscape Review Report v0",
+  "description": "Deterministic evidence coverage report only. The current v0 schema requires ranking, environmental and causal claims to remain disabled.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "schema_uri",
+    "review_id",
+    "scope",
+    "review_level",
+    "state",
+    "automated_ranking_allowed",
+    "environmental_claims_allowed",
+    "causal_claims_allowed",
+    "alternatives",
+    "metric_comparability",
+    "findings",
+    "interpretation_limit"
+  ],
+  "properties": {
+    "schema": {
+      "const": "luminous.landscape-review-report.v0"
+    },
+    "schema_uri": {
+      "const": "https://luminousdynamics.io/schemas/landscape-review-report-v0.schema.json"
+    },
+    "review_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "scope": {
+      "enum": [
+        "site-parcel",
+        "district",
+        "watershed",
+        "bioregion"
+      ]
+    },
+    "review_level": {
+      "const": "schematic-evidence-review"
+    },
+    "state": {
+      "enum": [
+        "evidence-gaps",
+        "synthetic-comparison-only",
+        "ready-for-human-inspection"
+      ]
+    },
+    "automated_ranking_allowed": {
+      "const": false
+    },
+    "environmental_claims_allowed": {
+      "const": false
+    },
+    "causal_claims_allowed": {
+      "const": false
+    },
+    "alternatives": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 8
+    },
+    "metric_comparability": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "metric_id",
+          "state",
+          "units_by_alternative",
+          "explanation"
+        ],
+        "properties": {
+          "metric_id": {
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "comparable-for-human-inspection",
+              "missing-evidence",
+              "unit-mismatch",
+              "method-mismatch",
+              "evidence-class-mismatch",
+              "not-computable",
+              "conflicting"
+            ]
+          },
+          "units_by_alternative": {
+            "type": "object",
+            "additionalProperties": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "explanation": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "code",
+          "severity",
+          "alternative_id",
+          "metric_id",
+          "related_sha256s",
+          "detail"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "severity": {
+            "enum": [
+              "info",
+              "warning"
+            ]
+          },
+          "alternative_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "metric_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "related_sha256s": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          },
+          "detail": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "interpretation_limit": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}
