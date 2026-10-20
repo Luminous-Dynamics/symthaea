@@ -691,4 +691,31 @@ mod tests {
         assert_eq!(report.synthetic_test_count, 1);
         assert_eq!(report.observed_test_count, 0);
     }
+
+    #[test]
+    fn held_out_ingredient_family_leakage_is_rejected() {
+        let mut manifest = valid_manifest();
+        manifest.held_out_axes = vec![TransferAxis::IngredientFamily];
+        manifest.cases[2].ingredient_family_ids = vec!["grain-a".to_owned()];
+
+        let report = validate_transfer_manifest(&manifest);
+        assert!(report.violations.iter().any(|violation| {
+            violation.code == TransferViolationCode::HeldOutAxisLeakage
+                && violation.case_id.as_deref() == Some("case-test")
+        }));
+    }
+
+    #[test]
+    fn missing_held_out_axis_value_is_rejected() {
+        let mut manifest = valid_manifest();
+        manifest.held_out_axes = vec![TransferAxis::MarketPeriod];
+        manifest.domains[2].market_period = None;
+
+        let report = validate_transfer_manifest(&manifest);
+        assert!(report.violations.iter().any(|violation| {
+            violation.code == TransferViolationCode::MissingAxisValue
+                && violation.case_id.as_deref() == Some("case-test")
+        }));
+    }
+
 }
