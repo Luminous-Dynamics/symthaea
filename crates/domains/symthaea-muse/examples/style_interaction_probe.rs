@@ -10,8 +10,7 @@
 //!   B: pin the pitch language to Dorian.
 //!
 //! Run from the workspace root with:
-//!   SYMTHAEA_GIT_REVISION="$(git rev-parse HEAD)" \
-//!   SYMTHAEA_RUSTC_VERSION="$(rustc --version)" \\
+//!   SYMTHAEA_GIT_REVISION="$(git rev-parse HEAD)" SYMTHAEA_RUSTC_VERSION="$(rustc --version)" \
 //!     cargo run -p symthaea-muse --features theory --example style_interaction_probe
 //!
 //! The caller-supplied revision is recorded as a claim only; this program does
