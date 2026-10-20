@@ -20,12 +20,23 @@ cargo run -p symthaea-proof-insights -- \
 
 The working tree must be clean, and the checkout's `HEAD` must match the supplied expected commit. This avoids quietly indexing a moving `main` branch or locally edited catalog.
 
+The frozen 372-family split is checked in at `data/benchmarks/proof-insight-transfer-v0/splits.json`. After generating the source index, compare its exact family assignments and partition digest against that artifact:
+
+```bash
+cargo run -p symthaea-proof-insights -- \
+  --verify-splits \
+  ./proof-insight-source-index.json \
+  ./data/benchmarks/proof-insight-transfer-v0/splits.json
+```
+
+The verifier must reject source-revision, digest, duplicate-ID, or family-assignment mismatches. This confirms agreement with the frozen assignment, not that the split is free of cross-family dependency leakage or pretraining contamination.
+
 ## What the JSON captures
 
 - source commit and repository-relative SHA-256 fingerprints for `README.md`, `CONTENTS.md`, `lean/formalization.yaml`, the Comparator scope notes, referenced manuscript PDFs, and present main-result Lean/config artifacts;
 - a cross-check between the manuscript/family counts declared in the upstream README and the actual family-header count parsed from `CONTENTS.md`; the indexer fails closed if the family counts disagree;
 - result family identifiers/titles and repository-relative links from `CONTENTS.md`;
-- a deterministic 70/15/15 train/validation/test assignment at the *related-result family* level, derived from SHA-256 ranking over a fixed seed and family ID, with the seed, algorithm, and exact counts included in the output;
+- a deterministic 70/15/15 train/validation/test assignment at the *related-result family* level, derived from SHA-256 ranking over a fixed seed and family ID, with the seed, algorithm, exact counts, and a canonical partition digest included in the output;
 - formalization catalog entries, direct family-link matches, and explicit unmatched source IDs;
 - present/missing status and hashes for catalogued source artifacts;
 - declared `status.main_results` records and the upstream manifest's stated scope/license label.
