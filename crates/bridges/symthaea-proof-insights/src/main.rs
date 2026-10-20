@@ -569,8 +569,11 @@ fn verify_temporal_manifest_file(repository_root: &Path, manifest_path: &Path) -
         );
     }
 
-    let toolchain_bytes =
-        git_show_file(&root, &manifest.repository_commit, &manifest.lean_toolchain_path)?;
+    let toolchain_bytes = git_show_file(
+        &root,
+        &manifest.repository_commit,
+        &manifest.lean_toolchain_path,
+    )?;
     let toolchain_at_commit = std::str::from_utf8(&toolchain_bytes)
         .context("pinned Lean toolchain file is not UTF-8")?
         .trim();
@@ -583,16 +586,19 @@ fn verify_temporal_manifest_file(repository_root: &Path, manifest_path: &Path) -
         );
     }
 
-    let mathlib_manifest =
-        git_show_file(&root, &manifest.repository_commit, &manifest.mathlib_manifest_path)?;
+    let mathlib_manifest = git_show_file(
+        &root,
+        &manifest.repository_commit,
+        &manifest.mathlib_manifest_path,
+    )?;
     if format!("{:x}", Sha256::digest(&mathlib_manifest)) != manifest.mathlib_manifest_sha256 {
         bail!(
             "Mathlib manifest digest does not match {} at the pinned repository commit",
             manifest.mathlib_manifest_path
         );
     }
-    let parsed_mathlib_manifest: serde_json::Value =
-        serde_json::from_slice(&mathlib_manifest).context("parse pinned Mathlib dependency manifest")?;
+    let parsed_mathlib_manifest: serde_json::Value = serde_json::from_slice(&mathlib_manifest)
+        .context("parse pinned Mathlib dependency manifest")?;
     let recorded_mathlib_revision = find_mathlib_revision(&parsed_mathlib_manifest)
         .context("pinned dependency manifest contains no identifiable Mathlib package revision")?;
     if !recorded_mathlib_revision.eq_ignore_ascii_case(&manifest.mathlib_revision) {
@@ -857,7 +863,10 @@ fn validate_temporal_manifest(manifest: &TemporalReplayManifest) -> Result<()> {
                     );
                 }
                 if artifact.target_position.is_some_and(|position| {
-                    !manifest.events.iter().any(|event| event.position == position)
+                    !manifest
+                        .events
+                        .iter()
+                        .any(|event| event.position == position)
                 }) {
                     bail!(
                         "proof artifact {} is associated with an unregistered target position",
@@ -873,7 +882,12 @@ fn validate_temporal_manifest(manifest: &TemporalReplayManifest) -> Result<()> {
                     );
                 }
                 if artifact.available_at_position.is_some_and(|position| {
-                    position > manifest.events.last().map(|event| event.position).unwrap_or(0)
+                    position
+                        > manifest
+                            .events
+                            .last()
+                            .map(|event| event.position)
+                            .unwrap_or(0)
                 }) {
                     bail!(
                         "artifact {} appears after the last registered timeline event",
@@ -895,7 +909,9 @@ fn validate_temporal_manifest(manifest: &TemporalReplayManifest) -> Result<()> {
             })?;
         if statement.artifact_kind != "theorem_statement"
             || statement.theorem_id.as_deref() != Some(event.theorem_id.as_str())
-            || statement.available_at_position.is_none_or(|position| position > event.position)
+            || statement
+                .available_at_position
+                .is_none_or(|position| position > event.position)
             || statement.target_position.is_some()
             || statement.content_sha256 != event.statement_sha256
         {
@@ -948,7 +964,10 @@ fn validate_temporal_manifest(manifest: &TemporalReplayManifest) -> Result<()> {
             if artifact_id != &event.statement_artifact_id {
                 match artifact.artifact_kind.as_str() {
                     "proof_body" => {
-                        if artifact.target_position.is_none_or(|position| position >= event.position) {
+                        if artifact
+                            .target_position
+                            .is_none_or(|position| position >= event.position)
+                        {
                             bail!(
                                 "future-proof leakage: proof {} is not from an earlier completed target than {}",
                                 artifact.artifact_id,
@@ -957,7 +976,10 @@ fn validate_temporal_manifest(manifest: &TemporalReplayManifest) -> Result<()> {
                         }
                     }
                     _ => {
-                        if artifact.available_at_position.is_none_or(|position| position >= event.position) {
+                        if artifact
+                            .available_at_position
+                            .is_none_or(|position| position >= event.position)
+                        {
                             bail!(
                                 "future-evidence leakage: artifact {} was not available before target {}",
                                 artifact.artifact_id,
@@ -1749,7 +1771,7 @@ mod tests {
         git(&root, &["config", "user.email", "pitb-test@example.invalid"]);
         git(
             &root,
-            &["remote", "add", "origin", "https://example.invalid/temporal-fixture"],
+            &["config", "user.email", "pitb-test@example.invalid"],
         );
 
         let timeline = "position,target_id\n0,target-000\n1,target-001\n";
@@ -1763,7 +1785,8 @@ mod tests {
         fs::write(root.join("lake-manifest.json"), &lake_manifest)
             .expect("write pinned Lake manifest");
 
-        let initial_source = "theorem first : True := by\n  sorry\ntheorem second : True := by\n  sorry\n";
+        let initial_source =
+            "theorem first : True := by\n  sorry\ntheorem second : True := by\n  sorry\n";
         fs::write(root.join("lean/Example.lean"), initial_source)
             .expect("write initial source state");
         let commit_one = commit(&root, "historical target statements");
@@ -1780,8 +1803,7 @@ mod tests {
         let source_two_sha = sha(&source_two);
 
         let third_source = second_source.replacen("  sorry\n", "  trivial\n", 1);
-        fs::write(root.join("lean/Example.lean"), &third_source)
-            .expect("complete second proof");
+        fs::write(root.join("lean/Example.lean"), &third_source).expect("complete second proof");
         let commit_three = commit(&root, "complete second proof");
         let source_three = git_show_file(&root, &commit_three, "lean/Example.lean")
             .expect("read third source revision");
