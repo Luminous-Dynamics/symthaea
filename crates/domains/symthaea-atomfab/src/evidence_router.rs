@@ -404,6 +404,9 @@ pub struct EvidenceRouteBenchmarkSummary {
     pub request_id: String,
     pub domain: EvidenceDomain,
     pub comparison_contract_digest: String,
+    pub benefit_unit: String,
+    pub cost_unit: String,
+    pub max_cost_units: u64,
     pub outcome_source: Option<EvidenceOutcomeSource>,
     pub selected_action_id: Option<String>,
     pub selected_efficiency: Option<EvidenceEfficiencyRatio>,
@@ -547,6 +550,9 @@ pub fn score_evidence_route(
         request_id: route.request_id.clone(),
         domain: route.domain,
         comparison_contract_digest: route.comparison_contract_digest.clone(),
+        benefit_unit: route.benefit_unit.clone(),
+        cost_unit: route.cost_unit.clone(),
+        max_cost_units: route.max_cost_units,
         outcome_source,
         selected_action_id: selected_outcome.map(|outcome| outcome.action_id.clone()),
         selected_efficiency: selected_outcome.map(|outcome| EvidenceEfficiencyRatio {
@@ -763,6 +769,105 @@ mod tests {
             EvidenceActionDisposition::Ineligible {
                 reasons: vec!["model_out_of_domain".to_owned()]
             }
+        );
+    }
+
+    fn outcome(
+        id: &str,
+        source: EvidenceOutcomeSource,
+        status: EvidenceOutcomeStatus,
+        benefit: u64,
+        cost: u64,
+        digest_byte: char,
+    ) -> EvidenceActionOutcome {
+        EvidenceActionOutcome {
+            action_id: id.to_owned(),
+            source,
+            status,
+            realized_decision_loss_reduction_units: benefit,
+            realized_cost_units: cost,
+            outcome_evidence_digest: digest_byte.to_string().repeat(64),
+        }
+    }
+
+    #[test]
+    fn retrospective_outcomes_expose_estimation_regret_without_mixing_sources() {
+        let fixture: serde_json::Value = serde_json::from_str(include_str!(
+            "../fixtures/evidence-action-proposals-v1.json"
+        ))
+        .expect("proposal fixture should parse");
+        let proposals: Vec<EvidenceActionProposal> =
+            serde_json::from_value(fixture["proposals"].clone()).unwrap();
+        let route = route_evidence_actions(&proposals).unwrap();
+        let outcomes = vec![
+            outcome("static-screen", EvidenceOutcomeSource::Reference, EvidenceOutcomeStatus::Completed, 4, 2, '1'),
+            outcome("universal-mlip", EvidenceOutcomeSource::Reference, EvidenceOutcomeStatus::Completed, 20, 4, '2'),
+            outcome("domain-specific-mlip", EvidenceOutcomeSource::Reference, EvidenceOutcomeStatus::Completed, 24, 8, '3'),
+            outcome("dft-reference", EvidenceOutcomeSource::Reference, EvidenceOutcomeStatus::Failed, 0, 40, '4'),
+            outcome("out-of-domain-mlip", EvidenceOutcomeSource::Reference, EvidenceOutcomeStatus::NotRun, 0, 0, '5'),
+        ];
+        let summary = score_evidence_route(&route, &outcomes)
+            .expect("every eligible action has a retrospective outcome");
+        assert_eq!(summary.selected_action_id.as_deref(), Some("static-screen"));
+        assert_eq!(summary.oracle_action_id.as_deref(), Some("universal-mlip"));
+        assert_eq!(
+            summary.selected_efficiency,
+            Some(EvidenceEfficiencyRatio {
+                benefit_units: 4,
+                cost_units: 2
+            })
+        );
+        assert_eq!(
+            summary.oracle_efficiency,
+            Some(EvidenceEfficiencyRatio {
+                benefit_units: 20,
+                cost_units: 4
+            })
+        );
+        assert_eq!(summary.failed_action_count, 1);
+        assert_eq!(summary.eligible_action_count, 4);
+        summary
+            .validate(&route)
+            .expect("summary must reproduce from its outcomes");
+
+        let mut forged = summary.clone();
+        forged.oracle_action_id = Some("static-screen".to_owned());
+        assert_eq!(
+            forged.validate(&route),
+            Err(EvidenceRouteError::InvalidBenchmarkSummary)
+        );
+    }
+
+    #[test]
+    fn retrospective_scoring_fails_closed_on_missing_or_mixed_outcomes() {
+        let proposals = vec![
+            proposal("static", EvidenceActionKind::StaticScreen, 10, 2),
+            proposal("dft", EvidenceActionKind::DftReference, 80, 40),
+        ];
+        let route = route_evidence_actions(&proposals).unwrap();
+        let static_outcome = outcome(
+            "static",
+            EvidenceOutcomeSource::Reference,
+            EvidenceOutcomeStatus::Completed,
+            10,
+            2,
+            '1',
+        );
+        assert_eq!(
+            score_evidence_route(&route, &[static_outcome.clone()]),
+            Err(EvidenceRouteError::MissingEligibleOutcome)
+        );
+        let dft_outcome = outcome(
+            "dft",
+            EvidenceOutcomeSource::Simulation,
+            EvidenceOutcomeStatus::Completed,
+            80,
+            40,
+            '2',
+        );
+        assert_eq!(
+            score_evidence_route(&route, &[static_outcome, dft_outcome]),
+            Err(EvidenceRouteError::MismatchedOutcomeSource)
         );
     }
 
