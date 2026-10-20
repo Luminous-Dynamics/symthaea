@@ -162,6 +162,24 @@ The focused harness compiles the exact tracked Rust source files through `tools/
 
 ## 10. UCI wine-quality source auditor
 
+## Dryad fermentation time-series intake auditor
+
+A third focused Rust executable supports the three long-form tab-separated files in the 2026 Dryad wine-temperature / yeast-ecology dataset (DOI 10.5061/dryad.cfxpnvxp3). It checks the declared columns, resolves columns by name, validates time/treatment/replicate fields, preserves `NA` and `ND` as distinct missingness, summarizes numeric analytes by unit, detects duplicate observation keys, hashes exact input bytes, and generates a JSON receipt.
+
+After downloading the files and reviewing the source record:
+
+```bash
+cargo test --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin fermentation_time_series_audit
+cargo run --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin fermentation_time_series_audit -- \
+  --input /path/to/Onetto2026_Figure1_raw_data_final.txt \
+  --dataset figure1 \
+  --out /tmp/figure1-intake.json
+```
+
+Supported dataset kinds are `figure1`, `figure2`, and `figure-s1`. The auditor allows column reordering only when the exact required column set remains intact and reports that deviation. The receipt expressly marks source identity as caller-declared, not authenticated.
+
+**Important design limit:** the source README describes `rep` as a technical replicate. Distinct `rep` values and timepoint rows are not evidence of independent fermentation batches. Model evaluation must group samples by the underlying biological/experimental unit and treatment, as justified by the study design. `AUDIT_OK` means raw-file contract integrity only, not experimental independence, causal inference, predictive performance or industrial transfer. Missingness is retained; it is never imputed to zero.
+
 The second Rust executable audits a locally obtained red or white UCI Wine Quality CSV using the semicolon-delimited 12-column format. It computes the SHA-256 of the exact raw bytes; validates the declared header and column order; accounts for each parsed data row as valid or invalid; rejects missing, nonnumeric, nonfinite and semantically out-of-range values; and emits column summaries plus the quality-score distribution.
 
 Example use after downloading and reviewing the current UCI terms:
