@@ -221,6 +221,14 @@ Choose numerical targets for trace/space, drilling, yield, cycle time, cost and 
 - OPC Foundation, [OPC UA for Machine Tools](https://reference.opcfoundation.org/specs/OPC-40501-1/1): common machine monitoring and job-management model.
 - ISO/ASTM, [52920:2023 additive-manufacturing qualification principles](https://committee.iso.org/standard/76911.html): precedent for per-process/site qualification rather than blanket machine claims.
 
+## Manufacturing-package integrity (new executable slice)
+
+The second synthetic corpus, `docs/research/fixtures/ATOMFAB_PCB_PACKAGE_CORPUS_V0_1.json`, tests the design-to-fabrication handoff after route feasibility has been evaluated. It binds native board and schematic files, netlist, source BOM, DRC report, target DRC-profile digest, exported Gerber/drill files, assembly BOM, placement output, revision identity, relative paths, and per-artifact SHA-256 values.
+
+Its 12 known-answer cases comprise 1 `ready_for_review`, 3 `incomplete`, and 8 `rejected` outcomes. The Rust validator independently rejects missing outputs, explicit DRC violations, mismatched board digest/revision/profile, invalid file digests, duplicate paths, directory traversal, missing native sources, and unknown DRC state. The `ready_for_review` disposition is deliberately weaker than manufacturing approval, machine-execution authorization, physical qualification, or product release.
+
+**Scope caveat:** the case corpus uses synthetic artifact names and hashes; it does not yet contain actual output from a KiCad design. The next product-facing implementation must run `kicad-cli` on a frozen native design, bind the resulting real output files and DRC report to the same source-board digest, and archive all tool/version/command evidence. KiCad documents deterministic command-line design-rule checks and Gerber/drill exports in its [official CLI reference](https://docs.kicad.org/9.0/en/cli/cli.html).
+
 ## Initial corpus check
 
 The version-0.3 corpus contains 16 unique synthetic cases, with route outcomes of 12 `feasible`, 3 `infeasible`, and 1 `unresolved`; independent evidence outcomes are 6 `complete`, 8 `incomplete`, and 2 `rejected`. The Rust module recomputes outcomes without using expected labels as decision inputs. It rejects every v0.3 physical-qualification claim because this corpus has no bound physical measurement records or calibration objects; changing a source label to `measured` cannot promote the claim. The CLI compares `ATOMFAB_GIT_HEAD` with `git rev-parse HEAD` before producing a receipt.
