@@ -550,7 +550,9 @@ mod tests {
             "counterexample_guided",
         ] {
             assert!(
-                policy_ids.iter().any(|value| value.as_str() == Some(required)),
+                policy_ids
+                    .iter()
+                    .any(|value| value.as_str() == Some(required)),
                 "reference campaign is missing policy arm {required}"
             );
         }
@@ -559,8 +561,7 @@ mod tests {
         ))
         .expect("supported-Cu campaign schema should parse");
         assert_eq!(
-            campaign_schema["properties"]["policy_comparison"]["properties"]["policies"]
-                ["minItems"],
+            campaign_schema["properties"]["policy_comparison"]["properties"]["policies"]["minItems"],
             8
         );
         assert_eq!(
