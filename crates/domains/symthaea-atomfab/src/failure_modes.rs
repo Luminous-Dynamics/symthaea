@@ -79,6 +79,9 @@ pub struct FailureRecord {
     pub evaluator_digest: String,
     pub evaluation_scope_digest: String,
     pub material_family: String,
+    /// Frozen stratum such as particle size × support surface × temperature regime.
+    /// Summaries must not pool distinct strata into one headline error rate.
+    pub evaluation_stratum: String,
     pub split: EvaluationSplit,
     pub parent_system_id: String,
     pub sample_id: String,
@@ -146,6 +149,7 @@ impl FailureRecord {
             (&self.campaign_id, "campaign_id"),
             (&self.model_id, "model_id"),
             (&self.material_family, "material_family"),
+            (&self.evaluation_stratum, "evaluation_stratum"),
             (&self.parent_system_id, "parent_system_id"),
             (&self.sample_id, "sample_id"),
         ] {
@@ -180,6 +184,7 @@ pub struct FailureModeSummary {
     pub evaluator_digest: String,
     pub evaluation_scope_digest: String,
     pub material_family: String,
+    pub evaluation_stratum: String,
     pub split: EvaluationSplit,
     pub assessment_basis: FailureAssessmentBasis,
     pub total_assessed: u64,
@@ -233,6 +238,7 @@ pub fn summarize_failure_modes(
             || record.evaluator_digest != first.evaluator_digest
             || record.evaluation_scope_digest != first.evaluation_scope_digest
             || record.material_family != first.material_family
+            || record.evaluation_stratum != first.evaluation_stratum
             || record.split != first.split
             || record.assessment_basis != first.assessment_basis
         {
@@ -302,6 +308,7 @@ pub fn summarize_failure_modes(
         evaluator_digest: first.evaluator_digest.clone(),
         evaluation_scope_digest: first.evaluation_scope_digest.clone(),
         material_family: first.material_family.clone(),
+        evaluation_stratum: first.evaluation_stratum.clone(),
         split: first.split,
         assessment_basis: first.assessment_basis,
         total_assessed,
@@ -396,6 +403,13 @@ mod tests {
         other_model[0].model_id = "different-model".to_owned();
         assert_eq!(
             summarize_failure_modes(&other_model),
+            Err(FailureModeError::MismatchedEvaluationScope)
+        );
+
+        let mut other_stratum = records.clone();
+        other_stratum[0].evaluation_stratum = "cu38_alpha_alumina_0001_fixture".to_owned();
+        assert_eq!(
+            summarize_failure_modes(&other_stratum),
             Err(FailureModeError::MismatchedEvaluationScope)
         );
 
