@@ -1,0 +1,41 @@
+{
+  "multiwindow_recovery": {
+    "evidence_class": "synthetic_simulation",
+    "scenario_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "per_mode": [
+      {
+        "mode": "online",
+        "baseline": {
+          "task_count": 3,
+          "completed_tasks": 1,
+          "completed_task_jain_fairness_ppm": 333333
+        },
+        "candidate_fair_share": {
+          "task_count": 3,
+          "completed_tasks": 3,
+          "completed_task_jain_fairness_ppm": 1000000
+        },
+        "baseline_by_priority": [
+          {"priority": "essential", "task_count": 1, "completed_tasks": 0, "deadline_misses": 1, "expiry_misses": 0},
+          {"priority": "interactive", "task_count": 1, "completed_tasks": 0, "deadline_misses": 1, "expiry_misses": 0},
+          {"priority": "bulk", "task_count": 1, "completed_tasks": 1, "deadline_misses": 0, "expiry_misses": 0}
+        ],
+        "candidate_by_priority": [
+          {"priority": "essential", "task_count": 1, "completed_tasks": 1, "deadline_misses": 0, "expiry_misses": 0},
+          {"priority": "interactive", "task_count": 1, "completed_tasks": 1, "deadline_misses": 0, "expiry_misses": 0},
+          {"priority": "bulk", "task_count": 1, "completed_tasks": 1, "deadline_misses": 0, "expiry_misses": 0}
+        ]
+      },
+      {
+        "mode": "wan_partition",
+        "baseline": {"task_count": 3, "completed_tasks": 1},
+        "candidate_fair_share": {"task_count": 3, "completed_tasks": 3}
+      },
+      {
+        "mode": "route_recovery",
+        "baseline": {"task_count": 3, "completed_tasks": 1},
+        "candidate_fair_share": {"task_count": 3, "completed_tasks": 3}
+      }
+    ]
+  }
+}
