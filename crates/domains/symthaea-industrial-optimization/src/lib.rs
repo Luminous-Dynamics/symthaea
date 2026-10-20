@@ -566,7 +566,7 @@ mod tests {
             .map(|p| (p.capex_usd, p.floor_tonnes_ch4_per_year))
             .collect();
 
-        assert_eq!(coordinates, vec![(10, 3), (20, 6), (30, 8), (50, 12)]);
+        assert_eq!(coordinates, vec![(0, 0), (10, 3), (20, 6), (30, 8), (50, 12)]);
         assert!(!frontier.iter().any(|p| p.selected_ids.contains(&"dominated".to_owned())));
         assert!(!frontier.iter().any(|p| p.selected_ids.contains(&"same-floor-more-cost".to_owned())));
     }
