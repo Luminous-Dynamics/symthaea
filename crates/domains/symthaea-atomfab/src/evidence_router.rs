@@ -379,8 +379,10 @@ pub struct EvidenceActionOutcome {
     pub action_id: String,
     pub source: EvidenceOutcomeSource,
     pub status: EvidenceOutcomeStatus,
-    /// Realized reduction in the same decision-loss units declared in the route.
-    pub realized_decision_loss_reduction_units: u64,
+    /// Signed realized decision-loss change in the route's declared units.
+    /// Positive means loss reduction; negative means the action made the
+    /// decision outcome worse.
+    pub realized_decision_loss_change_units: i64,
     /// Cost actually incurred, including failed/rework actions when nonzero.
     pub realized_cost_units: u64,
     /// Digest of the outcome/evaluator evidence, not a digest of the proposal.
@@ -390,7 +392,8 @@ pub struct EvidenceActionOutcome {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct EvidenceEfficiencyRatio {
-    pub benefit_units: u64,
+    /// Signed net decision-loss reduction. Negative values expose harmful actions.
+    pub benefit_units: i64,
     pub cost_units: u64,
 }
 
@@ -469,23 +472,19 @@ pub fn score_evidence_route(
         match outcome.status {
             EvidenceOutcomeStatus::NotRun
                 if outcome.realized_cost_units != 0
-                    || outcome.realized_decision_loss_reduction_units != 0 =>
+                    || outcome.realized_decision_loss_change_units != 0 =>
             {
                 return Err(EvidenceRouteError::InvalidOutcome(
-                    "not_run_must_have_zero_cost_and_benefit",
+                    "not_run_must_have_zero_cost_and_loss_change",
                 ));
             }
-            EvidenceOutcomeStatus::Failed | EvidenceOutcomeStatus::Abstained
-                if outcome.realized_cost_units == 0
-                    || outcome.realized_decision_loss_reduction_units != 0 =>
+            EvidenceOutcomeStatus::Failed
+            | EvidenceOutcomeStatus::Abstained
+            | EvidenceOutcomeStatus::Completed
+                if outcome.realized_cost_units == 0 =>
             {
                 return Err(EvidenceRouteError::InvalidOutcome(
-                    "failed_or_abstained_outcome_shape",
-                ));
-            }
-            EvidenceOutcomeStatus::Completed if outcome.realized_cost_units == 0 => {
-                return Err(EvidenceRouteError::InvalidOutcome(
-                    "completed_outcome_cost_must_be_positive",
+                    "executed_outcome_cost_must_be_positive",
                 ));
             }
             _ => {}
@@ -525,12 +524,18 @@ pub fn score_evidence_route(
         return Err(EvidenceRouteError::MismatchedOutcomeSource);
     }
 
-    let mut oracle: Vec<&EvidenceActionOutcome> = eligible_outcomes.clone();
+    // The explicit no-action baseline has zero benefit and zero cost; only
+    // actions with a strictly positive realized loss reduction can beat it.
+    let mut oracle: Vec<&EvidenceActionOutcome> = eligible_outcomes
+        .iter()
+        .copied()
+        .filter(|outcome| outcome.realized_decision_loss_change_units > 0)
+        .collect();
     oracle.sort_by(|left, right| {
-        let left_cross = u128::from(left.realized_decision_loss_reduction_units)
-            * u128::from(right.realized_cost_units);
-        let right_cross = u128::from(right.realized_decision_loss_reduction_units)
-            * u128::from(left.realized_cost_units);
+        let left_cross = i128::from(left.realized_decision_loss_change_units)
+            * i128::from(right.realized_cost_units);
+        let right_cross = i128::from(right.realized_decision_loss_change_units)
+            * i128::from(left.realized_cost_units);
         right_cross
             .cmp(&left_cross)
             .then_with(|| left.realized_cost_units.cmp(&right.realized_cost_units))
@@ -556,12 +561,12 @@ pub fn score_evidence_route(
         outcome_source,
         selected_action_id: selected_outcome.map(|outcome| outcome.action_id.clone()),
         selected_efficiency: selected_outcome.map(|outcome| EvidenceEfficiencyRatio {
-            benefit_units: outcome.realized_decision_loss_reduction_units,
+            benefit_units: outcome.realized_decision_loss_change_units,
             cost_units: outcome.realized_cost_units,
         }),
         oracle_action_id: oracle_outcome.map(|outcome| outcome.action_id.clone()),
         oracle_efficiency: oracle_outcome.map(|outcome| EvidenceEfficiencyRatio {
-            benefit_units: outcome.realized_decision_loss_reduction_units,
+            benefit_units: outcome.realized_decision_loss_change_units,
             cost_units: outcome.realized_cost_units,
         }),
         eligible_action_count: ranked.len(),
@@ -776,7 +781,7 @@ mod tests {
         id: &str,
         source: EvidenceOutcomeSource,
         status: EvidenceOutcomeStatus,
-        benefit: u64,
+        benefit: i64,
         cost: u64,
         digest_byte: char,
     ) -> EvidenceActionOutcome {
@@ -784,7 +789,7 @@ mod tests {
             action_id: id.to_owned(),
             source,
             status,
-            realized_decision_loss_reduction_units: benefit,
+            realized_decision_loss_change_units: benefit,
             realized_cost_units: cost,
             outcome_evidence_digest: digest_byte.to_string().repeat(64),
         }
