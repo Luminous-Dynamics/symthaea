@@ -674,9 +674,9 @@ fn assign_family_splits(families: &mut [FamilyRecord]) -> Result<FamilySplitPlan
     let mut partition_material = String::new();
     for (family_id, split) in partition_rows {
         partition_material.push_str(family_id);
-        partition_material.push('\\t');
+        partition_material.push('\t');
         partition_material.push_str(split);
-        partition_material.push('\\n');
+        partition_material.push('\n');
     }
     let partition_digest_sha256 = format!("{:x}", Sha256::digest(partition_material.as_bytes()));
 
