@@ -1128,6 +1128,36 @@ mod tests {
     }
 
     #[test]
+    fn all_due_requirements_with_no_feasible_offer_are_reported() {
+        let mut profile = profile();
+        profile.requirements.push(requirement(
+            "second-physical-confirmation",
+            "hull-candidate",
+            EvaluationClass::PhysicalTest,
+            EvidenceOrigin::ExperimentalMeasurement,
+            "second-tank-protocol",
+            "rev-2",
+            1,
+        ));
+        let receipts = vec![receipt(&profile.requirements[0], "physical-1", 100)];
+        let audit = audit_fidelity_campaign(&profile, &receipts);
+        let proposals = vec![physical("tank-run", Some(80), None)];
+        let report = prioritize_next_experiment(
+            &profile,
+            &audit,
+            &proposals,
+            &value_contract(),
+            100,
+        );
+        assert_eq!(report.disposition, ExperimentPriorityDisposition::SelectedMandatoryEvidence);
+        assert!(report.issues.contains(
+            &ExperimentPriorityIssue::MissingMandatoryProposal {
+                requirement_id: "second-physical-confirmation".to_string()
+            }
+        ));
+    }
+
+    #[test]
     fn audit_profile_mismatch_fails_closed() {
         let (profile, mut audit) = audit(false);
         audit.profile_id = "different-profile".to_string();
