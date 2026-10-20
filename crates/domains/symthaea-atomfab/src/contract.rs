@@ -770,4 +770,3 @@ mod tests {
             .expect("explicitly infeasible twin result should pass");
     }
 }
-
