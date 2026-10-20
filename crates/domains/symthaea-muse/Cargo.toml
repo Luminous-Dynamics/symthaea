@@ -159,6 +159,10 @@ name = "performance_calibration"
 required-features = ["theory"]
 
 [[example]]
+name = "performance_counterfactual_benchmark"
+required-features = ["theory"]
+
+[[example]]
 name = "vocabulary_calibration"
 required-features = ["theory"]
 
