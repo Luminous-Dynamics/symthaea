@@ -9,8 +9,8 @@
 #![forbid(unsafe_code)]
 
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
 use serde_json::Value;
+use std::collections::BTreeMap;
 
 pub const EXPLAINER_VERSION: &str = "symthaea.connectivity-explainer.v1";
 
