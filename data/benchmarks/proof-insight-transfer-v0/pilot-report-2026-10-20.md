@@ -48,6 +48,17 @@ The reusable *hypothesis* here is not “use a finite obstruction” but “sepa
 
 The source lemma `card_le_twice_chromaticNumber_of_indepNum` assumes `indepNum G ≤ 2` and derives `|V(G)| ≤ 2χ(G)`: it uses an **upper bound** on independent-set size to lower-bound chromatic number. It cannot be reversed to prove a lower bound on the same independence number under different hypotheses. The target instead uses a weighted optimizer, degree cutoff, and maximum-degree independence argument. Disposition: reject direct transfer with `inequality_direction`, `predicate_mismatch`, `precondition_mismatch`, `domain_mismatch`, and `quantifier_scope` codes. No tactic or source lemma was applied to the target. The typed record is in [`candidates/157-hadwiger-invariant-chain.json`](candidates/157-hadwiger-invariant-chain.json); these are curator-level negative controls, not empirical prover failures.
 
+## Candidate C — family 025: greedy ceiling–residue decomposition
+
+**Record:** [025-short-egyptian-greedy-residue.json](candidates/025-short-egyptian-greedy-residue.json).  
+**Primary source:** `lean/OAI/NumberTheory/ShortEgyptian/GreedyExistence.lean` at the pinned upstream commit.  
+**Artifact digest:** `5f95d34394ea96a9a1096b4925ffc6d385c5eb871d09a1da538bd66dfe77ada7` (SHA-256 of the exact UTF-8 source-file bytes fetched for the annotation).  
+**Theorem statement digest:** `7565d0240808cc2b1878b70742f1415a0b3b9d61ed32f701d5ad0135430749f8` (SHA-256 over the exact single-line declaration signature stored in the record, not an elaborated-expression digest).
+
+For `0<a<b`, choose `z = ceil(b/a)` and `r = a*z-b`. The proof uses `r<a` for strong induction, `b+r=a*z` for the exact identity `a/b = 1/z + r/(b*z)`, and a separate tail-sum argument to establish `z<n` for every denominator in the recursive tail. This is a more concrete candidate pattern than an abstract “greedy algorithm”: exact preservation, a well-founded measure, and an ordering invariant are separate obligations with independent evidence.
+
+The record is intentionally **unreviewed, unscored, and has no transfer target yet**. Static source inspection is not a Lean build or axiom audit. We have not measured whether this insight helps another theorem, nor claimed that the proof is reusable outside its preconditions.
+
 ## Integrity and exposure controls
 
 - Both family 156 and family 157 were confirmed as `train` in the frozen split before their proof sources were inspected for these candidate annotations.
