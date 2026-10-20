@@ -9,8 +9,8 @@
 
 pub mod benchmark_registry;
 pub mod campaign;
-pub mod decision_frontier;
 pub mod contract;
+pub mod decision_frontier;
 
 use std::collections::HashSet;
 use std::error::Error;
