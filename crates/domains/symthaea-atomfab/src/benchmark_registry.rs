@@ -398,6 +398,61 @@ mod tests {
     }
 
     #[test]
+    fn supported_cu_alumina_campaign_plan_pins_strata_without_faking_digests() {
+        let plan: serde_json::Value = serde_json::from_str(include_str!(
+            "../benchmarks/supported-cu-alumina-reference-campaign-v1.json"
+        ))
+        .expect("first reference campaign plan must parse");
+        let schema: serde_json::Value = serde_json::from_str(include_str!(
+            "../schemas/supported-cu-alumina-reference-campaign-v1.schema.json"
+        ))
+        .expect("first reference campaign schema must parse");
+        assert_eq!(schema["$schema"], "https://json-schema.org/draft/2020-12/schema");
+        assert_eq!(plan["schema_version"], 1);
+        assert_eq!(plan["status"], "proposed_not_executed");
+        assert_eq!(
+            plan["search_protocol"]["population_size"],
+            serde_json::json!(50)
+        );
+        assert_eq!(
+            plan["search_protocol"]["generations"],
+            serde_json::json!(20)
+        );
+        assert_eq!(
+            plan["search_protocol"]["offspring_operators"],
+            serde_json::json!(["cut_and_splice", "mutation"])
+        );
+        let strata = plan["strata"]
+            .as_array()
+            .expect("campaign strata must be an array");
+        assert_eq!(strata.len(), 12);
+        let ids: std::collections::BTreeSet<_> = strata
+            .iter()
+            .map(|stratum| stratum["stratum_id"].as_str().unwrap())
+            .collect();
+        assert_eq!(ids.len(), 12, "stratum IDs must be unique");
+        for model in plan["primary_model_baselines"].as_array().unwrap() {
+            assert_eq!(
+                model["checkpoint_digest"],
+                serde_json::Value::Null,
+                "unmaterialized checkpoints must not get placeholder hashes"
+            );
+            assert_eq!(model["execution_status"], "not_run");
+        }
+        for artifact in plan["sources"]["related_dataset_artifacts"]
+            .as_array()
+            .unwrap()
+        {
+            assert_eq!(
+                artifact["sha256"],
+                serde_json::Value::Null,
+                "source MD5 must not be misrepresented as our computed SHA-256"
+            );
+            assert_eq!(artifact["status"], "not_downloaded");
+        }
+    }
+
+    #[test]
     fn scientific_lanes_require_structured_failure_mode_reporting() {
         let registry = load_embedded_registry().expect("checked-in JSON should parse");
         for lane_id in ["scientific-ms25", "supported-nanoparticle-search"] {
