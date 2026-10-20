@@ -11,6 +11,7 @@ pub mod benchmark_registry;
 pub mod campaign;
 pub mod contract;
 
+use std::collections::BTreeSet;
 use std::error::Error;
 use std::fmt;
 
@@ -39,6 +40,21 @@ pub struct OrderingSummary {
     pub correctly_ordered_pairs: usize,
     /// Pairwise ordering accuracy in [0, 1].
     pub accuracy: f64,
+}
+
+/// A finite-prefix, top-weighted overlap score for two candidate rankings.
+///
+/// This is an explicitly normalized RBO-style metric, not a claim to reproduce
+/// every extrapolated RBO variant. The persistence parameter controls how
+/// strongly shallow prefixes dominate the score.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct TopWeightedOverlapSummary {
+    /// Number of prefix depths evaluated.
+    pub evaluated_depths: usize,
+    /// Normalized weighted prefix overlap in [0, 1].
+    pub normalized_score: f64,
+    /// Persistence weight, strictly between zero and one.
+    pub persistence: f64,
 }
 
 /// One process-feasibility prediction compared with an independent reference.
@@ -90,6 +106,12 @@ pub enum BenchmarkError {
         index: usize,
     },
     InvalidTieTolerance,
+    InvalidPersistence,
+    RankingLengthMismatch,
+    DuplicateRankingId {
+        ranking: &'static str,
+        index: usize,
+    },
     NoComparablePairs,
     ZeroReferenceStructures,
     InvalidRecoveryCounts,
@@ -108,6 +130,9 @@ impl fmt::Display for BenchmarkError {
                 write!(f, "sample {index} has a lower interval bound above its upper bound")
             }
             Self::InvalidTieTolerance => write!(f, "tie tolerance must be finite and non-negative"),
+            Self::InvalidPersistence => write!(f, "ranking persistence must be finite and strictly between zero and one"),
+            Self::RankingLengthMismatch => write!(f, "predicted and reference rankings must have the same non-zero length"),
+            Self::DuplicateRankingId { ranking, index } => write!(f, "{ranking} ranking repeats an identifier at index {index}"),
             Self::NoComparablePairs => write!(f, "no non-tied reference pairs are available"),
             Self::ZeroReferenceStructures => write!(f, "reference structure count must be greater than zero"),
             Self::InvalidRecoveryCounts => write!(f, "recovered structure count cannot exceed reference count"),
@@ -330,6 +355,76 @@ pub fn summarize_feasibility(
     })
 }
 
+/// Compute normalized finite-prefix top-weighted overlap for ranked candidate IDs.
+///
+/// Both rankings must contain the same number of unique candidate identifiers.
+/// At each depth, overlap is the fraction of top-depth candidates shared by both
+/// rankings. The score is the persistence-weighted average across depths using
+/// weights proportional to `(1 - p) * p^(depth - 1)`. Values near one indicate
+/// similar top-ranked lists. Larger persistence values give deeper prefixes
+/// more weight. The score is descriptive and does not establish physical
+/// validity or reproduce the extrapolated form of every published RBO metric.
+pub fn top_weighted_ranking_overlap(
+    predicted_ranking: &[u64],
+    reference_ranking: &[u64],
+    persistence: f64,
+) -> Result<TopWeightedOverlapSummary, BenchmarkError> {
+    if predicted_ranking.is_empty() || reference_ranking.is_empty() {
+        return Err(BenchmarkError::EmptyInput);
+    }
+    if predicted_ranking.len() != reference_ranking.len() {
+        return Err(BenchmarkError::RankingLengthMismatch);
+    }
+    if !persistence.is_finite() || !(0.0..1.0).contains(&persistence) {
+        return Err(BenchmarkError::InvalidPersistence);
+    }
+
+    for (ranking_name, ranking) in [
+        ("predicted", predicted_ranking),
+        ("reference", reference_ranking),
+    ] {
+        let mut seen = BTreeSet::new();
+        for (index, identifier) in ranking.iter().copied().enumerate() {
+            if !seen.insert(identifier) {
+                return Err(BenchmarkError::DuplicateRankingId {
+                    ranking: ranking_name,
+                    index,
+                });
+            }
+        }
+    }
+
+    let mut predicted_prefix = BTreeSet::new();
+    let mut reference_prefix = BTreeSet::new();
+    let mut weighted_overlap = 0.0;
+    let mut total_weight = 0.0;
+    for depth in 1..=predicted_ranking.len() {
+        predicted_prefix.insert(predicted_ranking[depth - 1]);
+        reference_prefix.insert(reference_ranking[depth - 1]);
+        let shared = predicted_prefix.intersection(&reference_prefix).count();
+        let prefix_overlap = shared as f64 / depth as f64;
+        let weight = (1.0 - persistence) * persistence.powf((depth - 1) as f64);
+        weighted_overlap += weight * prefix_overlap;
+        total_weight += weight;
+        if !weighted_overlap.is_finite() || !total_weight.is_finite() {
+            return Err(BenchmarkError::NonFiniteMetric);
+        }
+    }
+
+    if total_weight <= 0.0 {
+        return Err(BenchmarkError::NonFiniteMetric);
+    }
+    let normalized_score = weighted_overlap / total_weight;
+    if !normalized_score.is_finite() || !(0.0..=1.0).contains(&normalized_score) {
+        return Err(BenchmarkError::NonFiniteMetric);
+    }
+    Ok(TopWeightedOverlapSummary {
+        evaluated_depths: predicted_ranking.len(),
+        normalized_score,
+        persistence,
+    })
+}
+
 /// Fraction of known reference structures recovered by a search.
 ///
 /// Structure identity and the definition of a match are domain-specific and
@@ -501,6 +596,50 @@ mod tests {
                 0.0,
             ),
             Err(BenchmarkError::NoComparablePairs)
+        );
+    }
+
+    #[test]
+    fn top_weighted_overlap_is_one_for_identical_rankings() {
+        let summary = top_weighted_ranking_overlap(&[10, 20, 30], &[10, 20, 30], 0.9)
+            .expect("unique equal-length rankings should be comparable");
+        assert_eq!(summary.evaluated_depths, 3);
+        assert_eq!(summary.persistence, 0.9);
+        assert!((summary.normalized_score - 1.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn top_weighted_overlap_penalizes_a_top_rank_inversion() {
+        let predicted = top_weighted_ranking_overlap(&[20, 10, 30, 40], &[10, 20, 30, 40], 0.9)
+            .expect("valid rankings should compare");
+        let lower_persistence =
+            top_weighted_ranking_overlap(&[20, 10, 30, 40], &[10, 20, 30, 40], 0.2)
+                .expect("valid rankings should compare");
+        assert!(predicted.normalized_score < 1.0);
+        assert!(predicted.normalized_score > 0.0);
+        assert!(lower_persistence.normalized_score > predicted.normalized_score);
+    }
+
+    #[test]
+    fn top_weighted_overlap_rejects_bad_rankings() {
+        assert_eq!(
+            top_weighted_ranking_overlap(&[], &[], 0.9),
+            Err(BenchmarkError::EmptyInput)
+        );
+        assert_eq!(
+            top_weighted_ranking_overlap(&[1, 2], &[1], 0.9),
+            Err(BenchmarkError::RankingLengthMismatch)
+        );
+        assert_eq!(
+            top_weighted_ranking_overlap(&[1, 1], &[1, 2], 0.9),
+            Err(BenchmarkError::DuplicateRankingId {
+                ranking: "predicted",
+                index: 1,
+            })
+        );
+        assert_eq!(
+            top_weighted_ranking_overlap(&[1, 2], &[1, 2], 1.0),
+            Err(BenchmarkError::InvalidPersistence)
         );
     }
 
