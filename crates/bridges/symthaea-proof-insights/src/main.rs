@@ -237,6 +237,45 @@ struct TemporalTargetBundle {
 }
 
 #[derive(Debug, Serialize)]
+struct TemporalTimelineAudit {
+    schema_version: &'static str,
+    repository_url: String,
+    repository_commit: String,
+    timeline_path: String,
+    timeline_sha256: String,
+    lean_toolchain: String,
+    lean_toolchain_sha256: String,
+    mathlib_manifest_path: String,
+    mathlib_manifest_sha256: String,
+    mathlib_revision: String,
+    total_timeline_rows: usize,
+    unique_completion_commit_count: usize,
+    source_path_present_at_completion_count: usize,
+    source_path_missing_at_completion_count: usize,
+    source_path_not_recorded_count: usize,
+    verification_status_counts: BTreeMap<String, usize>,
+    events: Vec<TemporalTimelineAuditEvent>,
+}
+
+#[derive(Debug, Serialize)]
+struct TemporalTimelineAuditEvent {
+    position: usize,
+    event_key: String,
+    timeline_id: Option<String>,
+    lean_name: Option<String>,
+    spec_theorem_path: Option<String>,
+    function: Option<String>,
+    verified_status: String,
+    date_proven: String,
+    completion_commit: String,
+    commit_message: String,
+    completion_commit_ancestor_verified: bool,
+    source_file_status: String,
+    source_file_sha256: Option<String>,
+    source_file_bytes: Option<u64>,
+}
+
+#[derive(Debug, Serialize)]
 struct SourceIndex {
     schema_version: &'static str,
     upstream_repository: &'static str,
@@ -294,6 +333,19 @@ fn main() -> ExitCode {
             Ok(()) => ExitCode::SUCCESS,
             Err(error) => {
                 eprintln!("proof-insights temporal target bundle verification: {error:#}");
+                ExitCode::FAILURE
+            }
+        };
+    }
+    if args.len() == 5 && args[1] == "--audit-temporal-timeline" {
+        return match audit_temporal_timeline(
+            Path::new(&args[2]),
+            Path::new(&args[3]),
+            Path::new(&args[4]),
+        ) {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(error) => {
+                eprintln!("proof-insights temporal timeline audit: {error:#}");
                 ExitCode::FAILURE
             }
         };
@@ -584,6 +636,258 @@ fn execute_from_args() -> Result<()> {
             index.summary.formalization_sources_unmapped
         );
     }
+    Ok(())
+}
+
+fn audit_temporal_timeline(
+    repository_root: &Path,
+    timeline_path: &Path,
+    output_path: &Path,
+) -> Result<()> {
+    let root = repository_root
+        .canonicalize()
+        .with_context(|| format!("cannot resolve timeline repository {}", repository_root.display()))?;
+    let repository_commit = git_output(&root, &["rev-parse", "HEAD"])?;
+    validate_git_sha(&repository_commit).context("repository HEAD must be a full Git commit SHA")?;
+    let repository_url = git_output(&root, &["remote", "get-url", "origin"])?;
+    if !repository_url.starts_with("https://") {
+        bail!("timeline repository origin must be an explicit HTTPS URL");
+    }
+    if !git_output(&root, &["status", "--porcelain"])?.is_empty() {
+        bail!("timeline repository checkout must be clean before audit");
+    }
+
+    let timeline_path = timeline_path
+        .to_str()
+        .context("timeline path must be UTF-8")?;
+    let normalized_timeline_path = normalize_root_relative_path(timeline_path)?;
+    if normalized_timeline_path != timeline_path {
+        bail!("timeline path must be canonical and repository-relative");
+    }
+    let timeline_bytes = git_show_file(&root, &repository_commit, timeline_path)?;
+    let timeline_sha256 = format!("{:x}", Sha256::digest(&timeline_bytes));
+    let mut reader = csv::ReaderBuilder::new()
+        .has_headers(true)
+        .flexible(false)
+        .from_reader(timeline_bytes.as_slice());
+    let headers = reader.headers().context("read timeline CSV headers")?.clone();
+    for required in [
+        "id",
+        "lean_name",
+        "spec_theorem",
+        "function",
+        "verified",
+        "date_proven",
+        "commit_hash",
+        "commit_message",
+    ] {
+        if headers.iter().filter(|header| *header == required).count() != 1 {
+            bail!("timeline CSV must contain exactly one {required:?} column");
+        }
+    }
+    let column = |name: &str| {
+        headers
+            .iter()
+            .position(|header| header == name)
+            .with_context(|| format!("timeline CSV lacks column {name}"))
+    };
+    let id_col = column("id")?;
+    let lean_name_col = column("lean_name")?;
+    let theorem_path_col = column("spec_theorem")?;
+    let function_col = column("function")?;
+    let verified_col = column("verified")?;
+    let date_col = column("date_proven")?;
+    let commit_col = column("commit_hash")?;
+    let message_col = column("commit_message")?;
+
+    let toolchain_bytes = git_show_file(&root, &repository_commit, "lean-toolchain")?;
+    let lean_toolchain = std::str::from_utf8(&toolchain_bytes)
+        .context("pinned Lean toolchain file is not UTF-8")?
+        .trim()
+        .to_owned();
+    if lean_toolchain.is_empty() || lean_toolchain.eq_ignore_ascii_case("latest") {
+        bail!("timeline repository must pin a concrete Lean toolchain");
+    }
+    let mathlib_manifest_path = "lake-manifest.json";
+    let mathlib_manifest_bytes =
+        git_show_file(&root, &repository_commit, mathlib_manifest_path)?;
+    let mathlib_manifest: serde_json::Value =
+        serde_json::from_slice(&mathlib_manifest_bytes).context("parse pinned Lake manifest")?;
+    let mathlib_revision = find_mathlib_revision(&mathlib_manifest)
+        .context("Lake manifest contains no identifiable Mathlib revision")?;
+    validate_git_sha(&mathlib_revision).context("Lake manifest Mathlib revision is not a full SHA")?;
+
+    let mut events = Vec::new();
+    let mut timeline_ids = BTreeSet::new();
+    let mut verified_commit_cache: BTreeMap<String, bool> = BTreeMap::new();
+    let mut unique_commits = BTreeSet::new();
+    let mut source_path_present_at_completion_count = 0_usize;
+    let mut source_path_missing_at_completion_count = 0_usize;
+    let mut source_path_not_recorded_count = 0_usize;
+    let mut verification_status_counts = BTreeMap::new();
+    let mut previous_completion_commit: Option<String> = None;
+
+    for (zero_based_position, row_result) in reader.records().enumerate() {
+        let row = row_result.with_context(|| format!("parse timeline CSV row {}", zero_based_position + 2))?;
+        let get = |index: usize| row.get(index).unwrap_or("").trim();
+        let raw_id = get(id_col);
+        let event_key = if raw_id.is_empty() {
+            format!("row-{zero_based_position:04}")
+        } else {
+            if !timeline_ids.insert(raw_id.to_owned()) {
+                bail!("duplicate non-empty timeline ID {raw_id}");
+            }
+            raw_id.to_owned()
+        };
+        let completion_commit = get(commit_col).to_ascii_lowercase();
+        validate_git_sha(&completion_commit).with_context(|| {
+            format!("timeline row {} has an invalid completion commit", zero_based_position + 2)
+        })?;
+        let completion_commit_ancestor_verified = match verified_commit_cache.get(&completion_commit) {
+            Some(verified) => *verified,
+            None => {
+                let verified = git_is_ancestor(&root, &completion_commit, &repository_commit)
+                    .with_context(|| format!("verify completion commit for timeline row {event_key}"))?;
+                verified_commit_cache.insert(completion_commit.clone(), verified);
+                verified
+            }
+        };
+        if !completion_commit_ancestor_verified {
+            bail!(
+                "completion commit {} for timeline row {} is not an ancestor of pinned HEAD",
+                completion_commit,
+                event_key
+            );
+        }
+        if let Some(previous) = previous_completion_commit.as_deref()
+            && !git_is_ancestor(&root, previous, &completion_commit)?
+        {
+            bail!(
+                "timeline order violation: completion commit for {} does not descend from the previous timeline commit",
+                event_key
+            );
+        }
+        previous_completion_commit = Some(completion_commit.clone());
+        unique_commits.insert(completion_commit.clone());
+
+        let verified_status = get(verified_col).to_owned();
+        if verified_status.is_empty() {
+            bail!("timeline row {} has an empty verified/status field", event_key);
+        }
+        *verification_status_counts
+            .entry(verified_status.clone())
+            .or_insert(0) += 1;
+
+        let raw_path = get(theorem_path_col);
+        let (spec_theorem_path, source_file_status, source_file_sha256, source_file_bytes) =
+            if raw_path.is_empty() {
+                source_path_not_recorded_count += 1;
+                (None, "not_recorded".to_string(), None, None)
+            } else {
+                let normalized = normalize_root_relative_path(raw_path)
+                    .with_context(|| format!("unsafe spec theorem path on timeline row {event_key}"))?;
+                if normalized != raw_path {
+                    bail!(
+                        "spec theorem path on timeline row {} is not canonical: {}",
+                        event_key,
+                        raw_path
+                    );
+                }
+                match git_show_file(&root, &completion_commit, &normalized) {
+                    Ok(bytes) => {
+                        source_path_present_at_completion_count += 1;
+                        (
+                            Some(normalized),
+                            "present_at_completion".to_string(),
+                            Some(format!("{:x}", Sha256::digest(&bytes))),
+                            Some(bytes.len() as u64),
+                        )
+                    }
+                    Err(_) => {
+                        source_path_missing_at_completion_count += 1;
+                        (Some(normalized), "missing_at_completion".to_string(), None, None)
+                    }
+                }
+            };
+
+        events.push(TemporalTimelineAuditEvent {
+            position: zero_based_position,
+            event_key,
+            timeline_id: (!raw_id.is_empty()).then(|| raw_id.to_owned()),
+            lean_name: (!get(lean_name_col).is_empty()).then(|| get(lean_name_col).to_owned()),
+            spec_theorem_path,
+            function: (!get(function_col).is_empty()).then(|| get(function_col).to_owned()),
+            verified_status,
+            date_proven: get(date_col).to_owned(),
+            completion_commit,
+            commit_message: get(message_col).to_owned(),
+            completion_commit_ancestor_verified,
+            source_file_status,
+            source_file_sha256,
+            source_file_bytes,
+        });
+    }
+
+    if events.is_empty() {
+        bail!("timeline audit found zero rows; refusing an empty inventory");
+    }
+    let audit = TemporalTimelineAudit {
+        schema_version: "pitb.temporal-timeline-audit.v0",
+        repository_url,
+        repository_commit,
+        timeline_path: timeline_path.to_owned(),
+        timeline_sha256,
+        lean_toolchain,
+        lean_toolchain_sha256: format!("{:x}", Sha256::digest(&toolchain_bytes)),
+        mathlib_manifest_path: mathlib_manifest_path.to_owned(),
+        mathlib_manifest_sha256: format!("{:x}", Sha256::digest(&mathlib_manifest_bytes)),
+        mathlib_revision,
+        total_timeline_rows: events.len(),
+        unique_completion_commit_count: unique_commits.len(),
+        source_path_present_at_completion_count,
+        source_path_missing_at_completion_count,
+        source_path_not_recorded_count,
+        verification_status_counts,
+        events,
+    };
+
+    let output_parent = output_path.parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    if !output_parent.is_dir() {
+        bail!(
+            "timeline audit output directory must already exist: {}",
+            output_parent.display()
+        );
+    }
+    let canonical_parent = output_parent.canonicalize()
+        .with_context(|| format!("canonicalize output directory {}", output_parent.display()))?;
+    let resolved_output = canonical_parent.join(
+        output_path.file_name().context("timeline audit output path must have a file name")?
+    );
+    if resolved_output.starts_with(&root) {
+        bail!("timeline audit output must be outside the pinned repository checkout");
+    }
+    if fs::symlink_metadata(&resolved_output)
+        .is_ok_and(|metadata| metadata.file_type().is_symlink())
+    {
+        bail!("refusing to overwrite a symlink as temporal timeline audit output");
+    }
+
+    let mut serialized = serde_json::to_vec_pretty(&audit).context("serialize temporal timeline audit")?;
+    serialized.push(b'\n');
+    fs::write(&resolved_output, &serialized)
+        .with_context(|| format!("write temporal timeline audit {}", resolved_output.display()))?;
+    println!(
+        "PITB_TEMPORAL_TIMELINE_AUDIT_PASS: rows={} unique_completion_commits={} source_present={} source_missing={} source_not_recorded={} timeline_sha256={} output={}",
+        audit.total_timeline_rows,
+        audit.unique_completion_commit_count,
+        audit.source_path_present_at_completion_count,
+        audit.source_path_missing_at_completion_count,
+        audit.source_path_not_recorded_count,
+        audit.timeline_sha256,
+        resolved_output.display()
+    );
     Ok(())
 }
 
