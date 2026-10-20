@@ -430,4 +430,5 @@ mod tests {
             }),
             "router benchmark must resist value-estimate gaming"
         );
-    }}
+    }
+}
