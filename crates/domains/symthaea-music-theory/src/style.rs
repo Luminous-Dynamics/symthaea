@@ -1234,7 +1234,7 @@ impl Style {
                     vec![(5, 1, 2), (4, 1, 2), (3, 1, 2), (2, 1, 2), (1, 1, 1)],
                 ],
                 progression: ProgressionSpec::Archetype(vec![1, 4, 1, 5]),
-                accompaniment_pool: vec![A::Arpeggio],
+                accompaniment_pool: vec![A::Arpeggio, A::LullabyCradle],
                 // The theme-and-variations lullaby is the oldest association
                 // in the repertoire (Twinkle IS Mozart K.265's theme); rondo
                 // stays excluded — five sections outlasts a lullaby's job.
@@ -3504,6 +3504,10 @@ mod tests {
             assert_eq!(Style::Waltz.accompaniment(seed), A::OomPah);
             assert_eq!(Style::Cinematic.accompaniment(seed), A::Block);
         }
+        // Lullaby retains its original seed-zero arpeggio and adds a
+        // sparse cradle sway for the next deterministic accompaniment choice.
+        assert_eq!(Style::Lullaby.spec().accompaniment(0), A::Arpeggio);
+        assert_eq!(Style::Lullaby.spec().accompaniment(2), A::LullabyCradle);
         // Folk's new picked pulse joins its two established textures without
         // changing which style/seed selected either one before this addition.
         assert_eq!(Style::Folk.accompaniment(0), A::Arpeggio);
