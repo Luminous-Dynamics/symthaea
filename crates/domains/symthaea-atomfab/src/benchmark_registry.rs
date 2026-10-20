@@ -593,12 +593,32 @@ mod tests {
         let artifacts = plan["sources"]["related_dataset_artifacts"]
             .as_array()
             .unwrap();
-        assert_eq!(artifacts.len(), 4, "all related Zenodo source artifacts must be inventoried");
+        assert_eq!(
+            artifacts.len(),
+            4,
+            "all related Zenodo source artifacts must be inventoried"
+        );
         let expected_roles = [
-            ("dataset.zip", "training_validation_source", "not_independent_for_models_trained_on_archive"),
-            ("global_minima.zip", "published_reference_structure_source", "audit_overlap_before_test_use"),
-            ("dptrain_inputs.zip", "training_configuration_source", "not_evaluation_data"),
-            ("vasp_inputs.zip", "reference_calculation_input_source", "not_evaluation_data"),
+            (
+                "dataset.zip",
+                "training_validation_source",
+                "not_independent_for_models_trained_on_archive",
+            ),
+            (
+                "global_minima.zip",
+                "published_reference_structure_source",
+                "audit_overlap_before_test_use",
+            ),
+            (
+                "dptrain_inputs.zip",
+                "training_configuration_source",
+                "not_evaluation_data",
+            ),
+            (
+                "vasp_inputs.zip",
+                "reference_calculation_input_source",
+                "not_evaluation_data",
+            ),
         ];
         for (filename, role, disposition) in expected_roles {
             let artifact = artifacts
