@@ -673,6 +673,82 @@ fn partition_digest_sha256(families: &[SplitFamily]) -> String {
     sha256_hex(material.as_bytes())
 }
 
+fn parse_target_jsonl(bytes: &[u8], split: &str) -> Result<Vec<TargetOutcome>> {
+    let text = String::from_utf8(bytes.to_vec())
+        .with_context(|| format!("{split} target results must be UTF-8"))?;
+    let mut outcomes = Vec::new();
+    for (line_index, line) in text.lines().enumerate() {
+        if line.trim().is_empty() {
+            continue;
+        }
+        let row: TargetOutcome = serde_json::from_str(line)
+            .with_context(|| format!("parse {split} result JSONL line {}", line_index + 1))?;
+        outcomes.push(row);
+    }
+    if outcomes.is_empty() {
+        bail!("no {split} target outcome rows supplied");
+    }
+    Ok(outcomes)
+}
+
+fn compute_baseline_scores(targets: &[&TargetOutcome]) -> Result<BTreeMap<String, f64>> {
+    if targets.is_empty() {
+        bail!("cannot select a baseline from zero eligible validation targets");
+    }
+    let mut scores = BTreeMap::new();
+    for arm_id in BASELINE_SELECTION_ARMS {
+        let mut successes = 0_usize;
+        for target in targets {
+            let arm = target
+                .arms
+                .iter()
+                .find(|arm| arm.arm == arm_id)
+                .with_context(|| {
+                    format!("validation target {} lacks baseline arm {arm_id}", target.target_id)
+                })?;
+            successes += usize::from(arm.semantic_gate_passed);
+        }
+        scores.insert(arm_id.to_string(), successes as f64 / targets.len() as f64);
+    }
+    Ok(scores)
+}
+
+fn validate_baseline_scores(
+    receipt: &BaselineSelectionReceipt,
+    computed_scores: &BTreeMap<String, f64>,
+) -> Result<()> {
+    for arm_id in BASELINE_SELECTION_ARMS {
+        let claimed = receipt
+            .arm_scores
+            .get(arm_id)
+            .with_context(|| format!("baseline receipt lacks score for arm {arm_id}"))?;
+        let computed = computed_scores
+            .get(arm_id)
+            .with_context(|| format!("computed validation score missing for arm {arm_id}"))?;
+        if (claimed - computed).abs() > 1e-12 {
+            bail!(
+                "validation score for arm {arm_id} is {claimed}, but raw validation outcomes yield {computed}"
+            );
+        }
+    }
+    let selected = computed_scores
+        .iter()
+        .max_by(|(arm_a, score_a), (arm_b, score_b)| {
+            score_a
+                .total_cmp(score_b)
+                .then_with(|| arm_b.cmp(arm_a))
+        })
+        .map(|(arm, _)| arm.as_str())
+        .context("computed validation scores are empty")?;
+    if selected != receipt.selected_arm {
+        bail!(
+            "baseline receipt selected {}, but raw validation outcomes select {selected}",
+            receipt.selected_arm
+        );
+    }
+    Ok(())
+}
+
 fn validate_baseline_receipt(receipt: &BaselineSelectionReceipt, validation_bytes: &[u8]) -> Result<()> {
     if receipt.schema_version != "pitb.baseline-selection.v0" {
         bail!("unsupported baseline-selection receipt schema");
@@ -1307,6 +1383,7 @@ mod tests {
             frozen_before_test: true,
             test_outcomes_seen_before_selection: false,
             tie_break_rule: "highest score; alphabetical arm ID on exact tie".to_string(),
+            validation_results_sha256: "d".repeat(64),
             arm_scores: ["A", "B", "C", "D", "E", "I"]
                 .into_iter()
                 .map(|arm| (arm.to_string(), 0.5))
@@ -1317,6 +1394,40 @@ mod tests {
         receipt.validation_results_sha256 = sha256_hex(validation_bytes);
         validate_baseline_receipt(&receipt, validation_bytes)
             .expect("valid baseline receipt and validation hash should pass");
+    }
+
+    #[test]
+    fn baseline_scores_are_recomputed_from_raw_validation_outcomes() {
+        let mut target = test_target("012", "validation-target", false, false);
+        target.split = "validation".to_string();
+        let retrieval = target
+            .arms
+            .iter_mut()
+            .find(|arm| arm.arm == "I")
+            .expect("arm I should exist");
+        retrieval.status = OutcomeStatus::VerifiedSuccess;
+        retrieval.checker_passed = true;
+        retrieval.semantic_gate_passed = true;
+        let targets = vec![&target];
+        let scores = compute_baseline_scores(&targets).expect("baseline scores from real rows");
+        assert_eq!(scores.get("I"), Some(&1.0));
+        assert_eq!(scores.get("A"), Some(&0.0));
+
+        let mut receipt = BaselineSelectionReceipt {
+            schema_version: "pitb.baseline-selection.v0".to_string(),
+            selected_split: "validation".to_string(),
+            metric: "semantic_gate_success_rate".to_string(),
+            selected_arm: "I".to_string(),
+            frozen_before_test: true,
+            test_outcomes_seen_before_selection: false,
+            tie_break_rule: "highest score; alphabetical arm ID on exact tie".to_string(),
+            validation_results_sha256: "e".repeat(64),
+            arm_scores: scores.clone(),
+        };
+        validate_baseline_scores(&receipt, &scores)
+            .expect("receipt should agree with raw validation outcomes");
+        receipt.selected_arm = "A".to_string();
+        assert!(validate_baseline_scores(&receipt, &scores).is_err());
     }
 
     #[test]
@@ -1358,7 +1469,7 @@ mod tests {
         let config = test_config();
         let frozen_families =
             BTreeMap::from([(REQUIRED_EXPOSED_FAMILY.to_string(), "test".to_string())]);
-        let error = validate_outcomes(&[target], &config, &frozen_families)
+        let error = validate_outcomes(&[target], &config, &frozen_families, "test")
             .expect_err("known-exposed family must be rejected");
         assert!(error.to_string().contains("known-exposed family 089"));
     }
@@ -1371,7 +1482,7 @@ mod tests {
             ("090".to_string(), "test".to_string()),
             ("091".to_string(), "test".to_string()),
         ]);
-        let error = validate_outcomes(&[target], &config, &frozen_families)
+        let error = validate_outcomes(&[target], &config, &frozen_families, "test")
             .expect_err("missing test family must be surfaced rather than dropped");
         assert!(error.to_string().contains("091"));
         assert!(error.to_string().contains("explicit outcome/exclusion row"));
@@ -1383,7 +1494,7 @@ mod tests {
         target.arms[0].budget.max_tokens += 1;
         let config = test_config();
         let frozen_families = BTreeMap::from([("090".to_string(), "test".to_string())]);
-        let error = validate_outcomes(&[target], &config, &frozen_families)
+        let error = validate_outcomes(&[target], &config, &frozen_families, "test")
             .expect_err("unequal arm budget must be rejected");
         assert!(
             error
