@@ -58,3 +58,12 @@ The policy experiment's stretch gate now has a dedicated Rust implementation in 
 This is stricter than computing an interval over only successful seeds after results are observed. All target failures stay reportable campaign outcomes; the speedup interval is withheld if the entire declared paired cohort does not satisfy the target-reaching rule. A lower confidence bound above one is necessary but not sufficient for the stretch claim—the selected policy must also maintain or improve the validated objective at equal total cost.
 
 No benchmark campaign has been executed by adding this metric kernel. It is report-generation infrastructure awaiting exact data/model pins and external baseline runs.
+
+
+### Frozen seed roster and statistical claim boundary
+
+The current proposed extension pins seeds **101–120** in `policy_comparison.seed_manifest`. Its canonical SHA-256 is `c8dd76e3828125d3984e95bef0cd50603cee2bef7933f1fec178866dd973ba59`, computed over UTF-8 bytes of `atomfab-seed-manifest-v1\n` followed by each unique seed in ascending decimal form, one seed per line. The Rust `SeedManifestV1` checks this digest and rejects duplicate/unsorted rosters.
+
+The paired acceleration function receives the manifest explicitly, requires exactly one baseline/candidate pair for every seed in that roster, and writes both the roster and digest into its report. A missing seed, extra seed, duplicated seed, or mismatched roster blocks the interval. A campaign with a failed/non-target run is retained as a failure and blocks this strict target-reaching interval; it must not be silently removed to make the policy look faster. The seed roster and hash are proposal inputs and must remain fixed before outcomes are observed.
+
+The illustrative seed-manifest fixture is a test artifact, not evidence of any completed campaign. The accepted report still requires successful execution on an exact code head, traceable completed campaign records, and independent recomputation of the statistics from those records.
