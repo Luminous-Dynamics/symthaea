@@ -1217,9 +1217,7 @@ pub fn realize_with_spec_and_dialect(
 /// preset-driven native rendering, MIDI export, and FluidSynth rendering all
 /// consume the same selected dialect rather than independently guessing from
 /// spec flags.
-pub fn map_grammar_dialect(
-    d: symthaea_music_theory::PerformanceDialect,
-) -> PerformanceDialect {
+pub fn map_grammar_dialect(d: symthaea_music_theory::PerformanceDialect) -> PerformanceDialect {
     use symthaea_music_theory::PerformanceDialect as G;
     match d {
         G::ClassicalRubato => PerformanceDialect::ClassicalRubato,
@@ -2902,7 +2900,9 @@ mod tests {
                 dialect.expressive_blend_scale() as f64,
             ];
             assert!(
-                scales.iter().all(|scale| scale.is_finite() && *scale >= 0.0 && *scale <= 1.5),
+                scales
+                    .iter()
+                    .all(|scale| scale.is_finite() && *scale >= 0.0 && *scale <= 1.5),
                 "{dialect:?}: {scales:?}"
             );
         }
@@ -2945,5 +2945,4 @@ mod tests {
             assert!((0.0..=1.0).contains(&profile.wet_floor), "{dialect:?}");
         }
     }
-
 }
