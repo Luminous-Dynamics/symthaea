@@ -755,6 +755,7 @@ mod tests {
             Accompaniment::CompasGait,
             Accompaniment::BossaComp,
             Accompaniment::FolkPulse,
+            Accompaniment::LullabyCradle,
             Accompaniment::MarchPulse,
             Accompaniment::Sarabande,
             Accompaniment::Minuet,
