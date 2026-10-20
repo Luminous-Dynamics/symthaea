@@ -695,9 +695,7 @@ fn validate_temporal_manifest(manifest: &TemporalReplayManifest) -> Result<()> {
     }
     validate_git_sha(&manifest.repository_commit).context("invalid pinned repository commit")?;
     let normalized_timeline_path = normalize_root_relative_path(&manifest.timeline_path)?;
-    if normalized_timeline_path != manifest.timeline_path
-        || manifest.timeline_path.is_empty()
-    {
+    if normalized_timeline_path != manifest.timeline_path || manifest.timeline_path.is_empty() {
         bail!("timeline path must be canonical and repository-relative");
     }
     validate_sha256_hex(&manifest.timeline_sha256).context("invalid timeline SHA-256")?;
