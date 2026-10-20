@@ -632,7 +632,7 @@ mod tests {
         assert!(rendered.contains("WHAT THIS DOES NOT PROVE"));
         assert!(rendered.contains("FIFO misses 1 essential deadline"));
         assert!(rendered.contains("Scenario SHA-256: aaaaaaaaaa"));
-        assert!(rendered.contains("Recommended NEXT STEP") == false);
+        assert!(!rendered.contains("Recommended NEXT STEP"));
         assert!(rendered.contains("RECOMMENDED NEXT STEP"));
     }
 
