@@ -3,7 +3,7 @@ use std::fs;
 use std::process::ExitCode;
 
 use serde_json::Value;
-use symthaea_connectivity_explainer::explain_report;
+use symthaea_connectivity_explainer::{explain_report, render_human};
 
 const MAX_INPUT_BYTES: u64 = 16 * 1024 * 1024;
 
@@ -18,9 +18,12 @@ fn read_json(path: &str) -> Result<Value, String> {
 
 fn run() -> Result<(), String> {
     let args: Vec<String> = env::args().collect();
-    if args.len() < 2 || args.len() > 3 {
+    if args.len() < 2
+        || args.len() > 4
+        || (args.len() >= 3 && args[2] != "--json")
+    {
         return Err(format!(
-            "usage: {} <multiwindow-report.json> [output.json]",
+            "usage: {} <multiwindow-report.json> [--json [output.json]]",
             args.first()
                 .map(String::as_str)
                 .unwrap_or("symthaea-connectivity-explain")
@@ -30,21 +33,26 @@ fn run() -> Result<(), String> {
     let input = read_json(&args[1])?;
     let explanation =
         explain_report(&input).map_err(|error| format!("explanation refused: {error}"))?;
-    let output = serde_json::to_vec_pretty(&explanation)
-        .map_err(|error| format!("cannot serialize explanation: {error}"))?;
 
-    if let Some(path) = args.get(2) {
-        fs::write(path, output).map_err(|error| format!("cannot write {path}: {error}"))?;
-        println!("Evidence-grounded explanation written to {path}");
-    } else {
-        println!(
-            "{}",
-            String::from_utf8(output).map_err(|error| error.to_string())?
-        );
+    match args.get(2).map(String::as_str) {
+        None => {
+            print!("{}", render_human(&explanation));
+        }
+        Some("--json") => {
+            let output = serde_json::to_vec_pretty(&explanation)
+                .map_err(|error| format!("cannot serialize explanation: {error}"))?;
+            if let Some(path) = args.get(3) {
+                fs::write(path, output).map_err(|error| format!("cannot write {path}: {error}"))?;
+                println!("Evidence-grounded JSON explanation written to {path}");
+            } else {
+                println!(
+                    "{}",
+                    String::from_utf8(output).map_err(|error| error.to_string())?
+                );
+            }
+        }
+        Some(_) => unreachable!("arguments were validated before this match"),
     }
-    println!(
-        "Template-driven explanation only; source evidence class and limitations are preserved."
-    );
     Ok(())
 }
 
