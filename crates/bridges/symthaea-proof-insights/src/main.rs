@@ -208,6 +208,7 @@ struct MaterializedVisibleArtifact {
     source_file_sha256: String,
     source_commit: String,
     available_at_position: Option<usize>,
+    target_position: Option<usize>,
     theorem_id: Option<String>,
     content: String,
 }
@@ -841,6 +842,7 @@ fn materialize_temporal_target(
             source_file_sha256: artifact.source_file_sha256.clone(),
             source_commit: artifact.source_commit.clone(),
             available_at_position: artifact.available_at_position,
+            target_position: artifact.target_position,
             theorem_id: artifact.theorem_id.clone(),
             content,
         });
