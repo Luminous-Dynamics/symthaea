@@ -1,0 +1,388 @@
+{
+  "schema": "luminous.landscape-observation-batch.v0",
+  "schema_uri": "https://luminousdynamics.io/schemas/landscape-observation-batch-v0.schema.json",
+  "batch_id": "obs-batch-synthetic-v0",
+  "created_at_unix_ms": 1792520000000,
+  "observations": [
+    {
+      "schema": "luminous.landscape-observation.v0",
+      "schema_uri": "https://luminousdynamics.io/schemas/landscape-observation-v0.schema.json",
+      "observation_id": "obs-synthetic-plant-survival-0001",
+      "source_event_id": "event-synthetic-plant-survival-0001",
+      "project_ref": {
+        "project_snapshot_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "feature_id": "feature-0001",
+        "site_ref_sha256": null
+      },
+      "phenomenon_time": {
+        "start_unix_ms": 1792454400000,
+        "end_unix_ms": 1792458000000,
+        "clock_uncertainty_ms": 0
+      },
+      "result_time_unix_ms": 1792459000000,
+      "observed_property": {
+        "id": "urn:luminous:landscape:plant-survival-count",
+        "label": "Synthetic sample plants surviving",
+        "metric_id": null,
+        "unit": "count"
+      },
+      "result": {
+        "kind": "quantity",
+        "numeric_value": 17,
+        "unit": "count"
+      },
+      "evidence_class": "synthetic-test",
+      "source": {
+        "kind": "synthetic-fixture",
+        "source_id": "source-synthetic-plant-survival-0001",
+        "source_uri": "urn:luminous:synthetic:source:plant-survival-0001",
+        "source_version": "fixture-v0",
+        "payload_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "method_uri": "urn:luminous:synthetic:method:plant-survival-0001",
+        "method_version": "0",
+        "observer_ref_sha256": null,
+        "instrument_ref_sha256": null
+      },
+      "quality": {
+        "state": "unreviewed",
+        "calibration_state": "not-required",
+        "flags": [
+          "synthetic-data"
+        ],
+        "uncertainty": {
+          "kind": "unknown",
+          "value": null,
+          "lower_bound": null,
+          "upper_bound": null,
+          "coverage_probability": null,
+          "unit": null,
+          "method_uri": null,
+          "reason_code": "synthetic-fixture-no-uncertainty"
+        }
+      },
+      "location": {
+        "kind": "opaque-site",
+        "site_ref_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "precision_class": "site",
+        "sensitivity": "restricted"
+      },
+      "privacy": {
+        "classification": "synthetic",
+        "publication_policy": "private-only",
+        "consent_record_ref_sha256": null,
+        "policy_version": "landscape-privacy-v0",
+        "consent_authority": "mycelix"
+      },
+      "transformations": []
+    },
+    {
+      "schema": "luminous.landscape-observation.v0",
+      "schema_uri": "https://luminousdynamics.io/schemas/landscape-observation-v0.schema.json",
+      "observation_id": "obs-synthetic-surface-temperature-0002",
+      "source_event_id": "event-synthetic-surface-temperature-0002",
+      "project_ref": {
+        "project_snapshot_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "feature_id": "feature-0002",
+        "site_ref_sha256": null
+      },
+      "phenomenon_time": {
+        "start_unix_ms": 1792464400000,
+        "end_unix_ms": 1792468000000,
+        "clock_uncertainty_ms": 0
+      },
+      "result_time_unix_ms": 1792469000000,
+      "observed_property": {
+        "id": "urn:luminous:landscape:surface-temperature",
+        "label": "Synthetic surface temperature",
+        "metric_id": null,
+        "unit": "degC"
+      },
+      "result": {
+        "kind": "quantity",
+        "numeric_value": 32.1,
+        "unit": "degC"
+      },
+      "evidence_class": "synthetic-test",
+      "source": {
+        "kind": "synthetic-fixture",
+        "source_id": "source-synthetic-surface-temperature-0002",
+        "source_uri": "urn:luminous:synthetic:source:surface-temperature-0002",
+        "source_version": "fixture-v0",
+        "payload_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "method_uri": "urn:luminous:synthetic:method:surface-temperature-0002",
+        "method_version": "0",
+        "observer_ref_sha256": null,
+        "instrument_ref_sha256": null
+      },
+      "quality": {
+        "state": "unreviewed",
+        "calibration_state": "not-required",
+        "flags": [
+          "synthetic-data"
+        ],
+        "uncertainty": {
+          "kind": "interval",
+          "value": null,
+          "lower_bound": 31.2,
+          "upper_bound": 33,
+          "coverage_probability": 0.95,
+          "unit": "degC",
+          "method_uri": "urn:luminous:synthetic:uncertainty:interval-v0",
+          "reason_code": null
+        }
+      },
+      "location": {
+        "kind": "geographic-wgs84",
+        "crs": "OGC:CRS84",
+        "longitude_latitude_deg": [
+          10,
+          20
+        ],
+        "precision_m": 25,
+        "sensitivity": "coarse"
+      },
+      "privacy": {
+        "classification": "synthetic",
+        "publication_policy": "private-only",
+        "consent_record_ref_sha256": null,
+        "policy_version": "landscape-privacy-v0",
+        "consent_authority": "mycelix"
+      },
+      "transformations": []
+    },
+    {
+      "schema": "luminous.landscape-observation.v0",
+      "schema_uri": "https://luminousdynamics.io/schemas/landscape-observation-v0.schema.json",
+      "observation_id": "obs-synthetic-canopy-condition-0003",
+      "source_event_id": "event-synthetic-canopy-condition-0003",
+      "project_ref": {
+        "project_snapshot_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "feature_id": "feature-0003",
+        "site_ref_sha256": null
+      },
+      "phenomenon_time": {
+        "start_unix_ms": 1792474400000,
+        "end_unix_ms": 1792478000000,
+        "clock_uncertainty_ms": 0
+      },
+      "result_time_unix_ms": 1792479000000,
+      "observed_property": {
+        "id": "urn:luminous:landscape:canopy-condition",
+        "label": "Synthetic canopy condition class",
+        "metric_id": null,
+        "unit": null
+      },
+      "result": {
+        "kind": "category",
+        "category_value": "moderate",
+        "vocabulary_uri": "urn:luminous:synthetic:vocabulary:canopy-condition-v0"
+      },
+      "evidence_class": "synthetic-test",
+      "source": {
+        "kind": "synthetic-fixture",
+        "source_id": "source-synthetic-canopy-condition-0003",
+        "source_uri": "urn:luminous:synthetic:source:canopy-condition-0003",
+        "source_version": "fixture-v0",
+        "payload_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "method_uri": "urn:luminous:synthetic:method:canopy-condition-0003",
+        "method_version": "0",
+        "observer_ref_sha256": null,
+        "instrument_ref_sha256": null
+      },
+      "quality": {
+        "state": "unreviewed",
+        "calibration_state": "not-required",
+        "flags": [
+          "synthetic-data"
+        ],
+        "uncertainty": {
+          "kind": "qualitative",
+          "value": null,
+          "lower_bound": null,
+          "upper_bound": null,
+          "coverage_probability": null,
+          "unit": null,
+          "method_uri": "urn:luminous:synthetic:method:ordinal-rating",
+          "reason_code": "synthetic-observer-category"
+        }
+      },
+      "location": {
+        "kind": "project-local",
+        "frame_id": "urn:luminous:synthetic:frame:site-v0",
+        "units": "drawing-unit",
+        "coordinates_xy": [
+          100.5,
+          50.25
+        ],
+        "precision_units": 1,
+        "sensitivity": "public"
+      },
+      "privacy": {
+        "classification": "synthetic",
+        "publication_policy": "private-only",
+        "consent_record_ref_sha256": null,
+        "policy_version": "landscape-privacy-v0",
+        "consent_authority": "mycelix"
+      },
+      "transformations": []
+    },
+    {
+      "schema": "luminous.landscape-observation.v0",
+      "schema_uri": "https://luminousdynamics.io/schemas/landscape-observation-v0.schema.json",
+      "observation_id": "obs-synthetic-route-obstruction-0004",
+      "source_event_id": "event-synthetic-route-obstruction-0004",
+      "project_ref": {
+        "project_snapshot_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "feature_id": "feature-0004",
+        "site_ref_sha256": null
+      },
+      "phenomenon_time": {
+        "start_unix_ms": 1792484400000,
+        "end_unix_ms": 1792488000000,
+        "clock_uncertainty_ms": 0
+      },
+      "result_time_unix_ms": 1792489000000,
+      "observed_property": {
+        "id": "urn:luminous:landscape:route-obstruction",
+        "label": "Synthetic route obstruction present",
+        "metric_id": null,
+        "unit": null
+      },
+      "result": {
+        "kind": "boolean",
+        "boolean_value": false
+      },
+      "evidence_class": "synthetic-test",
+      "source": {
+        "kind": "synthetic-fixture",
+        "source_id": "source-synthetic-route-obstruction-0004",
+        "source_uri": "urn:luminous:synthetic:source:route-obstruction-0004",
+        "source_version": "fixture-v0",
+        "payload_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "method_uri": "urn:luminous:synthetic:method:route-obstruction-0004",
+        "method_version": "0",
+        "observer_ref_sha256": null,
+        "instrument_ref_sha256": null
+      },
+      "quality": {
+        "state": "unreviewed",
+        "calibration_state": "not-required",
+        "flags": [
+          "synthetic-data"
+        ],
+        "uncertainty": {
+          "kind": "not-applicable",
+          "value": null,
+          "lower_bound": null,
+          "upper_bound": null,
+          "coverage_probability": null,
+          "unit": null,
+          "method_uri": null,
+          "reason_code": "boolean-fixture-result"
+        }
+      },
+      "location": {
+        "kind": "opaque-site",
+        "site_ref_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "precision_class": "site",
+        "sensitivity": "restricted"
+      },
+      "privacy": {
+        "classification": "synthetic",
+        "publication_policy": "private-only",
+        "consent_record_ref_sha256": null,
+        "policy_version": "landscape-privacy-v0",
+        "consent_authority": "mycelix"
+      },
+      "transformations": []
+    },
+    {
+      "schema": "luminous.landscape-observation.v0",
+      "schema_uri": "https://luminousdynamics.io/schemas/landscape-observation-v0.schema.json",
+      "observation_id": "obs-synthetic-captured-water-0005",
+      "source_event_id": "event-synthetic-captured-water-0005",
+      "project_ref": {
+        "project_snapshot_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "feature_id": "feature-0005",
+        "site_ref_sha256": null
+      },
+      "phenomenon_time": {
+        "start_unix_ms": 1792494400000,
+        "end_unix_ms": 1792498000000,
+        "clock_uncertainty_ms": 0
+      },
+      "result_time_unix_ms": 1792499000000,
+      "observed_property": {
+        "id": "urn:luminous:landscape:captured-water-volume",
+        "label": "Synthetic captured water volume",
+        "metric_id": null,
+        "unit": "L"
+      },
+      "result": {
+        "kind": "quantity",
+        "numeric_value": 85.5,
+        "unit": "L"
+      },
+      "evidence_class": "synthetic-test",
+      "source": {
+        "kind": "synthetic-fixture",
+        "source_id": "source-synthetic-captured-water-0005",
+        "source_uri": "urn:luminous:synthetic:source:captured-water-0005",
+        "source_version": "fixture-v0",
+        "payload_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "method_uri": "urn:luminous:synthetic:method:captured-water-0005",
+        "method_version": "0",
+        "observer_ref_sha256": null,
+        "instrument_ref_sha256": null
+      },
+      "quality": {
+        "state": "unreviewed",
+        "calibration_state": "not-required",
+        "flags": [
+          "synthetic-data"
+        ],
+        "uncertainty": {
+          "kind": "standard-uncertainty",
+          "value": 0.25,
+          "lower_bound": null,
+          "upper_bound": null,
+          "coverage_probability": null,
+          "unit": "L",
+          "method_uri": "urn:luminous:synthetic:uncertainty:standard-v0",
+          "reason_code": null
+        }
+      },
+      "location": {
+        "kind": "opaque-site",
+        "site_ref_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+        "precision_class": "site",
+        "sensitivity": "restricted"
+      },
+      "privacy": {
+        "classification": "synthetic",
+        "publication_policy": "private-only",
+        "consent_record_ref_sha256": null,
+        "policy_version": "landscape-privacy-v0",
+        "consent_authority": "mycelix"
+      },
+      "transformations": [
+        {
+          "activity_uri": "urn:luminous:synthetic:transform:calibrate",
+          "activity_version": "v1",
+          "input_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "output_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+          "performed_at_unix_ms": 1792498400000,
+          "agent_ref_sha256": null
+        },
+        {
+          "activity_uri": "urn:luminous:synthetic:transform:aggregate",
+          "activity_version": "v1",
+          "input_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+          "output_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+          "performed_at_unix_ms": 1792498900000,
+          "agent_ref_sha256": null
+        }
+      ]
+    }
+  ]
+}
