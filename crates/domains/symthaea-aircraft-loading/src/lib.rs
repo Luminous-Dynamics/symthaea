@@ -71,11 +71,29 @@ pub struct CgEnvelopeBand {
     pub aft_cg_m: f64,
 }
 
+/// A loading-phase label for a declared weight-and-balance state.
+///
+/// The prototype computes results only for Takeoff. Other phases are present in the enum so
+/// callers cannot silently relabel a ramp/taxi/landing state as a take-off audit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LoadingPhase {
+    /// Aircraft state at take-off; the only phase currently evaluated.
+    Takeoff,
+    /// Aircraft state on the ramp; not yet supported by the prototype.
+    Ramp,
+    /// Aircraft state during taxi; not yet supported by the prototype.
+    Taxi,
+    /// Aircraft state at landing; not yet supported by the prototype.
+    Landing,
+}
+
 /// A loading scenario evaluated against exactly one aircraft profile revision.
 #[derive(Debug, Clone, PartialEq)]
 pub struct LoadingScenario {
     /// Stable manifest/scenario identifier.
     pub scenario_id: String,
+    /// Explicit mass/operating phase for the supplied item list.
+    pub phase: LoadingPhase,
     /// Aircraft identifier copied from the source profile.
     pub aircraft_id: String,
     /// Exact configuration revision copied from the source profile.
@@ -216,6 +234,8 @@ pub enum AuditInputError {
     DuplicateItemId(String),
     /// An item refers to a station absent from the profile.
     UnknownStationId(String),
+    /// The requested loading phase has no qualified profile/calculation in this prototype.
+    UnsupportedLoadingPhase(LoadingPhase),
     /// A loaded item has a missing identifier or non-positive/non-finite mass.
     InvalidLoadedItem(String),
     /// A finite-input arithmetic operation produced a non-finite result.
@@ -232,6 +252,9 @@ impl fmt::Display for AuditInputError {
             Self::DuplicateStationId(id) => write!(f, "duplicate loading station id: {id}"),
             Self::DuplicateItemId(id) => write!(f, "duplicate loaded item id: {id}"),
             Self::UnknownStationId(id) => write!(f, "unknown loading station id: {id}"),
+            Self::UnsupportedLoadingPhase(phase) => {
+                write!(f, "unsupported loading phase for aircraft audit: {phase:?}")
+            }
             Self::InvalidLoadedItem(id) => write!(f, "invalid loaded item: {id}"),
             Self::NumericOverflow => write!(f, "numeric overflow during loading audit"),
         }
@@ -240,12 +263,13 @@ impl fmt::Display for AuditInputError {
 
 impl Error for AuditInputError {}
 
-/// Audit one declared loading state against one explicit aircraft profile.
+/// Audit one declared take-off loading state against one explicit aircraft profile.
 ///
 /// This function is deterministic and has no external dependencies or side effects. It rejects
-/// malformed inputs and profile/revision mismatches. A returned report checks only the values
-/// supplied by the caller; its profile references and any securement references are not
-/// authenticated. Fuel burn, taxi/take-off/landing phase differences, passenger movement,
+/// malformed inputs, profile/revision mismatches, and any phase other than Takeoff. A returned
+/// report checks only the values supplied by the caller; its profile references and any
+/// securement references are not authenticated. Fuel burn, ramp/taxi/landing phase differences,
+/// passenger movement,
 /// dangerous-goods segregation, package geometry, floor pressure, restraint strength,
 /// aeroelastic effects, structural substantiation, and operational authorization are out of
 /// scope for this first increment.
@@ -259,6 +283,9 @@ pub fn audit_loading(
         return Err(AuditInputError::InvalidLoadedItem(
             "scenario id is empty".to_owned(),
         ));
+    }
+    if scenario.phase != LoadingPhase::Takeoff {
+        return Err(AuditInputError::UnsupportedLoadingPhase(scenario.phase));
     }
     if scenario.aircraft_id != profile.aircraft_id
         || scenario.configuration_revision != profile.configuration_revision
@@ -610,6 +637,7 @@ mod tests {
     fn scenario(items: Vec<LoadedItem>) -> LoadingScenario {
         LoadingScenario {
             scenario_id: "scenario-test-001".to_owned(),
+            phase: LoadingPhase::Takeoff,
             aircraft_id: "SYNTHETIC-100".to_owned(),
             configuration_revision: "cfg-test-001".to_owned(),
             items,
@@ -732,6 +760,16 @@ mod tests {
             audit_loading(&aircraft, &scenario(vec![])),
             Err(AuditInputError::InvalidProfile(_))
         ));
+    }
+
+    #[test]
+    fn rejects_non_takeoff_phase_until_phase_specific_profiles_exist() {
+        let mut manifest = scenario(vec![]);
+        manifest.phase = LoadingPhase::Landing;
+        assert_eq!(
+            audit_loading(&profile(), &manifest),
+            Err(AuditInputError::UnsupportedLoadingPhase(LoadingPhase::Landing))
+        );
     }
 
     #[test]
