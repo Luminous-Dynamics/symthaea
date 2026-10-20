@@ -888,8 +888,12 @@ fn materialize_temporal_target(
         .parent()
         .filter(|parent| !parent.as_os_str().is_empty())
         .unwrap_or_else(|| Path::new("."));
-    fs::create_dir_all(output_parent)
-        .with_context(|| format!("create target bundle directory {}", output_parent.display()))?;
+    if !output_parent.is_dir() {
+        bail!(
+            "target bundle output directory must already exist: {}",
+            output_parent.display()
+        );
+    }
     let canonical_parent = output_parent
         .canonicalize()
         .with_context(|| format!("canonicalize target bundle directory {}", output_parent.display()))?;
