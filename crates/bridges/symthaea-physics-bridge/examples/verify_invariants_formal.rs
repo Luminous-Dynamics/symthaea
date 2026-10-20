@@ -423,7 +423,7 @@ fn dump_dir() -> PathBuf {
         .unwrap_or_else(|_| PathBuf::from("papers/physics-math/ramanujan/proofs"))
 }
 
-fn main() -> ExitCode {
+pub fn run_verifier() -> ExitCode {
     let dir = dump_dir();
     if let Err(e) = fs::create_dir_all(&dir) {
         eprintln!("# mkdir {} failed: {}", dir.display(), e);
@@ -506,6 +506,10 @@ fn main() -> ExitCode {
     } else {
         ExitCode::SUCCESS
     }
+}
+
+fn main() -> ExitCode {
+    run_verifier()
 }
 
 #[cfg(test)]
