@@ -107,7 +107,10 @@ pub fn assess_trial(trial: &EvaluatorTrialV1) -> Result<TrialAssessmentV1, Asses
     if !trial.neutral_tolerance.is_finite() || trial.neutral_tolerance < 0.0 {
         return Err(AssessmentError::InvalidNeutralTolerance(trial.trial_id));
     }
-    if trial.loss_profile_id.trim().is_empty() || trial.resource.unit_id.trim().is_empty() {
+    if trial.loss_profile_id.trim().is_empty() {
+        return Err(AssessmentError::InvalidLossProfile(trial.trial_id));
+    }
+    if trial.resource.unit_id.trim().is_empty() {
         return Err(AssessmentError::InvalidResourceUnit(trial.trial_id));
     }
 
