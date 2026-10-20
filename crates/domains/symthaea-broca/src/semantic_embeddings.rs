@@ -15,7 +15,7 @@
 //! ## Three-Tier Composition
 //!
 //! - **Tier 1**: Direct decomposition from LexicalGrounding (~200 words)
-//! - **Tier 2**: Morphological decomposition via prefix/suffix analysis (~500 tokens)
+//! - **Tier 2**: Prefix/suffix candidates admitted only when a reduced stem is lexically grounded
 //! - **Tier 3**: Genesis-seeded fallback (remaining tokens)
 //!
 //! ## Integration
@@ -58,7 +58,7 @@ pub struct EmbeddingCoverageStats {
     pub total_tokens: usize,
     /// Tokens matched via LexicalGrounding (full word match).
     pub tier1_direct: usize,
-    /// Tokens matched via morphological prefix/suffix decomposition.
+    /// Tokens accepted through bounded affix reduction to a lexically grounded stem.
     pub tier2_morphological: usize,
     /// Tokens with no semantic decomposition (genesis fallback).
     pub tier3_genesis: usize,
