@@ -125,8 +125,7 @@
       ],
       "properties": {
         "benefit_units": {
-          "type": "integer",
-          "minimum": 0
+          "type": "integer"
         },
         "cost_units": {
           "type": "integer",
@@ -141,7 +140,7 @@
         "action_id",
         "source",
         "status",
-        "realized_decision_loss_reduction_units",
+        "realized_decision_loss_change_units",
         "realized_cost_units",
         "outcome_evidence_digest"
       ],
@@ -166,16 +165,15 @@
             "not_run"
           ]
         },
-        "realized_decision_loss_reduction_units": {
-          "type": "integer",
-          "minimum": 0
-        },
         "realized_cost_units": {
           "type": "integer",
           "minimum": 0
         },
         "outcome_evidence_digest": {
           "$ref": "#/$defs/sha256"
+        },
+        "realized_decision_loss_change_units": {
+          "type": "integer"
         }
       },
       "allOf": [
@@ -192,10 +190,10 @@
           },
           "then": {
             "properties": {
-              "realized_decision_loss_reduction_units": {
+              "realized_cost_units": {
                 "const": 0
               },
-              "realized_cost_units": {
+              "realized_decision_loss_change_units": {
                 "const": 0
               }
             }
@@ -217,9 +215,6 @@
           },
           "then": {
             "properties": {
-              "realized_decision_loss_reduction_units": {
-                "const": 0
-              },
               "realized_cost_units": {
                 "minimum": 1
               }
@@ -248,5 +243,5 @@
       ]
     }
   },
-  "$comment": "The report stores ratios as exact integer numerators and denominators. Rust EvidenceRouteBenchmarkSummary::validate recomputes selection and oracle from outcome records; schema validation alone does not prove source parity or complete eligible-outcome coverage."
+  "$comment": "The report stores realized net decision-loss reduction as a signed numerator and cost as a positive denominator. Negative ratios indicate harmful actions; the no-action baseline (zero benefit, zero cost) is the oracle when no eligible action has positive realized benefit. Rust EvidenceRouteBenchmarkSummary::validate recomputes selection and oracle from outcome records."
 }
