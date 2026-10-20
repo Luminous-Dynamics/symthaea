@@ -383,7 +383,7 @@ pub fn top_weighted_ranking_overlap(
     if predicted_ranking.len() != reference_ranking.len() {
         return Err(BenchmarkError::RankingLengthMismatch);
     }
-    if !persistence.is_finite() || !(0.0..1.0).contains(&persistence) {
+    if !persistence.is_finite() || persistence <= 0.0 || persistence >= 1.0 {
         return Err(BenchmarkError::InvalidPersistence);
     }
 
@@ -644,6 +644,10 @@ mod tests {
                 ranking: "predicted",
                 index: 1,
             })
+        );
+        assert_eq!(
+            top_weighted_ranking_overlap(&[1, 2], &[1, 2], 0.0),
+            Err(BenchmarkError::InvalidPersistence)
         );
         assert_eq!(
             top_weighted_ranking_overlap(&[1, 2], &[1, 2], 1.0),
