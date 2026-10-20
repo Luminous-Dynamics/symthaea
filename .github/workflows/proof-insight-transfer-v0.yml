@@ -197,6 +197,41 @@ jobs:
           }
           validator.validate(record)
 
+          # Synthetic positive transfer fixture: all source/target text and
+          # receipts are placeholders used only to exercise schema guards.
+          target_verification = {
+              "status": "passed",
+              "target_source_commit": "a" * 40,
+              "target_artifact_path": "lean/Synthetic/Target.lean",
+              "target_artifact_sha256": digest,
+              "target_statement_digest": digest,
+              "checker": "synthetic Lean checker",
+              "checker_version": "synthetic-only",
+              "exact_statement_checked": True,
+              "axiom_policy": "declared_classical",
+              "receipt_sha256": digest,
+              "target_statement_correspondence": {
+                  "status": "matches_intended_claim",
+                  "independent_reviewer_count": 1
+              },
+              "successor_test_status": "passed",
+              "successor_tests": [{
+                  "test_id": "synthetic-successor",
+                  "source_path": "lean/Synthetic/Target.lean",
+                  "test_declaration": "Synthetic.successor",
+                  "outcome": "passed",
+                  "depends_on_candidate": True
+              }],
+              "mutation_control_status": "passed",
+              "notes": ["Synthetic-only schema fixture; no real transfer is asserted"]
+          }
+          verified_record = copy.deepcopy(record)
+          verified_candidate = verified_record["insight"]["transfer_candidates"][0]
+          verified_candidate["status"] = "verified_transfer"
+          verified_candidate["target_theorem_id"] = "OAI.Synthetic.target"
+          verified_candidate["transfer_verification"] = target_verification
+          validator.validate(verified_record)
+
           mutants = []
           extra_property = copy.deepcopy(record)
           extra_property["unspecified_authority"] = True
@@ -218,12 +253,21 @@ jobs:
           del missing_contract["insight"]["transfer_candidates"][0]["directional_contract"]
           mutants.append(missing_contract)
 
-          incompatible_verified_transfer = copy.deepcopy(record)
+          incompatible_verified_transfer = copy.deepcopy(verified_record)
           incompatible_candidate = incompatible_verified_transfer["insight"]["transfer_candidates"][0]
-          incompatible_candidate["status"] = "verified_transfer"
           incompatible_candidate["directional_contract"]["compatibility"] = "incompatible"
           incompatible_candidate["directional_contract"]["mismatch_codes"] = ["inequality_direction"]
           mutants.append(incompatible_verified_transfer)
+
+          verified_without_receipt = copy.deepcopy(record)
+          verified_candidate_without_receipt = verified_without_receipt["insight"]["transfer_candidates"][0]
+          verified_candidate_without_receipt["status"] = "verified_transfer"
+          verified_candidate_without_receipt["target_theorem_id"] = "OAI.Synthetic.target"
+          mutants.append(verified_without_receipt)
+
+          missing_target_evidence = copy.deepcopy(verified_record)
+          del missing_target_evidence["insight"]["transfer_candidates"][0]["transfer_verification"]
+          mutants.append(missing_target_evidence)
 
           rejected_without_mismatch = copy.deepcopy(record)
           rejected_candidate = rejected_without_mismatch["insight"]["transfer_candidates"][0]
