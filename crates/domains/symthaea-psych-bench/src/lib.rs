@@ -6,7 +6,7 @@
 //! Standardized evaluation of Symthaea's neuroscience-inspired subsystems
 //! against established psychological benchmarks and published human baselines.
 //!
-//! ## Benchmarks (80 across 16 domains)
+//! ## Benchmark domains
 //!
 //! - **WorM** (6) — Working memory (N-back, change detection, serial recall,
 //!   spatial updating, binding, digit span)
