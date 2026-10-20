@@ -442,6 +442,39 @@ mod tests {
             refinement["exact_dft_settings_status"],
             "unresolved_before_execution"
         );
+        assert_eq!(
+            refinement["mutation_operators"],
+            serde_json::json!(["rattle", "mirror"])
+        );
+        assert_eq!(
+            refinement["mutation_operator_probability"]["rattle"],
+            serde_json::json!(0.5)
+        );
+        assert_eq!(
+            refinement["mutation_operator_probability"]["mirror"],
+            serde_json::json!(0.5)
+        );
+        assert!(
+            refinement["global_minimum_claim_ceiling"]
+                .as_str()
+                .unwrap()
+                .contains("Finite stochastic GA search cannot establish")
+        );
+        let fingerprint = &plan["published_result_fingerprint"];
+        assert_eq!(fingerprint["status"], "paper_reported_not_reproduced");
+        assert_eq!(fingerprint["system_count"], serde_json::json!(12));
+        assert_eq!(
+            fingerprint["model_minimum_binding_energy_winner_counts"]["dp-unialcu"],
+            serde_json::json!(8)
+        );
+        assert_eq!(
+            fingerprint["model_minimum_binding_energy_winner_counts"]["mattersim-v1.0.0-1m"],
+            serde_json::json!(3)
+        );
+        assert_eq!(
+            fingerprint["model_minimum_binding_energy_winner_counts"]["mace-omat-medium"],
+            serde_json::json!(1)
+        );
         let policy_extension = &plan["policy_comparison"];
         assert_eq!(
             policy_extension["paired_campaign_count"],
