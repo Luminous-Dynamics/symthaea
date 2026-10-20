@@ -1,0 +1,19 @@
+[package]
+name = "symthaea-observation-attestation"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "Ed25519 attestation and verification adapter for Symthaea observation-fabric receipts"
+
+[dependencies]
+blake3 = { workspace = true }
+ed25519-dalek = { workspace = true }
+serde = { workspace = true }
+symthaea-core = { path = "../symthaea-core" }
+thiserror = { workspace = true }
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+all = "warn"
