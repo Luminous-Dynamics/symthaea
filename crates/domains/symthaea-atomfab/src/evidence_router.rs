@@ -487,7 +487,7 @@ pub fn score_evidence_route(
             }
             _ => {}
         }
-        if matches!(entry.disposition, EvidenceActionDisposition::Ranked { .. })
+        if matches!(&entry.disposition, EvidenceActionDisposition::Ranked { .. })
             && outcome.status == EvidenceOutcomeStatus::NotRun
         {
             return Err(EvidenceRouteError::IncompleteEligibleOutcome);
@@ -497,7 +497,7 @@ pub fn score_evidence_route(
     let ranked: Vec<&EvidenceRouteEntry> = route
         .entries
         .iter()
-        .filter(|entry| matches!(entry.disposition, EvidenceActionDisposition::Ranked { .. }))
+        .filter(|entry| matches!(&entry.disposition, EvidenceActionDisposition::Ranked { .. }))
         .collect();
     for entry in &ranked {
         if !outcome_ids.contains(entry.proposal.action_id.as_str()) {
