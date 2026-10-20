@@ -2034,7 +2034,7 @@ mod tests {
             .push("proof-001".to_string());
         let error = validate_temporal_manifest(&manifest)
             .expect_err("a proof from the future timeline position must be rejected");
-        assert!(format!("{error:#}").contains("future-evidence leakage"));
+        assert!(format!("{error:#}").contains("future-proof leakage"));
     }
 
     #[test]
