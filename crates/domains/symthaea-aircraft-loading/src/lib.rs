@@ -310,9 +310,12 @@ pub fn audit_loading(
         total_mass_kg = checked_add(total_mass_kg, item.mass_kg)?;
         total_moment_kg_m = checked_add(total_moment_kg_m, item_moment)?;
 
-        let current_station_mass = *station_mass
+        let current_station_mass = station_mass
             .get(&item.station_id)
-            .expect("station mass was initialized for every declared station");
+            .copied()
+            .ok_or(AuditInputError::InvalidProfile(
+                "station mass accumulator is missing",
+            ))?;
         station_mass.insert(
             item.station_id.clone(),
             checked_add(current_station_mass, item.mass_kg)?,
@@ -354,7 +357,10 @@ pub fn audit_loading(
     for (station_id, loaded_mass_kg) in &station_mass {
         let station = stations
             .get(station_id)
-            .expect("station mass map only contains declared stations");
+            .copied()
+            .ok_or(AuditInputError::InvalidProfile(
+                "station reference is missing from profile index",
+            ))?;
         if *loaded_mass_kg > station.maximum_station_load_kg {
             findings.push(AuditFinding {
                 code: FindingCode::StationLoadExceeded,
@@ -430,19 +436,20 @@ pub fn audit_loading(
         AuditDisposition::WithinDeclaredEnvelopeForHumanReview
     };
 
-    let station_loads = station_mass
-        .into_iter()
-        .map(|(station_id, loaded_mass_kg)| {
-            let station = stations
-                .get(&station_id)
-                .expect("station mass map only contains declared stations");
-            StationLoadSummary {
-                station_id,
-                loaded_mass_kg,
-                maximum_station_load_kg: station.maximum_station_load_kg,
-            }
-        })
-        .collect();
+    let mut station_loads = Vec::with_capacity(station_mass.len());
+    for (station_id, loaded_mass_kg) in station_mass {
+        let station = stations
+            .get(&station_id)
+            .copied()
+            .ok_or(AuditInputError::InvalidProfile(
+                "station reference is missing from profile index",
+            ))?;
+        station_loads.push(StationLoadSummary {
+            station_id,
+            loaded_mass_kg,
+            maximum_station_load_kg: station.maximum_station_load_kg,
+        });
+    }
 
     Ok(AuditReport {
         scenario_id: scenario.scenario_id.clone(),
