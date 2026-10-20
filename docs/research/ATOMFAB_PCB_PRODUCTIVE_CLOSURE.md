@@ -175,7 +175,7 @@ Choose numerical targets for trace/space, drilling, yield, cycle time, cost and 
 
 **Phase 0 — software-first (start immediately)**
 - Extend existing MFG-PROC and productive-closure owners; do not create a competing ontology.
-- Freeze a small PCB route/profile corpus with accepted and rejected cases.
+- The initial 16-case route corpus is `docs/research/fixtures/ATOMFAB_PCB_ROUTE_CORPUS_V0_1.json`; implement and independently validate its oracle before adding machine adapters.
 - Bind native design, fabrication exports, BOM, process plan, as-built identity and test receipts.
 - Add offline deterministic validation and an independent oracle before machine adapters.
 
@@ -220,6 +220,12 @@ Choose numerical targets for trace/space, drilling, yield, cycle time, cost and 
 - IPC, [IPC-6012F rigid-board qualification](https://www.ipc.org/news-release/ipc-releases-ipc-6012f-qualification-and-performance-specification-rigid-printed), [board design standards](https://www.ipc.org/ipc-board-design-standards), and [assembly standards overview](https://www.ipc.org/news-release/ipc-releases-j-revisions-two-leading-standards-electronics-assembly).
 - OPC Foundation, [OPC UA for Machine Tools](https://reference.opcfoundation.org/specs/OPC-40501-1/1): common machine monitoring and job-management model.
 - ISO/ASTM, [52920:2023 additive-manufacturing qualification principles](https://committee.iso.org/standard/76911.html): precedent for per-process/site qualification rather than blanket machine claims.
+
+## Initial corpus check
+
+The committed synthetic route corpus contains 16 unique cases: 2 `route_admissible`, 5 `reject`, and 9 `incomplete`. A separate rule-based pass over the fetched, committed JSON independently recomputed all 16 expected dispositions/reason codes. This is an in-session corpus sanity check, not a committed Rust evaluator, CI pass, or physical-process validation.
+
+The execution work is tracked by [COMPUTE-MFG-001C #8223](https://github.com/Luminous-Dynamics/symthaea/issues/8223) and the Symtropy workcell benchmark [PCB-CELL-001 #2385](https://github.com/Luminous-Dynamics/symtropy/issues/2385).
 
 ## Exit criterion
 
