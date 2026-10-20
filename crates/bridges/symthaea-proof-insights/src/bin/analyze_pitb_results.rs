@@ -786,7 +786,8 @@ fn simulate_matched_study(
             for _ in 0..family.eligible_target_count {
                 let baseline_success = rng.uniform01() < baseline_family_rate;
                 let treatment_success = rng.uniform01() < treatment_family_rate;
-                delta_sum += i64::from(treatment_success) - i64::from(baseline_success);
+                delta_sum += (if treatment_success { 1_i64 } else { 0_i64 })
+                    - (if baseline_success { 1_i64 } else { 0_i64 });
             }
             SimulatedFamily {
                 target_count: family.eligible_target_count,
@@ -1782,6 +1783,16 @@ impl SplitMix64 {
                 return (value % bound) as usize;
             }
         }
+    }
+
+    fn uniform01(&mut self) -> f64 {
+        ((self.next_u64() >> 11) as f64 + 0.5) / ((1_u64 << 53) as f64)
+    }
+
+    fn normal(&mut self) -> f64 {
+        let radius = (-2.0 * self.uniform01().ln()).sqrt();
+        let angle = 2.0 * std::f64::consts::PI * self.uniform01();
+        radius * angle.cos()
     }
 }
 
