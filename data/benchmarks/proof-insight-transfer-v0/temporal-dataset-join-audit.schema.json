@@ -116,7 +116,7 @@
       ],
       "properties": {
         "dataset_position": {"type": "integer", "minimum": 0},
-        "dataset_id": {"type": "string", "minLength": 1},
+        "dataset_id": {"type": "string"},
         "theorem_name": {"type": "string"},
         "file_path": {"type": "string"},
         "commit_before": {"type": "string"},
