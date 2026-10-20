@@ -351,8 +351,8 @@ fn execute_from_args() -> Result<()> {
     let mut unique_fingerprints: Vec<SourceFingerprint> =
         Vec::with_capacity(source_fingerprints.len());
     for artifact in source_fingerprints {
-        if let Some(previous) = unique_fingerprints.last() {
-            if previous.path == artifact.path {
+        match unique_fingerprints.last() {
+            Some(previous) if previous.path == artifact.path => {
                 if previous.sha256 != artifact.sha256 || previous.bytes != artifact.bytes {
                     bail!(
                         "conflicting fingerprints for the same repository-relative path {}",
@@ -361,6 +361,7 @@ fn execute_from_args() -> Result<()> {
                 }
                 continue;
             }
+            _ => {}
         }
         unique_fingerprints.push(artifact);
     }
@@ -754,7 +755,7 @@ fn extract_families(contents: &str) -> Result<Vec<FamilyRecord>> {
             .captures_iter(body)
             .filter_map(|capture| capture.get(1).map(|m| m.as_str().trim()))
             .filter(|target| !target.contains("://") && !target.starts_with('#'))
-            .map(|path| normalize_root_relative_path(path))
+            .map(normalize_root_relative_path)
             .collect::<Result<BTreeSet<_>>>()?;
 
         families.push(FamilyRecord {
