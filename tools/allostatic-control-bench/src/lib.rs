@@ -82,6 +82,7 @@ pub struct Observation {
     pub forecast_load: f64,
     pub forecast_confidence: f64,
     pub shuffled_forecast_load: f64,
+    pub shuffled_forecast_confidence: f64,
     pub oracle_forecast_load: f64,
 }
 
@@ -220,7 +221,7 @@ fn choose_action(policy: Policy, observation: Observation) -> Action {
             projected_reserve < reserve_floor || projected_load > 0.68 || reserve < 0.22
         }
         Policy::ShuffledForecastControl => {
-            let uncertainty = epistemic_uncertainty(observation.forecast_confidence);
+            let uncertainty = epistemic_uncertainty(observation.shuffled_forecast_confidence);
             let false_forecast =
                 (observation.shuffled_forecast_load + uncertainty * 0.25).clamp(0.0, 1.0);
             let horizon = 1.0 + 2.0 * false_forecast;
@@ -300,8 +301,11 @@ pub fn run_episode(policy: Policy, scenario: Scenario, seed: u64) -> EpisodeMetr
         let forecast_load =
             (forecast_signal(scenario, tick, seed) + forecast_noise).clamp(0.0, 1.0);
         let shuffled_start = shuffled_forecast_index(tick, seed);
+        let shuffled_forecast_confidence =
+            0.65 + 0.30 * unit_noise(seed.wrapping_add(777), shuffled_start);
+        let shuffled_noise_scale = 0.10 + 0.35 * (1.0 - shuffled_forecast_confidence);
         let shuffled_noise =
-            (unit_noise(seed.wrapping_add(91), shuffled_start) - 0.5) * forecast_noise_scale;
+            (unit_noise(seed.wrapping_add(91), shuffled_start) - 0.5) * shuffled_noise_scale;
         let shuffled_forecast_load =
             (forecast_signal(scenario, shuffled_start, seed) + shuffled_noise).clamp(0.0, 1.0);
         let oracle_forecast_load = oracle_forecast_mean(scenario, tick + 1, seed);
@@ -313,6 +317,7 @@ pub fn run_episode(policy: Policy, scenario: Scenario, seed: u64) -> EpisodeMetr
             forecast_load,
             forecast_confidence,
             shuffled_forecast_load,
+            shuffled_forecast_confidence,
             oracle_forecast_load,
         };
         let action = choose_action(policy, observation);
@@ -461,6 +466,7 @@ mod tests {
             forecast_load: 0.90,
             forecast_confidence: 0.90,
             shuffled_forecast_load: 0.10,
+            shuffled_forecast_confidence: 0.90,
             oracle_forecast_load: 0.90,
         };
         assert_eq!(choose_action(Policy::StressReactive, observation), Action::Push);
