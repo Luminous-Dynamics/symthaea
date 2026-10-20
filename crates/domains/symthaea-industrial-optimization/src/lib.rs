@@ -548,13 +548,16 @@ mod tests {
 
     #[test]
     fn frontier_keeps_cost_abatement_tradeoffs_and_prunes_dominated_points() {
+        // Treat these as mutually exclusive interventions on one underlying
+        // source, so the test isolates the two objective coordinates instead
+        // of implicitly assuming effects add across unrelated sources.
         let candidates = vec![
-            item("cheap", "source-a", 10, 3, 4, 6, true),
-            item("mid", "source-b", 20, 6, 8, 10, true),
-            item("dominated", "source-c", 30, 5, 12, 14, true),
-            item("high-value", "source-d", 30, 8, 10, 12, true),
-            item("same-floor-more-cost", "source-e", 40, 8, 13, 16, true),
-            item("premium", "source-f", 50, 12, 15, 20, true),
+            item("cheap", "same-source", 10, 3, 4, 6, true),
+            item("mid", "same-source", 20, 6, 8, 10, true),
+            item("dominated", "same-source", 30, 5, 12, 14, true),
+            item("high-value", "same-source", 30, 8, 10, 12, true),
+            item("same-floor-more-cost", "same-source", 40, 8, 13, 16, true),
+            item("premium", "same-source", 50, 12, 15, 20, true),
         ];
 
         let frontier = pareto_frontier(&candidates, 50).unwrap();
