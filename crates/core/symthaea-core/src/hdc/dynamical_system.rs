@@ -601,7 +601,9 @@ impl Integrator for Rk45Integrator {
             if !accepted_dt.is_finite() || accepted_dt <= 0.0 || accepted_dt > remaining {
                 panic!("RK45 returned an invalid accepted timestep");
             }
-            if next_state.len() != state.len() || next_state.iter().any(|value| !value.is_finite()) {
+            if next_state.len() != state.len()
+                || next_state.iter().any(|value| !value.is_finite())
+            {
                 panic!("RK45 returned an invalid state vector");
             }
 
