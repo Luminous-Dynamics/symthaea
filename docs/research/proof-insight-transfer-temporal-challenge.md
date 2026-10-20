@@ -44,6 +44,16 @@ cargo run --release --locked --bin symthaea-proof-insights -- \
 
 Treat the bundle as the model-visible input boundary, not as a trusted answer. Recompute the payload digest before use, retain the exact outer file hash in the target-run receipt, and provide no evaluator manifest or hidden-proof path to the solver. The Rust end-to-end fixture exercises both early and later targets, checks that an earlier proof can be visible to a later target, and asserts that the current proof text and proof identifier remain absent.
 
+Verify the bundle from the consumer side after transport or before dispatch:
+
+```bash
+cargo run --release --locked --bin symthaea-proof-insights -- \
+  --verify-temporal-bundle /path/to/output/target-001-bundle.json
+sha256sum /path/to/output/target-001-bundle.json
+```
+
+Bundle verification recomputes the canonical payload digest, checks each visible-content digest, pins the exact theorem-statement artifact, enforces unique IDs/canonical paths and basic earlier-context position rules, and rejects evaluator-only artifact kinds. The external manifest audit is still the authority for source-commit ancestry and non-leakage of hidden-proof copies; a self-hash by itself is not an authenticity guarantee against an editor who can recompute the hash.
+
 ### T1 — chronological replay on a frozen repository
 
 Use a separately pinned Dalek Lean Bench snapshot as the first implementation target. Record the upstream commit, timeline digest, each target's source commit and theorem locator, the toolchain/Mathlib/Aeneas revisions, and hashes of the generated repository state.
