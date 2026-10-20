@@ -1222,6 +1222,61 @@ mod tests {
     use super::*;
 
     #[test]
+    fn deterministic_split_assignment_and_digest_are_order_independent() {
+        let mut families: Vec<SplitFamily> = (1..=20)
+            .map(|id| SplitFamily {
+                family_id: format!("{id:03}"),
+                split: String::new(),
+            })
+            .collect();
+        let assignments = expected_split_assignments(&families, EXPECTED_SPLIT_SEED)
+            .expect("unique IDs should produce assignments");
+        for family in &mut families {
+            family.split = assignments
+                .get(&family.family_id)
+                .expect("family should be assigned")
+                .clone();
+        }
+        let counts = families.iter().fold(BTreeMap::new(), |mut map, family| {
+            *map.entry(family.split.as_str()).or_insert(0_usize) += 1;
+            map
+        });
+        assert_eq!(counts.get("train"), Some(&14));
+        assert_eq!(counts.get("validation"), Some(&3));
+        assert_eq!(counts.get("test"), Some(&3));
+
+        let digest = partition_digest_sha256(&families);
+        families.reverse();
+        assert_eq!(partition_digest_sha256(&families), digest);
+
+        families[0].split = match families[0].split.as_str() {
+            "train" => "test".to_string(),
+            _ => "train".to_string(),
+        };
+        assert_ne!(partition_digest_sha256(&families), digest);
+    }
+
+    #[test]
+    fn duplicate_family_ids_are_rejected_by_split_assignment() {
+        let families = vec![
+            SplitFamily {
+                family_id: "dup".to_string(),
+                split: "train".to_string(),
+            },
+            SplitFamily {
+                family_id: "dup".to_string(),
+                split: "test".to_string(),
+            },
+        ];
+        assert!(
+            expected_split_assignments(&families, EXPECTED_SPLIT_SEED)
+                .expect_err("duplicate IDs must fail")
+                .to_string()
+                .contains("duplicate family ID")
+        );
+    }
+
+    #[test]
     fn splitmix_sampling_is_deterministic() {
         let mut left = SplitMix64 { state: 20261020 };
         let mut right = SplitMix64 { state: 20261020 };
