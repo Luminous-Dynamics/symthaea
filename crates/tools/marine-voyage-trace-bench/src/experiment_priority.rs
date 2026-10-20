@@ -110,12 +110,15 @@ pub struct ProposalAssessment {
     pub requirement_id: Option<String>,
     pub cost_units: Option<u64>,
     pub decision_value_lower_bound_units: Option<i64>,
+    /// False means the value estimate is unavailable or its contract/evidence did not validate.
+    pub decision_value_usable: bool,
     pub issues: Vec<ProposalIssue>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExperimentPriorityDisposition {
     SelectedMandatoryEvidence,
+    SelectedMandatoryEvidenceWithOtherGatesBlocked,
     SelectedOptionalExperiment,
     MandatoryRequirementHasNoAdmissibleProposal,
     MandatoryEvidenceExceedsBudget,
@@ -494,13 +497,22 @@ fn assess_proposal(
         requirement_id: proposal.requirement_id.clone(),
         cost_units: proposal.cost_units,
         decision_value_lower_bound_units: proposal.decision_value_lower_bound_units,
+        decision_value_usable: utility_is_structurally_valid,
         issues,
     }
 }
 
 fn ratio_order(a: &ProposalAssessment, b: &ProposalAssessment) -> Ordering {
-    let a_value = a.decision_value_lower_bound_units.unwrap_or(0).max(0) as u64;
-    let b_value = b.decision_value_lower_bound_units.unwrap_or(0).max(0) as u64;
+    let a_value = if a.decision_value_usable {
+        a.decision_value_lower_bound_units.unwrap_or(0).max(0) as u64
+    } else {
+        0
+    };
+    let b_value = if b.decision_value_usable {
+        b.decision_value_lower_bound_units.unwrap_or(0).max(0) as u64
+    } else {
+        0
+    };
     let a_cost = a.cost_units.unwrap_or(u64::MAX).max(1);
     let b_cost = b.cost_units.unwrap_or(u64::MAX).max(1);
 
@@ -522,6 +534,7 @@ fn proposal_is_mandatory_candidate(assessment: &ProposalAssessment) -> bool {
 
 fn proposal_is_optional_candidate(assessment: &ProposalAssessment) -> bool {
     assessment.disposition == ProposalDisposition::EligibleForOptionalRanking
+        && assessment.decision_value_usable
         && assessment.decision_value_lower_bound_units.is_some_and(|value| value > 0)
 }
 
@@ -687,8 +700,20 @@ pub fn prioritize_next_experiment(
         (ExperimentPriorityDisposition::InvalidProfileOrAudit, None, None)
     } else if !due.is_empty() {
         if let Some((requirement_id, proposal)) = select_mandatory(&due, &assessments) {
+            let blocked_due_gate_remains = issues.iter().any(|issue| {
+                matches!(
+                    issue,
+                    ExperimentPriorityIssue::MissingMandatoryProposal { .. }
+                        | ExperimentPriorityIssue::MandatoryProposalOverBudget { .. }
+                        | ExperimentPriorityIssue::NoAdmissibleProposalForRequirement { .. }
+                )
+            });
             (
-                ExperimentPriorityDisposition::SelectedMandatoryEvidence,
+                if blocked_due_gate_remains {
+                    ExperimentPriorityDisposition::SelectedMandatoryEvidenceWithOtherGatesBlocked
+                } else {
+                    ExperimentPriorityDisposition::SelectedMandatoryEvidence
+                },
                 Some(proposal),
                 Some(requirement_id),
             )
@@ -1148,7 +1173,10 @@ mod tests {
             &value_contract(),
             100,
         );
-        assert_eq!(report.disposition, ExperimentPriorityDisposition::SelectedMandatoryEvidence);
+        assert_eq!(
+            report.disposition,
+            ExperimentPriorityDisposition::SelectedMandatoryEvidenceWithOtherGatesBlocked
+        );
         assert!(report.issues.contains(
             &ExperimentPriorityIssue::MissingMandatoryProposal {
                 requirement_id: "second-physical-confirmation".to_string()
