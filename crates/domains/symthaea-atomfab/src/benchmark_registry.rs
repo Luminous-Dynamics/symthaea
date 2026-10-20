@@ -270,6 +270,30 @@ mod tests {
                 .any(|metric| metric.contains("p=0.94")),
             "ranking persistence must be preregistered"
         );
+        let reality_gap = registry
+            .benchmark_lanes
+            .iter()
+            .find(|lane| lane.id == "experimental-reality-gap")
+            .expect("experimental reality-gap lane should be registered");
+        assert!(
+            reality_gap
+                .metrics
+                .iter()
+                .any(|metric| metric.contains("risk-coverage") && metric.contains("AURC")),
+            "selective-risk evaluation should be part of the reality-gap lane"
+        );
+        let active_learning = registry
+            .benchmark_lanes
+            .iter()
+            .find(|lane| lane.id == "active-learning-policy")
+            .expect("active-learning lane should be registered");
+        assert!(
+            active_learning
+                .gates
+                .iter()
+                .any(|gate| gate.contains("shuffled-score negative controls")),
+            "active-learning evaluation should include uncertainty negative controls"
+        );
     }
 
     #[test]
