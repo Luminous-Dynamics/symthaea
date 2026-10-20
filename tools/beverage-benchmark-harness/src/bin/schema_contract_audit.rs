@@ -10,12 +10,7 @@
 use serde::Serialize;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
-use std::{
-    env,
-    fs,
-    path::PathBuf,
-    process::ExitCode,
-};
+use std::{env, fs, path::PathBuf, process::ExitCode};
 
 const DRAFT_URI: &str = "https://json-schema.org/draft/2020-12/schema";
 
@@ -65,14 +60,19 @@ fn find_external_reference(value: &Value) -> Option<String> {
     }
 }
 
-fn file_name(path: &PathBuf) -> String {
+fn file_name(path: &std::path::Path) -> String {
     path.file_name()
         .and_then(|value| value.to_str())
         .unwrap_or("<non-utf8>")
         .to_owned()
 }
 
-fn audit_schema(schema_bytes: &[u8], instance_bytes: &[u8], schema_file: String, instance_file: String) -> SchemaReceipt {
+fn audit_schema(
+    schema_bytes: &[u8],
+    instance_bytes: &[u8],
+    schema_file: String,
+    instance_file: String,
+) -> SchemaReceipt {
     let mut validation_errors = Vec::new();
     let mut declared_draft_2020_12 = false;
     let mut schema_meta_valid = false;
@@ -189,8 +189,10 @@ fn parse_args() -> Result<(PathBuf, PathBuf, PathBuf), String> {
 
 fn run() -> Result<ExitCode, String> {
     let (schema_path, instance_path, output_path) = parse_args()?;
-    let schema_bytes = fs::read(&schema_path).map_err(|error| format!("schema_read_failed:{error}"))?;
-    let instance_bytes = fs::read(&instance_path).map_err(|error| format!("instance_read_failed:{error}"))?;
+    let schema_bytes =
+        fs::read(&schema_path).map_err(|error| format!("schema_read_failed:{error}"))?;
+    let instance_bytes =
+        fs::read(&instance_path).map_err(|error| format!("instance_read_failed:{error}"))?;
     let receipt = audit_schema(
         &schema_bytes,
         &instance_bytes,
@@ -246,9 +248,15 @@ mod tests {
 
     #[test]
     fn missing_required_field_fails_instance_validation() {
-        let schema = br#"{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","required":["id"]}"#;
+        let schema =
+            br#"{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","required":["id"]}"#;
         let instance = br#"{"other":"value"}"#;
-        let receipt = audit_schema(schema, instance, "schema.json".to_owned(), "data.json".to_owned());
+        let receipt = audit_schema(
+            schema,
+            instance,
+            "schema.json".to_owned(),
+            "data.json".to_owned(),
+        );
         assert_eq!(receipt.status, "FAIL");
         assert!(receipt.schema_meta_valid);
         assert!(!receipt.instance_valid);
@@ -256,31 +264,53 @@ mod tests {
 
     #[test]
     fn malformed_schema_fails_closed() {
-        let receipt = audit_schema(b"{", br#"{}"#, "schema.json".to_owned(), "data.json".to_owned());
+        let receipt = audit_schema(
+            b"{",
+            br#"{}"#,
+            "schema.json".to_owned(),
+            "data.json".to_owned(),
+        );
         assert_eq!(receipt.status, "FAIL");
-        assert!(receipt.validation_errors.iter().any(|error| error.starts_with("schema_json_parse_error:")));
+        assert!(
+            receipt
+                .validation_errors
+                .iter()
+                .any(|error| error.starts_with("schema_json_parse_error:"))
+        );
     }
 
     #[test]
     fn unsupported_schema_draft_fails_closed() {
         let schema = br#"{"$schema":"http://json-schema.org/draft-07/schema#","type":"object"}"#;
-        let receipt = audit_schema(schema, br#"{}"#, "schema.json".to_owned(), "data.json".to_owned());
+        let receipt = audit_schema(
+            schema,
+            br#"{}"#,
+            "schema.json".to_owned(),
+            "data.json".to_owned(),
+        );
         assert_eq!(receipt.status, "FAIL");
         assert!(!receipt.declared_draft_2020_12);
     }
 
     #[test]
     fn external_references_are_refused_without_network_access() {
-        let schema = br#"{"$schema":"https://json-schema.org/draft/2020-12/schema","$ref":"https://example.invalid/schema.json"}"#;
+        let schema =
+            br#"{"$schema":"https://json-schema.org/draft/2020-12/schema","$ref":"https://example.invalid/schema.json"}"#;
         let receipt = audit_schema(schema, br#"{}"#, "schema.json".to_owned(), "data.json".to_owned());
         assert_eq!(receipt.status, "FAIL");
         assert!(!receipt.external_references_absent);
-        assert!(receipt.validation_errors.iter().any(|error| error.contains("external_schema_reference_refused")));
+        assert!(
+            receipt
+                .validation_errors
+                .iter()
+                .any(|error| error.contains("external_schema_reference_refused"))
+        );
     }
 
     #[test]
     fn invalid_meta_schema_fails_closed() {
-        let schema = br#"{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"not-a-valid-type"}"#;
+        let schema =
+            br#"{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"not-a-valid-type"}"#;
         let receipt = audit_schema(schema, br#"{}"#, "schema.json".to_owned(), "data.json".to_owned());
         assert_eq!(receipt.status, "FAIL");
         assert!(!receipt.schema_meta_valid);
