@@ -76,7 +76,7 @@ impl fmt::Display for BenchmarkError {
             Self::EmptySourceGroup { index } => {
                 write!(f, "candidate at index {index} has an empty source group")
             }
-            Self::ZeroCapex { id } => write!(f, "candidate {id} has zero capex; ratio baseline requires positive capex"),
+            Self::ZeroCapex { id } => write!(f, "candidate {id} has zero capex; this benchmark requires positive capex"),
             Self::InvalidAbatementRange { id } => {
                 write!(f, "candidate {id} must satisfy floor <= expected <= ceiling")
             }
@@ -313,10 +313,10 @@ mod tests {
         let robust = optimize_robust_portfolio(&candidates, 10).unwrap();
         let greedy = greedy_expected_per_dollar(&candidates, 10).unwrap();
 
-        assert_eq!(robust.selected_ids, vec!["b-stable", "c-stable"]);
+        assert_eq!(robust.selected_ids, vec!["b-stable".to_owned(), "c-stable".to_owned()]);
         assert_eq!(robust.floor_tonnes_ch4_per_year, 6);
         assert_eq!(robust.capex_usd, 10);
-        assert_eq!(greedy.selected_ids, vec!["a-high-variance"]);
+        assert_eq!(greedy.selected_ids, vec!["a-high-variance".to_owned()]);
         assert_eq!(greedy.floor_tonnes_ch4_per_year, 4);
     }
 
@@ -348,7 +348,7 @@ mod tests {
             item("unreviewed", "source-b", 1, 100, 100, 100, false),
         ];
         let result = optimize_robust_portfolio(&candidates, 100).unwrap();
-        assert_eq!(result.selected_ids, vec!["eligible"]);
+        assert_eq!(result.selected_ids, vec!["eligible".to_owned()]);
     }
 
     #[test]
@@ -373,6 +373,44 @@ mod tests {
             Err(BenchmarkError::DuplicateId {
                 id: "same".to_owned()
             })
+        );
+    }
+
+
+    #[test]
+    fn refuses_unbounded_exact_search() {
+        let candidates: Vec<Intervention> = (0..=MAX_EXACT_CANDIDATES)
+            .map(|index| {
+                item(
+                    &format!("candidate-{index}"),
+                    &format!("source-{index}"),
+                    1,
+                    0,
+                    0,
+                    0,
+                    true,
+                )
+            })
+            .collect();
+
+        assert_eq!(
+            optimize_robust_portfolio(&candidates, u64::MAX),
+            Err(BenchmarkError::TooManyCandidates {
+                actual: MAX_EXACT_CANDIDATES + 1,
+                maximum: MAX_EXACT_CANDIDATES
+            })
+        );
+    }
+
+    #[test]
+    fn overflowing_portfolio_totals_fail_closed() {
+        let candidates = vec![
+            item("large-a", "source-a", 1, u64::MAX, u64::MAX, u64::MAX, true),
+            item("large-b", "source-b", 1, u64::MAX, u64::MAX, u64::MAX, true),
+        ];
+        assert_eq!(
+            optimize_robust_portfolio(&candidates, 2),
+            Err(BenchmarkError::ArithmeticOverflow)
         );
     }
 
