@@ -2513,6 +2513,35 @@ mod tests {
     /// generated text. If all 8 intents produce identical output, the
     /// generator is ignoring intent information.
     #[test]
+    fn semantic_token_initialization_is_opt_in_and_tokenizer_aligned() {
+        assert!(
+            !BrocaConfig::default().enable_semantic_token_embeddings,
+            "the experimental initializer must not change existing defaults"
+        );
+
+        let genesis = test_genesis();
+        let config = BrocaConfig {
+            enable_semantic_token_embeddings: true,
+            ..Default::default()
+        };
+        let generator = BrocaGenerator::new(&genesis, config);
+
+        assert_eq!(
+            generator.controller().token_embeddings().len(),
+            generator.tokenizer().vocab_size(),
+            "semantic initialization must preserve tokenizer row alignment"
+        );
+        assert!(
+            generator
+                .controller()
+                .token_embeddings()
+                .iter()
+                .all(|embedding| embedding.as_slice().len() == symthaea_core::hdc::HDC_DIMENSION),
+            "semantic initialization must preserve HDC dimensionality"
+        );
+    }
+
+    #[test]
     fn test_intent_fidelity_generation_diversity() {
         let genesis = test_genesis();
         let config = BrocaConfig {
