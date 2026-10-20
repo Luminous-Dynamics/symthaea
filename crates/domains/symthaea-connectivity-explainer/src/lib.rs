@@ -387,6 +387,106 @@ pub fn explain_report(report: &Value) -> Result<Explanation, String> {
     })
 }
 
+fn display_optional_count(value: Option<u64>) -> String {
+    value.map_or_else(|| "not recorded".to_owned(), |count| count.to_string())
+}
+
+/// Render an explanation for a human reader, without hiding its evidence class,
+/// denominators, per-priority misses, limitations, or next step. This is a
+/// deterministic template renderer over the same structured explanation used
+/// for JSON output.
+pub fn render_human(explanation: &Explanation) -> String {
+    use std::fmt::Write as _;
+
+    let mut out = String::new();
+    let _ = writeln!(
+        out,
+        "CONNECTIVITY REPORT — {}",
+        explanation.evidence_label.to_uppercase()
+    );
+    let _ = writeln!(out, "{}", explanation.headline);
+    out.push('\n');
+    out.push_str("IN PLAIN LANGUAGE\n");
+    let _ = writeln!(out, "{}", explanation.simple_explanation);
+    out.push('\n');
+
+    out.push_str("WHAT THE SCENARIOS SHOW\n");
+    for mode in &explanation.modes {
+        let _ = writeln!(out, "\n{}", mode.plain_label);
+        let _ = writeln!(
+            out,
+            "  FIFO baseline: {}/{} tasks completed",
+            mode.baseline_completed, mode.task_count
+        );
+        let _ = writeln!(
+            out,
+            "  Fair-share:    {}/{} tasks completed",
+            mode.candidate_completed, mode.task_count
+        );
+        let comparison = if mode.completion_difference > 0 {
+            format!("+{} completed", mode.completion_difference)
+        } else if mode.completion_difference < 0 {
+            format!("{} completed (regression)", mode.completion_difference)
+        } else {
+            "no completion-count difference".to_owned()
+        };
+        let _ = writeln!(out, "  Difference:    {comparison}");
+        let _ = writeln!(out, "  Explanation:   {}", mode.plain_explanation);
+
+        if !mode.by_priority.is_empty() {
+            out.push_str("  By priority:\n");
+            for priority in &mode.by_priority {
+                let _ = writeln!(
+                    out,
+                    "    - {}: FIFO {}/{}, fair-share {}/{}; deadline misses FIFO {}, fair-share {}",
+                    priority.priority,
+                    priority.baseline_completed,
+                    priority.tasks,
+                    priority.candidate_completed,
+                    priority.tasks,
+                    display_optional_count(priority.baseline_deadline_misses),
+                    display_optional_count(priority.candidate_deadline_misses),
+                );
+            }
+        }
+    }
+    out.push('\n');
+
+    out.push_str("KEY FINDINGS\n");
+    if explanation.findings.is_empty() {
+        out.push_str("  No additional rule-based findings were emitted from this report.\n");
+    } else {
+        for finding in &explanation.findings {
+            let _ = writeln!(out, "  - {finding}");
+        }
+    }
+    out.push('\n');
+
+    out.push_str("WHAT THIS DOES NOT PROVE\n");
+    for limitation in &explanation.limitations {
+        let _ = writeln!(out, "  - {limitation}");
+    }
+    out.push('\n');
+
+    out.push_str("RECOMMENDED NEXT STEP\n");
+    let _ = writeln!(out, "{}", explanation.recommended_next_step);
+    out.push('\n');
+
+    out.push_str("PROVENANCE\n");
+    let _ = writeln!(
+        out,
+        "  Scenario SHA-256: {}",
+        explanation.scenario_sha256.as_deref().unwrap_or("not supplied")
+    );
+    let _ = writeln!(
+        out,
+        "  Profile SHA-256:  {}",
+        explanation.profile_sha256.as_deref().unwrap_or("not supplied")
+    );
+    let _ = writeln!(out, "  Explainer schema: {}", explanation.schema_version);
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -521,6 +621,19 @@ mod tests {
                 .iter()
                 .any(|item| item.contains("Per-priority outcome rows were absent"))
         );
+    }
+
+    #[test]
+    fn human_rendering_keeps_evidence_limits_and_priority_misses_visible() {
+        let explanation = explain_report(&report()).unwrap();
+        let rendered = render_human(&explanation);
+        assert!(rendered.contains("synthetic simulation"));
+        assert!(rendered.contains("live Wi-Fi performance has not been tested"));
+        assert!(rendered.contains("WHAT THIS DOES NOT PROVE"));
+        assert!(rendered.contains("FIFO misses 1 essential deadline"));
+        assert!(rendered.contains("Scenario SHA-256: aaaaaaaaaa"));
+        assert!(rendered.contains("Recommended NEXT STEP") == false);
+        assert!(rendered.contains("RECOMMENDED NEXT STEP"));
     }
 
     #[test]
