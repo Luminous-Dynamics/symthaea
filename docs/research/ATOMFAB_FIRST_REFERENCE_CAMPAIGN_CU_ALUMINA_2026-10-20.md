@@ -17,6 +17,12 @@ The published GA settings above are transcribed from the 2026 paper. Other setti
 
 The related 2025 Zenodo record contains training/validation structures, VASP inputs and global-minimum configurations. It lists `dataset.zip` MD5 `e88745ca2cfd25ef0b152f5fa3ed6bd9` and `global_minima.zip` MD5 `9788d7f13403450552e4ad1642c6a478`. These are source-record MD5 checksums, not our computed SHA-256 digests, and are not evidence that the archive is the 2026 paper's complete independent test set. We must materialize the source, verify these record checksums, compute SHA-256/byte length locally, identify licensing, and freeze the exact evaluation-file manifest before claim-bearing runs. [Zenodo record](https://zenodo.org/records/15865800).
 
+## Paper-compatible budget versus our policy experiment
+
+The reference paper states that it locally DFT-optimizes the 50 lowest-energy structures from each of the three MLIP-generated searches per nanoparticle/surface system. That is **150 DFT-refined candidates per stratum** and 1,800 candidates over twelve strata if all twelve combinations are reproduced. The DFT configuration, exact GA source details, actual candidate evaluation count, failures, and structure manifests must still be pinned before we can claim exact reproduction. The 50-member × 20-generation GA settings alone should not be used to assert exactly 1,000 unique candidate structures; the plan records that as a provisional arithmetic inference only, since deduplication and implementation behavior can change the count. [Paper, Methods](https://doi.org/10.1038/s41524-026-02043-8).
+
+Do not confuse that reproduction budget with our **extension**: compare acquisition policies on 20 paired seeds using the same seed across policies and a fixed per-policy reference budget. Use 150 reference relaxations per stratum only if it is appropriate to the matched decision experiment; choose and freeze another common budget if necessary. Charge MLIP inference, reference relaxations, failed retries, preprocessing/deduplication, router overhead and post-processing. A policy must not look efficient by shifting cost into a different accounting bucket.
+
 ## Executable order of operations
 
 1. Reproduce the exact published GA/reference comparison with DP-UniAlCu, MACE-OMAT medium and MatterSim v1.0.0-1M, after pinning checkpoint revisions and terms. Reproduce the reported number of repetitions if the paper specifies it.
