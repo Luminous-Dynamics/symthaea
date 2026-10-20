@@ -1,0 +1,286 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/landscape-review-request-v0.schema.json",
+  "title": "Symthaea Landscape Review Request v0",
+  "description": "Read-only evidence coverage request. It cannot request an automated ranking, environmental-effect claim, or causal claim.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "schema_uri",
+    "review_id",
+    "scope",
+    "required_metric_ids",
+    "alternatives"
+  ],
+  "properties": {
+    "schema": {
+      "const": "luminous.landscape-review-request.v0"
+    },
+    "schema_uri": {
+      "const": "https://luminousdynamics.io/schemas/landscape-review-request-v0.schema.json"
+    },
+    "review_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100,
+      "pattern": "^[A-Za-z0-9._-]+$"
+    },
+    "scope": {
+      "enum": [
+        "site-parcel",
+        "district",
+        "watershed",
+        "bioregion"
+      ]
+    },
+    "required_metric_ids": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)+$",
+        "maxLength": 200
+      }
+    },
+    "alternatives": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 8,
+      "items": {
+        "$ref": "#/$defs/alternative"
+      }
+    }
+  },
+  "$defs": {
+    "artifactRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "role",
+        "sha256",
+        "schema_uri"
+      ],
+      "properties": {
+        "role": {
+          "enum": [
+            "project-snapshot",
+            "evaluation-plan",
+            "scenario-manifest",
+            "scenario-result",
+            "observation-batch",
+            "stewardship-record",
+            "source-dataset"
+          ]
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "schema_uri": {
+          "type": "string",
+          "format": "uri",
+          "minLength": 8
+        }
+      }
+    },
+    "metricEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "metric_id",
+        "unit",
+        "state",
+        "evidence_class",
+        "method_uri",
+        "uncertainty_summary",
+        "supporting_artifact_sha256s"
+      ],
+      "properties": {
+        "metric_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)+$",
+          "maxLength": 200
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "\\S"
+        },
+        "state": {
+          "enum": [
+            "available",
+            "missing",
+            "not-computable",
+            "conflicting"
+          ]
+        },
+        "evidence_class": {
+          "enum": [
+            "observed",
+            "curated",
+            "synthetic",
+            "modelled",
+            "assumed",
+            "missing"
+          ]
+        },
+        "method_uri": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uri"
+        },
+        "uncertainty_summary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000
+        },
+        "supporting_artifact_sha256s": {
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 64,
+          "items": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "available"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "evidence_class": {
+                "not": {
+                  "const": "missing"
+                }
+              },
+              "method_uri": {
+                "type": "string",
+                "minLength": 8
+              },
+              "supporting_artifact_sha256s": {
+                "minItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "evidence_class": {
+                "const": "missing"
+              }
+            },
+            "required": [
+              "evidence_class"
+            ]
+          },
+          "then": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "missing",
+                  "not-computable",
+                  "conflicting"
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    "alternative": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "alternative_id",
+        "project_snapshot",
+        "evaluation_plan",
+        "scenario_manifests",
+        "scenario_results",
+        "observation_batches",
+        "stewardship_records",
+        "source_datasets",
+        "metrics"
+      ],
+      "properties": {
+        "alternative_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^[A-Za-z0-9._-]+$"
+        },
+        "project_snapshot": {
+          "$ref": "#/$defs/artifactRef"
+        },
+        "evaluation_plan": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/artifactRef"
+            }
+          ]
+        },
+        "scenario_manifests": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "$ref": "#/$defs/artifactRef"
+          }
+        },
+        "scenario_results": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "$ref": "#/$defs/artifactRef"
+          }
+        },
+        "observation_batches": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "$ref": "#/$defs/artifactRef"
+          }
+        },
+        "stewardship_records": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "$ref": "#/$defs/artifactRef"
+          }
+        },
+        "source_datasets": {
+          "type": "array",
+          "maxItems": 128,
+          "items": {
+            "$ref": "#/$defs/artifactRef"
+          }
+        },
+        "metrics": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "$ref": "#/$defs/metricEvidence"
+          }
+        }
+      }
+    }
+  }
+}
