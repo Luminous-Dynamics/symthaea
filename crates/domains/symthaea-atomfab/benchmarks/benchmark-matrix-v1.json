@@ -188,7 +188,9 @@
         "best validated objective and learning curve at equal cost",
         "Pareto frontier over unique reference-validated low-energy structures, best validated objective, and total cost; do not collapse these dimensions into one weighted score",
         "typed structural-search failure modes: non-convergence, geometry collapse, interatomic overlap, support/interface breakdown, non-finite force, out-of-domain recommendation, and abstention",
-        "failure-mode rates scoped by evaluation stratum (e.g., particle size × support surface × temperature regime), with the scope digest retained"
+        "failure-mode rates scoped by evaluation stratum (e.g., particle size × support surface × temperature regime), with the scope digest retained",
+        "published reference-search reproduction on 12 explicit strata: Cu27/Cu38/Cu47/Cu55 × γ-Al2O3(100)/γ-Al2O3(110)/α-Al2O3(0001)",
+        "reference-method/checkpoint/data-manifest completeness and checksum coverage before claim-bearing execution"
       ],
       "gates": [
         "report energy accuracy and structural exploration as separate score families",
@@ -200,7 +202,10 @@
         "do not generalize from the chosen supported-nanoparticle family to universal catalyst performance",
         "report the nondominated policy set per matched seed; hard-constraint violations make an outcome ineligible rather than tradeable against discovery quality or cost",
         "report failure and abstention distributions by particle size and support surface; do not report a search as efficient by excluding failed relaxations or invalid interfaces",
-        "report each evaluation stratum separately before any cross-stratum aggregate; no result may pool particle sizes, support surfaces or thermodynamic regimes into one hidden rate"
+        "report each evaluation stratum separately before any cross-stratum aggregate; no result may pool particle sizes, support surfaces or thermodynamic regimes into one hidden rate",
+        "reproduce the published GA/reference protocol, including population 50, 20 generations, random initial population, cut-and-splice and mutation, after pinning every remaining method setting",
+        "preserve the 12 per-size/per-surface strata; keep the 2025 related Zenodo training/validation/global-minima archive distinct from the exact 2026 benchmark evaluation manifest",
+        "no claim-bearing run until exact DFT settings, candidate/reference structure manifest, model checkpoints, licenses, evaluator version and SHA-256 artifact digests are pinned"
       ]
     },
     {
