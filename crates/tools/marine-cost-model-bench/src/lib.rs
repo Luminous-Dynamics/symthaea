@@ -586,4 +586,72 @@ mod tests {
         assert_eq!(break_even.vessel_units, 3.0);
         assert!(break_even.candidate_cheaper_above_crossover);
     }
+    
+    #[test]
+    fn lower_nre_but_higher_recurring_cost_is_cheaper_only_below_crossover() {
+        let baseline = case("baseline", 250.0, 50.0, 0.0, 0.0, 0.0);
+        let candidate = case("candidate", 100.0, 100.0, 0.0, 0.0, 0.0);
+        let result = compare(&baseline, &candidate, 10);
+        assert_eq!(result.disposition, ComparisonDisposition::BaselineRobustlyCheaperWithinDeclaredBounds);
+        let break_even = result.nominal_break_even.unwrap();
+        assert_eq!(break_even.vessel_units, 3.0);
+        assert!(!break_even.candidate_cheaper_above_crossover);
+    }
+
+    #[test]
+    fn zero_production_volume_is_invalid() {
+        let value = case("baseline", 100.0, 100.0, 10.0, 0.0, 0.0);
+        let errors = evaluate(&value, 0).unwrap_err();
+        assert!(errors.iter().any(|error| error.contains("production volume must be positive")));
+    }
+
+    #[test]
+    fn reversed_cost_interval_is_invalid() {
+        let mut value = case("baseline", 100.0, 100.0, 10.0, 0.0, 0.0);
+        value.annual_operating_cost.as_mut().unwrap().amount =
+            CostBand { lower: 12.0, nominal: 10.0, upper: 14.0 };
+        let errors = evaluate(&value, 10).unwrap_err();
+        assert!(errors.iter().any(|error| error.contains("ordered lower <= nominal <= upper")));
+    }
+
+    #[test]
+    fn replacement_outside_service_life_is_invalid() {
+        let mut value = case("baseline", 100.0, 100.0, 10.0, 5.0, 0.0);
+        value.replacement_plan.as_mut().unwrap()[0].year = 6;
+        let errors = evaluate(&value, 10).unwrap_err();
+        assert!(errors.iter().any(|error| error.contains("outside 1..=5")));
+    }
+
+    #[test]
+    fn missing_source_reference_and_origin_are_not_accepted() {
+        let mut value = case("baseline", 100.0, 100.0, 10.0, 0.0, 0.0);
+        let operating = value.annual_operating_cost.as_mut().unwrap();
+        operating.evidence_ref = None;
+        operating.origin = None;
+        let errors = evaluate(&value, 10).unwrap_err();
+        assert!(errors.iter().any(|error| error.contains("missing evidence reference for annual_operating_cost")));
+        assert!(errors.iter().any(|error| error.contains("missing evidence origin for annual_operating_cost")));
+    }
+
+    #[test]
+    fn mismatched_currency_basis_is_incomparable() {
+        let baseline = case("baseline", 100.0, 100.0, 10.0, 0.0, 0.0);
+        let mut candidate = case("candidate", 100.0, 90.0, 10.0, 0.0, 0.0);
+        candidate.currency_basis_id = "CAD-2024-CA".to_owned();
+        let result = compare(&baseline, &candidate, 10);
+        assert_eq!(result.disposition, ComparisonDisposition::Incomparable);
+        assert!(result.findings.iter().any(|finding| finding.contains("currency_basis_id mismatch")));
+    }
+
+    #[test]
+    fn derived_overflow_is_rejected() {
+        let mut value = case("baseline", 0.0, 1.0, 0.0, 0.0, 0.0);
+        value.unit_build_costs = Some(vec![
+            CostLine { line_id: "hull".to_owned(), estimate: estimate(f64::MAX, "hull") },
+            CostLine { line_id: "equipment".to_owned(), estimate: estimate(f64::MAX, "equipment") },
+        ]);
+        let errors = evaluate(&value, 10).unwrap_err();
+        assert!(errors.iter().any(|error| error.contains("derived arithmetic overflow or invalid interval")));
+    }
+
 }
