@@ -727,6 +727,10 @@ fn accompaniment_sentence(pattern: crate::accompaniment::Accompaniment) -> Optio
             "The accompaniment picks a low–high–middle–high chord-tone figure on quarter beats, \
              with a gentle lift toward beat three."
         }
+        A::LullabyCradle => {
+            "The accompaniment rocks between a grounded low tone held for two beats and a \
+             soft upper answer, leaving space instead of filling the bar with constant eighths."
+        }
         A::MarchPulse => {
             "The accompaniment keeps a square four-beat march pulse, with firm attacks on \
              beats one and three and lighter answers on beats two and four."
