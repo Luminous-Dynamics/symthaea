@@ -158,7 +158,7 @@ For atom manipulation specifically, later hardware benchmarks should use lattice
 
 ### M0 — Benchmark kernel and interop contract (this change)
 
-- Implement pure Rust metrics for scalar prediction errors, prediction-interval coverage, pairwise energy ordering, normalized finite-prefix top-weighted ranking overlap, reference-structure recovery, false-feasible decisions, and active-learning acceleration, with fail-closed input validation.
+- Implement pure Rust metrics for scalar prediction errors, prediction-interval coverage, pairwise energy ordering, normalized finite-prefix top-weighted ranking overlap at preregistered persistence p=0.94, reference-structure recovery, false-feasible decisions, and active-learning acceleration, with fail-closed input validation.
 - Add contract-v1 JSON Schema, serde-backed envelope/payload types, and semantic validation for source-kind, provenance, uncertainty, digests, measurement calibration, abort guards, and hard-constraint outcomes.
 - Add a shared valid process-proposal JSON fixture and a negative no-abort-guard fixture.
 - Add a machine-readable benchmark registry covering nine scientific, experimental, active-learning, workcell and prospective-metrology lanes; validate it for duplicate IDs, required policy baselines, and nontrivial performance gates.
