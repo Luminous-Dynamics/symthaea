@@ -14,6 +14,7 @@ use std::io::{self, ErrorKind};
 struct Episode {
     task_reward: f64,
     cumulative_exposure: f64,
+    unsafe_ticks: usize,
     unsafe_episode: bool,
     violation_exposure: f64,
     max_violation_severity: f64,
@@ -160,10 +161,19 @@ fn parse_episodes(csv: &str) -> Result<BTreeMap<ConditionKey, EpisodesBySeed>, B
         let policy = cell(&values, &header, "policy")?.to_string();
         let shielded = parse_bool(&values, &header, "shielded")?;
         let seed: u64 = cell(&values, &header, "seed")?.parse()?;
+        let unsafe_ticks = parse_usize(&values, &header, "unsafe_ticks")?;
+        let unsafe_episode = parse_bool(&values, &header, "unsafe_episode")?;
+        if unsafe_episode != (unsafe_ticks > 0) {
+            return Err(invalid_data(format!(
+                "unsafe_episode disagrees with unsafe_ticks on line {}",
+                line_index + 2
+            )).into());
+        }
         let episode = Episode {
             task_reward: parse_f64(&values, &header, "task_reward")?,
             cumulative_exposure: parse_f64(&values, &header, "cumulative_exposure")?,
-            unsafe_episode: parse_bool(&values, &header, "unsafe_episode")?,
+            unsafe_ticks,
+            unsafe_episode,
             violation_exposure: parse_f64(&values, &header, "violation_exposure")?,
             max_violation_severity: parse_f64(&values, &header, "max_violation_severity")?,
             minimum_reserve: parse_f64(&values, &header, "minimum_reserve")?,
@@ -173,7 +183,6 @@ fn parse_episodes(csv: &str) -> Result<BTreeMap<ConditionKey, EpisodesBySeed>, B
             false_alarms: parse_usize(&values, &header, "false_alarms")?,
             failed: parse_bool(&values, &header, "failed")?,
         };
-        let seed = episode.seed;
         let group = groups.entry((scenario, policy, shielded)).or_default();
         if group.insert(seed, episode).is_some() {
             return Err(invalid_data(format!("duplicate episode seed {seed} on line {}", line_index + 2)).into());
@@ -187,12 +196,13 @@ fn parse_episodes(csv: &str) -> Result<BTreeMap<ConditionKey, EpisodesBySeed>, B
 
 fn write_summary(groups: &BTreeMap<ConditionKey, EpisodesBySeed>, path: &str) -> Result<usize, Box<dyn Error>> {
     let mut output = String::from(
-        "scenario,policy,shielded,n,mean_task_reward,mean_cumulative_load,p95_cumulative_load,episode_violation_rate,mean_violation_exposure,p95_violation_exposure,mean_conditional_peak_violation,mean_minimum_reserve,mean_missed_limits,mean_shield_vetoes,mean_emergency_recover_steps,mean_false_alarms,episode_failure_rate\n"
+        "scenario,policy,shielded,n,mean_task_reward,mean_cumulative_load,p95_cumulative_load,episode_violation_rate,mean_unsafe_ticks,mean_violation_exposure,p95_violation_exposure,mean_conditional_peak_violation,mean_minimum_reserve,mean_missed_limits,mean_shield_vetoes,mean_emergency_recover_steps,mean_false_alarms,episode_failure_rate\n"
     );
     for ((scenario, policy, shielded), by_seed) in groups {
         let episodes: Vec<&Episode> = by_seed.values().collect();
         let rewards: Vec<f64> = episodes.iter().map(|row| row.task_reward).collect();
         let exposure: Vec<f64> = episodes.iter().map(|row| row.cumulative_exposure).collect();
+        let unsafe_ticks: Vec<f64> = episodes.iter().map(|row| row.unsafe_ticks as f64).collect();
         let violation_exposure: Vec<f64> = episodes.iter().map(|row| row.violation_exposure).collect();
         let conditional_severity: Vec<f64> = episodes.iter()
             .filter(|row| row.unsafe_episode)
@@ -211,12 +221,13 @@ fn write_summary(groups: &BTreeMap<ConditionKey, EpisodesBySeed>, path: &str) ->
             format!("{:.6}", mean(&conditional_severity))
         };
         output.push_str(&format!(
-            "{scenario},{policy},{shielded},{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{conditional},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6}\n",
+            "{scenario},{policy},{shielded},{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{conditional},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6}\n",
             episodes.len(),
             mean(&rewards),
             mean(&exposure),
             percentile_nearest_rank(&exposure, 0.95),
             violation_rate,
+            mean(&unsafe_ticks),
             mean(&violation_exposure),
             percentile_nearest_rank(&violation_exposure, 0.95),
             mean(&minimum_reserve),
