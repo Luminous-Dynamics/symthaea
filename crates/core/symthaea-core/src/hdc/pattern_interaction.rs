@@ -312,8 +312,8 @@ impl Default for PatternInteractionConfig {
             dimension: 16_384,
             prototype_count: 64,
             trials: 16,
-            noise_fractions: vec![0.05, 0.10, 0.20, 0.30],
-            bundle_sizes: vec![1, 3, 5, 9, 17],
+            noise_fractions: vec![0.05, 0.10, 0.20, 0.30, 0.35, 0.40, 0.45, 0.50],
+            bundle_sizes: vec![1, 3, 5, 9, 17, 33, 49],
         }
     }
 }
@@ -336,6 +336,14 @@ pub struct BundleCapacityResult {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct AssociativeCapacityResult {
+    pub association_count: usize,
+    pub mean_target_similarity: f64,
+    pub mean_max_distractor_similarity: f64,
+    pub recall_at_1: f64,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct PatternInteractionReport {
     pub seed: u64,
     pub dimension: usize,
@@ -349,6 +357,7 @@ pub struct PatternInteractionReport {
     pub basis_equivariance_exact: bool,
     pub noise_results: Vec<NoiseRetrievalResult>,
     pub bundle_results: Vec<BundleCapacityResult>,
+    pub associative_capacity_results: Vec<AssociativeCapacityResult>,
 }
 
 /// Run compositional, causal-ablation, basis-invariance, noise, and bundle
@@ -461,6 +470,56 @@ pub fn run_pattern_interaction_suite(
         });
     }
 
+    let mut associative_capacity_results = Vec::with_capacity(config.bundle_sizes.len());
+    for (size_index, &association_count) in config.bundle_sizes.iter().enumerate() {
+        let mut target_similarity_sum = 0.0;
+        let mut max_distractor_similarity_sum = 0.0;
+        let mut correct_count = 0usize;
+
+        for trial in 0..config.trials {
+            let fillers = make_prototypes(seed ^ 0x4153_534f_4349_4154, trial, config)?;
+            let roles = (0..association_count)
+                .map(|index| PatternVector::seeded_random(
+                    dimension,
+                    derived_seed(seed ^ 0x524f_4c45_535f_4844, trial as u64, index as u64),
+                ))
+                .collect::<Result<Vec<_>, _>>()?;
+            let bound_pairs = roles.iter()
+                .zip(fillers.iter())
+                .map(|(role, filler)| role.bind(filler))
+                .collect::<Result<Vec<_>, _>>()?;
+            let memory = PatternVector::bundle(
+                &bound_pairs,
+                derived_seed(seed, (size_index * config.trials + trial) as u64, 6),
+            )?;
+            let target_index = trial % association_count;
+            let query = memory.unbind(&roles[target_index])?;
+            let target_similarity = query.similarity(&fillers[target_index])?;
+            let max_distractor_similarity = fillers.iter()
+                .enumerate()
+                .filter(|(index, _)| *index != target_index)
+                .map(|(_, filler)| query.similarity(filler))
+                .collect::<Result<Vec<_>, _>>()?
+                .into_iter()
+                .fold(f64::NEG_INFINITY, f64::max);
+
+            target_similarity_sum += target_similarity;
+            max_distractor_similarity_sum += max_distractor_similarity;
+            let space = build_space(&fillers)?;
+            let ranked = space.rank(&query)?;
+            if ranked.first().is_some_and(|result| result.label == format!("p{target_index}")) {
+                correct_count += 1;
+            }
+        }
+
+        associative_capacity_results.push(AssociativeCapacityResult {
+            association_count,
+            mean_target_similarity: target_similarity_sum / config.trials as f64,
+            mean_max_distractor_similarity: max_distractor_similarity_sum / config.trials as f64,
+            recall_at_1: correct_count as f64 / config.trials as f64,
+        });
+    }
+
     Ok(PatternInteractionReport {
         seed,
         dimension,
@@ -474,6 +533,7 @@ pub fn run_pattern_interaction_suite(
         basis_equivariance_exact,
         noise_results,
         bundle_results,
+        associative_capacity_results,
     })
 }
 
@@ -604,6 +664,9 @@ mod tests {
         let report = run_pattern_interaction_suite(99, &config).expect("suite");
         assert_eq!(report.bundle_results.len(), 5);
         assert_eq!(report.bundle_results[0].member_recall_at_1, 1.0);
+        assert_eq!(report.associative_capacity_results.len(), 5);
+        assert_eq!(report.associative_capacity_results[0].recall_at_1, 1.0);
+        assert_eq!(report.associative_capacity_results[0].mean_target_similarity, 1.0);
         assert!(report.bundle_results.iter().all(|result| {
             (0.0..=1.0).contains(&result.member_recall_at_1)
                 && result.mean_member_similarity > result.mean_max_distractor_similarity
