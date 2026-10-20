@@ -140,7 +140,7 @@ pub fn bootstrap_binary_safety_metrics(
     let upper_quantile = 1.0 - alpha / 2.0;
     let mut intervals = BTreeMap::new();
     for metric in metric_names() {
-        let values = samples.remove(metric).unwrap_or_default();
+        let values = samples.remove(*metric).unwrap_or_default();
         let valid = values.len();
         let status = if valid == 0 {
             IntervalStatus::UndefinedOnAllReplicates
@@ -371,7 +371,7 @@ pub fn paired_bootstrap_binary_safety_comparison(
         candidate_by_id.values().copied().collect();
     let baseline_aligned: Vec<&BinarySafetyEvaluationCase> = candidate_by_id
         .keys()
-        .map(|id| baseline_by_id[id])
+        .map(|id| *baseline_by_id.get(*id).expect("baseline case ID was validated"))
         .collect();
 
     let candidate_point = evaluate_binary_safety(evaluation_config, candidate_cases)
@@ -382,7 +382,7 @@ pub fn paired_bootstrap_binary_safety_comparison(
     let point_differences: BTreeMap<String, Option<f64>> = metric_names()
         .iter()
         .map(|name| {
-            let difference = match (metric_value(&candidate_point, name), metric_value(&baseline_point, name)) {
+            let difference = match (metric_value(&candidate_point, *name), metric_value(&baseline_point, *name)) {
                 (Some(candidate), Some(baseline)) => Some(candidate - baseline),
                 _ => None,
             };
@@ -443,8 +443,8 @@ pub fn paired_bootstrap_binary_safety_comparison(
             (None, None)
         };
 
-        let point_candidate = metric_value(&candidate_point, name);
-        let point_baseline = metric_value(&baseline_point, name);
+        let point_candidate = metric_value(&candidate_point, *name);
+        let point_baseline = metric_value(&baseline_point, *name);
         differences.insert(name.to_string(), PairedMetricDifference {
             metric: name.to_string(),
             candidate_point_estimate: point_candidate,
