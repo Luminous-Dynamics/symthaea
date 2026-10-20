@@ -140,3 +140,18 @@ This still cannot prove publisher authenticity, legal rights, or that a team nev
 - The [ITTC CFD-validation benchmark procedure](https://ittc.info/search/?q=Self-Propulsion) is a process/reference source, not a substitute for raw measurement data.
 
 Do not tune a solver on the hold-out condition. Prefer grouped leave-one-operating-condition-out evaluation and report error separately for each observable and condition. If a data source omits uncertainty information, report descriptive residuals only; do not manufacture confidence levels. Unit-test fixtures are synthetic placeholders and never count as physical evidence.
+
+
+## Shift-specific claim gate (new, synthetic contract tests only)
+
+The `shift_claim_gate` module composes with `prediction_interval_calibration`: it does **not** duplicate coverage, Wilson intervals, interval scores, or implement a conformal correction. It checks whether a shift-specific interpretation may proceed after the referenced held-out calibration report has passed.
+
+- **Covariate shift / importance weighting:** requires reviewed assumptions, predeclared support-overlap floor, effective-sample-size floor and maximum normalized-weight cap. Failure of these checks is `IndeterminateInsufficientSupport`, not a forced pass from pooled calibration.
+- **Joint covariate-and-outcome shift, heteroscedasticity, local undercoverage and drift:** require a minimum roster of target-labelled independent groups that is declared disjoint from calibration and method/threshold tuning. Source-only evidence yields `IndeterminateNeedsTargetLabels` where labels are necessary.
+- **Support gaps:** every declared unsupported group must be abstained on; the strongest permitted outcome is `SelectiveClaimOnly`. Abstained regimes are not represented as calibrated.
+- **No-shift control:** an adaptive method cannot skip paired replay against the unmodified baseline. It fails closed here until a separate paired non-degradation comparison exists.
+- **Dependence and sparse regimes:** dependence remains indeterminate until the calibration report binds an actual dependence-adjusted uncertainty method/receipt; a review flag alone cannot qualify Wilson bounds that assume independent groups. Sparse/missing evidence cannot independently establish a shift claim.
+
+The canonical profile digest binds the assumption family, correction method, thresholds and sorted group rosters. It preserves duplicate IDs in the digest and rejects them during assessment. These flags, group identities, target-label independence and support diagnostics remain caller-attested: this is a deterministic admission gate, not authentication of source evidence. A pass is scoped to the frozen profile; it is not an unconditional coverage theorem, physical CFD validation, vessel safety assessment, certification, or operational approval.
+
+The unit tests are authored but have **not** been compiled or run in this environment. Do not describe the module as validated until `cargo metadata --locked`, `cargo test --locked`, `cargo fmt --check` and Clippy complete successfully. Research context: [conditional-coverage diagnostics / ERT (ICML 2026)](https://proceedings.mlr.press/v306/braun26c.html) motivates reporting conditional failure explicitly; [KMM-CP (UAI 2026)](https://proceedings.mlr.press/v337/laghuvarapu26a.html) treats covariate-shift weighting as dependent on support overlap. Its reported improvement is on molecular-property benchmarks only, not marine data.
