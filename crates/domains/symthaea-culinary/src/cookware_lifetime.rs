@@ -13,7 +13,7 @@
 //! or establish a product's actual service life.
 
 use super::cookware::{
-    CookwareBenchmarkManifestV1, CookwareCandidateV1, CookwareMetric, CookwareRunV1,
+    CookwareBenchmarkManifestV1, CookwareCandidateV1, CookwareRunV1,
     CookwareValidationReport, validate_cookware_benchmark,
 };
 use serde::{Deserialize, Serialize};
@@ -168,6 +168,8 @@ pub enum CookwareLifetimeViolationCode {
     InvalidStageEvent,
     InvalidConditionTransition,
     MissingRepairEvidence,
+    MissingMaintenanceEvent,
+    MissingRepairEvent,
     UnexpectedRepairEvidence,
     MissingFailureMode,
     UnexpectedFailureMode,
@@ -317,7 +319,9 @@ fn validate_event_shape(
             if event.stage != CookwareLifecycleStage::PostRepair
                 || !matches!(
                     event.condition_after,
-                    CookwareLifecycleCondition::InService | CookwareLifecycleCondition::Worn
+                    CookwareLifecycleCondition::InService
+                        | CookwareLifecycleCondition::Worn
+                        | CookwareLifecycleCondition::Failed
                 )
             {
                 add_violation(
@@ -796,6 +800,45 @@ pub fn validate_cookware_lifetime(
                 );
             }
 
+            if event.kind == CookwareLifecycleEventKind::StageAssessment {
+                let required_prior_event = match event.stage {
+                    CookwareLifecycleStage::PostMaintenance => {
+                        Some(CookwareLifecycleEventKind::MaintenanceCompleted)
+                    }
+                    CookwareLifecycleStage::PostRepair => {
+                        Some(CookwareLifecycleEventKind::RepairCompleted)
+                    }
+                    _ => None,
+                };
+                if let Some(required_kind) = required_prior_event {
+                    let has_prior_event = timeline.iter().take(index).any(|prior| {
+                        prior.kind == required_kind
+                            && prior.sequence_index < event.sequence_index
+                    });
+                    if !has_prior_event {
+                        let (code, detail) = match required_kind {
+                            CookwareLifecycleEventKind::MaintenanceCompleted => (
+                                CookwareLifetimeViolationCode::MissingMaintenanceEvent,
+                                "post-maintenance assessment requires an earlier maintenance event",
+                            ),
+                            CookwareLifecycleEventKind::RepairCompleted => (
+                                CookwareLifetimeViolationCode::MissingRepairEvent,
+                                "post-repair assessment requires an earlier repair event",
+                            ),
+                            _ => unreachable!("only maintenance/repair prerequisite kinds are selected"),
+                        };
+                        add_violation(
+                            &mut violations,
+                            code,
+                            Some(&event.candidate_id),
+                            Some(unit_id),
+                            Some(&event.event_id),
+                            detail,
+                        );
+                    }
+                }
+            }
+
             if let Some(previous) = previous_counters {
                 if !event.cumulative_cycles.is_componentwise_at_least(previous) {
                     add_violation(
@@ -866,7 +909,7 @@ pub fn validate_cookware_lifetime(
 mod tests {
     use super::*;
     use crate::cookware::{
-        AssistanceMode, CookwareBenchmarkManifestV1, CookwareCandidateV1, CookwareEvidenceClass,
+        CookwareBenchmarkManifestV1, CookwareCandidateV1, CookwareEvidenceClass, CookwareMetric,
         CookwareObservationV1, CookwareProtocolV1, CookwareRole, CookwareRunV1,
         CraftExperienceRecordV1, FoodContactEvidenceStatus,
     };
