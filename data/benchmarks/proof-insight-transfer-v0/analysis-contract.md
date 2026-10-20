@@ -31,7 +31,7 @@ The run config uses `schema_version = "pitb.run-config.v0"` and contains:
 
 The budget values are experiment choices, not defaults supplied by this implementation. Choose them before the test run, and encode identical limits for all arms. The checker identifier must distinguish relevant Lean/Mathlib and audit-policy revisions.
 
-The analyzer also verifies that the split document identifies upstream commit `1581d4cbdd69a0faf34b2089614fe2a814316a6a`, has 372 unique families and exact 260/56/56 train/validation/test family counts, and places every known-exposed family in the frozen test partition.
+The analyzer independently recomputes each family assignment from the frozen seed and `SHA-256(seed || NUL || family_id)`, checks sort/tie-break behavior and exact 70/15/15 floor cutoffs, recomputes the tab/newline-delimited partition digest, and then requires those values to match both `splits.json` and the run config. It also verifies upstream commit `1581d4cbdd69a0faf34b2089614fe2a814316a6a`, 372 unique families, exact 260/56/56 train/validation/test counts, and that every known-exposed family is assigned to the frozen test partition. This prevents a config creator from merely hashing a tampered split file and calling it frozen.
 
 ## Validation-only baseline receipt
 
