@@ -1157,7 +1157,7 @@ impl Style {
                 progression: ProgressionSpec::GrammarWithPalette(
                     crate::harmony::HarmonicPalette::march(),
                 ),
-                accompaniment_pool: vec![A::Block],
+                accompaniment_pool: vec![A::MarchPulse],
                 form_pool: vec![FormKind::Ternary, FormKind::Rondo],
                 ensemble_pool: s(&[["trumpet", "organ", "cello"]]),
                 counter_instrument: None,
@@ -3504,6 +3504,9 @@ mod tests {
             assert_eq!(Style::Waltz.accompaniment(seed), A::OomPah);
             assert_eq!(Style::Cinematic.accompaniment(seed), A::Block);
         }
+        // March has an explicit four-beat pulse rather than a generic held block.
+        assert_eq!(Style::March.accompaniment(0), A::MarchPulse);
+        assert_eq!(Style::March.accompaniment(7), A::MarchPulse);
         // Classical seed 0 stays on the pre-pattern texture (compat).
         assert_eq!(Style::Classical.accompaniment(0), A::Block);
         // And nonzero seeds genuinely vary the texture.
