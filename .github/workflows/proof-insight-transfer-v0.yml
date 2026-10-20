@@ -146,7 +146,18 @@ jobs:
                       "evidence_kind": "reviewer_annotation"
                   }],
                   "failure_boundaries": ["Synthetic-only; no transfer claim"],
-                  "transfer_candidates": []
+                  "transfer_candidates": [{
+                      "target_family_id": "synthetic-target",
+                      "rationale": "Schema fixture only",
+                      "status": "candidate",
+                      "directional_contract": {
+                          "compatibility": "compatible",
+                          "mismatch_codes": [],
+                          "source_move_requires": "Synthetic source requirement",
+                          "target_goal_requires": "Synthetic target requirement",
+                          "notes": ["No mathematical transfer is asserted"]
+                      }
+                  }]
               },
               "verification": {
                   "status": "not_attempted",
@@ -199,13 +210,31 @@ jobs:
           bad_status["verification"]["status"] = "verified-by-assertion"
           mutants.append(bad_status)
 
+          missing_contract = copy.deepcopy(record)
+          del missing_contract["insight"]["transfer_candidates"][0]["directional_contract"]
+          mutants.append(missing_contract)
+
+          incompatible_verified_transfer = copy.deepcopy(record)
+          incompatible_candidate = incompatible_verified_transfer["insight"]["transfer_candidates"][0]
+          incompatible_candidate["status"] = "verified_transfer"
+          incompatible_candidate["directional_contract"]["compatibility"] = "incompatible"
+          incompatible_candidate["directional_contract"]["mismatch_codes"] = ["inequality_direction"]
+          mutants.append(incompatible_verified_transfer)
+
+          rejected_without_mismatch = copy.deepcopy(record)
+          rejected_candidate = rejected_without_mismatch["insight"]["transfer_candidates"][0]
+          rejected_candidate["status"] = "rejected"
+          rejected_candidate["directional_contract"]["compatibility"] = "unknown"
+          rejected_candidate["directional_contract"]["mismatch_codes"] = ["unknown"]
+          mutants.append(rejected_without_mismatch)
+
           for index, mutant in enumerate(mutants, start=1):
               try:
                   validator.validate(mutant)
               except ValidationError:
                   continue
               raise SystemExit(f"schema negative control {index} unexpectedly passed")
-          print("PITB Draft 2020-12 schema: PASS; synthetic positive control: PASS; four negative controls: rejected")
+          print(f"PITB Draft 2020-12 schema: PASS; synthetic positive control: PASS; {len(mutants)} negative controls rejected, including transfer-contract invariants")
           PY
       - name: Index pinned OpenAI math snapshot twice
         shell: bash
