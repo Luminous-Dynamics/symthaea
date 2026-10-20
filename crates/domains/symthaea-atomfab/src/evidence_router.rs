@@ -453,6 +453,44 @@ mod tests {
     }
 
     #[test]
+    fn versioned_fixture_routes_atomistic_evidence_and_parses_schemas() {
+        let fixture: serde_json::Value = serde_json::from_str(include_str!(
+            "../fixtures/evidence-action-proposals-v1.json"
+        ))
+        .expect("evidence action fixture must be valid JSON");
+        assert_eq!(fixture["schema_version"], 1);
+        assert_eq!(fixture["fixture_kind"], "illustrative_not_result");
+
+        let _input_schema: serde_json::Value = serde_json::from_str(include_str!(
+            "../schemas/evidence-action-proposals-v1.schema.json"
+        ))
+        .expect("evidence action input schema must be valid JSON");
+        let _report_schema: serde_json::Value = serde_json::from_str(include_str!(
+            "../schemas/evidence-route-report-v1.schema.json"
+        ))
+        .expect("evidence route output schema must be valid JSON");
+
+        let proposals: Vec<EvidenceActionProposal> =
+            serde_json::from_value(fixture["proposals"].clone())
+                .expect("fixture proposals must match Rust records");
+        let report =
+            route_evidence_actions(&proposals).expect("fixture uses one route contract");
+        assert_eq!(report.selected_action_id.as_deref(), Some("static-screen"));
+        report.validate().expect("generated report must revalidate");
+        let out_of_domain = report
+            .entries
+            .iter()
+            .find(|entry| entry.proposal.action_id == "out-of-domain-mlip")
+            .unwrap();
+        assert_eq!(
+            out_of_domain.disposition,
+            EvidenceActionDisposition::Ineligible {
+                reasons: vec!["model_out_of_domain".to_owned()]
+            }
+        );
+    }
+
+    #[test]
     fn rankings_and_report_validation_are_permutation_deterministic() {
         let a = proposal("dft", EvidenceActionKind::DftReference, 80, 40);
         let b = proposal("universal", EvidenceActionKind::UniversalMlPotential, 20, 4);
