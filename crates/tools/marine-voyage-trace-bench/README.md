@@ -112,7 +112,7 @@ The separate prediction_interval_calibration module evaluates central predictive
 
 ## Conditional calibration under hydrodynamic regime shift
 
-The research protocol in [MARINE_SHIFT_ROBUSTNESS.md](MARINE_SHIFT_ROBUSTNESS.md) defines paired baselines and adversarial scenarios for IID calibration, covariate shift, subgroup undercoverage, joint covariate/outcome shift, support gaps, bias/drift and no-shift controls. It composes with `prediction_interval_calibration` for per-slice coverage and interval-score metrics, without claiming universal distribution-shift guarantees or copying another conformal predictor. This is a protocol draft; no shift benchmark has yet been run and DTC raw data are not admitted.
+The research protocol in [MARINE_SHIFT_ROBUSTNESS.md](MARINE_SHIFT_ROBUSTNESS.md) defines paired baselines and adversarial scenarios for IID calibration, covariate shift, subgroup undercoverage, joint covariate/outcome shift, support gaps, bias/drift and no-shift controls. It also separates controlled model-scale DTC tests from the JoRes full-scale trials/monitoring path, and describes the additional evidence required for an eventual scale-transfer claim. It composes with `prediction_interval_calibration` for per-slice coverage and interval-score metrics, without claiming universal distribution-shift guarantees or copying another conformal predictor. This is a protocol draft; no shift benchmark has yet been run and DTC raw data are not admitted.
 
 ## Claim ceiling
 
