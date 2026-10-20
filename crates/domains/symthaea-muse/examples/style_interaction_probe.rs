@@ -11,6 +11,7 @@
 //!
 //! Run from the workspace root with:
 //!   SYMTHAEA_GIT_REVISION="$(git rev-parse HEAD)" \
+//!   SYMTHAEA_RUSTC_VERSION="$(rustc --version)" \\
 //!     cargo run -p symthaea-muse --features theory --example style_interaction_probe
 //!
 //! The caller-supplied revision is recorded as a claim only; this program does
@@ -305,7 +306,7 @@ fn main() -> ExitCode {
     let revision = env::var("SYMTHAEA_GIT_REVISION").unwrap_or_default();
     if !valid_sha1(&revision) {
         eprintln!(
-            "FAIL: set SYMTHAEA_GIT_REVISION to the exact 40-hex checkout HEAD;              the runner records this claim but does not independently attest the build."
+        eprintln!("FAIL: set SYMTHAEA_GIT_REVISION to the exact 40-hex checkout HEAD; this is a caller claim, not build attestation.");
         );
         return ExitCode::FAILURE;
     }
