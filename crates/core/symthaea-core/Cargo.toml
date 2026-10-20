@@ -109,6 +109,10 @@ required-features = ["abstract_thought"]
 name = "cross_domain_query"
 path = "examples/cross_domain_query.rs"
 
+[[example]]
+name = "platonic_pattern_interaction"
+path = "examples/platonic_pattern_interaction.rs"
+
 # scaling_study_demo: module not yet wired into physics/mod.rs; exclude from default build
 [[example]]
 name = "scaling_study_demo"
