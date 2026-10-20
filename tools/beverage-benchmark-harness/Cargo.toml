@@ -25,3 +25,7 @@ path = "../../crates/domains/symthaea-culinary/src/bin/beverage_benchmark_receip
 [[bin]]
 name = "wine_quality_source_audit"
 path = "../../crates/domains/symthaea-culinary/src/bin/wine_quality_source_audit.rs"
+
+[[bin]]
+name = "fermentation_time_series_audit"
+path = "../../crates/domains/symthaea-culinary/src/bin/fermentation_time_series_audit.rs"
