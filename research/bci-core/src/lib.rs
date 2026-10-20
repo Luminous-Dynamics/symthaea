@@ -12,6 +12,13 @@
 
 use std::fmt;
 
+pub mod robustness;
+pub use robustness::{
+    evaluate_robustness, PerturbationFamily, RobustnessConfig, RobustnessError,
+    RobustnessEvaluationReport, RobustnessModelReport, RobustnessScenario,
+    RobustnessScenarioDelta, RobustnessScore, ROBUSTNESS_SCORE_SCALE_PPM,
+};
+
 pub mod selective;
 pub use selective::{evaluate_risk_coverage, evaluate_selective, SelectiveMetricError, SelectiveMetrics, SelectiveObservation};
 
