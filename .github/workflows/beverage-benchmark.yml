@@ -50,9 +50,9 @@ jobs:
 
       - name: Format focused runners
         run: |
-          rustfmt --edition 2024 --check crates/domains/symthaea-culinary/src/bin/beverage_benchmark_receipt.rs
-          rustfmt --edition 2024 --check crates/domains/symthaea-culinary/src/bin/wine_quality_source_audit.rs
-          rustfmt --edition 2024 --check crates/domains/symthaea-culinary/src/bin/fermentation_time_series_audit.rs
+          rustfmt --edition 2024 --check tools/beverage-benchmark-harness/src/bin/beverage_benchmark_receipt.rs
+          rustfmt --edition 2024 --check tools/beverage-benchmark-harness/src/bin/wine_quality_source_audit.rs
+          rustfmt --edition 2024 --check tools/beverage-benchmark-harness/src/bin/fermentation_time_series_audit.rs
           rustfmt --edition 2024 --check tools/beverage-benchmark-harness/src/bin/schema_contract_audit.rs
 
       - name: Test synthetic receipt contract
