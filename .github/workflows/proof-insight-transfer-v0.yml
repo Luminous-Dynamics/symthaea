@@ -627,6 +627,65 @@ jobs:
               f"{len(bundle_mutants)} invalid-bundle controls rejected"
           )
           PY
+      - name: Audit pinned Dalek Lean Bench timeline
+        shell: bash
+        run: |
+          set -euo pipefail
+          dalek_sha="9fdbfd066420aebcf61a70b06eba57a108c41340"
+          dalek="$RUNNER_TEMP/dalek-lean-bench"
+          audit="$RUNNER_TEMP/dalek-temporal-timeline-audit.json"
+          git clone --quiet https://github.com/Beneficial-AI-Foundation/dalek-lean-bench.git "$dalek"
+          git -C "$dalek" checkout --quiet --detach "$dalek_sha"
+          test "$(git -C "$dalek" rev-parse HEAD)" = "$dalek_sha"
+          test -z "$(git -C "$dalek" status --porcelain)"
+          cd "$(dirname "$PITB_MANIFEST")"
+          cargo run --release --locked --bin symthaea-proof-insights -- \
+            --audit-temporal-timeline "$dalek" proof_timeline.csv "$audit"
+          python - "$audit" "$dalek" "$GITHUB_WORKSPACE" <<'PY'
+          import hashlib
+          import json
+          import sys
+          from pathlib import Path
+          from jsonschema import Draft202012Validator, FormatChecker
+
+          audit_path, dalek, workspace = map(Path, sys.argv[1:])
+          audit = json.loads(audit_path.read_text())
+          schema_path = workspace / "data/benchmarks/proof-insight-transfer-v0/temporal-timeline-audit.schema.json"
+          schema = json.loads(schema_path.read_text())
+          Draft202012Validator.check_schema(schema)
+          Draft202012Validator(schema, format_checker=FormatChecker()).validate(audit)
+          expected_commit = "9fdbfd066420aebcf61a70b06eba57a108c41340"
+          if audit["repository_commit"] != expected_commit:
+              raise SystemExit("Dalek timeline audit references an unexpected repository commit")
+          if audit["total_timeline_rows"] != 249 or len(audit["events"]) != 249:
+              raise SystemExit("pinned Dalek timeline no longer contains the preregistered 249 rows")
+          if [event["position"] for event in audit["events"]] != list(range(249)):
+              raise SystemExit("timeline positions are not contiguous and in source order")
+          if len({event["event_key"] for event in audit["events"]}) != 249:
+              raise SystemExit("timeline audit event keys are not unique")
+          if not all(event["completion_commit_ancestor_verified"] is True for event in audit["events"]):
+              raise SystemExit("one or more timeline completion commits are not ancestry-verified")
+          source_counts = (
+              audit["source_path_present_at_completion_count"]
+              + audit["source_path_missing_at_completion_count"]
+              + audit["source_path_not_recorded_count"]
+          )
+          if source_counts != 249:
+              raise SystemExit("timeline source-path accounting does not cover all 249 rows")
+          if sum(audit["verification_status_counts"].values()) != 249:
+              raise SystemExit("timeline verification-status accounting does not cover all 249 rows")
+          timeline_bytes = (dalek / audit["timeline_path"]).read_bytes()
+          if hashlib.sha256(timeline_bytes).hexdigest() != audit["timeline_sha256"]:
+              raise SystemExit("timeline digest differs from the exact pinned checkout bytes")
+          print(
+              "PITB_DALEK_TIMELINE_AUDIT_PASS: "
+              f"rows=249 completion_commits={audit['unique_completion_commit_count']} "
+              f"source_present={audit['source_path_present_at_completion_count']} "
+              f"source_missing={audit['source_path_missing_at_completion_count']} "
+              f"source_not_recorded={audit['source_path_not_recorded_count']} "
+              f"timeline_sha256={audit['timeline_sha256']}"
+          )
+          PY
       - name: Index pinned OpenAI math snapshot twice
         shell: bash
         run: |
@@ -759,5 +818,6 @@ jobs:
           path: |
             ${{ runner.temp }}/proof-insight-source-index-*.json
             ${{ runner.temp }}/proof-insight-isolated/Cargo.lock
+            ${{ runner.temp }}/dalek-temporal-timeline-audit.json
           if-no-files-found: error
           retention-days: 30
