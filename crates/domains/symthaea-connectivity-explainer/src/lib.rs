@@ -234,6 +234,254 @@ fn parse_priority_rows(row: &Value) -> Result<Option<Vec<PriorityOutcome>>, Stri
     Ok(Some(outcomes))
 }
 
+fn optional_task_u64(value: &Value, key: &str, task_id: &str) -> Result<Option<u64>, String> {
+    match value.get(key) {
+        None | Some(Value::Null) => Ok(None),
+        Some(item) => item
+            .as_u64()
+            .map(Some)
+            .ok_or_else(|| format!("task_results/{task_id}/{key}: expected a non-negative integer or null")),
+    }
+}
+
+fn task_string(value: &Value, key: &str, task_id: &str) -> Result<String, String> {
+    value
+        .get(key)
+        .and_then(Value::as_str)
+        .map(str::to_owned)
+        .ok_or_else(|| format!("task_results/{task_id}/{key}: required string is missing"))
+}
+
+fn task_completion_explanation(
+    task_id: &str,
+    priority: &str,
+    service_bytes: u64,
+    deadline_window: u64,
+    baseline_delivered: u64,
+    candidate_delivered: u64,
+    baseline_outcome: &str,
+    candidate_outcome: &str,
+    baseline_completion: Option<u64>,
+    candidate_completion: Option<u64>,
+    baseline_failure: Option<&str>,
+    candidate_failure: Option<&str>,
+) -> String {
+    match (baseline_outcome, candidate_outcome) {
+        ("failed", "succeeded") => {
+            let failure = match baseline_failure {
+                Some("deadline") => format!("missed its deadline at window {deadline_window}"),
+                Some("expired") => "expired before completion".to_owned(),
+                Some(reason) => format!("failed ({reason})"),
+                None => "failed before completion".to_owned(),
+            };
+            format!(
+                "Task {task_id} ({priority}) needed {service_bytes} bytes by window {deadline_window}. FIFO delivered {baseline_delivered}/{service_bytes} bytes and {failure}; fair-share delivered {candidate_delivered}/{service_bytes} bytes and completed{}.",
+                candidate_completion.map_or_else(String::new, |window| format!(" in window {window}"))
+            )
+        }
+        ("succeeded", "failed") => {
+            let failure = match candidate_failure {
+                Some("deadline") => format!("missed its deadline at window {deadline_window}"),
+                Some("expired") => "expired before completion".to_owned(),
+                Some(reason) => format!("failed ({reason})"),
+                None => "failed before completion".to_owned(),
+            };
+            format!(
+                "REGRESSION: task {task_id} ({priority}) needed {service_bytes} bytes by window {deadline_window}. FIFO completed it{} after delivering {baseline_delivered} bytes, but fair-share delivered {candidate_delivered}/{service_bytes} bytes and {failure}.",
+                baseline_completion.map_or_else(String::new, |window| format!(" in window {window}"))
+            )
+        }
+        ("failed", "failed") if candidate_delivered > baseline_delivered => {
+            format!(
+                "Task {task_id} ({priority}) did not finish by its deadline in either policy. Fair-share delivered more partial progress ({candidate_delivered}/{service_bytes} bytes) than FIFO ({baseline_delivered}/{service_bytes}); this is not a successful task outcome."
+            )
+        }
+        ("failed", "failed") => {
+            let baseline_reason = baseline_failure.unwrap_or("unknown reason");
+            let candidate_reason = candidate_failure.unwrap_or("unknown reason");
+            format!(
+                "Task {task_id} ({priority}) failed under both policies. FIFO delivered {baseline_delivered}/{service_bytes} bytes ({baseline_reason}); fair-share delivered {candidate_delivered}/{service_bytes} bytes ({candidate_reason})."
+            )
+        }
+        ("succeeded", "succeeded") => {
+            format!(
+                "Task {task_id} ({priority}) completed under both policies: FIFO in window {}, fair-share in window {}.",
+                baseline_completion.map_or_else(|| "not recorded".to_owned(), |window| window.to_string()),
+                candidate_completion.map_or_else(|| "not recorded".to_owned(), |window| window.to_string())
+            )
+        }
+        _ => format!(
+            "Task {task_id} ({priority}) has an unrecognized outcome label; inspect its raw task receipt."
+        ),
+    }
+}
+
+fn parse_task_comparisons(root: &Value) -> Result<Option<(Vec<TaskComparison>, u64, bool)>, String> {
+    const MAX_EXPLANATIONS: usize = 50;
+    let Some(task_results) = root.get("task_results") else {
+        return Ok(None);
+    };
+    let groups = task_results
+        .as_array()
+        .filter(|groups| groups.len() == 2)
+        .ok_or_else(|| "multiwindow_recovery/task_results: expected exactly two task-result arrays".to_owned())?;
+
+    let mut baseline = BTreeMap::<String, &Value>::new();
+    let mut candidate = BTreeMap::<String, &Value>::new();
+    for group in groups {
+        let rows = group
+            .as_array()
+            .ok_or_else(|| "multiwindow_recovery/task_results/*: expected an array".to_owned())?;
+        for row in rows {
+            let task_id = row
+                .get("task_id")
+                .and_then(Value::as_str)
+                .ok_or_else(|| "task_results/*/task_id: required task token is missing".to_owned())?;
+            let arm = row
+                .get("arm")
+                .and_then(Value::as_str)
+                .ok_or_else(|| format!("task_results/{task_id}/arm: required arm is missing"))?;
+            let target = match arm {
+                "baseline" => &mut baseline,
+                "candidate" => &mut candidate,
+                other => return Err(format!("task_results/{task_id}/arm: unsupported arm '{other}'")),
+            };
+            if target.insert(task_id.to_owned(), row).is_some() {
+                return Err(format!("task_results/{task_id}: duplicate task ID within arm"));
+            }
+        }
+    }
+
+    if baseline.len() != candidate.len() {
+        return Err("task_results: baseline and candidate task counts differ; paired explanation refused".to_owned());
+    }
+
+    let mut comparisons = Vec::new();
+    for (task_id, base) in &baseline {
+        let cand = candidate
+            .get(task_id)
+            .ok_or_else(|| format!("task_results/{task_id}: candidate task result is missing"))?;
+
+        let mode = task_string(base, "mode", task_id)?;
+        let candidate_mode = task_string(cand, "mode", task_id)?;
+        let priority = task_string(base, "priority", task_id)?;
+        let candidate_priority = task_string(cand, "priority", task_id)?;
+        let service_bytes = required_u64(base, "service_bytes", &format!("task_results/{task_id}"))?;
+        let candidate_service = required_u64(cand, "service_bytes", &format!("task_results/{task_id}"))?;
+        let arrival_window = required_u64(base, "arrival_window", &format!("task_results/{task_id}"))?;
+        let candidate_arrival = required_u64(cand, "arrival_window", &format!("task_results/{task_id}"))?;
+        let deadline_window = required_u64(base, "deadline_window", &format!("task_results/{task_id}"))?;
+        let candidate_deadline = required_u64(cand, "deadline_window", &format!("task_results/{task_id}"))?;
+        let expires_after_window = required_u64(base, "expires_after_window", &format!("task_results/{task_id}"))?;
+        let candidate_expiry = required_u64(cand, "expires_after_window", &format!("task_results/{task_id}"))?;
+
+        if mode != candidate_mode
+            || priority != candidate_priority
+            || service_bytes != candidate_service
+            || arrival_window != candidate_arrival
+            || deadline_window != candidate_deadline
+            || expires_after_window != candidate_expiry
+        {
+            return Err(format!(
+                "task_results/{task_id}: scenario, priority, demand or deadline metadata differs between arms"
+            ));
+        }
+        if arrival_window > deadline_window || arrival_window > expires_after_window {
+            return Err(format!("task_results/{task_id}: task arrives after its deadline or expiry"));
+        }
+
+        let baseline_delivered = required_u64(base, "delivered_bytes", &format!("task_results/{task_id}"))?;
+        let candidate_delivered = required_u64(cand, "delivered_bytes", &format!("task_results/{task_id}"))?;
+        if baseline_delivered > service_bytes || candidate_delivered > service_bytes {
+            return Err(format!("task_results/{task_id}: delivered bytes exceed requested service bytes"));
+        }
+        let baseline_outcome = task_string(base, "outcome", task_id)?;
+        let candidate_outcome = task_string(cand, "outcome", task_id)?;
+        if !matches!(baseline_outcome.as_str(), "succeeded" | "failed")
+            || !matches!(candidate_outcome.as_str(), "succeeded" | "failed")
+        {
+            return Err(format!("task_results/{task_id}: unrecognized outcome state"));
+        }
+        if (baseline_outcome == "succeeded") != (baseline_delivered == service_bytes)
+            || (candidate_outcome == "succeeded") != (candidate_delivered == service_bytes)
+        {
+            return Err(format!("task_results/{task_id}: outcome state conflicts with delivered-byte total"));
+        }
+
+        let baseline_completion = optional_task_u64(base, "completion_window", task_id)?;
+        let candidate_completion = optional_task_u64(cand, "completion_window", task_id)?;
+        let baseline_failure = base
+            .get("failure_reason")
+            .and_then(Value::as_str)
+            .map(str::to_owned);
+        let candidate_failure = cand
+            .get("failure_reason")
+            .and_then(Value::as_str)
+            .map(str::to_owned);
+        if (baseline_outcome == "succeeded") != baseline_completion.is_some()
+            || (candidate_outcome == "succeeded") != candidate_completion.is_some()
+        {
+            return Err(format!("task_results/{task_id}: completion window conflicts with task outcome"));
+        }
+
+        let changed = baseline_outcome != candidate_outcome
+            || baseline_delivered != candidate_delivered
+            || baseline_completion != candidate_completion
+            || baseline_failure != candidate_failure;
+        if changed {
+            let explanation = task_completion_explanation(
+                task_id,
+                &priority,
+                service_bytes,
+                deadline_window,
+                baseline_delivered,
+                candidate_delivered,
+                &baseline_outcome,
+                &candidate_outcome,
+                baseline_completion,
+                candidate_completion,
+                baseline_failure.as_deref(),
+                candidate_failure.as_deref(),
+            );
+            comparisons.push(TaskComparison {
+                task_id: task_id.clone(),
+                mode,
+                priority,
+                service_bytes,
+                arrival_window,
+                deadline_window,
+                expires_after_window,
+                baseline_delivered_bytes: baseline_delivered,
+                candidate_delivered_bytes: candidate_delivered,
+                baseline_outcome,
+                candidate_outcome,
+                baseline_completion_window: baseline_completion,
+                candidate_completion_window: candidate_completion,
+                baseline_failure_reason: baseline_failure,
+                candidate_failure_reason: candidate_failure,
+                explanation,
+            });
+        }
+    }
+
+    comparisons.sort_by(|left, right| {
+        let rank = |priority: &str| match priority {
+            "essential" => 0_u8,
+            "interactive" => 1,
+            "bulk" => 2,
+            _ => 3,
+        };
+        rank(&left.priority)
+            .cmp(&rank(&right.priority))
+            .then_with(|| left.mode.cmp(&right.mode))
+            .then_with(|| left.task_id.cmp(&right.task_id))
+    });
+    let total = comparisons.len() as u64;
+    let truncated = comparisons.len() > MAX_EXPLANATIONS;
+    comparisons.truncate(MAX_EXPLANATIONS);
+    Ok(Some((comparisons, total, truncated)))
+}
+
 /// Explain a recovery simulation report at household, operator and review level.
 ///
 /// Expects a report containing multiwindow_recovery.evidence_class and
