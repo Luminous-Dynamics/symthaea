@@ -596,13 +596,18 @@ function ensureAnalyser() {
   analyser.connect(audioCtx.destination);
 }
 
+// Keep this set aligned with the 37 executable routes in the public catalog.
+// Rust-side parity tests enforce the canonical source; this legacy page stays
+// self-contained so it can be served without a generated JavaScript bundle.
 const LISTEN_STYLES = ['Classical', 'Nocturne', 'Cinematic', 'Passacaglia',
                        'Lullaby', 'Waltz', 'Folk', 'Tango', 'Fugue',
                        'ModalFolk', 'March', 'Playful', 'Celtic', 'Blues',
                        'Impressionism', 'SacredChoral', 'Minimalism',
                        'JazzBallad', 'BaroqueSuite', 'ProgFolk', 'Ambient', 'Sonata',
                        'RenaissancePolyphony', 'AfroCuban', 'Flamenco', 'BossaNova', 'Opera',
-                       'IrishTraditional', 'HindustaniInspired'];
+                       'IrishTraditional', 'HindustaniInspired', 'Rondo',
+                       'ThemeAndVariations', 'Erosion', 'Lineage', 'Sarabande',
+                       'MinuetAndTrio', 'Mazurka', 'Toccata'];
 const LISTEN_DEFAULT = new Set(['Classical', 'Nocturne', 'Cinematic',
                                 'Passacaglia', 'Lullaby']);
 const listenSel = new Set(LISTEN_DEFAULT);
@@ -2153,6 +2158,14 @@ const STYLE_PALETTES = {
   Opera:       { a: '176,96,182',  b: '112,52,120',    bg: ['#180c1c', '#0e0710'] },
   IrishTraditional: { a: '110,184,96', b: '62,128,52',  bg: ['#0e1c0c', '#081007'] },
   HindustaniInspired: { a: '224,168,72', b: '164,116,40', bg: ['#201708', '#130e05'] },
+  Rondo: { a: '222,184,95', b: '144,112,54', bg: ['#211a0c', '#110e08'] },
+  ThemeAndVariations: { a: '190,154,224', b: '130,94,168', bg: ['#201528', '#100c14'] },
+  Erosion: { a: '163,156,144', b: '103,96,88', bg: ['#1d1a17', '#0e0d0c'] },
+  Lineage: { a: '116,194,142', b: '54,132,88', bg: ['#102218', '#080f0b'] },
+  Sarabande: { a: '222,154,120', b: '148,68,58', bg: ['#25140f', '#120a08'] },
+  MinuetAndTrio: { a: '174,198,224', b: '112,142,174', bg: ['#18202c', '#0d1118'] },
+  Mazurka: { a: '236,122,94', b: '180,70,48', bg: ['#28130f', '#150a08'] },
+  Toccata: { a: '102,218,201', b: '218,176,92', bg: ['#0e2424', '#071211'] },
 };
 let currentPalette = STYLE_PALETTES.Classical;
 function applyPalette(style) {
