@@ -71,6 +71,8 @@ jobs:
           (staged / "src").mkdir(parents=True)
           (staged / "Cargo.toml").write_text(package_text + "\n".join(dependency_lines) + "\n")
           shutil.copy2(crate_dir / "src/main.rs", staged / "src/main.rs")
+          if (crate_dir / "src/bin").is_dir():
+              shutil.copytree(crate_dir / "src/bin", staged / "src/bin")
           shutil.copy2(root / "Cargo.lock", staged / "Cargo.lock")
           print(f"Staged isolated crate {crate['package']['name']} at {staged}")
           PY
@@ -79,6 +81,8 @@ jobs:
         run: cargo fmt --manifest-path "$PITB_MANIFEST" -- --check
       - name: Run indexer unit tests
         run: cargo test --locked --manifest-path "$PITB_MANIFEST"
+      - name: Validate checked-in transfer candidate
+        run: cargo run --locked --manifest-path "$PITB_MANIFEST" --bin validate_transfer_contract -- data/benchmarks/proof-insight-transfer-v0/candidates/156-borsuk-nine-finite-obstruction.json
       - name: Run strict Clippy
         run: cargo clippy --locked --manifest-path "$PITB_MANIFEST" --all-targets -- -D warnings
       - name: Install independent Draft 2020-12 validator
