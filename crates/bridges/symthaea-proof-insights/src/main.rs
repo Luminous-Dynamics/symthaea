@@ -778,8 +778,8 @@ fn audit_temporal_timeline(
                 None => {
                     let verified = git_is_ancestor(&root, &completion_commit, &repository_commit)
                         .with_context(|| {
-                            format!("verify completion commit for timeline row {event_key}")
-                        })?;
+                        format!("verify completion commit for timeline row {event_key}")
+                    })?;
                     verified_commit_cache.insert(completion_commit.clone(), verified);
                     verified
                 }
@@ -1883,7 +1883,15 @@ fn git_path_exists_at_commit(root: &Path, commit: &str, path: &str) -> Result<bo
     let output = Command::new("git")
         .arg("-C")
         .arg(root)
-        .args(["ls-tree", "--full-tree", "-r", "--name-only", commit, "--", path])
+        .args([
+            "ls-tree",
+            "--full-tree",
+            "-r",
+            "--name-only",
+            commit,
+            "--",
+            path,
+        ])
         .output()
         .with_context(|| format!("failed to list historical Git path {commit}:{path}"))?;
     if !output.status.success() {
@@ -2798,12 +2806,18 @@ mod tests {
         .expect("parse temporal timeline audit JSON");
         assert_eq!(timeline_audit["total_timeline_rows"], 3);
         assert_eq!(timeline_audit["readme_claimed_timeline_row_count"], 4);
-        assert_eq!(timeline_audit["timeline_row_count_matches_readme_claim"], false);
-        assert_eq!(timeline_audit["repository_readme_sha256"], sha(
-            git_show_file(&root, &repository_commit, "README.md")
-                .expect("read pinned README bytes")
-                .as_slice()
-        ));
+        assert_eq!(
+            timeline_audit["timeline_row_count_matches_readme_claim"],
+            false
+        );
+        assert_eq!(
+            timeline_audit["repository_readme_sha256"],
+            sha(
+                git_show_file(&root, &repository_commit, "README.md")
+                    .expect("read pinned README bytes")
+                    .as_slice()
+            )
+        );
         assert_eq!(timeline_audit["unique_completion_commit_count"], 2);
         assert_eq!(timeline_audit["source_path_present_at_completion_count"], 2);
         assert_eq!(timeline_audit["source_path_missing_at_completion_count"], 1);
