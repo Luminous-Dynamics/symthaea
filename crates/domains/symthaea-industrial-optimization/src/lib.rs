@@ -76,7 +76,10 @@ impl fmt::Display for BenchmarkError {
             Self::EmptySourceGroup { index } => {
                 write!(f, "candidate at index {index} has an empty source group")
             }
-            Self::ZeroCapex { id } => write!(f, "candidate {id} has zero capex; this benchmark requires positive capex"),
+            Self::ZeroCapex { id } => write!(
+                f,
+                "candidate {id} has zero capex; this benchmark requires positive capex"
+            ),
             Self::InvalidAbatementRange { id } => {
                 write!(f, "candidate {id} must satisfy floor <= expected <= ceiling")
             }
@@ -569,8 +572,16 @@ mod tests {
 
         assert_eq!(coordinates, vec![(0, 0), (10, 3), (20, 6), (30, 8), (50, 12)]);
         assert!(!frontier.iter().any(|p| p.selected_ids.contains(&"dominated".to_owned())));
-        assert!(!frontier.iter().any(|p| p.selected_ids.contains(&"same-floor-more-cost".to_owned())));
-        assert!(!frontier.iter().any(|p| p.selected_ids.contains(&"same-point-wider-range".to_owned())));
+        assert!(
+            !frontier
+                .iter()
+                .any(|p| p.selected_ids.contains(&"same-floor-more-cost".to_owned()))
+        );
+        assert!(
+            !frontier
+                .iter()
+                .any(|p| p.selected_ids.contains(&"same-point-wider-range".to_owned()))
+        );
     }
 
     #[test]
