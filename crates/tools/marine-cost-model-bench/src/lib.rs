@@ -532,10 +532,8 @@ mod tests {
         let candidate = case("candidate", 100.0, 90.0, 13.0, 0.0, 0.0);
         let result = compare(&baseline, &candidate, 10);
         assert_eq!(result.disposition, ComparisonDisposition::BaselineRobustlyCheaperWithinDeclaredBounds);
-        assert_eq!(
-            result.candidate_minus_baseline_per_service_unit.unwrap().nominal,
-            ((90.0 + 65.0) - (100.0 + 50.0)) / 1_000.0
-        );
+        let delta = result.candidate_minus_baseline_per_service_unit.unwrap().nominal;
+        assert!((delta - 0.005).abs() < 1e-12);
     }
 
     #[test]
