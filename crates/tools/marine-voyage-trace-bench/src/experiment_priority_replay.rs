@@ -41,6 +41,8 @@ impl RealizedOutcomeStatus {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct RealizedExperimentOutcome {
     pub proposal_id: String,
+    /// Digest of the frozen, common evaluation-group roster used to compare all candidates.
+    pub evaluation_group_roster_sha256: String,
     pub status: RealizedOutcomeStatus,
     /// Positive means predeclared decision loss decreased; negative means it increased.
     /// Only Completed outcomes may supply this field.
@@ -56,6 +58,12 @@ pub struct PriorityReplayProfile {
     pub replay_id: String,
     pub profile_id: String,
     pub campaign_id: String,
+    pub cost_basis_id: String,
+    pub decision_value_basis_id: String,
+    pub decision_value_estimator_method_id: String,
+    pub decision_value_estimator_method_revision: String,
+    /// Digest of the preregistered independent evaluation-group roster shared by every outcome.
+    pub evaluation_group_roster_sha256: String,
     /// Digest over the complete held-out outcome roster, computed with
     /// canonical_outcome_roster_sha256; not a substitute for source authenticity.
     pub outcome_roster_sha256: String,
@@ -109,6 +117,10 @@ pub enum PriorityReplayIssue {
     EmptyIdentity { field: &'static str },
     InvalidDigest { field: &'static str },
     ProfileCampaignMismatch,
+    CostBasisMismatch,
+    DecisionValueContractMismatch,
+    EvaluationGroupRosterMismatch { proposal_id: String },
+    DuplicateCandidateProposalId { proposal_id: String },
     ReportBudgetMismatch,
     SelectorDidNotSelectOptionalExperiment,
     MandatoryRequirementStillDue,
@@ -180,6 +192,7 @@ pub fn canonical_outcome_roster_sha256(outcomes: &[RealizedExperimentOutcome]) -
     hash.update((canonical.len() as u64).to_le_bytes());
     for outcome in &canonical {
         push_field(&mut hash, outcome.proposal_id.as_bytes());
+        push_field(&mut hash, outcome.evaluation_group_roster_sha256.as_bytes());
         hash.update([outcome.status.canonical_tag()]);
         push_optional_i64(&mut hash, outcome.realized_decision_loss_reduction_units);
         push_optional_u64(&mut hash, outcome.actual_end_to_end_cost_units);
@@ -365,6 +378,10 @@ pub fn replay_experiment_priority(
         (profile.replay_id.as_str(), "replay_id"),
         (profile.profile_id.as_str(), "profile_id"),
         (profile.campaign_id.as_str(), "campaign_id"),
+        (profile.cost_basis_id.as_str(), "cost_basis_id"),
+        (profile.decision_value_basis_id.as_str(), "decision_value_basis_id"),
+        (profile.decision_value_estimator_method_id.as_str(), "decision_value_estimator_method_id"),
+        (profile.decision_value_estimator_method_revision.as_str(), "decision_value_estimator_method_revision"),
     ] {
         if value.trim().is_empty() {
             issues.push(PriorityReplayIssue::EmptyIdentity { field });
@@ -379,6 +396,20 @@ pub fn replay_experiment_priority(
         || profile.campaign_id != priority_report.campaign_id
     {
         issues.push(PriorityReplayIssue::ProfileCampaignMismatch);
+    }
+    if profile.cost_basis_id != priority_report.cost_basis_id {
+        issues.push(PriorityReplayIssue::CostBasisMismatch);
+    }
+    if profile.decision_value_basis_id != priority_report.decision_value_basis_id
+        || profile.decision_value_estimator_method_id != priority_report.decision_value_estimator_method_id
+        || profile.decision_value_estimator_method_revision != priority_report.decision_value_estimator_method_revision
+    {
+        issues.push(PriorityReplayIssue::DecisionValueContractMismatch);
+    }
+    if !valid_sha256(&profile.evaluation_group_roster_sha256) {
+        issues.push(PriorityReplayIssue::InvalidDigest {
+            field: "evaluation_group_roster_sha256",
+        });
     }
     if profile.budget_units != priority_report.budget_remaining_units {
         issues.push(PriorityReplayIssue::ReportBudgetMismatch);
@@ -413,8 +444,16 @@ pub fn replay_experiment_priority(
     let mut outcome_counts = BTreeMap::<&str, usize>::new();
     for outcome in outcomes {
         *outcome_counts.entry(outcome.proposal_id.as_str()).or_default() += 1;
-        if outcome.proposal_id.trim().is_empty() || !valid_sha256(&outcome.outcome_artifact_sha256) {
+        if outcome.proposal_id.trim().is_empty()
+            || !valid_sha256(&outcome.outcome_artifact_sha256)
+            || !valid_sha256(&outcome.evaluation_group_roster_sha256)
+        {
             issues.push(PriorityReplayIssue::InvalidOutcomeReceipt {
+                proposal_id: outcome.proposal_id.clone(),
+            });
+        }
+        if outcome.evaluation_group_roster_sha256 != profile.evaluation_group_roster_sha256 {
+            issues.push(PriorityReplayIssue::EvaluationGroupRosterMismatch {
                 proposal_id: outcome.proposal_id.clone(),
             });
         }
@@ -451,6 +490,17 @@ pub fn replay_experiment_priority(
     let candidates = eligible_optional(priority_report);
     if candidates.is_empty() {
         issues.push(PriorityReplayIssue::NoEligibleOptionalProposals);
+    }
+    let mut candidate_counts = BTreeMap::<&str, usize>::new();
+    for candidate in &candidates {
+        *candidate_counts.entry(candidate.proposal_id.as_str()).or_default() += 1;
+    }
+    for (proposal_id, count) in &candidate_counts {
+        if *count > 1 {
+            issues.push(PriorityReplayIssue::DuplicateCandidateProposalId {
+                proposal_id: (*proposal_id).to_string(),
+            });
+        }
     }
     let candidate_ids: BTreeSet<&str> = candidates
         .iter()
@@ -587,6 +637,7 @@ mod tests {
     ) -> RealizedExperimentOutcome {
         RealizedExperimentOutcome {
             proposal_id: id.to_string(),
+            evaluation_group_roster_sha256: SHA_A.to_string(),
             status,
             realized_decision_loss_reduction_units: gain,
             actual_end_to_end_cost_units: Some(cost),
@@ -628,6 +679,11 @@ mod tests {
             replay_id: "replay-001".to_string(),
             profile_id: "profile-1".to_string(),
             campaign_id: "campaign-1".to_string(),
+            cost_basis_id: "lab-hours-v1".to_string(),
+            decision_value_basis_id: "loss-v1".to_string(),
+            decision_value_estimator_method_id: "estimator-v1".to_string(),
+            decision_value_estimator_method_revision: "r1".to_string(),
+            evaluation_group_roster_sha256: SHA_A.to_string(),
             outcome_roster_sha256: canonical_outcome_roster_sha256(&outcomes),
             budget_units: 12,
             candidate_roster_frozen_before_outcomes: true,
@@ -763,4 +819,29 @@ mod tests {
         assert_eq!(replay.hindsight_oracle_proposal_id, None);
         assert_eq!(replay.absolute_decision_loss_regret_units, None);
     }
+    #[test]
+    fn outcomes_from_different_evaluation_group_rosters_cannot_be_compared() {
+        let (mut profile, report, mut outcomes) = fixture();
+        outcomes[1].evaluation_group_roster_sha256 = SHA_B.to_string();
+        profile.outcome_roster_sha256 = canonical_outcome_roster_sha256(&outcomes);
+        let replay = replay_experiment_priority(&profile, &report, &outcomes);
+        assert_eq!(replay.disposition, ReplayDisposition::InvalidInput);
+        assert!(replay.issues.iter().any(|issue| matches!(
+            issue,
+            PriorityReplayIssue::EvaluationGroupRosterMismatch { proposal_id }
+                if proposal_id == "actually-good"
+        )));
+    }
+
+    #[test]
+    fn cost_and_decision_value_units_are_frozen_by_the_replay_profile() {
+        let (mut profile, report, outcomes) = fixture();
+        profile.cost_basis_id = "incompatible-cost-units".to_string();
+        profile.decision_value_basis_id = "incompatible-loss-units".to_string();
+        let replay = replay_experiment_priority(&profile, &report, &outcomes);
+        assert_eq!(replay.disposition, ReplayDisposition::InvalidInput);
+        assert!(replay.issues.contains(&PriorityReplayIssue::CostBasisMismatch));
+        assert!(replay.issues.contains(&PriorityReplayIssue::DecisionValueContractMismatch));
+    }
+
 }
