@@ -160,8 +160,6 @@ fn choose_action(policy: Policy, observation: Observation) -> Action {
     let reserve = observation.resource_reserve;
     let load = observation.allostatic_load;
     let stress = observation.current_stress;
-    let push_cost = 0.055 + 0.025 * stress;
-
     let maintain = match policy {
         Policy::TaskOnly => reserve < 0.12,
         Policy::StressReactive => stress >= 0.78 || reserve < 0.22,
@@ -190,7 +188,7 @@ fn choose_action(policy: Policy, observation: Observation) -> Action {
         }
     };
 
-    if maintain || push_cost <= 0.0 {
+    if maintain {
         Action::Maintain
     } else {
         Action::Push
@@ -340,10 +338,16 @@ mod tests {
 
     #[test]
     fn confidence_change_does_not_erase_viability_burden() {
-        let burden_high_confidence = viability_burden(0.8, 1.5);
-        let burden_low_confidence = viability_burden(0.8, 1.5);
+        let high_confidence = (0.8, 1.5, 0.9);
+        let low_confidence = (0.8, 1.5, 0.2);
+        let burden_high_confidence =
+            viability_burden(high_confidence.0, high_confidence.1);
+        let burden_low_confidence =
+            viability_burden(low_confidence.0, low_confidence.1);
         assert!((burden_high_confidence - burden_low_confidence).abs() < 1e-12);
-        assert!(epistemic_uncertainty(0.2) > epistemic_uncertainty(0.9));
+        assert!(
+            epistemic_uncertainty(low_confidence.2) > epistemic_uncertainty(high_confidence.2)
+        );
     }
 
     #[test]
