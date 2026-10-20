@@ -117,6 +117,7 @@ struct StructuredCase {
 struct StructuredReadoutReport {
     decoder: String,
     intent: String,
+    epistemic_status: String,
     roles: Vec<StructuredRoleFill>,
     intensity: f32,
     confidence: f32,
@@ -131,6 +132,7 @@ struct StructuredTranslationReport {
     source_decoder: String,
     grounding_surface: String,
     text: String,
+    epistemic_status: String,
     confidence: f32,
     evidence_level: String,
     grounding_preserved: bool,
@@ -437,9 +439,11 @@ fn structured_case(readout: StructuredReadout, include_molecule: bool) -> Struct
     };
     let validity =
         (0.6 * required_coverage + 0.3 * confidence + 0.1 * intensity_present).clamp(0.0, 1.0);
+    let epistemic_status = readout.epistemic_status.as_str().to_string();
     let readout = StructuredReadoutReport {
         decoder: readout.decoder,
         intent: readout.intent,
+        epistemic_status,
         roles: readout.roles,
         intensity: readout.intensity,
         confidence: readout.confidence,
@@ -480,11 +484,13 @@ fn structured_translation_case(
         .clamp(0.0, 1.0);
     let semantic_drift = 1.0 - validity;
 
+    let epistemic_status = translation.epistemic_status.as_str().to_string();
     StructuredTranslationReport {
         translator: translation.translator,
         source_decoder: translation.source_decoder,
         grounding_surface: translation.grounding_surface,
         text: translation.text,
+        epistemic_status,
         confidence: translation.confidence,
         evidence_level: translation.evidence_level,
         grounding_preserved,
@@ -503,6 +509,16 @@ fn structured_translation_role_coverage(
     expected.push(readout.intent.as_str());
     for fill in &readout.roles {
         match (fill.role.as_str(), fill.prime.as_str()) {
+            // For answer intent, the surface must preserve the answer request
+            // without forcing an epistemically overconfident action verb.
+            ("ACTION", _) if readout.intent == "answer" => {}
+            ("PREDICATE", _) => expected.push(match readout.epistemic_status {
+                symthaea_broca::decoder::EpistemicDisposition::Certain => "known",
+                symthaea_broca::decoder::EpistemicDisposition::Probable => "certain",
+                symthaea_broca::decoder::EpistemicDisposition::Uncertain => "uncertain",
+                symthaea_broca::decoder::EpistemicDisposition::Unknown => "information",
+                symthaea_broca::decoder::EpistemicDisposition::OutOfDomain => "outside",
+            }),
             ("ACTION", "THINK") => expected.push("thinking"),
             ("ACTION", "DO") => expected.push("act"),
             ("ACTION", "SAY") => expected.push("explain"),
@@ -510,9 +526,6 @@ fn structured_translation_role_coverage(
             ("ACTION", "KNOW") => expected.push("answer"),
             ("ACTION", "FEEL") => expected.push("state"),
             ("ACTION", "WITH") => expected.push("relating"),
-            ("PREDICATE", "KNOW") => expected.push("known"),
-            ("PREDICATE", "THINK") => expected.push("reasoned"),
-            ("PREDICATE", "MAYBE") => expected.push("uncertain"),
             ("EVALUATOR", "TRUE") => expected.push("consistent"),
             ("EVALUATOR", "GOOD") => expected.push("favorable"),
             ("EVALUATOR", "BAD") => expected.push("unfavorable"),
@@ -957,6 +970,26 @@ mod tests {
             decoders,
             vec![BrocaDecoderKind::Direct, BrocaDecoderKind::Structured]
         );
+    }
+
+    #[test]
+    fn structured_answer_coverage_accepts_each_epistemic_wording() {
+        let genesis = GenesisSeed::from_phrase("structured-answer-coverage");
+        let decoder = StructuredDecoder::new(&genesis);
+        let translator = StructuredProseTranslator::new();
+
+        for ordinal in 0.0..=4.0 {
+            let mut channels = symthaea_broca::encoder::ThoughtChannels::with_intent(4);
+            channels.set_epistemic(ordinal);
+            let readout = decoder.decode(&channels);
+            let translation = translator.translate(&readout);
+            let coverage = structured_translation_role_coverage(&readout, &translation);
+            assert!(
+                (coverage - 1.0).abs() < 0.0001,
+                "epistemic ordinal {ordinal} should preserve expected answer semantics; text={}",
+                translation.text
+            );
+        }
     }
 
     #[test]
