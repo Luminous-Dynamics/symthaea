@@ -1,6 +1,6 @@
 # AtomFab SOTA and Industry Comparison
 
-**Reviewed:** 2026-10-19  
+**Reviewed:** 2026-10-20  
 **Status:** Competitive research plan; no AtomFab or Symtropy result is claimed to beat a public leaderboard.  
 **Purpose:** Define what a fair state-of-the-art comparison means for the Symthaea + Symtropy atomic-scale manufacturing effort.
 
@@ -19,6 +19,7 @@ That is a different, testable claim from “our model is more accurate.” It mu
 | **UniFFBench / MinX** | A 2026 benchmark uses 1,500+ mineral systems across 85 elements and experimental references. It reports a reality gap between computational benchmarks and experimental property predictions. | Prioritize a held-out experimental-validation lane; test whether model confidence predicts actual error and whether the workflow abstains when it should. | Experimental reference values can have their own uncertainty, conditions, and coverage gaps; comparison must account for them. |
 | **MS25** | Diverse materials-relevant systems including MgO surfaces, liquid water, zeolites, Pt surface reactions, high-entropy alloys, and disordered Zr oxides; evaluates energy/force/stress and derived observables. | Use a pinned subset as the first reproducible task-level scientific benchmark. Preserve grouped material-family splits. | Its reference method and exact split must be respected; do not compare unlike DFT settings as equal ground truth. |
 | **2026 EOS + minima-hopping benchmark** | Evaluates near-equilibrium equation-of-state properties and far-from-equilibrium structural searches, showing search efficiency can diverge from structural fidelity. | Benchmark structure recovery, energetic ordering, EOS curves, and off-equilibrium robustness separately from MAE/RMSE. | The published study focuses on elemental systems; it is not proof of broad multicomponent generalization. |
+| **2026 supported-nanoparticle search benchmark / UniAlCu** | Explicitly examines how energy accuracy can decouple from structural exploration for supported nanoparticles. | Add a separate, preregistered lane that measures unique low-energy structures discovered, diversity, duplicate minima, matched-structure energy error, and cost per validated structure. | The chosen particle/support family and its DFT protocol define the scope; this is not universal catalytic generalization. |
 | **Open Catalyst Project OC20/OC22** | Open catalyst datasets, baseline models, and relaxation benchmarks at large scale; OC20/OC22 together include about 1.3 million relaxations and more than 260 million DFT calculations. | Add a catalyst route as a later domain-specific lane if AtomFab selects catalytic materials. Use task-specific relaxation/energy metrics and matched reference configurations. | Do not compare the OC22 energy-within-threshold metrics directly with Matbench F1 or MS25 errors; tasks differ. Public leaderboard submissions may be dated. |
 | **Matbench property-prediction suite** | Standardized materials-property tasks covering different dataset sizes and target properties. | Use only the tasks that match a declared AtomFab objective, as sanity checks for data splits and downstream property predictors. | It is not an atom-manipulation or process-planning benchmark. |
 | **Self-driving laboratory benchmark literature** | Uses acceleration factor (AF) and enhancement factor (EF) to compare experiments required and objective improvement. Published results vary greatly by search-space properties and protocol. | Compare campaign curves against random, diversity-only, uncertainty-only, and cost-aware baselines with the same objective and query cost. | An “AF of 6” from another domain is not a comparable guarantee for AtomFab; campaign difficulty and target definitions matter. |
@@ -31,9 +32,10 @@ That is a different, testable claim from “our model is more accurate.” It mu
 3. Mannan et al. (2026), “UniFFBench: evaluating universal machine learning force fields against experimental measurements,” *Nature Computational Science*. [https://doi.org/10.1038/s43588-026-01019-4](https://doi.org/10.1038/s43588-026-01019-4).
 4. Maxson et al. (2025), “MS25: Materials Science-Focused Benchmark Data Set for Machine Learning Interatomic Potentials,” *Journal of Chemical Information and Modeling*. [https://doi.org/10.1021/acs.jcim.5c01262](https://doi.org/10.1021/acs.jcim.5c01262).
 5. Tahmasbi et al. (2026), “Benchmarking universal machine learning interatomic potentials on elemental systems,” *npj Computational Materials*. [https://doi.org/10.1038/s41524-026-02251-2](https://doi.org/10.1038/s41524-026-02251-2).
-6. Open Catalyst Project, [OC20/OC22 datasets and baselines](https://opencatalystproject.org/).
-7. Adesiji et al. (2026), “Benchmarking self-driving labs,” *Digital Discovery*. [https://doi.org/10.1039/D5DD00337G](https://doi.org/10.1039/D5DD00337G).
-8. Frechette, Shao, and Pease (2026), *Digital Twins Workshops Summary Report*, NISTIR 8620. [https://doi.org/10.6028/NIST.IR.8620](https://doi.org/10.6028/NIST.IR.8620).
+6. Xu et al. (2026), “Benchmarking universal machine learning interatomic potentials for supported nanoparticles: decoupling energy accuracy from structural exploration,” *npj Computational Materials*. [https://doi.org/10.1038/s41524-026-02043-8](https://doi.org/10.1038/s41524-026-02043-8).
+7. Open Catalyst Project, [OC20/OC22 datasets and baselines](https://opencatalystproject.org/).
+8. Adesiji et al. (2026), “Benchmarking self-driving labs,” *Digital Discovery*. [https://doi.org/10.1039/D5DD00337G](https://doi.org/10.1039/D5DD00337G).
+9. Frechette, Shao, and Pease (2026), *Digital Twins Workshops Summary Report*, NISTIR 8620. [https://doi.org/10.6028/NIST.IR.8620](https://doi.org/10.6028/NIST.IR.8620).
 
 ## Concrete pretrained-model baseline pool
 
@@ -62,6 +64,15 @@ The campaign schema is [campaign-record-v1.schema.json](../../crates/domains/sym
 This is important because an apparent improvement can be manufactured unintentionally by changing the solver, model, data split, cost assumptions, or target between baselines. The campaign record is intended to make those mismatches explicit before aggregation. JSON Schema validates shape; the Rust semantic validator enforces cross-field rules such as evaluations used not exceeding the budget. These tests are authored but have not been executed in this environment.
 
 ## How to beat SOTA honestly
+
+### Separate energy accuracy from structural exploration
+
+The supported-nanoparticle benchmark published in April 2026 makes a second distinction alongside the EOS/minima-hopping results: an interatomic potential may score well on energy prediction for structures it sees, yet the search driven by that potential may fail to discover the right structures. Therefore, every structure-search campaign should publish **two scoreboards**:
+
+1. **Conditional scientific accuracy:** for matched candidate/reference structures, report energy error, energetic-ranking agreement and relevant property error.
+2. **Search discovery quality:** at equal reference-calculation budget, report the number of unique reference-validated low-energy structures found, structural diversity, duplicate-minimum rate, and cost per discovered structure.
+
+Never infer one scoreboard from the other. A model that predicts energies accurately on a selected set can still guide exploration poorly; a broad search that finds many minima can still rank them incorrectly. The new `supported-nanoparticle-search` registry lane is separate from the elemental EOS lane so material family and search protocol remain explicit.
 
 ### Track A — Scientific baseline parity
 
