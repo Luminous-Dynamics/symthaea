@@ -541,6 +541,30 @@ fn validate_profile(profile: &PairedReplayProfile) -> (bool, Vec<PairedReplayIss
         issues.push(PairedReplayIssue::NoRequiredSlices);
     }
 
+    let mut target_roster_sets = Vec::new();
+    for (roster, field) in [
+        (&profile.baseline_target_label_group_ids, "baseline_target_label_group_ids"),
+        (&profile.candidate_target_label_group_ids, "candidate_target_label_group_ids"),
+    ] {
+        let mut seen = BTreeSet::new();
+        for group_id in roster {
+            if group_id.trim().is_empty() {
+                issues.push(PairedReplayIssue::EmptyGroupIdentifier { field });
+            } else if !seen.insert(group_id.as_str()) {
+                issues.push(PairedReplayIssue::DuplicateGroupIdentifier {
+                    field,
+                    group_id: group_id.clone(),
+                });
+            }
+        }
+        let mut normalized: Vec<&str> = roster.iter().map(String::as_str).collect();
+        normalized.sort_unstable();
+        target_roster_sets.push(normalized);
+    }
+    if target_roster_sets[0] != target_roster_sets[1] {
+        issues.push(PairedReplayIssue::TargetLabelBudgetRosterMismatch);
+    }
+
     let mut group_ids = BTreeSet::new();
     for group_id in &profile.evaluation_group_ids {
         if group_id.trim().is_empty() {
@@ -551,6 +575,27 @@ fn validate_profile(profile: &PairedReplayProfile) -> (bool, Vec<PairedReplayIss
             issues.push(PairedReplayIssue::DuplicateGroupIdentifier {
                 field: "evaluation_group_ids",
                 group_id: group_id.clone(),
+            });
+        }
+    }
+
+    let mut cases_by_observable = BTreeMap::<(String, String, u16), BTreeSet<String>>::new();
+    for requirement in &profile.required_slices {
+        cases_by_observable
+            .entry((
+                requirement.observable_id.clone(),
+                requirement.unit_id.clone(),
+                requirement.nominal_coverage_bp,
+            ))
+            .or_default()
+            .insert(requirement.operating_case_id.clone());
+    }
+    for ((observable_id, unit_id, nominal_coverage_bp), cases) in cases_by_observable {
+        if cases.len() < 2 {
+            issues.push(PairedReplayIssue::ConditionalGapRequiresMultipleOperatingCases {
+                observable_id,
+                unit_id,
+                nominal_coverage_bp,
             });
         }
     }
@@ -1109,6 +1154,7 @@ pub fn evaluate_paired_replay(
         let width_delta = acc.width_delta.mean();
         let normalized_width_delta = width_delta.map(|value| value / requirement.normalization_scale);
         let width_ci = acc.width_delta.normal_ci95();
+        let coverage_ci = acc.coverage_delta.normal_ci95();
 
         let baseline_mean_score = acc.baseline_score.mean();
         let candidate_mean_score = acc.candidate_score.mean();
@@ -1121,6 +1167,12 @@ pub fn evaluate_paired_replay(
         });
         let candidate_false_safe_rate = requirement.engineering_constraint.as_ref().and_then(|_| {
             (pair_count > 0).then_some(acc.candidate_false_safe_count as f64 / n)
+        });
+        let baseline_missed_feasible_rate = requirement.engineering_constraint.as_ref().and_then(|_| {
+            (pair_count > 0).then_some(acc.baseline_missed_feasible_count as f64 / n)
+        });
+        let candidate_missed_feasible_rate = requirement.engineering_constraint.as_ref().and_then(|_| {
+            (pair_count > 0).then_some(acc.candidate_missed_feasible_count as f64 / n)
         });
 
         let applicability_gate_met = acc.borderline_count == 0
@@ -1139,13 +1191,29 @@ pub fn evaluate_paired_replay(
         } else {
             Some(true)
         };
+        let missed_feasible_gate_met = if requirement.engineering_constraint.is_some() {
+            candidate_missed_feasible_rate
+                .map(|rate| rate <= requirement.maximum_missed_feasible_rate)
+        } else {
+            Some(true)
+        };
         let thresholds_met = if !enough || !applicability_gate_met {
             None
         } else {
-            match (coverage_gate_met, score_gate_met, width_gate_met, false_safe_gate_met) {
-                (Some(coverage), Some(score), Some(width), Some(false_safe)) => {
-                    Some(coverage && score && width && false_safe)
-                }
+            match (
+                coverage_gate_met,
+                score_gate_met,
+                width_gate_met,
+                false_safe_gate_met,
+                missed_feasible_gate_met,
+            ) {
+                (
+                    Some(coverage),
+                    Some(score),
+                    Some(width),
+                    Some(false_safe),
+                    Some(missed_feasible),
+                ) => Some(coverage && score && width && false_safe && missed_feasible),
                 _ => None,
             }
         };
@@ -1216,6 +1284,8 @@ pub fn evaluate_paired_replay(
             baseline_coverage,
             candidate_coverage,
             coverage_delta,
+            coverage_delta_ci95_lower: coverage_ci.map(|ci| ci.0),
+            coverage_delta_ci95_upper: coverage_ci.map(|ci| ci.1),
             baseline_mean_interval_width: baseline_mean_width,
             candidate_mean_interval_width: candidate_mean_width,
             mean_interval_width_delta: width_delta,
@@ -1232,8 +1302,12 @@ pub fn evaluate_paired_replay(
                 .then_some("paired-group normal approximation (95%)"),
             baseline_false_safe_count: acc.baseline_false_safe_count,
             candidate_false_safe_count: acc.candidate_false_safe_count,
+            baseline_missed_feasible_count: acc.baseline_missed_feasible_count,
+            candidate_missed_feasible_count: acc.candidate_missed_feasible_count,
             baseline_false_safe_rate,
             candidate_false_safe_rate,
+            baseline_missed_feasible_rate,
+            candidate_missed_feasible_rate,
             within_declared_envelope_count: acc.within_count,
             borderline_count: acc.borderline_count,
             out_of_domain_count: acc.out_of_domain_count,
@@ -1243,6 +1317,7 @@ pub fn evaluate_paired_replay(
             score_non_degradation_gate_met: enough.then_some(score_gate_met).flatten(),
             width_non_degradation_gate_met: enough.then_some(width_gate_met).flatten(),
             false_safe_gate_met: enough.then_some(false_safe_gate_met).flatten(),
+            missed_feasible_gate_met: enough.then_some(missed_feasible_gate_met).flatten(),
             thresholds_met,
         });
     }
