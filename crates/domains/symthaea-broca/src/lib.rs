@@ -92,8 +92,8 @@ pub use checkpoint::{AdamState, BrocaCheckpoint, BrocaCheckpointMetadata};
 pub use consensus_engine::{ChangeProposal, ConsensusEngine, ConsensusResult};
 pub use controller::{LanguageController, LanguageControllerConfig, NetworkSnapshot};
 pub use decoder::{
-    StructuredDecoder, StructuredProseTranslator, StructuredReadout, StructuredRoleFill,
-    StructuredTranslation,
+    EpistemicDisposition, StructuredDecoder, StructuredProseTranslator, StructuredReadout,
+    StructuredRoleFill, StructuredTranslation,
 };
 pub use dreaming::DreamingService;
 pub use encoder::{
