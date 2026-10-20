@@ -294,7 +294,9 @@
       "uncertainty_only",
       "cost_aware",
       "symthaea_full",
-      "symthaea_without_history"
+      "symthaea_without_history",
+      "ensemble_disagreement",
+      "counterexample_guided"
     ],
     "outcomes": [
       "unique_reference_validated_low_energy_discoveries",
