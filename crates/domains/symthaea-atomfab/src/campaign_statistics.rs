@@ -156,11 +156,14 @@ pub fn bootstrap_median_acceleration(
         if !seen_seeds.insert(baseline.seed) {
             return Err(PairedAccelerationError::DuplicateSeed);
         }
-        if !run_ids.insert(baseline.run_id.as_str()) || !run_ids.insert(candidate.run_id.as_str()) {
+        if !run_ids.insert(baseline.run_id.clone())
+            || !run_ids.insert(candidate.run_id.clone())
+        {
             return Err(PairedAccelerationError::MismatchedCohort);
         }
 
         if baseline.total_cost_unit != candidate.total_cost_unit
+            || baseline.max_evaluations != candidate.max_evaluations
             || !baseline.total_cost_value.is_finite()
             || !candidate.total_cost_value.is_finite()
             || baseline.total_cost_value <= 0.0
@@ -462,6 +465,20 @@ mod tests {
         let decoded: PairedAccelerationSummary = serde_json::from_str(&encoded).unwrap();
         decoded.validate().unwrap();
         assert_eq!(decoded, summary);
+
+        let schema: serde_json::Value = serde_json::from_str(include_str!(
+            "../schemas/paired-acceleration-summary-v1.schema.json"
+        ))
+        .unwrap();
+        assert_eq!(schema["properties"]["schema_version"]["const"], 1);
+        assert_eq!(
+            schema["properties"]["campaign_pair_count"]["minimum"],
+            MINIMUM_CAMPAIGNS_FOR_ACCELERATION_INTERVAL
+        );
+        assert_eq!(
+            schema["properties"]["bootstrap_resamples"]["minimum"],
+            MINIMUM_BOOTSTRAP_RESAMPLES
+        );
 
         let mut invalid = summary;
         invalid.candidate_slower_count = 1;
