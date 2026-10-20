@@ -31,7 +31,8 @@ This is a directionality negative control: a retriever must not infer transfer f
 The v0 typed transfer contract now records:
 
 - a compatibility class (`compatible`, `incompatible`, `partial`, or `unknown`);
-- machine-readable mismatch codes, including `inequality_direction`;
+- machine-readable mismatch codes, including `predicate_mismatch` and `inequality_direction`;
+- the move kind plus typed source/target obligations: domain, object type, predicate, relation direction, quantifier scope, and preconditions;
 - what the source move requires and what the target goal requires;
 - consistency constraints: `verified_transfer` requires `compatible`; a curator-rejected transfer requires `incompatible` or `partial`.
 
