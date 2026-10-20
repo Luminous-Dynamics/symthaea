@@ -125,7 +125,10 @@ impl fmt::Display for EvidenceRouteError {
                 "eligible action outcomes must use the same evidence source class"
             ),
             Self::UnsupportedSummaryVersion(version) => {
-                write!(f, "unsupported evidence-route benchmark summary version: {version}")
+                write!(
+                    f,
+                    "unsupported evidence-route benchmark summary version: {version}"
+                )
             }
             Self::InvalidBenchmarkSummary => write!(
                 f,
@@ -423,10 +426,7 @@ pub struct EvidenceRouteBenchmarkSummary {
 impl EvidenceRouteBenchmarkSummary {
     /// Recompute the retrospective score instead of trusting stored selected or
     /// oracle labels. Outcome records remain in the returned summary for audit.
-    pub fn validate(
-        &self,
-        route: &EvidenceRouteReport,
-    ) -> Result<(), EvidenceRouteError> {
+    pub fn validate(&self, route: &EvidenceRouteReport) -> Result<(), EvidenceRouteError> {
         if self.schema_version != EVIDENCE_ROUTE_SCHEMA_VERSION {
             return Err(EvidenceRouteError::UnsupportedSummaryVersion(
                 self.schema_version,
@@ -541,10 +541,12 @@ pub fn score_evidence_route(
             .then_with(|| left.realized_cost_units.cmp(&right.realized_cost_units))
             .then_with(|| left.action_id.cmp(&right.action_id))
     });
-    let selected_outcome = route
-        .selected_action_id
-        .as_deref()
-        .and_then(|id| eligible_outcomes.iter().copied().find(|outcome| outcome.action_id == id));
+    let selected_outcome = route.selected_action_id.as_deref().and_then(|id| {
+        eligible_outcomes
+            .iter()
+            .copied()
+            .find(|outcome| outcome.action_id == id)
+    });
     let oracle_outcome = oracle.first().copied();
 
     let mut sorted_outcomes = outcomes.to_vec();
@@ -761,9 +763,7 @@ mod tests {
                 .expect("fixture proposals must match Rust records");
         let report = route_evidence_actions(&proposals).expect("fixture uses one route contract");
         assert_eq!(report.selected_action_id.as_deref(), Some("static-screen"));
-        report
-            .validate()
-            .expect("generated report must revalidate");
+        report.validate().expect("generated report must revalidate");
         let out_of_domain = report
             .entries
             .iter()
@@ -804,10 +804,9 @@ mod tests {
         let proposals: Vec<EvidenceActionProposal> =
             serde_json::from_value(fixture["proposals"].clone()).unwrap();
         let route = route_evidence_actions(&proposals).unwrap();
-        let outcome_fixture: serde_json::Value = serde_json::from_str(include_str!(
-            "../fixtures/evidence-action-outcomes-v1.json"
-        ))
-        .expect("outcome fixture should parse");
+        let outcome_fixture: serde_json::Value =
+            serde_json::from_str(include_str!("../fixtures/evidence-action-outcomes-v1.json"))
+                .expect("outcome fixture should parse");
         assert_eq!(outcome_fixture["schema_version"], 1);
         let _outcome_schema: serde_json::Value = serde_json::from_str(include_str!(
             "../schemas/evidence-action-outcomes-v1.schema.json"
@@ -928,10 +927,7 @@ mod tests {
             '3',
         );
         assert_eq!(
-            score_evidence_route(
-                &route,
-                &[static_outcome, universal_outcome, dft_outcome]
-            ),
+            score_evidence_route(&route, &[static_outcome, universal_outcome, dft_outcome]),
             Err(EvidenceRouteError::MismatchedOutcomeSource)
         );
     }
