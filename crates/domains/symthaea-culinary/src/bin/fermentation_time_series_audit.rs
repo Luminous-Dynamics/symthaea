@@ -12,14 +12,14 @@ use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::{
     collections::{BTreeMap, BTreeSet},
-    env,
-    fs,
+    env, fs,
     path::PathBuf,
     process::ExitCode,
 };
 
 const SOURCE_URI: &str = "https://doi.org/10.5061/dryad.cfxpnvxp3";
-const SOURCE_LICENSE: &str = "CC0 as declared by the Dryad record; verify the exact source version on intake";
+const SOURCE_LICENSE: &str =
+    "CC0 as declared by the Dryad record; verify the exact source version on intake";
 const FIELD1: &[&str] = &[
     "time_days",
     "treatment_temp",
@@ -47,7 +47,13 @@ const FIELD3: &[&str] = &[
     "rep",
     "value",
 ];
-const FIELDS1: &[&str] = &["time_days", "treatment_temp", "treatment_inoculation", "analyte", "rep"];
+const FIELDS1: &[&str] = &[
+    "time_days",
+    "treatment_temp",
+    "treatment_inoculation",
+    "analyte",
+    "rep",
+];
 const FIELDS2: &[&str] = &["time_days", "treatment_temp", "analyte", "rep"];
 const FIELDS3: &[&str] = &["treatment", "time_hours", "analyte", "rep"];
 
@@ -101,7 +107,11 @@ impl DatasetKind {
 
     fn condition_fields(self) -> &'static [&'static str] {
         match self {
-            Self::Figure1 => &["treatment_temp", "units_treatment_temp", "treatment_inoculation"],
+            Self::Figure1 => &[
+                "treatment_temp",
+                "units_treatment_temp",
+                "treatment_inoculation",
+            ],
             Self::Figure2 => &["treatment_temp", "units_treatment_temp"],
             Self::FigureS1 => &["treatment"],
         }
@@ -214,7 +224,10 @@ fn hex_sha256(bytes: &[u8]) -> String {
     output
 }
 
-fn column_indexes(header: &csv::StringRecord, expected: &[&str]) -> Option<BTreeMap<String, usize>> {
+fn column_indexes(
+    header: &csv::StringRecord,
+    expected: &[&str],
+) -> Option<BTreeMap<String, usize>> {
     if header.len() != expected.len() {
         return None;
     }
@@ -272,7 +285,8 @@ fn audit_tsv(bytes: &[u8], kind: DatasetKind, filename: &str) -> IntakeReceipt {
     let mut errors = Vec::new();
     let mut warnings = vec![
         "source_identity_is_caller_declared_not_authenticated".to_owned(),
-        "rep_is_a_technical_replicate_in_the_source_description_not_proof_of_independent_batches".to_owned(),
+        "rep_is_a_technical_replicate_in_the_source_description_not_proof_of_independent_batches"
+            .to_owned(),
         "no_prediction_or_scientific_validity_claim_is_evaluated".to_owned(),
     ];
 
@@ -298,11 +312,17 @@ fn audit_tsv(bytes: &[u8], kind: DatasetKind, filename: &str) -> IntakeReceipt {
             .zip(kind.expected_fields().iter())
             .all(|(actual, expected)| actual == *expected);
 
-    if !header_valid && !errors.iter().any(|error| error.starts_with("header_parse_error:")) {
+    if !header_valid
+        && !errors
+            .iter()
+            .any(|error| error.starts_with("header_parse_error:"))
+    {
         errors.push("header_columns_missing_extra_or_duplicated".to_owned());
     }
     if header_valid && !header_order_matches_reference {
-        warnings.push("header_order_differs_from_source_reference_but_named_columns_were_resolved".to_owned());
+        warnings.push(
+            "header_order_differs_from_source_reference_but_named_columns_were_resolved".to_owned(),
+        );
     }
 
     let mut rows_total = 0_u64;
@@ -342,8 +362,7 @@ fn audit_tsv(bytes: &[u8], kind: DatasetKind, filename: &str) -> IntakeReceipt {
                 row_errors.push(error);
             }
             if matches!(kind, DatasetKind::Figure1 | DatasetKind::Figure2) {
-                if let Err(error) =
-                    required_nonnegative_number(&record, &indexes, "treatment_temp")
+                if let Err(error) = required_nonnegative_number(&record, &indexes, "treatment_temp")
                 {
                     row_errors.push(error);
                 }
@@ -403,11 +422,17 @@ fn audit_tsv(bytes: &[u8], kind: DatasetKind, filename: &str) -> IntakeReceipt {
             match value {
                 Ok("NA") => {
                     missing_na_total += 1;
-                    summaries.entry((analyte.clone(), units.clone())).or_default().missing_na += 1;
+                    summaries
+                        .entry((analyte.clone(), units.clone()))
+                        .or_default()
+                        .missing_na += 1;
                 }
                 Ok("ND") => {
                     missing_nd_total += 1;
-                    summaries.entry((analyte.clone(), units.clone())).or_default().missing_nd += 1;
+                    summaries
+                        .entry((analyte.clone(), units.clone()))
+                        .or_default()
+                        .missing_nd += 1;
                 }
                 Ok(text) => match text.parse::<f64>() {
                     Ok(number) if number.is_finite() => {
@@ -418,7 +443,9 @@ fn audit_tsv(bytes: &[u8], kind: DatasetKind, filename: &str) -> IntakeReceipt {
                             .add(number);
                     }
                     Ok(_) => row_errors.push("value_non_finite".to_owned()),
-                    Err(_) => row_errors.push("value_not_numeric_or_declared_missing_code".to_owned()),
+                    Err(_) => {
+                        row_errors.push("value_not_numeric_or_declared_missing_code".to_owned())
+                    }
                 },
                 Err(error) => row_errors.push(error),
             }
@@ -427,7 +454,11 @@ fn audit_tsv(bytes: &[u8], kind: DatasetKind, filename: &str) -> IntakeReceipt {
                 rows_valid += 1;
             } else {
                 rows_invalid += 1;
-                errors.extend(row_errors.into_iter().map(|error| format!("row_{rows_total}_{error}")));
+                errors.extend(
+                    row_errors
+                        .into_iter()
+                        .map(|error| format!("row_{rows_total}_{error}")),
+                );
             }
         }
     }
@@ -497,7 +528,9 @@ fn parse_args() -> Result<(PathBuf, DatasetKind, PathBuf), String> {
     let mut args = env::args().skip(1);
 
     while let Some(flag) = args.next() {
-        let value = args.next().ok_or_else(|| format!("missing_value_for_{flag}"))?;
+        let value = args
+            .next()
+            .ok_or_else(|| format!("missing_value_for_{flag}"))?;
         match flag.as_str() {
             "--input" => input = Some(PathBuf::from(value)),
             "--dataset" => dataset = Some(DatasetKind::parse(&value)?),
@@ -523,7 +556,8 @@ fn run() -> Result<ExitCode, String> {
     let passed = receipt.status == "AUDIT_OK";
     let serialized = serde_json::to_vec_pretty(&receipt)
         .map_err(|error| format!("receipt_serialization_failed: {error}"))?;
-    fs::write(&output_path, serialized).map_err(|error| format!("receipt_write_failed: {error}"))?;
+    fs::write(&output_path, serialized)
+        .map_err(|error| format!("receipt_write_failed: {error}"))?;
     if passed {
         Ok(ExitCode::SUCCESS)
     } else {
@@ -546,7 +580,8 @@ mod tests {
     use super::*;
 
     const HEADER1: &str = "time_days\ttreatment_temp\tunits_treatment_temp\ttreatment_inoculation\tanalyte\tunits_analyte\trep\tvalue";
-    const HEADER2: &str = "time_days\ttreatment_temp\tunits_treatment_temp\tanalyte\tunits_analyte\trep\tvalue";
+    const HEADER2: &str =
+        "time_days\ttreatment_temp\tunits_treatment_temp\tanalyte\tunits_analyte\trep\tvalue";
     const HEADER3: &str = "treatment\ttime_hours\tanalyte\tunits_analyte\trep\tvalue";
 
     #[test]
@@ -591,17 +626,25 @@ mod tests {
         let receipt = audit_tsv(data.as_bytes(), DatasetKind::Figure2, "fixture.txt");
         assert_eq!(receipt.status, "FAIL");
         assert_eq!(receipt.duplicate_key_rows, 1);
-        assert!(receipt.errors.iter().any(|error| error == "duplicate_observation_keys_detected"));
+        assert!(
+            receipt
+                .errors
+                .iter()
+                .any(|error| error == "duplicate_observation_keys_detected")
+        );
     }
 
     #[test]
     fn unknown_missing_code_and_nonfinite_value_fail() {
-        let data = format!(
-            "{HEADER3}\nfresh\t0\tethanol\tg_L\t1\tNaN\n"
-        );
+        let data = format!("{HEADER3}\nfresh\t0\tethanol\tg_L\t1\tNaN\n");
         let receipt = audit_tsv(data.as_bytes(), DatasetKind::FigureS1, "fixture.txt");
         assert_eq!(receipt.status, "FAIL");
-        assert!(receipt.errors.iter().any(|error| error.ends_with("value_non_finite")));
+        assert!(
+            receipt
+                .errors
+                .iter()
+                .any(|error| error.ends_with("value_non_finite"))
+        );
     }
 
     #[test]
@@ -617,7 +660,12 @@ mod tests {
         let data = format!("{HEADER3}\nfrozen\t-1\tethanol\tg_L\t1\t0.5\n");
         let receipt = audit_tsv(data.as_bytes(), DatasetKind::FigureS1, "fixture.txt");
         assert_eq!(receipt.status, "FAIL");
-        assert!(receipt.errors.iter().any(|error| error.ends_with("negative_time_hours")));
+        assert!(
+            receipt
+                .errors
+                .iter()
+                .any(|error| error.ends_with("negative_time_hours"))
+        );
     }
 
     #[test]
@@ -626,6 +674,11 @@ mod tests {
         let receipt = audit_tsv(data.as_bytes(), DatasetKind::Figure2, "reordered.txt");
         assert_eq!(receipt.status, "AUDIT_OK");
         assert!(!receipt.header_order_matches_reference);
-        assert!(receipt.warnings.iter().any(|warning| warning.contains("header_order_differs")));
+        assert!(
+            receipt
+                .warnings
+                .iter()
+                .any(|warning| warning.contains("header_order_differs"))
+        );
     }
 }
