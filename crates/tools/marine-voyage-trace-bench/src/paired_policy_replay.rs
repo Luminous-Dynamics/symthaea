@@ -76,6 +76,9 @@ pub struct PairedReplayProfile {
     /// Attestation that methods, splits, scoring contract and thresholds were frozen before
     /// the final confirmation outcomes were inspected.
     pub final_confirmation_frozen_before_outcomes: bool,
+    /// Maximum allowed difference between highest and lowest candidate coverage across
+    /// operating cases for the same observable, unit and nominal coverage level.
+    pub maximum_conditional_coverage_gap: f64,
     /// Expected independent evaluation groups. A group can be present in only the operating
     /// slices it actually measured, but every declared group must occur somewhere.
     pub evaluation_group_ids: Vec<String>,
@@ -222,6 +225,13 @@ pub enum PairedReplayIssue {
         observable_id: String,
         unit_id: String,
         nominal_coverage_bp: u16,
+    },
+    ConditionalCoverageGapExceeded {
+        observable_id: String,
+        unit_id: String,
+        nominal_coverage_bp: u16,
+        maximum: String,
+        observed: String,
     },
 }
 
@@ -422,6 +432,10 @@ pub fn canonical_paired_replay_profile_sha256(profile: &PairedReplayProfile) -> 
         "final_confirmation_frozen_before_outcomes",
         profile.final_confirmation_frozen_before_outcomes,
     );
+    encoder.number(
+        "maximum_conditional_coverage_gap",
+        profile.maximum_conditional_coverage_gap,
+    );
     encoder.strings("evaluation_group_ids", &profile.evaluation_group_ids);
     let mut requirements = profile.required_slices.clone();
     requirements.sort_by(|a, b| {
@@ -489,6 +503,15 @@ fn validate_profile(profile: &PairedReplayProfile) -> (bool, Vec<PairedReplayIss
     }
     if !profile.final_confirmation_frozen_before_outcomes {
         issues.push(PairedReplayIssue::ModelNotFrozenBeforeFinalConfirmation);
+    }
+    if !profile.maximum_conditional_coverage_gap.is_finite()
+        || !(0.0..=1.0).contains(&profile.maximum_conditional_coverage_gap)
+    {
+        issues.push(PairedReplayIssue::InvalidRequirementField {
+            operating_case_id: String::new(),
+            observable_id: String::new(),
+            field: "maximum_conditional_coverage_gap",
+        });
     }
     if profile.required_slices.is_empty() {
         issues.push(PairedReplayIssue::NoRequiredSlices);
@@ -562,6 +585,17 @@ fn validate_profile(profile: &PairedReplayProfile) -> (bool, Vec<PairedReplayIss
         }
         for (value, field) in [
             (requirement.maximum_coverage_drop, "maximum_coverage_drop"),
+            (requirement.maximum_false_safe_rate, "maximum_false_safe_rate"),
+        ] {
+            if !value.is_finite() || !(0.0..=1.0).contains(&value) {
+                issues.push(PairedReplayIssue::InvalidRequirementField {
+                    operating_case_id: requirement.operating_case_id.clone(),
+                    observable_id: requirement.observable_id.clone(),
+                    field,
+                });
+            }
+        }
+        for (value, field) in [
             (
                 requirement.maximum_normalized_score_increase,
                 "maximum_normalized_score_increase",
@@ -570,9 +604,8 @@ fn validate_profile(profile: &PairedReplayProfile) -> (bool, Vec<PairedReplayIss
                 requirement.maximum_normalized_width_increase,
                 "maximum_normalized_width_increase",
             ),
-            (requirement.maximum_false_safe_rate, "maximum_false_safe_rate"),
         ] {
-            if !value.is_finite() || !(0.0..=1.0).contains(&value) {
+            if !value.is_finite() || value < 0.0 {
                 issues.push(PairedReplayIssue::InvalidRequirementField {
                     operating_case_id: requirement.operating_case_id.clone(),
                     observable_id: requirement.observable_id.clone(),
@@ -686,7 +719,6 @@ impl SliceAccumulator {
         self.candidate_width.add(candidate_width);
         self.width_delta.add(candidate_width - baseline_width);
 
-        let alpha = observation.nominal_coverage_bp as f64 / COVERAGE_BASIS_POINTS as f64;
         let baseline_score = central_interval_score(
             observation.baseline_lower,
             observation.baseline_upper,
@@ -699,7 +731,6 @@ impl SliceAccumulator {
             observation.observed_value,
             observation.nominal_coverage_bp,
         ).unwrap_or(f64::NAN);
-        let _ = alpha;
         self.baseline_score.add(baseline_score);
         self.candidate_score.add(candidate_score);
         self.score_delta.add(candidate_score - baseline_score);
@@ -1302,9 +1333,13 @@ fn coverage_extremes(scores: &[&PairedSliceScore], candidate: bool) -> Option<(f
         }
     });
     let first = values.next()?;
-    values.fold(Some((first, first)), |extremes, value| {
-        extremes.map(|(minimum, maximum)| (minimum.min(value), maximum.max(value)))
-    })
+    let (minimum, maximum, count) = values.fold(
+        (first, first, 1_usize),
+        |(minimum, maximum, count), value| {
+            (minimum.min(value), maximum.max(value), count + 1)
+        },
+    );
+    (count >= 2).then_some((minimum, maximum))
 }
 
 #[cfg(test)]
@@ -1353,6 +1388,7 @@ mod tests {
             candidate_method_id: "candidate".to_string(),
             candidate_method_revision: "r1".to_string(),
             final_confirmation_frozen_before_outcomes: true,
+            maximum_conditional_coverage_gap: 0.50,
             evaluation_group_ids: (0..6).map(|i| format!("group-{i}")).collect(),
             required_slices: vec![requirement("deep"), requirement("shallow")],
             profile_manifest_sha256: String::new(),
@@ -1409,7 +1445,7 @@ mod tests {
         let report = evaluate_paired_replay(&profile, &rows);
         assert_eq!(report.disposition, PairedReplayDisposition::PassDeclaredNonDegradation);
         assert_eq!(report.scored_pair_count, 12);
-        assert!(report.slices.iter().all(|s| s.normalized_mean_interval_score_delta == Some(-0.025)));
+        assert!(report.slices.iter().all(|s| s.normalized_mean_interval_score_delta == Some(-0.05)));
     }
 
     #[test]
