@@ -80,7 +80,10 @@ impl fmt::Display for EvidenceRouteError {
                 write!(f, "evidence action field must not be empty: {field}")
             }
             Self::InvalidDigest(field) => {
-                write!(f, "evidence action field is not a lowercase SHA-256 digest: {field}")
+                write!(
+                    f,
+                    "evidence action field is not a lowercase SHA-256 digest: {field}"
+                )
             }
             Self::InvalidBudget => write!(f, "evidence action cost and budget must be positive"),
             Self::DuplicateActionId => write!(f, "evidence action IDs must be unique"),
@@ -215,10 +218,10 @@ pub fn route_evidence_actions(
         .filter(|proposal| ineligibility_reasons(proposal).is_empty())
         .collect();
     eligible.sort_by(|left, right| {
-        let left_cross = u128::from(left.expected_decision_loss_reduction_units)
-            * u128::from(right.cost_units);
-        let right_cross = u128::from(right.expected_decision_loss_reduction_units)
-            * u128::from(left.cost_units);
+        let left_cross =
+            u128::from(left.expected_decision_loss_reduction_units) * u128::from(right.cost_units);
+        let right_cross =
+            u128::from(right.expected_decision_loss_reduction_units) * u128::from(left.cost_units);
         right_cross
             .cmp(&left_cross)
             .then_with(|| left.cost_units.cmp(&right.cost_units))
@@ -300,8 +303,7 @@ fn action_kind_matches_domain(domain: EvidenceDomain, kind: EvidenceActionKind) 
             EvidenceActionKind::WorkcellSimulation
         ) | (
             EvidenceDomain::Metrology,
-            EvidenceActionKind::CalibratedMeasurement
-                | EvidenceActionKind::IndependentReproduction
+            EvidenceActionKind::CalibratedMeasurement | EvidenceActionKind::IndependentReproduction
         )
     )
 }
@@ -373,17 +375,27 @@ mod tests {
                 .disposition,
             EvidenceActionDisposition::Ranked { rank: 2 }
         );
-        report.validate().expect("generated report should revalidate");
+        report
+            .validate()
+            .expect("generated report should revalidate");
     }
 
     #[test]
     fn uncalibrated_out_of_domain_and_over_budget_actions_cannot_win() {
         let safe = proposal("calibrated-static", EvidenceActionKind::StaticScreen, 10, 2);
-        let mut uncalibrated =
-            proposal("uncalibrated-dft", EvidenceActionKind::DftReference, 1000, 1);
+        let mut uncalibrated = proposal(
+            "uncalibrated-dft",
+            EvidenceActionKind::DftReference,
+            1000,
+            1,
+        );
         uncalibrated.value_estimate_calibrated = false;
-        let mut out_of_domain =
-            proposal("ood-universal", EvidenceActionKind::UniversalMlPotential, 100, 1);
+        let mut out_of_domain = proposal(
+            "ood-universal",
+            EvidenceActionKind::UniversalMlPotential,
+            100,
+            1,
+        );
         out_of_domain.model_in_domain = false;
         let mut over_budget = proposal("over-budget", EvidenceActionKind::DftReference, 500, 101);
         over_budget.max_cost_units = 100;
@@ -410,9 +422,15 @@ mod tests {
 
     #[test]
     fn process_simulation_cannot_substitute_for_atomistic_evidence() {
-        let mut proposal = proposal("wrong-domain", EvidenceActionKind::WorkcellSimulation, 100, 1);
+        let mut proposal = proposal(
+            "wrong-domain",
+            EvidenceActionKind::WorkcellSimulation,
+            100,
+            1,
+        );
         proposal.domain = EvidenceDomain::Atomistic;
-        let report = route_evidence_actions(&[proposal]).expect("invalid choice remains reportable");
+        let report =
+            route_evidence_actions(&[proposal]).expect("invalid choice remains reportable");
         assert_eq!(report.selected_action_id, None);
         assert_eq!(
             report.entries[0].disposition,
@@ -485,10 +503,11 @@ mod tests {
         let proposals: Vec<EvidenceActionProposal> =
             serde_json::from_value(fixture["proposals"].clone())
                 .expect("fixture proposals must match Rust records");
-        let report =
-            route_evidence_actions(&proposals).expect("fixture uses one route contract");
+        let report = route_evidence_actions(&proposals).expect("fixture uses one route contract");
         assert_eq!(report.selected_action_id.as_deref(), Some("static-screen"));
-        report.validate().expect("generated report must revalidate");
+        report
+            .validate()
+            .expect("generated report must revalidate");
         let out_of_domain = report
             .entries
             .iter()
@@ -512,6 +531,9 @@ mod tests {
         assert_eq!(first, second);
         let mut forged = first.clone();
         forged.selected_action_id = Some("dft".to_owned());
-        assert_eq!(forged.validate(), Err(EvidenceRouteError::InvalidRouteReport));
+        assert_eq!(
+            forged.validate(),
+            Err(EvidenceRouteError::InvalidRouteReport)
+        );
     }
 }
