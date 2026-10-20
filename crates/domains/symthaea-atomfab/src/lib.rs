@@ -98,20 +98,12 @@ pub struct IntervalSummary {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BenchmarkError {
     EmptyInput,
-    NonFiniteValue {
-        index: usize,
-        field: &'static str,
-    },
-    InvalidInterval {
-        index: usize,
-    },
+    NonFiniteValue { index: usize, field: &'static str },
+    InvalidInterval { index: usize },
     InvalidTieTolerance,
     InvalidPersistence,
     RankingLengthMismatch,
-    DuplicateRankingId {
-        ranking: &'static str,
-        index: usize,
-    },
+    DuplicateRankingId { ranking: &'static str, index: usize },
     NoComparablePairs,
     ZeroReferenceStructures,
     InvalidRecoveryCounts,
@@ -127,7 +119,10 @@ impl fmt::Display for BenchmarkError {
                 write!(f, "sample {index} has a non-finite {field} value")
             }
             Self::InvalidInterval { index } => {
-                write!(f, "sample {index} has a lower interval bound above its upper bound")
+                write!(
+                    f,
+                    "sample {index} has a lower interval bound above its upper bound"
+                )
             }
             Self::InvalidTieTolerance => write!(f, "tie tolerance must be finite and non-negative"),
             Self::InvalidPersistence => write!(
@@ -139,11 +134,18 @@ impl fmt::Display for BenchmarkError {
                 "predicted and reference rankings must have the same non-zero length"
             ),
             Self::DuplicateRankingId { ranking, index } => {
-                write!(f, "{ranking} ranking repeats an identifier at index {index}")
+                write!(
+                    f,
+                    "{ranking} ranking repeats an identifier at index {index}"
+                )
             }
             Self::NoComparablePairs => write!(f, "no non-tied reference pairs are available"),
-            Self::ZeroReferenceStructures => write!(f, "reference structure count must be greater than zero"),
-            Self::InvalidRecoveryCounts => write!(f, "recovered structure count cannot exceed reference count"),
+            Self::ZeroReferenceStructures => {
+                write!(f, "reference structure count must be greater than zero")
+            }
+            Self::InvalidRecoveryCounts => {
+                write!(f, "recovered structure count cannot exceed reference count")
+            }
             Self::NonFiniteMetric => write!(f, "metric calculation produced a non-finite value"),
             Self::ZeroEvaluationCount => {
                 write!(f, "evaluation counts must be greater than zero")
@@ -285,10 +287,16 @@ pub fn pairwise_ordering_accuracy(
     }
     for (index, sample) in samples.iter().enumerate() {
         if !sample.predicted.is_finite() {
-            return Err(BenchmarkError::NonFiniteValue { index, field: "predicted" });
+            return Err(BenchmarkError::NonFiniteValue {
+                index,
+                field: "predicted",
+            });
         }
         if !sample.reference.is_finite() {
-            return Err(BenchmarkError::NonFiniteValue { index, field: "reference" });
+            return Err(BenchmarkError::NonFiniteValue {
+                index,
+                field: "reference",
+            });
         }
     }
 
@@ -564,10 +572,22 @@ mod tests {
     #[test]
     fn feasibility_metrics_expose_false_accepts_and_missed_opportunities() {
         let summary = summarize_feasibility(&[
-            FeasibilityComparison { predicted_feasible: true, reference_feasible: true },
-            FeasibilityComparison { predicted_feasible: true, reference_feasible: false },
-            FeasibilityComparison { predicted_feasible: false, reference_feasible: true },
-            FeasibilityComparison { predicted_feasible: false, reference_feasible: false },
+            FeasibilityComparison {
+                predicted_feasible: true,
+                reference_feasible: true,
+            },
+            FeasibilityComparison {
+                predicted_feasible: true,
+                reference_feasible: false,
+            },
+            FeasibilityComparison {
+                predicted_feasible: false,
+                reference_feasible: true,
+            },
+            FeasibilityComparison {
+                predicted_feasible: false,
+                reference_feasible: false,
+            },
         ])
         .expect("non-empty cases should be summarized");
         assert_eq!(summary.sample_count, 4);
@@ -580,8 +600,14 @@ mod tests {
     #[test]
     fn feasibility_metrics_do_not_reward_abstaining_on_every_case() {
         let summary = summarize_feasibility(&[
-            FeasibilityComparison { predicted_feasible: false, reference_feasible: true },
-            FeasibilityComparison { predicted_feasible: false, reference_feasible: false },
+            FeasibilityComparison {
+                predicted_feasible: false,
+                reference_feasible: true,
+            },
+            FeasibilityComparison {
+                predicted_feasible: false,
+                reference_feasible: false,
+            },
         ])
         .expect("non-empty cases should be summarized");
         assert_eq!(summary.false_feasible_count, 0);
@@ -593,9 +619,18 @@ mod tests {
     fn ordering_accuracy_detects_rank_inversions() {
         let summary = pairwise_ordering_accuracy(
             &[
-                ScalarComparison { predicted: 1.0, reference: 1.0 },
-                ScalarComparison { predicted: 3.0, reference: 2.0 },
-                ScalarComparison { predicted: 2.0, reference: 3.0 },
+                ScalarComparison {
+                    predicted: 1.0,
+                    reference: 1.0,
+                },
+                ScalarComparison {
+                    predicted: 3.0,
+                    reference: 2.0,
+                },
+                ScalarComparison {
+                    predicted: 2.0,
+                    reference: 3.0,
+                },
             ],
             1e-12,
         )
@@ -610,7 +645,10 @@ mod tests {
     fn ordering_accuracy_rejects_tolerance_and_all_tied_references() {
         assert_eq!(
             pairwise_ordering_accuracy(
-                &[ScalarComparison { predicted: 1.0, reference: 1.0 }],
+                &[ScalarComparison {
+                    predicted: 1.0,
+                    reference: 1.0
+                }],
                 -1.0,
             ),
             Err(BenchmarkError::InvalidTieTolerance)
@@ -618,8 +656,14 @@ mod tests {
         assert_eq!(
             pairwise_ordering_accuracy(
                 &[
-                    ScalarComparison { predicted: 1.0, reference: 2.0 },
-                    ScalarComparison { predicted: 2.0, reference: 2.0 },
+                    ScalarComparison {
+                        predicted: 1.0,
+                        reference: 2.0
+                    },
+                    ScalarComparison {
+                        predicted: 2.0,
+                        reference: 2.0
+                    },
                 ],
                 0.0,
             ),
@@ -672,9 +716,7 @@ mod tests {
                 for depth in 1..=predicted.len() {
                     predicted_prefix.insert(predicted[depth - 1]);
                     reference_prefix.insert(reference[depth - 1]);
-                    let overlap = predicted_prefix
-                        .intersection(&reference_prefix)
-                        .count() as f64
+                    let overlap = predicted_prefix.intersection(&reference_prefix).count() as f64
                         / depth as f64;
                     let weight = (1.0 - persistence) * persistence.powf((depth - 1) as f64);
                     weighted_total += weight * overlap;
@@ -760,3 +802,4 @@ mod tests {
         );
     }
 }
+
