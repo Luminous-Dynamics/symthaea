@@ -131,11 +131,11 @@ jobs:
       - name: Verify deterministic receipt and refuse an incorrect head
         run: |
           export ATOMFAB_GIT_HEAD="$(git rev-parse HEAD)"
-          cargo run --quiet -p symthaea-fabrication-kernel --example atomfab_pcb_route_corpus > receipt-repeat.json
+          cargo run --quiet --manifest-path "${RUNNER_TEMP}/atomfab-pcb-route-check/Cargo.toml" --example atomfab_pcb_route_corpus > receipt-repeat.json
           cmp atomfab-pcb-route-receipt.json receipt-repeat.json
 
           export ATOMFAB_GIT_HEAD="$(printf '0%.0s' $(seq 1 40))"
-          if cargo run --quiet -p symthaea-fabrication-kernel --example atomfab_pcb_route_corpus >/dev/null 2>&1; then
+          if cargo run --quiet --manifest-path "${RUNNER_TEMP}/atomfab-pcb-route-check/Cargo.toml" --example atomfab_pcb_route_corpus >/dev/null 2>&1; then
             echo "mismatched Git HEAD unexpectedly produced a receipt"
             exit 1
           fi
