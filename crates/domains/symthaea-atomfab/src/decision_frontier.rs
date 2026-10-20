@@ -70,17 +70,32 @@ impl fmt::Display for FrontierError {
         match self {
             Self::EmptyCandidateSet => write!(f, "frontier needs at least one policy candidate"),
             Self::EmptyRequiredField(name) => write!(f, "frontier field must not be empty: {name}"),
-            Self::InvalidDigest(name) => write!(f, "frontier field is not a lowercase SHA-256 digest: {name}"),
-            Self::InvalidTolerance => write!(f, "objective tolerance must be finite and non-negative"),
+            Self::InvalidDigest(name) => write!(
+                f,
+                "frontier field is not a lowercase SHA-256 digest: {name}"
+            ),
+            Self::InvalidTolerance => {
+                write!(f, "objective tolerance must be finite and non-negative")
+            }
             Self::InvalidObjective => write!(f, "validated objective must be finite"),
             Self::DiscoveryObjectiveMismatch => write!(
                 f,
                 "best validated objective must be present exactly when validated discoveries are non-zero"
             ),
-            Self::InvalidCost => write!(f, "total cost must use a positive, fixed-resolution integer unit"),
-            Self::InvalidElapsedTime => write!(f, "elapsed seconds must be finite and non-negative"),
-            Self::MissingEvidence => write!(f, "every policy outcome must reference a hashed evidence bundle"),
-            Self::DuplicatePolicyId => write!(f, "policy IDs must be unique within a matched frontier"),
+            Self::InvalidCost => write!(
+                f,
+                "total cost must use a positive, fixed-resolution integer unit"
+            ),
+            Self::InvalidElapsedTime => {
+                write!(f, "elapsed seconds must be finite and non-negative")
+            }
+            Self::MissingEvidence => write!(
+                f,
+                "every policy outcome must reference a hashed evidence bundle"
+            ),
+            Self::DuplicatePolicyId => {
+                write!(f, "policy IDs must be unique within a matched frontier")
+            }
             Self::MismatchedComparisonContract => write!(
                 f,
                 "frontier candidates must share seed, comparison digest, objective contract, tolerance, and cost unit"
@@ -103,7 +118,10 @@ impl FrontierCandidate {
                 return Err(FrontierError::EmptyRequiredField(name));
             }
         }
-        validate_digest(&self.comparison_contract_digest, "comparison_contract_digest")?;
+        validate_digest(
+            &self.comparison_contract_digest,
+            "comparison_contract_digest",
+        )?;
         if self.evidence_digest.trim().is_empty() {
             return Err(FrontierError::MissingEvidence);
         }
@@ -117,10 +135,17 @@ impl FrontierCandidate {
         if self.total_cost_units == 0 {
             return Err(FrontierError::InvalidCost);
         }
-        match (self.validated_discovery_count, self.best_validated_objective) {
+        match (
+            self.validated_discovery_count,
+            self.best_validated_objective,
+        ) {
             (0, None) => {}
-            (0, Some(_)) | (_, None) => return Err(FrontierError::DiscoveryObjectiveMismatch),
-            (_, Some(value)) if !value.is_finite() => return Err(FrontierError::InvalidObjective),
+            (0, Some(_)) | (_, None) => {
+                return Err(FrontierError::DiscoveryObjectiveMismatch);
+            }
+            (_, Some(value)) if !value.is_finite() => {
+                return Err(FrontierError::InvalidObjective);
+            }
             _ => {}
         }
         Ok(())
@@ -276,8 +301,7 @@ fn ineligibility_reasons(candidate: &FrontierCandidate) -> Vec<String> {
 
 fn dominates(left: &FrontierCandidate, right: &FrontierCandidate) -> bool {
     // More independently validated discoveries is always preferable.
-    let discoveries_no_worse =
-        left.validated_discovery_count >= right.validated_discovery_count;
+    let discoveries_no_worse = left.validated_discovery_count >= right.validated_discovery_count;
     let discoveries_better = left.validated_discovery_count > right.validated_discovery_count;
 
     let objective_no_worse = match (
@@ -329,7 +353,12 @@ fn validate_digest(value: &str, field: &'static str) -> Result<(), FrontierError
 mod tests {
     use super::*;
 
-    fn candidate(policy: &str, discoveries: u64, objective: Option<f64>, cost: u64) -> FrontierCandidate {
+    fn candidate(
+        policy: &str,
+        discoveries: u64,
+        objective: Option<f64>,
+        cost: u64,
+    ) -> FrontierCandidate {
         FrontierCandidate {
             policy_id: policy.to_owned(),
             seed: 17,
@@ -357,12 +386,23 @@ mod tests {
             candidate("diversity", 2, Some(-3.04), 120),
             candidate("symthaea", 2, Some(-3.15), 110),
         ];
-        let report = build_decision_frontier(&candidates).expect("matched candidates should pass");
+        let report =
+            build_decision_frontier(&candidates).expect("matched candidates should pass");
         let lookup = |policy: &str| {
-            report.entries.iter().find(|entry| entry.policy_id == policy).unwrap()
+            report
+                .entries
+                .iter()
+                .find(|entry| entry.policy_id == policy)
+                .unwrap()
         };
-        assert_eq!(lookup("random").disposition, FrontierDisposition::ParetoFrontier);
-        assert_eq!(lookup("symthaea").disposition, FrontierDisposition::ParetoFrontier);
+        assert_eq!(
+            lookup("random").disposition,
+            FrontierDisposition::ParetoFrontier
+        );
+        assert_eq!(
+            lookup("symthaea").disposition,
+            FrontierDisposition::ParetoFrontier
+        );
         assert_eq!(
             lookup("diversity").disposition,
             FrontierDisposition::Dominated {
@@ -378,7 +418,11 @@ mod tests {
         unsafe_candidate.false_feasible_accepts = 1;
         let report = build_decision_frontier(&[safe, unsafe_candidate])
             .expect("unsafe outcomes remain reportable");
-        let entry = report.entries.iter().find(|entry| entry.policy_id == "unsafe").unwrap();
+        let entry = report
+            .entries
+            .iter()
+            .find(|entry| entry.policy_id == "unsafe")
+            .unwrap();
         assert_eq!(
             entry.disposition,
             FrontierDisposition::Ineligible {
@@ -391,7 +435,8 @@ mod tests {
     fn missing_hard_constraint_assessment_is_not_a_zero_failure_rate() {
         let mut candidate = candidate("unassessed", 1, Some(-3.10), 100);
         candidate.hard_constraints_assessed = false;
-        let report = build_decision_frontier(&[candidate]).expect("unassessed result remains visible");
+        let report =
+            build_decision_frontier(&[candidate]).expect("unassessed result remains visible");
         assert_eq!(
             report.entries[0].disposition,
             FrontierDisposition::Ineligible {
@@ -450,7 +495,10 @@ mod tests {
             Err(FrontierError::DuplicatePolicyId)
         );
         let free = candidate("free", 1, Some(-3.1), 0);
-        assert_eq!(build_decision_frontier(&[free]), Err(FrontierError::InvalidCost));
+        assert_eq!(
+            build_decision_frontier(&[free]),
+            Err(FrontierError::InvalidCost)
+        );
     }
     #[test]
     fn illustrative_fixture_builds_safety_gated_pareto_frontier() {
@@ -470,10 +518,9 @@ mod tests {
         ))
         .expect("report schema must be valid JSON");
 
-        let candidates: Vec<FrontierCandidate> = serde_json::from_value(
-            fixture["candidates"].clone()
-        )
-        .expect("fixture candidates must match Rust records");
+        let candidates: Vec<FrontierCandidate> =
+            serde_json::from_value(fixture["candidates"].clone())
+                .expect("fixture candidates must match Rust records");
         let report = build_decision_frontier(&candidates)
             .expect("illustrative candidates share a comparison contract");
         let lookup = |policy: &str| {
@@ -501,6 +548,4 @@ mod tests {
         let round_trip: DecisionFrontier =
             serde_json::from_slice(&result_bytes).expect("report should round-trip");
         assert_eq!(round_trip, report);
-    }
-
-}
+    }}
