@@ -257,12 +257,16 @@ fn validate_candidate(candidate: &Value) -> Result<()> {
         } else if opposite_bound_direction(source_obligation.relation, target_obligation.relation)
             && (compatibility == "compatible" || !mismatch_codes.contains("inequality_direction"))
         {
-            bail!("opposite source/target inequality directions require an inequality_direction mismatch");
+            bail!(
+                "opposite source/target inequality directions require an inequality_direction mismatch"
+            );
         }
         if source_obligation.quantifier_scope != target_obligation.quantifier_scope
             && (compatibility == "compatible" || !mismatch_codes.contains("quantifier_scope"))
         {
-            bail!("inequality transfer across quantifier scopes requires a quantifier_scope mismatch");
+            bail!(
+                "inequality transfer across quantifier scopes requires a quantifier_scope mismatch"
+            );
         }
     }
 
@@ -572,7 +576,8 @@ mod tests {
             contract["source_obligation"]["quantifier_scope"] = json!("for all graphs of size n");
             contract["target_obligation"]["predicate"] = json!("independence_number");
             contract["target_obligation"]["relation"] = json!("upper_bound");
-            contract["target_obligation"]["quantifier_scope"] = json!("for all triangle-free graphs");
+            contract["target_obligation"]["quantifier_scope"] =
+                json!("for all triangle-free graphs");
         }
         assert!(validate_candidate(&candidate).is_err());
 
