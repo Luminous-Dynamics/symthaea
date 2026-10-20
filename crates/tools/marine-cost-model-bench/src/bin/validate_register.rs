@@ -405,10 +405,11 @@ mod tests {
     }
 
     fn csv_for_rows(rows: &[Vec<String>]) -> String {
-        let mut output = format!("{}\\n", HEADERS.join(","));
+        let mut output = HEADERS.join(",");
+        output.push('\n');
         for row in rows {
             output.push_str(&row.join(","));
-            output.push('\\n');
+            output.push('\n');
         }
         output
     }
@@ -431,13 +432,20 @@ mod tests {
 
     #[test]
     fn csv_parser_handles_quoted_commas_and_escaped_quotes() {
-        let rows = parse_csv("a,b\\n\\"hello, world\\",\\"say \\"\\"yes\\"\\"\\"\\n").unwrap();
-        assert_eq!(rows[1], vec!["hello, world", "say \\"yes\\""]);
+        let rows = parse_csv(
+            r#"a,b
+"hello, world","say ""yes"""
+"#
+        ).unwrap();
+        assert_eq!(rows[1], vec!["hello, world", "say \"yes\""]);
     }
 
     #[test]
     fn csv_parser_rejects_unterminated_quotes() {
-        assert!(parse_csv("a,b\\n\\"unfinished,b\\n").is_err());
+        let input = r#"a,b
+"unfinished,b
+"#;
+        assert!(parse_csv(input).is_err());
     }
 
     #[test]
