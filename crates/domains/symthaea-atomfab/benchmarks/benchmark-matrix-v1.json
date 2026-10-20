@@ -173,6 +173,7 @@
       ],
       "gates": [
         "report energy accuracy and structural exploration as separate score families",
+        "canonicalize and deduplicate structure identities with a frozen tolerance before ranking comparison; candidate IDs must be stable across policies, and unmatched candidates count as discovery differences rather than being silently remapped",
         "pin particle composition, support surface, slab construction, relaxation settings and structural deduplication method before testing",
         "group related configurations by parent nanoparticle/support system when defining held-out splits",
         "count failed relaxations, duplicate minima, and invalid interfaces rather than silently excluding them",
