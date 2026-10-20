@@ -21,6 +21,7 @@ struct Episode {
     minimum_reserve: f64,
     missed_limits: usize,
     shield_vetoes: usize,
+    no_safe_action_ticks: usize,
     emergency_recover_steps: usize,
     false_alarms: usize,
     failed: bool,
@@ -142,7 +143,7 @@ fn parse_episodes(csv: &str) -> Result<BTreeMap<ConditionKey, EpisodesBySeed>, B
         "cumulative_exposure", "unsafe_ticks", "unsafe_episode",
         "violation_exposure", "max_violation_severity", "minimum_reserve",
         "missed_limits", "shield_vetoes", "emergency_recover_steps",
-        "false_alarms", "failed",
+        "no_safe_action_ticks", "false_alarms", "failed",
     ];
     for name in required {
         column_index(&header, name)?;
@@ -179,6 +180,7 @@ fn parse_episodes(csv: &str) -> Result<BTreeMap<ConditionKey, EpisodesBySeed>, B
             minimum_reserve: parse_f64(&values, &header, "minimum_reserve")?,
             missed_limits: parse_usize(&values, &header, "missed_limits")?,
             shield_vetoes: parse_usize(&values, &header, "shield_vetoes")?,
+            no_safe_action_ticks: parse_usize(&values, &header, "no_safe_action_ticks")?,
             emergency_recover_steps: parse_usize(&values, &header, "emergency_recover_steps")?,
             false_alarms: parse_usize(&values, &header, "false_alarms")?,
             failed: parse_bool(&values, &header, "failed")?,
@@ -196,7 +198,7 @@ fn parse_episodes(csv: &str) -> Result<BTreeMap<ConditionKey, EpisodesBySeed>, B
 
 fn write_summary(groups: &BTreeMap<ConditionKey, EpisodesBySeed>, path: &str) -> Result<usize, Box<dyn Error>> {
     let mut output = String::from(
-        "scenario,policy,shielded,n,mean_task_reward,mean_cumulative_load,p95_cumulative_load,episode_violation_rate,mean_unsafe_ticks,mean_violation_exposure,p95_violation_exposure,mean_conditional_peak_violation,mean_minimum_reserve,mean_missed_limits,mean_shield_vetoes,mean_emergency_recover_steps,mean_false_alarms,episode_failure_rate\n"
+        "scenario,policy,shielded,n,mean_task_reward,mean_cumulative_load,p95_cumulative_load,episode_violation_rate,mean_unsafe_ticks,mean_violation_exposure,p95_violation_exposure,mean_conditional_peak_violation,mean_minimum_reserve,mean_missed_limits,mean_shield_vetoes,mean_no_safe_action_ticks,mean_emergency_recover_steps,mean_false_alarms,episode_failure_rate\n"
     );
     for ((scenario, policy, shielded), by_seed) in groups {
         let episodes: Vec<&Episode> = by_seed.values().collect();
@@ -211,6 +213,7 @@ fn write_summary(groups: &BTreeMap<ConditionKey, EpisodesBySeed>, path: &str) ->
         let minimum_reserve: Vec<f64> = episodes.iter().map(|row| row.minimum_reserve).collect();
         let missed: Vec<f64> = episodes.iter().map(|row| row.missed_limits as f64).collect();
         let vetoes: Vec<f64> = episodes.iter().map(|row| row.shield_vetoes as f64).collect();
+        let no_safe_actions: Vec<f64> = episodes.iter().map(|row| row.no_safe_action_ticks as f64).collect();
         let emergency_steps: Vec<f64> = episodes.iter().map(|row| row.emergency_recover_steps as f64).collect();
         let false_alarms: Vec<f64> = episodes.iter().map(|row| row.false_alarms as f64).collect();
         let violation_rate = episodes.iter().filter(|row| row.unsafe_episode).count() as f64 / episodes.len() as f64;
@@ -221,7 +224,7 @@ fn write_summary(groups: &BTreeMap<ConditionKey, EpisodesBySeed>, path: &str) ->
             format!("{:.6}", mean(&conditional_severity))
         };
         output.push_str(&format!(
-            "{scenario},{policy},{shielded},{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{conditional},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6}\n",
+            "{scenario},{policy},{shielded},{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{conditional},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6}\n",
             episodes.len(),
             mean(&rewards),
             mean(&exposure),
@@ -233,6 +236,7 @@ fn write_summary(groups: &BTreeMap<ConditionKey, EpisodesBySeed>, path: &str) ->
             mean(&minimum_reserve),
             mean(&missed),
             mean(&vetoes),
+            mean(&no_safe_actions),
             mean(&emergency_steps),
             mean(&false_alarms),
             failure_rate,
@@ -319,6 +323,26 @@ fn main() -> Result<(), Box<dyn Error>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const SAMPLE_HEADER: &str = "scenario,seed,policy,shielded,task_reward,cumulative_exposure,mean_load,peak_load,minimum_reserve,terminal_reserve,terminal_load,unsafe_ticks,unsafe_episode,violation_exposure,max_violation_severity,missed_limits,shield_vetoes,no_safe_action_ticks,false_alarms,push_steps,maintain_steps,emergency_recover_steps,resource_cost,failed,recovery_steps";
+
+    const SAMPLE_ROW: &str = "calm,0,task_only,false,1.0,2.0,0.1,0.2,0.8,0.8,0.2,0,false,0.0,0.0,0,0,0,0,1,47,0,0.2,false,NA";
+
+    #[test]
+    fn parser_requires_episode_violation_flag_to_match_tick_count() {
+        let good = format!("{SAMPLE_HEADER}\n{SAMPLE_ROW}\n");
+        let groups = parse_episodes(&good).expect("valid minimal CSV should parse");
+        assert_eq!(groups.len(), 1);
+
+        let inconsistent = good.replace(",0,false,0.0,0.0,", ",1,false,0.0,0.0,");
+        assert!(parse_episodes(&inconsistent).is_err());
+    }
+
+    #[test]
+    fn parser_rejects_duplicate_condition_seed_rows() {
+        let duplicate = format!("{SAMPLE_HEADER}\n{SAMPLE_ROW}\n{SAMPLE_ROW}\n");
+        assert!(parse_episodes(&duplicate).is_err());
+    }
 
     #[test]
     fn nearest_rank_percentile_uses_observed_samples() {
