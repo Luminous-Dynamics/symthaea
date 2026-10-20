@@ -785,9 +785,12 @@ fn materialize_temporal_target(
     // historical visibility, source digest, or hidden-proof control fails.
     verify_temporal_manifest_file(repository_root, manifest_path)?;
 
-    let root = repository_root
-        .canonicalize()
-        .with_context(|| format!("cannot resolve temporal repository {}", repository_root.display()))?;
+    let root = repository_root.canonicalize().with_context(|| {
+        format!(
+            "cannot resolve temporal repository {}",
+            repository_root.display()
+        )
+    })?;
     let manifest_bytes = fs::read(manifest_path)
         .with_context(|| format!("cannot read temporal manifest {}", manifest_path.display()))?;
     let manifest: TemporalReplayManifest =
@@ -804,7 +807,9 @@ fn materialize_temporal_target(
             .artifacts
             .iter()
             .find(|artifact| artifact.artifact_id == *artifact_id)
-            .with_context(|| format!("visible artifact {artifact_id} disappeared after validation"))?;
+            .with_context(|| {
+                format!("visible artifact {artifact_id} disappeared after validation")
+            })?;
         if artifact.artifact_kind == "completion_statement"
             || artifact.artifact_id == event.proof_artifact_id
             || artifact.target_position == Some(event.position)
@@ -816,11 +821,19 @@ fn materialize_temporal_target(
                 target_id
             );
         }
-        let source = git_show_file(&root, &artifact.source_commit, &artifact.path)
-            .with_context(|| format!("read visible artifact {} from its historical commit", artifact.artifact_id))?;
+        let source =
+            git_show_file(&root, &artifact.source_commit, &artifact.path).with_context(|| {
+                format!(
+                    "read visible artifact {} from its historical commit",
+                    artifact.artifact_id
+                )
+            })?;
         let source_digest = format!("{:x}", Sha256::digest(&source));
         if source_digest != artifact.source_file_sha256 {
-            bail!("visible source file digest changed for artifact {}", artifact.artifact_id);
+            bail!(
+                "visible source file digest changed for artifact {}",
+                artifact.artifact_id
+            );
         }
         let span = exact_line_span(
             &source,
@@ -829,7 +842,10 @@ fn materialize_temporal_target(
         )?;
         let span_digest = format!("{:x}", Sha256::digest(span));
         if span_digest != artifact.content_sha256 {
-            bail!("visible artifact digest changed for {}", artifact.artifact_id);
+            bail!(
+                "visible artifact digest changed for {}",
+                artifact.artifact_id
+            );
         }
         let content = std::str::from_utf8(span)
             .with_context(|| format!("visible artifact {} is not UTF-8", artifact.artifact_id))?
@@ -894,9 +910,12 @@ fn materialize_temporal_target(
             output_parent.display()
         );
     }
-    let canonical_parent = output_parent
-        .canonicalize()
-        .with_context(|| format!("canonicalize target bundle directory {}", output_parent.display()))?;
+    let canonical_parent = output_parent.canonicalize().with_context(|| {
+        format!(
+            "canonicalize target bundle directory {}",
+            output_parent.display()
+        )
+    })?;
     let resolved_output = canonical_parent.join(
         output_path
             .file_name()
@@ -910,8 +929,12 @@ fn materialize_temporal_target(
     {
         bail!("refusing to overwrite a symlink as target bundle output");
     }
-    fs::write(&resolved_output, &serialized)
-        .with_context(|| format!("write target-specific context bundle {}", resolved_output.display()))?;
+    fs::write(&resolved_output, &serialized).with_context(|| {
+        format!(
+            "write target-specific context bundle {}",
+            resolved_output.display()
+        )
+    })?;
     println!(
         "PITB_TEMPORAL_TARGET_BUNDLE_PASS: target={} visible_artifacts={} payload_sha256={} output={}",
         target_id,
@@ -2207,15 +2230,9 @@ mod tests {
         verify_temporal_manifest_file(&root, &manifest_path)
             .expect("pinned chronological history and exact artifact bytes should verify");
         let target_bundle_path = base.join("target-001-bundle.json");
-        materialize_temporal_target(
-            &root,
-            &manifest_path,
-            "target-001",
-            &target_bundle_path,
-        )
-        .expect("only historically available artifacts should be materialized");
-        let bundle_bytes =
-            fs::read(&target_bundle_path).expect("read materialized target context");
+        materialize_temporal_target(&root, &manifest_path, "target-001", &target_bundle_path)
+            .expect("only historically available artifacts should be materialized");
+        let bundle_bytes = fs::read(&target_bundle_path).expect("read materialized target context");
         let bundle: serde_json::Value =
             serde_json::from_slice(&bundle_bytes).expect("parse target context bundle");
         assert_eq!(
