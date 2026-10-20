@@ -247,5 +247,61 @@
     "No SOTA claim without exact task, data, checkpoint, evaluator, split, configuration and metric parity with the comparison target.",
     "Policy comparison stretch target: at least 20 paired fixed-seed campaigns, median acceleration factor >=2 with a 95% bootstrap lower bound >1 only if both methods reach the same frozen objective target and quality at equal cost is no worse. This is a proposed target, not a result.",
     "A simulation or MLIP output is never a measurement; physical claims require independent metrology and reproducible procedures."
-  ]
+  ],
+  "published_candidate_refinement": {
+    "source": "Methods section of DOI 10.1038/s41524-026-02043-8",
+    "candidate_pool_per_model_per_stratum": 1000,
+    "pool_note": "Implied by the 50-member population and 20-generation GA protocol only if every generation's complete population is counted as candidate evaluations; exact implementation/evaluation count must be extracted from GDPy source/paper supplement before assuming this count.",
+    "selected_candidates_per_model_per_stratum": 50,
+    "model_count": 3,
+    "dft_refined_candidates_per_stratum": 150,
+    "stratum_count": 12,
+    "implied_total_dft_refinements_across_all_strata": 1800,
+    "selection_rule": "select the 50 lowest-MLIP-energy candidate structures from each of the three MLIP searches and locally optimize each selected structure using the pinned DFT reference method",
+    "exact_dft_settings_status": "unresolved_before_execution",
+    "duplicates_and_failures": "must preserve original candidate rows, count failed relaxations and duplicate minima; report the paper-compatible metric and a second deduplicated unique-discovery metric",
+    "status": "published_refinement_count_transcribed_other_run_details_unresolved"
+  },
+  "policy_comparison": {
+    "status": "proposed_extension_not_part_of_exact_paper_reproduction",
+    "paired_campaign_count": 20,
+    "same_seed_across_policies": true,
+    "fixed_per_policy_reference_refinement_budget": 150,
+    "budget_note": "Use a 150-reference-relaxation-per-stratum budget only if it is appropriate to the exact matched decision-layer experiment; otherwise preregister a different common budget before seeing test outcomes. Do not assume it is directly comparable to the paper's three-model combined refinement set.",
+    "include_all_costs": true,
+    "costs_to_include": [
+      "candidate generation",
+      "MLIP inference",
+      "DFT/reference relaxation",
+      "failed relaxation/retry",
+      "deduplication and preprocessing",
+      "acquisition/router overhead",
+      "post-processing"
+    ],
+    "policies": [
+      "random",
+      "diversity_only",
+      "uncertainty_only",
+      "cost_aware",
+      "symthaea_full",
+      "symthaea_without_history"
+    ],
+    "outcomes": [
+      "unique_reference_validated_low_energy_discoveries",
+      "best_reference_validated_objective",
+      "cost_per_unique_validated_discovery",
+      "failure_modes_by_stratum",
+      "abstention_rate",
+      "decision_value_calibration"
+    ],
+    "stretch_gate": {
+      "median_acceleration_factor_at_least": 2,
+      "campaigns_at_least": 20,
+      "confidence_level": 0.95,
+      "bootstrap_lower_bound_factor_strictly_greater_than": 1,
+      "requires_same_frozen_target_for_both_policies": true,
+      "requires_validated_objective_quality_no_worse_at_equal_total_cost": true,
+      "status": "proposed_not_achieved"
+    }
+  }
 }
