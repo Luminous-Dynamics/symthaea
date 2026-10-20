@@ -2377,9 +2377,25 @@ mod tests {
         assert!(visible_ids.contains("proof-000"));
         assert!(!visible_ids.contains("proof-001"));
         assert!(!visible_ids.contains("completion-statement-001"));
-        let bundle_text = String::from_utf8(bundle_bytes).expect("bundle JSON is UTF-8");
+        let bundle_text = String::from_utf8(bundle_bytes.clone()).expect("bundle JSON is UTF-8");
         assert!(bundle_text.contains("exact True.intro"));
         assert!(!bundle_text.contains("trivial"));
+        verify_temporal_target_bundle(&target_bundle_path)
+            .expect("materialized target bundle must verify independently");
+
+        let tampered_bundle_path = base.join("tampered-target-001-bundle.json");
+        let mut tampered_bundle: serde_json::Value =
+            serde_json::from_slice(&bundle_bytes).expect("parse source bundle");
+        tampered_bundle["payload"]["visible_artifacts"][1]["content"] =
+            serde_json::Value::String("exact False.elim".to_string());
+        fs::write(
+            &tampered_bundle_path,
+            serde_json::to_vec_pretty(&tampered_bundle).expect("serialize tampered bundle"),
+        )
+        .expect("write tampered bundle");
+        let tamper_error = verify_temporal_target_bundle(&tampered_bundle_path)
+            .expect_err("post-materialization context tampering must be detected");
+        assert!(format!("{tamper_error:#}").contains("payload digest mismatch"));
 
         let first_target_bundle_path = base.join("target-000-bundle.json");
         materialize_temporal_target(
@@ -2389,6 +2405,8 @@ mod tests {
             &first_target_bundle_path,
         )
         .expect("the first target must not see its own proof");
+        verify_temporal_target_bundle(&first_target_bundle_path)
+            .expect("first target bundle must pass structural verification");
         let first_bundle_text =
             fs::read_to_string(&first_target_bundle_path).expect("read first target bundle");
         assert!(!first_bundle_text.contains("exact True.intro"));
