@@ -978,7 +978,7 @@ mod tests {
         let decoder = StructuredDecoder::new(&genesis);
         let translator = StructuredProseTranslator::new();
 
-        for ordinal in 0.0..=4.0 {
+        for ordinal in [0.0_f32, 1.0, 2.0, 3.0, 4.0] {
             let mut channels = symthaea_broca::encoder::ThoughtChannels::with_intent(4);
             channels.set_epistemic(ordinal);
             let readout = decoder.decode(&channels);
