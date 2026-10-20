@@ -240,6 +240,8 @@ pub enum AuditInputError {
     InvalidLoadedItem(String),
     /// A finite-input arithmetic operation produced a non-finite result.
     NumericOverflow,
+    /// A non-zero contribution was lost to floating-point underflow or addition rounding.
+    NumericPrecisionLoss,
 }
 
 impl fmt::Display for AuditInputError {
@@ -257,6 +259,9 @@ impl fmt::Display for AuditInputError {
             }
             Self::InvalidLoadedItem(id) => write!(f, "invalid loaded item: {id}"),
             Self::NumericOverflow => write!(f, "numeric overflow during loading audit"),
+            Self::NumericPrecisionLoss => {
+                write!(f, "numeric precision loss during loading audit")
+            }
         }
     }
 }
@@ -334,6 +339,9 @@ pub fn audit_loading(
         if !item_moment.is_finite() {
             return Err(AuditInputError::NumericOverflow);
         }
+        if item.mass_kg != 0.0 && station.arm_m != 0.0 && item_moment == 0.0 {
+            return Err(AuditInputError::NumericPrecisionLoss);
+        }
         total_mass_kg = checked_add(total_mass_kg, item.mass_kg)?;
         total_moment_kg_m = checked_add(total_moment_kg_m, item_moment)?;
 
@@ -367,6 +375,9 @@ pub fn audit_loading(
     let center_of_gravity_m = total_moment_kg_m / total_mass_kg;
     if !center_of_gravity_m.is_finite() {
         return Err(AuditInputError::NumericOverflow);
+    }
+    if total_moment_kg_m != 0.0 && center_of_gravity_m == 0.0 {
+        return Err(AuditInputError::NumericPrecisionLoss);
     }
 
     if total_mass_kg > profile.maximum_takeoff_mass_kg {
@@ -592,11 +603,13 @@ fn is_sha256_hex(value: &str) -> bool {
 
 fn checked_add(current: f64, increment: f64) -> Result<f64, AuditInputError> {
     let result = current + increment;
-    if result.is_finite() {
-        Ok(result)
-    } else {
-        Err(AuditInputError::NumericOverflow)
+    if !result.is_finite() {
+        return Err(AuditInputError::NumericOverflow);
     }
+    if increment != 0.0 && result == current {
+        return Err(AuditInputError::NumericPrecisionLoss);
+    }
+    Ok(result)
 }
 
 #[cfg(test)]
@@ -812,6 +825,37 @@ mod tests {
                 &scenario(vec![cargo("box-1", "FWD", 1.0e308)])
             ),
             Err(AuditInputError::NumericOverflow)
+        );
+    }
+
+    #[test]
+    fn rejects_mass_contribution_lost_to_addition_rounding() {
+        let mut aircraft = profile();
+        aircraft.empty_mass_kg = 1.0e200;
+        aircraft.empty_moment_kg_m = 0.0;
+        aircraft.maximum_takeoff_mass_kg = f64::MAX;
+        aircraft.stations[0].maximum_station_load_kg = 1.0e100;
+        aircraft.cg_envelope[0].maximum_mass_kg = f64::MAX;
+        assert_eq!(
+            audit_loading(&aircraft, &scenario(vec![cargo("box-1", "FWD", 1.0)])),
+            Err(AuditInputError::NumericPrecisionLoss)
+        );
+    }
+
+    #[test]
+    fn rejects_nonzero_mass_arm_product_lost_to_underflow() {
+        let mut aircraft = profile();
+        aircraft.empty_mass_kg = 1.0e-200;
+        aircraft.empty_moment_kg_m = 0.0;
+        aircraft.maximum_takeoff_mass_kg = 1.0;
+        aircraft.stations[0].arm_m = 1.0e-200;
+        aircraft.stations[0].maximum_station_load_kg = 1.0;
+        aircraft.cg_envelope[0].minimum_mass_kg = 1.0e-200;
+        aircraft.cg_envelope[0].maximum_mass_kg = 1.0;
+        let item = cargo("tiny-box", "FWD", 1.0e-200);
+        assert_eq!(
+            audit_loading(&aircraft, &scenario(vec![item])),
+            Err(AuditInputError::NumericPrecisionLoss)
         );
     }
 
