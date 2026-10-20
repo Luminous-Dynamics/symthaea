@@ -315,9 +315,7 @@ fn execute() -> Result<()> {
 
     let interval_positive = lower > 0.0;
     let effect_gate = effect >= 0.10;
-    let passed = interval_positive
-        && effect_gate
-        && clusters >= MIN_CONFIRMATORY_FAMILY_CLUSTERS;
+    let passed = interval_positive && effect_gate && clusters >= MIN_CONFIRMATORY_FAMILY_CLUSTERS;
     let gate_decision = if clusters < MIN_CONFIRMATORY_FAMILY_CLUSTERS {
         "underpowered_too_few_independent_family_clusters"
     } else if passed {
