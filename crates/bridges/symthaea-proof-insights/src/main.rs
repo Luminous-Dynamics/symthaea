@@ -913,7 +913,7 @@ fn audit_temporal_timeline(
     let resolved_output = canonical_parent.join(
         output_path
             .file_name()
-            .context("timeline audit output path must have a file name")?
+            .context("timeline audit output path must have a file name")?,
     );
     if resolved_output.starts_with(&root) {
         bail!("timeline audit output must be outside the pinned repository checkout");
