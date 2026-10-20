@@ -9,6 +9,7 @@ pub mod operating_envelope;
 pub mod fidelity_ledger;
 pub mod reference_intake;
 pub mod validation_scorecard;
+pub mod uncertainty_comparison;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PowerChannel {
