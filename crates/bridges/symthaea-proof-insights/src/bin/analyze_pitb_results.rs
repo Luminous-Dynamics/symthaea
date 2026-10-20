@@ -268,6 +268,66 @@ struct PrimaryComparison {
     gate_decision: String,
 }
 
+#[derive(Debug, Serialize)]
+struct FamilyTargetCount {
+    family_id: String,
+    eligible_target_count: usize,
+}
+
+#[derive(Debug, Serialize)]
+struct PowerScenario {
+    status: String,
+    true_treatment_effect_percentage_points: f64,
+    assumed_family_icc: f64,
+    study_simulations: usize,
+    bootstrap_replicates_per_simulated_study: usize,
+    utility_gate_passes: usize,
+    estimated_utility_gate_power: Option<f64>,
+    monte_carlo_standard_error: Option<f64>,
+    mean_observed_effect_percentage_points: Option<f64>,
+    mean_lower_95ci_percentage_points: Option<f64>,
+    interpretation: String,
+}
+
+#[derive(Debug, Serialize)]
+struct PowerReport {
+    schema_version: &'static str,
+    protocol_id: String,
+    protocol_sha256: String,
+    run_config_sha256: String,
+    validation_results_sha256: String,
+    baseline_selection_receipt_sha256: String,
+    split_manifest_sha256: String,
+    partition_digest_sha256: String,
+    analyzer_source_sha256: String,
+    upstream_commit: String,
+    selected_baseline_arm: String,
+    eligible_validation_target_count: usize,
+    eligible_validation_family_count: usize,
+    validation_baseline_semantic_success_rate: f64,
+    family_target_counts: Vec<FamilyTargetCount>,
+    assumed_family_icc_grid: Vec<f64>,
+    true_effect_grid_percentage_points: Vec<f64>,
+    study_simulations: usize,
+    bootstrap_replicates_per_simulated_study: usize,
+    simulation_seed: u64,
+    confirmatory_minimum_family_count: usize,
+    utility_effect_threshold_percentage_points: f64,
+    required_power_at_20pp_and_icc_020: f64,
+    maximum_false_claim_probability_at_zero_effect: f64,
+    null_effect_false_claim_probability_max: Option<f64>,
+    estimated_power_at_20pp_and_icc_020: Option<f64>,
+    power_gate_passed: bool,
+    scenarios: Vec<PowerScenario>,
+    model_assumptions: Vec<String>,
+    interpretation: String,
+}
+
+struct SimulatedFamily {
+    target_count: usize,
+    paired_delta_sum: i64,
+}
+
 fn main() -> ExitCode {
     match execute() {
         Ok(()) => ExitCode::SUCCESS,
