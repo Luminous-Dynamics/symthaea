@@ -199,7 +199,8 @@ struct TemporalEvidenceArtifact {
     theorem_id: Option<String>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 struct MaterializedVisibleArtifact {
     artifact_id: String,
     path: String,
@@ -213,20 +214,23 @@ struct MaterializedVisibleArtifact {
     content: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 struct TemporalTargetPayload {
-    schema_version: &'static str,
+    schema_version: String,
     repository_url: String,
     repository_commit: String,
     target_id: String,
     theorem_id: String,
     position: usize,
     target_state_commit: String,
+    statement_artifact_id: String,
     statement_sha256: String,
     visible_artifacts: Vec<MaterializedVisibleArtifact>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 struct TemporalTargetBundle {
     payload_sha256: String,
     payload: TemporalTargetPayload,
@@ -281,6 +285,15 @@ fn main() -> ExitCode {
             Ok(()) => ExitCode::SUCCESS,
             Err(error) => {
                 eprintln!("proof-insights temporal target materialization: {error:#}");
+                ExitCode::FAILURE
+            }
+        };
+    }
+    if args.len() == 3 && args[1] == "--verify-temporal-bundle" {
+        return match verify_temporal_target_bundle(Path::new(&args[2])) {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(error) => {
+                eprintln!("proof-insights temporal target bundle verification: {error:#}");
                 ExitCode::FAILURE
             }
         };
@@ -880,13 +893,14 @@ fn materialize_temporal_target(
     }
 
     let payload = TemporalTargetPayload {
-        schema_version: "pitb.temporal-target-bundle.v0",
+        schema_version: "pitb.temporal-target-bundle.v0".to_string(),
         repository_url: manifest.repository_url,
         repository_commit: manifest.repository_commit,
         target_id: event.target_id.clone(),
         theorem_id: event.theorem_id.clone(),
         position: event.position,
         target_state_commit: event.target_state_commit.clone(),
+        statement_artifact_id: event.statement_artifact_id.clone(),
         statement_sha256: event.statement_sha256.clone(),
         visible_artifacts,
     };
@@ -941,6 +955,119 @@ fn materialize_temporal_target(
         bundle.payload.visible_artifacts.len(),
         bundle.payload_sha256,
         resolved_output.display()
+    );
+    Ok(())
+}
+
+fn verify_temporal_target_bundle(bundle_path: &Path) -> Result<()> {
+    let bytes = fs::read(bundle_path)
+        .with_context(|| format!("cannot read temporal target bundle {}", bundle_path.display()))?;
+    let bundle: TemporalTargetBundle =
+        serde_json::from_slice(&bytes).context("parse temporal target bundle JSON")?;
+    let payload = &bundle.payload;
+    if payload.schema_version != "pitb.temporal-target-bundle.v0" {
+        bail!("unsupported temporal target bundle schema {}", payload.schema_version);
+    }
+    if !payload.repository_url.starts_with("https://") {
+        bail!("temporal target bundle must pin an HTTPS repository URL");
+    }
+    validate_git_sha(&payload.repository_commit).context("invalid bundle repository commit")?;
+    validate_git_sha(&payload.target_state_commit).context("invalid target-state commit")?;
+    validate_sha256_hex(&payload.statement_sha256).context("invalid target statement digest")?;
+    if payload.target_id.trim().is_empty()
+        || payload.theorem_id.trim().is_empty()
+        || payload.position == usize::MAX
+    {
+        bail!("temporal target bundle contains invalid target metadata");
+    }
+    if payload.visible_artifacts.is_empty() {
+        bail!("temporal target bundle cannot contain an empty visible context");
+    }
+
+    let canonical_payload =
+        serde_json::to_vec(payload).context("serialize canonical temporal target payload")?;
+    let expected_bundle_digest = format!("{:x}", Sha256::digest(&canonical_payload));
+    if bundle.payload_sha256 != expected_bundle_digest {
+        bail!(
+            "target bundle payload digest mismatch: expected {}, found {}",
+            expected_bundle_digest,
+            bundle.payload_sha256
+        );
+    }
+
+    let mut seen_ids = BTreeSet::new();
+    let mut statement_found = false;
+    for artifact in &payload.visible_artifacts {
+        if artifact.artifact_id.trim().is_empty() || !seen_ids.insert(artifact.artifact_id.as_str()) {
+            bail!("bundle contains an empty or duplicate visible artifact ID");
+        }
+        let normalized_path = normalize_root_relative_path(&artifact.path)?;
+        if normalized_path != artifact.path {
+            bail!("bundle artifact path is not canonical: {}", artifact.path);
+        }
+        validate_sha256_hex(&artifact.content_sha256)
+            .with_context(|| format!("invalid bundle content digest for {}", artifact.artifact_id))?;
+        validate_sha256_hex(&artifact.source_file_sha256)
+            .with_context(|| format!("invalid bundle source-file digest for {}", artifact.artifact_id))?;
+        validate_git_sha(&artifact.source_commit)
+            .with_context(|| format!("invalid bundle source commit for {}", artifact.artifact_id))?;
+        let observed_content_digest = format!("{:x}", Sha256::digest(artifact.content.as_bytes()));
+        if observed_content_digest != artifact.content_sha256 {
+            bail!("bundle artifact content does not match digest for {}", artifact.artifact_id);
+        }
+
+        if artifact.artifact_id == payload.statement_artifact_id {
+            if artifact.artifact_kind != "theorem_statement"
+                || artifact.theorem_id.as_deref() != Some(payload.theorem_id.as_str())
+                || artifact.content_sha256 != payload.statement_sha256
+                || artifact.target_position.is_some()
+                || artifact.available_at_position.is_none_or(|position| position > payload.position)
+            {
+                bail!("bundle's exact target-statement artifact violates the statement/visibility contract");
+            }
+            statement_found = true;
+            continue;
+        }
+
+        match artifact.artifact_kind.as_str() {
+            "proof_body" => {
+                if artifact.available_at_position.is_some()
+                    || artifact.target_position.is_none_or(|position| position >= payload.position)
+                {
+                    bail!(
+                        "bundle proof {} is not an earlier completed proof",
+                        artifact.artifact_id
+                    );
+                }
+            }
+            "definition" | "module_context" | "theorem_statement" => {
+                if artifact.target_position.is_some()
+                    || artifact.available_at_position.is_none_or(|position| position >= payload.position)
+                {
+                    bail!(
+                        "bundle artifact {} was not available before the target",
+                        artifact.artifact_id
+                    );
+                }
+            }
+            other => bail!("bundle contains forbidden artifact kind {other}"),
+        }
+        if artifact.theorem_id.as_deref() == Some(payload.theorem_id.as_str())
+            && artifact.artifact_kind == "proof_body"
+            && artifact.target_position == Some(payload.position)
+        {
+            bail!("bundle contains the target's own proof body");
+        }
+    }
+
+    if !statement_found {
+        bail!("bundle omits the exact target statement artifact");
+    }
+    println!(
+        "PITB_TEMPORAL_BUNDLE_VERIFY_PASS: target={} visible_artifacts={} payload_sha256={}",
+        payload.target_id,
+        payload.visible_artifacts.len(),
+        bundle.payload_sha256
     );
     Ok(())
 }
