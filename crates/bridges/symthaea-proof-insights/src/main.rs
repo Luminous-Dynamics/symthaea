@@ -3195,6 +3195,20 @@ mod tests {
                 "file_path": "../outside.lean",
                 "commit_before": commit_one,
                 "formal_statement": "theorem outside : True := by"
+            }),
+            serde_json::json!({
+                "id": "missing-before-commit",
+                "theorem_name": "other",
+                "file_path": "lean/Other.lean",
+                "commit_before": "f".repeat(40),
+                "formal_statement": "theorem other : True := by"
+            }),
+            serde_json::json!({
+                "id": "malformed-before-commit",
+                "theorem_name": "other",
+                "file_path": "lean/Other.lean",
+                "commit_before": "not-a-git-sha",
+                "formal_statement": "theorem other : True := by"
             })
         ];
         let dataset_text = dataset_rows
@@ -3396,15 +3410,15 @@ mod tests {
         .expect("parse synthetic dataset join audit JSON");
         assert_eq!(dataset_audit["total_timeline_rows"], 4);
         assert_eq!(dataset_audit["unique_timeline_path_count"], 3);
-        assert_eq!(dataset_audit["total_dataset_records"], 5);
-        assert_eq!(dataset_audit["unique_dataset_id_count"], 5);
-        assert_eq!(dataset_audit["unique_path_join_count"], 2);
+        assert_eq!(dataset_audit["total_dataset_records"], 7);
+        assert_eq!(dataset_audit["unique_dataset_id_count"], 7);
+        assert_eq!(dataset_audit["unique_path_join_count"], 4);
         assert_eq!(dataset_audit["ambiguous_path_join_count"], 1);
         assert_eq!(dataset_audit["unmatched_path_join_count"], 1);
         assert_eq!(dataset_audit["invalid_dataset_path_count"], 1);
         assert_eq!(dataset_audit["commit_before_ancestor_of_head_count"], 5);
-        assert_eq!(dataset_audit["commit_before_missing_commit_object_count"], 0);
-        assert_eq!(dataset_audit["commit_before_invalid_sha_count"], 0);
+        assert_eq!(dataset_audit["commit_before_missing_commit_object_count"], 1);
+        assert_eq!(dataset_audit["commit_before_invalid_sha_count"], 1);
         assert_eq!(dataset_audit["commit_before_ancestor_of_completion_count"], 2);
         let dataset_events = dataset_audit["events"]
             .as_array()
@@ -3436,6 +3450,16 @@ mod tests {
         assert_eq!(
             dataset_events[4]["statement_match_relation"],
             "not_checked_due_to_invalid_path"
+        );
+        assert_eq!(dataset_events[5]["commit_before_object_exists"], false);
+        assert_eq!(
+            dataset_events[5]["statement_match_relation"],
+            "completion_match_pre_state_unavailable"
+        );
+        assert_eq!(dataset_events[6]["commit_before_object_exists"], null);
+        assert_eq!(
+            dataset_events[6]["statement_match_relation"],
+            "completion_match_pre_state_unavailable"
         );
 
         let target_bundle_path = base.join("target-001-bundle.json");
