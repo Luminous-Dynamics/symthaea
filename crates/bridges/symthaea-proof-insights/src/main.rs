@@ -82,6 +82,14 @@ struct SourceFingerprint {
     bytes: u64,
 }
 
+#[derive(Debug, Clone, Serialize)]
+struct CatalogueLinkedArtifact {
+    path: String,
+    file_exists: bool,
+    sha256: Option<String>,
+    bytes: Option<u64>,
+}
+
 #[derive(Debug, Serialize)]
 struct IndexedFormalizationSource {
     title: String,
@@ -131,6 +139,10 @@ struct IndexSummary {
     formalization_sources_mapped_to_family: usize,
     formalization_sources_unmapped: usize,
     formalization_source_files_missing: usize,
+    catalogue_linked_artifact_count: usize,
+    catalogue_linked_artifacts_present: usize,
+    catalogue_linked_artifacts_missing: usize,
+    missing_catalogue_linked_artifact_paths: Vec<String>,
     families_with_directly_mapped_formalization_sources: usize,
     main_result_declaration_count: usize,
     main_result_artifacts_missing: Vec<String>,
@@ -149,6 +161,7 @@ struct SourceIndex {
     upstream_status_scope: Option<String>,
     catalogue_claims: CatalogueClaims,
     source_fingerprints: Vec<SourceFingerprint>,
+    catalogue_linked_artifacts: Vec<CatalogueLinkedArtifact>,
     family_split_plan: FamilySplitPlan,
     summary: IndexSummary,
     families: Vec<FamilyRecord>,
@@ -281,6 +294,12 @@ fn execute_from_args() -> Result<()> {
         });
     }
 
+    // Inventory every local artifact linked from the catalogue, not only the subset
+    // already listed in the formalization manifest. Missing links are explicit rows;
+    // present files are content-hashed and added to the same source fingerprint set.
+    let catalogue_linked_artifacts =
+        inventory_catalogue_links(&root, &families, &mut source_file_fingerprints)?;
+
     let family_source_titles: BTreeMap<String, Vec<String>> = {
         let mut map: BTreeMap<String, Vec<String>> = BTreeMap::new();
         for source in &indexed_sources {
@@ -334,6 +353,20 @@ fn execute_from_args() -> Result<()> {
         formalization_sources_mapped_to_family: mapped_count,
         formalization_sources_unmapped: indexed_sources.len() - mapped_count,
         formalization_source_files_missing: missing_source_ids.len(),
+        catalogue_linked_artifact_count: catalogue_linked_artifacts.len(),
+        catalogue_linked_artifacts_present: catalogue_linked_artifacts
+            .iter()
+            .filter(|artifact| artifact.file_exists)
+            .count(),
+        catalogue_linked_artifacts_missing: catalogue_linked_artifacts
+            .iter()
+            .filter(|artifact| !artifact.file_exists)
+            .count(),
+        missing_catalogue_linked_artifact_paths: catalogue_linked_artifacts
+            .iter()
+            .filter(|artifact| !artifact.file_exists)
+            .map(|artifact| artifact.path.clone())
+            .collect(),
         families_with_directly_mapped_formalization_sources: families
             .iter()
             .filter(|family| !family.directly_mapped_formalization_sources.is_empty())
@@ -354,6 +387,7 @@ fn execute_from_args() -> Result<()> {
         upstream_status_scope: manifest.status.scope,
         catalogue_claims,
         source_fingerprints,
+        catalogue_linked_artifacts,
         family_split_plan,
         summary,
         families,
@@ -561,6 +595,44 @@ fn fingerprint(root: &Path, relative_path: &str) -> Result<SourceFingerprint> {
         sha256: format!("{:x}", Sha256::digest(&content)),
         bytes,
     })
+}
+
+fn inventory_catalogue_links(
+    root: &Path,
+    families: &[FamilyRecord],
+    source_file_fingerprints: &mut BTreeMap<String, SourceFingerprint>,
+) -> Result<Vec<CatalogueLinkedArtifact>> {
+    let linked_paths: BTreeSet<String> = families
+        .iter()
+        .flat_map(|family| family.linked_paths.iter().cloned())
+        .collect();
+    let mut inventory = Vec::with_capacity(linked_paths.len());
+
+    for relative_path in linked_paths {
+        let candidate_path = root.join(&relative_path);
+        if candidate_path.is_file() {
+            // fingerprint() canonicalizes and rejects symlinks that leave the pinned checkout.
+            let artifact = fingerprint(root, &relative_path)?;
+            source_file_fingerprints
+                .entry(relative_path.clone())
+                .or_insert_with(|| artifact.clone());
+            inventory.push(CatalogueLinkedArtifact {
+                path: relative_path,
+                file_exists: true,
+                sha256: Some(artifact.sha256),
+                bytes: Some(artifact.bytes),
+            });
+        } else {
+            inventory.push(CatalogueLinkedArtifact {
+                path: relative_path,
+                file_exists: false,
+                sha256: None,
+                bytes: None,
+            });
+        }
+    }
+
+    Ok(inventory)
 }
 
 fn extract_families(contents: &str) -> Result<Vec<FamilyRecord>> {
@@ -967,6 +1039,51 @@ mod tests {
             split: String::new(),
         }];
         assert!(assign_family_splits(&mut families).is_err());
+    }
+
+    #[test]
+    fn catalogue_link_inventory_hashes_present_files_and_retains_missing_paths() {
+        let root = std::env::temp_dir().join(format!(
+            "symthaea-proof-insights-catalogue-links-{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(root.join("preprints")).expect("create synthetic catalogue");
+        let bytes = b"synthetic manuscript bytes";
+        fs::write(root.join("preprints/present.pdf"), bytes).expect("write present artifact");
+
+        let contents = r#"
+**001. Synthetic family.**
+[present manuscript](preprints/present.pdf)
+[missing manuscript](preprints/missing.pdf)
+"#;
+        let families = extract_families(contents).expect("parse synthetic catalogue");
+        let mut fingerprints = BTreeMap::new();
+        let inventory = inventory_catalogue_links(&root, &families, &mut fingerprints)
+            .expect("inventory linked artifacts");
+
+        assert_eq!(inventory.len(), 2);
+        let present = inventory
+            .iter()
+            .find(|artifact| artifact.path == "preprints/present.pdf")
+            .expect("present artifact row");
+        assert!(present.file_exists);
+        assert_eq!(
+            present.sha256.as_deref(),
+            Some(format!("{:x}", Sha256::digest(bytes)).as_str())
+        );
+        assert_eq!(present.bytes, Some(bytes.len() as u64));
+        assert!(fingerprints.contains_key("preprints/present.pdf"));
+
+        let missing = inventory
+            .iter()
+            .find(|artifact| artifact.path == "preprints/missing.pdf")
+            .expect("missing artifact row");
+        assert!(!missing.file_exists);
+        assert_eq!(missing.sha256, None);
+        assert_eq!(missing.bytes, None);
+
+        fs::remove_dir_all(&root).expect("remove synthetic catalogue");
     }
 
     #[test]
