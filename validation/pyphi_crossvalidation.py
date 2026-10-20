@@ -23,6 +23,7 @@ Date: 2026-01-04
 Version: 1.0.0
 """
 
+import argparse
 import subprocess
 import json
 import numpy as np
@@ -263,7 +264,15 @@ class PyPhiValidator:
         if not PYPHI_AVAILABLE:
             raise RuntimeError("PyPhi not installed")
 
+        from importlib.metadata import version as package_version
         import time
+
+        installed_version = package_version("pyphi")
+        if installed_version != "2.0.0rc4":
+            raise RuntimeError(
+                f"PyPhi version {installed_version} is not qualified for this harness; "
+                "install the pinned validation dependency pyphi==2.0.0rc4."
+            )
 
         # Create adjacency matrix
         adj = self.edges_to_adjacency(topology.n_nodes, topology.edges)
@@ -486,6 +495,36 @@ class PyPhiValidator:
             "- N/A means a valid paired measurement was not produced.",
             "",
         ])
+        output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_text("\n".join(md), encoding="utf-8")
         logger.info("Report saved to %s", output_path)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        description="Run the fail-closed Symthaea/PyPhi validation scaffold."
+    )
+    parser.add_argument("--max-nodes", type=int, default=8)
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=Path("results/pyphi_validation_results.md"),
+        help="Markdown report destination.",
+    )
+    args = parser.parse_args()
+
+    validator = PyPhiValidator()
+    report = validator.run_validation(max_nodes=args.max_nodes)
+    validator.generate_report(report, args.output)
+    paired_count = sum(
+        result.hdc_phi is not None and result.pyphi_phi is not None
+        for result in report.results
+    )
+    print(f"Status: NOT QUALIFIED (paired measurements={paired_count}, failures={report.n_failed})")
+    print(f"Report: {args.output}")
+    return 0 if paired_count >= 3 and report.n_failed == 0 else 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
 
