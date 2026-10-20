@@ -1,0 +1,86 @@
+{
+  "schema": "luminous.landscape-design.v0",
+  "schema_uri": "https://luminousdynamics.io/schemas/landscape-design-v0.schema.json",
+  "project_name": "Starter landscape (schematic)",
+  "scope": "site-parcel",
+  "coordinate_frame": {
+    "kind": "LOCAL_CARTESIAN_DRAWING_UNITS",
+    "origin": "canvas top-left",
+    "x_axis": "right",
+    "y_axis": "down",
+    "georeferenced": false
+  },
+  "geometry_status": "schematic-design-intent",
+  "features": [
+    {
+      "id": "feature-0001",
+      "kind": "tree",
+      "label": "Canopy tree",
+      "x_du": 180,
+      "y_du": 160,
+      "status": "design-intent",
+      "source": "user-authored-schematic",
+      "geometry_representation": "schematic-symbol-anchor-v0"
+    },
+    {
+      "id": "feature-0002",
+      "kind": "tree",
+      "label": "Canopy tree",
+      "x_du": 245,
+      "y_du": 195,
+      "status": "design-intent",
+      "source": "user-authored-schematic",
+      "geometry_representation": "schematic-symbol-anchor-v0"
+    },
+    {
+      "id": "feature-0003",
+      "kind": "planting-bed",
+      "label": "Planting bed",
+      "x_du": 365,
+      "y_du": 250,
+      "status": "design-intent",
+      "source": "user-authored-schematic",
+      "geometry_representation": "schematic-symbol-anchor-v0"
+    },
+    {
+      "id": "feature-0004",
+      "kind": "water",
+      "label": "Water feature",
+      "x_du": 430,
+      "y_du": 285,
+      "status": "design-intent",
+      "source": "user-authored-schematic",
+      "geometry_representation": "schematic-symbol-anchor-v0"
+    },
+    {
+      "id": "feature-0005",
+      "kind": "path",
+      "label": "Path",
+      "x_du": 540,
+      "y_du": 360,
+      "status": "design-intent",
+      "source": "user-authored-schematic",
+      "geometry_representation": "schematic-symbol-anchor-v0"
+    },
+    {
+      "id": "feature-0006",
+      "kind": "built-element",
+      "label": "Built element",
+      "x_du": 740,
+      "y_du": 190,
+      "status": "design-intent",
+      "source": "user-authored-schematic",
+      "geometry_representation": "schematic-symbol-anchor-v0"
+    },
+    {
+      "id": "feature-0007",
+      "kind": "tree",
+      "label": "Canopy tree",
+      "x_du": 785,
+      "y_du": 420,
+      "status": "design-intent",
+      "source": "user-authored-schematic",
+      "geometry_representation": "schematic-symbol-anchor-v0"
+    }
+  ]
+}
