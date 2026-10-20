@@ -372,6 +372,7 @@ mod tests {
             "workcell lane must include fail-closed corpus execution and valid controls"
         );
     }
+
     #[test]
     fn discovery_and_active_learning_lanes_require_pareto_reporting() {
         let registry = load_embedded_registry().expect("checked-in JSON should parse");
@@ -394,4 +395,5 @@ mod tests {
                 "{lane_id} must explicitly gate Pareto reporting"
             );
         }
-    }}
+    }
+}
