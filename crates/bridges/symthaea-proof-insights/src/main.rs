@@ -857,7 +857,11 @@ fn audit_temporal_dataset(
             path_join_status = "invalid_path".to_string();
         } else {
             match candidate_matches {
-                None | Some(ref candidates) if candidates.is_empty() => {
+                None => {
+                    unmatched_path_join_count += 1;
+                    path_join_status = "no_path_match".to_string();
+                }
+                Some(candidates) if candidates.is_empty() => {
                     unmatched_path_join_count += 1;
                     path_join_status = "no_path_match".to_string();
                 }
