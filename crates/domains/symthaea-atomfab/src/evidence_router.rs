@@ -907,7 +907,7 @@ mod tests {
             '1',
         );
         assert_eq!(
-            score_evidence_route(&route, &[static_outcome.clone()]),
+            score_evidence_route(&route, std::slice::from_ref(&static_outcome)),
             Err(EvidenceRouteError::MissingEligibleOutcome)
         );
         let universal_outcome = outcome(
