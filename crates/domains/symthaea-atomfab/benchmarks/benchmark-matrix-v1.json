@@ -175,7 +175,8 @@
         "fraction of candidates satisfying geometry and interface validity constraints",
         "energy error conditional on structure recovery",
         "search cost per unique validated low-energy structure",
-        "best validated objective and learning curve at equal cost"
+        "best validated objective and learning curve at equal cost",
+        "Pareto frontier over unique reference-validated low-energy structures, best validated objective, and total cost; do not collapse these dimensions into one weighted score"
       ],
       "gates": [
         "report energy accuracy and structural exploration as separate score families",
@@ -184,7 +185,8 @@
         "group related configurations by parent nanoparticle/support system when defining held-out splits",
         "count failed relaxations, duplicate minima, and invalid interfaces rather than silently excluding them",
         "compare search policies at equal reference-calculation budgets and include a strong pretrained potential",
-        "do not generalize from the chosen supported-nanoparticle family to universal catalyst performance"
+        "do not generalize from the chosen supported-nanoparticle family to universal catalyst performance",
+        "report the nondominated policy set per matched seed; hard-constraint violations make an outcome ineligible rather than tradeable against discovery quality or cost"
       ]
     },
     {
@@ -235,7 +237,8 @@
         "queries and time to target",
         "risk-coverage curve",
         "risk-coverage AURC at matched coverage and budget",
-        "coverage and false-feasible count alongside selective risk; abstention is not free success"
+        "coverage and false-feasible count alongside selective risk; abstention is not free success",
+        "matched-seed Pareto frontier over validated objective quality, unique reference-validated discoveries, and declared total cost"
       ],
       "gates": [
         "freeze target and budget before campaigns",
@@ -244,7 +247,8 @@
         "report full curves and confidence intervals",
         "no win unless quality is at least as good at equal budget",
         "compare uncertainty-ranked selection against random-score and shuffled-score negative controls; report retained coverage and risk together",
-        "report realized coverage at nominal 50%, 75%, 90%, and 100% operating points; never split equal-uncertainty ties to hit a nominal coverage exactly"
+        "report realized coverage at nominal 50%, 75%, 90%, and 100% operating points; never split equal-uncertainty ties to hit a nominal coverage exactly",
+        "publish nondominated policies and per-dimension trade-offs; never use a single weighted score to hide discovery, quality, or cost regressions"
       ]
     },
     {
