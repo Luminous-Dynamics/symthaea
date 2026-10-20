@@ -39,12 +39,20 @@ cargo run -p symthaea-connectivity-explainer -- \
   crates/domains/symthaea-connectivity-explainer/examples/connectivity-report-synthetic-v1.json
 ```
 
-Or write the JSON to a file:
+The default command prints a plain-language report. For machine-readable output on stdout:
 
 ```sh
 cargo run -p symthaea-connectivity-explainer -- \
   crates/domains/symthaea-connectivity-explainer/examples/connectivity-report-synthetic-v1.json \
-  /tmp/connectivity-explanation.json
+  --json
+```
+
+Or write JSON for another tool to consume:
+
+```sh
+cargo run -p symthaea-connectivity-explainer -- \
+  crates/domains/symthaea-connectivity-explainer/examples/connectivity-report-synthetic-v1.json \
+  --json /tmp/connectivity-explanation.json
 ```
 
 ## Industry comparison and research standards
