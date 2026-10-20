@@ -776,11 +776,10 @@ fn audit_temporal_timeline(
             match verified_commit_cache.get(&completion_commit) {
                 Some(verified) => *verified,
                 None => {
-                    let verified =
-                        git_is_ancestor(&root, &completion_commit, &repository_commit)
-                            .with_context(|| {
-                                format!("verify completion commit for timeline row {event_key}")
-                            })?;
+                    let verified = git_is_ancestor(&root, &completion_commit, &repository_commit)
+                        .with_context(|| {
+                            format!("verify completion commit for timeline row {event_key}")
+                        })?;
                     verified_commit_cache.insert(completion_commit.clone(), verified);
                     verified
                 }
