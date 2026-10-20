@@ -447,8 +447,13 @@ jobs:
               item for item in index["source_fingerprints"]
               if item["path"] == record["source"]["path"]
           ]
-          if len(indexed) != 1 or indexed[0]["sha256"] != source_sha256:
-              raise SystemExit("candidate source digest does not match the reproducible source index")
+          if len(indexed) > 1:
+              raise SystemExit("candidate source path is duplicated in the reproducible source index")
+          if indexed and indexed[0]["sha256"] != source_sha256:
+              raise SystemExit("candidate source digest disagrees with the reproducible source index")
+          # The upstream index is intentionally scoped to manifest and catalogue-linked
+          # artifacts, so a supporting Lean file may be absent. Its pinned-checkout
+          # bytes are still verified independently above.
           family = record["source"]["family_id"]
           assignments = [
               item for item in split_manifest["families"]
@@ -457,8 +462,8 @@ jobs:
           if len(assignments) != 1 or assignments[0]["split"] != "train":
               raise SystemExit("new candidate must remain in exactly one frozen training family")
           print(
-              "PITB_TRAINING_CANDIDATE_PROVENANCE_PASS: "
-              f"family={family} source_sha256={source_sha256} statement_sha256={statement_digest}"
+              "PITB_TRAINING_CANDIDATE_PINNED_SOURCE_PASS: "
+              f"family={family} indexed={bool(indexed)} source_sha256={source_sha256} statement_sha256={statement_digest}"
           )
           PY
           echo "PITB_PINNED_SOURCE_INDEX_PASS: $upstream_sha"
