@@ -1139,6 +1139,7 @@ pub fn perform_with_spec_and_dialect(
         notes: pv.notes,
     })
     .collect()
+}
 
 /// Resolve a spec's instrument names into the four performed voices
 /// (melody, harmony, bass, counter). Unknown names fall back LOUDLY
