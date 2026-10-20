@@ -57,6 +57,7 @@ pub struct PairedSliceRequirement {
     pub maximum_normalized_width_increase: f64,
     /// Maximum candidate false-safe rate; denominator is all valid pairs in this slice.
     pub maximum_false_safe_rate: f64,
+    pub maximum_missed_feasible_rate: f64,
     pub engineering_constraint: Option<EngineeringConstraint>,
 }
 
@@ -75,6 +76,8 @@ pub struct PairedReplayProfile {
     pub candidate_method_revision: String,
     /// Attestation that methods, splits, scoring contract and thresholds were frozen before
     /// the final confirmation outcomes were inspected.
+    pub baseline_target_label_group_ids: Vec<String>,
+    pub candidate_target_label_group_ids: Vec<String>,
     pub final_confirmation_frozen_before_outcomes: bool,
     /// Maximum allowed difference between highest and lowest candidate coverage across
     /// operating cases for the same observable, unit and nominal coverage level.
@@ -146,6 +149,18 @@ pub enum PairedReplayIssue {
     },
     EmptyGroupIdentifier { field: &'static str },
     DuplicateGroupIdentifier { field: &'static str, group_id: String },
+    TargetLabelBudgetRosterMismatch,
+    ConditionalGapRequiresMultipleOperatingCases {
+        observable_id: String,
+        unit_id: String,
+        nominal_coverage_bp: u16,
+    },
+    MissedFeasibleRateExceeded {
+        operating_case_id: String,
+        observable_id: String,
+        unit_id: String,
+        nominal_coverage_bp: u16,
+    },
     EmptyObservationField {
         observation_id: String,
         field: &'static str,
@@ -247,6 +262,8 @@ pub struct PairedSliceScore {
     pub candidate_coverage: Option<f64>,
     /// Candidate minus baseline; negative means lower candidate coverage.
     pub coverage_delta: Option<f64>,
+    pub coverage_delta_ci95_lower: Option<f64>,
+    pub coverage_delta_ci95_upper: Option<f64>,
     pub baseline_mean_interval_width: Option<f64>,
     pub candidate_mean_interval_width: Option<f64>,
     /// Candidate minus baseline; negative means narrower candidate intervals.
@@ -266,9 +283,13 @@ pub struct PairedSliceScore {
     pub paired_ci_method: Option<&'static str>,
     pub baseline_false_safe_count: usize,
     pub candidate_false_safe_count: usize,
-    /// False-safe count divided by all valid pairs, so the denominator is comparable across arms.
+    pub baseline_missed_feasible_count: usize,
+    pub candidate_missed_feasible_count: usize,
+    /// Counts divided by all valid pairs, making denominators comparable across arms.
     pub baseline_false_safe_rate: Option<f64>,
     pub candidate_false_safe_rate: Option<f64>,
+    pub baseline_missed_feasible_rate: Option<f64>,
+    pub candidate_missed_feasible_rate: Option<f64>,
     pub within_declared_envelope_count: usize,
     pub borderline_count: usize,
     pub out_of_domain_count: usize,
@@ -278,6 +299,7 @@ pub struct PairedSliceScore {
     pub score_non_degradation_gate_met: Option<bool>,
     pub width_non_degradation_gate_met: Option<bool>,
     pub false_safe_gate_met: Option<bool>,
+    pub missed_feasible_gate_met: Option<bool>,
     pub thresholds_met: Option<bool>,
 }
 
@@ -428,6 +450,8 @@ pub fn canonical_paired_replay_profile_sha256(profile: &PairedReplayProfile) -> 
     encoder.text("baseline_method_revision", &profile.baseline_method_revision);
     encoder.text("candidate_method_id", &profile.candidate_method_id);
     encoder.text("candidate_method_revision", &profile.candidate_method_revision);
+    encoder.strings("baseline_target_label_group_ids", &profile.baseline_target_label_group_ids);
+    encoder.strings("candidate_target_label_group_ids", &profile.candidate_target_label_group_ids);
     encoder.boolean(
         "final_confirmation_frozen_before_outcomes",
         profile.final_confirmation_frozen_before_outcomes,
@@ -586,6 +610,7 @@ fn validate_profile(profile: &PairedReplayProfile) -> (bool, Vec<PairedReplayIss
         for (value, field) in [
             (requirement.maximum_coverage_drop, "maximum_coverage_drop"),
             (requirement.maximum_false_safe_rate, "maximum_false_safe_rate"),
+            (requirement.maximum_missed_feasible_rate, "maximum_missed_feasible_rate"),
         ] {
             if !value.is_finite() || !(0.0..=1.0).contains(&value) {
                 issues.push(PairedReplayIssue::InvalidRequirementField {
@@ -684,6 +709,7 @@ impl Moments {
 struct SliceAccumulator {
     baseline_cover_count: usize,
     candidate_cover_count: usize,
+    coverage_delta: Moments,
     baseline_width: Moments,
     candidate_width: Moments,
     width_delta: Moments,
@@ -692,6 +718,8 @@ struct SliceAccumulator {
     score_delta: Moments,
     baseline_false_safe_count: usize,
     candidate_false_safe_count: usize,
+    baseline_missed_feasible_count: usize,
+    candidate_missed_feasible_count: usize,
     within_count: usize,
     borderline_count: usize,
     out_of_domain_count: usize,
@@ -712,6 +740,9 @@ impl SliceAccumulator {
         ).unwrap_or(false);
         self.baseline_cover_count += usize::from(baseline_covers);
         self.candidate_cover_count += usize::from(candidate_covers);
+        self.coverage_delta.add(
+            f64::from(candidate_covers) - f64::from(baseline_covers),
+        );
 
         let baseline_width = observation.baseline_upper - observation.baseline_lower;
         let candidate_width = observation.candidate_upper - observation.candidate_lower;
@@ -751,6 +782,10 @@ impl SliceAccumulator {
                 usize::from(baseline_predicted_safe && !actual_safe);
             self.candidate_false_safe_count +=
                 usize::from(candidate_predicted_safe && !actual_safe);
+            self.baseline_missed_feasible_count +=
+                usize::from(!baseline_predicted_safe && actual_safe);
+            self.candidate_missed_feasible_count +=
+                usize::from(!candidate_predicted_safe && actual_safe);
         }
 
         match observation.applicability {
@@ -1383,6 +1418,7 @@ mod tests {
             maximum_normalized_score_increase: 0.2,
             maximum_normalized_width_increase: 0.2,
             maximum_false_safe_rate: 0.0,
+            maximum_missed_feasible_rate: 1.0,
             engineering_constraint: Some(EngineeringConstraint {
                 direction: ConstraintDirection::MaximumAllowed,
                 limit: 100.0,
@@ -1403,6 +1439,8 @@ mod tests {
             baseline_method_revision: "r1".to_string(),
             candidate_method_id: "candidate".to_string(),
             candidate_method_revision: "r1".to_string(),
+            baseline_target_label_group_ids: vec!["label-1".to_string(), "label-2".to_string()],
+            candidate_target_label_group_ids: vec!["label-1".to_string(), "label-2".to_string()],
             final_confirmation_frozen_before_outcomes: true,
             maximum_conditional_coverage_gap: 0.50,
             evaluation_group_ids: (0..6).map(|i| format!("group-{i}")).collect(),
