@@ -826,8 +826,8 @@ mod tests {
         assert_eq!(summary.baseline_target_reached_count, 14);
         assert_eq!(summary.candidate_target_reached_count, 17);
         assert_eq!(summary.both_reached_count, 13);
-        assert_eq!(summary.baseline_only_reached_count, 4);
-        assert_eq!(summary.candidate_only_reached_count, 1);
+        assert_eq!(summary.baseline_only_reached_count, 1);
+        assert_eq!(summary.candidate_only_reached_count, 4);
         assert_eq!(summary.neither_reached_count, 2);
         assert_eq!(summary.reach_rate_difference, 0.15);
         summary.validate().unwrap();
