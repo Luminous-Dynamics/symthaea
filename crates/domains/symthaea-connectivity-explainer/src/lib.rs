@@ -9,6 +9,7 @@
 #![forbid(unsafe_code)]
 
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use serde_json::Value;
 
 pub const EXPLAINER_VERSION: &str = "symthaea.connectivity-explainer.v1";
@@ -95,6 +96,26 @@ pub struct ModeExplanation {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct TaskComparison {
+    pub task_id: String,
+    pub mode: String,
+    pub priority: String,
+    pub service_bytes: u64,
+    pub arrival_window: u64,
+    pub deadline_window: u64,
+    pub expires_after_window: u64,
+    pub baseline_delivered_bytes: u64,
+    pub candidate_delivered_bytes: u64,
+    pub baseline_outcome: String,
+    pub candidate_outcome: String,
+    pub baseline_completion_window: Option<u64>,
+    pub candidate_completion_window: Option<u64>,
+    pub baseline_failure_reason: Option<String>,
+    pub candidate_failure_reason: Option<String>,
+    pub explanation: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Explanation {
     pub schema_version: String,
     pub evidence_class: EvidenceClass,
@@ -103,6 +124,7 @@ pub struct Explanation {
     pub simple_explanation: String,
     pub findings: Vec<String>,
     pub modes: Vec<ModeExplanation>,
+    pub task_comparisons: Vec<TaskComparison>,
     pub limitations: Vec<String>,
     pub recommended_next_step: String,
     pub scenario_sha256: Option<String>,
