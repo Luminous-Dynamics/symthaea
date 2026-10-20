@@ -342,6 +342,24 @@ fn execute_from_args() -> Result<()> {
         }
     }
     source_fingerprints.extend(source_file_fingerprints.into_values());
+    source_fingerprints.sort_by(|left, right| left.path.cmp(&right.path));
+    let mut unique_fingerprints: Vec<SourceFingerprint> =
+        Vec::with_capacity(source_fingerprints.len());
+    for artifact in source_fingerprints {
+        if let Some(previous) = unique_fingerprints.last() {
+            if previous.path == artifact.path {
+                if previous.sha256 != artifact.sha256 || previous.bytes != artifact.bytes {
+                    bail!(
+                        "conflicting fingerprints for the same repository-relative path {}",
+                        artifact.path
+                    );
+                }
+                continue;
+            }
+        }
+        unique_fingerprints.push(artifact);
+    }
+    let source_fingerprints = unique_fingerprints;
 
     let mapped_count = indexed_sources
         .iter()
@@ -425,6 +443,12 @@ fn execute_from_args() -> Result<()> {
     eprintln!(
         "formalization source files missing: {}",
         index.summary.formalization_source_files_missing
+    );
+    eprintln!(
+        "catalogue-linked artifacts: {} present / {} missing ({} total)",
+        index.summary.catalogue_linked_artifacts_present,
+        index.summary.catalogue_linked_artifacts_missing,
+        index.summary.catalogue_linked_artifact_count
     );
     eprintln!(
         "declared main-result entries: {}",
