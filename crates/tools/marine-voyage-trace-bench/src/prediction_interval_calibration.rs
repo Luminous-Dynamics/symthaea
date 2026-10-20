@@ -1199,12 +1199,12 @@ mod tests {
         p.profile_manifest_sha256 = canonical_calibration_profile_sha256(&p);
 
         let observations = vec![
-            observation("deep-1", "eval-A", 8.0, 12.0, 10.0),
             {
-                let mut o = observation("shallow-1", "eval-B", 8.0, 12.0, 10.0);
-                o.operating_case_id = "depth-ratio-1.2".to_owned();
+                let mut o = observation("deep-1", "eval-A", 8.0, 12.0, 10.0);
+                o.operating_case_id = "depth-ratio-4.0".to_owned();
                 o
             },
+            observation("shallow-1", "eval-B", 8.0, 12.0, 10.0),
         ];
         let report = evaluate_calibration(&p, &observations);
         assert_eq!(report.disposition, CalibrationDisposition::PassDeclaredCalibrationThresholds);
