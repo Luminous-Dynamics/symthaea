@@ -230,7 +230,6 @@ fn execute_from_args() -> Result<()> {
     let contents_path = root.join("CONTENTS.md");
     let readme_path = root.join("README.md");
     let manifest_path = root.join("lean/formalization.yaml");
-    let comparator_readme_path = root.join("lean/ComparatorChallenges/README.md");
 
     let contents = fs::read_to_string(&contents_path)
         .with_context(|| format!("cannot read {}", contents_path.display()))?;
