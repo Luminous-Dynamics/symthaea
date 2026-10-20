@@ -11,6 +11,7 @@ pub mod reference_intake;
 pub mod validation_scorecard;
 pub mod uncertainty_comparison;
 pub mod prediction_interval_calibration;
+pub mod shift_claim_gate;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PowerChannel {
