@@ -139,7 +139,7 @@ The candidate should advance only if it meets all applicable gates on frozen hel
 
 - **Safety:** zero observed hard-limit violations in the declared constrained test envelope, with a separate uncertainty bound and clear statement that this is not a universal guarantee.
 - **Burden:** at least 25% lower 95th-percentile unsafe exposure than the strongest reactive baseline, with the paired 95% interval excluding zero improvement.
-- **Benign performance:** no more than 3% task-reward loss against task-only control in the calm regime.
+- **Benign performance:** no more than 3% task-reward loss against the strongest reactive baseline that satisfies the declared viability limits in the calm regime. Report task-only reward separately as a throughput reference, even if task-only violates those limits.
 - **False alarms:** no more than a 5-percentage-point increase in calm-regime false-alarm rate.
 - **Recovery:** lower recovery exposure or time without hiding right-censored episodes.
 - **Forecast value:** predictive controller must outperform the shuffled-forecast negative control on held-out regime changes; otherwise the forecast mechanism has not been shown useful.
