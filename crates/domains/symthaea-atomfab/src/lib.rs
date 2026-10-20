@@ -649,6 +649,50 @@ mod tests {
     }
 
     #[test]
+    fn top_weighted_overlap_matches_brute_force_prefix_intersections() {
+        use std::collections::BTreeSet;
+
+        let rankings: [&[u64]; 6] = [
+            &[1, 2, 3, 4],
+            &[4, 3, 2, 1],
+            &[1, 3, 5, 7],
+            &[2, 4, 6, 8],
+            &[2, 1, 3, 4],
+            &[8, 1, 6, 4],
+        ];
+        let persistence = 0.94;
+
+        for predicted in rankings {
+            for reference in rankings {
+                let mut predicted_prefix = BTreeSet::new();
+                let mut reference_prefix = BTreeSet::new();
+                let mut weighted_total = 0.0;
+                let mut weight_total = 0.0;
+
+                for depth in 1..=predicted.len() {
+                    predicted_prefix.insert(predicted[depth - 1]);
+                    reference_prefix.insert(reference[depth - 1]);
+                    let overlap = predicted_prefix
+                        .intersection(&reference_prefix)
+                        .count() as f64
+                        / depth as f64;
+                    let weight = (1.0 - persistence) * persistence.powf((depth - 1) as f64);
+                    weighted_total += weight * overlap;
+                    weight_total += weight;
+                }
+                let expected = weighted_total / weight_total;
+                let actual = top_weighted_ranking_overlap(predicted, reference, persistence)
+                    .expect("unique equal-length rankings should compare")
+                    .normalized_score;
+                assert!(
+                    (actual - expected).abs() < 1.0e-12,
+                    "rankings {predicted:?} vs {reference:?}: {actual} != {expected}"
+                );
+            }
+        }
+    }
+
+    #[test]
     fn top_weighted_overlap_is_zero_for_disjoint_rankings() {
         let summary = top_weighted_ranking_overlap(&[1, 2, 3], &[4, 5, 6], 0.94)
             .expect("equal-length unique rankings should compare");
