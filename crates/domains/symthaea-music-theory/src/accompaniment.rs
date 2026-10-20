@@ -103,6 +103,10 @@ pub enum Accompaniment {
     /// accompaniment"). Reusable habit: syncopated timing and continuous
     /// sustain aren't opposites — a groove can be both at once.
     BossaComp,
+    /// March pulse: four square quarter-note chord attacks in common time.
+    /// Beats one and three are firm anchors; beats two and four are lighter,
+    /// producing a repeatable duple pulse without relying on percussion.
+    MarchPulse,
     /// Sarabande gait: three quarter-note chord pulses in a slow triple dance,
     /// with the defining accent on beat two (1-STRONG-3), distinct from Waltz.
     Sarabande,
@@ -430,6 +434,32 @@ impl Accompaniment {
                     }
                 }
             }
+            Accompaniment::MarchPulse => {
+                // Square four-to-the-bar pulse: strong beats one and three,
+                // with lighter beats two and four. The marker is also consumed
+                // by the performance dialect mapper so the groove and clock
+                // use one explicit style contract.
+                let quarter = Duration::quarter();
+                for (beat, accent) in [
+                    (0_i64, 1.0_f32),
+                    (1_i64, 0.68_f32),
+                    (2_i64, 0.9_f32),
+                    (3_i64, 0.68_f32),
+                ] {
+                    if beat as f64 >= meter_beats {
+                        continue;
+                    }
+                    for &pitch in voiced {
+                        push(
+                            score,
+                            pitch,
+                            bar_onset + quarter.scale(beat, 1),
+                            quarter,
+                            velocity * accent,
+                        );
+                    }
+                }
+            }
             Accompaniment::Sarabande => {
                 // Full-chord quarter-note attacks with a primary accent on beat two.
                 let quarter = Duration::quarter();
@@ -628,6 +658,7 @@ mod tests {
             Accompaniment::Alberti,
             Accompaniment::OomPah,
             Accompaniment::Comp,
+            Accompaniment::MarchPulse,
             Accompaniment::Sarabande,
             Accompaniment::Minuet,
             Accompaniment::MazurkaGait,
@@ -664,6 +695,29 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn march_pulse_is_a_square_four_beat_cell_with_1_and_3_accents() {
+        let notes = realize(Accompaniment::MarchPulse, 4.0);
+        assert_eq!(notes.len(), 12, "four chord attacks × three voiced pitches");
+
+        let mut onsets: Vec<f64> = notes.iter().map(|note| note.onset.beats()).collect();
+        onsets.sort_by(f64::total_cmp);
+        onsets.dedup_by(|a, b| (*a - *b).abs() < 1e-9);
+        assert_eq!(onsets, vec![0.0, 1.0, 2.0, 3.0]);
+
+        let velocity_at = |beat: f64| {
+            notes
+                .iter()
+                .find(|note| (note.onset.beats() - beat).abs() < 1e-9)
+                .expect("pulse onsets must exist")
+                .velocity
+        };
+        assert!(velocity_at(0.0) > velocity_at(1.0));
+        assert!(velocity_at(2.0) > velocity_at(1.0));
+        assert_eq!(velocity_at(1.0), velocity_at(3.0));
+        assert!(notes.iter().all(|note| note.duration == Duration::quarter()));
     }
 
     #[test]
