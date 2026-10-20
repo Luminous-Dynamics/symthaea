@@ -316,9 +316,55 @@ pub struct LanguageController {
 impl LanguageController {
     /// Create a new controller from a genesis seed and config.
     pub fn new(genesis: &GenesisSeed, config: &LanguageControllerConfig) -> Self {
+        let token_embeddings: Vec<ContinuousHV> = (0..config.vocab_size)
+            .map(|i| {
+                ContinuousHV::from_genesis(
+                    genesis,
+                    &format!("broca::token_emb::{i}"),
+                    HDC_DIMENSION,
+                )
+            })
+            .collect();
+        Self::new_with_token_embeddings(genesis, config, token_embeddings)
+    }
+
+    /// Create a controller whose token embeddings combine lexical-semantic
+    /// composition with a genesis-seeded fallback.
+    ///
+    /// This is an opt-in initialization experiment. Checkpoint loading should
+    /// continue restoring checkpoint embeddings verbatim; the default constructor
+    /// remains genesis-seeded for compatibility. Embeddings are built before the
+    /// controller so large vocabularies do not transiently allocate two tables.
+    pub fn new_with_semantic_embeddings(
+        genesis: &GenesisSeed,
+        config: &LanguageControllerConfig,
+        tokenizer: &BpeTokenizer,
+        embedding_config: &SemanticEmbeddingConfig,
+    ) -> (Self, EmbeddingCoverageStats) {
+        let mut effective_config = config.clone();
+        effective_config.vocab_size = tokenizer.vocab_size();
+
+        let basis = SemanticQuarkBasis::new(genesis);
+        let (embeddings, stats) = basis.build_embeddings(tokenizer, genesis, embedding_config);
+        let controller =
+            Self::new_with_token_embeddings(genesis, &effective_config, embeddings);
+        (controller, stats)
+    }
+
+    fn new_with_token_embeddings(
+        genesis: &GenesisSeed,
+        config: &LanguageControllerConfig,
+        token_embeddings: Vec<ContinuousHV>,
+    ) -> Self {
+        assert_eq!(
+            token_embeddings.len(),
+            config.vocab_size,
+            "token embedding row count must equal the configured vocabulary size"
+        );
+
         let neuron_config = UnifiedConfig {
-            tau_base: 0.02,                    // 20ms — matches token generation rate
-            backbone_tau: config.backbone_tau, // Configurable state dependency for coherent sequences
+            tau_base: 0.02,
+            backbone_tau: config.backbone_tau,
             dimension: HDC_DIMENSION,
             learning_rate: config.learning_rate,
             ..UnifiedConfig::default()
@@ -332,17 +378,6 @@ impl LanguageController {
         };
 
         let network = HdcLtcUnifiedNetwork::from_genesis(net_config, genesis);
-
-        // Genesis-seeded token embeddings
-        let token_embeddings: Vec<ContinuousHV> = (0..config.vocab_size)
-            .map(|i| {
-                ContinuousHV::from_genesis(
-                    genesis,
-                    &format!("broca::token_emb::{i}"),
-                    HDC_DIMENSION,
-                )
-            })
-            .collect();
 
         let position_base =
             ContinuousHV::from_genesis(genesis, "broca::position_base", HDC_DIMENSION);
@@ -389,29 +424,6 @@ impl LanguageController {
             #[cfg(feature = "highway-projection")]
             highway,
         }
-    }
-
-    /// Create a controller whose token embeddings combine lexical-semantic
-    /// composition with a genesis-seeded fallback.
-    ///
-    /// This is an opt-in initialization experiment; checkpoint loading should
-    /// continue restoring checkpoint embeddings verbatim. The default constructor remains genesis-seeded for compatibility.
-    pub fn new_with_semantic_embeddings(
-        genesis: &GenesisSeed,
-        config: &LanguageControllerConfig,
-        tokenizer: &BpeTokenizer,
-        embedding_config: &SemanticEmbeddingConfig,
-    ) -> (Self, EmbeddingCoverageStats) {
-        let mut effective_config = config.clone();
-        effective_config.vocab_size = tokenizer.vocab_size();
-
-        let basis = SemanticQuarkBasis::new(genesis);
-        let (embeddings, stats) =
-            basis.build_embeddings(tokenizer, genesis, embedding_config);
-
-        let mut controller = Self::new(genesis, &effective_config);
-        controller.restore_token_embeddings(embeddings);
-        (controller, stats)
     }
 
     /// Build GPU/candle embedding cache from token embeddings.
