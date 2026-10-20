@@ -150,6 +150,46 @@ struct IndexSummary {
     missing_formalization_source_ids: Vec<String>,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct TemporalReplayManifest {
+    schema_version: String,
+    repository_url: String,
+    repository_commit: String,
+    timeline_sha256: String,
+    lean_toolchain: String,
+    mathlib_revision: String,
+    events: Vec<TemporalTimelineEvent>,
+    artifacts: Vec<TemporalEvidenceArtifact>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct TemporalTimelineEvent {
+    position: usize,
+    target_id: String,
+    theorem_id: String,
+    target_state_commit: String,
+    proof_completion_commit: String,
+    statement_sha256: String,
+    statement_artifact_id: String,
+    proof_artifact_id: String,
+    visible_artifact_ids: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct TemporalEvidenceArtifact {
+    artifact_id: String,
+    path: String,
+    artifact_kind: String,
+    content_sha256: String,
+    source_file_sha256: String,
+    source_commit: String,
+    available_at_position: usize,
+    theorem_id: Option<String>,
+}
+
 #[derive(Debug, Serialize)]
 struct SourceIndex {
     schema_version: &'static str,
