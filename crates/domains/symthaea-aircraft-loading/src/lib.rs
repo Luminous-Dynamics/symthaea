@@ -221,6 +221,72 @@ pub struct AuditReport {
     pub profile_source_authenticated: bool,
 }
 
+
+/// Declared bounded uncertainty for one loaded item and its effective station arm.
+///
+/// Bounds must contain the nominal item mass and the profile's nominal station arm. Arm
+/// uncertainty can represent approved compartment placement tolerances or another externally
+/// justified bounded variation; this type does not establish that the bounds are physically valid.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ItemLoadUncertainty {
+    /// Item identifier matching exactly one item in the scenario.
+    pub item_id: String,
+    /// Lowest possible item mass, in kilograms; must be positive.
+    pub minimum_mass_kg: f64,
+    /// Highest possible item mass, in kilograms.
+    pub maximum_mass_kg: f64,
+    /// Lowest possible effective longitudinal arm, in metres from the profile datum.
+    pub minimum_station_arm_m: f64,
+    /// Highest possible effective longitudinal arm, in metres from the profile datum.
+    pub maximum_station_arm_m: f64,
+}
+
+/// Bounded empty-aircraft and per-item uncertainty for a single declared take-off scenario.
+///
+/// Empty mass and moment ranges must contain the values in the profile. Every scenario item must
+/// have exactly one matching item range. This is an input model only; bounds and source evidence
+/// are not authenticated by the calculation kernel.
+#[derive(Debug, Clone, PartialEq)]
+pub struct LoadingUncertaintyBounds {
+    /// Lower bound on basic empty aircraft mass, in kilograms.
+    pub minimum_empty_mass_kg: f64,
+    /// Upper bound on basic empty aircraft mass, in kilograms.
+    pub maximum_empty_mass_kg: f64,
+    /// Lower bound on basic empty aircraft moment, in kilogram-metres.
+    pub minimum_empty_moment_kg_m: f64,
+    /// Upper bound on basic empty aircraft moment, in kilogram-metres.
+    pub maximum_empty_moment_kg_m: f64,
+    /// One bounded uncertainty declaration per scenario item.
+    pub items: Vec<ItemLoadUncertainty>,
+}
+
+/// Conservative mass, moment and CG interval propagated from declared input bounds.
+///
+/// The interval arithmetic deliberately ignores correlations between total mass and total moment,
+/// so the CG interval may be wider than the set of physically attainable CG values. It is intended
+/// to expose uncertainty for further review, not to establish compliance with a CG envelope.
+#[derive(Debug, Clone, PartialEq)]
+pub struct LoadingUncertaintyEnvelope {
+    /// Scenario identity associated with the analysis.
+    pub scenario_id: String,
+    /// Aircraft identity associated with the analysis.
+    pub aircraft_id: String,
+    /// Exact configuration revision used by the analysis.
+    pub configuration_revision: String,
+    /// Conservative lower bound on total mass, in kilograms.
+    pub minimum_total_mass_kg: f64,
+    /// Conservative upper bound on total mass, in kilograms.
+    pub maximum_total_mass_kg: f64,
+    /// Conservative lower bound on total moment, in kilogram-metres.
+    pub minimum_total_moment_kg_m: f64,
+    /// Conservative upper bound on total moment, in kilogram-metres.
+    pub maximum_total_moment_kg_m: f64,
+    /// Conservative lower bound on center of gravity, in metres from the profile datum.
+    pub minimum_center_of_gravity_m: f64,
+    /// Conservative upper bound on center of gravity, in metres from the profile datum.
+    pub maximum_center_of_gravity_m: f64,
+}
+
 /// Input/configuration error that prevents a meaningful arithmetic audit.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AuditInputError {
@@ -242,6 +308,8 @@ pub enum AuditInputError {
     NumericOverflow,
     /// A non-zero contribution was lost to floating-point underflow or addition rounding.
     NumericPrecisionLoss,
+    /// An uncertainty range is malformed, incomplete, or does not contain its nominal value.
+    InvalidUncertainty(&'static str),
 }
 
 impl fmt::Display for AuditInputError {
@@ -265,11 +333,205 @@ impl fmt::Display for AuditInputError {
             Self::NumericPrecisionLoss => {
                 write!(f, "numeric precision loss during loading audit")
             }
+            Self::InvalidUncertainty(reason) => write!(f, "invalid loading uncertainty: {reason}"),
         }
     }
 }
 
 impl Error for AuditInputError {}
+
+
+/// Analyze uncertainty bounds for one take-off loading scenario.
+///
+/// The nominal profile/scenario are first checked by `audit_loading`; this function then propagates
+/// supplied mass and effective-arm intervals using outward-rounded interval arithmetic. The result
+/// is intentionally only an uncertainty envelope: it does not decide whether every possible
+/// mass/CG combination remains inside the aircraft's mass-dependent approved envelope, and it is
+/// not a loading/dispatch authorization.
+pub fn analyze_loading_uncertainty(
+    profile: &AircraftProfile,
+    scenario: &LoadingScenario,
+    uncertainty: &LoadingUncertaintyBounds,
+) -> Result<LoadingUncertaintyEnvelope, AuditInputError> {
+    let _nominal_report = audit_loading(profile, scenario)?;
+    if !uncertainty.minimum_empty_mass_kg.is_finite()
+        || !uncertainty.maximum_empty_mass_kg.is_finite()
+        || uncertainty.minimum_empty_mass_kg <= 0.0
+        || uncertainty.minimum_empty_mass_kg > profile.empty_mass_kg
+        || profile.empty_mass_kg > uncertainty.maximum_empty_mass_kg
+        || !uncertainty.minimum_empty_moment_kg_m.is_finite()
+        || !uncertainty.maximum_empty_moment_kg_m.is_finite()
+        || uncertainty.minimum_empty_moment_kg_m > profile.empty_moment_kg_m
+        || profile.empty_moment_kg_m > uncertainty.maximum_empty_moment_kg_m
+    {
+        return Err(AuditInputError::InvalidUncertainty(
+            "empty mass/moment intervals must be finite, ordered, and contain the profile values",
+        ));
+    }
+
+    let mut bounds_by_item = BTreeMap::<String, &ItemLoadUncertainty>::new();
+    for bounds in &uncertainty.items {
+        if bounds.item_id.trim().is_empty()
+            || !bounds.minimum_mass_kg.is_finite()
+            || !bounds.maximum_mass_kg.is_finite()
+            || bounds.minimum_mass_kg <= 0.0
+            || bounds.minimum_mass_kg > bounds.maximum_mass_kg
+            || !bounds.minimum_station_arm_m.is_finite()
+            || !bounds.maximum_station_arm_m.is_finite()
+            || bounds.minimum_station_arm_m > bounds.maximum_station_arm_m
+        {
+            return Err(AuditInputError::InvalidUncertainty(
+                "item mass and arm intervals must be finite, positive/ordered as applicable",
+            ));
+        }
+        if bounds_by_item.insert(bounds.item_id.clone(), bounds).is_some() {
+            return Err(AuditInputError::InvalidUncertainty(
+                "item uncertainty identifiers must be unique",
+            ));
+        }
+    }
+
+    let stations: BTreeMap<String, &LoadingStation> = profile
+        .stations
+        .iter()
+        .map(|station| (station.station_id.clone(), station))
+        .collect();
+    let mut joined =
+        BTreeMap::<String, (&LoadedItem, &LoadingStation, &ItemLoadUncertainty)>::new();
+    for item in &scenario.items {
+        let bounds = bounds_by_item.remove(&item.item_id).ok_or(
+            AuditInputError::InvalidUncertainty(
+                "every scenario item must have exactly one uncertainty declaration",
+            ),
+        )?;
+        let station = stations
+            .get(&item.station_id)
+            .copied()
+            .ok_or_else(|| AuditInputError::UnknownStationId(item.station_id.clone()))?;
+        if bounds.minimum_mass_kg > item.mass_kg
+            || item.mass_kg > bounds.maximum_mass_kg
+            || bounds.minimum_station_arm_m > station.arm_m
+            || station.arm_m > bounds.maximum_station_arm_m
+        {
+            return Err(AuditInputError::InvalidUncertainty(
+                "item bounds must contain nominal mass and station arm",
+            ));
+        }
+        joined.insert(item.item_id.clone(), (item, station, bounds));
+    }
+    if !bounds_by_item.is_empty() {
+        return Err(AuditInputError::InvalidUncertainty(
+            "uncertainty declarations must not name items absent from the scenario",
+        ));
+    }
+
+    let mut total_mass_min = uncertainty.minimum_empty_mass_kg;
+    let mut total_mass_max = uncertainty.maximum_empty_mass_kg;
+    let mut total_moment_min = uncertainty.minimum_empty_moment_kg_m;
+    let mut total_moment_max = uncertainty.maximum_empty_moment_kg_m;
+    for (_item_id, (_item, _station, bounds)) in joined {
+        total_mass_min = add_outward_lower(total_mass_min, bounds.minimum_mass_kg)?;
+        total_mass_max = add_outward_upper(total_mass_max, bounds.maximum_mass_kg)?;
+        let (item_moment_min, item_moment_max) = product_interval(
+            bounds.minimum_mass_kg,
+            bounds.maximum_mass_kg,
+            bounds.minimum_station_arm_m,
+            bounds.maximum_station_arm_m,
+        )?;
+        total_moment_min = add_outward_lower(total_moment_min, item_moment_min)?;
+        total_moment_max = add_outward_upper(total_moment_max, item_moment_max)?;
+    }
+    if total_mass_min <= 0.0 || total_mass_min > total_mass_max {
+        return Err(AuditInputError::NumericOverflow);
+    }
+
+    // Interval division: denominator is strictly positive, so the quotient is bounded by the
+    // extrema of all four numerator/denominator endpoint combinations. This is conservative even
+    // though total moment and total mass are correlated through the same loaded items.
+    let quotient_corners = [
+        total_moment_min / total_mass_min,
+        total_moment_min / total_mass_max,
+        total_moment_max / total_mass_min,
+        total_moment_max / total_mass_max,
+    ];
+    if quotient_corners.iter().any(|value| !value.is_finite()) {
+        return Err(AuditInputError::NumericOverflow);
+    }
+    let cg_min = quotient_corners.iter().copied().fold(f64::INFINITY, f64::min);
+    let cg_max = quotient_corners
+        .iter()
+        .copied()
+        .fold(f64::NEG_INFINITY, f64::max);
+
+    Ok(LoadingUncertaintyEnvelope {
+        scenario_id: scenario.scenario_id.clone(),
+        aircraft_id: profile.aircraft_id.clone(),
+        configuration_revision: profile.configuration_revision.clone(),
+        minimum_total_mass_kg: total_mass_min,
+        maximum_total_mass_kg: total_mass_max,
+        minimum_total_moment_kg_m: total_moment_min,
+        maximum_total_moment_kg_m: total_moment_max,
+        minimum_center_of_gravity_m: outward_down(cg_min)?,
+        maximum_center_of_gravity_m: outward_up(cg_max)?,
+    })
+}
+
+fn add_outward_lower(left: f64, right: f64) -> Result<f64, AuditInputError> {
+    let sum = left + right;
+    if !sum.is_finite() {
+        return Err(AuditInputError::NumericOverflow);
+    }
+    outward_down(sum)
+}
+
+fn add_outward_upper(left: f64, right: f64) -> Result<f64, AuditInputError> {
+    let sum = left + right;
+    if !sum.is_finite() {
+        return Err(AuditInputError::NumericOverflow);
+    }
+    outward_up(sum)
+}
+
+fn product_interval(
+    mass_min: f64,
+    mass_max: f64,
+    arm_min: f64,
+    arm_max: f64,
+) -> Result<(f64, f64), AuditInputError> {
+    let corners = [
+        mass_min * arm_min,
+        mass_min * arm_max,
+        mass_max * arm_min,
+        mass_max * arm_max,
+    ];
+    if corners.iter().any(|value| !value.is_finite()) {
+        return Err(AuditInputError::NumericOverflow);
+    }
+    let minimum = corners.iter().copied().fold(f64::INFINITY, f64::min);
+    let maximum = corners
+        .iter()
+        .copied()
+        .fold(f64::NEG_INFINITY, f64::max);
+    Ok((outward_down(minimum)?, outward_up(maximum)?))
+}
+
+fn outward_down(value: f64) -> Result<f64, AuditInputError> {
+    let result = value.next_down();
+    if result.is_finite() {
+        Ok(result)
+    } else {
+        Err(AuditInputError::NumericOverflow)
+    }
+}
+
+fn outward_up(value: f64) -> Result<f64, AuditInputError> {
+    let result = value.next_up();
+    if result.is_finite() {
+        Ok(result)
+    } else {
+        Err(AuditInputError::NumericOverflow)
+    }
+}
 
 /// Audit one declared take-off loading state against one explicit aircraft profile.
 ///

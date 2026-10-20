@@ -27,6 +27,14 @@ A scenario declares matching aircraft/configuration identity and a list of uniqu
 
 A CG band's mass interval is inclusive. If no band matches, or more than one band matches, the CG test is **not assessable**; the engine must not pick a convenient band. Numeric exceedances take precedence in the disposition even if other evidence is missing, so a known hard failure is never hidden by an unknown.
 
+## 3.1 Bounded uncertainty envelope (new research slice)
+
+The crate now has a separate `analyze_loading_uncertainty` function, with explicit intervals for empty-aircraft mass/moment and each loaded item's mass/effective station arm. It returns outward-rounded bounds for total mass, total moment and center of gravity. It requires one uncertainty record per scenario item, rejects duplicate/missing/extra item identities, and requires the intervals to contain all nominal values.
+
+The center-of-gravity interval is computed by interval division over independent total-moment and total-mass bounds. This intentionally ignores correlations between numerator and denominator, so the interval can be wider than the physically attainable values. That is acceptable for an uncertainty screen but could make the result uninformative; it must not be interpreted as CG-envelope approval. Comparing the result against mass-dependent approved CG bands and accounting for correlated measurement/calibration errors remain separate follow-on work.
+
+An independent integration oracle enumerates all 64 endpoint combinations of the two-item synthetic fixture and checks the mass, moment and CG values all lie inside the returned bounds. Additional negative controls reject missing intervals and ranges that exclude the nominal profile/item values. The new test target is authored but awaits exact-head CI validation.
+
 ## 3. Safety and evidence boundary
 
 Presence of a URL/reference and a well-formed SHA-256 string does not authenticate source bytes or establish that an authority approved the profile. The profile can be wrong, stale, or mismatched to the tail/configuration. A securement reference is only a locator; the engine does not verify the evidence or calculate tie-down forces.
