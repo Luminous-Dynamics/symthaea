@@ -285,3 +285,14 @@ The result reports the budget reduction, paired candidate-minus-reference score 
 The initial target can be preregistered as 50% fewer labelled calibration examples with no more than a 2-percentage-point absolute loss in the benchmark score, tested on matched held-out participants. This is an aspirational go/no-go criterion, not a result. The implementation evaluates exactly one declared budget comparison; do not search over many budgets on the final test set and report only the one that passed. If a calibration frontier is explored, select candidate budgets using development data and confirm the chosen comparison on a separately frozen test set.
 
 Limitations: this contract operates on already computed scores; it does not perform online learning or measure wall-clock calibration time itself. It assumes higher scores are better and uses the same participant-resampling percentile interval helper as the paired evaluation module. The tests are synthetic and do not establish a real calibration reduction or any clinical outcome.
+
+
+## Robustness battery implementation status (October 2026)
+
+The isolated `research/bci-core/src/robustness.rs` module now provides the point-summary contract for the next evaluation phase. It requires one clean reference plus at least one preregistered stress scenario, validates a complete model × scenario grid, and reports equal-weighted mean perturbed score, worst-case scenario score, degradation from clean, and matched per-scenario baseline/candidate deltas. Candidate acceptance has separate mean-score and worst-case-degradation gates so a high average cannot hide a serious weakness in one scenario.
+
+Supported scenario families include channel dropout, amplitude scaling, additive artifacts, packet loss, temporal jitter, session shift, reference shift, and montage shift. These names describe test categories, not a guarantee that arbitrary synthetic transformations are physiologically realistic. Every transformation, parameter range, and severity level must be frozen and documented before final evaluation. Severity is ordinal within a family; it is not a universal physical unit.
+
+The Rust contract consumes scores already aggregated by a common upstream scoring protocol. It does not synthesize EEG, prove scenario realism, preserve unit-level uncertainty itself, or establish clinical or operational safety. Every model/scenario score must derive from the same frozen held-out units; retain per-participant/per-cell results and run paired inference separately. Keep synthetic stress testing distinct from robustness measured on naturally occurring artifacts or held-out sessions.
+
+The empirical experiment and acceptance gates are tracked in [BCI-RD-006, issue #8220](https://github.com/Luminous-Dynamics/symthaea/issues/8220). The implementation's synthetic tests are authored but not yet compiled or executed; no robustness result or SOTA improvement has been demonstrated.
