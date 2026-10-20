@@ -13,6 +13,7 @@ pub mod contract;
 pub mod decision_frontier;
 pub mod evidence_router;
 pub mod failure_modes;
+pub mod published_ranking;
 
 use std::collections::HashSet;
 use std::error::Error;
