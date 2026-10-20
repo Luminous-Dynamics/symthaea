@@ -175,8 +175,7 @@ pub fn compare_published_rankings(
 
     let raw_extrapolated_rbo =
         compute_extrapolated_rbo(&predicted_order, &reference_order, persistence);
-    if !raw_extrapolated_rbo.is_finite()
-        || !(-1e-12..=1.0 + 1e-12).contains(&raw_extrapolated_rbo)
+    if !raw_extrapolated_rbo.is_finite() || !(-1e-12..=1.0 + 1e-12).contains(&raw_extrapolated_rbo)
     {
         return Err(PublishedRankingError::InvalidMetric);
     }
