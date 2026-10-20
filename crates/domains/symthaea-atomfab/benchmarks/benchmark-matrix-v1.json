@@ -193,7 +193,8 @@
         "reference-method/checkpoint/data-manifest completeness and checksum coverage before claim-bearing execution",
         "paper-compatible budget: 50 lowest-energy candidates per MLIP locally DFT-optimized per stratum; record the original candidate pool, failed refinements, duplicates and resulting unique validated discoveries",
         "distinct budget for the policy-extension phase: matched per-policy reference budget over at least 20 paired seeds, with router/preprocessing/retry costs included",
-        "paper-reported search-winner fingerprint by model across 12 size×surface systems, reported as reference context rather than a deterministic requirement under different stochastic seeds"
+        "paper-reported search-winner fingerprint by model across 12 size×surface systems, reported as reference context rather than a deterministic requirement under different stochastic seeds",
+        "paper-compatible extrapolated RBO with persistence p=0.94 and Kendall tau-b on identical canonical candidate IDs, reported separately from discovery-set Jaccard and the finite-prefix RBO-style internal metric"
       ],
       "gates": [
         "report energy accuracy and structural exploration as separate score families",
@@ -212,7 +213,9 @@
         "report the published reproduction phase separately from the policy-extension phase; do not infer exact candidate counts from population × generations when code-level duplicate/offspring accounting has not been pinned",
         "for the extension stretch claim, use paired seeds and identical frozen targets; if either policy fails to reach the target, target-reaching acceleration is undefined for that pair and the failure remains in the report",
         "never label a finite GA best-known structure as the true global minimum unless exhaustive/certifying evidence supports that claim; record random seeds and deviations from paper-reported winner counts without tuning the evaluator",
-        "pin both mutation operators and their probabilities, including rattle/mirror weighting, before exact reproduction"
+        "pin both mutation operators and their probabilities, including rattle/mirror weighting, before exact reproduction",
+        "match the published ranking comparison by applying RBO p=0.94 and tie-aware Kendall tau-b to the same reference-DFT-refined candidate universe; keep discovery-set overlap as a separate metric",
+        "pin the canonical-ID tie-break for exact RBO ties and the predeclared energy tie tolerance for Kendall tau-b before evaluating held-out results"
       ]
     },
     {
