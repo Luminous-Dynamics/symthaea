@@ -1738,3 +1738,27 @@ jobs:
           sudo mv gitleaks /usr/local/bin/
       - name: Run gitleaks
         run: gitleaks detect --source . --config .gitleaks.toml --verbose --exit-code 1
+
+  # LOADMASTER-001 is a small dependency-free engineering kernel. Most broad
+  # CI jobs are intentionally skipped on draft PRs; this exact-package job
+  # must still compile and test the loading contract on its draft branch.
+  aircraft-loading-contract:
+    name: Aircraft Loading Contract (exact package)
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || startsWith(github.head_ref, 'feat/aviation-loadmaster-')
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: clippy, rustfmt
+
+      - name: Check loading package formatting
+        run: cargo fmt --manifest-path crates/domains/symthaea-aircraft-loading/Cargo.toml -- --check
+
+      - name: Lint loading package and tests
+        run: cargo clippy --manifest-path crates/domains/symthaea-aircraft-loading/Cargo.toml --all-targets -- -D warnings
+
+      - name: Run loading unit and independent oracle tests
+        run: cargo test --manifest-path crates/domains/symthaea-aircraft-loading/Cargo.toml
