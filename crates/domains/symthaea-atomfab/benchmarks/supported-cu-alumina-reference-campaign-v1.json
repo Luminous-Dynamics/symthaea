@@ -232,7 +232,7 @@
     "MAE/RMSE/max error for binding energy on identical structures with common reference labels",
     "DFT-refined best binding energy per stratum and difference from the best known reference structure",
     "unique reference-validated low-energy structures recovered under equal DFT-reference budget",
-    "recovery of known DFT-relaxed global-minimum structures using a frozen structure matching/deduplication tolerance",
+    "recovery of published/reference DFT-refined best-known minima using a frozen structure matching/deduplication tolerance; do not call true global optimum unless independently established",
     "structural diversity, duplicate-minimum rate, and candidate-set Jaccard",
     "ranking agreement only on shared canonical structure IDs, with discovery-set agreement reported separately",
     "failure-mode counts/rates by stratum and severity, with abstentions separate and failed relaxations retained in denominators",
@@ -260,7 +260,16 @@
     "selection_rule": "select the 50 lowest-MLIP-energy candidate structures from each of the three MLIP searches and locally optimize each selected structure using the pinned DFT reference method",
     "exact_dft_settings_status": "unresolved_before_execution",
     "duplicates_and_failures": "must preserve original candidate rows, count failed relaxations and duplicate minima; report the paper-compatible metric and a second deduplicated unique-discovery metric",
-    "status": "published_refinement_count_transcribed_other_run_details_unresolved"
+    "status": "published_refinement_count_transcribed_other_run_details_unresolved",
+    "mutation_operators": [
+      "rattle",
+      "mirror"
+    ],
+    "mutation_operator_probability": {
+      "rattle": 0.5,
+      "mirror": 0.5
+    },
+    "global_minimum_claim_ceiling": "Finite stochastic GA search cannot establish the true global minimum. Label reference results as best-known or published DFT-refined minima unless an independent proof/exhaustive enumeration supports a global-optimum claim."
   },
   "policy_comparison": {
     "status": "proposed_extension_not_part_of_exact_paper_reproduction",
@@ -303,5 +312,16 @@
       "requires_validated_objective_quality_no_worse_at_equal_total_cost": true,
       "status": "proposed_not_achieved"
     }
+  },
+  "published_result_fingerprint": {
+    "status": "paper_reported_not_reproduced",
+    "system_count": 12,
+    "model_minimum_binding_energy_winner_counts": {
+      "dp-unialcu": 8,
+      "mattersim-v1.0.0-1m": 3,
+      "mace-omat-medium": 1
+    },
+    "interpretation": "Historical paper-reported finite-search counts for the 12 size×surface cases. Treat as a reproduction fingerprint, not as a guaranteed result under a different random seed; deviations require traceable seed/protocol analysis and must not be silently fitted.",
+    "citation_doi": "10.1038/s41524-026-02043-8"
   }
 }
