@@ -26,7 +26,9 @@ pub mod hdc {
             pub const DEFAULT_DIM: usize = 16_384;
 
             pub fn zero(dim: usize) -> Self {
-                Self { values: vec![0.0; dim] }
+                Self {
+                    values: vec![0.0; dim],
+                }
             }
 
             /// Produce a deterministic pseudo-random ±1 test basis.
@@ -54,8 +56,12 @@ pub mod hdc {
                 if self.values.len() != other.values.len() || self.values.is_empty() {
                     return 0.0;
                 }
-                let dot = self.values.iter().zip(&other.values)
-                    .map(|(a, b)| a * b).sum::<f32>();
+                let dot = self
+                    .values
+                    .iter()
+                    .zip(&other.values)
+                    .map(|(a, b)| a * b)
+                    .sum::<f32>();
                 let lhs_norm = self.values.iter().map(|v| v * v).sum::<f32>().sqrt();
                 let rhs_norm = other.values.iter().map(|v| v * v).sum::<f32>().sqrt();
                 let denominator = lhs_norm * rhs_norm;
