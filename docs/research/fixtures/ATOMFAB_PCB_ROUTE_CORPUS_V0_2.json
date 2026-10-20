@@ -62,11 +62,15 @@
       "expected": {
         "route": {
           "disposition": "feasible",
-          "reason_code": "ALL_DECLARED_ROUTE_CAPABILITIES_SATISFIED"
+          "reason_codes": [
+            "ALL_DECLARED_ROUTE_CAPABILITIES_SATISFIED"
+          ]
         },
         "evidence": {
           "disposition": "complete",
-          "reason_code": "DECLARED_EVIDENCE_GATES_SATISFIED"
+          "reason_codes": [
+            "DECLARED_EVIDENCE_GATES_SATISFIED"
+          ]
         }
       }
     },
@@ -108,11 +112,15 @@
       "expected": {
         "route": {
           "disposition": "feasible",
-          "reason_code": "ALL_DECLARED_ROUTE_CAPABILITIES_SATISFIED"
+          "reason_codes": [
+            "ALL_DECLARED_ROUTE_CAPABILITIES_SATISFIED"
+          ]
         },
         "evidence": {
           "disposition": "complete",
-          "reason_code": "DECLARED_EVIDENCE_GATES_SATISFIED"
+          "reason_codes": [
+            "DECLARED_EVIDENCE_GATES_SATISFIED"
+          ]
         }
       }
     },
@@ -153,11 +161,15 @@
       "expected": {
         "route": {
           "disposition": "infeasible",
-          "reason_code": "CAPABILITY_MISSING:plated_vias"
+          "reason_codes": [
+            "CAPABILITY_MISSING:plated_vias"
+          ]
         },
         "evidence": {
           "disposition": "complete",
-          "reason_code": "DECLARED_EVIDENCE_GATES_SATISFIED"
+          "reason_codes": [
+            "DECLARED_EVIDENCE_GATES_SATISFIED"
+          ]
         }
       }
     },
@@ -197,11 +209,15 @@
       "expected": {
         "route": {
           "disposition": "infeasible",
-          "reason_code": "CAPABILITY_MISSING:multilayer"
+          "reason_codes": [
+            "CAPABILITY_MISSING:multilayer"
+          ]
         },
         "evidence": {
           "disposition": "complete",
-          "reason_code": "DECLARED_EVIDENCE_GATES_SATISFIED"
+          "reason_codes": [
+            "DECLARED_EVIDENCE_GATES_SATISFIED"
+          ]
         }
       }
     },
@@ -242,11 +258,15 @@
       "expected": {
         "route": {
           "disposition": "unresolved",
-          "reason_code": "CAPABILITY_UNKNOWN"
+          "reason_codes": [
+            "CAPABILITY_UNKNOWN"
+          ]
         },
         "evidence": {
           "disposition": "complete",
-          "reason_code": "DECLARED_EVIDENCE_GATES_SATISFIED"
+          "reason_codes": [
+            "DECLARED_EVIDENCE_GATES_SATISFIED"
+          ]
         }
       }
     },
@@ -284,11 +304,15 @@
       "expected": {
         "route": {
           "disposition": "feasible",
-          "reason_code": "ALL_DECLARED_ROUTE_CAPABILITIES_SATISFIED"
+          "reason_codes": [
+            "ALL_DECLARED_ROUTE_CAPABILITIES_SATISFIED"
+          ]
         },
         "evidence": {
           "disposition": "incomplete",
-          "reason_code": "DRC_NOT_CURRENT"
+          "reason_codes": [
+            "DRC_NOT_CURRENT"
+          ]
         }
       }
     },
@@ -328,11 +352,15 @@
       "expected": {
         "route": {
           "disposition": "feasible",
-          "reason_code": "ALL_DECLARED_ROUTE_CAPABILITIES_SATISFIED"
+          "reason_codes": [
+            "ALL_DECLARED_ROUTE_CAPABILITIES_SATISFIED"
+          ]
         },
         "evidence": {
           "disposition": "incomplete",
-          "reason_code": "DRILL_EXPORT_NOT_CURRENT"
+          "reason_codes": [
+            "DRILL_EXPORT_NOT_CURRENT"
+          ]
         }
       }
     },
@@ -373,11 +401,15 @@
       "expected": {
         "route": {
           "disposition": "infeasible",
-          "reason_code": "CAPABILITY_MISSING:solder_mask"
+          "reason_codes": [
+            "CAPABILITY_MISSING:solder_mask"
+          ]
         },
         "evidence": {
           "disposition": "complete",
-          "reason_code": "DECLARED_EVIDENCE_GATES_SATISFIED"
+          "reason_codes": [
+            "DECLARED_EVIDENCE_GATES_SATISFIED"
+          ]
         }
       }
     },
@@ -415,11 +447,15 @@
       "expected": {
         "route": {
           "disposition": "feasible",
-          "reason_code": "ALL_DECLARED_ROUTE_CAPABILITIES_SATISFIED"
+          "reason_codes": [
+            "ALL_DECLARED_ROUTE_CAPABILITIES_SATISFIED"
+          ]
         },
         "evidence": {
           "disposition": "rejected",
-          "reason_code": "UNAPPROVED_BOM_SUBSTITUTION"
+          "reason_codes": [
+            "UNAPPROVED_BOM_SUBSTITUTION"
+          ]
         }
       }
     },
@@ -457,11 +493,15 @@
       "expected": {
         "route": {
           "disposition": "feasible",
-          "reason_code": "ALL_DECLARED_ROUTE_CAPABILITIES_SATISFIED"
+          "reason_codes": [
+            "ALL_DECLARED_ROUTE_CAPABILITIES_SATISFIED"
+          ]
         },
         "evidence": {
           "disposition": "incomplete",
-          "reason_code": "BARE_BOARD_INSPECTION_INCOMPLETE"
+          "reason_codes": [
+            "BARE_BOARD_INSPECTION_INCOMPLETE"
+          ]
         }
       }
     },
@@ -499,11 +539,15 @@
       "expected": {
         "route": {
           "disposition": "feasible",
-          "reason_code": "ALL_DECLARED_ROUTE_CAPABILITIES_SATISFIED"
+          "reason_codes": [
+            "ALL_DECLARED_ROUTE_CAPABILITIES_SATISFIED"
+          ]
         },
         "evidence": {
           "disposition": "incomplete",
-          "reason_code": "CALIBRATION_NOT_CURRENT"
+          "reason_codes": [
+            "CALIBRATION_NOT_CURRENT"
+          ]
         }
       }
     },
@@ -541,11 +585,15 @@
       "expected": {
         "route": {
           "disposition": "feasible",
-          "reason_code": "ALL_DECLARED_ROUTE_CAPABILITIES_SATISFIED"
+          "reason_codes": [
+            "ALL_DECLARED_ROUTE_CAPABILITIES_SATISFIED"
+          ]
         },
         "evidence": {
           "disposition": "incomplete",
-          "reason_code": "ASSEMBLY_PACKAGE_INCOMPLETE"
+          "reason_codes": [
+            "ASSEMBLY_PACKAGE_INCOMPLETE"
+          ]
         }
       }
     },
@@ -583,11 +631,15 @@
       "expected": {
         "route": {
           "disposition": "feasible",
-          "reason_code": "ALL_DECLARED_ROUTE_CAPABILITIES_SATISFIED"
+          "reason_codes": [
+            "ALL_DECLARED_ROUTE_CAPABILITIES_SATISFIED"
+          ]
         },
         "evidence": {
           "disposition": "incomplete",
-          "reason_code": "ASSEMBLY_INSPECTION_INCOMPLETE"
+          "reason_codes": [
+            "ASSEMBLY_INSPECTION_INCOMPLETE"
+          ]
         }
       }
     },
@@ -625,11 +677,15 @@
       "expected": {
         "route": {
           "disposition": "feasible",
-          "reason_code": "ALL_DECLARED_ROUTE_CAPABILITIES_SATISFIED"
+          "reason_codes": [
+            "ALL_DECLARED_ROUTE_CAPABILITIES_SATISFIED"
+          ]
         },
         "evidence": {
           "disposition": "incomplete",
-          "reason_code": "FUNCTIONAL_TEST_REVISION_MISMATCH"
+          "reason_codes": [
+            "FUNCTIONAL_TEST_REVISION_MISMATCH"
+          ]
         }
       }
     },
@@ -667,11 +723,15 @@
       "expected": {
         "route": {
           "disposition": "feasible",
-          "reason_code": "ALL_DECLARED_ROUTE_CAPABILITIES_SATISFIED"
+          "reason_codes": [
+            "ALL_DECLARED_ROUTE_CAPABILITIES_SATISFIED"
+          ]
         },
         "evidence": {
           "disposition": "incomplete",
-          "reason_code": "PROVENANCE_INCOMPLETE"
+          "reason_codes": [
+            "PROVENANCE_INCOMPLETE"
+          ]
         }
       }
     },
@@ -709,11 +769,15 @@
       "expected": {
         "route": {
           "disposition": "feasible",
-          "reason_code": "ALL_DECLARED_ROUTE_CAPABILITIES_SATISFIED"
+          "reason_codes": [
+            "ALL_DECLARED_ROUTE_CAPABILITIES_SATISFIED"
+          ]
         },
         "evidence": {
           "disposition": "rejected",
-          "reason_code": "UNSUPPORTED_PHYSICAL_QUALIFICATION_CLAIM"
+          "reason_codes": [
+            "UNSUPPORTED_PHYSICAL_QUALIFICATION_CLAIM"
+          ]
         }
       }
     }
