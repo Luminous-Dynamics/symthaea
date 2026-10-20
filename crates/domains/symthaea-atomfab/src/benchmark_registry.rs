@@ -406,11 +406,18 @@ mod tests {
                 .iter()
                 .find(|lane| lane.id == lane_id)
                 .unwrap_or_else(|| panic!("missing benchmark lane {lane_id}"));
-            assert!(
+            let has_lane_specific_failure_metrics = if lane_id == "scientific-ms25" {
                 lane.metrics.iter().any(|metric| {
                     metric.contains("failure-mode") && metric.contains("material family")
-                }),
-                "{lane_id} must report typed failure modes by material family"
+                })
+            } else {
+                lane.metrics.iter().any(|metric| {
+                    metric.contains("failure-mode rates") && metric.contains("support surface")
+                })
+            };
+            assert!(
+                has_lane_specific_failure_metrics,
+                "{lane_id} must report typed failure modes for its material/condition scope"
             );
             assert!(
                 lane.gates.iter().any(|gate| {
