@@ -50,21 +50,21 @@ jobs:
           rustfmt --edition 2024 --check crates/domains/symthaea-culinary/src/bin/wine_quality_source_audit.rs
 
       - name: Test synthetic receipt contract
-        run: cargo test -p symthaea-culinary --bin beverage_benchmark_receipt
+        run: cargo test --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin beverage_benchmark_receipt
 
       - name: Test wine source auditor
-        run: cargo test -p symthaea-culinary --bin wine_quality_source_audit
+        run: cargo test --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin wine_quality_source_audit
 
       - name: Clippy focused runners
         run: |
-          cargo clippy -p symthaea-culinary --bin beverage_benchmark_receipt -- -D warnings
-          cargo clippy -p symthaea-culinary --bin wine_quality_source_audit -- -D warnings
+          cargo clippy --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin beverage_benchmark_receipt -- -D warnings
+          cargo clippy --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin wine_quality_source_audit -- -D warnings
 
       - name: Emit exact-head receipt
         env:
           EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
-          cargo run -p symthaea-culinary --bin beverage_benchmark_receipt -- \
+          cargo run --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin beverage_benchmark_receipt -- \
             --corpus docs/research/beverage-engineering-scenarios-v1.json \
             --schema docs/research/beverage-engineering-scenarios-v1.schema.json \
             --expected-head "$EXPECTED_HEAD" \
