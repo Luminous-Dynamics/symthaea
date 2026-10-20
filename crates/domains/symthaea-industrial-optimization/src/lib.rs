@@ -443,6 +443,32 @@ mod tests {
         assert!(greedy_expected_per_dollar(&candidates, 10).unwrap().capex_usd <= 10);
     }
 
+
+    #[test]
+    fn portfolio_strategies_are_input_order_invariant() {
+        let candidates = vec![
+            item("a", "source-x", 5, 2, 3, 5, true),
+            item("b", "source-y", 7, 3, 4, 6, true),
+            item("c", "source-x", 6, 3, 4, 7, true),
+            item("d", "source-z", 9, 4, 5, 8, true),
+        ];
+        let mut reversed = candidates.clone();
+        reversed.reverse();
+
+        assert_eq!(
+            greedy_expected_per_dollar(&candidates, 16).unwrap(),
+            greedy_expected_per_dollar(&reversed, 16).unwrap()
+        );
+        assert_eq!(
+            optimize_robust_portfolio(&candidates, 16).unwrap(),
+            optimize_robust_portfolio(&reversed, 16).unwrap()
+        );
+        assert_eq!(
+            pareto_frontier(&candidates, 16).unwrap(),
+            pareto_frontier(&reversed, 16).unwrap()
+        );
+    }
+
     #[test]
     fn same_source_group_cannot_be_double_counted() {
         let candidates = vec![
