@@ -1,0 +1,68 @@
+{
+  "schema": "luminous.landscape-evaluation-plan.v0",
+  "schema_uri": "https://luminousdynamics.io/schemas/landscape-evaluation-plan-v0.schema.json",
+  "evaluation_id": "eval-watershed-demo-v0",
+  "project_snapshot_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "created_at_unix_s": 1792454400,
+  "project_scope": "watershed",
+  "plan_status": "draft",
+  "study_design": "before-after-control-impact",
+  "analysis_intent": "associational",
+  "time_windows": {
+    "baseline": {
+      "start_unix_s": 1767225600,
+      "end_unix_s": 1782864000
+    },
+    "follow_up": {
+      "start_unix_s": 1788220800,
+      "end_unix_s": 1796083200
+    }
+  },
+  "arms": [
+    {
+      "id": "arm-restoration",
+      "role": "intervention",
+      "site_ref_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "allocation_method": "non-randomized"
+    },
+    {
+      "id": "arm-comparison",
+      "role": "comparison",
+      "site_ref_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "allocation_method": "matched"
+    }
+  ],
+  "outcomes": [
+    {
+      "metric_id": "water.event_runoff_volume",
+      "unit": "m3/event",
+      "method_id": "runoff-volume-v1",
+      "method_uri": "https://www.landscapeperformance.org/guide-to-evaluate-performance",
+      "sampling_design": "event-based",
+      "minimum_observations_per_arm_window": 6,
+      "uncertainty_method": "Bootstrap by independent rainfall event; report interval, missing-event coverage, and sensitivity to event inclusion.",
+      "desired_direction": "decrease",
+      "target_band": null
+    },
+    {
+      "metric_id": "ecology.canopy_cover_fraction",
+      "unit": "percent_of_area",
+      "method_id": "canopy-cover-v1",
+      "method_uri": "https://www.landscapeperformance.org/guide-to-evaluate-performance",
+      "sampling_design": "seasonal",
+      "minimum_observations_per_arm_window": 3,
+      "uncertainty_method": "Propagate crown-delineation uncertainty and repeat-season variability; report coverage and source date.",
+      "desired_direction": "increase",
+      "target_band": null
+    }
+  ],
+  "causal_analysis_plan": null,
+  "privacy": {
+    "location_sensitivity": "restricted",
+    "publication_policy": "aggregate-only",
+    "consent_status": "pending",
+    "consent_record_ref": null,
+    "aggregation_policy": "Publish only catchment-level aggregates after review; never disclose site coordinates or participant-linked records."
+  },
+  "interpretation_limit": "validation-does-not-prove-impact-or-causality"
+}
