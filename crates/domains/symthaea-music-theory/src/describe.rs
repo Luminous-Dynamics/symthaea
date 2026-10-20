@@ -680,7 +680,11 @@ fn development_sentence(dev: crate::spec::DevelopmentDna) -> Option<String> {
 fn accompaniment_sentence(pattern: crate::accompaniment::Accompaniment) -> Option<String> {
     use crate::accompaniment::Accompaniment as A;
     let s = match pattern {
-        A::Block | A::Arpeggio | A::Alberti | A::OomPah | A::Comp => return None, // no strong identity story
+        A::Block | A::Arpeggio | A::Alberti | A::Comp => return None, // no strong identity story
+        A::OomPah => {
+            "The harmony leaves beat one to the bass, then answers with full-chord stabs on \
+             beats two and three: the characteristic waltz oom-pah-pah."
+        }
         A::Habanera => {
             "The accompaniment moves in a habanera rhythm cell — a dotted anchor, a pickup, \
              two answering beats."
