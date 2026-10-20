@@ -389,6 +389,77 @@
                     }
                   }
                 }
+              },
+              "transfer_verification": {
+                "type": "object",
+                "additionalProperties": false,
+                "description": "Target-side proof evidence for this transfer attempt. This is distinct from verification of the source theorem. A verified transfer must carry an exact-target receipt.",
+                "required": [
+                  "status",
+                  "target_statement_digest",
+                  "checker",
+                  "checker_version",
+                  "exact_statement_checked",
+                  "axiom_policy",
+                  "receipt_sha256"
+                ],
+                "properties": {
+                  "status": {
+                    "enum": [
+                      "not_attempted",
+                      "passed",
+                      "failed",
+                      "timed_out",
+                      "tool_unavailable",
+                      "counterexample_found"
+                    ]
+                  },
+                  "target_statement_digest": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
+                  },
+                  "checker": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 300
+                  },
+                  "checker_version": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 300
+                  },
+                  "exact_statement_checked": {
+                    "type": "boolean"
+                  },
+                  "axiom_policy": {
+                    "enum": [
+                      "not_applicable",
+                      "declared_classical",
+                      "constructive_policy",
+                      "custom",
+                      "unknown"
+                    ]
+                  },
+                  "axioms": {
+                    "type": "array",
+                    "uniqueItems": true,
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "receipt_sha256": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
+                  },
+                  "notes": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "maxLength": 2000
+                    }
+                  }
+                }
               }
             },
             "allOf": [
@@ -404,6 +475,9 @@
                   ]
                 },
                 "then": {
+                  "required": [
+                    "transfer_verification"
+                  ],
                   "properties": {
                     "directional_contract": {
                       "properties": {
@@ -411,6 +485,25 @@
                           "const": "compatible"
                         }
                       }
+                    },
+                    "transfer_verification": {
+                      "properties": {
+                        "status": {
+                          "const": "passed"
+                        },
+                        "exact_statement_checked": {
+                          "const": true
+                        }
+                      },
+                      "required": [
+                        "status",
+                        "target_statement_digest",
+                        "checker",
+                        "checker_version",
+                        "exact_statement_checked",
+                        "axiom_policy",
+                        "receipt_sha256"
+                      ]
                     }
                   }
                 }
@@ -437,6 +530,32 @@
                           ]
                         }
                       }
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "transfer_verification": {
+                      "properties": {
+                        "status": {
+                          "const": "passed"
+                        }
+                      },
+                      "required": [
+                        "status"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "transfer_verification"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "status": {
+                      "const": "verified_transfer"
                     }
                   }
                 }
