@@ -253,10 +253,13 @@ struct ProjectMetadata {
 #[derive(Clone, Debug)]
 struct ValidatedAlternative {
     report: AlternativeAssessment,
-    roles: BTreeMap<String, ArtifactRole>,
-    scenario_purposes: BTreeMap<String, String>,
-    bound_observation_batches: BTreeSet<String>,
     metric_evidence: BTreeMap<String, MetricEvidence>,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+struct ObservationBatchQualification {
+    has_project_bound_observation: bool,
+    has_synthetic_observation: bool,
 }
 
 pub fn sha256_hex(bytes: &[u8]) -> String {
@@ -422,6 +425,7 @@ fn validate_alternative(
     let mut roles = BTreeMap::new();
     let mut scenario_purposes = BTreeMap::new();
     let mut bound_observation_batches = BTreeSet::new();
+    let mut synthetic_observation_batches = BTreeSet::new();
     let mut verified_digests = BTreeSet::new();
     verified_digests.insert(alternative.project_snapshot.sha256.clone());
     roles.insert(alternative.project_snapshot.sha256.clone(), ArtifactRole::ProjectSnapshot);
@@ -498,8 +502,18 @@ fn validate_alternative(
         }
         let Some(bytes) = verified_bytes(observation_ref, payloads, alt_id, violations) else { continue };
         let Some(value) = parse_object(bytes, alt_id, observation_ref, violations) else { continue };
-        if validate_observation_batch(&value, observation_ref, &alternative.project_snapshot.sha256, alt_id, violations) {
+        let qualification = validate_observation_batch(
+            &value,
+            observation_ref,
+            &alternative.project_snapshot.sha256,
+            alt_id,
+            violations,
+        );
+        if qualification.has_project_bound_observation {
             bound_observation_batches.insert(observation_ref.sha256.clone());
+        }
+        if qualification.has_synthetic_observation {
+            synthetic_observation_batches.insert(observation_ref.sha256.clone());
         }
         verified_digests.insert(observation_ref.sha256.clone());
         roles.insert(observation_ref.sha256.clone(), ArtifactRole::ObservationBatch);
@@ -554,7 +568,15 @@ fn validate_alternative(
                 push_violation(violations, "metric-support-not-verified", Some(alt_id), Some(support), Some("metrics.supporting_artifact_sha256s"), "Every supporting digest must reference an artifact verified in this alternative.");
             }
         }
-        validate_metric_evidence(metric, alt_id, &roles, &scenario_purposes, &bound_observation_batches, violations);
+        validate_metric_evidence(
+            metric,
+            alt_id,
+            &roles,
+            &scenario_purposes,
+            &bound_observation_batches,
+            &synthetic_observation_batches,
+            violations,
+        );
         if matches!(metric.state, MetricState::Missing | MetricState::NotComputable | MetricState::Conflicting) {
             findings.push(ReviewFinding {
                 code: match metric.state {
@@ -624,9 +646,6 @@ fn validate_alternative(
     };
     Some(ValidatedAlternative {
         report,
-        roles,
-        scenario_purposes,
-        bound_observation_batches,
         metric_evidence: metrics,
     })
 }
@@ -759,7 +778,7 @@ fn validate_observation_batch(
     project_digest: &str,
     alternative_id: &str,
     violations: &mut Vec<ReviewViolation>,
-) -> bool {
+) -> ObservationBatchQualification {
     if value.get("schema").and_then(Value::as_str) != Some(OBSERVATION_BATCH_SCHEMA)
         || value.get("schema_uri").and_then(Value::as_str) != Some(OBSERVATION_BATCH_SCHEMA_URI)
         || reference.schema_uri != OBSERVATION_BATCH_SCHEMA_URI
@@ -768,18 +787,23 @@ fn validate_observation_batch(
     }
     let Some(observations) = value.get("observations").and_then(Value::as_array) else {
         push_violation(violations, "observation-batch-records-missing", Some(alternative_id), Some(&reference.sha256), Some("observations"), "Observation batch must contain an observations array.");
-        return false;
+        return ObservationBatchQualification::default();
     };
-    let mut bound = false;
+    let mut qualification = ObservationBatchQualification::default();
     for observation in observations {
         let bound_snapshot = observation.pointer("/project_ref/project_snapshot_sha256").and_then(Value::as_str);
         match bound_snapshot {
-            Some(digest) if digest == project_digest => bound = true,
+            Some(digest) if digest == project_digest => {
+                qualification.has_project_bound_observation = true;
+                if observation.get("evidence_class").and_then(Value::as_str) == Some("synthetic-test") {
+                    qualification.has_synthetic_observation = true;
+                }
+            }
             Some(_) => push_violation(violations, "observation-project-digest-mismatch", Some(alternative_id), Some(&reference.sha256), Some("observations.project_ref.project_snapshot_sha256"), "An observation attached to a different project revision cannot support this alternative."),
             None => {}
         }
     }
-    bound
+    qualification
 }
 
 fn validate_stewardship_record(
@@ -842,6 +866,7 @@ fn validate_metric_evidence(
     roles: &BTreeMap<String, ArtifactRole>,
     scenario_purposes: &BTreeMap<String, String>,
     bound_observation_batches: &BTreeSet<String>,
+    synthetic_observation_batches: &BTreeSet<String>,
     violations: &mut Vec<ReviewViolation>,
 ) {
     if metric.state == MetricState::Available {
@@ -890,7 +915,8 @@ fn validate_metric_evidence(
         && !metric.supporting_artifact_sha256s.iter().any(|digest| {
             (roles.get(digest) == Some(&ArtifactRole::ScenarioManifest)
                 && scenario_purposes.get(digest).is_some_and(|purpose| purpose == "synthetic-benchmark"))
-                || roles.get(digest) == Some(&ArtifactRole::ObservationBatch)
+                || (roles.get(digest) == Some(&ArtifactRole::ObservationBatch)
+                    && synthetic_observation_batches.contains(digest))
         })
     {
         push_violation(violations, "synthetic-metric-without-synthetic-source", Some(alternative_id), None, Some("metrics.supporting_artifact_sha256s"), "Synthetic evidence must cite a pinned synthetic scenario or synthetic observation batch.");
