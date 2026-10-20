@@ -40,7 +40,7 @@
         "action_id",
         "source",
         "status",
-        "realized_decision_loss_reduction_units",
+        "realized_decision_loss_change_units",
         "realized_cost_units",
         "outcome_evidence_digest"
       ],
@@ -65,16 +65,15 @@
             "not_run"
           ]
         },
-        "realized_decision_loss_reduction_units": {
-          "type": "integer",
-          "minimum": 0
-        },
         "realized_cost_units": {
           "type": "integer",
           "minimum": 0
         },
         "outcome_evidence_digest": {
           "$ref": "#/$defs/sha256"
+        },
+        "realized_decision_loss_change_units": {
+          "type": "integer"
         }
       },
       "allOf": [
@@ -91,10 +90,10 @@
           },
           "then": {
             "properties": {
-              "realized_decision_loss_reduction_units": {
+              "realized_cost_units": {
                 "const": 0
               },
-              "realized_cost_units": {
+              "realized_decision_loss_change_units": {
                 "const": 0
               }
             }
@@ -116,9 +115,6 @@
           },
           "then": {
             "properties": {
-              "realized_decision_loss_reduction_units": {
-                "const": 0
-              },
               "realized_cost_units": {
                 "minimum": 1
               }
