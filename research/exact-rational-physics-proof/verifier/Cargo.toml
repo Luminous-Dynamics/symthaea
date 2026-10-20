@@ -1,0 +1,9 @@
+[package]
+name = "symthaea-exact-rational-physics-proof-verifier"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "Isolated verifier for Symthaea's emitted polynomial conservation obligations."
+
+[dependencies]
+symthaea-core = { path = "../symthaea-core-stub" }
