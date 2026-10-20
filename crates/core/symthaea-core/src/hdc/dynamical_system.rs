@@ -147,19 +147,35 @@ pub enum SimulationError {
     InvalidTimeStep,
     NonFiniteTimeSpan,
     NonFiniteStepCount,
-    StepBudgetExceeded { maximum_steps: usize },
-    TrajectoryBudgetExceeded { maximum_state_values: usize },
-    StateDimensionMismatch { expected: usize, actual: usize },
-    NonFiniteInitialState { index: usize },
+    StepBudgetExceeded {
+        maximum_steps: usize,
+    },
+    TrajectoryBudgetExceeded {
+        maximum_state_values: usize,
+    },
+    StateDimensionMismatch {
+        expected: usize,
+        actual: usize,
+    },
+    NonFiniteInitialState {
+        index: usize,
+    },
     InvalidIntegratorStateDimension {
         step: usize,
         expected: usize,
         actual: usize,
     },
-    NonFiniteIntegratorState { step: usize, index: usize },
+    NonFiniteIntegratorState {
+        step: usize,
+        index: usize,
+    },
     InvalidIntegratorConfiguration,
-    InvalidIntegratorStepSize { step: usize },
-    TimeDidNotAdvance { step: usize },
+    InvalidIntegratorStepSize {
+        step: usize,
+    },
+    TimeDidNotAdvance {
+        step: usize,
+    },
 }
 
 /// Checked simulation entry point.
@@ -223,11 +239,11 @@ pub fn try_simulate(
     let sample_count = n_steps
         .checked_add(1)
         .ok_or(SimulationError::NonFiniteStepCount)?;
-    let state_value_count = sample_count
-        .checked_mul(expected_dim)
-        .ok_or(SimulationError::TrajectoryBudgetExceeded {
+    let state_value_count = sample_count.checked_mul(expected_dim).ok_or(
+        SimulationError::TrajectoryBudgetExceeded {
             maximum_state_values: MAX_TRAJECTORY_STATE_VALUES,
-        })?;
+        },
+    )?;
     if state_value_count > MAX_TRAJECTORY_STATE_VALUES {
         return Err(SimulationError::TrajectoryBudgetExceeded {
             maximum_state_values: MAX_TRAJECTORY_STATE_VALUES,
@@ -250,17 +266,18 @@ pub fn try_simulate(
             });
         }
 
-        let next_sample_count = states
-            .len()
-            .checked_add(1)
-            .ok_or(SimulationError::TrajectoryBudgetExceeded {
+        let next_sample_count =
+            states
+                .len()
+                .checked_add(1)
+                .ok_or(SimulationError::TrajectoryBudgetExceeded {
+                    maximum_state_values: MAX_TRAJECTORY_STATE_VALUES,
+                })?;
+        let next_state_value_count = next_sample_count.checked_mul(expected_dim).ok_or(
+            SimulationError::TrajectoryBudgetExceeded {
                 maximum_state_values: MAX_TRAJECTORY_STATE_VALUES,
-            })?;
-        let next_state_value_count = next_sample_count
-            .checked_mul(expected_dim)
-            .ok_or(SimulationError::TrajectoryBudgetExceeded {
-                maximum_state_values: MAX_TRAJECTORY_STATE_VALUES,
-            })?;
+            },
+        )?;
         if next_state_value_count > MAX_TRAJECTORY_STATE_VALUES {
             return Err(SimulationError::TrajectoryBudgetExceeded {
                 maximum_state_values: MAX_TRAJECTORY_STATE_VALUES,
@@ -275,8 +292,7 @@ pub fn try_simulate(
             });
         }
 
-        let (next_state, accepted_dt) =
-            integrator.step_with_dt(system, &state, t, requested_dt);
+        let (next_state, accepted_dt) = integrator.step_with_dt(system, &state, t, requested_dt);
         if !accepted_dt.is_finite() || accepted_dt <= 0.0 || accepted_dt > requested_dt {
             return Err(SimulationError::InvalidIntegratorStepSize {
                 step: completed_steps + 1,
@@ -602,8 +618,7 @@ impl Integrator for Rk45Integrator {
             if !accepted_dt.is_finite() || accepted_dt <= 0.0 || accepted_dt > remaining {
                 panic!("RK45 returned an invalid accepted timestep");
             }
-            if next_state.len() != state.len()
-                || next_state.iter().any(|value| !value.is_finite())
+            if next_state.len() != state.len() || next_state.iter().any(|value| !value.is_finite())
             {
                 panic!("RK45 returned an invalid state vector");
             }
