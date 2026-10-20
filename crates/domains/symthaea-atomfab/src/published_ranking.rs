@@ -172,8 +172,16 @@ pub fn compare_published_rankings(
     let mut reference_order: Vec<&RankedEnergy> = reference.iter().collect();
     reference_order.sort_by(|a, b| compare_energy_order(a, b));
 
-    let extrapolated_rbo =
+    let raw_extrapolated_rbo =
         compute_extrapolated_rbo(&predicted_order, &reference_order, persistence);
+    if !raw_extrapolated_rbo.is_finite()
+        || !(-1e-12..=1.0 + 1e-12).contains(&raw_extrapolated_rbo)
+    {
+        return Err(PublishedRankingError::InvalidMetric);
+    }
+    // RBO is mathematically bounded by [0, 1]. Clamp only tiny floating-point
+    // round-off around those bounds after rejecting materially invalid values.
+    let extrapolated_rbo = raw_extrapolated_rbo.clamp(0.0, 1.0);
     let reference_energy: BTreeMap<&str, f64> = reference
         .iter()
         .map(|item| (item.structure_id.as_str(), item.energy))
