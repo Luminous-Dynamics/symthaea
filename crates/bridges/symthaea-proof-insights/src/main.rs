@@ -704,13 +704,13 @@ fn verify_temporal_manifest_file(repository_root: &Path, manifest_path: &Path) -
                 event.target_id
             );
         }
-        if let Some(previous) = previous_completion_commit {
-            if !git_is_ancestor(&root, previous, &event.target_state_commit)? {
-                bail!(
-                    "target {} is evaluated before the previous timeline proof was available",
-                    event.target_id
-                );
-            }
+        if let Some(previous) = previous_completion_commit
+            && !git_is_ancestor(&root, previous, &event.target_state_commit)?
+        {
+            bail!(
+                "target {} is evaluated before the previous timeline proof was available",
+                event.target_id
+            );
         }
 
         for artifact_id in &event.visible_artifact_ids {
@@ -1462,13 +1462,12 @@ fn find_mathlib_revision(value: &serde_json::Value) -> Option<&str> {
                     .get("url")
                     .and_then(serde_json::Value::as_str)
                     .is_some_and(|url| url.to_ascii_lowercase().contains("mathlib4"));
-            if is_mathlib_package {
-                if let Some(revision) = ["rev", "revision", "inputRev", "input_rev"]
+            if is_mathlib_package
+                && let Some(revision) = ["rev", "revision", "inputRev", "input_rev"]
                     .iter()
                     .find_map(|key| object.get(*key).and_then(serde_json::Value::as_str))
-                {
-                    return Some(revision);
-                }
+            {
+                return Some(revision);
             }
             object.values().find_map(find_mathlib_revision)
         }
