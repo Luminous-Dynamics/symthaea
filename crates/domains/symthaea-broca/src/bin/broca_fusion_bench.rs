@@ -1,7 +1,11 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! broca-fusion-bench: A/B benchmark for algebraic fusion flags.
+//! broca-fusion-bench: paired A/B smoke benchmark for Broca initialization and fusion.
+//!
+//! With --epochs N, every configuration is trained independently on the same
+//! training split, then evaluated on held-out phrases. Without --epochs, output
+//! is an initialization-only smoke comparison, not a trained-model result.
 //!
 //! Usage:
 //!   cargo run --release -p symthaea-broca --bin broca_fusion_bench -- --epochs 20
@@ -40,9 +44,25 @@ fn base_config() -> BrocaConfig {
 fn core_configs() -> Vec<BenchRun> {
     vec![
         BenchRun {
-            name: "raw baseline (all off)".into(),
+            name: "raw baseline (genesis tokens)".into(),
             setup: Box::new(|c| {
                 c.controller.enable_compositional_logits = false;
+                c.enable_semantic_token_embeddings = false;
+            }),
+        },
+        BenchRun {
+            name: "semantic token init only".into(),
+            setup: Box::new(|c| {
+                c.controller.enable_compositional_logits = false;
+                c.enable_semantic_token_embeddings = true;
+            }),
+        },
+        BenchRun {
+            name: "semantic init + comp+alg".into(),
+            setup: Box::new(|c| {
+                c.controller.enable_compositional_logits = true;
+                c.enable_semantic_token_embeddings = true;
+                c.gating.enable_algebraic_correction = true;
             }),
         },
         BenchRun {
@@ -95,9 +115,9 @@ fn alpha_sweep_configs() -> Vec<BenchRun> {
         .collect()
 }
 
-fn make_dataset(tok: &BpeTokenizer) -> TrainingDataset {
-    let mut ds = TrainingDataset::default();
-    let texts = [
+fn make_datasets(tok: &BpeTokenizer) -> (TrainingDataset, TrainingDataset) {
+    let mut training = TrainingDataset::default();
+    let training_texts = [
         "I understand",
         "the answer is",
         "let me clarify",
@@ -107,21 +127,62 @@ fn make_dataset(tok: &BpeTokenizer) -> TrainingDataset {
         "continuing now",
         "something new",
     ];
-    for (i, text) in texts.iter().enumerate() {
-        let ch = ThoughtChannels::with_intent(i % 8);
+    for (i, text) in training_texts.iter().enumerate() {
+        let channels = ThoughtChannels::with_intent(i % 8);
         for _ in 0..3 {
-            ds.push(TrainingPair::new(ch, text.to_string(), tok));
+            training.push(TrainingPair::new(channels, text.to_string(), tok));
         }
     }
-    ds
+
+    // Hold out different surface combinations. This remains a tiny smoke split,
+    // not a general language-capability benchmark, but it avoids reporting
+    // training-set perplexity as held-out generalization.
+    let mut evaluation = TrainingDataset::default();
+    let held_out_texts = [
+        "I may analyze this",
+        "a likely answer",
+        "could you explain",
+        "we should maybe wait",
+        "the result is known",
+        "consider this again",
+        "please continue later",
+        "an unknown thing",
+    ];
+    for (i, text) in held_out_texts.iter().enumerate() {
+        let channels = ThoughtChannels::with_intent(i % 8);
+        evaluation.push(TrainingPair::new(channels, text.to_string(), tok));
+    }
+
+    (training, evaluation)
 }
 
-fn run_eval(genesis: &GenesisSeed, bench: &BenchRun, dataset: &TrainingDataset) -> EvalResult {
+fn run_eval(
+    genesis: &GenesisSeed,
+    bench: &BenchRun,
+    training_dataset: &TrainingDataset,
+    evaluation_dataset: &TrainingDataset,
+    epochs: usize,
+) -> EvalResult {
     let mut cfg = base_config();
     (bench.setup)(&mut cfg);
     let mut r#gen = BrocaGenerator::new(genesis, cfg);
+    if epochs > 0 {
+        let training_config = TrainingConfig {
+            epochs,
+            learning_rate: 0.01,
+            bptt_window: 8,
+            use_adam: true,
+            train_network: true,
+            network_lr_scale: 0.3,
+            embedding_target_norm: 128.0,
+            ..Default::default()
+        };
+        // Every arm receives the same data, epoch count and optimizer profile.
+        // Initialization and enabled mechanisms are the intended differences.
+        let _metrics = training::train(&mut r#gen, training_dataset, &training_config);
+    }
     let eval_cfg = EvalConfig {
-        dataset: dataset.clone(),
+        dataset: evaluation_dataset.clone(),
         compute_perplexity: true,
         compute_english_ratio: true,
         per_intent_breakdown: false,
@@ -177,25 +238,14 @@ fn main() {
     let tok = BpeTokenizer::default_minimal();
     let dataset = make_dataset(&tok);
 
-    // Phase 1: Eval-only benchmark (train baseline, eval with flags)
-    if epochs > 0 {
-        eprintln!("=== Phase 1: Train baseline ({epochs} epochs), eval with flags ===");
-        let cfg = base_config();
-        let mut r#gen = BrocaGenerator::new(&genesis, cfg);
-        let tc = TrainingConfig {
-            epochs,
-            learning_rate: 0.01,
-            bptt_window: 8,
-            use_adam: true,
-            train_network: true,
-            network_lr_scale: 0.3,
-            embedding_target_norm: 128.0,
-            ..Default::default()
-        };
-        let m = training::train(&mut r#gen, &dataset, &tc);
+    let (training_dataset, evaluation_dataset) = make_datasets(&tok);
+    if epochs == 0 {
         eprintln!(
-            "  Final loss: {:.4}\n",
-            m.last().map(|m| m.avg_loss).unwrap_or(0.0)
+            "Initialization-only smoke comparison: use --epochs N for paired trained evaluation."
+        );
+    } else {
+        eprintln!(
+            "Paired training: {epochs} epochs per configuration; held-out phrases reserved for evaluation."
         );
     }
 
@@ -204,7 +254,13 @@ fn main() {
     let configs = core_configs();
     for run in &configs {
         eprint!("  {} ... ", run.name);
-        let r = run_eval(&genesis, run, &dataset);
+        let r = run_eval(
+            &genesis,
+            run,
+            &training_dataset,
+            &evaluation_dataset,
+            epochs,
+        );
         eprintln!(
             "ppl={:.1} eng={:.3} coh={:.4}",
             r.perplexity, r.english_word_ratio, r.avg_coherence
@@ -220,7 +276,13 @@ fn main() {
         let sweep = alpha_sweep_configs();
         for run in &sweep {
             eprint!("  {} ... ", run.name);
-            let r = run_eval(&genesis, run, &dataset);
+            let r = run_eval(
+            &genesis,
+            run,
+            &training_dataset,
+            &evaluation_dataset,
+            epochs,
+        );
             eprintln!(
                 "ppl={:.1} eng={:.3} coh={:.4}",
                 r.perplexity, r.english_word_ratio, r.avg_coherence
@@ -251,7 +313,7 @@ fn main() {
             fusion_warmup_epochs: epochs / 4, // First 25% without fusion
             ..Default::default()
         };
-        let m = training::train(&mut r#gen, &dataset, &tc);
+        let m = training::train(&mut r#gen, &training_dataset, &tc);
         eprintln!(
             "  Fusion-trained final loss: {:.4}",
             m.last().map(|m| m.avg_loss).unwrap_or(0.0)
@@ -268,7 +330,7 @@ fn main() {
 
         // Eval the fusion-trained model
         let eval_cfg = EvalConfig {
-            dataset: dataset.clone(),
+            dataset: evaluation_dataset.clone(),
             compute_perplexity: true,
             compute_english_ratio: true,
             per_intent_breakdown: false,
