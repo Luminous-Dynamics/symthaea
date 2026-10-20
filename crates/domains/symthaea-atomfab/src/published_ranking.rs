@@ -62,7 +62,10 @@ impl fmt::Display for PublishedRankingError {
                 write!(f, "candidate {index} has an empty canonical structure ID")
             }
             Self::DuplicateStructureId { side, index } => {
-                write!(f, "{side} ranking has a duplicate structure ID at index {index}")
+                write!(
+                    f,
+                    "{side} ranking has a duplicate structure ID at index {index}"
+                )
             }
             Self::MismatchedCandidateUniverse => write!(
                 f,
@@ -72,15 +75,23 @@ impl fmt::Display for PublishedRankingError {
                 write!(f, "candidate {index} has a non-finite energy")
             }
             Self::InvalidPersistence => {
-                write!(f, "RBO persistence must be finite and strictly between zero and one")
+                write!(
+                    f,
+                    "RBO persistence must be finite and strictly between zero and one"
+                )
             }
             Self::InvalidTieTolerance => {
                 write!(f, "energy tie tolerance must be finite and non-negative")
             }
             Self::NoComparablePairs => {
-                write!(f, "Kendall tau-b is undefined because no non-tied pairs are comparable")
+                write!(
+                    f,
+                    "Kendall tau-b is undefined because no non-tied pairs are comparable"
+                )
             }
-            Self::InvalidMetric => write!(f, "computed ranking metric is not finite or out of range"),
+            Self::InvalidMetric => {
+                write!(f, "computed ranking metric is not finite or out of range")
+            }
             Self::UnsupportedSchemaVersion(version) => {
                 write!(f, "unsupported published-ranking schema version: {version}")
             }
@@ -97,7 +108,9 @@ impl PublishedRankingMetrics {
     /// canonical prediction/reference inputs must be checked by the caller.
     pub fn validate(&self) -> Result<(), PublishedRankingError> {
         if self.schema_version != PUBLISHED_RANKING_SCHEMA_VERSION {
-            return Err(PublishedRankingError::UnsupportedSchemaVersion(self.schema_version));
+            return Err(PublishedRankingError::UnsupportedSchemaVersion(
+                self.schema_version,
+            ));
         }
         if self.candidate_count == 0
             || !self.rbo_persistence.is_finite()
@@ -142,10 +155,14 @@ pub fn compare_published_rankings(
         return Err(PublishedRankingError::InvalidTieTolerance);
     }
 
-    let predicted_ids: BTreeSet<&str> =
-        predicted.iter().map(|item| item.structure_id.as_str()).collect();
-    let reference_ids: BTreeSet<&str> =
-        reference.iter().map(|item| item.structure_id.as_str()).collect();
+    let predicted_ids: BTreeSet<&str> = predicted
+        .iter()
+        .map(|item| item.structure_id.as_str())
+        .collect();
+    let reference_ids: BTreeSet<&str> = reference
+        .iter()
+        .map(|item| item.structure_id.as_str())
+        .collect();
     if predicted_ids != reference_ids {
         return Err(PublishedRankingError::MismatchedCandidateUniverse);
     }
@@ -253,16 +270,16 @@ fn compute_kendall_tau_b(
     let mut tied_only_predicted = 0u64;
     let mut tied_only_reference = 0u64;
 
-    for i in 0..predicted.len() {
-        for j in (i + 1)..predicted.len() {
+    for (i, predicted_i) in predicted.iter().enumerate() {
+        for predicted_j in predicted.iter().skip(i + 1) {
             let predicted_cmp = compare_with_tolerance(
-                predicted[i].energy,
-                predicted[j].energy,
+                predicted_i.energy,
+                predicted_j.energy,
                 tie_tolerance,
             );
             let reference_cmp = compare_with_tolerance(
-                reference[predicted[i].structure_id.as_str()],
-                reference[predicted[j].structure_id.as_str()],
+                reference[predicted_i.structure_id.as_str()],
+                reference[predicted_j.structure_id.as_str()],
                 tie_tolerance,
             );
             match (predicted_cmp, reference_cmp) {
@@ -280,10 +297,9 @@ fn compute_kendall_tau_b(
     let tied_only_predicted = tied_only_predicted as f64;
     let tied_only_reference = tied_only_reference as f64;
     let numerator = concordant - discordant;
-    let denominator =
-        ((concordant + discordant + tied_only_predicted)
-            * (concordant + discordant + tied_only_reference))
-            .sqrt();
+    let denominator = ((concordant + discordant + tied_only_predicted)
+        * (concordant + discordant + tied_only_reference))
+        .sqrt();
     if denominator == 0.0 {
         return Err(PublishedRankingError::NoComparablePairs);
     }
@@ -311,7 +327,10 @@ mod tests {
         ))
         .expect("published ranking metric schema must parse");
         assert_eq!(schema["properties"]["schema_version"]["const"], 1);
-        assert_eq!(schema["properties"]["rbo_persistence"]["exclusiveMinimum"], 0);
+        assert_eq!(
+            schema["properties"]["rbo_persistence"]["exclusiveMinimum"],
+            0
+        );
         assert_eq!(schema["properties"]["extrapolated_rbo"]["maximum"], 1);
         assert_eq!(schema["properties"]["kendall_tau_b"]["minimum"], -1);
 
