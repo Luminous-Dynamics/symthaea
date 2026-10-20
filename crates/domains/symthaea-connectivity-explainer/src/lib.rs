@@ -1002,7 +1002,7 @@ mod tests {
     fn human_rendering_keeps_evidence_limits_and_priority_misses_visible() {
         let explanation = explain_report(&report()).unwrap();
         let rendered = render_human(&explanation);
-        assert!(rendered.contains("synthetic simulation"));
+        assert!(rendered.contains("SYNTHETIC SIMULATION"));
         assert!(rendered.contains("live Wi-Fi performance has not been tested"));
         assert!(rendered.contains("WHAT THIS DOES NOT PROVE"));
         assert!(rendered.contains("FIFO misses 1 essential deadline"));
