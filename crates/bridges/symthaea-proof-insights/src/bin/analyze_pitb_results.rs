@@ -2235,6 +2235,16 @@ mod tests {
     }
 
     #[test]
+    fn run_design_digest_excludes_power_receipt_to_avoid_a_hash_cycle() {
+        let mut config = test_config();
+        let base_digest = run_design_sha256(&config).expect("base run design should serialize");
+        config.power_report_sha256 = Some("f".repeat(64));
+        let final_digest =
+            run_design_sha256(&config).expect("adding receipt hash must not change the design digest");
+        assert_eq!(base_digest, final_digest);
+    }
+
+    #[test]
     fn splitmix_sampling_is_deterministic() {
         let mut left = SplitMix64 { state: 20261020 };
         let mut right = SplitMix64 { state: 20261020 };
