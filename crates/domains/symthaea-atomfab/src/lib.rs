@@ -346,7 +346,12 @@ pub fn summarize_risk_coverage(
         }
     }
 
-    ordered.sort_by(|a, b| a.uncertainty.total_cmp(&b.uncertainty));
+    ordered.sort_by(|a, b| {
+        a.uncertainty
+            .total_cmp(&b.uncertainty)
+            .then_with(|| a.predicted.total_cmp(&b.predicted))
+            .then_with(|| a.reference.total_cmp(&b.reference))
+    });
     let count = ordered.len();
     let denominator = count as f64;
     let mut points = Vec::new();
@@ -753,6 +758,31 @@ mod tests {
         assert_eq!(first.points[0].accepted_count, 2);
         assert!((first.points[0].mean_absolute_error - 5.0).abs() < 1e-12);
         assert_eq!(first.points[1].accepted_count, 3);
+    }
+
+    #[test]
+    fn risk_coverage_tied_scores_are_bitwise_deterministic_under_permutation() {
+        let samples = [
+            UncertaintyComparison {
+                predicted: 1.0e16,
+                reference: 0.0,
+                uncertainty: 0.5,
+            },
+            UncertaintyComparison {
+                predicted: 1.0,
+                reference: 0.0,
+                uncertainty: 0.5,
+            },
+            UncertaintyComparison {
+                predicted: 1.0,
+                reference: 0.0,
+                uncertainty: 0.5,
+            },
+        ];
+        let forward = summarize_risk_coverage(&samples).expect("valid samples");
+        let reverse = summarize_risk_coverage(&[samples[2], samples[1], samples[0]])
+            .expect("permuted valid samples");
+        assert_eq!(forward, reverse);
     }
 
     #[test]
