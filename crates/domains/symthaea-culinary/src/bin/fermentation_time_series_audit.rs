@@ -39,6 +39,14 @@ const FIELD2: &[&str] = &[
     "rep",
     "value",
 ];
+const FIELD3: &[&str] = &[
+    "treatment",
+    "time_hours",
+    "analyte",
+    "units_analyte",
+    "rep",
+    "value",
+];
 const FIELDS1: &[&str] = &["time_days", "treatment_temp", "treatment_inoculation", "analyte", "rep"];
 const FIELDS2: &[&str] = &["time_days", "treatment_temp", "analyte", "rep"];
 const FIELDS3: &[&str] = &["treatment", "time_hours", "analyte", "rep"];
@@ -72,14 +80,7 @@ impl DatasetKind {
         match self {
             Self::Figure1 => FIELD1,
             Self::Figure2 => FIELD2,
-            Self::FigureS1 => &[
-                "treatment",
-                "time_hours",
-                "analyte",
-                "units_analyte",
-                "rep",
-                "value",
-            ],
+            Self::FigureS1 => FIELD3,
         }
     }
 
@@ -95,6 +96,14 @@ impl DatasetKind {
         match self {
             Self::Figure1 | Self::Figure2 => "time_days",
             Self::FigureS1 => "time_hours",
+        }
+    }
+
+    fn condition_fields(self) -> &'static [&'static str] {
+        match self {
+            Self::Figure1 => &["treatment_temp", "units_treatment_temp", "treatment_inoculation"],
+            Self::Figure2 => &["treatment_temp", "units_treatment_temp"],
+            Self::FigureS1 => &["treatment"],
         }
     }
 }
@@ -139,6 +148,12 @@ impl NumericAccumulator {
             max: self.max,
             mean: self.sum / self.count as f64,
         })
+    }
+}
+
+impl Default for NumericAccumulator {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -332,9 +347,8 @@ fn audit_tsv(bytes: &[u8], kind: DatasetKind, filename: &str) -> IntakeReceipt {
                 {
                     row_errors.push(error);
                 }
-                match required_cell(&record, &indexes, "units_treatment_temp") {
-                    Ok(value) => { treatments.insert(value.to_owned()); }
-                    Err(error) => row_errors.push(error),
+                if let Err(error) = required_cell(&record, &indexes, "units_treatment_temp") {
+                    row_errors.push(error);
                 }
             }
 
@@ -365,14 +379,16 @@ fn audit_tsv(bytes: &[u8], kind: DatasetKind, filename: &str) -> IntakeReceipt {
                 row_errors.push("replicate_not_positive_integer".to_owned());
             }
 
-            for field in ["treatment_inoculation", "treatment"] {
-                if let Some(index) = indexes.get(field) {
-                    if let Some(value) = record.get(*index) {
-                        if !value.trim().is_empty() {
-                            treatments.insert(value.trim().to_owned());
-                        }
-                    }
-                }
+            let condition_parts = kind
+                .condition_fields()
+                .iter()
+                .filter_map(|field| indexes.get(*field).and_then(|index| record.get(*index)))
+                .map(str::trim)
+                .collect::<Vec<_>>();
+            if condition_parts.iter().any(|value| value.is_empty()) {
+                row_errors.push("treatment_condition_field_blank".to_owned());
+            } else {
+                treatments.insert(condition_parts.join("\\u{1f}"));
             }
 
             if row_errors.is_empty() {
