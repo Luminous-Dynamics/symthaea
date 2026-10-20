@@ -586,8 +586,8 @@ pub fn top_weighted_ranking_overlap(
     let mut shared_prefix_count = 0usize;
     let mut weighted_overlap = 0.0;
     let mut total_weight = 0.0;
-    for depth in 1..=len {
-        shared_prefix_count += shared_starting_at[depth];
+    for (depth, shared_at_depth) in shared_starting_at.iter().enumerate().skip(1) {
+        shared_prefix_count += *shared_at_depth;
         let prefix_overlap = shared_prefix_count as f64 / depth as f64;
         let weight = (1.0 - persistence) * persistence.powf((depth - 1) as f64);
         weighted_overlap += weight * prefix_overlap;
