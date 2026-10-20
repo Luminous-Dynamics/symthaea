@@ -1,0 +1,121 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/crates/domains/symthaea-atomfab/schemas/paired-target-reachability-summary-v1.schema.json",
+  "title": "AtomFab Paired Target Reachability Summary v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "baseline_policy_id",
+    "candidate_policy_id",
+    "predeclared_seeds",
+    "seed_manifest_sha256",
+    "campaign_pair_count",
+    "bootstrap_resamples",
+    "bootstrap_seed",
+    "confidence_level",
+    "baseline_target_reached_count",
+    "baseline_target_reach_rate",
+    "candidate_target_reached_count",
+    "candidate_target_reach_rate",
+    "reach_rate_difference",
+    "lower_confidence_bound",
+    "upper_confidence_bound",
+    "both_reached_count",
+    "baseline_only_reached_count",
+    "candidate_only_reached_count",
+    "neither_reached_count"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "baseline_policy_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "candidate_policy_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "predeclared_seeds": {
+      "type": "array",
+      "minItems": 20,
+      "uniqueItems": true,
+      "items": {
+        "type": "integer",
+        "minimum": 0
+      }
+    },
+    "seed_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "campaign_pair_count": {
+      "type": "integer",
+      "minimum": 20
+    },
+    "bootstrap_resamples": {
+      "type": "integer",
+      "minimum": 1000
+    },
+    "bootstrap_seed": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "confidence_level": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "exclusiveMaximum": 1
+    },
+    "baseline_target_reached_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "baseline_target_reach_rate": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "candidate_target_reached_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "candidate_target_reach_rate": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "reach_rate_difference": {
+      "type": "number",
+      "minimum": -1,
+      "maximum": 1
+    },
+    "lower_confidence_bound": {
+      "type": "number",
+      "minimum": -1,
+      "maximum": 1
+    },
+    "upper_confidence_bound": {
+      "type": "number",
+      "minimum": -1,
+      "maximum": 1
+    },
+    "both_reached_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "baseline_only_reached_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "candidate_only_reached_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "neither_reached_count": {
+      "type": "integer",
+      "minimum": 0
+    }
+  }
+}
