@@ -239,10 +239,9 @@ fn parse_priority_rows(row: &Value) -> Result<Option<Vec<PriorityOutcome>>, Stri
 fn optional_task_u64(value: &Value, key: &str, task_id: &str) -> Result<Option<u64>, String> {
     match value.get(key) {
         None | Some(Value::Null) => Ok(None),
-        Some(item) => item
-            .as_u64()
-            .map(Some)
-            .ok_or_else(|| format!("task_results/{task_id}/{key}: expected a non-negative integer or null")),
+        Some(item) => item.as_u64().map(Some).ok_or_else(|| {
+            format!("task_results/{task_id}/{key}: expected a non-negative integer or null")
+        }),
     }
 }
 
@@ -278,7 +277,8 @@ fn task_completion_explanation(
             };
             format!(
                 "Task {task_id} ({priority}) needed {service_bytes} bytes by window {deadline_window}. FIFO delivered {baseline_delivered}/{service_bytes} bytes and {failure}; fair-share delivered {candidate_delivered}/{service_bytes} bytes and completed{}.",
-                candidate_completion.map_or_else(String::new, |window| format!(" in window {window}"))
+                candidate_completion
+                    .map_or_else(String::new, |window| format!(" in window {window}"))
             )
         }
         ("succeeded", "failed") => {
@@ -290,7 +290,8 @@ fn task_completion_explanation(
             };
             format!(
                 "REGRESSION: task {task_id} ({priority}) needed {service_bytes} bytes by window {deadline_window}. FIFO completed it{} after delivering {baseline_delivered} bytes, but fair-share delivered {candidate_delivered}/{service_bytes} bytes and {failure}.",
-                baseline_completion.map_or_else(String::new, |window| format!(" in window {window}"))
+                baseline_completion
+                    .map_or_else(String::new, |window| format!(" in window {window}"))
             )
         }
         ("failed", "failed") if candidate_delivered > baseline_delivered => {
@@ -308,8 +309,10 @@ fn task_completion_explanation(
         ("succeeded", "succeeded") => {
             format!(
                 "Task {task_id} ({priority}) completed under both policies: FIFO in window {}, fair-share in window {}.",
-                baseline_completion.map_or_else(|| "not recorded".to_owned(), |window| window.to_string()),
-                candidate_completion.map_or_else(|| "not recorded".to_owned(), |window| window.to_string())
+                baseline_completion
+                    .map_or_else(|| "not recorded".to_owned(), |window| window.to_string()),
+                candidate_completion
+                    .map_or_else(|| "not recorded".to_owned(), |window| window.to_string())
             )
         }
         _ => format!(
@@ -318,7 +321,9 @@ fn task_completion_explanation(
     }
 }
 
-fn parse_task_comparisons(root: &Value) -> Result<Option<(Vec<TaskComparison>, u64, bool)>, String> {
+fn parse_task_comparisons(
+    root: &Value,
+) -> Result<Option<(Vec<TaskComparison>, u64, bool)>, String> {
     const MAX_EXPLANATIONS: usize = 50;
     let Some(task_results) = root.get("task_results") else {
         return Ok(None);
@@ -326,7 +331,9 @@ fn parse_task_comparisons(root: &Value) -> Result<Option<(Vec<TaskComparison>, u
     let groups = task_results
         .as_array()
         .filter(|groups| groups.len() == 2)
-        .ok_or_else(|| "multiwindow_recovery/task_results: expected exactly two task-result arrays".to_owned())?;
+        .ok_or_else(|| {
+            "multiwindow_recovery/task_results: expected exactly two task-result arrays".to_owned()
+        })?;
 
     let mut baseline = BTreeMap::<String, &Value>::new();
     let mut candidate = BTreeMap::<String, &Value>::new();
@@ -335,10 +342,9 @@ fn parse_task_comparisons(root: &Value) -> Result<Option<(Vec<TaskComparison>, u
             .as_array()
             .ok_or_else(|| "multiwindow_recovery/task_results/*: expected an array".to_owned())?;
         for row in rows {
-            let task_id = row
-                .get("task_id")
-                .and_then(Value::as_str)
-                .ok_or_else(|| "task_results/*/task_id: required task token is missing".to_owned())?;
+            let task_id = row.get("task_id").and_then(Value::as_str).ok_or_else(|| {
+                "task_results/*/task_id: required task token is missing".to_owned()
+            })?;
             let arm = row
                 .get("arm")
                 .and_then(Value::as_str)
@@ -346,16 +352,25 @@ fn parse_task_comparisons(root: &Value) -> Result<Option<(Vec<TaskComparison>, u
             let target = match arm {
                 "baseline" => &mut baseline,
                 "candidate" => &mut candidate,
-                other => return Err(format!("task_results/{task_id}/arm: unsupported arm '{other}'")),
+                other => {
+                    return Err(format!(
+                        "task_results/{task_id}/arm: unsupported arm '{other}'"
+                    ));
+                }
             };
             if target.insert(task_id.to_owned(), row).is_some() {
-                return Err(format!("task_results/{task_id}: duplicate task ID within arm"));
+                return Err(format!(
+                    "task_results/{task_id}: duplicate task ID within arm"
+                ));
             }
         }
     }
 
     if baseline.len() != candidate.len() {
-        return Err("task_results: baseline and candidate task counts differ; paired explanation refused".to_owned());
+        return Err(
+            "task_results: baseline and candidate task counts differ; paired explanation refused"
+                .to_owned(),
+        );
     }
 
     let mut comparisons = Vec::new();
@@ -368,14 +383,28 @@ fn parse_task_comparisons(root: &Value) -> Result<Option<(Vec<TaskComparison>, u
         let candidate_mode = task_string(cand, "mode", task_id)?;
         let priority = task_string(base, "priority", task_id)?;
         let candidate_priority = task_string(cand, "priority", task_id)?;
-        let service_bytes = required_u64(base, "service_bytes", &format!("task_results/{task_id}"))?;
-        let candidate_service = required_u64(cand, "service_bytes", &format!("task_results/{task_id}"))?;
-        let arrival_window = required_u64(base, "arrival_window", &format!("task_results/{task_id}"))?;
-        let candidate_arrival = required_u64(cand, "arrival_window", &format!("task_results/{task_id}"))?;
-        let deadline_window = required_u64(base, "deadline_window", &format!("task_results/{task_id}"))?;
-        let candidate_deadline = required_u64(cand, "deadline_window", &format!("task_results/{task_id}"))?;
-        let expires_after_window = required_u64(base, "expires_after_window", &format!("task_results/{task_id}"))?;
-        let candidate_expiry = required_u64(cand, "expires_after_window", &format!("task_results/{task_id}"))?;
+        let service_bytes =
+            required_u64(base, "service_bytes", &format!("task_results/{task_id}"))?;
+        let candidate_service =
+            required_u64(cand, "service_bytes", &format!("task_results/{task_id}"))?;
+        let arrival_window =
+            required_u64(base, "arrival_window", &format!("task_results/{task_id}"))?;
+        let candidate_arrival =
+            required_u64(cand, "arrival_window", &format!("task_results/{task_id}"))?;
+        let deadline_window =
+            required_u64(base, "deadline_window", &format!("task_results/{task_id}"))?;
+        let candidate_deadline =
+            required_u64(cand, "deadline_window", &format!("task_results/{task_id}"))?;
+        let expires_after_window = required_u64(
+            base,
+            "expires_after_window",
+            &format!("task_results/{task_id}"),
+        )?;
+        let candidate_expiry = required_u64(
+            cand,
+            "expires_after_window",
+            &format!("task_results/{task_id}"),
+        )?;
 
         if mode != candidate_mode
             || priority != candidate_priority
@@ -389,25 +418,35 @@ fn parse_task_comparisons(root: &Value) -> Result<Option<(Vec<TaskComparison>, u
             ));
         }
         if arrival_window > deadline_window || arrival_window > expires_after_window {
-            return Err(format!("task_results/{task_id}: task arrives after its deadline or expiry"));
+            return Err(format!(
+                "task_results/{task_id}: task arrives after its deadline or expiry"
+            ));
         }
 
-        let baseline_delivered = required_u64(base, "delivered_bytes", &format!("task_results/{task_id}"))?;
-        let candidate_delivered = required_u64(cand, "delivered_bytes", &format!("task_results/{task_id}"))?;
+        let baseline_delivered =
+            required_u64(base, "delivered_bytes", &format!("task_results/{task_id}"))?;
+        let candidate_delivered =
+            required_u64(cand, "delivered_bytes", &format!("task_results/{task_id}"))?;
         if baseline_delivered > service_bytes || candidate_delivered > service_bytes {
-            return Err(format!("task_results/{task_id}: delivered bytes exceed requested service bytes"));
+            return Err(format!(
+                "task_results/{task_id}: delivered bytes exceed requested service bytes"
+            ));
         }
         let baseline_outcome = task_string(base, "outcome", task_id)?;
         let candidate_outcome = task_string(cand, "outcome", task_id)?;
         if !matches!(baseline_outcome.as_str(), "succeeded" | "failed")
             || !matches!(candidate_outcome.as_str(), "succeeded" | "failed")
         {
-            return Err(format!("task_results/{task_id}: unrecognized outcome state"));
+            return Err(format!(
+                "task_results/{task_id}: unrecognized outcome state"
+            ));
         }
         if (baseline_outcome == "succeeded") != (baseline_delivered == service_bytes)
             || (candidate_outcome == "succeeded") != (candidate_delivered == service_bytes)
         {
-            return Err(format!("task_results/{task_id}: outcome state conflicts with delivered-byte total"));
+            return Err(format!(
+                "task_results/{task_id}: outcome state conflicts with delivered-byte total"
+            ));
         }
 
         let baseline_completion = optional_task_u64(base, "completion_window", task_id)?;
@@ -423,7 +462,9 @@ fn parse_task_comparisons(root: &Value) -> Result<Option<(Vec<TaskComparison>, u
         if (baseline_outcome == "succeeded") != baseline_completion.is_some()
             || (candidate_outcome == "succeeded") != candidate_completion.is_some()
         {
-            return Err(format!("task_results/{task_id}: completion window conflicts with task outcome"));
+            return Err(format!(
+                "task_results/{task_id}: completion window conflicts with task outcome"
+            ));
         }
 
         let changed = baseline_outcome != candidate_outcome
@@ -983,9 +1024,20 @@ mod tests {
         assert_eq!(essential.deadline_window, 0);
         assert_eq!(essential.baseline_delivered_bytes, 0);
         assert_eq!(essential.candidate_delivered_bytes, 3000);
-        assert_eq!(essential.baseline_failure_reason.as_deref(), Some("deadline"));
-        assert!(essential.explanation.contains("needed 3000 bytes by window 0"));
-        assert!(essential.explanation.contains("FIFO delivered 0/3000 bytes and missed its deadline"));
+        assert_eq!(
+            essential.baseline_failure_reason.as_deref(),
+            Some("deadline")
+        );
+        assert!(
+            essential
+                .explanation
+                .contains("needed 3000 bytes by window 0")
+        );
+        assert!(
+            essential
+                .explanation
+                .contains("FIFO delivered 0/3000 bytes and missed its deadline")
+        );
         assert!(essential.explanation.contains("completed in window 0"));
         let rendered = render_human(&explanation);
         assert!(rendered.contains("TASKS THAT CHANGED OUTCOME OR PROGRESS"));
@@ -1009,7 +1061,12 @@ mod tests {
             .remove("task_results");
         let explanation = explain_report(&value).unwrap();
         assert!(explanation.task_comparisons.is_empty());
-        assert!(explanation.limitations.iter().any(|item| item.contains("Task-level paired receipts were absent")));
+        assert!(
+            explanation
+                .limitations
+                .iter()
+                .any(|item| item.contains("Task-level paired receipts were absent"))
+        );
     }
 
     #[test]
