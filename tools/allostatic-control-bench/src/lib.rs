@@ -179,6 +179,14 @@ fn forecast_signal(scenario: Scenario, tick: usize, seed: u64) -> f64 {
     (base + jitter).clamp(0.0, 1.0)
 }
 
+/// Deterministic affine permutation of time indices. Since 13 and the
+/// 48-step horizon are coprime, every position occurs exactly once. This
+/// destroys temporal alignment without changing the warning stream's marginals.
+fn shuffled_forecast_index(tick: usize, seed: u64) -> usize {
+    let offset = (unit_noise(seed.wrapping_add(991), 0) * HORIZON as f64) as usize;
+    (tick * 13 + offset) % HORIZON
+}
+
 /// Perfect short-horizon look-ahead, available only to the diagnostic oracle.
 fn oracle_forecast_mean(scenario: Scenario, start: usize, seed: u64) -> f64 {
     let mut values = [0.0; 3];
@@ -291,7 +299,7 @@ pub fn run_episode(policy: Policy, scenario: Scenario, seed: u64) -> EpisodeMetr
             (unit_noise(seed.wrapping_add(91), tick) - 0.5) * forecast_noise_scale;
         let forecast_load =
             (forecast_signal(scenario, tick, seed) + forecast_noise).clamp(0.0, 1.0);
-        let shuffled_start = (tick + 13) % HORIZON;
+        let shuffled_start = shuffled_forecast_index(tick, seed);
         let shuffled_noise =
             (unit_noise(seed.wrapping_add(91), shuffled_start) - 0.5) * forecast_noise_scale;
         let shuffled_forecast_load =
@@ -421,6 +429,20 @@ mod tests {
             > chronic.iter().copied().fold(0.0, f64::max));
         assert!((cumulative_exposure(&acute, 1.0)
             - cumulative_exposure(&chronic, 1.0)).abs() < 1e-12);
+    }
+
+    #[test]
+    fn shuffled_forecast_preserves_all_indices_but_breaks_time_order() {
+        for seed in 0..32 {
+            let mut indices: Vec<usize> =
+                (0..HORIZON).map(|tick| shuffled_forecast_index(tick, seed)).collect();
+            indices.sort_unstable();
+            assert_eq!(indices, (0..HORIZON).collect::<Vec<_>>());
+        }
+        let ordered: Vec<usize> = (0..HORIZON).collect();
+        let shuffled: Vec<usize> =
+            (0..HORIZON).map(|tick| shuffled_forecast_index(tick, 0)).collect();
+        assert_ne!(shuffled, ordered);
     }
 
     #[test]
