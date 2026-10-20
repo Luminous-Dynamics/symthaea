@@ -13,6 +13,8 @@ on:
       - ".github/workflows/beverage-benchmark.yml"
   pull_request:
     paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
       - "crates/domains/symthaea-culinary/**"
       - "docs/research/BEVERAGE_ENGINEERING_BENCHMARK_V1.md"
       - "docs/research/beverage-engineering-scenarios-v1.json"
