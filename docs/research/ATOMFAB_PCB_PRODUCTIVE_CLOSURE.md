@@ -175,7 +175,7 @@ Choose numerical targets for trace/space, drilling, yield, cycle time, cost and 
 
 **Phase 0 — software-first (start immediately)**
 - Extend existing MFG-PROC and productive-closure owners; do not create a competing ontology.
-- The initial 16-case route corpus is `docs/research/fixtures/ATOMFAB_PCB_ROUTE_CORPUS_V0_1.json`; implement and independently validate its oracle before adding machine adapters.
+- The initial 16-case corpus is `docs/research/fixtures/ATOMFAB_PCB_ROUTE_CORPUS_V0_2.json`; `symthaea-fabrication-kernel::atomfab_pcb_route` provides an independent Rust route/evidence evaluator and an exact-HEAD-bound receipt runner.
 - Bind native design, fabrication exports, BOM, process plan, as-built identity and test receipts.
 - Add offline deterministic validation and an independent oracle before machine adapters.
 
@@ -223,7 +223,7 @@ Choose numerical targets for trace/space, drilling, yield, cycle time, cost and 
 
 ## Initial corpus check
 
-The committed synthetic route corpus contains 16 unique cases: 2 `route_admissible`, 5 `reject`, and 9 `incomplete`. A separate rule-based pass over the fetched, committed JSON independently recomputed all 16 expected dispositions/reason codes. This is an in-session corpus sanity check, not a committed Rust evaluator, CI pass, or physical-process validation.
+The version-0.2 corpus contains 16 unique synthetic cases, with route outcomes of 12 `feasible`, 3 `infeasible`, and 1 `unresolved`; independent evidence outcomes are 6 `complete`, 8 `incomplete`, and 2 `rejected`. The new Rust module recomputes these outcomes without using expected labels as inputs to the decision logic. Tests were added for full-corpus matching, duplicated IDs, wrong counts, expectation mutation, input-order normalization, route/evidence separation, and rejection of synthetic-evidence overclaims. These tests have not yet been run locally in this work session; no CI or physical-process qualification is claimed.
 
 The execution work is tracked by [COMPUTE-MFG-001C #8223](https://github.com/Luminous-Dynamics/symthaea/issues/8223) and the Symtropy workcell benchmark [PCB-CELL-001 #2385](https://github.com/Luminous-Dynamics/symtropy/issues/2385).
 
