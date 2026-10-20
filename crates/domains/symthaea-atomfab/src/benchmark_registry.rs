@@ -372,4 +372,30 @@ mod tests {
             "workcell lane must include fail-closed corpus execution and valid controls"
         );
     }
+    #[test]
+    fn discovery_and_active_learning_lanes_require_pareto_reporting() {
+        let registry = load_embedded_registry().expect("checked-in JSON should parse");
+        for lane_id in ["supported-nanoparticle-search", "active-learning-policy"] {
+            let lane = registry
+                .benchmark_lanes
+                .iter()
+                .find(|lane| lane.id == lane_id)
+                .unwrap_or_else(|| panic!("missing benchmark lane {lane_id}"));
+            assert!(
+                lane.metrics.iter().any(|metric| {
+                    metric.contains("Pareto frontier")
+                        && metric.contains("total cost")
+                }),
+                "{lane_id} must report a multi-objective discovery frontier"
+            );
+            assert!(
+                lane.gates.iter().any(|gate| {
+                    gate.contains("nondominated")
+                        && gate.contains("cost")
+                }),
+                "{lane_id} must explicitly gate Pareto reporting"
+            );
+        }
+    }
+
 }
