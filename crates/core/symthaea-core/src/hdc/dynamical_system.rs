@@ -74,6 +74,20 @@ pub trait Integrator {
     /// New state vector at time t + dt
     fn step(&self, system: &dyn DynamicalSystem, state: &[f64], t: f64, dt: f64) -> Vec<f64>;
 
+    /// Advance a state and return both the new state and the accepted time step.
+    ///
+    /// Fixed-step integrators can use this default. Adaptive integrators must
+    /// override it when the accepted step may be smaller than the requested step.
+    fn step_with_dt(
+        &self,
+        system: &dyn DynamicalSystem,
+        state: &[f64],
+        t: f64,
+        dt: f64,
+    ) -> (Vec<f64>, f64) {
+        (self.step(system, state, t, dt), dt)
+    }
+
     /// Human-readable name of the integrator.
     fn name(&self) -> &str;
 }
@@ -137,6 +151,7 @@ pub enum SimulationError {
         actual: usize,
     },
     NonFiniteIntegratorState { step: usize, index: usize },
+    InvalidIntegratorStepSize { step: usize },
     TimeDidNotAdvance { step: usize },
 }
 
@@ -219,35 +234,69 @@ pub fn try_simulate(
     times.push(t);
     states.push(state.clone());
 
-    for step in 0..n_steps {
-        let remaining = t_end - t;
-        let step_dt = dt.min(remaining);
-        if !step_dt.is_finite() || step_dt <= 0.0 {
-            return Err(SimulationError::TimeDidNotAdvance { step: step + 1 });
+    while t < t_end {
+        let completed_steps = times.len() - 1;
+        if completed_steps >= MAX_SIMULATION_STEPS {
+            return Err(SimulationError::StepBudgetExceeded {
+                maximum_steps: MAX_SIMULATION_STEPS,
+            });
         }
 
-        let next_state = integrator.step(system, &state, t, step_dt);
+        let next_sample_count = states
+            .len()
+            .checked_add(1)
+            .ok_or(SimulationError::TrajectoryBudgetExceeded {
+                maximum_state_values: MAX_TRAJECTORY_STATE_VALUES,
+            })?;
+        let next_state_value_count = next_sample_count
+            .checked_mul(expected_dim)
+            .ok_or(SimulationError::TrajectoryBudgetExceeded {
+                maximum_state_values: MAX_TRAJECTORY_STATE_VALUES,
+            })?;
+        if next_state_value_count > MAX_TRAJECTORY_STATE_VALUES {
+            return Err(SimulationError::TrajectoryBudgetExceeded {
+                maximum_state_values: MAX_TRAJECTORY_STATE_VALUES,
+            });
+        }
+
+        let remaining = t_end - t;
+        let requested_dt = dt.min(remaining);
+        if !requested_dt.is_finite() || requested_dt <= 0.0 {
+            return Err(SimulationError::TimeDidNotAdvance {
+                step: completed_steps + 1,
+            });
+        }
+
+        let (next_state, accepted_dt) =
+            integrator.step_with_dt(system, &state, t, requested_dt);
+        if !accepted_dt.is_finite() || accepted_dt <= 0.0 || accepted_dt > requested_dt {
+            return Err(SimulationError::InvalidIntegratorStepSize {
+                step: completed_steps + 1,
+            });
+        }
         if next_state.len() != expected_dim {
             return Err(SimulationError::InvalidIntegratorStateDimension {
-                step: step + 1,
+                step: completed_steps + 1,
                 expected: expected_dim,
                 actual: next_state.len(),
             });
         }
         if let Some(index) = next_state.iter().position(|value| !value.is_finite()) {
             return Err(SimulationError::NonFiniteIntegratorState {
-                step: step + 1,
+                step: completed_steps + 1,
                 index,
             });
         }
 
-        let next_t = if step_dt >= remaining {
+        let next_t = if accepted_dt >= remaining {
             t_end
         } else {
-            t + step_dt
+            t + accepted_dt
         };
         if !next_t.is_finite() || next_t <= t {
-            return Err(SimulationError::TimeDidNotAdvance { step: step + 1 });
+            return Err(SimulationError::TimeDidNotAdvance {
+                step: completed_steps + 1,
+            });
         }
 
         state = next_state;
@@ -500,6 +549,17 @@ impl Integrator for Rk45Integrator {
     fn step(&self, system: &dyn DynamicalSystem, state: &[f64], t: f64, dt: f64) -> Vec<f64> {
         let (new_state, _actual_dt, _error) = self.adaptive_step(system, state, t, dt);
         new_state
+    }
+
+    fn step_with_dt(
+        &self,
+        system: &dyn DynamicalSystem,
+        state: &[f64],
+        t: f64,
+        dt: f64,
+    ) -> (Vec<f64>, f64) {
+        let (new_state, actual_dt, _error) = self.adaptive_step(system, state, t, dt);
+        (new_state, actual_dt)
     }
 
     fn name(&self) -> &str {
@@ -1261,6 +1321,30 @@ mod tests {
         assert_eq!(
             try_simulate(&osc, &non_finite, &[1.0, 0.0], 0.0, 0.1, 0.1),
             Err(SimulationError::NonFiniteIntegratorState { step: 1, index: 0 })
+        );
+    }
+
+    #[test]
+    fn rk45_uses_accepted_step_size_to_advance_simulation_time() {
+        let osc = HarmonicOscillator::simple(1.0);
+        let initial = [1.0, 0.0];
+        let t_end = 10.0;
+        let integrator = Rk45Integrator::new(1.0e-12);
+        let result = try_simulate(&osc, &integrator, &initial, 0.0, t_end, 0.01)
+            .expect("valid adaptive simulation should complete");
+
+        assert_eq!(result.times.last().copied(), Some(t_end));
+        let expected_x = t_end.cos();
+        let expected_v = -t_end.sin();
+        assert!(
+            (result.final_state()[0] - expected_x).abs() < 1.0e-8,
+            "adaptive RK45 x error was {:.3e}",
+            (result.final_state()[0] - expected_x).abs()
+        );
+        assert!(
+            (result.final_state()[1] - expected_v).abs() < 1.0e-8,
+            "adaptive RK45 v error was {:.3e}",
+            (result.final_state()[1] - expected_v).abs()
         );
     }
 
