@@ -112,7 +112,7 @@ Sources:
 - Flanders Hydraulics full-scale shallow-water data description: https://www.waterbouwkundiglaboratorium.be/en/publications-and-data
 - Flanders Hydraulics data-request form, explicitly listing “Full scale shallow water speed/power trial data”: https://www.waterbouwkundiglaboratorium.be/en/publications-and-data/benchmark-data/requesting-benchmark-data
 
-These pages establish that a potential access route exists, not that our team has downloaded or secured the files. Access involves registration and/or a request workflow. Before admission, preserve access terms and the exact permission basis, download the raw artifacts, compute and verify byte checksums, inspect measurement/correction/uncertainty metadata and align case identities. No figures, screenshots, paper tables or search snippets should be substituted for raw evidence.
+These pages establish that a potential access route exists, not that our team has downloaded or secured the files. Access involves registration and/or a request workflow. The generic JoRes website terms state that website information does not itself grant licenses to intellectual property, while other terms discuss reuse of contributions and downloaded extracts subject to third-party rights and notices. Those general terms are not a dataset-specific reuse decision; inspect the specific file/case rights and any access agreement before use. Before admission, preserve access terms and the exact permission basis, download the raw artifacts, compute and verify byte checksums, inspect measurement/correction/uncertainty metadata and align case identities. No figures, screenshots, paper tables or search snippets should be substituted for raw evidence.
 
 ### How to use the two tiers
 
