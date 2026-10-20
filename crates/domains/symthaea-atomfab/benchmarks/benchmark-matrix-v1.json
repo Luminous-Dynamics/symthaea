@@ -267,13 +267,15 @@
         "fault detection precision/recall",
         "safe-stop latency",
         "recovery",
-        "replay fidelity"
+        "replay fidelity",
+        "decision/reason-code parity over the frozen 15-case atomfab-workcell-fault-corpus-v1; report runtime-integrated versus specification-only cases separately"
       ],
       "gates": [
         "zero false-feasible accepts on the frozen adversarial hard-constraint suite",
         "undefined false-feasible rate when no cases are accepted",
         "every rejection has a reason",
-        "synthetic validity must not be presented as hardware validation"
+        "synthetic validity must not be presented as hardware validation",
+        "execute all 15 corpus cases against the exact pinned workcell/adapter build; require zero false-feasible accepts, explicit rejection reasons, expected parity for typed adapter cases, and accepted in-domain controls"
       ]
     },
     {
