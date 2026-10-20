@@ -107,6 +107,10 @@ pub enum Accompaniment {
     /// middle–high through the voiced chord. Stronger first/third beats and
     /// a lighter second/fourth create a gently buoyant acoustic-song pulse.
     FolkPulse,
+    /// Lullaby cradle: a low chord tone held for two beats, answered by a
+    /// soft upper chord tone on beat three. Longer durations keep the texture
+    /// rocking and sparse rather than filling the bar with constant eighths.
+    LullabyCradle,
     /// March pulse: four square quarter-note chord attacks in common time.
     /// Beats one and three are firm anchors; beats two and four are lighter,
     /// producing a repeatable duple pulse without relying on percussion.
@@ -438,6 +442,31 @@ impl Accompaniment {
                     }
                 }
             }
+            Accompaniment::LullabyCradle => {
+                // Repeat a two-beat cradle cell: grounded low tone, then a
+                // quieter upper answer. Odd final bars (notably 3/4) shorten
+                // the last sustain to end exactly at the barline.
+                let mut beat = 0_i64;
+                while (beat as f64 < meter_beats - 1e-9 {
+                    let remaining = (meter_beats - beat as f64).ceil() as i64;
+                    let duration = remaining.min(2).max(1);
+                    let is_anchor = beat.rem_euclid(4) == 0;
+                    let pitch = if is_anchor {
+                        ascending[0]
+                    } else {
+                        ascending[ascending.len() - 1]
+                    };
+                    let accent = if is_anchor { 0.72_f32 } else { 0.46_f32 };
+                    push(
+                        score,
+                        pitch,
+                        bar_onset + Duration::new(beat, 1),
+                        Duration::new(duration, 1),
+                        velocity * accent,
+                    );
+                    beat += 2;
+                }
+            }
             Accompaniment::FolkPulse => {
                 // A picked quarter-note pattern: low, high, middle, high.
                 // Beat one is firm, beat three lifts without overtaking it;
@@ -691,6 +720,7 @@ mod tests {
             Accompaniment::CompasGait,
             Accompaniment::BossaComp,
             Accompaniment::FolkPulse,
+            Accompaniment::LullabyCradle,
             Accompaniment::MarchPulse,
             Accompaniment::Sarabande,
             Accompaniment::Minuet,
@@ -737,6 +767,31 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn lullaby_cradle_is_sparse_and_fits_triple_meter() {
+        let notes = realize(Accompaniment::LullabyCradle, 3.0);
+        assert_eq!(notes.len(), 2);
+        assert_eq!(
+            notes.iter().map(|note| note.onset.beats()).collect::<Vec<_>>(),
+            vec![0.0, 2.0]
+        );
+        assert_eq!(
+            notes.iter().map(|note| note.duration.beats()).collect::<Vec<_>>(),
+            vec![2.0, 1.0]
+        );
+        assert_eq!(
+            notes.iter().map(|note| note.pitch.midi()).collect::<Vec<_>>(),
+            vec![60, 67]
+        );
+        assert!(notes[0].velocity > notes[1].velocity);
+        assert_eq!((notes[0].onset + notes[0].duration).beats(), notes[1].onset.beats());
+        assert_eq!(
+            (notes[1].onset + notes[1].duration).beats(),
+            3.0,
+            "last cradle tone must end on the barline"
+        );
     }
 
     #[test]
