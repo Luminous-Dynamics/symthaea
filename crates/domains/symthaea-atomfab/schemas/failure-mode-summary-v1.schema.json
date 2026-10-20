@@ -12,6 +12,7 @@
     "evaluator_digest",
     "evaluation_scope_digest",
     "material_family",
+    "evaluation_stratum",
     "split",
     "assessment_basis",
     "total_assessed",
@@ -160,6 +161,10 @@
       "items": {
         "$ref": "#/$defs/sha256"
       }
+    },
+    "evaluation_stratum": {
+      "type": "string",
+      "minLength": 1
     }
   },
   "$defs": {
@@ -168,5 +173,5 @@
       "pattern": "^[0-9a-f]{64}$"
     }
   },
-  "$comment": "Aggregate counts are scoped to one model/family/split/campaign and assessment basis. JSON schema checks structure; FailureModeSummary::validate recomputes counts from source records."
+  "$comment": "Aggregate counts are scoped to one model/family/evaluation stratum (e.g., particle size × support surface × temperature)/split/campaign and assessment basis. JSON schema checks structure; FailureModeSummary::validate recomputes counts from source records."
 }
