@@ -11,7 +11,7 @@ pub mod benchmark_registry;
 pub mod campaign;
 pub mod contract;
 
-use std::collections::BTreeSet;
+use std::collections::HashSet;
 use std::error::Error;
 use std::fmt;
 
@@ -394,7 +394,7 @@ pub fn top_weighted_ranking_overlap(
         ("predicted", predicted_ranking),
         ("reference", reference_ranking),
     ] {
-        let mut seen = BTreeSet::new();
+        let mut seen = HashSet::new();
         for (index, identifier) in ranking.iter().copied().enumerate() {
             if !seen.insert(identifier) {
                 return Err(BenchmarkError::DuplicateRankingId {
@@ -409,6 +409,7 @@ pub fn top_weighted_ranking_overlap(
     // both its predicted and reference rank are <= d. Count each shared ID at
     // its max rank once, then accumulate the prefix counts. This avoids
     // repeatedly intersecting two growing sets (quadratic work for long lists).
+    // Hash-based uniqueness/indexing keeps the expected work linear in list length.
     let len = predicted_ranking.len();
     let reference_positions: std::collections::HashMap<u64, usize> = reference_ranking
         .iter()
