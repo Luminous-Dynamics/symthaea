@@ -11,7 +11,7 @@ This directory defines a proposed benchmark format. **It currently contains no d
 - `transfer-adjudications.md` — records two static cross-family negative controls and the typed compatibility/inequality-direction gate. They are curated annotations, not measured model failures.
 - `candidates/156-borsuk-nine-finite-obstruction.json` — records a rejected direct transfer with machine-readable compatibility codes.
 - `candidates/156-borsuk-nine-finite-obstruction.json` — one training-family candidate annotation, not a scored benchmark record. Source/statement hashes are pinned, but independent review, Lean checking, and actual transfer are outstanding.
-- `crates/bridges/symthaea-proof-insights/src/bin/validate_transfer_contract.rs` — fail-closed consistency checker for directional contracts and target-side proof receipts; its rules do not establish mathematical truth.
+- `crates/bridges/symthaea-proof-insights/src/bin/validate_transfer_contract.rs` — fail-closed consistency checker for typed source/target obligations, inequality direction, domain/object-type compatibility, and target-side proof receipts; its rules do not establish mathematical truth.
 - Future `manifest.json` — indexed source artifacts and inclusion/exclusion/unknown accounting produced by the Rust indexer.
 - Future `records.jsonl` — one schema-conformant JSON object per line, only after source evidence has been inspected and rights reviewed.
 - The indexer emits its own `family_split_plan` and each family's `split`; compare them to `splits.json` with `--verify-splits` before creating any benchmark examples.
