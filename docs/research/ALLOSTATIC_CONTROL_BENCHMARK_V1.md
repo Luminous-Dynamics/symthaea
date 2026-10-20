@@ -158,13 +158,12 @@ These thresholds are proposed screening gates, not values drawn from a standard 
 - If the candidate only improves its own weighted score, fails under small threshold perturbations, or becomes needlessly conservative, do not integrate it.
 - Do not replace Symthaea's existing loss/learning objectives or modify the qualified interoception v0.1 semantics as part of this experiment. Keep the prototype isolated until evidence justifies a separately versioned integration.
 
-## Reproduction
+## Reproduction and provenance
 
-From the repository root:
+From the repository root, on a Rust-enabled checkout:
 
-    cargo fmt --manifest-path tools/allostatic-control-bench/Cargo.toml -- --check
-    cargo test --manifest-path tools/allostatic-control-bench/Cargo.toml
-    cargo clippy --manifest-path tools/allostatic-control-bench/Cargo.toml --all-targets -- -D warnings
-    cargo run --release --manifest-path tools/allostatic-control-bench/Cargo.toml > allostatic-control-v1.csv
+    bash tools/allostatic-control-bench/qualify.sh <exact-tested-commit>
 
-The authoring environment used for this initial draft had no Rust toolchain available. The commands above are therefore instructions for exact-head qualification, not claimed execution results.
+The script checks that the checkout matches the supplied commit; runs formatting, tests, and Clippy; executes the benchmark twice; rejects non-byte-identical CSV output; and writes a SHA-256 provenance receipt for the benchmark output and source inputs. It defaults to writing `allostatic-control-v1.csv` and `allostatic-control-v1.csv.receipt.txt`; pass a second argument to choose a different CSV path. Keep the output and receipt together when publishing results. The script intentionally does not decide whether the benchmark passes the scientific advancement gates; those require analysis of the output.
+
+The authoring environment used for this initial draft had no Rust toolchain available. The qualification script and Rust tests have therefore **not** been executed here. This specification and prototype are not qualified until a Rust-enabled environment runs the script on the exact PR head and the receipt is independently checked.
