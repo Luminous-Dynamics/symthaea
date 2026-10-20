@@ -515,6 +515,7 @@ fn parse_args(args: Vec<String>) -> Result<BTreeMap<String, String>> {
     let mut iter = args.into_iter();
     while let Some(flag) = iter.next() {
         if ![
+            "--mode",
             "--config",
             "--results",
             "--validation-results",
@@ -522,6 +523,8 @@ fn parse_args(args: Vec<String>) -> Result<BTreeMap<String, String>> {
             "--splits",
             "--baseline-receipt",
             "--out",
+            "--power-simulations",
+            "--power-bootstrap-replicates",
         ]
         .contains(&flag.as_str())
         {
@@ -529,14 +532,18 @@ fn parse_args(args: Vec<String>) -> Result<BTreeMap<String, String>> {
         }
         let value = iter
             .next()
-            .with_context(|| format!("missing path after {flag}"))?;
+            .with_context(|| format!("missing value after {flag}"))?;
         if parsed.insert(flag.clone(), value).is_some() {
             bail!("duplicate argument {flag}");
         }
     }
+
+    let mode = parsed.get("--mode").map(String::as_str).unwrap_or("analyze");
+    if !["analyze", "power"].contains(&mode) {
+        bail!("unsupported mode {mode}; expected analyze or power");
+    }
     for required in [
         "--config",
-        "--results",
         "--validation-results",
         "--protocol",
         "--splits",
@@ -546,6 +553,41 @@ fn parse_args(args: Vec<String>) -> Result<BTreeMap<String, String>> {
         if !parsed.contains_key(required) {
             bail!("missing required argument {required}");
         }
+    }
+
+    match mode {
+        "analyze" => {
+            if !parsed.contains_key("--results") {
+                bail!("analyze mode requires --results");
+            }
+            if parsed.contains_key("--power-simulations")
+                || parsed.contains_key("--power-bootstrap-replicates")
+            {
+                bail!("power simulation options are only valid in --mode power");
+            }
+        }
+        "power" => {
+            if parsed.contains_key("--results") {
+                bail!("power mode must not receive held-out test outcomes");
+            }
+            let simulations = parsed
+                .get("--power-simulations")
+                .context("power mode requires --power-simulations")?
+                .parse::<usize>()
+                .context("--power-simulations must be a positive integer")?;
+            let bootstrap_replicates = parsed
+                .get("--power-bootstrap-replicates")
+                .context("power mode requires --power-bootstrap-replicates")?
+                .parse::<usize>()
+                .context("--power-bootstrap-replicates must be a positive integer")?;
+            if simulations < 1_000 {
+                bail!("confirmatory power planning requires at least 1000 simulated studies");
+            }
+            if bootstrap_replicates < 500 {
+                bail!("power planning requires at least 500 bootstrap replicates per simulated study");
+            }
+        }
+        _ => unreachable!("mode was validated above"),
     }
     Ok(parsed)
 }
