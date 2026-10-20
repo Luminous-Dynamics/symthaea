@@ -279,7 +279,8 @@ fn task_completion_explanation(
             };
             format!(
                 "Task {task_id} ({priority}) needed {service_bytes} bytes by window {deadline_window}. FIFO delivered {}/{service_bytes} bytes and {failure}; fair-share delivered {}/{service_bytes} bytes and completed{}.",
-                baseline.delivered_bytes, candidate.delivered_bytes,
+                baseline.delivered_bytes,
+                candidate.delivered_bytes,
                 candidate
                     .completion_window
                     .map_or_else(String::new, |window| format!(" in window {window}"))
@@ -312,8 +313,7 @@ fn task_completion_explanation(
             let candidate_reason = candidate.failure_reason.unwrap_or("unknown reason");
             format!(
                 "Task {task_id} ({priority}) failed under both policies. FIFO delivered {}/{service_bytes} bytes ({baseline_reason}); fair-share delivered {}/{service_bytes} bytes ({candidate_reason}).",
-                baseline.delivered_bytes,
-                candidate.delivered_bytes
+                baseline.delivered_bytes, candidate.delivered_bytes
             )
         }
         ("succeeded", "succeeded") => {
