@@ -10,6 +10,7 @@
 //! Usage:
 //!   cargo run -p symthaea-proof-insights -- /path/to/openai/math 1581d4cbdd69a0faf34b2089614fe2a814316a6a ./proof-insight-source-index.json
 //!   cargo run -p symthaea-proof-insights -- --verify-splits ./proof-insight-source-index.json ./data/benchmarks/proof-insight-transfer-v0/splits.json
+//!   cargo run -p symthaea-proof-insights -- --verify-temporal-manifest /path/to/pinned-repository ./temporal-manifest.json
 
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -216,6 +217,15 @@ fn main() -> ExitCode {
             Ok(()) => ExitCode::SUCCESS,
             Err(error) => {
                 eprintln!("proof-insights split verification: {error:#}");
+                ExitCode::FAILURE
+            }
+        };
+    }
+    if args.len() == 4 && args[1] == "--verify-temporal-manifest" {
+        return match verify_temporal_manifest_file(Path::new(&args[2]), Path::new(&args[3])) {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(error) => {
+                eprintln!("proof-insights temporal manifest verification: {error:#}");
                 ExitCode::FAILURE
             }
         };
