@@ -421,12 +421,13 @@ fn validate_alternative(
     verified_digests.insert(alternative.project_snapshot.sha256.clone());
     roles.insert(alternative.project_snapshot.sha256.clone(), ArtifactRole::ProjectSnapshot);
 
+    let mut evaluation_plan_id = None;
     if let Some(plan_ref) = &alternative.evaluation_plan {
         if plan_ref.role != ArtifactRole::EvaluationPlan || plan_ref.schema_uri != EVALUATION_PLAN_SCHEMA_URI {
             push_violation(violations, "unsupported-evaluation-plan-reference", Some(alt_id), Some(&plan_ref.sha256), Some("evaluation_plan"), "Evaluation plan reference must use the pinned v0 role and schema URI.");
         } else if let Some(bytes) = verified_bytes(plan_ref, payloads, alt_id, violations) {
             if let Some(value) = parse_object(bytes, alt_id, plan_ref, violations) {
-                validate_evaluation_plan(&value, plan_ref, &alternative.project_snapshot.sha256, request.scope.as_str(), alt_id, violations);
+                evaluation_plan_id = validate_evaluation_plan(&value, plan_ref, &alternative.project_snapshot.sha256, request.scope.as_str(), alt_id, violations);
                 verified_digests.insert(plan_ref.sha256.clone());
                 roles.insert(plan_ref.sha256.clone(), ArtifactRole::EvaluationPlan);
             }
@@ -440,7 +441,7 @@ fn validate_alternative(
         }
         let Some(bytes) = verified_bytes(scenario_ref, payloads, alt_id, violations) else { continue };
         let Some(value) = parse_object(bytes, alt_id, scenario_ref, violations) else { continue };
-        if let Some(purpose) = validate_scenario_manifest(&value, scenario_ref, &alternative.project_snapshot.sha256, &metadata, alternative.evaluation_plan.as_ref(), alt_id, violations) {
+        if let Some(purpose) = validate_scenario_manifest(&value, scenario_ref, &alternative.project_snapshot.sha256, &metadata, alternative.evaluation_plan.as_ref(), evaluation_plan_id.as_deref(), alt_id, violations) {
             scenario_purposes.insert(scenario_ref.sha256.clone(), purpose);
             verified_digests.insert(scenario_ref.sha256.clone());
             roles.insert(scenario_ref.sha256.clone(), ArtifactRole::ScenarioManifest);
