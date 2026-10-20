@@ -2077,6 +2077,26 @@ mod tests {
             left.estimated_utility_gate_power
                 .is_some_and(|power| (0.0..=1.0).contains(&power))
         );
+        let power = left.estimated_utility_gate_power.expect("estimated power");
+        assert!(
+            left.estimated_power_lower_95
+                .is_some_and(|lower| lower <= power)
+        );
+        assert!(
+            left.estimated_power_upper_95
+                .is_some_and(|upper| upper >= power)
+        );
+    }
+
+    #[test]
+    fn wilson_interval_brackets_observed_bernoulli_rate() {
+        let (lower, upper) = wilson_interval(80, 100);
+        assert!(lower < 0.80);
+        assert!(upper > 0.80);
+        let (all_lower, all_upper) = wilson_interval(100, 100);
+        assert!(all_lower <= 1.0);
+        assert_eq!(all_upper, 1.0);
+        assert_eq!(wilson_interval(0, 0), (0.0, 1.0));
     }
 
     #[test]
