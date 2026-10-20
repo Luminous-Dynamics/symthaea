@@ -30,7 +30,7 @@ pub struct FrontierCandidate {
     pub objective_name: String,
     pub objective_unit: String,
     pub objective_direction: ObjectiveDirection,
-    /// Differences within this preregistered tolerance count as objective ties.
+    /// Minimum meaningful improvement; no-worse comparisons remain direction-correct and transitive.
     pub objective_tolerance: f64,
     /// Count of unique structures that passed the declared reference validator.
     pub validated_discovery_count: u64,
@@ -104,6 +104,9 @@ impl FrontierCandidate {
             }
         }
         validate_digest(&self.comparison_contract_digest, "comparison_contract_digest")?;
+        if self.evidence_digest.trim().is_empty() {
+            return Err(FrontierError::MissingEvidence);
+        }
         validate_digest(&self.evidence_digest, "evidence_digest")?;
         if !self.objective_tolerance.is_finite() || self.objective_tolerance < 0.0 {
             return Err(FrontierError::InvalidTolerance);
