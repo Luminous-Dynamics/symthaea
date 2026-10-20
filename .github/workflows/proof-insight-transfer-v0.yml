@@ -494,6 +494,10 @@ jobs:
           traversal_path["artifacts"][0]["path"] = "../outside.lean"
           mutants.append(traversal_path)
 
+          traversal_timeline = copy.deepcopy(manifest)
+          traversal_timeline["timeline_path"] = "../outside.csv"
+          mutants.append(traversal_timeline)
+
           unknown_authority_field = copy.deepcopy(manifest)
           unknown_authority_field["trusted"] = True
           mutants.append(unknown_authority_field)
