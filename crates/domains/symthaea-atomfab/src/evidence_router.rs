@@ -70,6 +70,14 @@ pub enum EvidenceRouteError {
     MismatchedRouteContract,
     UnsupportedSchemaVersion(u16),
     InvalidRouteReport,
+    UnknownOutcomeAction,
+    DuplicateOutcomeId,
+    MissingEligibleOutcome,
+    IncompleteEligibleOutcome,
+    InvalidOutcome(&'static str),
+    MismatchedOutcomeSource,
+    UnsupportedSummaryVersion(u16),
+    InvalidBenchmarkSummary,
 }
 
 impl fmt::Display for EvidenceRouteError {
@@ -97,6 +105,31 @@ impl fmt::Display for EvidenceRouteError {
             Self::InvalidRouteReport => write!(
                 f,
                 "evidence route rankings or dispositions do not match canonical recomputation"
+            ),
+            Self::UnknownOutcomeAction => write!(
+                f,
+                "outcome references an action absent from the route report"
+            ),
+            Self::DuplicateOutcomeId => write!(f, "outcome action IDs must be unique"),
+            Self::MissingEligibleOutcome => write!(
+                f,
+                "retrospective benchmark is missing an outcome for an eligible route action"
+            ),
+            Self::IncompleteEligibleOutcome => write!(
+                f,
+                "a ranked action marked not_run cannot define retrospective decision regret"
+            ),
+            Self::InvalidOutcome(field) => write!(f, "invalid evidence action outcome: {field}"),
+            Self::MismatchedOutcomeSource => write!(
+                f,
+                "eligible action outcomes must use the same evidence source class"
+            ),
+            Self::UnsupportedSummaryVersion(version) => {
+                write!(f, "unsupported evidence-route benchmark summary version: {version}")
+            }
+            Self::InvalidBenchmarkSummary => write!(
+                f,
+                "evidence-route benchmark summary does not match canonical outcome recomputation"
             ),
         }
     }
@@ -318,6 +351,220 @@ fn validate_digest(value: &str, field: &'static str) -> Result<(), EvidenceRoute
     } else {
         Ok(())
     }
+}
+
+/// Evidence class used by the retrospective outcome evaluator. Outcomes from
+/// different classes must not be pooled into one route-regret score.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EvidenceOutcomeSource {
+    Reference,
+    Simulation,
+    Measurement,
+    IndependentReproduction,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EvidenceOutcomeStatus {
+    Completed,
+    Failed,
+    Abstained,
+    NotRun,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EvidenceActionOutcome {
+    pub action_id: String,
+    pub source: EvidenceOutcomeSource,
+    pub status: EvidenceOutcomeStatus,
+    /// Realized reduction in the same decision-loss units declared in the route.
+    pub realized_decision_loss_reduction_units: u64,
+    /// Cost actually incurred, including failed/rework actions when nonzero.
+    pub realized_cost_units: u64,
+    /// Digest of the outcome/evaluator evidence, not a digest of the proposal.
+    pub outcome_evidence_digest: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EvidenceEfficiencyRatio {
+    pub benefit_units: u64,
+    pub cost_units: u64,
+}
+
+/// Retrospective score for a route on a fully labelled action set. It preserves
+/// exact benefit/cost numerators and denominators so consumers can compare
+/// policies without introducing hidden floating-point ranking behavior.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EvidenceRouteBenchmarkSummary {
+    pub schema_version: u16,
+    pub request_id: String,
+    pub domain: EvidenceDomain,
+    pub comparison_contract_digest: String,
+    pub outcome_source: Option<EvidenceOutcomeSource>,
+    pub selected_action_id: Option<String>,
+    pub selected_efficiency: Option<EvidenceEfficiencyRatio>,
+    pub oracle_action_id: Option<String>,
+    pub oracle_efficiency: Option<EvidenceEfficiencyRatio>,
+    pub eligible_action_count: usize,
+    pub failed_action_count: usize,
+    pub outcomes: Vec<EvidenceActionOutcome>,
+}
+
+impl EvidenceRouteBenchmarkSummary {
+    /// Recompute the retrospective score instead of trusting stored selected or
+    /// oracle labels. Outcome records remain in the returned summary for audit.
+    pub fn validate(
+        &self,
+        route: &EvidenceRouteReport,
+    ) -> Result<(), EvidenceRouteError> {
+        if self.schema_version != EVIDENCE_ROUTE_SCHEMA_VERSION {
+            return Err(EvidenceRouteError::UnsupportedSummaryVersion(
+                self.schema_version,
+            ));
+        }
+        let canonical = score_evidence_route(route, &self.outcomes)?;
+        if canonical != *self {
+            return Err(EvidenceRouteError::InvalidBenchmarkSummary);
+        }
+        Ok(())
+    }
+}
+
+/// Score a selected action against a retrospective oracle built from outcomes
+/// for *all* eligible actions. This requires fully labelled / matched data; it
+/// is not valid to infer oracle regret from the selected action alone.
+///
+/// Ineligible actions may be recorded as NotRun with zero cost and benefit.
+/// Every ranked action must have an observed outcome. If any ranked action was
+/// not run or is missing, scoring fails closed rather than inventing regret.
+pub fn score_evidence_route(
+    route: &EvidenceRouteReport,
+    outcomes: &[EvidenceActionOutcome],
+) -> Result<EvidenceRouteBenchmarkSummary, EvidenceRouteError> {
+    route.validate()?;
+    let known: std::collections::BTreeMap<&str, &EvidenceRouteEntry> = route
+        .entries
+        .iter()
+        .map(|entry| (entry.proposal.action_id.as_str(), entry))
+        .collect();
+    let mut outcome_ids = BTreeSet::new();
+    for outcome in outcomes {
+        if outcome.action_id.trim().is_empty() {
+            return Err(EvidenceRouteError::InvalidOutcome("action_id"));
+        }
+        validate_digest(&outcome.outcome_evidence_digest, "outcome_evidence_digest")?;
+        if !outcome_ids.insert(outcome.action_id.as_str()) {
+            return Err(EvidenceRouteError::DuplicateOutcomeId);
+        }
+        let entry = known
+            .get(outcome.action_id.as_str())
+            .ok_or(EvidenceRouteError::UnknownOutcomeAction)?;
+        match outcome.status {
+            EvidenceOutcomeStatus::NotRun
+                if outcome.realized_cost_units != 0
+                    || outcome.realized_decision_loss_reduction_units != 0 =>
+            {
+                return Err(EvidenceRouteError::InvalidOutcome(
+                    "not_run_must_have_zero_cost_and_benefit",
+                ));
+            }
+            EvidenceOutcomeStatus::Failed | EvidenceOutcomeStatus::Abstained
+                if outcome.realized_cost_units == 0
+                    || outcome.realized_decision_loss_reduction_units != 0 =>
+            {
+                return Err(EvidenceRouteError::InvalidOutcome(
+                    "failed_or_abstained_outcome_shape",
+                ));
+            }
+            EvidenceOutcomeStatus::Completed if outcome.realized_cost_units == 0 => {
+                return Err(EvidenceRouteError::InvalidOutcome(
+                    "completed_outcome_cost_must_be_positive",
+                ));
+            }
+            _ => {}
+        }
+        if matches!(entry.disposition, EvidenceActionDisposition::Ranked { .. })
+            && outcome.status == EvidenceOutcomeStatus::NotRun
+        {
+            return Err(EvidenceRouteError::IncompleteEligibleOutcome);
+        }
+    }
+
+    let ranked: Vec<&EvidenceRouteEntry> = route
+        .entries
+        .iter()
+        .filter(|entry| matches!(entry.disposition, EvidenceActionDisposition::Ranked { .. }))
+        .collect();
+    for entry in &ranked {
+        if !outcome_ids.contains(entry.proposal.action_id.as_str()) {
+            return Err(EvidenceRouteError::MissingEligibleOutcome);
+        }
+    }
+
+    let eligible_outcomes: Vec<&EvidenceActionOutcome> = ranked
+        .iter()
+        .map(|entry| {
+            outcomes
+                .iter()
+                .find(|outcome| outcome.action_id == entry.proposal.action_id)
+                .expect("coverage checked immediately above")
+        })
+        .collect();
+    let outcome_source = eligible_outcomes.first().map(|outcome| outcome.source);
+    if eligible_outcomes
+        .iter()
+        .any(|outcome| Some(outcome.source) != outcome_source)
+    {
+        return Err(EvidenceRouteError::MismatchedOutcomeSource);
+    }
+
+    let mut oracle: Vec<&EvidenceActionOutcome> = eligible_outcomes.clone();
+    oracle.sort_by(|left, right| {
+        let left_cross = u128::from(left.realized_decision_loss_reduction_units)
+            * u128::from(right.realized_cost_units);
+        let right_cross = u128::from(right.realized_decision_loss_reduction_units)
+            * u128::from(left.realized_cost_units);
+        right_cross
+            .cmp(&left_cross)
+            .then_with(|| left.realized_cost_units.cmp(&right.realized_cost_units))
+            .then_with(|| left.action_id.cmp(&right.action_id))
+    });
+    let selected_outcome = route
+        .selected_action_id
+        .as_deref()
+        .and_then(|id| eligible_outcomes.iter().copied().find(|outcome| outcome.action_id == id));
+    let oracle_outcome = oracle.first().copied();
+
+    let mut sorted_outcomes = outcomes.to_vec();
+    sorted_outcomes.sort_by(|left, right| left.action_id.cmp(&right.action_id));
+
+    Ok(EvidenceRouteBenchmarkSummary {
+        schema_version: EVIDENCE_ROUTE_SCHEMA_VERSION,
+        request_id: route.request_id.clone(),
+        domain: route.domain,
+        comparison_contract_digest: route.comparison_contract_digest.clone(),
+        outcome_source,
+        selected_action_id: selected_outcome.map(|outcome| outcome.action_id.clone()),
+        selected_efficiency: selected_outcome.map(|outcome| EvidenceEfficiencyRatio {
+            benefit_units: outcome.realized_decision_loss_reduction_units,
+            cost_units: outcome.realized_cost_units,
+        }),
+        oracle_action_id: oracle_outcome.map(|outcome| outcome.action_id.clone()),
+        oracle_efficiency: oracle_outcome.map(|outcome| EvidenceEfficiencyRatio {
+            benefit_units: outcome.realized_decision_loss_reduction_units,
+            cost_units: outcome.realized_cost_units,
+        }),
+        eligible_action_count: ranked.len(),
+        failed_action_count: eligible_outcomes
+            .iter()
+            .filter(|outcome| outcome.status == EvidenceOutcomeStatus::Failed)
+            .count(),
+        outcomes: sorted_outcomes,
+    })
 }
 
 #[cfg(test)]
