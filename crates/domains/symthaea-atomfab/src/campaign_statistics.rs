@@ -23,7 +23,7 @@ pub const SEED_MANIFEST_SCHEMA_VERSION: u16 = 1;
 
 /// Canonical, versioned roster of seeds fixed before outcome inspection.
 ///
-/// Hash preimage: UTF-8 bytes of `atomfab-seed-manifest-v1\\n` followed by
+/// Hash preimage: UTF-8 bytes of `atomfab-seed-manifest-v1\n` followed by
 /// every unique seed in ascending decimal form, one per line. Pin this digest
 /// in the preregistration before any outcomes are examined.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -70,10 +70,10 @@ impl SeedManifestV1 {
 }
 
 fn seed_manifest_sha256(seeds: &[u64]) -> String {
-    let mut canonical = String::from("atomfab-seed-manifest-v1\\n");
+    let mut canonical = String::from("atomfab-seed-manifest-v1\n");
     for seed in seeds {
         canonical.push_str(&seed.to_string());
-        canonical.push('\\n');
+        canonical.push('\n');
     }
     format!("{:x}", Sha256::digest(canonical.as_bytes()))
 }
