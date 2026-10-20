@@ -1144,6 +1144,124 @@ mod tests {
         report.issues.iter().any(|issue| issue == expected)
     }
 
+    fn synthetic_ten_regime_panel(critical_regime_undercoverage: bool) -> (
+        CalibrationProfile,
+        Vec<CalibrationObservation>,
+    ) {
+        const REGIMES: usize = 10;
+        const GROUPS_PER_REGIME: usize = 100;
+        let regime_ids: Vec<String> = (0..REGIMES)
+            .map(|index| format!("synthetic-regime-{index:02}"))
+            .collect();
+
+        let mut p = profile();
+        p.profile_id = "synthetic-regime-shift-panel-v1".to_owned();
+        p.required_slices = regime_ids
+            .iter()
+            .map(|regime_id| {
+                let mut req = requirement();
+                req.operating_case_id = regime_id.clone();
+                req.nominal_coverage_bp = 9_500;
+                req.minimum_observations = GROUPS_PER_REGIME;
+                req.minimum_wilson_95_lower_bp = 8_500;
+                req.maximum_wilson_95_upper_bp = 10_000;
+                req.max_normalized_mean_interval_score = 1.0;
+                req
+            })
+            .collect();
+        p.evaluation_group_ids = (0..REGIMES)
+            .flat_map(|regime_index| {
+                (0..GROUPS_PER_REGIME)
+                    .map(move |group_index| format!("eval-{regime_index:02}-{group_index:03}"))
+            })
+            .collect();
+        p.profile_manifest_sha256 = canonical_calibration_profile_sha256(&p);
+
+        let mut observations = Vec::with_capacity(REGIMES * GROUPS_PER_REGIME);
+        for (regime_index, regime_id) in regime_ids.iter().enumerate() {
+            for group_index in 0..GROUPS_PER_REGIME {
+                let undercovered = critical_regime_undercoverage
+                    && regime_index == REGIMES - 1
+                    && group_index >= GROUPS_PER_REGIME / 2;
+                let group_id = format!("eval-{regime_index:02}-{group_index:03}");
+                let outcome = if undercovered { 13.0 } else { 10.0 };
+                let mut item = observation(
+                    &format!("obs-{regime_index:02}-{group_index:03}"),
+                    &group_id,
+                    8.0,
+                    12.0,
+                    outcome,
+                );
+                item.operating_case_id = regime_id.clone();
+                item.nominal_coverage_bp = 9_500;
+                observations.push(item);
+            }
+        }
+        (p, observations)
+    }
+
+    #[test]
+    fn high_pooled_coverage_cannot_hide_critical_regime_undercoverage() {
+        let (p, observations) = synthetic_ten_regime_panel(true);
+        let report = evaluate_calibration(&p, &observations);
+
+        let total_covered: usize = report.slices.iter().map(|slice| slice.covered_count).sum();
+        let total_observations: usize = report.slices.iter().map(|slice| slice.observation_count).sum();
+        let pooled_coverage = total_covered as f64 / total_observations as f64;
+        assert_eq!(total_observations, 1_000);
+        assert_eq!(pooled_coverage, 0.95);
+        assert_eq!(
+            report.disposition,
+            CalibrationDisposition::FailDeclaredCalibrationThresholds
+        );
+
+        let critical = report
+            .slices
+            .iter()
+            .find(|slice| slice.operating_case_id == "synthetic-regime-09")
+            .unwrap();
+        assert_eq!(critical.observation_count, 100);
+        assert_eq!(critical.covered_count, 50);
+        assert_eq!(critical.empirical_coverage, Some(0.5));
+        assert_eq!(critical.coverage_gate_met, Some(false));
+        assert_eq!(critical.interval_score_gate_met, Some(true));
+        assert_eq!(critical.thresholds_met, Some(false));
+
+        assert_eq!(
+            report
+                .slices
+                .iter()
+                .filter(|slice| slice.thresholds_met == Some(false))
+                .count(),
+            1
+        );
+        assert_eq!(
+            report
+                .slices
+                .iter()
+                .filter(|slice| slice.thresholds_met == Some(true))
+                .count(),
+            9
+        );
+    }
+
+    #[test]
+    fn no_shift_control_passes_every_regime_without_adaptation() {
+        let (p, observations) = synthetic_ten_regime_panel(false);
+        let report = evaluate_calibration(&p, &observations);
+
+        assert_eq!(
+            report.disposition,
+            CalibrationDisposition::PassDeclaredCalibrationThresholds
+        );
+        assert_eq!(report.slices.len(), 10);
+        assert!(report.slices.iter().all(|slice| {
+            slice.empirical_coverage == Some(1.0)
+                && slice.thresholds_met == Some(true)
+                && slice.applicability_gate_met
+        }));
+    }
+
     #[test]
     fn covered_intervals_report_width_score_and_wilson_bounds() {
         let report = evaluate_calibration(&profile(), &two_covered());
