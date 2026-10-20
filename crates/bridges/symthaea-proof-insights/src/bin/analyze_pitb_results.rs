@@ -543,6 +543,9 @@ fn execute_power(args: &BTreeMap<String, String>) -> Result<()> {
 
     let config: RunConfig =
         serde_json::from_slice(&config_bytes).context("parse frozen run config JSON")?;
+    if config.power_report_sha256.is_some() {
+        bail!("power planning must use the run design before its power-report digest is added");
+    }
     validate_config(&config, &protocol_bytes, &split_bytes, &receipt_bytes)?;
     let split_manifest: SplitManifest =
         serde_json::from_slice(&split_bytes).context("parse frozen split manifest JSON")?;
@@ -930,6 +933,7 @@ fn parse_args(args: Vec<String>) -> Result<BTreeMap<String, String>> {
             "--protocol",
             "--splits",
             "--baseline-receipt",
+            "--power-report",
             "--out",
             "--power-simulations",
             "--power-bootstrap-replicates",
@@ -971,6 +975,9 @@ fn parse_args(args: Vec<String>) -> Result<BTreeMap<String, String>> {
             if !parsed.contains_key("--results") {
                 bail!("analyze mode requires --results");
             }
+            if !parsed.contains_key("--power-report") {
+                bail!("analyze mode requires a content-pinned --power-report");
+            }
             if parsed.contains_key("--power-simulations")
                 || parsed.contains_key("--power-bootstrap-replicates")
             {
@@ -980,6 +987,9 @@ fn parse_args(args: Vec<String>) -> Result<BTreeMap<String, String>> {
         "power" => {
             if parsed.contains_key("--results") {
                 bail!("power mode must not receive held-out test outcomes");
+            }
+            if parsed.contains_key("--power-report") {
+                bail!("power mode creates the report; it must not consume one");
             }
             let simulations = parsed
                 .get("--power-simulations")
@@ -1021,6 +1031,9 @@ fn validate_config(
     }
     if config.protocol_id != EXPECTED_PROTOCOL_ID {
         bail!("unexpected protocol id {}", config.protocol_id);
+    }
+    if let Some(power_digest) = config.power_report_sha256.as_deref() {
+        validate_sha256(power_digest).context("invalid power_report_sha256")?;
     }
     for (field, value) in [
         ("protocol_sha256", config.protocol_sha256.as_str()),
