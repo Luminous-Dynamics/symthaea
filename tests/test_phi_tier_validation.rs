@@ -270,7 +270,7 @@ fn test_heuristic_vs_exact_correlation() {
     println!(
         "Spectral connectivity diagnostic: {}",
         if spectral_matches_proxy_target {
-            "✅ VALIDATED"
+            "✅ INTERNAL TARGET MET"
         } else {
             "❌ NOT AN IIT MEASURE"
         }
@@ -316,7 +316,7 @@ fn test_heuristic_vs_exact_correlation() {
     // Record whether this generator gives the star label the highest proxy score.
     let star_highest = topology_means[0].0 == "star";
     println!(
-        "Star has highest Φ: {}",
+        "Star label has highest HDC proxy score: {}",
         if star_highest {
             "YES (HDC proxy result only)"
         } else {
