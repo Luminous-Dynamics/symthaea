@@ -47,6 +47,7 @@ pub mod nix_kg;
 pub mod physiological_scorer;
 pub mod rust_walker;
 pub mod secure_dreaming;
+pub mod semantic_embeddings;
 pub mod self_actualization;
 pub mod self_optimization;
 pub mod species_learning;
@@ -131,6 +132,7 @@ pub use species_learning::MemoryConsolidator;
 pub use structural_generator::StructuralGenerator;
 pub use structural_scorer::{NixStructuralScorer, StructuralVerdict};
 pub use substrate_binding::{AnticipatedImpact, ImpactRecommendation, SubstrateBindingEngine};
+pub use semantic_embeddings::{EmbeddingCoverageStats, SemanticEmbeddingConfig, SemanticQuarkBasis};
 pub use thought_chunk::{
     ProgramNode, ThoughtChunk, ThoughtChunkDecoder, ThoughtChunkKind, ThoughtChunkSequence,
 };
