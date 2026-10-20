@@ -361,8 +361,13 @@ pub fn validate_and_review(
 
     let metric_comparability = build_metric_comparability(&validated, &request.required_metric_ids);
     let all_required_present = validated.iter().all(|item| item.report.missing_required_metric_ids.is_empty());
-    let has_synthetic = validated.iter().flat_map(|item| item.report.metrics.iter()).any(|metric| metric.evidence_class == EvidenceClass::Synthetic);
-    let state = if !all_required_present {
+    let metrics = validated.iter().flat_map(|item| item.report.metrics.iter());
+    let has_synthetic = metrics.clone().any(|metric| metric.evidence_class == EvidenceClass::Synthetic);
+    let has_incomplete_or_assumed = metrics.clone().any(|metric| {
+        metric.state != MetricState::Available
+            || matches!(metric.evidence_class, EvidenceClass::Missing | EvidenceClass::Assumed)
+    });
+    let state = if !all_required_present || has_incomplete_or_assumed {
         ReviewState::EvidenceGaps
     } else if has_synthetic {
         ReviewState::SyntheticComparisonOnly
