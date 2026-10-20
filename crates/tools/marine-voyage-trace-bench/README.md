@@ -85,6 +85,23 @@ The synthetic tests use a shallow-water outlier to verify that a bad required op
 
 Benchmark targets include exact synthetic known-answer arithmetic, zero false pass when a required slice violates its predeclared threshold, deterministic output under input permutation, and explicit missing-case / bad-digest / nonfinite / duplicate-ID controls. These are proposed target gates, not achieved performance results.
 
+
+
+## Pointwise interval comparison without collapsing uncertainty sources
+
+The `uncertainty_comparison` module compares separately declared reference-measurement intervals and numerical-solution intervals at the same operating condition and observable. V0 accepts only reviewed `ConservativeAbsoluteBound` semantics on both sides; standard deviations, expanded uncertainties, confidence intervals and unknown semantics are rejected rather than reinterpreted as guaranteed bounds.
+
+Each record retains both intervals and the nominal residual. It reports interval overlap and the positive gap between nonoverlapping intervals, normalized by a frozen profile scale. Dataset/model/condition digests and units must match the profile. Applicability status is separate: a borderline, out-of-domain or unknown point cannot contribute to an engineering pass. Each required slice reports coverage, overlap count, maximum normalized gap and nominal residual; the profile's limits are bound into its canonical SHA-256.
+
+Interval overlap only establishes compatibility of the declared intervals at that point. It does not validate a model or account for model-form discrepancy, input-condition uncertainty, domain gap or dependence between uncertainty sources. These categories remain separate; no root-sum-square or probability is inferred.
+
+This follows the *distinction* used in ITTC uncertainty/verification/validation guidance and the scoped pointwise comparison philosophy of ASME V&V 20. It is not a claim of compliance with either standard, and does not implement ASME VVUQ 20.1's multivariate metric:
+- [ITTC 7.5-03-01-01, 2024 Revision 05](https://www.ittc.info/media/11950/75-03-01-01.pdf)
+- [ASME V&V 20-2009 (R2021)](https://www.asme.org/codes-standards/find-codes-standards/standard-for-verification-and-validation-in-computational-fluid-dynamics-and-heat-transfer/2009/print-book)
+- [ASME VVUQ standards, including VVUQ 20.1:2024](https://www.asme.org/codes-standards/vvuq-standards)
+
+A 2026 MARSTRUCT study reports 24 sets of calculations from 22 codes and 15 institutions across three ship types for wave-induced motions and global loads. It is a useful reminder that validation depends on hull type, method family and response quantity; it is not directly comparable to the calm-water DTC resistance cases: https://www.sciencedirect.com/science/article/pii/S0951833926002443.
+
 ## Claim ceiling
 
 A Complete result means only that the canonical trace passed this crate's metadata, time-coverage, numeric and integration gates. It does not validate the measurement system, prove a hydrodynamic improvement, show corrected speed-power performance, establish lifecycle emissions, demonstrate vessel safety, or certify compliance.
