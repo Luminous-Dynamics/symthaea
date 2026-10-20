@@ -38,3 +38,7 @@ argmin-math = { version = "0.4", features = ["vec"] }
 
 [dev-dependencies]
 proptest = "1.4"
+
+[[example]]
+name = "levin_multiscale_experiments"
+path = "examples/levin_multiscale_experiments.rs"
