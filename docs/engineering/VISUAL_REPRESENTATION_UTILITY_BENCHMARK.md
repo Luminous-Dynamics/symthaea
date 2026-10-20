@@ -174,6 +174,7 @@ Evidence classes remain distinct: `ANALYTIC_FIXTURE`, `SYNTHETIC_EVALUATION`, `O
 - DINOv3 official repository / paper and model-specific license: https://github.com/facebookresearch/dinov3 and https://ai.meta.com/research/publications/dinov3/
 - Perception Encoder models and checkpoint families (verify exact checkpoint and terms): https://github.com/facebookresearch/perception_models
 - SAM 3.1 / SAM 3 (current promptable concept detection, segmentation and tracking comparator; the reported 32 FPS is on an H100, not our target hardware): https://ai.meta.com/blog/segment-anything-model-3/ and https://ai.meta.com/research/sam3/
+- SAM 3.1 official release notes / public score tables: https://github.com/facebookresearch/sam3/blob/main/RELEASE_SAM3p1.md
 - SAM 2 (compatibility / historical baseline where useful): https://ai.meta.com/research/sam2/
 - MOSEv2 complex video segmentation / disappearance and reappearance: https://mose.video/ (non-commercial research terms; check current license)
 - TAO open-world tracking: https://taodataset.org/
@@ -183,6 +184,13 @@ Evidence classes remain distinct: `ANALYTIC_FIXTURE`, `SYNTHETIC_EVALUATION`, `O
 
 These references define comparison points only. No Symthaea result is implied by a paper's published score or by adding a baseline adapter.
 
+
+
+### Interpreting current industry baselines
+
+SAM 3.1 is a required current task-level candidate, but not a universal score target. Its official release notes report mixed results across video concept detection/tracking metrics and improvements on 6 of 7 reported video-object-segmentation benchmarks, including +2.0 J&F on MOSEv2. The 32 FPS headline is for the vendor-stated workload on an H100; it is not a laptop-GPU estimate. Freeze the exact released checkpoint and protocol and publish per-dataset results rather than extrapolating from one headline. See the official [SAM 3.1 release table](https://github.com/facebookresearch/sam3/blob/main/RELEASE_SAM3p1.md).
+
+The 15 October 2026 review, [Active Visual Perception: Opportunities and Challenges](https://www.mdpi.com/1424-8220/26/20/6544), reinforces a separate boundary: prerecorded videos can compare passive representation quality, but cannot fully qualify a policy that changes future observations. Active-view claims need an interactive environment, matched perception backbone/action budget, passive/fixed and random baselines, before/after observation-quality measurements, downstream task effects, and separately reported motion, time, compute, energy, communication and safety costs. Keep that lane under existing active-perception ownership instead of expanding VIS-REP into a second view-planning system.
 
 ## 11. Follow-on: allocate compute by downstream decision value
 
