@@ -64,12 +64,15 @@ fn sym_to_smt(expr: &SymExpr) -> Option<String> {
             if *denominator == 0 {
                 return None;
             }
+            // Force Real literals: (/ 1 3) can be inferred as integer
+            // division, whereas decimal-point numerals are exact SMT Real
+            // rationals and preserve 1/3 rather than truncating to zero.
             let numerator_smt = if *numerator < 0 {
-                format!("(- {})", numerator.unsigned_abs())
+                format!("(- {}.0)", numerator.unsigned_abs())
             } else {
-                numerator.to_string()
+                format!("{}.0", numerator)
             };
-            Some(format!("(/ {} {})", numerator_smt, denominator))
+            Some(format!("(/ {} {}.0)", numerator_smt, denominator))
         }
         SymExpr::Add(a, b) => Some(format!("(+ {} {})", sym_to_smt(a)?, sym_to_smt(b)?)),
         SymExpr::Mul(a, b) => Some(format!("(* {} {})", sym_to_smt(a)?, sym_to_smt(b)?)),
@@ -512,9 +515,9 @@ mod tests {
 
     #[test]
     fn rational_literals_serialize_as_exact_smt_rationals() {
-        assert_eq!(sym_to_smt(&rat(1, 3)).as_deref(), Some("(/ 1 3)"));
-        assert_eq!(sym_to_smt(&rat(1, 2)).as_deref(), Some("(/ 1 2)"));
-        assert_eq!(sym_to_smt(&rat(-1, 3)).as_deref(), Some("(/ (- 1) 3)"));
+        assert_eq!(sym_to_smt(&rat(1, 3)).as_deref(), Some("(/ 1.0 3.0)"));
+        assert_eq!(sym_to_smt(&rat(1, 2)).as_deref(), Some("(/ 1.0 2.0)"));
+        assert_eq!(sym_to_smt(&rat(-1, 3)).as_deref(), Some("(/ (- 1.0) 3.0)"));
         assert_eq!(sym_to_smt(&SymExpr::Rational(1, 0)), None);
     }
 
@@ -525,8 +528,8 @@ mod tests {
             .find(|problem| problem.name == "henon_heiles_exact_H")
             .expect("exact Hénon-Heiles fixture");
         let smt = build_obligation(&problem).expect("supported polynomial obligation");
-        assert!(smt.contains("(/ 1 2)"));
-        assert!(smt.contains("(/ 1 3)"));
+        assert!(smt.contains("(/ 1.0 2.0)"));
+        assert!(smt.contains("(/ 1.0 3.0)"));
         assert!(!smt.contains("0.3333333333333333"));
     }
 }
