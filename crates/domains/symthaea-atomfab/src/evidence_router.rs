@@ -799,13 +799,22 @@ mod tests {
         let proposals: Vec<EvidenceActionProposal> =
             serde_json::from_value(fixture["proposals"].clone()).unwrap();
         let route = route_evidence_actions(&proposals).unwrap();
-        let outcomes = vec![
-            outcome("static-screen", EvidenceOutcomeSource::Reference, EvidenceOutcomeStatus::Completed, 4, 2, '1'),
-            outcome("universal-mlip", EvidenceOutcomeSource::Reference, EvidenceOutcomeStatus::Completed, 20, 4, '2'),
-            outcome("domain-specific-mlip", EvidenceOutcomeSource::Reference, EvidenceOutcomeStatus::Completed, 24, 8, '3'),
-            outcome("dft-reference", EvidenceOutcomeSource::Reference, EvidenceOutcomeStatus::Failed, 0, 40, '4'),
-            outcome("out-of-domain-mlip", EvidenceOutcomeSource::Reference, EvidenceOutcomeStatus::NotRun, 0, 0, '5'),
-        ];
+        let outcome_fixture: serde_json::Value = serde_json::from_str(include_str!(
+            "../fixtures/evidence-action-outcomes-v1.json"
+        ))
+        .expect("outcome fixture should parse");
+        assert_eq!(outcome_fixture["schema_version"], 1);
+        let _outcome_schema: serde_json::Value = serde_json::from_str(include_str!(
+            "../schemas/evidence-action-outcomes-v1.schema.json"
+        ))
+        .expect("outcome schema must parse");
+        let _summary_schema: serde_json::Value = serde_json::from_str(include_str!(
+            "../schemas/evidence-route-benchmark-summary-v1.schema.json"
+        ))
+        .expect("summary schema must parse");
+        let outcomes: Vec<EvidenceActionOutcome> =
+            serde_json::from_value(outcome_fixture["outcomes"].clone())
+                .expect("fixture outcomes must match Rust records");
         let summary = score_evidence_route(&route, &outcomes)
             .expect("every eligible action has a retrospective outcome");
         assert_eq!(summary.selected_action_id.as_deref(), Some("static-screen"));
