@@ -132,11 +132,23 @@ impl fmt::Display for PairedAccelerationError {
                 "paired bootstrap needs at least {minimum} resamples; got {actual}"
             ),
             Self::InvalidConfidenceLevel => {
-                write!(f, "confidence level must be finite and strictly between zero and one")
+                write!(
+                    f,
+                    "confidence level must be finite and strictly between zero and one"
+                )
             }
-            Self::InvalidSeedManifest => write!(f, "seed manifest must be sorted, unique, versioned, and contain at least 20 seeds"),
-            Self::SeedManifestMismatch => write!(f, "seed manifest SHA-256 does not match its canonical seed roster"),
-            Self::SeedRosterMismatch => write!(f, "observed campaign seed roster does not exactly match the predeclared manifest"),
+            Self::InvalidSeedManifest => write!(
+                f,
+                "seed manifest must be sorted, unique, versioned, and contain at least 20 seeds"
+            ),
+            Self::SeedManifestMismatch => write!(
+                f,
+                "seed manifest SHA-256 does not match its canonical seed roster"
+            ),
+            Self::SeedRosterMismatch => write!(
+                f,
+                "observed campaign seed roster does not exactly match the predeclared manifest"
+            ),
             Self::DuplicateSeed => write!(f, "each preregistered seed may appear only once"),
             Self::MismatchedCohort => write!(
                 f,
@@ -153,7 +165,9 @@ impl fmt::Display for PairedAccelerationError {
             Self::NonFiniteStatistic => {
                 write!(f, "bootstrap produced a non-finite statistic")
             }
-            Self::InvalidSummary => write!(f, "paired acceleration summary is internally inconsistent"),
+            Self::InvalidSummary => {
+                write!(f, "paired acceleration summary is internally inconsistent")
+            }
             Self::InvalidCampaign(error) => write!(f, "invalid campaign record: {error}"),
         }
     }
@@ -164,8 +178,9 @@ impl Error for PairedAccelerationError {}
 impl From<CampaignError> for PairedAccelerationError {
     fn from(value: CampaignError) -> Self {
         match value {
-            CampaignError::TargetNotReached
-            | CampaignError::TargetReachedOnNonCompletedRun => Self::TargetNotReached,
+            CampaignError::TargetNotReached | CampaignError::TargetReachedOnNonCompletedRun => {
+                Self::TargetNotReached
+            }
             other => Self::InvalidCampaign(other),
         }
     }
@@ -228,9 +243,7 @@ pub fn bootstrap_median_acceleration(
         if !seen_seeds.insert(baseline.seed) {
             return Err(PairedAccelerationError::DuplicateSeed);
         }
-        if !run_ids.insert(baseline.run_id.clone())
-            || !run_ids.insert(candidate.run_id.clone())
-        {
+        if !run_ids.insert(baseline.run_id.clone()) || !run_ids.insert(candidate.run_id.clone()) {
             return Err(PairedAccelerationError::MismatchedCohort);
         }
 
@@ -256,7 +269,10 @@ pub fn bootstrap_median_acceleration(
     if observed_seeds != seed_manifest.seeds {
         return Err(PairedAccelerationError::SeedRosterMismatch);
     }
-    let factors = ordered.iter().map(|(_, factor)| *factor).collect::<Vec<_>>();
+    let factors = ordered
+        .iter()
+        .map(|(_, factor)| *factor)
+        .collect::<Vec<_>>();
     let median_acceleration_factor = median(&factors);
 
     let candidate_faster_count = factors.iter().filter(|factor| **factor > 1.0).count();
@@ -423,7 +439,11 @@ mod tests {
             model_digest: "b".repeat(64),
             evaluator_digest: "c".repeat(64),
             environment_digest: "9".repeat(64),
-            config_digest: if policy == "random" { "d".repeat(64) } else { "8".repeat(64) },
+            config_digest: if policy == "random" {
+                "d".repeat(64)
+            } else {
+                "8".repeat(64)
+            },
             target_definition_digest: "e".repeat(64),
             budget_definition_digest: "f".repeat(64),
             objective_name: "best_validated_objective".to_owned(),
@@ -434,7 +454,11 @@ mod tests {
             elapsed_seconds: 3.0,
             total_cost_value: cost,
             total_cost_unit: "reference_eval_equivalent".to_owned(),
-            terminal_status: if target_reached { CampaignStatus::Completed } else { CampaignStatus::Failed },
+            terminal_status: if target_reached {
+                CampaignStatus::Completed
+            } else {
+                CampaignStatus::Failed
+            },
             target_reached,
             best_validated_objective: Some(0.75),
             evidence: vec![EvidenceReference {
@@ -442,11 +466,18 @@ mod tests {
                 sha256: "1".repeat(64),
                 role: "campaign_result".to_owned(),
             }],
-            failure_reasons: if target_reached { Vec::new() } else { vec!["target_not_reached".to_owned()] },
+            failure_reasons: if target_reached {
+                Vec::new()
+            } else {
+                vec!["target_not_reached".to_owned()]
+            },
         }
     }
 
-    fn make_pairs(ratios: &[f64], all_targets_reached: bool) -> (Vec<CampaignRecord>, Vec<CampaignRecord>) {
+    fn make_pairs(
+        ratios: &[f64],
+        all_targets_reached: bool,
+    ) -> (Vec<CampaignRecord>, Vec<CampaignRecord>) {
         let baseline = ratios
             .iter()
             .enumerate()
@@ -455,7 +486,9 @@ mod tests {
         let candidate = ratios
             .iter()
             .enumerate()
-            .map(|(index, factor)| campaign("symthaea_full", index as u64 + 1, 100.0 / factor, true))
+            .map(|(index, factor)| {
+                campaign("symthaea_full", index as u64 + 1, 100.0 / factor, true)
+            })
             .collect::<Vec<_>>();
         (baseline, candidate)
     }
@@ -479,26 +512,13 @@ mod tests {
         resamples: usize,
         seed: u64,
     ) -> Result<PairedAccelerationSummary, PairedAccelerationError> {
-        bootstrap_median_acceleration(
-            pairs,
-            &seed_manifest(count),
-            confidence,
-            resamples,
-            seed,
-        )
+        bootstrap_median_acceleration(pairs, &seed_manifest(count), confidence, resamples, seed)
     }
 
     #[test]
     fn constant_two_x_acceleration_has_exact_interval() {
         let (baseline, candidate) = make_pairs(&[2.0; 20], true);
-        let summary = summarize(
-            &references(&baseline, &candidate),
-            20,
-            0.95,
-            2_000,
-            17,
-        )
-        .unwrap();
+        let summary = summarize(&references(&baseline, &candidate), 20, 0.95, 2_000, 17).unwrap();
         assert_eq!(summary.campaign_pair_count, 20);
         assert_eq!(summary.median_acceleration_factor, 2.0);
         assert_eq!(summary.lower_confidence_bound, 2.0);
@@ -509,17 +529,16 @@ mod tests {
 
     #[test]
     fn summary_is_deterministic_and_input_permutation_invariant() {
-        let ratios = (0..20).map(|index| 0.8 + index as f64 * 0.07).collect::<Vec<_>>();
+        let ratios = (0..20)
+            .map(|index| 0.8 + index as f64 * 0.07)
+            .collect::<Vec<_>>();
         let (baseline, candidate) = make_pairs(&ratios, true);
         let pairs = references(&baseline, &candidate);
         let forward = summarize(&pairs, 20, 0.95, 4_000, 123).unwrap();
         let reversed = pairs.iter().rev().copied().collect::<Vec<_>>();
         let backward = summarize(&reversed, 20, 0.95, 4_000, 123).unwrap();
         assert_eq!(forward, backward);
-        assert_eq!(
-            forward,
-            summarize(&pairs, 20, 0.95, 4_000, 123).unwrap()
-        );
+        assert_eq!(forward, summarize(&pairs, 20, 0.95, 4_000, 123).unwrap());
     }
 
     #[test]
@@ -529,14 +548,7 @@ mod tests {
         baseline[7].terminal_status = CampaignStatus::Failed;
         baseline[7].target_reached = false;
         baseline[7].failure_reasons = vec!["budget_exhausted".to_owned()];
-        let err = summarize(
-            &references(&baseline, &candidate),
-            20,
-            0.95,
-            2_000,
-            1,
-        )
-        .unwrap_err();
+        let err = summarize(&references(&baseline, &candidate), 20, 0.95, 2_000, 1).unwrap_err();
         assert_eq!(err, PairedAccelerationError::TargetNotReached);
     }
 
@@ -553,8 +565,7 @@ mod tests {
         let (baseline, mut candidate) = make_pairs(&[2.0; 20], true);
         candidate[5].model_digest = "7".repeat(64);
         assert_eq!(
-            summarize(&references(&baseline, &candidate), 20, 0.95, 2_000, 3)
-                .unwrap_err(),
+            summarize(&references(&baseline, &candidate), 20, 0.95, 2_000, 3).unwrap_err(),
             PairedAccelerationError::InvalidCampaign(CampaignError::MismatchedPolicies)
         );
     }
@@ -562,14 +573,7 @@ mod tests {
     #[test]
     fn summary_round_trips_and_rejects_internally_inconsistent_reports() {
         let (baseline, candidate) = make_pairs(&[2.0; 20], true);
-        let summary = summarize(
-            &references(&baseline, &candidate),
-            20,
-            0.95,
-            2_000,
-            17,
-        )
-        .unwrap();
+        let summary = summarize(&references(&baseline, &candidate), 20, 0.95, 2_000, 17).unwrap();
         summary.validate().unwrap();
 
         let encoded = serde_json::to_string(&summary).unwrap();
@@ -583,19 +587,18 @@ mod tests {
         .unwrap();
         assert_eq!(schema["properties"]["schema_version"]["const"], 1);
         assert_eq!(schema["properties"]["predeclared_seeds"]["minItems"], 20);
-        assert_eq!(schema["properties"]["seed_manifest_sha256"]["pattern"], "^[0-9a-f]{64}$");
+        assert_eq!(
+            schema["properties"]["seed_manifest_sha256"]["pattern"],
+            "^[0-9a-f]{64}$"
+        );
 
-        let seed_schema: serde_json::Value = serde_json::from_str(include_str!(
-            "../schemas/seed-manifest-v1.schema.json"
-        ))
-        .unwrap();
+        let seed_schema: serde_json::Value =
+            serde_json::from_str(include_str!("../schemas/seed-manifest-v1.schema.json")).unwrap();
         assert_eq!(seed_schema["properties"]["schema_version"]["const"], 1);
         assert_eq!(seed_schema["properties"]["seeds"]["minItems"], 20);
 
-        let seed_fixture: SeedManifestV1 = serde_json::from_str(include_str!(
-            "../fixtures/seed-manifest-v1.json"
-        ))
-        .unwrap();
+        let seed_fixture: SeedManifestV1 =
+            serde_json::from_str(include_str!("../fixtures/seed-manifest-v1.json")).unwrap();
         seed_fixture.validate().unwrap();
         assert_eq!(seed_fixture.seeds, (101..=120).collect::<Vec<_>>());
         assert_eq!(
@@ -617,8 +620,7 @@ mod tests {
 
     #[test]
     fn seed_manifest_is_canonical_and_roster_mismatch_blocks_summary() {
-        let manifest = SeedManifestV1::from_seeds(&(101..=120).rev().collect::<Vec<_>>())
-            .unwrap();
+        let manifest = SeedManifestV1::from_seeds(&(101..=120).rev().collect::<Vec<_>>()).unwrap();
         assert_eq!(
             manifest.sha256,
             "c8dd76e3828125d3984e95bef0cd50603cee2bef7933f1fec178866dd973ba59"
