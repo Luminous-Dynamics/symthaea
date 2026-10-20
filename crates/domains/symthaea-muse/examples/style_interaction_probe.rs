@@ -305,9 +305,7 @@ fn executable_digest() -> Result<(String, u64), String> {
 fn main() -> ExitCode {
     let revision = env::var("SYMTHAEA_GIT_REVISION").unwrap_or_default();
     if !valid_sha1(&revision) {
-        eprintln!(
         eprintln!("FAIL: set SYMTHAEA_GIT_REVISION to the exact 40-hex checkout HEAD; this is a caller claim, not build attestation.");
-        );
         return ExitCode::FAILURE;
     }
 
