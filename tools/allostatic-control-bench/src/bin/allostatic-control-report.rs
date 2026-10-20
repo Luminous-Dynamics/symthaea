@@ -12,13 +12,8 @@ use std::io::{self, ErrorKind};
 
 #[derive(Clone, Debug)]
 struct Episode {
-    seed: u64,
-    scenario: String,
-    policy: String,
-    shielded: bool,
     task_reward: f64,
     cumulative_exposure: f64,
-    unsafe_ticks: usize,
     unsafe_episode: bool,
     violation_exposure: f64,
     max_violation_severity: f64,
@@ -164,14 +159,10 @@ fn parse_episodes(csv: &str) -> Result<BTreeMap<ConditionKey, EpisodesBySeed>, B
         let scenario = cell(&values, &header, "scenario")?.to_string();
         let policy = cell(&values, &header, "policy")?.to_string();
         let shielded = parse_bool(&values, &header, "shielded")?;
+        let seed: u64 = cell(&values, &header, "seed")?.parse()?;
         let episode = Episode {
-            seed: cell(&values, &header, "seed")?.parse()?,
-            scenario: scenario.clone(),
-            policy: policy.clone(),
-            shielded,
             task_reward: parse_f64(&values, &header, "task_reward")?,
             cumulative_exposure: parse_f64(&values, &header, "cumulative_exposure")?,
-            unsafe_ticks: parse_usize(&values, &header, "unsafe_ticks")?,
             unsafe_episode: parse_bool(&values, &header, "unsafe_episode")?,
             violation_exposure: parse_f64(&values, &header, "violation_exposure")?,
             max_violation_severity: parse_f64(&values, &header, "max_violation_severity")?,
@@ -210,7 +201,7 @@ fn write_summary(groups: &BTreeMap<ConditionKey, EpisodesBySeed>, path: &str) ->
         let minimum_reserve: Vec<f64> = episodes.iter().map(|row| row.minimum_reserve).collect();
         let missed: Vec<f64> = episodes.iter().map(|row| row.missed_limits as f64).collect();
         let vetoes: Vec<f64> = episodes.iter().map(|row| row.shield_vetoes as f64).collect();
-        let recovery_steps: Vec<f64> = episodes.iter().map(|row| row.emergency_recover_steps as f64).collect();
+        let emergency_steps: Vec<f64> = episodes.iter().map(|row| row.emergency_recover_steps as f64).collect();
         let false_alarms: Vec<f64> = episodes.iter().map(|row| row.false_alarms as f64).collect();
         let violation_rate = episodes.iter().filter(|row| row.unsafe_episode).count() as f64 / episodes.len() as f64;
         let failure_rate = episodes.iter().filter(|row| row.failed).count() as f64 / episodes.len() as f64;
@@ -231,7 +222,7 @@ fn write_summary(groups: &BTreeMap<ConditionKey, EpisodesBySeed>, path: &str) ->
             mean(&minimum_reserve),
             mean(&missed),
             mean(&vetoes),
-            mean(&recovery_steps),
+            mean(&emergency_steps),
             mean(&false_alarms),
             failure_rate,
         ));
@@ -246,7 +237,11 @@ fn write_paired_deltas(groups: &BTreeMap<ConditionKey, EpisodesBySeed>, path: &s
         "scenario,policy,n,delta_task_reward_mean,delta_task_reward_ci95_low,delta_task_reward_ci95_high,delta_cumulative_load_mean,delta_cumulative_load_ci95_low,delta_cumulative_load_ci95_high,delta_violation_exposure_mean,delta_violation_exposure_ci95_low,delta_violation_exposure_ci95_high,delta_episode_violation_rate_mean,delta_episode_violation_rate_ci95_low,delta_episode_violation_rate_ci95_high,delta_peak_violation_severity_mean,delta_peak_violation_severity_ci95_low,delta_peak_violation_severity_ci95_high\n"
     );
     let mut pair_count = 0;
-    for ((scenario, policy, shielded), shielded_rows) in groups.iter().filter(|((_, _, shielded), _)| *shielded) {
+    for (key, shielded_rows) in groups {
+        let (scenario, policy, shielded) = key;
+        if !*shielded {
+            continue;
+        }
         let unshielded_rows = groups
             .get(&(scenario.clone(), policy.clone(), false))
             .ok_or_else(|| invalid_data(format!("missing unshielded pair for {scenario}/{policy}")))?;
@@ -265,9 +260,9 @@ fn write_paired_deltas(groups: &BTreeMap<ConditionKey, EpisodesBySeed>, path: &s
             reward_delta.push(shielded_episode.task_reward - baseline.task_reward);
             load_delta.push(shielded_episode.cumulative_exposure - baseline.cumulative_exposure);
             exposure_delta.push(shielded_episode.violation_exposure - baseline.violation_exposure);
-            violation_rate_delta.push(
-                f64::from(shielded_episode.unsafe_episode) - f64::from(baseline.unsafe_episode)
-            );
+            let shielded_violation = if shielded_episode.unsafe_episode { 1.0 } else { 0.0 };
+            let baseline_violation = if baseline.unsafe_episode { 1.0 } else { 0.0 };
+            violation_rate_delta.push(shielded_violation - baseline_violation);
             severity_delta.push(shielded_episode.max_violation_severity - baseline.max_violation_severity);
         }
         let reward_ci = bootstrap_mean_ci(&reward_delta, stable_seed(&format!("{scenario}/{policy}/reward")));
