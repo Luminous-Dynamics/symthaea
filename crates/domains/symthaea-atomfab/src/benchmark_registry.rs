@@ -490,8 +490,8 @@ mod tests {
         assert_eq!(ranking["rbo_persistence"], serde_json::json!(0.94));
         assert_eq!(ranking["kendall_tau_variant"], "tau_b");
         assert_eq!(
-            ranking["kendall_tau_energy_tie_tolerance_eV"],
-            serde_json::json!(0.0)
+            ranking["kendall_tau_energy_tie_tolerance_eV"].as_f64(),
+            Some(0.0)
         );
         assert_eq!(
             ranking["exact_energy_tie_order"],
