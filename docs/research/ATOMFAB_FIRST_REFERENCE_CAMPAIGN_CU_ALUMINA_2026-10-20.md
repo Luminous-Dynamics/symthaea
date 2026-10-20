@@ -39,6 +39,11 @@ The 2026 paper reports that among its 12 nanoparticle-size/surface cases, DP-Uni
 
 The paper itself notes that finite stochastic searches are unlikely to establish true global minima. AtomFab therefore uses “published/reference DFT-refined best-known minimum” unless a separate exhaustive or certifying procedure supports a genuine global-optimum claim. The benchmark objective is to improve the evidence-backed best-known result at matched cost, not to make an unprovable global-optimality claim.
 
+
+## Ranking metric reproduction requirement
+
+The published paper's comparison should be reproduced with both RBO (p=0.94) and Kendall tau-b on the common set of 150 DFT-refined structures per size/surface stratum, with the same structure identities and pinned reference energies. AtomFab's finite-prefix RBO-style metric is useful for its own large-candidate search analysis but is not a drop-in replacement for the paper's RBO; the new `published_ranking.rs` implements a separate paper-compatible extrapolated RBO and tie-aware Kendall tau-b. Candidate-set Jaccard/unique discovery remains a distinct metric. The paper-reported 8/3/1 best-binding-energy winner count is a historical stochastic-search fingerprint, not a hard result requirement under unreported/different random seeds.
+
 ## Decision criteria
 
 A result deserves an industry-comparison claim only after: (a) exact reference protocol reproduction; (b) pinned, license-compatible model/checkpoint/evaluator; (c) comparable task and splits; (d) identical reference-validation budget; (e) total costs and failed runs accounted; (f) independently recomputed metrics from evidence artifacts; and (g) stratum-specific failures remain visible. The 2026 study shows that energy-error rankings and exploration performance can diverge, so neither MAE nor best predicted energy alone can establish superiority. [Benchmark source](https://doi.org/10.1038/s41524-026-02043-8).
