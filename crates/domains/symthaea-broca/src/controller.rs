@@ -1258,6 +1258,35 @@ mod tests {
         assert_eq!(ctrl.current_pos(), 0);
     }
 
+    #[test]
+    fn semantic_embedding_constructor_preserves_tokenizer_alignment_and_coverage() {
+        let genesis = test_genesis();
+        let tokenizer = BpeTokenizer::default_minimal();
+        let config = test_config();
+        let (controller, stats) = LanguageController::new_with_semantic_embeddings(
+            &genesis,
+            &config,
+            &tokenizer,
+            &SemanticEmbeddingConfig::default(),
+        );
+
+        assert_eq!(controller.vocab_size(), tokenizer.vocab_size());
+        assert_eq!(controller.token_embeddings().len(), tokenizer.vocab_size());
+        assert_eq!(stats.total_tokens, tokenizer.vocab_size());
+        assert_eq!(
+            stats.tier1_direct + stats.tier2_morphological + stats.tier3_genesis,
+            stats.total_tokens,
+            "semantic coverage tiers must account for every tokenizer row"
+        );
+        assert!(
+            controller
+                .token_embeddings()
+                .iter()
+                .all(|embedding| embedding.as_slice().len() == HDC_DIMENSION),
+            "all initialized embeddings must retain the controller's HDC dimensionality"
+        );
+    }
+
     #[cfg(any(feature = "mamba-cpu", feature = "gpu-logits"))]
     #[test]
     fn test_token_embedding_mutation_invalidates_candle_cache() {
