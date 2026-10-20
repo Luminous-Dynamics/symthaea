@@ -86,12 +86,11 @@
     "transfer_candidates": [
       {
         "target_family_id": "157",
-        "rationale": "Rejected as a direct mathematical transfer after inspecting the training-family target. Source family 156 refutes a ten-set small-diameter cover by mapping a hypothetical cover to Admissible data, deriving a finite support-face system, then invoking a finite no-ten-system theorem. Target family 157's OAI.HadwigerCounterexample.not_hadwiger_conjecture is established through an analytic/exponential graph construction, a small connected-matching bound, a matching-minor inequality, and a chromatic-number lower bound. Both are contradiction-based graph/geometry arguments at a very broad level, but the source's actual finite support-face transformation has no demonstrated structural role in the target proof. This is a curator's static negative-control annotation, not a measured failed model attempt and not an empirical transfer score.",
+        "rationale": "Rejected after inspecting the pinned training-family proof. Family 157's theorem is proved through an analytic/finite-sampling graph construction plus a quantitative connected-matching-to-Hadwiger bound and a chromatic lower bound. It does not instantiate the source strategy's specific Borsuk finite support-face/TenSystem obstruction or satisfy that strategy's geometric representation preconditions. The commonality is only the broad engineering pattern of a modular certificate chain; that is too generic to count as a validated mathematical strategy transfer.",
         "preconditions_checked": [
-          "Confirmed from the frozen split manifest that both source family 156 and target family 157 are assigned to train.",
-          "Inspected the target's scope note and the exact OAI.HadwigerCounterexample.Main theorem chain in the pinned upstream commit.",
-          "The source strategy requires a geometric cover-to-Admissible representation and a finite support-face obstruction; the target proof instead constructs arbitrarily large graphs with low independence and connected-matching invariants, then derives a chromatic-versus-clique-minor contradiction.",
-          "No shared representation map, incidence invariant, or target subgoal supporting the source move was identified in this static review."
+          "Read family 157 Main.lean and identified the exists_graphs → exists_counterexamples → not_hadwiger_conjecture proof chain.",
+          "Read HadwigerMatching/Main.lean and MinorBound.lean; the decisive bridge uses the connected-matching number and graph-size arithmetic rather than the Borsuk support-face/TenSystem construction.",
+          "No target theorem with matching Admissible support-face hypotheses was identified; no transferred tactic or lemma was applied."
         ],
         "status": "rejected",
         "target_theorem_id": "OAI.HadwigerCounterexample.not_hadwiger_conjecture",
