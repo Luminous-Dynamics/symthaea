@@ -13,6 +13,16 @@ cargo run --locked --offline --manifest-path crates/tools/marine-cost-model-benc
 
 The package is a nested Cargo workspace to remain isolated from the large Symthaea workspace.
 
+Validate the procurement register separately:
+
+~~~sh
+cargo run --locked --offline --manifest-path crates/tools/marine-cost-model-bench/Cargo.toml --bin validate_register -- crates/tools/marine-cost-model-bench/references/public-procurement-anchors.csv
+~~~
+
+The validator pins the V0 column contract, rejects malformed CSV/duplicate identifiers, and fails closed on contradictory price/disposition declarations. A row can be valid context-only evidence without being admitted as a comparable price point. To declare `ComparablePriceEvidence`, a row needs a positive numeric price, currency, known quantity, dated award/issue, vessel description, defined cost scope, explicit inclusions and no unresolved fields (or an explicit `None`). Blank-price specifications and discovery leads can never be admitted as price evidence.
+
+This checker validates record structure and declared admission rules only. It does not download or authenticate the referenced artifacts, check licensing, prove a public contract was fulfilled, normalize currency/inflation/tax/scope, or independently establish that a declared quantity is correct. Those remain separate review steps.
+
 ## Inputs and boundaries
 
 - **Money basis:** all values in one currency_basis_id, which must identify currency, price year and geographic/market basis. Conversion and escalation happen before this calculator; do not mix nominal years or currencies.
