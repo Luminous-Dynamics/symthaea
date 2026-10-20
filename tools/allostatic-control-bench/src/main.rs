@@ -2,7 +2,7 @@ use allostatic_control_bench::{run_episode, Policy, Scenario};
 
 fn main() {
     println!(
-        "scenario,seed,policy,task_reward,cumulative_exposure,mean_load,peak_load,unsafe_ticks,missed_limits,false_alarms,push_steps,maintain_steps,resource_cost,failed,recovery_steps"
+        "scenario,seed,policy,task_reward,cumulative_exposure,mean_load,peak_load,minimum_reserve,terminal_reserve,terminal_load,unsafe_ticks,missed_limits,false_alarms,push_steps,maintain_steps,resource_cost,failed,recovery_steps"
     );
 
     for scenario in Scenario::all() {
@@ -13,7 +13,7 @@ fn main() {
                     .recovery_steps
                     .map_or_else(|| "NA".to_string(), |steps| steps.to_string());
                 println!(
-                    "{},{},{},{:.6},{:.6},{:.6},{:.6},{},{},{},{},{},{:.6},{},{}",
+                    "{},{},{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{},{},{},{},{},{:.6},{},{}",
                     scenario.name(),
                     seed,
                     policy.name(),
@@ -21,6 +21,9 @@ fn main() {
                     m.cumulative_exposure,
                     m.mean_load,
                     m.peak_load,
+                    m.minimum_reserve,
+                    m.terminal_reserve,
+                    m.terminal_load,
                     m.unsafe_ticks,
                     m.missed_limits,
                     m.false_alarms,
