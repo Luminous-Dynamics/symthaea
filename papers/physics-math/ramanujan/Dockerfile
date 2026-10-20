@@ -36,7 +36,7 @@ WORKDIR /work
 
 # Copy the entire symthaea workspace. The build context is assumed to be the
 # symthaea/ directory when running from CI; for local docker build, invoke
-# as:  docker build -f papers/ramanujan/Dockerfile -t ramanujan-repro .
+# as:  docker build -f papers/physics-math/ramanujan/Dockerfile -t ramanujan-repro .
 #
 # (the .dockerignore file should exclude target/, .git/, and large dataset
 # directories.)
