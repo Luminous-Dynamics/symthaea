@@ -398,7 +398,7 @@ fn test_exhaustive_proxy_topology_discrimination() {
     // We expect at least some discrimination (>0.05)
     assert!(
         discrimination > 0.02,
-        "Exact tier shows almost no discrimination between topologies (Δ={:.4}). \
+        "Exhaustive HDC proxy shows almost no discrimination between representation families (Δ={:.4}). \
          This suggests the MIP calculation may not be working correctly.",
         discrimination
     );
