@@ -19,7 +19,7 @@ cargo run --example entropy_causality_reference --release
 cargo test --example entropy_causality_reference
 ~~~
 
-The harness caps exhaustive enumeration at 12 nodes. Its tests are source definitions until a Rust runner executes them. No compilation or test pass is claimed in this change.
+The harness intentionally caps exhaustive enumeration at 8 nodes: it evaluates every nontrivial bipartition and every transition row, so the partition count grows exponentially and transition tables grow exponentially in both dimensions. Larger systems require bounded or sampled cuts rather than raising this cap blindly. Its tests are source definitions until a Rust runner executes them. No compilation or test pass is claimed in this change.
 
 ## Measures
 
