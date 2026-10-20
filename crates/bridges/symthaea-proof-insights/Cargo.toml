@@ -12,6 +12,7 @@ categories = ["science", "mathematics"]
 
 [dependencies]
 anyhow = { workspace = true }
+csv = { workspace = true }
 regex = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
