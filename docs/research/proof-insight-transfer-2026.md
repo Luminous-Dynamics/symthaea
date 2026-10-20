@@ -15,6 +15,8 @@ The measurable target is:
 
 A result counts as useful only when it beats non-neural / standard retrieval baselines on held-out theorem families and the formal checker validates the exact target statement. Similarity scores, plausible explanations, and generated conjectures do not count as mathematical discoveries on their own.
 
+The execution contract is now specified in [`data/benchmarks/proof-insight-transfer-v0/evaluation-protocol.md`](../../data/benchmarks/proof-insight-transfer-v0/evaluation-protocol.md). It freezes the paired baseline arms, compute matching, semantic-gate primary endpoint, family-clustered confidence interval, leakage audit, negative controls, and go/no-go decisions before a confirmatory run. It is a protocol, not a result: the dataset and transfer experiments remain unbuilt, and the Rust implementation still requires compilation and tests.
+
 ## Why this is the next step
 
 ### Current Symthaea evidence
