@@ -89,7 +89,7 @@ struct Summary {
 
 #[derive(Clone, Copy)]
 struct Event {
-    voice: usize,
+    voice: String,
     pitch_bits: u32,
     start: f32,
 }
@@ -114,10 +114,10 @@ fn event_signature(voices: &[PerformedVoice]) -> Vec<(String, String, Vec<(u32, 
 
 fn flatten(voices: &[PerformedVoice]) -> Vec<Event> {
     let mut out = Vec::new();
-    for (voice_idx, voice) in voices.iter().enumerate() {
+    for voice in voices {
         for note in &voice.notes {
             out.push(Event {
-                voice: voice_idx,
+                voice: voice.name.clone(),
                 pitch_bits: note.frequency.to_bits(),
                 start: note.start_time,
             });
