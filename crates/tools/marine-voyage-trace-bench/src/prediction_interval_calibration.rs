@@ -12,6 +12,56 @@ use std::collections::{BTreeMap, BTreeSet};
 const COVERAGE_BASIS_POINTS: u16 = 10_000;
 const WILSON_95_Z: f64 = 1.959_963_984_540_054;
 
+/// Compute the central interval score used by calibration and paired-policy comparisons.
+///
+/// Returns None for non-finite inputs, reversed limits, invalid nominal coverage, or a
+/// non-finite score. This is a proper interval score for a central predictive interval; it is
+/// not a physical error bound, confidence interval, tolerance interval, or safety certificate.
+pub fn central_interval_score(
+    lower: f64,
+    upper: f64,
+    observed_value: f64,
+    nominal_coverage_bp: u16,
+) -> Option<f64> {
+    if !lower.is_finite()
+        || !upper.is_finite()
+        || !observed_value.is_finite()
+        || lower > upper
+        || nominal_coverage_bp == 0
+        || nominal_coverage_bp >= COVERAGE_BASIS_POINTS
+    {
+        return None;
+    }
+
+    let width = upper - lower;
+    let alpha = (COVERAGE_BASIS_POINTS - nominal_coverage_bp) as f64
+        / COVERAGE_BASIS_POINTS as f64;
+    if !width.is_finite() || alpha <= 0.0 {
+        return None;
+    }
+
+    let mut score = width;
+    if observed_value < lower {
+        score += (2.0 / alpha) * (lower - observed_value);
+    } else if observed_value > upper {
+        score += (2.0 / alpha) * (observed_value - upper);
+    }
+
+    (score.is_finite() && score >= 0.0).then_some(score)
+}
+
+/// Inclusive coverage predicate for a finite central interval.
+pub fn central_interval_covers(lower: f64, upper: f64, observed_value: f64) -> Option<bool> {
+    if !lower.is_finite()
+        || !upper.is_finite()
+        || !observed_value.is_finite()
+        || lower > upper
+    {
+        return None;
+    }
+    Some(observed_value >= lower && observed_value <= upper)
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ApplicabilityStatus {
     WithinDeclaredEnvelope,
@@ -568,18 +618,15 @@ impl Accumulator {
 
     fn add(&mut self, observation: &CalibrationObservation) -> bool {
         let width = observation.upper - observation.lower;
-        let alpha = (COVERAGE_BASIS_POINTS - observation.nominal_coverage_bp) as f64
-            / COVERAGE_BASIS_POINTS as f64;
-        if !width.is_finite() || alpha <= 0.0 {
+        let Some(interval_score) = central_interval_score(
+            observation.lower,
+            observation.upper,
+            observation.observed_value,
+            observation.nominal_coverage_bp,
+        ) else {
             return false;
-        }
-        let mut interval_score = width;
-        if observation.observed_value < observation.lower {
-            interval_score += (2.0 / alpha) * (observation.lower - observation.observed_value);
-        } else if observation.observed_value > observation.upper {
-            interval_score += (2.0 / alpha) * (observation.observed_value - observation.upper);
-        }
-        if !interval_score.is_finite() || interval_score < 0.0 {
+        };
+        if !width.is_finite() {
             return false;
         }
         let next_width_sum = self.width_sum;
