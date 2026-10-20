@@ -567,7 +567,7 @@ impl Style {
         match self {
             Style::Classical => [A::Block, A::Alberti, A::Arpeggio][(seed as usize / 2) % 3],
             Style::Waltz => A::OomPah,
-            Style::Folk => [A::Arpeggio, A::Block][(seed as usize / 2) % 2],
+            Style::Folk => [A::Arpeggio, A::Block, A::FolkPulse][(seed as usize / 2) % 3],
             Style::Cinematic => A::Block,
             Style::Playful => [A::Comp, A::Alberti][(seed as usize / 2) % 2],
             _ => self.spec().accompaniment(seed),
@@ -874,7 +874,7 @@ impl Style {
                     vec![1, 4, 5, 1],
                     vec![1, 5, 4, 1],
                 ]),
-                accompaniment_pool: vec![A::Arpeggio, A::Block],
+                accompaniment_pool: vec![A::Arpeggio, A::Block, A::FolkPulse],
                 form_pool: vec![FormKind::Ternary, FormKind::Rondo],
                 ensemble_pool: s(&[
                     ["flute", "acoustic_guitar", "upright_bass"],
@@ -1302,7 +1302,7 @@ impl Style {
                     ],
                 ],
                 progression: ProgressionSpec::Archetype(vec![1, 7, 4, 1]),
-                accompaniment_pool: vec![A::Arpeggio, A::Block],
+                accompaniment_pool: vec![A::Arpeggio, A::Block, A::FolkPulse],
                 form_pool: vec![FormKind::Ternary, FormKind::Rondo],
                 ensemble_pool: s(&[["flute", "marimba", "upright_bass"]]),
                 counter_instrument: None,
@@ -3504,6 +3504,12 @@ mod tests {
             assert_eq!(Style::Waltz.accompaniment(seed), A::OomPah);
             assert_eq!(Style::Cinematic.accompaniment(seed), A::Block);
         }
+        // Folk's new picked pulse joins its two established textures without
+        // changing which style/seed selected either one before this addition.
+        assert_eq!(Style::Folk.accompaniment(0), A::Arpeggio);
+        assert_eq!(Style::Folk.accompaniment(2), A::Block);
+        assert_eq!(Style::Folk.accompaniment(4), A::FolkPulse);
+        assert_eq!(Style::ModalFolk.spec().accompaniment(4), A::FolkPulse);
         // March has an explicit four-beat pulse rather than a generic held block.
         assert_eq!(Style::March.accompaniment(0), A::MarchPulse);
         assert_eq!(Style::March.accompaniment(7), A::MarchPulse);

@@ -171,16 +171,17 @@ impl PerformanceDialect {
 /// 2. explicit Mazurka/Toccata accompaniment mechanisms → their provisional
 ///    style-specific dialects (before any generic groove-family matching)
 /// 3. `MarchPulse` → [`PerformanceDialect::MarchLocked`]
-/// 4. a rhythm-cell accompaniment (Habanera/Montuno/BossaComp/CompasGait/
+/// 4. `FolkPulse` → [`PerformanceDialect::FolkLift`]
+/// 5. a rhythm-cell accompaniment (Habanera/Montuno/BossaComp/CompasGait/
 ///    Shuffle), non-straight swing, or a full backbeat kit → groove: with a
 ///    jazz marker (Shuffle, swing ≠ 0.5, or `seventh_chords`) →
 ///    [`PerformanceDialect::JazzLaidBack`], else [`PerformanceDialect::DanceLocked`]
-/// 5. `roll_ornaments` or `drone` → [`PerformanceDialect::FolkLift`]
-/// 6. everything else → [`PerformanceDialect::ClassicalRubato`] (the identity)
+/// 6. `roll_ornaments` or `drone` → [`PerformanceDialect::FolkLift`]
+/// 7. everything else → [`PerformanceDialect::ClassicalRubato`] (the identity)
 ///
-/// Known remaining limits (documented, not hidden): plain Folk/ModalFolk read
-/// as ClassicalRubato (their specs carry none of the folk habit flags — only
-/// Celtic's drone and Irish's rolls are visible at the spec level).
+/// Remaining presets use ClassicalRubato as a neutral identity until a separate
+/// rhythmic/performance contract is justified; this baseline is not an assertion
+/// that those styles share historical performance practice.
 pub fn dialect_for_spec(spec: &symthaea_music_theory::CompositionSpec) -> PerformanceDialect {
     use symthaea_music_theory::Accompaniment as A;
     use symthaea_music_theory::DrumPolicy;
@@ -196,6 +197,9 @@ pub fn dialect_for_spec(spec: &symthaea_music_theory::CompositionSpec) -> Perfor
     }
     if spec.accompaniment_pool.contains(&A::MarchPulse) {
         return PerformanceDialect::MarchLocked;
+    }
+    if spec.accompaniment_pool.contains(&A::FolkPulse) {
+        return PerformanceDialect::FolkLift;
     }
     let has_shuffle = spec.accompaniment_pool.contains(&A::Shuffle);
     let has_groove_cell = has_shuffle
@@ -1819,15 +1823,14 @@ mod tests {
         let cases = [
             (Style::Classical, D::ClassicalRubato),
             (Style::Waltz, D::ClassicalRubato),
-            // v1 limit, documented on `dialect_for_spec`: plain Folk and
-            // ModalFolk carry none of the spec-visible folk habit flags.
-            (Style::Folk, D::ClassicalRubato),
+            // Folk's picked pulse is its explicit clock marker.
+            (Style::Folk, D::FolkLift),
             (Style::Cinematic, D::ClassicalRubato),
             (Style::Playful, D::DanceLocked), // full backbeat kit
             (Style::Nocturne, D::ClassicalRubato),
             (Style::March, D::MarchLocked),
             (Style::Lullaby, D::ClassicalRubato),
-            (Style::ModalFolk, D::ClassicalRubato),
+            (Style::ModalFolk, D::FolkLift), // shares the picked-pulse contract
             (Style::Fugue, D::ClassicalRubato),
             (Style::Passacaglia, D::ClassicalRubato),
             (Style::Tango, D::DanceLocked),  // Habanera rhythm cell
@@ -1908,6 +1911,8 @@ mod tests {
         };
 
         for (style, expected_dialect) in [
+            (Style::Folk, D::FolkLift),
+            (Style::ModalFolk, D::FolkLift),
             (Style::March, D::MarchLocked),
             (Style::Mazurka, D::MazurkaLilt),
             (Style::Toccata, D::ToccataMotor),
@@ -1989,9 +1994,17 @@ mod tests {
     fn style_dialect_hypotheses_are_non_identity_and_explicit() {
         use PerformanceDialect as D;
         let classical = D::ClassicalRubato;
+        let folk = D::FolkLift;
         let march = D::MarchLocked;
         let mazurka = D::MazurkaLilt;
         let toccata = D::ToccataMotor;
+
+        assert_eq!(folk.breath_scale(), 1.0);
+        assert_eq!(folk.climax_scale(), 1.0);
+        assert_eq!(folk.cadence_scale(), 0.6);
+        assert_eq!(folk.jitter_scale(), 1.2);
+        assert_eq!(folk.expressive_blend_scale(), 1.0);
+        assert!(folk.jitter_scale() > classical.jitter_scale());
 
         assert_eq!(march.breath_scale(), 0.12);
         assert_eq!(march.climax_scale(), 0.12);

@@ -103,6 +103,10 @@ pub enum Accompaniment {
     /// accompaniment"). Reusable habit: syncopated timing and continuous
     /// sustain aren't opposites — a groove can be both at once.
     BossaComp,
+    /// Folk pulse: one picked chord tone per quarter beat, moving low–high–
+    /// middle–high through the voiced chord. Stronger first/third beats and
+    /// a lighter second/fourth create a gently buoyant acoustic-song pulse.
+    FolkPulse,
     /// March pulse: four square quarter-note chord attacks in common time.
     /// Beats one and three are firm anchors; beats two and four are lighter,
     /// producing a repeatable duple pulse without relying on percussion.
@@ -434,6 +438,27 @@ impl Accompaniment {
                     }
                 }
             }
+            Accompaniment::FolkPulse => {
+                // A picked quarter-note pattern: low, high, middle, high.
+                // Beat one is firm, beat three lifts without overtaking it;
+                // the pattern remains chord-tone-only in every meter.
+                let quarter = Duration::quarter();
+                let figure = [0_usize, 2, 1, 2];
+                let accents = [1.0_f32, 0.68, 0.88, 0.68];
+                let steps = meter_beats.ceil() as usize;
+                for beat in 0..steps {
+                    if beat as f64 >= meter_beats - 1e-9 {
+                        continue;
+                    }
+                    push(
+                        score,
+                        ascending[figure[beat % figure.len()] % ascending.len()],
+                        bar_onset + quarter.scale(beat as i64, 1),
+                        quarter,
+                        velocity * accents[beat % accents.len()],
+                    );
+                }
+            }
             Accompaniment::MarchPulse => {
                 // Square four-to-the-bar pulse: strong beats one and three,
                 // with lighter beats two and four. The marker is also consumed
@@ -648,7 +673,7 @@ mod tests {
     }
 
     #[test]
-    fn core_patterns_and_sarabande_only_use_the_voiced_pitches() {
+    fn every_pattern_only_uses_the_voiced_pitches() {
         // The safety property: a pattern may re-time chord tones but can
         // NEVER introduce a pitch the voice leading didn't produce.
         let allowed: std::collections::BTreeSet<u8> = triad().iter().map(|p| p.midi()).collect();
@@ -658,6 +683,14 @@ mod tests {
             Accompaniment::Alberti,
             Accompaniment::OomPah,
             Accompaniment::Comp,
+            Accompaniment::Habanera,
+            Accompaniment::FiveGait,
+            Accompaniment::JigGait,
+            Accompaniment::Shuffle,
+            Accompaniment::Montuno,
+            Accompaniment::CompasGait,
+            Accompaniment::BossaComp,
+            Accompaniment::FolkPulse,
             Accompaniment::MarchPulse,
             Accompaniment::Sarabande,
             Accompaniment::Minuet,
@@ -677,13 +710,22 @@ mod tests {
     }
 
     #[test]
-    fn core_patterns_and_sarabande_stay_within_the_bar() {
+    fn every_pattern_stays_within_the_bar() {
         for pattern in [
             Accompaniment::Block,
             Accompaniment::Arpeggio,
             Accompaniment::Alberti,
             Accompaniment::OomPah,
             Accompaniment::Comp,
+            Accompaniment::Habanera,
+            Accompaniment::FiveGait,
+            Accompaniment::JigGait,
+            Accompaniment::Shuffle,
+            Accompaniment::Montuno,
+            Accompaniment::CompasGait,
+            Accompaniment::BossaComp,
+            Accompaniment::FolkPulse,
+            Accompaniment::MarchPulse,
             Accompaniment::Sarabande,
             Accompaniment::Minuet,
             Accompaniment::MazurkaGait,
@@ -695,6 +737,24 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn folk_pulse_picks_low_high_middle_high_on_quarter_beats() {
+        let notes = realize(Accompaniment::FolkPulse, 4.0);
+        assert_eq!(notes.len(), 4);
+        assert_eq!(
+            notes.iter().map(|note| note.onset.beats()).collect::<Vec<_>>(),
+            vec![0.0, 1.0, 2.0, 3.0]
+        );
+        assert_eq!(
+            notes.iter().map(|note| note.pitch.midi()).collect::<Vec<_>>(),
+            vec![60, 67, 64, 67]
+        );
+        assert!(notes[0].velocity > notes[1].velocity);
+        assert!(notes[2].velocity > notes[1].velocity);
+        assert_eq!(notes[1].velocity, notes[3].velocity);
+        assert!(notes.iter().all(|note| note.duration == Duration::quarter()));
     }
 
     #[test]

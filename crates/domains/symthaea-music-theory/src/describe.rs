@@ -723,6 +723,10 @@ fn accompaniment_sentence(pattern: crate::accompaniment::Accompaniment) -> Optio
             "The accompaniment keeps continuous sixteenth-note chord-tone motion, anchored \
              by stronger quarter-note pulse points."
         }
+        A::FolkPulse => {
+            "The accompaniment picks a low–high–middle–high chord-tone figure on quarter beats, \
+             with a gentle lift toward beat three."
+        }
         A::MarchPulse => {
             "The accompaniment keeps a square four-beat march pulse, with firm attacks on \
              beats one and three and lighter answers on beats two and four."
