@@ -325,7 +325,6 @@ fn main() -> ExitCode {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::from_slice;
 
     const HEADER: &str = "fixed acidity;volatile acidity;citric acid;residual sugar;chlorides;free sulfur dioxide;total sulfur dioxide;density;pH;sulphates;alcohol;quality";
     const ROW_1: &str = "7.4;0.7;0.0;1.9;0.076;11;34;0.9978;3.51;0.56;9.4;5";
@@ -363,7 +362,7 @@ mod tests {
 
     #[test]
     fn wrong_header_or_delimiter_fails_closed() {
-        let bytes = format!("{HEADER}\n{ROW_1}\n").replace(';', ',');
+        let bytes = format!("{HEADER}\n{ROW_1}\n").replace(';', ",");
         let receipt = audit_csv(bytes.as_bytes(), "red", "wrong-delimiter.csv");
         assert_eq!(receipt.status, "FAIL");
         assert!(!receipt.header_valid);
