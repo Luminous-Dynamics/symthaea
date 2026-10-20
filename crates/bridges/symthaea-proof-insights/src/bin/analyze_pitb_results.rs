@@ -34,7 +34,7 @@ const ARMS: [&str; 9] = ["A", "B", "C", "D", "E", "F", "G", "H", "I"];
 const BASELINE_SELECTION_ARMS: [&str; 6] = ["A", "B", "C", "D", "E", "I"];
 const TREATMENT_ARM: &str = "F";
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct RunConfig {
     schema_version: String,
@@ -49,7 +49,8 @@ struct RunConfig {
     model_version: String,
     checker_version: String,
     budget: Budget,
-}
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+RunConfig check no-op
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -268,13 +269,13 @@ struct PrimaryComparison {
     gate_decision: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 struct FamilyTargetCount {
     family_id: String,
     eligible_target_count: usize,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 struct PowerScenario {
     status: String,
     true_treatment_effect_percentage_points: f64,
@@ -291,12 +292,12 @@ struct PowerScenario {
     interpretation: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 struct PowerReport {
-    schema_version: &'static str,
+    schema_version: String,
     protocol_id: String,
     protocol_sha256: String,
-    run_config_sha256: String,
+    run_design_sha256: String,
     validation_results_sha256: String,
     baseline_selection_receipt_sha256: String,
     split_manifest_sha256: String,
