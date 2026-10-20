@@ -817,7 +817,7 @@ fn validate_temporal_manifest(manifest: &TemporalReplayManifest) -> Result<()> {
                 .get(artifact.artifact_id.as_str())
                 .with_context(|| format!("proof artifact {} is not assigned to a registered timeline event", artifact.artifact_id))?;
             if event.position != artifact.available_at_position
-                || event.theorem_id != artifact.theorem_id.as_deref().unwrap_or_default()
+                || event.theorem_id.as_str() != artifact.theorem_id.as_deref().unwrap_or_default()
             {
                 bail!("proof artifact {} is inconsistent with its timeline event", artifact.artifact_id);
             }
@@ -1499,7 +1499,7 @@ mod tests {
             available_at_position: 0,
             theorem_id: None,
         });
-        manifest.events[0]
+        manifest.events[1]
             .visible_artifact_ids
             .push("renamed-copy".to_string());
         let error = validate_temporal_manifest(&manifest)
