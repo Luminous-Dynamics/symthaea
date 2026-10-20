@@ -1,8 +1,8 @@
 # PSAFE: Psychoactive Safety and Evidence Benchmark
 
-**Status:** research protocol proposal v0.1 — design specification only; no benchmark result is claimed  
+**Status:** research protocol plus unverified Rust prototype modules; no benchmark result is claimed  
 **Owner:** Symthaea research  
-**Target home:** `crates/domains/symthaea-psych-bench` integration after review  
+**Prototype location:** `crates/domains/symthaea-psych-bench` (review and tests pending)  
 **Date:** 2026-10-20
 
 ## Executive thesis
