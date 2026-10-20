@@ -383,7 +383,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python - <<'PY'
+          "$RUNNER_TEMP/jsonschema-venv/bin/python" - <<'PY'
           import copy
           import json
           from pathlib import Path
@@ -641,7 +641,7 @@ jobs:
           cd "$(dirname "$PITB_MANIFEST")"
           cargo run --release --locked --bin symthaea-proof-insights -- \
             --audit-temporal-timeline "$dalek" proof_timeline.csv "$audit"
-          python - "$audit" "$dalek" "$GITHUB_WORKSPACE" <<'PY'
+          "$RUNNER_TEMP/jsonschema-venv/bin/python" - "$audit" "$dalek" "$GITHUB_WORKSPACE" <<'PY'
           import hashlib
           import json
           import sys
