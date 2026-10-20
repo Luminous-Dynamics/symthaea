@@ -168,17 +168,9 @@ pub fn compare_published_rankings(
     }
 
     let mut predicted_order: Vec<&RankedEnergy> = predicted.iter().collect();
-    predicted_order.sort_by(|a, b| {
-        a.energy
-            .total_cmp(&b.energy)
-            .then_with(|| a.structure_id.cmp(&b.structure_id))
-    });
+    predicted_order.sort_by(|a, b| compare_energy_order(a, b));
     let mut reference_order: Vec<&RankedEnergy> = reference.iter().collect();
-    reference_order.sort_by(|a, b| {
-        a.energy
-            .total_cmp(&b.energy)
-            .then_with(|| a.structure_id.cmp(&b.structure_id))
-    });
+    reference_order.sort_by(|a, b| compare_energy_order(a, b));
 
     let extrapolated_rbo =
         compute_extrapolated_rbo(&predicted_order, &reference_order, persistence);
@@ -198,6 +190,14 @@ pub fn compare_published_rankings(
     };
     metrics.validate()?;
     Ok(metrics)
+}
+
+fn compare_energy_order(left: &RankedEnergy, right: &RankedEnergy) -> std::cmp::Ordering {
+    if left.energy == right.energy {
+        left.structure_id.cmp(&right.structure_id)
+    } else {
+        left.energy.total_cmp(&right.energy)
+    }
 }
 
 fn validate_side(items: &[RankedEnergy], side: &'static str) -> Result<(), PublishedRankingError> {
@@ -359,6 +359,22 @@ mod tests {
         let metrics = compare_published_rankings(&predicted, &reference, 0.5, 0.0).unwrap();
         assert!((metrics.extrapolated_rbo - 0.375).abs() < 1e-12);
         assert!((metrics.kendall_tau_b - (-1.0)).abs() < 1e-12);
+    }
+
+    #[test]
+    fn rbo_tie_break_is_canonical_even_for_signed_zero() {
+        let predicted = energies(&[("b", 0.0), ("a", -0.0), ("c", 1.0)]);
+        let reference = energies(&[("a", 0.0), ("b", -0.0), ("c", 1.0)]);
+        let first = compare_published_rankings(&predicted, &reference, 0.94, 0.0).unwrap();
+        let second = compare_published_rankings(
+            &predicted.iter().cloned().rev().collect::<Vec<_>>(),
+            &reference.iter().cloned().rev().collect::<Vec<_>>(),
+            0.94,
+            0.0,
+        )
+        .unwrap();
+        assert!((first.extrapolated_rbo - 1.0).abs() < 1e-12);
+        assert_eq!(first, second);
     }
 
     #[test]
