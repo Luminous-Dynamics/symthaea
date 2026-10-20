@@ -1175,28 +1175,22 @@ mod tests {
 
     #[test]
     fn metric_unit_mismatch_never_becomes_comparable() {
-        let (mut request, mut payloads) = request_with_two_schematic_alternatives();
-        let alt_ids: Vec<String> = request.alternatives.iter().map(|alt| alt.alternative_id.clone()).collect();
+        let (mut request, payloads) = request_with_two_schematic_alternatives();
         for (index, alt) in request.alternatives.iter_mut().enumerate() {
             let metric = MetricEvidence {
                 metric_id: "heat.shade_fraction".to_string(),
                 unit: if index == 0 { "percent".to_string() } else { "ratio".to_string() },
                 state: MetricState::Available,
-                evidence_class: EvidenceClass::Observed,
+                evidence_class: EvidenceClass::Assumed,
                 method_uri: Some("https://example.invalid/method/shade-v1".to_string()),
                 uncertainty_summary: "Synthetic test record; not an actual observation.".to_string(),
                 supporting_artifact_sha256s: vec![alt.project_snapshot.sha256.clone()],
             };
             alt.metrics.push(metric);
-            // Observed evidence cannot be sourced from a project snapshot.
-            // Re-labeling it synthetic remains non-comparable for physical claims.
-            alt.metrics[0].evidence_class = EvidenceClass::Synthetic;
         }
         let report = validate_and_review(&request, &payloads).unwrap();
         let cmp = report.metric_comparability.iter().find(|item| item.metric_id == "heat.shade_fraction").unwrap();
         assert_eq!(cmp.state, ComparabilityState::UnitMismatch);
         assert!(!report.automated_ranking_allowed);
-        let _ = &mut payloads;
-        let _ = alt_ids;
     }
 }
