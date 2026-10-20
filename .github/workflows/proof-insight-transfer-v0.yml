@@ -420,6 +420,7 @@ jobs:
                       "proof_completion_commit": commit("2"),
                       "statement_sha256": sha("a"),
                       "statement_artifact_id": "statement-000",
+                      "completion_statement_artifact_id": "completion-statement-000",
                       "proof_artifact_id": "proof-000",
                       "visible_artifact_ids": ["statement-000"]
                   },
@@ -431,6 +432,7 @@ jobs:
                       "proof_completion_commit": commit("3"),
                       "statement_sha256": sha("c"),
                       "statement_artifact_id": "statement-001",
+                      "completion_statement_artifact_id": "completion-statement-001",
                       "proof_artifact_id": "proof-001",
                       "visible_artifact_ids": ["statement-000", "proof-000", "statement-001"]
                   }
@@ -463,6 +465,19 @@ jobs:
                       "theorem_id": "Example.first"
                   },
                   {
+                      "artifact_id": "completion-statement-000",
+                      "path": "lean/Example.lean",
+                      "artifact_kind": "completion_statement",
+                      "content_sha256": sha("a"),
+                      "content_start_line": 1,
+                      "content_end_line": 1,
+                      "source_file_sha256": sha("f"),
+                      "source_commit": commit("2"),
+                      "available_at_position": None,
+                      "target_position": 0,
+                      "theorem_id": "Example.first"
+                  },
+                  {
                       "artifact_id": "statement-001",
                       "path": "lean/Example.lean",
                       "artifact_kind": "theorem_statement",
@@ -473,6 +488,19 @@ jobs:
                       "source_commit": commit("2"),
                       "available_at_position": 1,
                       "target_position": None,
+                      "theorem_id": "Example.second"
+                  },
+                  {
+                      "artifact_id": "completion-statement-001",
+                      "path": "lean/Example.lean",
+                      "artifact_kind": "completion_statement",
+                      "content_sha256": sha("c"),
+                      "content_start_line": 3,
+                      "content_end_line": 3,
+                      "source_file_sha256": sha("8"),
+                      "source_commit": commit("3"),
+                      "available_at_position": None,
+                      "target_position": 1,
                       "theorem_id": "Example.second"
                   },
                   {
