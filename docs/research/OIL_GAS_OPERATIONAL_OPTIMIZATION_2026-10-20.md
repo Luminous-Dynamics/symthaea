@@ -60,7 +60,7 @@ The new stdlib-only Rust crate, symthaea-industrial-optimization, provides two e
 1. greedy_expected_per_dollar: an interpretable expected-value-per-capex baseline.
 2. optimize_robust_portfolio: exhaustive search for small frozen cases, maximizing the sum of lower scenario estimates under the same budget.
 
-Both reject malformed scenario ordering, require positive capex for the ratio baseline, exclude candidates marked ineligible for planning, enforce one intervention per declared source group, and use deterministic output ordering. Embedded example values are invented mechanics fixtures, not field data or industry averages.
+Both reject malformed scenario ordering and require positive capex (so the ratio baseline remains defined), exclude candidates marked ineligible for planning, enforce one intervention per declared source group, and use deterministic output ordering. Embedded example values are invented mechanics fixtures, not field data or industry averages.
 
 The exact solver is intentionally capped at 20 candidate interventions (at most 1,048,576 subsets). It does not infer emissions, establish that an intervention is safe, or model interactions between different source groups.
 
