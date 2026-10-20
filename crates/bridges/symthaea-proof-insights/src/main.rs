@@ -2096,6 +2096,20 @@ mod tests {
     }
 
     #[test]
+    fn temporal_manifest_rejects_statement_drift_at_proof_completion() {
+        let mut manifest = temporal_manifest_fixture();
+        let completion_statement = manifest
+            .artifacts
+            .iter_mut()
+            .find(|artifact| artifact.artifact_id == "completion-statement-001")
+            .expect("completion-time statement exists");
+        completion_statement.content_sha256 = "9".repeat(64);
+        let error = validate_temporal_manifest(&manifest)
+            .expect_err("the proof completion statement must preserve the original target proposition");
+        assert!(format!("{error:#}").contains("theorem statement changed between target state and proof completion"));
+    }
+
+    #[test]
     fn temporal_manifest_rejects_hidden_proof_associated_with_wrong_target() {
         let mut manifest = temporal_manifest_fixture();
         let proof = manifest
