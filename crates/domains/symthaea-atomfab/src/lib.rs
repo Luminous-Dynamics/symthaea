@@ -194,9 +194,10 @@ impl fmt::Display for BenchmarkError {
                     "{ranking} ranking repeats an identifier at index {index}"
                 )
             }
-            Self::NoSharedRankingCandidates => {
-                write!(f, "ranking agreement is undefined because no candidate IDs are shared")
-            }
+            Self::NoSharedRankingCandidates => write!(
+                f,
+                "ranking agreement is undefined because no candidate IDs are shared"
+            ),
             Self::NoComparablePairs => write!(f, "no non-tied reference pairs are available"),
             Self::ZeroReferenceStructures => {
                 write!(f, "reference structure count must be greater than zero")
@@ -807,8 +808,7 @@ mod tests {
         assert!((summary.points[1].mean_absolute_error - 1.5).abs() < 1e-12);
         assert_eq!(summary.points[2].accepted_count, 3);
         assert!((summary.points[2].mean_absolute_error - (13.0 / 3.0)).abs() < 1e-12);
-        let expected_area =
-            (1.0 / 3.0) * 1.0 + (1.0 / 3.0) * 1.5 + (1.0 / 3.0) * (13.0 / 3.0);
+        let expected_area = (1.0 / 3.0) * 1.0 + (1.0 / 3.0) * 1.5 + (1.0 / 3.0) * (13.0 / 3.0);
         assert!((summary.area_under_curve - expected_area).abs() < 1e-12);
     }
 
@@ -830,8 +830,8 @@ mod tests {
             uncertainty: 0.8,
         };
         let first = summarize_risk_coverage(&[a, b, c]).expect("valid samples");
-        let second = summarize_risk_coverage(&[c, b, a])
-            .expect("permutation should not change result");
+        let second =
+            summarize_risk_coverage(&[c, b, a]).expect("permutation should not change result");
         assert_eq!(first, second);
         assert_eq!(first.points.len(), 2);
         assert_eq!(first.points[0].accepted_count, 2);
