@@ -8711,3 +8711,94 @@ mod tests {
         assert!(compose_sonata_with_plan(&intent, &spec).is_none());
     }
 }
+
+#[cfg(test)]
+mod dedicated_form_energy_response_tests {
+    use super::*;
+    use crate::style::Style;
+
+    const DEDICATED_FORMS: [Style; 8] = [
+        Style::Fugue,
+        Style::ProgFolk,
+        Style::Sonata,
+        Style::Opera,
+        Style::Passacaglia,
+        Style::Erosion,
+        Style::Lineage,
+        Style::RenaissancePolyphony,
+    ];
+
+    fn intent_with_energy(energy: f32) -> MusicalIntent {
+        MusicalIntent {
+            energy,
+            bars: 16,
+            seed: 771_903,
+            ..MusicalIntent::default()
+        }
+    }
+
+    fn mean_velocity(score: &Score) -> f64 {
+        assert!(!score.notes.is_empty(), "a dedicated form must produce notes");
+        score.notes.iter().map(|note| note.velocity as f64).sum::<f64>()
+            / score.notes.len() as f64
+    }
+
+    #[test]
+    fn neutral_energy_envelope_is_bit_identical_at_default() {
+        let intent = intent_with_energy(0.6);
+        for style in DEDICATED_FORMS {
+            let before = compose_styled(&intent, style);
+            let mut after = before.clone();
+            apply_dedicated_energy_envelope(&mut after, intent.energy);
+            assert_eq!(
+                before, after,
+                "{style:?}: energy 0.6 must preserve legacy notes exactly"
+            );
+        }
+    }
+
+    #[test]
+    fn dedicated_form_energy_changes_velocity_not_musical_structure() {
+        let low_intent = intent_with_energy(0.2);
+        let high_intent = intent_with_energy(0.9);
+        for style in DEDICATED_FORMS {
+            let low = compose_styled(&low_intent, style);
+            let high = compose_styled(&high_intent, style);
+            assert_eq!(
+                low.notes.len(),
+                high.notes.len(),
+                "{style:?}: energy must not change form length or note count"
+            );
+            assert!(
+                mean_velocity(&high) > mean_velocity(&low),
+                "{style:?}: higher energy must raise the score's mean velocity"
+            );
+            for (low_note, high_note) in low.notes.iter().zip(&high.notes) {
+                assert_eq!(low_note.part, high_note.part, "{style:?}: part identity");
+                assert_eq!(low_note.pitch, high_note.pitch, "{style:?}: pitch");
+                assert_eq!(low_note.onset, high_note.onset, "{style:?}: onset");
+                assert_eq!(low_note.duration, high_note.duration, "{style:?}: duration");
+                assert_eq!(low_note.role, high_note.role, "{style:?}: voice role");
+                assert_eq!(low_note.emphasis, high_note.emphasis, "{style:?}: emphasis");
+                assert_eq!(
+                    low_note.section_intensity,
+                    high_note.section_intensity,
+                    "{style:?}: structural dynamics"
+                );
+                assert!(
+                    high_note.velocity + 1e-6 >= low_note.velocity,
+                    "{style:?}: raising energy must not lower an individual note"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn non_finite_energy_falls_back_to_the_neutral_setting() {
+        let intent = intent_with_energy(0.6);
+        let original = compose_styled(&intent, Style::Fugue);
+        let mut score = original.clone();
+        apply_dedicated_energy_envelope(&mut score, f32::NAN);
+        assert_eq!(score, original);
+    }
+}
