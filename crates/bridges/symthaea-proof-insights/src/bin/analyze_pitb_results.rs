@@ -2239,8 +2239,8 @@ mod tests {
         let mut config = test_config();
         let base_digest = run_design_sha256(&config).expect("base run design should serialize");
         config.power_report_sha256 = Some("f".repeat(64));
-        let final_digest =
-            run_design_sha256(&config).expect("adding receipt hash must not change the design digest");
+        let final_digest = run_design_sha256(&config)
+            .expect("adding receipt hash must not change the design digest");
         assert_eq!(base_digest, final_digest);
     }
 
