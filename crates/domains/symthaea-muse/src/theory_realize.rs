@@ -232,13 +232,13 @@ impl PerformanceDialect {
 /// 6. `Sarabande` / `Minuet` → their own measured triple-dance profiles
 /// 7. `OomPah` → [`PerformanceDialect::WaltzLilt`]
 /// 8. `JigGait` → [`PerformanceDialect::JigDrive`] before the drone fallback
-/// 9. `PhraseRhetoric::Singing` → [`PerformanceDialect::NocturneBreath`]
-///    after stronger mechanism markers (e.g. Sarabande / jazz groove)
-/// 10. a rhythm-cell accompaniment (Habanera/Montuno/BossaComp/CompasGait/
+/// 9. a rhythm-cell accompaniment (Habanera/Montuno/BossaComp/CompasGait/
 ///    Shuffle), non-straight swing, or a full backbeat kit → groove: with a
 ///    jazz marker (Shuffle, swing ≠ 0.5, or `seventh_chords`) →
 ///    [`PerformanceDialect::JazzLaidBack`], else [`PerformanceDialect::DanceLocked`]
-/// 11. `roll_ornaments` or `drone` → [`PerformanceDialect::FolkLift`]
+/// 10. `roll_ornaments` or `drone` → [`PerformanceDialect::FolkLift`]
+/// 11. `PhraseRhetoric::Singing` → [`PerformanceDialect::NocturneBreath`]
+///     (after stronger rhythm/process/folk markers)
 /// 12. everything else → [`PerformanceDialect::ClassicalRubato`] (the identity)
 ///
 /// Remaining presets use ClassicalRubato as a neutral identity until a separate
