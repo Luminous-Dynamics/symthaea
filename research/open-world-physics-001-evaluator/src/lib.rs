@@ -545,7 +545,7 @@ fn median(values: &mut [f64]) -> Option<f64> {
     }
     values.sort_by(f64::total_cmp);
     let middle = values.len() / 2;
-    Some(if values.len() % 2 == 0 {
+    Some(if values.len().is_multiple_of(2) {
         (values[middle - 1] + values[middle]) / 2.0
     } else {
         values[middle]
@@ -737,8 +737,7 @@ mod tests {
             let points = query_points(QueryPolicy::FixedGrid, world.seed);
             let observations = points
                 .into_iter()
-                .enumerate()
-                .map(|(i, x)| Observation {
+                .map(|x| Observation {
                     x,
                     response: world.truth.predict(x).unwrap(),
                     declared_sigma: RELATIVE_NOISE
