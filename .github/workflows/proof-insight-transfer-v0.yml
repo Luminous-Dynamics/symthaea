@@ -404,6 +404,7 @@ jobs:
               "schema_version": "pitb.temporal-replay-manifest.v0",
               "repository_url": "https://example.invalid/temporal-fixture",
               "repository_commit": commit("5"),
+              "timeline_path": "proof_timeline.csv",
               "timeline_sha256": sha("9"),
               "lean_toolchain": "leanprover/lean4:v4.34.1",
               "mathlib_revision": commit("6"),
