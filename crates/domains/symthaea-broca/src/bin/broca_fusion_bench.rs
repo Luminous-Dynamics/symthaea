@@ -236,8 +236,6 @@ fn main() {
 
     let genesis = GenesisSeed::from_phrase("broca-fusion-bench-v3");
     let tok = BpeTokenizer::default_minimal();
-    let dataset = make_dataset(&tok);
-
     let (training_dataset, evaluation_dataset) = make_datasets(&tok);
     if epochs == 0 {
         eprintln!(
@@ -277,12 +275,12 @@ fn main() {
         for run in &sweep {
             eprint!("  {} ... ", run.name);
             let r = run_eval(
-            &genesis,
-            run,
-            &training_dataset,
-            &evaluation_dataset,
-            epochs,
-        );
+                &genesis,
+                run,
+                &training_dataset,
+                &evaluation_dataset,
+                epochs,
+            );
             eprintln!(
                 "ppl={:.1} eng={:.3} coh={:.4}",
                 r.perplexity, r.english_word_ratio, r.avg_coherence
