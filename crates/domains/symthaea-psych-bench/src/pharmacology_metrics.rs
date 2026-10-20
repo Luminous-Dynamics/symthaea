@@ -286,8 +286,10 @@ struct CalibrationBin {
 fn ranking_metrics(predictions: &[(f64, bool)]) -> (Option<f64>, Option<f64>) {
     let positives = predictions.iter().filter(|item| item.1).count();
     let negatives = predictions.len() - positives;
+    // Both ranking metrics are non-informative when only one class is
+    // represented. Keep them undefined rather than reporting a misleading AP=1.
     if positives == 0 || negatives == 0 {
-        return (None, if positives == 0 { None } else { Some(1.0) });
+        return (None, None);
     }
 
     // AUROC via average ranks: ties receive their shared midrank.
@@ -448,6 +450,7 @@ mod tests {
         let cases = vec![case("p1", true, 0.9), case("p2", true, 0.4)];
         let report = evaluate_binary_safety(&config(), &cases).expect("evaluation");
         assert_eq!(report.auroc, None);
+        assert_eq!(report.average_precision, None);
         assert_eq!(report.specificity, None);
     }
 
@@ -462,6 +465,13 @@ mod tests {
         assert!(errors.iter().any(|e| e.contains("input_data_manifest_digest")));
         assert!(errors.iter().any(|e| e.contains("duplicate case_id")));
         assert!(errors.iter().any(|e| e.contains("hazard_probability")));
+
+        let mut excessive_bins = config();
+        excessive_bins.calibration_bins = 1_001;
+        assert!(evaluate_binary_safety(&excessive_bins, &[case("ok", true, 0.9)])
+            .expect_err("excessive bin count must fail")
+            .iter()
+            .any(|e| e.contains("calibration_bins")));
     }
 
     #[test]
