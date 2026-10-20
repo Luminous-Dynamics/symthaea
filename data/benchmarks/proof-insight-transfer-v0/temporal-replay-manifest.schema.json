@@ -14,7 +14,10 @@
     "lean_toolchain",
     "mathlib_revision",
     "events",
-    "artifacts"
+    "artifacts",
+    "lean_toolchain_path",
+    "mathlib_manifest_path",
+    "mathlib_manifest_sha256"
   ],
   "properties": {
     "schema_version": {
@@ -58,6 +61,19 @@
       "type": "string",
       "minLength": 1,
       "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.?(/|$)).+$"
+    },
+    "lean_toolchain_path": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.?(/|$)).+$"
+    },
+    "mathlib_manifest_path": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.?(/|$)).+$"
+    },
+    "mathlib_manifest_sha256": {
+      "$ref": "#/$defs/sha256"
     }
   },
   "$defs": {
