@@ -32,6 +32,132 @@ jobs:
         run: cargo test --locked --manifest-path Cargo.toml -p symthaea-proof-insights
       - name: Run strict Clippy
         run: cargo clippy --locked --manifest-path Cargo.toml -p symthaea-proof-insights --all-targets -- -D warnings
+      - name: Install independent Draft 2020-12 validator
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install pinned schema-validation dependency
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m venv "$RUNNER_TEMP/jsonschema-venv"
+          "$RUNNER_TEMP/jsonschema-venv/bin/pip" install --disable-pip-version-check --no-input "jsonschema==4.26.0"
+      - name: Validate insight schema and synthetic positive/negative controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/jsonschema-venv/bin/python" - <<'PY'
+          import copy
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator, FormatChecker, ValidationError
+
+          path = Path("data/benchmarks/proof-insight-transfer-v0/insight-record.schema.json")
+          schema = json.loads(path.read_text())
+          Draft202012Validator.check_schema(schema)
+          validator = Draft202012Validator(schema, format_checker=FormatChecker())
+
+          # Deliberately synthetic schema probe: not a benchmark dataset row and
+          # not evidence that any manuscript theorem has been formalized.
+          digest = "0" * 64
+          record = {
+              "schema_version": "pitb.insight-record.v0",
+              "record_id": "synthetic-schema-probe-v0",
+              "source": {
+                  "repository_url": "https://example.invalid/synthetic-source",
+                  "commit": "a" * 40,
+                  "path": "synthetic/fixture.txt",
+                  "sha256": digest,
+                  "family_id": "synthetic-family",
+                  "license_status": "unknown"
+              },
+              "theorem": {
+                  "theorem_id": "synthetic-claim-not-a-theorem",
+                  "statement_digest": digest,
+                  "domain": ["synthetic-only"],
+                  "claim_status": "unknown"
+              },
+              "artifact": {
+                  "kind": "other",
+                  "path": "synthetic/fixture.txt",
+                  "sha256": digest
+              },
+              "insight": {
+                  "move_id": "synthetic-move",
+                  "obstacle": "Schema exercise only",
+                  "strategy": "No mathematical strategy is asserted",
+                  "preconditions": [],
+                  "transformation": {
+                      "before_state": "Unspecified",
+                      "after_state": "Unspecified"
+                  },
+                  "evidence": [{
+                      "source_path": "synthetic/fixture.txt",
+                      "locator": "synthetic fixture",
+                      "evidence_kind": "reviewer_annotation"
+                  }],
+                  "failure_boundaries": ["Synthetic-only; no transfer claim"],
+                  "transfer_candidates": []
+              },
+              "verification": {
+                  "status": "not_attempted",
+                  "exact_statement_checked": False,
+                  "axiom_policy": "unknown"
+              },
+              "semantic_validation": {
+                  "status": "not_attempted",
+                  "statement_correspondence": {
+                      "status": "not_reviewed",
+                      "independent_reviewer_count": 0
+                  },
+                  "successor_tests": [],
+                  "mutation_controls": []
+              },
+              "constructive_transfer": {
+                  "status": "not_attempted",
+                  "unknowns": [],
+                  "candidate_witness": {
+                      "status": "absent",
+                      "representation": None
+                  },
+                  "proof_obligations": [],
+                  "answer_equivalence": {
+                      "method": "none",
+                      "status": "not_attempted"
+                  }
+              },
+              "review": {
+                  "status": "unreviewed",
+                  "independent_review_count": 0
+              }
+          }
+          validator.validate(record)
+
+          mutants = []
+          extra_property = copy.deepcopy(record)
+          extra_property["unspecified_authority"] = True
+          mutants.append(extra_property)
+
+          bad_commit = copy.deepcopy(record)
+          bad_commit["source"]["commit"] = "main"
+          mutants.append(bad_commit)
+
+          bad_uri = copy.deepcopy(record)
+          bad_uri["source"]["repository_url"] = "not a URI"
+          mutants.append(bad_uri)
+
+          bad_status = copy.deepcopy(record)
+          bad_status["verification"]["status"] = "verified-by-assertion"
+          mutants.append(bad_status)
+
+          for index, mutant in enumerate(mutants, start=1):
+              try:
+                  validator.validate(mutant)
+              except ValidationError:
+                  continue
+              raise SystemExit(f"schema negative control {index} unexpectedly passed")
+          print("PITB Draft 2020-12 schema: PASS; synthetic positive control: PASS; four negative controls: rejected")
+          PY
       - name: Index pinned OpenAI math snapshot twice
         shell: bash
         run: |
