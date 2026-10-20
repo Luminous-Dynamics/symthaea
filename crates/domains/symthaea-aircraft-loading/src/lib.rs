@@ -249,7 +249,10 @@ impl fmt::Display for AuditInputError {
         match self {
             Self::InvalidProfile(reason) => write!(f, "invalid aircraft profile: {reason}"),
             Self::ProfileIdentityMismatch => {
-                write!(f, "scenario aircraft identity/revision does not match profile")
+                write!(
+                    f,
+                    "scenario aircraft identity/revision does not match profile"
+                )
             }
             Self::DuplicateStationId(id) => write!(f, "duplicate loading station id: {id}"),
             Self::DuplicateItemId(id) => write!(f, "duplicate loaded item id: {id}"),
@@ -322,9 +325,7 @@ pub fn audit_loading(
 
     for item in &scenario.items {
         if item.item_id.trim().is_empty() || !item.mass_kg.is_finite() || item.mass_kg <= 0.0 {
-            return Err(AuditInputError::InvalidLoadedItem(
-                item.item_id.clone(),
-            ));
+            return Err(AuditInputError::InvalidLoadedItem(item.item_id.clone()));
         }
         if !item_ids.insert(item.item_id.clone()) {
             return Err(AuditInputError::DuplicateItemId(item.item_id.clone()));
@@ -345,12 +346,13 @@ pub fn audit_loading(
         total_mass_kg = checked_add(total_mass_kg, item.mass_kg)?;
         total_moment_kg_m = checked_add(total_moment_kg_m, item_moment)?;
 
-        let current_station_mass = station_mass
-            .get(&item.station_id)
-            .copied()
-            .ok_or(AuditInputError::InvalidProfile(
-                "station mass accumulator is missing",
-            ))?;
+        let current_station_mass =
+            station_mass
+                .get(&item.station_id)
+                .copied()
+                .ok_or(AuditInputError::InvalidProfile(
+                    "station mass accumulator is missing",
+                ))?;
         station_mass.insert(
             item.station_id.clone(),
             checked_add(current_station_mass, item.mass_kg)?,
@@ -456,8 +458,11 @@ pub fn audit_loading(
     }
 
     findings.sort_by(|a, b| {
-        (a.severity, a.code, a.subject_id.as_deref())
-            .cmp(&(b.severity, b.code, b.subject_id.as_deref()))
+        (a.severity, a.code, a.subject_id.as_deref()).cmp(&(
+            b.severity,
+            b.code,
+            b.subject_id.as_deref(),
+        ))
     });
 
     let disposition = if findings
@@ -508,13 +513,17 @@ fn validate_profile(profile: &AircraftProfile) -> Result<(), AuditInputError> {
         return Err(AuditInputError::InvalidProfile("aircraft id is empty"));
     }
     if profile.configuration_revision.trim().is_empty() {
-        return Err(AuditInputError::InvalidProfile("configuration revision is empty"));
+        return Err(AuditInputError::InvalidProfile(
+            "configuration revision is empty",
+        ));
     }
     if profile.source_reference.trim().is_empty() {
         return Err(AuditInputError::InvalidProfile("source reference is empty"));
     }
     if profile.approval_reference.trim().is_empty() {
-        return Err(AuditInputError::InvalidProfile("approval reference is empty"));
+        return Err(AuditInputError::InvalidProfile(
+            "approval reference is empty",
+        ));
     }
     if !is_sha256_hex(&profile.source_sha256) {
         return Err(AuditInputError::InvalidProfile(
@@ -531,9 +540,7 @@ fn validate_profile(profile: &AircraftProfile) -> Result<(), AuditInputError> {
             "empty moment must be finite",
         ));
     }
-    if !profile.maximum_takeoff_mass_kg.is_finite()
-        || profile.maximum_takeoff_mass_kg <= 0.0
-    {
+    if !profile.maximum_takeoff_mass_kg.is_finite() || profile.maximum_takeoff_mass_kg <= 0.0 {
         return Err(AuditInputError::InvalidProfile(
             "maximum take-off mass must be positive and finite",
         ));
@@ -565,9 +572,7 @@ fn validate_profile(profile: &AircraftProfile) -> Result<(), AuditInputError> {
                 "station arm must be finite",
             ));
         }
-        if !station.maximum_station_load_kg.is_finite()
-            || station.maximum_station_load_kg <= 0.0
-        {
+        if !station.maximum_station_load_kg.is_finite() || station.maximum_station_load_kg <= 0.0 {
             return Err(AuditInputError::InvalidProfile(
                 "station limit must be positive and finite",
             ));
@@ -693,10 +698,12 @@ mod tests {
         let report = audit_loading(&aircraft, &scenario(vec![cargo("box-1", "FWD", 300.0)]))
             .expect("valid scenario should produce a report");
         assert_eq!(report.disposition, AuditDisposition::BlockedByDeclaredLimit);
-        assert!(report
-            .findings
-            .iter()
-            .any(|finding| finding.code == FindingCode::MaximumTakeoffMassExceeded));
+        assert!(
+            report
+                .findings
+                .iter()
+                .any(|finding| finding.code == FindingCode::MaximumTakeoffMassExceeded)
+        );
     }
 
     #[test]
@@ -704,10 +711,12 @@ mod tests {
         let aircraft = profile();
         let report = audit_loading(&aircraft, &scenario(vec![cargo("box-1", "AFT", 700.0)]))
             .expect("valid scenario should produce a report");
-        assert!(report
-            .findings
-            .iter()
-            .any(|finding| finding.code == FindingCode::StationLoadExceeded));
+        assert!(
+            report
+                .findings
+                .iter()
+                .any(|finding| finding.code == FindingCode::StationLoadExceeded)
+        );
         assert_eq!(report.disposition, AuditDisposition::BlockedByDeclaredLimit);
     }
 
@@ -717,9 +726,12 @@ mod tests {
         aircraft.stations[1].arm_m = 8.0;
         let report = audit_loading(&aircraft, &scenario(vec![cargo("box-1", "AFT", 500.0)]))
             .expect("valid scenario should produce a report");
-        assert!(report.findings.iter().any(|finding| {
-            finding.code == FindingCode::CenterOfGravityOutsideEnvelope
-        }));
+        assert!(
+            report
+                .findings
+                .iter()
+                .any(|finding| { finding.code == FindingCode::CenterOfGravityOutsideEnvelope })
+        );
         assert_eq!(report.disposition, AuditDisposition::BlockedByDeclaredLimit);
     }
 
@@ -743,9 +755,12 @@ mod tests {
         let report = audit_loading(&aircraft, &scenario(vec![cargo("box-1", "FWD", 300.0)]))
             .expect("unknown envelope is a report-level result");
         assert_eq!(report.disposition, AuditDisposition::NotAssessable);
-        assert!(report.findings.iter().any(|finding| {
-            finding.code == FindingCode::CenterOfGravityEnvelopeMissing
-        }));
+        assert!(
+            report
+                .findings
+                .iter()
+                .any(|finding| { finding.code == FindingCode::CenterOfGravityEnvelopeMissing })
+        );
     }
 
     #[test]
@@ -760,9 +775,12 @@ mod tests {
         let report = audit_loading(&aircraft, &scenario(vec![cargo("box-1", "AFT", 100.0)]))
             .expect("ambiguous envelope is a report-level result");
         assert_eq!(report.disposition, AuditDisposition::NotAssessable);
-        assert!(report.findings.iter().any(|finding| {
-            finding.code == FindingCode::CenterOfGravityEnvelopeAmbiguous
-        }));
+        assert!(
+            report
+                .findings
+                .iter()
+                .any(|finding| { finding.code == FindingCode::CenterOfGravityEnvelopeAmbiguous })
+        );
     }
 
     #[test]
@@ -781,7 +799,9 @@ mod tests {
         manifest.phase = LoadingPhase::Landing;
         assert_eq!(
             audit_loading(&profile(), &manifest),
-            Err(AuditInputError::UnsupportedLoadingPhase(LoadingPhase::Landing))
+            Err(AuditInputError::UnsupportedLoadingPhase(
+                LoadingPhase::Landing
+            ))
         );
     }
 
@@ -820,10 +840,7 @@ mod tests {
         aircraft.maximum_takeoff_mass_kg = 1.0e308;
         aircraft.cg_envelope[0].maximum_mass_kg = 1.0e308;
         assert_eq!(
-            audit_loading(
-                &aircraft,
-                &scenario(vec![cargo("box-1", "FWD", 1.0e308)])
-            ),
+            audit_loading(&aircraft, &scenario(vec![cargo("box-1", "FWD", 1.0e308)])),
             Err(AuditInputError::NumericOverflow)
         );
     }
@@ -863,11 +880,8 @@ mod tests {
     fn item_order_does_not_change_report() {
         let first = cargo("a", "FWD", 50.0);
         let second = cargo("b", "AFT", 75.0);
-        let report_a = audit_loading(
-            &profile(),
-            &scenario(vec![first.clone(), second.clone()]),
-        )
-        .expect("valid order");
+        let report_a = audit_loading(&profile(), &scenario(vec![first.clone(), second.clone()]))
+            .expect("valid order");
         let report_b =
             audit_loading(&profile(), &scenario(vec![second, first])).expect("reordered items");
         assert_eq!(report_a, report_b);

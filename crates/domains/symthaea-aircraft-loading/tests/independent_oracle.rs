@@ -5,8 +5,8 @@
 //! reuse the production accumulator or station-aggregation logic.
 
 use symthaea_aircraft_loading::{
-    AircraftProfile, AuditDisposition, CgEnvelopeBand, LoadedItem, LoadedItemKind,
-    LoadingPhase, LoadingScenario, LoadingStation, audit_loading,
+    AircraftProfile, AuditDisposition, CgEnvelopeBand, LoadedItem, LoadedItemKind, LoadingPhase,
+    LoadingScenario, LoadingStation, audit_loading,
 };
 
 fn item(id: &str, station_id: &str, mass_kg: f64) -> LoadedItem {
@@ -76,14 +76,11 @@ fn exhaustive_small_integer_grid_matches_independent_mass_moment_oracle() {
 
                     // Independent closed-form integer arithmetic. The fixture's empty mass and
                     // moment are explicit constants, and all item masses/arms are small integers.
-                    let expected_mass_kg = 1_000_i64
-                        + i64::from(mass_fwd)
-                        + i64::from(mass_aft);
+                    let expected_mass_kg = 1_000_i64 + i64::from(mass_fwd) + i64::from(mass_aft);
                     let expected_moment_kg_m = 2_500_i64
                         + i64::from(mass_fwd) * i64::from(arm_fwd)
                         + i64::from(mass_aft) * i64::from(arm_aft);
-                    let expected_cg_m =
-                        expected_moment_kg_m as f64 / expected_mass_kg as f64;
+                    let expected_cg_m = expected_moment_kg_m as f64 / expected_mass_kg as f64;
 
                     let report =
                         audit_loading(&aircraft, &loaded).expect("oracle fixture is valid");
