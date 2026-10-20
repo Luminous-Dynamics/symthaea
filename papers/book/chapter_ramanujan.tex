@@ -30,7 +30,7 @@ The protocol integrates four components:
 \begin{equation}
 E ::= x_i \mid C \mid E + E \mid E \cdot E \mid -E \mid E^k \mid \sqrt{E} \mid \ln E \mid \sin E \mid \cos E \mid \frac{1}{E}
 \end{equation}
-where $x_i$ are state variables, $C \in \{-2, -1, 1, 2, 3\}$ are integer constants, and trees are depth- and size-constrained. Typical runs use population size 250, 80--500 generations depending on problem difficulty, and a fixed seed (42) to ensure deterministic reproducibility. Every reader can regenerate the exact table from the paper by running \texttt{./papers/ramanujan/reproduce.sh}.
+where $x_i$ are state variables, $C \in \{-2, -1, 1, 2, 3\}$ are integer constants, and trees are depth- and size-constrained. Typical runs use population size 250, 80--500 generations depending on problem difficulty, and a fixed seed (42) to ensure deterministic reproducibility. Every reader can regenerate the exact table from the paper by running \texttt{./papers/physics-math/ramanujan/reproduce.sh}.
 
 \textbf{(2) Fitness function: trajectory variance with Occam penalty.} For a sampled trajectory $\{\mathbf{x}(t_i)\}_{i=1}^N$ and candidate $C$, the raw fitness is
 \begin{equation}
@@ -177,9 +177,9 @@ The container outputs \texttt{results\_table.tex} and \texttt{showcase\_stdout.t
 Requires Rust $\geq$ 1.75 and Z3 $\geq$ 4.13 on PATH. Same output as Docker, typically faster on a local machine.
 
 \textbf{(3) SMT-only verification (no Rust required):}
-Every \texttt{.smt2} witness file in \texttt{papers/ramanujan/proofs/} is a standalone formal proof obligation:
+Every \texttt{.smt2} witness file in \texttt{papers/physics-math/ramanujan/proofs/} is a standalone formal proof obligation:
 \begin{verbatim}
-  for f in papers/ramanujan/proofs/*.smt2; do
+  for f in papers/physics-math/ramanujan/proofs/*.smt2; do
     z3 -smt2 "$f" | tail -1
   done
 \end{verbatim}
