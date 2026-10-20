@@ -106,10 +106,10 @@ pub fn mean_burden(samples: &[f64]) -> f64 {
 /// Discrete area under the burden curve. dt is an abstract model-step duration,
 /// not seconds unless a separately qualified mapping says otherwise.
 pub fn cumulative_exposure(samples: &[f64], dt: f64) -> f64 {
-    if !dt.is_finite() || dt < 0.0 {
+    if !dt.is_finite() || dt < 0.0 || samples.iter().any(|value| !value.is_finite()) {
         return f64::NAN;
     }
-    samples.iter().map(|v| v.max(0.0) * dt).sum()
+    samples.iter().map(|value| value.max(0.0) * dt).sum()
 }
 
 fn unit_noise(seed: u64, tick: usize) -> f64 {
@@ -388,6 +388,14 @@ mod tests {
         assert!((mean_burden(&short) - mean_burden(&long)).abs() < 1e-12);
         assert!((cumulative_exposure(&long, 1.0)
             - 2.0 * cumulative_exposure(&short, 1.0)).abs() < 1e-12);
+    }
+
+    #[test]
+    fn cumulative_exposure_rejects_nonfinite_evidence() {
+        assert!(cumulative_exposure(&[0.2, f64::NAN], 1.0).is_nan());
+        assert!(cumulative_exposure(&[0.2, f64::INFINITY], 1.0).is_nan());
+        assert!(cumulative_exposure(&[0.2], f64::NAN).is_nan());
+        assert!(cumulative_exposure(&[0.2], -1.0).is_nan());
     }
 
     #[test]
