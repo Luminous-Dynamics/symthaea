@@ -882,9 +882,7 @@ impl DynamicalSystem for NBodyGravity {
         let mut deriv = vec![0.0; total];
 
         // Positions' derivatives are velocities
-        for i in 0..half {
-            deriv[i] = state[half + i];
-        }
+        deriv[..half].copy_from_slice(&state[half..(half + half)]);
 
         // Velocities' derivatives are gravitational accelerations
         for i in 0..n {
@@ -1961,17 +1959,29 @@ mod tests {
 
         let rk4_error = (res_rk4.final_state()[0] - exact_x).abs();
         let rk45_error = (res_rk45.final_state()[0] - exact_x).abs();
+        let rk4_velocity_error = (res_rk4.final_state()[1] - exact_v).abs();
+        let rk45_velocity_error = (res_rk45.final_state()[1] - exact_v).abs();
 
         assert!(
             rk45_error < 1e-8,
-            "RK45 error {:.2e} should be very small",
+            "RK45 position error {:.2e} should be very small",
             rk45_error
         );
-        // RK4 with dt=0.01 should also be quite good
+        assert!(
+            rk45_velocity_error < 1e-8,
+            "RK45 velocity error {:.2e} should be very small",
+            rk45_velocity_error
+        );
+        // RK4 with dt=0.01 should also be quite good for both state variables.
         assert!(
             rk4_error < 1e-6,
-            "RK4 error {:.2e} should be small",
+            "RK4 position error {:.2e} should be small",
             rk4_error
+        );
+        assert!(
+            rk4_velocity_error < 1e-6,
+            "RK4 velocity error {:.2e} should be small",
+            rk4_velocity_error
         );
     }
 
