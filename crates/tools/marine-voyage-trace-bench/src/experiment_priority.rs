@@ -7,7 +7,7 @@
 //! from interval width or prediction error alone.
 
 use super::fidelity_ledger::{
-    AttemptStatus, EvaluationClass, EvidenceOrigin, EvidenceUseStatus, FidelityAudit,
+    EvaluationClass, EvidenceOrigin, EvidenceUseStatus, FidelityAudit,
     FidelityAuditDisposition, FidelityProfile,
 };
 use std::cmp::Ordering;
@@ -21,6 +21,14 @@ pub enum ProposalSupportStatus {
     TargetsDeclaredSupportGap,
     /// Applicability/scope is not established.
     Unknown,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DecisionValueContract {
+    pub basis_id: String,
+    pub estimator_method_id: String,
+    pub estimator_method_revision: String,
+    pub semantics_reviewed: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -118,6 +126,8 @@ pub enum ExperimentPriorityDisposition {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ExperimentPriorityIssue {
     EmptyDecisionValueBasis,
+    EmptyDecisionValueEstimatorIdentity { field: &'static str },
+    DecisionValueEstimatorContractNotReviewed,
     ProfileAuditIdentityMismatch,
     ProfileDigestInvalid,
     CostCannotBeAudited,
@@ -152,6 +162,8 @@ pub struct ExperimentPriorityReport {
     pub campaign_id: String,
     pub cost_basis_id: String,
     pub decision_value_basis_id: String,
+    pub decision_value_estimator_method_id: String,
+    pub decision_value_estimator_method_revision: String,
     pub disposition: ExperimentPriorityDisposition,
     pub budget_remaining_units: u64,
     pub campaign_spent_units: Option<u128>,
@@ -177,11 +189,22 @@ fn valid_sha256(value: &str) -> bool {
 fn validate_profile_audit(
     profile: &FidelityProfile,
     audit: &FidelityAudit,
-    decision_value_basis_id: &str,
+    value_contract: &DecisionValueContract,
 ) -> (bool, Vec<ExperimentPriorityIssue>) {
     let mut issues = Vec::new();
-    if !nonempty(decision_value_basis_id) {
+    if !nonempty(&value_contract.basis_id) {
         issues.push(ExperimentPriorityIssue::EmptyDecisionValueBasis);
+    }
+    for (value, field) in [
+        (value_contract.estimator_method_id.as_str(), "estimator_method_id"),
+        (value_contract.estimator_method_revision.as_str(), "estimator_method_revision"),
+    ] {
+        if !nonempty(value) {
+            issues.push(ExperimentPriorityIssue::EmptyDecisionValueEstimatorIdentity { field });
+        }
+    }
+    if !value_contract.semantics_reviewed {
+        issues.push(ExperimentPriorityIssue::DecisionValueEstimatorContractNotReviewed);
     }
     if profile.profile_id != audit.profile_id || profile.campaign_id != audit.campaign_id {
         issues.push(ExperimentPriorityIssue::ProfileAuditIdentityMismatch);
@@ -272,7 +295,7 @@ fn assess_proposal(
     proposal: &ExperimentProposal,
     requirements: &BTreeMap<&str, &super::fidelity_ledger::FidelityRequirement>,
     pending_mandatory: &BTreeSet<String>,
-    decision_value_basis_id: &str,
+    value_contract: &DecisionValueContract,
     budget_remaining_units: u64,
 ) -> ProposalAssessment {
     let mut issues = Vec::new();
@@ -366,7 +389,12 @@ fn assess_proposal(
         }
         Some(_) => {
             let mut valid = true;
-            if proposal.decision_value_basis_id != decision_value_basis_id {
+            if proposal.decision_value_basis_id != value_contract.basis_id
+                || proposal.decision_value_method_id.as_deref()
+                    != Some(value_contract.estimator_method_id.as_str())
+                || proposal.decision_value_method_revision.as_deref()
+                    != Some(value_contract.estimator_method_revision.as_str())
+            {
                 issues.push(ProposalIssue::DecisionValueBasisMismatch);
                 valid = false;
             }
@@ -386,7 +414,7 @@ fn assess_proposal(
                     valid = false;
                 }
             }
-            if !proposal.decision_value_semantics_reviewed {
+            if !proposal.decision_value_semantics_reviewed || !value_contract.semantics_reviewed {
                 issues.push(ProposalIssue::DecisionValueNotReviewed);
                 valid = false;
             }
@@ -527,11 +555,11 @@ pub fn prioritize_next_experiment(
     profile: &FidelityProfile,
     audit: &FidelityAudit,
     proposals: &[ExperimentProposal],
-    decision_value_basis_id: &str,
+    value_contract: &DecisionValueContract,
     budget_remaining_units: u64,
 ) -> ExperimentPriorityReport {
     let (audit_valid, mut issues) =
-        validate_profile_audit(profile, audit, decision_value_basis_id);
+        validate_profile_audit(profile, audit, value_contract);
     let requirements: BTreeMap<&str, &super::fidelity_ledger::FidelityRequirement> = profile
         .requirements
         .iter()
@@ -580,7 +608,7 @@ pub fn prioritize_next_experiment(
                 proposal,
                 &requirements,
                 &pending_mandatory,
-                decision_value_basis_id,
+                value_contract,
                 budget_remaining_units,
             );
             if let Some(count) = proposal_id_counts.get(&proposal.proposal_id).copied() {
@@ -700,7 +728,9 @@ pub fn prioritize_next_experiment(
         profile_id: profile.profile_id.clone(),
         campaign_id: profile.campaign_id.clone(),
         cost_basis_id: profile.cost_basis_id.clone(),
-        decision_value_basis_id: decision_value_basis_id.to_owned(),
+        decision_value_basis_id: value_contract.basis_id.clone(),
+        decision_value_estimator_method_id: value_contract.estimator_method_id.clone(),
+        decision_value_estimator_method_revision: value_contract.estimator_method_revision.clone(),
         disposition,
         budget_remaining_units,
         campaign_spent_units: audit.total_cost_units,
@@ -807,6 +837,15 @@ mod tests {
         }
     }
 
+    fn value_contract() -> DecisionValueContract {
+        DecisionValueContract {
+            basis_id: "loss-units-v1".to_string(),
+            estimator_method_id: "paired-loss-estimator".to_string(),
+            estimator_method_revision: "rev-1".to_string(),
+            semantics_reviewed: true,
+        }
+    }
+
     fn audit(require_physical: bool) -> (FidelityProfile, FidelityAudit) {
         let profile = profile();
         let receipts = if require_physical {
@@ -888,7 +927,7 @@ mod tests {
             physical("tank-run", Some(80), None),
             optional("cheap-screen", Some(1), Some(10_000)),
         ];
-        let report = prioritize_next_experiment(&profile, &audit, &proposals, "loss-units-v1", 100);
+        let report = prioritize_next_experiment(&profile, &audit, &proposals, &value_contract(), 100);
         assert_eq!(report.disposition, ExperimentPriorityDisposition::SelectedMandatoryEvidence);
         assert_eq!(report.selected_proposal_id.as_deref(), Some("tank-run"));
     }
@@ -943,7 +982,7 @@ mod tests {
             optional("low-ratio", Some(20), Some(40)),
             optional("high-ratio", Some(5), Some(20)),
         ];
-        let report = prioritize_next_experiment(&profile, &audit, &proposals, "loss-units-v1", 30);
+        let report = prioritize_next_experiment(&profile, &audit, &proposals, &value_contract(), 30);
         assert_eq!(report.disposition, ExperimentPriorityDisposition::SelectedOptionalExperiment);
         assert_eq!(report.selected_proposal_id.as_deref(), Some("high-ratio"));
         assert_eq!(report.selected_value_per_cost_numerator, Some(20));
@@ -981,7 +1020,7 @@ mod tests {
         let (profile, audit) = audit(false);
         let mut proposal = optional("restricted", Some(2), Some(10_000));
         proposal.evidence_use_status = EvidenceUseStatus::Restricted;
-        let report = prioritize_next_experiment(&profile, &audit, &[proposal], "loss-units-v1", 10);
+        let report = prioritize_next_experiment(&profile, &audit, &[proposal], &value_contract(), 10);
         assert_eq!(report.disposition, ExperimentPriorityDisposition::NoBeneficialOptionalProposal);
     }
 
@@ -990,7 +1029,7 @@ mod tests {
         let (profile, audit) = audit(false);
         let mut proposal = optional("unknown-support", Some(2), Some(100));
         proposal.support_status = ProposalSupportStatus::Unknown;
-        let report = prioritize_next_experiment(&profile, &audit, &[proposal], "loss-units-v1", 10);
+        let report = prioritize_next_experiment(&profile, &audit, &[proposal], &value_contract(), 10);
         assert_eq!(report.disposition, ExperimentPriorityDisposition::NoBeneficialOptionalProposal);
     }
 
@@ -999,7 +1038,7 @@ mod tests {
         let (profile, audit) = audit(false);
         let mut proposal = optional("wrong-cost-basis", Some(2), Some(100));
         proposal.cost_basis_id = "other-units".to_string();
-        let report = prioritize_next_experiment(&profile, &audit, &[proposal], "loss-units-v1", 10);
+        let report = prioritize_next_experiment(&profile, &audit, &[proposal], &value_contract(), 10);
         assert_eq!(report.disposition, ExperimentPriorityDisposition::NoBeneficialOptionalProposal);
     }
 
@@ -1010,7 +1049,7 @@ mod tests {
             optional("same-id", Some(2), Some(100)),
             optional("same-id", Some(1), Some(200)),
         ];
-        let report = prioritize_next_experiment(&profile, &audit, &proposals, "loss-units-v1", 10);
+        let report = prioritize_next_experiment(&profile, &audit, &proposals, &value_contract(), 10);
         assert_eq!(report.disposition, ExperimentPriorityDisposition::NoBeneficialOptionalProposal);
         assert!(report.assessments.iter().all(|item| item.disposition == ProposalDisposition::BlockedDuplicateProposalId));
     }
@@ -1020,8 +1059,8 @@ mod tests {
         let (profile, audit) = audit(false);
         let a = optional("proposal-a", Some(5), Some(50));
         let b = optional("proposal-b", Some(10), Some(100));
-        let first = prioritize_next_experiment(&profile, &audit, &[b.clone(), a.clone()], "loss-units-v1", 20);
-        let second = prioritize_next_experiment(&profile, &audit, &[a, b], "loss-units-v1", 20);
+        let first = prioritize_next_experiment(&profile, &audit, &[b.clone(), a.clone()], &value_contract(), 20);
+        let second = prioritize_next_experiment(&profile, &audit, &[a, b], &value_contract(), 20);
         assert_eq!(first.selected_proposal_id, second.selected_proposal_id);
         assert_eq!(first.selected_proposal_id.as_deref(), Some("proposal-a"));
     }
@@ -1031,7 +1070,7 @@ mod tests {
         let (profile, audit) = audit(false);
         let mut proposal = optional("stale-utility", Some(2), Some(100));
         proposal.decision_value_evidence_sha256 = Some("not-a-digest".to_string());
-        let report = prioritize_next_experiment(&profile, &audit, &[proposal], "loss-units-v1", 10);
+        let report = prioritize_next_experiment(&profile, &audit, &[proposal], &value_contract(), 10);
         assert_eq!(report.disposition, ExperimentPriorityDisposition::NoBeneficialOptionalProposal);
     }
 
@@ -1039,7 +1078,7 @@ mod tests {
     fn audit_profile_mismatch_fails_closed() {
         let (profile, mut audit) = audit(false);
         audit.profile_id = "different-profile".to_string();
-        let report = prioritize_next_experiment(&profile, &audit, &[], "loss-units-v1", 10);
+        let report = prioritize_next_experiment(&profile, &audit, &[], &value_contract(), 10);
         assert_eq!(report.disposition, ExperimentPriorityDisposition::InvalidProfileOrAudit);
     }
 
@@ -1049,7 +1088,7 @@ mod tests {
         let mut proposal = optional("support-gap", Some(2), Some(100));
         proposal.support_status = ProposalSupportStatus::TargetsDeclaredSupportGap;
         proposal.support_assessment_reviewed = false;
-        let report = prioritize_next_experiment(&profile, &audit, &[proposal], "loss-units-v1", 10);
+        let report = prioritize_next_experiment(&profile, &audit, &[proposal], &value_contract(), 10);
         assert_eq!(report.disposition, ExperimentPriorityDisposition::NoBeneficialOptionalProposal);
     }
 }
