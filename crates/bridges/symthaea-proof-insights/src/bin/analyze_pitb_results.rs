@@ -194,7 +194,9 @@ struct AnalysisReport {
     protocol_id: String,
     protocol_sha256: String,
     run_config_sha256: String,
+    validation_results_sha256: String,
     results_jsonl_sha256: String,
+    analyzer_source_sha256: String,
     split_manifest_sha256: String,
     partition_digest_sha256: String,
     baseline_selection_receipt_sha256: String,
@@ -202,6 +204,10 @@ struct AnalysisReport {
     selected_baseline_arm: String,
     treatment_arm: &'static str,
     total_test_families_in_frozen_split: usize,
+    eligible_validation_target_count: usize,
+    excluded_validation_target_count: usize,
+    unknown_validation_target_count: usize,
+    validation_baseline_scores: BTreeMap<String, f64>,
     eligible_target_count: usize,
     eligible_family_count: usize,
     excluded_target_count: usize,
@@ -353,7 +359,9 @@ fn execute() -> Result<()> {
         protocol_id: config.protocol_id,
         protocol_sha256: config.protocol_sha256,
         run_config_sha256: sha256_hex(&config_bytes),
+        validation_results_sha256: sha256_hex(&validation_bytes),
         results_jsonl_sha256: results_digest,
+        analyzer_source_sha256: sha256_hex(include_bytes!("analyze_pitb_results.rs")),
         split_manifest_sha256: config.split_manifest_sha256,
         partition_digest_sha256: config.partition_digest_sha256,
         baseline_selection_receipt_sha256: config.baseline_selection_receipt_sha256,
@@ -365,6 +373,16 @@ fn execute() -> Result<()> {
             .iter()
             .filter(|family| family.split == "test")
             .count(),
+        eligible_validation_target_count: eligible_validation.len(),
+        excluded_validation_target_count: validation_outcomes
+            .iter()
+            .filter(|row| row.eligibility == Eligibility::Excluded)
+            .count(),
+        unknown_validation_target_count: validation_outcomes
+            .iter()
+            .filter(|row| row.eligibility == Eligibility::Unknown)
+            .count(),
+        validation_baseline_scores: validation_scores,
         eligible_target_count: eligible.len(),
         eligible_family_count,
         excluded_target_count: outcomes
