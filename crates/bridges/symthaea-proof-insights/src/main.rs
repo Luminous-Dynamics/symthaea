@@ -2200,6 +2200,50 @@ mod tests {
 
         verify_temporal_manifest_file(&root, &manifest_path)
             .expect("pinned chronological history and exact artifact bytes should verify");
+        let target_bundle_path = base.join("target-001-bundle.json");
+        materialize_temporal_target(
+            &root,
+            &manifest_path,
+            "target-001",
+            &target_bundle_path,
+        )
+        .expect("only historically available artifacts should be materialized");
+        let bundle_bytes =
+            fs::read(&target_bundle_path).expect("read materialized target context");
+        let bundle: serde_json::Value =
+            serde_json::from_slice(&bundle_bytes).expect("parse target context bundle");
+        assert_eq!(
+            bundle["payload"]["schema_version"],
+            "pitb.temporal-target-bundle.v0"
+        );
+        let visible = bundle["payload"]["visible_artifacts"]
+            .as_array()
+            .expect("visible artifacts must be an array");
+        let visible_ids: BTreeSet<&str> = visible
+            .iter()
+            .filter_map(|artifact| artifact["artifact_id"].as_str())
+            .collect();
+        assert!(visible_ids.contains("statement-001"));
+        assert!(visible_ids.contains("proof-000"));
+        assert!(!visible_ids.contains("proof-001"));
+        assert!(!visible_ids.contains("completion-statement-001"));
+        let bundle_text = String::from_utf8(bundle_bytes).expect("bundle JSON is UTF-8");
+        assert!(bundle_text.contains("exact True.intro"));
+        assert!(!bundle_text.contains("trivial"));
+
+        let first_target_bundle_path = base.join("target-000-bundle.json");
+        materialize_temporal_target(
+            &root,
+            &manifest_path,
+            "target-000",
+            &first_target_bundle_path,
+        )
+        .expect("the first target must not see its own proof");
+        let first_bundle_text =
+            fs::read_to_string(&first_target_bundle_path).expect("read first target bundle");
+        assert!(!first_bundle_text.contains("exact True.intro"));
+        assert!(!first_bundle_text.contains("proof-000"));
+
         assert!(
             git(&root, &["status", "--porcelain"]).is_empty(),
             "fixture checkout must remain clean after verification"
