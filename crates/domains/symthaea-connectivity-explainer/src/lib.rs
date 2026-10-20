@@ -279,9 +279,10 @@ fn task_completion_explanation(
             };
             format!(
                 "Task {task_id} ({priority}) needed {service_bytes} bytes by window {deadline_window}. FIFO delivered {}/{service_bytes} bytes and {failure}; fair-share delivered {}/{service_bytes} bytes and completed{}.",
-                baseline.delivered_bytes,
-                candidate.delivered_bytes,
-                candidate.completion_window.map_or_else(String::new, |window| format!(" in window {window}"))
+                baseline.delivered_bytes, candidate.delivered_bytes,
+                candidate
+                    .completion_window
+                    .map_or_else(String::new, |window| format!(" in window {window}"))
             )
         }
         ("succeeded", "failed") => {
@@ -293,7 +294,9 @@ fn task_completion_explanation(
             };
             format!(
                 "REGRESSION: task {task_id} ({priority}) needed {service_bytes} bytes by window {deadline_window}. FIFO completed it{} after delivering {} bytes, but fair-share delivered {}/{service_bytes} bytes and {failure}.",
-                baseline.completion_window.map_or_else(String::new, |window| format!(" in window {window}")),
+                baseline
+                    .completion_window
+                    .map_or_else(String::new, |window| format!(" in window {window}")),
                 baseline.delivered_bytes,
                 candidate.delivered_bytes
             )
@@ -301,8 +304,7 @@ fn task_completion_explanation(
         ("failed", "failed") if candidate.delivered_bytes > baseline.delivered_bytes => {
             format!(
                 "Task {task_id} ({priority}) did not finish by its deadline in either policy. Fair-share delivered more partial progress ({}/{service_bytes} bytes) than FIFO ({}/{service_bytes}); this is not a successful task outcome.",
-                candidate.delivered_bytes,
-                baseline.delivered_bytes
+                candidate.delivered_bytes, baseline.delivered_bytes
             )
         }
         ("failed", "failed") => {
@@ -317,8 +319,12 @@ fn task_completion_explanation(
         ("succeeded", "succeeded") => {
             format!(
                 "Task {task_id} ({priority}) completed under both policies: FIFO in window {}, fair-share in window {}.",
-                baseline.completion_window.map_or_else(|| "not recorded".to_owned(), |window| window.to_string()),
-                candidate.completion_window.map_or_else(|| "not recorded".to_owned(), |window| window.to_string())
+                baseline
+                    .completion_window
+                    .map_or_else(|| "not recorded".to_owned(), |window| window.to_string()),
+                candidate
+                    .completion_window
+                    .map_or_else(|| "not recorded".to_owned(), |window| window.to_string())
             )
         }
         _ => format!(
