@@ -200,6 +200,38 @@ struct TemporalEvidenceArtifact {
 }
 
 #[derive(Debug, Serialize)]
+struct MaterializedVisibleArtifact {
+    artifact_id: String,
+    path: String,
+    artifact_kind: String,
+    content_sha256: String,
+    source_file_sha256: String,
+    source_commit: String,
+    available_at_position: Option<usize>,
+    theorem_id: Option<String>,
+    content: String,
+}
+
+#[derive(Debug, Serialize)]
+struct TemporalTargetPayload {
+    schema_version: &'static str,
+    repository_url: String,
+    repository_commit: String,
+    target_id: String,
+    theorem_id: String,
+    position: usize,
+    target_state_commit: String,
+    statement_sha256: String,
+    visible_artifacts: Vec<MaterializedVisibleArtifact>,
+}
+
+#[derive(Debug, Serialize)]
+struct TemporalTargetBundle {
+    payload_sha256: String,
+    payload: TemporalTargetPayload,
+}
+
+#[derive(Debug, Serialize)]
 struct SourceIndex {
     schema_version: &'static str,
     upstream_repository: &'static str,
@@ -234,6 +266,20 @@ fn main() -> ExitCode {
             Ok(()) => ExitCode::SUCCESS,
             Err(error) => {
                 eprintln!("proof-insights temporal manifest verification: {error:#}");
+                ExitCode::FAILURE
+            }
+        };
+    }
+    if args.len() == 6 && args[1] == "--materialize-temporal-target" {
+        return match materialize_temporal_target(
+            Path::new(&args[2]),
+            Path::new(&args[3]),
+            &args[4],
+            Path::new(&args[5]),
+        ) {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(error) => {
+                eprintln!("proof-insights temporal target materialization: {error:#}");
                 ExitCode::FAILURE
             }
         };
@@ -724,6 +770,148 @@ fn verify_temporal_manifest_file(repository_root: &Path, manifest_path: &Path) -
         manifest.events.len(),
         manifest.artifacts.len(),
         manifest.repository_commit
+    );
+    Ok(())
+}
+
+fn materialize_temporal_target(
+    repository_root: &Path,
+    manifest_path: &Path,
+    target_id: &str,
+    output_path: &Path,
+) -> Result<()> {
+    // Validate every timeline edge and artifact first. No output is written if any
+    // historical visibility, source digest, or hidden-proof control fails.
+    verify_temporal_manifest_file(repository_root, manifest_path)?;
+
+    let root = repository_root
+        .canonicalize()
+        .with_context(|| format!("cannot resolve temporal repository {}", repository_root.display()))?;
+    let manifest_bytes = fs::read(manifest_path)
+        .with_context(|| format!("cannot read temporal manifest {}", manifest_path.display()))?;
+    let manifest: TemporalReplayManifest =
+        serde_json::from_slice(&manifest_bytes).context("parse temporal replay manifest JSON")?;
+    let event = manifest
+        .events
+        .iter()
+        .find(|event| event.target_id == target_id)
+        .with_context(|| format!("target {target_id} is not in the frozen temporal manifest"))?;
+
+    let mut visible_artifacts = Vec::with_capacity(event.visible_artifact_ids.len());
+    for artifact_id in &event.visible_artifact_ids {
+        let artifact = manifest
+            .artifacts
+            .iter()
+            .find(|artifact| artifact.artifact_id == *artifact_id)
+            .with_context(|| format!("visible artifact {artifact_id} disappeared after validation"))?;
+        if artifact.artifact_kind == "completion_statement"
+            || artifact.artifact_id == event.proof_artifact_id
+            || artifact.target_position == Some(event.position)
+                && artifact.artifact_kind == "proof_body"
+        {
+            bail!(
+                "refusing to materialize evaluator-only artifact {} for target {}",
+                artifact.artifact_id,
+                target_id
+            );
+        }
+        let source = git_show_file(&root, &artifact.source_commit, &artifact.path)
+            .with_context(|| format!("read visible artifact {} from its historical commit", artifact.artifact_id))?;
+        let source_digest = format!("{:x}", Sha256::digest(&source));
+        if source_digest != artifact.source_file_sha256 {
+            bail!("visible source file digest changed for artifact {}", artifact.artifact_id);
+        }
+        let span = exact_line_span(
+            &source,
+            artifact.content_start_line,
+            artifact.content_end_line,
+        )?;
+        let span_digest = format!("{:x}", Sha256::digest(span));
+        if span_digest != artifact.content_sha256 {
+            bail!("visible artifact digest changed for {}", artifact.artifact_id);
+        }
+        let content = std::str::from_utf8(span)
+            .with_context(|| format!("visible artifact {} is not UTF-8", artifact.artifact_id))?
+            .to_owned();
+        visible_artifacts.push(MaterializedVisibleArtifact {
+            artifact_id: artifact.artifact_id.clone(),
+            path: artifact.path.clone(),
+            artifact_kind: artifact.artifact_kind.clone(),
+            content_sha256: artifact.content_sha256.clone(),
+            source_file_sha256: artifact.source_file_sha256.clone(),
+            source_commit: artifact.source_commit.clone(),
+            available_at_position: artifact.available_at_position,
+            theorem_id: artifact.theorem_id.clone(),
+            content,
+        });
+    }
+
+    if !visible_artifacts
+        .iter()
+        .any(|artifact| artifact.artifact_id == event.statement_artifact_id)
+    {
+        bail!("materialized solver context lacks the exact target statement");
+    }
+    if visible_artifacts.iter().any(|artifact| {
+        artifact.artifact_id == event.proof_artifact_id
+            || artifact.artifact_kind == "completion_statement"
+            || artifact.target_position == Some(event.position)
+                && artifact.artifact_kind == "proof_body"
+    }) {
+        bail!("materialized solver context contains target-specific evaluator evidence");
+    }
+
+    let payload = TemporalTargetPayload {
+        schema_version: "pitb.temporal-target-bundle.v0",
+        repository_url: manifest.repository_url,
+        repository_commit: manifest.repository_commit,
+        target_id: event.target_id.clone(),
+        theorem_id: event.theorem_id.clone(),
+        position: event.position,
+        target_state_commit: event.target_state_commit.clone(),
+        statement_sha256: event.statement_sha256.clone(),
+        visible_artifacts,
+    };
+    let canonical_payload =
+        serde_json::to_vec(&payload).context("serialize temporal target payload")?;
+    let bundle = TemporalTargetBundle {
+        payload_sha256: format!("{:x}", Sha256::digest(&canonical_payload)),
+        payload,
+    };
+    let mut serialized =
+        serde_json::to_vec_pretty(&bundle).context("serialize temporal target bundle")?;
+    serialized.push(b'\n');
+
+    let output_parent = output_path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    fs::create_dir_all(output_parent)
+        .with_context(|| format!("create target bundle directory {}", output_parent.display()))?;
+    let canonical_parent = output_parent
+        .canonicalize()
+        .with_context(|| format!("canonicalize target bundle directory {}", output_parent.display()))?;
+    let resolved_output = canonical_parent.join(
+        output_path
+            .file_name()
+            .context("target bundle output path must have a file name")?,
+    );
+    if resolved_output.starts_with(&root) {
+        bail!("target bundle output must be outside the pinned repository checkout");
+    }
+    if fs::symlink_metadata(&resolved_output)
+        .is_ok_and(|metadata| metadata.file_type().is_symlink())
+    {
+        bail!("refusing to overwrite a symlink as target bundle output");
+    }
+    fs::write(&resolved_output, &serialized)
+        .with_context(|| format!("write target-specific context bundle {}", resolved_output.display()))?;
+    println!(
+        "PITB_TEMPORAL_TARGET_BUNDLE_PASS: target={} visible_artifacts={} payload_sha256={} output={}",
+        target_id,
+        bundle.payload.visible_artifacts.len(),
+        bundle.payload_sha256,
+        resolved_output.display()
     );
     Ok(())
 }
