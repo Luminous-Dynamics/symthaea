@@ -556,6 +556,7 @@ mod tests {
             item("mid", "same-source", 20, 6, 8, 10, true),
             item("dominated", "same-source", 30, 5, 12, 14, true),
             item("high-value", "same-source", 30, 8, 10, 12, true),
+            item("same-point-wider-range", "same-source", 30, 8, 11, 20, true),
             item("same-floor-more-cost", "same-source", 40, 8, 13, 16, true),
             item("premium", "same-source", 50, 12, 15, 20, true),
         ];
@@ -569,6 +570,7 @@ mod tests {
         assert_eq!(coordinates, vec![(0, 0), (10, 3), (20, 6), (30, 8), (50, 12)]);
         assert!(!frontier.iter().any(|p| p.selected_ids.contains(&"dominated".to_owned())));
         assert!(!frontier.iter().any(|p| p.selected_ids.contains(&"same-floor-more-cost".to_owned())));
+        assert!(!frontier.iter().any(|p| p.selected_ids.contains(&"same-point-wider-range".to_owned())));
     }
 
     #[test]
