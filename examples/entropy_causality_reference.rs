@@ -303,11 +303,11 @@ fn main() {
         ));
     }
 
-    println!("network\\tnodes\\tH_next_bits\\tH_next_given_prev_bits\\tI_prev_next_bits\\tmin_cut_sensitivity_tv");
+    println!("network\tnodes\tH_next_bits\tH_next_given_prev_bits\tI_prev_next_bits\tmin_cut_sensitivity_tv");
     for (name, network) in cases {
         let m = measure(&network);
         println!(
-            "{name}\\t{}\\t{:.6}\\t{:.6}\\t{:.6}\\t{:.6}",
+            "{name}\t{}\t{:.6}\t{:.6}\t{:.6}\t{:.6}",
             m.nodes,
             m.state_entropy_bits,
             m.transition_entropy_bits,
