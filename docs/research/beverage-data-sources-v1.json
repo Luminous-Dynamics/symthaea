@@ -86,9 +86,12 @@
           2024
         ],
         "participating_facilities": "more than 1600",
-        "water_risk_context": "more than 60% of facilities face at least medium water risk",
+        "water_risk_context": "more than 60% of facilities face at least medium water risk; more than half projected to face medium-to-extremely-high water stress by 2030",
         "published_release_date": "2026-04-22",
-        "caveat": "Aggregate industry results; not a matched causal baseline for a single site or a universal target."
+        "caveat": "Aggregate sector ratios across reporting facilities; not a matched causal baseline for a single-site intervention or a universal target.",
+        "reported_production_growth_percent": 8,
+        "participating_companies": 15,
+        "continents": 6
       }
     },
     {
@@ -232,6 +235,38 @@
         "real plant anomaly detection performance",
         "biological model validity",
         "resource savings"
+      ]
+    },
+    {
+      "id": "WINE-ML-KB-HYBRID-2026",
+      "title": "Critical assessment of machine learning approaches for classification, dynamic prediction and surrogate modeling in food fermentation",
+      "uri": "https://doi.org/10.1016/j.foodres.2026.118403",
+      "article_uri": "https://www.sciencedirect.com/science/article/pii/S0963996926000773",
+      "publisher": "Food Research International",
+      "publication_date": "2026-04-01",
+      "license": "Open access under a Creative Commons license; confirm exact article/supplement terms before reuse",
+      "domain": [
+        "wine",
+        "fermentation_time_series",
+        "mechanistic_kinetics",
+        "machine_learning",
+        "hybrid_residual_model",
+        "surrogate_model"
+      ],
+      "reported_results": {
+        "knowledge_based_dynamic_prediction_average_nrmse_percent": 6,
+        "ml_with_expanded_data_nrmse_percent": 7.6,
+        "hybrid_knowledge_based_plus_residual_network_test_nrmse_percent": 5,
+        "synthetic_mechanistic_surrogate_nrmse_percent_against_knowledge_based_model": 0.6,
+        "synthetic_surrogate_speedup_factor": 30
+      },
+      "results_context": "Study-specific results: knowledge-based and ML dynamic-prediction comparisons use experimental time-series data; the approximately 0.6% surrogate result is fidelity to the knowledge-based model on synthetic test cases, not real-world fermentation measurement error.",
+      "use_gate": "Reproduce the published data definitions, split strategy, uncertainty and baseline values first. Separate empirical NRMSE from synthetic simulator-fidelity error; compare on same inputs, targets and test units. Treat the hybrid residual network as a candidate, not a presumed winner.",
+      "claims_not_supported": [
+        "universal superiority of mechanistic or ML models",
+        "industrial-site/vintage transfer without separate holdout",
+        "0.6% error against physical fermentation outcomes",
+        "resource savings or food-safety performance"
       ]
     }
   ],
