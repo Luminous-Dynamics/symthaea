@@ -388,7 +388,7 @@ fn audit_tsv(bytes: &[u8], kind: DatasetKind, filename: &str) -> IntakeReceipt {
             if condition_parts.iter().any(|value| value.is_empty()) {
                 row_errors.push("treatment_condition_field_blank".to_owned());
             } else {
-                treatments.insert(condition_parts.join("\\u{1f}"));
+                treatments.insert(condition_parts.join("\u{1f}"));
             }
 
             if row_errors.is_empty() {
