@@ -264,7 +264,7 @@ pub fn explain_report(report: &Value) -> Result<Explanation, String> {
         }
         let delta = completion_delta(candidate_completed, baseline_completed)?;
         let plain_explanation = if baseline_tasks == 0 {
-            format!("No tasks were declared for {mode_label(mode)}.")
+            format!("No tasks were declared for {}.", mode_label(mode))
         } else if delta > 0 {
             format!(
                 "In {label}, fair-share completes {delta} more {} than FIFO ({candidate_completed}/{candidate_tasks} versus {baseline_completed}/{baseline_tasks}).",
