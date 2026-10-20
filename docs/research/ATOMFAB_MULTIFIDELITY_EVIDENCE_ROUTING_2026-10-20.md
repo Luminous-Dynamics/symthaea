@@ -32,11 +32,20 @@ Report target attainment, best reference-validated objective at equal cost, uniq
 
 No cross-domain score should combine atomistic and process-twin actions. Run separate decisions with the same objective contract in each domain, then join them at the manufacturing-intent level where both evidence branches are required.
 
+## Retrospective outcome scoring
+
+A selected recommendation is not a successful experiment. The new `score_evidence_route` evaluator requires an outcome record for every eligible action in a fully labelled retrospective campaign. This is needed to identify an oracle action and measure regret; evaluating only the action chosen by the router would bias the estimate of policy quality. Eligible action outcomes must share a provenance class (reference, simulation, measurement, or independent reproduction). The evaluator retains the selected action's realized benefit/cost ratio and the retrospective oracle ratio as exact integer numerators and denominators, counts failed actions, and validates imported summaries by recomputation. It rejects incomplete eligible-outcome coverage and mixed source classes rather than manufacturing a score.
+
+This evaluator is for retrospective, fully labelled benchmarks or bounded simulation studies where the counterfactual outcomes are actually available. In a prospective campaign, unselected outcomes are generally unknown; do not claim measured regret unless an appropriate matched/counterfactual design supports it. Simulation-sourced outcomes establish only simulation-level results and must not be reported as physical observations.
+
 ## Artifacts
 
-- Rust implementation: `crates/domains/symthaea-atomfab/src/evidence_router.rs`
+- Rust implementation and retrospective evaluator: `crates/domains/symthaea-atomfab/src/evidence_router.rs`
 - Input schema: `schemas/evidence-action-proposals-v1.schema.json`
-- Output schema: `schemas/evidence-route-report-v1.schema.json`
-- Synthetic contract fixture: `fixtures/evidence-action-proposals-v1.json`
+- Route output schema: `schemas/evidence-route-report-v1.schema.json`
+- Outcome input schema: `schemas/evidence-action-outcomes-v1.schema.json`
+- Retrospective summary schema: `schemas/evidence-route-benchmark-summary-v1.schema.json`
+- Synthetic proposal fixture: `fixtures/evidence-action-proposals-v1.json`
+- Synthetic outcome fixture: `fixtures/evidence-action-outcomes-v1.json`
 
 Fixture values exist solely to test shape and routing semantics. They are not observed model performance or trustworthy value estimates.
