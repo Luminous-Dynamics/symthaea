@@ -108,7 +108,8 @@
             "inequality_direction",
             "predicate_mismatch",
             "precondition_mismatch",
-            "domain_mismatch"
+            "domain_mismatch",
+            "quantifier_scope"
           ],
           "source_move_requires": "Use the source's premise indepNum(G) ≤ 2 to derive |V(G)| ≤ 2χ(G), a chromatic-number lower bound. The key independent-set fact is an upper bound on indepNum(G).",
           "target_goal_requires": "For each r ≥ 4, show that there is c > 0 such that every finite r-clique-free graph G with average degree d ≥ 2 satisfies c·|V(G)|·log(d)/d ≤ indepNum(G), a lower bound on indepNum(G).",
