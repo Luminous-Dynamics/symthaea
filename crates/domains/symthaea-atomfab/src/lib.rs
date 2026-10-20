@@ -11,6 +11,7 @@ pub mod benchmark_registry;
 pub mod campaign;
 pub mod contract;
 pub mod decision_frontier;
+pub mod evidence_router;
 
 use std::collections::HashSet;
 use std::error::Error;
