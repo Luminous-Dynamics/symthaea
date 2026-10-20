@@ -75,7 +75,21 @@
       "claims_not_supported": [
         "causal savings attributable to our optimizer",
         "universal per-liter target across facility types"
-      ]
+      ],
+      "published_results": {
+        "reported_water_use_ratio_reduction_percent": 3,
+        "reported_energy_use_ratio_reduction_percent": 4,
+        "reported_emissions_ratio_reduction_percent": 11,
+        "reporting_years": [
+          2020,
+          2022,
+          2024
+        ],
+        "participating_facilities": "more than 1600",
+        "water_risk_context": "more than 60% of facilities face at least medium water risk",
+        "published_release_date": "2026-04-22",
+        "caveat": "Aggregate industry results; not a matched causal baseline for a single site or a universal target."
+      }
     },
     {
       "id": "PUBLIC-FERMENTATION-SENSOR-GAP-AUDIT",
