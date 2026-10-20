@@ -175,9 +175,7 @@ pub fn compare_published_rankings(
 
     let raw_extrapolated_rbo =
         compute_extrapolated_rbo(&predicted_order, &reference_order, persistence);
-    if !raw_extrapolated_rbo.is_finite()
-        || !(-1e-12..=1.0 + 1e-12).contains(&raw_extrapolated_rbo)
-    {
+    if !raw_extrapolated_rbo.is_finite() || !(-1e-12..=1.0 + 1e-12).contains(&raw_extrapolated_rbo) {
         return Err(PublishedRankingError::InvalidMetric);
     }
     // RBO is mathematically bounded by [0, 1]. Clamp only tiny floating-point
@@ -281,11 +279,8 @@ fn compute_kendall_tau_b(
 
     for (i, predicted_i) in predicted.iter().enumerate() {
         for predicted_j in predicted.iter().skip(i + 1) {
-            let predicted_cmp = compare_with_tolerance(
-                predicted_i.energy,
-                predicted_j.energy,
-                tie_tolerance,
-            );
+            let predicted_cmp =
+                compare_with_tolerance(predicted_i.energy, predicted_j.energy, tie_tolerance);
             let reference_cmp = compare_with_tolerance(
                 reference[predicted_i.structure_id.as_str()],
                 reference[predicted_j.structure_id.as_str()],
