@@ -584,6 +584,16 @@ mod tests {
     }
 
     #[test]
+    fn safety_shield_vetoes_unsafe_push_and_selects_recovery_if_needed() {
+        let (action, vetoed, no_safe_action) =
+            apply_safety_shield(Action::Push, 0.16, 0.87, 0.90);
+        assert_eq!(action, Action::EmergencyRecover);
+        assert!(vetoed);
+        assert!(!no_safe_action);
+        assert!(satisfies_one_step_viability(action, 0.16, 0.87, 0.90));
+    }
+
+    #[test]
     fn outputs_are_bounded_and_finite_for_the_declared_suite() {
         for scenario in Scenario::all() {
             for seed in 0..32 {
@@ -600,6 +610,7 @@ mod tests {
                         assert!(result.violation_exposure.is_finite());
                         assert!((0.0..=1.0).contains(&result.max_violation_severity));
                         assert!(result.unsafe_ticks <= HORIZON);
+                        assert_eq!(result.unsafe_episode, result.unsafe_ticks > 0);
                         assert!(
                             result.push_steps + result.maintain_steps + result.emergency_recover_steps
                                 == HORIZON
