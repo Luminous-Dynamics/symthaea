@@ -525,7 +525,10 @@ mod tests {
         );
         assert_eq!(
             policy_extension["seed_manifest"]["seeds"],
-            serde_json::json!([101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120])
+            serde_json::json!([
+                101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116,
+                117, 118, 119, 120
+            ])
         );
         assert_eq!(
             policy_extension["seed_manifest"]["sha256"],
@@ -681,5 +684,4 @@ mod tests {
             "speedup claims must combine statistical evidence with equal-cost result quality"
         );
     }
-
 }
