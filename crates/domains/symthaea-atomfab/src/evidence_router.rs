@@ -842,6 +842,7 @@ mod tests {
     fn retrospective_scoring_fails_closed_on_missing_or_mixed_outcomes() {
         let proposals = vec![
             proposal("static", EvidenceActionKind::StaticScreen, 10, 2),
+            proposal("universal", EvidenceActionKind::UniversalMlPotential, 20, 4),
             proposal("dft", EvidenceActionKind::DftReference, 80, 40),
         ];
         let route = route_evidence_actions(&proposals).unwrap();
@@ -857,16 +858,27 @@ mod tests {
             score_evidence_route(&route, &[static_outcome.clone()]),
             Err(EvidenceRouteError::MissingEligibleOutcome)
         );
+        let universal_outcome = outcome(
+            "universal",
+            EvidenceOutcomeSource::Reference,
+            EvidenceOutcomeStatus::Completed,
+            20,
+            4,
+            '2',
+        );
         let dft_outcome = outcome(
             "dft",
             EvidenceOutcomeSource::Simulation,
             EvidenceOutcomeStatus::Completed,
             80,
             40,
-            '2',
+            '3',
         );
         assert_eq!(
-            score_evidence_route(&route, &[static_outcome, dft_outcome]),
+            score_evidence_route(
+                &route,
+                &[static_outcome, universal_outcome, dft_outcome]
+            ),
             Err(EvidenceRouteError::MismatchedOutcomeSource)
         );
     }
