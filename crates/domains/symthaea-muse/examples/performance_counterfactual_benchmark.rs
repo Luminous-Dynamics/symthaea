@@ -91,7 +91,7 @@ struct Summary {
     p95_case_median_abs_onset_shift_ms: Option<f64>,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 struct Event {
     voice: String,
     pitch_bits: u32,
