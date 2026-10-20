@@ -4,7 +4,8 @@
 //! below are invented test fixtures, not field measurements or industry averages.
 
 use symthaea_industrial_optimization::{
-    AbatementEstimate, Intervention, greedy_expected_per_dollar, optimize_robust_portfolio, pareto_frontier,
+    AbatementEstimate, Intervention, greedy_expected_per_dollar, optimize_robust_portfolio,
+    pareto_frontier,
 };
 
 fn item(
@@ -44,7 +45,7 @@ fn print_portfolio(label: &str, portfolio: &symthaea_industrial_optimization::Po
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("SYNTHETIC BENCHMARK ONLY — NOT A SITE ESTIMATE OR OPERATING ADVICE");
     let candidates = vec![
-        item("ldar-repair-event-a", "measured-source-event-a", 22_000, 2, 7, 15, true),
+        item("ldar-repair-event-a", "source-event-a", 22_000, 2, 7, 15, true),
         item("dry-compressor-seal", "compressor-seals-unit-1", 88_000, 7, 12, 18, true),
         item("compressor-seal-repair", "compressor-seals-unit-1", 30_000, 2, 5, 9, true),
         item("pneumatic-controller-swap", "pneumatic-unit-4", 45_000, 3, 7, 11, true),
@@ -66,7 +67,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for (index, portfolio) in frontier.iter().enumerate() {
         print_portfolio(&format!("  frontier point {}", index + 1), portfolio);
     }
-    println!("\nInterpretation: the two strategies optimize different objectives.");
+    println!("\nInterpretation: the greedy, robust, and frontier views answer different questions.");
     println!("These outputs validate portfolio-selection mechanics only; they establish");
     println!("nothing about actual methane emissions, intervention efficacy, cost, or safety.");
     Ok(())
