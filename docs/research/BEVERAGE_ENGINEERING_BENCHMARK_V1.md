@@ -146,8 +146,8 @@ From the repository root, after checking out the exact commit you intend to qual
 ```bash
 EXPECTED_HEAD="$(git rev-parse HEAD)"
 cargo fmt --all -- --check
-cargo test -p symthaea-culinary --bin beverage_benchmark_receipt
-cargo run -p symthaea-culinary --bin beverage_benchmark_receipt -- \
+cargo test --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin beverage_benchmark_receipt
+cargo run --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin beverage_benchmark_receipt -- \
   --corpus docs/research/beverage-engineering-scenarios-v1.json \
   --schema docs/research/beverage-engineering-scenarios-v1.schema.json \
   --expected-head "$EXPECTED_HEAD" \
@@ -155,6 +155,8 @@ cargo run -p symthaea-culinary --bin beverage_benchmark_receipt -- \
 ```
 
 The receipt binds the raw corpus and schema bytes with SHA-256, includes the exact checked-out Git HEAD, rejects malformed input and unknown fields, checks unique scenario identifiers/names, verifies declared product/disposition values against schema enums, requires the corpus to remain explicitly synthetic, and emits a deterministic `PASS` or `FAIL` JSON report. The CLI exits non-zero on a failed contract.
+
+The focused harness compiles the exact tracked Rust source files through `tools/beverage-benchmark-harness/Cargo.toml`. This avoids falsely attributing a monorepo manifest-enumeration failure to the beverage tools: the current root workspace glob also sees `crates/core/symthaea-observation-attestation/src/lib.rs`, but that directory has no `Cargo.toml`. The harness does not exclude or skip that source from the main workspace and does not establish full-workspace health.
 
 **Qualification limit:** this first runner does not implement the full JSON Schema Draft 2020-12 specification. It checks a narrow set of safety-relevant schema invariants and then deserializes into strict Rust types. An independent standards-compliant JSON Schema validator remains required. Passing receipt checks establishes contract integrity only, not that any scientific result is valid. The test binary must be built, formatted, tested, and run against the exact intended head before the receipt can be called qualified.
 
