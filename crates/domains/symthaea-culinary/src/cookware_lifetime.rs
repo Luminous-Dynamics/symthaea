@@ -330,7 +330,7 @@ fn validate_event_shape(
                     candidate_id,
                     unit_id,
                     event_id,
-                    "repair events must record a post-repair in-service or worn state",
+                    "repair events must record the post-repair in-service, worn, or failed outcome",
                 );
             }
             let repair_valid = !event.repair_parts.is_empty()
