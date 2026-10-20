@@ -4,6 +4,11 @@ use super::*;
 pub enum SymExpr {
     Var(String),
     Const(f64),
+    /// Exact rational literal (numerator / denominator).
+    ///
+    /// Unlike Const(f64), this preserves the intended mathematical value
+    /// for symbolic/formal reasoning. A zero denominator is invalid.
+    Rational(i64, u64),
     Add(Box<SymExpr>, Box<SymExpr>),
     Mul(Box<SymExpr>, Box<SymExpr>),
     Div(Box<SymExpr>, Box<SymExpr>),
@@ -23,6 +28,13 @@ impl SymExpr {
                 .map(|(_, v)| *v)
                 .unwrap_or(0.0),
             SymExpr::Const(c) => *c,
+            SymExpr::Rational(numerator, denominator) => {
+                if *denominator == 0 {
+                    f64::NAN
+                } else {
+                    *numerator as f64 / *denominator as f64
+                }
+            }
             SymExpr::Add(a, b) => a.eval(vars) + b.eval(vars),
             SymExpr::Mul(a, b) => a.eval(vars) * b.eval(vars),
             SymExpr::Div(a, b) => {
@@ -53,7 +65,7 @@ impl SymExpr {
                     SymExpr::Const(0.0)
                 }
             }
-            SymExpr::Const(_) => SymExpr::Const(0.0),
+            SymExpr::Const(_) | SymExpr::Rational(_, _) => SymExpr::Const(0.0),
             SymExpr::Add(a, b) => SymExpr::Add(Box::new(a.diff(var)), Box::new(b.diff(var))),
             SymExpr::Mul(a, b) => SymExpr::Add(
                 Box::new(SymExpr::Mul(Box::new(a.diff(var)), b.clone())),
@@ -181,6 +193,9 @@ impl fmt::Display for SymExpr {
                 } else {
                     write!(f, "{:.4}", c)
                 }
+            }
+            SymExpr::Rational(numerator, denominator) => {
+                write!(f, "{}/{}", numerator, denominator)
             }
             SymExpr::Add(a, b) => write!(f, "({} + {})", a, b),
             SymExpr::Mul(a, b) => write!(f, "({} · {})", a, b),
@@ -335,4 +350,27 @@ pub struct DerivativeVerification {
     pub derivative_str: String,
     pub max_relative_error: f64,
     pub is_consistent: bool,
+}
+
+#[cfg(test)]
+mod exact_rational_tests {
+    use super::SymExpr;
+
+    #[test]
+    fn rational_literals_evaluate_and_display_without_decimal_rounding() {
+        let third = SymExpr::Rational(1, 3);
+        assert!((third.eval(&[]) - 1.0 / 3.0).abs() < f64::EPSILON);
+        assert_eq!(third.to_string(), "1/3");
+    }
+
+    #[test]
+    fn rational_literal_has_zero_derivative() {
+        let third = SymExpr::Rational(1, 3);
+        assert_eq!(third.diff("x").eval(&[]), 0.0);
+    }
+
+    #[test]
+    fn zero_denominator_is_not_treated_as_a_numeric_constant() {
+        assert!(SymExpr::Rational(1, 0).eval(&[]).is_nan());
+    }
 }
