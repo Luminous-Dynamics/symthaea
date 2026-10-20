@@ -638,6 +638,49 @@ mod tests {
     }
 
     #[test]
+    fn paired_comparison_uses_same_cases_and_estimates_candidate_minus_baseline() {
+        let candidate = balanced_cases();
+        let mut baseline = candidate.clone();
+        for case in &mut baseline {
+            let probability = if case.ground_truth_hazard { 0.1 } else { 0.9 };
+            case.output = BinarySafetyOutput::Probability { hazard_probability: probability };
+        }
+        baseline.reverse(); // Case ordering must not affect the paired comparison.
+        let report = paired_bootstrap_binary_safety_comparison(
+            &eval_config(),
+            &candidate,
+            &baseline,
+            &config(123),
+        )
+        .expect("paired comparison");
+        assert_eq!(report.candidate_case_count, 6);
+        assert_eq!(report.matched_case_count, 6);
+        assert_eq!(report.differences["auroc"].candidate_minus_baseline, Some(1.0));
+        assert_eq!(report.differences["sensitivity"].candidate_minus_baseline, Some(1.0));
+        let auc_interval = &report.differences["auroc"];
+        assert_eq!(auc_interval.status, IntervalStatus::Estimated);
+        assert_eq!(auc_interval.lower_bound, Some(1.0));
+        assert_eq!(auc_interval.upper_bound, Some(1.0));
+    }
+
+    #[test]
+    fn paired_comparison_rejects_case_and_label_mismatch() {
+        let candidate = balanced_cases();
+        let mut baseline = candidate.clone();
+        baseline[0].case_id = "different-id".to_string();
+        baseline[1].ground_truth_hazard = !baseline[1].ground_truth_hazard;
+        let errors = paired_bootstrap_binary_safety_comparison(
+            &eval_config(),
+            &candidate,
+            &baseline,
+            &config(6),
+        )
+        .expect_err("mismatched pairs must fail");
+        assert!(errors.iter().any(|error| error.contains("missing case_id")));
+        assert!(errors.iter().any(|error| error.contains("label mismatch")));
+    }
+
+    #[test]
     fn too_few_valid_resamples_withhold_interval_bounds() {
         let cases = vec![case("only-positive", true, 0.9)];
         let mut bootstrap = config(5);
