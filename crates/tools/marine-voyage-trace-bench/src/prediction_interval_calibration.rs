@@ -202,7 +202,9 @@ pub struct CalibrationSliceScore {
     pub borderline_count: usize,
     pub out_of_domain_count: usize,
     pub unknown_applicability_count: usize,
-    /// None means insufficient observations or an invalid metric, not a pass.
+    /// False when any evaluated record is borderline, out of domain or unknown.
+    pub applicability_gate_met: bool,
+    /// None means incomplete groups/counts, unestablished applicability or invalid metric.
     pub coverage_gate_met: Option<bool>,
     pub interval_score_gate_met: Option<bool>,
     pub thresholds_met: Option<bool>,
@@ -1024,9 +1026,15 @@ pub fn evaluate_calibration(
                     .is_some_and(|score| score <= requirement.max_normalized_mean_interval_score),
             )
         };
-        let thresholds_met = match (coverage_gate_met, interval_score_gate_met) {
-            (Some(coverage_ok), Some(score_ok)) => Some(coverage_ok && score_ok),
-            _ => None,
+        let applicability_gate_met = accumulator.count > 0
+            && accumulator.within_count == accumulator.count;
+        let thresholds_met = if !applicability_gate_met {
+            None
+        } else {
+            match (coverage_gate_met, interval_score_gate_met) {
+                (Some(coverage_ok), Some(score_ok)) => Some(coverage_ok && score_ok),
+                _ => None,
+            }
         };
         if thresholds_met == Some(false) {
             threshold_failure = true;
@@ -1051,6 +1059,7 @@ pub fn evaluate_calibration(
             borderline_count: accumulator.borderline_count,
             out_of_domain_count: accumulator.out_of_domain_count,
             unknown_applicability_count: accumulator.unknown_applicability_count,
+            applicability_gate_met,
             coverage_gate_met,
             interval_score_gate_met,
             thresholds_met,
@@ -1357,6 +1366,8 @@ mod tests {
             assert_eq!(report.disposition, CalibrationDisposition::DomainNotEstablished);
             assert_eq!(report.slices[0].observation_count, 2);
             assert_eq!(report.slices[0].covered_count, 2);
+            assert!(!report.slices[0].applicability_gate_met);
+            assert_eq!(report.slices[0].thresholds_met, None);
             assert!(has_issue(&report, &CalibrationIssue::ApplicabilityNotEstablished {
                 observation_id: "obs-1".to_owned(),
                 status,
