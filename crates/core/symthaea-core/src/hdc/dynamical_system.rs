@@ -599,16 +599,36 @@ impl Rk45Controller {
         if !maximum_dt.is_finite() || maximum_dt <= 0.0 {
             return Err(SimulationError::InvalidTimeStep);
         }
+        tolerances.validate(system.state_dim())?;
+        self.try_step_validated(integrator, system, state, t, maximum_dt, tolerances)
+    }
+
+    fn try_step_validated(
+        &mut self,
+        integrator: &Rk45Integrator,
+        system: &dyn DynamicalSystem,
+        state: &[f64],
+        t: f64,
+        maximum_dt: f64,
+        tolerances: &Rk45Tolerances,
+    ) -> Result<Rk45StepReport, SimulationError> {
+        if !t.is_finite() {
+            return Err(SimulationError::NonFiniteTimeBounds);
+        }
+        if !maximum_dt.is_finite() || maximum_dt <= 0.0 {
+            return Err(SimulationError::InvalidTimeStep);
+        }
         let requested_dt = self
             .next_step_size
             .unwrap_or(maximum_dt)
             .min(maximum_dt);
-        let report = integrator.try_adaptive_step_with_tolerances(
+        let report = integrator.try_adaptive_step_impl(
             system,
             state,
             t,
             requested_dt,
-            tolerances,
+            Rk45ErrorControl::Scaled(tolerances),
+            Rk45ErrorNorm::WeightedRms,
         )?;
         self.next_step_size = Some(report.proposed_next_dt);
         Ok(report)
@@ -645,6 +665,28 @@ pub struct Rk45SimulationReport {
 enum Rk45ErrorNorm {
     WeightedInfinity,
     WeightedRms,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum Rk45ErrorControl<'a> {
+    LegacyScalarAbsolute(f64),
+    Scaled(&'a Rk45Tolerances),
+}
+
+impl Rk45ErrorControl<'_> {
+    fn relative(&self) -> f64 {
+        match self {
+            Self::LegacyScalarAbsolute(_) => 0.0,
+            Self::Scaled(tolerances) => tolerances.relative,
+        }
+    }
+
+    fn absolute(&self, index: usize) -> f64 {
+        match self {
+            Self::LegacyScalarAbsolute(value) => *value,
+            Self::Scaled(tolerances) => tolerances.absolute[index],
+        }
+    }
 }
 
 impl Rk45Integrator {
@@ -687,7 +729,7 @@ impl Rk45Integrator {
         state: &[f64],
         t: f64,
         dt: f64,
-        tolerances: &Rk45Tolerances,
+        error_control: Rk45ErrorControl<'_>,
         norm: Rk45ErrorNorm,
     ) -> Result<Rk45StepReport, SimulationError> {
         self.validate()?;
@@ -707,7 +749,6 @@ impl Rk45Integrator {
         if let Some(index) = state.iter().position(|value| !value.is_finite()) {
             return Err(SimulationError::NonFiniteInitialState { index });
         }
-        tolerances.validate(expected_dim)?;
         let dim = state.len();
         let mut h = dt.min(self.dt_max);
         let mut attempted_steps = 0usize;
@@ -791,8 +832,8 @@ impl Rk45Integrator {
                 }
                 max_absolute_error = max_absolute_error.max(component_error);
 
-                let component_scale = tolerances.absolute[index]
-                    + tolerances.relative * state[index].abs().max(y5[index].abs());
+                let component_scale = error_control.absolute(index)
+                    + error_control.relative() * state[index].abs().max(y5[index].abs());
                 if !component_scale.is_finite() || component_scale <= 0.0 {
                     return Err(SimulationError::InvalidRk45Tolerances);
                 }
@@ -866,13 +907,12 @@ impl Rk45Integrator {
                 actual: state.len(),
             });
         }
-        let tolerances = Rk45Tolerances::new(0.0, vec![self.tol; state.len()]);
         let report = self.try_adaptive_step_impl(
             system,
             state,
             t,
             dt,
-            &tolerances,
+            Rk45ErrorControl::LegacyScalarAbsolute(self.tol),
             Rk45ErrorNorm::WeightedInfinity,
         )?;
         Ok((report.state, report.accepted_dt, report.max_absolute_error))
@@ -892,12 +932,13 @@ impl Rk45Integrator {
         dt: f64,
         tolerances: &Rk45Tolerances,
     ) -> Result<Rk45StepReport, SimulationError> {
+        tolerances.validate(system.state_dim())?;
         self.try_adaptive_step_impl(
             system,
             state,
             t,
             dt,
-            tolerances,
+            Rk45ErrorControl::Scaled(tolerances),
             Rk45ErrorNorm::WeightedRms,
         )
     }
@@ -992,7 +1033,7 @@ impl Rk45Integrator {
 
             let remaining = t_end - time;
             let maximum_dt = self.dt_max.min(remaining);
-            let step = controller.try_step(
+            let step = controller.try_step_validated(
                 self,
                 system,
                 &state,
