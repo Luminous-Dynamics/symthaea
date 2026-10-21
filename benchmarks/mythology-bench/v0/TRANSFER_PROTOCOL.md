@@ -83,6 +83,12 @@ Compare:
 
 Ablate one component at a time: temporal context, version identity, relation typing, counterevidence, provenance gating and HDC composition. Fix questions, source packs, model versions, prompt budgets, decoding settings and compute budgets. If external models are used, publish model/version/access date, prompts, retrieval index digests, context budgets, raw case outputs, latency and cost.
 
+## Paired intervention controls
+
+The executable paired track is defined in [`metamorphic-pair.schema.json`](metamorphic-pair.schema.json) and instantiated by [`metamorphic-pairs.jsonl`](metamorphic-pairs.jsonl). It tests expected change (context, witness, evidence, variant and counterevidence), expected abstention/revision, rejection of unsupported relation upgrades, denial after rights revocation, and expected invariance (equivalent aliases and source-embedded prompt injection). The current ten pairs are synthetic development controls; they are not examples of Egyptian or any living tradition's actual beliefs. The focused Rust harness checks the pair schema and pair-specific contracts in addition to the ordinary fixture schemas.
+
+Use [`STRUCTURAL_TRANSFER_SCORE.md`](STRUCTURAL_TRANSFER_SCORE.md) for the proposed scorecard, provisional thresholds and fair comparison protocol. It deliberately avoids an unconstrained single scalar: critical provenance/rights/lineage failures must not be offset by strong accuracy elsewhere.
+
 ## Nonclaims
 
 This protocol does not prove any mythic event happened literally, prove/disprove a community's spiritual beliefs, or demonstrate Symthaea superiority. It defines experiments needed to test reasoning hypotheses. All current fixtures are development data, and external source links are references—not rights grants or permission for automated crawling.
