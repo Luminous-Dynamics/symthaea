@@ -1609,6 +1609,19 @@ mod tests {
         assert_eq!(ctrl.highway_weights(), ctrl2.highway_weights());
     }
     #[test]
+    fn token_seed_scheme_does_not_change_controller_config_wire_shape() {
+        let config = test_config();
+        let encoded = serde_json::to_value(&config).expect("controller config should serialize");
+        let object = encoded
+            .as_object()
+            .expect("controller config should serialize as an object");
+        assert!(
+            !object.contains_key("token_embedding_seed_scheme"),
+            "runtime-only seed scheme must not alter the serialized config/checkpoint shape"
+        );
+    }
+
+    #[test]
     fn legacy_token_seed_scheme_remains_the_exact_default() {
         let genesis = test_genesis();
         let config = test_config();
