@@ -13,6 +13,8 @@ use std::{
 };
 
 const CORPUS_VERSION: &str = "first-aid-trajectory-corpus-v0";
+const REQUIRED_CLAIM_CEILING: &str =
+    "Synthetic process-integrity audit only; no clinical safety or patient-outcome claim.";
 const EXPECTED_CORPUS_SHA256: &str =
     "1ac414e6b920a6259d68a20c273a0a9465e98c7a596393f9777be9976d6e3fd3";
 
@@ -232,8 +234,11 @@ fn validate_corpus(corpus: &TrajectoryCorpus) -> Result<()> {
     if corpus.clinical_use_authorized {
         bail!("trajectory corpus cannot authorize clinical use");
     }
-    if corpus.claim_ceiling.trim().is_empty() {
-        bail!("trajectory corpus must declare a claim ceiling");
+    if corpus.claim_ceiling != REQUIRED_CLAIM_CEILING {
+        bail!(
+            "trajectory corpus claim ceiling must remain exactly non-clinical: {}",
+            REQUIRED_CLAIM_CEILING
+        );
     }
     if corpus.scenarios.is_empty() {
         bail!("trajectory corpus must contain at least one trace");
@@ -573,4 +578,18 @@ mod tests {
             }
         }
     }
+    #[test]
+    fn claim_ceiling_cannot_be_weakened_to_clinical_validation() {
+        let mut value = corpus();
+        value.claim_ceiling = "Clinically validated for patient care.".to_string();
+        assert!(validate_corpus(&value).is_err());
+    }
+
+    #[test]
+    fn clinical_use_authorization_remains_forbidden() {
+        let mut value = corpus();
+        value.clinical_use_authorized = true;
+        assert!(validate_corpus(&value).is_err());
+    }
+
 }
