@@ -697,8 +697,7 @@ mod tests {
 
     #[test]
     fn recovery_summary_excludes_no_disturbance_episodes_from_censoring_denominator() {
-        let no_disturbance =
-            summarize_recovery([(false, None), (false, None)]);
+        let no_disturbance = summarize_recovery([(false, None), (false, None)]);
         assert_eq!(no_disturbance.disturbed_episodes, 0);
         assert_eq!(no_disturbance.observed_recovery_count, 0);
         assert_eq!(no_disturbance.censored_count, 0);
