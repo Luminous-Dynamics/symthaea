@@ -24,8 +24,7 @@ Version: 1.0.0
 """
 
 import argparse
-import subprocess
-import json
+import hashlib
 import numpy as np
 from typing import List, Tuple, Dict, Optional
 from dataclasses import dataclass, field
@@ -66,6 +65,8 @@ class ValidationResult:
     pyphi_computation_time: float = 0.0
     hdc_computation_time: float = 0.0
     error_message: Optional[str] = None
+    reference_model_digest: Optional[str] = None
+    reference_formalism: str = "IIT_3_0"
 
 
 @dataclass
@@ -251,15 +252,52 @@ class PyPhiValidator:
             adj[j, i] = 1  # Undirected
         return adj
 
-    def compute_pyphi_phi(self, topology: TopologySpec) -> Tuple[float, float]:
+    def build_reference_model(
+        self, topology: TopologySpec
+    ) -> Tuple[np.ndarray, np.ndarray, str]:
+        """Build a canonical graph-derived TPM and digest the exact reference model.
+
+        This model is a deliberately simple noisy OR-neighbor network. It is a
+        reproducible PyPhi reference fixture, not yet the model used by Symthaea's
+        causal-cut Rust benchmark; comparisons must remain blocked until both share
+        the same canonical model.
         """
-        Compute the PyPhi reference value with an explicitly selected IIT 3.0 formalism.
+        if topology.n_nodes < 1:
+            raise ValueError("topology must have at least one node")
+        for source, target in topology.edges:
+            if not (0 <= source < topology.n_nodes and 0 <= target < topology.n_nodes):
+                raise ValueError(
+                    f"edge ({source}, {target}) is outside the {topology.n_nodes}-node topology"
+                )
 
-        Args:
-            topology: Topology specification
+        adjacency = self.edges_to_adjacency(topology.n_nodes, topology.edges)
+        n_states = 2 ** topology.n_nodes
+        tpm = np.zeros((n_states, topology.n_nodes), dtype=np.float64)
+        for state_index in range(n_states):
+            state_bits = [(state_index >> i) & 1 for i in range(topology.n_nodes)]
+            for node in range(topology.n_nodes):
+                neighbors = [j for j in range(topology.n_nodes) if adjacency[node, j] == 1]
+                output = any(state_bits[j] for j in neighbors) if neighbors else bool(state_bits[node])
+                probability = 1.0 if output else 0.0
+                tpm[state_index, node] = np.clip(probability * 0.98 + 0.01, 0.01, 0.99)
 
-        Returns:
-            (phi_value, computation_time_seconds)
+        # PyPhi's integer state rows are little-endian by node index: node 0 varies
+        # fastest. Include both adjacency and TPM in the digest to prevent topology
+        # names alone from serving as provenance.
+        digest = hashlib.sha256()
+        digest.update(b"symthaea-pyphi-reference-model/v1\\0")
+        digest.update(repr(adjacency.shape).encode("ascii"))
+        digest.update(np.ascontiguousarray(adjacency, dtype=np.uint8).tobytes())
+        digest.update(repr(tpm.shape).encode("ascii"))
+        digest.update(np.ascontiguousarray(tpm, dtype="<f8").tobytes())
+        digest.update(b"state=all-ones\\0formalism=IIT_3_0\\0")
+        return adjacency, tpm, digest.hexdigest()
+
+    def compute_pyphi_phi(self, topology: TopologySpec) -> Tuple[float, float]:
+        """Compute the graph-derived PyPhi reference under IIT 3.0.
+
+        The Symthaea/PyPhi comparison remains scientifically blocked until the
+        Rust side consumes the same explicit transition model.
         """
         if not PYPHI_AVAILABLE:
             raise RuntimeError("PyPhi not installed")
@@ -274,58 +312,19 @@ class PyPhiValidator:
                 "install the pinned validation dependency pyphi==2.0.0rc4."
             )
 
-        # Create adjacency matrix
-        adj = self.edges_to_adjacency(topology.n_nodes, topology.edges)
-
-        # PyPhi requires a TPM (transition probability matrix)
-        # For a simple deterministic network, we use identity-like TPM
-        # This is a simplification - real validation would use actual network dynamics
-
-        # Create simple network: each node XORs its inputs
-        # TPM shape: (2^n_nodes, n_nodes) - probability of each node being ON
-        # given each possible past state
-
-        n = topology.n_nodes
-        n_states = 2 ** n
-
-        # Simple TPM: each node takes OR of neighbors
-        tpm = np.zeros((n_states, n))
-        for state in range(n_states):
-            state_bits = [(state >> i) & 1 for i in range(n)]
-            for node in range(n):
-                # Node is ON if any neighbor was ON
-                neighbors = [j for j in range(n) if adj[node, j] == 1]
-                if neighbors:
-                    neighbor_or = any(state_bits[j] for j in neighbors)
-                    tpm[state, node] = 1.0 if neighbor_or else 0.0
-                else:
-                    tpm[state, node] = state_bits[node]  # Isolated nodes stay same
-
-        # Add small noise to avoid deterministic issues
-        tpm = np.clip(tpm * 0.98 + 0.01, 0.01, 0.99)
-
-        start = time.time()
-
-        try:
-            # Create PyPhi network
-            network = pyphi.Network(tpm, connectivity_matrix=adj)
-
-            # Get subsystem for all nodes in all-on state
-            state = tuple([1] * n)
-            subsystem = pyphi.Subsystem(network, state)
-
-            # Compute Φ (this is the expensive operation)
-            if not hasattr(pyphi, "analyze"):
-                raise RuntimeError("PyPhi 2.0 analyze API required to pin the IIT formalism explicitly")
-            analysis = pyphi.analyze(network, state, formalism="IIT_3_0")
-            phi = float(analysis.phi)
-
-            elapsed = time.time() - start
-            return phi, elapsed
-
-        except Exception as e:
-            logger.error(f"PyPhi computation failed for {topology.name}: {e}")
-            raise
+        adjacency, tpm, _model_digest = self.build_reference_model(topology)
+        start = time.perf_counter()
+        substrate = pyphi.Substrate(
+            tpm,
+            cm=adjacency,
+            node_labels=tuple(f"node_{index}" for index in range(topology.n_nodes)),
+        )
+        state = tuple([1] * topology.n_nodes)
+        analysis = pyphi.analyze(substrate, state, formalism="IIT_3_0")
+        phi = float(analysis.phi)
+        if not np.isfinite(phi):
+            raise RuntimeError(f"PyPhi returned a non-finite value for {topology.name}")
+        return phi, time.perf_counter() - start
 
     def compute_hdc_phi(self, topology: TopologySpec, n_samples: int = 10) -> Tuple[float, float, float]:
         """Fail closed until a valid Rust causal-model adapter is implemented.
@@ -356,8 +355,14 @@ class PyPhiValidator:
             topology_name=topology.name,
             n_nodes=topology.n_nodes,
             hdc_phi=None,
-            pyphi_phi=None
+            pyphi_phi=None,
         )
+        try:
+            _adjacency, _tpm, digest = self.build_reference_model(topology)
+            result.reference_model_digest = digest
+        except Exception as error:
+            result.error_message = f"Reference model error: {error}"
+            return result
 
         # HDC adapter intentionally fails closed until it uses the same causal model.
         try:
@@ -461,6 +466,8 @@ class PyPhiValidator:
             "",
             f"- Paired measurements: {paired_count}",
             f"- Failed or unavailable cases: {report.n_failed}",
+            "- Pinned PyPhi reference version: 2.0.0rc4 (pre-release)",
+            "- Declared reference formalism: IIT_3_0",
             f"- Correlation: {fmt(report.correlation, '.4f')}",
             f"- Mean absolute error: {fmt(report.mean_absolute_error, '.4f')}",
             f"- Maximum absolute error: {fmt(report.max_absolute_error, '.4f')}",
@@ -468,8 +475,8 @@ class PyPhiValidator:
             "",
             "## Detailed results",
             "",
-            "| Topology | Nodes | Symthaea score | PyPhi score | Absolute error | Status |",
-            "|---|---:|---:|---:|---:|---|",
+            "| Topology | Nodes | Reference model SHA-256 | Symthaea score | PyPhi score | Absolute error | Status |",
+            "|---|---:|---|---:|---:|---:|---|",
         ]
         for result in report.results:
             hdc = fmt(result.hdc_phi, ".6f")
@@ -480,9 +487,10 @@ class PyPhiValidator:
             else:
                 error = "N/A"
                 case_status = "FAILED / NOT RUN"
+            model_digest = result.reference_model_digest or "N/A"
             md.append(
-                f"| {result.topology_name} | {result.n_nodes} | {hdc} | "
-                f"{reference} | {error} | {case_status} |"
+                f"| {result.topology_name} | {result.n_nodes} | {model_digest} | "
+                f"{hdc} | {reference} | {error} | {case_status} |"
             )
         md.extend([
             "",
