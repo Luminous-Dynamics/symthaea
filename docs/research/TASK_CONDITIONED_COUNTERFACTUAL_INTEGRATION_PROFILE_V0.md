@@ -222,6 +222,7 @@ A separate exhaustive Python enumerator (used as a cross-check, **not a Rust tes
 | Harmful coupling | 511 | 448 | 63 | [-0.5, +0.5] |
 | Role-matched AND, high \(x_1\) activity prior | 15 | 8 | 7 | [-0.3, +0.3] |
 | Same AND system, reversed input prior | 15 | 8 | 7 | [-0.3, +0.3] |
+| Role-matched XOR synergy control | 15 | 8 | 7 | [0.0, 0.0] |
 
 This is an important warning, not a result to hide: for the same fixed toy causal model and intervention outcome table, the contrast can reverse sign with the partition. The declared partitions recover the expected +0.5, 0.0 and -0.5 fixture scores, but these score ranges show that the contrast is **partition-relative**, not an intrinsic scalar property of the network. This is why the metric must expose the full partition profile and freeze partition selection before held-out evaluation. It also makes independent control selection and matched-stratum quality central requirements. The toy sweep still does not prove that TCCIP is useful or better than existing methods.
 
