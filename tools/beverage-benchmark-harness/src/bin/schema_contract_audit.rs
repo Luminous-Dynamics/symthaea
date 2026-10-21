@@ -314,7 +314,12 @@ mod tests {
     fn invalid_meta_schema_fails_closed() {
         let schema =
             br#"{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"not-a-valid-type"}"#;
-        let receipt = audit_schema(schema, br#"{}"#, "schema.json".to_owned(), "data.json".to_owned());
+        let receipt = audit_schema(
+            schema,
+            br#"{}"#,
+            "schema.json".to_owned(),
+            "data.json".to_owned(),
+        );
         assert_eq!(receipt.status, "FAIL");
         assert!(!receipt.schema_meta_valid);
     }
