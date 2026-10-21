@@ -18,7 +18,7 @@
 - **Population Pharmacogenomics for Health Equity** (Genes 2023, MDPI): Review/perspective paper. Frames the problem but provides no computational tool.
 
 ### Gap we fill
-No published open-source tool systematically computes a per-drug, per-gene, per-population **equity gap score** from allele frequency data + CPIC guidelines. PharmCAT is the closest relative but operates at individual genotype level, not population risk stratification. Our engine computes expected metabolizer phenotype distributions via Hardy-Weinberg, then derives composite equity scores, underserved population flags, and ancestry-adjusted dosing recommendations.
+No published open-source tool systematically computes a per-drug, per-gene, per-population **equity gap score** from allele frequency data + CPIC guidelines. PharmCAT is the closest relative but operates at individual genotype level, not population risk stratification. Our engine computes exploratory aggregate phenotype-frequency approximations via Hardy-Weinberg and derives population-level equity-gap flags. It does not provide an individual's genotype/phenotype interpretation or dosing recommendation.
 
 ### Honest limitations of our claims
 - Our allele frequency data is compiled from published sources (PharmGKB, gnomAD v4, NCBI NBK574601, Gaedigk 2017, Ionova 2020), not from original sequencing.
@@ -31,7 +31,7 @@ No published open-source tool systematically computes a per-drug, per-gene, per-
 
 ## Abstract (~250 words)
 
-Pharmacogenomic guidelines from the Clinical Pharmacogenetics Implementation Consortium (CPIC) are predominantly validated in European-ancestry populations, creating a measurable equity gap for the majority of the world's population. We present an open-source pharmacogenomic health equity engine that quantifies this gap by computing expected metabolizer phenotype distributions from published allele frequencies using Hardy-Weinberg equilibrium, then deriving per-drug, per-gene, per-population equity gap scores. Across 4 CPIC Level A drug-gene pairs (codeine/CYP2D6, clopidogrel/CYP2C19, warfarin/CYP2C9, sertraline/CYP2C19) and 6 ancestry groups, we identify [N] underserved population-drug combinations where current guideline applicability falls below 85%. East Asian populations show the largest phenotype divergence from European reference for CYP2C19-metabolized drugs (CYP2C19*2 frequency 29% vs 15% European), while South Asian populations face the highest aggregate equity gap for CYP2C9-dependent warfarin dosing (CYP2C9*3 frequency 11% vs 7% European). The engine provides ancestry-adjusted dosing recommendations that flag underserved populations and recommend therapeutic drug monitoring where guideline applicability is poor. All code and reference data are released under AGPL-3.0. We argue that systematic equity quantification should become a standard component of pharmacogenomic guideline development.
+Pharmacogenomic guidelines from the Clinical Pharmacogenetics Implementation Consortium (CPIC) are predominantly validated in European-ancestry populations, creating a measurable equity gap for the majority of the world's population. We present an open-source pharmacogenomic health equity engine that quantifies this gap by computing expected metabolizer phenotype distributions from published allele frequencies using Hardy-Weinberg equilibrium, then deriving per-drug, per-gene, per-population equity gap scores. Across 4 CPIC Level A drug-gene pairs (codeine/CYP2D6, clopidogrel/CYP2C19, warfarin/CYP2C9, sertraline/CYP2C19) and 6 ancestry groups, we identify [N] underserved population-drug combinations where current guideline applicability falls below 85%. East Asian populations show the largest phenotype divergence from European reference for CYP2C19-metabolized drugs (CYP2C19*2 frequency 29% vs 15% European), while South Asian populations face the highest aggregate equity gap for CYP2C9-dependent warfarin dosing (CYP2C9*3 frequency 11% vs 7% European). The engine produces population-level equity flags and modeled estimates only. It does not provide patient-level phenotype calls, treatment decisions, or dosing recommendations; documented discrepancies and variant-coverage limits must be resolved before any clinical translation. All code and reference data are released under AGPL-3.0. We argue that systematic equity quantification should become a standard component of pharmacogenomic guideline development.
 
 ---
 
@@ -60,7 +60,7 @@ Pharmacogenomic guidelines from the Clinical Pharmacogenetics Implementation Con
 - We present an open-source engine that fills this gap
 
 ### 1.5 Contribution statement
-We provide: (1) a formalized equity gap scoring methodology, (2) an open-source Rust engine implementing it, (3) ancestry-stratified equity analyses for CPIC Level A drug-gene pairs, (4) ancestry-adjusted dosing recommendations with underserved population flags.
+We provide: (1) a formalized equity gap scoring methodology, (2) an open-source Rust engine implementing it, (3) ancestry-stratified equity analyses for CPIC Level A drug-gene pairs, (4) population-level equity flags and modeled sensitivity analyses (not individual dosing).
 
 ---
 
@@ -105,7 +105,7 @@ We provide: (1) a formalized equity gap scoring methodology, (2) an open-source 
 ### 2.5 CPIC guideline integration
 - 4 drug-gene pairs with full recommendation chains: codeine/CYP2D6, clopidogrel/CYP2C19, warfarin/CYP2C9, sertraline/CYP2C19
 - Each guideline encodes: drug, gene, phenotype, dosing action (StandardDose/ReduceDose/IncreaseDose/AvoidDrug/UseAlternative/TherapeuticDrugMonitoring), evidence level (Strong/Moderate/Optional/Informative), source population
-- Ancestry-adjusted recommendation: if patient ancestry is flagged as underserved for the drug-gene pair, append therapeutic drug monitoring advisory with equity gap score
+- Research-only guideline projection: require exact drug/gene/phenotype match; unsupported tuples return `Indeterminate`; population labels never substitute for individual genotype evidence
 
 ### 2.6 Implementation
 - Rust implementation (~900 LOC), AGPL-3.0 license
@@ -175,7 +175,7 @@ We provide: (1) a formalized equity gap scoring methodology, (2) an open-source 
 
 ### 4.4 Policy recommendations
 - CPIC guideline development should include systematic equity impact assessment for each new or updated guideline
-- PGx clinical decision support systems should display population-level equity context alongside individual genotype results
+- Any future clinical display of aggregate equity analysis would require independent qualification and must remain separate from individual genotype-to-phenotype interpretation
 - Pharmacovigilance databases should stratify adverse event reporting by genetic ancestry (not self-reported race)
 - Biobanks (All of Us, UK Biobank, H3Africa) should prioritize population-specific allele frequency refinement for pharmacogenes
 - Open-source tools for equity quantification lower the barrier for global adoption, particularly in LMICs where no PGx tools have been developed locally
@@ -192,7 +192,7 @@ We provide: (1) a formalized equity gap scoring methodology, (2) an open-source 
 
 ## 5. Conclusion (~300 words)
 
-Pharmacogenomic guidelines are a powerful tool for precision medicine, but their predominantly European calibration creates a quantifiable equity gap affecting billions of people globally. We present an open-source engine that makes this gap visible and actionable. By computing ancestry-stratified metabolizer phenotype distributions and deriving per-drug equity gap scores, we provide a systematic framework for identifying underserved populations and generating ancestry-adjusted dosing recommendations. The tool is not a replacement for CPIC guidelines but an equity lens through which to view them. We release all code and reference data to enable global replication, extension, and integration into clinical decision support systems. Systematic equity quantification should become a standard component of pharmacogenomic guideline development and implementation.
+Pharmacogenomic guidelines are a powerful tool for precision medicine, but their predominantly European calibration creates a quantifiable equity gap affecting billions of people globally. We present an open-source engine that makes this gap visible and actionable. By computing exploratory aggregate phenotype-frequency approximations and per-drug equity-gap scores, the work proposes a framework for identifying where population-level evidence may not transport across groups. These outputs are not patient-level genotype interpretations, dose recommendations, or clinical decision support. They must be independently checked against complete allele/diplotype references and externally evaluated before any clinical translation. We release the code and reference data for replication and critique, including the documented gaps and negative findings.
 
 ---
 
