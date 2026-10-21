@@ -252,6 +252,31 @@ Pre-register the comparison. Freeze exact source commits, corpora, data access, 
 
 Require an independent reproduction before making a broad superiority claim. If one lane improves and another regresses, publish the Pareto trade-off rather than averaging away the regression. Report costs and failures, not just accuracy.
 
+## External benchmark update — SCILAWS-BENCH (2026-10-21)
+
+A newer state-of-the-art comparison target has appeared since this protocol's first draft: **SCILAWS-BENCH**, submitted on 1 September 2026. Its paper describes 118 problems drawn from 381 publications, 291 candidate laws, and roughly 8 million real data points, with two complementary settings:
+
+- **SCILAWS-REAL:** infer from fixed real observations, then separate held-out predictive fit from literature-grounded scientific validity.
+- **SCILAWS-PARALLEL:** actively query residual-calibrated synthetic worlds to recover a newly hidden law derived from published physical relationships.
+
+The authors report that predictive fit can diverge from scientific validity, that memorization influences whether models reproduce or move beyond known formulas, and that best-of-N candidate selection remains a bottleneck. Those are directly relevant to Symthaea's goal of connecting cold hypothesis generation, experimental discrimination, independent verification, and evidence admission. Source: https://arxiv.org/abs/2609.01552
+
+### What changes for Symthaea
+
+The initial [Rust evaluator PR #8150](https://github.com/Luminous-Dynamics/symthaea/pull/8150) covers a useful *mechanism test*—three source-visible synthetic law families with fixed-grid and seeded-random query baselines. It is not large enough or blind enough to support broad law-discovery claims, and its truth labels are not independent hidden evidence.
+
+Keep the existing evaluator as the reproducible unit-test lane; add external benchmark interoperability as a separate, staged lane rather than replacing it or cloning a second corpus.
+
+1. **Public synthetic mechanism lane.** Keep known-answer equations and exact seed/query budgets. Treat it as the debugging baseline, never the publication-grade hidden test.
+2. **Parallel-world recovery lane.** Where SCILAWS-PARALLEL access/terms permit, benchmark active query selection, fixed/round-robin, seeded-random, and best-of-N candidate selection under paired worlds and identical query/compute budgets. Preserve hidden truth outside the candidate-facing process when claiming blind recovery.
+3. **Real-data scientific-validity lane.** Where SCILAWS-REAL data and labels can lawfully be used, evaluate held-out prediction, equation/structure recovery, source-grounded scientific validity, uncertainty/calibration, and model discrepancy as distinct axes. A good fit is not itself evidence that the proposed mechanism is scientifically valid.
+4. **Leakage/novelty controls.** Split by source paper and physical system where possible, maintain a known-equation/library exposure ledger, search structural equivalence separately from literal string novelty, and mark benchmark items that may overlap public training data. A formula's absence from a local catalogue does not prove novelty.
+5. **Selection-efficiency track.** Report success per query and per unit compute, paired-seed deltas with confidence intervals, best-of-N budget, selection regret against an oracle where the oracle is benchmark-only, and failure/abstention rates. Do not use a single aggregate to hide gains in prediction alongside losses in validity or explanation.
+
+Before building an adapter, check upstream licensing, redistribution terms, available evaluator interfaces, and exact dataset/version digests. Do not check in restricted raw data; prefer a reproducible fetch/verification recipe or an explicitly permitted subset. If access is unavailable, record that lane as **not run** and continue using the synthetic mechanism tests without upgrading the claim level.
+
+**No SOTA claim is implied.** The correct target is a reproducible comparison on named tracks with independent metrics. Any claim of outperforming SCILAWS-BENCH requires a matched, permitted evaluation, pinned evaluator/data versions, predeclared metrics, and retained per-problem failures—not a local synthetic score.
+
 ## Research anchors
 
 These existing works motivate different benchmark lanes; none alone covers the entire proposed protocol:
