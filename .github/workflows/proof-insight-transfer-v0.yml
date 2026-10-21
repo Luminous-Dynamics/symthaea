@@ -881,6 +881,10 @@ jobs:
           assert abs(report["metrics"]["compatible_accept_recall"]["estimate"] - 20 / 21) < 1e-12
           assert report["metrics"]["incompatible_false_accept_rate"]["estimate"] == 0.0
           assert abs(report["metrics"]["binary_coverage"]["estimate"] - 41 / 42) < 1e-12
+          assert report["calibration"]["probability_scored_pairs"] == 42
+          assert report["calibration"]["complete_binary_coverage"] is True
+          assert abs(report["calibration"]["brier_score"] - 0.01) < 1e-12
+          assert abs(report["calibration"]["expected_calibration_error_10_bins"] - 0.1) < 1e-12
           assert report["proposed_gates"]["pair_selectivity_gate"] == "pair_track_thresholds_met"
           assert report["proposed_gates"]["finite_mutation_suite_gate"] == "not_evaluated_by_this_analyzer"
           assert report["proposed_gates"]["overall_confirmatory_decision"].startswith("not_evaluated_")
