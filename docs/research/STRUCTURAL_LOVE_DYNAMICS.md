@@ -235,3 +235,12 @@ Passing a suite can support only a bounded claim about the exact tested subject,
 3. *Evaluating over-empathizing in emotional support conversations: A user-centered framework* (2026). https://www.sciencedirect.com/science/article/pii/S0957417425046731
 4. Bai et al. (7 September 2026). *Emotional supporters often use multiple strategies in a single turn*. https://www.sciencedirect.com/science/article/pii/S0925231226012944
 5. Machidon (published online 2 July 2026). *Love as Moral Telos: A Love-Based Ethical Framework for Artificial Intelligence*. https://www.tandfonline.com/doi/full/10.1080/23736992.2026.2699087
+
+## 10. Cross-scale research extension
+
+A separate synthesis examines possible relations among love-consistent behavior, biological life, stress/allostatic load, multiple kinds of entropy, Φ/integrated-information estimates, and consciousness. These are related research axes, not interchangeable variables or a single causal chain.
+
+- [Cross-scale dynamics and experiment plan](structural-love-dynamics/CROSS_SCALE_DYNAMICS.md) distinguishes empirical, computational, normative, and phenomenological claims; proposes falsifiable hypotheses and ablation experiments; and audits current Symthaea measurement semantics.
+- [Issue #8274: audit Φ-dyad construct validity](https://github.com/Luminous-Dynamics/symthaea/issues/8274) tracks the concrete concern that current dyad inputs may be self-generated proxies rather than independent human observations. It requires provenance, construct separation, and negative controls before interpreting those outputs relationally.
+
+The cross-scale extension is MeasurementOnly: it does not authorize runtime changes, claim that Φ measures love, or establish subjective experience.
