@@ -10,11 +10,19 @@ use symthaea_core::hdc::pattern_interaction::{
 fn k95(
     observations: impl IntoIterator<Item = (usize, f64)>,
 ) -> Option<usize> {
-    observations
-        .into_iter()
-        .filter(|(_, lower_recall_bound)| *lower_recall_bound >= 0.95)
-        .map(|(capacity, _)| capacity)
-        .max()
+    let mut observations: Vec<(usize, f64)> = observations.into_iter().collect();
+    observations.sort_by_key(|(capacity, _)| *capacity);
+
+    let mut last_qualified = None;
+    for (capacity, lower_recall_bound) in observations {
+        // K95 is a prefix capacity target: once a tested capacity fails, a
+        // later noisy point must not "requalify" the larger memory.
+        if lower_recall_bound < 0.95 {
+            break;
+        }
+        last_qualified = Some(capacity);
+    }
+    last_qualified
 }
 
 fn format_k95(value: Option<usize>) -> String {
@@ -239,5 +247,10 @@ mod tests {
     #[test]
     fn k95_is_na_when_no_tested_capacity_meets_the_recall_bound() {
         assert_eq!(k95([(1, 0.90), (7, 0.949)]), None);
+    }
+
+    #[test]
+    fn k95_does_not_requalify_after_a_capacity_point_fails() {
+        assert_eq!(k95([(31, 0.99), (1, 1.0), (7, 0.94)]), Some(1));
     }
 }
