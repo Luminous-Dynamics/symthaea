@@ -209,7 +209,8 @@
         ]
       },
       "evidence_status": "unit_test_added",
-      "note": "Implemented in rendering_outside_active_session_is_rejected."
+      "note": "Implemented in rendering_outside_active_session_is_rejected.",
+      "test_name": "rendering_outside_active_session_is_rejected"
     },
     {
       "case_id": "MUT-002",
@@ -224,7 +225,8 @@
         ]
       },
       "evidence_status": "unit_test_added",
-      "note": "Implemented in starting_new_session_invalidates_prior_bundle_verification."
+      "note": "Implemented in starting_new_session_invalidates_prior_bundle_verification.",
+      "test_name": "starting_new_session_invalidates_prior_bundle_verification"
     },
     {
       "case_id": "MUT-003",
@@ -239,7 +241,8 @@
         ]
       },
       "evidence_status": "unit_test_added",
-      "note": "Implemented in intermittent_connectivity_cannot_be_a_core_network_dependency."
+      "note": "Implemented in intermittent_connectivity_cannot_be_a_core_network_dependency.",
+      "test_name": "intermittent_connectivity_cannot_be_a_core_network_dependency"
     },
     {
       "case_id": "MUT-004",
@@ -252,7 +255,8 @@
         "violation_codes": []
       },
       "evidence_status": "unit_test_added",
-      "note": "Implemented in claim_ceiling_cannot_be_weakened_to_clinical_validation."
+      "note": "Implemented in claim_ceiling_cannot_be_weakened_to_clinical_validation.",
+      "test_name": "claim_ceiling_cannot_be_weakened_to_clinical_validation"
     },
     {
       "case_id": "MUT-005",
@@ -265,7 +269,8 @@
         "violation_codes": []
       },
       "evidence_status": "unit_test_added",
-      "note": "Implemented in clinical_use_authorization_remains_forbidden."
+      "note": "Implemented in clinical_use_authorization_remains_forbidden.",
+      "test_name": "clinical_use_authorization_remains_forbidden"
     },
     {
       "case_id": "MUT-006",
@@ -278,7 +283,8 @@
         "violation_codes": []
       },
       "evidence_status": "unit_test_existing",
-      "note": "Implemented in duplicate_or_decreasing_sequences_are_rejected."
+      "note": "Implemented in duplicate_or_decreasing_sequences_are_rejected.",
+      "test_name": "duplicate_or_decreasing_sequences_are_rejected"
     },
     {
       "case_id": "MUT-007",
@@ -291,7 +297,8 @@
         "violation_codes": []
       },
       "evidence_status": "unit_test_existing",
-      "note": "Implemented in unknown_fields_are_rejected."
+      "note": "Implemented in unknown_fields_are_rejected.",
+      "test_name": "unknown_fields_are_rejected"
     },
     {
       "case_id": "MUT-008",
@@ -306,7 +313,8 @@
         ]
       },
       "evidence_status": "unit_test_existing",
-      "note": "Implemented in revocation_mutation_detects_post_revoke_render."
+      "note": "Implemented in revocation_mutation_detects_post_revoke_render.",
+      "test_name": "revocation_mutation_detects_post_revoke_render"
     },
     {
       "case_id": "MUT-009",
@@ -321,7 +329,8 @@
         ]
       },
       "evidence_status": "unit_test_existing",
-      "note": "Implemented in interruption_clears_verified_state."
+      "note": "Implemented in interruption_clears_verified_state.",
+      "test_name": "interruption_clears_verified_state"
     },
     {
       "case_id": "MUT-010",
@@ -360,7 +369,8 @@
         "violation_codes": []
       },
       "evidence_status": "unit_test_added",
-      "note": "Implemented in non_sensitive_egress_does_not_require_sensitive_data_consent_scope. Exact-head workflow validation is pending."
+      "note": "Implemented in non_sensitive_egress_does_not_require_sensitive_data_consent_scope. Exact-head workflow validation is pending.",
+      "test_name": "non_sensitive_egress_does_not_require_sensitive_data_consent_scope"
     },
     {
       "case_id": "MUT-013",
@@ -375,7 +385,8 @@
         ]
       },
       "evidence_status": "unit_test_added",
-      "note": "Implemented in rendering_different_bundle_from_verified_bundle_is_rejected. Exact-head workflow validation is pending."
+      "note": "Implemented in rendering_different_bundle_from_verified_bundle_is_rejected. Exact-head workflow validation is pending.",
+      "test_name": "rendering_different_bundle_from_verified_bundle_is_rejected"
     },
     {
       "case_id": "MUT-014",
@@ -390,7 +401,8 @@
         ]
       },
       "evidence_status": "unit_test_added",
-      "note": "Implemented in failed_digest_verification_blocks_rendering. Exact-head workflow validation is pending."
+      "note": "Implemented in failed_digest_verification_blocks_rendering. Exact-head workflow validation is pending.",
+      "test_name": "failed_digest_verification_blocks_rendering"
     },
     {
       "case_id": "MUT-015",
@@ -405,7 +417,8 @@
         ]
       },
       "evidence_status": "unit_test_added",
-      "note": "Implemented in expired_bundle_cannot_be_verified_or_rendered. Exact-head workflow validation is pending."
+      "note": "Implemented in expired_bundle_cannot_be_verified_or_rendered. Exact-head workflow validation is pending.",
+      "test_name": "expired_bundle_cannot_be_verified_or_rendered"
     },
     {
       "case_id": "MUT-016",
@@ -420,7 +433,8 @@
         ]
       },
       "evidence_status": "unit_test_added",
-      "note": "Implemented in new_uncertainty_after_prior_preservation_is_not_lost_at_handoff. Exact-head workflow validation is pending."
+      "note": "Implemented in new_uncertainty_after_prior_preservation_is_not_lost_at_handoff. Exact-head workflow validation is pending.",
+      "test_name": "new_uncertainty_after_prior_preservation_is_not_lost_at_handoff"
     },
     {
       "case_id": "MUT-017",
@@ -435,7 +449,8 @@
         ]
       },
       "evidence_status": "unit_test_added",
-      "note": "Implemented in revocation_survives_new_session_and_remains_a_violation. Revocation is the primary reported violation; generic missing-verification is suppressed for a revoked render. Exact-head validation is pending."
+      "note": "Implemented in revocation_survives_new_session_and_remains_a_violation. Revocation is the primary reported violation; generic missing-verification is suppressed for a revoked render. Exact-head validation is pending.",
+      "test_name": "revocation_survives_new_session_and_remains_a_violation"
     },
     {
       "case_id": "MUT-018",
@@ -487,7 +502,8 @@
         "violation_codes": []
       },
       "evidence_status": "unit_test_added",
-      "note": "Implemented in unknown_event_kind_is_rejected_by_schema_deserialization. Exact-head workflow validation is pending."
+      "note": "Implemented in unknown_event_kind_is_rejected_by_schema_deserialization. Exact-head workflow validation is pending.",
+      "test_name": "unknown_event_kind_is_rejected_by_schema_deserialization"
     },
     {
       "case_id": "MUT-022",
@@ -500,7 +516,8 @@
         "violation_codes": []
       },
       "evidence_status": "unit_test_added",
-      "note": "Implemented in bundle_verification_requires_digest_metadata. Exact-head workflow validation is pending."
+      "note": "Implemented in bundle_verification_requires_digest_metadata. Exact-head workflow validation is pending.",
+      "test_name": "bundle_verification_requires_digest_metadata"
     },
     {
       "case_id": "MUT-023",
