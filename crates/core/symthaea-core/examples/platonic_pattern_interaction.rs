@@ -31,7 +31,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     )?;
     let matched_bytes_hrr_dimension = (config.dimension / 8).max(1);
     let matched_bytes_hrr_report = run_hrr_associative_capacity(
-        0x4d41_5443_4842_5954,
+        0x4c45_5649_4e,
         matched_bytes_hrr_dimension,
         config.prototype_count,
         config.trials,
