@@ -307,13 +307,7 @@ impl KnowledgePersistence {
                 }
             }
         }
-        let mut next_id = used_ids
-            .iter()
-            .copied()
-            .max()
-            .unwrap_or(0)
-            .checked_add(1)
-            .ok_or_else(|| "no stable fact IDs available for graph snapshot".to_string())?;
+        let mut next_id = 1u64;
         let mut normalized = Vec::with_capacity(facts.len());
         for fact in facts {
             let fact_id = match fact.fact_id {
