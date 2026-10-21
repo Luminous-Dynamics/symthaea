@@ -662,11 +662,8 @@ fn evaluate(samples: &[ScoredQuery], rule: DecisionRule) -> Evaluation {
 
 fn certify_rule(samples: &[ScoredQuery], rule: DecisionRule) -> CertificationResult {
     let result = evaluate(samples, rule);
-    let upper_risk = clopper_pearson_upper_bound(
-        result.errors,
-        result.accepted,
-        CERTIFICATION_ALPHA_PER_RULE,
-    );
+    let upper_risk =
+        clopper_pearson_upper_bound(result.errors, result.accepted, CERTIFICATION_ALPHA_PER_RULE);
     CertificationResult {
         accepted: result.accepted,
         errors: result.errors,
@@ -686,16 +683,22 @@ fn report_row(
     certificate: Option<CertificationResult>,
     samples: &[ScoredQuery],
 ) {
-    let (certified, cert_accepted, cert_errors, cert_upper_risk) =
-        certificate.map_or(
-            ("not_applicable", "NA".to_owned(), "NA".to_owned(), "NA".to_owned()),
-            |certificate| (
+    let (certified, cert_accepted, cert_errors, cert_upper_risk) = certificate.map_or(
+        (
+            "not_applicable",
+            "NA".to_owned(),
+            "NA".to_owned(),
+            "NA".to_owned(),
+        ),
+        |certificate| {
+            (
                 if certificate.passed { "pass" } else { "fail" },
                 certificate.accepted.to_string(),
                 certificate.errors.to_string(),
                 format!("{:.6}", certificate.upper_risk),
-            ),
-        );
+            )
+        },
+    );
 
     write_evaluation_row(
         &format!("{report_family}_overall"),
@@ -974,7 +977,11 @@ fn report_conformal_set_summaries(
         (QueryKind::RandomOod, "random_ood"),
         (QueryKind::AmbiguousMixture, "ambiguous_mixture"),
     ] {
-        let subset: Vec<_> = samples.iter().copied().filter(|sample| sample.kind == kind).collect();
+        let subset: Vec<_> = samples
+            .iter()
+            .copied()
+            .filter(|sample| sample.kind == kind)
+            .collect();
         emit(seed, split, label, alpha, quantile, calibration_n, &subset);
     }
     for distance_index in 0..NEAR_UNKNOWN_DISTANCES.len() {
@@ -1148,9 +1155,7 @@ fn wilson_interval_95(errors: usize, accepted: usize) -> (f64, f64) {
     let z_squared = z * z;
     let denominator = 1.0 + z_squared / n;
     let center = (p + z_squared / (2.0 * n)) / denominator;
-    let half_width = z
-        * (p * (1.0 - p) / n + z_squared / (4.0 * n * n)).sqrt()
-        / denominator;
+    let half_width = z * (p * (1.0 - p) / n + z_squared / (4.0 * n * n)).sqrt() / denominator;
     (
         (center - half_width).max(0.0),
         (center + half_width).min(1.0),
@@ -1229,9 +1234,7 @@ fn wilson_upper_bound(errors: usize, accepted: usize, z: f64) -> f64 {
     let z_squared = z * z;
     let denominator = 1.0 + z_squared / n;
     let center = (p + z_squared / (2.0 * n)) / denominator;
-    let half_width = z
-        * (p * (1.0 - p) / n + z_squared / (4.0 * n * n)).sqrt()
-        / denominator;
+    let half_width = z * (p * (1.0 - p) / n + z_squared / (4.0 * n * n)).sqrt() / denominator;
     (center + half_width).min(1.0)
 }
 
@@ -1570,4 +1573,3 @@ mod tests {
         }
     }
 }
-
