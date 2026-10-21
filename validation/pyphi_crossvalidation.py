@@ -67,6 +67,8 @@ class ValidationResult:
     error_message: Optional[str] = None
     reference_model_digest: Optional[str] = None
     symthaea_model_digest: Optional[str] = None
+    reference_prior_digest: Optional[str] = None
+    symthaea_prior_digest: Optional[str] = None
     reference_formalism: str = "IIT_3_0"
 
 
@@ -504,6 +506,9 @@ class PyPhiValidator:
                 result.reference_model_digest is not None
                 and result.symthaea_model_digest is not None
                 and result.reference_model_digest == result.symthaea_model_digest
+                and result.reference_prior_digest is not None
+                and result.symthaea_prior_digest is not None
+                and result.reference_prior_digest == result.symthaea_prior_digest
                 for result in report.results
             )
         )
