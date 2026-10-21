@@ -591,7 +591,14 @@ fn analyze(
         .collect();
     let mut undefined_replicates: BTreeMap<&'static str, usize> =
         metric_values.keys().map(|key| (*key, 0)).collect();
-    let clusters: Vec<CellCounts> = class_components.values().copied().collect();
+    // Components containing only partial/unknown/pending labels must remain
+    // accounted for in the report but cannot contribute zero-valued bootstrap
+    // clusters to a binary compatibility metric.
+    let clusters: Vec<CellCounts> = class_components
+        .values()
+        .copied()
+        .filter(|row| row.compatible + row.incompatible > 0)
+        .collect();
     let mut rng = SplitMix64::new(seed);
     for _ in 0..bootstrap_replicates {
         let mut sample = CellCounts::default();
@@ -900,6 +907,22 @@ mod tests {
         assert_eq!(report.counts.incompatible_components, 1);
         assert!(!report.proposed_gates.compatible_component_floor_met);
         assert!(!report.proposed_gates.incompatible_component_floor_met);
+    }
+
+    #[test]
+    fn compatibility_probability_must_be_present_even_when_null_is_allowed() {
+        let missing = serde_json::from_value::<Prediction>(json!({
+            "decision": "accept",
+            "predicted_label": "compatible"
+        }));
+        assert!(missing.is_err());
+
+        let explicit_null = serde_json::from_value::<Prediction>(json!({
+            "decision": "abstain",
+            "predicted_label": "unknown",
+            "compatibility_probability": null
+        }));
+        assert!(explicit_null.is_ok());
     }
 
     #[test]
