@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -204,7 +204,7 @@ fn ratio(numerator: usize, denominator: usize) -> f64 {
 }
 
 fn macro_f1(pairs: &[PairCase], observations: &[&Observation]) -> f64 {
-    let labels: HashSet<&str> = pairs.iter().map(|pair| pair.expected_relation.as_str()).collect();
+    let labels: BTreeSet<&str> = pairs.iter().map(|pair| pair.expected_relation.as_str()).collect();
     if labels.is_empty() {
         return 0.0;
     }
@@ -591,6 +591,7 @@ fn run() -> Result<(), String> {
     let plan: Plan = serde_json::from_slice(&plan_bytes)
         .map_err(|error| format!("plan JSON is invalid: {error}"))?;
     let pairs = parse_jsonl::<PairCase>(&pair_bytes, "pair manifest")?;
+    let pair_count = pairs.len();
     let results = parse_jsonl::<Observation>(&result_bytes, "paired-intervention results")?;
     let system_metrics = score(&plan, pairs, results)?;
 
@@ -622,7 +623,7 @@ fn run() -> Result<(), String> {
         benchmark_case_manifest_sha256: plan.benchmark.case_manifest_sha256,
         source_catalog_sha256: plan.benchmark.source_catalog_sha256,
         source_pack_sha256: plan.benchmark.source_pack_sha256,
-        pair_count: pairs.len(),
+        pair_count,
         system_count: system_metrics.len(),
         systems: system_metrics,
         nonclaims: vec![
@@ -710,7 +711,7 @@ mod tests {
         }
     }
 
-    fn observation(id: &str, system: &str, pair: &str, relation: &str) -> Observation {
+    fn observation(_id: &str, system: &str, pair: &str, relation: &str) -> Observation {
         Observation {
             schema_version:"paired-intervention-result-v0".into(),
             result_id:format!("{system}-{pair}"),
