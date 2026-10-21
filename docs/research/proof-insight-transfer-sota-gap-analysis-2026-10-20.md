@@ -59,6 +59,10 @@ First Proof Batch 3, published **14 October 2026**, tested five systems on ten r
 
 10. **From domain-narrow score chasing to structured transfer coverage.** TheoremBench shows that premise exposure and subtheorem difficulty can alter reported theorem-level success ([paper](https://arxiv.org/abs/2606.09450)); VeriSoftBench reports a gap between curated dependency context and raw repository context on 500 obligations across 23 projects ([benchmark](https://utopia-group.github.io/VeriSoftBench/)); CAM-Bench targets 1,000 Lean problems in computational and applied mathematics ([paper](https://arxiv.org/abs/2605.17255)). Report results by domain, dependency depth, target difficulty, source-target family distance, and context regime. PITB should establish value on mathematical transfer itself, then demonstrate portability across repository-scale verification and applied mathematics—not pool these tasks into an incomparable headline score.
 
+11. **From single-system insight extraction to portable proof-strategy contracts.** ITPEval evaluates statement and proof translation across Lean 4, Rocq, Isabelle, and HOL Light using 1,560 source files and 6,848 theorems. Its reported statement-translation pass@1 peaks at 29.1% and proof-translation pass@1 at 10.5%; a separate definitional-equality check finds only 54.0% equivalence among one translated subset that had already passed Lean checking ([ITPEval](https://arxiv.org/abs/2607.19407)). PITB should not claim cross-system portability now, but its insight record can eventually serve as an intermediate representation: preserve mathematical preconditions, proof-state transformation and failure boundaries, then separately compile or map the strategy into each prover's native context. The acceptance criterion must be target-kernel verification plus statement correspondence in each system, not textual or syntactic similarity. Start with the Rust analyzer's current Lean-only evidence format and treat cross-prover realization as a later external track.
+
+12. **From isolated theorem success to theory-scale compositionality.** LCS-Bench reports 327 textbook items, over 4,076 Lean declarations and 85K-plus lines, with state-of-the-art model performance of 20.1% on its auto-formalization tasks ([LCS-Bench](https://arxiv.org/abs/2606.26525)). This suggests a second long-horizon challenge for strategy transfer: can insights be composed across a dependency graph while definitions and local assumptions remain stable? Do not compare its auto-formalization score with PITB's exact-target proof success. A future pilot should measure obligation closure, definition drift, dependency reuse, regression and proof maintenance over a multi-theorem unit.
+
 ## A measurement metric the field often underreports: temporal resolution coverage
 
 Before any proof model is run, publish a **task-resolution funnel** alongside solve rates:
@@ -118,6 +122,7 @@ A result can establish “improves over the strongest registered baseline on thi
 ### P1 — build a small, auditable training/validation corpus
 
 1. Manually inspect training-family artifacts only. Preserve the split and mark missing/unclear formalizations as excluded or unknown with reasons.
+2. The initial training-only library now includes family 025's greedy-residue decomposition and family 026's eventual-inclusion / positive-linear-count density-transport strategy. Both are static source annotations only: no transfer has been attempted, and their license status remains `needs_review` until confirmed.
 2. Require two reviewers for the first strategy records. Record disagreement rather than silently adjudicating it away.
 3. Add simple direct negative-transfer pairs (such as an upper-bound insight offered for a lower-bound goal) and compatible positive controls before any model comparison.
 4. Select the retriever, prompt/configuration, checker, task budget, validation baseline and statistical seed using validation families only.
@@ -139,6 +144,9 @@ A result can establish “improves over the strongest registered baseline on thi
 ## Research references
 
 - Kim, Han & Hwang, [Benchmarking Testing in Automated Theorem Proving](https://aclanthology.org/2026.acl-industry.150/), ACL 2026 Industry Track.
+- Wu, George & Anandkumar, [ITPEval: Benchmarking Formal Translation Across Interactive Theorem Provers](https://arxiv.org/abs/2607.19407), July 2026.
+- Feng et al., [Theory-Scale Auto-Formalization of Logics for Computer Science (LCS-Bench)](https://arxiv.org/abs/2606.26525), June 2026.
+- Zhang et al., [Beyond Compilation: Evaluating Faithful Natural-Language-to-Lean Statement Formalization](https://arxiv.org/abs/2606.31002), June 2026.
 - Gao et al., [LeanSearch v2: Global Premise Retrieval for Lean 4 Theorem Proving](https://arxiv.org/abs/2605.13137), May 2026; [code and benchmarks](https://github.com/frenzymath/LeanSearch-v2).
 - Pham et al., [TheoremBench](https://arxiv.org/abs/2606.09450), June 2026.
 - Xin et al., [VeriSoftBench](https://arxiv.org/abs/2602.18307); [repository](https://github.com/utopia-group/VeriSoftBench).
