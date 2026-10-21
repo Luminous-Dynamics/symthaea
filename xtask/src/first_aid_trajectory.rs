@@ -143,8 +143,8 @@ pub fn run(root: &Path, corpus_arg: &Path, out_arg: Option<&Path>) -> Result<()>
             corpus_digest
         );
     }
-    let corpus_text = std::str::from_utf8(&corpus_bytes)
-        .context("trajectory corpus must be valid UTF-8")?;
+    let corpus_text =
+        std::str::from_utf8(&corpus_bytes).context("trajectory corpus must be valid UTF-8")?;
     let corpus: TrajectoryCorpus =
         serde_json::from_str(corpus_text).context("parse trajectory corpus JSON")?;
     validate_corpus(&corpus)?;
@@ -153,8 +153,8 @@ pub fn run(root: &Path, corpus_arg: &Path, out_arg: Option<&Path>) -> Result<()>
         .context("read trajectory validator source for receipt identity")?;
     let entrypoint_source = fs::read(root.join("xtask/src/main.rs"))
         .context("read xtask entrypoint source for receipt identity")?;
-    let executable_path = std::env::current_exe()
-        .context("resolve trajectory validator executable")?;
+    let executable_path =
+        std::env::current_exe().context("resolve trajectory validator executable")?;
     let executable_bytes = fs::read(&executable_path)
         .with_context(|| format!("read validator executable {}", executable_path.display()))?;
 
@@ -172,18 +172,21 @@ pub fn run(root: &Path, corpus_arg: &Path, out_arg: Option<&Path>) -> Result<()>
         runtime_arch: std::env::consts::ARCH.to_string(),
         trace_count: corpus.scenarios.len(),
         counterexample_trace_count: results.iter().filter(|codes| !codes.is_empty()).count(),
-        critical_trace_count: corpus.scenarios.iter()
+        critical_trace_count: corpus
+            .scenarios
+            .iter()
             .filter(|trace| trace.criticality == Criticality::Critical)
             .count(),
-        critical_counterexample_count: corpus.scenarios.iter()
+        critical_counterexample_count: corpus
+            .scenarios
+            .iter()
             .zip(&results)
             .filter(|(trace, codes)| {
                 trace.criticality == Criticality::Critical && !codes.is_empty()
             })
             .count(),
         violation_count: results.iter().map(Vec::len).sum(),
-        claim_ceiling:
-            "synthetic process-integrity audit only; no clinical safety or patient-outcome claim",
+        claim_ceiling: "synthetic process-integrity audit only; no clinical safety or patient-outcome claim",
     };
     let encoded = serde_json::to_string_pretty(&receipt)?;
 
@@ -218,7 +221,10 @@ fn sha256_hex(bytes: &[u8]) -> String {
 
 fn validate_corpus(corpus: &TrajectoryCorpus) -> Result<()> {
     if corpus.schema_version != CORPUS_VERSION {
-        bail!("unsupported trajectory corpus version: {}", corpus.schema_version);
+        bail!(
+            "unsupported trajectory corpus version: {}",
+            corpus.schema_version
+        );
     }
     if corpus.status != "synthetic_process_contract_tests_only" {
         bail!("trajectory corpus status must remain explicitly synthetic");
@@ -258,7 +264,11 @@ fn validate_corpus(corpus: &TrajectoryCorpus) -> Result<()> {
                 bail!("{}: unknown violation code {}", trace.trace_id, code);
             }
             if !expected_codes.insert(code.as_str()) {
-                bail!("{}: duplicate expected violation code {}", trace.trace_id, code);
+                bail!(
+                    "{}: duplicate expected violation code {}",
+                    trace.trace_id,
+                    code
+                );
             }
         }
         let actual = inspect_trace(trace);
@@ -284,12 +294,22 @@ fn validate_event_fields(trace: &TrajectoryScenario, event: &TraceEvent) -> Resu
             | EventKind::BundleRevoked
     );
     if needs_bundle_id && event.bundle_id.as_deref().is_none_or(str::is_empty) {
-        bail!("{} event {} requires a nonempty bundle_id", trace.trace_id, event.sequence);
+        bail!(
+            "{} event {} requires a nonempty bundle_id",
+            trace.trace_id,
+            event.sequence
+        );
     }
-    if matches!(event.kind, EventKind::BundleLoaded | EventKind::BundleVerified)
-        && event.bundle_state.is_none()
+    if matches!(
+        event.kind,
+        EventKind::BundleLoaded | EventKind::BundleVerified
+    ) && event.bundle_state.is_none()
     {
-        bail!("{} event {} requires bundle_state", trace.trace_id, event.sequence);
+        bail!(
+            "{} event {} requires bundle_state",
+            trace.trace_id,
+            event.sequence
+        );
     }
     if event.kind == EventKind::BundleVerified && event.digest_verified.is_none() {
         bail!("{} event {} requires digest_verified", trace.trace_id, event.sequence);
@@ -386,8 +406,7 @@ fn inspect_trace(trace: &TrajectoryScenario) -> Vec<String> {
                 if matches!(
                     event.resource_state,
                     Some(ResourceState::Stale | ResourceState::Unknown)
-                )
-                    && event.presented_as == Some(PresentedAs::Confirmed)
+                ) && event.presented_as == Some(PresentedAs::Confirmed)
                 {
                     violations.push("stale_resource_claimed_confirmed".to_string());
                 }
@@ -435,10 +454,7 @@ mod tests {
 
     #[test]
     fn checked_in_trajectory_corpus_has_pinned_digest() {
-        assert_eq!(
-            sha256_hex(CORPUS_JSON.as_bytes()),
-            EXPECTED_CORPUS_SHA256
-        );
+        assert_eq!(sha256_hex(CORPUS_JSON.as_bytes()), EXPECTED_CORPUS_SHA256);
         assert_eq!(corpus().scenarios.len(), 12);
     }
 
@@ -511,7 +527,10 @@ mod tests {
             sensitive_payload: None,
             consent_scoped: None,
         });
-        assert_eq!(inspect_trace(&trace), vec!["render_without_verified_bundle"]);
+        assert_eq!(
+            inspect_trace(&trace),
+            vec!["render_without_verified_bundle"]
+        );
     }
 
     #[test]
@@ -533,7 +552,8 @@ mod tests {
 
     #[test]
     fn stale_resource_is_not_a_violation_when_marked_unconfirmed() {
-        let trace = corpus().scenarios
+        let trace = corpus()
+            .scenarios
             .into_iter()
             .find(|trace| trace.trace_id == "FA-TRACE-011")
             .unwrap();
