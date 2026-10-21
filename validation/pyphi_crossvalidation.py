@@ -447,14 +447,14 @@ class PyPhiValidator:
         relative_errors = errors / np.maximum(np.abs(pyphi_values), 0.001)
         report.agreement_within_10_percent = float(np.mean(relative_errors < 0.10) * 100.0)
 
-    def generate_report(self, report: ValidationReport, output_path: Path):
-        """Generate a report that never presents missing results as numeric zeros."""
+    def is_qualified(self, report: ValidationReport) -> bool:
+        """Single source of truth for both report status and CLI exit status."""
         paired_count = sum(
             r.hdc_phi is not None and r.pyphi_phi is not None
             and np.isfinite(r.hdc_phi) and np.isfinite(r.pyphi_phi)
             for r in report.results
         )
-        qualified = (
+        return (
             paired_count >= 3
             and paired_count == len(report.results)
             and report.n_validated == paired_count
@@ -463,6 +463,15 @@ class PyPhiValidator:
             and np.isfinite(report.correlation)
             and report.correlation > 0.90
         )
+
+    def generate_report(self, report: ValidationReport, output_path: Path):
+        """Generate a report that never presents missing results as numeric zeros."""
+        paired_count = sum(
+            r.hdc_phi is not None and r.pyphi_phi is not None
+            and np.isfinite(r.hdc_phi) and np.isfinite(r.pyphi_phi)
+            for r in report.results
+        )
+        qualified = self.is_qualified(report)
         fmt = lambda value, spec: "N/A" if value is None or not np.isfinite(value) else format(value, spec)
         status = "PASS" if qualified else "NOT QUALIFIED"
         md = [
@@ -541,7 +550,7 @@ def main() -> int:
     )
     print(f"Status: NOT QUALIFIED (paired measurements={paired_count}, failures={report.n_failed})")
     print(f"Report: {args.output}")
-    return 0 if paired_count >= 3 and report.n_failed == 0 else 2
+    return 0 if validator.is_qualified(report) else 2
 
 
 if __name__ == "__main__":
