@@ -13,7 +13,7 @@ use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::fmt;
 
-pub const REPORT_SCHEMA: &str = "open-world-physics-evaluator.v0.1";
+pub const REPORT_SCHEMA: &str = "open-world-physics-evaluator.v0.2";
 pub const TRAIN_X_MIN: f64 = 0.75;
 pub const TRAIN_X_MAX: f64 = 3.5;
 pub const HOLDOUT_X_MIN: f64 = 4.0;
@@ -23,6 +23,8 @@ pub const HOLDOUT_POINT_COUNT: usize = 31;
 const RELATIVE_NOISE: f64 = 0.005;
 /// A BIC difference below this value is reported as indeterminate, not a unique recovery.
 const BIC_DECISIVE_DELTA: f64 = 2.0;
+/// Per-family proposal counts used to expose the candidate-selection bottleneck.
+const CANDIDATES_PER_FAMILY: &[usize] = &[1, 3, 10, 30];
 
 const AMPLITUDES: &[f64] = &[0.5, 1.0, 1.5, 2.0, 2.5, 3.0];
 const EXPONENTS: &[f64] = &[1.0, 1.5, 2.0, 2.5, 3.0];
@@ -145,6 +147,37 @@ pub struct PolicySummary {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct SelectionBottleneckCase {
+    pub world_id: String,
+    pub policy: QueryPolicy,
+    pub candidates_per_family: usize,
+    pub candidate_count: usize,
+    pub expected_family: LawFamily,
+    pub selected_family: LawFamily,
+    pub family_recovered: bool,
+    pub selection_disposition: SelectionDisposition,
+    pub delta_bic_to_runner_up: f64,
+    pub selected_training_nrmse: f64,
+    pub selected_heldout_nrmse: f64,
+    /// Best held-out error among the exact same candidate pool; evaluator-only oracle.
+    pub oracle_pool_heldout_nrmse: f64,
+    /// Nonnegative gap from the training-selected candidate to the evaluator-only pool oracle.
+    pub selection_regret_nrmse: f64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct SelectionBottleneckSummary {
+    pub policy: QueryPolicy,
+    pub candidates_per_family: usize,
+    pub case_count: usize,
+    pub family_recovery_rate: f64,
+    pub mean_selected_heldout_nrmse: f64,
+    pub mean_oracle_pool_heldout_nrmse: f64,
+    pub mean_selection_regret_nrmse: f64,
+    pub mean_generalization_gap_nrmse: f64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ReportBody {
     pub schema: String,
     /// False by design: this first reference corpus is open source and source-visible.
@@ -165,6 +198,9 @@ pub struct ReportBody {
     pub holdout_point_count_per_case: usize,
     pub policies: Vec<PolicySummary>,
     pub cases: Vec<CaseResult>,
+    /// Controlled candidate-pool-size sweep. The oracle metric is evaluator-only.
+    pub selection_bottleneck_cases: Vec<SelectionBottleneckCase>,
+    pub selection_bottleneck_summaries: Vec<SelectionBottleneckSummary>,
     pub claim_boundary: String,
 }
 
@@ -584,6 +620,162 @@ fn summarize(policy: QueryPolicy, rows: &[CaseResult]) -> Option<PolicySummary> 
     })
 }
 
+
+fn candidate_pool(family: LawFamily, count: usize, seed: u64) -> Vec<Law> {
+    let mut candidates = candidate_grid(family);
+    let family_salt = match family {
+        LawFamily::InversePower => 0x4341_4e44_0000_0001,
+        LawFamily::ScreenedInversePower => 0x4341_4e44_0000_0002,
+        LawFamily::Saturating => 0x4341_4e44_0000_0003,
+    };
+    // Shuffle once per world/family, then take prefixes. Larger pools are
+    // nested, so their evaluator-side oracle must never get worse.
+    let mut state = seed ^ family_salt;
+    for index in (1..candidates.len()).rev() {
+        let other = (splitmix64(&mut state) % (index as u64 + 1)) as usize;
+        candidates.swap(index, other);
+    }
+    candidates.truncate(count.min(candidates.len()));
+    candidates
+}
+
+fn heldout_nrmse_for_law(world: &ReferenceWorld, law: Law) -> Option<f64> {
+    let mut predictions = Vec::with_capacity(HOLDOUT_POINT_COUNT);
+    let mut truth = Vec::with_capacity(HOLDOUT_POINT_COUNT);
+    for i in 0..HOLDOUT_POINT_COUNT {
+        let x = HOLDOUT_X_MIN
+            + i as f64 * (HOLDOUT_X_MAX - HOLDOUT_X_MIN)
+                / (HOLDOUT_POINT_COUNT.saturating_sub(1) as f64);
+        predictions.push(law.predict(x)?);
+        truth.push(world.truth.predict(x)?);
+    }
+    normalized_rmse(&predictions, &truth)
+}
+
+fn training_nrmse_for_law(law: Law, observations: &[Observation]) -> Option<f64> {
+    let predicted = observations
+        .iter()
+        .map(|observation| law.predict(observation.x))
+        .collect::<Option<Vec<_>>>()?;
+    let observed = observations
+        .iter()
+        .map(|observation| observation.response)
+        .collect::<Vec<_>>();
+    normalized_rmse(&predicted, &observed)
+}
+
+fn evaluate_selection_bottleneck(
+    world: &ReferenceWorld,
+    policy: QueryPolicy,
+    candidates_per_family: usize,
+) -> Option<SelectionBottleneckCase> {
+    let points = query_points(policy, world.seed);
+    let observations = points
+        .iter()
+        .enumerate()
+        .map(|(i, x)| world.query(*x, i as u64))
+        .collect::<Result<Vec<_>, _>>()
+        .ok()?;
+
+    // Keep proposal coverage and ranking quality separate: every structural
+    // family receives the same candidate budget, but the parameters are a
+    // deterministic sampled subset of that family's declared grid.
+    let mut family_best: Vec<(f64, Law, f64, f64)> = Vec::new();
+    let mut candidate_count = 0usize;
+    let mut oracle_pool_heldout_nrmse = f64::INFINITY;
+    for family in [
+        LawFamily::InversePower,
+        LawFamily::ScreenedInversePower,
+        LawFamily::Saturating,
+    ] {
+        let pool = candidate_pool(family, candidates_per_family, world.seed);
+        candidate_count += pool.len();
+        let mut best_for_family: Option<(f64, Law, f64, f64)> = None;
+        for law in pool {
+            let Some(score) = bic_for(law, &observations) else {
+                continue;
+            };
+            let Some(training_error) = training_nrmse_for_law(law, &observations) else {
+                continue;
+            };
+            let Some(heldout_error) = heldout_nrmse_for_law(world, law) else {
+                continue;
+            };
+            oracle_pool_heldout_nrmse = oracle_pool_heldout_nrmse.min(heldout_error);
+            if best_for_family
+                .as_ref()
+                .is_none_or(|(best_score, _, _, _)| score < *best_score)
+            {
+                best_for_family = Some((score, law, training_error, heldout_error));
+            }
+        }
+        family_best.push(best_for_family?);
+    }
+    family_best.sort_by(|left, right| left.0.total_cmp(&right.0));
+    let delta_bic_to_runner_up = (family_best[1].0 - family_best[0].0).max(0.0);
+    let (_, selected_law, selected_training_nrmse, selected_heldout_nrmse) = family_best[0];
+    let selection_regret_nrmse =
+        (selected_heldout_nrmse - oracle_pool_heldout_nrmse).max(0.0);
+
+    Some(SelectionBottleneckCase {
+        world_id: world.id.to_owned(),
+        policy,
+        candidates_per_family,
+        candidate_count,
+        expected_family: world.truth.family,
+        selected_family: selected_law.family,
+        family_recovered: selected_law.family == world.truth.family,
+        selection_disposition: disposition_from_delta_bic(delta_bic_to_runner_up),
+        delta_bic_to_runner_up,
+        selected_training_nrmse,
+        selected_heldout_nrmse,
+        oracle_pool_heldout_nrmse,
+        selection_regret_nrmse,
+    })
+}
+
+fn summarize_selection_bottleneck(
+    policy: QueryPolicy,
+    candidates_per_family: usize,
+    rows: &[SelectionBottleneckCase],
+) -> Option<SelectionBottleneckSummary> {
+    let selected = rows
+        .iter()
+        .filter(|row| row.policy == policy && row.candidates_per_family == candidates_per_family)
+        .collect::<Vec<_>>();
+    if selected.is_empty() {
+        return None;
+    }
+    let count = selected.len() as f64;
+    let recovered = selected.iter().filter(|row| row.family_recovered).count();
+    Some(SelectionBottleneckSummary {
+        policy,
+        candidates_per_family,
+        case_count: selected.len(),
+        family_recovery_rate: recovered as f64 / count,
+        mean_selected_heldout_nrmse: selected
+            .iter()
+            .map(|row| row.selected_heldout_nrmse)
+            .sum::<f64>()
+            / count,
+        mean_oracle_pool_heldout_nrmse: selected
+            .iter()
+            .map(|row| row.oracle_pool_heldout_nrmse)
+            .sum::<f64>()
+            / count,
+        mean_selection_regret_nrmse: selected
+            .iter()
+            .map(|row| row.selection_regret_nrmse)
+            .sum::<f64>()
+            / count,
+        mean_generalization_gap_nrmse: selected
+            .iter()
+            .map(|row| row.selected_heldout_nrmse - row.selected_training_nrmse)
+            .sum::<f64>()
+            / count,
+    })
+}
+
 pub fn run_reference_benchmark() -> BenchmarkReport {
     let worlds = reference_worlds();
     let mut rows = Vec::new();
@@ -596,6 +788,31 @@ pub fn run_reference_benchmark() -> BenchmarkReport {
         .into_iter()
         .map(|policy| summarize(policy, &rows).expect("each policy has reference cases"))
         .collect();
+
+    let mut selection_bottleneck_cases = Vec::new();
+    for &candidates_per_family in CANDIDATES_PER_FAMILY {
+        for policy in [QueryPolicy::FixedGrid, QueryPolicy::SeededRandom] {
+            for world in &worlds {
+                selection_bottleneck_cases.push(
+                    evaluate_selection_bottleneck(world, policy, candidates_per_family)
+                        .expect("fixed candidate-selection diagnostic must evaluate"),
+                );
+            }
+        }
+    }
+    let mut selection_bottleneck_summaries = Vec::new();
+    for &candidates_per_family in CANDIDATES_PER_FAMILY {
+        for policy in [QueryPolicy::FixedGrid, QueryPolicy::SeededRandom] {
+            selection_bottleneck_summaries.push(
+                summarize_selection_bottleneck(
+                    policy,
+                    candidates_per_family,
+                    &selection_bottleneck_cases,
+                )
+                .expect("each candidate pool size has reference cases"),
+            );
+        }
+    }
 
     let body = ReportBody {
         schema: REPORT_SCHEMA.to_owned(),
@@ -623,6 +840,8 @@ pub fn run_reference_benchmark() -> BenchmarkReport {
         holdout_point_count_per_case: HOLDOUT_POINT_COUNT,
         policies,
         cases: rows,
+        selection_bottleneck_cases,
+        selection_bottleneck_summaries,
         claim_boundary: "Open, source-visible synthetic reference suite and bounded grid-search baseline only; not a blind SOTA result, not evidence of new real-world physics, and not production solver qualification.".to_owned(),
     };
     let bytes = serde_json::to_vec(&body).expect("report body must serialize deterministically");
@@ -863,6 +1082,72 @@ mod tests {
                 row.selection_disposition == SelectionDisposition::DecisiveWithinReferenceGrammar,
                 row.delta_bic_to_runner_up >= BIC_DECISIVE_DELTA
             );
+        }
+    }
+
+
+    #[test]
+    fn candidate_selection_curve_separates_ranking_regret_from_pool_quality() {
+        let first = run_reference_benchmark();
+        let second = run_reference_benchmark();
+        assert_eq!(first, second);
+        assert!(first.verify_receipt());
+        assert_eq!(first.body.selection_bottleneck_cases.len(), 24);
+        assert_eq!(first.body.selection_bottleneck_summaries.len(), 8);
+
+        for row in &first.body.selection_bottleneck_cases {
+            assert_eq!(row.candidate_count, row.candidates_per_family * 3);
+            assert!(row.selected_training_nrmse.is_finite());
+            assert!(row.selected_heldout_nrmse.is_finite());
+            assert!(row.oracle_pool_heldout_nrmse.is_finite());
+            assert!(row.selection_regret_nrmse.is_finite());
+            assert!(row.selection_regret_nrmse >= 0.0);
+            assert!(
+                row.oracle_pool_heldout_nrmse <= row.selected_heldout_nrmse + 1.0e-12,
+                "pool oracle must be no worse than the selected candidate"
+            );
+            assert!(
+                (row.selection_regret_nrmse
+                    - (row.selected_heldout_nrmse - row.oracle_pool_heldout_nrmse).max(0.0))
+                    .abs()
+                    <= 1.0e-12
+            );
+        }
+
+        // The pool is built from deterministic shuffled prefixes. More candidate
+        // proposals may improve the evaluator-only oracle, but may not worsen it.
+        for world in reference_worlds() {
+            for policy in [QueryPolicy::FixedGrid, QueryPolicy::SeededRandom] {
+                let mut previous_oracle = f64::INFINITY;
+                for &pool_size in CANDIDATES_PER_FAMILY {
+                    let row = first
+                        .body
+                        .selection_bottleneck_cases
+                        .iter()
+                        .find(|row| {
+                            row.world_id == world.id
+                                && row.policy == policy
+                                && row.candidates_per_family == pool_size
+                        })
+                        .expect("candidate-selection row exists");
+                    assert!(
+                        row.oracle_pool_heldout_nrmse <= previous_oracle + 1.0e-12,
+                        "oracle error worsened as nested candidate pool grew: {}",
+                        world.id
+                    );
+                    previous_oracle = row.oracle_pool_heldout_nrmse;
+                }
+            }
+        }
+
+        for summary in &first.body.selection_bottleneck_summaries {
+            assert_eq!(summary.case_count, 3);
+            assert!(summary.family_recovery_rate.is_finite());
+            assert!((0.0..=1.0).contains(&summary.family_recovery_rate));
+            assert!(summary.mean_selected_heldout_nrmse.is_finite());
+            assert!(summary.mean_oracle_pool_heldout_nrmse.is_finite());
+            assert!(summary.mean_selection_regret_nrmse.is_finite());
+            assert!(summary.mean_generalization_gap_nrmse.is_finite());
         }
     }
 
