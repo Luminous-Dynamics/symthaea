@@ -137,6 +137,23 @@ jobs:
           test "$gerber_count" -ge 5
           test "$drill_count" -ge 1
 
+          # Assert each required fabrication layer by name; a file-count-only
+          # check could otherwise hide a missing copper, mask or outline layer.
+          for expected in \
+            continuity-coupon-F_Cu.gbr \
+            continuity-coupon-B_Cu.gbr \
+            continuity-coupon-F_Mask.gbr \
+            continuity-coupon-B_Mask.gbr \
+            continuity-coupon-F_Silkscreen.gbr \
+            continuity-coupon-Edge_Cuts.gbr; do
+            test -s "$OUT_HOST/gerbers/$expected"
+            test -s "$OUT_HOST/gerbers-repeat/$expected"
+          done
+          test -s "$OUT_HOST/drill/continuity-coupon.drl"
+          grep -qx 'M48' "$OUT_HOST/drill/continuity-coupon.drl"
+          grep -qx '%' "$OUT_HOST/drill/continuity-coupon.drl"
+          grep -q '^T1C1\.000$' "$OUT_HOST/drill/continuity-coupon.drl"
+
           board_sha=$(sha256sum "$GITHUB_WORKSPACE/$BOARD_REL" | cut -d ' ' -f 1)
           git_head=$(git rev-parse HEAD)
           image_digest="sha256:cef4a572df1465b98fa63cdac88780e0f8d39f03c5493434802bcd92f62123fb"
@@ -177,7 +194,9 @@ jobs:
               },
               generated_outputs: {
                 nonempty_gerber_files: $gerber_count,
-                nonempty_drill_files: $drill_file_count
+                nonempty_drill_files: $drill_file_count,
+                required_gerber_filename_set_checked: true,
+                expected_excellon_filename_and_header_checked: true
               },
               authority: "native_eda_cli_drc_and_export_smoke_only_no_physical_or_production_release_authority",
               claim_ceiling: "The CLI parsed the fixture and generated the recorded outputs; this does not prove physical board conformity, electrical safety, assembly quality, or product qualification."
@@ -209,8 +228,10 @@ jobs:
             and .controls.intentional_short_detected_by_exit_code
             and .controls.intentional_short_type_checked_as_shorting_items
             and .controls.short_control_has_zero_unconnected_items
-            and .generated_outputs.nonempty_gerber_files >= 5
-            and .generated_outputs.nonempty_drill_files >= 1
+            and .generated_outputs.nonempty_gerber_files == 6
+            and .generated_outputs.nonempty_drill_files == 1
+            and .generated_outputs.required_gerber_filename_set_checked
+            and .generated_outputs.expected_excellon_filename_and_header_checked
             and .authority == "native_eda_cli_drc_and_export_smoke_only_no_physical_or_production_release_authority"
           ' "$OUT_HOST/receipt.json"
 
