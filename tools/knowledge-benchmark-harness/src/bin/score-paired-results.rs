@@ -32,6 +32,7 @@ struct Plan {
     benchmark: Benchmark,
     systems: Vec<System>,
     preregistration: Preregistration,
+    bootstrap: BootstrapPlan,
 }
 
 #[derive(Debug, Deserialize)]
@@ -55,6 +56,13 @@ struct Preregistration {
     held_out_access: String,
 }
 
+#[derive(Debug, Deserialize)]
+struct BootstrapPlan {
+    replicates: usize,
+    seed: u64,
+    confidence_level: f64,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 struct PairCase {
     pair_id: String,
@@ -63,6 +71,7 @@ struct PairCase {
     dimension: String,
     expected_relation: String,
     criticality: String,
+    source_family_ids: Vec<String>,
     baseline: PairState,
     mutated: PairState,
     acceptance: Acceptance,
@@ -115,7 +124,7 @@ struct Acceptance {
     must_not: Vec<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 struct Observation {
     schema_version: String,
     result_id: String,
@@ -163,6 +172,23 @@ struct SystemMetrics {
 }
 
 #[derive(Debug, Serialize)]
+struct PairwiseComparison {
+    baseline_system_id: String,
+    candidate_system_id: String,
+    primary_endpoint: String,
+    baseline_value: f64,
+    candidate_value: f64,
+    absolute_difference: f64,
+    confidence_interval_low: f64,
+    confidence_interval_high: f64,
+    confidence_level: f64,
+    source_family_cluster_count: usize,
+    bootstrap_replicates: usize,
+    bootstrap_seed: u64,
+    candidate_improvement_supported: bool,
+}
+
+#[derive(Debug, Serialize)]
 struct Report {
     report_schema_version: &'static str,
     tool_version: &'static str,
@@ -181,9 +207,14 @@ struct Report {
     benchmark_case_manifest_sha256: String,
     source_catalog_sha256: String,
     source_pack_sha256: String,
+    bootstrap_replicates: usize,
+    bootstrap_seed: u64,
+    confidence_level: f64,
+    source_family_cluster_count: usize,
     pair_count: usize,
     system_count: usize,
     systems: Vec<SystemMetrics>,
+    comparisons: Vec<PairwiseComparison>,
     nonclaims: Vec<&'static str>,
 }
 
