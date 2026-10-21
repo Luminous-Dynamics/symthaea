@@ -244,3 +244,5 @@ A separate synthesis examines possible relations among love-consistent behavior,
 - [Issue #8274: audit Φ-dyad construct validity](https://github.com/Luminous-Dynamics/symthaea/issues/8274) tracks the concrete concern that current dyad inputs may be self-generated proxies rather than independent human observations. It requires provenance, construct separation, and negative controls before interpreting those outputs relationally.
 
 The cross-scale extension is MeasurementOnly: it does not authorize runtime changes, claim that Φ measures love, or establish subjective experience.
+
+- [Baseline and comparison protocol](structural-love-dynamics/BASELINE_PROTOCOL.md) defines the benchmark strata, SOTA comparators, non-compensable gates, ablations, corpus growth, reproducibility receipts, and no-go criteria. It explicitly positions SLD as complementary to MentalHealthBench, Emotional Dynamic Trajectories, RESCUE-BENCH, and ESConv/ESC-Eval rather than claiming those areas as new.
