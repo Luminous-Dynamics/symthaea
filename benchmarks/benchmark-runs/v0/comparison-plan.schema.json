@@ -314,7 +314,8 @@
         "replicates",
         "seed",
         "confidence_level",
-        "multiple_comparison_correction"
+        "multiple_comparison_correction",
+        "minimum_independent_clusters"
       ],
       "properties": {
         "replicates": {
@@ -335,6 +336,10 @@
             "none",
             "bonferroni"
           ]
+        },
+        "minimum_independent_clusters": {
+          "type": "integer",
+          "minimum": 20
         }
       }
     }
