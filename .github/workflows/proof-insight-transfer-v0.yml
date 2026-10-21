@@ -789,8 +789,14 @@ jobs:
               raise SystemExit("theorem-identity status counts do not cover all dataset records")
           by_status = {event["path_join_status"]: 0 for event in audit["events"]}
           for event in audit["events"]:
-              if not set(event["identity_candidate_timeline_positions"]).issubset(set(event["candidate_timeline_positions"])):
+              path_positions = set(event["candidate_timeline_positions"])
+              if not set(event["identity_candidate_timeline_positions"]).issubset(path_positions):
                   raise SystemExit("theorem identity join refers to a timeline row outside its path candidates")
+              ambiguous_declarations = event["ambiguous_declaration_timeline_positions"]
+              if not set(ambiguous_declarations).issubset(path_positions):
+                  raise SystemExit("ambiguous declarations refer to a timeline row outside its path candidates")
+              if event["identity_join_status"] == "ambiguous_declaration_identity" and not ambiguous_declarations:
+                  raise SystemExit("ambiguous declaration status lacks explicit ambiguous timeline positions")
               if event["identity_join_status"] == "unique_stable_theorem_proof_transition":
                   if len(event["identity_candidate_timeline_positions"]) != 1:
                       raise SystemExit("stable theorem identity must resolve to exactly one proof transition")
