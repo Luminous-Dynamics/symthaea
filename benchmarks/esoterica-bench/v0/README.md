@@ -6,6 +6,7 @@ This directory contains the initial claim schema and adversarial starter cases f
 - `case.schema.json`: JSON Schema Draft 2020-12 for evaluation case records.
 - `cases.jsonl`: 12 development case fixtures; not a held-out evaluation set.
 - `claim-fixtures.jsonl`: four synthetic claim records that exercise distinct epistemic lanes; they are not historical evidence.
+- Shared source identities, source-family groups, split status and rights-review status: [source catalog](../../source-catalog/v0/README.md).
 - Design and evaluation protocol: [ESOTERICA_KNOWLEDGE_FABRIC.md](../../../docs/research/ESOTERICA_KNOWLEDGE_FABRIC.md).
 
 ## Important status
@@ -32,6 +33,6 @@ Mythology is a first-class adjacent domain, not a synonym for esotericism. The E
 
 ## Local validator
 
-The isolated Rust validator lives in [`tools/knowledge-benchmark-harness/`](../../../tools/knowledge-benchmark-harness/). Run [`scripts/validate-knowledge-benchmarks.sh`](../../../scripts/validate-knowledge-benchmarks.sh) from a repository checkout. It validates the schema against the Draft 2020-12 meta-schema, validates instances with format checking enabled, refuses remote/file schema references, verifies graph IDs and evidence references, hashes exact input bytes and the dependency lockfile, and emits one JSON report per fixture set. It never fetches the source URLs.
+The isolated Rust validator lives in [`tools/knowledge-benchmark-harness/`](../../../tools/knowledge-benchmark-harness/). Run [`scripts/validate-knowledge-benchmarks.sh`](../../../scripts/validate-knowledge-benchmarks.sh) from a repository checkout. The script validates six input groups: Esoterica cases, synthetic claim controls, Mythology cases, paired metamorphic interventions, the shared source catalog, and narrative graph fixtures. The harness checks Draft 2020-12 schemas, local schema references, domain contracts, source IDs/URIs and split agreement, source-family split leakage, rights/access combinations, and paired-intervention integrity; it hashes the exact input/schema/lock bytes and never fetches source URLs. Cargo runs use `--locked`.
 
-The harness has been authored on the research branch but has **not been compiled or executed in this environment**; this container has no Rust/Cargo toolchain and cannot resolve GitHub network hosts. Do not interpret the source code or CI workflow as a passing qualification result. The generated lockfile must be reviewed and committed before calling repeated runs fully dependency-reproducible.
+All current cases remain development fixtures; all catalog sources are metadata-only with unknown rights and pending review. No held-out model evaluation or SOTA comparison has been run. A contract validator passing would establish data and invariant checks only—not scholarly correctness, rights, empirical truth, or model quality.
