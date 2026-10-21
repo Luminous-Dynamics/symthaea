@@ -32,7 +32,7 @@ The smoke mode uses 16,384 coordinates, 64 candidate prototypes, 16 trials, nois
 
 ## Capacity target: K95 (tested-grid estimate)
 
-The runner now emits `max_tested_k95` for MAP raw retrieval, MAP projected-softmax cleanup, same-dimension HRR, and byte-matched HRR. Here K95 means the **largest capacity actually present in the configured sweep** for which the lower 95% Wilson bound on Recall@1 is at least 95%. The output says `k95_tested_grid_only=true` deliberately: this is not a claim about untested capacity values or a continuous maximum.
+The runner now emits `max_tested_k95` for MAP raw retrieval, MAP projected-softmax cleanup, same-dimension HRR, and byte-matched HRR. Here K95 means the **largest capacity in the initial consecutive prefix of the configured sweep** for which every tested point's lower 95% Wilson bound on Recall@1 remains at least 95%. The algorithm stops at the first failed point; a later noisy point cannot requalify a larger capacity. The output says `k95_tested_grid_only=true` deliberately: this is not a claim about untested capacity values or a continuous maximum.
 
 Two important qualifications:
 
