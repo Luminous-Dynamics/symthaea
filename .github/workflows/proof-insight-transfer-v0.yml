@@ -1196,9 +1196,12 @@ jobs:
           from pathlib import Path
 
           upstream, index_path, workspace = map(Path, sys.argv[1:])
-          record_path = workspace / "data/benchmarks/proof-insight-transfer-v0/candidates/025-short-egyptian-greedy-residue.json"
+          candidate_paths = [
+              workspace / "data/benchmarks/proof-insight-transfer-v0/candidates/025-short-egyptian-greedy-residue.json",
+              workspace / "data/benchmarks/proof-insight-transfer-v0/candidates/026-eventual-subset-density-transfer.json",
+          ]
           split_path = workspace / "data/benchmarks/proof-insight-transfer-v0/splits.json"
-          record = json.loads(record_path.read_text())
+          records = [(candidate_path, json.loads(candidate_path.read_text())) for candidate_path in candidate_paths]
           index = json.loads(index_path.read_text())
           split_manifest = json.loads(split_path.read_text())
 
@@ -1237,50 +1240,51 @@ jobs:
               raise SystemExit("generated index partition digest differs from independently recomputed digest")
           print(f"PITB_FROZEN_SPLIT_REPRODUCTION_PASS: {partition_digest}")
 
-          relative = Path(record["source"]["path"])
-          if relative.is_absolute() or ".." in relative.parts:
-              raise SystemExit("candidate source path must remain repository-relative")
-          source = upstream / relative
-          try:
-              source.resolve().relative_to(upstream.resolve())
-          except ValueError as error:
-              raise SystemExit("candidate source path escaped the pinned checkout") from error
-          source_bytes = source.read_bytes()
-          source_sha256 = hashlib.sha256(source_bytes).hexdigest()
-          if source_sha256 != record["source"]["sha256"]:
-              raise SystemExit("candidate source SHA-256 differs from the pinned upstream bytes")
-          if source_sha256 != record["artifact"]["sha256"]:
-              raise SystemExit("candidate artifact and source digests disagree")
-          statement = record["theorem"]["statement_text"]
-          statement_digest = hashlib.sha256(statement.encode("utf-8")).hexdigest()
-          if statement_digest != record["theorem"]["statement_digest"]:
-              raise SystemExit("candidate statement digest does not match its exact stored UTF-8 text")
-          normalized_statement = " ".join(statement.split())
-          normalized_source = " ".join(source_bytes.decode("utf-8").split())
-          if normalized_statement not in normalized_source:
-              raise SystemExit("candidate theorem signature is not present after whitespace normalization in the pinned source")
-          indexed = [
-              item for item in index["source_fingerprints"]
-              if item["path"] == record["source"]["path"]
-          ]
-          if len(indexed) > 1:
-              raise SystemExit("candidate source path is duplicated in the reproducible source index")
-          if indexed and indexed[0]["sha256"] != source_sha256:
-              raise SystemExit("candidate source digest disagrees with the reproducible source index")
-          # The upstream index is intentionally scoped to manifest and catalogue-linked
-          # artifacts, so a supporting Lean file may be absent. Its pinned-checkout
-          # bytes are still verified independently above.
-          family = record["source"]["family_id"]
-          assignments = [
-              item for item in split_manifest["families"]
-              if item["family_id"] == family
-          ]
-          if len(assignments) != 1 or assignments[0]["split"] != "train":
-              raise SystemExit("new candidate must remain in exactly one frozen training family")
-          print(
-              "PITB_TRAINING_CANDIDATE_PINNED_SOURCE_PASS: "
-              f"family={family} indexed={bool(indexed)} source_sha256={source_sha256} statement_sha256={statement_digest}"
-          )
+          for record_path, record in records:
+              relative = Path(record["source"]["path"])
+              if relative.is_absolute() or ".." in relative.parts:
+                  raise SystemExit("candidate source path must remain repository-relative")
+              source = upstream / relative
+              try:
+                  source.resolve().relative_to(upstream.resolve())
+              except ValueError as error:
+                  raise SystemExit("candidate source path escaped the pinned checkout") from error
+              source_bytes = source.read_bytes()
+              source_sha256 = hashlib.sha256(source_bytes).hexdigest()
+              if source_sha256 != record["source"]["sha256"]:
+                  raise SystemExit("candidate source SHA-256 differs from the pinned upstream bytes")
+              if source_sha256 != record["artifact"]["sha256"]:
+                  raise SystemExit("candidate artifact and source digests disagree")
+              statement = record["theorem"]["statement_text"]
+              statement_digest = hashlib.sha256(statement.encode("utf-8")).hexdigest()
+              if statement_digest != record["theorem"]["statement_digest"]:
+                  raise SystemExit("candidate statement digest does not match its exact stored UTF-8 text")
+              normalized_statement = " ".join(statement.split())
+              normalized_source = " ".join(source_bytes.decode("utf-8").split())
+              if normalized_statement not in normalized_source:
+                  raise SystemExit("candidate theorem signature is not present after whitespace normalization in the pinned source")
+              indexed = [
+                  item for item in index["source_fingerprints"]
+                  if item["path"] == record["source"]["path"]
+              ]
+              if len(indexed) > 1:
+                  raise SystemExit("candidate source path is duplicated in the reproducible source index")
+              if indexed and indexed[0]["sha256"] != source_sha256:
+                  raise SystemExit("candidate source digest disagrees with the reproducible source index")
+              # The upstream index is intentionally scoped to manifest and catalogue-linked
+              # artifacts, so a supporting Lean file may be absent. Its pinned-checkout
+              # bytes are still verified independently above.
+              family = record["source"]["family_id"]
+              assignments = [
+                  item for item in split_manifest["families"]
+                  if item["family_id"] == family
+              ]
+              if len(assignments) != 1 or assignments[0]["split"] != "train":
+                  raise SystemExit("new candidate must remain in exactly one frozen training family")
+              print(
+                  "PITB_TRAINING_CANDIDATE_PINNED_SOURCE_PASS: "
+                  f"family={family} indexed={bool(indexed)} source_sha256={source_sha256} statement_sha256={statement_digest}"
+              )
           PY
           echo "PITB_PINNED_SOURCE_INDEX_PASS: $upstream_sha"
       - name: Upload exact-source index and receipts
