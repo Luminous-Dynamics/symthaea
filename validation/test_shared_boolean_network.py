@@ -58,9 +58,9 @@ class SharedBooleanNetworkTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             manifest = Path(directory) / "bad.tsv"
             manifest.write_text(
-                "# test manifest\\n"
-                "bad_prior\\t2\\tcopy:0,copy:1\\t0000000000000000\\t"
-                "sparse:0:3fe0000000000000\\n",
+                "# test manifest\n"
+                "bad_prior\t2\tcopy:0,copy:1\t0000000000000000\t"
+                "sparse:0:3fe0000000000000\n",
                 encoding="utf-8",
             )
             with self.assertRaisesRegex(ValueError, "sum to 1"):
@@ -70,7 +70,7 @@ class SharedBooleanNetworkTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             manifest = Path(directory) / "bad.tsv"
             manifest.write_text(
-                "bad_noise\\t2\\tcopy:0,copy:1\\t3fe0000000000000\\tuniform\\n",
+                "bad_noise\t2\tcopy:0,copy:1\t3fe0000000000000\tuniform\n",
                 encoding="utf-8",
             )
             with self.assertRaisesRegex(ValueError, "flip probability"):
