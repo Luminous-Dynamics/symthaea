@@ -234,6 +234,9 @@ fn parse_episodes(csv: &str) -> Result<BTreeMap<ConditionKey, EpisodesBySeed>, B
         let violation_exposure = parse_f64(&values, &header, "violation_exposure")?;
         let max_violation_severity = parse_f64(&values, &header, "max_violation_severity")?;
         let minimum_reserve = parse_f64(&values, &header, "minimum_reserve")?;
+        let mean_safe_action_options = parse_f64(&values, &header, "mean_safe_action_options")?;
+        let minimum_safe_action_options =
+            parse_usize(&values, &header, "minimum_safe_action_options")?;
         let terminal_reserve = parse_f64(&values, &header, "terminal_reserve")?;
         let terminal_load = parse_f64(&values, &header, "terminal_load")?;
         let false_alarms = parse_usize(&values, &header, "false_alarms")?;
