@@ -1,12 +1,13 @@
 //! Separate nominal and true one-step action models for mismatch falsification.
 //!
 //! This module is a deterministic synthetic harness. The nominal model is the
-//! controller's estimate; each episode's true model applies explicit additive
-//! residuals by action. Calibration scores take a maximum over the full stress
-//! grid and every available action, never just the selected action.
+//! controller estimate; each true model applies explicit additive residuals by
+//! state channel and action. Episode scores maximize residuals across every
+//! candidate action and the frozen stress grid, not only the selected action.
 
 use super::calibration::{
-    calibrate_episode_radii, enclose_predicted_action_effects, CalibratedEnvelopeRadii,
+    calibrate_episode_radii, enclose_predicted_action_effects, enclose_predicted_state,
+    CalibratedEnvelopeRadii,
 };
 use super::robust_viability::{
     next_state_envelope, robustly_viable, ActionEffectBounds, Interval, StateEnvelope,
@@ -76,8 +77,8 @@ pub struct EpisodeResidualScores {
     pub load_effect: f64,
 }
 
-/// Controller-side nominal action effect, copied as an explicit model contract.
-/// It does not consult the episode's true mismatch profile.
+/// Controller-side nominal action effect, independent of the episode's true
+/// mismatch profile.
 pub fn nominal_action_effect(action: Action, stress: f64) -> Option<ActionEffectBounds> {
     if !stress.is_finite() || !(0.0..=1.0).contains(&stress) {
         return None;
@@ -96,8 +97,8 @@ pub fn nominal_action_effect(action: Action, stress: f64) -> Option<ActionEffect
     )
 }
 
-/// Environment-side true action effect. The mismatch residual is deliberately
-/// separate from the nominal equation so a point-estimate shield can be wrong.
+/// Environment-side true action effect. Mismatch is additive and deliberately
+/// separate from the nominal equation, so a point-estimate shield can be wrong.
 pub fn true_action_effect(
     action: Action,
     stress: f64,
@@ -111,8 +112,8 @@ pub fn true_action_effect(
     ))
 }
 
-/// Produce the four episode scores required by the calibrated-envelope module.
-/// Effect errors are maximized over all actions and all stress values in the grid.
+/// Produce four episode scores. Each effect score is the maximum absolute
+/// residual over all actions and all stress values in the supplied grid.
 pub fn episode_residual_scores(
     mismatch: MismatchProfile,
     stress_grid: &[f64],
@@ -132,8 +133,6 @@ pub fn episode_residual_scores(
             let error = mismatch.error(action);
             reserve_effect = reserve_effect.max(error.reserve_delta_error.abs());
             load_effect = load_effect.max(error.load_delta_error.abs());
-            // Also require nominal and true model functions to accept the same
-            // stress domain; errors are additive but never conceal invalid input.
             nominal_action_effect(action, *stress)?;
         }
     }
@@ -146,8 +145,8 @@ pub fn episode_residual_scores(
     })
 }
 
-/// Calibrate episode-level radii over a supplied independent calibration panel.
-/// Callers must pass one worst-case score per independent episode, not timesteps.
+/// Calibrate episode-level radii from a supplied independent calibration panel.
+/// There must be one worst-case score per independent episode, not per timestep.
 pub fn calibrate_mismatch_panel(
     profiles: &[MismatchProfile],
     stress_grid: &[f64],
@@ -173,49 +172,13 @@ pub fn calibrate_mismatch_panel(
     )
 }
 
-/// Estimated action effect expanded by a calibrated residual envelope.
+/// Estimated action effect expanded by its calibrated residual envelope.
 pub fn calibrated_action_effect(
     action: Action,
     stress: f64,
     radii: CalibratedEnvelopeRadii,
 ) -> Option<ActionEffectBounds> {
     enclose_predicted_action_effects(nominal_action_effect(action, stress)?, radii)
-}
-
-/// Check both robust predicted viability and the separate true transition.
-/// This exists for falsification tests: a point estimate may pass while the true
-/// model violates the constraint; a calibrated envelope should reject it when
-/// the held-out model error is enclosed by its calibration radius.
-pub fn point_and_robust_vs_true(
-    state: StateEnvelope,
-    action: Action,
-    stress: f64,
-    mismatch: MismatchProfile,
-    radii: CalibratedEnvelopeRadii,
-    limits: ViabilityLimits,
-) -> Option<(bool, bool, bool)> {
-    let point_effect = nominal_action_effect(action, stress)?;
-    let robust_effect = calibrated_action_effect(action, stress, radii)?;
-    let true_effect = true_action_effect(action, stress, mismatch)?;
-    let nominal_reserve = (state.reserve().lower() + state.reserve().upper()) * 0.5;
-    let nominal_load = (state.load().lower() + state.load().upper()) * 0.5;
-    let true_state = StateEnvelope::new(
-        Interval::point((nominal_reserve + mismatch.reserve_state_error).clamp(0.0, 1.0))?,
-        Interval::point((nominal_load + mismatch.load_state_error).clamp(0.0, 1.0))?,
-    )?;
-    let robust_state = super::calibration::enclose_predicted_state(state, radii)?;
-    let point_certified = robustly_viable(state, point_effect, limits);
-    let robust_certified = robustly_viable(robust_state, robust_effect, limits);
-    let true_next = next_state_envelope(
-        true_state,
-        ActionEffectBounds::new(
-            Interval::point(true_effect.0)?,
-            Interval::point(true_effect.1)?,
-        )?,
-    )?;
-    let true_safe = true_next.reserve().lower() >= limits.min_reserve()
-        && true_next.load().upper() <= limits.max_load();
-    Some((point_certified, robust_certified, true_safe))
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -229,10 +192,8 @@ pub struct SafetyAvailabilityMetrics {
     pub robust_false_vetoes: usize,
 }
 
-/// Evaluate a candidate action set against a distinct true model. This makes
-/// the safety/availability trade-off visible: fewer certificates are not
-/// automatically better unless false certificates also fall without excessive
-/// rejection of actions that are actually safe.
+/// Keep certification safety and availability cost separate. A filter cannot
+/// look successful just by rejecting every candidate action.
 pub fn evaluate_safety_availability(
     state: StateEnvelope,
     stress: f64,
@@ -291,7 +252,7 @@ fn deterministic_trit(seed: u64, dimension: usize) -> f64 {
 }
 
 /// Deterministic calibration-design panel: zero error, both extrema on each of
-/// eight coordinates, plus mixed perturbations. It is not empirical data.
+/// eight coordinates, plus mixed perturbations. This is not empirical data.
 pub fn calibration_panel() -> Vec<MismatchProfile> {
     let mut profiles = vec![make_profile_from_coordinates([0.0; 8])];
     for axis in 0..8 {
@@ -308,6 +269,89 @@ pub fn calibration_panel() -> Vec<MismatchProfile> {
     }
     profiles
 }
+
+/// Generate a deterministic held-out mismatch profile. Scale 1.0 stays within
+/// the declared coordinate bounds; scale 2.0 is an out-of-family negative control.
+pub fn synthetic_mismatch_profile(seed: u64, scale: f64) -> Option<MismatchProfile> {
+    if !scale.is_finite() || !(0.0..=10.0).contains(&scale) {
+        return None;
+    }
+    let coordinates =
+        std::array::from_fn(|dimension| deterministic_trit(seed, dimension) * scale);
+    Some(make_profile_from_coordinates(coordinates))
+}
+
+/// Compare nominal certification, robust certification, and true one-step safety.
+/// Input state is the controller estimate; the true model adds the profile's state
+/// error. Robust certification includes the calibrated state and action-effect
+/// envelopes, while the true transition is evaluated at the perturbed state.
+pub fn point_and_robust_vs_true(
+    state: StateEnvelope,
+    action: Action,
+    stress: f64,
+    mismatch: MismatchProfile,
+    radii: CalibratedEnvelopeRadii,
+    limits: ViabilityLimits,
+) -> Option<(bool, bool, bool)> {
+    let point_effect = nominal_action_effect(action, stress)?;
+    let robust_effect = calibrated_action_effect(action, stress, radii)?;
+    let true_effect = true_action_effect(action, stress, mismatch)?;
+    let nominal_reserve = (state.reserve().lower() + state.reserve().upper()) * 0.5;
+    let nominal_load = (state.load().lower() + state.load().upper()) * 0.5;
+    let true_state = StateEnvelope::new(
+        Interval::point((nominal_reserve + mismatch.reserve_state_error).clamp(0.0, 1.0))?,
+        Interval::point((nominal_load + mismatch.load_state_error).clamp(0.0, 1.0))?,
+    )?;
+    let robust_state = enclose_predicted_state(state, radii)?;
+    let point_certified = robustly_viable(state, point_effect, limits);
+    let robust_certified = robustly_viable(robust_state, robust_effect, limits);
+    let true_next = next_state_envelope(
+        true_state,
+        ActionEffectBounds::new(
+            Interval::point(true_effect.0)?,
+            Interval::point(true_effect.1)?,
+        )?,
+    )?;
+    let true_safe = true_next.reserve().lower() >= limits.min_reserve()
+        && true_next.load().upper() <= limits.max_load();
+    Some((point_certified, robust_certified, true_safe))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const STRESS_GRID: [f64; 5] = [0.0, 0.25, 0.5, 0.75, 1.0];
+
+    fn error(reserve: f64, load: f64) -> ActionEffectError {
+        ActionEffectError {
+            reserve_delta_error: reserve,
+            load_delta_error: load,
+        }
+    }
+
+    fn profile(scale: f64) -> MismatchProfile {
+        MismatchProfile::new(
+            0.01 * scale,
+            -0.02 * scale,
+            error(-0.03 * scale, 0.06 * scale),
+            error(0.01 * scale, -0.025 * scale),
+            error(-0.015 * scale, 0.04 * scale),
+        )
+        .expect("finite synthetic mismatch")
+    }
+
+    fn state() -> StateEnvelope {
+        StateEnvelope::new(
+            Interval::point(0.22).expect("finite point"),
+            Interval::point(0.80).expect("finite point"),
+        )
+        .expect("valid state")
+    }
+
+    fn limits() -> ViabilityLimits {
+        ViabilityLimits::new(0.15, 0.88).expect("valid limits")
+    }
 
     #[test]
     fn mismatch_calibration_panel_reaches_each_independent_error_bound() {
@@ -375,34 +419,23 @@ pub fn calibration_panel() -> Vec<MismatchProfile> {
         assert!(episode_residual_scores(valid, &[]).is_none());
         assert!(episode_residual_scores(valid, &[0.0, f64::NAN]).is_none());
         assert!(nominal_action_effect(Action::Push, 1.1).is_none());
+        assert!(synthetic_mismatch_profile(0, f64::NAN).is_none());
     }
 
     #[test]
     fn point_shield_false_positive_is_rejected_by_a_calibrated_envelope() {
-        // Every calibration episode contains <= this held-out error magnitude.
         let calibration = calibration_panel();
         let radii = calibrate_mismatch_panel(&calibration, &STRESS_GRID, 0.90)
             .expect("39 episodes meet the 90% four-family finite-rank gate");
         let held_out = profile(1.0);
 
-        // Nominal Push predicts reserve 0.1525 and load 0.842; true effects
-        // cross both boundaries. Robust bounds should refuse the action.
         let (point_certified, robust_certified, true_safe) =
             point_and_robust_vs_true(state(), Action::Push, 0.5, held_out, radii, limits())
                 .expect("valid test contracts");
 
-        assert!(
-            point_certified,
-            "point shield should demonstrate the false positive"
-        );
-        assert!(
-            !robust_certified,
-            "calibrated shield should reject the action"
-        );
-        assert!(
-            !true_safe,
-            "the held-out true transition should violate constraints"
-        );
+        assert!(point_certified, "point shield should demonstrate the false positive");
+        assert!(!robust_certified, "calibrated shield should reject the action");
+        assert!(!true_safe, "the held-out true transition should violate constraints");
     }
 
     #[test]
@@ -458,6 +491,5 @@ pub fn calibration_panel() -> Vec<MismatchProfile> {
 
         assert!(scores.reserve_effect > radii.reserve_effect_radius());
         assert!(scores.load_effect > radii.load_effect_radius());
-        // A finite-sample envelope is conditional, not a promise against shifts.
     }
 }
