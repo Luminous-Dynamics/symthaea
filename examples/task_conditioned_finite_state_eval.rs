@@ -614,7 +614,7 @@ fn fixtures() -> Result<Vec<Fixture>, String> {
         if fixture.network.rules.len() != parse_usize(fields[1], "node count")? {
             return Err(format!("node count disagrees with rules in fixture {}", fixture.name));
         }
-        if fixture.input_state_weights.iter().map(u64::to_string).collect::<Vec<_>>().join(",") != fields[5] {
+        if fixture.input_state_weights.iter().map(|weight| weight.to_string()).collect::<Vec<_>>().join(",") != fields[5] {
             return Err(format!("noncanonical input-state weights in fixture {}", fixture.name));
         }
         if fixture.network.canonical_rules() != fields[6] {
@@ -1037,7 +1037,7 @@ mod tests {
             assert_eq!(fixture.network.input_count, fields[2].parse::<usize>().unwrap());
             assert_eq!(fixture.network.output_node, fields[3].parse::<usize>().unwrap());
             assert_eq!(fixture.task_target.canonical(), fields[4]);
-            assert_eq!(fixture.input_state_weights.iter().map(u64::to_string).collect::<Vec<_>>().join(","), fields[5]);
+            assert_eq!(fixture.input_state_weights.iter().map(|weight| weight.to_string()).collect::<Vec<_>>().join(","), fields[5]);
             assert_eq!(fixture.network.canonical_rules(), fields[6]);
             let component_labels = fixture.network.components.iter()
                 .map(|component| if *component == 0 { 'A' } else { 'B' })
