@@ -222,5 +222,7 @@ The current graph is a useful retrieval substrate, but source-grounded cultural 
 
 These choices may be useful heuristics for broad associative memory, but they are not sufficient evidence rules for historical narrative graphs. Two source witnesses can be semantically similar while reporting different variants; a shared motif does not establish transmission; and one linguistic negation marker is not a universal theory of contradiction. This PR therefore adds a separately validated source-witness/variant layer and paired negative controls without silently changing the generic graph.
 
+The split-governance seed is in [`benchmarks/source-catalog/v0/`](../../benchmarks/source-catalog/v0/): 13 source IDs grouped into 10 source families. The current catalog is development-only, metadata-only, rights-unknown and not expert-reviewed; it provides no held-out score or model generalization claim.
+
 The next engine increment is tracked in [#8265](https://github.com/Luminous-Dynamics/symthaea/issues/8265): let HDC similarity propose candidate neighbors, then use typed claim identity, witness/context/period metadata and admissible evidence to decide whether to merge, corroborate, contradict or merely link them. Benchmark false merges, confidence calibration and provenance retention before and after the change. The source inspection establishes the current heuristic design; it does not establish the measured frequency of these failure modes.
 
