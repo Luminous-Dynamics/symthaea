@@ -9,7 +9,7 @@ use std::env;
 use std::error::Error;
 use std::fs;
 use std::io::{self, ErrorKind};
-use allostatic_control_bench::{EPISODE_CSV_HEADER, HORIZON};
+use allostatic_control_bench::{EPISODE_CSV_HEADER, HORIZON, Policy, Scenario};
 
 #[derive(Clone, Debug)]
 struct Episode {
@@ -176,6 +176,15 @@ fn parse_episodes(csv: &str) -> Result<BTreeMap<ConditionKey, EpisodesBySeed>, B
         let policy = cell(&values, &header, "policy")?.to_string();
         let shielded = parse_bool(&values, &header, "shielded")?;
         let seed: u64 = cell(&values, &header, "seed")?.parse()?;
+        if !Scenario::all().iter().any(|candidate| candidate.name() == scenario)
+            || !Policy::all().iter().any(|candidate| candidate.name() == policy)
+            || seed >= 32
+        {
+            return Err(invalid_data(format!(
+                "unknown scenario/policy or out-of-panel seed on line {}",
+                line_index + 2
+            )).into());
+        }
         let unsafe_ticks = parse_usize(&values, &header, "unsafe_ticks")?;
         let unsafe_episode = parse_bool(&values, &header, "unsafe_episode")?;
         let cumulative_load = parse_f64(&values, &header, "cumulative_exposure")?;
@@ -467,6 +476,30 @@ mod tests {
         let altered_row = SAMPLE_ROW.replace(",4.8,0.1,", ",4.8,0.2,");
         let altered = format!("{SAMPLE_HEADER}\n{altered_row}\n");
         assert!(parse_episodes(&altered).is_err());
+    }
+
+    #[test]
+    fn parser_rejects_unknown_scenario_policy_and_seed() {
+        let unknown_scenario = format!(
+            "{}\n{}\n",
+            SAMPLE_HEADER,
+            SAMPLE_ROW.replace("calm,0,task_only", "unknown,0,task_only")
+        );
+        assert!(parse_episodes(&unknown_scenario).is_err());
+
+        let unknown_policy = format!(
+            "{}\n{}\n",
+            SAMPLE_HEADER,
+            SAMPLE_ROW.replace("calm,0,task_only", "calm,0,unknown")
+        );
+        assert!(parse_episodes(&unknown_policy).is_err());
+
+        let out_of_panel_seed = format!(
+            "{}\n{}\n",
+            SAMPLE_HEADER,
+            SAMPLE_ROW.replace("calm,0,task_only", "calm,32,task_only")
+        );
+        assert!(parse_episodes(&out_of_panel_seed).is_err());
     }
 
     #[test]
