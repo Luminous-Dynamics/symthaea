@@ -808,6 +808,9 @@ mod tests {
         assert!(report.noise_results[0].top1_accuracy >= 0.9);
         assert!(report.noise_results[0].cleanup_top1_accuracy >= 0.9);
         assert!(report.noise_results[0].cleanup_mean_similarity_margin > 0.0);
+        let (low, high) = report.noise_results[0].cleanup_top1_accuracy_ci95;
+        assert!(low <= report.noise_results[0].cleanup_top1_accuracy);
+        assert!(high >= report.noise_results[0].cleanup_top1_accuracy);
     }
 
     #[test]
@@ -830,6 +833,9 @@ mod tests {
             report.associative_capacity_results[0].cleanup_mean_target_similarity,
             1.0
         );
+        let (low, high) = report.associative_capacity_results[0].cleanup_recall_at_1_ci95;
+        assert!(low <= report.associative_capacity_results[0].cleanup_recall_at_1);
+        assert!(high >= report.associative_capacity_results[0].cleanup_recall_at_1);
         assert!(report.bundle_results.iter().all(|result| {
             (0.0..=1.0).contains(&result.member_recall_at_1)
                 && result.mean_member_similarity > result.mean_max_distractor_similarity
@@ -863,6 +869,17 @@ mod tests {
             space.rank(&PatternVector::seeded_random(4, 101).expect("wrong-sized query")),
             Err(PatternSpaceError::DimensionMismatch { expected: 8, actual: 4 }),
         ));
+    }
+
+    #[test]
+    fn wilson_interval_bounds_include_observed_accuracy() {
+        let all_correct = wilson_interval_95(16, 16);
+        assert!(all_correct.0 > 0.0);
+        assert_eq!(all_correct.1, 1.0);
+        let half_correct = wilson_interval_95(50, 100);
+        assert!(half_correct.0 < 0.5);
+        assert!(half_correct.1 > 0.5);
+        assert_eq!(wilson_interval_95(0, 0), (0.0, 1.0));
     }
 
     #[test]
