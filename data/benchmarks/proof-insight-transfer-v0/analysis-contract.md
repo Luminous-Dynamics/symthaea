@@ -102,7 +102,7 @@ An `eligible` target must include:
 - `source_commit`, exactly pinned to the frozen upstream commit;
 - exact Lean `theorem_id`, repository-relative `artifact_path`, `artifact_sha256`, `statement_sha256`, `lean_toolchain`, and `mathlib_revision`;
 - SHA-256 references to eligibility, statement-correspondence, proof/axiom audit, successor-test, and mutation-control receipts;
-- exactly one result for each arm A-H.
+- exactly one result for each arm A-I. The nine arms are A (no retrieval), B (BM25/lexical), C (typed syntax), D (dependency graph), E (raw proof retrieval), F (typed insight), G (insight plus proof), H (HDC/embedding), and I (strong premise retrieval). Every eligible target must contain each arm exactly once; the validation-only baseline-selection receipt scores only A-E and I.
 
 Every arm object contains the `arm`, `status`, `checker_passed`, `semantic_gate_passed`, matching model/checker versions and `budget`, actual `model_calls_used`, `tokens_used`, `wall_ms`, and `cost_microusd`, plus SHA-256 references for fixed arm configuration, exact input, retrieval log, checker receipt, and semantic-gate receipt. Preserve the referenced artifacts. Receipt digests in this JSONL bind the audit trail but do not substitute for the receipt contents or an independent reviewer.
 
