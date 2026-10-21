@@ -1235,6 +1235,18 @@ fn audit_temporal_dataset(
             events.len()
         );
     }
+    let identity_status_count_total = unique_theorem_identity_join_count
+        + ambiguous_theorem_identity_join_count
+        + unmatched_theorem_identity_join_count;
+    if identity_status_count_total != events.len()
+        || theorem_identity_status_counts.values().sum::<usize>() != events.len()
+    {
+        bail!(
+            "temporal dataset theorem-identity accounting mismatch: {} status counts for {} rows",
+            identity_status_count_total,
+            events.len()
+        );
+    }
 
     let audit = TemporalDatasetJoinAudit {
         schema_version: "pitb.temporal-dataset-join-audit.v0",
