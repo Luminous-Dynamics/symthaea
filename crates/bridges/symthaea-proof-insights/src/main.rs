@@ -3683,8 +3683,9 @@ mod tests {
             "by /- copied explanation /- nested -/ -/\n  exact Nat.add_comm a b -- trailing note\n",
         );
         assert_eq!(canonical, commented);
-        let string_literal =
-            normalize_lean_for_leakage(r##"exact String.contains value "-- /- remain literal -/""##);
+        let string_literal = normalize_lean_for_leakage(
+            r##"exact String.contains value "-- /- remain literal -/""##,
+        );
         assert!(string_literal.contains(r#""-- /- remain literal -/""#));
     }
 
