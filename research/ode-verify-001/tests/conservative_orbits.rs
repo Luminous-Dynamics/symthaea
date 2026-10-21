@@ -6,7 +6,7 @@
 use std::f64::consts::PI;
 
 use ode_verify_001_harness::dynamical_system::{
-    try_simulate, NBodyGravity, SimulationResult, VerletIntegrator,
+    NBodyGravity, SimulationResult, VerletIntegrator, try_simulate,
 };
 
 const MASS: f64 = 1.0;
@@ -24,10 +24,14 @@ struct InvariantAudit {
 
 fn initial_state() -> [f64; 8] {
     [
-        -1.0, 0.0, // body 1 position
-        1.0, 0.0, // body 2 position
-        0.0, -INITIAL_TANGENTIAL_SPEED, // body 1 velocity
-        0.0, INITIAL_TANGENTIAL_SPEED, // body 2 velocity
+        -1.0,
+        0.0, // body 1 position
+        1.0,
+        0.0, // body 2 position
+        0.0,
+        -INITIAL_TANGENTIAL_SPEED, // body 1 velocity
+        0.0,
+        INITIAL_TANGENTIAL_SPEED, // body 2 velocity
     ]
 }
 
@@ -45,9 +49,7 @@ fn reference_kepler_period() -> f64 {
 
 fn angular_momentum_z(state: &[f64]) -> f64 {
     // State order: [all positions, all velocities] for two bodies in 2D.
-    state[0] * state[5] - state[1] * state[4]
-        + state[2] * state[7]
-        - state[3] * state[6]
+    state[0] * state[5] - state[1] * state[4] + state[2] * state[7] - state[3] * state[6]
 }
 
 fn max_relative_energy_drift(system: &NBodyGravity, result: &SimulationResult, e0: f64) -> f64 {
@@ -62,15 +64,8 @@ fn audit_orbit(dt: f64) -> InvariantAudit {
     let system = NBodyGravity::new(vec![MASS, MASS], GRAVITATIONAL_CONSTANT, 2);
     let initial = initial_state();
     let end_time = ORBIT_COUNT * reference_kepler_period();
-    let result = try_simulate(
-        &system,
-        &VerletIntegrator,
-        &initial,
-        0.0,
-        end_time,
-        dt,
-    )
-    .expect("the finite, bounded orbit request should be accepted");
+    let result = try_simulate(&system, &VerletIntegrator, &initial, 0.0, end_time, dt)
+        .expect("the finite, bounded orbit request should be accepted");
 
     let e0 = system.energy(&initial);
     let p0 = system.momentum(&initial);
@@ -82,8 +77,7 @@ fn audit_orbit(dt: f64) -> InvariantAudit {
         .iter()
         .map(|state| {
             let momentum = system.momentum(state);
-            ((momentum[0] - p0[0]).powi(2) + (momentum[1] - p0[1]).powi(2)).sqrt()
-                / momentum_scale
+            ((momentum[0] - p0[0]).powi(2) + (momentum[1] - p0[1]).powi(2)).sqrt() / momentum_scale
         })
         .fold(0.0, f64::max);
 
@@ -168,8 +162,7 @@ fn verlet_energy_error_improves_under_timestep_refinement() {
         fine.max_relative_energy_drift
     );
     assert!(
-        fine.max_scaled_momentum_drift < 1e-10
-            && fine.max_relative_angular_momentum_drift < 1e-10,
+        fine.max_scaled_momentum_drift < 1e-10 && fine.max_relative_angular_momentum_drift < 1e-10,
         "fine-step invariants out of tolerance: momentum={:.3e}, angular momentum={:.3e}",
         fine.max_scaled_momentum_drift,
         fine.max_relative_angular_momentum_drift
