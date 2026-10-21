@@ -507,7 +507,8 @@ impl Rk45Tolerances {
     }
 
     fn validate(&self, dimension: usize) -> Result<(), SimulationError> {
-        if !self.relative.is_finite()
+        if dimension == 0
+            || !self.relative.is_finite()
             || self.relative < 0.0
             || self.absolute.len() != dimension
             || self.absolute.iter().any(|value| !value.is_finite() || *value <= 0.0)
@@ -630,6 +631,12 @@ impl Rk45Integrator {
         expected_dim: usize,
         stage: u8,
     ) -> Result<Vec<f64>, SimulationError> {
+        if let Some(index) = state.iter().position(|value| !value.is_finite()) {
+            return Err(SimulationError::NonFiniteIntegratorState {
+                step: usize::from(stage),
+                index,
+            });
+        }
         let derivatives = system.derivatives(state, t);
         if derivatives.len() != expected_dim {
             return Err(SimulationError::DerivativeDimensionMismatch {
@@ -857,6 +864,160 @@ impl Rk45Integrator {
             tolerances,
             Rk45ErrorNorm::WeightedRms,
         )
+    }
+
+    /// Integrate a complete trajectory with scale-aware error control and a
+    /// persistent step-size controller.
+    ///
+    /// Unlike the legacy `try_simulate` entry point, this API explicitly accepts
+    /// component-wise absolute tolerances and a relative tolerance, and returns
+    /// accepted/rejected-step and derivative-evaluation diagnostics.
+    pub fn try_simulate_with_tolerances(
+        &self,
+        system: &dyn DynamicalSystem,
+        initial_state: &[f64],
+        t_start: f64,
+        t_end: f64,
+        initial_dt: f64,
+        tolerances: &Rk45Tolerances,
+    ) -> Result<Rk45SimulationReport, SimulationError> {
+        self.validate()?;
+        if !t_start.is_finite() || !t_end.is_finite() {
+            return Err(SimulationError::NonFiniteTimeBounds);
+        }
+        if t_end < t_start {
+            return Err(SimulationError::ReversedTimeRange);
+        }
+        if !initial_dt.is_finite() || initial_dt <= 0.0 {
+            return Err(SimulationError::InvalidTimeStep);
+        }
+        let elapsed = t_end - t_start;
+        if !elapsed.is_finite() {
+            return Err(SimulationError::NonFiniteTimeSpan);
+        }
+
+        let expected_dim = system.state_dim();
+        if initial_state.len() != expected_dim {
+            return Err(SimulationError::StateDimensionMismatch {
+                expected: expected_dim,
+                actual: initial_state.len(),
+            });
+        }
+        if let Some(index) = initial_state.iter().position(|value| !value.is_finite()) {
+            return Err(SimulationError::NonFiniteInitialState { index });
+        }
+        tolerances.validate(expected_dim)?;
+        if expected_dim > MAX_TRAJECTORY_STATE_VALUES {
+            return Err(SimulationError::TrajectoryBudgetExceeded {
+                maximum_state_values: MAX_TRAJECTORY_STATE_VALUES,
+            });
+        }
+
+        let mut times = Vec::new();
+        let mut states = Vec::new();
+        times.push(t_start);
+        states.push(initial_state.to_vec());
+        let mut time = t_start;
+        let mut state = initial_state.to_vec();
+        let mut controller = Rk45Controller::new(initial_dt)?;
+        let mut diagnostics = Rk45Diagnostics {
+            accepted_steps: 0,
+            rejected_steps: 0,
+            derivative_evaluations: 0,
+            min_accepted_dt: None,
+            max_accepted_dt: None,
+            max_error_norm: 0.0,
+        };
+
+        while time < t_end {
+            if diagnostics.accepted_steps >= MAX_SIMULATION_STEPS {
+                return Err(SimulationError::StepBudgetExceeded {
+                    maximum_steps: MAX_SIMULATION_STEPS,
+                });
+            }
+
+            let next_sample_count =
+                states
+                    .len()
+                    .checked_add(1)
+                    .ok_or(SimulationError::TrajectoryBudgetExceeded {
+                        maximum_state_values: MAX_TRAJECTORY_STATE_VALUES,
+                    })?;
+            let state_value_count = next_sample_count.checked_mul(expected_dim).ok_or(
+                SimulationError::TrajectoryBudgetExceeded {
+                    maximum_state_values: MAX_TRAJECTORY_STATE_VALUES,
+                },
+            )?;
+            if state_value_count > MAX_TRAJECTORY_STATE_VALUES {
+                return Err(SimulationError::TrajectoryBudgetExceeded {
+                    maximum_state_values: MAX_TRAJECTORY_STATE_VALUES,
+                });
+            }
+
+            let remaining = t_end - time;
+            let maximum_dt = self.dt_max.min(remaining);
+            let step = controller.try_step(
+                self,
+                system,
+                &state,
+                time,
+                maximum_dt,
+                tolerances,
+            )?;
+            if !step.accepted_dt.is_finite()
+                || step.accepted_dt <= 0.0
+                || step.accepted_dt > remaining
+                || step.state.len() != expected_dim
+                || step.state.iter().any(|value| !value.is_finite())
+            {
+                return Err(SimulationError::InvalidIntegratorStepSize {
+                    step: diagnostics.accepted_steps + 1,
+                });
+            }
+
+            let next_time = if step.accepted_dt >= remaining {
+                t_end
+            } else {
+                time + step.accepted_dt
+            };
+            if !next_time.is_finite() || next_time <= time {
+                return Err(SimulationError::TimeDidNotAdvance {
+                    step: diagnostics.accepted_steps + 1,
+                });
+            }
+
+            diagnostics.accepted_steps += 1;
+            diagnostics.rejected_steps += step.rejected_steps;
+            diagnostics.derivative_evaluations += step.derivative_evaluations;
+            diagnostics.min_accepted_dt = Some(
+                diagnostics
+                    .min_accepted_dt
+                    .map_or(step.accepted_dt, |value| value.min(step.accepted_dt)),
+            );
+            diagnostics.max_accepted_dt = Some(
+                diagnostics
+                    .max_accepted_dt
+                    .map_or(step.accepted_dt, |value| value.max(step.accepted_dt)),
+            );
+            diagnostics.max_error_norm = diagnostics.max_error_norm.max(step.error_norm);
+
+            time = next_time;
+            state = step.state;
+            times.push(time);
+            states.push(state.clone());
+        }
+
+        let simulation = SimulationResult {
+            times,
+            steps: diagnostics.accepted_steps,
+            states,
+            total_time: elapsed,
+            system_name: system.name().to_string(),
+        };
+        Ok(Rk45SimulationReport {
+            simulation,
+            diagnostics,
+        })
     }
 
     /// Compatibility wrapper for callers that require a tuple-returning API.
