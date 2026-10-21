@@ -1431,10 +1431,11 @@ fn run() -> Result<(), String> {
     let source_records = parse_jsonl::<SourceRecord>(&source_catalog_bytes, "source catalog")?;
     let source_pack_records = parse_jsonl::<SourcePackSnapshot>(&source_pack_bytes, "source pack")?;
     validate_source_pack_matches_pairs(&pairs, &source_pack_records, plan.synthetic_only)?;
+    // Validate source rights/splits/family identities before performing any statistical scoring.
+    let system_metrics = score(&plan, pairs.clone(), results.clone(), &source_records)?;
     let clusters = source_family_clusters(&pairs)?;
     let comparisons = compute_pairwise_comparisons(&plan, &pairs, &results, &clusters)?;
     let source_family_cluster_count = clusters.len();
-    let system_metrics = score(&plan, pairs, results, &source_records)?;
 
     let manifest_lock_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("Cargo.lock");
     let lock_bytes = fs::read(&manifest_lock_path).map_err(|error| {
