@@ -53,6 +53,8 @@ class FailClosedPyPhiValidationTests(unittest.TestCase):
         self.assertIsNone(report.correlation)
         self.assertIsNone(report.mean_absolute_error)
         self.assertIsNone(report.max_absolute_error)
+        self.assertIsNone(report.spearman_correlation)
+        self.assertIsNone(report.root_mean_square_error)
         self.assertIsNone(report.agreement_within_10_percent)
 
         with tempfile.TemporaryDirectory() as temporary_directory:
@@ -187,17 +189,32 @@ class FailClosedPyPhiValidationTests(unittest.TestCase):
                     n_nodes=2,
                     hdc_phi=value,
                     pyphi_phi=value,
+                    reference_model_digest=f"model-{index}",
+                    symthaea_model_digest=f"model-{index}",
                 )
                 for index, value in enumerate(values)
             ],
             correlation=1.0,
+            spearman_correlation=1.0,
             mean_absolute_error=0.0,
+            root_mean_square_error=0.0,
             max_absolute_error=0.0,
             agreement_within_10_percent=100.0,
+            pyphi_version="2.0.0",
+            shared_model_verified=True,
             n_validated=3,
             n_failed=0,
         )
         self.assertTrue(self.validator.is_qualified(report))
+
+        # A release candidate must never become publication-qualified.
+        report.pyphi_version = "2.0.0rc4"
+        self.assertFalse(self.validator.is_qualified(report))
+        report.pyphi_version = "2.0.0"
+
+        # A mismatched per-case model digest also blocks qualification.
+        report.results[0].symthaea_model_digest = "different-model"
+        self.assertFalse(self.validator.is_qualified(report))
 
     def test_cli_exits_nonzero_when_no_shared_adapter_can_produce_scores(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
