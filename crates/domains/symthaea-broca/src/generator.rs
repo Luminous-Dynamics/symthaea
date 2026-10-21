@@ -2652,4 +2652,42 @@ mod tests {
              not silently fall back to a different default"
         );
     }
+    #[test]
+    fn checkpoint_roundtrip_preserves_token_embedding_seed_scheme() {
+        let genesis = test_genesis();
+        let generator = BrocaGenerator::new_with_token_embedding_seed_scheme(
+            &genesis,
+            BrocaConfig::default(),
+            crate::controller::TokenEmbeddingSeedScheme::DomainSeparatedV2,
+        );
+        assert_eq!(
+            generator.config.controller.token_embedding_seed_scheme,
+            crate::controller::TokenEmbeddingSeedScheme::DomainSeparatedV2
+        );
+
+        let directory = tempfile::tempdir().expect("temporary checkpoint directory");
+        let path = directory.path().join("seed-scheme-v2.bin");
+        generator
+            .save_checkpoint(&path, 0, 0.0, None, None, None)
+            .expect("save V2 checkpoint");
+
+        let (mut reloaded, ..) =
+            BrocaGenerator::from_checkpoint(&path, &genesis).expect("reload V2 checkpoint");
+        assert_eq!(
+            reloaded.config.controller.token_embedding_seed_scheme,
+            crate::controller::TokenEmbeddingSeedScheme::DomainSeparatedV2,
+            "checkpoint reconstruction must retain the token initializer for future vocabulary growth"
+        );
+
+        let old_vocab_size = reloaded.controller.vocab_size();
+        reloaded
+            .controller
+            .append_token(&genesis, "after-reload", None);
+        assert_eq!(
+            reloaded.controller.token_embeddings()[old_vocab_size].values,
+            genesis.hv_v2("broca::token_emb::after-reload", symthaea_core::hdc::HDC_DIMENSION).values,
+            "a reloaded V2 model must not append legacy-seeded token rows"
+        );
+    }
+
 }
