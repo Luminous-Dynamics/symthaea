@@ -44,12 +44,12 @@ GIT_COMMIT_SHA=$(git rev-parse HEAD) cargo run -p symthaea-broca --bin broca-voc
 - median new-row norm relative to the median old-row norm;
 - mean similarity to supplied context rows;
 - mean and maximum absolute pairwise cosine among added rows;
-- probability mass assigned to all new tokens for one fixed query, plus non-finite logit count;
+- mean and maximum probability mass assigned to new tokens across 16 deterministic fixed queries, plus non-finite logit count;
 - KL divergence between the original old-vocabulary distribution and the extended distribution renormalized over old tokens;
 - finite/non-finite coordinate counts;
 - schema version, fixed fixture digest, source revision, and explicit claim boundary.
 
-The KL metric isolates changes within the old-token conditional distribution. If extension leaves old logits unchanged, that conditional KL should be near zero; total probability mass assigned to newly added tokens is reported separately because softmax's denominator changes.
+The benchmark uses a bank of 16 deterministic queries. It reports the fraction of queries where the original top-1 token remains top-1 across the full extended vocabulary, and the minimum old-best-vs-new-best logit margin. The KL metric isolates changes within the old-token conditional distribution. If extension leaves old logits unchanged, that conditional KL should be near zero; total probability mass assigned to newly added tokens is reported separately because softmax's denominator changes.
 
 ## Proposed evaluation gates
 
