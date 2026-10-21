@@ -88,20 +88,11 @@ fn shifted_effect(
 }
 
 fn dynamics_for(seed: u64) -> Result<DynamicsBounds, Box<dyn Error>> {
-    DynamicsBounds::new(
-        shifted_effect((-0.030, -0.005), (0.030, 0.070), seed, 0)?,
-        shifted_effect((0.010, 0.040), (-0.010, 0.030), seed, 1)?,
-        shifted_effect((0.025, 0.060), (-0.160, -0.080), seed, 2)?,
-    )
-    .pipe(Ok)
+    let push = shifted_effect((-0.030, -0.005), (0.030, 0.070), seed, 0)?;
+    let maintain = shifted_effect((0.010, 0.040), (-0.010, 0.030), seed, 1)?;
+    let emergency_recover = shifted_effect((0.025, 0.060), (-0.160, -0.080), seed, 2)?;
+    Ok(DynamicsBounds::new(push, maintain, emergency_recover))
 }
-
-trait Pipe: Sized {
-    fn pipe<R>(self, f: impl FnOnce(Self) -> R) -> R {
-        f(self)
-    }
-}
-impl<T> Pipe for T {}
 
 fn state_for(point: OperatingPoint) -> Result<StateEnvelope, Box<dyn Error>> {
     StateEnvelope::new(
