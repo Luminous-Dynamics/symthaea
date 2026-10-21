@@ -205,7 +205,7 @@ The first fixtures test three deliberately different situations:
 | Irrelevant cross-component branch | 1.0 | 1.0 | 1.0 | 0.0 |
 | Harmful constant-bias coupling | 0.0 | 0.5 | 0.0 | -0.5 |
 
-These exact expectations were independently checked with a separate, small enumerator. **That is not a Rust compilation or test pass.** The Rust example now has 13 test definitions covering exact toy contrasts, partition sensitivity/sign reversal, malformed interventions, fail-closed strata, determinism, bounds, and manifest parity. Rust/cargo are unavailable in the current execution environment, so this example remains uncompiled and unexecuted.
+These exact expectations were independently checked with a separate, small enumerator. **That is not a Rust compilation or test pass.** The Rust example now has 14 test definitions covering exact toy contrasts, partition sensitivity/sign reversal, prior-dependent sign changes, malformed interventions, fail-closed strata, determinism, bounds, and manifest parity. Rust/cargo are unavailable in the current execution environment, so this example remains uncompiled and unexecuted.
 
 These are conformance fixtures, not evidence of empirical usefulness. The controls are deliberately simple matched edge-signal replacements; they do not yet solve all practical matching problems involving degree, delay, bandwidth, component role, or network centrality. The harmful-coupling fixture also begins with zero task accuracy, so it demonstrates the required sign behavior, not a competitive architecture. A real evaluation must report intact capability and matched-control quality alongside the profile and use held-out systems.
 
@@ -224,6 +224,21 @@ A separate exhaustive Python enumerator (used as a cross-check, **not a Rust tes
 This is an important warning, not a result to hide: for the same fixed toy causal model and intervention outcome table, the contrast can reverse sign with the partition. The declared partitions recover the expected +0.5, 0.0 and -0.5 fixture scores, but these score ranges show that the contrast is **partition-relative**, not an intrinsic scalar property of the network. This is why the metric must expose the full partition profile and freeze partition selection before held-out evaluation. It also makes independent control selection and matched-stratum quality central requirements. The toy sweep still does not prove that TCCIP is useful or better than existing methods.
 
 The 13 authored test definitions include exact expected sign reversals, the invariant that the declared partition appears in the exhaustive sweep, and parity checks against `validation/fixtures/tccip_toy_expectations.tsv`. The TSV is an expectation oracle, not a run receipt. The source remains uncompiled and unexecuted in this environment. The independent Python oracle's core calculation was separately cross-checked during development, but the committed `validation/tccip_reference_oracle.py` and its nine unittest definitions have not themselves been run as committed files.
+
+## State-prior conditioning with role-matched task-gate cuts (new experiment)
+
+The previous positive fixture compared a task-relevant edge against an edge into an unused branch. That contrast was too easy to game: different task roles were being compared. The manifest now adds a stronger pair of fixtures in which the cross-partition edge and within-partition control edge both enter the same AND gate that directly computes the task output. Both edges have the same target node, gate type, intervention operation, and cost. The only changed input is the declared input-state distribution.
+
+Input states use bit 0 for input 0 and bit 1 for input 1; integer weights are listed in binary-state order 00, 01, 10, 11 only if explicitly specified by that schema. In schema v3 the ordering is instead **least-significant-bit state index** (00, 10, 01, 11), so weights `4,1,16,4` give (P(x_0=1)=0.2), (P(x_1=1)=0.8). The reverse weights `4,16,1,4` give (P(x_0=1)=0.8), (P(x_1=1)=0.2).
+
+| Same causal graph and task, different input-state weights | Cross-cut mean loss | Internal-control mean loss | TCCIP |
+|---|---:|---:|---:|
+| (P(x_0=1)=0.2, P(x_1=1)=0.8) | 0.4 | 0.1 | +0.3 |
+| (P(x_0=1)=0.8, P(x_1=1)=0.2) | 0.1 | 0.4 | −0.3 |
+
+The intact system performs perfectly in both cases. The underlying rules, task, component labels, and intervention edges are identical; only the state prior changes. The cross-cut term has greater expected task influence under the first prior and lower expected influence under the second. This is a useful positive result for a **task- and distribution-conditioned engineering profile**, but a disqualifying result if anyone tries to describe TCCIP as an intrinsic, prior-free integration scalar.
+
+This does not show that TCCIP is better than a direct conditional intervention-effect curve. In this simple example, the main effect is already understandable from the marginal activity of the other AND input. The next requirement is to show added predictive or diagnostic value on harder held-out systems after controlling for such simpler explanations.
 
 ## Literature-aware scope and a stronger next paradigm
 
