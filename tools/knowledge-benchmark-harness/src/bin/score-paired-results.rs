@@ -58,6 +58,8 @@ struct Preregistration {
 #[derive(Debug, Clone, Deserialize)]
 struct PairCase {
     pair_id: String,
+    split: String,
+    synthetic_only: bool,
     dimension: String,
     expected_relation: String,
     criticality: String,
@@ -479,6 +481,16 @@ fn score(
     validate_plan_eligibility(plan)?;
     let mut pair_by_id = HashMap::new();
     for pair in &pairs {
+        if pair.synthetic_only != plan.synthetic_only || pair.split != plan.benchmark.split {
+            return Err(format!(
+                "pair {:?} split/synthetic status ({:?}, {}) does not match plan ({:?}, {})",
+                pair.pair_id,
+                pair.split,
+                pair.synthetic_only,
+                plan.benchmark.split,
+                plan.synthetic_only
+            ));
+        }
         if pair.acceptance.must_preserve.is_empty() {
             return Err(format!("pair {:?} must declare at least one must_preserve criterion", pair.pair_id));
         }
@@ -804,6 +816,8 @@ mod tests {
     fn pair(id: &str, dimension: &str, expected: &str, criticality: &str, must_change: bool) -> PairCase {
         PairCase {
             pair_id: id.into(),
+            split: "synthetic".into(),
+            synthetic_only: true,
             dimension: dimension.into(),
             expected_relation: expected.into(),
             criticality: criticality.into(),
@@ -898,6 +912,29 @@ mod tests {
         ];
         let error = score(&plan, pairs, results).unwrap_err();
         assert!(error.contains("incomplete pair coverage"));
+    }
+
+    #[test]
+    fn synthetic_pairs_cannot_be_scored_as_held_out() {
+        let mut plan = fixture_plan();
+        plan.phase = "preregistered_held_out".into();
+        plan.synthetic_only = false;
+        plan.benchmark.split = "holdout".into();
+        plan.benchmark.source_family_disjoint = true;
+        plan.benchmark.rights_review_status = "approved".into();
+        plan.preregistration.held_out_access = "sealed_until_freeze".into();
+        let pairs = vec![
+            pair("p1", "context_swap", "local_change", "release_blocker", true),
+            pair("p2", "alias_equivalence", "invariant", "diagnostic", false),
+        ];
+        let results = vec![
+            observation("r1", "s1", "p1", "local_change"),
+            observation("r2", "s1", "p2", "invariant"),
+            observation("r3", "s2", "p1", "local_change"),
+            observation("r4", "s2", "p2", "invariant"),
+        ];
+        let error = score(&plan, pairs, results).unwrap_err();
+        assert!(error.contains("split/synthetic status"));
     }
 
     #[test]
