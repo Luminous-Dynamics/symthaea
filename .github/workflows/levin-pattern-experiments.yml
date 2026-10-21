@@ -81,6 +81,17 @@ jobs:
             echo "kernel=$(uname -srmo)"
           } | tee research-results/run-metadata.txt
 
+      - name: Resolve workspace metadata and capture lockfile drift
+        run: |
+          cargo metadata --format-version 1 >/dev/null
+          if ! git diff --quiet -- Cargo.lock; then
+            git diff -- Cargo.lock > research-results/Cargo.lock-resolution.patch
+            echo "LOCKFILE_DRIFT=true" > research-results/lockfile-drift.txt
+            cat research-results/Cargo.lock-resolution.patch
+          else
+            echo "LOCKFILE_DRIFT=false" > research-results/lockfile-drift.txt
+          fi
+
       - name: Verify HDC pattern invariants and retrieval tests
         run: cargo test --locked --release -p symthaea-core pattern_interaction -- --nocapture
 
@@ -94,6 +105,14 @@ jobs:
         run: |
           cargo run --locked --release -p symthaea-cell-foundry --example levin_multiscale_experiments 2>&1 | tee research-results/levin-multiscale-experiments.log
           cp levin_multiscale_results.json research-results/levin-multiscale-results.json
+
+      - name: Fail closed on uncommitted lockfile drift
+        if: always()
+        run: |
+          if grep -qx "LOCKFILE_DRIFT=true" research-results/lockfile-drift.txt 2>/dev/null; then
+            echo "::error::Cargo resolved a different lockfile. Commit Cargo.lock-resolution.patch before accepting results."
+            exit 1
+          fi
 
       - name: Record artifact hashes
         if: always()
