@@ -118,6 +118,10 @@ path = "examples/platonic_pattern_interaction.rs"
 name = "platonic_selective_retrieval"
 path = "examples/platonic_selective_retrieval.rs"
 
+[[example]]
+name = "platonic_osp_thresholds"
+path = "examples/platonic_osp_thresholds.rs"
+
 # scaling_study_demo: module not yet wired into physics/mod.rs; exclude from default build
 [[example]]
 name = "scaling_study_demo"
