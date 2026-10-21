@@ -156,7 +156,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             seed,
             "classwise_osp_inspired",
             "all",
-            f64::NAN,
+            None,
             selection.len(),
             classwise_selection.errors,
             certification.len(),
@@ -186,7 +186,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 seed,
                 "classwise_osp_inspired",
                 &class.to_string(),
-                threshold,
+                Some(threshold),
                 selection.len(),
                 count_class_false_positives(&selection, class, threshold),
                 certification.len(),
@@ -538,7 +538,7 @@ fn write_row(
     seed: u64,
     strategy: &str,
     class: &str,
-    threshold: f64,
+    threshold: Option<f64>,
     selection_n: usize,
     selection_fp: usize,
     certification_n: usize,
@@ -551,12 +551,12 @@ fn write_row(
     group_n: usize,
 ) {
     let selective_risk = result.selective_risk();
-    let (risk_low, risk_high) = wilson_interval_95(
-        result.errors,
-        result.accepted,
-    );
+    let (risk_low, risk_high) = wilson_interval_95(result.errors, result.accepted);
+    let threshold_text = threshold
+        .map(|value| format!("{value:.6}"))
+        .unwrap_or_else(|| "NA".to_owned());
     println!(
-        "{record_type},{seed},{strategy},{class},{threshold:.6},{selection_n},{selection_fp},{certification_n},{certification_fp},{cert_upper:.8},{cert_upper_sum:.8},{certified},{test_population},{group_n},{},{:.6},{:.6},{},{:.8},{},{:.6},{:.6}",
+        "{record_type},{seed},{strategy},{class},{threshold_text},{selection_n},{selection_fp},{certification_n},{certification_fp},{cert_upper:.8},{cert_upper_sum:.8},{certified},{test_population},{group_n},{},{:.6},{:.6},{},{:.8},{},{:.6},{:.6}",
         result.accepted,
         safe_ratio(result.accepted, test_population),
         result.coverage(),
