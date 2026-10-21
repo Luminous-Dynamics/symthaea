@@ -176,8 +176,8 @@ fn parse_episodes(csv: &str) -> Result<BTreeMap<ConditionKey, EpisodesBySeed>, B
         let policy = cell(&values, &header, "policy")?.to_string();
         let shielded = parse_bool(&values, &header, "shielded")?;
         let seed: u64 = cell(&values, &header, "seed")?.parse()?;
-        if !Scenario::all().iter().any(|candidate| candidate.name() == scenario)
-            || !Policy::all().iter().any(|candidate| candidate.name() == policy)
+        if !Scenario::all().iter().any(|candidate| candidate.name() == scenario.as_str())
+            || !Policy::all().iter().any(|candidate| candidate.name() == policy.as_str())
             || seed >= 32
         {
             return Err(invalid_data(format!(
