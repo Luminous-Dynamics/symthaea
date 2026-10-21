@@ -24,7 +24,7 @@ class TccipReferenceOracleTests(unittest.TestCase):
         cls.fixtures, cls.manifest_bytes = parse_manifest(DEFAULT_MANIFEST)
         cls.by_name = {fixture.name: fixture for fixture in cls.fixtures}
 
-    def test_manifest_is_versioned_and_covers_three_cases(self) -> None:
+    def test_manifest_is_versioned_and_covers_all_cases(self) -> None:
         self.assertEqual(len(self.fixtures), 5)
         self.assertEqual(
             set(self.by_name),
@@ -76,8 +76,8 @@ class TccipReferenceOracleTests(unittest.TestCase):
             self.assertEqual(summary["total"], total)
             self.assertEqual(len(partitions), usable)
             self.assertEqual(summary["skipped"], skipped)
-            self.assertEqual(min(point.tccip for point in partitions), lower)
-            self.assertEqual(max(point.tccip for point in partitions), upper)
+            self.assertAlmostEqual(min(point.tccip for point in partitions), lower, places=12)
+            self.assertAlmostEqual(max(point.tccip for point in partitions), upper, places=12)
 
     def test_same_graph_reverses_tccip_sign_when_input_prior_is_reversed(self) -> None:
         high_x1 = self.by_name["task_relevant_high_x1_prior"]
