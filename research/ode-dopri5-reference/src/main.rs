@@ -129,7 +129,19 @@ fn main() -> Result<(), Box<dyn Error>> {
                 Ok(stats) => {
                     let reference_states = dopri5.y_out();
                     let reference_times = dopri5.x_out();
-                    let endpoint = reference_states.last().ok_or("Dopri5 produced no output states")?;
+                    let Some(endpoint) = reference_states.last() else {
+                        all_passed = false;
+                        observations.push(format!(
+                            "{{\"scale\":{:.17e},\"rtol\":{:.17e},\"atol\":{:.17e},\"global_endpoint_error_limit\":{:.17e},\"global_energy_drift_limit\":{:.17e},{},\"dopri5_pass\":false,\"dopri5_error\":\"no_output_states\"}}",
+                            scale,
+                            rtol,
+                            atol,
+                            endpoint_error_limit,
+                            energy_drift_limit,
+                            custom_fields
+                        ));
+                        continue;
+                    };
                     let endpoint_time = reference_times.last().copied().unwrap_or(f64::NAN);
                     let endpoint_error = scaled_endpoint_error(&[endpoint[0], endpoint[1]], scale, T_END);
                     let energy_drift = max_relative_energy_drift(
