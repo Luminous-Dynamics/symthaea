@@ -240,7 +240,7 @@ fn main() {
                 }
             }
             Err(error) => {
-                status = match error {
+                status = match &error {
                     SimulationError::AdaptiveToleranceNotMet => "tolerance_not_met",
                     SimulationError::TimeDidNotAdvance { .. } => "time_did_not_advance",
                     _ => "solver_error",
