@@ -94,7 +94,7 @@ The initial thresholds qualify only this fixture and tolerance grid; they are no
 
 ## First implementation increment: bounded explicit diagnostic
 
-The bounded first probe lives at `research/ode-verify-001/examples/robertson_explicit_probe.rs`. It invokes Symthaea's current Cash–Karp controller over the frozen 17-point output grid, with a 100,000-reported-attempt budget. It preserves named outcomes, accepted-endpoint invariant/positivity diagnostics, work counters, source/checkout SHAs, and deterministic output samples; CI runs the receipt twice and compares the bytes.
+The bounded first probe lives at `research/ode-verify-001/examples/robertson_explicit_probe.rs`. It invokes Symthaea's current Cash–Karp controller over the frozen 17-point output grid with a 100,000-reported-attempt threshold checked between controller calls. Because the current API cannot apply a remaining attempt budget inside one call, the final call may overshoot that threshold; the receipt reports the actual attempts returned by completed calls instead of claiming a strict in-call cap. It preserves named outcomes, accepted-endpoint invariant/positivity diagnostics, an independent exact RHS-callback count, source/checkout SHAs, and deterministic output samples; CI runs the receipt twice and compares the bytes.
 
 This is a **stress diagnostic**, not a qualified solver benchmark. It does not use the exploratory SciPy samples as an oracle, does not silently clip negative concentrations, and explicitly labels every receipt `UNQUALIFIED_DIAGNOSTIC_ONLY`. Its 100,000-attempt cap is a quick diagnostic budget, not the 2,000,000-attempt budget proposed for the full qualification matrix.
 
