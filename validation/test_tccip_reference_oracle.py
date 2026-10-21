@@ -14,6 +14,7 @@ from validation.tccip_reference_oracle import (
     Intervention,
     evaluate_fixture,
     input_information_baseline,
+    pairwise_utility_interactions,
     parse_manifest,
     render_artifact,
     task_utility,
@@ -99,6 +100,16 @@ class TccipReferenceOracleTests(unittest.TestCase):
         self.assertAlmostEqual(info["target_entropy_bits"], 1.0, places=12)
         self.assertEqual(info["individual_input_mi_bits"], [0.0, 0.0])
         self.assertAlmostEqual(info["joint_input_mi_bits"], 1.0, places=12)
+        interactions = pairwise_utility_interactions(fixture)
+        pair = next(
+            row for row in interactions
+            if row["first_intervention_id"] == "cross_cut_xor_left"
+            and row["second_intervention_id"] == "matched_internal_xor_right"
+        )
+        self.assertEqual(pair["first_cut_utility"], 0.5)
+        self.assertEqual(pair["second_cut_utility"], 0.5)
+        self.assertEqual(pair["joint_cut_utility"], 0.5)
+        self.assertEqual(pair["utility_interaction_contrast"], 0.5)
 
     def test_same_graph_reverses_tccip_sign_when_input_prior_is_reversed(self) -> None:
         high_x1 = self.by_name["task_relevant_high_x1_prior"]
@@ -144,13 +155,21 @@ class TccipReferenceOracleTests(unittest.TestCase):
         self.assertIn("\t1\t0,0\t1", first)
         data_lines = [line for line in first.splitlines() if line and not line.startswith("#")]
         table = list(csv.reader(io.StringIO("\n".join(data_lines)), delimiter="\t"))
-        self.assertEqual(len(table[0]), 22)
-        self.assertTrue(all(len(row) == 22 for row in table[1:]))
+        self.assertEqual(len(table[0]), 28)
+        self.assertTrue(all(len(row) == 28 for row in table[1:]))
         xor_info = next(
             row for row in table
             if row[0] == "information_baseline" and row[1] == "role_matched_xor_synergy_uniform_prior"
         )
-        self.assertEqual(xor_info[-3:], ["1", "0,0", "1"])
+        self.assertEqual(xor_info[19:22], ["1", "0,0", "1"])
+        xor_interaction = next(
+            row for row in table
+            if row[0] == "utility_interaction"
+            and row[1] == "role_matched_xor_synergy_uniform_prior"
+            and row[22] == "cross_cut_xor_left"
+            and row[23] == "matched_internal_xor_right"
+        )
+        self.assertEqual(xor_interaction[24:28], ["0.5", "0.5", "0.5", "0.5"])
 
     def test_declared_partition_mask_mismatch_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
