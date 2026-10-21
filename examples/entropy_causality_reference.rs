@@ -349,6 +349,14 @@ mod tests {
     }
 
     #[test]
+    fn canonical_specification_includes_rule_order_and_noise() {
+        assert_eq!(
+            directed_ring(3, 0.1).canonical_specification(),
+            "rules=copy:1,copy:2,copy:0;flip=0.100000"
+        );
+    }
+
+    #[test]
     fn every_transition_row_is_a_probability_distribution() {
         let network = directed_ring(3, 0.13);
         for row in network.transition_matrix(None) {
