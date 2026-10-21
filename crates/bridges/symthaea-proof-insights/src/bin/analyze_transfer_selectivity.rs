@@ -24,6 +24,21 @@ const DEFAULT_BOOTSTRAP_REPLICATES: usize = 10_000;
 const DEFAULT_SEED: u64 = 0x5049_5442_5345_4c45;
 const MIN_COMPONENTS_PER_CLASS: usize = 20;
 const REQUIRED_REVIEWERS: usize = 2;
+const REVIEW_REASON_CODES: &[&str] = &[
+    "missing_precondition",
+    "object_type",
+    "domain_mismatch",
+    "inequality_direction",
+    "predicate_mismatch",
+    "quantifier_scope",
+    "premise_unavailable",
+    "irrelevant_near_neighbour",
+    "other",
+    "unknown",
+];
+const TRANSFER_MISMATCH_CODES: &[&str] = REVIEW_REASON_CODES;
+const PRECONDITION_OUTCOMES: &[&str] =
+    &["satisfied", "violated", "unknown", "not_applicable"];
 
 #[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -441,6 +456,27 @@ fn validate_digest_field(
     Ok(())
 }
 
+fn validate_string_enum_array(
+    values: &[Value],
+    allowed: &[&str],
+    context: &str,
+    require_unique: bool,
+) -> Result<()> {
+    let mut seen = BTreeSet::new();
+    for value in values {
+        let value = value
+            .as_str()
+            .with_context(|| format!("{context} values must be strings"))?;
+        if !allowed.contains(&value) {
+            bail!("{context} contains unsupported value {value:?}");
+        }
+        if require_unique && !seen.insert(value) {
+            bail!("{context} contains duplicate value {value:?}");
+        }
+    }
+    Ok(())
+}
+
 fn validate_outcome_contract(value: &Value, context: &str) -> Result<()> {
     let root = require_exact_keys(
         value,
@@ -572,11 +608,15 @@ fn validate_outcome_contract(value: &Value, context: &str) -> Result<()> {
             .get("reason_codes")
             .and_then(Value::as_array)
             .with_context(|| format!("{reviewer_ctx}.reason_codes must be an array"))?;
-        if codes.is_empty()
-            || codes.iter().any(|code| code.as_str().is_none_or(|value| value.trim().is_empty()))
-        {
-            bail!("{reviewer_ctx}.reason_codes must contain non-empty strings");
+        if codes.is_empty() {
+            bail!("{reviewer_ctx}.reason_codes must contain at least one reason code");
         }
+        validate_string_enum_array(
+            codes,
+            REVIEW_REASON_CODES,
+            &format!("{reviewer_ctx}.reason_codes"),
+            true,
+        )?;
     }
 
     let prediction_ctx = format!("{context}.prediction");
@@ -620,12 +660,12 @@ fn validate_outcome_contract(value: &Value, context: &str) -> Result<()> {
         .get("mismatch_codes")
         .and_then(Value::as_array)
         .with_context(|| format!("{prediction_ctx}.mismatch_codes must be an array"))?;
-    if mismatch_codes
-        .iter()
-        .any(|code| code.as_str().is_none_or(|value| value.trim().is_empty()))
-    {
-        bail!("{prediction_ctx}.mismatch_codes must contain strings");
-    }
+    validate_string_enum_array(
+        mismatch_codes,
+        TRANSFER_MISMATCH_CODES,
+        &format!("{prediction_ctx}.mismatch_codes"),
+        true,
+    )?;
     let checks = prediction
         .get("precondition_checks")
         .and_then(Value::as_array)
@@ -639,7 +679,10 @@ fn validate_outcome_contract(value: &Value, context: &str) -> Result<()> {
             &[],
         )?;
         required_nonempty_string(check, "check_id", &check_ctx)?;
-        required_nonempty_string(check, "outcome", &check_ctx)?;
+        let outcome = required_nonempty_string(check, "outcome", &check_ctx)?;
+        if !PRECONDITION_OUTCOMES.contains(&outcome) {
+            bail!("{check_ctx}.outcome has unsupported value {outcome:?}");
+        }
         match check.get("evidence_sha256") {
             Some(Value::Null) => {}
             Some(_) => validate_digest_field(check, "evidence_sha256", 64, &check_ctx)?,
