@@ -44,13 +44,14 @@ The executable is intended to measure horizon-induced capability loss and search
 
 ## Synthetic falsification fixtures
 
-The deterministic unit tests cover six contracts:
+The deterministic unit tests cover seven contracts:
 1. Horizon-1 results match the existing one-step viable-action set.
 2. A Push that is safe for one step is rejected at horizon 2 when every possible continuation violates the load limit.
 3. Increasing the horizon can remove certified actions but cannot add a new one.
 4. Emergency-recovery authority is enforced across the whole plan, not just at the first step.
 5. Invalid horizons and an already-unsafe initial tube fail closed.
 6. A future EmergencyRecover cannot excuse an unsafe intermediate tube.
+7. An independent short-horizon action-sequence enumerator agrees with the production recursive search over multiple state tubes, dynamics envelopes and authority settings.
 
 The test dynamics are deliberately synthetic. These tests check the interval-propagation/search contract; they do not demonstrate a safe real-world controller, model calibration, or SOTA performance.
 
