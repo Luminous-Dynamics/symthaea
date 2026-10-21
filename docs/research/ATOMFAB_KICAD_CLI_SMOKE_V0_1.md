@@ -13,7 +13,7 @@ The fixture is a small two-layer, passive continuity coupon. It is intentionally
 - Workflow: `.github/workflows/atomfab-kicad-cli-smoke.yml`.
 - Receipt/artifacts: `atomfab-kicad-cli-smoke-receipt`.
 
-The workflow uses `kicad-cli pcb drc` in JSON mode with violation exit codes enabled. It records a successful clean-board run, then changes the GND trace coordinates to coincide with the VCC trace and requires exit code 5 on the deliberately shorted fixture. It parses both JSON reports and exports copper, mask, silkscreen and outline Gerbers plus Excellon drill output. Checksums include the design, negative-control input, reports, exports and receipt.
+The workflow uses `kicad-cli pcb drc` in JSON mode with violation exit codes enabled. It records a successful clean-board run, then changes the GND trace coordinates to coincide with the VCC trace and requires exit code 5 on the deliberately shorted fixture. It parses both JSON reports and exports copper, mask, silkscreen and outline Gerbers plus Excellon drill output. The workflow reruns the clean DRC report and repeats both exports to separate directories, requiring byte-identical reports/files and matching output filenames. Checksums include the design, negative-control input, reports, primary/repeated exports and receipt.
 
 KiCad's [official CLI reference](https://docs.kicad.org/9.0/en/cli/cli.html) documents DRC's exit code (0 when no violations are found, 5 when violations exist), Gerber's per-layer output and drill export. The [official image manifest](https://hub.docker.com/layers/kicad/kicad/9.0.9/images/sha256-cef4a572df1465b98fa63cdac88780e0f8d39f03c5493434802bcd92f62123fb) identifies the pinned Linux/amd64 KiCad 9.0.9 image.
 
