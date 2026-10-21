@@ -87,3 +87,8 @@ Reviewing the downloaded bundle then revealed a handoff issue: `SHA256SUMS` reco
 ## Portable checksum verification
 
 The checksum list initially used absolute paths from the hosted runner. I fixed that follow-up in the parent workflow: it now changes into the artifact root, hashes every file except `SHA256SUMS` with sorted relative paths, and immediately executes `sha256sum -c SHA256SUMS`. This adds a portability check to the exact-head run rather than assuming an artifact can be verified only on its producer machine.
+
+
+## Fail-closed role contract
+
+The generated inventory declares the expected 22 CAM roles independently of observed files. The workflow requires that fixed role list, the observed role list and the path list to agree exactly. If an expected output disappears, the manifest must be incomplete/rejected rather than redefining its own required set from whatever files happened to be found. This is the intended contract for downstream consumers of the shared Rust artifact inventory validator.
