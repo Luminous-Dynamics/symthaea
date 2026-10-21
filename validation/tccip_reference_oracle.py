@@ -460,7 +460,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(f"wrote {args.output} ({len(artifact.encode('utf-8'))} bytes)", file=sys.stderr)
         else:
             sys.stdout.write(artifact)
-        print(f"QUALIFIED_REFERENCE_ORACLE: {len(fixtures)} fixtures; source_sha={args.source_sha}", file=sys.stderr)
+        print(f"REFERENCE_ORACLE_CHECKS_PASSED: {len(fixtures)} fixtures; source_sha={args.source_sha}", file=sys.stderr)
         return 0
     except (OSError, UnicodeError, ValueError, AssertionError) as error:
         print(f"NOT QUALIFIED: {error}", file=sys.stderr)
