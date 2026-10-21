@@ -44,7 +44,6 @@ pub fn validate_review(review: &Value) -> Result<(), Vec<String>> {
     for field in ["review_id", "created_at", "analysis_profile"] {
         require_nonblank(review, field, "$", &mut errors);
     }
-    require_const(review.get("analysis_profile").unwrap_or(&Value::Null), "unused", "", "", &mut Vec::new());
 
     let authority = object_field(review, "authority", "$", &mut errors);
     if let Some(authority) = authority {
