@@ -316,6 +316,7 @@ pub struct EpisodeMetrics {
     /// Steps for which no available action was predicted to satisfy both one-step limits.
     pub no_safe_action_ticks: usize,
     pub false_alarms: usize,
+    pub false_alarm_opportunities: usize,
     pub push_steps: usize,
     pub maintain_steps: usize,
     pub emergency_recover_steps: usize,
@@ -348,6 +349,7 @@ pub fn run_episode_with_shield(
     let mut shield_vetoes = 0;
     let mut no_safe_action_ticks = 0;
     let mut false_alarms = 0;
+    let mut false_alarm_opportunities = 0;
     let mut push_steps = 0;
     let mut maintain_steps = 0;
     let mut emergency_recover_steps = 0;
@@ -392,6 +394,16 @@ pub fn run_episode_with_shield(
             shuffled_forecast_confidence,
             oracle_forecast_load,
         };
+        // Count false-alarm opportunities from the pre-action state; do not
+        // let the action itself change the denominator or hide the opportunity.
+        let false_alarm_opportunity = stress < 0.20
+            && reserve > 0.30
+            && allostatic_load < 0.25
+            && forecast_load < 0.25;
+        if false_alarm_opportunity {
+            false_alarm_opportunities += 1;
+        }
+
         let proposed_action = choose_action(policy, observation);
         let projected = projected_state(proposed_action, reserve, allostatic_load, stress);
         if proposed_action == Action::Push && (projected.0 < 0.15 || projected.1 > 0.88) {
@@ -433,12 +445,7 @@ pub fn run_episode_with_shield(
         reserve = next_reserve;
         allostatic_load = next_load;
 
-        if action == Action::Maintain
-            && stress < 0.20
-            && reserve > 0.30
-            && allostatic_load < 0.25
-            && forecast_load < 0.25
-        {
+        if action == Action::Maintain && false_alarm_opportunity {
             false_alarms += 1;
         }
 
@@ -488,6 +495,7 @@ pub fn run_episode_with_shield(
         shield_vetoes,
         no_safe_action_ticks,
         false_alarms,
+        false_alarm_opportunities,
         push_steps,
         maintain_steps,
         emergency_recover_steps,
