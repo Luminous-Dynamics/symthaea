@@ -183,47 +183,35 @@ jobs:
                 *) echo "unclassified CAM artifact: $relative" >&2; exit 42 ;;
               esac
               digest=$(sha256sum "$file" | cut -d ' ' -f 1)
-              byte_len=$(wc -c < "$file" | tr -d '[:space:]')
               jq -cn --arg path "$relative" --arg role "$role" --arg sha256 "$digest" \
-                --argjson byte_len "$byte_len" \
-                '{path:$path,role:$role,byte_len:$byte_len,sha256:$sha256}'
+                '{path:$path,role:$role,expected_sha256:$sha256}'
             done < <(find "$OUT_HOST" -type f -print0 | sort -z) | jq -s 'sort_by(.path)'
           )"
 
           jq -n -S \
-            --arg schema "atomfab-native-cam-artifact-manifest-v0.1" \
-            --arg git_head "$git_head" \
-            --arg board_path "$BOARD_REL" \
-            --arg board_sha256 "$board_sha" \
-            --arg image_digest "$image_digest" \
-            --arg kicad_version "$kicad_version" \
+            --arg schema "atomfab-pcb-artifact-inventory-v0.1" \
             --argjson artifacts "$artifact_entries_json" \
             '{
               schema: $schema,
-              git_head: $git_head,
-              board_path: $board_path,
-              board_sha256: $board_sha256,
-              tool: {
-                image: "kicad/kicad@sha256:cef4a572df1465b98fa63cdac88780e0f8d39f03c5493434802bcd92f62123fb",
-                image_digest: $image_digest,
-                version_output: $kicad_version
-              },
+              design_id: "ATOMFAB-CONTINUITY-COUPON",
+              design_revision: "r0",
+              required_roles: ($artifacts | map(.role) | unique),
               artifacts: $artifacts,
-              artifact_count: ($artifacts | length),
-              authority: "native_eda_input_report_and_export_inventory_only_no_physical_or_production_release_authority",
-              claim_ceiling: "Manifest binds actual source/report/export bytes; it does not prove physical board conformity, electrical safety, assembly quality, or product qualification."
+              authority: "artifact_presence_and_digest_inventory_only_no_design_or_production_authority",
+              claim_ceiling: "Artifact presence and SHA-256 inventory only; no KiCad DRC, design manufacturability, physical quality, safety, or production-release authority."
             }' > "$OUT_HOST/artifact-manifest.json"
 
-          jq -e --arg head "$git_head" --arg board_sha "$board_sha" '
-            .schema == "atomfab-native-cam-artifact-manifest-v0.1"
-            and .git_head == $head
-            and .board_sha256 == $board_sha
-            and .artifact_count == 20
+          jq -e '
+            .schema == "atomfab-pcb-artifact-inventory-v0.1"
+            and .design_id == "ATOMFAB-CONTINUITY-COUPON"
+            and .design_revision == "r0"
+            and .authority == "artifact_presence_and_digest_inventory_only_no_design_or_production_authority"
+            and .claim_ceiling == "Artifact presence and SHA-256 inventory only; no KiCad DRC, design manufacturability, physical quality, safety, or production-release authority."
+            and .required_roles == ([.artifacts[].role] | unique)
             and (.artifacts | length) == 20
             and ([.artifacts[].path] | unique | length) == 20
             and ([.artifacts[].role] | unique | length) == 20
-            and all(.artifacts[]; (.byte_len > 0) and (.sha256 | test("^[0-9a-f]{64}$")))
-            and .tool.image_digest == "sha256:cef4a572df1465b98fa63cdac88780e0f8d39f03c5493434802bcd92f62123fb"
+            and all(.artifacts[]; .expected_sha256 | test("^[0-9a-f]{64}$"))
           ' "$OUT_HOST/artifact-manifest.json" > /dev/null
           manifest_sha=$(sha256sum "$OUT_HOST/artifact-manifest.json" | cut -d ' ' -f 1)
 
@@ -233,7 +221,7 @@ jobs:
             --arg board_path "$BOARD_REL" \
             --arg board_sha256 "$board_sha" \
             --arg artifact_manifest_sha256 "$manifest_sha" \
-            --argjson artifact_count "$(jq '.artifact_count' "$OUT_HOST/artifact-manifest.json")" \
+            --argjson artifact_count "$(jq '.artifacts | length' "$OUT_HOST/artifact-manifest.json")" \
             --arg image "$IMAGE" \
             --arg image_digest "$image_digest" \
             --arg kicad_version "$kicad_version" \
