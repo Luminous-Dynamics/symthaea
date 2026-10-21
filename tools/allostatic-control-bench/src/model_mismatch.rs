@@ -287,6 +287,36 @@ mod tests {
         .expect("finite synthetic mismatch")
     }
 
+    fn signed_cycle(index: usize) -> f64 {
+        [-1.0, 0.0, 1.0][index % 3]
+    }
+
+    /// Forty? Use 39 episodes to exactly exercise the finite 90% four-family
+    /// calibration gate while varying eight error coordinates independently.
+    fn factorial_profiles() -> Vec<MismatchProfile> {
+        (0..39)
+            .map(|index| {
+                MismatchProfile::new(
+                    0.01 * signed_cycle(index),
+                    0.02 * signed_cycle(index + 1),
+                    error(
+                        0.03 * signed_cycle(index + 2),
+                        0.06 * signed_cycle(index + 3),
+                    ),
+                    error(
+                        0.01 * signed_cycle(index + 4),
+                        0.025 * signed_cycle(index + 5),
+                    ),
+                    error(
+                        0.015 * signed_cycle(index + 6),
+                        0.04 * signed_cycle(index + 7),
+                    ),
+                )
+                .expect("finite factorial mismatch")
+            })
+            .collect()
+    }
+
     fn state() -> StateEnvelope {
         StateEnvelope::new(
             Interval::point(0.22).expect("finite point"),
@@ -297,6 +327,20 @@ mod tests {
 
     fn limits() -> ViabilityLimits {
         ViabilityLimits::new(0.15, 0.88).expect("valid limits")
+    }
+
+    #[test]
+    fn factorial_calibration_panel_reaches_each_independent_error_bound() {
+        let panel = factorial_profiles();
+        assert_eq!(panel.len(), 39);
+        let scores: Vec<EpisodeResidualScores> = panel
+            .iter()
+            .map(|mismatch| episode_residual_scores(*mismatch, &STRESS_GRID).expect("scores"))
+            .collect();
+        assert!((scores.iter().map(|s| s.reserve_state).fold(0.0, f64::max) - 0.01).abs() < 1e-12);
+        assert!((scores.iter().map(|s| s.load_state).fold(0.0, f64::max) - 0.02).abs() < 1e-12);
+        assert!((scores.iter().map(|s| s.reserve_effect).fold(0.0, f64::max) - 0.03).abs() < 1e-12);
+        assert!((scores.iter().map(|s| s.load_effect).fold(0.0, f64::max) - 0.06).abs() < 1e-12);
     }
 
     #[test]
@@ -348,8 +392,7 @@ mod tests {
     #[test]
     fn point_shield_false_positive_is_rejected_by_a_calibrated_envelope() {
         // Every calibration episode contains <= this held-out error magnitude.
-        let calibration: Vec<MismatchProfile> =
-            (1..=39).map(|i| profile(i as f64 / 39.0)).collect();
+        let calibration = factorial_profiles();
         let radii = calibrate_mismatch_panel(&calibration, &STRESS_GRID, 0.90)
             .expect("39 episodes meet the 90% four-family finite-rank gate");
         let held_out = profile(1.0);
@@ -376,8 +419,7 @@ mod tests {
 
     #[test]
     fn robustness_is_scored_with_false_certifications_and_false_vetoes_separate() {
-        let calibration: Vec<MismatchProfile> =
-            (1..=39).map(|i| profile(i as f64 / 39.0)).collect();
+        let calibration = factorial_profiles();
         let radii =
             calibrate_mismatch_panel(&calibration, &STRESS_GRID, 0.90).expect("calibration panel");
         let metrics =
