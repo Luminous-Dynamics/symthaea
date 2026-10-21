@@ -255,7 +255,8 @@ fn parse_episodes(csv: &str) -> Result<BTreeMap<ConditionKey, EpisodesBySeed>, B
             return Err(invalid_data(format!(
                 "unsafe_episode disagrees with unsafe_ticks on line {}",
                 line_index + 2
-            )).into());
+            ))
+            .into());
         }
         for (name, value) in [
             ("mean_load", mean_load),
