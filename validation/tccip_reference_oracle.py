@@ -279,6 +279,9 @@ def parse_manifest(path: Path) -> tuple[list[Fixture], bytes]:
             expected_partition_range=(float(fields[17]), float(fields[18])),
         )
         validate_fixture(fixture)
+        actual_mask = sum(component << index for index, component in enumerate(components))
+        if actual_mask != mask:
+            raise ValueError(f"{name}: declared partition mask {mask} disagrees with component labels {actual_mask}")
         if canonical_target(target) != fields[4]:
             raise ValueError(f"{name}: task target is not canonical")
         if ",".join(str(weight) for weight in input_weights) != fields[5]:
