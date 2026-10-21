@@ -37,17 +37,13 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     println!("experiment,mode,seed,dimension,prototypes,trials,random_baseline");
     println!(
-        "pattern_interaction,{}, {},{},{},{},{},{}",
+        "pattern_interaction,{},{},{},{},{},{}",
         if stress_mode { "stress" } else { "smoke" },
         report.seed,
         report.dimension,
         report.prototype_count,
         config.trials,
         report.random_chance_baseline
-    );
-    println!(
-        "pattern_interaction,{},{},{},{}",
-        report.seed, report.dimension, report.prototype_count, report.random_chance_baseline
     );
     println!();
     println!("metric,value");
