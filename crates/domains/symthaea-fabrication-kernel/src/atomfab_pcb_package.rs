@@ -127,9 +127,7 @@ pub struct PackageCorpusReceipt {
 
 impl PackageCorpusReceipt {
     pub fn passed(&self) -> bool {
-        self.status == "passed"
-            && self.exact_head_bound
-            && self.matched_cases == self.case_count
+        self.status == "passed" && self.exact_head_bound && self.matched_cases == self.case_count
     }
 }
 
@@ -180,8 +178,16 @@ pub fn evaluate_package_corpus_bytes(
     {
         return Err("package evidence-boundary declaration weakened or missing".into());
     }
-    require_exact_roles(&corpus.required_source_roles, REQUIRED_SOURCE_ROLES, "source")?;
-    require_exact_roles(&corpus.required_output_roles, REQUIRED_OUTPUT_ROLES, "output")?;
+    require_exact_roles(
+        &corpus.required_source_roles,
+        REQUIRED_SOURCE_ROLES,
+        "source",
+    )?;
+    require_exact_roles(
+        &corpus.required_output_roles,
+        REQUIRED_OUTPUT_ROLES,
+        "output",
+    )?;
 
     let mut case_ids = BTreeSet::new();
     for case in &corpus.cases {
@@ -307,7 +313,10 @@ fn evaluate_package(package: &PackageManifest) -> PackageGateResult {
         }
     }
 
-    if !matches!(package.drc.status.as_str(), "clean" | "violations" | "unknown") {
+    if !matches!(
+        package.drc.status.as_str(),
+        "clean" | "violations" | "unknown"
+    ) {
         rejected.push("INVALID_DRC_STATUS".to_string());
     }
     if !is_hex_digest(&package.drc.source_board_sha256) {
@@ -439,7 +448,13 @@ mod tests {
             .find(|case| case.case_id == "PCB-PKG-001")
             .expect("valid package positive control");
         assert_eq!(case.actual.disposition, "ready_for_review");
-        assert!(!case.actual.reason_codes.iter().any(|reason| reason.contains("qualified")));
+        assert!(
+            !case
+                .actual
+                .reason_codes
+                .iter()
+                .any(|reason| reason.contains("qualified"))
+        );
     }
 
     #[test]
@@ -452,10 +467,11 @@ mod tests {
             .find(|case| case.case_id == "PCB-PKG-004")
             .expect("stale DRC digest negative control");
         assert_eq!(case.actual.disposition, "rejected");
-        assert!(case
-            .actual
-            .reason_codes
-            .contains(&"DRC_BOARD_DIGEST_MISMATCH".to_string()));
+        assert!(
+            case.actual
+                .reason_codes
+                .contains(&"DRC_BOARD_DIGEST_MISMATCH".to_string())
+        );
     }
 
     #[test]
@@ -468,10 +484,11 @@ mod tests {
             .find(|case| case.case_id == "PCB-PKG-009")
             .expect("path traversal negative control");
         assert_eq!(case.actual.disposition, "rejected");
-        assert!(case
-            .actual
-            .reason_codes
-            .contains(&"UNSAFE_ARTIFACT_PATH:../unsafe.gbr".to_string()));
+        assert!(
+            case.actual
+                .reason_codes
+                .contains(&"UNSAFE_ARTIFACT_PATH:../unsafe.gbr".to_string())
+        );
     }
 
     #[test]
@@ -479,23 +496,26 @@ mod tests {
         let mut value = corpus_value();
         value["cases"][1]["id"] = value["cases"][0]["id"].clone();
         let duplicated = serde_json::to_vec(&value).expect("serialize duplicate corpus");
-        assert!(evaluate_valid(&duplicated)
-            .expect_err("duplicate package case must reject")
-            .contains("duplicate package case ID"));
+        assert!(
+            evaluate_valid(&duplicated)
+                .expect_err("duplicate package case must reject")
+                .contains("duplicate package case ID")
+        );
 
         let mut value = corpus_value();
         value["case_count"] = serde_json::json!(11);
         let altered_count = serde_json::to_vec(&value).expect("serialize altered package corpus");
-        assert!(evaluate_valid(&altered_count)
-            .expect_err("package count tampering must reject")
-            .contains("package case count mismatch"));
+        assert!(
+            evaluate_valid(&altered_count)
+                .expect_err("package count tampering must reject")
+                .contains("package case count mismatch")
+        );
     }
 
     #[test]
     fn altered_expectation_fails_receipt() {
         let mut value = corpus_value();
-        value["cases"][0]["expected"]["disposition"] =
-            serde_json::Value::String("rejected".into());
+        value["cases"][0]["expected"]["disposition"] = serde_json::Value::String("rejected".into());
         let mutated = serde_json::to_vec(&value).expect("serialize altered expected output");
         let receipt = evaluate_valid(&mutated).expect("altered expectation remains parseable");
         assert!(!receipt.passed());
@@ -507,7 +527,10 @@ mod tests {
         let original =
             evaluate_valid(EMBEDDED_PACKAGE_CORPUS.as_bytes()).expect("valid package corpus");
         let mut value = corpus_value();
-        value["cases"].as_array_mut().expect("cases array").reverse();
+        value["cases"]
+            .as_array_mut()
+            .expect("cases array")
+            .reverse();
         let reverse = serde_json::to_vec(&value).expect("serialize reordered cases");
         let reordered = evaluate_valid(&reverse).expect("reordered package corpus");
         assert!(reordered.passed());
@@ -519,12 +542,10 @@ mod tests {
     fn declared_head_must_match_actual_checkout() {
         let declared = "a".repeat(40);
         let actual = "b".repeat(40);
-        assert!(evaluate_package_corpus_bytes(
-            EMBEDDED_PACKAGE_CORPUS.as_bytes(),
-            &declared,
-            &actual
-        )
-        .expect_err("Git SHA mismatch must reject")
-        .contains("does not match the actual checkout HEAD"));
+        assert!(
+            evaluate_package_corpus_bytes(EMBEDDED_PACKAGE_CORPUS.as_bytes(), &declared, &actual)
+                .expect_err("Git SHA mismatch must reject")
+                .contains("does not match the actual checkout HEAD")
+        );
     }
 }
