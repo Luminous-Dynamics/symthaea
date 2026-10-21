@@ -66,6 +66,23 @@ Acceptance controls for the scale-aware path:
 
 Use public benchmark families represented in [SciMLBenchmarks](https://docs.sciml.ai/SciMLBenchmarksOutput/stable/): non-stiff problems (Enright–Pryce, FitzHugh–Nagumo, Lotka–Volterra, Pleiades, rigid-body and three-body dynamics), stiff problems (ROBER, HIRES, Van der Pol, and chemistry/battery examples), and suitable dynamical systems. Add PDE/engineering cases only after choosing the correct qualified model/solver interfaces.
 
+### First deterministic scale-aware work–precision receipt
+
+Run the analytical oscillator sweep:
+
+```sh
+ODE_BENCH_SOURCE_SHA="$(git rev-parse HEAD)" \
+  cargo run --locked --release \
+    --manifest-path research/ode-verify-001/Cargo.toml \
+    --example work_precision > ode-work-precision.json
+```
+
+The receipt `ODE-WP-ANALYTIC-OSCILLATOR-001` crosses three state scales (`1e-6`, `1`, `1e6`) with three relative tolerances (`1e-3`, `1e-5`, `1e-7`). The absolute tolerance is scaled with the state units to test relative-error semantics. It records endpoint error against the analytical oscillator solution, maximum relative energy drift, accepted and rejected steps, derivative-evaluation count, maximum accepted normalized error, completion/finiteness, source SHA, and an explicit numerical-contract disposition.
+
+The focused workflow generates the receipt twice, requires byte identity, validates the schema and nine observations, uploads the receipt even when the numerical gate fails, and then separately enforces the pass conditions. The deterministic receipt intentionally excludes wall-clock timing; timing comparisons require repeated runs under a separately frozen hardware/toolchain profile.
+
+This first sweep is an internal analytical work–precision baseline only. It is not an external-SOTA comparison, does not prove physical validity, and must not be used to claim that the custom integrator is faster than SciPy, SUNDIALS, or SciML. The follow-up should use matched model semantics and compare endpoint/trajectory error, derivative evaluations, runtime distribution, memory, failure/abstention, and all out-of-tolerance cases against independently run mature solvers.
+
 For every common error threshold, report:
 - achieved state/trajectory error and invariant diagnostics;
 - wall time (repeat runs and report median plus spread);
