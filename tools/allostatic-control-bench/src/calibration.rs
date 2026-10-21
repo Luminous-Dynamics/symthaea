@@ -1,4 +1,4 @@
-//! Episode-level split-conformal radii for robust state envelopes.
+//! Episode-level split-conformal two-sided radii for robust state envelopes.
 //!
 //! Each score must be the maximum absolute prediction residual over one
 //! independent calibration episode, not a per-timestep residual. This provides
