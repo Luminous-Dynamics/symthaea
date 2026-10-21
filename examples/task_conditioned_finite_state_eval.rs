@@ -422,11 +422,11 @@ impl Fixture {
             let inputs = (0..self.network.input_count)
                 .map(|index| ((state >> index) & 1) != 0)
                 .collect::<Vec<_>>();
-            let target = usize::from(self.task_target.evaluate(&inputs));
+            let target = if self.task_target.evaluate(&inputs) { 1 } else { 0 };
             let weight = self.input_state_weights[state] as u128;
             target_counts[target] += weight;
             for index in 0..self.network.input_count {
-                let input_value = usize::from(inputs[index]);
+                let input_value = if inputs[index] { 1 } else { 0 };
                 joint_counts[index][input_value][target] += weight;
             }
         }
