@@ -8,6 +8,7 @@
 //! experience. Oracle and shuffled-forecast policies are diagnostic controls.
 
 pub mod calibration;
+pub mod model_mismatch;
 pub mod robust_viability;
 
 pub const HORIZON: usize = 48;
