@@ -268,6 +268,53 @@
         "0.6% error against physical fermentation outcomes",
         "resource savings or food-safety performance"
       ]
+    },
+    {
+      "id": "INDUSTRIAL-YEAST-FEEDRATE-FIGSHARE-2026",
+      "title": "Industrial baker's yeast fed-batch fermentation nutrient-addition time series",
+      "uri": "https://doi.org/10.6084/m9.figshare.33201579",
+      "code_companion": "https://github.com/tyrone1979/yeast",
+      "publisher": "figshare deposit referenced by the public analysis repository",
+      "dataset_reported_scope": {
+        "production_batches": 59,
+        "hourly_records": 1090,
+        "full_process_batches": 10,
+        "sparse_batches": 49,
+        "target": "sugar_feed_rate_kg_rs_h",
+        "target_unit": "kg reducing sugar per hour",
+        "strain_id": "167"
+      },
+      "reported_reference_result": {
+        "model": "BiLSTM",
+        "validation": "leave-one-batch-out on 10 full-process batches",
+        "held_out_windows": 129,
+        "pooled_mae_kg_rs_h": 99.1193,
+        "pooled_mape_percent": 10.4589,
+        "pooled_r2": 0.901,
+        "caveat": "Numbers are reported in the public code companion; not independently reproduced. Per-batch errors vary materially, and only 10 full-process batches are in this result."
+      },
+      "domain": [
+        "industrial_baker_yeast",
+        "fed_batch_fermentation",
+        "nutrient_feed_rate",
+        "process_time_series",
+        "batch_holdout"
+      ],
+      "evidence_class": "REPORTED_ON_PLANT_MEASUREMENTS_IN_SOURCE_DESCRIPTION",
+      "rights_status": "FIGSHARE_LICENSE_AND_DOWNLOAD_TERMS_NOT_YET_VERIFIED",
+      "use_gate": "Verify the Figshare deposit's current license and metadata, download authorized files, record byte-level SHA-256 and column/units dictionary, audit missingness and unusual records, then reproduce the published leave-one-batch-out baseline before any comparison. Review each feature's actual timestamp/availability against the feed-decision cutoff; current-hour target/feature alignment may describe the historical operator policy rather than prospective controllable prediction.",
+      "claims_not_supported": [
+        "beer, wine or spirits performance without separate domain validation",
+        "prospective feed-control benefit from current-hour feed-rate reconstruction",
+        "generalization beyond represented batches or strain",
+        "SOTA superiority without matching the published split, preprocessing and metrics",
+        "industrial resource saving or safe actuator control"
+      ],
+      "next_benchmark": "Compare persistence/last-action, simple regression, tree baseline and sequence models under identical leave-one-batch-out splits; separately score truly next-hour prediction after an explicit feature cutoff, calibration, error by batch, and matched decision value.",
+      "references": [
+        "https://github.com/tyrone1979/yeast",
+        "https://github.com/tyrone1979/yeast/blob/main/usage/results/lobo_metrics.json"
+      ]
     }
   ],
   "research_notes": [
@@ -275,6 +322,8 @@
     "Primary intake candidate: Dryad 2026 CC0 wine-temperature/yeast-ecology files, after raw-byte and replicate-structure audit.",
     "Separate curve-reproduction candidate: 2026 Frontiers wine-kinetics article and supplement; table/uncertainty reproduction is not external validation.",
     "Transcriptome time courses are biological evidence, not direct process-sensor or final-quality targets.",
-    "Synthetic fermentation data are for pipeline and fault-injection tests only."
+    "Synthetic fermentation data are for pipeline and fault-injection tests only.",
+    "An additional industrial process-data candidate is a baker's-yeast fed-batch dataset (59 batches/1,090 hourly rows reported by its code companion). It is not alcoholic beverage data; use it as an external process-method validation only after the Figshare license and source bytes are verified.",
+    "Reported current-hour feed-rate prediction may not be a prospective control task unless all inputs are proven available before the target decision. Evaluate next-hour and decision-cutoff tasks separately."
   ]
 }
