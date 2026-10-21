@@ -242,3 +242,12 @@ The execution work is tracked by [COMPUTE-MFG-001C #8223](https://github.com/Lum
 For a bounded electronics product, AtomFab can select and explain feasible routes; emit a reproducible manufacturing package; distinguish outsourced from local capability; assemble and test the board; preserve required lineage; and produce an accepted artifact against a frozen profile. It can reject infeasible candidates and reproduce the evidence chain on a second run.
 
 Passing proves only that bounded end-to-end capability. It does not prove universal manufacturing, industrial multilayer PCB production, semiconductor self-sufficiency, or atomically precise fabrication.
+
+
+## Actual-byte artifact inventory (new software gate)
+
+`atomfab_pcb_artifacts` complements the package-manifest consistency validator by opening every declared path below a canonical artifact root and calculating SHA-256 from the bytes that are really present. It rejects path traversal, absolute/drive-style paths, symlink escapes from the root, duplicate roles/paths, undeclared roles, stale expected digests, and weakened authority declarations. It distinguishes `complete`, `incomplete`, and `rejected`, sorts observations for deterministic receipts, and binds the runner receipt to the current Git HEAD.
+
+The workflow includes an **explicitly synthetic I/O smoke fixture** so the path and digest contract can be exercised without pretending that this repository already has a real native KiCad design. Those files are placeholders, not a KiCad board, not a DRC report, and not actual Gerber output. The receipt proves only that the named fixture files were present and hashed. It does not promote a package to manufacturable, physically qualified, safe, or releasable.
+
+The next substantive product-facing step is to feed a frozen native KiCad project through pinned `kicad-cli` DRC and export commands, retain the real tool version/argv/exit status, hash the generated Gerber/drill/BOM/placement files, and parse the actual DRC report before any `ready_for_review` decision. KiCad 9 documents the command-line DRC and Gerber/drill exporters in its [official CLI reference](https://docs.kicad.org/9.0/en/cli/cli.html). That adapter must have clean and violated-design controls; an artifact digest alone is not DRC evidence.
