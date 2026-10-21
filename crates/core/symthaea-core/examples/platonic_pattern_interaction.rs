@@ -14,7 +14,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         PatternInteractionConfig {
             dimension: 4_096,
             prototype_count: 256,
-            trials: 8,
+            trials: 32,
             noise_fractions: vec![0.05, 0.10, 0.20, 0.30, 0.40, 0.50],
             bundle_sizes: vec![1, 7, 31, 63, 127, 255],
         }
