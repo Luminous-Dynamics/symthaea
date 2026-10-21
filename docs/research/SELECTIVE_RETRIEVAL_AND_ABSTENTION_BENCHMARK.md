@@ -53,9 +53,10 @@ A second baseline, fixed-sequence confidence-interval calibration (CIC), uses **
 
 - **Top-1 accuracy:** correct unique-label predictions across the full evaluation mix; OOD and ambiguous mixture queries cannot count as correct.
 - **Coverage:** fraction of evaluation queries accepted rather than rejected.
+- **Reason-coded abstention:** each row counts queries rejected by the similarity threshold only, the top-two margin threshold only, or both thresholds. The three rejection categories are mutually exclusive and partition all rejected queries. Interpret them as diagnostics, not perfect semantic labels: a low-score rejection suggests insufficient match evidence; a low-margin rejection suggests competing candidates; both failures indicate weak match evidence and weak separation.
 - **Selective risk:** fraction of accepted queries that are incorrect. Risk is undefined when the system accepts no queries.
 - **95% Wilson interval:** uncertainty interval for errors among accepted queries.
-- **Thresholds and counts:** selection, certification, and evaluation sample counts; score/margin thresholds; independent certification pass/fail; accepted certification count, certification errors, exact-binomial upper-risk bound, and held-out accepted count/errors.
+- **Thresholds and counts:** selection, certification, and evaluation sample counts; score/margin thresholds; independent certification pass/fail; accepted certification count, certification errors, exact-binomial upper-risk bound, held-out accepted count/errors, and all three rejection-reason counts.
 - **Stratified diagnostics:** each seed/rule emits an overall row plus separate rows for every corruption level, random OOD queries, and ambiguous mixtures. This prevents pooled risk from hiding failures on a particular query type.
 - **Runtime:** total benchmark wall time per invocation, recorded separately from per-row decision quality.
 - **Conformal set-valued output:** calibration quantile q, known-query calibration count, marginal target coverage among labeled known test queries, mean prediction-set size, singleton fraction, and empty-set fraction. Per-noise coverage rows are diagnostic only; the guarantee is pooled over known queries, not conditional on a specific corruption rate.
