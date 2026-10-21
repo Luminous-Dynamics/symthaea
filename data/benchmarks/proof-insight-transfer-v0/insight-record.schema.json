@@ -920,7 +920,7 @@
                               "const": "matches_intended_claim"
                             },
                             "independent_reviewer_count": {
-                              "minimum": 1
+                              "minimum": 2
                             }
                           },
                           "required": [
