@@ -332,11 +332,16 @@ fn main() {
     let genesis = GenesisSeed::from_phrase(GENESIS_PHRASE);
     let tok = BpeTokenizer::default_minimal();
     let (training_dataset, evaluation_dataset) = make_datasets(&tok);
-    let json_out = args
-        .iter()
-        .position(|arg| arg == "--json-out")
-        .and_then(|i| args.get(i + 1))
-        .cloned();
+    let json_out = match args.iter().position(|arg| arg == "--json-out") {
+        Some(index) => match args.get(index + 1) {
+            Some(path) if !path.trim().is_empty() => Some(path.clone()),
+            _ => {
+                eprintln!("--json-out requires a non-empty output path");
+                std::process::exit(2);
+            }
+        },
+        None => None,
+    };
     let mut report_arms = Vec::new();
 
     if epochs == 0 {
