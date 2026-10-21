@@ -1447,7 +1447,11 @@ impl PgxHealthEquityEngine {
     /// estimate or a count of people needing a treatment change.
     ///
     /// Denominator provenance and population-category validity require separate review.
-    pub fn population_scenario_estimate(&self, drug: &str, gene: &str) -> PopulationScenarioEstimate {
+    pub fn population_scenario_estimate(
+        &self,
+        drug: &str,
+        gene: &str,
+    ) -> PopulationScenarioEstimate {
         // Rounded broad-group denominators for arithmetic examples only; they are not genotype cohorts.
         const POP_EUROPEAN: f64 = 195.0;
         const POP_AFRICAN: f64 = 47.0;
@@ -1494,18 +1498,20 @@ impl PgxHealthEquityEngine {
                 .unwrap_or(0.0);
 
             let modelled_fraction = if is_expressor_scenario {
-                // For tacrolimus: NM + IM are expressors who need dose increase.
+                // Historical model convention only; this is not a dose requirement.
                 nm + im
-            } else if is_prodrug {
-                // Prototype category sum for the selected class; not a clinical risk estimate.
-                pm + um
             } else {
-                // Prototype category sum for other drugs; not a clinical risk estimate.
+                // Prototype phenotype-category sum only; not a clinical risk estimate.
                 pm + um
             };
 
             let modelled_product_count = (modelled_fraction * pop_millions * 1_000_000.0) as u64;
-            per_population_scenario.push((ancestry, pop_millions, modelled_fraction, modelled_product_count));
+            per_population_scenario.push((
+                ancestry,
+                pop_millions,
+                modelled_fraction,
+                modelled_product_count,
+            ));
             sum_of_modelled_products += modelled_product_count;
 
             if modelled_product_count > largest_modelled_product {
