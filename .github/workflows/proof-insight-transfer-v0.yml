@@ -133,6 +133,7 @@ jobs:
           cd "$(dirname "$PITB_MANIFEST")"
           cargo run --locked --bin validate_transfer_contract -- "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/candidates/156-borsuk-nine-finite-obstruction.json"
           cargo run --locked --bin validate_transfer_contract -- "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/candidates/157-hadwiger-invariant-chain.json"
+          cargo run --locked --bin validate_transfer_contract -- "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/candidates/026-eventual-subset-density-transfer.json"
       - name: Run strict Clippy
         shell: bash
         run: |
