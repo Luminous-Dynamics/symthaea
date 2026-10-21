@@ -273,6 +273,20 @@ fn satisfies_one_step_viability(action: Action, reserve: f64, load: f64, stress:
     next_reserve >= 0.15 && next_load <= 0.88
 }
 
+/// Count how many currently available actions stay inside the declared
+/// one-step viability region. This measures local option breadth, not long-horizon
+/// reachability or the value of those options.
+pub fn safe_action_option_count(reserve: f64, load: f64, stress: f64) -> usize {
+    [
+        Action::Push,
+        Action::Maintain,
+        Action::EmergencyRecover,
+    ]
+    .iter()
+    .filter(|action| satisfies_one_step_viability(**action, reserve, load, stress))
+    .count()
+}
+
 /// Model-perfect one-step shield for the synthetic environment. This is not a
 /// formal guarantee outside the declared transition model or when state estimates
 /// and action effects are wrong.
@@ -302,6 +316,10 @@ pub struct EpisodeMetrics {
     pub mean_load: f64,
     pub peak_load: f64,
     pub minimum_reserve: f64,
+    /// Mean number of currently viable one-step actions over the episode, [0, 3].
+    pub mean_safe_action_options: f64,
+    /// Minimum number of currently viable one-step actions in any step, [0, 3].
+    pub minimum_safe_action_options: usize,
     pub terminal_reserve: f64,
     pub terminal_load: f64,
     pub unsafe_ticks: usize,
@@ -339,6 +357,8 @@ pub fn run_episode_with_shield(
 ) -> EpisodeMetrics {
     let mut reserve: f64 = 0.85;
     let mut minimum_reserve: f64 = reserve;
+    let mut safe_action_options_total: usize = 0;
+    let mut minimum_safe_action_options: usize = 3;
     let mut allostatic_load: f64 = 0.0;
     let mut task_reward = 0.0;
     let mut cumulative_load = 0.0;
@@ -397,6 +417,11 @@ pub fn run_episode_with_shield(
         };
         // Count false-alarm opportunities from the pre-action state; do not
         // let the action itself change the denominator or hide the opportunity.
+        let safe_options =
+            safe_action_option_count(reserve, allostatic_load, stress);
+        safe_action_options_total += safe_options;
+        minimum_safe_action_options = minimum_safe_action_options.min(safe_options);
+
         let false_alarm_opportunity = stress < 0.20
             && reserve > 0.30
             && allostatic_load < 0.25
@@ -486,6 +511,8 @@ pub fn run_episode_with_shield(
         mean_load: cumulative_load / HORIZON as f64,
         peak_load,
         minimum_reserve,
+        mean_safe_action_options: safe_action_options_total as f64 / HORIZON as f64,
+        minimum_safe_action_options,
         terminal_reserve: reserve,
         terminal_load: allostatic_load,
         unsafe_ticks,
@@ -620,6 +647,8 @@ mod tests {
                     assert!((0.0..=1.0).contains(&result.mean_load));
                     assert!((0.0..=1.0).contains(&result.peak_load));
                     assert!((0.0..=1.0).contains(&result.minimum_reserve));
+                    assert!((0.0..=3.0).contains(&result.mean_safe_action_options));
+                    assert!(result.minimum_safe_action_options <= 3);
                     assert!((0.0..=1.0).contains(&result.terminal_reserve));
                         assert!((0.0..=1.0).contains(&result.terminal_load));
                         assert!(result.violation_exposure.is_finite());
@@ -631,6 +660,7 @@ mod tests {
                                 == HORIZON
                         );
                         if shielded {
+                            assert!(result.minimum_safe_action_options >= 1);
                             assert_eq!(result.no_safe_action_ticks, 0);
                             assert_eq!(
                                 result.unsafe_ticks, 0,
