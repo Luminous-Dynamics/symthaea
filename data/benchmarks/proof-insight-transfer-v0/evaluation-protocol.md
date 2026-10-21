@@ -124,6 +124,8 @@ This is a protocol template; the alpha level, power assumptions, eligibility den
 
 - **2026-10-20, before any confirmatory model outcomes were collected or inspected:** added a conservative minimum of 20 eligible independent test-family clusters for a confirmatory utility claim and made simulation-based power planning mandatory. This is an additional no-go condition, not a relaxation of the +10 percentage-point effect or positive 95% interval gates. The floor is project-specific and not itself evidence of adequate power. The same pre-outcome amendment requires explicit outcome/exclusion rows for every frozen validation and test family to prevent silent denominator shrinkage, requires the baseline scores to be recomputed from content-hashed raw validation outcomes, and makes power planning a gate: simulate the combined utility rule across true effects 0/+10/+15/+20pp and ICC 0/0.05/0.10/0.20, with ≥80% power at +20pp and ICC 0.20 and ≤5% false claims at zero effect. This specifically avoids demanding 80% power at the same +10pp threshold the observed point estimate must exceed. The Monte Carlo confidence bounds prevent an under-replicated simulation from being declared adequate merely because its point estimate passes. It also adds arm I, a strong premise-retrieval comparator, because the May 2026 LeanSearch v2 paper reported 46.1% recovery of ground-truth premise groups within 10 candidates on its 69-query research-Mathlib benchmark and 20% downstream proof success in its own fixed-prover setup; those numbers are not treated as directly comparable PITB results. The current file bytes, not an earlier commit of this document, must be hashed into the frozen run configuration. Git history preserves the prior draft and this amendment.
 
+- **2026-10-21, before confirmatory outcomes were collected or inspected:** preregistered separate external challenge strata for frozen-infrastructure transfer, formal-infrastructure construction, and dependency-rich repository tasks. Added an adversarial proof-critic calibration design inspired by FormalRewardBench error-injection methodology. These are evaluation-design changes only: they do not alter the primary v0 endpoint, import external benchmark scores into PITB, or claim transfer gains. All run configs must hash this protocol revision.
+
 ## 6. Leakage and external validity
 
 Family-level splitting blocks only direct within-family exposure under the catalog's declared mapping. It does **not** block:
@@ -135,6 +137,23 @@ Family-level splitting blocks only direct within-family exposure under the catal
 - model-specific memorization or contamination in retrieval caches.
 
 Before calling a result generalization evidence, add a leakage audit: normalized theorem-statement and proof fingerprints; cross-family dependency/near-duplicate edges; source-to-target family overlap review; and exact retrieval logs showing every item surfaced for each target. Freeze this audit before scoring. Keep a separate *external challenge set* with later, unpublished, or otherwise exposure-resistant targets, adjudicated for rights and feasibility. Report unknown exposure explicitly; do not claim that hashing alone proves non-contamination.
+
+
+### External challenge strata: transfer versus infrastructure construction
+
+The v0 primary endpoint remains **exact-target proof success with the target development and checker context frozen**. Do not pool infrastructure-building tasks into that endpoint. For external generalization, report these strata separately:
+
+1. **Frozen-infrastructure transfer:** target definitions, imports and dependency closure are supplied; only the requested proof obligation is changed.
+2. **Infrastructure construction:** a vetted informal argument is supplied, but the agent must create missing formal definitions, intermediate lemmas and proof scaffolding before reaching the target. AutoformBench (released 13 October 2026) is a relevant comparator design: 341 Lean 4 formalization tasks from 24 advanced-mathematics sources, with human-formalized and audited target statements ([benchmark and results](https://ai.meta.com/research/publications/autoformbench-a-lean-formalization-benchmark-for-advanced-mathematics/)). Its headline task success must not be numerically compared to PITB exact-target success because the work and denominator differ.
+3. **Dependency-rich repository transfer:** project-local definitions, imports and successor obligations are preserved, as in repository-scale evaluation; report dependency closure size/depth and context regime.
+
+For the infrastructure stratum, record whether the target proof succeeds, whether required definitions/helper lemmas were constructed, the number of accepted intermediate declarations, downstream successor-test results, and total calls/tokens/time/cost. The hypothesis is that typed proof insights may be most valuable at *infrastructure bottlenecks*; this remains untested and must be evaluated as a separate interaction/stratified effect, not asserted as a result.
+
+### Adversarial proof-critic calibration
+
+Proof generation and proof criticism are separate capabilities. FormalRewardBench evaluates 250 Lean proof preference pairs with five curated error-injection families; its paper reports 59.8% for its best frontier LLM evaluator and 24.4% for specialized theorem-prover models in that study's setup ([paper](https://arxiv.org/abs/2605.10141)). Those scores are **not** transfer-compatibility results and are not PITB baselines. Borrow the experimental method, not the score: add contrastive pairs where one minimal change breaks a key hypothesis, type, quantifier, premise or inference direction while a style-only change preserves the proof obligation. Two blind reviewers should label whether the *strategy applies to the target*, independently of whether a proposed proof compiles.
+
+Report false acceptance, false rejection, abstention, probability coverage and calibration by error class. Preserve the positive controls: a critic that rejects every candidate is not useful. Keep these critic outcomes secondary to verified target-solve utility and do not count proof-critic accuracy as proof success.
 
 ## 7. Mutation suite and negative controls
 
@@ -203,4 +222,6 @@ Each run must persist: protocol version and digest; source commit and family spl
 - [T² source and experiment harness](https://github.com/ldilab/T2).
 - Liu et al., [Formal Problem-Solving / D-FPS](https://proceedings.mlr.press/v306/liu26gl.html), ICML 2026; [implementation/data](https://github.com/Purewhite2019/formal_problem_solving_main).
 - [First Proof Batch 3 results](https://1stproof.org/third-batch-press-release.html), 14 October 2026.
+- Arnal et al., [AutoformBench: A Lean Formalization Benchmark for Advanced Mathematics](https://ai.meta.com/research/publications/autoformbench-a-lean-formalization-benchmark-for-advanced-mathematics/), 13 October 2026.
+- Uluşan et al., [FormalRewardBench: A Benchmark for Formal Theorem Proving Reward Models](https://arxiv.org/abs/2605.10141), May 2026.
 - [OpenAI math source snapshot](https://github.com/openai/math/tree/1581d4cbdd69a0faf34b2089614fe2a814316a6a).
