@@ -851,6 +851,35 @@ mod tests {
         );
         cases.push(("resume without interruption", resume_without_interrupt));
 
+        let mut verify_without_session = scenario("FA-TRACE-001");
+        let verify_index = verify_without_session
+            .events
+            .iter()
+            .position(|event| event.kind == EventKind::BundleVerified)
+            .expect("verification event exists");
+        verify_without_session.events[verify_index].sequence += 1;
+        let render_index = verify_without_session
+            .events
+            .iter()
+            .position(|event| event.kind == EventKind::ProtocolRendered)
+            .expect("render event exists");
+        verify_without_session.events[render_index].sequence += 1;
+        verify_without_session.events.insert(
+            verify_index,
+            TraceEvent {
+                sequence: 3,
+                kind: EventKind::SessionInterrupted,
+                bundle_id: None,
+                bundle_state: None,
+                digest_verified: None,
+                resource_state: None,
+                presented_as: None,
+                sensitive_payload: None,
+                consent_scoped: None,
+            },
+        );
+        cases.push(("verification outside active session", verify_without_session));
+
         for (label, trace) in cases {
             let value = serde_json::to_value(&trace).expect("mutated trace serializes");
             assert_eq!(
