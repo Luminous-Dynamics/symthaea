@@ -7,6 +7,7 @@ on:
       - ".github/workflows/first-aid-contract.yml"
       - "docs/research/first-aid/**"
       - "xtask/src/first_aid.rs"
+      - "xtask/src/first_aid_trajectory.rs"
       - "xtask/src/guideline_change_impact.rs"
       - "xtask/src/main.rs"
       - "xtask/Cargo.toml"
@@ -38,7 +39,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout exact change head
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
@@ -58,10 +59,13 @@ jobs:
           components: rustfmt, clippy
 
       - name: Check formatting for changed Rust files
-        run: rustfmt --edition 2024 --check xtask/src/main.rs xtask/src/first_aid.rs xtask/src/guideline_change_impact.rs
+        run: rustfmt --edition 2024 --check xtask/src/main.rs xtask/src/first_aid.rs xtask/src/first_aid_trajectory.rs xtask/src/guideline_change_impact.rs
 
       - name: Verify first-aid contract validator unit tests
         run: cargo test -p xtask first_aid::tests -- --nocapture
+
+      - name: Verify first-aid trajectory validator unit tests
+        run: cargo test -p xtask first_aid_trajectory::tests -- --nocapture
 
       - name: Verify guideline change-impact validator unit tests
         run: cargo test -p xtask guideline_change_impact::tests -- --nocapture
@@ -70,6 +74,11 @@ jobs:
         env:
           FIRST_AID_SOURCE_REVISION: ${{ github.event.pull_request.head.sha || github.sha }}
         run: cargo run -p xtask -- first-aid-validate --out target/first-aid-contract-receipt.json
+
+      - name: Run the synthetic first-aid trajectory validator
+        env:
+          FIRST_AID_SOURCE_REVISION: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: cargo run -p xtask -- first-aid-trajectory-validate --out target/first-aid-trajectory-receipt.json
 
       - name: Run the synthetic guideline change-impact validator
         env:
@@ -87,16 +96,30 @@ jobs:
           set -euo pipefail
           test -s target/first-aid-contract-receipt.json
           test -s target/first-aid-change-impact-receipt.json
+          test -s target/first-aid-trajectory-receipt.json
           jq -e --arg expected "$EXPECTED_HEAD" '
             .status == "contract_validation_passed" and
             .source_revision_sha == $expected and
             .scenario_count == 24 and
-            .benchmark_count == 17 and
+            .benchmark_count == 18 and
             .claim_ceiling == "synthetic contract integrity only; no clinical validation" and
             ([.corpus_sha256, .benchmark_sha256, .schema_sha256,
               .validator_source_sha256, .entrypoint_source_sha256,
               .executable_sha256] | all(test("^[0-9a-f]{64}$")))
           ' target/first-aid-contract-receipt.json
+          jq -e --arg expected "$EXPECTED_HEAD" '
+            .status == "synthetic_trajectory_contract_passed" and
+            .source_revision_sha == $expected and
+            .trace_count == 12 and
+            .counterexample_trace_count == 9 and
+            .critical_trace_count == 8 and
+            .critical_counterexample_count == 6 and
+            .violation_count == 9 and
+            .corpus_sha256 == "1ac414e6b920a6259d68a20c273a0a9465e98c7a596393f9777be9976d6e3fd3" and
+            .claim_ceiling == "synthetic process-integrity audit only; no clinical safety or patient-outcome claim" and
+            ([.corpus_sha256, .validator_source_sha256, .entrypoint_source_sha256,
+              .executable_sha256] | all(test("^[0-9a-f]{64}$")))
+          ' target/first-aid-trajectory-receipt.json
           jq -e --arg expected "$EXPECTED_HEAD" '
             .status == "synthetic_change_impact_contract_passed" and
             .source_revision_sha == $expected and
@@ -115,6 +138,7 @@ jobs:
             ([.source_artifact_sha256[]] | all(test("^[0-9a-f]{64}$")))
           ' target/first-aid-change-impact-receipt.json
           jq . target/first-aid-contract-receipt.json
+          jq . target/first-aid-trajectory-receipt.json
           jq . target/first-aid-change-impact-receipt.json
 
       - name: Publish non-clinical validation receipts
@@ -123,6 +147,7 @@ jobs:
           name: first-aid-evidence-receipts-${{ github.event.pull_request.head.sha || github.sha }}
           path: |
             target/first-aid-contract-receipt.json
+            target/first-aid-trajectory-receipt.json
             target/first-aid-change-impact-receipt.json
           if-no-files-found: error
           retention-days: 30
