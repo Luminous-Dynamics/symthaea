@@ -326,11 +326,15 @@ pub struct NoiseRetrievalResult {
     pub noise_fraction: f64,
     /// One-step nearest-prototype classifier accuracy.
     pub top1_accuracy: f64,
+    /// Wilson 95% confidence interval for nearest-prototype accuracy.
+    pub top1_accuracy_ci95: (f64, f64),
     /// Mean target similarity minus the best competing-prototype similarity.
     pub mean_similarity_margin: f64,
     /// Accuracy after iterative softmax-weighted pattern cleanup with bipolar projection.
     /// This is a Hopfield-inspired baseline, not an exact reproduction of a specific paper.
     pub cleanup_top1_accuracy: f64,
+    /// Wilson 95% confidence interval for cleanup accuracy.
+    pub cleanup_top1_accuracy_ci95: (f64, f64),
     /// Target-vs-best-distractor margin after projected associative cleanup.
     pub cleanup_mean_similarity_margin: f64,
 }
@@ -342,6 +346,8 @@ pub struct BundleCapacityResult {
     pub mean_max_distractor_similarity: f64,
     /// Fraction of trials where the top-ranked prototype is a bundle member.
     pub member_recall_at_1: f64,
+    /// Wilson 95% confidence interval for member recall.
+    pub member_recall_at_1_ci95: (f64, f64),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -351,8 +357,12 @@ pub struct AssociativeCapacityResult {
     /// Maximum over all non-target fillers in the candidate library.
     pub mean_max_distractor_similarity: f64,
     pub recall_at_1: f64,
+    /// Wilson 95% confidence interval for raw retrieval recall.
+    pub recall_at_1_ci95: (f64, f64),
     /// Recall after projected-softmax cleanup of the unbound query.
     pub cleanup_recall_at_1: f64,
+    /// Wilson 95% confidence interval for cleanup retrieval recall.
+    pub cleanup_recall_at_1_ci95: (f64, f64),
     pub cleanup_mean_target_similarity: f64,
     /// Maximum competing-filler similarity after projected-softmax cleanup.
     pub cleanup_mean_max_distractor_similarity: f64,
@@ -463,8 +473,10 @@ pub fn run_pattern_interaction_suite(
         noise_results.push(NoiseRetrievalResult {
             noise_fraction,
             top1_accuracy: correct as f64 / config.trials as f64,
+            top1_accuracy_ci95: wilson_interval_95(correct, config.trials),
             mean_similarity_margin: margin_sum / config.trials as f64,
             cleanup_top1_accuracy: cleanup_correct as f64 / config.trials as f64,
+            cleanup_top1_accuracy_ci95: wilson_interval_95(cleanup_correct, config.trials),
             cleanup_mean_similarity_margin: cleanup_margin_sum / config.trials as f64,
         });
     }
@@ -507,6 +519,7 @@ pub fn run_pattern_interaction_suite(
             mean_member_similarity: member_similarity_sum / config.trials as f64,
             mean_max_distractor_similarity: distractor_similarity_sum / config.trials as f64,
             member_recall_at_1: member_recall_count as f64 / config.trials as f64,
+            member_recall_at_1_ci95: wilson_interval_95(member_recall_count, config.trials),
         });
     }
 
@@ -584,7 +597,9 @@ pub fn run_pattern_interaction_suite(
             mean_max_distractor_similarity: max_distractor_similarity_sum
                 / config.trials as f64,
             recall_at_1: correct_count as f64 / config.trials as f64,
+            recall_at_1_ci95: wilson_interval_95(correct_count, config.trials),
             cleanup_recall_at_1: cleanup_correct_count as f64 / config.trials as f64,
+            cleanup_recall_at_1_ci95: wilson_interval_95(cleanup_correct_count, config.trials),
             cleanup_mean_target_similarity: cleanup_target_similarity_sum
                 / config.trials as f64,
             cleanup_mean_max_distractor_similarity: cleanup_distractor_similarity_sum
@@ -607,6 +622,23 @@ pub fn run_pattern_interaction_suite(
         bundle_results,
         associative_capacity_results,
     })
+}
+
+/// Two-sided 95% Wilson score interval for a binomial proportion.
+fn wilson_interval_95(successes: usize, trials: usize) -> (f64, f64) {
+    if trials == 0 {
+        return (0.0, 1.0);
+    }
+    let n = trials as f64;
+    let p = successes as f64 / n;
+    let z = 1.959_963_984_540_054_f64;
+    let z2 = z * z;
+    let denominator = 1.0 + z2 / n;
+    let center = (p + z2 / (2.0 * n)) / denominator;
+    let half_width = z
+        * ((p * (1.0 - p) / n + z2 / (4.0 * n * n)).sqrt())
+        / denominator;
+    ((center - half_width).max(0.0), (center + half_width).min(1.0))
 }
 
 /// Projected softmax associative cleanup: score all stored patterns against
