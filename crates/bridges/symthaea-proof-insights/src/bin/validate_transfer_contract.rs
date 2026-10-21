@@ -354,7 +354,9 @@ fn validate_target_verification(evidence: &Value) -> Result<()> {
         .and_then(Value::as_u64)
         .context("target statement correspondence needs independent_reviewer_count")?;
     if reviewer_count < 2 {
-        bail!("verified transfer needs at least two independent statement-correspondence reviewers");
+        bail!(
+            "verified transfer needs at least two independent statement-correspondence reviewers"
+        );
     }
 
     let successor_status = required_string(evidence, "successor_test_status")?;
@@ -633,8 +635,8 @@ mod tests {
             "notes": ["Synthetic fixture only"]
         });
         let mut single_reviewer = candidate.clone();
-        single_reviewer["transfer_verification"]["target_statement_correspondence"]
-            ["independent_reviewer_count"] = json!(1);
+        single_reviewer["transfer_verification"]["target_statement_correspondence"]["independent_reviewer_count"] =
+            json!(1);
         assert!(validate_candidate(&single_reviewer).is_err());
         assert!(validate_candidate(&candidate).is_ok());
     }
