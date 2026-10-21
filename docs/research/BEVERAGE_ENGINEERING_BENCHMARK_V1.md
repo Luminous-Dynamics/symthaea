@@ -342,6 +342,23 @@ Phase E — decision and plant twin integration: evaluate value of information a
 - BIER (2025), Water, Energy, and Emissions Benchmarking Summary. https://www.bieroundtable.com/2025-water-energy-and-emissions-benchmarking-summary-bier
 - Boulton, Nelson & Knoesen (2025), A Review of Sensors for the Monitoring, Modeling, and Control of Commercial Wine Fermentations. https://doi.org/10.3390/fermentation11060329
 
+## Adaptive-sampling replay and realized decision-value audit
+
+The adaptive-sensing work separates two questions that must not be conflated:
+
+1. **Decision-record consistency:** `adaptive_sampling_policy_audit.rs` verifies that a single discretionary sample request has an available channel, only uses observations available by decision time, preserves required tests, gives an explicit decision deadline, and has positive estimated net value in common preregistered loss units:
+   `expected_loss_without_sample - expected_loss_with_sample - sampling_cost - delay_cost > 0`.
+   The expected result must arrive before the deadline for the decision it is intended to inform. Deferral requires calibrated uncertainty and a review time before the deadline.
+2. **Realized cohort outcomes:** `adaptive_sampling_replay_audit.rs` compares the candidate with a predeclared baseline across paired trajectories or matched independent units. It reports discretionary measurement cost and assay count, paired decision-loss differences, missed high-severity events, false alarms, deadline misses, quality failures, required-test violations and hard-constraint violations. It calculates deterministic 5,000-resample percentile-bootstrap intervals for measurement-cost reduction and mean paired decision-loss degradation, with a separately preregistered worst-pair loss margin.
+
+The replay evaluator requires a common declared measurement-cost unit, a pinned decision-loss definition, configuration digests, an equal discretionary budget cap, a minimum pair count and minimum event count. Synthetic/retrospective pairs must share the same reference trajectory; block-randomized/matched-control arms must use distinct unit IDs. It rejects required-test or hard-constraint violations, cost-cap violations, policy event-miss rate worse than baseline, false-alarm rate beyond the preregistered maximum, deadline-miss-rate degradation beyond its margin, quality failures worse than baseline, insufficient cost-saving confidence bounds, mean-loss degradation beyond its confidence-bound margin, and a worst-pair regression beyond its own margin.
+
+### Proposed measured-cohort target
+
+For a prospective or credible retrospective evaluation, a proposed stretch gate is **at least 20% cost reduction at the lower 95% bootstrap bound**, while the upper 95% bound on mean decision-loss degradation remains below the preregistered margin and the worst-pair degradation stays within its own guardrail. Required-test and hard-constraint violation counts must be zero; high-severity event miss rate must not be worse than baseline; the false-alarm ceiling, deadline-miss margin and quality-outcome guardrail must hold.
+
+The 20% figure is a hypothesis to test, not a result or a universal plant limit. The synthetic fixture has eight invented trajectory-pairs and merely exercises evaluator paths. The min-pair and event-count settings are not a statistical power calculation. A replay only supports an empirical claim where its ground-truth/counterfactual assumptions are justified; a randomized or matched prospective comparison, data provenance, preregistration and independent quality/process review remain necessary for operational claims.
+
 ## Claim ceiling
 
 This document specifies a benchmark intended to make future claims more rigorous. It does not report a passed model, a production trial, a sensory improvement, an energy or water saving, or a superiority result. Current CI/test state must be inspected on the exact PR head; skipped, queued, cancelled or absent checks are not passes.
