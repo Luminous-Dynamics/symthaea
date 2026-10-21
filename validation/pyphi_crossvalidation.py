@@ -485,14 +485,44 @@ class PyPhiValidator:
             and np.isfinite(r.hdc_phi) and np.isfinite(r.pyphi_phi)
             for r in report.results
         )
-        return (
+        numeric_pairs_complete = (
             paired_count >= 3
             and paired_count == len(report.results)
             and report.n_validated == paired_count
             and report.n_failed == 0
+        )
+        model_pairs_verified = (
+            report.shared_model_verified
+            and all(
+                result.reference_model_digest is not None
+                and result.symthaea_model_digest is not None
+                and result.reference_model_digest == result.symthaea_model_digest
+                for result in report.results
+            )
+        )
+        version = (report.pyphi_version or "").lower()
+        stable_reference = bool(version) and not any(
+            marker in version for marker in ("rc", "dev", "a", "b")
+        )
+        return (
+            numeric_pairs_complete
+            and model_pairs_verified
+            and stable_reference
             and report.correlation is not None
             and np.isfinite(report.correlation)
             and report.correlation > 0.90
+            and report.spearman_correlation is not None
+            and np.isfinite(report.spearman_correlation)
+            and report.spearman_correlation > 0.90
+            and report.mean_absolute_error is not None
+            and np.isfinite(report.mean_absolute_error)
+            and report.root_mean_square_error is not None
+            and np.isfinite(report.root_mean_square_error)
+            and report.max_absolute_error is not None
+            and np.isfinite(report.max_absolute_error)
+            and report.agreement_within_10_percent is not None
+            and np.isfinite(report.agreement_within_10_percent)
+            and report.agreement_within_10_percent >= 90.0
         )
 
     def generate_report(self, report: ValidationReport, output_path: Path):
