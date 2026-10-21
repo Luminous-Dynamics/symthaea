@@ -1145,7 +1145,7 @@ fn audit_temporal_dataset(
                 }
                 unmatched_theorem_identity_join_count += 1;
             }
-            [(position, completion_commit, completion_statement_match)] => {
+            [(_position, completion_commit, completion_statement_match)] => {
                 identity_statement_match_at_completion = Some(*completion_statement_match);
                 identity_proof_matches_completion = Some(true);
                 let pre_state_is_ancestor = commit_before_object_exists == Some(true)
@@ -1179,7 +1179,6 @@ fn audit_temporal_dataset(
                         "unique_proof_transition_with_statement_or_visibility_mismatch".to_string();
                     unmatched_theorem_identity_join_count += 1;
                 }
-                let _ = position;
             }
             _ => {
                 identity_join_status = "ambiguous_proof_transition".to_string();
