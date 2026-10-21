@@ -18,8 +18,8 @@ A small Rust reference harness for the Symthaea OPEN-WORLD-PHYSICS-001 research 
 From the Symthaea repository root:
 
 ```sh
-cargo test --manifest-path research/open-world-physics-001-evaluator/Cargo.toml
-cargo run --manifest-path research/open-world-physics-001-evaluator/Cargo.toml --release
+cargo test --locked --manifest-path research/open-world-physics-001-evaluator/Cargo.toml
+cargo run --locked --manifest-path research/open-world-physics-001-evaluator/Cargo.toml --release
 ```
 
 The CLI emits a JSON report to stdout. The report receipt is checked before output. Missing toolchain/lock metadata and dirty source state are explicit report fields, not silently treated as clean.
@@ -30,7 +30,7 @@ The CLI emits a JSON report to stdout. The report receipt is checked before outp
 
 The grid-search fit and candidate-pool sweep are bounded reference baselines, not Ramanujan, EUREKA, or a claim of novel law discovery. The ΔBIC-like threshold is only a model-selection heuristic, not a posterior probability, formal proof, or physical-truth oracle. The held-out oracle is strictly evaluator-side: it measures the best generalization available in the exact candidate pool and is never used to choose the submitted candidate. Selection regret diagnoses the gap between that ceiling and the training-selected candidate; it must not be reported as an agent-accessible score. The harness does not yet connect to the canonical ScientificModel / PhysicsIR handoff, PR #8034 experiment selector, Symtropy Physics Experiment Atlas, or an EUREKA qualification service. Those integrations must use the existing contracts rather than introduce parallel ones.
 
-The three analytic laws are simple synthetic fixtures; no historical apparatus is reproduced, no measured dataset is used, and no claim is made about real-world physical novelty. The nested `Cargo.lock` has not been generated and committed in this draft because no Rust toolchain is available in the current editing environment; the report can fingerprint a lockfile generated at build time, but repeatable dependency resolution still requires committing that lockfile. The v0 scores quantify whether the baseline fitting pipeline recovers these declared families and generalizes into the held-out input range—not whether it exceeds the state of the art.
+The three analytic laws are simple synthetic fixtures; no historical apparatus is reproduced, no measured dataset is used, and no claim is made about real-world physical novelty. The nested `Cargo.lock` is committed and the focused workflow uses `--locked`; the authoring environment lacks a Rust toolchain, so it cannot supply local compile/test evidence. The v0 scores quantify behaviour on this declared grammar—not whether the evaluator exceeds the state of the art.
 
 ## Next gate
 
