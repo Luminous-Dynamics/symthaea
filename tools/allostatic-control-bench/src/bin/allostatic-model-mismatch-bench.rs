@@ -63,14 +63,26 @@ fn summarize_panel(panel: &str, counters: PanelCounters, summary: &mut String) {
         counters.action_specific_false_certifications,
         counters.global_robust_false_vetoes,
         counters.action_specific_false_vetoes,
-        rate(counters.point_false_certifications, counters.point_certified),
-        rate(counters.global_robust_false_certifications, counters.global_robust_certified),
-        rate(counters.action_specific_false_certifications, counters.action_specific_certified),
+        rate(
+            counters.point_false_certifications,
+            counters.point_certified
+        ),
+        rate(
+            counters.global_robust_false_certifications,
+            counters.global_robust_certified
+        ),
+        rate(
+            counters.action_specific_false_certifications,
+            counters.action_specific_certified
+        ),
         rate(counters.global_robust_false_vetoes, counters.true_safe),
         rate(counters.action_specific_false_vetoes, counters.true_safe),
         rate(counters.point_certified, counters.candidate_actions),
         rate(counters.global_robust_certified, counters.candidate_actions),
-        rate(counters.action_specific_certified, counters.candidate_actions),
+        rate(
+            counters.action_specific_certified,
+            counters.candidate_actions
+        ),
     ));
 }
 
