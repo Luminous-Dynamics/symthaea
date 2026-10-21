@@ -265,6 +265,36 @@ impl EnhancedKnowledgeGraph {
         }
     }
 
+    /// Reject a generated candidate without changing either fact's confidence.
+    pub fn reject_evidence_candidate(
+        &mut self,
+        from_fact_id: FactId,
+        to_fact_id: FactId,
+        relation: EvidenceRelation,
+        rationale: String,
+        current_cycle: u64,
+    ) -> Result<EvidenceLink, String> {
+        if rationale.trim().is_empty() {
+            return Err("rejecting a candidate requires a rationale".into());
+        }
+        let index = self
+            .evidence_links
+            .iter()
+            .position(|link| {
+                link.from_fact_id == from_fact_id
+                    && link.to_fact_id == to_fact_id
+                    && link.relation == relation
+                    && link.status == EvidenceLinkStatus::Candidate
+            })
+            .ok_or_else(|| "matching candidate evidence link not found".to_string())?;
+        let mut link = self.evidence_links[index].clone();
+        link.status = EvidenceLinkStatus::Rejected;
+        link.rationale = Some(rationale);
+        link.detected_at_cycle = current_cycle;
+        self.evidence_links[index] = link.clone();
+        Ok(link)
+    }
+
     /// Adjudicate a typed relation using source evidence referenced by both claims.
     #[allow(clippy::too_many_arguments)]
     pub fn adjudicate_evidence_relation(
@@ -1176,6 +1206,26 @@ mod tests {
         assert_eq!(graph.get_fact(id_a).unwrap().corroboration_count, 0);
         assert_eq!(graph.get_fact(id_a).unwrap().confidence, 0.7);
         assert_eq!(graph.get_fact(id_b).unwrap().confidence, 0.7);
+    }
+
+    #[test]
+    fn rejecting_similarity_candidate_does_not_change_confidence() {
+        let mut graph = EnhancedKnowledgeGraph::new(100);
+        let (first, _) = graph.insert(make_encoding("symbol means renewal", 0.7), 1, None, false);
+        let before = graph.get_fact(first).unwrap().confidence;
+        let (second, _) = graph.insert(make_encoding("symbol means renewal", 0.8), 2, None, false);
+        let rejected = graph
+            .reject_evidence_candidate(
+                first,
+                second,
+                EvidenceRelation::SemanticNeighbor,
+                "Same vector pattern but no admissible identity evidence".into(),
+                3,
+            )
+            .unwrap();
+        assert_eq!(rejected.status, EvidenceLinkStatus::Rejected);
+        assert_eq!(graph.get_fact(first).unwrap().confidence, before);
+        assert_eq!(graph.get_fact(first).unwrap().corroboration_count, 0);
     }
 
     #[test]
