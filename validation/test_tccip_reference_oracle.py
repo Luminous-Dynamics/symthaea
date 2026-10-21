@@ -15,6 +15,7 @@ from validation.tccip_reference_oracle import (
     evaluate_fixture,
     input_information_baseline,
     pairwise_utility_interactions,
+    task_utility_for_cuts,
     parse_manifest,
     render_artifact,
     task_utility,
@@ -145,6 +146,38 @@ class TccipReferenceOracleTests(unittest.TestCase):
         pairs = pairwise_utility_interactions(fixture)
         self.assertEqual(len(pairs), 1)
         self.assertEqual(pairs[0]["utility_interaction_contrast"], 0.0)
+
+    def test_pairwise_interaction_manifest_matches_all_exact_joint_cut_values(self) -> None:
+        path = Path(__file__).resolve().parents[1] / "validation/fixtures/tccip_pairwise_utility_interactions.tsv"
+        lines = path.read_text(encoding="utf-8").splitlines()
+        self.assertIn(
+            "# schema=tccip-pairwise-utility-interaction-expectations-v1",
+            lines,
+        )
+        seen = set()
+        for line in lines:
+            if not line or line.startswith("#"):
+                continue
+            fields = line.split("\t")
+            self.assertEqual(len(fields), 8, line)
+            key = (fields[0], fields[1], fields[2])
+            self.assertNotIn(key, seen)
+            seen.add(key)
+            fixture = self.by_name[fields[0]]
+            first = next(item for item in fixture.interventions if item.identifier == fields[1])
+            second = next(item for item in fixture.interventions if item.identifier == fields[2])
+            actual = (
+                task_utility_for_cuts(fixture, ()),
+                task_utility_for_cuts(fixture, (first,)),
+                task_utility_for_cuts(fixture, (second,)),
+                task_utility_for_cuts(fixture, (first, second)),
+            )
+            expected = tuple(map(float, fields[3:7]))
+            for got, wanted in zip(actual, expected):
+                self.assertAlmostEqual(got, wanted, places=12, msg=str(key))
+            contrast = actual[0] - actual[1] - actual[2] + actual[3]
+            self.assertAlmostEqual(contrast, float(fields[7]), places=12, msg=str(key))
+        self.assertEqual(len(seen), 16)
 
     def test_duplicate_edge_interventions_are_rejected(self) -> None:
         fixture = self.by_name["role_matched_xor_synergy_uniform_prior"]
