@@ -1,9 +1,7 @@
-use allostatic_control_bench::{run_episode_with_shield, Policy, Scenario};
+use allostatic_control_bench::{run_episode_with_shield, Policy, Scenario, EPISODE_CSV_HEADER};
 
 fn main() {
-    println!(
-        "scenario,seed,policy,shielded,task_reward,cumulative_exposure,mean_load,peak_load,minimum_reserve,terminal_reserve,terminal_load,unsafe_ticks,unsafe_episode,violation_exposure,max_violation_severity,missed_limits,shield_vetoes,no_safe_action_ticks,false_alarms,false_alarm_opportunities,push_steps,maintain_steps,emergency_recover_steps,resource_cost,failed,recovery_steps"
-    );
+    println!("{EPISODE_CSV_HEADER}");
 
     for scenario in Scenario::all() {
         for seed in 0..32_u64 {
