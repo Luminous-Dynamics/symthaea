@@ -822,6 +822,20 @@ fn validate_run_contract(plan: &Value) -> Vec<String> {
         errors.push("comparison must include at least two distinct baseline families".into());
     }
 
+    let declared_system_ids: HashSet<&str> = plan
+        .get("systems")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|system| string_field(system, "system_id"))
+        .collect();
+    let candidate_system_id = string_field(plan, "candidate_system_id").unwrap_or("");
+    if candidate_system_id.is_empty() || !declared_system_ids.contains(candidate_system_id) {
+        errors.push(format!(
+            "candidate_system_id {candidate_system_id:?} must identify a declared comparison system"
+        ));
+    }
+
     match phase {
         "synthetic_control" => {
             if !synthetic_only || split != "synthetic" {
