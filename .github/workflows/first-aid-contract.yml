@@ -54,10 +54,15 @@ jobs:
           printf 'expected_head=%s\nactual_head=%s\n' "$expected" "$actual"
           test "$actual" = "$expected"
 
-      - name: Install stable Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
+      - name: Install pinned Rust toolchain
+        id: toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt --component clippy
+          rustup default 1.96.0
+          echo "rustc_version=$(rustc --version)" >> "$GITHUB_OUTPUT"
+          echo "cargo_version=$(cargo --version)" >> "$GITHUB_OUTPUT"
 
       - name: Check formatting for changed Rust files
         run: rustfmt --edition 2024 --check xtask/src/main.rs xtask/src/first_aid.rs xtask/src/first_aid_trajectory.rs xtask/src/guideline_change_impact.rs
@@ -106,6 +111,8 @@ jobs:
       - name: Run the synthetic first-aid trajectory validator
         env:
           FIRST_AID_SOURCE_REVISION: ${{ github.event.pull_request.head.sha || github.sha }}
+          RUSTC_VERSION: ${{ steps.toolchain.outputs.rustc_version }}
+          CARGO_VERSION: ${{ steps.toolchain.outputs.cargo_version }}
         run: cargo run -p xtask -- first-aid-trajectory-validate --out target/first-aid-trajectory-receipt.json
 
       - name: Run the synthetic guideline change-impact validator
@@ -146,8 +153,10 @@ jobs:
             .corpus_sha256 == "1ac414e6b920a6259d68a20c273a0a9465e98c7a596393f9777be9976d6e3fd3" and
             .claim_ceiling == "synthetic process-integrity audit only; no clinical safety or patient-outcome claim" and
             ([.corpus_sha256, .evaluation_protocol_sha256, .mutation_matrix_sha256,
-              .validator_source_sha256, .entrypoint_source_sha256,
-              .executable_sha256] | all(test("^[0-9a-f]{64}$")))
+              .cargo_lock_sha256, .validator_source_sha256, .entrypoint_source_sha256,
+              .executable_sha256] | all(test("^[0-9a-f]{64}$"))) and
+            (.rustc_version | startswith("rustc 1.96.0 ")) and
+            (.cargo_version | startswith("cargo 1.96.0 "))
           ' target/first-aid-trajectory-receipt.json
           jq -e --arg expected "$EXPECTED_HEAD" '
             .status == "synthetic_change_impact_contract_passed" and
