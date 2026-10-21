@@ -572,8 +572,8 @@ class PyPhiValidator:
             "",
             "## Detailed results",
             "",
-            "| Topology | Nodes | PyPhi model SHA-256 | Symthaea model SHA-256 | Symthaea score | PyPhi score | Absolute error | Status |",
-            "|---|---:|---|---|---:|---:|---:|---|",
+            "| Topology | Nodes | PyPhi model SHA-256 | Symthaea model SHA-256 | PyPhi prior SHA-256 | Symthaea prior SHA-256 | Symthaea score | PyPhi score | Absolute error | Status |",
+            "|---|---:|---|---|---|---|---:|---:|---:|---|",
         ]
         for result in report.results:
             hdc = fmt(result.hdc_phi, ".6f")
@@ -588,8 +588,10 @@ class PyPhiValidator:
                 if (
                     result.reference_model_digest is not None
                     and result.reference_model_digest == result.symthaea_model_digest
+                    and result.reference_prior_digest is not None
+                    and result.reference_prior_digest == result.symthaea_prior_digest
                 ):
-                    case_status = "PAIRED / MODEL MATCH"
+                    case_status = "PAIRED / MODEL + PRIOR MATCH"
                 else:
                     case_status = "SCORES PRESENT / MODEL UNVERIFIED"
             else:
@@ -597,17 +599,20 @@ class PyPhiValidator:
                 case_status = "FAILED / NOT RUN"
             reference_digest = result.reference_model_digest or "N/A"
             symthaea_digest = result.symthaea_model_digest or "N/A"
+            reference_prior = result.reference_prior_digest or "N/A"
+            symthaea_prior = result.symthaea_prior_digest or "N/A"
             md.append(
                 f"| {result.topology_name} | {result.n_nodes} | {reference_digest} | "
-                f"{symthaea_digest} | {hdc} | {reference} | {error} | {case_status} |"
+                f"{symthaea_digest} | {reference_prior} | {symthaea_prior} | "
+                f"{hdc} | {reference} | {error} | {case_status} |"
             )
         md.extend([
             "",
             "## Qualification notes",
             "",
             "- The Symthaea adapter is intentionally blocked; numeric fallback estimates are prohibited.",
-            "- The PyPhi reference call uses the declared formalism; exact package version and matching Rust/PyPhi model digests are mandatory.",
-            "- A pass requires every case paired, equal per-case model digests, explicit shared-model verification, a stable PyPhi release, Pearson and Spearman > 0.90, and at least 90% of pairs within 10% relative error.",
+            "- The PyPhi reference call uses the declared formalism; exact package version, matching model digests, and matching state-prior digests are mandatory.",
+            "- A pass requires every case paired, equal per-case model and prior digests, explicit shared-model verification, a stable PyPhi release, Pearson and Spearman > 0.90, and at least 90% of pairs within 10% relative error.",
             "- Release-candidate versions are not eligible for qualification even if correlations are high.",
             "- Spectral connectivity is not IIT Phi.",
             "- N/A means a valid paired measurement was not produced.",
