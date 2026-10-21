@@ -3636,14 +3636,6 @@ end Second
 
         let dataset_rows = [
             serde_json::json!({
-                "id": "ambiguous-declarations",
-                "theorem_name": "shared",
-                "file_path": "lean/Ambiguous.lean",
-                "commit_before": commit_one,
-                "formal_statement": "theorem shared (n : Nat) : n = n := by",
-                "proof": "rfl"
-            }),
-            serde_json::json!({
                 "id": "unique-other",
                 "theorem_name": "other",
                 "file_path": "lean/Other.lean",
@@ -3706,6 +3698,14 @@ end Second
                 "commit_before": "not-a-git-sha",
                 "formal_statement": "theorem other : True := by",
                 "proof": "exact True.intro"
+            }),
+            serde_json::json!({
+                "id": "ambiguous-declarations",
+                "theorem_name": "shared",
+                "file_path": "lean/Ambiguous.lean",
+                "commit_before": commit_one,
+                "formal_statement": "theorem shared (n : Nat) : n = n := by",
+                "proof": "rfl"
             }),
         ];
         let dataset_text = dataset_rows
