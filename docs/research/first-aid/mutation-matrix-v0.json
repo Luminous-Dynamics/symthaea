@@ -614,6 +614,7 @@
     "mutation_suite_test_name": "differential_json_reference_agrees_on_adversarial_mutation_suite",
     "state_model_path": "xtask/src/first_aid_model.rs",
     "state_model_test_name": "exhaustive_reachable_state_graph_preserves_trust_invariants",
-    "state_model_scope": "finite abstract graph exploration for session state, bundle identity/validity/digest, revocation monotonicity and uncertainty handoff; separate from the trace parser but not formal verification of clinical correctness"
+    "state_model_scope": "finite abstract graph exploration for session state, bundle identity/validity/digest, revocation monotonicity and uncertainty handoff; separate from the trace parser but not formal verification of clinical correctness",
+    "state_model_spec_path": "docs/research/first-aid/STATE_MODEL_V0.md"
   }
 }
