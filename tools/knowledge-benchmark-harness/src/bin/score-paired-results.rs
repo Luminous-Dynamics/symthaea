@@ -426,6 +426,12 @@ fn score(
     validate_plan_eligibility(plan)?;
     let mut pair_by_id = HashMap::new();
     for pair in &pairs {
+        if pair.acceptance.must_preserve.is_empty() {
+            return Err(format!("pair {:?} must declare at least one must_preserve criterion", pair.pair_id));
+        }
+        if pair.acceptance.must_not.is_empty() {
+            return Err(format!("pair {:?} must declare at least one must_not criterion", pair.pair_id));
+        }
         if pair_by_id.insert(pair.pair_id.as_str(), pair).is_some() {
             return Err(format!("duplicate pair_id {:?}", pair.pair_id));
         }
@@ -444,6 +450,9 @@ fn score(
     let mut grouped: HashMap<&str, Vec<&Observation>> = HashMap::new();
 
     for observation in &observations {
+        if observation.notes.trim().is_empty() {
+            return Err(format!("result {:?} requires non-empty notes", observation.result_id));
+        }
         if observation.schema_version != "paired-intervention-result-v0" {
             return Err(format!(
                 "result {:?} has unsupported schema_version {:?}",
@@ -515,8 +524,8 @@ fn score(
     for system in &plan.systems {
         let expected_pairs: HashSet<&str> = pair_by_id.keys().copied().collect();
         let actual_pairs = seen_pairs.get(system.system_id.as_str());
-        if actual_pairs.is_none_or(|actual| *actual != expected_pairs) {
-            let observed_count = actual_pairs.map_or(0, HashSet::len);
+        if actual_pairs.is_none_or(|actual| actual != &expected_pairs) {
+            let observed_count = actual_pairs.map_or(0, |actual| actual.len());
             return Err(format!(
                 "system {:?} has incomplete pair coverage: {observed_count}/{}",
                 system.system_id,
@@ -536,7 +545,7 @@ fn score(
                 .map(|pair| pair.pair_id.as_str())
                 .unwrap_or("")
         });
-        let mut ordered_pairs: Vec<PairCase> = ordered_observations
+        let ordered_pairs: Vec<PairCase> = ordered_observations
             .iter()
             .map(|observation| {
                 (**pair_by_id
@@ -611,7 +620,7 @@ fn run() -> Result<(), String> {
     };
     let bytes = serde_json::to_vec_pretty(&report)
         .map_err(|error| format!("cannot serialize score report: {error}"))?;
-    if let Some(parent) = args.output.parent() {
+    if let Some(parent) = args.output.parent().filter(|parent| !parent.as_os_str().is_empty()) {
         fs::create_dir_all(parent).map_err(|error| {
             format!("cannot create output directory {}: {error}", parent.display())
         })?;
