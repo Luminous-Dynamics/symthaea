@@ -675,7 +675,7 @@ fn score(
         if let Some(existing_split) = source_family_splits
             .insert(source.source_family_id.as_str(), source.split.as_str())
         {
-            if existing_split != source.split {
+            if existing_split != source.split.as_str() {
                 return Err(format!(
                     "source family {:?} spans multiple splits in the supplied catalog",
                     source.source_family_id
