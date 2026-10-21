@@ -351,6 +351,7 @@ fn validate_event_fields(trace: &TrajectoryScenario, event: &TraceEvent) -> Resu
 
 fn inspect_trace(trace: &TrajectoryScenario) -> Vec<String> {
     let mut violations = Vec::new();
+    let mut session_active = false;
     let mut active_bundle: Option<String> = None;
     let mut verified_bundle: Option<String> = None;
     let mut revoked_bundles: HashSet<String> = HashSet::new();
@@ -378,6 +379,9 @@ fn inspect_trace(trace: &TrajectoryScenario) -> Vec<String> {
             }
             EventKind::ProtocolRendered => {
                 let bundle_id = event.bundle_id.as_deref().unwrap_or_default();
+                if !session_active {
+                    violations.push("render_without_active_session".to_string());
+                }
                 if revoked_bundles.contains(bundle_id)
                     || event.bundle_state == Some(BundleState::Revoked)
                 {
@@ -394,9 +398,13 @@ fn inspect_trace(trace: &TrajectoryScenario) -> Vec<String> {
                 }
             }
             EventKind::SessionInterrupted => {
+                session_active = false;
                 verified_bundle = None;
             }
-            EventKind::SessionResumed => {}
+            EventKind::SessionResumed => {
+                // Resume reactivates the session but never restores the prior verification.
+                session_active = true;
+            }
             EventKind::UncertaintyDetected => {
                 uncertainty_pending = true;
                 uncertainty_preserved = false;
@@ -439,7 +447,14 @@ fn inspect_trace(trace: &TrajectoryScenario) -> Vec<String> {
                     violations.push("sensitive_data_egress_without_consent".to_string());
                 }
             }
-            EventKind::SessionStarted => {}
+            EventKind::SessionStarted => {
+                session_active = true;
+                // A new session must not inherit the previous session's verified bundle.
+                active_bundle = None;
+                verified_bundle = None;
+                uncertainty_pending = false;
+                uncertainty_preserved = false;
+            }
         }
     }
     violations
@@ -450,6 +465,7 @@ fn is_known_violation_code(code: &str) -> bool {
         code,
         "invalid_bundle_verification"
             | "render_after_revocation"
+            | "render_without_active_session"
             | "render_without_verified_bundle"
             | "unknown_normalized"
             | "uncertainty_lost_at_handoff"
@@ -614,6 +630,46 @@ mod tests {
             inspect_trace(&trace),
             vec!["intermittent_core_network_dependency"]
         );
+    }
+
+    #[test]
+    fn rendering_outside_active_session_is_rejected() {
+        let mut value = corpus();
+        let mut trace = value.scenarios.remove(0);
+        trace.events.remove(0);
+        trace.expected_violation_codes = vec!["render_without_active_session".to_string()];
+        value.scenarios = vec![trace];
+        validate_corpus(&value).expect("render without session must fail its frozen oracle");
+    }
+
+    #[test]
+    fn starting_new_session_invalidates_prior_bundle_verification() {
+        let mut value = corpus();
+        let mut trace = value.scenarios.remove(0);
+        let render_index = trace
+            .events
+            .iter()
+            .position(|event| event.kind == EventKind::ProtocolRendered)
+            .expect("render event exists");
+        trace.events[render_index].sequence += 1;
+        trace.events.insert(
+            render_index,
+            TraceEvent {
+                sequence: 4,
+                kind: EventKind::SessionStarted,
+                bundle_id: None,
+                bundle_state: None,
+                digest_verified: None,
+                resource_state: None,
+                presented_as: None,
+                sensitive_payload: None,
+                consent_scoped: None,
+            },
+        );
+        trace.expected_violation_codes =
+            vec!["render_without_verified_bundle".to_string()];
+        value.scenarios = vec![trace];
+        validate_corpus(&value).expect("new session must require a fresh bundle verification");
     }
 
 }
