@@ -431,12 +431,11 @@
       "expected": {
         "outcome": "evaluate",
         "violation_codes": [
-          "render_after_revocation",
-          "render_without_verified_bundle"
+          "render_after_revocation"
         ]
       },
       "evidence_status": "unit_test_added",
-      "note": "Implemented in revocation_survives_new_session_and_both_failures_remain_visible. Exact-head workflow validation is pending."
+      "note": "Implemented in revocation_survives_new_session_and_remains_a_violation. Revocation is the primary reported violation; generic missing-verification is suppressed for a revoked render. Exact-head validation is pending."
     },
     {
       "case_id": "MUT-018",
