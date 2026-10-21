@@ -14,7 +14,10 @@
 //!
 //! Science: Ebbinghaus (1885) memory consolidation across sessions
 
-use super::claim_provenance::{ClaimContext, EvidenceLink};
+use super::claim_provenance::{
+    ClaimContext, EvidenceLink, EvidenceLinkStatus, EvidenceRelation,
+};
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
 /// Knowledge persistence layer backed by SQLite.
@@ -57,6 +60,117 @@ pub struct GraphFactRecord {
     pub fact: FactRecord,
     /// Optional source-witness-grounded claim envelope.
     pub claim_context: Option<ClaimContext>,
+}
+
+fn validate_graph_snapshot(
+    facts: &[GraphFactRecord],
+    links: &[EvidenceLink],
+) -> Result<(), String> {
+    let mut fact_ids = HashSet::new();
+    let mut contexts: HashMap<u64, &ClaimContext> = HashMap::new();
+    for record in facts {
+        let fact_id = record
+            .fact_id
+            .ok_or_else(|| "atomic graph snapshots require stable fact IDs".to_string())?;
+        if !fact_ids.insert(fact_id) {
+            return Err(format!("duplicate graph snapshot fact ID {fact_id}"));
+        }
+        if let Some(context) = record.claim_context.as_ref() {
+            context.validate().map_err(|error| {
+                format!("graph fact {fact_id} has invalid claim context: {error}")
+            })?;
+            contexts.insert(fact_id, context);
+        }
+    }
+
+    let mut link_keys = HashSet::new();
+    for link in links {
+        if link.from_fact_id == link.to_fact_id {
+            return Err("evidence links must connect two distinct facts".into());
+        }
+        for endpoint in [link.from_fact_id, link.to_fact_id] {
+            if !fact_ids.contains(&endpoint) {
+                return Err(format!(
+                    "evidence link endpoint {endpoint} is absent from graph snapshot"
+                ));
+            }
+        }
+        let mut evidence_ids = link.evidence_ids.clone();
+        evidence_ids.sort();
+        if !link_keys.insert((
+            link.from_fact_id,
+            link.to_fact_id,
+            link.relation,
+            link.status,
+            evidence_ids,
+        )) {
+            return Err("graph snapshot repeats an identical evidence link".into());
+        }
+
+        if link.status == EvidenceLinkStatus::Rejected
+            && link.rationale.as_deref().is_none_or(|value| value.trim().is_empty())
+        {
+            return Err("rejected evidence links require a rationale".into());
+        }
+        if link.status != EvidenceLinkStatus::Adjudicated {
+            continue;
+        }
+        let evidence: HashSet<&str> = link.evidence_ids.iter().map(String::as_str).collect();
+        if evidence.is_empty()
+            || link.evidence_ids.iter().any(|value| value.trim().is_empty())
+            || evidence.len() != link.evidence_ids.len()
+            || link.rationale.as_deref().is_none_or(|value| value.trim().is_empty())
+        {
+            return Err("adjudicated evidence links require a rationale and unique evidence IDs".into());
+        }
+        let from = contexts.get(&link.from_fact_id).ok_or_else(|| {
+            format!("adjudicated link source {} has no claim context", link.from_fact_id)
+        })?;
+        let to = contexts.get(&link.to_fact_id).ok_or_else(|| {
+            format!("adjudicated link target {} has no claim context", link.to_fact_id)
+        })?;
+        if !from.evidence_ids.iter().any(|id| evidence.contains(id.as_str()))
+            || !to.evidence_ids.iter().any(|id| evidence.contains(id.as_str()))
+        {
+            return Err("adjudicated link evidence must reference both claim contexts".into());
+        }
+        match link.relation {
+            EvidenceRelation::SemanticNeighbor | EvidenceRelation::SameWitnessVariant => {
+                return Err("candidate-only relations cannot be persisted as adjudicated".into());
+            }
+            EvidenceRelation::Corroborates => {
+                if !from.same_claim(to) || !from.admissibly_independent_from(to) {
+                    return Err("adjudicated corroboration violates claim identity or source independence".into());
+                }
+            }
+            EvidenceRelation::Contradicts => {
+                if !from.same_conflict_scope(to) || from.same_claim(to) {
+                    return Err("adjudicated contradiction violates scoped-claim invariants".into());
+                }
+            }
+            EvidenceRelation::Precedes => {
+                if !matches!((from.event_time, to.event_time), (Some(left), Some(right)) if left < right) {
+                    return Err("adjudicated precedes relation requires explicit increasing event times".into());
+                }
+            }
+            EvidenceRelation::Causes => {
+                if !matches!((from.event_time, to.event_time), (Some(left), Some(right)) if left < right)
+                    || link.causal_argument.as_deref().is_none_or(|value| value.trim().is_empty())
+                {
+                    return Err("adjudicated causes relation requires time order and a causal argument".into());
+                }
+            }
+            EvidenceRelation::HistoricallyInfluences => {
+                if !matches!((from.event_time, to.event_time), (Some(left), Some(right)) if left < right)
+                    || link.transmission_chain.as_deref().is_none_or(|value| value.trim().is_empty())
+                {
+                    return Err("adjudicated historical influence requires time order and a transmission chain".into());
+                }
+            }
+            EvidenceRelation::Resembles => {}
+        }
+    }
+    Ok(())
 }
 
 /// A serializable causal edge record
@@ -228,6 +342,7 @@ impl KnowledgePersistence {
         facts: &[GraphFactRecord],
         links: &[EvidenceLink],
     ) -> Result<(usize, usize), String> {
+        validate_graph_snapshot(facts, links)?;
         if !self.is_configured() {
             return Err("No database path configured".into());
         }
@@ -688,6 +803,66 @@ mod tests {
         assert_eq!(loaded_after_snapshot.len(), 1);
 
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn graph_snapshot_rejects_dangling_evidence_link_endpoints() {
+        let fact = GraphFactRecord {
+            fact_id: Some(1),
+            fact: FactRecord {
+                vector_bytes: vec![0; 2048],
+                source_text: "fact".into(),
+                confidence: 0.5,
+                domain: None,
+                cycle: 0,
+                is_causal: false,
+            },
+            claim_context: None,
+        };
+        let link = EvidenceLink {
+            from_fact_id: 1,
+            to_fact_id: 2,
+            relation: EvidenceRelation::SemanticNeighbor,
+            status: EvidenceLinkStatus::Candidate,
+            evidence_ids: Vec::new(),
+            rationale: None,
+            causal_argument: None,
+            transmission_chain: None,
+            detected_at_cycle: 0,
+        };
+        assert!(validate_graph_snapshot(&[fact], &[link])
+            .unwrap_err()
+            .contains("absent from graph snapshot"));
+    }
+
+    #[test]
+    fn graph_snapshot_rejects_adjudicated_link_without_provenance() {
+        let fact = |id: u64| GraphFactRecord {
+            fact_id: Some(id),
+            fact: FactRecord {
+                vector_bytes: vec![id as u8; 2048],
+                source_text: format!("fact {id}"),
+                confidence: 0.5,
+                domain: None,
+                cycle: id,
+                is_causal: false,
+            },
+            claim_context: None,
+        };
+        let link = EvidenceLink {
+            from_fact_id: 1,
+            to_fact_id: 2,
+            relation: EvidenceRelation::Corroborates,
+            status: EvidenceLinkStatus::Adjudicated,
+            evidence_ids: vec!["evidence-1".into()],
+            rationale: Some("claimed corroboration".into()),
+            causal_argument: None,
+            transmission_chain: None,
+            detected_at_cycle: 2,
+        };
+        assert!(validate_graph_snapshot(&[fact(1), fact(2)], &[link])
+            .unwrap_err()
+            .contains("has no claim context"));
     }
 
     #[test]
