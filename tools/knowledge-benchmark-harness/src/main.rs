@@ -18,6 +18,7 @@ enum Kind {
     Pair,
     Source,
     Annotation,
+    Run,
 }
 
 impl Kind {
@@ -29,8 +30,9 @@ impl Kind {
             "pair" => Ok(Self::Pair),
             "source" => Ok(Self::Source),
             "annotation" => Ok(Self::Annotation),
+            "run" => Ok(Self::Run),
             _ => Err(format!(
-                "unknown --kind {raw:?}; expected case, graph, claim, pair, source, or annotation"
+                "unknown --kind {raw:?}; expected case, graph, claim, pair, source, annotation, or run"
             )),
         }
     }
@@ -43,6 +45,7 @@ impl Kind {
             Self::Pair => "pair",
             Self::Source => "source",
             Self::Annotation => "annotation",
+            Self::Run => "run",
         }
     }
 }
@@ -85,7 +88,7 @@ struct Report {
 }
 
 fn usage() -> &'static str {
-    "Usage: knowledge-benchmark-harness --schema FILE --input JSONL --kind case|graph|claim|pair|source|annotation [--out FILE] [--subject-revision SHA]\n\nValidates local data only. It never fetches source URLs or remote schemas."
+    "Usage: knowledge-benchmark-harness --schema FILE --input JSONL --kind case|graph|claim|pair|source|annotation|run [--out FILE] [--subject-revision SHA]\n\nValidates local data only. It never fetches source URLs or remote schemas."
 }
 
 fn parse_args() -> Result<Config, String> {
@@ -304,6 +307,7 @@ fn record_identity(kind: Kind, value: &Value, line: usize) -> String {
         Kind::Pair => "pair_id",
         Kind::Source => "source_id",
         Kind::Annotation => "annotation_id",
+        Kind::Run => "plan_id",
     };
     string_field(value, key)
         .map(str::to_string)
@@ -767,6 +771,116 @@ fn validate_annotation_contract(annotation: &Value) -> Vec<String> {
     errors
 }
 
+fn validate_run_contract(plan: &Value) -> Vec<String> {
+    let mut errors = Vec::new();
+    let phase = string_field(plan, "phase").unwrap_or("");
+    let synthetic_only = plan.get("synthetic_only").and_then(Value::as_bool).unwrap_or(false);
+    let benchmark = plan.get("benchmark").unwrap_or(&Value::Null);
+    let split = string_field(benchmark, "split").unwrap_or("");
+    let source_family_disjoint = benchmark
+        .get("source_family_disjoint")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    let rights_review = string_field(benchmark, "rights_review_status").unwrap_or("");
+    let preregistration = plan.get("preregistration").unwrap_or(&Value::Null);
+    let held_out_access = string_field(preregistration, "held_out_access").unwrap_or("");
+    let systems = plan
+        .get("systems")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    let mut system_ids = HashSet::new();
+    let mut families = HashSet::new();
+
+    if systems.len() < 2 {
+        errors.push("comparison plan must define at least two systems".into());
+    }
+    for system in &systems {
+        let system_id = string_field(system, "system_id").unwrap_or("");
+        if system_id.is_empty() {
+            errors.push("system_id must be a non-empty string".into());
+        } else if !system_ids.insert(system_id.to_string()) {
+            errors.push(format!("duplicate comparison system_id {system_id:?}"));
+        }
+        let family = string_field(system, "baseline_family").unwrap_or("");
+        if !family.is_empty() {
+            families.insert(family.to_string());
+        }
+        for key in ["implementation", "revision", "prompt_sha256", "retriever_revision"] {
+            if string_field(system, key).is_none_or(str::is_empty) {
+                errors.push(format!(
+                    "comparison system {system_id:?} requires non-empty {key}"
+                ));
+            }
+        }
+    }
+    if families.len() < 2 {
+        errors.push("comparison must include at least two distinct baseline families".into());
+    }
+
+    match phase {
+        "synthetic_control" => {
+            if !synthetic_only || split != "synthetic" {
+                errors.push(
+                    "synthetic_control requires synthetic_only=true and benchmark split=synthetic"
+                        .into(),
+                );
+            }
+            if held_out_access != "not_applicable_synthetic" {
+                errors.push(
+                    "synthetic_control requires held_out_access=not_applicable_synthetic".into(),
+                );
+            }
+        }
+        "development_pilot" => {
+            if synthetic_only || !matches!(split, "development" | "validation") {
+                errors.push(
+                    "development_pilot requires non-synthetic data in development/validation split"
+                        .into(),
+                );
+            }
+        }
+        "preregistered_held_out" => {
+            if synthetic_only {
+                errors.push("preregistered_held_out cannot be synthetic".into());
+            }
+            if !matches!(split, "test" | "holdout") {
+                errors.push(
+                    "preregistered_held_out requires benchmark split=test or holdout".into(),
+                );
+            }
+            if !source_family_disjoint {
+                errors.push("preregistered_held_out requires source-family-disjoint data".into());
+            }
+            if rights_review != "approved" {
+                errors.push(
+                    "preregistered_held_out requires rights_review_status=approved".into(),
+                );
+            }
+            if !matches!(held_out_access, "sealed_until_freeze" | "independent_evaluator") {
+                errors.push(
+                    "preregistered_held_out requires sealed or independent-evaluator access"
+                        .into(),
+                );
+            }
+        }
+        _ => errors.push(format!("unknown comparison phase {phase:?}")),
+    }
+
+    let benchmark_digests_ok = ["case_manifest_sha256", "source_catalog_sha256", "source_pack_sha256"]
+        .iter()
+        .all(|key| {
+            string_field(benchmark, key).is_some_and(|digest| {
+                digest.len() == 64 && digest.bytes().all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+            })
+        });
+    if !benchmark_digests_ok {
+        errors.push("comparison plan requires lowercase SHA-256 digests for case manifest, source catalog, and source pack".into());
+    }
+
+    errors
+}
+
 fn validate_domain_contract(
     kind: Kind,
     value: &Value,
@@ -816,6 +930,7 @@ fn validate_domain_contract(
         Kind::Pair => errors.extend(validate_pair_contract(value)),
         Kind::Source => errors.extend(validate_source_contract(value, seen_ids)),
         Kind::Annotation => errors.extend(validate_annotation_contract(value)),
+        Kind::Run => errors.extend(validate_run_contract(value)),
     }
     errors
 }
