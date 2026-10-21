@@ -290,8 +290,18 @@ fn validate_plan_eligibility(plan: &Plan) -> Result<(), String> {
         {
             return Err("held-out scoring requires real test/holdout data, source-family disjointness, approved rights, and sealed/independent evaluation access".into());
         }
-    } else if plan.synthetic_only {
-        return Err("only synthetic_control plans may set synthetic_only=true".into());
+    } else if plan.phase == "development_pilot" {
+        if plan.synthetic_only
+            || !matches!(plan.benchmark.split.as_str(), "development" | "validation")
+        {
+            return Err("development_pilot requires non-synthetic development/validation data".into());
+        }
+    } else {
+        return Err(format!("unsupported comparison phase {:?}", plan.phase));
+    }
+
+    if !plan.synthetic_only && plan.benchmark.rights_review_status == "denied" {
+        return Err("cannot score source material whose rights review is denied".into());
     }
 
     if !matches!(
