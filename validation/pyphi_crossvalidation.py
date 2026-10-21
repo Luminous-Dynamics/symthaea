@@ -88,23 +88,23 @@ class ValidationReport:
 
 
 class PyPhiValidator:
-    """Validates HDC-Φ against exact PyPhi Φ calculation."""
+    """Fail-closed research scaffold; not yet a qualified HDC/PyPhi comparator."""
 
     def __init__(self, symthaea_binary: str = "cargo"):
-        """
-        Initialize validator.
+        """Initialize the legacy scaffold.
 
-        Args:
-            symthaea_binary: Path to cargo or compiled Symthaea binary
+        symthaea_binary is retained for call-site compatibility only. No
+        subprocess is currently invoked because the old adapter returned
+        ungrounded fallback scores.
         """
         self.symthaea_binary = symthaea_binary
         self.results: List[ValidationResult] = []
 
     def create_test_topologies(self) -> List[TopologySpec]:
         """
-        Create standard test topologies for validation.
+        Create deterministic graph fixtures for the reference TPM builder.
 
-        Returns topologies with n ≤ 8 nodes where exact Φ is tractable.
+        The eight-node cap is a harness budget, not a claim of exact IIT tractability.
         """
         topologies = [
             # 2-node topologies
@@ -355,13 +355,16 @@ class PyPhiValidator:
 
     def validate_topology(self, topology: TopologySpec) -> ValidationResult:
         """
-        Validate HDC-Φ against PyPhi for a single topology.
+        Attempt a comparison for one topology while preserving all failures.
+
+        The HDC adapter currently raises a blocked error, so a paired result is
+        not expected. Never fill unavailable values with zero or topology labels.
 
         Args:
-            topology: Topology to validate
+            topology: Graph fixture used to construct the reference TPM
 
         Returns:
-            ValidationResult with both calculations
+            ValidationResult with explicit missing values and provenance
         """
         logger.info(f"Validating {topology.name} (n={topology.n_nodes})...")
 
@@ -402,13 +405,16 @@ class PyPhiValidator:
 
     def run_validation(self, max_nodes: int = 8) -> ValidationReport:
         """
-        Run complete cross-validation.
+        Run the fail-closed scaffold over all selected graph fixtures.
+
+        This is not a qualified cross-validation run until a shared model adapter
+        sets the approximation score/digest and explicit shared-model attestation.
 
         Args:
-            max_nodes: Maximum number of nodes to test (PyPhi tractability limit)
+            max_nodes: Maximum number of nodes to include in the fixture sweep
 
         Returns:
-            Complete validation report
+            Report with missing values and failure counts preserved
         """
         topologies = self.create_test_topologies()
         topologies = [t for t in topologies if t.n_nodes <= max_nodes]
