@@ -18,8 +18,7 @@ pub struct Interval {
 
 impl Interval {
     pub fn new(lower: f64, upper: f64) -> Option<Self> {
-        (lower.is_finite() && upper.is_finite() && lower <= upper)
-            .then_some(Self { lower, upper })
+        (lower.is_finite() && upper.is_finite() && lower <= upper).then_some(Self { lower, upper })
     }
 
     pub fn point(value: f64) -> Option<Self> {
@@ -134,10 +133,10 @@ impl ViabilityLimits {
             && max_load.is_finite()
             && (0.0..=1.0).contains(&min_reserve)
             && (0.0..=1.0).contains(&max_load))
-            .then_some(Self {
-                min_reserve,
-                max_load,
-            })
+        .then_some(Self {
+            min_reserve,
+            max_load,
+        })
     }
 }
 
@@ -197,10 +196,7 @@ pub fn next_state_envelope(
     state: StateEnvelope,
     effects: ActionEffectBounds,
 ) -> Option<StateEnvelope> {
-    let reserve = state
-        .reserve
-        .add(effects.reserve_delta)?
-        .clamp(0.0, 1.0)?;
+    let reserve = state.reserve.add(effects.reserve_delta)?.clamp(0.0, 1.0)?;
     let load = state.load.add(effects.load_delta)?.clamp(0.0, 1.0)?;
     StateEnvelope::new(reserve, load)
 }
@@ -240,10 +236,7 @@ mod tests {
         Interval::new(lower, upper).expect("test interval should be valid")
     }
 
-    fn effects(
-        reserve_delta: (f64, f64),
-        load_delta: (f64, f64),
-    ) -> ActionEffectBounds {
+    fn effects(reserve_delta: (f64, f64), load_delta: (f64, f64)) -> ActionEffectBounds {
         ActionEffectBounds::new(
             interval(reserve_delta.0, reserve_delta.1),
             interval(load_delta.0, load_delta.1),
@@ -260,11 +253,8 @@ mod tests {
     }
 
     fn state(reserve: (f64, f64), load: (f64, f64)) -> StateEnvelope {
-        StateEnvelope::new(
-            interval(reserve.0, reserve.1),
-            interval(load.0, load.1),
-        )
-        .expect("test state should be valid")
+        StateEnvelope::new(interval(reserve.0, reserve.1), interval(load.0, load.1))
+            .expect("test state should be valid")
     }
 
     fn limits() -> ViabilityLimits {
