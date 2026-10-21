@@ -45,6 +45,7 @@ struct ExtensionMetrics {
     max_abs_pairwise_new_cosine: f64,
     new_token_probability_mass: f64,
     conditional_old_vocab_kl_nats: f64,
+    non_finite_logit_count: usize,
     finite_new_coordinate_count: usize,
     non_finite_new_coordinate_count: usize,
 }
@@ -213,6 +214,7 @@ fn run_arm(
 
     controller.reset();
     let extended_logits = controller.forward_step(query, 0, 0);
+    let non_finite_logit_count = extended_logits.iter().filter(|logit| !logit.is_finite()).count();
     let old_vocab_max_abs_logit_delta = baseline_logits
         .iter()
         .zip(extended_logits[..old_vocab_size].iter())
@@ -307,6 +309,7 @@ fn run_arm(
         max_abs_pairwise_new_cosine: pairwise.iter().copied().fold(0.0, f64::max),
         new_token_probability_mass,
         conditional_old_vocab_kl_nats,
+        non_finite_logit_count,
         finite_new_coordinate_count,
         non_finite_new_coordinate_count,
     })
