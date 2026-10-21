@@ -28,6 +28,7 @@ struct Episode {
     emergency_recover_steps: usize,
     false_alarms: usize,
     false_alarm_opportunities: usize,
+    had_disturbance: bool,
     recovery_steps: Option<usize>,
     failed: bool,
 }
@@ -188,8 +189,9 @@ fn parse_episodes(csv: &str) -> Result<BTreeMap<ConditionKey, EpisodesBySeed>, B
         "push_steps",
         "maintain_steps",
         "resource_cost",
-        "recovery_steps",
         "failed",
+        "had_disturbance",
+        "recovery_steps",
     ];
     for name in required {
         column_index(&header, name)?;
@@ -248,6 +250,8 @@ fn parse_episodes(csv: &str) -> Result<BTreeMap<ConditionKey, EpisodesBySeed>, B
         let maintain_steps = parse_usize(&values, &header, "maintain_steps")?;
         let emergency_recover_steps = parse_usize(&values, &header, "emergency_recover_steps")?;
         let resource_cost = parse_f64(&values, &header, "resource_cost")?;
+        let failed = parse_bool(&values, &header, "failed")?;
+        let had_disturbance = parse_bool(&values, &header, "had_disturbance")?;
         let recovery_text = cell(&values, &header, "recovery_steps")?;
         let recovery_steps = if recovery_text == "NA" {
             None
@@ -330,6 +334,13 @@ fn parse_episodes(csv: &str) -> Result<BTreeMap<ConditionKey, EpisodesBySeed>, B
             ))
             .into());
         }
+        if recovery_steps.is_some() && !had_disturbance {
+            return Err(invalid_data(format!(
+                "recovery recorded without a disturbance on line {}",
+                line_index + 2
+            ))
+            .into());
+        }
         let episode = Episode {
             task_reward: parse_f64(&values, &header, "task_reward")?,
             cumulative_exposure: cumulative_load,
@@ -346,8 +357,9 @@ fn parse_episodes(csv: &str) -> Result<BTreeMap<ConditionKey, EpisodesBySeed>, B
             emergency_recover_steps,
             false_alarms,
             false_alarm_opportunities,
+            had_disturbance,
             recovery_steps,
-            failed: parse_bool(&values, &header, "failed")?,
+            failed,
         };
         let group = groups.entry((scenario, policy, shielded)).or_default();
         if group.insert(seed, episode).is_some() {
@@ -589,7 +601,7 @@ mod tests {
 
     const SAMPLE_HEADER: &str = EPISODE_CSV_HEADER;
 
-    const SAMPLE_ROW: &str = "calm,0,task_only,false,1.0,4.8,0.1,0.2,0.8,1.5,1,0.8,0.2,0,false,0.0,0.0,0,0,0,0,1,1,47,0,0.2,false,NA";
+    const SAMPLE_ROW: &str = "calm,0,task_only,false,1.0,4.8,0.1,0.2,0.8,1.5,1,0.8,0.2,0,false,0.0,0.0,0,0,0,0,1,1,47,0,0.2,false,false,NA";
 
     #[test]
     fn parser_requires_episode_violation_flag_to_match_tick_count() {
