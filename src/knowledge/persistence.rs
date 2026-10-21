@@ -187,7 +187,7 @@ impl KnowledgePersistence {
                         .map(|raw| {
                             serde_json::from_str::<ClaimContext>(&raw).map_err(|error| {
                                 rusqlite::Error::FromSqlConversionFailure(
-                                    6,
+                                    7,
                                     rusqlite::types::Type::Text,
                                     Box::new(error),
                                 )
@@ -197,8 +197,8 @@ impl KnowledgePersistence {
                 })
             })
             .map_err(|e| e.to_string())?
-            .filter_map(|r| r.ok())
-            .collect();
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|error| format!("Fact record decoding failed: {error}"))?;
 
         self.total_loaded += facts.len() as u64;
         Ok(facts)
