@@ -279,8 +279,6 @@ The canonical pairwise oracle is `validation/fixtures/tccip_pairwise_utility_int
 
 | Fixture / pair | \(J_0\) | \(J_i\) | \(J_j\) | \(J_{ij}\) | \(\Delta^2J\) |
 |---|---:|---:|---:|---:|---:|
-| XOR: cut input edge 1 | 1.0 | 0.5 | — | — | — |
-| XOR: cut input edge 2 | 1.0 | — | 0.5 | — | — |
 | XOR: cut both task edges | 1.0 | 0.5 | 0.5 | 0.5 | +0.5 |
 | Harmful bias: cut correct path and bias path | 0.0 | 0.5 | 0.5 | 0.5 | −0.5 |
 | AND task, prior A: cut both task inputs | 1.0 | 0.6 | 0.9 | 0.67 | +0.17 |
