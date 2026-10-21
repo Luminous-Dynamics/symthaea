@@ -36,42 +36,58 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("storage_estimate_excludes,Vec metadata and transient working allocations");
 
     println!();
-    println!("noise_fraction,nearest_top1,nearest_margin,cleanup_top1,cleanup_margin");
+    println!(
+        "noise_fraction,nearest_top1,nearest_ci_low,nearest_ci_high,nearest_margin,cleanup_top1,cleanup_ci_low,cleanup_ci_high,cleanup_margin"
+    );
     for result in &report.noise_results {
         println!(
-            "{:.3},{:.6},{:.6},{:.6},{:.6}",
+            "{:.3},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6}",
             result.noise_fraction,
             result.top1_accuracy,
+            result.top1_accuracy_ci95.0,
+            result.top1_accuracy_ci95.1,
             result.mean_similarity_margin,
             result.cleanup_top1_accuracy,
+            result.cleanup_top1_accuracy_ci95.0,
+            result.cleanup_top1_accuracy_ci95.1,
             result.cleanup_mean_similarity_margin
         );
     }
 
     println!();
-    println!("bundle_size,mean_member_similarity,mean_max_distractor_similarity,member_recall_at_1");
+    println!(
+        "bundle_size,mean_member_similarity,mean_max_distractor_similarity,member_recall_at_1,recall_ci_low,recall_ci_high"
+    );
     for result in &report.bundle_results {
         println!(
-            "{},{:.6},{:.6},{:.6}",
+            "{},{:.6},{:.6},{:.6},{:.6},{:.6}",
             result.bundle_size,
             result.mean_member_similarity,
             result.mean_max_distractor_similarity,
-            result.member_recall_at_1
+            result.member_recall_at_1,
+            result.member_recall_at_1_ci95.0,
+            result.member_recall_at_1_ci95.1
         );
     }
 
     println!();
-    println!("associations,target_similarity,max_distractor,recall_at_1,cleanup_target_similarity,cleanup_max_distractor,cleanup_recall_at_1");
+    println!(
+        "associations,target_similarity,max_distractor,recall_at_1,recall_ci_low,recall_ci_high,cleanup_target_similarity,cleanup_max_distractor,cleanup_recall_at_1,cleanup_ci_low,cleanup_ci_high"
+    );
     for result in &report.associative_capacity_results {
         println!(
-            "{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6}",
+            "{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6}",
             result.association_count,
             result.mean_target_similarity,
             result.mean_max_distractor_similarity,
             result.recall_at_1,
+            result.recall_at_1_ci95.0,
+            result.recall_at_1_ci95.1,
             result.cleanup_mean_target_similarity,
             result.cleanup_mean_max_distractor_similarity,
-            result.cleanup_recall_at_1
+            result.cleanup_recall_at_1,
+            result.cleanup_recall_at_1_ci95.0,
+            result.cleanup_recall_at_1_ci95.1
         );
     }
 
