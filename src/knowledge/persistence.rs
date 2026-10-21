@@ -14,6 +14,7 @@
 //!
 //! Science: Ebbinghaus (1885) memory consolidation across sessions
 
+use super::claim_provenance::{ClaimContext, EvidenceLink};
 use std::path::Path;
 
 /// Knowledge persistence layer backed by SQLite.
@@ -45,6 +46,8 @@ pub struct FactRecord {
     pub cycle: u64,
     /// Whether the fact contains causal relations
     pub is_causal: bool,
+    /// Optional typed source-witness identity envelope.
+    pub claim_context: Option<ClaimContext>,
 }
 
 /// A serializable causal edge record
@@ -118,8 +121,8 @@ impl KnowledgePersistence {
         let mut count = 0;
         for fact in facts {
             conn.execute(
-                "INSERT INTO knowledge_facts (vector_blob, source_text, confidence, domain, cycle, is_causal)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                "INSERT INTO knowledge_facts (vector_blob, source_text, confidence, domain, cycle, is_causal, claim_context_json)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
                 rusqlite::params![
                     fact.vector_bytes,
                     fact.source_text,
@@ -127,6 +130,11 @@ impl KnowledgePersistence {
                     fact.domain,
                     fact.cycle as i64,
                     fact.is_causal,
+                    fact.claim_context
+                        .as_ref()
+                        .map(serde_json::to_string)
+                        .transpose()
+                        .map_err(|error| error.to_string())?,
                 ],
             )
             .map_err(|e| e.to_string())?;
@@ -150,7 +158,7 @@ impl KnowledgePersistence {
 
         let mut stmt = conn
             .prepare(
-                "SELECT vector_blob, source_text, confidence, domain, cycle, is_causal
+                "SELECT vector_blob, source_text, confidence, domain, cycle, is_causal, claim_context_json
                  FROM knowledge_facts ORDER BY cycle DESC",
             )
             .map_err(|e| e.to_string())?;
@@ -164,6 +172,18 @@ impl KnowledgePersistence {
                     domain: row.get(3)?,
                     cycle: row.get::<_, i64>(4)? as u64,
                     is_causal: row.get(5)?,
+                    claim_context: row
+                        .get::<_, Option<String>>(6)?
+                        .map(|raw| {
+                            serde_json::from_str::<ClaimContext>(&raw).map_err(|error| {
+                                rusqlite::Error::FromSqlConversionFailure(
+                                    6,
+                                    rusqlite::types::Type::Text,
+                                    Box::new(error),
+                                )
+                            })
+                        })
+                        .transpose()?,
                 })
             })
             .map_err(|e| e.to_string())?
@@ -172,6 +192,52 @@ impl KnowledgePersistence {
 
         self.total_loaded += facts.len() as u64;
         Ok(facts)
+    }
+
+    /// Replace the persisted typed relation snapshot.
+    pub fn save_evidence_links(&mut self, links: &[EvidenceLink]) -> Result<usize, String> {
+        if !self.is_configured() {
+            return Err("No database path configured".into());
+        }
+        let conn = self.open_connection()?;
+        self.ensure_schema(&conn)?;
+        let tx = conn.unchecked_transaction().map_err(|error| error.to_string())?;
+        tx.execute("DELETE FROM knowledge_evidence_links", [])
+            .map_err(|error| error.to_string())?;
+        for link in links {
+            let encoded = serde_json::to_string(link).map_err(|error| error.to_string())?;
+            tx.execute(
+                "INSERT INTO knowledge_evidence_links (link_json) VALUES (?1)",
+                rusqlite::params![encoded],
+            )
+            .map_err(|error| error.to_string())?;
+        }
+        tx.commit().map_err(|error| error.to_string())?;
+        self.total_saved += links.len() as u64;
+        Ok(links.len())
+    }
+
+    /// Load persisted typed relation links. Graph import validates endpoint IDs.
+    pub fn load_evidence_links(&mut self) -> Result<Vec<EvidenceLink>, String> {
+        if !self.is_configured() {
+            return Err("No database path configured".into());
+        }
+        let conn = self.open_connection()?;
+        self.ensure_schema(&conn)?;
+        let mut stmt = conn
+            .prepare("SELECT link_json FROM knowledge_evidence_links ORDER BY id")
+            .map_err(|error| error.to_string())?;
+        let rows: Vec<String> = stmt
+            .query_map([], |row| row.get::<_, String>(0))
+            .map_err(|error| error.to_string())?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|error| error.to_string())?;
+        let links = rows
+            .iter()
+            .map(|raw| serde_json::from_str::<EvidenceLink>(raw).map_err(|error| error.to_string()))
+            .collect::<Result<Vec<_>, _>>()?;
+        self.total_loaded += links.len() as u64;
+        Ok(links)
     }
 
     /// Save causal edge records.
@@ -351,7 +417,12 @@ impl KnowledgePersistence {
                 confidence REAL NOT NULL,
                 domain TEXT,
                 cycle INTEGER NOT NULL,
-                is_causal INTEGER NOT NULL DEFAULT 0
+                is_causal INTEGER NOT NULL DEFAULT 0,
+                claim_context_json TEXT
+            );
+            CREATE TABLE IF NOT EXISTS knowledge_evidence_links (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                link_json TEXT NOT NULL
             );
             CREATE TABLE IF NOT EXISTS knowledge_causal_edges (
                 cause TEXT NOT NULL,
@@ -374,6 +445,26 @@ impl KnowledgePersistence {
             CREATE INDEX IF NOT EXISTS idx_facts_cycle ON knowledge_facts(cycle);",
         )
         .map_err(|e| format!("Schema init: {e}"))?;
+
+        // CREATE TABLE IF NOT EXISTS does not migrate databases created by older
+        // versions. Add a nullable provenance column without rewriting old facts.
+        let columns: Vec<String> = {
+            let mut statement = conn
+                .prepare("PRAGMA table_info(knowledge_facts)")
+                .map_err(|error| format!("Schema inspection: {error}"))?;
+            statement
+                .query_map([], |row| row.get::<_, String>(1))
+                .map_err(|error| format!("Schema inspection: {error}"))?
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(|error| format!("Schema inspection: {error}"))?
+        };
+        if !columns.iter().any(|column| column == "claim_context_json") {
+            conn.execute(
+                "ALTER TABLE knowledge_facts ADD COLUMN claim_context_json TEXT",
+                [],
+            )
+            .map_err(|error| format!("Schema migration: {error}"))?;
+        }
 
         self.initialized = true;
         Ok(())
