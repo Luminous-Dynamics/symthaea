@@ -14,6 +14,8 @@ Mythology deserves a first-class module in the shared knowledge fabric, but myth
 - [`TRANSFER_PROTOCOL.md`](TRANSFER_PROTOCOL.md): cross-source splits, transfer metrics, metamorphic tests, baselines and nonclaims.
 - [`metamorphic-pair.schema.json`](metamorphic-pair.schema.json) and [`metamorphic-pairs.jsonl`](metamorphic-pairs.jsonl): ten synthetic baseline/intervention pairs, covering context/source changes, evidence removal, relation mutation, variant isolation, transfer, counterevidence, access revocation, aliases and prompt injection.
 - [`STRUCTURAL_TRANSFER_SCORE.md`](STRUCTURAL_TRANSFER_SCORE.md): proposed evidence-bounded structural-transfer scorecard, controls, SOTA comparison protocol and provisional targets.
+- [Preregistered comparison protocol](../../benchmark-runs/v0/README.md): baseline ladder, shared evidence/compute budgets, held-out split requirements, source-family confidence intervals and non-compensatory release gates.
+- [Multi-answer annotation contract](../../knowledge-annotation/v0/README.md): blinded claim-level review, alternative interpretations, abstention and disagreement preservation.
 - [Validator harness](../../../tools/knowledge-benchmark-harness/): offline Rust JSON Schema validation, source-reference checks, paired intervention contracts, and digest-bound reports.
 
 Schema validation checks data structure only. A separate domain validator must verify graph endpoint/source references, relation-specific evidence, interval consistency, permissions, and variant isolation.
