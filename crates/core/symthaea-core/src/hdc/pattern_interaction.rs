@@ -548,7 +548,11 @@ pub fn run_pattern_interaction_suite(
                 &bound_pairs,
                 derived_seed(seed, (size_index * config.trials + trial) as u64, 6),
             )?;
-            let target_index = trial % association_count;
+            let target_index = (derived_seed(
+                seed ^ 0x5155_4552_595f_4944,
+                trial as u64,
+                association_count as u64,
+            ) % association_count as u64) as usize;
             let query = memory.unbind(&roles[target_index])?;
             let target_similarity = query.similarity(&fillers[target_index])?;
             let max_distractor_similarity = fillers.iter()
