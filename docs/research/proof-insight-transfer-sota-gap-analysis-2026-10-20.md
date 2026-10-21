@@ -51,6 +51,8 @@ First Proof Batch 3, published **14 October 2026**, tested five systems on ten r
 
 6. **From raw solve rate to useful verified work.** Measure verified solves per fixed dollar / wall-clock hour, median and tail latency, tokens per verified solve, downstream regression, proof portability/maintenance, and abstention quality. Do not trade a lower correctness rate for high raw throughput.
 
+7. **From explanatory annotation to causal intervention.** A strategy description may correlate with proof success without causing it. The secondary experiment therefore compares a full typed insight to a high-similarity but adjudicated-incompatible decoy, then removes preconditions, failure boundaries, or evidence anchors one component at a time. Mechanically derive every intervention from the same frozen record, keep task/model/checker/budgets fixed, match input tokens, and compare paired exact-target semantic-gate outcomes. If context-token matching is not exact, downgrade causal claims to exploratory. The new transfer-selectivity outcome schema separately records gold adjudications, model decisions, abstentions, precondition checks, and content-addressed receipts. This is preregistered design work, not evidence that any component has yet improved proof performance.
+
 ## A measurement metric the field often underreports: temporal resolution coverage
 
 Before any proof model is run, publish a **task-resolution funnel** alongside solve rates:
