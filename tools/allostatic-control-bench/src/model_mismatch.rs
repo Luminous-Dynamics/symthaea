@@ -291,30 +291,47 @@ mod tests {
         [-1.0, 0.0, 1.0][index % 3]
     }
 
-    /// Use 39 episodes to exercise the finite 90% four-family calibration gate
-    /// while varying eight error coordinates independently.
-    fn factorial_profiles() -> Vec<MismatchProfile> {
-        (0..39)
-            .map(|index| {
-                MismatchProfile::new(
-                    0.01 * signed_cycle(index),
-                    0.02 * signed_cycle(index + 1),
-                    error(
-                        0.03 * signed_cycle(index + 2),
-                        0.06 * signed_cycle(index + 3),
-                    ),
-                    error(
-                        0.01 * signed_cycle(index + 4),
-                        0.025 * signed_cycle(index + 5),
-                    ),
-                    error(
-                        0.015 * signed_cycle(index + 6),
-                        0.04 * signed_cycle(index + 7),
-                    ),
-                )
-                .expect("finite factorial mismatch")
-            })
-            .collect()
+    fn profile_from_coordinates(coordinates: [f64; 8]) -> MismatchProfile {
+        MismatchProfile::new(
+            0.01 * coordinates[0],
+            0.02 * coordinates[1],
+            error(0.03 * coordinates[2], 0.06 * coordinates[3]),
+            error(0.01 * coordinates[4], 0.025 * coordinates[5]),
+            error(0.015 * coordinates[6], 0.04 * coordinates[7]),
+        )
+        .expect("finite synthetic mismatch")
+    }
+
+    fn deterministic_trit(seed: u64, dimension: usize) -> f64 {
+        let mut value = seed.wrapping_add(
+            (dimension as u64 + 1).wrapping_mul(0x9E37_79B9_7F4A_7C15),
+        );
+        value = (value ^ (value >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+        value = (value ^ (value >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+        value ^= value >> 31;
+        [-1.0, 0.0, 1.0][(value % 3) as usize]
+    }
+
+    /// A 39-episode synthetic panel: zero error, both extrema on each of eight
+    /// independent error coordinates, plus 22 deterministic mixed perturbations.
+    /// It exercises the finite 90% four-family order-statistic gate but is not
+    /// treated as evidence of real-world exchangeability or empirical coverage.
+    fn mismatch_calibration_panel() -> Vec<MismatchProfile> {
+        let mut profiles = vec![profile_from_coordinates([0.0; 8])];
+        for axis in 0..8 {
+            for sign in [-1.0, 1.0] {
+                let mut coordinates = [0.0; 8];
+                coordinates[axis] = sign;
+                profiles.push(profile_from_coordinates(coordinates));
+            }
+        }
+        for case in 0..22_u64 {
+            let coordinates = std::array::from_fn(|dimension| {
+                deterministic_trit(case + 100, dimension)
+            });
+            profiles.push(profile_from_coordinates(coordinates));
+        }
+        profiles
     }
 
     fn state() -> StateEnvelope {
@@ -330,8 +347,8 @@ mod tests {
     }
 
     #[test]
-    fn factorial_calibration_panel_reaches_each_independent_error_bound() {
-        let panel = factorial_profiles();
+    fn mismatch_calibration_panel_reaches_each_independent_error_bound() {
+        let panel = mismatch_calibration_panel();
         assert_eq!(panel.len(), 39);
         let scores: Vec<EpisodeResidualScores> = panel
             .iter()
@@ -400,7 +417,7 @@ mod tests {
     #[test]
     fn point_shield_false_positive_is_rejected_by_a_calibrated_envelope() {
         // Every calibration episode contains <= this held-out error magnitude.
-        let calibration = factorial_profiles();
+        let calibration = mismatch_calibration_panel();
         let radii = calibrate_mismatch_panel(&calibration, &STRESS_GRID, 0.90)
             .expect("39 episodes meet the 90% four-family finite-rank gate");
         let held_out = profile(1.0);
@@ -427,7 +444,7 @@ mod tests {
 
     #[test]
     fn robustness_is_scored_with_false_certifications_and_false_vetoes_separate() {
-        let calibration = factorial_profiles();
+        let calibration = mismatch_calibration_panel();
         let radii =
             calibrate_mismatch_panel(&calibration, &STRESS_GRID, 0.90).expect("calibration panel");
         let metrics =
@@ -443,7 +460,7 @@ mod tests {
 
     #[test]
     fn calibrated_certificate_matches_realized_safety_for_the_enclosed_model_panel() {
-        let calibration = factorial_profiles();
+        let calibration = mismatch_calibration_panel();
         let radii =
             calibrate_mismatch_panel(&calibration, &STRESS_GRID, 0.90).expect("calibration panel");
         for mismatch in calibration {
