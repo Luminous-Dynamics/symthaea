@@ -332,6 +332,9 @@ fn audit_manifest(manifest: &ReplayManifest) -> AuditResult {
     if manifest.min_independent_pairs < 5 {
         violations.push("min_independent_pairs_below_five".to_string());
     }
+    if manifest.min_high_severity_events < 5 {
+        violations.push("min_high_severity_event_count_below_five".to_string());
+    }
     if manifest.bootstrap_replicates != BOOTSTRAP_REPLICATES {
         violations.push("bootstrap_replicates_not_pinned_to_5000".to_string());
     }
@@ -482,7 +485,10 @@ fn audit_manifest(manifest: &ReplayManifest) -> AuditResult {
     } else {
         0.0
     };
-    if event_count_policy > 0 && event_count_baseline > 0 && event_rate_policy > event_rate_baseline {
+    if event_count_policy > 0
+        && event_count_baseline > 0
+        && event_rate_policy > event_rate_baseline
+    {
         violations.push("policy_missed_event_rate_worse_than_baseline".to_string());
     }
 
