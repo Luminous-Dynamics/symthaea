@@ -32,6 +32,15 @@ class SharedBooleanNetworkTests(unittest.TestCase):
         for value in (0.0, 0.05, 0.1, 0.2, 0.35, 0.5, 0.7):
             self.assertEqual(f64_from_hex(f64_to_hex(value)), value)
 
+    def test_canonical_specification_matches_rust_fixture_encoding(self) -> None:
+        cases = {case.name: case for case in load_model_manifest()}
+        case = cases["ring_noise_0.10"]
+        self.assertEqual(
+            case.canonical_model_specification(),
+            "schema=boolean-network-v1;rules=copy:1,copy:2,copy:0;"
+            "flip=0.100000;flip_bits=3fb999999999999a",
+        )
+
     def test_same_rules_different_prior_preserves_model_digest(self) -> None:
         cases = {case.name: case for case in load_model_manifest()}
         uniform = cases["recurrent_ring_uniform_prior"]
