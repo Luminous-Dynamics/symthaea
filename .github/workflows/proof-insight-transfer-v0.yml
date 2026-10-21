@@ -691,9 +691,19 @@ jobs:
               audit["source_path_present_at_completion_count"]
               + audit["source_path_missing_at_completion_count"]
               + audit["source_path_not_recorded_count"]
+              + audit["source_path_rejected_count"]
           )
           if source_counts != 248:
               raise SystemExit("timeline source-path accounting does not cover all 248 rows")
+          if audit["source_path_rejected_count"] != 1:
+              raise SystemExit("pinned timeline must account for exactly one rejected machine-local source path")
+          unsafe_event = next((event for event in audit["events"] if event["event_key"] == "tl_0056_is_negative"), None)
+          if unsafe_event is None:
+              raise SystemExit("pinned unsafe-path row tl_0056_is_negative disappeared")
+          if unsafe_event["source_file_status"] != "rejected_unsafe_path" or unsafe_event["spec_theorem_path"] is not None:
+              raise SystemExit("machine-local source path must be rejected and redacted, not read or echoed")
+          if unsafe_event["source_file_sha256"] is not None or unsafe_event["source_file_bytes"] is not None:
+              raise SystemExit("rejected source paths must not receive a file digest or size")
           if sum(audit["verification_status_counts"].values()) != 248:
               raise SystemExit("timeline verification-status accounting does not cover all 248 rows")
           timeline_bytes = (dalek / audit["timeline_path"]).read_bytes()
@@ -709,6 +719,7 @@ jobs:
               f"source_present={audit['source_path_present_at_completion_count']} "
               f"source_missing={audit['source_path_missing_at_completion_count']} "
               f"source_not_recorded={audit['source_path_not_recorded_count']} "
+              f"source_path_rejected={audit['source_path_rejected_count']} "
               f"timeline_sha256={audit['timeline_sha256']}"
           )
           PY
