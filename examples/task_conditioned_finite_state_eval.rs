@@ -315,6 +315,13 @@ fn all_partition_profiles(
 }
 
 impl Fixture {
+    fn canonical_interventions(&self) -> String {
+        self.interventions.iter()
+            .map(|cut| format!("{}:{}:{}:{}", cut.id, cut.source, cut.target, cut.cost))
+            .collect::<Vec<_>>()
+            .join(";")
+    }
+
     fn validate(&self) -> Result<(), String> {
         self.network.validate()?;
         self.task_target.validate(self.network.input_count)?;
@@ -471,81 +478,169 @@ fn intervention(id: &str, source: usize, target: usize) -> Intervention {
     }
 }
 
-fn fixtures() -> Vec<Fixture> {
-    vec![
-        Fixture {
-            name: "useful_xor_coordination".into(),
+fn parse_usize(value: &str, field: &str) -> Result<usize, String> {
+    value.parse::<usize>()
+        .map_err(|error| format!("invalid {field} {value:?}: {error}"))
+}
+
+fn parse_rule(spec: &str) -> Result<Rule, String> {
+    let parts = spec.split(':').collect::<Vec<_>>();
+    match parts.as_slice() {
+        ["input", index] => Ok(Rule::Input { index: parse_usize(index, "input index")? }),
+        ["copy", from] => Ok(Rule::Copy { from: parse_usize(from, "copy source")? }),
+        ["xor", left, right] => Ok(Rule::Xor {
+            left: parse_usize(left, "XOR left source")?,
+            right: parse_usize(right, "XOR right source")?,
+        }),
+        ["and", left, right] => Ok(Rule::And {
+            left: parse_usize(left, "AND left source")?,
+            right: parse_usize(right, "AND right source")?,
+        }),
+        ["constant", "0"] => Ok(Rule::Constant(false)),
+        ["constant", "1"] => Ok(Rule::Constant(true)),
+        _ => Err(format!("unsupported rule specification {spec:?}")),
+    }
+}
+
+fn parse_task_target(spec: &str) -> Result<TaskTarget, String> {
+    let parts = spec.split(':').collect::<Vec<_>>();
+    match parts.as_slice() {
+        ["xor-inputs", left, right] => Ok(TaskTarget::XorInputs {
+            left: parse_usize(left, "task XOR left input")?,
+            right: parse_usize(right, "task XOR right input")?,
+        }),
+        ["and-inputs", left, right] => Ok(TaskTarget::AndInputs {
+            left: parse_usize(left, "task AND left input")?,
+            right: parse_usize(right, "task AND right input")?,
+        }),
+        ["copy-input", index] => Ok(TaskTarget::CopyInput {
+            index: parse_usize(index, "task copied input")?,
+        }),
+        ["constant", "0"] => Ok(TaskTarget::Constant(false)),
+        ["constant", "1"] => Ok(TaskTarget::Constant(true)),
+        _ => Err(format!("unsupported task target specification {spec:?}")),
+    }
+}
+
+fn parse_interventions(spec: &str) -> Result<Vec<Intervention>, String> {
+    if spec.trim().is_empty() {
+        return Err("intervention specification must not be empty".into());
+    }
+    spec.split(';')
+        .map(|token| {
+            let fields = token.split(':').collect::<Vec<_>>();
+            if fields.len() != 4 {
+                return Err(format!("intervention must be id:source:target:cost, got {token:?}"));
+            }
+            Ok(Intervention {
+                id: fields[0].to_string(),
+                source: parse_usize(fields[1], "intervention source")?,
+                target: parse_usize(fields[2], "intervention target")?,
+                cost: fields[3].parse::<u32>()
+                    .map_err(|error| format!("invalid intervention cost {:?}: {error}", fields[3]))?,
+            })
+        })
+        .collect()
+}
+
+/// Load executable fixture definitions from one versioned manifest.
+fn fixtures() -> Result<Vec<Fixture>, String> {
+    const MANIFEST: &str = include_str!("../validation/fixtures/tccip_toy_expectations.tsv");
+    const SCHEMA: &str = "# schema=tccip-toy-expectations-v2";
+    if !MANIFEST.lines().any(|line| line.trim() == SCHEMA) {
+        return Err(format!("fixture manifest must declare {SCHEMA}"));
+    }
+
+    let mut parsed = Vec::new();
+    let mut names = HashSet::new();
+    for (line_number, line) in MANIFEST.lines().enumerate() {
+        let line = line.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        let fields = line.split('\t').collect::<Vec<_>>();
+        if fields.len() != 18 {
+            return Err(format!(
+                "manifest line {} has {} fields; expected 18",
+                line_number + 1, fields.len()
+            ));
+        }
+        if fields[0].trim().is_empty() || !names.insert(fields[0].to_string()) {
+            return Err(format!("manifest line {} has empty or duplicate fixture name", line_number + 1));
+        }
+
+        let rules = fields[5].split(',').map(parse_rule)
+            .collect::<Result<Vec<_>, _>>()?;
+        let components = fields[6].chars().map(|label| match label {
+            'A' => Ok(0),
+            'B' => Ok(1),
+            _ => Err(format!("invalid component label {label:?} in {}", fields[0])),
+        }).collect::<Result<Vec<u8>, String>>()?;
+
+        let fixture = Fixture {
+            name: fields[0].to_string(),
             network: Network {
-                input_count: 2,
-                output_node: 4,
-                rules: vec![
-                    Rule::Input { index: 0 },     // 0
-                    Rule::Input { index: 1 },     // 1
-                    Rule::Copy { from: 0 },       // 2, component A
-                    Rule::Copy { from: 1 },       // 3, component A
-                    Rule::Xor { left: 2, right: 3 }, // 4, task output in component B
-                    Rule::Copy { from: 0 },       // 5, control branch in B
-                    Rule::Copy { from: 1 },       // 6, control branch in B
-                    Rule::Xor { left: 5, right: 6 }, // 7, unused control output
-                ],
-                components: vec![0, 0, 0, 0, 1, 1, 1, 1],
+                rules,
+                output_node: parse_usize(fields[3], "output node")?,
+                input_count: parse_usize(fields[2], "input count")?,
+                components,
             },
-            task_target: TaskTarget::XorInputs { left: 0, right: 1 },
-            interventions: vec![
-                intervention("cross_left_into_task_xor", 2, 4),
-                intervention("cross_right_into_task_xor", 3, 4),
-                intervention("matched_cut_control_left", 5, 7),
-                intervention("matched_cut_control_right", 6, 7),
-            ],
-        },
-        Fixture {
-            name: "irrelevant_cross_component_connectivity".into(),
-            network: Network {
-                input_count: 2,
-                output_node: 2,
-                rules: vec![
-                    Rule::Input { index: 0 }, // 0
-                    Rule::Input { index: 1 }, // 1
-                    Rule::Copy { from: 0 },   // 2, task output
-                    Rule::Copy { from: 2 },   // 3, cross-component side branch
-                    Rule::Copy { from: 3 },   // 4, internal control branch
-                ],
-                components: vec![0, 0, 0, 1, 1],
-            },
-            task_target: TaskTarget::CopyInput { index: 0 },
-            interventions: vec![
-                intervention("cross_cut_irrelevant_branch", 2, 3),
-                intervention("matched_internal_side_branch", 3, 4),
-            ],
-        },
-        Fixture {
-            name: "harmful_cross_component_coupling".into(),
-            network: Network {
-                input_count: 2,
-                output_node: 6,
-                rules: vec![
-                    Rule::Input { index: 0 }, // 0
-                    Rule::Input { index: 1 }, // 1
-                    Rule::Copy { from: 0 },   // 2
-                    Rule::Copy { from: 1 },   // 3
-                    Rule::Xor { left: 2, right: 3 }, // 4, desired parity
-                    Rule::Constant(true),     // 5, harmful bias
-                    Rule::Xor { left: 4, right: 5 }, // 6, output is inverted parity
-                    Rule::Copy { from: 0 },   // 7, control branch in B
-                    Rule::Copy { from: 1 },   // 8, control branch in B
-                    Rule::Xor { left: 7, right: 8 }, // 9, unused control output
-                ],
-                components: vec![0, 0, 0, 0, 0, 0, 1, 1, 1, 1],
-            },
-            task_target: TaskTarget::XorInputs { left: 0, right: 1 },
-            interventions: vec![
-                intervention("cross_cut_correct_parity_path", 4, 6),
-                intervention("cross_cut_harmful_bias_path", 5, 6),
-                intervention("matched_control_left", 7, 9),
-                intervention("matched_control_right", 8, 9),
-            ],
-        },
-    ]
+            task_target: parse_task_target(fields[4])?,
+            interventions: parse_interventions(fields[7])?,
+        };
+        fixture.validate()?;
+        if fixture.network.rules.len() != parse_usize(fields[1], "node count")? {
+            return Err(format!("node count disagrees with rules in fixture {}", fixture.name));
+        }
+        if fixture.network.canonical_rules() != fields[5] {
+            return Err(format!("noncanonical rule list in fixture {}", fixture.name));
+        }
+        let component_labels = fixture.network.components.iter()
+            .map(|component| if *component == 0 { 'A' } else { 'B' })
+            .collect::<String>();
+        if component_labels != fields[6] {
+            return Err(format!("component labels disagree with parsed network in {}", fixture.name));
+        }
+        if fixture.task_target.canonical() != fields[4] {
+            return Err(format!("noncanonical task target in fixture {}", fixture.name));
+        }
+        if fixture.canonical_interventions() != fields[7] {
+            return Err(format!("noncanonical interventions in fixture {}", fixture.name));
+        }
+        let partition_mask = fixture.network.components.iter().enumerate().fold(
+            0usize,
+            |acc, (index, component)| acc | ((*component as usize) << index),
+        );
+        if partition_mask != parse_usize(fields[8], "partition mask")? {
+            return Err(format!("partition mask disagrees with labels in fixture {}", fixture.name));
+        }
+        for (column, field_name) in [
+            (9, "intact utility"),
+            (10, "cross-cut mean loss"),
+            (11, "control mean loss"),
+            (12, "TCCIP"),
+            (16, "minimum partition TCCIP"),
+            (17, "maximum partition TCCIP"),
+        ] {
+            let value = fields[column].parse::<f64>()
+                .map_err(|error| format!("invalid {field_name} in {}: {error}", fixture.name))?;
+            if !value.is_finite() || !(-1.0..=1.0).contains(&value) {
+                return Err(format!("out-of-range {field_name} in fixture {}", fixture.name));
+            }
+        }
+        for (column, field_name) in [
+            (13, "partition count"),
+            (14, "usable partition count"),
+            (15, "skipped partition count"),
+        ] {
+            parse_usize(fields[column], field_name)?;
+        }
+        parsed.push(fixture);
+    }
+    if parsed.is_empty() {
+        return Err("fixture manifest contains no cases".into());
+    }
+    Ok(parsed)
 }
 
 fn main() {
@@ -558,8 +653,15 @@ fn main() {
     println!("# component labels: 0=A, 1=B; intervention kind is derived from source/target labels");
     println!("fixture\tintervention\tkind\tsource\ttarget\tcost\tintact_utility\tutility\tutility_loss");
     let mut any_failed = false;
+    let loaded_fixtures = match fixtures() {
+        Ok(fixtures) => fixtures,
+        Err(error) => {
+            eprintln!("NOT QUALIFIED: cannot load fixture manifest: {error}");
+            std::process::exit(2);
+        }
+    };
 
-    for fixture in fixtures() {
+    for fixture in loaded_fixtures {
         if let Err(error) = fixture.validate() {
             eprintln!("NOT QUALIFIED: fixture {}: {error}", fixture.name);
             any_failed = true;
@@ -686,7 +788,7 @@ mod tests {
 
     #[test]
     fn every_intervention_is_a_real_edge_and_component_classification_is_derived() {
-        for fixture in fixtures() {
+        for fixture in fixtures().unwrap() {
             fixture.validate().unwrap();
             for cut in fixture.interventions {
                 assert!(fixture.network.edge_exists(cut.source, cut.target));
@@ -718,7 +820,7 @@ mod tests {
 
     #[test]
     fn rejects_invalid_edges_and_non_topological_rules() {
-        let mut fixture = fixtures().remove(0);
+        let mut fixture = fixtures().unwrap().remove(0);
         fixture.interventions.push(intervention("bad_edge", 7, 4));
         assert!(fixture.validate().unwrap_err().contains("missing edge"));
 
@@ -733,7 +835,7 @@ mod tests {
 
     #[test]
     fn exact_evaluator_is_deterministic_and_within_utility_bounds() {
-        for fixture in fixtures() {
+        for fixture in fixtures().unwrap() {
             let (first, first_profile) = fixture.run().unwrap();
             let (second, second_profile) = fixture.run().unwrap();
             assert_eq!(first, second);
@@ -744,7 +846,7 @@ mod tests {
 
     #[test]
     fn intervention_cost_must_be_positive_and_ids_unique() {
-        let mut fixture = fixtures().remove(0);
+        let mut fixture = fixtures().unwrap().remove(0);
         fixture.interventions.push(Intervention {
             id: "cross_left_into_task_xor".into(),
             source: 2,
@@ -753,14 +855,14 @@ mod tests {
         });
         assert!(fixture.validate().unwrap_err().contains("unique"));
 
-        let mut fixture = fixtures().remove(1);
+        let mut fixture = fixtures().unwrap().remove(1);
         fixture.interventions[0].cost = 0;
         assert!(fixture.validate().unwrap_err().contains("positive cost"));
     }
 
     #[test]
     fn exhaustive_partition_sweep_contains_the_declared_partition_result() {
-        for fixture in fixtures() {
+        for fixture in fixtures().unwrap() {
             let (results, declared_profile) = fixture.run().unwrap();
             let mask = fixture.network.components.iter().enumerate().fold(
                 0usize,
@@ -777,7 +879,7 @@ mod tests {
 
     #[test]
     fn partition_sweep_is_stable_and_reports_all_unusable_partitions() {
-        for fixture in fixtures() {
+        for fixture in fixtures().unwrap() {
             let (results, _) = fixture.run().unwrap();
             let (first, total, skipped) =
                 all_partition_profiles(&fixture.name, fixture.network.rules.len(), &results);
@@ -794,7 +896,7 @@ mod tests {
 
     #[test]
     fn useful_xor_partition_sweep_exposes_sign_reversal() {
-        let fixture = fixtures().into_iter()
+        let fixture = fixtures().unwrap().into_iter()
             .find(|fixture| fixture.name == "useful_xor_coordination").unwrap();
         let (results, _) = fixture.run().unwrap();
         let (profiles, total, skipped) =
@@ -809,7 +911,7 @@ mod tests {
 
     #[test]
     fn harmful_coupling_partition_sweep_also_exposes_sign_reversal() {
-        let fixture = fixtures().into_iter()
+        let fixture = fixtures().unwrap().into_iter()
             .find(|fixture| fixture.name == "harmful_cross_component_coupling").unwrap();
         let (results, _) = fixture.run().unwrap();
         let (profiles, total, skipped) =
@@ -825,14 +927,14 @@ mod tests {
     fn declarative_oracle_manifest_matches_fixture_rules_and_metrics() {
         const MANIFEST: &str =
             include_str!("../validation/fixtures/tccip_toy_expectations.tsv");
-        let all_fixtures = fixtures();
+        let all_fixtures = fixtures().unwrap();
         let mut seen = HashSet::new();
 
         for line in MANIFEST.lines().map(str::trim).filter(|line| {
             !line.is_empty() && !line.starts_with('#')
         }) {
             let fields = line.split('\t').collect::<Vec<_>>();
-            assert_eq!(fields.len(), 17, "bad manifest row: {line}");
+            assert_eq!(fields.len(), 18, "bad manifest row: {line}");
             assert!(seen.insert(fields[0].to_string()), "duplicate fixture {}", fields[0]);
             let fixture = all_fixtures.iter()
                 .find(|fixture| fixture.name == fields[0])
@@ -847,11 +949,12 @@ mod tests {
                 .map(|component| if *component == 0 { 'A' } else { 'B' })
                 .collect::<String>();
             assert_eq!(component_labels, fields[6]);
+            assert_eq!(fixture.canonical_interventions(), fields[7]);
             let mask = fixture.network.components.iter().enumerate().fold(
                 0usize,
                 |acc, (index, component)| acc | ((*component as usize) << index),
             );
-            assert_eq!(mask, fields[7].parse::<usize>().unwrap());
+            assert_eq!(mask, fields[8].parse::<usize>().unwrap());
 
             let (results, declared) = fixture.run().unwrap();
             let point = &declared[0];
@@ -866,23 +969,23 @@ mod tests {
                     actual
                 );
             };
-            close(point.intact_utility, 8);
-            close(point.cross_cut_mean_loss, 9);
-            close(point.matched_control_mean_loss, 10);
-            close(point.tccip, 11);
+            close(point.intact_utility, 9);
+            close(point.cross_cut_mean_loss, 10);
+            close(point.matched_control_mean_loss, 11);
+            close(point.tccip, 12);
 
             let (sweep, total, skipped) =
                 all_partition_profiles(&fixture.name, fixture.network.rules.len(), &results);
-            assert_eq!(total, fields[12].parse::<usize>().unwrap());
-            assert_eq!(sweep.len(), fields[13].parse::<usize>().unwrap());
-            assert_eq!(skipped, fields[14].parse::<usize>().unwrap());
+            assert_eq!(total, fields[13].parse::<usize>().unwrap());
+            assert_eq!(sweep.len(), fields[14].parse::<usize>().unwrap());
+            assert_eq!(skipped, fields[15].parse::<usize>().unwrap());
             close(
                 sweep.iter().map(|point| point.tccip).fold(f64::INFINITY, f64::min),
-                15,
+                16,
             );
             close(
                 sweep.iter().map(|point| point.tccip).fold(f64::NEG_INFINITY, f64::max),
-                16,
+                17,
             );
         }
 
