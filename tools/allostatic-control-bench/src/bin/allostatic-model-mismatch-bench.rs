@@ -9,8 +9,8 @@ use allostatic_control_bench::calibration::{
 };
 use allostatic_control_bench::model_mismatch::{
     action_specific_calibration_panel, calibrate_action_specific_mismatch_panel,
-    calibrate_mismatch_panel, point_and_action_specific_robust_vs_true,
-    point_and_robust_vs_true, synthetic_mismatch_profile,
+    calibrate_mismatch_panel, point_and_action_specific_robust_vs_true, point_and_robust_vs_true,
+    synthetic_mismatch_profile,
 };
 use allostatic_control_bench::robust_viability::{Interval, StateEnvelope, ViabilityLimits};
 use allostatic_control_bench::Action;
@@ -85,7 +85,11 @@ impl PanelCounters {
         for (left, right) in self.robust_certified.iter_mut().zip(other.robust_certified) {
             *left += right;
         }
-        for (left, right) in self.false_certifications.iter_mut().zip(other.false_certifications) {
+        for (left, right) in self
+            .false_certifications
+            .iter_mut()
+            .zip(other.false_certifications)
+        {
             *left += right;
         }
         for (left, right) in self.false_vetoes.iter_mut().zip(other.false_vetoes) {
@@ -122,9 +126,7 @@ fn summarize_panel(
         .robust_certified
         .iter()
         .enumerate()
-        .map(|(index, denominator)| {
-            rate(counters.false_certifications[index + 1], *denominator)
-        })
+        .map(|(index, denominator)| rate(counters.false_certifications[index + 1], *denominator))
         .collect();
     let false_veto_rates: Vec<String> = counters
         .false_vetoes
@@ -202,7 +204,10 @@ fn run_panel(
                     limits,
                 )
                 .ok_or_else(|| {
-                    IoError::new(ErrorKind::InvalidData, "invalid global 90% comparison inputs")
+                    IoError::new(
+                        ErrorKind::InvalidData,
+                        "invalid global 90% comparison inputs",
+                    )
                 })?;
                 let (point_95, global_95, true_95) = point_and_robust_vs_true(
                     state,
@@ -213,7 +218,10 @@ fn run_panel(
                     limits,
                 )
                 .ok_or_else(|| {
-                    IoError::new(ErrorKind::InvalidData, "invalid global 95% comparison inputs")
+                    IoError::new(
+                        ErrorKind::InvalidData,
+                        "invalid global 95% comparison inputs",
+                    )
                 })?;
                 let (specific_point_90, action_specific_90, true_specific_90) =
                     point_and_action_specific_robust_vs_true(
@@ -260,7 +268,8 @@ fn run_panel(
                     .into());
                 }
 
-                let robust_certified = [global_90, action_specific_90, global_95, action_specific_95];
+                let robust_certified =
+                    [global_90, action_specific_90, global_95, action_specific_95];
                 let false_certifications = [
                     point_certified && !true_safe,
                     global_90 && !true_safe,
@@ -275,9 +284,7 @@ fn run_panel(
                     !action_specific_95 && true_safe,
                 ];
 
-                if is_in_envelope
-                    && robust_certified.iter().zip([global_90, action_specific_90, global_95, action_specific_95])
-                        .any(|(certified, _)| *certified && !true_safe)
+                if is_in_envelope && robust_certified.iter().any(|certified| *certified && !true_safe)
                 {
                     return Err(IoError::new(
                         ErrorKind::InvalidData,
@@ -295,11 +302,16 @@ fn run_panel(
 
                 counters.candidate_actions += 1;
                 counters.point_certified += usize::from(point_certified);
-                for (count, certified) in counters.robust_certified.iter_mut().zip(robust_certified) {
+                for (count, certified) in counters.robust_certified.iter_mut().zip(robust_certified)
+                {
                     *count += usize::from(certified);
                 }
                 counters.true_safe += usize::from(true_safe);
-                for (count, is_false) in counters.false_certifications.iter_mut().zip(false_certifications) {
+                for (count, is_false) in counters
+                    .false_certifications
+                    .iter_mut()
+                    .zip(false_certifications)
+                {
                     *count += usize::from(is_false);
                 }
                 for (count, is_veto) in counters.false_vetoes.iter_mut().zip(false_vetoes) {
@@ -355,14 +367,20 @@ fn main() -> Result<(), Box<dyn Error>> {
     let action_specific_90 =
         calibrate_action_specific_mismatch_panel(&calibration_panel, &STRESS_GRID, 0.90)
             .ok_or_else(|| {
-                IoError::new(ErrorKind::InvalidData, "action-specific 90% calibration failed")
+                IoError::new(
+                    ErrorKind::InvalidData,
+                    "action-specific 90% calibration failed",
+                )
             })?;
     let global_95 = calibrate_mismatch_panel(&calibration_panel, &STRESS_GRID, 0.95)
         .ok_or_else(|| IoError::new(ErrorKind::InvalidData, "global 95% calibration failed"))?;
     let action_specific_95 =
         calibrate_action_specific_mismatch_panel(&calibration_panel, &STRESS_GRID, 0.95)
             .ok_or_else(|| {
-                IoError::new(ErrorKind::InvalidData, "action-specific 95% calibration failed")
+                IoError::new(
+                    ErrorKind::InvalidData,
+                    "action-specific 95% calibration failed",
+                )
             })?;
     let models = CalibrationModels {
         global_90,
