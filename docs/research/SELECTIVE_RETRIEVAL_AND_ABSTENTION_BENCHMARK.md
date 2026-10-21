@@ -24,6 +24,12 @@ Every query is sampled from the declared 7:2:2 mixture of known/noisy patterns, 
 
 The random OOD samples have no registered target. A bundled pair of stored prototypes is intentionally ambiguous, so a unique-label acceptance counts as an error. This avoids giving the system credit for confidently guessing one component of a genuinely multi-pattern query.
 
+### Identifiability boundary: vector content is not registry identity
+
+The near-prototype challenge generates observations by flipping 5%, 10%, or 20% of the bits in an enrolled prototype, but labels the result as an **unregistered identity**. Those vectors are deliberately outside the *semantic* registry while being close to, and in the 10%/20% cases drawn using corruption rates that also occur for valid registered queries. This challenge is therefore excluded from the certification distribution: it measures an identifiability limit, not the same risk distribution that was certified.
+
+The next addition pairs a known/noisy query and an unregistered query with the **exact same vector**. Their registration labels differ, but the vector, nearest-prototype score, and top-two margin are identical. A vector-only decision rule must make the same accept/reject decision for both. This is a falsifiable negative control for the claim that similarity thresholds alone can guarantee unknown-identity rejection. Solving it requires additional evidence about enrollment/identity (for example, a verified template ID or trustworthy registry lookup), or an explicit abstention policy that acknowledges the ambiguity. It cannot be solved by retuning similarity alone without changing the operating trade-off.
+
 ### Compared decision rules
 
 1. **Always top-1:** the uncalibrated nearest-prototype baseline; it never abstains.
@@ -44,6 +50,21 @@ Thresholds are chosen only on the selection split by maximizing coverage subject
 - **Runtime:** total benchmark wall time per invocation, recorded separately from per-row decision quality.
 
 The first version reports risk/coverage points rather than claiming a complete area-under-risk-coverage result. A later protocol should add full risk–coverage curves and normalized area under the risk–coverage curve (AURC), as well as calibration cost and query latency distributions.
+
+## Preliminary result from a completed earlier head
+
+Run [39589249419](https://github.com/Luminous-Dynamics/symthaea/actions/runs/39589249419) completed successfully on source SHA `2757da27bb6f294c60f7b0b9ba7b2045cf648f2b` and archived its [research artifact](https://github.com/Luminous-Dynamics/symthaea/actions/runs/39589249419/artifacts/12341831170). These values are historical, exact-head outputs from that revision; they are not results for later source edits.
+
+| Policy | Mean evaluation coverage | Mean selective risk among accepted | Independent certification |
+|---|---:|---:|---:|
+| Always top-1 | 100.0% | 45.21% | Not applicable |
+| Calibrated score-only | 27.66% | 1.87% | 4/5 seeds pass |
+| Calibrated margin-only | 55.90% | 2.09% | 5/5 seeds pass |
+| Calibrated score + margin | 55.90% | 2.09% | 5/5 seeds pass |
+
+On the separate near-prototype identity challenge, every one of the 384/384 challenge queries was accepted and incorrect for every tested policy on every seed (20 overall rows: 5 seeds × 4 policies). The Wilson lower bound was 0.9901 for the 100% observed false-accept rate. This is not a deployment-risk estimate: it shows the vector-only rules fail to distinguish the challenge's unregistered identities from noisy enrolled vectors.
+
+Two useful negative results emerge. First, the score-only rule has lower coverage, and it failed certification for one seed. Second, the combined score-and-margin rule selected the same thresholds and gave exactly the same outcomes as margin-only across all five seeds; this added score threshold did not improve the operating point. A more complex rule is not progress unless a preregistered comparison shows better risk–coverage performance or stronger robustness.
 
 ## What would count as progress?
 
@@ -84,6 +105,7 @@ A useful capacity metric for the expanded suite is **K95**: the largest stored-m
 - Vergés et al. (2025), “Classification using hyperdimensional computing: a review with comparative analysis,” *Artificial Intelligence Review*. The review highlights inconsistent evaluation and reports both seven commonly used HD/VSA datasets and 121 UCI classification tasks. <https://doi.org/10.1007/s10462-025-11181-2>
 - Gangrade, Kag, and Saligrama (2021), “Selective Classification via One-Sided Prediction,” AISTATS/PMLR. A published high-accuracy/low-error selective-classification baseline to study and reproduce; it is not implemented in protocol v1. <https://proceedings.mlr.press/v130/gangrade21a.html>
 - Xu, Guo, and Wei (2025), “Selective Conformal Risk Control,” preprint. A relevant conformal/selective risk-control comparator. <https://arxiv.org/abs/2512.12844>
+- “Fixed-Sequence Confidence-Interval Calibration for Finite-Sample Selective Risk Control” (published 2 October 2026). The fixed-sequence threshold-testing idea is a current comparison target for reducing the data inefficiency of selecting thresholds on one split and certifying on a second. It must be implemented or independently reproduced before any superiority claim. <https://www.mdpi.com/2571-905X/9/5/109>
 - Yu and Liu (2026), “A Joint Finite-Sample Certificate for Adaptive Selective Conformal Risk Control,” preprint. It studies simultaneous certification of risk and acceptance probability under adaptive threshold selection; reported results are on specific image/panoptic settings and are not assumed to transfer to HDC. <https://arxiv.org/abs/2606.08517>
 - IEEE CIS Task Force on Hyperdimensional Computing and Vector Symbolic Architectures. <https://cis.taskforce.ieee.org/hdcvsa/>
 - Kleyko et al. (2023), “A Survey on Hyperdimensional Computing aka Vector Symbolic Architectures, Part II: Applications, Cognitive Models, and Challenges,” *ACM Computing Surveys*. <https://doi.org/10.1145/3558000>
