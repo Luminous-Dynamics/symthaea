@@ -1434,6 +1434,20 @@ mod tests {
         over_budget["run"]["actual_tokens"] = json!(16001);
         assert!(validate_outcome_contract(&over_budget, "over budget").is_err());
 
+        let mut invalid_reason = valid.clone();
+        invalid_reason["adjudication"]["reviewer_decisions"][0]["reason_codes"] =
+            json!(["not-a-registered-reason"]);
+        assert!(validate_outcome_contract(&invalid_reason, "invalid reason code").is_err());
+
+        let mut invalid_mismatch = valid.clone();
+        invalid_mismatch["prediction"]["mismatch_codes"] = json!(["wrong-way"]);
+        assert!(validate_outcome_contract(&invalid_mismatch, "invalid mismatch code").is_err());
+
+        let mut invalid_precondition = valid.clone();
+        invalid_precondition["prediction"]["precondition_checks"][0]["outcome"] =
+            json!("probably-satisfied");
+        assert!(validate_outcome_contract(&invalid_precondition, "invalid precondition outcome").is_err());
+
         let mut extra_field = valid;
         extra_field["unregistered_authority"] = json!(true);
         assert!(validate_outcome_contract(&extra_field, "extra field").is_err());
