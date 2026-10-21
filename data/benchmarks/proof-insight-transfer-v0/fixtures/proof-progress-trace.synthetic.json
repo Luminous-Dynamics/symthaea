@@ -16,7 +16,8 @@
     "statement_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
     "root_obligation_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
     "toolchain": "synthetic Lean toolchain (fixture only)",
-    "checker": "synthetic checker (fixture only)"
+    "checker": "synthetic checker (fixture only)",
+    "root_obligation_id": "g0"
   },
   "run": {
     "run_id": "synthetic-run",
@@ -74,11 +75,18 @@
       "state_after_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
       "obligation_transitions": [
         {
+          "obligation_id": "g0",
           "obligation_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
           "transition": "split",
-          "child_obligation_sha256s": [
-            "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
-            "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          "children": [
+            {
+              "obligation_id": "g1",
+              "obligation_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+            },
+            {
+              "obligation_id": "g2",
+              "obligation_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+            }
           ],
           "checker_receipt_sha256": null
         }
@@ -98,9 +106,10 @@
       "state_after_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
       "obligation_transitions": [
         {
+          "obligation_id": "g1",
           "obligation_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
           "transition": "discharged",
-          "child_obligation_sha256s": [],
+          "children": [],
           "checker_receipt_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
         }
       ],
@@ -119,9 +128,10 @@
       "state_after_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
       "obligation_transitions": [
         {
+          "obligation_id": "g2",
           "obligation_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
           "transition": "discharged",
-          "child_obligation_sha256s": [],
+          "children": [],
           "checker_receipt_sha256": "7777777777777777777777777777777777777777777777777777777777777777"
         }
       ],
