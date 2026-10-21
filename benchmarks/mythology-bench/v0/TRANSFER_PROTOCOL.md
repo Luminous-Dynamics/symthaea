@@ -86,3 +86,8 @@ Ablate one component at a time: temporal context, version identity, relation typ
 ## Nonclaims
 
 This protocol does not prove any mythic event happened literally, prove/disprove a community's spiritual beliefs, or demonstrate Symthaea superiority. It defines experiments needed to test reasoning hypotheses. All current fixtures are development data, and external source links are references—not rights grants or permission for automated crawling.
+
+
+## Contract validation tool
+
+A focused implementation is in [`tools/knowledge-benchmark-harness/`](../../../tools/knowledge-benchmark-harness/) and is invoked by [`scripts/validate-knowledge-benchmarks.sh`](../../../scripts/validate-knowledge-benchmarks.sh). It uses the pinned jsonschema 0.59.0 Rust crate with remote/file schema references disabled by a preflight scan, validates the declared Draft 2020-12 dialect and instance formats, and checks graph referential integrity plus limited relation-evidence invariants. Validation reports bind schema/input SHA-256 digests and the resolved Cargo lockfile digest. Because this environment lacks Rust/Cargo, it remains uncompiled and unexecuted; all code-level outcomes require real test/build evidence before qualification. The initial cargo invocation will create a lockfile; review and commit that lockfile before treating dependency resolution as fixed across runs.
