@@ -45,7 +45,7 @@ MythologyBench should complement rather than duplicate them: its focus is source
 
 ## Acceptance boundary
 
-The newer cases add local-to-universal overgeneralization, graph similarity versus identity, multi-answer grading, and missing-domain abstention. A proposed structural-competence track is described in [the transfer protocol](TRANSFER_PROTOCOL.md), drawing cautiously on ICML 2026 meta-cultural structure research and ACL 2026 FrameNet-Cultures.
+The newer cases add local-to-universal overgeneralization, graph similarity versus identity, multi-answer grading, and missing-domain abstention. The proposed structural-competence track is described in [the transfer protocol](TRANSFER_PROTOCOL.md) and [Structural Transfer Scorecard](STRUCTURAL_TRANSFER_SCORE.md), drawing cautiously on ICML 2026 meta-cultural structure research and ACL 2026 FrameNet-Cultures. Ten synthetic intervention pairs provide contract tests only, not historical benchmark cases or results.
 
 All cases are `development`; synthetic controls are not historical evidence. Source links are not an invitation for automated crawling. Rights remain `unknown` until reviewed. Use [`scripts/validate-knowledge-benchmarks.sh`](../../../scripts/validate-knowledge-benchmarks.sh) to run the focused harness over all four fixture groups. The harness requires a generated `Cargo.lock`, binds its SHA-256 into each report, refuses remote schema references, and never crawls the scholarly source URLs.
 
