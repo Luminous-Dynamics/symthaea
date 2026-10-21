@@ -152,8 +152,9 @@ pub fn run(root: &Path, corpus_arg: &Path, out_arg: Option<&Path>) -> Result<()>
         serde_json::from_str(corpus_text).context("parse trajectory corpus JSON")?;
     validate_corpus(&corpus)?;
 
-    let evaluation_protocol = fs::read(root.join("docs/research/first-aid/EVALUATION_PROTOCOL_V0.md"))
-        .context("read evaluation protocol for receipt identity")?;
+    let evaluation_protocol =
+        fs::read(root.join("docs/research/first-aid/EVALUATION_PROTOCOL_V0.md"))
+            .context("read evaluation protocol for receipt identity")?;
     let evaluation_protocol_digest = sha256_hex(&evaluation_protocol);
     let validator_source = fs::read(root.join("xtask/src/first_aid_trajectory.rs"))
         .context("read trajectory validator source for receipt identity")?;
@@ -666,8 +667,7 @@ mod tests {
                 consent_scoped: None,
             },
         );
-        trace.expected_violation_codes =
-            vec!["render_without_verified_bundle".to_string()];
+        trace.expected_violation_codes = vec!["render_without_verified_bundle".to_string()];
         value.scenarios = vec![trace];
         validate_corpus(&value).expect("new session must require a fresh bundle verification");
     }
