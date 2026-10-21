@@ -100,6 +100,25 @@ pub fn validate_review(review: &Value) -> Result<(), Vec<String>> {
     }
 
     let alternatives = validate_alternatives(review.get("alternatives"), baseline_geometry_status, &mut errors);
+    if let Some(inputs) = inputs {
+        if let Some(baseline) = inputs.get("baseline_design") {
+            let baseline_sha = string_value(baseline.get("sha256"));
+            let alternatives_contain_baseline = review
+                .get("alternatives")
+                .and_then(Value::as_array)
+                .is_some_and(|items| {
+                    items.iter().any(|alternative| {
+                        string_value(alternative.get("snapshot_sha256")) == baseline_sha
+                    })
+                });
+            if !baseline_sha.is_empty() && !alternatives_contain_baseline {
+                errors.push(
+                    "$.alternatives: at least one alternative must bind the exact baseline design snapshot"
+                        .to_string(),
+                );
+            }
+        }
+    }
     let metric_assessments = review
         .get("metric_assessments")
         .and_then(Value::as_array);
@@ -801,6 +820,17 @@ mod tests {
             }
         ]);
         review
+    }
+
+    #[test]
+    fn review_alternatives_must_include_exact_baseline_design_snapshot() {
+        let mut review = fixture();
+        review["alternatives"][0]["snapshot_sha256"] =
+            json!("dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd");
+        let errors = validate_review(&review).unwrap_err();
+        assert!(errors.iter().any(|error| {
+            error.contains("at least one alternative must bind the exact baseline design snapshot")
+        }));
     }
 
     #[test]
