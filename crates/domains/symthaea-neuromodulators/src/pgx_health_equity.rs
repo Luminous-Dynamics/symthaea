@@ -1448,7 +1448,7 @@ impl PgxHealthEquityEngine {
     ///
     /// Denominator provenance and population-category validity require separate review.
     pub fn population_scenario_estimate(&self, drug: &str, gene: &str) -> PopulationScenarioEstimate {
-        // Approximate US population by ancestry (2024 census estimates, millions).
+        // Rounded broad-group denominators for arithmetic examples only; they are not genotype cohorts.
         const POP_EUROPEAN: f64 = 195.0;
         const POP_AFRICAN: f64 = 47.0;
         const POP_EAST_ASIAN: f64 = 7.0;
@@ -1465,8 +1465,8 @@ impl PgxHealthEquityEngine {
             (AncestryGroup::Mixed, POP_MIXED),
         ];
 
-        let is_prodrug = drug == "codeine" || drug == "clopidogrel";
-        // For tacrolimus/CYP3A5, expressors (NM/IM) need dose increase — different risk model.
+        // A special, documented prototype scenario for tacrolimus/CYP3A5 sums NM + IM.
+        // This encodes a historical model convention, not a dose implication.
         let is_expressor_scenario = drug == "tacrolimus" && gene == "CYP3A5";
 
         let mut per_population_scenario = Vec::new();
@@ -1533,11 +1533,11 @@ impl PgxHealthEquityEngine {
         }
     }
 
-    /// Perturb all allele frequencies by a multiplicative factor.
+    /// Perturb included allele-frequency inputs by a multiplicative factor.
     ///
     /// `factor` is a fractional change: e.g., 0.10 means +10%, -0.20 means -20%.
-    /// All frequencies are clamped to [0.0, 1.0] after perturbation.
-    /// Useful for sensitivity analysis to assess robustness of equity conclusions.
+    /// All frequencies are clamped to [0.0, 1.0]. This probes internal sensitivity only;
+    /// it cannot establish phenotype accuracy, ranking validity, or clinical equity.
     pub fn perturb_frequencies(&mut self, factor: f64) {
         for allele in &mut self.allele_frequencies {
             for freq in allele.frequencies.values_mut() {
@@ -2077,18 +2077,22 @@ mod tests {
     fn test_population_scenario_estimate_reasonable_numbers() {
         let e = engine();
         let estimate = e.population_scenario_estimate("codeine", "CYP2D6");
-        // Total US population ~331M. At-risk (PM+UM) should be some fraction.
         assert!(
-            estimate.sum_of_modelled_products > 1_000_000,
-            "At least 1M at risk for codeine/CYP2D6, got {}",
-            estimate.sum_of_modelled_products
+            estimate.sum_of_modelled_products > 0,
+            "The selected model inputs should produce a nonzero arithmetic scenario"
         );
         assert!(
             estimate.sum_of_modelled_products < 200_000_000,
-            "At risk should be <200M, got {}",
-            estimate.sum_of_modelled_products
+            "The prototype arithmetic product should remain in its configured numeric range"
         );
-        assert!(!estimate.scenario_note.is_empty());
+        let sum_of_rows: u64 = estimate
+            .per_population_scenario
+            .iter()
+            .map(|(_, _, _, product)| *product)
+            .sum();
+        assert_eq!(estimate.sum_of_modelled_products, sum_of_rows);
+        assert!(estimate.scenario_note.contains("arithmetic scenario"));
+        assert!(estimate.scenario_note.contains("Not an estimate of patients at risk"));
     }
 
     #[test]
