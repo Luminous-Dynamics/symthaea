@@ -1712,7 +1712,12 @@ mod tests {
                 kind: QueryKind::RandomOod,
             },
         ];
-        let (quantile, calibration_n) = split_conformal_quantile(&samples, 0.5).expect("quantile");
+        let (quantile, calibration_n) = split_conformal_quantile(
+            &samples,
+            0.5,
+            ConformalScoreMode::RawSimilarity,
+        )
+        .expect("quantile");
         assert_eq!(calibration_n, 4);
         // Scores 1 - sim are [0.1, 0.2, 0.3, 0.4]; ceil((4+1)*.5)=3.
         assert!((quantile - 0.3).abs() < 1e-12);
@@ -1736,7 +1741,7 @@ mod tests {
         };
         let queries = vec![known, unknown];
         let scores = score_queries(&queries, &prototypes).expect("scores");
-        let set_results = score_conformal_sets(&scores, 0.0);
+        let set_results = score_conformal_sets(&scores, 0.0, ConformalScoreMode::RawSimilarity);
         assert_eq!(set_results[0].set_size, 1);
         assert_eq!(set_results[0].set_size, set_results[1].set_size);
         assert!(set_results[0].covered);
@@ -1754,7 +1759,8 @@ mod tests {
             kind: QueryKind::Known { noise_index: 0 },
         };
         let (quantile, count) =
-            split_conformal_quantile(&[sample], 0.05).expect("full-set quantile");
+            split_conformal_quantile(&[sample], 0.05, ConformalScoreMode::RawSimilarity)
+                .expect("full-set quantile");
         assert_eq!(count, 1);
         assert!(quantile.is_infinite());
     }
