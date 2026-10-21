@@ -41,8 +41,8 @@ cargo fmt --manifest-path "$manifest" -- --check
 cargo test --locked --manifest-path "$manifest"
 cargo clippy --locked --manifest-path "$manifest" --all-targets -- -D warnings
 
-cargo run --locked --release --manifest-path "$manifest" > "$tmpdir/run-a.csv"
-cargo run --locked --release --manifest-path "$manifest" > "$tmpdir/run-b.csv"
+cargo run --locked --release --manifest-path "$manifest" --bin allostatic-control-bench > "$tmpdir/run-a.csv"
+cargo run --locked --release --manifest-path "$manifest" --bin allostatic-control-bench > "$tmpdir/run-b.csv"
 if ! cmp -s "$tmpdir/run-a.csv" "$tmpdir/run-b.csv"; then
   printf 'FAIL: repeated benchmark output is not byte-identical\n' >&2
   exit 1
