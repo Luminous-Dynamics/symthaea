@@ -16,7 +16,8 @@
     "systems",
     "candidate_system_id",
     "preregistration",
-    "claims_policy"
+    "claims_policy",
+    "bootstrap"
   ],
   "properties": {
     "schema_version": {
@@ -305,6 +306,30 @@
     "candidate_system_id": {
       "type": "string",
       "minLength": 1
+    },
+    "bootstrap": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "replicates",
+        "seed",
+        "confidence_level"
+      ],
+      "properties": {
+        "replicates": {
+          "type": "integer",
+          "minimum": 1000
+        },
+        "seed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "confidence_level": {
+          "type": "number",
+          "exclusiveMinimum": 0.5,
+          "exclusiveMaximum": 1
+        }
+      }
     }
   }
 }
