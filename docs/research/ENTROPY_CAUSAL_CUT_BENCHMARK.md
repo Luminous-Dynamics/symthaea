@@ -49,7 +49,7 @@ Other fixtures exercise common-driver dependence, feed-forward chains, XOR and A
 
 ### Phase A — qualify the kernel
 
-- Execute all ten Rust tests on the exact branch head.
+- Execute all twelve Rust tests on the exact branch head.
 - Add property-based checks for stochastic-row normalization, nonnegativity, entropy bounds, deterministic/noise extremes, and permutation invariance.
 - Independently implement the tiny transition-model calculations or use a separately written analytical enumerator; cross-check every TPM row and metric, not just summary statistics.
 - Freeze emitted rows as a versioned deterministic CSV/JSON artifact with schema, input-model digest, source SHA, and run receipt. Do not hand-edit measurements into documentation.
@@ -107,11 +107,35 @@ These are research targets, not current results:
 7. Report false-positive rates on negative controls. Do not assert consciousness from any scalar score.
 8. Publish exact source commit, tool versions, formalism preset, inputs, outputs, and verification receipt for every claimed pass. Queued workflows are not passes.
 
+## SOTA and industry comparison protocol
+
+These methods are not all competing estimators of one quantity. Compare them on a common model and report the target each one actually answers.
+
+| Baseline family | Correct comparison question | Pass condition |
+|---|---|---|
+| Shannon entropy / entropy rate | Does the system have uncertainty or temporal predictability? | Analytic invariants and exact probability checks |
+| Pairwise MI / conditional MI / transfer entropy | Does statistical or directed predictive dependence exist? | Known common-cause, redundancy, and XOR counterexamples |
+| Spectral connectivity (lambda-2) | Does the wiring graph remain connected / mix quickly? | Correct graph-theoretic values; no IIT label |
+| This causal-cut diagnostic | How sensitive is this explicit TPM to the declared cut operation? | Invariance, negative controls, and cross-implementation agreement under the same cut definition |
+| PyPhi 2.0 under IIT_3_0, IIT_4_0_2023, and IIT_4_0_2026 | What does each declared IIT formalism calculate for this substrate and state? | Version-pinned outputs, canonical TPM digest, exact state/formalism, and independent receipts |
+| Symthaea HDC approximation | How closely does the proxy approximate a declared reference target? | Held-out error distribution plus speed/memory savings at matched accuracy |
+
+PyPhi 2.0 makes these distinctions operational: it has explicit per-call formalisms, and IIT 3.0, IIT 4.0 (2023), and IIT 4.0 (2026) can return different values for the same substrate and state. A correlation table that mixes formalism versions or models is not a valid SOTA comparison. [PyPhi migration guide](https://pyphi.readthedocs.io/en/latest/migration/migration-2.0.html) · [Formalism configuration](https://pyphi.readthedocs.io/en/latest/reference/configuration.html).
+
 ## How this could outperform the state of the art
 
-Do not claim novelty merely for combining entropy with phi. The promising contribution is a rigorous, reusable test harness for distinguishing uncertainty, dependence, and intervention-sensitive irreducibility with exact small-system controls and explicit estimator boundaries.
+Do not claim novelty merely for combining entropy with phi. The candidate contribution is a **fail-closed measurement and approximation benchmark** that makes metric semantics, causal models, state distributions, partition conventions, and reference provenance explicit.
 
-The potential advantage is a cleaner route from toy systems to Symthaea's large hyperdimensional dynamical models: every approximation is paired with measured error, known counterexamples, and an independent reference. This could yield practical speedups without sacrificing semantic honesty, and surface dynamical regimes where entropy and causal integration diverge.
+After an identical model and target are wired across both implementations, aim for the following stretch targets—not current results:
+
+- **Reference correctness:** all tiny-model TPM rows agree within 1e-12; all documented analytical invariants pass; no fallback-derived measurements.
+- **Approximation fidelity:** held-out Pearson and Spearman >= 0.95, median relative error <= 5%, 95th-percentile relative error <= 10% where the reference is nonzero, and 100% explicit accounting of failed cases. Report MAE/RMSE and confidence intervals too.
+- **Adversarial robustness:** zero false-positive "integration" claims on the frozen negative-control set; no target-family leakage between tuning and evaluation; no unexplained rank reversal on the predeclared critical contrasts.
+- **Efficiency:** demonstrate >= 10x lower wall-clock or memory cost at a matched error budget, measured with identical hardware, concurrency, cache policy, and model digest. Otherwise publish the accuracy–cost frontier without claiming superiority.
+- **Reproducibility:** exact source SHA, environment lock, input-model digest, formalism/state/config, stdout artifact digest, and independently reproduced receipts for every pass.
+
+Until those gates are met, the correct product is a transparent experimental diagnostic—not a faster IIT estimator. The current Rust kernel and PyPhi reference fixture still use different model representations, and the cross-validation adapter remains intentionally blocked.
+
 
 ## References
 
