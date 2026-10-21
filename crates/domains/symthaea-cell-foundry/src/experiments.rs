@@ -206,7 +206,7 @@ impl AdaptiveCouplingConfig {
 }
 
 /// Per-day trace from a discrepancy-trend adaptive permeability experiment.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AdaptiveConditionResult {
     pub perturbation_label: String,
     pub homing_enabled: bool,
@@ -603,6 +603,49 @@ mod tests {
         }
     }
 
+    #[test]
+    fn adaptive_coupling_is_deterministic_and_bounded() {
+        let template = build_radial_bipolar_template(77, 64, 5, 0.2);
+        let perturbation = Perturbation::Amputate {
+            min_r: 0.8,
+            max_r: 2.0,
+        };
+        let config = AdaptiveCouplingConfig::default();
+        let first = run_adaptive_coupling_experiment(
+            &template, &perturbation, 15, true, config,
+        ).expect("valid adaptive policy");
+        let second = run_adaptive_coupling_experiment(
+            &template, &perturbation, 15, true, config,
+        ).expect("valid adaptive policy");
+        assert_eq!(first, second);
+        assert_eq!(first.permeability_trajectory.len(), 15);
+        assert_eq!(first.discrepancy_trajectory.len(), 15);
+        assert!(first.permeability_trajectory.iter().all(|(_, value)| {
+            (config.min_permeability..=config.max_permeability).contains(value)
+        }));
+        let integrated = first.discrepancy_trajectory.iter()
+            .map(|(_, value)| *value)
+            .sum::<f64>();
+        assert!((integrated - first.integrated_discrepancy).abs() < 1e-9);
+    }
+
+    #[test]
+    fn adaptive_coupling_rejects_invalid_configuration() {
+        let mut config = AdaptiveCouplingConfig::default();
+        config.initial_permeability = 1.5;
+        assert!(config.validate().is_err());
+        config = AdaptiveCouplingConfig::default();
+        config.decision_window_days = 0;
+        assert!(config.validate().is_err());
+        let template = build_radial_bipolar_template(78, 32, 3, 0.2);
+        let perturbation = Perturbation::Amputate {
+            min_r: 0.8,
+            max_r: 2.0,
+        };
+        assert!(run_adaptive_coupling_experiment(
+            &template, &perturbation, 0, false, AdaptiveCouplingConfig::default(),
+        ).is_err());
+    }
     #[test]
     fn perturbation_label_is_stable_and_distinct() {
         let a = Perturbation::Amputate {
