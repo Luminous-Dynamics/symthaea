@@ -877,6 +877,22 @@ mod tests {
         );
         cases.push(("verification outside active session", verify_without_session));
 
+        let mut repeated_violations = scenario("FA-TRACE-002");
+        let mut repeated_render = repeated_violations
+            .events
+            .iter()
+            .find(|event| event.kind == EventKind::ProtocolRendered)
+            .expect("render event exists")
+            .clone();
+        repeated_render.sequence = repeated_violations
+            .events
+            .last()
+            .expect("events exist")
+            .sequence
+            + 1;
+        repeated_violations.events.push(repeated_render);
+        cases.push(("repeated violation occurrences", repeated_violations));
+
         for (label, trace) in cases {
             let value = serde_json::to_value(&trace).expect("mutated trace serializes");
             assert_eq!(
