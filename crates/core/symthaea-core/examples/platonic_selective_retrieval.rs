@@ -66,7 +66,7 @@ struct ScoredQuery {
     kind: QueryKind,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 enum ConformalScoreMode {
     RawSimilarity,
     GapAdjusted { penalty: f64 },
@@ -1499,6 +1499,63 @@ mod tests {
                 + result.rejected_both,
             result.total
         );
+    }
+
+    #[test]
+    fn gap_adjusted_score_penalizes_non_top_candidates() {
+        let raw = conformal_nonconformity(0.85, 0.90, ConformalScoreMode::RawSimilarity);
+        let top = conformal_nonconformity(
+            0.90,
+            0.90,
+            ConformalScoreMode::GapAdjusted { penalty: 2.0 },
+        );
+        let lower_rank = conformal_nonconformity(
+            0.85,
+            0.90,
+            ConformalScoreMode::GapAdjusted { penalty: 2.0 },
+        );
+        assert!((raw - 0.15).abs() < 1e-12);
+        assert!((top - 0.10).abs() < 1e-12);
+        assert!((lower_rank - 0.25).abs() < 1e-12);
+        assert!(lower_rank > raw);
+    }
+
+    #[test]
+    fn dco_score_tuning_is_deterministic_and_uses_independent_calibration() {
+        let prototypes = (0..8)
+            .map(|index| PatternVector::seeded_random(256, 5_000 + index as u64))
+            .collect::<Result<Vec<_>, _>>()
+            .expect("prototype bank");
+        let tuning_queries =
+            generate_queries(&prototypes, 0x5455_4e45, 512).expect("tuning queries");
+        let fresh_calibration_queries =
+            generate_queries(&prototypes, 0x4341_4c49, 512).expect("fresh calibration queries");
+        let tuning = score_queries(&tuning_queries, &prototypes).expect("tuning scores");
+        let fresh_calibration =
+            score_queries(&fresh_calibration_queries, &prototypes).expect("calibration scores");
+
+        let first = tune_dco_score(&tuning, CONFORMAL_ALPHA).expect("DCO tuning");
+        let second = tune_dco_score(&tuning, CONFORMAL_ALPHA).expect("repeat DCO tuning");
+        assert_eq!(first.mode, second.mode);
+        assert_eq!(first.provisional_quantile, second.provisional_quantile);
+        assert_eq!(first.mean_set_size, second.mean_set_size);
+        assert!(first.tuning_coverage >= 1.0 - CONFORMAL_ALPHA);
+
+        // Selection does not receive the fresh-calibration data; calibration is
+        // performed only after the DCO score mode is fixed.
+        let (fresh_quantile, fresh_count) = split_conformal_quantile(
+            &fresh_calibration,
+            CONFORMAL_ALPHA,
+            first.mode,
+        )
+        .expect("fresh conformal calibration");
+        assert!(fresh_count > 0);
+        let heldout_sets = score_conformal_sets(&fresh_calibration, fresh_quantile, first.mode);
+        let known: Vec<_> = heldout_sets
+            .iter()
+            .filter(|result| result.labeled && matches!(result.kind, QueryKind::Known { .. }))
+            .collect();
+        assert!(!known.is_empty());
     }
 
     #[test]
