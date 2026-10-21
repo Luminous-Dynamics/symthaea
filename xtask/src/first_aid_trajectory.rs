@@ -138,18 +138,23 @@ struct TrajectoryReceipt {
     claim_ceiling: &'static str,
 }
 
+fn checked_corpus_digest(bytes: &[u8]) -> Result<String> {
+    let digest = sha256_hex(bytes);
+    if digest != EXPECTED_CORPUS_SHA256 {
+        bail!(
+            "trajectory corpus digest mismatch: expected {}, got {}",
+            EXPECTED_CORPUS_SHA256,
+            digest
+        );
+    }
+    Ok(digest)
+}
+
 pub fn run(root: &Path, corpus_arg: &Path, out_arg: Option<&Path>) -> Result<()> {
     let corpus_path = resolve(root, corpus_arg);
     let corpus_bytes = fs::read(&corpus_path)
         .with_context(|| format!("read trajectory corpus {}", corpus_path.display()))?;
-    let corpus_digest = sha256_hex(&corpus_bytes);
-    if corpus_digest != EXPECTED_CORPUS_SHA256 {
-        bail!(
-            "trajectory corpus digest mismatch: expected {}, got {}",
-            EXPECTED_CORPUS_SHA256,
-            corpus_digest
-        );
-    }
+    let corpus_digest = checked_corpus_digest(&corpus_bytes)?;
     let corpus_text =
         std::str::from_utf8(&corpus_bytes).context("trajectory corpus must be valid UTF-8")?;
     let corpus: TrajectoryCorpus =
@@ -518,6 +523,17 @@ mod tests {
     fn checked_in_trajectory_corpus_has_pinned_digest() {
         assert_eq!(sha256_hex(CORPUS_JSON.as_bytes()), EXPECTED_CORPUS_SHA256);
         assert_eq!(corpus().scenarios.len(), 12);
+        assert_eq!(
+            checked_corpus_digest(CORPUS_JSON.as_bytes()).expect("pinned fixture digest passes"),
+            EXPECTED_CORPUS_SHA256
+        );
+    }
+
+    #[test]
+    fn one_byte_corpus_mutation_is_rejected_by_digest_gate() {
+        let mut bytes = CORPUS_JSON.as_bytes().to_vec();
+        bytes[0] ^= 1;
+        assert!(checked_corpus_digest(&bytes).is_err());
     }
 
     #[test]
