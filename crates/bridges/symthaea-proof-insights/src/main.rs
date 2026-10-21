@@ -273,6 +273,7 @@ struct TemporalDatasetJoinAudit {
     dataset_sha256: String,
     total_timeline_rows: usize,
     unique_timeline_path_count: usize,
+    invalid_timeline_path_count: usize,
     total_dataset_records: usize,
     unique_dataset_id_count: usize,
     blank_dataset_line_count: usize,
@@ -766,6 +767,7 @@ fn audit_temporal_dataset(
 
     let mut candidates_by_path: BTreeMap<String, Vec<TimelinePathCandidate>> = BTreeMap::new();
     let mut timeline_row_count = 0_usize;
+    let mut invalid_timeline_path_count = 0_usize;
     for (position, row_result) in timeline_reader.records().enumerate() {
         let row =
             row_result.with_context(|| format!("parse timeline join row {}", position + 2))?;
@@ -773,14 +775,6 @@ fn audit_temporal_dataset(
         let path = row.get(path_col).unwrap_or("").trim();
         if path.is_empty() {
             continue;
-        }
-        let normalized = normalize_root_relative_path(path)
-            .with_context(|| format!("unsafe timeline spec path on row {}", position + 2))?;
-        if normalized != path {
-            bail!(
-                "timeline spec path is not canonical on row {}",
-                position + 2
-            );
         }
         let completion_commit = row
             .get(commit_col)
@@ -798,6 +792,16 @@ fn audit_temporal_dataset(
                 position + 2
             );
         }
+        // Historical source-path values can contain machine-local absolute paths.
+        // Validate each completion commit above, but reject unsafe path values
+        // from the join index without opening or echoing them.
+        let normalized = match normalize_root_relative_path(path) {
+            Ok(normalized) if normalized == path => normalized,
+            _ => {
+                invalid_timeline_path_count += 1;
+                continue;
+            }
+        };
         candidates_by_path
             .entry(normalized)
             .or_default()
@@ -1066,6 +1070,7 @@ fn audit_temporal_dataset(
         dataset_sha256,
         total_timeline_rows: timeline_row_count,
         unique_timeline_path_count,
+        invalid_timeline_path_count,
         total_dataset_records: events.len(),
         unique_dataset_id_count: dataset_ids.len(),
         blank_dataset_line_count,
@@ -1120,8 +1125,10 @@ fn audit_temporal_dataset(
     fs::write(&resolved_output, encoded)
         .with_context(|| format!("write temporal dataset audit {}", resolved_output.display()))?;
     println!(
-        "PITB_TEMPORAL_DATASET_AUDIT_PASS: rows={} unique_path_join={} ambiguous_path_join={} unmatched_path_join={} invalid_path={} statements={} report_sha256={}",
+        "PITB_TEMPORAL_DATASET_AUDIT_PASS: records={} timeline_rows={} invalid_timeline_paths={} unique_path_join={} ambiguous_path_join={} unmatched_path_join={} invalid_dataset_path={} statements={} report_sha256={}",
         audit.total_dataset_records,
+        audit.total_timeline_rows,
+        audit.invalid_timeline_path_count,
         audit.unique_path_join_count,
         audit.ambiguous_path_join_count,
         audit.unmatched_path_join_count,
