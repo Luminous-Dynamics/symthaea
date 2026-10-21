@@ -12,8 +12,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Instant;
 
 use ode_verify_001_harness::dynamical_system::{
-    try_simulate, DynamicalSystem, EulerIntegrator, HarmonicOscillator, Integrator, Rk4Integrator,
-    VerletIntegrator,
+    DynamicalSystem, EulerIntegrator, HarmonicOscillator, Integrator, Rk4Integrator,
+    VerletIntegrator, try_simulate,
 };
 
 const PERIODS: usize = 4;
@@ -106,7 +106,12 @@ fn evaluate_case(
             end_time,
             step_size,
         )
-        .map_err(|error| format!("{} rejected benchmark request: {error:?}", integrator.name()))?;
+        .map_err(|error| {
+            format!(
+                "{} rejected benchmark request: {error:?}",
+                integrator.name()
+            )
+        })?;
         let elapsed = start.elapsed().as_nanos();
         black_box(&result);
 
@@ -137,10 +142,8 @@ fn evaluate_case(
         }
 
         let derivative_evaluations = system.derivative_evaluations.load(Ordering::Relaxed);
-        if expected_steps_observed
-            .is_some_and(|steps| steps != result.steps)
-            || expected_evaluations_observed
-                .is_some_and(|count| count != derivative_evaluations)
+        if expected_steps_observed.is_some_and(|steps| steps != result.steps)
+            || expected_evaluations_observed.is_some_and(|count| count != derivative_evaluations)
         {
             return Err(format!(
                 "{} did not repeat with stable step/evaluation counts",
@@ -156,13 +159,15 @@ fn evaluate_case(
     let (result, derivative_evaluations) =
         final_run.ok_or_else(|| "benchmark repeated zero times".to_string())?;
     let oscillator = HarmonicOscillator::simple(OMEGA);
-    let initial_energy = oscillator.energy(&INITIAL_STATE).abs().max(f64::MIN_POSITIVE);
+    let initial_energy = oscillator
+        .energy(&INITIAL_STATE)
+        .abs()
+        .max(f64::MIN_POSITIVE);
     let mut max_trajectory_error_linf = 0.0_f64;
     let mut max_relative_energy_drift = 0.0_f64;
 
     for (time, state) in result.times.iter().zip(result.states.iter()) {
-        max_trajectory_error_linf =
-            max_trajectory_error_linf.max(state_error(*time, state));
+        max_trajectory_error_linf = max_trajectory_error_linf.max(state_error(*time, state));
         let relative_drift = (oscillator.energy(state) - initial_energy).abs() / initial_energy;
         max_relative_energy_drift = max_relative_energy_drift.max(relative_drift);
     }
@@ -171,8 +176,7 @@ fn evaluate_case(
         .times
         .last()
         .ok_or_else(|| "trajectory contained no final time".to_string())?;
-    let final_state = result
-        .final_state();
+    let final_state = result.final_state();
     let final_state_error_linf = state_error(final_time, final_state);
 
     Ok(Metrics {
@@ -212,8 +216,7 @@ fn print_metrics(metrics: &Metrics) {
 }
 
 fn main() {
-    let integrators: [&dyn Integrator; 3] =
-        [&EulerIntegrator, &Rk4Integrator, &VerletIntegrator];
+    let integrators: [&dyn Integrator; 3] = [&EulerIntegrator, &Rk4Integrator, &VerletIntegrator];
 
     print_header();
     let mut failures = 0usize;
@@ -270,7 +273,11 @@ mod tests {
 
     #[test]
     fn all_methods_emit_finite_errors_and_nonzero_work_counts() {
-        for integrator in [&EulerIntegrator as &dyn Integrator, &Rk4Integrator, &VerletIntegrator] {
+        for integrator in [
+            &EulerIntegrator as &dyn Integrator,
+            &Rk4Integrator,
+            &VerletIntegrator,
+        ] {
             let metrics = evaluate_case(integrator, 64, 1).expect("finite work-precision case");
             assert!(metrics.steps > 0);
             assert!(metrics.derivative_evaluations > 0);
