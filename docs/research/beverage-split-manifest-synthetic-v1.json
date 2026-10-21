@@ -1,0 +1,59 @@
+{
+  "schema_version": "beverage-split-manifest-v1",
+  "evidence_class": "SYNTHETIC_CONTRACT_FIXTURE",
+  "task_id": "trajectory_forecast_demo",
+  "dataset_id": "synthetic-demo-only",
+  "dataset_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "time_coordinate": "hours_since_inoculation",
+  "minimum_groups_per_split": 2,
+  "records": [
+    {
+      "sample_id": "sample-001",
+      "group_id": "batch-001",
+      "split": "train",
+      "max_feature_available_time": 20.0,
+      "prediction_cutoff_time": 24.0,
+      "target_observed_time": 48.0
+    },
+    {
+      "sample_id": "sample-002",
+      "group_id": "batch-002",
+      "split": "train",
+      "max_feature_available_time": 18.0,
+      "prediction_cutoff_time": 24.0,
+      "target_observed_time": 36.0
+    },
+    {
+      "sample_id": "sample-003",
+      "group_id": "batch-003",
+      "split": "validation",
+      "max_feature_available_time": 12.0,
+      "prediction_cutoff_time": 24.0,
+      "target_observed_time": 48.0
+    },
+    {
+      "sample_id": "sample-004",
+      "group_id": "batch-004",
+      "split": "validation",
+      "max_feature_available_time": 24.0,
+      "prediction_cutoff_time": 24.0,
+      "target_observed_time": 48.0
+    },
+    {
+      "sample_id": "sample-005",
+      "group_id": "batch-005",
+      "split": "test",
+      "max_feature_available_time": 16.0,
+      "prediction_cutoff_time": 24.0,
+      "target_observed_time": 60.0
+    },
+    {
+      "sample_id": "sample-006",
+      "group_id": "batch-006",
+      "split": "test",
+      "max_feature_available_time": 20.0,
+      "prediction_cutoff_time": 24.0,
+      "target_observed_time": 72.0
+    }
+  ]
+}
