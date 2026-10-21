@@ -104,6 +104,8 @@ jobs:
           done < <(jq -r '.cases[] | select(.evidence_status == "unit_test_added" or .evidence_status == "unit_test_existing") | .test_name' "$matrix")
           oracle_test="$(jq -r '.differential_oracle.test_name' "$matrix")"
           grep -Fq "fn ${oracle_test}(" xtask/src/first_aid_trajectory.rs
+          mutation_suite_test="$(jq -r '.differential_oracle.mutation_suite_test_name' "$matrix")"
+          grep -Fq "fn ${mutation_suite_test}(" xtask/src/first_aid_trajectory.rs
           while IFS= read -r gate_ref; do
             grep -Fq -- "$gate_ref" .github/workflows/first-aid-contract.yml
           done < <(jq -r '.cases[] | select(.evidence_status == "workflow_gate_existing") | .gate_ref' "$matrix")
