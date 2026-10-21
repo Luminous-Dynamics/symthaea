@@ -27,6 +27,10 @@ const MIN_ACCEPTED_FOR_CALIBRATION: usize = 30;
 const MIN_ACCEPTED_FOR_CERTIFICATION: usize = 112;
 const CERTIFICATION_ALPHA_PER_RULE: f64 = 0.05 / 15.0;
 const NOISE_LEVELS: [f64; 7] = [0.0, 0.10, 0.20, 0.30, 0.40, 0.45, 0.50];
+// Novel unregistered templates deliberately correlated with known prototypes.
+// This is a separate identifiability challenge, not part of risk certification.
+const NEAR_UNKNOWN_DISTANCES: [f64; 3] = [0.05, 0.10, 0.20];
+const NEAR_UNKNOWN_PER_DISTANCE: usize = 128;
 const SEEDS: [u64; 5] = [17, 29, 41, 53, 67];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -34,6 +38,7 @@ enum QueryKind {
     Known { noise_index: usize },
     RandomOod,
     AmbiguousMixture,
+    NearPrototypeUnknown { distance_index: usize },
 }
 
 #[derive(Debug, Clone)]
@@ -91,9 +96,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     let start = Instant::now();
     println!("# protocol=selective-retrieval-v1");
     println!("# calibration_rule=selection_split_max_coverage_then_independent_certification");
-    println!("# certification=one_sided_clopper_pearson_upper_bound_bonferroni_adjusted_for_3_rules");
+    println!("# certification=one_sided_clopper_pearson_upper_bound_bonferroni_adjusted_for_3_rules_x_5_seeds");
     println!("# query_mix_weights=known:random_ood:ambiguous_mixture=7:2:2");
     println!("# known_query_noise_level=uniform_over_0,0.10,0.20,0.30,0.40,0.45,0.50");
+    println!("# separate_near_unknown_challenge_distances=0.05,0.10,0.20");
+    println!("# near_unknown_challenge_is_not_in_certification_distribution=true");
     println!(
         "record_type,seed,strategy,query_kind,noise_fraction,dimension,prototypes,selection_n,certification_n,certified,cert_accept,cert_errors,cert_risk_upper95,test_n,min_similarity,min_margin,n,accepted,coverage,errors,selective_risk,risk95_low,risk95_high,top1_accuracy"
     );
@@ -128,12 +135,19 @@ fn main() -> Result<(), Box<dyn Error>> {
         let selection = score_queries(&selection_queries, &prototypes)?;
         let certification = score_queries(&certification_queries, &prototypes)?;
         let test = score_queries(&test_queries, &prototypes)?;
+        let near_unknown_queries = generate_near_unknown_challenges(
+            &prototypes,
+            derive_seed(seed, 0x4e45_4152, 0),
+            NEAR_UNKNOWN_PER_DISTANCE,
+        )?;
+        let near_unknown = score_queries(&near_unknown_queries, &prototypes)?;
 
         let always_accept = DecisionRule {
             min_similarity: -1.0,
             min_margin: -1.0,
         };
         report_row(
+            "evaluation",
             seed,
             "always_top1",
             always_accept,
@@ -141,6 +155,16 @@ fn main() -> Result<(), Box<dyn Error>> {
             0,
             None,
             &test,
+        );
+        report_row(
+            "near_unknown_challenge",
+            seed,
+            "always_top1",
+            always_accept,
+            0,
+            0,
+            None,
+            &near_unknown,
         );
 
         for (name, rule) in [
@@ -159,6 +183,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         ] {
             let certificate = certify_rule(&certification, rule);
             report_row(
+                "evaluation",
                 seed,
                 name,
                 rule,
@@ -167,11 +192,50 @@ fn main() -> Result<(), Box<dyn Error>> {
                 Some(certificate),
                 &test,
             );
+            report_row(
+                "near_unknown_challenge",
+                seed,
+                name,
+                rule,
+                0,
+                0,
+                None,
+                &near_unknown,
+            );
         }
     }
 
     println!("# wall_ms={}", start.elapsed().as_millis());
     Ok(())
+}
+
+fn generate_near_unknown_challenges(
+    prototypes: &[PatternVector],
+    seed: u64,
+    samples_per_distance: usize,
+) -> Result<Vec<QuerySample>, Box<dyn Error>> {
+    if prototypes.len() < 2 {
+        return Err("near-unknown challenge requires at least two prototypes".into());
+    }
+    let mut rng_state = seed;
+    let mut queries = Vec::with_capacity(samples_per_distance * NEAR_UNKNOWN_DISTANCES.len());
+    for (distance_index, distance) in NEAR_UNKNOWN_DISTANCES.iter().copied().enumerate() {
+        for _ in 0..samples_per_distance {
+            let source = sample_bounded(&mut rng_state, prototypes.len());
+            let query = prototypes[source].with_noise(distance, next_u64(&mut rng_state))?;
+            // This template is declared as a novel, unregistered item even though
+            // it lies close to a stored prototype. Its vector can overlap the
+            // valid noisy-known distribution; rejecting it reliably from vector
+            // features alone may be impossible. This red-team split is excluded
+            // from calibration and certification by design.
+            queries.push(QuerySample {
+                vector: query,
+                target: None,
+                kind: QueryKind::NearPrototypeUnknown { distance_index },
+            });
+        }
+    }
+    Ok(queries)
 }
 
 fn generate_queries(
@@ -405,6 +469,7 @@ fn certify_rule(samples: &[ScoredQuery], rule: DecisionRule) -> CertificationRes
 }
 
 fn report_row(
+    report_family: &str,
     seed: u64,
     name: &str,
     rule: DecisionRule,
@@ -425,7 +490,7 @@ fn report_row(
         );
 
     write_evaluation_row(
-        "overall",
+        &format!("{report_family}_overall"),
         seed,
         name,
         "all",
@@ -448,8 +513,11 @@ fn report_row(
             .filter(|sample| sample.kind == kind)
             .cloned()
             .collect();
+        if subset.is_empty() {
+            continue;
+        }
         write_evaluation_row(
-            "stratum",
+            &format!("{report_family}_stratum"),
             seed,
             name,
             &format!("known_noise_{noise_index}"),
@@ -475,12 +543,43 @@ fn report_row(
             .filter(|sample| sample.kind == kind)
             .cloned()
             .collect();
+        if subset.is_empty() {
+            continue;
+        }
         write_evaluation_row(
-            "stratum",
+            &format!("{report_family}_stratum"),
             seed,
             name,
             label,
             None,
+            rule,
+            selection_n,
+            certification_n,
+            certified,
+            &cert_accepted,
+            &cert_errors,
+            &cert_upper_risk,
+            samples.len(),
+            evaluate(&subset, rule),
+        );
+    }
+
+    for (distance_index, distance) in NEAR_UNKNOWN_DISTANCES.iter().copied().enumerate() {
+        let kind = QueryKind::NearPrototypeUnknown { distance_index };
+        let subset: Vec<ScoredQuery> = samples
+            .iter()
+            .filter(|sample| sample.kind == kind)
+            .cloned()
+            .collect();
+        if subset.is_empty() {
+            continue;
+        }
+        write_evaluation_row(
+            &format!("{report_family}_stratum"),
+            seed,
+            name,
+            &format!("near_unknown_{distance_index}"),
+            Some(distance),
             rule,
             selection_n,
             certification_n,
