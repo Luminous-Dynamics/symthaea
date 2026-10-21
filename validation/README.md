@@ -51,7 +51,7 @@ sha256sum results/tccip_rust_reference.tsv
 
 Keep both artifacts and their source SHAs/hashes. They are independently authored calculations over the same manifest; do not call the Python output a Rust run. A `UNBOUND` source SHA marks the output exploratory. Current fixtures show three limitations: arbitrary partition changes can reverse TCCIP's sign; reversing the input-state prior can reverse it for the same graph/task; and in balanced XOR, equally essential cross-cut/internal edges each reduce accuracy by 0.5, so TCCIP is zero even though joint input MI is 1 bit while either individual input MI is zero. The Rust output and independent Python artifact now include this information baseline. Report per-edge effects, partition and prior profiles, and higher-order information separately; do not use TCCIP as a standalone integration/synergy scalar.
 
-The oracle and eleven Python regression-test definitions are newly authored research code. They have not yet been run from the committed files in this environment. The Rust evaluator has 15 authored tests and has not been compiled. No qualification or performance claim is made by adding the harness.
+The oracle and twelve Python regression-test definitions are newly authored research code. They have not yet been run from the committed files in this environment. The Rust evaluator has 15 authored tests and has not been compiled. No qualification or performance claim is made by adding the harness.
 
 ## Required before qualification
 
