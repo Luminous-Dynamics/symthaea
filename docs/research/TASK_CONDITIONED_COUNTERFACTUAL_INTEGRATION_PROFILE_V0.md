@@ -177,13 +177,43 @@ Added `examples/task_conditioned_counterfactual_profile.rs`, a dependency-free R
 
 This is intentionally only the **summary/scoring layer**. It does not run a causal simulator, generate matched controls, establish that a provided cut is a valid intervention, estimate uncertainty, or demonstrate usefulness. Example data in `main` are illustrative values only, not empirical or simulation results. Rust is unavailable in the current environment, so the example and tests have not been compiled or executed. The next step remains an end-to-end finite-state toy evaluator that produces raw utility outcomes from explicit model/task/intervention fixtures.
 
+## First exact finite-state evaluator prototype (2026-10-21)
+
+Added `examples/task_conditioned_finite_state_eval.rs`. Unlike the earlier scorer, this evaluator computes intact and intervention utility by exhaustive enumeration of all two-bit exogenous inputs and both outcomes of the fair-coin replacement signal. The cut is applied to a declared edge in an acyclic Boolean rule graph; whether it crosses the declared two-component partition is derived from endpoint labels, not supplied by the score caller. Raw intervention outcomes and aggregate profile rows are emitted separately.
+
+The first fixtures test three deliberately different situations:
+
+| Fixture | Intact utility | Cross-cut utility | Matched-control utility | Expected TCCIP |
+|---|---:|---:|---:|---:|
+| XOR coordination | 1.0 | 0.5 | 1.0 | +0.5 |
+| Irrelevant cross-component branch | 1.0 | 1.0 | 1.0 | 0.0 |
+| Harmful constant-bias coupling | 0.0 | 0.5 | 0.0 | -0.5 |
+
+These exact expectations were independently checked with a separate, small enumerator. **That is not a Rust compilation or test pass.** Eight Rust test definitions now cover the three expected contrasts, edge/partition semantics, fail-closed missing strata, malformed edges/topology, repeatability/bounds, and invalid IDs/costs. Rust/cargo are unavailable in the current execution environment, so this example remains uncompiled and unexecuted.
+
+These are conformance fixtures, not evidence of empirical usefulness. The controls are deliberately simple matched edge-signal replacements; they do not yet solve all practical matching problems involving degree, delay, bandwidth, component role, or network centrality. The harmful-coupling fixture also begins with zero task accuracy, so it demonstrates the required sign behavior, not a competitive architecture. A real evaluation must report intact capability and matched-control quality alongside the profile and use held-out systems.
+
+## Literature-aware scope and a stronger next paradigm
+
+The initial literature check confirms that the broad territory is populated: information-geometric integrated-information measures such as Φ_CIS/Φ_CII, causal emergence/effective information, and SURD already address related questions about causal integration, scale, and synergistic/unique/redundant contributions. SURD is designed to decompose future information contributions, including hidden-variable "causality leak"; see [Martínez-Sánchez et al. (2024)](https://www.nature.com/articles/s41467-024-53373-4). Information geometry already defines integrated information as a divergence from a constrained causally disconnected model; see [Oizumi et al. (2016)](https://pmc.ncbi.nlm.nih.gov/articles/PMC5187746/). Recent work on causal emergence also argues that a single maximizing scale omits the distribution of causal contribution across multiple scales; see [A reframed landscape of causal emergence (2025)](https://doi.org/10.1016/j.patter.2025.101476).
+
+Therefore, the strongest prospective direction is not just task-conditioned edge ablation. It is an **interventional task-relevance landscape across multiple partitions, states, and budgets**, with:
+- a profile over multiple candidate partitions / coarse-grainings rather than a single chosen cut;
+- separate discovery and held-out partitions to reduce selection bias;
+- matched interventions and explicit intervention-support diagnostics;
+- state-conditional profile curves to find mechanisms that help in some regimes and harm in others;
+- synergy/redundancy controls compared directly against relevant PID/SURD outputs when assumptions permit;
+- task utility and fault recovery retained as outcomes, not re-labeled as intrinsic Φ.
+
+This only becomes a contribution if those additions improve held-out prediction or engineering decisions beyond raw causal-ablation curves and existing multiscale / information-theoretic baselines. TCCIP is a provisional engineering estimand, not a replacement for the target of IIT or a measure of consciousness.
+
 ## Immediate implementation plan
 
-1. Add a declarative task-and-intervention fixture format; keep task, model, environment and prior identities separate.
-2. Implement a tiny dependency-free evaluator for finite-state toy tasks, with intact, cross-cut and matched-control rollouts.
-3. Publish raw per-intervention task outcomes rather than only aggregate TCCIP.
-4. Test the adversarial matrix and compare with unadjusted cut-loss plus simple graph/information baselines.
-5. Only after the synthetic gates pass, connect a real Symthaea task and evaluate on held-out environments.
-6. Keep the feature research-only until external review and evidence support a specific engineering use.
+1. Extend the now-added exact evaluator to a declarative fixture manifest with separate model, task, partition, and intervention identities.
+2. Sweep predeclared alternate partitions / coarse-grainings and retain the full multiscale profile; do not select the best partition on the evaluation set.
+3. Add state-conditioned and controlled prior-shift fixtures, plus degree/delay/bandwidth-matched intervention controls where meaningful.
+4. Compare against raw task ablation, graph/spectral measures, entropy/MI/transfer entropy, and relevant PID/SURD/effective-information baselines.
+5. Test the preregistered adversarial matrix, then connect a real Symthaea task only after exact synthetic gates pass.
+6. Keep the feature research-only until external review and evidence support a concrete engineering use.
 
 **Current evidence status:** specification only. No implementation accuracy, novel-metric claim, IIT correspondence, consciousness inference, SOTA result, or passing test is asserted.
