@@ -111,6 +111,7 @@ struct ReviewerDecision {
 struct Prediction {
     decision: Decision,
     predicted_label: Label,
+    #[serde(deserialize_with = "deserialize_required_nullable_f64")]
     compatibility_probability: Option<f64>,
 }
 
@@ -785,6 +786,13 @@ fn quantile(sorted_values: &[f64], q: f64) -> f64 {
     sorted_values[low] + (sorted_values[high] - sorted_values[low]) * weight
 }
 
+fn deserialize_required_nullable_f64<'de, D>(deserializer: D) -> std::result::Result<Option<f64>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    Option::<f64>::deserialize(deserializer)
+}
+
 fn sha256_hex(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
 }
@@ -845,6 +853,8 @@ mod tests {
         assert_eq!(report.calibration.probability_scored_pairs, 2);
         assert!(report.calibration.complete_binary_coverage);
         assert!(report.calibration.brier_score.is_some());
+        assert!((report.calibration.brier_score.unwrap() - 0.01).abs() < 1e-12);
+        assert!(report.calibration.expected_calibration_error_10_bins.is_some());
         assert_eq!(
             report.proposed_gates.overall_confirmatory_decision,
             "not_evaluated_requires_independent_mutation_receipt_and_protocol_audit"
