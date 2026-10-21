@@ -7,7 +7,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-const TOOL_VERSION: &str = "score-paired-results-v0.7.0";
+const TOOL_VERSION: &str = "score-paired-results-v0.8.0";
 const SCORE_REPORT_SCHEMA: &str =
     include_str!("../../../../benchmarks/benchmark-runs/v0/score-report.schema.json");
 
@@ -1759,6 +1759,27 @@ mod tests {
         ];
         let error = score(&plan, pairs, results, &[]).unwrap_err();
         assert!(error.contains("split/synthetic status"));
+    }
+
+    #[test]
+    fn held_out_comparisons_require_familywise_correction_for_multiple_baselines() {
+        let mut plan = fixture_plan();
+        plan.phase = "preregistered_held_out".into();
+        plan.synthetic_only = false;
+        plan.benchmark.split = "holdout".into();
+        plan.benchmark.source_family_disjoint = true;
+        plan.benchmark.rights_review_status = "approved".into();
+        plan.preregistration.held_out_access = "sealed_until_freeze".into();
+        plan.systems.push(System {
+            system_id: "s3".into(),
+            baseline_family: "dense_retrieval".into(),
+        });
+        plan.bootstrap.multiple_comparison_correction = "none".into();
+        let error = validate_plan_eligibility(&plan).unwrap_err();
+        assert!(error.contains("require familywise correction"));
+
+        plan.bootstrap.multiple_comparison_correction = "bonferroni".into();
+        assert!(validate_plan_eligibility(&plan).is_ok());
     }
 
     #[test]
