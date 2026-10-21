@@ -57,6 +57,8 @@ jobs:
           jq -e '
             .schema_version == "0.1.0"
             and .benchmark_id == "ODE-WP-ANALYTIC-OSCILLATOR-001"
+            and (.source_sha | test("^[0-9a-f]{40}$"))
+            and (.checkout_sha | test("^[0-9a-f]{40}$"))
             and (.observations | length == 9)
           ' /tmp/ode-work-precision-1.json
           sha256sum /tmp/ode-work-precision-1.json
