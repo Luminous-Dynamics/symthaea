@@ -71,6 +71,48 @@ jobs:
           path: /tmp/ode-work-precision-1.json
           if-no-files-found: error
 
+      - name: Generate deterministic Robertson explicit diagnostic twice
+        id: robertson_probe
+        if: always()
+        shell: bash
+        run: |
+          set -uo pipefail
+          source_sha="${{ github.event.pull_request.head.sha || github.sha }}"
+          checkout_sha="$(git rev-parse HEAD)"
+          set +e
+          ODE_BENCH_SOURCE_SHA="$source_sha" ODE_BENCH_CHECKOUT_SHA="$checkout_sha" cargo run --locked --release --manifest-path research/ode-verify-001/Cargo.toml --example robertson_explicit_probe > /tmp/ode-robertson-probe-1.json
+          first_status=$?
+          ODE_BENCH_SOURCE_SHA="$source_sha" ODE_BENCH_CHECKOUT_SHA="$checkout_sha" cargo run --locked --release --manifest-path research/ode-verify-001/Cargo.toml --example robertson_explicit_probe > /tmp/ode-robertson-probe-2.json
+          second_status=$?
+          set -e
+          echo "first_status=$first_status" >> "$GITHUB_OUTPUT"
+          echo "second_status=$second_status" >> "$GITHUB_OUTPUT"
+          cmp /tmp/ode-robertson-probe-1.json /tmp/ode-robertson-probe-2.json
+          jq -e '
+            .schema_version == "0.1.0"
+            and .benchmark_id == "ODE-ROBERTSON-EXPLICIT-PROBE-001"
+            and (.source_sha | test("^[0-9a-f]{40}$"))
+            and (.checkout_sha | test("^[0-9a-f]{40}$"))
+            and .qualification_status == "UNQUALIFIED_DIAGNOSTIC_ONLY"
+            and (.status | IN("completed","attempt_budget_exceeded","tolerance_not_met","time_did_not_advance","solver_error","non_finite_state","invalid_step_report","invalid_target_interval","sample_target_overshoot","invalid_controller"))
+            and (.output_target_count == 17)
+            and (.output_sample_count >= 1)
+            and (.output_samples | length == .output_sample_count)
+            and (.attempted_steps_reported >= .accepted_steps_reported)
+            and (.state_is_finite == true)
+            and all(.final_state[]; type == "number" and isfinite)
+            and (.output_samples | all(.[]; (.time | type == "number") and (.state | length == 3) and all(.state[]; type == "number" and isfinite)))
+          ' /tmp/ode-robertson-probe-1.json
+          sha256sum /tmp/ode-robertson-probe-1.json
+
+      - name: Upload Robertson explicit diagnostic receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ode-robertson-explicit-probe-${{ github.event.pull_request.head.sha || github.sha }}
+          path: /tmp/ode-robertson-probe-1.json
+          if-no-files-found: error
+
       - name: Enforce work-precision qualification gates
         if: always()
         env:
@@ -83,3 +125,21 @@ jobs:
           test "$FIRST_STATUS" = "0"
           test "$SECOND_STATUS" = "0"
           jq -e 'all(.observations[]; .numerical_contract_pass == true)' /tmp/ode-work-precision-1.json
+
+      - name: Enforce Robertson diagnostic receipt gates
+        if: always()
+        env:
+          GENERATION_OUTCOME: ${{ steps.robertson_probe.outcome }}
+          FIRST_STATUS: ${{ steps.robertson_probe.outputs.first_status }}
+          SECOND_STATUS: ${{ steps.robertson_probe.outputs.second_status }}
+        run: |
+          set -euo pipefail
+          test "$GENERATION_OUTCOME" = "success"
+          test "$FIRST_STATUS" = "0"
+          test "$SECOND_STATUS" = "0"
+          jq -e '
+            .schema_version == "0.1.0"
+            and .benchmark_id == "ODE-ROBERTSON-EXPLICIT-PROBE-001"
+            and .qualification_status == "UNQUALIFIED_DIAGNOSTIC_ONLY"
+            and (.output_samples | length == .output_sample_count)
+          ' /tmp/ode-robertson-probe-1.json
