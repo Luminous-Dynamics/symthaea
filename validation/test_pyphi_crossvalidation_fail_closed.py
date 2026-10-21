@@ -6,6 +6,9 @@ import inspect
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stdout
+from io import StringIO
+from unittest.mock import patch
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -15,6 +18,7 @@ if str(REPO_ROOT) not in sys.path:
 from validation.pyphi_crossvalidation import (  # noqa: E402
     PyPhiValidator,
     TopologySpec,
+    main,
     ValidationReport,
     ValidationResult,
 )
@@ -194,6 +198,21 @@ class FailClosedPyPhiValidationTests(unittest.TestCase):
             n_failed=0,
         )
         self.assertTrue(self.validator.is_qualified(report))
+
+    def test_cli_exits_nonzero_when_no_shared_adapter_can_produce_scores(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            destination = Path(temporary_directory) / "report.md"
+            captured = StringIO()
+            with patch(
+                "sys.argv",
+                ["pyphi_crossvalidation.py", "--max-nodes", "2", "--output", str(destination)],
+            ), redirect_stdout(captured):
+                exit_code = main()
+
+        self.assertEqual(exit_code, 2)
+        self.assertIn("Status: NOT QUALIFIED", captured.getvalue())
+        self.assertTrue(destination.exists())
+        self.assertIn("Status: NOT QUALIFIED", destination.read_text(encoding="utf-8"))
 
     def test_pyphi_version_and_iit_formalism_are_explicit(self) -> None:
         source = inspect.getsource(PyPhiValidator.compute_pyphi_phi)
