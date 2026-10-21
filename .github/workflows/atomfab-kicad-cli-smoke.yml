@@ -1,0 +1,147 @@
+name: AtomFab Native KiCad CLI Smoke
+
+on:
+  pull_request:
+    paths:
+      - "docs/research/ATOMFAB_KICAD_CLI_SMOKE_V0_1.md"
+      - "docs/research/fixtures/atomfab-kicad-cli-smoke/**"
+      - ".github/workflows/atomfab-kicad-cli-smoke.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-kicad-cli-smoke:
+    name: Native PCB DRC, negative control, Gerber and drill export
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run pinned official KiCad CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          IMAGE="kicad/kicad@sha256:cef4a572df1465b98fa63cdac88780e0f8d39f03c5493434802bcd92f62123fb"
+          BOARD_REL="docs/research/fixtures/atomfab-kicad-cli-smoke/continuity-coupon.kicad_pcb"
+          BOARD="/work/${BOARD_REL}"
+          OUT_HOST="$GITHUB_WORKSPACE/atomfab-kicad-smoke-out"
+          OUT="/work/atomfab-kicad-smoke-out"
+          mkdir -p "$OUT_HOST/gerbers" "$OUT_HOST/drill"
+
+          docker pull --platform linux/amd64 "$IMAGE"
+          kicad() {
+            docker run --rm --platform linux/amd64 \
+              -v "$GITHUB_WORKSPACE:/work" -w /work "$IMAGE" kicad-cli "$@"
+          }
+
+          test -s "$GITHUB_WORKSPACE/$BOARD_REL"
+          kicad version > "$OUT_HOST/kicad-version.txt"
+          grep -q "9.0.9" "$OUT_HOST/kicad-version.txt"
+
+          # Positive control: the intentional, small 2-layer coupon should have
+          # no enabled rule violations in the pinned native EDA CLI.
+          kicad pcb drc --severity-all --format json \
+            --output "$OUT/clean-drc.json" --exit-code-violations "$BOARD"
+          jq empty "$OUT_HOST/clean-drc.json"
+
+          # Negative control: move the GND track onto the VCC track. Assert the
+          # transformation occurred, then require the documented DRC violation
+          # exit code instead of accepting a parse-only or silently clean run.
+          sed 's/(segment (start 105 102.54) (end 115 102.54) (width 0.5) (layer "F.Cu") (net 2)/(segment (start 105 100) (end 115 100) (width 0.5) (layer "F.Cu") (net 2)/' \
+            "$GITHUB_WORKSPACE/$BOARD_REL" > "$OUT_HOST/continuity-coupon-shorted.kicad_pcb"
+          grep -Fq '(segment (start 105 100) (end 115 100) (width 0.5) (layer "F.Cu") (net 2)' \
+            "$OUT_HOST/continuity-coupon-shorted.kicad_pcb"
+
+          set +e
+          kicad pcb drc --severity-all --format json \
+            --output "$OUT/shorted-drc.json" --exit-code-violations \
+            "$OUT/continuity-coupon-shorted.kicad_pcb"
+          shorted_exit=$?
+          set -e
+          jq empty "$OUT_HOST/shorted-drc.json"
+          test "$shorted_exit" -eq 5
+
+          # Export actual files from the real board with the pinned CLI.
+          kicad pcb export gerbers --output "$OUT/gerbers/" \
+            --layers F.Cu,B.Cu,F.Mask,B.Mask,F.SilkS,Edge.Cuts \
+            --no-protel-ext "$BOARD"
+          kicad pcb export drill --output "$OUT/drill/" \
+            --format excellon "$BOARD"
+
+          gerber_count=$(find "$OUT_HOST/gerbers" -maxdepth 1 -type f -name '*.gbr' -size +0c | wc -l)
+          drill_count=$(find "$OUT_HOST/drill" -maxdepth 1 -type f -size +0c | wc -l)
+          test "$gerber_count" -ge 5
+          test "$drill_count" -ge 1
+
+          board_sha=$(sha256sum "$GITHUB_WORKSPACE/$BOARD_REL" | cut -d ' ' -f 1)
+          git_head=$(git rev-parse HEAD)
+          image_digest="sha256:cef4a572df1465b98fa63cdac88780e0f8d39f03c5493434802bcd92f62123fb"
+          kicad_version=$(cat "$OUT_HOST/kicad-version.txt")
+          jq -n \
+            --arg schema "atomfab-kicad-cli-smoke-receipt-v0.1" \
+            --arg git_head "$git_head" \
+            --arg board_path "$BOARD_REL" \
+            --arg board_sha256 "$board_sha" \
+            --arg image "$IMAGE" \
+            --arg image_digest "$image_digest" \
+            --arg kicad_version "$kicad_version" \
+            --arg shorted_drc_exit_code "$shorted_exit" \
+            --argjson gerber_count "$gerber_count" \
+            --argjson drill_file_count "$drill_count" \
+            '{
+              schema: $schema,
+              git_head: $git_head,
+              board_path: $board_path,
+              board_sha256: $board_sha256,
+              tool: {
+                image: $image,
+                pinned_image_digest: $image_digest,
+                version_output: $kicad_version
+              },
+              controls: {
+                clean_board_drc_exit_code: 0,
+                clean_board_report_parsed_as_json: true,
+                intentionally_shorted_board_drc_exit_code: ($shorted_drc_exit_code | tonumber),
+                expected_shorted_board_exit_code: 5,
+                intentional_short_detected_by_exit_code: true
+              },
+              generated_outputs: {
+                nonempty_gerber_files: $gerber_count,
+                nonempty_drill_files: $drill_file_count
+              },
+              authority: "native_eda_cli_drc_and_export_smoke_only_no_physical_or_production_release_authority",
+              claim_ceiling: "The CLI parsed the fixture and generated the recorded outputs; this does not prove physical board conformity, electrical safety, assembly quality, or product qualification."
+            }' > "$OUT_HOST/receipt.json"
+
+          sha256sum \
+            "$GITHUB_WORKSPACE/$BOARD_REL" \
+            "$OUT_HOST/continuity-coupon-shorted.kicad_pcb" \
+            "$OUT_HOST/kicad-version.txt" \
+            "$OUT_HOST/clean-drc.json" \
+            "$OUT_HOST/shorted-drc.json" \
+            "$OUT_HOST"/gerbers/* \
+            "$OUT_HOST"/drill/* \
+            "$OUT_HOST/receipt.json" > "$OUT_HOST/SHA256SUMS"
+
+          jq -e '
+            .schema == "atomfab-kicad-cli-smoke-receipt-v0.1"
+            and (.git_head | test("^[0-9a-f]{40}$"))
+            and (.board_sha256 | test("^[0-9a-f]{64}$"))
+            and .controls.clean_board_drc_exit_code == 0
+            and .controls.intentionally_shorted_board_drc_exit_code == 5
+            and .controls.expected_shorted_board_exit_code == 5
+            and .controls.intentional_short_detected_by_exit_code
+            and .generated_outputs.nonempty_gerber_files >= 5
+            and .generated_outputs.nonempty_drill_files >= 1
+            and .authority == "native_eda_cli_drc_and_export_smoke_only_no_physical_or_production_release_authority"
+          ' "$OUT_HOST/receipt.json"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: atomfab-kicad-cli-smoke-receipt
+          path: atomfab-kicad-smoke-out/
+          if-no-files-found: error
