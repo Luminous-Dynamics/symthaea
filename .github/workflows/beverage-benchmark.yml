@@ -10,6 +10,7 @@ on:
       - "docs/research/beverage-engineering-scenarios-v1.json"
       - "docs/research/beverage-engineering-scenarios-v1.schema.json"
       - "docs/research/beverage-data-sources-v1.json"
+      - ".github/workflows/beverage-benchmark.yml"
   pull_request:
     paths:
       - "crates/domains/symthaea-culinary/**"
