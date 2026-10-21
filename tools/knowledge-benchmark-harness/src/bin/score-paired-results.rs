@@ -575,8 +575,28 @@ fn score(
     plan: &Plan,
     pairs: Vec<PairCase>,
     observations: Vec<Observation>,
+    source_records: &[SourceRecord],
 ) -> Result<Vec<SystemMetrics>, String> {
     validate_plan_eligibility(plan)?;
+
+    let mut source_catalog: HashMap<&str, &SourceRecord> = HashMap::new();
+    let mut source_family_splits: HashMap<&str, &str> = HashMap::new();
+    for source in source_records {
+        if source_catalog.insert(source.source_id.as_str(), source).is_some() {
+            return Err(format!("duplicate source catalog ID {:?}", source.source_id));
+        }
+        if let Some(existing_split) = source_family_splits
+            .insert(source.source_family_id.as_str(), source.split.as_str())
+        {
+            if existing_split != source.split {
+                return Err(format!(
+                    "source family {:?} spans multiple splits in the supplied catalog",
+                    source.source_family_id
+                ));
+            }
+        }
+    }
+
     let mut pair_by_id = HashMap::new();
     for pair in &pairs {
         if pair.synthetic_only != plan.synthetic_only || pair.split != plan.benchmark.split {
@@ -588,6 +608,31 @@ fn score(
                 plan.benchmark.split,
                 plan.synthetic_only
             ));
+        }
+        if pair.synthetic_only {
+            for (state_name, state) in [("baseline", &pair.baseline), ("mutated", &pair.mutated)] {
+                if state.evidence_pack.iter().any(|evidence| evidence.kind != "synthetic_control") {
+                    return Err(format!(
+                        "synthetic pair {:?} {state_name} contains non-synthetic evidence",
+                        pair.pair_id
+                    ));
+                }
+            }
+        } else {
+            validate_real_pair_state(
+                &pair.pair_id,
+                &pair.split,
+                "baseline",
+                &pair.baseline,
+                &source_catalog,
+            )?;
+            validate_real_pair_state(
+                &pair.pair_id,
+                &pair.split,
+                "mutated",
+                &pair.mutated,
+                &source_catalog,
+            )?;
         }
         if pair.acceptance.must_preserve.is_empty() {
             return Err(format!("pair {:?} must declare at least one must_preserve criterion", pair.pair_id));
@@ -783,7 +828,8 @@ fn run() -> Result<(), String> {
     let pairs = parse_jsonl::<PairCase>(&pair_bytes, "pair manifest")?;
     let pair_count = pairs.len();
     let results = parse_jsonl::<Observation>(&result_bytes, "paired-intervention results")?;
-    let system_metrics = score(&plan, pairs, results)?;
+    let source_records = parse_jsonl::<SourceRecord>(&source_catalog_bytes, "source catalog")?;
+    let system_metrics = score(&plan, pairs, results, &source_records)?;
 
     let manifest_lock_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("Cargo.lock");
     let lock_bytes = fs::read(&manifest_lock_path).map_err(|error| {
@@ -911,6 +957,18 @@ mod tests {
         })).unwrap()
     }
 
+    fn synthetic_pair_state() -> PairState {
+        PairState {
+            source_id: "synthetic-source".into(),
+            rights_status: "synthetic_only".into(),
+            access_decision: "synthetic_only".into(),
+            evidence_pack: vec![PairEvidence {
+                source_id: "synthetic-source".into(),
+                kind: "synthetic_control".into(),
+            }],
+        }
+    }
+
     fn pair(id: &str, dimension: &str, expected: &str, criticality: &str, must_change: bool) -> PairCase {
         PairCase {
             pair_id: id.into(),
@@ -919,6 +977,8 @@ mod tests {
             dimension: dimension.into(),
             expected_relation: expected.into(),
             criticality: criticality.into(),
+            baseline: synthetic_pair_state(),
+            mutated: synthetic_pair_state(),
             acceptance: Acceptance {
                 must_preserve: vec!["source identity".into()],
                 must_change: if must_change { vec!["expected behavior changes".into()] } else { vec![] },
@@ -986,7 +1046,7 @@ mod tests {
         }
         let index = results.iter().position(|row| row.system_id == "s1" && row.pair_id == "p1").unwrap();
         results[index].forbidden_behaviors.push("source fabrication".into());
-        let metrics = score(&plan, pairs, results).unwrap();
+        let metrics = score(&plan, pairs, results, &[]).unwrap();
         let s1 = metrics.iter().find(|m| m.system_id == "s1").unwrap();
         let s2 = metrics.iter().find(|m| m.system_id == "s2").unwrap();
         assert_eq!(s1.critical_gate_violations, 1);
@@ -1008,7 +1068,7 @@ mod tests {
             observation("r2", "s2", "p1", "local_change"),
             observation("r3", "s2", "p2", "invariant"),
         ];
-        let error = score(&plan, pairs, results).unwrap_err();
+        let error = score(&plan, pairs, results, &[]).unwrap_err();
         assert!(error.contains("incomplete pair coverage"));
     }
 
@@ -1031,7 +1091,7 @@ mod tests {
             observation("r3", "s2", "p1", "local_change"),
             observation("r4", "s2", "p2", "invariant"),
         ];
-        let error = score(&plan, pairs, results).unwrap_err();
+        let error = score(&plan, pairs, results, &[]).unwrap_err();
         assert!(error.contains("split/synthetic status"));
     }
 
