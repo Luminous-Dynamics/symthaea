@@ -1665,6 +1665,57 @@ mod tests {
     }
 
     #[test]
+    fn vocabulary_extension_preserves_old_logits_for_fixed_input() {
+        let genesis = test_genesis();
+        let config = test_config();
+        let base = LanguageController::new(&genesis, &config);
+        let query = ContinuousHV::from_genesis(&genesis, "vocab_extension_fixed_query", HDC_DIMENSION);
+        let contexts = vec![
+            base.token_embeddings()[1].clone(),
+            base.token_embeddings()[2].clone(),
+            base.token_embeddings()[3].clone(),
+        ];
+        let context_refs: Vec<&ContinuousHV> = contexts.iter().collect();
+
+        let mut reference = base.clone();
+        reference.reset();
+        let reference_logits = reference.forward_step(&query, 0, 0);
+
+        let strategies = [
+            TokenExtensionInitialization::SeededRandomV1,
+            TokenExtensionInitialization::ContextBundleNormMatched,
+            TokenExtensionInitialization::ContextBundleNormMatchedWithResidual {
+                residual_weight: 0.15,
+            },
+        ];
+        for (index, strategy) in strategies.into_iter().enumerate() {
+            let mut extended = base.clone();
+            extended
+                .append_token_with_initialization(
+                    &genesis,
+                    &format!("fixed-input-extension-{index}"),
+                    Some(&context_refs),
+                    strategy,
+                )
+                .expect("valid strategy should extend vocabulary");
+            extended.reset();
+            let extended_logits = extended.forward_step(&query, 0, 0);
+
+            assert_eq!(extended.vocab_size(), reference_logits.len() + 1);
+            for (token_id, (before, after)) in reference_logits
+                .iter()
+                .zip(extended_logits[..reference_logits.len()].iter())
+                .enumerate()
+            {
+                assert!(
+                    (before - after).abs() <= 1e-6,
+                    "strategy {strategy:?} changed old-token logit {token_id}: {before} vs {after}"
+                );
+            }
+        }
+    }
+
+    #[test]
     fn test_append_token() {
         let genesis = test_genesis();
         let config = test_config();
