@@ -37,3 +37,26 @@ jobs:
 
       - name: Strict Clippy
         run: cargo clippy --locked --manifest-path research/ode-verify-001/Cargo.toml --all-targets -- -D warnings
+
+      - name: Generate deterministic analytical work-precision receipt twice
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_sha="$(git rev-parse HEAD)"
+          ODE_BENCH_SOURCE_SHA="$source_sha" cargo run --locked --release --manifest-path research/ode-verify-001/Cargo.toml --example work_precision > /tmp/ode-work-precision-1.json
+          ODE_BENCH_SOURCE_SHA="$source_sha" cargo run --locked --release --manifest-path research/ode-verify-001/Cargo.toml --example work_precision > /tmp/ode-work-precision-2.json
+          cmp /tmp/ode-work-precision-1.json /tmp/ode-work-precision-2.json
+          jq -e '
+            .schema_version == "0.1.0"
+            and .benchmark_id == "ODE-WP-ANALYTIC-OSCILLATOR-001"
+            and (.observations | length == 9)
+            and all(.observations[]; .numerical_contract_pass == true)
+          ' /tmp/ode-work-precision-1.json
+          sha256sum /tmp/ode-work-precision-1.json
+
+      - name: Upload deterministic work-precision receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: ode-work-precision-${{ github.sha }}
+          path: /tmp/ode-work-precision-1.json
+          if-no-files-found: error
