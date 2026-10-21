@@ -24,7 +24,13 @@
     "requested_at_ms",
     "next_review_at_ms",
     "reason_code",
-    "estimated_cost_units"
+    "estimated_cost_units",
+    "decision_deadline_ms",
+    "expected_result_available_at_ms",
+    "expected_loss_without_sample_units",
+    "expected_loss_with_sample_units",
+    "estimated_sampling_cost_units",
+    "estimated_delay_cost_units"
   ],
   "properties": {
     "schema_version": {
@@ -139,6 +145,42 @@
     "estimated_cost_units": {
       "type": "number",
       "minimum": 0
+    },
+    "decision_deadline_ms": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "expected_result_available_at_ms": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "expected_loss_without_sample_units": {
+      "type": "number",
+      "minimum": 0
+    },
+    "expected_loss_with_sample_units": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "estimated_sampling_cost_units": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "estimated_delay_cost_units": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0
     }
   },
   "allOf": [
@@ -165,8 +207,30 @@
           },
           "next_review_at_ms": {
             "type": "null"
+          },
+          "expected_result_available_at_ms": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "expected_loss_with_sample_units": {
+            "type": "number",
+            "minimum": 0
+          },
+          "estimated_sampling_cost_units": {
+            "type": "number",
+            "minimum": 0
+          },
+          "estimated_delay_cost_units": {
+            "type": "number",
+            "minimum": 0
           }
-        }
+        },
+        "required": [
+          "expected_result_available_at_ms",
+          "expected_loss_with_sample_units",
+          "estimated_sampling_cost_units",
+          "estimated_delay_cost_units"
+        ]
       }
     },
     {
@@ -194,6 +258,18 @@
           },
           "calibration_state": {
             "const": "CALIBRATED"
+          },
+          "expected_result_available_at_ms": {
+            "type": "null"
+          },
+          "expected_loss_with_sample_units": {
+            "type": "null"
+          },
+          "estimated_sampling_cost_units": {
+            "type": "null"
+          },
+          "estimated_delay_cost_units": {
+            "type": "null"
           }
         }
       }
@@ -221,6 +297,18 @@
             "type": "null"
           },
           "next_review_at_ms": {
+            "type": "null"
+          },
+          "expected_result_available_at_ms": {
+            "type": "null"
+          },
+          "expected_loss_with_sample_units": {
+            "type": "null"
+          },
+          "estimated_sampling_cost_units": {
+            "type": "null"
+          },
+          "estimated_delay_cost_units": {
             "type": "null"
           }
         }
