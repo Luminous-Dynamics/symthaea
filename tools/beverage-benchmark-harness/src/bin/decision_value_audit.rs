@@ -23,6 +23,7 @@ const CLAIM_CEILING: &str = "This audit checks declared matched comparisons, res
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 enum Design {
+    SyntheticFixture,
     BlockRandomized,
     MatchedControl,
     UncontrolledPrePost,
@@ -660,6 +661,24 @@ mod tests {
         assert!(receipt.primary_target_gate_passed);
         assert!(receipt.secondary_resource_guardrail_passed);
         assert!(receipt.primary_effect.unwrap().percentile_bootstrap_95pct_low >= 10.0);
+    }
+
+    #[test]
+    fn synthetic_contract_requires_synthetic_design_label() {
+        let mut value = fixture_value();
+        value["design"] = "SYNTHETIC_FIXTURE".into();
+        let receipt = audit_value(value);
+        assert_eq!(receipt.status, "SYNTHETIC_CONTRACT_PASS_NOT_EMPIRICAL");
+        assert!(receipt.design_gate_passed);
+    }
+
+    #[test]
+    fn synthetic_data_cannot_masquerade_as_a_measured_study_design() {
+        let mut value = fixture_value();
+        value["design"] = "BLOCK_RANDOMIZED".into();
+        let receipt = audit_value(value);
+        assert_eq!(receipt.status, "FAIL");
+        assert!(!receipt.design_gate_passed);
     }
 
     #[test]
