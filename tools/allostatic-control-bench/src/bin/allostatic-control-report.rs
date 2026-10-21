@@ -445,7 +445,7 @@ mod tests {
 
     const SAMPLE_HEADER: &str = EPISODE_CSV_HEADER;
 
-    const SAMPLE_ROW: &str = "calm,0,task_only,false,1.0,4.8,0.1,0.2,0.8,0.8,0.2,0,false,0.0,0.0,0,0,0,0,1,1,47,0,0.2,false,NA";
+    const SAMPLE_ROW: &str = "calm,0,task_only,false,1.0,4.8,0.1,0.2,0.8,1.5,1,0.8,0.2,0,false,0.0,0.0,0,0,0,0,1,1,47,0,0.2,false,NA";
 
     #[test]
     fn parser_requires_episode_violation_flag_to_match_tick_count() {
