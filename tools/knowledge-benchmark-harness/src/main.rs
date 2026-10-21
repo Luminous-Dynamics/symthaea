@@ -361,6 +361,13 @@ fn validate_pair_contract(pair: &Value) -> Vec<String> {
         .get("synthetic_only")
         .and_then(Value::as_bool)
         .unwrap_or(false);
+    let declared_families = string_array(pair, "source_family_ids");
+    if declared_families.is_empty() {
+        errors.push("pair must declare at least one source_family_id cluster".into());
+    }
+    if declared_families.iter().collect::<HashSet<_>>().len() != declared_families.len() {
+        errors.push("pair repeats source_family_id".into());
+    }
     if synthetic_only != (split == "synthetic") {
         errors.push(
             "pair split must be synthetic exactly when synthetic_only=true".into(),
@@ -1106,6 +1113,9 @@ fn validate_pair_catalog_refs(pair: &Value) -> Vec<String> {
     let mut errors = Vec::new();
     let pair_id = string_field(pair, "pair_id").unwrap_or("<unknown>");
     let split = string_field(pair, "split").unwrap_or("");
+    let declared_families: HashSet<String> =
+        string_array(pair, "source_family_ids").into_iter().map(str::to_string).collect();
+    let mut observed_families = HashSet::<String>::new();
     let mut catalog = std::collections::HashMap::<String, Value>::new();
 
     for (index, raw_line) in
@@ -1179,6 +1189,9 @@ fn validate_pair_catalog_refs(pair: &Value) -> Vec<String> {
                 continue;
             };
             let catalog_split = string_field(source, "split").unwrap_or("");
+            if let Some(family_id) = string_field(source, "source_family_id") {
+                observed_families.insert(family_id.to_string());
+            }
             let rights_status = string_field(source, "rights_status").unwrap_or("");
             let content_access = string_field(source, "content_access").unwrap_or("");
             let rights_review = string_field(source, "rights_review").unwrap_or("");
@@ -1210,6 +1223,12 @@ fn validate_pair_catalog_refs(pair: &Value) -> Vec<String> {
                 ));
             }
         }
+    }
+
+    if declared_families != observed_families {
+        errors.push(format!(
+            "pair {pair_id:?} declared source_family_ids do not match the source families referenced by its states/evidence"
+        ));
     }
 
     errors
