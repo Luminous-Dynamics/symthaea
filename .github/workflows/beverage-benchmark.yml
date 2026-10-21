@@ -37,6 +37,7 @@ jobs:
   synthetic-contract:
     name: Synthetic Corpus Contract
     runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     steps:
       - uses: actions/checkout@v4
         with:
