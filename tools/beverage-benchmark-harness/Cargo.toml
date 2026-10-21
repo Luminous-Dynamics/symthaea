@@ -46,3 +46,7 @@ path = "src/bin/decision_value_audit.rs"
 [[bin]]
 name = "adaptive_sampling_policy_audit"
 path = "src/bin/adaptive_sampling_policy_audit.rs"
+
+[[bin]]
+name = "adaptive_sampling_replay_audit"
+path = "src/bin/adaptive_sampling_replay_audit.rs"
