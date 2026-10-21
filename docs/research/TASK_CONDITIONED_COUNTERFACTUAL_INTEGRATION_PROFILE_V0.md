@@ -223,7 +223,7 @@ A separate exhaustive Python enumerator (used as a cross-check, **not a Rust tes
 
 This is an important warning, not a result to hide: for the same fixed toy causal model and intervention outcome table, the contrast can reverse sign with the partition. The declared partitions recover the expected +0.5, 0.0 and -0.5 fixture scores, but these score ranges show that the contrast is **partition-relative**, not an intrinsic scalar property of the network. This is why the metric must expose the full partition profile and freeze partition selection before held-out evaluation. It also makes independent control selection and matched-stratum quality central requirements. The toy sweep still does not prove that TCCIP is useful or better than existing methods.
 
-The 13 authored test definitions include exact expected sign reversals, the invariant that the declared partition appears in the exhaustive sweep, and parity checks against `validation/fixtures/tccip_toy_expectations.tsv`. The TSV is an expectation oracle, not a run receipt. The source remains uncompiled and unexecuted in this environment.
+The 13 authored test definitions include exact expected sign reversals, the invariant that the declared partition appears in the exhaustive sweep, and parity checks against `validation/fixtures/tccip_toy_expectations.tsv`. The TSV is an expectation oracle, not a run receipt. The source remains uncompiled and unexecuted in this environment. The independent Python oracle's core calculation was separately cross-checked during development, but the committed `validation/tccip_reference_oracle.py` and its nine unittest definitions have not themselves been run as committed files.
 
 ## Literature-aware scope and a stronger next paradigm
 
@@ -238,6 +238,23 @@ Therefore, the strongest prospective direction is not just task-conditioned edge
 - task utility and fault recovery retained as outcomes, not re-labeled as intrinsic Φ.
 
 This only becomes a contribution if those additions improve held-out prediction or engineering decisions beyond raw causal-ablation curves and existing multiscale / information-theoretic baselines. TCCIP is a provisional engineering estimand, not a replacement for the target of IIT or a measure of consciousness.
+
+## Reproduction commands for the manifest and independent oracle
+
+```bash
+python -m unittest validation.test_tccip_reference_oracle -v
+python validation/tccip_reference_oracle.py \
+  --source-sha "$(git rev-parse HEAD)" \
+  --output results/tccip_python_reference.tsv
+sha256sum results/tccip_python_reference.tsv
+cargo test --example task_conditioned_finite_state_eval
+SYMTHAEA_SOURCE_SHA="$(git rev-parse HEAD)" \
+  cargo run --release --example task_conditioned_finite_state_eval \
+  > results/tccip_rust_reference.tsv
+sha256sum results/tccip_rust_reference.tsv
+```
+
+These commands intentionally produce separately labeled Python and Rust artifacts; do not relabel one as the other. Both consume the same manifest. Compare raw intervention values and every usable partition, not just one aggregate. Record the exact source SHA and artifact hash together.
 
 ## Immediate implementation plan
 
