@@ -1112,11 +1112,17 @@ mod tests {
         };
         let catalog = HashMap::from([("source-1", &source)]);
         let state = PairState {
+            context_id: "ctx".into(),
+            tradition_scope: "example".into(),
             source_id: "source-1".into(),
+            variant_id: "v1".into(),
+            prompt: "summarize source".into(),
             rights_status: "unknown".into(),
             access_decision: "allow".into(),
             evidence_pack: vec![PairEvidence {
+                evidence_id: "e1".into(),
                 source_id: "source-1".into(),
+                statement: "evidence".into(),
                 kind: "source_attestation".into(),
             }],
         };
@@ -1137,11 +1143,17 @@ mod tests {
         };
         let catalog = HashMap::from([("source-1", &source)]);
         let state = PairState {
+            context_id: "ctx".into(),
+            tradition_scope: "example".into(),
             source_id: "source-1".into(),
+            variant_id: "v1".into(),
+            prompt: "summarize source".into(),
             rights_status: "open_license_verified".into(),
             access_decision: "allow".into(),
             evidence_pack: vec![PairEvidence {
+                evidence_id: "e1".into(),
                 source_id: "source-1".into(),
+                statement: "evidence".into(),
                 kind: "source_attestation".into(),
             }],
         };
