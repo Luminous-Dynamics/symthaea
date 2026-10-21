@@ -229,10 +229,10 @@ pub fn evaluate_action_set(
     shield_can_recover: bool,
 ) -> RobustActionSet {
     RobustActionSet {
-        push: robustly_viable(state, dynamics.push, limits),
-        maintain: robustly_viable(state, dynamics.maintain, limits),
+        push: robustly_viable(state, dynamics.effect(Action::Push), limits),
+        maintain: robustly_viable(state, dynamics.effect(Action::Maintain), limits),
         emergency_recover: shield_can_recover
-            && robustly_viable(state, dynamics.emergency_recover, limits),
+            && robustly_viable(state, dynamics.effect(Action::EmergencyRecover), limits),
     }
 }
 
