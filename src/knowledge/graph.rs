@@ -384,14 +384,27 @@ impl EnhancedKnowledgeGraph {
             }
         }
 
+        let symmetric_relation = matches!(
+            relation,
+            EvidenceRelation::Corroborates | EvidenceRelation::Contradicts | EvidenceRelation::Resembles
+        );
         if let Some(existing) = self.evidence_links.iter().find(|link| {
-            link.from_fact_id == from_fact_id
-                && link.to_fact_id == to_fact_id
+            let same_direction =
+                link.from_fact_id == from_fact_id && link.to_fact_id == to_fact_id;
+            let reverse_direction = symmetric_relation
+                && link.from_fact_id == to_fact_id
+                && link.to_fact_id == from_fact_id;
+            (same_direction || reverse_direction)
                 && link.relation == relation
                 && link.status == EvidenceLinkStatus::Adjudicated
-                && link.evidence_ids == evidence_ids
         }) {
-            return Ok(existing.clone());
+            if existing.evidence_ids == evidence_ids {
+                return Ok(existing.clone());
+            }
+            return Err(
+                "this fact pair/relation is already adjudicated with a different evidence set; update the claim context before adjudicating again"
+                    .into(),
+            );
         }
         let link = EvidenceLink {
             from_fact_id,
@@ -420,7 +433,16 @@ impl EnhancedKnowledgeGraph {
             }
             self.total_contradictions += 1;
         }
-        self.evidence_links.push(link.clone());
+        if let Some(candidate_index) = self.evidence_links.iter().position(|candidate| {
+            candidate.from_fact_id == from_fact_id
+                && candidate.to_fact_id == to_fact_id
+                && candidate.relation == relation
+                && candidate.status == EvidenceLinkStatus::Candidate
+        }) {
+            self.evidence_links[candidate_index] = link.clone();
+        } else {
+            self.evidence_links.push(link.clone());
+        }
         Ok(link)
     }
 
@@ -1271,6 +1293,51 @@ mod tests {
         ).unwrap();
         assert_eq!(graph.get_fact(id_a).unwrap().corroboration_count, 1);
         assert_eq!(graph.get_fact(id_a).unwrap().confidence, 0.75);
+    }
+
+    #[test]
+    fn corroboration_cannot_boost_twice_for_reverse_orientation_or_new_evidence_subset() {
+        let mut graph = EnhancedKnowledgeGraph::new(100);
+        let mut context_a = make_claim_context(
+            "witness-a", "family-a", "evidence-a", "renewal", ClaimPolarity::Positive, Some(1),
+        );
+        context_a.evidence_ids.push("evidence-a2".into());
+        let mut context_b = make_claim_context(
+            "witness-b", "family-b", "evidence-b", "renewal", ClaimPolarity::Positive, Some(1),
+        );
+        context_b.evidence_ids.push("evidence-b2".into());
+        let (id_a, _) = graph
+            .insert_grounded(make_encoding("same proposition", 0.7), 1, None, false, context_a)
+            .unwrap();
+        let (id_b, _) = graph
+            .insert_grounded(make_encoding("same proposition", 0.7), 2, None, false, context_b)
+            .unwrap();
+
+        graph.adjudicate_evidence_relation(
+            id_a, id_b, EvidenceRelation::Corroborates,
+            vec!["evidence-a".into(), "evidence-b".into()],
+            "Two independent source families".into(), None, None, 3,
+        ).unwrap();
+        assert_eq!(
+            graph.adjudicate_evidence_relation(
+                id_b, id_a, EvidenceRelation::Corroborates,
+                vec!["evidence-a".into(), "evidence-b".into()],
+                "Same adjudication requested in reverse".into(), None, None, 4,
+            ).unwrap_err().contains("different evidence set"),
+            false
+        );
+        let error = graph.adjudicate_evidence_relation(
+            id_a, id_b, EvidenceRelation::Corroborates,
+            vec!["evidence-a2".into(), "evidence-b2".into()],
+            "Alternative subset from same two sources".into(), None, None, 5,
+        ).unwrap_err();
+        assert!(error.contains("already adjudicated with a different evidence set"));
+        assert_eq!(graph.get_fact(id_a).unwrap().corroboration_count, 1);
+        assert_eq!(graph.get_fact(id_a).unwrap().confidence, 0.75);
+        assert_eq!(graph.evidence_links().iter().filter(|link| {
+            link.relation == EvidenceRelation::Corroborates
+                && link.status == EvidenceLinkStatus::Adjudicated
+        }).count(), 1);
     }
 
     #[test]
