@@ -212,7 +212,7 @@ fn print_metrics(metrics: &Metrics) {
 }
 
 fn main() {
-    let integrators: [(&dyn Integrator); 3] =
+    let integrators: [&dyn Integrator; 3] =
         [&EulerIntegrator, &Rk4Integrator, &VerletIntegrator];
 
     print_header();
