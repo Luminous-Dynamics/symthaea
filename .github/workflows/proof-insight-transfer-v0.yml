@@ -754,6 +754,8 @@ jobs:
               raise SystemExit("dataset join audit references an unexpected repository commit")
           if audit["total_timeline_rows"] != 248:
               raise SystemExit("dataset join audit expected exactly 248 timeline rows")
+          if audit["invalid_timeline_path_count"] != 1:
+              raise SystemExit("pinned timeline must explicitly account for its one rejected machine-local source path")
           if audit["total_dataset_records"] != 146 or len(audit["events"]) != 146:
               raise SystemExit("pinned Dalek dataset.jsonl must contain exactly 146 records")
           if audit["unique_path_join_count"] != 39:
@@ -791,6 +793,7 @@ jobs:
           print(
               "PITB_DALEK_DATASET_JOIN_AUDIT_PASS: "
               f"records={audit['total_dataset_records']} "
+              f"invalid_timeline_paths={audit['invalid_timeline_path_count']} "
               f"unique_path={audit['unique_path_join_count']} "
               f"ambiguous_path={audit['ambiguous_path_join_count']} "
               f"unmatched_path={audit['unmatched_path_join_count']} "
