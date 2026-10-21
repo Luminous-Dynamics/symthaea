@@ -55,6 +55,7 @@ mod tests {
         RenderAfterRevocation,
         RenderWithoutVerifiedBundle,
         UncertaintyLostAtHandoff,
+        UncertaintyLostAtSessionBoundary,
     }
 
     #[derive(Debug, Clone, Copy)]
@@ -111,8 +112,9 @@ mod tests {
                 next.session_active = true;
                 next.loaded = None;
                 next.verified = None;
-                next.uncertainty_pending = false;
-                next.uncertainty_preserved = false;
+                if state.uncertainty_pending && !state.uncertainty_preserved {
+                    violations.push(Violation::UncertaintyLostAtSessionBoundary);
+                }
             }
             Action::LoadA | Action::LoadB => {
                 next.loaded = Some(match action {
@@ -235,8 +237,13 @@ mod tests {
                         assert!(outcome.next.session_active);
                         assert_eq!(outcome.next.loaded, None);
                         assert_eq!(outcome.next.verified, None);
-                        assert!(!outcome.next.uncertainty_pending);
-                        assert!(!outcome.next.uncertainty_preserved);
+                        assert_eq!(outcome.next.uncertainty_pending, state.uncertainty_pending);
+                        assert_eq!(
+                            outcome
+                                .violations
+                                .contains(&Violation::UncertaintyLostAtSessionBoundary),
+                            state.uncertainty_pending && !state.uncertainty_preserved
+                        );
                     }
                     Action::Interrupt => {
                         assert!(!outcome.next.session_active);
@@ -310,7 +317,10 @@ mod tests {
         };
         let started = transition(state, Action::StartSession);
         assert_eq!(started.next.revoked_mask, Bundle::A.bit());
-        assert!(!started.next.uncertainty_pending);
+        assert!(started.next.uncertainty_pending);
+        assert!(started
+            .violations
+            .contains(&Violation::UncertaintyLostAtSessionBoundary));
         let revoked_render = transition(started.next, Action::RenderA);
         assert!(revoked_render
             .violations
