@@ -8,6 +8,7 @@ on:
       - "docs/research/first-aid/**"
       - "xtask/src/first_aid.rs"
       - "xtask/src/first_aid_trajectory.rs"
+      - "xtask/src/first_aid_model.rs"
       - "xtask/src/guideline_change_impact.rs"
       - "xtask/src/main.rs"
       - "xtask/Cargo.toml"
@@ -65,7 +66,7 @@ jobs:
           echo "cargo_version=$(cargo --version)" >> "$GITHUB_OUTPUT"
 
       - name: Check formatting for changed Rust files
-        run: rustfmt --edition 2024 --check xtask/src/main.rs xtask/src/first_aid.rs xtask/src/first_aid_trajectory.rs xtask/src/guideline_change_impact.rs
+        run: rustfmt --edition 2024 --check xtask/src/main.rs xtask/src/first_aid.rs xtask/src/first_aid_trajectory.rs xtask/src/first_aid_model.rs xtask/src/guideline_change_impact.rs
 
       - name: Validate machine-readable mutation matrix and fixture binding
         shell: bash
@@ -77,10 +78,10 @@ jobs:
             .schema_version == "first-aid-mutation-matrix-v0" and
             .status == "research_coverage_inventory" and
             .clinical_use_authorized == false and
-            .count_summary.case_count == 36 and
-            .count_summary.implemented_or_frozen_count == 36 and
+            .count_summary.case_count == 38 and
+            .count_summary.implemented_or_frozen_count == 38 and
             .count_summary.frozen_trace_count == 12 and
-            .count_summary.mutation_case_count == 24 and
+            .count_summary.mutation_case_count == 26 and
             .count_summary.planned_not_yet_executable_count == 0 and
             .differential_oracle.status == "unit_test_added" and
             ([.differential_oracle.implementation, .differential_oracle.coverage,
@@ -106,6 +107,8 @@ jobs:
           grep -Fq "fn ${oracle_test}(" xtask/src/first_aid_trajectory.rs
           mutation_suite_test="$(jq -r '.differential_oracle.mutation_suite_test_name' "$matrix")"
           grep -Fq "fn ${mutation_suite_test}(" xtask/src/first_aid_trajectory.rs
+          state_model_test="$(jq -r '.differential_oracle.state_model_test_name' "$matrix")"
+          grep -Fq "fn ${state_model_test}(" xtask/src/first_aid_model.rs
           while IFS= read -r gate_ref; do
             grep -Fq -- "$gate_ref" .github/workflows/first-aid-contract.yml
           done < <(jq -r '.cases[] | select(.evidence_status == "workflow_gate_existing") | .gate_ref' "$matrix")
@@ -118,6 +121,10 @@ jobs:
 
       - name: Verify first-aid trajectory validator unit tests
         run: cargo test -p xtask first_aid_trajectory::tests -- --nocapture
+
+      - name: Verify independent finite-state model tests
+        id: state-model-tests
+        run: cargo test -p xtask first_aid_model::tests -- --nocapture
 
       - name: Verify guideline change-impact validator unit tests
         run: cargo test -p xtask guideline_change_impact::tests -- --nocapture
@@ -132,6 +139,7 @@ jobs:
           FIRST_AID_SOURCE_REVISION: ${{ github.event.pull_request.head.sha || github.sha }}
           RUSTC_VERSION: ${{ steps.toolchain.outputs.rustc_version }}
           CARGO_VERSION: ${{ steps.toolchain.outputs.cargo_version }}
+          STATE_MODEL_TEST_OUTCOME: ${{ steps.state-model-tests.outcome }}
         run: cargo run -p xtask -- first-aid-trajectory-validate --out target/first-aid-trajectory-receipt.json
 
       - name: Run the synthetic guideline change-impact validator
@@ -172,8 +180,9 @@ jobs:
             .corpus_sha256 == "1ac414e6b920a6259d68a20c273a0a9465e98c7a596393f9777be9976d6e3fd3" and
             .claim_ceiling == "synthetic process-integrity audit only; no clinical safety or patient-outcome claim" and
             ([.corpus_sha256, .evaluation_protocol_sha256, .mutation_matrix_sha256,
-              .cargo_lock_sha256, .validator_source_sha256, .entrypoint_source_sha256,
-              .executable_sha256] | all(test("^[0-9a-f]{64}$"))) and
+              .state_model_sha256, .cargo_lock_sha256, .validator_source_sha256,
+              .entrypoint_source_sha256, .executable_sha256] | all(test("^[0-9a-f]{64}$"))) and
+            .state_model_test_outcome == "success" and
             (.rustc_version | startswith("rustc 1.96.0 ")) and
             (.cargo_version | startswith("cargo 1.96.0 "))
           ' target/first-aid-trajectory-receipt.json
