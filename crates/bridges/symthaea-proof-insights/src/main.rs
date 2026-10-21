@@ -2926,6 +2926,64 @@ fn normalize_lean_relative_path(path: &str) -> Result<String> {
     normalize_with_base(["lean"], path)
 }
 
+fn declared_name_from_statement(statement: &str) -> Option<String> {
+    let declaration = Regex::new(
+        r"(?m)^[ \\t]*(?:theorem|lemma|def|abbrev|opaque|instance)[ \\t]+([A-Za-z_][A-Za-z0-9_'.]*)\\b",
+    )
+    .ok()?;
+    declaration
+        .captures(statement)
+        .and_then(|captures| captures.get(1))
+        .map(|name| name.as_str().to_owned())
+}
+
+fn statement_declaration_prefix(statement: &str) -> Option<String> {
+    let declaration = Regex::new(
+        r"(?m)^[ \\t]*(?:theorem|lemma|def|abbrev|opaque|instance)[ \\t]+[A-Za-z_][A-Za-z0-9_'.]*\\b",
+    )
+    .ok()?;
+    let start = declaration.find(statement)?.start();
+    Some(statement[start..].trim().to_owned())
+}
+
+fn named_declaration_blocks(source: &str, requested_name: &str) -> Result<Vec<String>> {
+    let declarations = Regex::new(
+        r"(?m)^[ \\t]*(?:@\\[[^\\]\\n]*\\][ \\t]*)*(?:(?:private|protected|noncomputable|unsafe|partial)[ \\t]+)*(?:theorem|lemma|def|abbrev|opaque|instance|structure|class|inductive|axiom)[ \\t]+([A-Za-z_][A-Za-z0-9_'.]*)\\b",
+    )
+    .context("compile Lean declaration identity expression")?;
+    let target = requested_name.rsplit('.').next().unwrap_or(requested_name);
+    let matches: Vec<_> = declarations.captures_iter(source).collect();
+    let mut blocks = Vec::new();
+    for (index, captures) in matches.iter().enumerate() {
+        let name = captures
+            .get(1)
+            .context("Lean declaration match has no captured name")?
+            .as_str();
+        let short_name = name.rsplit('.').next().unwrap_or(name);
+        if name != requested_name && short_name != target {
+            continue;
+        }
+        let start = captures
+            .get(0)
+            .context("Lean declaration match is empty")?
+            .start();
+        let end = matches
+            .get(index + 1)
+            .and_then(|next| next.get(0))
+            .map(|next| next.start())
+            .unwrap_or(source.len());
+        if start <= end && end <= source.len() {
+            blocks.push(source[start..end].to_owned());
+        }
+    }
+    Ok(blocks)
+}
+
+fn normalized_contains(container: &str, needle: &str) -> bool {
+    let needle = normalize_whitespace(needle);
+    !needle.is_empty() && normalize_whitespace(container).contains(&needle)
+}
+
 fn normalize_whitespace(text: &str) -> String {
     text.split_whitespace().collect::<Vec<_>>().join(" ")
 }
