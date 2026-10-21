@@ -119,6 +119,7 @@ struct TrajectoryReceipt {
     receipt_version: &'static str,
     status: &'static str,
     corpus_sha256: String,
+    evaluation_protocol_sha256: String,
     source_revision_sha: String,
     validator_source_sha256: String,
     entrypoint_source_sha256: String,
@@ -151,6 +152,9 @@ pub fn run(root: &Path, corpus_arg: &Path, out_arg: Option<&Path>) -> Result<()>
         serde_json::from_str(corpus_text).context("parse trajectory corpus JSON")?;
     validate_corpus(&corpus)?;
 
+    let evaluation_protocol = fs::read(root.join("docs/research/first-aid/EVALUATION_PROTOCOL_V0.md"))
+        .context("read evaluation protocol for receipt identity")?;
+    let evaluation_protocol_digest = sha256_hex(&evaluation_protocol);
     let validator_source = fs::read(root.join("xtask/src/first_aid_trajectory.rs"))
         .context("read trajectory validator source for receipt identity")?;
     let entrypoint_source = fs::read(root.join("xtask/src/main.rs"))
@@ -165,6 +169,7 @@ pub fn run(root: &Path, corpus_arg: &Path, out_arg: Option<&Path>) -> Result<()>
         receipt_version: "first-aid-trajectory-receipt-v0",
         status: "synthetic_trajectory_contract_passed",
         corpus_sha256: corpus_digest,
+        evaluation_protocol_sha256: evaluation_protocol_digest,
         source_revision_sha: std::env::var("FIRST_AID_SOURCE_REVISION")
             .unwrap_or_else(|_| "not-provided".to_string()),
         validator_source_sha256: sha256_hex(&validator_source),
