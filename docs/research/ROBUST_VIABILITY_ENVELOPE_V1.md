@@ -1,6 +1,6 @@
 # Robust Viability Envelope V1
 
-Status: isolated Rust prototype plus synthetic unit tests; not yet compiled or qualified.
+Status: isolated Rust research prototype and deterministic synthetic falsification harness; exact-head qualification is still required.
 
 Follow-up to:
 - [Allostatic control benchmark PR #8240](https://github.com/Luminous-Dynamics/symthaea/pull/8240)
@@ -36,10 +36,12 @@ These intervals must be calibrated with independent episode-level data or justif
 
 ## Implementation
 
-Sources: `tools/allostatic-control-bench/src/robust_viability.rs` and `tools/allostatic-control-bench/src/calibration.rs`.
+Sources: `tools/allostatic-control-bench/src/robust_viability.rs`, `tools/allostatic-control-bench/src/calibration.rs`, and `tools/allostatic-control-bench/src/model_mismatch.rs`.
 
 - `Interval` rejects nonfinite and inverted ranges.
 - `calibrate_episode_radii` uses episode-level maximum residuals and Bonferroni-adjusts reserve-state, load-state, reserve-effect, and load-effect coverage to target simultaneous envelope coverage. Too few calibration episodes returns `None`; it never invents a finite radius.
+- `model_mismatch.rs` keeps the nominal and true transition models separate, builds residual scores over all candidate actions and stress levels, and compares point certification, robust certification, and realized safety. Its fixed synthetic profiles are falsification tests—not a calibrated real-world dynamics model.
+- `SafetyAvailabilityMetrics` reports candidate-action count, point/robust certifications, true-safe actions, false certifications, and false vetoes separately so a filter cannot look successful merely by rejecting every action.
 - `StateEnvelope` constrains reserve/load intervals to [0, 1].
 - `ActionEffectBounds` constrains one-step reserve/load deltas to [-1, 1].
 - `ViabilityLimits` validates the reserve floor and load ceiling independently; they represent different axes and must not be compared to each other.
@@ -59,15 +61,18 @@ The combined unit tests cover:
 6. No safe action is reported when every candidate violates at least one bound.
 7. A safe proposal is preserved and unsafe proposals use only a fallback that is itself robustly viable.
 8. Episode-level calibration uses the correct order statistic, rejects insufficient/nonfinite/mismatched samples, expands both state and action-effect bounds conservatively, and never shrinks an envelope when the residual radii increase.
+9. A deliberately misspecified point shield can false-certify an unsafe action; a calibration envelope covering the held-out residual must reject it.
+10. An explicitly out-of-calibration-family perturbation acts as a negative control, and safety certification is scored separately from false-veto/availability cost.
 
 These tests are authored but do not count as passing until the exact-head Rust qualification workflow compiles and executes them.
 
 ## Qualification and comparison plan
 
-First qualify the interval arithmetic and action-set semantics in the existing dependency-free Rust crate. Then integrate a separate true-versus-estimated dynamics experiment under issue #8243:
+First qualify the interval arithmetic and action-set semantics in the existing dependency-free Rust crate. The new `model_mismatch.rs` now supplies the first deterministic true-versus-estimated model falsification cell. Extend it under issue #8243 with:
 
 - true transition dynamics and shield-estimated dynamics must be distinct values;
 - vary state-estimation width and action-effect uncertainty separately;
+- report the robust safety–availability frontier across uncertainty width: false certification rate and false-veto rate versus task reward and available action count;
 - test under-bounded envelopes as explicit negative controls (they should reveal why bounds must be calibrated);
 - include missing telemetry, biased warnings, delayed warnings, and unannounced regime changes;
 - compare no shield, point-estimate shield, interval-envelope shield, threshold control, and independently implemented MPC/control-barrier filters;
@@ -79,6 +84,15 @@ The existing benchmark can provide a local accounting harness. It now separates 
 - [SafeRLEval / Evaluation Metrics for Safe Reinforcement Learning (September 2026)](https://arxiv.org/abs/2609.15315)
 
 This prototype does not reproduce or outperform those benchmarks. It introduces a small local testable hypothesis that must later be evaluated in the external environment.
+
+## Proposed quantitative benchmark gates (targets, not current results)
+
+- **Coverage:** evaluate the nominal 90% and 95% joint envelopes on untouched exchangeable episodes. Report empirical coverage and a binomial confidence interval separately for every perturbation cell; never use the same episodes to fit radii and claim test coverage.
+- **Within-envelope safety:** target zero false certifications in 300 independent held-out episodes per perturbation cell. With zero events, the rough 95% 'rule of three' upper bound is about 1% for that cell; report the interval, not just the zero count.
+- **Availability cost:** target no more than 5% false vetoes among truly safe candidate actions on in-envelope data and no more than a 5% task-reward drop versus the strongest safe baseline in nominal conditions. If these targets conflict with the risk bound, publish the frontier rather than hide the trade-off.
+- **Shift robustness:** target at least 20% lower p95 normalized violation exposure than a point-estimate shield under the predeclared mismatch grid, at matched reward/authority budget. This is a go/no-go research target, not an asserted result.
+- **Stress matrix:** pre-register reserve-drain, load-growth, and recovery mismatch at ±5/±10/±20%; state bias and noise; 0/5/20% missing telemetry; false, missed, delayed, and severity-biased warnings; plus fully unannounced regime shifts.
+- **External comparison:** pin Safe-Control-Gym/Safety-Gymnasium commit, task, integration frequency, disturbance settings, controller and safety-filter variants, and tuning budget. Compare only where dynamics, action spaces, and constraint semantics can be mapped honestly.
 
 ## Acceptance gates for the next experiment
 
