@@ -135,7 +135,8 @@ mod tests {
                     Action::VerifyBValid => (Bundle::B, true, true),
                     _ => unreachable!(),
                 };
-                if state.loaded == Some(bundle)
+                if state.session_active
+                    && state.loaded == Some(bundle)
                     && valid_state
                     && digest_verified
                     && !state.is_revoked(bundle)
@@ -275,6 +276,7 @@ mod tests {
                         if outcome.next.verified.is_some() =>
                     {
                         let verified = outcome.next.verified.expect("checked above");
+                        assert!(state.session_active);
                         assert_eq!(state.loaded, Some(verified));
                         assert!(!state.is_revoked(verified));
                     }
@@ -330,4 +332,21 @@ mod tests {
             .violations
             .contains(&Violation::UncertaintyLostAtHandoff));
     }
+    #[test]
+    fn verification_without_active_session_is_rejected() {
+        let state = State {
+            session_active: false,
+            loaded: Some(Bundle::A),
+            verified: None,
+            revoked_mask: 0,
+            uncertainty_pending: false,
+            uncertainty_preserved: false,
+        };
+        let result = transition(state, Action::VerifyAValid);
+        assert_eq!(result.next.verified, None);
+        assert!(result
+            .violations
+            .contains(&Violation::InvalidBundleVerification));
+    }
+
 }
