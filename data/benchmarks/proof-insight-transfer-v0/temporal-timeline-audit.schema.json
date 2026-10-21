@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://luminousdynamics.io/schemas/pitb.temporal-timeline-audit.v0.json",
   "title": "PITB historical theorem timeline audit",
-  "description": "Read-only inventory of a pinned historical proof timeline. This is provenance evidence, not a verified replay manifest and not benchmark outcome data.",
+  "description": "Read-only inventory of a pinned historical proof timeline. Each completion commit must be an ancestor of pinned HEAD; adjacent rows preserve CSV source order and report Git DAG ancestry without requiring a linear commit chain. This is provenance evidence, not a verified replay manifest and not benchmark outcome data.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -21,6 +21,7 @@
     "mathlib_revision",
     "total_timeline_rows",
     "unique_completion_commit_count",
+    "non_ancestral_adjacent_transition_count",
     "source_path_present_at_completion_count",
     "source_path_missing_at_completion_count",
     "source_path_not_recorded_count",
@@ -58,6 +59,7 @@
     "mathlib_revision": {"$ref": "#/$defs/gitSha"},
     "total_timeline_rows": {"type": "integer", "minimum": 1},
     "unique_completion_commit_count": {"type": "integer", "minimum": 1},
+    "non_ancestral_adjacent_transition_count": {"type": "integer", "minimum": 0},
     "source_path_present_at_completion_count": {"type": "integer", "minimum": 0},
     "source_path_missing_at_completion_count": {"type": "integer", "minimum": 0},
     "source_path_not_recorded_count": {"type": "integer", "minimum": 0},
@@ -107,6 +109,8 @@
         "completion_commit",
         "commit_message",
         "completion_commit_ancestor_verified",
+        "previous_completion_commit",
+        "previous_completion_is_ancestor",
         "source_file_status",
         "source_file_sha256",
         "source_file_bytes"
@@ -128,6 +132,18 @@
         "completion_commit": {"$ref": "#/$defs/gitSha"},
         "commit_message": {"type": "string"},
         "completion_commit_ancestor_verified": {"const": true},
+        "previous_completion_commit": {
+          "oneOf": [
+            {"$ref": "#/$defs/gitSha"},
+            {"type": "null"}
+          ]
+        },
+        "previous_completion_is_ancestor": {
+          "oneOf": [
+            {"type": "boolean"},
+            {"type": "null"}
+          ]
+        },
         "source_file_status": {
           "enum": [
             "present_at_completion",
@@ -149,6 +165,14 @@
         }
       },
       "allOf": [
+        {
+          "if": {"properties": {"previous_completion_commit": {"type": "null"}}},
+          "then": {"properties": {"previous_completion_is_ancestor": {"type": "null"}}}
+        },
+        {
+          "if": {"properties": {"previous_completion_commit": {"$ref": "#/$defs/gitSha"}}},
+          "then": {"properties": {"previous_completion_is_ancestor": {"type": "boolean"}}}
+        },
         {
           "if": {"properties": {"source_file_status": {"const": "present_at_completion"}}},
           "then": {
