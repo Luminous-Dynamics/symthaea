@@ -348,14 +348,14 @@ pub struct BundleCapacityResult {
 pub struct AssociativeCapacityResult {
     pub association_count: usize,
     pub mean_target_similarity: f64,
-    /// `None` when a single association means no distractor exists.
-    pub mean_max_distractor_similarity: Option<f64>,
+    /// Maximum over all non-target fillers in the candidate library.
+    pub mean_max_distractor_similarity: f64,
     pub recall_at_1: f64,
     /// Recall after projected-softmax cleanup of the unbound query.
     pub cleanup_recall_at_1: f64,
     pub cleanup_mean_target_similarity: f64,
-    /// `None` when a single association means no distractor exists.
-    pub cleanup_mean_max_distractor_similarity: Option<f64>,
+    /// Maximum competing-filler similarity after projected-softmax cleanup.
+    pub cleanup_mean_max_distractor_similarity: f64,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -514,11 +514,9 @@ pub fn run_pattern_interaction_suite(
     for (size_index, &association_count) in config.bundle_sizes.iter().enumerate() {
         let mut target_similarity_sum = 0.0;
         let mut max_distractor_similarity_sum = 0.0;
-        let mut has_distractors = false;
         let mut correct_count = 0usize;
         let mut cleanup_target_similarity_sum = 0.0;
         let mut cleanup_distractor_similarity_sum = 0.0;
-        let mut cleanup_has_distractors = false;
         let mut cleanup_correct_count = 0usize;
 
         for trial in 0..config.trials {
@@ -549,10 +547,7 @@ pub fn run_pattern_interaction_suite(
                 .fold(f64::NEG_INFINITY, f64::max);
 
             target_similarity_sum += target_similarity;
-            if max_distractor_similarity.is_finite() {
-                max_distractor_similarity_sum += max_distractor_similarity;
-                has_distractors = true;
-            }
+            max_distractor_similarity_sum += max_distractor_similarity;
             let space = build_space(&fillers)?;
             let ranked = space.rank(&query)?;
             if ranked.first().is_some_and(|result| result.label == format!("p{target_index}")) {
@@ -574,10 +569,7 @@ pub fn run_pattern_interaction_suite(
                 .collect::<Result<Vec<_>, _>>()?
                 .into_iter()
                 .fold(f64::NEG_INFINITY, f64::max);
-            if cleaned_max_distractor.is_finite() {
-                cleanup_distractor_similarity_sum += cleaned_max_distractor;
-                cleanup_has_distractors = true;
-            }
+            cleanup_distractor_similarity_sum += cleaned_max_distractor;
             let cleaned_ranked = space.rank(&cleaned)?;
             if cleaned_ranked.first().is_some_and(|result| {
                 result.label == format!("p{target_index}")
@@ -589,16 +581,14 @@ pub fn run_pattern_interaction_suite(
         associative_capacity_results.push(AssociativeCapacityResult {
             association_count,
             mean_target_similarity: target_similarity_sum / config.trials as f64,
-            mean_max_distractor_similarity: has_distractors.then_some(
-                max_distractor_similarity_sum / config.trials as f64
-            ),
+            mean_max_distractor_similarity: max_distractor_similarity_sum
+                / config.trials as f64,
             recall_at_1: correct_count as f64 / config.trials as f64,
             cleanup_recall_at_1: cleanup_correct_count as f64 / config.trials as f64,
             cleanup_mean_target_similarity: cleanup_target_similarity_sum
                 / config.trials as f64,
-            cleanup_mean_max_distractor_similarity: cleanup_has_distractors.then_some(
-                cleanup_distractor_similarity_sum / config.trials as f64
-            ),
+            cleanup_mean_max_distractor_similarity: cleanup_distractor_similarity_sum
+                / config.trials as f64,
         });
     }
 
