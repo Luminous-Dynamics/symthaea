@@ -25,7 +25,7 @@ class TccipReferenceOracleTests(unittest.TestCase):
         cls.by_name = {fixture.name: fixture for fixture in cls.fixtures}
 
     def test_manifest_is_versioned_and_covers_all_cases(self) -> None:
-        self.assertEqual(len(self.fixtures), 5)
+        self.assertEqual(len(self.fixtures), 6)
         self.assertEqual(
             set(self.by_name),
             {
@@ -34,6 +34,7 @@ class TccipReferenceOracleTests(unittest.TestCase):
                 "harmful_cross_component_coupling",
                 "task_relevant_high_x1_prior",
                 "task_relevant_high_x0_prior",
+                "role_matched_xor_synergy_uniform_prior",
             },
         )
         for fixture in self.fixtures:
@@ -69,6 +70,7 @@ class TccipReferenceOracleTests(unittest.TestCase):
             "harmful_cross_component_coupling": (511, 448, 63, -0.5, 0.5),
             "task_relevant_high_x1_prior": (15, 8, 7, -0.3, 0.3),
             "task_relevant_high_x0_prior": (15, 8, 7, -0.3, 0.3),
+            "role_matched_xor_synergy_uniform_prior": (15, 8, 7, 0.0, 0.0),
         }
         for fixture in self.fixtures:
             _, partitions, summary = evaluate_fixture(fixture)
@@ -78,6 +80,20 @@ class TccipReferenceOracleTests(unittest.TestCase):
             self.assertEqual(summary["skipped"], skipped)
             self.assertAlmostEqual(min(point.tccip for point in partitions), lower, places=12)
             self.assertAlmostEqual(max(point.tccip for point in partitions), upper, places=12)
+
+    def test_role_matched_xor_edges_are_both_essential_but_tccip_is_zero(self) -> None:
+        fixture = self.by_name["role_matched_xor_synergy_uniform_prior"]
+        scores, _, summary = evaluate_fixture(fixture)
+        self.assertEqual(summary["intact"], 1.0)
+        self.assertEqual(summary["cross_loss"], 0.5)
+        self.assertEqual(summary["control_loss"], 0.5)
+        self.assertEqual(summary["tccip"], 0.0)
+        # The direct intervention-effect profile says both inputs matter equally.
+        self.assertEqual([score.loss for score in scores], [0.5, 0.5])
+        # Under a uniform prior, XOR has one bit of joint information with its
+        # output but zero information from either input alone.
+        self.assertEqual(scores[0].utility, 0.5)
+        self.assertEqual(scores[1].utility, 0.5)
 
     def test_same_graph_reverses_tccip_sign_when_input_prior_is_reversed(self) -> None:
         high_x1 = self.by_name["task_relevant_high_x1_prior"]
