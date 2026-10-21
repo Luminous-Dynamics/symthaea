@@ -169,26 +169,26 @@ fn main() -> Result<(), Box<dyn Error>> {
             evaluation.len(),
         );
 
-        for class in 0..CLASS_COUNT {
+        for (class, (threshold, class_cert)) in classwise_thresholds
+            .iter()
+            .copied()
+            .zip(classwise_certificate.iter().copied())
+            .enumerate()
+        {
             let group: Vec<ScoredQuery> = evaluation
                 .iter()
                 .filter(|sample| sample.predicted_class == class)
                 .cloned()
                 .collect();
             let class_test = evaluate_classwise(&group, &classwise_thresholds);
-            let class_cert = classwise_certificate[class];
             write_row(
                 "class",
                 seed,
                 "classwise_osp_inspired",
                 &class.to_string(),
-                classwise_thresholds[class],
+                threshold,
                 selection.len(),
-                count_class_false_positives(
-                    &selection,
-                    class,
-                    classwise_thresholds[class],
-                ),
+                count_class_false_positives(&selection, class, threshold),
                 certification.len(),
                 class_cert.false_positives,
                 class_cert.upper_bound,
@@ -513,13 +513,14 @@ fn certify_classwise(
     thresholds: &[f64],
     class_count: usize,
 ) -> Vec<ErrorMassCertificate> {
-    (0..class_count)
-        .map(|class| {
-            let false_positives = count_class_false_positives(
-                certification,
-                class,
-                thresholds[class],
-            );
+    thresholds
+        .iter()
+        .copied()
+        .take(class_count)
+        .enumerate()
+        .map(|(class, threshold)| {
+            let false_positives =
+                count_class_false_positives(certification, class, threshold);
             ErrorMassCertificate {
                 false_positives,
                 upper_bound: clopper_pearson_upper_bound(
