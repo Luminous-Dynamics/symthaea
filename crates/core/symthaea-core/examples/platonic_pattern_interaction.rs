@@ -2,6 +2,7 @@ use std::error::Error;
 use std::mem::size_of;
 use std::time::Instant;
 
+use symthaea_core::hdc::hrr_baseline::run_hrr_associative_capacity;
 use symthaea_core::hdc::pattern_interaction::{
     run_pattern_interaction_suite, PatternInteractionConfig,
 };
@@ -10,6 +11,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     let started = Instant::now();
     let config = PatternInteractionConfig::default();
     let report = run_pattern_interaction_suite(0x4c45_5649_4e, &config)?;
+    let hrr_report = run_hrr_associative_capacity(
+        0x4c45_5649_4e,
+        config.dimension,
+        config.prototype_count,
+        config.trials,
+        &config.bundle_sizes,
+    )?;
     let elapsed_ms = started.elapsed().as_millis();
     let estimated_prototype_payload_bytes =
         report.dimension * report.prototype_count * size_of::<i8>();
