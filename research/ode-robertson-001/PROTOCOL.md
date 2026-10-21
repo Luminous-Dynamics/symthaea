@@ -53,6 +53,8 @@ Construct candidate references at two increasingly strict component-wise toleran
 
 If these checks fail, the reference is unresolved and all downstream candidate accuracy scores remain UNQUALIFIED.
 
+The reference ladder needs an explicit quantitative agreement gate. Compare the two tighter candidate-reference trajectories at the protocol's common output grid using the strictest candidate profile denominator for each component, \`atol_i + rtol * |y_i|\`. Require the maximum normalized cross-reference discrepancy to be \(\le 10^{-3}\). This reserves at most one-thousandth of the candidate tolerance envelope for reference disagreement, while the candidate error gate is 10. If the reference pair fails this gate, the result is UNQUALIFIED; do not average the references or relax the threshold after seeing candidate outcomes. This is a reference-agreement criterion, not a mathematical proof of reference error.
+
 ### Independent cross-check
 
 Before freezing golden reference bytes, compare against a separately implemented stiff method (preferably a pinned Rust BDF implementation after API and license review, or another independently built solver). Different solvers are not interchangeable oracles by brand name: save their raw state tables and compare their common-grid results. If independent solutions disagree beyond the declared reference budget, investigate the discrepancy rather than averaging it away.
