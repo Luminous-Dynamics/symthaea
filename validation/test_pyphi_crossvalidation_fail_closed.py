@@ -70,10 +70,15 @@ class FailClosedPyPhiValidationTests(unittest.TestCase):
                     pyphi_phi=0.25,
                 )
                 for index in range(3)
-            ]
+            ],
+            n_validated=3,
+            n_failed=0,
         )
         self.validator._compute_report_metrics(report)
         self.assertIsNone(report.correlation)
+        # Guard against the old split-brain behavior where the CLI could exit 0
+        # even though the report correctly said NOT QUALIFIED.
+        self.assertFalse(self.validator.is_qualified(report))
 
         with tempfile.TemporaryDirectory() as temporary_directory:
             destination = Path(temporary_directory) / "report.md"
@@ -168,6 +173,27 @@ class FailClosedPyPhiValidationTests(unittest.TestCase):
             text = destination.read_text(encoding="utf-8")
         self.assertIn("Status: NOT QUALIFIED", text)
         self.assertIn("N/A", text)
+
+    def test_perfect_correlated_pairs_can_qualify_only_when_all_gates_hold(self) -> None:
+        values = (0.1, 0.2, 0.3)
+        report = ValidationReport(
+            results=[
+                ValidationResult(
+                    topology_name=f"matched_{index}",
+                    n_nodes=2,
+                    hdc_phi=value,
+                    pyphi_phi=value,
+                )
+                for index, value in enumerate(values)
+            ],
+            correlation=1.0,
+            mean_absolute_error=0.0,
+            max_absolute_error=0.0,
+            agreement_within_10_percent=100.0,
+            n_validated=3,
+            n_failed=0,
+        )
+        self.assertTrue(self.validator.is_qualified(report))
 
     def test_pyphi_version_and_iit_formalism_are_explicit(self) -> None:
         source = inspect.getsource(PyPhiValidator.compute_pyphi_phi)
