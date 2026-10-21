@@ -169,11 +169,25 @@ pub fn validate_review(review: &Value) -> Result<(), Vec<String>> {
         }
     }
 
-    if baseline_geometry_status == "synthetic-benchmark" && metric_assessments.is_some_and(|metrics| {
-        metrics.iter().any(|metric| string_value(metric.get("status")) == "computed")
-    }) {
+    if baseline_geometry_status == "synthetic-benchmark"
+        && metric_assessments.is_some_and(|metrics| {
+            metrics
+                .iter()
+                .any(|metric| string_value(metric.get("status")) == "computed")
+        })
+    {
         errors.push(
             "$.metric_assessments: synthetic benchmark geometry cannot qualify environmental/social outcome metrics"
+                .to_string(),
+        );
+    }
+    if metric_assessments.is_some_and(|metrics| {
+        metrics
+            .iter()
+            .any(|metric| string_value(metric.get("status")) == "computed")
+    }) {
+        errors.push(
+            "$.metric_assessments: the v0 LOCAL_CARTESIAN_DRAWING_UNITS frame cannot support physical or spatial outcome values"
                 .to_string(),
         );
     }
