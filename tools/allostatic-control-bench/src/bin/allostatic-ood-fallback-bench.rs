@@ -193,12 +193,12 @@ fn predictive_dynamics_for(seed: u64) -> Result<DynamicsBounds, Box<dyn Error>> 
 /// reusing the predictive model's narrower intervals.
 fn fallback_dynamics() -> Result<DynamicsBounds, Box<dyn Error>> {
     let push = ActionEffectBounds::new(
-        interval(-0.09, -0.005)?,
+        interval(-0.09, 0.01)?,
         interval(0.02, 0.18)?,
     )
     .ok_or_else(|| IoError::new(ErrorKind::InvalidData, "invalid fallback push bounds"))?;
     let maintain = ActionEffectBounds::new(
-        interval(-0.03, 0.04)?,
+        interval(-0.03, 0.06)?,
         interval(-0.02, 0.10)?,
     )
     .ok_or_else(|| IoError::new(ErrorKind::InvalidData, "invalid fallback maintain bounds"))?;
@@ -238,7 +238,7 @@ fn actual_dynamics_for(
         "moderate_shift" => [
             (-0.025, 0.050),
             (-0.015, 0.035),
-            (-0.020, 0.040),
+            (-0.030, 0.060),
         ],
         "strong_shift" => [
             (-0.055, 0.100),
