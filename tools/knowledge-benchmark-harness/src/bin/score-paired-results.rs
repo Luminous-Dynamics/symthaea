@@ -7,7 +7,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-const TOOL_VERSION: &str = "score-paired-results-v0.5.0";
+const TOOL_VERSION: &str = "score-paired-results-v0.6.0";
 const SCORE_REPORT_SCHEMA: &str =
     include_str!("../../../../benchmarks/benchmark-runs/v0/score-report.schema.json");
 
@@ -453,7 +453,7 @@ fn validate_source_pack_matches_pairs(
                     pair.pair_id
                 )
             })?;
-            if snapshot.state_data != *expected_state {
+            if &snapshot.state_data != expected_state {
                 return Err(format!(
                     "source-pack snapshot does not match pair {:?} state {state_name}",
                     pair.pair_id
