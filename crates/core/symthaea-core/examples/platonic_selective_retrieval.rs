@@ -398,15 +398,87 @@ fn report_row(
     certified: &str,
     samples: &[ScoredQuery],
 ) {
-    let result = evaluate(samples, rule);
+    write_evaluation_row(
+        "overall",
+        seed,
+        name,
+        "all",
+        None,
+        rule,
+        selection_n,
+        certification_n,
+        certified,
+        evaluate(samples, rule),
+    );
+
+    for noise_index in 0..NOISE_LEVELS.len() {
+        let kind = QueryKind::Known { noise_index };
+        let subset: Vec<ScoredQuery> = samples
+            .iter()
+            .filter(|sample| sample.kind == kind)
+            .cloned()
+            .collect();
+        write_evaluation_row(
+            "stratum",
+            seed,
+            name,
+            &format!("known_noise_{noise_index}"),
+            Some(NOISE_LEVELS[noise_index]),
+            rule,
+            selection_n,
+            certification_n,
+            certified,
+            evaluate(&subset, rule),
+        );
+    }
+
+    for (kind, label) in [
+        (QueryKind::RandomOod, "random_ood"),
+        (QueryKind::AmbiguousMixture, "ambiguous_mixture"),
+    ] {
+        let subset: Vec<ScoredQuery> = samples
+            .iter()
+            .filter(|sample| sample.kind == kind)
+            .cloned()
+            .collect();
+        write_evaluation_row(
+            "stratum",
+            seed,
+            name,
+            label,
+            None,
+            rule,
+            selection_n,
+            certification_n,
+            certified,
+            evaluate(&subset, rule),
+        );
+    }
+}
+
+fn write_evaluation_row(
+    record_type: &str,
+    seed: u64,
+    strategy: &str,
+    query_kind: &str,
+    noise_fraction: Option<f64>,
+    rule: DecisionRule,
+    selection_n: usize,
+    certification_n: usize,
+    certified: &str,
+    result: Evaluation,
+) {
     let (risk_low, risk_high) = wilson_interval_95(result.errors, result.accepted);
     let risk_text = result
         .selective_risk()
         .map(|value| format!("{value:.6}"))
         .unwrap_or_else(|| "NA".to_owned());
+    let noise = noise_fraction
+        .map(|value| format!("{value:.2}"))
+        .unwrap_or_else(|| "NA".to_owned());
 
     println!(
-        "{seed},{name},{DIMENSION},{PROTOTYPE_COUNT},{selection_n},{certification_n},{certified},{},{:.6},{:.6},{},{:.6},{},{},{:.6},{:.6},{:.6}",
+        "{record_type},{seed},{strategy},{query_kind},{noise},{DIMENSION},{PROTOTYPE_COUNT},{selection_n},{certification_n},{certified},{},{:.6},{:.6},{},{},{:.6},{},{},{:.6},{:.6},{:.6}",
         result.total,
         rule.min_similarity,
         rule.min_margin,
@@ -557,6 +629,7 @@ mod tests {
                 best_similarity: 0.5,
                 top_two_margin: 0.2,
                 correct: true,
+                kind: QueryKind::Known { noise_index: 0 },
             };
             MIN_ACCEPTED_FOR_CERTIFICATION - 1
         ];
@@ -567,6 +640,7 @@ mod tests {
                 best_similarity: 0.5,
                 top_two_margin: 0.2,
                 correct: true,
+                kind: QueryKind::Known { noise_index: 0 },
             };
             MIN_ACCEPTED_FOR_CERTIFICATION
         ];
@@ -580,11 +654,13 @@ mod tests {
                 best_similarity: 0.9,
                 top_two_margin: 0.2,
                 correct: true,
+                kind: QueryKind::Known { noise_index: 0 },
             },
             ScoredQuery {
                 best_similarity: 0.8,
                 top_two_margin: 0.1,
                 correct: false,
+                kind: QueryKind::RandomOod,
             },
         ];
         let result = evaluate(
