@@ -15,7 +15,8 @@ This is a paradigm shift from optimizing a scalar called phi to building an **ev
 Run and test on a machine with the Rust toolchain:
 
 ~~~sh
-cargo run --example entropy_causality_reference --release
+cargo run --example entropy_causality_reference --release > results/entropy_causality_reference.tsv
+sha256sum results/entropy_causality_reference.tsv
 cargo test --example entropy_causality_reference
 ~~~
 
