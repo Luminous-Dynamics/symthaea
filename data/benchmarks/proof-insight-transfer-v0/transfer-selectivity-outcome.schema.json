@@ -250,7 +250,8 @@
             "null"
           ],
           "minimum": 0,
-          "maximum": 1
+          "maximum": 1,
+          "description": "Model-reported confidence in the selected label/action. This is distinct from compatibility_probability and must not be treated as the probability that a proposed transfer is mathematically compatible."
         },
         "mismatch_codes": {
           "type": "array",
