@@ -213,9 +213,6 @@ pub struct LanguageControllerConfig {
     #[serde(default = "default_highway_layers")]
     pub highway_layers: usize,
 
-    /// Versioned token-row initializer; placed last to preserve positional legacy config fields.
-    #[serde(default)]
-    pub token_embedding_seed_scheme: TokenEmbeddingSeedScheme,
 }
 
 fn default_highway_layers() -> usize {
@@ -269,7 +266,6 @@ impl Default for LanguageControllerConfig {
             neurons_per_layer: 8,
             learning_rate: 0.001,
             vocab_size: 256, // Minimal default, override for real use
-            token_embedding_seed_scheme: TokenEmbeddingSeedScheme::LegacyV1,
             max_seq_len: 512,
             dt_per_token: 0.02, // 20ms per token step
             logit_temperature: 1.0,
@@ -328,6 +324,8 @@ pub struct LanguageController {
     learning_rate: f32,
     /// Configuration.
     config: LanguageControllerConfig,
+    /// Seed scheme used for future vocabulary extensions.
+    token_embedding_seed_scheme: TokenEmbeddingSeedScheme,
     /// Current sequence position (reset between generations).
     current_pos: usize,
     /// Coherence feedback from the generator (Phase 3: adaptive dt).
@@ -358,7 +356,7 @@ impl LanguageController {
         Self::new_with_token_embedding_seed_scheme(
             genesis,
             config,
-            config.token_embedding_seed_scheme,
+            TokenEmbeddingSeedScheme::LegacyV1,
         )
     }
 
@@ -371,10 +369,6 @@ impl LanguageController {
         config: &LanguageControllerConfig,
         seed_scheme: TokenEmbeddingSeedScheme,
     ) -> Self {
-        let mut effective_config = config.clone();
-        effective_config.token_embedding_seed_scheme = seed_scheme;
-        let config = &effective_config;
-
         let neuron_config = UnifiedConfig {
             tau_base: 0.02,                    // 20ms — matches token generation rate
             backbone_tau: config.backbone_tau, // Configurable state dependency for coherent sequences
@@ -436,6 +430,7 @@ impl LanguageController {
             orthogonal_positions,
             learning_rate: config.learning_rate,
             config: config.clone(),
+            token_embedding_seed_scheme: seed_scheme,
             current_pos: 0,
             coherence_for_dt: 1.0,
             last_effective_dt: config.dt_per_token,
@@ -1675,32 +1670,6 @@ mod tests {
             first.token_embeddings()[0].values,
             legacy.token_embeddings()[0].values,
             "V2 must be independently distinguishable from legacy initialization"
-        );
-    }
-
-    #[test]
-    fn token_seed_scheme_serialization_is_backward_compatible() {
-        let mut config = test_config();
-        config.token_embedding_seed_scheme = TokenEmbeddingSeedScheme::DomainSeparatedV2;
-
-        let encoded = serde_json::to_value(&config).expect("config should serialize");
-        let decoded: LanguageControllerConfig =
-            serde_json::from_value(encoded.clone()).expect("V2 config should deserialize");
-        assert_eq!(
-            decoded.token_embedding_seed_scheme,
-            TokenEmbeddingSeedScheme::DomainSeparatedV2
-        );
-
-        let mut legacy_json = encoded;
-        legacy_json
-            .as_object_mut()
-            .expect("serialized config should be an object")
-            .remove("token_embedding_seed_scheme");
-        let legacy: LanguageControllerConfig =
-            serde_json::from_value(legacy_json).expect("old config should deserialize");
-        assert_eq!(
-            legacy.token_embedding_seed_scheme,
-            TokenEmbeddingSeedScheme::LegacyV1
         );
     }
 
