@@ -429,7 +429,12 @@ impl BrocaGenerator {
         seed_scheme: crate::controller::TokenEmbeddingSeedScheme,
     ) -> Self {
         let tokenizer = BpeTokenizer::default_4k();
-        Self::with_tokenizer_and_token_embedding_seed_scheme(genesis, config, tokenizer, seed_scheme)
+        Self::with_tokenizer_and_token_embedding_seed_scheme(
+            genesis,
+            config,
+            tokenizer,
+            seed_scheme,
+        )
     }
 
     /// Create a generator with a custom tokenizer.
@@ -626,7 +631,7 @@ impl BrocaGenerator {
             .metadata
             .feature_set
             .iter()
-            .any(|feature| feature == TOKEN_SEED_SCHEME_V2_FEATURE)
+            .any(|feature| feature.as_str() == TOKEN_SEED_SCHEME_V2_FEATURE)
         {
             crate::controller::TokenEmbeddingSeedScheme::DomainSeparatedV2
         } else {
@@ -2685,7 +2690,7 @@ mod tests {
         assert_eq!(
             reloaded.token_embedding_seed_scheme,
             crate::controller::TokenEmbeddingSeedScheme::LegacyV1,
-            "checkpoints without a V2 feature marker must retain the historical initializer for vocabulary growth"
+            "checkpoints without a V2 marker must retain the historical initializer"
         );
     }
     #[test]
@@ -2714,7 +2719,7 @@ mod tests {
                 .metadata
                 .feature_set
                 .iter()
-                .any(|feature| feature == TOKEN_SEED_SCHEME_V2_FEATURE),
+                .any(|feature| feature.as_str() == TOKEN_SEED_SCHEME_V2_FEATURE),
             "V2 scheme must be persisted in the existing checkpoint feature_set"
         );
 
