@@ -2381,6 +2381,24 @@ mod tests {
     }
 
     #[test]
+    fn test_unsupported_phenotype_fails_closed_as_indeterminate() {
+        let e = engine();
+        let rec = e.adjusted_recommendation(
+            "codeine",
+            "CYP2D6",
+            AncestryGroup::European,
+            MetabolizerPhenotype::Intermediate,
+        );
+
+        assert!(
+            matches!(rec.action, DosingAction::Indeterminate),
+            "A phenotype without a guideline must not inherit another action"
+        );
+        assert!(rec.dose_adjustment.is_none());
+        assert!(rec.alternative_drug.is_none());
+    }
+
+    #[test]
     fn test_unsupported_drug_fails_closed_as_indeterminate() {
         let e = engine();
         let rec = e.adjusted_recommendation(
