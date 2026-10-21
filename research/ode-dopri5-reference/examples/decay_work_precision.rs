@@ -10,9 +10,7 @@ use std::env;
 use std::error::Error;
 
 use ode_solvers::{Dopri5, System, Vector2};
-use ode_verify_001_harness::dynamical_system::{
-    DynamicalSystem, Rk45Integrator, Rk45Tolerances,
-};
+use ode_verify_001_harness::dynamical_system::{DynamicalSystem, Rk45Integrator, Rk45Tolerances};
 
 const T_END: f64 = 1.0;
 const INITIAL_DT: f64 = 0.05;
@@ -89,8 +87,9 @@ fn evaluate_samples(
         {
             finite = false;
         }
-        max_scaled_absolute_error =
-            max_scaled_absolute_error.max(scaled_error).max(sentinel_error);
+        max_scaled_absolute_error = max_scaled_absolute_error
+            .max(scaled_error)
+            .max(sentinel_error);
         if state[0] < -slack {
             nonnegative_within_tolerance = false;
         }
@@ -107,9 +106,7 @@ fn evaluate_samples(
 
     let final_scaled_absolute_error = samples
         .last()
-        .map(|(time, state)| {
-            (state[0] - scale * (-rate * *time).exp()).abs() / scale
-        })
+        .map(|(time, state)| (state[0] - scale * (-rate * *time).exp()).abs() / scale)
         .unwrap_or(f64::INFINITY);
 
     TrajectoryMetrics {
@@ -124,8 +121,7 @@ fn evaluate_samples(
 
 fn main() -> Result<(), Box<dyn Error>> {
     let source_sha = env::var("ODE_BENCH_SOURCE_SHA").unwrap_or_else(|_| "unknown".to_string());
-    let checkout_sha =
-        env::var("ODE_BENCH_CHECKOUT_SHA").unwrap_or_else(|_| "unknown".to_string());
+    let checkout_sha = env::var("ODE_BENCH_CHECKOUT_SHA").unwrap_or_else(|_| "unknown".to_string());
     let lock_sha = env::var("ODE_BENCH_LOCK_SHA").unwrap_or_else(|_| "unknown".to_string());
 
     let integrator = Rk45Integrator::new(1.0e-8);
