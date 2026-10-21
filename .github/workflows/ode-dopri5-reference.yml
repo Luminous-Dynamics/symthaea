@@ -39,6 +39,29 @@ jobs:
           sha256sum research/ode-dopri5-reference/Cargo.lock
           cargo metadata --locked --no-deps --manifest-path research/ode-dopri5-reference/Cargo.toml > /tmp/ode-dopri5-metadata.json
 
+      - name: Diagnose dependency-lock drift without weakening the committed-lock gate
+        id: lock_refresh
+        shell: bash
+        run: |
+          set -uo pipefail
+          lock_path="research/ode-dopri5-reference/Cargo.lock"
+          before="$(sha256sum "$lock_path" | cut -d ' ' -f 1)"
+          set +e
+          cargo metadata --manifest-path research/ode-dopri5-reference/Cargo.toml --format-version 1 > /tmp/ode-dopri5-metadata-resolved.json
+          metadata_status=$?
+          set -e
+          after="$(sha256sum "$lock_path" | cut -d ' ' -f 1)"
+          changed=false
+          if [ "$before" != "$after" ]; then changed=true; fi
+          echo "lock_sha_before=$before" >> "$GITHUB_OUTPUT"
+          echo "lock_sha_after=$after" >> "$GITHUB_OUTPUT"
+          echo "lock_changed=$changed" >> "$GITHUB_OUTPUT"
+          echo "metadata_status=$metadata_status" >> "$GITHUB_OUTPUT"
+          printf 'lock_sha_before=%s\nlock_sha_after=%s\nlock_changed=%s\nmetadata_status=%s\n' "$before" "$after" "$changed" "$metadata_status"
+          # This step emits a reviewed candidate lockfile as evidence when drift is found.
+          # The final gate still rejects any uncommitted lockfile mutation.
+          exit 0
+
       - name: Format
         run: cargo fmt --manifest-path research/ode-dopri5-reference/Cargo.toml -- --check
 
@@ -92,8 +115,12 @@ jobs:
           GENERATION_OUTCOME: ${{ steps.comparison.outcome }}
           FIRST_STATUS: ${{ steps.comparison.outputs.first_status }}
           SECOND_STATUS: ${{ steps.comparison.outputs.second_status }}
+          LOCK_CHANGED: ${{ steps.lock_refresh.outputs.lock_changed }}
+          LOCK_METADATA_STATUS: ${{ steps.lock_refresh.outputs.metadata_status }}
         run: |
           set -euo pipefail
+          test "$LOCK_METADATA_STATUS" = "0"
+          test "$LOCK_CHANGED" = "false"
           test "$GENERATION_OUTCOME" = "success"
           test "$FIRST_STATUS" = "0"
           test "$SECOND_STATUS" = "0"
