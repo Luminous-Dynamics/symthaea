@@ -34,8 +34,6 @@ pub struct KnowledgePersistence {
 /// A serializable fact record for persistence
 #[derive(Debug, Clone)]
 pub struct FactRecord {
-    /// Stable graph-level fact ID; absent only for pre-migration SQLite rows.
-    pub fact_id: Option<u64>,
     /// BinaryHV encoded as raw bytes (2048 bytes for 16,384 bits)
     pub vector_bytes: Vec<u8>,
     /// Source text of the fact
@@ -44,11 +42,20 @@ pub struct FactRecord {
     pub confidence: f32,
     /// Domain tag (optional)
     pub domain: Option<String>,
-    /// Cycle when fact was inserted
+    /// Cycle when the fact was inserted
     pub cycle: u64,
     /// Whether the fact contains causal relations
     pub is_causal: bool,
-    /// Optional typed source-witness identity envelope.
+}
+
+/// Graph snapshot record that retains stable graph identity and optional claim provenance.
+#[derive(Debug, Clone)]
+pub struct GraphFactRecord {
+    /// Stable graph-level fact ID; absent only for pre-migration SQLite rows.
+    pub fact_id: Option<u64>,
+    /// Legacy persisted fact payload.
+    pub fact: FactRecord,
+    /// Optional source-witness-grounded claim envelope.
     pub claim_context: Option<ClaimContext>,
 }
 
@@ -105,10 +112,9 @@ impl KnowledgePersistence {
         !self.db_path.is_empty()
     }
 
-    /// Save a batch of fact records to the database.
+    /// Save a batch of legacy fact records to the database.
     ///
-    /// Uses a single transaction for efficiency.
-    /// Returns the number of facts saved.
+    /// This retains the original append-style API for existing callers.
     pub fn save_facts(&mut self, facts: &[FactRecord]) -> Result<usize, String> {
         if !self.is_configured() {
             return Err("No database path configured".into());
@@ -116,47 +122,32 @@ impl KnowledgePersistence {
 
         let conn = self.open_connection()?;
         self.ensure_schema(&conn)?;
-
         conn.execute_batch("BEGIN TRANSACTION")
-            .map_err(|e| e.to_string())?;
-        // A save is a graph snapshot, not an append-only event log. Replacing the
-        // snapshot prevents stale rows and preserves stable graph fact IDs for links.
-        conn.execute("DELETE FROM knowledge_facts", [])
             .map_err(|error| error.to_string())?;
 
-        let mut count = 0;
         for fact in facts {
-            let claim_context_json = fact
-                .claim_context
-                .as_ref()
-                .map(serde_json::to_string)
-                .transpose()
-                .map_err(|error| error.to_string())?;
             conn.execute(
-                "INSERT INTO knowledge_facts (fact_id, vector_blob, source_text, confidence, domain, cycle, is_causal, claim_context_json)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                "INSERT INTO knowledge_facts (vector_blob, source_text, confidence, domain, cycle, is_causal)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
                 rusqlite::params![
-                    fact.fact_id.map(|id| id as i64),
                     fact.vector_bytes,
                     fact.source_text,
                     fact.confidence,
                     fact.domain,
                     fact.cycle as i64,
                     fact.is_causal,
-                    claim_context_json,
                 ],
             )
             .map_err(|error| error.to_string())?;
-            count += 1;
         }
 
-        conn.execute_batch("COMMIT").map_err(|e| e.to_string())?;
-
-        self.total_saved += count as u64;
-        Ok(count)
+        conn.execute_batch("COMMIT")
+            .map_err(|error| error.to_string())?;
+        self.total_saved += facts.len() as u64;
+        Ok(facts.len())
     }
 
-    /// Load all fact records from the database.
+    /// Load legacy fact records without requiring the newer graph-provenance fields.
     pub fn load_facts(&mut self) -> Result<Vec<FactRecord>, String> {
         if !self.is_configured() {
             return Err("No database path configured".into());
@@ -164,90 +155,115 @@ impl KnowledgePersistence {
 
         let conn = self.open_connection()?;
         self.ensure_schema(&conn)?;
-
-        let mut stmt = conn
+        let mut statement = conn
             .prepare(
-                "SELECT fact_id, vector_blob, source_text, confidence, domain, cycle, is_causal, claim_context_json
+                "SELECT vector_blob, source_text, confidence, domain, cycle, is_causal
                  FROM knowledge_facts ORDER BY cycle DESC, id DESC",
             )
-            .map_err(|e| e.to_string())?;
-
-        let facts: Vec<FactRecord> = stmt
+            .map_err(|error| error.to_string())?;
+        let rows = statement
             .query_map([], |row| {
                 Ok(FactRecord {
-                    fact_id: row.get::<_, Option<i64>>(0)?.map(|id| id as u64),
-                    vector_bytes: row.get(1)?,
-                    source_text: row.get(2)?,
-                    confidence: row.get(3)?,
-                    domain: row.get(4)?,
-                    cycle: row.get::<_, i64>(5)? as u64,
-                    is_causal: row.get(6)?,
-                    claim_context: row
-                        .get::<_, Option<String>>(7)?
-                        .map(|raw| {
-                            serde_json::from_str::<ClaimContext>(&raw).map_err(|error| {
-                                rusqlite::Error::FromSqlConversionFailure(
-                                    7,
-                                    rusqlite::types::Type::Text,
-                                    Box::new(error),
-                                )
-                            })
-                        })
-                        .transpose()?,
+                    vector_bytes: row.get(0)?,
+                    source_text: row.get(1)?,
+                    confidence: row.get(2)?,
+                    domain: row.get(3)?,
+                    cycle: row.get::<_, i64>(4)? as u64,
+                    is_causal: row.get(5)?,
                 })
             })
-            .map_err(|e| e.to_string())?
+            .map_err(|error| error.to_string())?
             .collect::<Result<Vec<_>, _>>()
             .map_err(|error| format!("Fact record decoding failed: {error}"))?;
 
-        self.total_loaded += facts.len() as u64;
-        Ok(facts)
+        self.total_loaded += rows.len() as u64;
+        Ok(rows)
     }
 
-    /// Replace the persisted typed relation snapshot.
-    pub fn save_evidence_links(&mut self, links: &[EvidenceLink]) -> Result<usize, String> {
+    /// Replace the current graph snapshot with stable fact IDs and claim contexts.
+    pub fn save_graph_facts(&mut self, facts: &[GraphFactRecord]) -> Result<usize, String> {
         if !self.is_configured() {
             return Err("No database path configured".into());
         }
         let conn = self.open_connection()?;
         self.ensure_schema(&conn)?;
         let tx = conn.unchecked_transaction().map_err(|error| error.to_string())?;
-        tx.execute("DELETE FROM knowledge_evidence_links", [])
+        tx.execute("DELETE FROM knowledge_facts", [])
             .map_err(|error| error.to_string())?;
-        for link in links {
-            let encoded = serde_json::to_string(link).map_err(|error| error.to_string())?;
+        for item in facts {
+            let claim_context_json = item
+                .claim_context
+                .as_ref()
+                .map(serde_json::to_string)
+                .transpose()
+                .map_err(|error| error.to_string())?;
             tx.execute(
-                "INSERT INTO knowledge_evidence_links (link_json) VALUES (?1)",
-                rusqlite::params![encoded],
+                "INSERT INTO knowledge_facts
+                 (fact_id, vector_blob, source_text, confidence, domain, cycle, is_causal, claim_context_json)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                rusqlite::params![
+                    item.fact_id.map(|id| id as i64),
+                    item.fact.vector_bytes,
+                    item.fact.source_text,
+                    item.fact.confidence,
+                    item.fact.domain,
+                    item.fact.cycle as i64,
+                    item.fact.is_causal,
+                    claim_context_json,
+                ],
             )
             .map_err(|error| error.to_string())?;
         }
         tx.commit().map_err(|error| error.to_string())?;
-        self.total_saved += links.len() as u64;
-        Ok(links.len())
+        self.total_saved += facts.len() as u64;
+        Ok(facts.len())
     }
 
-    /// Load persisted typed relation links. Graph import validates endpoint IDs.
-    pub fn load_evidence_links(&mut self) -> Result<Vec<EvidenceLink>, String> {
+    /// Load the graph snapshot, preserving IDs used by typed evidence-link endpoints.
+    pub fn load_graph_facts(&mut self) -> Result<Vec<GraphFactRecord>, String> {
         if !self.is_configured() {
             return Err("No database path configured".into());
         }
         let conn = self.open_connection()?;
         self.ensure_schema(&conn)?;
-        let mut stmt = conn
-            .prepare("SELECT link_json FROM knowledge_evidence_links ORDER BY id")
+        let mut statement = conn
+            .prepare(
+                "SELECT fact_id, vector_blob, source_text, confidence, domain, cycle, is_causal, claim_context_json
+                 FROM knowledge_facts ORDER BY cycle DESC, id DESC",
+            )
             .map_err(|error| error.to_string())?;
-        let rows: Vec<String> = stmt
-            .query_map([], |row| row.get::<_, String>(0))
+        let rows = statement
+            .query_map([], |row| {
+                let claim_context = row
+                    .get::<_, Option<String>>(7)?
+                    .map(|raw| {
+                        serde_json::from_str::<ClaimContext>(&raw).map_err(|error| {
+                            rusqlite::Error::FromSqlConversionFailure(
+                                7,
+                                rusqlite::types::Type::Text,
+                                Box::new(error),
+                            )
+                        })
+                    })
+                    .transpose()?;
+                Ok(GraphFactRecord {
+                    fact_id: row.get::<_, Option<i64>>(0)?.map(|id| id as u64),
+                    fact: FactRecord {
+                        vector_bytes: row.get(1)?,
+                        source_text: row.get(2)?,
+                        confidence: row.get(3)?,
+                        domain: row.get(4)?,
+                        cycle: row.get::<_, i64>(5)? as u64,
+                        is_causal: row.get(6)?,
+                    },
+                    claim_context,
+                })
+            })
             .map_err(|error| error.to_string())?
             .collect::<Result<Vec<_>, _>>()
-            .map_err(|error| error.to_string())?;
-        let links = rows
-            .iter()
-            .map(|raw| serde_json::from_str::<EvidenceLink>(raw).map_err(|error| error.to_string()))
-            .collect::<Result<Vec<_>, _>>()?;
-        self.total_loaded += links.len() as u64;
-        Ok(links)
+            .map_err(|error| format!("Graph fact record decoding failed: {error}"))?;
+        self.total_loaded += rows.len() as u64;
+        Ok(rows)
     }
 
     /// Save causal edge records.
