@@ -535,7 +535,7 @@
     }
   ],
   "differential_oracle": {
-    "status": "unit_test_added_pending_exact_head_validation",
+    "status": "unit_test_added",
     "implementation": "JSON-value-based reference interpreter compared against the production typed-state interpreter",
     "coverage": "all 12 frozen traces plus a session-start mutation",
     "limits": "same maintainers and frozen fixture; implementation-diversity cross-check only, not external clinical adjudication or a formally verified specification"
