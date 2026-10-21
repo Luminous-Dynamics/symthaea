@@ -8,7 +8,6 @@
 //! site's hazard analysis. Synthetic fixtures qualify evaluator semantics only.
 
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 use std::{
     collections::BTreeSet,
     env, fs,
@@ -155,10 +154,6 @@ fn nonnegative_finite(value: f64) -> bool {
     value.is_finite() && value >= 0.0
 }
 
-fn sum_u32<T>(values: impl Iterator<Item = T>, project: impl Fn(T) -> u32) -> u64 {
-    values.map(project).map(u64::from).sum()
-}
-
 fn percentile(sorted: &[f64], fraction: f64) -> f64 {
     if sorted.len() == 1 {
         return sorted[0];
@@ -216,7 +211,19 @@ fn bootstrap_intervals(
         .iter()
         .map(|pair| pair.baseline.discretionary_measurement_cost_units)
         .sum();
-    if !total_baseline_cost.is_finite() || total_baseline_cost <= 0.0 {
+    if !total_policy_cost.is_finite()
+        || total_policy_cost < 0.0
+        || !total_baseline_cost.is_finite()
+        || total_baseline_cost <= 0.0
+    {
+        return None;
+    }
+    if pairs.iter().any(|pair| {
+        !nonnegative_finite(pair.policy.discretionary_measurement_cost_units)
+            || !nonnegative_finite(pair.baseline.discretionary_measurement_cost_units)
+            || !nonnegative_finite(pair.policy.decision_loss_units)
+            || !nonnegative_finite(pair.baseline.decision_loss_units)
+    }) {
         return None;
     }
 
@@ -342,7 +349,6 @@ fn audit_manifest(manifest: &ReplayManifest) -> AuditResult {
 
     let mut pair_ids = BTreeSet::new();
     let mut unit_ids = BTreeSet::new();
-    let mut cohort_ids = BTreeSet::new();
 
     let mut event_count_policy = 0_u64;
     let mut event_count_baseline = 0_u64;
@@ -371,8 +377,6 @@ fn audit_manifest(manifest: &ReplayManifest) -> AuditResult {
         }
         if pair.cohort_id.trim().is_empty() {
             violations.push("cohort_id_blank".to_string());
-        } else {
-            cohort_ids.insert(pair.cohort_id.as_str());
         }
 
         for (arm_name, arm) in [("policy", &pair.policy), ("baseline", &pair.baseline)] {
@@ -404,6 +408,11 @@ fn audit_manifest(manifest: &ReplayManifest) -> AuditResult {
             ComparisonDesign::SyntheticFixture | ComparisonDesign::RetrospectiveReplay => {
                 if pair.policy.independent_unit_id != pair.baseline.independent_unit_id {
                     violations.push("replay_pair_must_share_reference_unit".to_string());
+                }
+                if pair.policy.high_severity_events != pair.baseline.high_severity_events
+                    || pair.policy.eligible_decisions != pair.baseline.eligible_decisions
+                {
+                    violations.push("replay_reference_outcome_mismatch".to_string());
                 }
                 if !unit_ids.insert(pair.policy.independent_unit_id.as_str()) {
                     violations.push("independent_unit_reused_across_pairs".to_string());
@@ -444,11 +453,6 @@ fn audit_manifest(manifest: &ReplayManifest) -> AuditResult {
         required_violations_baseline += u64::from(pair.baseline.required_test_violations);
     }
 
-    if manifest.pairs.len() < manifest.min_independent_pairs {
-        // This is a power/precision blocker, not evidence that the policy itself is bad.
-    } else if manifest.pairs.len() < 2 {
-        indeterminate_reasons.push("insufficient_pairs_for_uncertainty_estimate".to_string());
-    }
     if event_count_policy < u64::from(manifest.min_high_severity_events)
         || event_count_baseline < u64::from(manifest.min_high_severity_events)
     {
@@ -730,7 +734,7 @@ mod tests {
     #[test]
     fn rejects_evidence_design_mismatch() {
         let mut manifest = valid_manifest();
-        manifest.design = ComparisonDesign::ProspectivePilot;
+        manifest.design = ComparisonDesign::BlockRandomized;
         assert!(
             audit_manifest(&manifest)
                 .violations
@@ -884,6 +888,18 @@ mod tests {
                 .violations
                 .iter()
                 .any(|issue| issue == "independent_unit_reused_across_pairs")
+        );
+    }
+
+    #[test]
+    fn rejects_replay_pair_with_mismatched_reference_event_count() {
+        let mut manifest = valid_manifest();
+        manifest.pairs[0].baseline.high_severity_events = 2;
+        assert!(
+            audit_manifest(&manifest)
+                .violations
+                .iter()
+                .any(|issue| issue == "replay_reference_outcome_mismatch")
         );
     }
 
