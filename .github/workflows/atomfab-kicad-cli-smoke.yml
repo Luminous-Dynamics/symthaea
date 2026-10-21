@@ -292,20 +292,13 @@ jobs:
               claim_ceiling: "The CLI parsed the fixture and generated the recorded outputs; this does not prove physical board conformity, electrical safety, assembly quality, or product qualification."
             }' > "$OUT_HOST/receipt.json"
 
-          sha256sum \
-            "$GITHUB_WORKSPACE/$BOARD_REL" \
-            "$OUT_HOST/continuity-coupon-shorted.kicad_pcb" \
-            "$OUT_HOST/kicad-version.txt" \
-            "$OUT_HOST/clean-drc.json" \
-            "$OUT_HOST/clean-drc-repeat.json" \
-            "$OUT_HOST/shorted-drc.json" \
-            "$OUT_HOST/continuity-coupon.kicad_pcb" \
-            "$OUT_HOST/artifact-manifest.json" \
-            "$OUT_HOST"/gerbers/* \
-            "$OUT_HOST"/gerbers-repeat/* \
-            "$OUT_HOST"/drill/* \
-            "$OUT_HOST"/drill-repeat/* \
-            "$OUT_HOST/receipt.json" > "$OUT_HOST/SHA256SUMS"
+          # Portable, artifact-root-relative checksums. This bundle must verify
+          # after download on another host; never leak runner absolute paths.
+          (
+            cd "$OUT_HOST"
+            find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
+            sha256sum -c SHA256SUMS
+          )
 
           jq -e '
             .schema == "atomfab-kicad-cli-smoke-receipt-v0.1"
