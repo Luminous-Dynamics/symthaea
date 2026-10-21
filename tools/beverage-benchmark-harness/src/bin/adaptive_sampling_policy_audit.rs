@@ -252,10 +252,15 @@ fn audit_record(record: &DecisionRecord) -> Vec<String> {
 
             match (loss_with_sample, record.estimated_sampling_cost_units, record.estimated_delay_cost_units) {
                 (Some(loss_after), Some(sample_cost), Some(delay_cost))
-                    if sample_cost.is_finite() && delay_cost.is_finite()
-                        && sample_cost >= 0.0 && delay_cost >= 0.0 =>
+                    if sample_cost.is_finite()
+                        && delay_cost.is_finite()
+                        && sample_cost >= 0.0
+                        && delay_cost >= 0.0 =>
                 {
-                    let net_value = record.expected_loss_without_sample_units - loss_after - sample_cost - delay_cost;
+                    let net_value = record.expected_loss_without_sample_units
+                        - loss_after
+                        - sample_cost
+                        - delay_cost;
                     if net_value <= 0.0 {
                         violations.push("sample_expected_net_value_not_positive".to_string());
                     }
@@ -543,7 +548,7 @@ mod tests {
         assert!(
             audit_record(&record)
                 .iter()
-                .any(|issue| issue == "estimated_cost_units_invalid")
+                .any(|issue| issue == "estimated_sampling_cost_units_invalid")
         );
     }
 
@@ -580,7 +585,9 @@ mod tests {
         let value = serde_json::to_value(valid_record()).expect("record serializes");
         let mut object = value.as_object().expect("object").clone();
         object.insert("override_safety_floor".to_string(), serde_json::json!(true));
-        assert!(serde_json::from_value::<DecisionRecord>(serde_json::Value::Object(object)).is_err());
+        assert!(
+            serde_json::from_value::<DecisionRecord>(serde_json::Value::Object(object)).is_err()
+        );
     }
 
     #[test]
@@ -606,28 +613,44 @@ mod tests {
         record.expected_loss_with_sample_units = Some(6.0);
         record.estimated_sampling_cost_units = Some(3.0);
         record.estimated_delay_cost_units = Some(1.0);
-        assert!(audit_record(&record).iter().any(|issue| issue == "sample_expected_net_value_not_positive"));
+        assert!(
+            audit_record(&record)
+                .iter()
+                .any(|issue| issue == "sample_expected_net_value_not_positive")
+        );
     }
 
     #[test]
     fn rejects_sample_result_after_decision_deadline() {
         let mut record = valid_record();
         record.expected_result_available_at_ms = Some(record.decision_deadline_ms + 1);
-        assert!(audit_record(&record).iter().any(|issue| issue == "sample_result_after_decision_deadline"));
+        assert!(
+            audit_record(&record)
+                .iter()
+                .any(|issue| issue == "sample_result_after_decision_deadline")
+        );
     }
 
     #[test]
     fn rejects_deferral_past_decision_deadline() {
         let mut record = valid_record();
         make_defer(&mut record, record.decision_deadline_ms + 1);
-        assert!(audit_record(&record).iter().any(|issue| issue == "defer_review_after_decision_deadline"));
+        assert!(
+            audit_record(&record)
+                .iter()
+                .any(|issue| issue == "defer_review_after_decision_deadline")
+        );
     }
 
     #[test]
     fn rejects_decision_deadline_before_decision_time() {
         let mut record = valid_record();
         record.decision_deadline_ms = record.decision_time_ms - 1;
-        assert!(audit_record(&record).iter().any(|issue| issue == "decision_deadline_precedes_decision"));
+        assert!(
+            audit_record(&record)
+                .iter()
+                .any(|issue| issue == "decision_deadline_precedes_decision")
+        );
     }
 
 }
