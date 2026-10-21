@@ -139,6 +139,84 @@ pub struct ConditionResult {
     pub final_discrepancy: f64,
 }
 
+/// Bounded feedback controller for exploratory coupling adaptation.
+///
+/// A window's mean target discrepancy is compared with the previous window.
+/// Improvement raises permeability by `increase_step`; deterioration lowers it
+/// by `decrease_step`; changes smaller than `improvement_tolerance` preserve
+/// the current setting. This is a simple research policy, not a biological claim.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct AdaptiveCouplingConfig {
+    pub min_permeability: f32,
+    pub max_permeability: f32,
+    pub initial_permeability: f32,
+    pub increase_step: f32,
+    pub decrease_step: f32,
+    pub decision_window_days: u32,
+    pub improvement_tolerance: f64,
+    pub recovery_tolerance: f64,
+}
+
+impl Default for AdaptiveCouplingConfig {
+    fn default() -> Self {
+        Self {
+            min_permeability: 0.0,
+            max_permeability: 1.0,
+            initial_permeability: 0.5,
+            increase_step: 0.1,
+            decrease_step: 0.2,
+            decision_window_days: 3,
+            improvement_tolerance: 0.002,
+            recovery_tolerance: 0.05,
+        }
+    }
+}
+
+impl AdaptiveCouplingConfig {
+    pub fn validate(&self) -> Result<(), &'static str> {
+        let values_are_finite = self.min_permeability.is_finite()
+            && self.max_permeability.is_finite()
+            && self.initial_permeability.is_finite()
+            && self.increase_step.is_finite()
+            && self.decrease_step.is_finite()
+            && self.improvement_tolerance.is_finite()
+            && self.recovery_tolerance.is_finite();
+        if !values_are_finite {
+            return Err("adaptive coupling parameters must be finite");
+        }
+        if self.decision_window_days == 0 {
+            return Err("decision_window_days must be positive");
+        }
+        if !(0.0..=1.0).contains(&self.min_permeability)
+            || !(0.0..=1.0).contains(&self.max_permeability)
+            || self.min_permeability > self.max_permeability
+            || self.initial_permeability < self.min_permeability
+            || self.initial_permeability > self.max_permeability
+        {
+            return Err("permeability bounds must satisfy 0 <= min <= initial <= max <= 1");
+        }
+        if self.increase_step <= 0.0 || self.decrease_step <= 0.0 {
+            return Err("adaptive coupling step sizes must be positive");
+        }
+        if self.improvement_tolerance < 0.0 || self.recovery_tolerance < 0.0 {
+            return Err("discrepancy tolerances must be non-negative");
+        }
+        Ok(())
+    }
+}
+
+/// Per-day trace from a discrepancy-trend adaptive permeability experiment.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AdaptiveConditionResult {
+    pub perturbation_label: String,
+    pub homing_enabled: bool,
+    pub permeability_trajectory: Vec<(u32, f32)>,
+    pub discrepancy_trajectory: Vec<(u32, f64)>,
+    pub final_discrepancy: f64,
+    /// Sum of daily discrepancy; lower is better for otherwise comparable runs.
+    pub integrated_discrepancy: f64,
+    pub first_day_below_tolerance: Option<u32>,
+}
 /// Full equifinality experiment result across all perturbations, each run
 /// under both open (`permeability = 1.0`) and blocked (`permeability =
 /// 0.0`) gap junctions.
@@ -337,6 +415,83 @@ pub fn run_dose_response_experiment(
         .collect()
 }
 
+/// Run a predeclared feedback policy that changes gap-junction permeability
+/// according to whether target-morphology discrepancy improves over successive
+/// windows. Report the whole control trajectory; do not collapse it to a final
+/// permeability as if the policy were static.
+pub fn run_adaptive_coupling_experiment(
+    template: &NeuralOrganoid,
+    perturbation: &Perturbation,
+    recovery_days: u32,
+    homing: bool,
+    config: AdaptiveCouplingConfig,
+) -> Result<AdaptiveConditionResult, &'static str> {
+    config.validate()?;
+    if recovery_days == 0 {
+        return Err("recovery_days must be positive");
+    }
+
+    let mut organoid = template.clone();
+    organoid.set_positional_homing(homing);
+    organoid.set_gap_junction_permeability(config.initial_permeability);
+    perturbation.apply(&mut organoid);
+
+    let mut permeability = config.initial_permeability;
+    let mut permeability_trajectory = Vec::with_capacity(recovery_days as usize);
+    let mut discrepancy_trajectory = Vec::with_capacity(recovery_days as usize);
+    let mut current_window = Vec::with_capacity(config.decision_window_days as usize);
+    let mut previous_window_mean: Option<f64> = None;
+    let mut first_day_below_tolerance = None;
+    let mut integrated_discrepancy = 0.0;
+
+    for day in 1..=recovery_days {
+        organoid.set_gap_junction_permeability(permeability);
+        organoid.advance_day();
+        let discrepancy = organoid
+            .morphology_discrepancy()
+            .filter(|value| value.is_finite())
+            .unwrap_or(1.0)
+            .max(0.0);
+        permeability_trajectory.push((day, permeability));
+        discrepancy_trajectory.push((day, discrepancy));
+        integrated_discrepancy += discrepancy;
+        current_window.push(discrepancy);
+        if first_day_below_tolerance.is_none() && discrepancy <= config.recovery_tolerance {
+            first_day_below_tolerance = Some(day);
+        }
+
+        let window_complete = current_window.len() >= config.decision_window_days as usize
+            || day == recovery_days;
+        if window_complete {
+            let current_mean = current_window.iter().sum::<f64>() / current_window.len() as f64;
+            if let Some(previous_mean) = previous_window_mean {
+                if current_mean + config.improvement_tolerance < previous_mean {
+                    permeability = (permeability + config.increase_step)
+                        .min(config.max_permeability);
+                } else if current_mean > previous_mean + config.improvement_tolerance {
+                    permeability = (permeability - config.decrease_step)
+                        .max(config.min_permeability);
+                }
+            }
+            previous_window_mean = Some(current_mean);
+            current_window.clear();
+        }
+    }
+
+    let final_discrepancy = discrepancy_trajectory
+        .last()
+        .map(|(_, value)| *value)
+        .unwrap_or(1.0);
+    Ok(AdaptiveConditionResult {
+        perturbation_label: perturbation.label(),
+        homing_enabled: homing,
+        permeability_trajectory,
+        discrepancy_trajectory,
+        final_discrepancy,
+        integrated_discrepancy,
+        first_day_below_tolerance,
+    })
+}
 /// Run the equifinality experiment: for each perturbation in
 /// `perturbations`, clone `template` (which must already have a captured
 /// target morphology — see [`build_radial_bipolar_template`]), run it under
