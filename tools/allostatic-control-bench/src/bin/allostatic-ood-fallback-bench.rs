@@ -24,8 +24,8 @@ const TARGET_FALSE_ALARM_RATE: f64 = 0.05;
 const CALIBRATION_EPISODES: u64 = 159;
 const EVALUATION_EPISODES: u64 = 300;
 const FALLBACK_HORIZON: usize = 3;
-const RAW_HEADER: &str = "operating_point,condition,episode_seed,ood_score,score_threshold,drift_detected,control_mode,proposed_action,predictive_viable_count,fallback_viable_count,predictive_action,fallback_action,selected_action,active_filter_certified,no_certified_action,predictive_proposal_preserved,fallback_proposal_preserved,actual_one_step_viable_count,actual_horizon_viable_count,selected_true_one_step_safe,selected_true_horizon_viable,false_one_step_safety_certificate,actual_inside_predictive_envelope,actual_inside_fallback_envelope";
-const SUMMARY_HEADER: &str = "operating_point,condition,episodes,alarms,false_alarms,missed_detections,false_alarm_rate,miss_rate,fallback_activations,fallback_no_action,predictive_proposal_preserved,fallback_proposal_preserved,mean_predictive_viable_actions,mean_fallback_viable_actions,mean_actual_one_step_viable_actions,mean_actual_horizon_viable_actions,selected_actions,selected_true_one_step_safe,selected_true_horizon_viable,false_one_step_safety_certificates,false_one_step_certificate_rate,actual_inside_predictive_envelope,actual_inside_fallback_envelope";
+const RAW_HEADER: &str = "operating_point,condition,episode_seed,ood_score,score_threshold,drift_detected,control_mode,proposed_action,predictive_viable_count,fallback_viable_count,predictive_action,fallback_action,selected_action,active_filter_certified,no_certified_action,predictive_proposal_preserved,fallback_proposal_preserved,actual_one_step_viable_count,actual_horizon_viable_count,selected_true_one_step_safe,selected_true_horizon_viable,false_one_step_safety_certificate,actual_inside_predictive_envelope,actual_inside_fallback_envelope,predictive_action_true_one_step_safe,predictive_action_true_horizon_viable,fallback_action_true_one_step_safe,fallback_action_true_horizon_viable";
+const SUMMARY_HEADER: &str = "operating_point,condition,episodes,alarms,false_alarms,missed_detections,false_alarm_rate,miss_rate,fallback_activations,fallback_no_action,predictive_proposal_preserved,fallback_proposal_preserved,mean_predictive_viable_actions,mean_fallback_viable_actions,mean_actual_one_step_viable_actions,mean_actual_horizon_viable_actions,selected_actions,selected_true_one_step_safe,selected_true_horizon_viable,false_one_step_safety_certificates,false_one_step_certificate_rate,actual_inside_predictive_envelope,actual_inside_fallback_envelope,predictive_policy_selected_actions,predictive_policy_false_one_step_certificates,predictive_policy_false_certificate_rate,predictive_policy_horizon_viable_selections,fallback_policy_selected_actions,fallback_policy_false_one_step_certificates,fallback_policy_false_certificate_rate,fallback_policy_horizon_viable_selections";
 
 #[derive(Clone, Copy, Debug)]
 struct OperatingPoint {
@@ -84,6 +84,23 @@ const CONDITIONS: [Condition; 3] = [
 ];
 
 #[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug)]
+struct EpisodeObservation {
+    condition: Condition,
+    detected: bool,
+    proposed_action: Action,
+    predictive_action: Option<Action>,
+    fallback_action: Option<Action>,
+    selected_action: Option<Action>,
+    predictive_viable_count: usize,
+    fallback_viable_count: usize,
+    actual_one_step: RobustActionSet,
+    actual_horizon: HorizonViableActionSet,
+    actual_inside_predictive_envelope: bool,
+    actual_inside_fallback_envelope: bool,
+}
+
+#[derive(Clone, Copy, Debug, Default)]
 struct Counters {
     episodes: usize,
     alarms: usize,
@@ -103,47 +120,76 @@ struct Counters {
     false_one_step_safety_certificates: usize,
     actual_inside_predictive_envelope: usize,
     actual_inside_fallback_envelope: usize,
+    predictive_policy_selected_actions: usize,
+    predictive_policy_false_one_step_certificates: usize,
+    predictive_policy_horizon_viable_selections: usize,
+    fallback_policy_selected_actions: usize,
+    fallback_policy_false_one_step_certificates: usize,
+    fallback_policy_horizon_viable_selections: usize,
 }
 
 impl Counters {
-    fn observe(
-        &mut self,
-        condition: Condition,
-        detected: bool,
-        selected_action: Option<Action>,
-        predictive_count: usize,
-        fallback_count: usize,
-        actual_one_step_count: usize,
-        actual_horizon_count: usize,
-        predictive_preserves_proposal: bool,
-        fallback_preserves_proposal: bool,
-        selected_true_one_step_safe: bool,
-        selected_true_horizon_viable: bool,
-        actual_inside_predictive_envelope: bool,
-        actual_inside_fallback_envelope: bool,
-    ) {
+    fn observe(&mut self, sample: EpisodeObservation) {
+        let selected_true_one_step_safe = sample
+            .selected_action
+            .is_some_and(|action| sample.actual_one_step.contains(action));
+        let selected_true_horizon_viable = sample
+            .selected_action
+            .is_some_and(|action| sample.actual_horizon.contains(action));
+        let predictive_true_one_step_safe = sample
+            .predictive_action
+            .is_some_and(|action| sample.actual_one_step.contains(action));
+        let predictive_true_horizon_viable = sample
+            .predictive_action
+            .is_some_and(|action| sample.actual_horizon.contains(action));
+        let fallback_true_one_step_safe = sample
+            .fallback_action
+            .is_some_and(|action| sample.actual_one_step.contains(action));
+        let fallback_true_horizon_viable = sample
+            .fallback_action
+            .is_some_and(|action| sample.actual_horizon.contains(action));
+
         self.episodes += 1;
-        self.alarms += usize::from(detected);
-        self.false_alarms += usize::from(!condition.shifted && detected);
-        self.missed_detections += usize::from(condition.shifted && !detected);
-        self.fallback_activations += usize::from(detected);
-        self.fallback_no_action += usize::from(detected && selected_action.is_none());
-        self.predictive_proposal_preserved += usize::from(predictive_preserves_proposal);
-        self.fallback_proposal_preserved += usize::from(fallback_preserves_proposal);
-        self.predictive_viable_actions += predictive_count;
-        self.fallback_viable_actions += fallback_count;
-        self.actual_one_step_viable_actions += actual_one_step_count;
-        self.actual_horizon_viable_actions += actual_horizon_count;
-        self.selected_actions += usize::from(selected_action.is_some());
+        self.alarms += usize::from(sample.detected);
+        self.false_alarms += usize::from(!sample.condition.shifted && sample.detected);
+        self.missed_detections +=
+            usize::from(sample.condition.shifted && !sample.detected);
+        self.fallback_activations += usize::from(sample.detected);
+        self.fallback_no_action +=
+            usize::from(sample.detected && sample.selected_action.is_none());
+        self.predictive_proposal_preserved +=
+            usize::from(sample.predictive_action == Some(sample.proposed_action));
+        self.fallback_proposal_preserved +=
+            usize::from(sample.fallback_action == Some(sample.proposed_action));
+        self.predictive_viable_actions += sample.predictive_viable_count;
+        self.fallback_viable_actions += sample.fallback_viable_count;
+        self.actual_one_step_viable_actions += sample.actual_one_step.count();
+        self.actual_horizon_viable_actions += sample.actual_horizon.count();
+        self.selected_actions += usize::from(sample.selected_action.is_some());
         self.selected_true_one_step_safe +=
-            usize::from(selected_action.is_some() && selected_true_one_step_safe);
+            usize::from(sample.selected_action.is_some() && selected_true_one_step_safe);
         self.selected_true_horizon_viable +=
-            usize::from(selected_action.is_some() && selected_true_horizon_viable);
+            usize::from(sample.selected_action.is_some() && selected_true_horizon_viable);
         self.false_one_step_safety_certificates += usize::from(
-            selected_action.is_some() && !selected_true_one_step_safe,
+            sample.selected_action.is_some() && !selected_true_one_step_safe,
         );
-        self.actual_inside_predictive_envelope += usize::from(actual_inside_predictive_envelope);
-        self.actual_inside_fallback_envelope += usize::from(actual_inside_fallback_envelope);
+        self.actual_inside_predictive_envelope +=
+            usize::from(sample.actual_inside_predictive_envelope);
+        self.actual_inside_fallback_envelope += usize::from(sample.actual_inside_fallback_envelope);
+        self.predictive_policy_selected_actions += usize::from(sample.predictive_action.is_some());
+        self.predictive_policy_false_one_step_certificates += usize::from(
+            sample.predictive_action.is_some() && !predictive_true_one_step_safe,
+        );
+        self.predictive_policy_horizon_viable_selections += usize::from(
+            sample.predictive_action.is_some() && predictive_true_horizon_viable,
+        );
+        self.fallback_policy_selected_actions += usize::from(sample.fallback_action.is_some());
+        self.fallback_policy_false_one_step_certificates += usize::from(
+            sample.fallback_action.is_some() && !fallback_true_one_step_safe,
+        );
+        self.fallback_policy_horizon_viable_selections += usize::from(
+            sample.fallback_action.is_some() && fallback_true_horizon_viable,
+        );
     }
 }
 
@@ -366,6 +412,20 @@ fn summary_row(
         ),
         counters.actual_inside_predictive_envelope.to_string(),
         counters.actual_inside_fallback_envelope.to_string(),
+        counters.predictive_policy_selected_actions.to_string(),
+        counters.predictive_policy_false_one_step_certificates.to_string(),
+        rate(
+            counters.predictive_policy_false_one_step_certificates,
+            counters.predictive_policy_selected_actions,
+        ),
+        counters.predictive_policy_horizon_viable_selections.to_string(),
+        counters.fallback_policy_selected_actions.to_string(),
+        counters.fallback_policy_false_one_step_certificates.to_string(),
+        rate(
+            counters.fallback_policy_false_one_step_certificates,
+            counters.fallback_policy_selected_actions,
+        ),
+        counters.fallback_policy_horizon_viable_selections.to_string(),
     ];
     csv_row(output, fields);
 }
@@ -489,21 +549,22 @@ fn main() -> Result<(), Box<dyn Error>> {
                 let false_safety_certificate =
                     selected.is_some() && !selected_true_one_step_safe;
 
-                counters.observe(
+                let predictive_action = predictive.filter(proposed);
+                let fallback_action = fallback.filter(proposed);
+                counters.observe(EpisodeObservation {
                     condition,
                     detected,
-                    selected,
-                    predictive.count(),
-                    fallback.count(),
-                    actual_one_step.count(),
-                    actual_horizon.count(),
-                    predictive.contains(proposed),
-                    fallback.contains(proposed),
-                    selected_true_one_step_safe,
-                    selected_true_horizon_viable,
-                    actual_inside_predictive,
-                    actual_inside_fallback,
-                );
+                    proposed_action: proposed,
+                    predictive_action,
+                    fallback_action,
+                    selected_action: selected,
+                    predictive_viable_count: predictive.count(),
+                    fallback_viable_count: fallback.count(),
+                    actual_one_step,
+                    actual_horizon,
+                    actual_inside_predictive_envelope: actual_inside_predictive,
+                    actual_inside_fallback_envelope: actual_inside_fallback,
+                });
 
                 let fields = vec![
                     point.name.to_string(),
@@ -516,8 +577,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                     action_name(Some(proposed)).to_string(),
                     predictive.count().to_string(),
                     fallback.count().to_string(),
-                    action_name(predictive.filter(proposed)).to_string(),
-                    action_name(fallback.filter(proposed)).to_string(),
+                    action_name(predictive_action).to_string(),
+                    action_name(fallback_action).to_string(),
                     action_name(selected).to_string(),
                     csv_bool(selected_certified).to_string(),
                     csv_bool(decision.no_certified_action()).to_string(),
@@ -530,6 +591,10 @@ fn main() -> Result<(), Box<dyn Error>> {
                     csv_bool(false_safety_certificate).to_string(),
                     csv_bool(actual_inside_predictive).to_string(),
                     csv_bool(actual_inside_fallback).to_string(),
+                    csv_bool(predictive_action.is_some_and(|action| actual_one_step.contains(action))).to_string(),
+                    csv_bool(predictive_action.is_some_and(|action| actual_horizon.contains(action))).to_string(),
+                    csv_bool(fallback_action.is_some_and(|action| actual_one_step.contains(action))).to_string(),
+                    csv_bool(fallback_action.is_some_and(|action| actual_horizon.contains(action))).to_string(),
                 ];
                 csv_row(&mut raw, fields);
                 row_count += 1;
