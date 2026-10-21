@@ -1,0 +1,322 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/benchmarks/mythology-bench/v0/narrative-graph.schema.json",
+  "title": "Source-grounded Narrative Knowledge Graph v0",
+  "description": "Graph shape contract only. Referential integrity, relation evidence, chronology consistency and rights enforcement require separate validation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "graph_id",
+    "synthetic_only",
+    "source_records",
+    "nodes",
+    "edges",
+    "nonclaims"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mythology-graph-v0"
+    },
+    "graph_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "synthetic_only": {
+      "type": "boolean"
+    },
+    "source_records": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "source_id",
+          "source_kind",
+          "role",
+          "rights_status",
+          "description"
+        ],
+        "properties": {
+          "source_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_kind": {
+            "enum": [
+              "synthetic_control",
+              "primary_source",
+              "scholarly_analysis",
+              "catalog_record",
+              "community_authorized_source",
+              "experimental_data"
+            ]
+          },
+          "role": {
+            "type": "string",
+            "minLength": 1
+          },
+          "rights_status": {
+            "enum": [
+              "public_domain_verified",
+              "open_license_verified",
+              "metadata_only",
+              "permission_required",
+              "restricted",
+              "community_governed",
+              "unknown"
+            ]
+          },
+          "uri": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uri"
+          },
+          "locator": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          },
+          "date_or_interval": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "language": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "nodes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "node_id",
+          "kind",
+          "label",
+          "context",
+          "source_ids"
+        ],
+        "properties": {
+          "node_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "enum": [
+              "agent",
+              "deity",
+              "human",
+              "concept",
+              "symbol",
+              "event",
+              "place",
+              "ritual",
+              "narrative_version",
+              "motif",
+              "artifact",
+              "institution",
+              "textual_witness"
+            ]
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1
+          },
+          "aliases": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "context": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "tradition_context",
+              "period_or_interval",
+              "language",
+              "genre"
+            ],
+            "properties": {
+              "tradition_context": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "community_or_school": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "period_or_interval": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "place_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "language": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "genre": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "source_version": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          },
+          "source_ids": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "attributes": {
+            "type": "object"
+          },
+          "uncertainty": {
+            "enum": [
+              "low",
+              "moderate",
+              "high",
+              "unassessed"
+            ]
+          }
+        }
+      }
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "edge_id",
+          "source_node",
+          "target_node",
+          "relation",
+          "epistemic_status",
+          "evidence_basis",
+          "source_ids"
+        ],
+        "properties": {
+          "edge_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_node": {
+            "type": "string",
+            "minLength": 1
+          },
+          "target_node": {
+            "type": "string",
+            "minLength": 1
+          },
+          "relation": {
+            "enum": [
+              "attests",
+              "interprets",
+              "supports",
+              "contradicts",
+              "contextualizes",
+              "resembles",
+              "historically_influences",
+              "variant_of",
+              "precedes",
+              "overlaps",
+              "after",
+              "causes",
+              "participates_in",
+              "has_role",
+              "has_attribute",
+              "transforms_into",
+              "localized_as",
+              "part_of",
+              "contests"
+            ]
+          },
+          "epistemic_status": {
+            "enum": [
+              "source_attested",
+              "tradition_internal",
+              "scholarly_interpretation",
+              "inference",
+              "unknown"
+            ]
+          },
+          "evidence_basis": {
+            "enum": [
+              "direct_source",
+              "scholarly_argument",
+              "explicit_inference",
+              "synthetic_assertion"
+            ]
+          },
+          "source_ids": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "valid_time": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "nonclaims": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}
