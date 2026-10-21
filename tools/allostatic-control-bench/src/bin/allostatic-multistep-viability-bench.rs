@@ -1,6 +1,6 @@
 //! Deterministic finite-horizon viable-action frontier across operating states.
 //!
-//! Usage: allostatic-multistep-viability-bench <raw.csv>
+//! Usage: allostatic-multistep-viability-bench <raw.csv> <summary.csv>
 //! Synthetic results test search contracts and runtime accounting, not empirical
 //! safety or performance on a physical system.
 
@@ -19,7 +19,8 @@ use std::io::{Error as IoError, ErrorKind};
 
 const HORIZONS: [usize; 5] = [1, 2, 3, 5, 8];
 const PROFILE_COUNT: u64 = 24;
-const HEADER: &str = "operating_point,profile_seed,horizon,push_certified,maintain_certified,emergency_recover_certified,certified_action_count,empty_viable_set,expanded_nodes,transition_evaluations,max_depth_reached";
+const RAW_HEADER: &str = "operating_point,profile_seed,horizon,push_certified,maintain_certified,emergency_recover_certified,certified_action_count,empty_viable_set,expanded_nodes,transition_evaluations,max_depth_reached";
+const SUMMARY_HEADER: &str = "operating_point,horizon,profiles,candidate_actions,certified_action_cases,certified_action_fraction,empty_viable_sets,empty_set_rate,mean_expanded_nodes,p95_expanded_nodes,max_expanded_nodes,mean_transition_evaluations,p95_transition_evaluations,max_transition_evaluations,max_depth_reached";
 
 #[derive(Clone, Copy, Debug)]
 struct OperatingPoint {
@@ -56,12 +57,49 @@ const OPERATING_POINTS: [OperatingPoint; 5] = [
     },
 ];
 
+#[derive(Debug)]
+struct SummaryBucket {
+    operating_point: &'static str,
+    horizon: usize,
+    profiles: usize,
+    candidate_actions: usize,
+    certified_action_cases: usize,
+    empty_viable_sets: usize,
+    expanded_nodes: Vec<usize>,
+    transition_evaluations: Vec<usize>,
+    max_depth_reached: usize,
+}
+
+impl SummaryBucket {
+    fn new(operating_point: &'static str, horizon: usize) -> Self {
+        Self {
+            operating_point,
+            horizon,
+            profiles: 0,
+            candidate_actions: 0,
+            certified_action_cases: 0,
+            empty_viable_sets: 0,
+            expanded_nodes: Vec::new(),
+            transition_evaluations: Vec::new(),
+            max_depth_reached: 0,
+        }
+    }
+
+    fn observe(&mut self, actions: HorizonViableActionSet, stats: HorizonSearchStats) {
+        self.profiles += 1;
+        self.candidate_actions += 3;
+        self.certified_action_cases += actions.count();
+        self.empty_viable_sets += usize::from(actions.count() == 0);
+        self.expanded_nodes.push(stats.expanded_nodes);
+        self.transition_evaluations
+            .push(stats.transition_evaluations);
+        self.max_depth_reached = self.max_depth_reached.max(stats.max_depth_reached);
+    }
+}
+
 fn deterministic_trit(seed: u64, dimension: u64) -> f64 {
-    let mut value = seed.wrapping_add(
-        dimension
-            .wrapping_add(1)
-            .wrapping_mul(0x9E37_79B9_7F4A_7C15),
-    );
+    let mut value =
+        seed.wrapping_add(dimension.wrapping_add(1).wrapping_mul(0x9E37_79B9_7F4A_7C15));
     value = (value ^ (value >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
     value = (value ^ (value >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
     value ^= value >> 31;
@@ -115,10 +153,29 @@ fn subset_of(shorter: HorizonViableActionSet, longer: HorizonViableActionSet) ->
 }
 
 fn csv_bool(value: bool) -> &'static str {
-    if value { "true" } else { "false" }
+    if value {
+        "true"
+    } else {
+        "false"
+    }
 }
 
-fn row(
+fn mean(values: &[usize]) -> f64 {
+    values.iter().sum::<usize>() as f64 / values.len() as f64
+}
+
+fn percentile95(values: &[usize]) -> usize {
+    let mut sorted = values.to_vec();
+    sorted.sort_unstable();
+    let rank = (sorted.len() * 95).div_ceil(100);
+    sorted[rank - 1]
+}
+
+fn maximum(values: &[usize]) -> usize {
+    *values.iter().max().expect("each summary bucket has profiles")
+}
+
+fn raw_row(
     output: &mut String,
     point: OperatingPoint,
     seed: u64,
@@ -142,29 +199,61 @@ fn row(
     ));
 }
 
+fn summary_row(output: &mut String, bucket: &SummaryBucket) {
+    output.push_str(&format!(
+        "{},{},{},{},{},{:.6},{},{},{:.6},{},{},{:.6},{},{},{}\n",
+        bucket.operating_point,
+        bucket.horizon,
+        bucket.profiles,
+        bucket.candidate_actions,
+        bucket.certified_action_cases,
+        bucket.certified_action_cases as f64 / bucket.candidate_actions as f64,
+        bucket.empty_viable_sets,
+        bucket.empty_viable_sets as f64 / bucket.profiles as f64,
+        mean(&bucket.expanded_nodes),
+        percentile95(&bucket.expanded_nodes),
+        maximum(&bucket.expanded_nodes),
+        mean(&bucket.transition_evaluations),
+        percentile95(&bucket.transition_evaluations),
+        maximum(&bucket.transition_evaluations),
+        bucket.max_depth_reached,
+    ));
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = std::env::args().collect();
-    if args.len() != 2 {
+    if args.len() != 3 {
         return Err(IoError::new(
             ErrorKind::InvalidInput,
-            "usage: allostatic-multistep-viability-bench <raw.csv>",
+            "usage: allostatic-multistep-viability-bench <raw.csv> <summary.csv>",
         )
         .into());
     }
 
     let limits = ViabilityLimits::new(0.15, 0.88)
         .ok_or_else(|| IoError::new(ErrorKind::InvalidData, "invalid viability limits"))?;
-    let mut output = format!("{HEADER}\n");
+    let mut raw = format!("{RAW_HEADER}\n");
+    let mut summary = format!("{SUMMARY_HEADER}\n");
+    let mut buckets: Vec<SummaryBucket> = OPERATING_POINTS
+        .iter()
+        .flat_map(|point| HORIZONS.iter().map(|horizon| SummaryBucket::new(point.name, *horizon)))
+        .collect();
+    let pooled_offset = buckets.len();
+    buckets.extend(
+        HORIZONS
+            .iter()
+            .map(|horizon| SummaryBucket::new("all_states", *horizon)),
+    );
     let mut row_count = 0_usize;
 
-    for point in OPERATING_POINTS {
+    for (point_index, point) in OPERATING_POINTS.iter().copied().enumerate() {
         let state = state_for(point)?;
         for seed in 0..PROFILE_COUNT {
             let dynamics = dynamics_for(seed)?;
             let one_step = evaluate_action_set(state, dynamics, limits, true);
             let mut previous: Option<HorizonViableActionSet> = None;
 
-            for horizon in HORIZONS {
+            for (horizon_index, horizon) in HORIZONS.iter().copied().enumerate() {
                 let evaluation = evaluate_horizon_action_set_with_budget(
                     state,
                     dynamics,
@@ -210,14 +299,18 @@ fn main() -> Result<(), Box<dyn Error>> {
                     .into());
                 }
 
-                row(
-                    &mut output,
+                raw_row(
+                    &mut raw,
                     point,
                     seed,
                     horizon,
                     evaluation.action_set,
                     evaluation.stats,
                 );
+                let state_bucket_index = point_index * HORIZONS.len() + horizon_index;
+                buckets[state_bucket_index].observe(evaluation.action_set, evaluation.stats);
+                buckets[pooled_offset + horizon_index]
+                    .observe(evaluation.action_set, evaluation.stats);
                 row_count += 1;
                 previous = Some(evaluation.action_set);
             }
@@ -231,6 +324,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         )
         .into());
     }
-    fs::write(&args[1], output)?;
+
+    for bucket in &buckets {
+        summary_row(&mut summary, bucket);
+    }
+    fs::write(&args[1], raw)?;
+    fs::write(&args[2], summary)?;
     Ok(())
 }
