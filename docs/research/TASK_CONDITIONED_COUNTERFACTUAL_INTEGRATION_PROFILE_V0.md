@@ -177,6 +177,22 @@ Added `examples/task_conditioned_counterfactual_profile.rs`, a dependency-free R
 
 This is intentionally only the **summary/scoring layer**. It does not run a causal simulator, generate matched controls, establish that a provided cut is a valid intervention, estimate uncertainty, or demonstrate usefulness. Example data in `main` are illustrative values only, not empirical or simulation results. Rust is unavailable in the current environment, so the example and tests have not been compiled or executed. The next step remains an end-to-end finite-state toy evaluator that produces raw utility outcomes from explicit model/task/intervention fixtures.
 
+## Exact finite-state evaluator: reproduction commands
+
+On a machine with the repository's Rust toolchain:
+
+```bash
+git rev-parse HEAD
+cargo test --example task_conditioned_finite_state_eval
+mkdir -p results
+SYMTHAEA_SOURCE_SHA="$(git rev-parse HEAD)" \
+  cargo run --release --example task_conditioned_finite_state_eval \
+  > results/tccip_exact_finite_state_v1.tsv
+sha256sum results/tccip_exact_finite_state_v1.tsv
+```
+
+The output includes canonical fixture definitions and one row per intervention plus a profile summary. If `SYMTHAEA_SOURCE_SHA` is absent, the artifact labels the source revision `UNBOUND` and is exploratory only. Preserve the complete output, exact source SHA, test output, and artifact digest together. The run is an exact two-input reference, not a large-scale benchmark.
+
 ## First exact finite-state evaluator prototype (2026-10-21)
 
 Added `examples/task_conditioned_finite_state_eval.rs`. Unlike the earlier scorer, this evaluator computes intact and intervention utility by exhaustive enumeration of all two-bit exogenous inputs and both outcomes of the fair-coin replacement signal. The cut is applied to a declared edge in an acyclic Boolean rule graph; whether it crosses the declared two-component partition is derived from endpoint labels, not supplied by the score caller. Raw intervention outcomes and aggregate profile rows are emitted separately.
