@@ -30,7 +30,7 @@ jobs:
           BOARD="/work/${BOARD_REL}"
           OUT_HOST="$GITHUB_WORKSPACE/atomfab-kicad-smoke-out"
           OUT="/work/atomfab-kicad-smoke-out"
-          mkdir -p "$OUT_HOST/gerbers" "$OUT_HOST/drill"
+          mkdir -p "$OUT_HOST/gerbers" "$OUT_HOST/gerbers-repeat" "$OUT_HOST/drill" "$OUT_HOST/drill-repeat"
           chmod -R a+rwX "$OUT_HOST"
 
           docker pull --platform linux/amd64 "$IMAGE"
@@ -48,6 +48,9 @@ jobs:
           kicad pcb drc --severity-all --format json \
             --output "$OUT/clean-drc.json" --exit-code-violations "$BOARD"
           jq empty "$OUT_HOST/clean-drc.json"
+          kicad pcb drc --severity-all --format json \
+            --output "$OUT/clean-drc-repeat.json" --exit-code-violations "$BOARD"
+          cmp "$OUT_HOST/clean-drc.json" "$OUT_HOST/clean-drc-repeat.json"
 
           # Negative control: move the GND track onto the VCC track. Assert the
           # transformation occurred, then require the documented DRC violation
@@ -72,6 +75,24 @@ jobs:
             --no-protel-ext "$BOARD"
           kicad pcb export drill --output "$OUT/drill/" \
             --format excellon "$BOARD"
+
+          # Replay both exporters into clean directories. Deterministic bytes
+          # are a required benchmark result, not an assumption.
+          kicad pcb export gerbers --output "$OUT/gerbers-repeat/" \
+            --layers F.Cu,B.Cu,F.Mask,B.Mask,F.SilkS,Edge.Cuts \
+            --no-protel-ext "$BOARD"
+          kicad pcb export drill --output "$OUT/drill-repeat/" \
+            --format excellon "$BOARD"
+          diff <(find "$OUT_HOST/gerbers" -maxdepth 1 -type f -printf '%f\\n' | sort) \
+            <(find "$OUT_HOST/gerbers-repeat" -maxdepth 1 -type f -printf '%f\\n' | sort)
+          diff <(find "$OUT_HOST/drill" -maxdepth 1 -type f -printf '%f\\n' | sort) \
+            <(find "$OUT_HOST/drill-repeat" -maxdepth 1 -type f -printf '%f\\n' | sort)
+          for generated in "$OUT_HOST"/gerbers/*; do
+            cmp "$generated" "$OUT_HOST/gerbers-repeat/$(basename "$generated")"
+          done
+          for generated in "$OUT_HOST"/drill/*; do
+            cmp "$generated" "$OUT_HOST/drill-repeat/$(basename "$generated")"
+          done
 
           gerber_count=$(find "$OUT_HOST/gerbers" -maxdepth 1 -type f -name '*.gbr' -size +0c | wc -l)
           drill_count=$(find "$OUT_HOST/drill" -maxdepth 1 -type f -size +0c | wc -l)
@@ -106,6 +127,8 @@ jobs:
               controls: {
                 clean_board_drc_exit_code: 0,
                 clean_board_report_parsed_as_json: true,
+                repeated_clean_drc_report_byte_identical: true,
+                repeated_gerber_and_drill_exports_byte_identical: true,
                 intentionally_shorted_board_drc_exit_code: ($shorted_drc_exit_code | tonumber),
                 expected_shorted_board_exit_code: 5,
                 intentional_short_detected_by_exit_code: true
@@ -123,9 +146,12 @@ jobs:
             "$OUT_HOST/continuity-coupon-shorted.kicad_pcb" \
             "$OUT_HOST/kicad-version.txt" \
             "$OUT_HOST/clean-drc.json" \
+            "$OUT_HOST/clean-drc-repeat.json" \
             "$OUT_HOST/shorted-drc.json" \
             "$OUT_HOST"/gerbers/* \
+            "$OUT_HOST"/gerbers-repeat/* \
             "$OUT_HOST"/drill/* \
+            "$OUT_HOST"/drill-repeat/* \
             "$OUT_HOST/receipt.json" > "$OUT_HOST/SHA256SUMS"
 
           jq -e '
@@ -133,6 +159,8 @@ jobs:
             and (.git_head | test("^[0-9a-f]{40}$"))
             and (.board_sha256 | test("^[0-9a-f]{64}$"))
             and .controls.clean_board_drc_exit_code == 0
+            and .controls.repeated_clean_drc_report_byte_identical
+            and .controls.repeated_gerber_and_drill_exports_byte_identical
             and .controls.intentionally_shorted_board_drc_exit_code == 5
             and .controls.expected_shorted_board_exit_code == 5
             and .controls.intentional_short_detected_by_exit_code
