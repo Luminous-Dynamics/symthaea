@@ -26,6 +26,7 @@ struct Episode {
     emergency_recover_steps: usize,
     false_alarms: usize,
     false_alarm_opportunities: usize,
+    recovery_steps: Option<usize>,
     failed: bool,
 }
 
@@ -192,6 +193,11 @@ fn parse_episodes(csv: &str) -> Result<BTreeMap<ConditionKey, EpisodesBySeed>, B
         let emergency_recover_steps = parse_usize(&values, &header, "emergency_recover_steps")?;
         let resource_cost = parse_f64(&values, &header, "resource_cost")?;
         let recovery_text = cell(&values, &header, "recovery_steps")?;
+        let recovery_steps = if recovery_text == "NA" {
+            None
+        } else {
+            Some(recovery_text.parse::<usize>()?)
+        };
         if unsafe_episode != (unsafe_ticks > 0) {
             return Err(invalid_data(format!(
                 "unsafe_episode disagrees with unsafe_ticks on line {}",
@@ -234,11 +240,8 @@ fn parse_episodes(csv: &str) -> Result<BTreeMap<ConditionKey, EpisodesBySeed>, B
         {
             return Err(invalid_data(format!("episode counters violate horizon/denominator contract on line {}", line_index + 2)).into());
         }
-        if recovery_text != "NA" {
-            let recovery: usize = recovery_text.parse()?;
-            if recovery > HORIZON {
-                return Err(invalid_data(format!("recovery_steps outside horizon on line {}", line_index + 2)).into());
-            }
+        if recovery_steps.is_some_and(|steps| steps > HORIZON) {
+            return Err(invalid_data(format!("recovery_steps outside horizon on line {}", line_index + 2)).into());
         }
         let episode = Episode {
             task_reward: parse_f64(&values, &header, "task_reward")?,
@@ -254,6 +257,7 @@ fn parse_episodes(csv: &str) -> Result<BTreeMap<ConditionKey, EpisodesBySeed>, B
             emergency_recover_steps,
             false_alarms,
             false_alarm_opportunities,
+            recovery_steps,
             failed: parse_bool(&values, &header, "failed")?,
         };
         let group = groups.entry((scenario, policy, shielded)).or_default();
@@ -269,7 +273,7 @@ fn parse_episodes(csv: &str) -> Result<BTreeMap<ConditionKey, EpisodesBySeed>, B
 
 fn write_summary(groups: &BTreeMap<ConditionKey, EpisodesBySeed>, path: &str) -> Result<usize, Box<dyn Error>> {
     let mut output = String::from(
-        "scenario,policy,shielded,n,mean_task_reward,mean_cumulative_load,p95_cumulative_load,episode_violation_rate,mean_unsafe_ticks,mean_violation_exposure,p95_violation_exposure,mean_conditional_peak_violation,mean_minimum_reserve,mean_missed_limits,mean_shield_vetoes,mean_no_safe_action_ticks,mean_emergency_recover_steps,mean_false_alarms,mean_false_alarm_opportunities,false_alarm_rate_when_opportunity,episode_failure_rate\n"
+        "scenario,policy,shielded,n,mean_task_reward,mean_cumulative_load,p95_cumulative_load,episode_violation_rate,mean_unsafe_ticks,mean_violation_exposure,p95_violation_exposure,mean_conditional_peak_violation,mean_minimum_reserve,mean_missed_limits,mean_shield_vetoes,mean_no_safe_action_ticks,mean_emergency_recover_steps,mean_false_alarms,mean_false_alarm_opportunities,false_alarm_rate_when_opportunity,recovery_observed_n,mean_observed_recovery_steps,recovery_censored_rate,episode_failure_rate\n"
     );
     for ((scenario, policy, shielded), by_seed) in groups {
         let episodes: Vec<&Episode> = by_seed.values().collect();
@@ -298,6 +302,16 @@ fn write_summary(groups: &BTreeMap<ConditionKey, EpisodesBySeed>, path: &str) ->
         } else {
             format!("{:.6}", false_alarm_total as f64 / false_alarm_opportunity_total as f64)
         };
+        let observed_recovery: Vec<f64> = episodes.iter()
+            .filter_map(|row| row.recovery_steps.map(|steps| steps as f64))
+            .collect();
+        let recovery_censored = episodes.iter().filter(|row| row.recovery_steps.is_none()).count();
+        let recovery_mean = if observed_recovery.is_empty() {
+            "NA".to_string()
+        } else {
+            format!("{:.6}", mean(&observed_recovery))
+        };
+        let recovery_censored_rate = recovery_censored as f64 / episodes.len() as f64;
         let violation_rate = episodes.iter().filter(|row| row.unsafe_episode).count() as f64 / episodes.len() as f64;
         let failure_rate = episodes.iter().filter(|row| row.failed).count() as f64 / episodes.len() as f64;
         let conditional = if conditional_severity.is_empty() {
@@ -322,6 +336,8 @@ fn write_summary(groups: &BTreeMap<ConditionKey, EpisodesBySeed>, path: &str) ->
             mean(&emergency_steps),
             mean(&false_alarms),
             mean(&false_alarm_opportunities),
+            observed_recovery.len(),
+            recovery_censored_rate,
             failure_rate,
         ));
     }
