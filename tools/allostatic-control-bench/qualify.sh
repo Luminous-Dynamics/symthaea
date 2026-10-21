@@ -72,7 +72,7 @@ fi
 
 cargo run --locked --release --manifest-path "$manifest" --bin allostatic-control-report -- \
   "$tmpdir/run-a.csv" "$tmpdir/summary-a.csv" "$tmpdir/paired-a.csv" > "$tmpdir/report-a.log"
-cargo run --release --manifest-path "$manifest" --bin allostatic-control-report -- \
+cargo run --locked --release --manifest-path "$manifest" --bin allostatic-control-report -- \
   "$tmpdir/run-b.csv" "$tmpdir/summary-b.csv" "$tmpdir/paired-b.csv" > "$tmpdir/report-b.log"
 if ! cmp -s "$tmpdir/summary-a.csv" "$tmpdir/summary-b.csv" ||
    ! cmp -s "$tmpdir/paired-a.csv" "$tmpdir/paired-b.csv"; then
