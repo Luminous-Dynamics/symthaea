@@ -3,6 +3,7 @@ name: Active Experiment Score Validity
 on:
   pull_request:
     paths:
+      - "Cargo.toml"
       - "crates/core/symthaea-core/src/hdc/conjecture_engine.rs"
       - "crates/core/symthaea-core/src/hdc/conjecture_engine/experiment_selection.rs"
       - "crates/bridges/symthaea-physics-bridge/src/integrated_discovery.rs"
