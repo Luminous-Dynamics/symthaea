@@ -1,4 +1,4 @@
-//! Emit a paired operating-state frontier for point, global, and action-specific safety filters.
+//! Compare global and action-specific robust filters at matched 90% and 95% joint coverage targets.
 //!
 //! Usage: allostatic-model-mismatch-bench <raw.csv> <summary.csv>
 //! The generated profiles are deterministic synthetic falsification fixtures,
@@ -9,7 +9,7 @@ use allostatic_control_bench::calibration::{
 };
 use allostatic_control_bench::model_mismatch::{
     action_specific_calibration_panel, calibrate_action_specific_mismatch_panel,
-    calibrate_mismatch_panel, calibration_panel, point_and_action_specific_robust_vs_true,
+    calibrate_mismatch_panel, point_and_action_specific_robust_vs_true,
     point_and_robust_vs_true, synthetic_mismatch_profile,
 };
 use allostatic_control_bench::robust_viability::{Interval, StateEnvelope, ViabilityLimits};
@@ -19,8 +19,8 @@ use std::fs;
 use std::io::{Error as IoError, ErrorKind};
 
 const STRESS_GRID: [f64; 5] = [0.0, 0.25, 0.5, 0.75, 1.0];
-const RAW_HEADER: &str = "panel,operating_point,reserve,load,episode,stress,action,point_certified,global_robust_certified,action_specific_certified,true_safe,point_false_certification,global_robust_false_certification,action_specific_false_certification,global_robust_false_veto,action_specific_false_veto";
-const SUMMARY_HEADER: &str = "panel,operating_point,reserve,load,profiles,candidate_actions,point_certified_actions,global_robust_certified_actions,action_specific_certified_actions,true_safe_actions,point_false_certifications,global_robust_false_certifications,action_specific_false_certifications,global_robust_false_vetoes,action_specific_false_vetoes,point_false_cert_rate,global_robust_false_cert_rate,action_specific_false_cert_rate,global_robust_false_veto_rate,action_specific_false_veto_rate,point_action_fraction,global_robust_action_fraction,action_specific_action_fraction";
+const RAW_HEADER: &str = "panel,operating_point,reserve,load,episode,stress,action,point_certified,global_90_certified,action_specific_90_certified,global_95_certified,action_specific_95_certified,true_safe,point_false_certification,global_90_false_certification,action_specific_90_false_certification,global_95_false_certification,action_specific_95_false_certification,global_90_false_veto,action_specific_90_false_veto,global_95_false_veto,action_specific_95_false_veto";
+const SUMMARY_HEADER: &str = "panel,operating_point,reserve,load,profiles,candidate_actions,point_certified_actions,global_90_certified_actions,action_specific_90_certified_actions,global_95_certified_actions,action_specific_95_certified_actions,true_safe_actions,point_false_certifications,global_90_false_certifications,action_specific_90_false_certifications,global_95_false_certifications,action_specific_95_false_certifications,global_90_false_vetoes,action_specific_90_false_vetoes,global_95_false_vetoes,action_specific_95_false_vetoes,point_false_cert_rate,global_90_false_cert_rate,action_specific_90_false_cert_rate,global_95_false_cert_rate,action_specific_95_false_cert_rate,global_90_false_veto_rate,action_specific_90_false_veto_rate,global_95_false_veto_rate,action_specific_95_false_veto_rate,point_action_fraction,global_90_action_fraction,action_specific_90_action_fraction,global_95_action_fraction,action_specific_95_action_fraction";
 
 #[derive(Clone, Copy, Debug)]
 struct OperatingPoint {
@@ -59,8 +59,10 @@ const OPERATING_POINTS: [OperatingPoint; 5] = [
 
 #[derive(Clone, Copy, Debug)]
 struct CalibrationModels {
-    global: CalibratedEnvelopeRadii,
-    action_specific: ActionSpecificCalibratedEnvelopeRadii,
+    global_90: CalibratedEnvelopeRadii,
+    action_specific_90: ActionSpecificCalibratedEnvelopeRadii,
+    global_95: CalibratedEnvelopeRadii,
+    action_specific_95: ActionSpecificCalibratedEnvelopeRadii,
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -68,14 +70,10 @@ struct PanelCounters {
     profiles: usize,
     candidate_actions: usize,
     point_certified: usize,
-    global_robust_certified: usize,
-    action_specific_certified: usize,
+    robust_certified: [usize; 4],
     true_safe: usize,
-    point_false_certifications: usize,
-    global_robust_false_certifications: usize,
-    action_specific_false_certifications: usize,
-    global_robust_false_vetoes: usize,
-    action_specific_false_vetoes: usize,
+    false_certifications: [usize; 5],
+    false_vetoes: [usize; 4],
 }
 
 impl PanelCounters {
@@ -83,14 +81,16 @@ impl PanelCounters {
         self.profiles += other.profiles;
         self.candidate_actions += other.candidate_actions;
         self.point_certified += other.point_certified;
-        self.global_robust_certified += other.global_robust_certified;
-        self.action_specific_certified += other.action_specific_certified;
         self.true_safe += other.true_safe;
-        self.point_false_certifications += other.point_false_certifications;
-        self.global_robust_false_certifications += other.global_robust_false_certifications;
-        self.action_specific_false_certifications += other.action_specific_false_certifications;
-        self.global_robust_false_vetoes += other.global_robust_false_vetoes;
-        self.action_specific_false_vetoes += other.action_specific_false_vetoes;
+        for (left, right) in self.robust_certified.iter_mut().zip(other.robust_certified) {
+            *left += right;
+        }
+        for (left, right) in self.false_certifications.iter_mut().zip(other.false_certifications) {
+            *left += right;
+        }
+        for (left, right) in self.false_vetoes.iter_mut().zip(other.false_vetoes) {
+            *left += right;
+        }
     }
 }
 
@@ -118,40 +118,45 @@ fn summarize_panel(
     counters: PanelCounters,
     summary: &mut String,
 ) {
-    summary.push_str(&format!(
-        "{panel},{operating_point},{reserve},{load},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}\n",
-        counters.profiles,
-        counters.candidate_actions,
+    let robust_rates: Vec<String> = counters
+        .robust_certified
+        .iter()
+        .enumerate()
+        .map(|(index, denominator)| {
+            rate(counters.false_certifications[index + 1], *denominator)
+        })
+        .collect();
+    let false_veto_rates: Vec<String> = counters
+        .false_vetoes
+        .iter()
+        .map(|vetoes| rate(*vetoes, counters.true_safe))
+        .collect();
+    let action_fractions: Vec<String> = std::iter::once(counters.point_certified)
+        .chain(counters.robust_certified)
+        .map(|certified| rate(certified, counters.candidate_actions))
+        .collect();
+
+    let mut fields = vec![
+        panel.to_string(),
+        operating_point.to_string(),
+        reserve.to_string(),
+        load.to_string(),
+        counters.profiles.to_string(),
+        counters.candidate_actions.to_string(),
+        counters.point_certified.to_string(),
+    ];
+    fields.extend(counters.robust_certified.iter().map(usize::to_string));
+    fields.push(counters.true_safe.to_string());
+    fields.extend(counters.false_certifications.iter().map(usize::to_string));
+    fields.extend(counters.false_vetoes.iter().map(usize::to_string));
+    fields.push(rate(
+        counters.false_certifications[0],
         counters.point_certified,
-        counters.global_robust_certified,
-        counters.action_specific_certified,
-        counters.true_safe,
-        counters.point_false_certifications,
-        counters.global_robust_false_certifications,
-        counters.action_specific_false_certifications,
-        counters.global_robust_false_vetoes,
-        counters.action_specific_false_vetoes,
-        rate(counters.point_false_certifications, counters.point_certified),
-        rate(
-            counters.global_robust_false_certifications,
-            counters.global_robust_certified
-        ),
-        rate(
-            counters.action_specific_false_certifications,
-            counters.action_specific_certified
-        ),
-        rate(counters.global_robust_false_vetoes, counters.true_safe),
-        rate(counters.action_specific_false_vetoes, counters.true_safe),
-        rate(counters.point_certified, counters.candidate_actions),
-        rate(
-            counters.global_robust_certified,
-            counters.candidate_actions
-        ),
-        rate(
-            counters.action_specific_certified,
-            counters.candidate_actions
-        ),
     ));
+    fields.extend(robust_rates);
+    fields.extend(false_veto_rates);
+    fields.extend(action_fractions);
+    push_row(summary, fields);
 }
 
 fn state_for(point: OperatingPoint) -> Result<StateEnvelope, Box<dyn Error>> {
@@ -188,48 +193,92 @@ fn run_panel(
             .ok_or_else(|| IoError::new(ErrorKind::InvalidData, "invalid mismatch scale"))?;
         for stress in STRESS_GRID {
             for action in actions {
-                let (point_certified, global_robust_certified, true_safe) =
-                    point_and_robust_vs_true(
-                        state,
-                        action,
-                        stress,
-                        mismatch,
-                        models.global,
-                        limits,
-                    )
-                    .ok_or_else(|| {
-                        IoError::new(ErrorKind::InvalidData, "invalid global comparison inputs")
-                    })?;
-                let (specific_point_certified, action_specific_certified, specific_true_safe) =
+                let (point_certified, global_90, true_safe) = point_and_robust_vs_true(
+                    state,
+                    action,
+                    stress,
+                    mismatch,
+                    models.global_90,
+                    limits,
+                )
+                .ok_or_else(|| {
+                    IoError::new(ErrorKind::InvalidData, "invalid global 90% comparison inputs")
+                })?;
+                let (point_95, global_95, true_95) = point_and_robust_vs_true(
+                    state,
+                    action,
+                    stress,
+                    mismatch,
+                    models.global_95,
+                    limits,
+                )
+                .ok_or_else(|| {
+                    IoError::new(ErrorKind::InvalidData, "invalid global 95% comparison inputs")
+                })?;
+                let (specific_point_90, action_specific_90, true_specific_90) =
                     point_and_action_specific_robust_vs_true(
                         state,
                         action,
                         stress,
                         mismatch,
-                        models.action_specific,
+                        models.action_specific_90,
                         limits,
                     )
                     .ok_or_else(|| {
                         IoError::new(
                             ErrorKind::InvalidData,
-                            "invalid action-specific comparison inputs",
+                            "invalid action-specific 90% comparison inputs",
                         )
                     })?;
-                if point_certified != specific_point_certified || true_safe != specific_true_safe {
+                let (specific_point_95, action_specific_95, true_specific_95) =
+                    point_and_action_specific_robust_vs_true(
+                        state,
+                        action,
+                        stress,
+                        mismatch,
+                        models.action_specific_95,
+                        limits,
+                    )
+                    .ok_or_else(|| {
+                        IoError::new(
+                            ErrorKind::InvalidData,
+                            "invalid action-specific 95% comparison inputs",
+                        )
+                    })?;
+
+                if [point_95, specific_point_90, specific_point_95]
+                    .iter()
+                    .any(|value| *value != point_certified)
+                    || [true_95, true_specific_90, true_specific_95]
+                        .iter()
+                        .any(|value| *value != true_safe)
+                {
                     return Err(IoError::new(
                         ErrorKind::InvalidData,
-                        "global and action-specific comparisons disagree on point prediction or true state",
+                        "matched-coverage models disagree on point prediction or true state",
                     )
                     .into());
                 }
 
-                let point_false = point_certified && !true_safe;
-                let global_robust_false = global_robust_certified && !true_safe;
-                let action_specific_false = action_specific_certified && !true_safe;
-                let global_robust_false_veto = !global_robust_certified && true_safe;
-                let action_specific_false_veto = !action_specific_certified && true_safe;
+                let robust_certified = [global_90, action_specific_90, global_95, action_specific_95];
+                let false_certifications = [
+                    point_certified && !true_safe,
+                    global_90 && !true_safe,
+                    action_specific_90 && !true_safe,
+                    global_95 && !true_safe,
+                    action_specific_95 && !true_safe,
+                ];
+                let false_vetoes = [
+                    !global_90 && true_safe,
+                    !action_specific_90 && true_safe,
+                    !global_95 && true_safe,
+                    !action_specific_95 && true_safe,
+                ];
 
-                if is_in_envelope && (global_robust_false || action_specific_false) {
+                if is_in_envelope
+                    && robust_certified.iter().zip([global_90, action_specific_90, global_95, action_specific_95])
+                        .any(|(certified, _)| *certified && !true_safe)
+                {
                     return Err(IoError::new(
                         ErrorKind::InvalidData,
                         format!(
@@ -246,32 +295,42 @@ fn run_panel(
 
                 counters.candidate_actions += 1;
                 counters.point_certified += usize::from(point_certified);
-                counters.global_robust_certified += usize::from(global_robust_certified);
-                counters.action_specific_certified += usize::from(action_specific_certified);
+                for (count, certified) in counters.robust_certified.iter_mut().zip(robust_certified) {
+                    *count += usize::from(certified);
+                }
                 counters.true_safe += usize::from(true_safe);
-                counters.point_false_certifications += usize::from(point_false);
-                counters.global_robust_false_certifications += usize::from(global_robust_false);
-                counters.action_specific_false_certifications += usize::from(action_specific_false);
-                counters.global_robust_false_vetoes += usize::from(global_robust_false_veto);
-                counters.action_specific_false_vetoes += usize::from(action_specific_false_veto);
+                for (count, is_false) in counters.false_certifications.iter_mut().zip(false_certifications) {
+                    *count += usize::from(is_false);
+                }
+                for (count, is_veto) in counters.false_vetoes.iter_mut().zip(false_vetoes) {
+                    *count += usize::from(is_veto);
+                }
 
-                raw.push_str(&format!(
-                    "{panel},{},{:.2},{:.2},{},{stress:.2},{},{},{},{},{},{},{},{},{},{}\n",
-                    point.name,
-                    point.reserve,
-                    point.load,
-                    offset,
-                    action_name(action),
-                    point_certified,
-                    global_robust_certified,
-                    action_specific_certified,
-                    true_safe,
-                    point_false,
-                    global_robust_false,
-                    action_specific_false,
-                    global_robust_false_veto,
-                    action_specific_false_veto,
-                ));
+                let fields = vec![
+                    panel.to_string(),
+                    point.name.to_string(),
+                    format!("{:.2}", point.reserve),
+                    format!("{:.2}", point.load),
+                    offset.to_string(),
+                    format!("{stress:.2}"),
+                    action_name(action).to_string(),
+                    b(point_certified),
+                    b(global_90),
+                    b(action_specific_90),
+                    b(global_95),
+                    b(action_specific_95),
+                    b(true_safe),
+                    b(false_certifications[0]),
+                    b(false_certifications[1]),
+                    b(false_certifications[2]),
+                    b(false_certifications[3]),
+                    b(false_certifications[4]),
+                    b(false_vetoes[0]),
+                    b(false_vetoes[1]),
+                    b(false_vetoes[2]),
+                    b(false_vetoes[3]),
+                ];
+                push_row(raw, fields);
             }
         }
     }
@@ -288,21 +347,28 @@ fn main() -> Result<(), Box<dyn Error>> {
         .into());
     }
 
-    let global_calibration = calibration_panel();
-    let global = calibrate_mismatch_panel(&global_calibration, &STRESS_GRID, 0.90)
-        .ok_or_else(|| IoError::new(ErrorKind::InvalidData, "global calibration panel failed"))?;
-    let action_specific_calibration = action_specific_calibration_panel();
-    let action_specific =
-        calibrate_action_specific_mismatch_panel(&action_specific_calibration, &STRESS_GRID, 0.95)
+    // Calibrate all four methods on the same 159-profile synthetic design panel.
+    // The panel is a deterministic bounds fixture, not an exchangeable empirical sample.
+    let calibration_panel = action_specific_calibration_panel();
+    let global_90 = calibrate_mismatch_panel(&calibration_panel, &STRESS_GRID, 0.90)
+        .ok_or_else(|| IoError::new(ErrorKind::InvalidData, "global 90% calibration failed"))?;
+    let action_specific_90 =
+        calibrate_action_specific_mismatch_panel(&calibration_panel, &STRESS_GRID, 0.90)
             .ok_or_else(|| {
-                IoError::new(
-                    ErrorKind::InvalidData,
-                    "action-specific calibration panel failed",
-                )
+                IoError::new(ErrorKind::InvalidData, "action-specific 90% calibration failed")
+            })?;
+    let global_95 = calibrate_mismatch_panel(&calibration_panel, &STRESS_GRID, 0.95)
+        .ok_or_else(|| IoError::new(ErrorKind::InvalidData, "global 95% calibration failed"))?;
+    let action_specific_95 =
+        calibrate_action_specific_mismatch_panel(&calibration_panel, &STRESS_GRID, 0.95)
+            .ok_or_else(|| {
+                IoError::new(ErrorKind::InvalidData, "action-specific 95% calibration failed")
             })?;
     let models = CalibrationModels {
-        global,
-        action_specific,
+        global_90,
+        action_specific_90,
+        global_95,
+        action_specific_95,
     };
 
     let mut raw = format!("{RAW_HEADER}\n");
