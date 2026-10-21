@@ -769,11 +769,8 @@ impl KnowledgeManager {
                 })
                 .collect();
             let ontology_records = self.ontology.export_ontology_records();
-            if let Err(e) = p.save_graph_facts(&facts) {
-                tracing::warn!(error = %e, "Knowledge persistence: failed to save facts");
-            }
-            if let Err(e) = p.save_evidence_links(&evidence_links) {
-                tracing::warn!(error = %e, "Knowledge persistence: failed to save evidence links");
+            if let Err(e) = p.save_graph_snapshot(&facts, &evidence_links) {
+                tracing::warn!(error = %e, "Knowledge persistence: failed to save atomic graph/provenance snapshot");
             }
             if let Err(e) = p.save_causal_edges(&edges) {
                 tracing::warn!(error = %e, "Knowledge persistence: failed to save edges");
