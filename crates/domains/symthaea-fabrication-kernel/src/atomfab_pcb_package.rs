@@ -139,10 +139,10 @@ pub fn evaluate_package_corpus_bytes(
     declared_git_head: &str,
     actual_checkout_head: &str,
 ) -> Result<PackageCorpusReceipt, String> {
-    if !is_hex_digest(declared_git_head) || !matches!(declared_git_head.len(), 40 | 64) {
+    if !is_commit_sha(declared_git_head) {
         return Err("ATOMFAB_GIT_HEAD must be a 40- or 64-character hexadecimal commit SHA".into());
     }
-    if !is_hex_digest(actual_checkout_head) || !matches!(actual_checkout_head.len(), 40 | 64) {
+    if !is_commit_sha(actual_checkout_head) {
         return Err(
             "actual checkout HEAD must be a 40- or 64-character hexadecimal commit SHA".into(),
         );
@@ -372,6 +372,10 @@ fn is_safe_relative_path(value: &str) -> bool {
         .all(|segment| !segment.is_empty() && segment != "." && segment != "..")
 }
 
+fn is_commit_sha(value: &str) -> bool {
+    matches!(value.len(), 40 | 64) && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
 fn is_hex_digest(value: &str) -> bool {
     value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
@@ -546,6 +550,27 @@ mod tests {
             evaluate_package_corpus_bytes(EMBEDDED_PACKAGE_CORPUS.as_bytes(), &declared, &actual)
                 .expect_err("Git SHA mismatch must reject")
                 .contains("does not match the actual checkout HEAD")
+        );
+    }
+
+    #[test]
+    fn checkout_head_validation_accepts_sha1_and_sha256_ids() {
+        let bytes = EMBEDDED_PACKAGE_CORPUS.as_bytes();
+        for head in ["a".repeat(40), "b".repeat(64)] {
+            let receipt = evaluate_package_corpus_bytes(bytes, &head, &head)
+                .expect("valid SHA-1 or SHA-256 Git object ID");
+            assert!(receipt.passed(), "receipt: {receipt:#?}");
+            assert_eq!(receipt.git_head, head);
+        }
+        assert!(
+            evaluate_package_corpus_bytes(bytes, &"a".repeat(39), &"a".repeat(39))
+                .expect_err("short object ID must reject")
+                .contains("40- or 64-character hexadecimal commit SHA")
+        );
+        assert!(
+            evaluate_package_corpus_bytes(bytes, &"g".repeat(40), &"g".repeat(40))
+                .expect_err("non-hex object ID must reject")
+                .contains("40- or 64-character hexadecimal commit SHA")
         );
     }
 }
