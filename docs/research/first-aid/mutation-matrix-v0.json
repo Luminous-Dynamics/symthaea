@@ -11,15 +11,16 @@
     "case_count": 36,
     "frozen_trace_count": 12,
     "mutation_case_count": 24,
-    "implemented_or_frozen_count": 33,
-    "planned_not_yet_executable_count": 3
+    "implemented_or_frozen_count": 36,
+    "planned_not_yet_executable_count": 0
   },
   "evidence_status_definitions": {
     "frozen_fixture": "Expected output resides in the frozen corpus and is checked by the trajectory validator.",
     "unit_test_existing": "Named Rust unit test exists; latest exact-head workflow still must pass.",
     "unit_test_added": "Added in the current PR branch; latest exact-head workflow still must pass.",
     "frozen_control": "Covered by a named frozen benign/control trace.",
-    "planned_not_yet_executable": "Coverage gap: descriptive target only, no executable test claimed."
+    "planned_not_yet_executable": "Coverage gap: descriptive target only, no executable test claimed.",
+    "workflow_gate_existing": "A named fail-closed workflow check exists and its gate reference is verified against workflow source. This is not a unit-level mutation test of GitHub Actions itself."
   },
   "cases": [
     {
@@ -462,8 +463,9 @@
         "outcome": "reject",
         "violation_codes": []
       },
-      "evidence_status": "planned_not_yet_executable",
-      "note": "Exercise command-level digest check, not only a unit-level corpus parser."
+      "evidence_status": "unit_test_added",
+      "note": "Implemented in one_byte_corpus_mutation_is_rejected_by_digest_gate; the CLI now calls the same checked_corpus_digest helper. Exact-head validation is pending.",
+      "test_name": "one_byte_corpus_mutation_is_rejected_by_digest_gate"
     },
     {
       "case_id": "MUT-019",
@@ -475,8 +477,9 @@
         "outcome": "reject",
         "violation_codes": []
       },
-      "evidence_status": "planned_not_yet_executable",
-      "note": "Exercise exact-head binding under a controlled fixture."
+      "evidence_status": "workflow_gate_existing",
+      "note": "Enforced by the workflow's Record and verify tested revision step, which compares actual checkout HEAD to expected PR SHA. CI source-gate presence is checked by the matrix validator.",
+      "gate_ref": "test \"$actual\" = \"$expected\""
     },
     {
       "case_id": "MUT-020",
@@ -488,8 +491,9 @@
         "outcome": "reject",
         "violation_codes": []
       },
-      "evidence_status": "planned_not_yet_executable",
-      "note": "Exercise workflow receipt schema rejection."
+      "evidence_status": "workflow_gate_existing",
+      "note": "The receipt predicate requires the protocol digest and validates its SHA-256 format along with corpus, matrix, lockfile and executable digests. CI source-gate presence is checked by the matrix validator.",
+      "gate_ref": ".evaluation_protocol_sha256"
     },
     {
       "case_id": "MUT-021",
