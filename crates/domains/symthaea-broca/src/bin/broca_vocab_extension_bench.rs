@@ -30,7 +30,9 @@ const CONTEXTS: [[usize; 3]; NEW_TOKEN_COUNT] = [
     [13, 14, 15],
     [16, 17, 18],
     [19, 20, 21],
-    [22, 23, 24],
+    // Intentional duplicate context control: bundle-only initialization should
+    // expose exact collisions, while name-specific residuals should separate rows.
+    [19, 20, 21],
 ];
 
 #[derive(Debug, Serialize)]
@@ -210,7 +212,7 @@ fn run_arm(
     let old_rows_bit_identical = controller.token_embeddings()[..old_vocab_size]
         .iter()
         .zip(old_rows.iter())
-        .all(|(row, expected)| row.values == *expected);
+        .all(|(row, expected)| row.values.as_slice() == expected.as_slice());
 
     controller.reset();
     let extended_logits = controller.forward_step(query, 0, 0);
