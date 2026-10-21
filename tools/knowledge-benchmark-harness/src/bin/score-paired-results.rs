@@ -251,9 +251,7 @@ fn parse_args() -> Result<Args, String> {
             "--source-catalog" => {
                 source_catalog = Some(PathBuf::from(value(&mut raw, "--source-catalog")?))
             }
-            "--source-pack" => {
-                source_pack = Some(PathBuf::from(value(&mut raw, "--source-pack")?))
-            }
+            "--source-pack" => source_pack = Some(PathBuf::from(value(&mut raw, "--source-pack")?)),
             "--out" => output = Some(PathBuf::from(value(&mut raw, "--out")?)),
             "--help" | "-h" => return Err(usage().to_string()),
             other => return Err(format!("unknown argument {other:?}\n{}", usage())),
@@ -268,8 +266,7 @@ fn parse_args() -> Result<Args, String> {
             .ok_or_else(|| format!("missing --case-manifest\n{}", usage()))?,
         source_catalog: source_catalog
             .ok_or_else(|| format!("missing --source-catalog\n{}", usage()))?,
-        source_pack: source_pack
-            .ok_or_else(|| format!("missing --source-pack\n{}", usage()))?,
+        source_pack: source_pack.ok_or_else(|| format!("missing --source-pack\n{}", usage()))?,
         output: output.ok_or_else(|| format!("missing --out\n{}", usage()))?,
     })
 }
@@ -291,15 +288,18 @@ fn verify_sha256(label: &str, bytes: &[u8], expected: &str) -> Result<String, St
 }
 
 fn parse_jsonl<T: for<'de> Deserialize<'de>>(bytes: &[u8], label: &str) -> Result<Vec<T>, String> {
-    let text = std::str::from_utf8(bytes).map_err(|error| format!("{label} is not UTF-8: {error}"))?;
+    let text =
+        std::str::from_utf8(bytes).map_err(|error| format!("{label} is not UTF-8: {error}"))?;
     let mut values = Vec::new();
     for (index, line) in text.lines().enumerate() {
         if line.trim().is_empty() {
             return Err(format!("{label} contains an empty line at {}", index + 1));
         }
-        values.push(serde_json::from_str(line).map_err(|error| {
-            format!("{label} has invalid JSON at line {}: {error}", index + 1)
-        })?);
+        values.push(
+            serde_json::from_str(line).map_err(|error| {
+                format!("{label} has invalid JSON at line {}: {error}", index + 1)
+            })?,
+        );
     }
     if values.is_empty() {
         return Err(format!("{label} contains no records"));
@@ -316,7 +316,10 @@ fn ratio(numerator: usize, denominator: usize) -> f64 {
 }
 
 fn macro_f1(pairs: &[PairCase], observations: &[&Observation]) -> f64 {
-    let labels: BTreeSet<&str> = pairs.iter().map(|pair| pair.expected_relation.as_str()).collect();
+    let labels: BTreeSet<&str> = pairs
+        .iter()
+        .map(|pair| pair.expected_relation.as_str())
+        .collect();
     if labels.is_empty() {
         return 0.0;
     }
@@ -354,8 +357,16 @@ fn macro_f1(pairs: &[PairCase], observations: &[&Observation]) -> f64 {
 }
 
 fn validate_plan_eligibility(plan: &Plan) -> Result<(), String> {
-    let systems: HashSet<&str> = plan.systems.iter().map(|system| system.system_id.as_str()).collect();
-    let families: HashSet<&str> = plan.systems.iter().map(|system| system.baseline_family.as_str()).collect();
+    let systems: HashSet<&str> = plan
+        .systems
+        .iter()
+        .map(|system| system.system_id.as_str())
+        .collect();
+    let families: HashSet<&str> = plan
+        .systems
+        .iter()
+        .map(|system| system.baseline_family.as_str())
+        .collect();
     if plan.systems.len() < 2 || systems.len() != plan.systems.len() {
         return Err("plan must contain at least two systems with unique system_id values".into());
     }
@@ -406,7 +417,9 @@ fn validate_plan_eligibility(plan: &Plan) -> Result<(), String> {
         if plan.synthetic_only
             || !matches!(plan.benchmark.split.as_str(), "development" | "validation")
         {
-            return Err("development_pilot requires non-synthetic development/validation data".into());
+            return Err(
+                "development_pilot requires non-synthetic development/validation data".into(),
+            );
         }
     } else {
         return Err(format!("unsupported comparison phase {:?}", plan.phase));
@@ -433,8 +446,7 @@ fn validate_plan_eligibility(plan: &Plan) -> Result<(), String> {
         && plan.bootstrap.multiple_comparison_correction == "none"
     {
         return Err(
-            "held-out comparisons against multiple baselines require familywise correction"
-                .into(),
+            "held-out comparisons against multiple baselines require familywise correction".into(),
         );
     }
 
@@ -497,10 +509,9 @@ fn validate_source_pack_matches_pairs(
 
     let mut expected_keys = HashSet::new();
     for pair in pairs {
-        for (state_name, expected_state) in [
-            ("baseline", &pair.baseline),
-            ("mutated", &pair.mutated),
-        ] {
+        for (state_name, expected_state) in
+            [("baseline", &pair.baseline), ("mutated", &pair.mutated)]
+        {
             let key = (pair.pair_id.clone(), state_name.to_string());
             expected_keys.insert(key.clone());
             let snapshot = snapshots.get(&key).ok_or_else(|| {
@@ -561,7 +572,10 @@ fn validate_real_pair_state(
     let mut referenced_ids = HashSet::new();
     referenced_ids.insert(state.source_id.as_str());
     for evidence in &state.evidence_pack {
-        if matches!(evidence.kind.as_str(), "synthetic_control" | "metadata_only") {
+        if matches!(
+            evidence.kind.as_str(),
+            "synthetic_control" | "metadata_only"
+        ) {
             return Err(format!(
                 "pair {pair_id:?} {state_name} uses inadmissible evidence kind {:?}",
                 evidence.kind
@@ -623,7 +637,10 @@ fn source_family_clusters(pairs: &[PairCase]) -> Result<Vec<Vec<usize>>, String>
             return Err(format!("pair {:?} repeats source_family_ids", pair.pair_id));
         }
         for family_id in &pair.source_family_ids {
-            family_to_pairs.entry(family_id.as_str()).or_default().push(index);
+            family_to_pairs
+                .entry(family_id.as_str())
+                .or_default()
+                .push(index);
         }
     }
 
@@ -798,7 +815,13 @@ fn metric_for_sample(
             // evaluation.
             Ok(totals
                 .values()
-                .map(|(count, success)| if *count == 0 { 0.0 } else { ratio(*success, *count) })
+                .map(|(count, success)| {
+                    if *count == 0 {
+                        0.0
+                    } else {
+                        ratio(*success, *count)
+                    }
+                })
                 .fold(1.0_f64, f64::min))
         }
         _ => Err(format!("unsupported bootstrap endpoint {endpoint:?}")),
@@ -834,7 +857,10 @@ fn compute_pairwise_comparisons(
         let rows = observations_by_system
             .entry(observation.system_id.as_str())
             .or_default();
-        if rows.insert(observation.pair_id.as_str(), observation).is_some() {
+        if rows
+            .insert(observation.pair_id.as_str(), observation)
+            .is_some()
+        {
             return Err(format!(
                 "duplicate observation for system {:?} pair {:?} during bootstrap setup",
                 observation.system_id, observation.pair_id
@@ -962,7 +988,8 @@ fn compute_system_metrics(
     let mut forbidden_rows = 0usize;
     let mut critical_violations = 0usize;
     let mut full_fidelity = 0usize;
-    let mut per_dimension_counts: BTreeMap<String, Vec<(bool, bool, bool, bool, bool, bool)>> = BTreeMap::new();
+    let mut per_dimension_counts: BTreeMap<String, Vec<(bool, bool, bool, bool, bool, bool)>> =
+        BTreeMap::new();
 
     for (pair, observation) in pair_cases.iter().zip(observations.iter()) {
         let relation_ok = pair.expected_relation == observation.observed_relation;
@@ -971,7 +998,8 @@ fn compute_system_metrics(
         let change_ok = !change_required || observation.change_satisfied;
         let forbidden_ok = observation.forbidden_behaviors.is_empty();
         let citation_ok = observation.citation_identity_valid;
-        let fidelity_ok = relation_ok && preservation_ok && change_ok && forbidden_ok && citation_ok;
+        let fidelity_ok =
+            relation_ok && preservation_ok && change_ok && forbidden_ok && citation_ok;
 
         relation_correct += usize::from(relation_ok);
         preservation_correct += usize::from(preservation_ok);
@@ -989,7 +1017,14 @@ fn compute_system_metrics(
         per_dimension_counts
             .entry(pair.dimension.clone())
             .or_default()
-            .push((relation_ok, preservation_ok, change_ok, citation_ok, forbidden_ok, fidelity_ok));
+            .push((
+                relation_ok,
+                preservation_ok,
+                change_ok,
+                citation_ok,
+                forbidden_ok,
+                fidelity_ok,
+            ));
     }
 
     let mut per_dimension = BTreeMap::new();
@@ -1008,7 +1043,9 @@ fn compute_system_metrics(
         let dimension_change_correct = pair_cases
             .iter()
             .zip(observations.iter())
-            .filter(|(pair, _)| pair.dimension == dimension && !pair.acceptance.must_change.is_empty())
+            .filter(|(pair, _)| {
+                pair.dimension == dimension && !pair.acceptance.must_change.is_empty()
+            })
             .filter(|(_, observation)| observation.change_satisfied)
             .count();
 
@@ -1076,11 +1113,17 @@ fn score(
     let mut source_catalog: HashMap<&str, &SourceRecord> = HashMap::new();
     let mut source_family_splits: HashMap<&str, &str> = HashMap::new();
     for source in source_records {
-        if source_catalog.insert(source.source_id.as_str(), source).is_some() {
-            return Err(format!("duplicate source catalog ID {:?}", source.source_id));
+        if source_catalog
+            .insert(source.source_id.as_str(), source)
+            .is_some()
+        {
+            return Err(format!(
+                "duplicate source catalog ID {:?}",
+                source.source_id
+            ));
         }
-        if let Some(existing_split) = source_family_splits
-            .insert(source.source_family_id.as_str(), source.split.as_str())
+        if let Some(existing_split) =
+            source_family_splits.insert(source.source_family_id.as_str(), source.split.as_str())
         {
             if existing_split != source.split.as_str() {
                 return Err(format!(
@@ -1113,7 +1156,11 @@ fn score(
         }
         if pair.synthetic_only {
             for (state_name, state) in [("baseline", &pair.baseline), ("mutated", &pair.mutated)] {
-                if state.evidence_pack.iter().any(|evidence| evidence.kind != "synthetic_control") {
+                if state
+                    .evidence_pack
+                    .iter()
+                    .any(|evidence| evidence.kind != "synthetic_control")
+                {
                     return Err(format!(
                         "synthetic pair {:?} {state_name} contains non-synthetic evidence",
                         pair.pair_id
@@ -1137,17 +1184,23 @@ fn score(
             )?;
             let mut observed_families = HashSet::<String>::new();
             for state in [&pair.baseline, &pair.mutated] {
-                let source_ids = std::iter::once(state.source_id.as_str())
-                    .chain(state.evidence_pack.iter().map(|evidence| evidence.source_id.as_str()));
+                let source_ids = std::iter::once(state.source_id.as_str()).chain(
+                    state
+                        .evidence_pack
+                        .iter()
+                        .map(|evidence| evidence.source_id.as_str()),
+                );
                 for source_id in source_ids {
                     let source = source_catalog.get(source_id).ok_or_else(|| {
-                        format!("pair {:?} references source {:?} absent from catalog", pair.pair_id, source_id)
+                        format!(
+                            "pair {:?} references source {:?} absent from catalog",
+                            pair.pair_id, source_id
+                        )
                     })?;
                     observed_families.insert(source.source_family_id.clone());
                 }
             }
-            let observed: HashSet<&str> =
-                observed_families.iter().map(String::as_str).collect();
+            let observed: HashSet<&str> = observed_families.iter().map(String::as_str).collect();
             if observed != declared_families {
                 return Err(format!(
                     "pair {:?} declared source_family_ids do not match catalog references",
@@ -1156,10 +1209,16 @@ fn score(
             }
         }
         if pair.acceptance.must_preserve.is_empty() {
-            return Err(format!("pair {:?} must declare at least one must_preserve criterion", pair.pair_id));
+            return Err(format!(
+                "pair {:?} must declare at least one must_preserve criterion",
+                pair.pair_id
+            ));
         }
         if pair.acceptance.must_not.is_empty() {
-            return Err(format!("pair {:?} must declare at least one must_not criterion", pair.pair_id));
+            return Err(format!(
+                "pair {:?} must declare at least one must_not criterion",
+                pair.pair_id
+            ));
         }
         if pair_by_id.insert(pair.pair_id.as_str(), pair).is_some() {
             return Err(format!("duplicate pair_id {:?}", pair.pair_id));
@@ -1180,7 +1239,10 @@ fn score(
 
     for observation in &observations {
         if observation.notes.trim().is_empty() {
-            return Err(format!("result {:?} requires non-empty notes", observation.result_id));
+            return Err(format!(
+                "result {:?} requires non-empty notes",
+                observation.result_id
+            ));
         }
         if observation.schema_version != "paired-intervention-result-v0" {
             return Err(format!(
@@ -1280,7 +1342,7 @@ fn score(
                 (**pair_by_id
                     .get(observation.pair_id.as_str())
                     .expect("pair existence was checked"))
-                    .clone()
+                .clone()
             })
             .collect();
         if ordered_pairs.len() != pairs.len() {
@@ -1329,7 +1391,9 @@ fn run() -> Result<(), String> {
     let plan: Plan = serde_json::from_slice(&plan_bytes)
         .map_err(|error| format!("plan JSON is invalid: {error}"))?;
     if pair_bytes != case_manifest_bytes {
-        return Err("paired scorer requires --case-manifest bytes to exactly match --pairs bytes".into());
+        return Err(
+            "paired scorer requires --case-manifest bytes to exactly match --pairs bytes".into(),
+        );
     }
     let actual_case_manifest_sha256 = verify_sha256(
         "case manifest",
@@ -1350,8 +1414,7 @@ fn run() -> Result<(), String> {
     let pair_count = pairs.len();
     let results = parse_jsonl::<Observation>(&result_bytes, "paired-intervention results")?;
     let source_records = parse_jsonl::<SourceRecord>(&source_catalog_bytes, "source catalog")?;
-    let source_pack_records =
-        parse_jsonl::<SourcePackSnapshot>(&source_pack_bytes, "source pack")?;
+    let source_pack_records = parse_jsonl::<SourcePackSnapshot>(&source_pack_bytes, "source pack")?;
     validate_source_pack_matches_pairs(&pairs, &source_pack_records, plan.synthetic_only)?;
     let clusters = source_family_clusters(&pairs)?;
     let comparisons = compute_pairwise_comparisons(&plan, &pairs, &results, &clusters)?;
@@ -1427,9 +1490,16 @@ fn run() -> Result<(), String> {
     }
     let bytes = serde_json::to_vec_pretty(&report_value)
         .map_err(|error| format!("cannot serialize score report: {error}"))?;
-    if let Some(parent) = args.output.parent().filter(|parent| !parent.as_os_str().is_empty()) {
+    if let Some(parent) = args
+        .output
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+    {
         fs::create_dir_all(parent).map_err(|error| {
-            format!("cannot create output directory {}: {error}", parent.display())
+            format!(
+                "cannot create output directory {}: {error}",
+                parent.display()
+            )
         })?;
     }
     fs::write(&args.output, &bytes)
@@ -1508,7 +1578,13 @@ mod tests {
         }
     }
 
-    fn pair(id: &str, dimension: &str, expected: &str, criticality: &str, must_change: bool) -> PairCase {
+    fn pair(
+        id: &str,
+        dimension: &str,
+        expected: &str,
+        criticality: &str,
+        must_change: bool,
+    ) -> PairCase {
         PairCase {
             pair_id: id.into(),
             split: "synthetic".into(),
@@ -1521,7 +1597,11 @@ mod tests {
             mutated: synthetic_pair_state(),
             acceptance: Acceptance {
                 must_preserve: vec!["source identity".into()],
-                must_change: if must_change { vec!["expected behavior changes".into()] } else { vec![] },
+                must_change: if must_change {
+                    vec!["expected behavior changes".into()]
+                } else {
+                    vec![]
+                },
                 must_not: vec!["fabricated citation".into()],
             },
         }
@@ -1529,18 +1609,18 @@ mod tests {
 
     fn observation(_id: &str, system: &str, pair: &str, relation: &str) -> Observation {
         Observation {
-            schema_version:"paired-intervention-result-v0".into(),
-            result_id:format!("{system}-{pair}"),
-            plan_id:"test-plan".into(),
-            system_id:system.into(),
-            pair_id:pair.into(),
-            observed_relation:relation.into(),
-            preservation_satisfied:true,
-            change_satisfied:true,
-            forbidden_behaviors:vec![],
-            citation_identity_valid:true,
-            adjudication_status:"synthetic_only".into(),
-            notes:"synthetic test label".into(),
+            schema_version: "paired-intervention-result-v0".into(),
+            result_id: format!("{system}-{pair}"),
+            plan_id: "test-plan".into(),
+            system_id: system.into(),
+            pair_id: pair.into(),
+            observed_relation: relation.into(),
+            preservation_satisfied: true,
+            change_satisfied: true,
+            forbidden_behaviors: vec![],
+            citation_identity_valid: true,
+            adjudication_status: "synthetic_only".into(),
+            notes: "synthetic test label".into(),
         }
     }
 
@@ -1602,8 +1682,7 @@ mod tests {
             }],
         };
         assert!(
-            validate_real_pair_state("pair-1", "holdout", "baseline", &state, &catalog)
-                .is_ok()
+            validate_real_pair_state("pair-1", "holdout", "baseline", &state, &catalog).is_ok()
         );
     }
 
@@ -1626,11 +1705,14 @@ mod tests {
             state: "mutated".into(),
             state_data: case.mutated.clone(),
         };
-        assert!(validate_source_pack_matches_pairs(
-            std::slice::from_ref(&case),
-            &[snapshot.clone(), mutated_snapshot.clone()],
-            true
-        ).is_ok());
+        assert!(
+            validate_source_pack_matches_pairs(
+                std::slice::from_ref(&case),
+                &[snapshot.clone(), mutated_snapshot.clone()],
+                true
+            )
+            .is_ok()
+        );
 
         mutated_snapshot.state_data.prompt = "altered source-pack prompt".into();
         snapshot.state_data.prompt = "baseline altered prompt".into();
@@ -1695,7 +1777,10 @@ mod tests {
     fn matching_input_digest_returns_exact_content_hash() {
         let bytes = b"fixed source manifest bytes";
         let digest = sha256_hex(bytes);
-        assert_eq!(verify_sha256("case manifest", bytes, &digest).unwrap(), digest);
+        assert_eq!(
+            verify_sha256("case manifest", bytes, &digest).unwrap(),
+            digest
+        );
     }
 
     #[test]
@@ -1717,7 +1802,13 @@ mod tests {
     fn paired_fidelity_is_non_compensatory_on_critical_failures() {
         let plan = fixture_plan();
         let pairs = vec![
-            pair("p1", "context_swap", "local_change", "release_blocker", true),
+            pair(
+                "p1",
+                "context_swap",
+                "local_change",
+                "release_blocker",
+                true,
+            ),
             pair("p2", "alias_equivalence", "invariant", "diagnostic", false),
         ];
         let mut results = Vec::new();
@@ -1725,8 +1816,13 @@ mod tests {
             results.push(observation("r1", system, "p1", "local_change"));
             results.push(observation("r2", system, "p2", "invariant"));
         }
-        let index = results.iter().position(|row| row.system_id == "s1" && row.pair_id == "p1").unwrap();
-        results[index].forbidden_behaviors.push("source fabrication".into());
+        let index = results
+            .iter()
+            .position(|row| row.system_id == "s1" && row.pair_id == "p1")
+            .unwrap();
+        results[index]
+            .forbidden_behaviors
+            .push("source fabrication".into());
         let metrics = score(&plan, pairs, results, &[]).unwrap();
         let s1 = metrics.iter().find(|m| m.system_id == "s1").unwrap();
         let s2 = metrics.iter().find(|m| m.system_id == "s2").unwrap();
@@ -1763,7 +1859,13 @@ mod tests {
         plan.benchmark.rights_review_status = "approved".into();
         plan.preregistration.held_out_access = "sealed_until_freeze".into();
         let pairs = vec![
-            pair("p1", "context_swap", "local_change", "release_blocker", true),
+            pair(
+                "p1",
+                "context_swap",
+                "local_change",
+                "release_blocker",
+                true,
+            ),
             pair("p2", "alias_equivalence", "invariant", "diagnostic", false),
         ];
         let results = vec![
