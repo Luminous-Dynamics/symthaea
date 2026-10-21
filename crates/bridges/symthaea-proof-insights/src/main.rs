@@ -2716,7 +2716,9 @@ fn normalized_full_proof_body(block: &str) -> Result<String> {
         bail!("source declaration prefix is ambiguous after normalization");
     }
     let proof_start = prefix_start + matched_prefix.len();
-    let proof_region = normalized_block[proof_start..].split_whitespace().collect::<Vec<_>>();
+    let proof_region = normalized_block[proof_start..]
+        .split_whitespace()
+        .collect::<Vec<_>>();
     let mut proof_tokens = proof_region;
     loop {
         if proof_tokens.last().copied() == Some("end") {
@@ -2737,12 +2739,8 @@ fn validate_artifact_declaration_identity(
     artifact: &TemporalEvidenceArtifact,
     span: &[u8],
 ) -> Result<()> {
-    if ![
-        "theorem_statement",
-        "completion_statement",
-        "proof_body",
-    ]
-    .contains(&artifact.artifact_kind.as_str())
+    if !["theorem_statement", "completion_statement", "proof_body"]
+        .contains(&artifact.artifact_kind.as_str())
     {
         return Ok(());
     }
@@ -2766,9 +2764,7 @@ fn validate_artifact_declaration_identity(
             let expected_prefix = statement_declaration_prefix(span_text)
                 .context("statement artifact lacks a parseable ':= by' declaration boundary")?;
             if !normalized_contains(block, &expected_prefix) {
-                bail!(
-                    "statement span does not match the proposition of declaration {theorem_id}"
-                );
+                bail!("statement span does not match the proposition of declaration {theorem_id}");
             }
         }
         "proof_body" => {
@@ -3679,16 +3675,13 @@ mod tests {
 
     #[test]
     fn normalized_lean_leakage_matching_ignores_comments_but_preserves_strings() {
-        let canonical = normalize_lean_for_leakage(
-            "by\n  exact Nat.add_comm a b\n",
-        );
+        let canonical = normalize_lean_for_leakage("by\n  exact Nat.add_comm a b\n");
         let commented = normalize_lean_for_leakage(
             "by /- copied explanation /- nested -/ -/\n  exact Nat.add_comm a b -- trailing note\n",
         );
         assert_eq!(canonical, commented);
-        let string_literal = normalize_lean_for_leakage(
-            r#"exact String.contains value "-- /- remain literal -/"#,
-        );
+        let string_literal =
+            normalize_lean_for_leakage(r#"exact String.contains value "-- /- remain literal -/"#);
         assert!(string_literal.contains(r#""-- /- remain literal -/""#));
     }
 
@@ -3741,7 +3734,11 @@ mod tests {
         }
         let error = validate_normalized_future_proof_leakage(&manifest, &normalized)
             .expect_err("comment/whitespace changes must not hide a copied future proof");
-        assert!(error.to_string().contains("normalized future-proof leakage"));
+        assert!(
+            error
+                .to_string()
+                .contains("normalized future-proof leakage")
+        );
         assert!(error.to_string().contains("target-000"));
         assert!(error.to_string().contains("target-001"));
     }
@@ -4259,10 +4256,8 @@ end Second
         let mut wrong_declaration_manifest = manifest.clone();
         let unrelated_span = exact_line_span(&source_two, 4, 4)
             .expect("line four belongs to the unrelated second theorem");
-        wrong_declaration_manifest["artifacts"][1]["content_start_line"] =
-            serde_json::json!(4);
-        wrong_declaration_manifest["artifacts"][1]["content_end_line"] =
-            serde_json::json!(4);
+        wrong_declaration_manifest["artifacts"][1]["content_start_line"] = serde_json::json!(4);
+        wrong_declaration_manifest["artifacts"][1]["content_end_line"] = serde_json::json!(4);
         wrong_declaration_manifest["artifacts"][1]["content_sha256"] =
             serde_json::Value::String(sha(unrelated_span));
         let wrong_declaration_path = base.join("wrong-declaration-proof.json");
@@ -4275,7 +4270,8 @@ end Second
         let identity_error = verify_temporal_manifest_file(&root, &wrong_declaration_path)
             .expect_err("a proof span from another declaration must be rejected");
         assert!(
-            format!("{identity_error:#}").contains("does not match its declared Lean theorem identity"),
+            format!("{identity_error:#}")
+                .contains("does not match its declared Lean theorem identity"),
             "the rejection must be due to theorem identity, not a stale digest"
         );
 
