@@ -7,7 +7,7 @@ Mythology deserves a first-class module in the shared knowledge fabric, but myth
 ## Contents
 
 - [`case.schema.json`](case.schema.json): versioned evaluation case contract.
-- [`cases.jsonl`](cases.jsonl): **22** development cases (Egypt-first + synthetic transfer/metamorphic controls).
+- [`cases.jsonl`](cases.jsonl): **26** development cases (Egypt-first + synthetic transfer/metamorphic controls).
 - [`narrative-graph.schema.json`](narrative-graph.schema.json): a source-grounded narrative-graph shape contract.
 - [`narrative-graph-fixtures.jsonl`](narrative-graph-fixtures.jsonl): four explicitly synthetic graph fixtures.
 - [`TRANSFER_PROTOCOL.md`](TRANSFER_PROTOCOL.md): cross-source splits, transfer metrics, metamorphic tests, baselines and nonclaims.
@@ -42,6 +42,8 @@ These links are scholarly context, not grants of full-text reuse rights:
 MythologyBench should complement rather than duplicate them: its focus is source-witness attribution, versioned narratives, tradition/time-conditioned meaning, variant isolation, transmission claims, and transfer to unseen source families without cultural projection.
 
 ## Acceptance boundary
+
+The newer cases add local-to-universal overgeneralization, graph similarity versus identity, multi-answer grading, and missing-domain abstention. A proposed structural-competence track is described in [the transfer protocol](TRANSFER_PROTOCOL.md), drawing cautiously on ICML 2026 meta-cultural structure research and ACL 2026 FrameNet-Cultures.
 
 All cases are `development`; synthetic controls are not historical evidence. Source links are not an invitation for automated crawling. Rights remain `unknown` until reviewed. Use [`scripts/validate-knowledge-benchmarks.sh`](../../../scripts/validate-knowledge-benchmarks.sh) to run the focused harness over all four fixture groups. The harness requires a generated `Cargo.lock`, binds its SHA-256 into each report, refuses remote schema references, and never crawls the scholarly source URLs.
 
