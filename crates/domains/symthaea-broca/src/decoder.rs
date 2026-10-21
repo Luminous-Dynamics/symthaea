@@ -226,8 +226,18 @@ impl StructuredProseTranslator {
 }
 
 pub fn active_intent_name(channels: &ThoughtChannels) -> &'static str {
+    // Keep this order aligned with ThoughtChannels::CHANNEL_NAMES and the
+    // SemanticIntent enum: acknowledge, answer, clarify, propose, uncertainty,
+    // reflect, continue, unknown.
     let names = [
-        "analyze", "create", "explain", "question", "answer", "reflect", "relate", "unknown",
+        "acknowledge",
+        "answer",
+        "clarify",
+        "propose",
+        "uncertainty",
+        "reflect",
+        "continue",
+        "unknown",
     ];
     channels
         .channels
@@ -241,10 +251,8 @@ pub fn active_intent_name(channels: &ThoughtChannels) -> &'static str {
 
 fn intent_prime(intent: &str, epistemic_status: EpistemicDisposition) -> SemanticPrime {
     match intent {
-        "analyze" => SemanticPrime::Think,
-        "create" => SemanticPrime::Do,
-        "explain" => SemanticPrime::Say,
-        "question" => SemanticPrime::Want,
+        // Acknowledgement is a communicative act, not a factual confidence claim.
+        "acknowledge" => SemanticPrime::Say,
         "answer" => match epistemic_status {
             EpistemicDisposition::Certain => SemanticPrime::Know,
             EpistemicDisposition::Probable => SemanticPrime::Think,
@@ -252,8 +260,11 @@ fn intent_prime(intent: &str, epistemic_status: EpistemicDisposition) -> Semanti
             | EpistemicDisposition::Unknown
             | EpistemicDisposition::OutOfDomain => SemanticPrime::Maybe,
         },
+        "clarify" => SemanticPrime::Want,
+        "propose" => SemanticPrime::Do,
+        "uncertainty" | "unknown" => SemanticPrime::Maybe,
         "reflect" => SemanticPrime::Feel,
-        "relate" => SemanticPrime::With,
+        "continue" => SemanticPrime::Think,
         _ => SemanticPrime::Maybe,
     }
 }
@@ -272,10 +283,11 @@ fn action_sentence(
     patient: &str,
     epistemic_status: EpistemicDisposition,
 ) -> &'static str {
-    // An Answer intent describes the requested act, not permission to claim
-    // knowledge. The upstream epistemic disposition controls the wording.
-    if intent == "answer" {
-        return match epistemic_status {
+    // Intent names follow the encoder's eight-channel contract. In particular,
+    // only channel 1 ("answer") is an answer request; channel 4 means uncertainty.
+    match intent {
+        "acknowledge" => "I acknowledge what you shared.",
+        "answer" => match epistemic_status {
             EpistemicDisposition::Certain => "The available evidence supports a direct answer.",
             EpistemicDisposition::Probable => "I can offer a qualified answer.",
             EpistemicDisposition::Uncertain => {
@@ -287,25 +299,24 @@ fn action_sentence(
             EpistemicDisposition::OutOfDomain => {
                 "This question is outside the domain I can answer reliably."
             }
-        };
-    }
-
-    match (intent, action) {
-        ("analyze", "THINK") => "I am analyzing the situation.",
-        ("create", "DO") => "I can create a concrete next step.",
-        ("explain", "SAY") => "I can explain the situation.",
-        ("question", "WANT") => "I want to ask a clarifying question.",
-        ("reflect", "FEEL") => "I am reflecting on the state change.",
-        ("relate", "WITH") => "I am relating this to nearby context.",
-        (_, "THINK") => "I am thinking about this.",
-        (_, "DO") => "I can act on this.",
-        (_, "SAY") => "I can explain this.",
-        (_, "WANT") => "I want to clarify this.",
-        (_, "FEEL") => "I feel this state changing.",
-        (_, "WITH") => "I am relating this to nearby context.",
-        (_, "MAYBE") => "I am uncertain about this.",
-        _ if patient == "SOMETHING" => "I am attending to something.",
-        _ => "I am attending to this.",
+        },
+        "clarify" => "I want to clarify the request.",
+        "propose" => "I can propose a concrete next step.",
+        "uncertainty" => "The available information leaves this uncertain.",
+        "reflect" => "I am reflecting on the current state.",
+        "continue" => "I will continue from the current context.",
+        "unknown" => "I cannot classify the requested intent reliably.",
+        _ => match action {
+            "THINK" => "I am thinking about this.",
+            "DO" => "I can act on this.",
+            "SAY" => "I can explain this.",
+            "WANT" => "I want to clarify this.",
+            "FEEL" => "I feel this state changing.",
+            "WITH" => "I am relating this to nearby context.",
+            "MAYBE" => "I am uncertain about this.",
+            _ if patient == "SOMETHING" => "I am attending to something.",
+            _ => "I am attending to this.",
+        },
     }
 }
 
@@ -339,9 +350,44 @@ mod tests {
         let decoder = StructuredDecoder::new(&genesis);
         let channels = ThoughtChannels::with_intent(2);
         let readout = decoder.decode(&channels);
-        assert_eq!(readout.intent, "explain");
-        assert!(readout.surface.contains("ACTION:SAY"));
+        assert_eq!(readout.intent, "clarify");
+        assert!(readout.surface.contains("ACTION:WANT"));
         assert!(!readout.roles.is_empty());
+    }
+
+    #[test]
+    fn all_eight_intent_channels_match_the_encoder_contract() {
+        let genesis = GenesisSeed::from_phrase("structured-intent-contract-test");
+        let decoder = StructuredDecoder::new(&genesis);
+        let translator = StructuredProseTranslator::new();
+        let cases = [
+            (0, "acknowledge", "ACTION:SAY", "acknowledge"),
+            (1, "answer", "ACTION:KNOW", "answer"),
+            (2, "clarify", "ACTION:WANT", "clarify"),
+            (3, "propose", "ACTION:DO", "propose"),
+            (4, "uncertainty", "ACTION:MAYBE", "uncertain"),
+            (5, "reflect", "ACTION:FEEL", "reflecting"),
+            (6, "continue", "ACTION:THINK", "continue"),
+            (7, "unknown", "ACTION:MAYBE", "unknown"),
+        ];
+
+        for (index, expected_intent, expected_action, expected_phrase) in cases {
+            let channels = ThoughtChannels::with_intent(index);
+            let readout = decoder.decode(&channels);
+            let translation = translator.translate(&readout);
+
+            assert_eq!(readout.intent, expected_intent, "channel {index}");
+            assert!(
+                readout.surface.contains(expected_action),
+                "channel {index} should encode {expected_action}: {}",
+                readout.surface
+            );
+            assert!(
+                translation.text.to_lowercase().contains(expected_phrase),
+                "channel {index} should preserve '{expected_phrase}': {}",
+                translation.text
+            );
+        }
     }
 
     #[test]
@@ -359,7 +405,7 @@ mod tests {
         ];
 
         for (ordinal, expected_status, expected_phrase) in cases {
-            let mut channels = ThoughtChannels::with_intent(4);
+            let mut channels = ThoughtChannels::with_intent(1);
             channels.set_epistemic(ordinal);
             let readout = decoder.decode(&channels);
             let translation = translator.translate(&readout);
@@ -406,7 +452,7 @@ mod tests {
     fn structured_prose_translation_preserves_grounding() {
         let genesis = GenesisSeed::from_phrase("structured-prose-test");
         let decoder = StructuredDecoder::new(&genesis);
-        let channels = ThoughtChannels::with_intent(4);
+        let channels = ThoughtChannels::with_intent(1);
         let readout = decoder.decode(&channels);
         let translation = StructuredProseTranslator::new().translate(&readout);
 
