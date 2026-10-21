@@ -60,7 +60,7 @@ The report retains each seed replicate independently. Do not pool the 8 held-out
 
 These are targets to preregister, not achieved results:
 
-1. **Compatibility:** default constructors produce bit-identical V1 token rows for the same genesis phrase and config; old configs lacking the new trailing field load as V1.
+1. **Compatibility:** default constructors produce bit-identical V1 token rows for the same genesis phrase and config; the serialized `LanguageControllerConfig` shape remains unchanged; old checkpoints without the V2 feature marker restore as V1.
 2. **Determinism:** repeat initialization and repeat benchmark arms produce exactly equal pre-training token rows for equal phrase, label, and scheme.
 3. **Numerical health:** zero non-finite values; no coordinate equals +1 in V2; sampled coordinate mean absolute value below 0.02 and RMS between 0.56 and 0.60 for 16,384 dimensions; mean absolute cosine below 0.02 across the selected random-row sample, and no pathological duplicate rows.
 4. **Seed robustness:** at least 5 matched genesis replicates and a larger fixture before interpreting downstream performance.
