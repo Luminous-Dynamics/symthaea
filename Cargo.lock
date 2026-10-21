@@ -19197,6 +19197,14 @@ name = "symthaea-lambda"
 version = "0.1.0"
 
 [[package]]
+name = "symthaea-landscape-review"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+ "sha2 0.10.9",
+]
+
+[[package]]
 name = "symthaea-lean-bridge"
 version = "0.1.0"
 dependencies = [
