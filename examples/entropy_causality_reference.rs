@@ -68,6 +68,21 @@ impl Network {
         Self { rules, flip_probability }
     }
 
+    fn canonical_specification(&self) -> String {
+        let rules = self
+            .rules
+            .iter()
+            .map(|rule| match rule {
+                Rule::Copy { from } => format!("copy:{from}"),
+                Rule::Xor { left, right } => format!("xor:{left}:{right}"),
+                Rule::And { left, right } => format!("and:{left}:{right}"),
+                Rule::Constant(value) => format!("constant:{}", if *value { 1 } else { 0 }),
+            })
+            .collect::<Vec<_>>()
+            .join(",");
+        format!("rules={rules};flip={:.6}", self.flip_probability)
+    }
+
     fn node_count(&self) -> usize {
         self.rules.len()
     }
@@ -303,12 +318,13 @@ fn main() {
         ));
     }
 
-    println!("network\tnodes\tH_next_bits\tH_next_given_prev_bits\tI_prev_next_bits\tmin_cut_sensitivity_tv");
+    println!("network\tnodes\tmodel_spec\tH_next_bits\tH_next_given_prev_bits\tI_prev_next_bits\tmin_cut_sensitivity_tv");
     for (name, network) in cases {
         let m = measure(&network);
         println!(
-            "{name}\t{}\t{:.6}\t{:.6}\t{:.6}\t{:.6}",
+            "{name}\t{}\t{}\t{:.6}\t{:.6}\t{:.6}\t{:.6}",
             m.nodes,
+            network.canonical_specification(),
             m.state_entropy_bits,
             m.transition_entropy_bits,
             m.mutual_information_bits,
