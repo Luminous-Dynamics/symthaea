@@ -64,3 +64,12 @@ The raw files and a checksum list are preserved. For repeatability comparisons, 
 
 
 The machine-readable manifest deliberately uses the existing strict `atomfab-pcb-artifact-inventory-v0.1` contract: `design_id`, `design_revision`, `required_roles`, and one `{role, path, expected_sha256}` entry per artifact, with the inventory evaluator's exact authority and claim-ceiling markers. Paths are relative to the artifact directory. This keeps native EDA output inventory compatible with the independent Rust byte-hashing verifier rather than introducing a second manifest schema.
+
+
+## Latest failure-driven refinement (2026-10-21)
+
+The latest executed run confirmed the connected negative-control mutation is now doing the right thing: the shorted-board DRC report records **two `tracks_crossing` violations and zero unconnected items**. The true-short negative control is therefore supported by report semantics, not merely exit code.
+
+The remaining replay failure came from KiCad's generated `continuity-coupon-job.gbrjob` JSON. It contains `Header.CreationDate`, which changes between otherwise equivalent exports; this is separate from the timestamp lines in the Gerber layer files. The workflow now compares `.gbrjob` files with canonical JSON after deleting only `Header.CreationDate`, compares raw Gerber layer payloads after removing the known creation-date lines, and preserves raw files plus SHA-256 hashes.
+
+The artifact manifest includes the two job-metadata files in addition to the six primary Gerber layers, six repeat layers, two Excellon outputs, three DRC reports, native/negative board, and tool-version output: **22 uniquely role-bound files**. The manifest uses the same strict schema as the Rust actual-byte inventory gate in parent PR #8222. This rerun still needs to validate the latest code; no green native-EDA claim is made until it passes at its exact head.
