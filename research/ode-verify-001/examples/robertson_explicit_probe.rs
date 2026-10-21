@@ -136,7 +136,12 @@ fn main() {
     let mut controller = match Rk45Controller::new(INITIAL_DT) {
         Ok(controller) => controller,
         Err(error) => {
-            print_failure_receipt(&source_sha, &checkout_sha, "invalid_controller", &format!("{error:?}"));
+            print_failure_receipt(
+                &source_sha,
+                &checkout_sha,
+                "invalid_controller",
+                &format!("{error:?}"),
+            );
             return;
         }
     };
@@ -195,7 +200,8 @@ fn main() {
                     || step.state.len() != 3
                 {
                     status = "invalid_step_report";
-                    status_detail = "accepted step report had an invalid dt or state dimension".to_owned();
+                    status_detail =
+                        "accepted step report had an invalid dt or state dimension".to_owned();
                     failed_step_work_complete = false;
                     break;
                 }
