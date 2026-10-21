@@ -43,11 +43,12 @@ jobs:
         shell: bash
         run: |
           set -uo pipefail
-          source_sha="$(git rev-parse HEAD)"
+          source_sha="${{ github.event.pull_request.head.sha || github.sha }}"
+          checkout_sha="$(git rev-parse HEAD)"
           set +e
-          ODE_BENCH_SOURCE_SHA="$source_sha" cargo run --locked --release --manifest-path research/ode-verify-001/Cargo.toml --example work_precision > /tmp/ode-work-precision-1.json
+          ODE_BENCH_SOURCE_SHA="$source_sha" ODE_BENCH_CHECKOUT_SHA="$checkout_sha" cargo run --locked --release --manifest-path research/ode-verify-001/Cargo.toml --example work_precision > /tmp/ode-work-precision-1.json
           first_status=$?
-          ODE_BENCH_SOURCE_SHA="$source_sha" cargo run --locked --release --manifest-path research/ode-verify-001/Cargo.toml --example work_precision > /tmp/ode-work-precision-2.json
+          ODE_BENCH_SOURCE_SHA="$source_sha" ODE_BENCH_CHECKOUT_SHA="$checkout_sha" cargo run --locked --release --manifest-path research/ode-verify-001/Cargo.toml --example work_precision > /tmp/ode-work-precision-2.json
           second_status=$?
           set -e
           echo "first_status=$first_status" >> "$GITHUB_OUTPUT"
@@ -64,7 +65,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: ode-work-precision-${{ github.sha }}
+          name: ode-work-precision-${{ github.event.pull_request.head.sha || github.sha }}
           path: /tmp/ode-work-precision-1.json
           if-no-files-found: error
 
