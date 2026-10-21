@@ -30,8 +30,8 @@ jobs:
         with:
           components: rustfmt, clippy
 
-      # Bootstrap only: the generated lock is uploaded below, then committed.
-      # The follow-up revision removes this step and enforces the committed lock.
+      # Bootstrap only. After reviewing the generated lock artifact, commit it
+      # and remove this step so future runs use only the reviewed lockfile.
       - name: Bootstrap candidate dependency lock
         run: cargo generate-lockfile --manifest-path research/ode-dopri5-reference/Cargo.toml
 
@@ -69,7 +69,8 @@ jobs:
             and (.lock_sha | test("^[0-9a-f]{64}$"))
             and (.observations | length == 9)
           ' /tmp/ode-dopri5-comparison-1.json
-          sha256sum research/ode-dopri5-reference/Cargo.lock /tmp/ode-dopri5-comparison-1.json
+          cp /tmp/ode-dopri5-comparison-1.json research/ode-dopri5-reference/ode-dopri5-comparison.json
+          sha256sum research/ode-dopri5-reference/Cargo.lock research/ode-dopri5-reference/ode-dopri5-comparison.json
 
       - name: Upload comparison receipt and candidate lock
         if: always()
@@ -78,7 +79,7 @@ jobs:
           name: ode-dopri5-reference-${{ github.event.pull_request.head.sha || github.sha }}
           path: |
             research/ode-dopri5-reference/Cargo.lock
-            /tmp/ode-dopri5-comparison-1.json
+            research/ode-dopri5-reference/ode-dopri5-comparison.json
           if-no-files-found: warn
 
       - name: Enforce source and numerical comparison gates
@@ -92,4 +93,4 @@ jobs:
           test "$GENERATION_OUTCOME" = "success"
           test "$FIRST_STATUS" = "0"
           test "$SECOND_STATUS" = "0"
-          jq -e 'all(.observations[]; .custom_pass == true and .dopri5_pass == true)' /tmp/ode-dopri5-comparison-1.json
+          jq -e 'all(.observations[]; .custom_pass == true and .dopri5_pass == true)' research/ode-dopri5-reference/ode-dopri5-comparison.json
