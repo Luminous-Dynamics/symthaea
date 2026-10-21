@@ -422,6 +422,19 @@ mod tests {
     }
 
     #[test]
+    fn parser_rejects_noncanonical_header() {
+        let altered = format!("{}\n{SAMPLE_ROW}\n", SAMPLE_HEADER.replace("scenario,seed", "scenario,id"));
+        assert!(parse_episodes(&altered).is_err());
+    }
+
+    #[test]
+    fn parser_rejects_inconsistent_mean_and_cumulative_load() {
+        let altered_row = SAMPLE_ROW.replace(",4.8,0.1,", ",4.8,0.2,");
+        let altered = format!("{SAMPLE_HEADER}\n{altered_row}\n");
+        assert!(parse_episodes(&altered).is_err());
+    }
+
+    #[test]
     fn parser_rejects_duplicate_condition_seed_rows() {
         let duplicate = format!("{SAMPLE_HEADER}\n{SAMPLE_ROW}\n{SAMPLE_ROW}\n");
         assert!(parse_episodes(&duplicate).is_err());
