@@ -97,6 +97,8 @@ jobs:
           while IFS= read -r test_name; do
             grep -Fq "fn ${test_name}(" xtask/src/first_aid_trajectory.rs
           done < <(jq -r '.cases[] | select(.evidence_status == "unit_test_added" or .evidence_status == "unit_test_existing") | .test_name' "$matrix")
+          oracle_test="$(jq -r '.differential_oracle.test_name' "$matrix")"
+          grep -Fq "fn ${oracle_test}(" xtask/src/first_aid_trajectory.rs
           expected_corpus_sha="$(jq -r '.fixture_binding.trajectory_corpus_sha256' "$matrix")"
           actual_corpus_sha="$(sha256sum "$corpus" | awk '{print $1}')"
           test "$actual_corpus_sha" = "$expected_corpus_sha"
