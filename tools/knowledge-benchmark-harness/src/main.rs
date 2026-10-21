@@ -1222,7 +1222,7 @@ mod tests {
                             )
                         });
                         assert_eq!(
-                            uri, catalog_uri,
+                            uri, catalog_uri.as_str(),
                             "case {} source URI differs from catalog for {source_id:?}",
                             string_field(&case, "id").unwrap_or("<unknown>")
                         );
