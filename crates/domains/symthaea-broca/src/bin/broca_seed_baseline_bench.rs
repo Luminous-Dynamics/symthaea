@@ -9,12 +9,15 @@
 //! Usage:
 //!   cargo run -p symthaea-broca --bin broca_seed_baseline_bench
 //!   cargo run -p symthaea-broca --bin broca_seed_baseline_bench -- --epochs 20 --seed-replicates 5
-//!   GIT_COMMIT_SHA=$(git rev-parse HEAD) cargo run -p symthaea-broca --bin broca_seed_baseline_bench -- --epochs 20 --json-out seed-ab.json
+//!   GIT_COMMIT_SHA=$(git rev-parse HEAD) cargo run -p symthaea-broca --bin broca_seed_baseline_bench --
+//!       --epochs 20 --seed-replicates 5 --json-out seed-ab.json
 
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::error::Error;
-use symthaea_broca::controller::{LanguageController, LanguageControllerConfig, TokenEmbeddingSeedScheme};
+use symthaea_broca::controller::{
+    LanguageController, LanguageControllerConfig, TokenEmbeddingSeedScheme,
+};
 use symthaea_broca::encoder::ThoughtChannels;
 use symthaea_broca::evaluation::{self, EvalConfig, EvalResult};
 use symthaea_broca::gating::GatingConfig;
@@ -121,7 +124,11 @@ fn base_config() -> BrocaConfig {
     }
 }
 
-fn make_dataset(cases: &[FixtureCase], tokenizer: &BpeTokenizer, repeats: usize) -> TrainingDataset {
+fn make_dataset(
+    cases: &[FixtureCase],
+    tokenizer: &BpeTokenizer,
+    repeats: usize,
+) -> TrainingDataset {
     let mut dataset = TrainingDataset::default();
     for case in cases {
         let mut channels = ThoughtChannels::with_intent(case.intent);
@@ -139,7 +146,8 @@ fn embedding_geometry(
     scheme: TokenEmbeddingSeedScheme,
 ) -> EmbeddingGeometry {
     let config = LanguageControllerConfig { vocab_size, ..Default::default() };
-    let controller = LanguageController::new_with_token_embedding_seed_scheme(genesis, &config, scheme);
+    let controller =
+        LanguageController::new_with_token_embedding_seed_scheme(genesis, &config, scheme);
     let rows: Vec<_> = controller.token_embeddings().iter().take(GEOMETRY_ROWS).collect();
     let dimension = rows.first().map(|row| row.values.len()).unwrap_or(0);
     let mut finite_coordinate_count = 0usize;
@@ -181,7 +189,11 @@ fn embedding_geometry(
         non_finite_coordinate_count,
         coordinate_mean,
         coordinate_rms,
-        mean_absolute_pairwise_cosine: if pair_count == 0 { 0.0 } else { pair_sum / pair_count as f64 },
+        mean_absolute_pairwise_cosine: if pair_count == 0 {
+            0.0
+        } else {
+            pair_sum / pair_count as f64
+        },
         max_absolute_pairwise_cosine,
     }
 }
@@ -230,7 +242,13 @@ fn run_arm(
     };
     let evaluation = evaluation::evaluate(&mut generator, &eval_config);
 
-    ArmResult { seed_replicate, seed_scheme: scheme, initial_geometry, training_final_loss, evaluation }
+    ArmResult {
+        seed_replicate,
+        seed_scheme: scheme,
+        initial_geometry,
+        training_final_loss,
+        evaluation,
+    }
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -256,7 +274,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     for replicate in 0..seed_replicates {
         let phrase = format!("broca-baseline-ab::replicate::{replicate}");
         let genesis = GenesisSeed::from_phrase(&phrase);
-        for scheme in [TokenEmbeddingSeedScheme::LegacyV1, TokenEmbeddingSeedScheme::DomainSeparatedV2] {
+        for scheme in [
+            TokenEmbeddingSeedScheme::LegacyV1,
+            TokenEmbeddingSeedScheme::DomainSeparatedV2,
+        ] {
             eprintln!("replicate={replicate} scheme={scheme:?} epochs={epochs}");
             results.push(run_arm(
                 &genesis, replicate, scheme, &training_dataset, &held_out_dataset, epochs,
@@ -268,7 +289,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         schema_version: 1,
         benchmark_id: "broca-genesis-token-init-v2-smoke-v1",
         evidence_level: "smoke",
-        evaluation_mode: if epochs == 0 { "initialization_only_smoke" } else { "paired_training_held_out_smoke" },
+        evaluation_mode: if epochs == 0 {
+            "initialization_only_smoke"
+        } else {
+            "paired_training_held_out_smoke"
+        },
         source_revision: option_env!("GIT_COMMIT_SHA"),
         epochs_per_arm: epochs,
         seed_replicates,
