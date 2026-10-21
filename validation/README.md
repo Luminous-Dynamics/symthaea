@@ -51,7 +51,7 @@ sha256sum results/tccip_rust_reference.tsv
 
 Keep both artifacts and their source SHAs/hashes. They are independently authored calculations over the same manifest; do not call the Python output a Rust run. A `UNBOUND` source SHA marks the output exploratory. Current fixtures show two distinct sensitivity effects: arbitrary partition changes can reverse the sign of TCCIP, and reversing the input-state prior can flip TCCIP (+0.3 to −0.3) even when the causal rules, task, partition, and intervention edges are identical. The latter pair uses edges into the same task-output AND gate as a stronger role-matched comparison. Report the full partition and state-prior profile; never select the most favorable result after seeing outcomes.
 
-The oracle and ten Python regression-test definitions are newly authored research code. They have not yet been run from the committed files in this environment. The Rust evaluator has 14 authored tests and has not been compiled. No qualification or performance claim is made by adding the harness.
+The oracle and eleven Python regression-test definitions are newly authored research code. They have not yet been run from the committed files in this environment. The Rust evaluator has 15 authored tests and has not been compiled. No qualification or performance claim is made by adding the harness.
 
 ## Required before qualification
 
