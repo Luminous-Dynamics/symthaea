@@ -300,7 +300,7 @@ jobs:
               "receipt_sha256": digest,
               "target_statement_correspondence": {
                   "status": "matches_intended_claim",
-                  "independent_reviewer_count": 1
+                  "independent_reviewer_count": 2
               },
               "successor_test_status": "passed",
               "successor_tests": [{
