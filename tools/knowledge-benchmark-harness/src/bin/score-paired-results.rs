@@ -214,6 +214,7 @@ struct Report {
     source_pack_sha256: String,
     bootstrap_replicates: usize,
     bootstrap_seed: u64,
+    minimum_independent_clusters: usize,
     confidence_level: f64,
     source_family_cluster_count: usize,
     pair_count: usize,
