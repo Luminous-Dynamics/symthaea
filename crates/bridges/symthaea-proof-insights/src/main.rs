@@ -229,6 +229,14 @@ struct TemporalTargetPayload {
     visible_artifacts: Vec<MaterializedVisibleArtifact>,
 }
 
+#[derive(Debug, Default)]
+struct LeakageScreeningSummary {
+    hidden_proof_artifact_count: usize,
+    short_proof_body_count: usize,
+    visible_proof_pairs_screened: usize,
+    visible_proof_pairs_skipped_short_body: usize,
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct TemporalTargetBundle {
@@ -1887,13 +1895,18 @@ fn verify_temporal_manifest_file(repository_root: &Path, manifest_path: &Path) -
             normalize_lean_for_leakage(span_text),
         );
     }
-    validate_normalized_future_proof_leakage(&manifest, &normalized_artifact_content)?;
+    let leakage_summary =
+        validate_normalized_future_proof_leakage(&manifest, &normalized_artifact_content)?;
 
     println!(
-        "PITB_TEMPORAL_MANIFEST_PASS: events={} artifacts={} repository_commit={}",
+        "PITB_TEMPORAL_MANIFEST_PASS: events={} artifacts={} repository_commit={} hidden_proofs={} short_proofs_without_substring_check={} visibility_pairs_screened={} visibility_pairs_skipped_short_proof={}",
         manifest.events.len(),
         manifest.artifacts.len(),
-        manifest.repository_commit
+        manifest.repository_commit,
+        leakage_summary.hidden_proof_artifact_count,
+        leakage_summary.short_proof_body_count,
+        leakage_summary.visible_proof_pairs_screened,
+        leakage_summary.visible_proof_pairs_skipped_short_body
     );
     Ok(())
 }
@@ -2624,13 +2637,16 @@ fn normalize_lean_for_leakage(source: &str) -> String {
 fn validate_normalized_future_proof_leakage(
     manifest: &TemporalReplayManifest,
     normalized_artifact_content: &BTreeMap<String, String>,
-) -> Result<()> {
+) -> Result<LeakageScreeningSummary> {
     const MIN_NORMALIZED_PROOF_TOKENS: usize = 12;
     let artifacts_by_id: BTreeMap<&str, &TemporalEvidenceArtifact> = manifest
         .artifacts
         .iter()
         .map(|artifact| (artifact.artifact_id.as_str(), artifact))
         .collect();
+    let mut summary = LeakageScreeningSummary::default();
+    let mut seen_hidden_proofs = BTreeSet::new();
+    let mut short_proofs = BTreeSet::new();
 
     for event in &manifest.events {
         for future_event in manifest
@@ -2654,11 +2670,19 @@ fn validate_normalized_future_proof_leakage(
                         future_event.target_id
                     )
                 })?;
+            if seen_hidden_proofs.insert(proof.artifact_id.as_str()) {
+                summary.hidden_proof_artifact_count += 1;
+            }
             if normalized_proof.split_whitespace().count() < MIN_NORMALIZED_PROOF_TOKENS {
+                if short_proofs.insert(proof.artifact_id.as_str()) {
+                    summary.short_proof_body_count += 1;
+                }
+                summary.visible_proof_pairs_skipped_short_body += event.visible_artifact_ids.len();
                 continue;
             }
             let needle = format!(" {normalized_proof} ");
             for visible_id in &event.visible_artifact_ids {
+                summary.visible_proof_pairs_screened += 1;
                 let visible = normalized_artifact_content
                     .get(visible_id)
                     .with_context(|| {
@@ -2676,7 +2700,7 @@ fn validate_normalized_future_proof_leakage(
             }
         }
     }
-    Ok(())
+    Ok(summary)
 }
 
 fn validate_artifact_declaration_identity(
