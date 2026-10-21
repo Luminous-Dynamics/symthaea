@@ -10,6 +10,7 @@
 //! Usage:
 //!   cargo run --release -p symthaea-broca --bin broca_fusion_bench -- --epochs 20
 //!   cargo run --release -p symthaea-broca --bin broca_fusion_bench -- --epochs 20 --sweep
+//!   GIT_COMMIT_SHA=$(git rev-parse HEAD) cargo run --release -p symthaea-broca --bin broca_fusion_bench -- --epochs 20 --json-out broca-smoke.json
 
 use symthaea_broca::encoder::ThoughtChannels;
 use symthaea_broca::evaluation::{self, EvalConfig, EvalResult};
@@ -234,6 +235,20 @@ fn run_eval(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn dataset_receipt_digests_are_stable_and_change_with_fixture_content() {
+        let tokenizer = BpeTokenizer::default_minimal();
+        let (training, evaluation) = make_datasets(&tokenizer);
+
+        let training_digest = dataset_sha256(&training);
+        assert_eq!(training_digest, dataset_sha256(&training));
+        assert_ne!(training_digest, dataset_sha256(&evaluation));
+
+        let mut modified = training.clone();
+        modified.pairs[0].target_text.push_str(" changed");
+        assert_ne!(training_digest, dataset_sha256(&modified));
+    }
 
     #[test]
     fn train_and_held_out_fixtures_preserve_intent_and_epistemic_targets() {
