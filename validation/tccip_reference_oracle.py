@@ -23,7 +23,7 @@ from typing import Iterable, Sequence
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_MANIFEST = ROOT / "validation/fixtures/tccip_toy_expectations.tsv"
-SCHEMA = "# schema=tccip-toy-expectations-v2"
+SCHEMA = "# schema=tccip-toy-expectations-v3"
 TOLERANCE = 1e-12
 
 
@@ -48,6 +48,7 @@ class Fixture:
     input_count: int
     output_node: int
     target: tuple[str, tuple[int | bool, ...]]
+    input_state_weights: tuple[int, ...]
     rules: tuple[Rule, ...]
     components: tuple[int, ...]
     interventions: tuple[Intervention, ...]
@@ -174,6 +175,10 @@ def validate_fixture(fixture: Fixture) -> None:
         raise ValueError(f"{fixture.name}: node count outside 1..=12")
     if not 1 <= fixture.input_count <= 8:
         raise ValueError(f"{fixture.name}: input count outside 1..=8")
+    if len(fixture.input_state_weights) != (1 << fixture.input_count):
+        raise ValueError(f"{fixture.name}: input-state weights must have exactly 2^input_count entries")
+    if any(weight < 0 for weight in fixture.input_state_weights) or not any(fixture.input_state_weights):
+        raise ValueError(f"{fixture.name}: input-state weights must be nonnegative and not all zero")
     if len(fixture.rules) != fixture.node_count:
         raise ValueError(f"{fixture.name}: node count differs from rule count")
     if len(fixture.components) != fixture.node_count:
@@ -245,8 +250,8 @@ def parse_manifest(path: Path) -> tuple[list[Fixture], bytes]:
         if not line or line.startswith("#"):
             continue
         fields = line.split("\t")
-        if len(fields) != 18:
-            raise ValueError(f"line {line_number}: expected 18 fields, got {len(fields)}")
+        if len(fields) != 19:
+            raise ValueError(f"line {line_number}: expected 19 fields, got {len(fields)}")
         name = fields[0]
         if not name or name in names:
             raise ValueError(f"line {line_number}: empty/duplicate fixture name {name!r}")
@@ -255,29 +260,32 @@ def parse_manifest(path: Path) -> tuple[list[Fixture], bytes]:
         inputs = parse_int(fields[2], "input count", minimum=1)
         output = parse_int(fields[3], "output node")
         target = parse_target(fields[4])
-        rules = tuple(parse_rule(token) for token in fields[5].split(","))
-        component_names = fields[6]
+        input_weights = tuple(parse_int(token, "input-state weight") for token in fields[5].split(","))
+        rules = tuple(parse_rule(token) for token in fields[6].split(","))
+        component_names = fields[7]
         if any(label not in "AB" for label in component_names):
             raise ValueError(f"{name}: invalid component labels {component_names!r}")
         components = tuple(0 if label == "A" else 1 for label in component_names)
-        interventions = parse_interventions(fields[7])
-        mask = parse_int(fields[8], "partition mask")
+        interventions = parse_interventions(fields[8])
+        mask = parse_int(fields[9], "partition mask")
         fixture = Fixture(
             name=name, node_count=n, input_count=inputs, output_node=output,
-            target=target, rules=rules, components=components,
+            target=target, input_state_weights=input_weights, rules=rules, components=components,
             interventions=interventions, declared_mask=mask,
-            expected=(float(fields[9]), float(fields[10]), float(fields[11]), float(fields[12])),
-            expected_partition_counts=(parse_int(fields[13], "partition count"),
-                                       parse_int(fields[14], "usable partition count"),
-                                       parse_int(fields[15], "skipped partition count")),
-            expected_partition_range=(float(fields[16]), float(fields[17])),
+            expected=(float(fields[10]), float(fields[11]), float(fields[12]), float(fields[13])),
+            expected_partition_counts=(parse_int(fields[14], "partition count"),
+                                       parse_int(fields[15], "usable partition count"),
+                                       parse_int(fields[16], "skipped partition count")),
+            expected_partition_range=(float(fields[17]), float(fields[18])),
         )
         validate_fixture(fixture)
         if canonical_target(target) != fields[4]:
             raise ValueError(f"{name}: task target is not canonical")
-        if ",".join(canonical_rule(rule) for rule in rules) != fields[5]:
+        if ",".join(str(weight) for weight in input_weights) != fields[5]:
+            raise ValueError(f"{name}: input-state weights are not canonical")
+        if ",".join(canonical_rule(rule) for rule in rules) != fields[6]:
             raise ValueError(f"{name}: rule list is not canonical")
-        if canonical_interventions(interventions) != fields[7]:
+        if canonical_interventions(interventions) != fields[8]:
             raise ValueError(f"{name}: intervention list is not canonical")
         if len(component_names) != n:
             raise ValueError(f"{name}: component string length differs from node count")
