@@ -2585,6 +2585,27 @@ fn normalize_lean_for_leakage(source: &str) -> String {
     let mut output = String::with_capacity(source.len());
     let mut index = 0;
     while index < chars.len() {
+        // Strings take precedence over comment delimiters. Lean string contents
+        // may contain "--" and "/-" literally, so scanning comments first would
+        // erase string contents and make leakage matching unsound.
+        if chars[index] == '"' {
+            output.push(chars[index]);
+            index += 1;
+            let mut escaped = false;
+            while index < chars.len() {
+                let character = chars[index];
+                output.push(character);
+                index += 1;
+                if escaped {
+                    escaped = false;
+                } else if character == '\\' {
+                    escaped = true;
+                } else if character == '"' {
+                    break;
+                }
+            }
+            continue;
+        }
         if chars[index] == '-' && chars.get(index + 1) == Some(&'-') {
             index += 2;
             while index < chars.len() && chars[index] != '\n' {
@@ -2608,24 +2629,6 @@ fn normalize_lean_for_leakage(source: &str) -> String {
                 }
             }
             output.push(' ');
-            continue;
-        }
-        if chars[index] == '"' {
-            output.push(chars[index]);
-            index += 1;
-            let mut escaped = false;
-            while index < chars.len() {
-                let character = chars[index];
-                output.push(character);
-                index += 1;
-                if escaped {
-                    escaped = false;
-                } else if character == '\\' {
-                    escaped = true;
-                } else if character == '"' {
-                    break;
-                }
-            }
             continue;
         }
         output.push(chars[index]);
