@@ -111,6 +111,9 @@ jobs:
       - name: Run high-capacity MAP versus HRR stress sweep
         run: cargo run --locked --release -p symthaea-core --example platonic_pattern_interaction -- --stress 2>&1 | tee research-results/platonic-pattern-interaction-stress.log
 
+      - name: Check selective retrieval example formatting
+        run: rustfmt --edition 2024 --check crates/core/symthaea-core/examples/platonic_selective_retrieval.rs
+
       - name: Test selective retrieval calibration and certification
         run: cargo test --locked --release -p symthaea-core --example platonic_selective_retrieval -- --nocapture
 
