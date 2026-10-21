@@ -388,6 +388,300 @@ fn run_from_args() -> Result<()> {
     Ok(())
 }
 
+fn require_exact_keys<'a>(
+    value: &'a Value,
+    context: &str,
+    required: &[&str],
+    optional: &[&str],
+) -> Result<&'a serde_json::Map<String, Value>> {
+    let object = value
+        .as_object()
+        .with_context(|| format!("{context} must be a JSON object"))?;
+    for key in required {
+        if !object.contains_key(*key) {
+            bail!("{context} is missing required field {key:?}");
+        }
+    }
+    for key in object.keys() {
+        if !required.contains(&key.as_str()) && !optional.contains(&key.as_str()) {
+            bail!("{context} contains unsupported field {key:?}");
+        }
+    }
+    Ok(object)
+}
+
+fn required_nonempty_string<'a>(
+    object: &'a serde_json::Map<String, Value>,
+    key: &str,
+    context: &str,
+) -> Result<&'a str> {
+    object
+        .get(key)
+        .and_then(Value::as_str)
+        .filter(|value| !value.trim().is_empty())
+        .with_context(|| format!("{context}.{key} must be a non-empty string"))
+}
+
+fn validate_digest_field(
+    object: &serde_json::Map<String, Value>,
+    key: &str,
+    expected_len: usize,
+    context: &str,
+) -> Result<()> {
+    let value = required_nonempty_string(object, key, context)?;
+    if value.len() != expected_len
+        || !value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    {
+        bail!(
+            "{context}.{key} must be a lowercase hexadecimal digest of {expected_len} characters"
+        );
+    }
+    Ok(())
+}
+
+fn validate_outcome_contract(value: &Value, context: &str) -> Result<()> {
+    let root = require_exact_keys(
+        value,
+        context,
+        &[
+            "schema_version",
+            "pair_id",
+            "split",
+            "component_id",
+            "source",
+            "target",
+            "adjudication",
+            "prediction",
+            "run",
+        ],
+        &[],
+    )?;
+    if required_nonempty_string(root, "schema_version", context)? != SCHEMA_VERSION {
+        bail!("{context}.schema_version is not the registered v0 contract");
+    }
+    for key in ["pair_id", "component_id"] {
+        required_nonempty_string(root, key, context)?;
+    }
+
+    let source_ctx = format!("{context}.source");
+    let source = require_exact_keys(
+        root.get("source").context("source field missing")?,
+        &source_ctx,
+        &[
+            "record_id",
+            "family_id",
+            "source_commit",
+            "artifact_sha256",
+            "insight_sha256",
+        ],
+        &[],
+    )?;
+    for key in ["record_id", "family_id"] {
+        required_nonempty_string(source, key, &source_ctx)?;
+    }
+    validate_digest_field(source, "source_commit", 40, &source_ctx)?;
+    validate_digest_field(source, "artifact_sha256", 64, &source_ctx)?;
+    validate_digest_field(source, "insight_sha256", 64, &source_ctx)?;
+
+    let target_ctx = format!("{context}.target");
+    let target = require_exact_keys(
+        root.get("target").context("target field missing")?,
+        &target_ctx,
+        &[
+            "theorem_id",
+            "family_id",
+            "source_commit",
+            "artifact_path",
+            "artifact_sha256",
+            "statement_sha256",
+            "obligation_sha256",
+        ],
+        &["domain_labels"],
+    )?;
+    for key in ["theorem_id", "family_id"] {
+        required_nonempty_string(target, key, &target_ctx)?;
+    }
+    validate_digest_field(target, "source_commit", 40, &target_ctx)?;
+    for key in ["artifact_sha256", "statement_sha256", "obligation_sha256"] {
+        validate_digest_field(target, key, 64, &target_ctx)?;
+    }
+    let artifact_path = required_nonempty_string(target, "artifact_path", &target_ctx)?;
+    let path = Path::new(artifact_path);
+    if path.is_absolute() || path.components().any(|component| {
+        matches!(component, std::path::Component::ParentDir)
+    }) {
+        bail!("{target_ctx}.artifact_path must be a safe repository-relative path");
+    }
+    if let Some(labels) = target.get("domain_labels") {
+        let labels = labels
+            .as_array()
+            .with_context(|| format!("{target_ctx}.domain_labels must be an array"))?;
+        if labels.is_empty()
+            || labels.iter().any(|label| {
+                label.as_str().is_none_or(|value| value.trim().is_empty())
+            })
+        {
+            bail!("{target_ctx}.domain_labels must contain non-empty strings");
+        }
+    }
+
+    let adjudication_ctx = format!("{context}.adjudication");
+    let adjudication = require_exact_keys(
+        root.get("adjudication").context("adjudication field missing")?,
+        &adjudication_ctx,
+        &[
+            "status",
+            "label",
+            "rubric_version",
+            "reviewer_decisions",
+            "receipt_sha256",
+        ],
+        &["adjudication_note"],
+    )?;
+    required_nonempty_string(adjudication, "rubric_version", &adjudication_ctx)?;
+    validate_digest_field(adjudication, "receipt_sha256", 64, &adjudication_ctx)?;
+    let reviewers = adjudication
+        .get("reviewer_decisions")
+        .and_then(Value::as_array)
+        .with_context(|| format!("{adjudication_ctx}.reviewer_decisions must be an array"))?;
+    if reviewers.len() < REQUIRED_REVIEWERS {
+        bail!("{adjudication_ctx}.reviewer_decisions requires at least two independent reviewers");
+    }
+    for (index, reviewer) in reviewers.iter().enumerate() {
+        let reviewer_ctx = format!("{adjudication_ctx}.reviewer_decisions[{index}]");
+        let reviewer = require_exact_keys(
+            reviewer,
+            &reviewer_ctx,
+            &["reviewer_id", "label", "reason_codes", "evidence_sha256"],
+            &[],
+        )?;
+        required_nonempty_string(reviewer, "reviewer_id", &reviewer_ctx)?;
+        validate_digest_field(reviewer, "evidence_sha256", 64, &reviewer_ctx)?;
+        let codes = reviewer
+            .get("reason_codes")
+            .and_then(Value::as_array)
+            .with_context(|| format!("{reviewer_ctx}.reason_codes must be an array"))?;
+        if codes.is_empty()
+            || codes.iter().any(|code| code.as_str().is_none_or(|value| value.trim().is_empty()))
+        {
+            bail!("{reviewer_ctx}.reason_codes must contain non-empty strings");
+        }
+    }
+
+    let prediction_ctx = format!("{context}.prediction");
+    let prediction = require_exact_keys(
+        root.get("prediction").context("prediction field missing")?,
+        &prediction_ctx,
+        &[
+            "decision",
+            "predicted_label",
+            "confidence",
+            "compatibility_probability",
+            "mismatch_codes",
+            "precondition_checks",
+            "receipt_sha256",
+        ],
+        &[],
+    )?;
+    let confidence = prediction
+        .get("confidence")
+        .and_then(Value::as_f64)
+        .with_context(|| format!("{prediction_ctx}.confidence must be numeric"))?;
+    if !(0.0..=1.0).contains(&confidence) {
+        bail!("{prediction_ctx}.confidence must lie in [0, 1]");
+    }
+    match prediction.get("compatibility_probability") {
+        Some(Value::Null) => {}
+        Some(value) => {
+            let probability = value.as_f64().with_context(|| {
+                format!("{prediction_ctx}.compatibility_probability must be null or numeric")
+            })?;
+            if !probability.is_finite() || !(0.0..=1.0).contains(&probability) {
+                bail!("{prediction_ctx}.compatibility_probability must be null or lie in [0, 1]");
+            }
+        }
+        None => bail!("{prediction_ctx}.compatibility_probability is required; use null when unscored"),
+    }
+    validate_digest_field(prediction, "receipt_sha256", 64, &prediction_ctx)?;
+    let mismatch_codes = prediction
+        .get("mismatch_codes")
+        .and_then(Value::as_array)
+        .with_context(|| format!("{prediction_ctx}.mismatch_codes must be an array"))?;
+    if mismatch_codes
+        .iter()
+        .any(|code| code.as_str().is_none_or(|value| value.trim().is_empty()))
+    {
+        bail!("{prediction_ctx}.mismatch_codes must contain strings");
+    }
+    let checks = prediction
+        .get("precondition_checks")
+        .and_then(Value::as_array)
+        .with_context(|| format!("{prediction_ctx}.precondition_checks must be an array"))?;
+    for (index, check) in checks.iter().enumerate() {
+        let check_ctx = format!("{prediction_ctx}.precondition_checks[{index}]");
+        let check = require_exact_keys(
+            check,
+            &check_ctx,
+            &["check_id", "outcome", "evidence_sha256"],
+            &[],
+        )?;
+        required_nonempty_string(check, "check_id", &check_ctx)?;
+        required_nonempty_string(check, "outcome", &check_ctx)?;
+        match check.get("evidence_sha256") {
+            Some(Value::Null) => {}
+            Some(_) => validate_digest_field(check, "evidence_sha256", 64, &check_ctx)?,
+            None => bail!("{check_ctx}.evidence_sha256 is required; use null when unavailable"),
+        }
+    }
+
+    let run_ctx = format!("{context}.run");
+    let run = require_exact_keys(
+        root.get("run").context("run field missing")?,
+        &run_ctx,
+        &[
+            "model_id",
+            "model_version",
+            "prompt_sha256",
+            "config_sha256",
+            "input_sha256",
+            "output_sha256",
+            "budget",
+        ],
+        &[
+            "actual_model_calls",
+            "actual_tokens",
+            "actual_wall_ms",
+            "actual_cost_microusd",
+        ],
+    )?;
+    for key in ["model_id", "model_version"] {
+        required_nonempty_string(run, key, &run_ctx)?;
+    }
+    for key in ["prompt_sha256", "config_sha256", "input_sha256", "output_sha256"] {
+        validate_digest_field(run, key, 64, &run_ctx)?;
+    }
+    let budget_ctx = format!("{run_ctx}.budget");
+    let budget = require_exact_keys(
+        run.get("budget").context("run budget missing")?,
+        &budget_ctx,
+        &["max_model_calls", "max_tokens", "max_wall_ms", "max_cost_microusd"],
+        &[],
+    )?;
+    for key in ["max_model_calls", "max_tokens", "max_wall_ms", "max_cost_microusd"] {
+        if budget.get(key).and_then(Value::as_u64).is_none() {
+            bail!("{budget_ctx}.{key} must be a non-negative integer");
+        }
+    }
+    for key in ["actual_model_calls", "actual_tokens", "actual_wall_ms", "actual_cost_microusd"] {
+        if run.get(key).is_some_and(|value| value.as_u64().is_none()) {
+            bail!("{run_ctx}.{key} must be a non-negative integer when present");
+        }
+    }
+    Ok(())
+}
+
 fn parse_jsonl(text: &str, expected_split: Split) -> Result<Vec<Outcome>> {
     let mut outcomes = Vec::new();
     let mut pair_ids = BTreeSet::new();
@@ -398,8 +692,11 @@ fn parse_jsonl(text: &str, expected_split: Split) -> Result<Vec<Outcome>> {
         if line.trim().is_empty() {
             continue;
         }
-        let outcome: Outcome = serde_json::from_str(line)
+        let raw: Value = serde_json::from_str(line)
             .with_context(|| format!("parse outcome JSONL line {}", line_index + 1))?;
+        validate_outcome_contract(&raw, &format!("JSONL line {}", line_index + 1))?;
+        let outcome: Outcome = serde_json::from_value(raw)
+            .with_context(|| format!("deserialize outcome JSONL line {}", line_index + 1))?;
         if outcome.schema_version != SCHEMA_VERSION {
             bail!(
                 "line {} has schema_version {:?}, expected {:?}",
