@@ -789,6 +789,15 @@ jobs:
               raise SystemExit("theorem-identity status counts do not cover all dataset records")
           by_status = {event["path_join_status"]: 0 for event in audit["events"]}
           for event in audit["events"]:
+              if not set(event["identity_candidate_timeline_positions"]).issubset(set(event["candidate_timeline_positions"])):
+                  raise SystemExit("theorem identity join refers to a timeline row outside its path candidates")
+              if event["identity_join_status"] == "unique_stable_theorem_proof_transition":
+                  if len(event["identity_candidate_timeline_positions"]) != 1:
+                      raise SystemExit("stable theorem identity must resolve to exactly one proof transition")
+                  if event["identity_statement_match_at_commit_before"] is not True or event["identity_statement_match_at_completion"] is not True:
+                      raise SystemExit("stable theorem identity lacks exact statement agreement")
+                  if event["identity_proof_matches_completion"] is not True or event["identity_proof_absent_at_commit_before"] is not True:
+                      raise SystemExit("stable theorem identity lacks proof provenance/hidden-target evidence")
               by_status[event["path_join_status"]] += 1
               if event["path_join_status"] == "unique_path_match":
                   if len(event["candidate_timeline_positions"]) != 1 or not event["matched_completion_commit"]:
