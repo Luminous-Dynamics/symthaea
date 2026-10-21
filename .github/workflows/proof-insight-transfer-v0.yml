@@ -701,6 +701,7 @@ jobs:
                       "decision": decision,
                       "predicted_label": predicted_label,
                       "confidence": 0.75,
+                      "compatibility_probability": 0.9 if predicted_label == "compatible" else (0.1 if predicted_label == "incompatible" else None),
                       "mismatch_codes": mismatch_codes or [],
                       "precondition_checks": [
                           {
@@ -836,6 +837,7 @@ jobs:
                           "decision": decision,
                           "predicted_label": predicted_label,
                           "confidence": 0.9,
+                          "compatibility_probability": 0.9 if truth == "compatible" else 0.1,
                           "mismatch_codes": [] if decision == "accept" else ([reason_code] if decision == "reject" else ["unknown"]),
                           "precondition_checks": [
                               {"check_id": "synthetic-check", "outcome": "satisfied" if decision == "accept" else ("violated" if decision == "reject" else "unknown"), "evidence_sha256": digest}
