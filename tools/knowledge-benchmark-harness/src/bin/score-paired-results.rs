@@ -202,6 +202,16 @@ fn sha256_hex(bytes: &[u8]) -> String {
     format!("{:x}", digest.finalize())
 }
 
+fn verify_sha256(label: &str, bytes: &[u8], expected: &str) -> Result<String, String> {
+    let actual = sha256_hex(bytes);
+    if actual != expected {
+        return Err(format!(
+            "{label} digest mismatch: manifest declares {expected}, actual bytes hash to {actual}"
+        ));
+    }
+    Ok(actual)
+}
+
 fn parse_jsonl<T: for<'de> Deserialize<'de>>(bytes: &[u8], label: &str) -> Result<Vec<T>, String> {
     let text = std::str::from_utf8(bytes).map_err(|error| format!("{label} is not UTF-8: {error}"))?;
     let mut values = Vec::new();
@@ -642,23 +652,24 @@ fn run() -> Result<(), String> {
     })?;
     let plan: Plan = serde_json::from_slice(&plan_bytes)
         .map_err(|error| format!("plan JSON is invalid: {error}"))?;
-    let actual_case_manifest_sha256 = sha256_hex(&case_manifest_bytes);
-    let actual_source_catalog_sha256 = sha256_hex(&source_catalog_bytes);
-    let actual_source_pack_sha256 = sha256_hex(&source_pack_bytes);
     if pair_bytes != case_manifest_bytes {
         return Err("paired scorer requires --case-manifest bytes to exactly match --pairs bytes".into());
     }
-    for (label, actual, expected) in [
-        ("case manifest", actual_case_manifest_sha256.as_str(), plan.benchmark.case_manifest_sha256.as_str()),
-        ("source catalog", actual_source_catalog_sha256.as_str(), plan.benchmark.source_catalog_sha256.as_str()),
-        ("source pack", actual_source_pack_sha256.as_str(), plan.benchmark.source_pack_sha256.as_str()),
-    ] {
-        if actual != expected {
-            return Err(format!(
-                "{label} digest mismatch: manifest declares {expected}, actual bytes hash to {actual}"
-            ));
-        }
-    }
+    let actual_case_manifest_sha256 = verify_sha256(
+        "case manifest",
+        &case_manifest_bytes,
+        &plan.benchmark.case_manifest_sha256,
+    )?;
+    let actual_source_catalog_sha256 = verify_sha256(
+        "source catalog",
+        &source_catalog_bytes,
+        &plan.benchmark.source_catalog_sha256,
+    )?;
+    let actual_source_pack_sha256 = verify_sha256(
+        "source pack",
+        &source_pack_bytes,
+        &plan.benchmark.source_pack_sha256,
+    )?;
     let pairs = parse_jsonl::<PairCase>(&pair_bytes, "pair manifest")?;
     let pair_count = pairs.len();
     let results = parse_jsonl::<Observation>(&result_bytes, "paired-intervention results")?;
@@ -819,6 +830,19 @@ mod tests {
             adjudication_status:"synthetic_only".into(),
             notes:"synthetic test label".into(),
         }
+    }
+
+    #[test]
+    fn declared_input_digest_mismatch_fails_closed() {
+        let error = verify_sha256("source pack", b"observed bytes", &"0".repeat(64)).unwrap_err();
+        assert!(error.contains("source pack digest mismatch"));
+    }
+
+    #[test]
+    fn matching_input_digest_returns_exact_content_hash() {
+        let bytes = b"fixed source manifest bytes";
+        let digest = sha256_hex(bytes);
+        assert_eq!(verify_sha256("case manifest", bytes, &digest).unwrap(), digest);
     }
 
     #[test]
