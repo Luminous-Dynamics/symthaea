@@ -885,6 +885,10 @@ jobs:
           assert report["calibration"]["complete_binary_coverage"] is True
           assert abs(report["calibration"]["brier_score"] - 0.01) < 1e-12
           assert abs(report["calibration"]["expected_calibration_error_10_bins"] - 0.1) < 1e-12
+          assert report["calibration"]["brier_score_ci_95"] is not None
+          assert report["calibration"]["brier_score_ci_95"]["lower"] <= 0.01 <= report["calibration"]["brier_score_ci_95"]["upper"]
+          assert report["calibration"]["calibration_error_ci_95"] is not None
+          assert report["calibration"]["calibration_error_ci_95"]["lower"] <= 0.1 <= report["calibration"]["calibration_error_ci_95"]["upper"]
           assert report["proposed_gates"]["pair_selectivity_gate"] == "pair_track_thresholds_met"
           assert report["proposed_gates"]["finite_mutation_suite_gate"] == "not_evaluated_by_this_analyzer"
           assert report["proposed_gates"]["overall_confirmatory_decision"].startswith("not_evaluated_")
