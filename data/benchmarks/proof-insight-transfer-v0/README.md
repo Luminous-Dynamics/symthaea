@@ -6,6 +6,7 @@ This directory defines a proposed benchmark format. **It currently contains no d
 
 - `insight-record.schema.json` — JSON Schema Draft 2020-12 for one provenance-linked insight record, including semantic-validation evidence and a constructive-solving track for unknown witnesses, proof obligations, and answer equivalence (RPE or formal/expert checking).
 - `transfer-selectivity-outcome.schema.json` — JSON Schema Draft 2020-12 for one source-insight/target-obligation compatibility outcome. It separates expert adjudication from system prediction, requires provenance and run receipts, records abstention and precondition checks, and supports false-accept/false-reject/recall/selective-risk analysis. It validates structure, not mathematical truth or family-disjointness.
+- `crates/bridges/symthaea-proof-insights/src/bin/analyze_transfer_selectivity.rs` — deterministic Rust JSONL analyzer for the transfer-selectivity track. It enforces one requested split, unique pairs, consistent dual-review labels, family-connected component IDs, and reports class-conditioned accept/reject/abstain rates, component-clustered bootstrap intervals, probability coverage, Brier score, and ten-bin reliability data. It never declares the overall confirmatory gate passed because the finite mutation-suite receipt is external to this binary.
 - `temporal-replay-manifest.schema.json` — JSON Schema Draft 2020-12 for the evaluator-side chronological repository replay manifest; it is a format/guardrail, not a generated Dalek dataset or a measured result.
 - `temporal-timeline-audit.schema.json` — strict schema for the Rust-produced historical timeline audit, including README-vs-CSV count discrepancies, per-row source-file availability, adjacent completion-commit ancestry as explicit Git DAG evidence, and an explicit rejected/redacted status for unsafe machine-local paths. CSV source order is preserved; adjacent commits are not required to form a linear chain because parallel branches can be merged into the pinned head. Unsafe paths are not read or echoed in audit output.
 - `temporal-dataset-join-audit.schema.json` — strict schema for both the unchanged path-only diagnostic and a second declaration-scoped theorem/proof transition join. The latter requires an exact declared-name match, proof text present within the named completion declaration but absent in every direct parent, an ancestral target-state commit, and the full typed statement prefix through the `:= by` boundary matching at both target time and completion. Multiple declarations sharing the requested short name produce `ambiguous_declaration_identity` plus their timeline positions; multiple proof-transition candidates have a separate ambiguity status. Ambiguous, missing, unsafe, or statement-drift cases remain explicit non-success states; the audit never opens or echoes machine-local paths.
@@ -27,6 +28,25 @@ This directory defines a proposed benchmark format. **It currently contains no d
 - Future `manifest.json` — indexed source artifacts and inclusion/exclusion/unknown accounting produced by the Rust indexer.
 - Future `records.jsonl` — one schema-conformant JSON object per line, only after source evidence has been inspected and rights reviewed.
 - The indexer emits its own `family_split_plan` and each family's `split`; compare them to `splits.json` with `--verify-splits` before creating any benchmark examples.
+
+## Transfer-selectivity analysis
+
+The analyzer consumes already-adjudicated outcomes; it does not adjudicate mathematical truth. Each input file must contain **only one selected split**. Example, after the isolated crate has been validated:
+
+```bash
+cargo run --locked --bin analyze_transfer_selectivity -- \
+  data/benchmarks/proof-insight-transfer-v0/test-transfer-selectivity.jsonl \
+  test \
+  transfer-selectivity-report.json \
+  10000 \
+  20261021
+```
+
+Use `external_challenge` for a separately maintained external set. Do not mix train, validation, test, and external-challenge rows in one analysis input. The report hashes the exact input bytes, fixes the bootstrap seed and replicate count, resamples declared family-connected components, and emits 95% percentile intervals for compatible recall, incompatible false-accept rate, compatible false-reject rate, class-specific abstention rates, binary coverage, and selective risk.
+
+`prediction.compatibility_probability` is distinct from action confidence: it means the estimated probability that the proposed transfer is compatible, regardless of whether the action is accept, reject, or abstain. The analyzer reports its scored coverage, Brier score, and ten equal-width reliability bins without imputing missing values. Probability metrics are descriptive until the rubric, calibration coverage, sample size, and independent cluster-level uncertainty are reviewed; missing calibration values do not count as a model failure or a success.
+
+The analyzer deliberately emits `overall_confirmatory_decision = not_evaluated_...`: pair metrics alone cannot satisfy the preregistered finite mutation-suite gate or the primary exact-target proof-utility gate. The pair-track thresholds are diagnostics, not an overall SOTA or mathematical-correctness verdict.
 
 ## Required discipline
 
@@ -50,3 +70,5 @@ This directory defines a proposed benchmark format. **It currently contains no d
 Creating this schema or protocol does not establish that the records are complete, that the schema has been validated by an independent JSON Schema implementation, that proof insights transfer, or that Symthaea outperforms any baseline. Those require the stated validation gates and actual measured experiments; see also [the research design](../../../docs/research/proof-insight-transfer-2026.md).
 
 15. After the protocol amendment, every future frozen run config must hash the current protocol bytes. The secondary transfer-selectivity outcome schema separates gold labels from model decisions; keep unresolved reviewer disagreements as `unknown`, report compatible-positive recall as well as incompatible false-accepts, and never interpret a structurally valid JSON row as a verified mathematical judgment.
+
+16. For transfer selectivity, score only the preselected split using `analyze_transfer_selectivity`; report raw denominators, component counts, abstention, false acceptance, compatible recall, Brier score/reliability when available, and cluster-bootstrap intervals. The analyzer's overall decision is intentionally fail-closed pending an independent negative-control receipt and the primary proof-utility gate.
