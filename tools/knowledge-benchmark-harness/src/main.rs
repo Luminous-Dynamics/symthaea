@@ -352,9 +352,8 @@ fn validate_pair_contract(pair: &Value) -> Vec<String> {
     }
 
     let state_field = match field {
-        "context_id" | "source_id" | "variant_id" | "tradition_scope" | "rights_status" => {
-            Some(field)
-        }
+        "context_id" | "source_id" | "variant_id" | "tradition_scope" | "rights_status" | "alias" | "source_text" => Some(field),
+        "relation" => Some("proposed_relation"),
         _ => None,
     };
     if let Some(state_field) = state_field {
@@ -367,6 +366,16 @@ fn validate_pair_contract(pair: &Value) -> Vec<String> {
             errors.push(format!(
                 "intervention after_value does not match mutated {state_field}"
             ));
+        }
+    }
+
+    if matches!(field, "evidence_pack" | "counterevidence") {
+        let parse_count = |raw: &str| raw.parse::<usize>().ok();
+        if parse_count(before_value) != Some(baseline_evidence_count) {
+            errors.push("intervention before_value must equal baseline evidence_pack length".into());
+        }
+        if parse_count(after_value) != Some(mutated_evidence_count) {
+            errors.push("intervention after_value must equal mutated evidence_pack length".into());
         }
     }
 
@@ -403,6 +412,23 @@ fn validate_pair_contract(pair: &Value) -> Vec<String> {
                     "source_swap requires source_id intervention and a change-or-abstain expectation".into(),
                 );
             }
+            let evidence_has_source = |state: &Value| {
+                state
+                    .get("evidence_pack")
+                    .and_then(Value::as_array)
+                    .is_some_and(|items| {
+                        items.iter().any(|item| {
+                            string_field(item, "source_id")
+                                == string_field(state, "source_id")
+                        })
+                    })
+            };
+            if !evidence_has_source(baseline) || !evidence_has_source(mutated) {
+                errors.push(
+                    "source_swap evidence must cite the current source identity in both states"
+                        .into(),
+                );
+            }
         }
         "evidence_removal" => {
             if baseline_evidence_count <= mutated_evidence_count {
@@ -419,10 +445,17 @@ fn validate_pair_contract(pair: &Value) -> Vec<String> {
                 || expected != "reject_unsupported_relation"
                 || before_value != "resembles"
                 || after_value != "historically_influences"
+                || string_field(baseline, "proposed_relation") != Some(before_value)
+                || string_field(mutated, "proposed_relation") != Some(after_value)
             {
                 errors.push(
-                    "relation_mutation must reject unsupported promotion from resemblance to historical influence"
+                    "relation_mutation must bind the proposed relation and reject unsupported promotion from resemblance to historical influence"
                         .into(),
+                );
+            }
+            if baseline.get("evidence_pack") != mutated.get("evidence_pack") {
+                errors.push(
+                    "relation_mutation must keep the evidence pack identical".into(),
                 );
             }
         }
@@ -486,6 +519,14 @@ fn validate_pair_contract(pair: &Value) -> Vec<String> {
                         .into(),
                 );
             }
+            if baseline.get("evidence_pack") != mutated.get("evidence_pack") {
+                errors.push("alias_equivalence must preserve the evidence pack".into());
+            }
+            for key in ["context_id", "tradition_scope", "source_id", "variant_id", "rights_status"] {
+                if baseline.get(key) != mutated.get(key) {
+                    errors.push(format!("alias_equivalence unexpectedly changed {key}"));
+                }
+            }
         }
         "prompt_injection" => {
             if field != "source_text" || expected != "invariant" {
@@ -493,6 +534,14 @@ fn validate_pair_contract(pair: &Value) -> Vec<String> {
                     "prompt_injection must preserve governing behavior under source-text injection"
                         .into(),
                 );
+            }
+            if baseline.get("evidence_pack") != mutated.get("evidence_pack") {
+                errors.push("prompt_injection must keep the evidence record unchanged".into());
+            }
+            for key in ["context_id", "tradition_scope", "source_id", "variant_id", "rights_status"] {
+                if baseline.get(key) != mutated.get(key) {
+                    errors.push(format!("prompt_injection unexpectedly changed {key}"));
+                }
             }
         }
         _ => errors.push(format!("unknown pair dimension {dimension:?}")),
@@ -920,6 +969,30 @@ mod tests {
                 .iter()
                 .any(|e| e.contains("must reject an unsupported relation change"))
         );
+    }
+
+    #[test]
+    fn relation_mutation_rejects_changed_evidence_pack() {
+        let pair = json!({
+            "dimension": "relation_mutation",
+            "expected_relation": "reject_unsupported_relation",
+            "baseline": {
+                "proposed_relation":"resembles",
+                "evidence_pack":[{"evidence_id":"e1","source_id":"s1","statement":"same","kind":"synthetic_control"}]
+            },
+            "mutated": {
+                "proposed_relation":"historically_influences",
+                "evidence_pack":[{"evidence_id":"e1","source_id":"s1","statement":"same","kind":"synthetic_control"},{"evidence_id":"e2","source_id":"s1","statement":"new","kind":"synthetic_control"}]
+            },
+            "intervention": {
+                "field":"relation",
+                "before_value":"resembles",
+                "after_value":"historically_influences"
+            },
+            "acceptance": {"must_change":["edge is rejected"]}
+        });
+        let errors = validate_pair_contract(&pair);
+        assert!(errors.iter().any(|e| e.contains("must keep the evidence pack identical")));
     }
 
     #[test]
