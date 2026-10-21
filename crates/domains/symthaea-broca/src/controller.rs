@@ -66,6 +66,21 @@ impl GpuEmbeddingCache {
     }
 }
 
+/// Versioned seed derivation scheme for Broca token embeddings.
+///
+/// V1 remains the compatibility default. V2 changes token vectors and must be
+/// treated as a distinct initialization condition in checkpoint and benchmark
+/// comparisons; it is not applied retroactively to loaded checkpoints.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TokenEmbeddingSeedScheme {
+    /// Historical concatenation of the seed phrase, delimiter, and label.
+    #[default]
+    LegacyV1,
+    /// Length-prefixed domain tuple and explicit 24-bit coordinate mapping.
+    DomainSeparatedV2,
+}
+
 /// Configuration for the language controller.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct LanguageControllerConfig {
@@ -309,8 +324,26 @@ pub struct LanguageController {
 }
 
 impl LanguageController {
-    /// Create a new controller from a genesis seed and config.
+    /// Create a controller with the historical token-embedding initializer.
+    ///
+    /// This remains the default to preserve existing model initialization.
     pub fn new(genesis: &GenesisSeed, config: &LanguageControllerConfig) -> Self {
+        Self::new_with_token_embedding_seed_scheme(
+            genesis,
+            config,
+            TokenEmbeddingSeedScheme::LegacyV1,
+        )
+    }
+
+    /// Create a controller with an explicit token-embedding seed scheme.
+    ///
+    /// The recurrent network and all non-token parameters keep their existing
+    /// initializer, isolating this option to the weight-tied token table.
+    pub fn new_with_token_embedding_seed_scheme(
+        genesis: &GenesisSeed,
+        config: &LanguageControllerConfig,
+        seed_scheme: TokenEmbeddingSeedScheme,
+    ) -> Self {
         let neuron_config = UnifiedConfig {
             tau_base: 0.02,                    // 20ms — matches token generation rate
             backbone_tau: config.backbone_tau, // Configurable state dependency for coherent sequences
@@ -328,14 +361,19 @@ impl LanguageController {
 
         let network = HdcLtcUnifiedNetwork::from_genesis(net_config, genesis);
 
-        // Genesis-seeded token embeddings
+        // Seed scheme is isolated to token rows; the recurrent network above
+        // intentionally retains its existing initialization for controlled A/B.
         let token_embeddings: Vec<ContinuousHV> = (0..config.vocab_size)
             .map(|i| {
-                ContinuousHV::from_genesis(
-                    genesis,
-                    &format!("broca::token_emb::{i}"),
-                    HDC_DIMENSION,
-                )
+                let label = format!("broca::token_emb::{i}");
+                match seed_scheme {
+                    TokenEmbeddingSeedScheme::LegacyV1 => {
+                        ContinuousHV::from_genesis(genesis, &label, HDC_DIMENSION)
+                    }
+                    TokenEmbeddingSeedScheme::DomainSeparatedV2 => {
+                        genesis.hv_v2(&label, HDC_DIMENSION)
+                    }
+                }
             })
             .collect();
 
