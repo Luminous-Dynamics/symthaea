@@ -182,22 +182,40 @@ pub struct ResearchGuidelineProjection {
     pub phenotype: MetabolizerPhenotype,
     pub reference_evidence_level: Option<EvidenceLevel>,
     pub reference_source_population: Option<AncestryGroup>,
-    pub population_equity_gap: Option<f64>,
-    pub population_context_flagged: Option<bool>,
+    pub population_model_gap_score: Option<f64>,
+    pub population_context_crossed_model_threshold: Option<bool>,
     pub claim_ceiling: String,
 }
 
-/// Risk profile for a single ancestry group relative to a drug-gene pair.
+/// Exploratory numeric features calculated from aggregate modelled phenotype fractions.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PopulationRisk {
-    /// Expected metabolizer phenotype distribution (fractions summing to ~1.0).
+pub struct PopulationHeuristicProfile {
+    /// Simplified, unvalidated phenotype-frequency fractions from the current model.
     pub phenotype_distribution: HashMap<MetabolizerPhenotype, f64>,
-    /// Estimated risk of adverse drug reactions (0.0 - 1.0).
-    pub adverse_event_risk: f64,
-    /// Estimated risk of therapeutic failure (0.0 - 1.0).
-    pub efficacy_risk: f64,
-    /// How well current CPIC guidelines apply to this population (0.0 - 1.0).
-    pub guideline_applicability: f64,
+    /// Analyst-weighted toxicity-oriented index (not a probability or clinical risk estimate).
+    pub toxicity_heuristic_index: f64,
+    /// Analyst-weighted efficacy-oriented index (not a probability or clinical outcome estimate).
+    pub efficacy_heuristic_index: f64,
+    /// Similarity proxy to a selected reference distribution (not actual guideline applicability).
+    pub reference_similarity_proxy: f64,
+}
+
+/// Arithmetic scenario from broad population denominators and this model's phenotype-fraction outputs.
+///
+/// This is not an estimate of patients at risk, clinical impact, prescriptions, adverse events,
+/// or people needing treatment. The inputs and simplified phenotype model are not validated.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PopulationScenarioEstimate {
+    pub drug: String,
+    pub gene: String,
+    /// (broad population label, denominator in millions, modelled fraction, arithmetic product count).
+    pub per_population_scenario: Vec<(AncestryGroup, f64, f64, u64)>,
+    /// Sum of arithmetic products; not a count of people affected or needing treatment.
+    pub sum_of_modelled_products: u64,
+    /// Population label with the largest arithmetic product, not a clinically most-affected group.
+    pub largest_modelled_product_group: AncestryGroup,
+    /// Text describing the calculation and its claim ceiling.
+    pub scenario_note: String,
 }
 
 /// Estimate of clinical impact for a drug-gene pair across US populations.
@@ -205,36 +223,34 @@ pub struct PopulationRisk {
 /// Quantifies how many patients are affected by ancestry-biased dosing
 /// guidelines, using US census population data and allele frequency distributions.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ClinicalImpactEstimate {
+pub struct PopulationScenarioEstimate {
     /// Drug name.
     pub drug: String,
     /// Gene name.
     pub gene: String,
     /// Per-ancestry breakdown: (ancestry, population_millions, at_risk_fraction, at_risk_count).
-    pub per_ancestry: Vec<(AncestryGroup, f64, f64, u64)>,
+    pub per_population_scenario: Vec<(AncestryGroup, f64, f64, u64)>,
     /// Total patients at risk across all US populations.
-    pub total_at_risk: u64,
+    pub sum_of_modelled_products: u64,
     /// Ancestry group with the highest absolute at-risk count.
-    pub most_affected: AncestryGroup,
+    pub largest_modelled_product_group: AncestryGroup,
     /// Human-readable risk description.
-    pub risk_description: String,
+    pub scenario_note: String,
 }
 
-/// Full equity analysis for a drug-gene pair across populations.
+/// Outputs of the current aggregate pharmacogenomics heuristic model.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EquityAnalysis {
-    /// Drug name.
     pub drug: String,
-    /// Gene name.
     pub gene: String,
-    /// Per-population risk profile.
-    pub population_risk: HashMap<AncestryGroup, PopulationRisk>,
-    /// Aggregate equity gap score (0.0 = equitable, 1.0 = severe disparity).
-    pub equity_gap_score: f64,
-    /// Populations where current guidelines are inadequate.
-    pub underserved_populations: Vec<AncestryGroup>,
-    /// Summary recommendation text.
-    pub recommendation: String,
+    /// Population-labeled model features; not patient-level risk estimates.
+    pub population_profiles: HashMap<AncestryGroup, PopulationHeuristicProfile>,
+    /// Variation in prototype heuristic indices (not a validated inequity measure).
+    pub model_gap_score: f64,
+    /// Population labels crossing the prototype's thresholds; not a finding of clinical underservice.
+    pub model_flagged_populations: Vec<AncestryGroup>,
+    /// Non-actionable description of model output; contains no clinical instruction.
+    pub research_note: String,
 }
 
 // ---------------------------------------------------------------------------
@@ -388,7 +404,7 @@ impl AdmixedPopulation {
 // Engine
 // ---------------------------------------------------------------------------
 
-/// Pharmacogenomics health equity engine.
+/// Exploratory pharmacogenomics population-frequency and heuristic-score engine.
 ///
 /// Loads reference allele frequencies and CPIC guidelines, then provides
 /// methods for aggregate equity analysis, research-only guideline projections,
@@ -1203,8 +1219,7 @@ impl PgxHealthEquityEngine {
         });
     }
 
-    /// Compute the expected metabolizer phenotype distribution for a gene
-    /// in a given ancestry group.
+    /// Compute a simplified phenotype-frequency approximation for a population label. This is not an individual phenotype call.
     ///
     /// Uses Hardy-Weinberg equilibrium to derive diplotype frequencies from
     /// allele frequencies, then maps diplotypes to CPIC phenotype bins.
@@ -1278,11 +1293,11 @@ impl PgxHealthEquityEngine {
             AncestryGroup::Mixed,
         ];
 
-        let mut population_risk = HashMap::new();
+        let mut population_profiles = HashMap::new();
         let mut max_adverse = 0.0_f64;
         let mut min_adverse = 1.0_f64;
-        let mut max_efficacy_risk = 0.0_f64;
-        let mut min_efficacy_risk = 1.0_f64;
+        let mut max_efficacy_heuristic_index = 0.0_f64;
+        let mut min_efficacy_heuristic_index = 1.0_f64;
 
         for &anc in &ancestries {
             let dist = self.metabolizer_distribution(gene, anc);
@@ -1306,7 +1321,7 @@ impl PgxHealthEquityEngine {
             };
 
             // Efficacy risk: PM for prodrugs (no activation), UM for active drugs (sub-therapeutic).
-            let efficacy_risk = if is_prodrug {
+            let efficacy_heuristic_index = if is_prodrug {
                 pm_frac * 0.9
             } else {
                 um_frac * 0.7 + pm_frac * 0.3
@@ -1323,43 +1338,43 @@ impl PgxHealthEquityEngine {
                 .sum::<f64>()
                 / 2.0; // normalize: max divergence = 1.0
 
-            let guideline_applicability = (1.0 - dist_divergence).clamp(0.0, 1.0);
+            let reference_similarity_proxy = (1.0 - dist_divergence).clamp(0.0, 1.0);
 
             max_adverse = max_adverse.max(adverse);
             min_adverse = min_adverse.min(adverse);
-            max_efficacy_risk = max_efficacy_risk.max(efficacy_risk);
-            min_efficacy_risk = min_efficacy_risk.min(efficacy_risk);
+            max_efficacy_heuristic_index = max_efficacy_heuristic_index.max(efficacy_heuristic_index);
+            min_efficacy_heuristic_index = min_efficacy_heuristic_index.min(efficacy_heuristic_index);
 
-            population_risk.insert(
+            population_profiles.insert(
                 anc,
-                PopulationRisk {
+                PopulationHeuristicProfile {
                     phenotype_distribution: dist,
-                    adverse_event_risk: adverse,
-                    efficacy_risk,
-                    guideline_applicability,
+                    toxicity_heuristic_index: adverse,
+                    efficacy_heuristic_index,
+                    reference_similarity_proxy,
                 },
             );
         }
 
         // Equity gap: maximum inter-population variance in combined risk.
         let adverse_range = max_adverse - min_adverse;
-        let efficacy_range = max_efficacy_risk - min_efficacy_risk;
-        let equity_gap_score = ((adverse_range + efficacy_range) / 2.0).clamp(0.0, 1.0);
+        let efficacy_range = max_efficacy_heuristic_index - min_efficacy_heuristic_index;
+        let model_gap_score = ((adverse_range + efficacy_range) / 2.0).clamp(0.0, 1.0);
 
         // Flag underserved populations.
-        let underserved: Vec<AncestryGroup> = population_risk
+        let underserved: Vec<AncestryGroup> = population_profiles
             .iter()
             .filter(|(anc, risk)| {
                 **anc != AncestryGroup::European
-                    && (risk.guideline_applicability < (1.0 - UNDERSERVED_THRESHOLD)
-                        || risk.adverse_event_risk > min_adverse + UNDERSERVED_THRESHOLD)
+                    && (risk.reference_similarity_proxy < (1.0 - UNDERSERVED_THRESHOLD)
+                        || risk.toxicity_heuristic_index > min_adverse + UNDERSERVED_THRESHOLD)
             })
             .map(|(anc, _)| *anc)
             .collect();
 
         let recommendation = if underserved.is_empty() {
             format!(
-                "{}/{}: Current guidelines appear reasonably equitable across populations.",
+                "{}/{}: No population label crossed the prototype's current heuristic thresholds. This is not a clinical equity or guideline-applicability finding.",
                 drug, gene
             )
         } else {
@@ -1379,7 +1394,7 @@ impl PgxHealthEquityEngine {
                  This aggregate result is not an individual dose, monitoring, or treatment recommendation.",
                 drug,
                 gene,
-                equity_gap_score,
+                model_gap_score,
                 names.join(", ")
             )
         };
@@ -1387,10 +1402,10 @@ impl PgxHealthEquityEngine {
         EquityAnalysis {
             drug: drug.into(),
             gene: gene.into(),
-            population_risk,
-            equity_gap_score,
-            underserved_populations: underserved,
-            recommendation,
+            population_profiles,
+            model_gap_score,
+            model_flagged_populations: underserved,
+            research_note: recommendation,
         }
     }
 
@@ -1420,16 +1435,16 @@ impl PgxHealthEquityEngine {
                 phenotype: phenotype_context,
                 reference_evidence_level: None,
                 reference_source_population: None,
-                population_equity_gap: None,
-                population_context_flagged: None,
+                population_model_gap_score: None,
+                population_context_crossed_model_threshold: None,
                 claim_ceiling: "No matching reference record; no medication action is inferred."
                     .to_string(),
             };
         };
 
         let equity = self.equity_analysis(drug, gene);
-        let population_context_flagged =
-            equity.underserved_populations.contains(&population_context);
+        let population_context_crossed_model_threshold =
+            equity.model_flagged_populations.contains(&population_context);
 
         ResearchGuidelineProjection {
             status: ResearchProjectionStatus::ReferenceFound,
@@ -1438,21 +1453,21 @@ impl PgxHealthEquityEngine {
             phenotype: phenotype_context,
             reference_evidence_level: Some(guideline.evidence_level),
             reference_source_population: Some(guideline.source_population),
-            population_equity_gap: Some(equity.equity_gap_score),
-            population_context_flagged: Some(population_context_flagged),
+            population_model_gap_score: Some(equity.model_gap_score),
+            population_context_crossed_model_threshold: Some(population_context_crossed_model_threshold),
             claim_ceiling: "Reference metadata and exploratory aggregate context only; no patient-level inference or medication action."
                 .to_string(),
         }
     }
 
-        /// Estimates the number of patients affected by ancestry-biased dosing
-    /// for a specific drug-gene pair, using US census population data (2024).
+        /// Computes arithmetic population scenarios from the model's aggregate phenotype fractions
+    /// and broad denominator values that require separate validation.
     ///
-    /// "At risk" = fraction of population with an actionable phenotype (PM or UM)
-    /// where the standard European-calibrated guideline may not apply optimally.
+    /// The fraction is a prototype-defined phenotype-category sum, not a validated clinical-risk
+    /// estimate or a count of people needing a treatment change.
     ///
-    /// Sources: US Census Bureau (2024 estimates).
-    pub fn clinical_impact_estimate(&self, drug: &str, gene: &str) -> ClinicalImpactEstimate {
+    /// Denominator provenance and population-category validity require separate review.
+    pub fn population_scenario_estimate(&self, drug: &str, gene: &str) -> PopulationScenarioEstimate {
         // Approximate US population by ancestry (2024 census estimates, millions).
         const POP_EUROPEAN: f64 = 195.0;
         const POP_AFRICAN: f64 = 47.0;
@@ -1472,12 +1487,12 @@ impl PgxHealthEquityEngine {
 
         let is_prodrug = drug == "codeine" || drug == "clopidogrel";
         // For tacrolimus/CYP3A5, expressors (NM/IM) need dose increase — different risk model.
-        let is_expressor_risk = drug == "tacrolimus" && gene == "CYP3A5";
+        let is_expressor_scenario = drug == "tacrolimus" && gene == "CYP3A5";
 
-        let mut per_ancestry = Vec::new();
-        let mut total_at_risk: u64 = 0;
-        let mut max_risk_count: u64 = 0;
-        let mut most_affected = AncestryGroup::European;
+        let mut per_population_scenario = Vec::new();
+        let mut sum_of_modelled_products: u64 = 0;
+        let mut largest_modelled_product: u64 = 0;
+        let mut largest_modelled_product_group = AncestryGroup::European;
 
         for &(ancestry, pop_millions) in &ancestries {
             let dist = self.metabolizer_distribution(gene, ancestry);
@@ -1498,49 +1513,43 @@ impl PgxHealthEquityEngine {
                 .copied()
                 .unwrap_or(0.0);
 
-            let at_risk_fraction = if is_expressor_risk {
+            let modelled_fraction = if is_expressor_scenario {
                 // For tacrolimus: NM + IM are expressors who need dose increase.
                 nm + im
             } else if is_prodrug {
-                // For prodrugs: PM (no activation) + UM (toxic overactivation).
+                // Prototype category sum for the selected class; not a clinical risk estimate.
                 pm + um
             } else {
-                // For active drugs: PM (accumulation) + UM (sub-therapeutic).
+                // Prototype category sum for other drugs; not a clinical risk estimate.
                 pm + um
             };
 
-            let at_risk_count = (at_risk_fraction * pop_millions * 1_000_000.0) as u64;
-            per_ancestry.push((ancestry, pop_millions, at_risk_fraction, at_risk_count));
-            total_at_risk += at_risk_count;
+            let modelled_product_count = (modelled_fraction * pop_millions * 1_000_000.0) as u64;
+            per_population_scenario.push((ancestry, pop_millions, modelled_fraction, modelled_product_count));
+            sum_of_modelled_products += modelled_product_count;
 
-            if at_risk_count > max_risk_count {
-                max_risk_count = at_risk_count;
-                most_affected = ancestry;
+            if modelled_product_count > largest_modelled_product {
+                largest_modelled_product = modelled_product_count;
+                largest_modelled_product_group = ancestry;
             }
         }
 
-        let risk_description = format!(
-            "{}/{}: ~{:.1}M patients at risk across US populations. \
-             Most affected: {:?} ({:.1}M at-risk individuals, {:.1}% of that population).",
+        let scenario_note = format!(
+            "{}/{}: arithmetic scenario product sum ~{:.1}M (prototype inputs only). Largest product label: {:?} (~{:.1}M). Not an estimate of patients at risk, clinical impact, or treatment need.",
             drug,
             gene,
-            total_at_risk as f64 / 1_000_000.0,
-            most_affected,
-            max_risk_count as f64 / 1_000_000.0,
-            per_ancestry
-                .iter()
-                .find(|(a, _, _, _)| *a == most_affected)
-                .map(|(_, _, f, _)| f * 100.0)
-                .unwrap_or(0.0),
+            sum_of_modelled_products as f64 / 1_000_000.0,
+            largest_modelled_product_group,
+            largest_modelled_product as f64 / 1_000_000.0,
         );
 
-        ClinicalImpactEstimate {
+        PopulationScenarioEstimate {
             drug: drug.into(),
             gene: gene.into(),
-            per_ancestry,
-            total_at_risk,
-            most_affected,
-            risk_description,
+            per_population_scenario,
+            sum_of_modelled_products,
+            largest_modelled_product_group,
+            scenario_note,
         }
     }
 
@@ -1766,7 +1775,7 @@ impl PgxHealthEquityEngine {
                 } else {
                     pm * 0.8 + um * 0.2
                 };
-                let efficacy_risk = if is_prodrug {
+                let efficacy_heuristic_index = if is_prodrug {
                     pm * 0.9
                 } else {
                     um * 0.7 + pm * 0.3
@@ -1785,8 +1794,8 @@ impl PgxHealthEquityEngine {
                 if adverse > UNDERSERVED_THRESHOLD {
                     flags.push(format!("adverse_risk={:.2}", adverse));
                 }
-                if efficacy_risk > UNDERSERVED_THRESHOLD {
-                    flags.push(format!("efficacy_risk={:.2}", efficacy_risk));
+                if efficacy_heuristic_index > UNDERSERVED_THRESHOLD {
+                    flags.push(format!("efficacy_heuristic_index={:.2}", efficacy_heuristic_index));
                 }
 
                 (pop.name.clone(), gap_score, flags)
@@ -1869,11 +1878,11 @@ mod tests {
     fn test_equity_analysis_produces_valid_result_for_codeine() {
         let e = engine();
         let analysis = e.equity_analysis("codeine", "CYP2D6");
-        assert!(analysis.equity_gap_score >= 0.0, "Gap score non-negative");
-        assert!(analysis.equity_gap_score <= 1.0, "Gap score bounded");
+        assert!(analysis.model_gap_score >= 0.0, "Gap score non-negative");
+        assert!(analysis.model_gap_score <= 1.0, "Gap score bounded");
         // At least one population should differ from the European reference
         assert!(
-            !analysis.population_risk.is_empty(),
+            !analysis.population_profiles.is_empty(),
             "Should have per-population risk data"
         );
     }
@@ -1884,10 +1893,10 @@ mod tests {
         let analysis = e.equity_analysis("clopidogrel", "CYP2C19");
         assert!(
             analysis
-                .underserved_populations
+                .model_flagged_populations
                 .contains(&AncestryGroup::EastAsian),
             "East Asian population should be flagged for clopidogrel/CYP2C19: {:?}",
-            analysis.underserved_populations
+            analysis.model_flagged_populations
         );
     }
 
@@ -1902,8 +1911,8 @@ mod tests {
         );
         assert_eq!(projection.status, ResearchProjectionStatus::ReferenceFound);
         assert_eq!(projection.reference_evidence_level, Some(EvidenceLevel::Strong));
-        assert!(projection.population_equity_gap.is_some());
-        assert!(projection.population_context_flagged.is_some());
+        assert!(projection.population_model_gap_score.is_some());
+        assert!(projection.population_context_crossed_model_threshold.is_some());
 
         let encoded = serde_json::to_value(&projection).unwrap();
         for forbidden in ["action", "dose_adjustment", "alternative_drug", "monitoring"] {
@@ -1940,8 +1949,8 @@ mod tests {
     #[test]
     fn test_equity_gap_both_nonzero() {
         let e = engine();
-        let codeine_gap = e.equity_analysis("codeine", "CYP2D6").equity_gap_score;
-        let sertraline_gap = e.equity_analysis("sertraline", "CYP2C19").equity_gap_score;
+        let codeine_gap = e.equity_analysis("codeine", "CYP2D6").model_gap_score;
+        let sertraline_gap = e.equity_analysis("sertraline", "CYP2C19").model_gap_score;
         // Both drugs have meaningful cross-population equity gaps.
         // CYP2C19 shows large variation (*2: 15% EUR vs 32% SAS) so sertraline
         // gap may exceed codeine with corrected frequencies.
@@ -2061,12 +2070,12 @@ mod tests {
         // leading to more PMs who accumulate efavirenz to toxic levels.
         assert!(
             analysis
-                .underserved_populations
+                .model_flagged_populations
                 .contains(&AncestryGroup::African)
-                || analysis.equity_gap_score > 0.01,
+                || analysis.model_gap_score > 0.01,
             "Efavirenz/CYP2B6 should show an equity gap or flag African: gap={:.3}, underserved={:?}",
-            analysis.equity_gap_score,
-            analysis.underserved_populations
+            analysis.model_gap_score,
+            analysis.model_flagged_populations
         );
     }
 
@@ -2078,53 +2087,53 @@ mod tests {
         // meaning ~82% are CYP3A5 expressors who metabolize tacrolimus faster
         // and are systematically underdosed.
         assert!(
-            analysis.equity_gap_score > 0.05,
+            analysis.model_gap_score > 0.05,
             "Tacrolimus/CYP3A5 should show a significant equity gap: {:.3}",
-            analysis.equity_gap_score
+            analysis.model_gap_score
         );
     }
 
     #[test]
-    fn test_clinical_impact_estimate_reasonable_numbers() {
+    fn test_population_scenario_estimate_reasonable_numbers() {
         let e = engine();
-        let estimate = e.clinical_impact_estimate("codeine", "CYP2D6");
+        let estimate = e.population_scenario_estimate("codeine", "CYP2D6");
         // Total US population ~331M. At-risk (PM+UM) should be some fraction.
         assert!(
-            estimate.total_at_risk > 1_000_000,
+            estimate.sum_of_modelled_products > 1_000_000,
             "At least 1M at risk for codeine/CYP2D6, got {}",
-            estimate.total_at_risk
+            estimate.sum_of_modelled_products
         );
         assert!(
-            estimate.total_at_risk < 200_000_000,
+            estimate.sum_of_modelled_products < 200_000_000,
             "At risk should be <200M, got {}",
-            estimate.total_at_risk
+            estimate.sum_of_modelled_products
         );
-        assert!(!estimate.risk_description.is_empty());
+        assert!(!estimate.scenario_note.is_empty());
     }
 
     #[test]
-    fn test_clinical_impact_total_equals_sum_of_per_ancestry() {
+    fn test_clinical_impact_total_equals_sum_of_per_population_scenario() {
         let e = engine();
-        let estimate = e.clinical_impact_estimate("efavirenz", "CYP2B6");
-        let sum: u64 = estimate.per_ancestry.iter().map(|(_, _, _, c)| c).sum();
+        let estimate = e.population_scenario_estimate("efavirenz", "CYP2B6");
+        let sum: u64 = estimate.per_population_scenario.iter().map(|(_, _, _, c)| c).sum();
         assert_eq!(
-            estimate.total_at_risk, sum,
+            estimate.sum_of_modelled_products, sum,
             "Total at risk ({}) should equal sum of per-ancestry counts ({})",
-            estimate.total_at_risk, sum
+            estimate.sum_of_modelled_products, sum
         );
     }
 
     #[test]
-    fn test_clinical_impact_tacrolimus_most_affected() {
+    fn test_clinical_impact_tacrolimus_largest_modelled_product_group() {
         let e = engine();
-        let estimate = e.clinical_impact_estimate("tacrolimus", "CYP3A5");
+        let estimate = e.population_scenario_estimate("tacrolimus", "CYP3A5");
         // For tacrolimus, European has the largest absolute population with
         // standard dosing already correct (*3/*3 non-expressors = PM = standard dose).
         // But the at-risk expressors are concentrated in African and Mixed groups.
         // European has huge population but low expressor rate (~6%).
-        // The most_affected should be the group with highest absolute at-risk count.
+        // The largest_modelled_product_group should be the group with highest absolute at-risk count.
         assert!(
-            estimate.total_at_risk > 0,
+            estimate.sum_of_modelled_products > 0,
             "Should have at-risk patients for tacrolimus/CYP3A5"
         );
     }
@@ -2294,10 +2303,10 @@ mod tests {
 
         // Get ancestral gap scores for reference.
         let analysis = e.equity_analysis("codeine", "CYP2D6");
-        let eur_risk = &analysis.population_risk[&AncestryGroup::European];
-        let afr_risk = &analysis.population_risk[&AncestryGroup::African];
-        let _eur_combined = eur_risk.adverse_event_risk + eur_risk.efficacy_risk;
-        let _afr_combined = afr_risk.adverse_event_risk + afr_risk.efficacy_risk;
+        let eur_risk = &analysis.population_profiles[&AncestryGroup::European];
+        let afr_risk = &analysis.population_profiles[&AncestryGroup::African];
+        let _eur_combined = eur_risk.toxicity_heuristic_index + eur_risk.efficacy_heuristic_index;
+        let _afr_combined = afr_risk.toxicity_heuristic_index + afr_risk.efficacy_heuristic_index;
 
         // African American (80% African, 20% European) gap should be non-zero
         // but less extreme than pure African divergence from European.
@@ -2385,7 +2394,7 @@ mod tests {
         );
         assert_eq!(projection.status, ResearchProjectionStatus::Indeterminate);
         assert!(projection.reference_evidence_level.is_none());
-        assert!(projection.population_equity_gap.is_none());
+        assert!(projection.population_model_gap_score.is_none());
         let encoded = serde_json::to_value(&projection).unwrap();
         for forbidden in ["action", "dose_adjustment", "alternative_drug", "monitoring"] {
             assert!(encoded.get(forbidden).is_none());
@@ -2403,7 +2412,7 @@ mod tests {
         );
         assert_eq!(projection.status, ResearchProjectionStatus::Indeterminate);
         assert!(projection.reference_evidence_level.is_none());
-        assert!(projection.population_context_flagged.is_none());
+        assert!(projection.population_context_crossed_model_threshold.is_none());
     }
 
     #[test]
@@ -2417,6 +2426,6 @@ mod tests {
         );
         assert_eq!(projection.status, ResearchProjectionStatus::Indeterminate);
         assert!(projection.reference_evidence_level.is_none());
-        assert!(projection.population_equity_gap.is_none());
+        assert!(projection.population_model_gap_score.is_none());
     }
 }
