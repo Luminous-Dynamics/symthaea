@@ -111,7 +111,15 @@ impl StructuredDecoder {
         let intent = intent_kind.as_str();
         // Public channel arrays can be populated by older serializers or external
         // callers; sanitize numeric inputs before they influence readout scores.
-        let epistemic_ordinal = finite_clamp(channels.epistemic_ordinal(), 0.0, 4.0, 3.0);
+        let raw_epistemic_ordinal = channels.epistemic_ordinal();
+        let epistemic_ordinal = if raw_epistemic_ordinal.is_finite()
+            && (0.0..=4.0).contains(&raw_epistemic_ordinal)
+        {
+            raw_epistemic_ordinal
+        } else {
+            // Invalid ordinals must never be clamped into apparent certainty.
+            3.0 // Unknown
+        };
         let valence = finite_clamp(channels.valence(), -1.0, 1.0, 0.0);
         let arousal = finite_clamp(channels.arousal(), 0.0, 1.0, 0.5);
         let psi = finite_clamp(channels.psi(), 0.0, 1.0, 0.5);
@@ -444,6 +452,18 @@ mod tests {
         assert!(translation.confidence.is_finite());
         assert!(translation.text.contains("classify"));
         assert!(!translation.text.contains("direct answer"));
+
+        for invalid_ordinal in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY, -1.0, 5.0] {
+            let mut invalid = ThoughtChannels::with_intent(1);
+            invalid.channels[8] = invalid_ordinal;
+            let readout = decoder.decode(&invalid);
+            assert_eq!(
+                readout.epistemic_status,
+                EpistemicDisposition::Unknown,
+                "invalid epistemic ordinal {invalid_ordinal} must not upgrade to certainty"
+            );
+            assert!(readout.confidence.is_finite());
+        }
     }
 
     #[test]
