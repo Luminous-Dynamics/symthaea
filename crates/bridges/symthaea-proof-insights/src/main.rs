@@ -886,9 +886,9 @@ fn audit_temporal_dataset(
         let declared_statement_name = declared_name_from_statement(&formal_statement);
         let statement_prefix = statement_declaration_prefix(&formal_statement);
         let theorem_short_name = theorem_name.rsplit('.').next().unwrap_or(&theorem_name);
-        let declared_name_matches_dataset = declared_statement_name.as_ref().map(|name| {
-            name.rsplit('.').next().unwrap_or(name) == theorem_short_name
-        });
+        let declared_name_matches_dataset = declared_statement_name
+            .as_ref()
+            .map(|name| name.rsplit('.').next().unwrap_or(name) == theorem_short_name);
         dataset_ids.insert(dataset_id.clone());
 
         let commit_before_object_exists = if validate_git_sha(&commit_before).is_ok() {
@@ -1129,12 +1129,8 @@ fn audit_temporal_dataset(
                             continue;
                         }
 
-                        let completion_statement_match =
-                            !statement_prefix.is_empty()
-                                && normalized_contains(
-                                    &completion_blocks[0],
-                                    statement_prefix,
-                                );
+                        let completion_statement_match = !statement_prefix.is_empty()
+                            && normalized_contains(&completion_blocks[0], statement_prefix);
                         identity_candidates.push((
                             candidate.position,
                             candidate.completion_commit.clone(),
@@ -2671,9 +2667,7 @@ fn git_parent_commits(root: &Path, commit: &str) -> Result<Vec<String>> {
         .next()
         .context("git rev-list returned an empty commit row")?;
     if resolved_commit != commit {
-        bail!(
-            "git rev-list returned commit {resolved_commit}, expected {commit}"
-        );
+        bail!("git rev-list returned commit {resolved_commit}, expected {commit}");
     }
     Ok(parts.map(str::to_owned).collect())
 }
@@ -3484,7 +3478,10 @@ theorem following_spec (x : Nat) : x = x := by
         assert!(normalized_contains(&blocks[0], &statement_prefix));
         assert!(normalized_contains(&blocks[0], "simp [encode] rfl"));
         assert!(!normalized_contains(&blocks[0], "exact Eq.rfl"));
-        assert!(!normalized_contains(&blocks[0], "rfl theorem following_spec"));
+        assert!(!normalized_contains(
+            &blocks[0],
+            "rfl theorem following_spec"
+        ));
     }
 
     #[test]
@@ -3503,7 +3500,11 @@ end Second
         let blocks = named_declaration_blocks(source, "shared")
             .expect("short-name extraction should be well-formed");
         assert_eq!(blocks.len(), 2);
-        assert!(blocks.iter().any(|block| normalized_contains(block, "exact Eq.rfl")));
+        assert!(
+            blocks
+                .iter()
+                .any(|block| normalized_contains(block, "exact Eq.rfl"))
+        );
         assert!(blocks.iter().any(|block| normalized_contains(block, "rfl")));
     }
 
@@ -3613,8 +3614,11 @@ end Second
         fs::write(root.join("lean/Other.lean"), &other_completed_source)
             .expect("complete independent theorem");
         let completed_ambiguous_source = initial_ambiguous_source.replace("  sorry\n", "  rfl\n");
-        fs::write(root.join("lean/Ambiguous.lean"), &completed_ambiguous_source)
-            .expect("complete duplicate-name declarations");
+        fs::write(
+            root.join("lean/Ambiguous.lean"),
+            &completed_ambiguous_source,
+        )
+        .expect("complete duplicate-name declarations");
         let commit_three = commit(&root, "complete second and independent proofs");
         let source_three = git_show_file(&root, &commit_three, "lean/Example.lean")
             .expect("read third source revision");
@@ -3951,31 +3955,64 @@ end Second
             dataset_events[0]["identity_join_status"],
             "unique_stable_theorem_proof_transition"
         );
-        assert_eq!(dataset_events[0]["identity_candidate_timeline_positions"][0], 3);
-        assert_eq!(dataset_events[0]["identity_statement_match_at_commit_before"], true);
-        assert_eq!(dataset_events[0]["identity_statement_match_at_completion"], true);
+        assert_eq!(
+            dataset_events[0]["identity_candidate_timeline_positions"][0],
+            3
+        );
+        assert_eq!(
+            dataset_events[0]["identity_statement_match_at_commit_before"],
+            true
+        );
+        assert_eq!(
+            dataset_events[0]["identity_statement_match_at_completion"],
+            true
+        );
         assert_eq!(dataset_events[0]["identity_proof_matches_completion"], true);
-        assert_eq!(dataset_events[0]["identity_proof_absent_at_commit_before"], true);
+        assert_eq!(
+            dataset_events[0]["identity_proof_absent_at_commit_before"],
+            true
+        );
         assert_eq!(
             dataset_events[1]["identity_join_status"],
             "unique_stable_theorem_proof_transition"
         );
-        assert_eq!(dataset_events[1]["identity_candidate_timeline_positions"][0], 0);
-        assert_eq!(dataset_events[1]["path_join_status"], "ambiguous_path_match");
+        assert_eq!(
+            dataset_events[1]["identity_candidate_timeline_positions"][0],
+            0
+        );
+        assert_eq!(
+            dataset_events[1]["path_join_status"],
+            "ambiguous_path_match"
+        );
         assert_eq!(
             dataset_events[1]["statement_match_relation"],
             "not_checked_due_to_ambiguous_path"
         );
-        assert_eq!(dataset_events[2]["path_join_status"], "ambiguous_path_match");
+        assert_eq!(
+            dataset_events[2]["path_join_status"],
+            "ambiguous_path_match"
+        );
         assert_eq!(
             dataset_events[2]["identity_join_status"],
             "unique_proof_transition_with_statement_or_visibility_mismatch"
         );
-        assert_eq!(dataset_events[2]["identity_candidate_timeline_positions"][0], 1);
-        assert_eq!(dataset_events[2]["identity_statement_match_at_commit_before"], false);
-        assert_eq!(dataset_events[2]["identity_statement_match_at_completion"], false);
+        assert_eq!(
+            dataset_events[2]["identity_candidate_timeline_positions"][0],
+            1
+        );
+        assert_eq!(
+            dataset_events[2]["identity_statement_match_at_commit_before"],
+            false
+        );
+        assert_eq!(
+            dataset_events[2]["identity_statement_match_at_completion"],
+            false
+        );
         assert_eq!(dataset_events[2]["identity_proof_matches_completion"], true);
-        assert_eq!(dataset_events[2]["identity_proof_absent_at_commit_before"], true);
+        assert_eq!(
+            dataset_events[2]["identity_proof_absent_at_commit_before"],
+            true
+        );
         assert_eq!(
             dataset_events[2]["statement_match_relation"],
             "not_checked_due_to_ambiguous_path"
@@ -4020,16 +4057,19 @@ end Second
             dataset_events[7]["statement_match_relation"],
             "completion_match_pre_state_unavailable"
         );
-        assert_eq!(
-            dataset_events[8]["path_join_status"],
-            "unique_path_match"
-        );
+        assert_eq!(dataset_events[8]["path_join_status"], "unique_path_match");
         assert_eq!(
             dataset_events[8]["identity_join_status"],
             "ambiguous_declaration_identity"
         );
-        assert_eq!(dataset_events[8]["identity_candidate_timeline_positions"], serde_json::json!([]));
-        assert_eq!(dataset_events[8]["ambiguous_declaration_timeline_positions"], serde_json::json!([4]));
+        assert_eq!(
+            dataset_events[8]["identity_candidate_timeline_positions"],
+            serde_json::json!([])
+        );
+        assert_eq!(
+            dataset_events[8]["ambiguous_declaration_timeline_positions"],
+            serde_json::json!([4])
+        );
 
         let target_bundle_path = base.join("target-001-bundle.json");
         materialize_temporal_target(&root, &manifest_path, "target-001", &target_bundle_path)
