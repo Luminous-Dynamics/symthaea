@@ -264,8 +264,11 @@ struct CalibrationAssessment {
     probability_scored_pairs: usize,
     probability_coverage: f64,
     complete_binary_coverage: bool,
+    scored_components: usize,
     brier_score: Option<f64>,
+    brier_score_ci_95: Option<Interval>,
     expected_calibration_error_10_bins: Option<f64>,
+    calibration_error_ci_95: Option<Interval>,
     reliability_bins: Vec<ReliabilityBin>,
 }
 
@@ -640,7 +643,7 @@ fn analyze(
         );
     }
 
-    let calibration = calibration_assessment(outcomes);
+    let calibration = calibration_assessment(outcomes, bootstrap_replicates, seed);
     let recall = metrics["compatible_accept_recall"].estimate;
     let compatible_floor_met = counts.compatible_components >= MIN_COMPONENTS_PER_CLASS;
     let incompatible_floor_met = counts.incompatible_components >= MIN_COMPONENTS_PER_CLASS;
@@ -681,19 +684,42 @@ fn analyze(
     })
 }
 
-fn calibration_assessment(outcomes: &[Outcome]) -> CalibrationAssessment {
-    let binary_rows: Vec<(Option<f64>, bool)> = outcomes
+fn calibration_assessment(
+    outcomes: &[Outcome],
+    bootstrap_replicates: usize,
+    seed: u64,
+) -> CalibrationAssessment {
+    let binary_rows: Vec<(String, Option<f64>, bool)> = outcomes
         .iter()
         .filter(|outcome| outcome.adjudication.status == AdjudicationStatus::Adjudicated)
         .filter_map(|outcome| match outcome.adjudication.label {
-            Label::Compatible => Some((outcome.prediction.compatibility_probability, true)),
-            Label::Incompatible => Some((outcome.prediction.compatibility_probability, false)),
+            Label::Compatible => Some((
+                outcome.component_id.clone(),
+                outcome.prediction.compatibility_probability,
+                true,
+            )),
+            Label::Incompatible => Some((
+                outcome.component_id.clone(),
+                outcome.prediction.compatibility_probability,
+                false,
+            )),
             Label::Partial | Label::Unknown => None,
         })
         .collect();
-    let scored: Vec<(f64, bool)> = binary_rows
-        .iter()
-        .filter_map(|(probability, truth)| probability.map(|value| (value, *truth)))
+
+    let mut scored_by_component = BTreeMap::<String, Vec<(f64, bool)>>::new();
+    for (component_id, probability, truth) in &binary_rows {
+        if let Some(probability) = probability {
+            scored_by_component
+                .entry(component_id.clone())
+                .or_default()
+                .push((*probability, *truth));
+        }
+    }
+    let scored: Vec<(f64, bool)> = scored_by_component
+        .values()
+        .flatten()
+        .copied()
         .collect();
     let probability_coverage = ratio(scored.len(), binary_rows.len()).unwrap_or(0.0);
     if scored.is_empty() {
@@ -702,38 +728,31 @@ fn calibration_assessment(outcomes: &[Outcome]) -> CalibrationAssessment {
             probability_scored_pairs: 0,
             probability_coverage,
             complete_binary_coverage: binary_rows.is_empty(),
+            scored_components: 0,
             brier_score: None,
+            brier_score_ci_95: None,
             expected_calibration_error_10_bins: None,
+            calibration_error_ci_95: None,
             reliability_bins: Vec::new(),
         };
     }
 
-    let brier_score = scored
-        .iter()
-        .map(|(probability, truth)| {
-            let target = if *truth { 1.0 } else { 0.0 };
-            (probability - target).powi(2)
-        })
-        .sum::<f64>()
-        / scored.len() as f64;
-
+    let (brier_score, expected_calibration_error_10_bins) = calibration_scores(&scored);
     let mut bins: Vec<Vec<(f64, bool)>> = (0..10).map(|_| Vec::new()).collect();
     for (probability, truth) in &scored {
         let bin_index = ((*probability * 10.0).floor() as usize).min(9);
         bins[bin_index].push((*probability, *truth));
     }
 
-    let mut ece = 0.0;
     let mut reliability_bins = Vec::new();
     for (index, values) in bins.into_iter().enumerate() {
         if values.is_empty() {
             continue;
         }
         let count = values.len();
-        let mean_probability = values.iter().map(|(p, _)| p).sum::<f64>() / count as f64;
+        let mean_probability = values.iter().map(|(p, _)| *p).sum::<f64>() / count as f64;
         let observed_rate =
             values.iter().filter(|(_, truth)| *truth).count() as f64 / count as f64;
-        ece += count as f64 / scored.len() as f64 * (mean_probability - observed_rate).abs();
         reliability_bins.push(ReliabilityBin {
             bin_index: index,
             lower_bound: index as f64 / 10.0,
@@ -744,15 +763,76 @@ fn calibration_assessment(outcomes: &[Outcome]) -> CalibrationAssessment {
         });
     }
 
+    let scored_components = scored_by_component.len();
+    let (brier_score_ci_95, calibration_error_ci_95) = if scored_components >= 2 {
+        let clusters: Vec<&Vec<(f64, bool)>> = scored_by_component.values().collect();
+        let mut rng = SplitMix64::new(seed ^ 0x4341_4c49_4252_4154);
+        let mut brier_samples = Vec::with_capacity(bootstrap_replicates);
+        let mut error_samples = Vec::with_capacity(bootstrap_replicates);
+        for _ in 0..bootstrap_replicates {
+            let mut sample = Vec::new();
+            for _ in 0..clusters.len() {
+                sample.extend(clusters[rng.index(clusters.len())].iter().copied());
+            }
+            let (brier, error) = calibration_scores(&sample);
+            brier_samples.push(brier);
+            error_samples.push(error);
+        }
+        brier_samples.sort_by(f64::total_cmp);
+        error_samples.sort_by(f64::total_cmp);
+        (
+            Some(Interval {
+                lower: quantile(&brier_samples, 0.025),
+                upper: quantile(&brier_samples, 0.975),
+            }),
+            Some(Interval {
+                lower: quantile(&error_samples, 0.025),
+                upper: quantile(&error_samples, 0.975),
+            }),
+        )
+    } else {
+        (None, None)
+    };
+
     CalibrationAssessment {
         eligible_binary_pairs: binary_rows.len(),
         probability_scored_pairs: scored.len(),
         probability_coverage,
         complete_binary_coverage: scored.len() == binary_rows.len(),
+        scored_components,
         brier_score: Some(brier_score),
-        expected_calibration_error_10_bins: Some(ece),
+        brier_score_ci_95,
+        expected_calibration_error_10_bins: Some(expected_calibration_error_10_bins),
+        calibration_error_ci_95,
         reliability_bins,
     }
+}
+
+fn calibration_scores(values: &[(f64, bool)]) -> (f64, f64) {
+    debug_assert!(!values.is_empty());
+    let brier = values
+        .iter()
+        .map(|(probability, truth)| {
+            let target = if *truth { 1.0 } else { 0.0 };
+            (*probability - target).powi(2)
+        })
+        .sum::<f64>()
+        / values.len() as f64;
+
+    let mut bins: Vec<Vec<(f64, bool)>> = (0..10).map(|_| Vec::new()).collect();
+    for (probability, truth) in values {
+        let bin_index = ((*probability * 10.0).floor() as usize).min(9);
+        bins[bin_index].push((*probability, *truth));
+    }
+    let mut ece = 0.0;
+    for bin in bins.into_iter().filter(|bin| !bin.is_empty()) {
+        let count = bin.len();
+        let mean_probability = bin.iter().map(|(p, _)| *p).sum::<f64>() / count as f64;
+        let observed_rate =
+            bin.iter().filter(|(_, truth)| *truth).count() as f64 / count as f64;
+        ece += count as f64 / values.len() as f64 * (mean_probability - observed_rate).abs();
+    }
+    (brier, ece)
 }
 
 fn metric_counts(name: &str, cells: CellCounts) -> (usize, usize) {
@@ -869,7 +949,9 @@ mod tests {
         assert!(report.calibration.complete_binary_coverage);
         assert!(report.calibration.brier_score.is_some());
         assert!((report.calibration.brier_score.unwrap() - 0.01).abs() < 1e-12);
+        assert!(report.calibration.brier_score_ci_95.is_some());
         assert!(report.calibration.expected_calibration_error_10_bins.is_some());
+        assert!(report.calibration.calibration_error_ci_95.is_some());
         assert_eq!(
             report.proposed_gates.overall_confirmatory_decision,
             "not_evaluated_requires_independent_mutation_receipt_and_protocol_audit"
