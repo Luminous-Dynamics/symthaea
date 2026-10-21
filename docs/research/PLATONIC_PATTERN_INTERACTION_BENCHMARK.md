@@ -16,6 +16,7 @@ This benchmark asks a narrow, testable question: when patterns are represented a
 5. **Noise robustness.** Corrupt a stored pattern at controlled flip rates and retrieve against a fixed prototype library. Report top-1 accuracy and the target-vs-best-competitor similarity margin.
 6. **Superposition capacity.** Bundle K stored patterns and compare mean member similarity, maximum distractor similarity, and top-1 member recall as K increases.
 7. **Associative capacity.** Bind distinct role/filler pairs, bundle all pairs into one memory trace, query by unbinding one role, and measure target similarity, strongest distractor similarity, and top-1 retrieval as the number of relations increases. This is the most direct abstract-pattern test of whether composition preserves relationships under interference.
+8. **Iterative associative cleanup.** Compare nearest-prototype retrieval with a projected softmax-weighted pattern update over the same stored library. The latter is a Hopfield-inspired baseline (softmax attention over stored patterns plus bipolar projection), not an exact replication of a named modern Hopfield model. Report both accuracy and target/distractor margin across the same corruption rates.
 
 Every random pattern and noise mask is deterministic for the supplied seed. The report exposes random-chance retrieval as a baseline. Use multiple independent seeds for publication-quality comparisons; the included default seed is for reproducibility, not statistical evidence.
 
@@ -34,7 +35,7 @@ Default experiment dimensions are 16,384 bipolar coordinates, 64 prototypes, 16 
 - Nearest-prototype retrieval is intentionally a simple recall baseline, not a learned attractor or autonomous repair mechanism.
 - Bundle recall is expected to degrade with increasing bundle size; report the full curve rather than choosing only a favorable K.
 - The bundling-ablation comparison is a controlled operator comparison, not evidence that binding is universally superior for every task.
-- Use held-out pattern seeds, multiple bundle sizes, and unrelated distractors. Do not tune thresholds on the evaluation trials.
+- Use held-out pattern seeds, multiple bundle sizes, and unrelated distractors. Compare the nearest-prototype baseline against the projected-softmax cleanup baseline using the same stored items, seeds, and corruption masks. Do not tune thresholds on the evaluation trials.
 - Before claiming an advantage, compare against nearest-neighbor, random-choice, and task-specific baselines at matched dimensionality and compute; report confidence intervals across independent seeds.
 
 ## Follow-on biology-inspired tests
