@@ -16,6 +16,9 @@ struct Args {
     plan: PathBuf,
     pairs: PathBuf,
     results: PathBuf,
+    case_manifest: PathBuf,
+    source_catalog: PathBuf,
+    source_pack: PathBuf,
     output: PathBuf,
 }
 
@@ -141,7 +144,7 @@ struct Report {
 }
 
 fn usage() -> &'static str {
-    "Usage: score-paired-results --plan FILE --pairs JSONL --results JSONL --out FILE\n\
+    "Usage: score-paired-results --plan FILE --pairs JSONL --results JSONL --case-manifest FILE --source-catalog FILE --source-pack FILE --out FILE\n\
      Scores blinded/adjudicated paired-intervention observations against a frozen comparison plan.\n\
      It does not run models, infer labels, or turn synthetic controls into benchmark results."
 }
@@ -151,6 +154,9 @@ fn parse_args() -> Result<Args, String> {
     let mut plan = None;
     let mut pairs = None;
     let mut results = None;
+    let mut case_manifest = None;
+    let mut source_catalog = None;
+    let mut source_pack = None;
     let mut output = None;
 
     while let Some(arg) = raw.next() {
@@ -161,6 +167,15 @@ fn parse_args() -> Result<Args, String> {
             "--plan" => plan = Some(PathBuf::from(value(&mut raw, "--plan")?)),
             "--pairs" => pairs = Some(PathBuf::from(value(&mut raw, "--pairs")?)),
             "--results" => results = Some(PathBuf::from(value(&mut raw, "--results")?)),
+            "--case-manifest" => {
+                case_manifest = Some(PathBuf::from(value(&mut raw, "--case-manifest")?))
+            }
+            "--source-catalog" => {
+                source_catalog = Some(PathBuf::from(value(&mut raw, "--source-catalog")?))
+            }
+            "--source-pack" => {
+                source_pack = Some(PathBuf::from(value(&mut raw, "--source-pack")?))
+            }
             "--out" => output = Some(PathBuf::from(value(&mut raw, "--out")?)),
             "--help" | "-h" => return Err(usage().to_string()),
             other => return Err(format!("unknown argument {other:?}\n{}", usage())),
@@ -171,6 +186,12 @@ fn parse_args() -> Result<Args, String> {
         plan: plan.ok_or_else(|| format!("missing --plan\n{}", usage()))?,
         pairs: pairs.ok_or_else(|| format!("missing --pairs\n{}", usage()))?,
         results: results.ok_or_else(|| format!("missing --results\n{}", usage()))?,
+        case_manifest: case_manifest
+            .ok_or_else(|| format!("missing --case-manifest\n{}", usage()))?,
+        source_catalog: source_catalog
+            .ok_or_else(|| format!("missing --source-catalog\n{}", usage()))?,
+        source_pack: source_pack
+            .ok_or_else(|| format!("missing --source-pack\n{}", usage()))?,
         output: output.ok_or_else(|| format!("missing --out\n{}", usage()))?,
     })
 }
@@ -601,8 +622,43 @@ fn run() -> Result<(), String> {
         .map_err(|error| format!("cannot read pairs {}: {error}", args.pairs.display()))?;
     let result_bytes = fs::read(&args.results)
         .map_err(|error| format!("cannot read results {}: {error}", args.results.display()))?;
+    let case_manifest_bytes = fs::read(&args.case_manifest).map_err(|error| {
+        format!(
+            "cannot read case manifest {}: {error}",
+            args.case_manifest.display()
+        )
+    })?;
+    let source_catalog_bytes = fs::read(&args.source_catalog).map_err(|error| {
+        format!(
+            "cannot read source catalog {}: {error}",
+            args.source_catalog.display()
+        )
+    })?;
+    let source_pack_bytes = fs::read(&args.source_pack).map_err(|error| {
+        format!(
+            "cannot read source pack {}: {error}",
+            args.source_pack.display()
+        )
+    })?;
     let plan: Plan = serde_json::from_slice(&plan_bytes)
         .map_err(|error| format!("plan JSON is invalid: {error}"))?;
+    let actual_case_manifest_sha256 = sha256_hex(&case_manifest_bytes);
+    let actual_source_catalog_sha256 = sha256_hex(&source_catalog_bytes);
+    let actual_source_pack_sha256 = sha256_hex(&source_pack_bytes);
+    if pair_bytes != case_manifest_bytes {
+        return Err("paired scorer requires --case-manifest bytes to exactly match --pairs bytes".into());
+    }
+    for (label, actual, expected) in [
+        ("case manifest", actual_case_manifest_sha256.as_str(), plan.benchmark.case_manifest_sha256.as_str()),
+        ("source catalog", actual_source_catalog_sha256.as_str(), plan.benchmark.source_catalog_sha256.as_str()),
+        ("source pack", actual_source_pack_sha256.as_str(), plan.benchmark.source_pack_sha256.as_str()),
+    ] {
+        if actual != expected {
+            return Err(format!(
+                "{label} digest mismatch: manifest declares {expected}, actual bytes hash to {actual}"
+            ));
+        }
+    }
     let pairs = parse_jsonl::<PairCase>(&pair_bytes, "pair manifest")?;
     let pair_count = pairs.len();
     let results = parse_jsonl::<Observation>(&result_bytes, "paired-intervention results")?;
@@ -634,9 +690,9 @@ fn run() -> Result<(), String> {
         pair_manifest_sha256: sha256_hex(&pair_bytes),
         result_rows_sha256: sha256_hex(&result_bytes),
         dependency_lock_sha256: sha256_hex(&lock_bytes),
-        benchmark_case_manifest_sha256: plan.benchmark.case_manifest_sha256,
-        source_catalog_sha256: plan.benchmark.source_catalog_sha256,
-        source_pack_sha256: plan.benchmark.source_pack_sha256,
+        benchmark_case_manifest_sha256: actual_case_manifest_sha256,
+        source_catalog_sha256: actual_source_catalog_sha256,
+        source_pack_sha256: actual_source_pack_sha256,
         pair_count,
         system_count: system_metrics.len(),
         systems: system_metrics,
