@@ -767,6 +767,120 @@ jobs:
               "false-accept outcomes remain representable for evaluation"
           )
           PY
+      - name: Run transfer-selectivity analysis on synthetic clustered controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$(dirname "$PITB_MANIFEST")"
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          out = Path(__import__("os").environ["RUNNER_TEMP"]) / "pitb-transfer-selectivity-synthetic.jsonl"
+          digest = "0" * 64
+          commit = "a" * 40
+          budget = {
+              "max_model_calls": 8,
+              "max_tokens": 16000,
+              "max_wall_ms": 300000,
+              "max_cost_microusd": 500000,
+          }
+          rows = []
+          for i in range(21):
+              for truth in ("compatible", "incompatible"):
+                  pair_id = f"{truth}-{i:03}"
+                  component_id = f"component-{truth}-{i:03}"
+                  decision = "accept" if truth == "compatible" and i < 20 else (
+                      "abstain" if truth == "compatible" else "reject"
+                  )
+                  predicted_label = {
+                      "accept": "compatible",
+                      "reject": "incompatible",
+                      "abstain": "unknown",
+                  }[decision]
+                  reason_code = "other" if truth == "compatible" else "inequality_direction"
+                  row = {
+                      "schema_version": "pitb.transfer-selectivity-outcome.v0",
+                      "pair_id": pair_id,
+                      "split": "test",
+                      "component_id": component_id,
+                      "source": {
+                          "record_id": f"source-{pair_id}",
+                          "family_id": f"source-family-{pair_id}",
+                          "source_commit": commit,
+                          "artifact_sha256": digest,
+                          "insight_sha256": digest,
+                      },
+                      "target": {
+                          "theorem_id": f"Synthetic.Target{pair_id.replace('-', '')}",
+                          "family_id": f"target-family-{pair_id}",
+                          "source_commit": commit,
+                          "artifact_path": f"lean/Synthetic/{pair_id}.lean",
+                          "artifact_sha256": digest,
+                          "statement_sha256": digest,
+                          "obligation_sha256": f"{i + (0 if truth == 'compatible' else 100):064x}",
+                          "domain_labels": ["synthetic-only"],
+                      },
+                      "adjudication": {
+                          "status": "adjudicated",
+                          "label": truth,
+                          "rubric_version": "synthetic-v0",
+                          "reviewer_decisions": [
+                              {"reviewer_id": "reviewer-a", "label": truth, "reason_codes": [reason_code], "evidence_sha256": digest},
+                              {"reviewer_id": "reviewer-b", "label": truth, "reason_codes": [reason_code], "evidence_sha256": digest},
+                          ],
+                          "receipt_sha256": digest,
+                          "adjudication_note": "Synthetic analyzer fixture only.",
+                      },
+                      "prediction": {
+                          "decision": decision,
+                          "predicted_label": predicted_label,
+                          "confidence": 0.9,
+                          "mismatch_codes": [] if decision == "accept" else ([reason_code] if decision == "reject" else ["unknown"]),
+                          "precondition_checks": [
+                              {"check_id": "synthetic-check", "outcome": "satisfied" if decision == "accept" else ("violated" if decision == "reject" else "unknown"), "evidence_sha256": digest}
+                          ],
+                          "receipt_sha256": digest,
+                      },
+                      "run": {
+                          "model_id": "synthetic-only",
+                          "model_version": "synthetic-v0",
+                          "prompt_sha256": digest,
+                          "config_sha256": digest,
+                          "input_sha256": digest,
+                          "output_sha256": digest,
+                          "budget": budget,
+                          "actual_model_calls": 1,
+                          "actual_tokens": 100,
+                          "actual_wall_ms": 100,
+                          "actual_cost_microusd": 1,
+                      },
+                  }
+                  rows.append(row)
+          out.write_text("".join(json.dumps(row, sort_keys=True) + "\n" for row in rows))
+          print(f"PITB_TRANSFER_SELECTIVITY_FIXTURE: rows={len(rows)} path={out}")
+          PY
+          report="$RUNNER_TEMP/pitb-transfer-selectivity-synthetic-report.json"
+          cargo run --locked --bin analyze_transfer_selectivity -- "$RUNNER_TEMP/pitb-transfer-selectivity-synthetic.jsonl" test "$report" 1000 20261021
+          python - "$report" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          report = json.loads(Path(sys.argv[1]).read_text())
+          assert report["schema_version"] == "pitb.transfer-selectivity-analysis.v0"
+          assert report["counts"]["rows"] == 42
+          assert report["counts"]["binary_evaluable_pairs"] == 42
+          assert report["counts"]["compatible_components"] == 21
+          assert report["counts"]["incompatible_components"] == 21
+          assert abs(report["metrics"]["compatible_accept_recall"]["estimate"] - 20 / 21) < 1e-12
+          assert report["metrics"]["incompatible_false_accept_rate"]["estimate"] == 0.0
+          assert abs(report["metrics"]["binary_coverage"]["estimate"] - 41 / 42) < 1e-12
+          assert report["proposed_gates"]["pair_selectivity_gate"] == "pair_track_thresholds_met"
+          assert report["proposed_gates"]["finite_mutation_suite_gate"] == "not_evaluated_by_this_analyzer"
+          assert report["proposed_gates"]["overall_confirmatory_decision"].startswith("not_evaluated_")
+          print("PITB_TRANSFER_SELECTIVITY_ANALYZER_PASS: 42 synthetic rows, clustered intervals, class metrics, abstention accounting, and fail-closed overall decision")
+          PY
       - name: Audit pinned Dalek Lean Bench timeline
         shell: bash
         run: |
