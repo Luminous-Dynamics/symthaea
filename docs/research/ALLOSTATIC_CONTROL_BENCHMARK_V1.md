@@ -26,6 +26,7 @@ No single weighted score can hide a safety violation. Report task reward, breach
 - [Issue #268](https://github.com/Luminous-Dynamics/symthaea/issues/268): separate epistemic precision from viability burden.
 - [Issue #269](https://github.com/Luminous-Dynamics/symthaea/issues/269): separate mean projected burden from cumulative exposure and other temporal measures.
 - [Issue #3431](https://github.com/Luminous-Dynamics/symthaea/issues/3431): predict the state of the computational/embodied substrate before constraints are crossed.
+- [Issue #8243](https://github.com/Luminous-Dynamics/symthaea/issues/8243): follow-up experiment for model mismatch, noisy/missing state telemetry, and robust shield evaluation.
 - Existing [AllostaticStress benchmark](https://github.com/Luminous-Dynamics/symthaea/blob/main/crates/domains/symthaea-psych-bench/src/benchmarks/neuromod/allostatic_stress.rs): transmitter-baseline and simplified chronic-stress/recovery dynamics.
 
 The new crate is independent of cognitive-loop internals so we can falsify the decision rule before wiring it into live cognition. It is an engineering abstraction, not a model of subjective distress, human physiology, or consciousness.
@@ -70,7 +71,7 @@ Each of the six policies is evaluated with the shield disabled and enabled, givi
 - if `Maintain` is also predicted to cross a limit, try the task-interrupting `EmergencyRecover`;
 - if none of the available actions is predicted to satisfy both limits, execute the best-effort recovery action and count the event as `no_safe_action_ticks`.
 
-The shield and simulator deliberately share the same synthetic transition function. This removes implementation drift between the prediction used for vetoing and the transition used for scoring, but it also means the shield is **model-perfect by construction**. Zero violations in shielded synthetic runs is a semantic regression test—not evidence of safety under model error, uncertain state estimates, physical dynamics, or external tasks. A later benchmark must perturb shield-model parameters and state estimates, and compare against independently implemented control-barrier/MPC filters.
+The shield and simulator deliberately share the same synthetic transition function. This removes implementation drift between the prediction used for vetoing and the transition used for scoring, but it also means the shield is **model-perfect by construction**. Zero violations in shielded synthetic runs is a semantic regression test—not evidence of safety under model error, uncertain state estimates, physical dynamics, or external tasks. The follow-up [issue #8243](https://github.com/Luminous-Dynamics/symthaea/issues/8243) requires perturbing shield-model parameters and state estimates, and comparing against independently implemented control-barrier/MPC filters.
 
 ### Reported metrics
 
