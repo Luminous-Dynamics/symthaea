@@ -51,6 +51,8 @@ GIT_COMMIT_SHA=$(git rev-parse HEAD) cargo run -p symthaea-broca --bin broca-voc
 
 The benchmark uses a bank of 16 deterministic queries. It reports the fraction of queries where the original top-1 token remains top-1 across the full extended vocabulary, and the minimum old-best-vs-new-best logit margin. The KL metric isolates changes within the old-token conditional distribution. If extension leaves old logits unchanged, that conditional KL should be near zero; total probability mass assigned to newly added tokens is reported separately because softmax's denominator changes.
 
+A literature result from CoNLL 2024 motivates constraining new embeddings to the convex hull of existing rows under a dot-product scoring argument. Broca's current logits use cosine similarity, so we do **not** assume that guarantee transfers: vector normalization changes the geometry of the score. This branch measures greedy preservation empirically instead. The next quality-stage version should collect representative hidden/query states from a fixed calibration corpus, tune or reject candidates using old-vs-new top-1 margins on calibration data, and verify on a sealed holdout; finite calibration cannot prove preservation for every possible hidden state.
+
 ## Proposed evaluation gates
 
 Targets below must be preregistered and are not current results:
