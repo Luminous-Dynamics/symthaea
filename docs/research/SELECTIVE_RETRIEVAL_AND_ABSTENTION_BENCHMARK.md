@@ -51,7 +51,7 @@ A second baseline, fixed-sequence confidence-interval calibration (CIC), uses **
 - **Stratified diagnostics:** each seed/rule emits an overall row plus separate rows for every corruption level, random OOD queries, and ambiguous mixtures. This prevents pooled risk from hiding failures on a particular query type.
 - **Runtime:** total benchmark wall time per invocation, recorded separately from per-row decision quality.
 
-The first version reports risk/coverage points rather than claiming a complete area-under-risk-coverage result. A later protocol should add full risk–coverage curves and normalized area under the risk–coverage curve (AURC), as well as calibration cost and query latency distributions.
+The current executable emits the full predeclared 101-point risk–coverage curves plus per-run trapezoidal AURC summaries. Confidence intervals for AURC and query-latency distributions remain future work.
 
 ## Preliminary result from a completed earlier head
 
@@ -70,11 +70,13 @@ Two useful negative results emerge. First, the score-only rule has lower coverag
 
 ## Fixed-sequence calibration baseline added
 
-The current executable now compares six prespecified policies across five seeds: three empirical-threshold baselines (score, margin, score + margin) and three fixed-sequence CIC baselines. The CIC threshold schedules are fixed in source: score-only `0.65 → 0.45` in 0.01 steps; margin-only `0.10 → 0.02` in 0.005 steps; and combined score/margin with both thresholds relaxed monotonically together. They are not fitted from the calibration values.
+The current executable compares six prespecified policies across five seeds: three empirical-threshold baselines (score, margin, score + margin) and three fixed-sequence CIC baselines. The CIC threshold schedules are **101 predeclared candidates per strategy**: score-only similarity from 0.65 to -1.0, margin from 0.10 to 0.0, and a combined schedule that relaxes both thresholds monotonically. These schedules are fixed in source rather than fit to calibration values.
 
-This follows Dong, Hao, and Shinnou (2026), whose *Fixed-Sequence Confidence-Interval Calibration for Finite-Sample Selective Risk Control* applies one-sided Hoeffding or exact Clopper–Pearson bounds to a predeclared threshold sequence, stopping at the first failed certificate. They show that fixed-sequence testing can retain more acceptance than a simultaneous Bonferroni correction in favorable threshold orders, even without assuming risk is monotone across thresholds. The HDC experiment tests whether that advantage transfers to hypervector retrieval; it is not assumed.
+This follows Dong, Hao, and Shinnou (2026), whose *Fixed-Sequence Confidence-Interval Calibration for Finite-Sample Selective Risk Control* applies one-sided Hoeffding or exact Clopper–Pearson bounds to a predeclared threshold sequence, stopping at the first failed certificate. The HDC experiment tests whether the fixed-sequence approach transfers to hypervector retrieval; it does not assume an improvement in advance.
 
-**Status:** code and unit tests are added, but no exact-head result for the new CIC baseline is claimed yet. The next comparison is paired risk/coverage and calibration sample cost on identical seeded query generators. CIC should only be considered better if held-out risk remains controlled and coverage or calibration cost improves; otherwise record the negative result.
+The executable also emits all **held-out risk–coverage points** as `risk_coverage_curve` records and prints a trapezoidal area under the risk–coverage curve (AURC) summary for each seed/strategy. Lower AURC is better, but test-set AURC is descriptive only—it must not be used to pick a threshold. Future work should add AURC uncertainty estimates, direct same-coverage comparisons, calibration-cost comparisons, query-latency distributions, and a faithful reproduction of published one-sided selective-prediction baselines.
+
+**Status:** source and unit tests are committed. The newest CIC plus AURC changes still require an exact-head research-workflow pass before their results can be reported. CIC should only be considered better if held-out risk is controlled and it improves coverage at comparable risk or reduces calibration-data requirements.
 
 ## What would count as progress?
 
