@@ -554,23 +554,34 @@ impl ThoughtChannels {
         channels
     }
 
-    /// Return the dominant intent channel, failing closed to Unknown when all
-    /// eight channels are absent, non-positive, or non-finite.
+    /// Return the dominant intent channel, failing closed on missing,
+    /// non-positive, non-finite, or tied intent evidence.
+    ///
+    /// Intent is specified as one-hot. Silently choosing between tied channels
+    /// would turn malformed input into a confident but arbitrary semantic act.
     pub fn semantic_intent(&self) -> IntentChannel {
-        let Some((index, value)) = self
-            .channels
-            .iter()
-            .take(8)
-            .enumerate()
-            .filter(|(_, value)| value.is_finite())
-            .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
-        else {
-            return IntentChannel::Unknown;
-        };
-        if *value <= 0.0 {
-            IntentChannel::Unknown
-        } else {
-            IntentChannel::from_index(index)
+        let mut best_value = f32::NEG_INFINITY;
+        let mut best_index = None;
+        let mut tied_for_best = false;
+
+        for (index, value) in self.channels.iter().take(8).enumerate() {
+            if !value.is_finite() {
+                continue;
+            }
+            if *value > best_value {
+                best_value = *value;
+                best_index = Some(index);
+                tied_for_best = false;
+            } else if *value == best_value {
+                tied_for_best = true;
+            }
+        }
+
+        match best_index {
+            Some(index) if best_value > 0.0 && !tied_for_best => {
+                IntentChannel::from_index(index)
+            }
+            _ => IntentChannel::Unknown,
         }
     }
 
@@ -1091,6 +1102,37 @@ mod tests {
             "Different intents should produce dissimilar HVs: sim={sim}"
         );
         assert!(sim > 0.0, "Should share structure: sim={sim}");
+    }
+
+    #[test]
+    fn typed_intent_contract_round_trips_all_channels() {
+        for intent in IntentChannel::ALL {
+            assert_eq!(IntentChannel::from_index(intent.index()), intent);
+            assert_eq!(IntentChannel::from_name(intent.as_str()), intent);
+            assert_eq!(CHANNEL_NAMES[intent.index()], intent.channel_name());
+
+            let channels = ThoughtChannels::with_semantic_intent(intent);
+            assert_eq!(channels.semantic_intent(), intent);
+            assert_eq!(channels.channels[intent.index()], 1.0);
+        }
+    }
+
+    #[test]
+    fn ambiguous_or_missing_intent_fails_closed_to_unknown() {
+        let mut channels = ThoughtChannels::default();
+        for channel in channels.channels.iter_mut().take(8) {
+            *channel = 0.0;
+        }
+        assert_eq!(channels.semantic_intent(), IntentChannel::Unknown);
+
+        channels.channels[0] = 0.8;
+        channels.channels[1] = 0.8;
+        assert_eq!(channels.semantic_intent(), IntentChannel::Unknown);
+
+        for channel in channels.channels.iter_mut().take(8) {
+            *channel = f32::NAN;
+        }
+        assert_eq!(channels.semantic_intent(), IntentChannel::Unknown);
     }
 
     #[test]
