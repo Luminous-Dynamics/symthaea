@@ -1,6 +1,13 @@
 name: Open-World Physics Evaluator
 
 on:
+  # Push validation also covers stacked research branches whose base is not main.
+  push:
+    branches:
+      - "bench/**"
+    paths:
+      - "research/open-world-physics-001-evaluator/**"
+      - ".github/workflows/open-world-physics-evaluator.yml"
   pull_request:
     paths:
       - "research/open-world-physics-001-evaluator/**"
