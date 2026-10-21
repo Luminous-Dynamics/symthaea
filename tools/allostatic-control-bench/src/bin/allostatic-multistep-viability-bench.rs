@@ -234,10 +234,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         .ok_or_else(|| IoError::new(ErrorKind::InvalidData, "invalid viability limits"))?;
     let mut raw = format!("{RAW_HEADER}\n");
     let mut summary = format!("{SUMMARY_HEADER}\n");
-    let mut buckets: Vec<SummaryBucket> = OPERATING_POINTS
-        .iter()
-        .flat_map(|point| HORIZONS.iter().map(|horizon| SummaryBucket::new(point.name, *horizon)))
-        .collect();
+    let mut buckets: Vec<SummaryBucket> = Vec::new();
+    for point in OPERATING_POINTS {
+        for horizon in HORIZONS {
+            buckets.push(SummaryBucket::new(point.name, horizon));
+        }
+    }
     let pooled_offset = buckets.len();
     buckets.extend(
         HORIZONS
