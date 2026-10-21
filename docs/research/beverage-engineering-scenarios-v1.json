@@ -1,0 +1,294 @@
+{
+  "schema_version": "beverage-engineering-scenarios-v1",
+  "status": "synthetic_contract_fixtures_not_beverage_measurements",
+  "description": "Synthetic evaluator scenarios for leakage resistance, evidence separation, uncertainty, and cross-beverage claim discipline. No row represents a real production batch.",
+  "source_spec": "docs/research/BEVERAGE_ENGINEERING_BENCHMARK_V1.md",
+  "scenarios": [
+    {
+      "id": "BEV-001",
+      "name": "beer_trajectory_positive_control",
+      "product": "beer",
+      "task": "trajectory_forecast",
+      "evidence_class": "MEASURED_INPUTS_WITH_DECLARED_TARGET",
+      "expected_disposition": "ACCEPT_FOR_EVALUATION",
+      "guards": [
+        "timestamped_inputs",
+        "prediction_cutoff",
+        "batch_group_split",
+        "target_units"
+      ],
+      "primary_metrics": [
+        "MAE_physical_units",
+        "RMSE_physical_units"
+      ],
+      "claim_ceiling": "synthetic fixture; no predictive performance established"
+    },
+    {
+      "id": "BEV-002",
+      "name": "post_outcome_feature_leakage",
+      "product": "beer",
+      "task": "trajectory_forecast",
+      "evidence_class": "MIXED",
+      "expected_disposition": "REJECT",
+      "guards": [
+        "no_final_lab_feature_before_cutoff",
+        "no_packaging_result_feature",
+        "no_post_hoc_quality_label_feature"
+      ],
+      "primary_metrics": [],
+      "claim_ceiling": "leakage rejection only"
+    },
+    {
+      "id": "BEV-003",
+      "name": "duplicate_batch_cross_split",
+      "product": "beer",
+      "task": "quality_prediction",
+      "evidence_class": "MEASURED",
+      "expected_disposition": "REJECT",
+      "guards": [
+        "same_parent_lot_same_split",
+        "duplicate_sample_detection",
+        "derived_record_lineage"
+      ],
+      "primary_metrics": [],
+      "claim_ceiling": "split-integrity rejection only"
+    },
+    {
+      "id": "BEV-004",
+      "name": "wine_unseen_vintage_holdout",
+      "product": "wine",
+      "task": "trajectory_forecast",
+      "evidence_class": "MEASURED",
+      "expected_disposition": "EVALUATE_WITH_SHIFT_REPORT",
+      "guards": [
+        "vintage_group_holdout",
+        "training_only_preprocessing",
+        "per_vintage_metrics",
+        "coverage_report"
+      ],
+      "primary_metrics": [
+        "MAE_physical_units",
+        "RMSE_physical_units",
+        "prediction_interval_coverage",
+        "interval_width"
+      ],
+      "claim_ceiling": "one held-out vintage does not establish all-climate transfer"
+    },
+    {
+      "id": "BEV-005",
+      "name": "wine_sensor_drift_without_calibration",
+      "product": "wine",
+      "task": "sensor_state_estimation",
+      "evidence_class": "MEASURED_SENSOR_UNCALIBRATED",
+      "expected_disposition": "INDETERMINATE",
+      "guards": [
+        "sensor_identity",
+        "calibration_evidence",
+        "drift_diagnostic",
+        "matrix_conditions"
+      ],
+      "primary_metrics": [
+        "drift_detection_latency",
+        "false_alarm_rate"
+      ],
+      "claim_ceiling": "uncalibrated sensor fingerprints are not quantitative lab values"
+    },
+    {
+      "id": "BEV-006",
+      "name": "spirit_heterogeneous_mash_unobserved_state",
+      "product": "spirits",
+      "task": "fermentation_state_estimation",
+      "evidence_class": "PARTIAL_SENSOR_EVIDENCE",
+      "expected_disposition": "INDETERMINATE",
+      "guards": [
+        "sensor_location",
+        "mixing_or_stratification_assumption",
+        "mash_state_coverage",
+        "uncertainty"
+      ],
+      "primary_metrics": [
+        "MAE_physical_units",
+        "grouped_error"
+      ],
+      "claim_ceiling": "a sensor at one point does not establish vessel-wide state"
+    },
+    {
+      "id": "BEV-007",
+      "name": "consumer_review_mislabeled_as_blind_sensory",
+      "product": "cross_beverage",
+      "task": "sensory_prediction",
+      "evidence_class": "PUBLIC_CONSUMER_REVIEWS",
+      "expected_disposition": "REJECT",
+      "guards": [
+        "target_label_semantics",
+        "blindness_metadata",
+        "panel_or_user_identity_policy",
+        "confounder_disclosure"
+      ],
+      "primary_metrics": [],
+      "claim_ceiling": "consumer ratings may only be scored as consumer ratings"
+    },
+    {
+      "id": "BEV-008",
+      "name": "chemistry_target_distinct_from_preference",
+      "product": "cross_beverage",
+      "task": "endpoint_separation",
+      "evidence_class": "MEASURED_CHEMISTRY_AND_SEPARATE_SENSORY_LABELS",
+      "expected_disposition": "ACCEPT_WITH_SEPARATE_REPORTS",
+      "guards": [
+        "target_schema_separation",
+        "panel_protocol",
+        "independent_test_units",
+        "no_target_aliasing"
+      ],
+      "primary_metrics": [
+        "chemistry_MAE",
+        "sensory_rank_metric",
+        "panel_repeatability"
+      ],
+      "claim_ceiling": "chemical accuracy does not prove preference prediction"
+    },
+    {
+      "id": "BEV-009",
+      "name": "simulated_value_claimed_as_measured",
+      "product": "cross_beverage",
+      "task": "evidence_validation",
+      "evidence_class": "SIMULATED",
+      "expected_disposition": "REJECT",
+      "guards": [
+        "evidence_class_consistency",
+        "model_version",
+        "simulation_assumptions",
+        "source_digest"
+      ],
+      "primary_metrics": [],
+      "claim_ceiling": "simulation is not a measurement"
+    },
+    {
+      "id": "BEV-010",
+      "name": "water_energy_functional_unit_mismatch",
+      "product": "cross_beverage",
+      "task": "resource_comparison",
+      "evidence_class": "MEASURED_OR_VERIFIED_RESOURCE_RECORDS",
+      "expected_disposition": "NOT_COMPARABLE",
+      "guards": [
+        "facility_type",
+        "product_mix",
+        "saleable_output_basis",
+        "functional_unit",
+        "boundary_alignment"
+      ],
+      "primary_metrics": [
+        "water_per_saleable_L",
+        "energy_per_saleable_L",
+        "waste_per_saleable_kg"
+      ],
+      "claim_ceiling": "unmatched production boundaries cannot support an efficiency ranking"
+    },
+    {
+      "id": "BEV-011",
+      "name": "source_rights_unknown",
+      "product": "cross_beverage",
+      "task": "data_eligibility",
+      "evidence_class": "UNKNOWN_RIGHTS",
+      "expected_disposition": "INELIGIBLE_FOR_REUSE",
+      "guards": [
+        "license_or_permission",
+        "attribution_requirements",
+        "redistribution_scope",
+        "source_version"
+      ],
+      "primary_metrics": [],
+      "claim_ceiling": "unknown rights do not imply permission"
+    },
+    {
+      "id": "BEV-012",
+      "name": "batch_transformation_lineage",
+      "product": "spirits",
+      "task": "provenance_validation",
+      "evidence_class": "DECLARED_WITH_DIGESTS",
+      "expected_disposition": "ACCEPT_IF_LINKS_RESOLVE",
+      "guards": [
+        "parent_child_lot_edges",
+        "blend_or_distillation_events",
+        "event_order",
+        "supersession_link"
+      ],
+      "primary_metrics": [
+        "lineage_completeness"
+      ],
+      "claim_ceiling": "integrity of declared lineage does not prove physical authenticity"
+    },
+    {
+      "id": "BEV-013",
+      "name": "nominal_90_percent_interval_uncalibrated",
+      "product": "cross_beverage",
+      "task": "uncertainty_validation",
+      "evidence_class": "MODELLED",
+      "expected_disposition": "FAIL_CALIBRATION_GATE",
+      "guards": [
+        "held_out_coverage",
+        "interval_width",
+        "groupwise_coverage",
+        "training_only_calibration"
+      ],
+      "primary_metrics": [
+        "empirical_coverage",
+        "mean_interval_width"
+      ],
+      "claim_ceiling": "nominal level is not empirical calibration"
+    },
+    {
+      "id": "BEV-014",
+      "name": "cross_site_transfer_holdout",
+      "product": "beer",
+      "task": "external_generalization",
+      "evidence_class": "MEASURED",
+      "expected_disposition": "EVALUATE_WITH_SHIFT_REPORT",
+      "guards": [
+        "site_group_holdout",
+        "same_information_budget",
+        "source_site_metadata",
+        "per_site_error"
+      ],
+      "primary_metrics": [
+        "MAE_physical_units",
+        "relative_error_vs_strongest_baseline",
+        "coverage"
+      ],
+      "claim_ceiling": "one site transfer result is local to represented domains"
+    },
+    {
+      "id": "BEV-015",
+      "name": "synthetic_fixture_overclaimed_as_field_result",
+      "product": "cross_beverage",
+      "task": "claim_validation",
+      "evidence_class": "SIMULATED_SYNTHETIC",
+      "expected_disposition": "REJECT_CLAIM",
+      "guards": [
+        "synthetic_status_preserved",
+        "claim_scope_matches_evidence",
+        "exact_head_receipt"
+      ],
+      "primary_metrics": [],
+      "claim_ceiling": "synthetic contract success proves only the encoded evaluator behavior"
+    },
+    {
+      "id": "BEV-016",
+      "name": "insufficient_independent_batches",
+      "product": "wine",
+      "task": "model_qualification",
+      "evidence_class": "MEASURED_BUT_UNDERPOWERED",
+      "expected_disposition": "INDETERMINATE",
+      "guards": [
+        "independent_batch_count",
+        "predeclared_power_or_uncertainty_rule",
+        "no_resampling_as_new_batches"
+      ],
+      "primary_metrics": [
+        "group_bootstrap_interval"
+      ],
+      "claim_ceiling": "repeat samples do not substitute for independent batches"
+    }
+  ]
+}
