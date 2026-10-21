@@ -276,5 +276,6 @@
         "quality_failures": 0
       }
     }
-  ]
+  ],
+  "max_pair_loss_degradation_units": 0.25
 }
