@@ -11,6 +11,7 @@ from validation.tccip_reference_oracle import (
     DEFAULT_MANIFEST,
     Intervention,
     evaluate_fixture,
+    input_information_baseline,
     parse_manifest,
     render_artifact,
     task_utility,
@@ -84,16 +85,18 @@ class TccipReferenceOracleTests(unittest.TestCase):
     def test_role_matched_xor_edges_are_both_essential_but_tccip_is_zero(self) -> None:
         fixture = self.by_name["role_matched_xor_synergy_uniform_prior"]
         scores, _, summary = evaluate_fixture(fixture)
+        info = input_information_baseline(fixture)
         self.assertEqual(summary["intact"], 1.0)
         self.assertEqual(summary["cross_loss"], 0.5)
         self.assertEqual(summary["control_loss"], 0.5)
         self.assertEqual(summary["tccip"], 0.0)
-        # The direct intervention-effect profile says both inputs matter equally.
+        # Both individual edges matter equally to performance.
         self.assertEqual([score.loss for score in scores], [0.5, 0.5])
-        # Under a uniform prior, XOR has one bit of joint information with its
-        # output but zero information from either input alone.
-        self.assertEqual(scores[0].utility, 0.5)
-        self.assertEqual(scores[1].utility, 0.5)
+        # Yet the task has one bit of joint input information, and zero MI
+        # between either individual input and the XOR target.
+        self.assertAlmostEqual(info["target_entropy_bits"], 1.0, places=12)
+        self.assertEqual(info["individual_input_mi_bits"], [0.0, 0.0])
+        self.assertAlmostEqual(info["joint_input_mi_bits"], 1.0, places=12)
 
     def test_same_graph_reverses_tccip_sign_when_input_prior_is_reversed(self) -> None:
         high_x1 = self.by_name["task_relevant_high_x1_prior"]
@@ -135,6 +138,8 @@ class TccipReferenceOracleTests(unittest.TestCase):
         self.assertIn("manifest_sha256=", first)
         self.assertIn("not Rust execution output", first)
         self.assertIn("partition\tuseful_xor_coordination", first)
+        self.assertIn("information_baseline\trole_matched_xor_synergy_uniform_prior", first)
+        self.assertIn("\t1\t0,0\t1", first)
 
     def test_malformed_manifest_row_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
