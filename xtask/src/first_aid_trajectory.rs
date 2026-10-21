@@ -121,6 +121,9 @@ struct TrajectoryReceipt {
     corpus_sha256: String,
     evaluation_protocol_sha256: String,
     mutation_matrix_sha256: String,
+    cargo_lock_sha256: String,
+    rustc_version: String,
+    cargo_version: String,
     source_revision_sha: String,
     validator_source_sha256: String,
     entrypoint_source_sha256: String,
@@ -160,6 +163,13 @@ pub fn run(root: &Path, corpus_arg: &Path, out_arg: Option<&Path>) -> Result<()>
     let mutation_matrix = fs::read(root.join("docs/research/first-aid/mutation-matrix-v0.json"))
         .context("read mutation matrix for receipt identity")?;
     let mutation_matrix_digest = sha256_hex(&mutation_matrix);
+    let cargo_lock = fs::read(root.join("Cargo.lock"))
+        .context("read Cargo.lock for dependency-resolution identity")?;
+    let cargo_lock_digest = sha256_hex(&cargo_lock);
+    let rustc_version = std::env::var("RUSTC_VERSION")
+        .unwrap_or_else(|_| "not-provided".to_string());
+    let cargo_version = std::env::var("CARGO_VERSION")
+        .unwrap_or_else(|_| "not-provided".to_string());
     let validator_source = fs::read(root.join("xtask/src/first_aid_trajectory.rs"))
         .context("read trajectory validator source for receipt identity")?;
     let entrypoint_source = fs::read(root.join("xtask/src/main.rs"))
@@ -176,6 +186,9 @@ pub fn run(root: &Path, corpus_arg: &Path, out_arg: Option<&Path>) -> Result<()>
         corpus_sha256: corpus_digest,
         evaluation_protocol_sha256: evaluation_protocol_digest,
         mutation_matrix_sha256: mutation_matrix_digest,
+        cargo_lock_sha256: cargo_lock_digest,
+        rustc_version,
+        cargo_version,
         source_revision_sha: std::env::var("FIRST_AID_SOURCE_REVISION")
             .unwrap_or_else(|_| "not-provided".to_string()),
         validator_source_sha256: sha256_hex(&validator_source),
