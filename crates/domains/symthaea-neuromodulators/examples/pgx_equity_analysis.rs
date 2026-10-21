@@ -16,16 +16,6 @@
 use symthaea_neuromodulators::pgx_health_equity::{AdmixedPopulation, PgxHealthEquityEngine};
 use symthaea_neuromodulators::pharmacogenomics::{AncestryGroup, MetabolizerPhenotype};
 
-/// US population estimates by ancestry (Census 2020, rounded to millions).
-const US_POP: &[(AncestryGroup, f64, &str)] = &[
-    (AncestryGroup::European, 191.0, "European"),
-    (AncestryGroup::African, 41.0, "African"),
-    (AncestryGroup::EastAsian, 19.0, "E.Asian"),
-    (AncestryGroup::SouthAsian, 5.4, "S.Asian"),
-    (AncestryGroup::NativeAmerican, 3.7, "NatAmer"),
-    (AncestryGroup::Mixed, 33.8, "Mixed"),
-];
-
 const ANCESTRY_ORDER: &[(AncestryGroup, &str)] = &[
     (AncestryGroup::European, "European"),
     (AncestryGroup::African, "African"),
@@ -75,7 +65,7 @@ fn main() {
     print_header();
     print_table1_metabolizer_distributions(&engine);
     print_table2_equity_gap(&engine);
-    print_table3_clinical_impact(&engine);
+    print_table3_population_scenarios(&engine);
     print_figure_heatmap(&engine);
     print_admixed_population_analysis(&engine);
     print_key_findings(&engine);
@@ -131,26 +121,26 @@ fn print_table1_metabolizer_distributions(engine: &PgxHealthEquityEngine) {
 fn print_table2_equity_gap(engine: &PgxHealthEquityEngine) {
     println!("=== TABLE 2: Equity Gap Analysis by Drug ===\n");
     println!(
-        "{:<14}| {:<8}| {:<10}| {:<24}| Underserved Populations",
-        "Drug", "Gene", "Gap Score", "Most Affected"
+        "{:<14}| {:<8}| {:<10}| {:<24}| Model-Flagged Labels",
+        "Drug", "Gene", "Model Score", "Largest Profile"
     );
     println!("{:-<14}|{:-<9}|{:-<11}|{:-<25}|{:-<30}", "", "", "", "", "");
 
     for &(drug, gene) in DRUG_GENE_PAIRS {
         let analysis = engine.equity_analysis(drug, gene);
 
-        // Find most affected ancestry: highest combined adverse + efficacy risk
+        // Select the highest sum of two uncalibrated model indices; not a clinical ranking.
         let most_affected = analysis
-            .population_risk
+            .population_profiles
             .iter()
             .max_by(|a, b| {
-                let score_a = a.1.adverse_event_risk + a.1.efficacy_risk;
-                let score_b = b.1.adverse_event_risk + b.1.efficacy_risk;
+                let score_a = a.1.toxicity_heuristic_index + a.1.efficacy_heuristic_index;
+                let score_b = b.1.toxicity_heuristic_index + b.1.efficacy_heuristic_index;
                 score_a.partial_cmp(&score_b).unwrap()
             })
             .unwrap();
 
-        // Find highest actionable phenotype frequency for the most affected group
+        // Show the largest non-normal category in the selected model profile.
         let dist = &most_affected.1.phenotype_distribution;
         let (worst_pheno, worst_frac) = dist
             .iter()
@@ -172,126 +162,59 @@ fn print_table2_equity_gap(engine: &PgxHealthEquityEngine) {
             worst_frac * 100.0
         );
 
-        let underserved_str: String = analysis
-            .underserved_populations
+        let flagged_str: String = analysis
+            .model_flagged_populations
             .iter()
             .map(|a| ancestry_name(a))
             .collect::<Vec<_>>()
             .join(", ");
 
-        let underserved_display = if underserved_str.is_empty() {
+        let flagged_display = if flagged_str.is_empty() {
             "(none)".to_string()
         } else {
-            underserved_str
+            flagged_str
         };
 
         println!(
             "{:<14}| {:<8}|    {:.2}   | {:<24}| {}",
-            drug, gene, analysis.equity_gap_score, affected_str, underserved_display
+            drug, gene, analysis.model_gap_score, affected_str, flagged_display
         );
     }
     println!();
 }
 
-fn print_table3_clinical_impact(engine: &PgxHealthEquityEngine) {
-    println!("=== TABLE 3: Clinical Impact Estimates (US Population) ===\n");
+fn print_table3_population_scenarios(engine: &PgxHealthEquityEngine) {
+    println!("=== TABLE 3: Illustrative Population Scenario Arithmetic ===\n");
     println!(
-        "{:<14}| {:<8}| {:>13} | {:<24}| Risk Description",
-        "Drug", "Gene", "Total At Risk", "Most Affected Group"
+        "{:<14}| {:<8}| {:>14} | {:<24}| Scenario Note",
+        "Drug", "Gene", "Product Sum", "Largest Product Label"
     );
-    println!("{:-<14}|{:-<9}|{:-<15}|{:-<25}|{:-<30}", "", "", "", "", "");
+    println!("{:-<14}|{:-<9}|{:-<16}|{:-<25}|{:-<35}", "", "", "", "", "");
 
     for &(drug, gene) in DRUG_GENE_PAIRS {
-        let analysis = engine.equity_analysis(drug, gene);
-        let is_prodrug = drug == "codeine" || drug == "clopidogrel" || drug == "tamoxifen";
-
-        let mut total_at_risk = 0.0_f64;
-        let mut worst_group = AncestryGroup::European;
-        let mut worst_count = 0.0_f64;
-        let mut worst_risk_desc = String::new();
-
-        for &(anc, _, _label) in US_POP {
-            let risk = match analysis.population_risk.get(&anc) {
-                Some(r) => r,
-                None => continue,
-            };
-            let dist = &risk.phenotype_distribution;
-            let pop = US_POP.iter().find(|(a, _, _)| *a == anc).unwrap().1;
-
-            // At-risk = those with actionable phenotypes
-            let actionable_frac = if is_prodrug {
-                // Prodrugs: UM (toxicity) + PM (no efficacy)
-                dist.get(&MetabolizerPhenotype::UltraRapid)
-                    .copied()
-                    .unwrap_or(0.0)
-                    + dist
-                        .get(&MetabolizerPhenotype::Poor)
-                        .copied()
-                        .unwrap_or(0.0)
-            } else {
-                // Active drugs: PM (toxicity) + UM (sub-therapeutic)
-                dist.get(&MetabolizerPhenotype::Poor)
-                    .copied()
-                    .unwrap_or(0.0)
-                    + dist
-                        .get(&MetabolizerPhenotype::UltraRapid)
-                        .copied()
-                        .unwrap_or(0.0)
-            };
-
-            let at_risk = pop * actionable_frac;
-            total_at_risk += at_risk;
-
-            if at_risk > worst_count {
-                worst_count = at_risk;
-                worst_group = anc;
-                worst_risk_desc = if is_prodrug {
-                    let um = dist
-                        .get(&MetabolizerPhenotype::UltraRapid)
-                        .copied()
-                        .unwrap_or(0.0);
-                    let pm = dist
-                        .get(&MetabolizerPhenotype::Poor)
-                        .copied()
-                        .unwrap_or(0.0);
-                    if um > pm {
-                        "Toxicity risk (UM)".to_string()
-                    } else {
-                        "No efficacy (PM)".to_string()
-                    }
-                } else {
-                    let pm = dist
-                        .get(&MetabolizerPhenotype::Poor)
-                        .copied()
-                        .unwrap_or(0.0);
-                    let um = dist
-                        .get(&MetabolizerPhenotype::UltraRapid)
-                        .copied()
-                        .unwrap_or(0.0);
-                    if pm > um {
-                        "Toxicity risk (PM)".to_string()
-                    } else {
-                        "Sub-therapeutic (UM)".to_string()
-                    }
-                };
-            }
-        }
-
+        let estimate = engine.population_scenario_estimate(drug, gene);
+        let total_millions = estimate.sum_of_modelled_products as f64 / 1_000_000.0;
+        let largest_millions = estimate
+            .per_population_scenario
+            .iter()
+            .find(|(group, _, _, _)| *group == estimate.largest_modelled_product_group)
+            .map(|(_, _, _, product)| *product as f64 / 1_000_000.0)
+            .unwrap_or(0.0);
         println!(
-            "{:<14}| {:<8}|      {:5.1}M   | {:<24}| {}",
+            "{:<14}| {:<8}| {:>10.1} M | {:<24}| {}",
             drug,
             gene,
-            total_at_risk,
-            format!("{} ({:.1}M)", ancestry_name(&worst_group), worst_count),
-            worst_risk_desc
+            total_millions,
+            format!("{:?} ({:.1} M)", estimate.largest_modelled_product_group, largest_millions),
+            estimate.scenario_note
         );
     }
     println!();
 }
 
 fn print_figure_heatmap(engine: &PgxHealthEquityEngine) {
-    println!("=== FIGURE DATA: Equity Gap Heatmap ===");
-    println!("(Drug x Ancestry, values = adverse_event_risk + efficacy_risk)\n");
+    println!("=== FIGURE DATA: Heuristic Model Output Heatmap ===");
+    println!("(Drug x Ancestry, values = toxicity_heuristic_index + efficacy_heuristic_index)\n");
 
     // Header
     print!("{:<14}|", "");
@@ -310,9 +233,9 @@ fn print_figure_heatmap(engine: &PgxHealthEquityEngine) {
         print!("{:<14}|", drug);
         for &(anc, _) in ANCESTRY_ORDER {
             let risk = analysis
-                .population_risk
+                .population_profiles
                 .get(&anc)
-                .map(|r| r.adverse_event_risk + r.efficacy_risk)
+                .map(|r| r.toxicity_heuristic_index + r.efficacy_heuristic_index)
                 .unwrap_or(0.0);
             print!("     {:.3}  |", risk);
         }
@@ -423,7 +346,7 @@ fn print_key_findings(engine: &PgxHealthEquityEngine) {
     let mut largest_drug = "";
     let mut largest_gene = "";
     for &(drug, gene) in DRUG_GENE_PAIRS {
-        let gap = engine.equity_analysis(drug, gene).equity_gap_score;
+        let gap = engine.equity_analysis(drug, gene).model_gap_score;
         if gap > largest_gap {
             largest_gap = gap;
             largest_drug = drug;
@@ -444,7 +367,7 @@ fn print_key_findings(engine: &PgxHealthEquityEngine) {
                 .filter(|&&(drug, gene)| {
                     engine
                         .equity_analysis(drug, gene)
-                        .underserved_populations
+                        .model_flagged_populations
                         .contains(&anc)
                 })
                 .count();
@@ -466,7 +389,7 @@ fn print_key_findings(engine: &PgxHealthEquityEngine) {
         let analysis = engine.equity_analysis(drug, gene);
         let is_prodrug = drug == "codeine" || drug == "clopidogrel" || drug == "tamoxifen";
         for &(anc, pop, _) in US_POP {
-            if let Some(risk) = analysis.population_risk.get(&anc) {
+            if let Some(risk) = analysis.population_profiles.get(&anc) {
                 let dist = &risk.phenotype_distribution;
                 let frac = if is_prodrug {
                     dist.get(&MetabolizerPhenotype::UltraRapid)
@@ -536,9 +459,9 @@ fn print_key_findings(engine: &PgxHealthEquityEngine) {
         print!("  {:<14} {:<8}: ", drug, gene);
         for &(anc, label) in ANCESTRY_ORDER {
             let applicability = analysis
-                .population_risk
+                .population_profiles
                 .get(&anc)
-                .map(|r| r.guideline_applicability)
+                .map(|r| r.reference_similarity_proxy)
                 .unwrap_or(0.0);
             print!("{}={:.2}  ", label, applicability);
         }
