@@ -288,14 +288,60 @@ fn record_identity(kind: Kind, value: &Value, line: usize) -> String {
         .unwrap_or_else(|| format!("line-{line}"))
 }
 
+fn collect_unique_object_ids(
+    value: &Value,
+    array_key: &str,
+    id_key: &str,
+    context: &str,
+    errors: &mut Vec<String>,
+) -> HashSet<String> {
+    let mut ids = HashSet::new();
+    let items = value
+        .get(array_key)
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    for item in items {
+        if let Some(id) = string_field(&item, id_key) {
+            if !ids.insert(id.to_string()) {
+                errors.push(format!("duplicate {context} identifier {id:?}"));
+            }
+        }
+    }
+    ids
+}
+
 fn validate_domain_contract(kind: Kind, value: &Value, seen_ids: &mut HashSet<String>) -> Vec<String> {
     let mut errors = Vec::new();
     let id = record_identity(kind, value, 0);
     if !seen_ids.insert(id.clone()) {
         errors.push(format!("duplicate record ID {id:?}"));
     }
-    if kind == Kind::Graph {
-        errors.extend(validate_graph_contract(value));
+
+    match kind {
+        Kind::Case => {
+            collect_unique_object_ids(value, "source_refs", "source_id", "source", &mut errors);
+            collect_unique_object_ids(value, "evidence_pack", "evidence_id", "evidence", &mut errors);
+        }
+        Kind::Claim => {
+            let source_ids =
+                collect_unique_object_ids(value, "sources", "source_id", "claim source", &mut errors);
+            let counterclaims = value
+                .get("counterclaims")
+                .and_then(Value::as_array)
+                .cloned()
+                .unwrap_or_default();
+            for counterclaim in counterclaims {
+                for source_id in string_array(&counterclaim, "source_ids") {
+                    if !source_ids.contains(source_id) {
+                        errors.push(format!(
+                            "counterclaim references unknown claim source_id {source_id:?}"
+                        ));
+                    }
+                }
+            }
+        }
+        Kind::Graph => errors.extend(validate_graph_contract(value)),
     }
     errors
 }
@@ -554,6 +600,30 @@ mod tests {
         });
         let errors = validate_graph_contract(&graph);
         assert!(errors.iter().any(|e| e.contains("cannot assert historical influence")));
+    }
+
+    #[test]
+    fn case_contract_rejects_duplicate_evidence_ids() {
+        let value = json!({
+            "id":"case-1",
+            "evidence_pack":[
+                {"evidence_id":"same","statement":"A","kind":"synthetic_control"},
+                {"evidence_id":"same","statement":"B","kind":"synthetic_control"}
+            ]
+        });
+        let errors = validate_domain_contract(Kind::Case, &value, &mut HashSet::new());
+        assert!(errors.iter().any(|e| e.contains("duplicate evidence identifier")));
+    }
+
+    #[test]
+    fn claim_contract_rejects_dangling_counterclaim_sources() {
+        let value = json!({
+            "id":"claim-1",
+            "sources":[{"source_id":"known"}],
+            "counterclaims":[{"statement":"disputes claim","source_ids":["missing"]}]
+        });
+        let errors = validate_domain_contract(Kind::Claim, &value, &mut HashSet::new());
+        assert!(errors.iter().any(|e| e.contains("unknown claim source_id")));
     }
 
     #[test]
