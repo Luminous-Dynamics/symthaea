@@ -21,6 +21,8 @@ const CALIBRATION_UNKNOWN: usize = 64;
 const TEST_UNKNOWN: usize = 128;
 const MAX_VALIDATION_RISK: f64 = 0.05;
 const MIN_ACCEPTED_FOR_CALIBRATION: usize = 30;
+const MIN_ACCEPTED_FOR_CERTIFICATION: usize = 52;
+const BONFERRONI_Z_ONE_SIDED_95: f64 = 2.128_045_234_184_984;
 const NOISE_LEVELS: [f64; 7] = [0.0, 0.10, 0.20, 0.30, 0.40, 0.45, 0.50];
 const SEEDS: [u64; 3] = [17, 29, 41];
 
@@ -62,10 +64,11 @@ impl Evaluation {
 fn main() -> Result<(), Box<dyn Error>> {
     let start = Instant::now();
     println!("# protocol=selective-retrieval-v1");
-    println!("# calibration_rule=max_coverage_with_wilson_upper_risk_le_0.05");
+    println!("# calibration_rule=selection_split_max_coverage_then_independent_certification");
+    println!("# certification=one_sided_wilson_upper_bound_bonferroni_adjusted_for_3_rules");
     println!("# query_mix=known-noise+random-ood+two-prototype-mixture");
     println!(
-        "seed,strategy,dimension,prototypes,calibration_n,test_n,min_similarity,min_margin,accepted,coverage,errors,selective_risk,risk95_low,risk95_high,top1_accuracy"
+        "seed,strategy,dimension,prototypes,selection_n,certification_n,certified,test_n,min_similarity,min_margin,accepted,coverage,errors,selective_risk,risk95_low,risk95_high,top1_accuracy"
     );
 
     for seed in SEEDS {
@@ -78,9 +81,18 @@ fn main() -> Result<(), Box<dyn Error>> {
             })
             .collect::<Result<Vec<_>, _>>()?;
 
-        let calibration_queries = generate_queries(
+        // Separate threshold selection, independent risk certification, and final evaluation.
+        // The certification split is never used to choose the thresholds.
+        let selection_queries = generate_queries(
             &prototypes,
-            derive_seed(seed, 0x4341_4c49, 0),
+            derive_seed(seed, 0x5345_4c45, 0),
+            CALIBRATION_PER_NOISE,
+            CALIBRATION_UNKNOWN,
+            CALIBRATION_UNKNOWN,
+        )?;
+        let certification_queries = generate_queries(
+            &prototypes,
+            derive_seed(seed, 0x4345_5254, 0),
             CALIBRATION_PER_NOISE,
             CALIBRATION_UNKNOWN,
             CALIBRATION_UNKNOWN,
@@ -92,30 +104,48 @@ fn main() -> Result<(), Box<dyn Error>> {
             TEST_UNKNOWN,
             TEST_UNKNOWN,
         )?;
-        let calibration = score_queries(&calibration_queries, &prototypes)?;
+        let selection = score_queries(&selection_queries, &prototypes)?;
+        let certification = score_queries(&certification_queries, &prototypes)?;
         let test = score_queries(&test_queries, &prototypes)?;
 
         let always_accept = DecisionRule {
             min_similarity: -1.0,
             min_margin: -1.0,
         };
-        report_row(seed, "always_top1", always_accept, calibration.len(), &test);
+        report_row(
+            seed,
+            "always_top1",
+            always_accept,
+            0,
+            0,
+            "not_applicable",
+            &test,
+        );
 
         for (name, rule) in [
             (
                 "calibrated_score_only",
-                calibrate_rule(&calibration, CalibrationMode::ScoreOnly),
+                calibrate_rule(&selection, CalibrationMode::ScoreOnly),
             ),
             (
                 "calibrated_margin_only",
-                calibrate_rule(&calibration, CalibrationMode::MarginOnly),
+                calibrate_rule(&selection, CalibrationMode::MarginOnly),
             ),
             (
                 "calibrated_score_and_margin",
-                calibrate_rule(&calibration, CalibrationMode::ScoreAndMargin),
+                calibrate_rule(&selection, CalibrationMode::ScoreAndMargin),
             ),
         ] {
-            report_row(seed, name, rule, calibration.len(), &test);
+            let certified = certify_rule(&certification, rule);
+            report_row(
+                seed,
+                name,
+                rule,
+                selection.len(),
+                certification.len(),
+                if certified { "pass" } else { "fail" },
+                &test,
+            );
         }
     }
 
@@ -300,11 +330,20 @@ fn evaluate(samples: &[ScoredQuery], rule: DecisionRule) -> Evaluation {
     }
 }
 
+fn certify_rule(samples: &[ScoredQuery], rule: DecisionRule) -> bool {
+    let result = evaluate(samples, rule);
+    result.accepted >= MIN_ACCEPTED_FOR_CERTIFICATION
+        && wilson_upper_bonferroni_95(result.errors, result.accepted)
+            <= MAX_VALIDATION_RISK
+}
+
 fn report_row(
     seed: u64,
     name: &str,
     rule: DecisionRule,
-    calibration_n: usize,
+    selection_n: usize,
+    certification_n: usize,
+    certified: &str,
     samples: &[ScoredQuery],
 ) {
     let result = evaluate(samples, rule);
@@ -315,7 +354,7 @@ fn report_row(
         .unwrap_or_else(|| "NA".to_owned());
 
     println!(
-        "{seed},{name},{DIMENSION},{PROTOTYPE_COUNT},{calibration_n},{},{:.6},{:.6},{},{:.6},{},{},{:.6},{:.6},{:.6}",
+        "{seed},{name},{DIMENSION},{PROTOTYPE_COUNT},{selection_n},{certification_n},{certified},{},{:.6},{:.6},{},{:.6},{},{},{:.6},{:.6},{:.6}",
         result.total,
         rule.min_similarity,
         rule.min_margin,
@@ -349,12 +388,21 @@ fn wilson_interval_95(errors: usize, accepted: usize) -> (f64, f64) {
 }
 
 fn wilson_upper_95(errors: usize, accepted: usize) -> f64 {
+    wilson_upper_bound(errors, accepted, 1.644_853_626_951_472_2_f64)
+}
+
+/// Per-rule certification uses a Bonferroni-adjusted one-sided bound for the
+/// three candidate threshold policies compared per seed.
+fn wilson_upper_bonferroni_95(errors: usize, accepted: usize) -> f64 {
+    wilson_upper_bound(errors, accepted, BONFERRONI_Z_ONE_SIDED_95)
+}
+
+fn wilson_upper_bound(errors: usize, accepted: usize, z: f64) -> f64 {
     if accepted == 0 {
         return 1.0;
     }
     let n = accepted as f64;
     let p = errors as f64 / n;
-    let z = 1.644_853_626_951_472_2_f64;
     let z_squared = z * z;
     let denominator = 1.0 + z_squared / n;
     let center = (p + z_squared / (2.0 * n)) / denominator;
