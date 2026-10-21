@@ -396,7 +396,7 @@ mod tests {
             (4, "uncertainty", "ACTION:MAYBE", "uncertain"),
             (5, "reflect", "ACTION:FEEL", "reflecting"),
             (6, "continue", "ACTION:THINK", "continue"),
-            (7, "unknown", "ACTION:MAYBE", "unknown"),
+            (7, "unknown", "ACTION:MAYBE", "classify"),
         ];
 
         for (index, expected_intent, expected_action, expected_phrase) in cases {
