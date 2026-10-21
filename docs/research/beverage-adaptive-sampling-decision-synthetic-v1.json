@@ -33,5 +33,10 @@
   "requested_at_ms": 1000,
   "next_review_at_ms": null,
   "reason_code": "synthetic_decision_value_exceeds_cost",
-  "estimated_cost_units": 2.0
+  "decision_deadline_ms": 1500,
+  "expected_result_available_at_ms": 1200,
+  "expected_loss_without_sample_units": 10,
+  "expected_loss_with_sample_units": 2,
+  "estimated_sampling_cost_units": 3,
+  "estimated_delay_cost_units": 1
 }
