@@ -73,8 +73,10 @@ fn run_panel(
     raw: &mut String,
 ) -> Result<PanelCounters, Box<dyn Error>> {
     let state = StateEnvelope::new(
-        Interval::point(0.22).ok_or_else(|| IoError::new(ErrorKind::InvalidData, "invalid reserve point"))?,
-        Interval::point(0.80).ok_or_else(|| IoError::new(ErrorKind::InvalidData, "invalid load point"))?,
+        Interval::point(0.22)
+            .ok_or_else(|| IoError::new(ErrorKind::InvalidData, "invalid reserve point"))?,
+        Interval::point(0.80)
+            .ok_or_else(|| IoError::new(ErrorKind::InvalidData, "invalid load point"))?,
     )
     .ok_or_else(|| IoError::new(ErrorKind::InvalidData, "invalid state"))?;
     let limits = ViabilityLimits::new(0.15, 0.88)
@@ -92,8 +94,17 @@ fn run_panel(
         for stress in STRESS_GRID {
             for action in actions {
                 let (point_certified, robust_certified, true_safe) =
-                    point_and_robust_vs_true(state, action, stress, mismatch, calibration_radii, limits)
-                        .ok_or_else(|| IoError::new(ErrorKind::InvalidData, "invalid comparison inputs"))?;
+                    point_and_robust_vs_true(
+                        state,
+                        action,
+                        stress,
+                        mismatch,
+                        calibration_radii,
+                        limits,
+                    )
+                    .ok_or_else(|| {
+                        IoError::new(ErrorKind::InvalidData, "invalid comparison inputs")
+                    })?;
                 let point_false = point_certified && !true_safe;
                 let robust_false = robust_certified && !true_safe;
                 let robust_false_veto = !robust_certified && true_safe;
@@ -101,7 +112,11 @@ fn run_panel(
                 if is_in_envelope && robust_false {
                     return Err(IoError::new(
                         ErrorKind::InvalidData,
-                        format!("robust false certification within envelope: profile={} stress={stress} action={}", offset, action_name(action)),
+                        format!(
+                            "robust false certification within envelope: profile={} stress={stress} action={}",
+                            offset,
+                            action_name(action)
+                        ),
                     )
                     .into());
                 }
