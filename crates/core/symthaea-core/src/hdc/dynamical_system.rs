@@ -494,14 +494,23 @@ impl Rk45Integrator {
         t: f64,
         dt: f64,
     ) -> Result<(Vec<f64>, f64, f64), SimulationError> {
-        assert!(
-            self.validate().is_ok(),
-            "RK45 requires finite tol > 0 and finite 0 < dt_min <= dt_max"
-        );
-        assert!(
-            t.is_finite() && dt.is_finite() && dt > 0.0,
-            "RK45 requires finite time and a positive finite requested timestep"
-        );
+        self.validate()?;
+        if !t.is_finite() {
+            return Err(SimulationError::NonFiniteTimeBounds);
+        }
+        if !dt.is_finite() || dt <= 0.0 {
+            return Err(SimulationError::InvalidTimeStep);
+        }
+        let expected_dim = system.state_dim();
+        if state.len() != expected_dim {
+            return Err(SimulationError::StateDimensionMismatch {
+                expected: expected_dim,
+                actual: state.len(),
+            });
+        }
+        if let Some(index) = state.iter().position(|value| !value.is_finite()) {
+            return Err(SimulationError::NonFiniteInitialState { index });
+        }
         let dim = state.len();
         let mut h = dt.min(self.dt_max);
 
