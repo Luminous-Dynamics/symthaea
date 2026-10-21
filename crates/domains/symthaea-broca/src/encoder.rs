@@ -1118,6 +1118,25 @@ mod tests {
     }
 
     #[test]
+    fn semantic_intent_is_invariant_under_non_intent_channel_perturbations() {
+        for intent in IntentChannel::ALL {
+            let mut channels = ThoughtChannels::with_semantic_intent(intent);
+            channels.set_epistemic(4.0);
+            channels.set_emotion(-1.0, 1.0, 0.0);
+            channels.set_consciousness(0.0, 1.0, 0.0);
+            channels.set_context(1.0, 0.0, 1.0, 0.0);
+            channels.set_code(1.0, 0.0, 1.0, 1.0);
+            channels.set_epistemic_cube(4, 3, 3, 1.0, 1.0);
+
+            assert_eq!(
+                channels.semantic_intent(),
+                intent,
+                "non-intent feature changes must not alter intent {intent:?}"
+            );
+        }
+    }
+
+    #[test]
     fn ambiguous_or_missing_intent_fails_closed_to_unknown() {
         let mut channels = ThoughtChannels::default();
         for channel in channels.channels.iter_mut().take(8) {
