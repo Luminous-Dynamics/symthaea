@@ -2410,7 +2410,12 @@ mod tests {
         assert!(projection.reference_evidence_level.is_none());
         assert!(projection.population_model_gap_score.is_none());
         let encoded = serde_json::to_value(&projection).unwrap();
-        for forbidden in ["action", "dose_adjustment", "alternative_drug", "monitoring"] {
+        for forbidden in [
+            "action",
+            "dose_adjustment",
+            "alternative_drug",
+            "monitoring",
+        ] {
             assert!(encoded.get(forbidden).is_none());
         }
     }
