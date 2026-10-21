@@ -57,6 +57,60 @@ impl EpistemicDisposition {
     }
 }
 
+/// Typed contract for the eight intent channels in ThoughtChannels.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum StructuredIntent {
+    Acknowledge,
+    Answer,
+    Clarify,
+    Propose,
+    Uncertainty,
+    Reflect,
+    Continue,
+    Unknown,
+}
+
+impl StructuredIntent {
+    fn from_channel_index(index: usize) -> Self {
+        match index {
+            0 => Self::Acknowledge,
+            1 => Self::Answer,
+            2 => Self::Clarify,
+            3 => Self::Propose,
+            4 => Self::Uncertainty,
+            5 => Self::Reflect,
+            6 => Self::Continue,
+            _ => Self::Unknown,
+        }
+    }
+
+    fn from_name(name: &str) -> Self {
+        match name {
+            "acknowledge" => Self::Acknowledge,
+            "answer" => Self::Answer,
+            "clarify" => Self::Clarify,
+            "propose" => Self::Propose,
+            "uncertainty" => Self::Uncertainty,
+            "reflect" => Self::Reflect,
+            "continue" => Self::Continue,
+            _ => Self::Unknown,
+        }
+    }
+
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Acknowledge => "acknowledge",
+            Self::Answer => "answer",
+            Self::Clarify => "clarify",
+            Self::Propose => "propose",
+            Self::Uncertainty => "uncertainty",
+            Self::Reflect => "reflect",
+            Self::Continue => "continue",
+            Self::Unknown => "unknown",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StructuredRoleFill {
     pub role: String,
@@ -107,9 +161,10 @@ impl StructuredDecoder {
     }
 
     pub fn decode(&self, channels: &ThoughtChannels) -> StructuredReadout {
-        let intent = active_intent_name(channels);
+        let intent_kind = active_intent(channels);
+        let intent = intent_kind.as_str();
         let epistemic_status = EpistemicDisposition::from_ordinal(channels.epistemic_ordinal());
-        let action = intent_prime(intent, epistemic_status);
+        let action = intent_prime(intent_kind, epistemic_status);
         let evaluator = if channels.valence() < -0.2 {
             SemanticPrime::Bad
         } else if channels.valence() > 0.2 {
@@ -196,7 +251,7 @@ impl StructuredProseTranslator {
         let uncertain_reason = role_prime(readout, "REASON") == Some("MAYBE");
 
         let mut clauses = vec![action_sentence(
-            readout.intent.as_str(),
+            StructuredIntent::from_name(readout.intent.as_str()),
             action,
             patient,
             readout.epistemic_status,
@@ -225,47 +280,37 @@ impl StructuredProseTranslator {
     }
 }
 
-pub fn active_intent_name(channels: &ThoughtChannels) -> &'static str {
-    // Keep this order aligned with ThoughtChannels::CHANNEL_NAMES and the
-    // SemanticIntent enum: acknowledge, answer, clarify, propose, uncertainty,
-    // reflect, continue, unknown.
-    let names = [
-        "acknowledge",
-        "answer",
-        "clarify",
-        "propose",
-        "uncertainty",
-        "reflect",
-        "continue",
-        "unknown",
-    ];
+fn active_intent(channels: &ThoughtChannels) -> StructuredIntent {
     channels
         .channels
         .iter()
-        .take(names.len())
+        .take(8)
         .enumerate()
         .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
-        .map(|(idx, _)| names[idx])
-        .unwrap_or("unknown")
+        .map(|(index, _)| StructuredIntent::from_channel_index(index))
+        .unwrap_or(StructuredIntent::Unknown)
 }
 
-fn intent_prime(intent: &str, epistemic_status: EpistemicDisposition) -> SemanticPrime {
+pub fn active_intent_name(channels: &ThoughtChannels) -> &'static str {
+    active_intent(channels).as_str()
+}
+
+fn intent_prime(intent: StructuredIntent, epistemic_status: EpistemicDisposition) -> SemanticPrime {
     match intent {
         // Acknowledgement is a communicative act, not a factual confidence claim.
-        "acknowledge" => SemanticPrime::Say,
-        "answer" => match epistemic_status {
+        StructuredIntent::Acknowledge => SemanticPrime::Say,
+        StructuredIntent::Answer => match epistemic_status {
             EpistemicDisposition::Certain => SemanticPrime::Know,
             EpistemicDisposition::Probable => SemanticPrime::Think,
             EpistemicDisposition::Uncertain
             | EpistemicDisposition::Unknown
             | EpistemicDisposition::OutOfDomain => SemanticPrime::Maybe,
         },
-        "clarify" => SemanticPrime::Want,
-        "propose" => SemanticPrime::Do,
-        "uncertainty" | "unknown" => SemanticPrime::Maybe,
-        "reflect" => SemanticPrime::Feel,
-        "continue" => SemanticPrime::Think,
-        _ => SemanticPrime::Maybe,
+        StructuredIntent::Clarify => SemanticPrime::Want,
+        StructuredIntent::Propose => SemanticPrime::Do,
+        StructuredIntent::Uncertainty | StructuredIntent::Unknown => SemanticPrime::Maybe,
+        StructuredIntent::Reflect => SemanticPrime::Feel,
+        StructuredIntent::Continue => SemanticPrime::Think,
     }
 }
 
@@ -278,16 +323,16 @@ fn role_prime<'a>(readout: &'a StructuredReadout, role: &str) -> Option<&'a str>
 }
 
 fn action_sentence(
-    intent: &str,
+    intent: StructuredIntent,
     action: &str,
     patient: &str,
     epistemic_status: EpistemicDisposition,
 ) -> &'static str {
-    // Intent names follow the encoder's eight-channel contract. In particular,
-    // only channel 1 ("answer") is an answer request; channel 4 means uncertainty.
+    // Only the Answer intent is permitted to use answer-specific wording, and
+    // its epistemic disposition still controls how strong that wording may be.
     match intent {
-        "acknowledge" => "I acknowledge what you shared.",
-        "answer" => match epistemic_status {
+        StructuredIntent::Acknowledge => "I acknowledge what you shared.",
+        StructuredIntent::Answer => match epistemic_status {
             EpistemicDisposition::Certain => "The available evidence supports a direct answer.",
             EpistemicDisposition::Probable => "I can offer a qualified answer.",
             EpistemicDisposition::Uncertain => {
@@ -300,23 +345,12 @@ fn action_sentence(
                 "This question is outside the domain I can answer reliably."
             }
         },
-        "clarify" => "I want to clarify the request.",
-        "propose" => "I can propose a concrete next step.",
-        "uncertainty" => "The available information leaves this uncertain.",
-        "reflect" => "I am reflecting on the current state.",
-        "continue" => "I will continue from the current context.",
-        "unknown" => "I cannot classify the requested intent reliably.",
-        _ => match action {
-            "THINK" => "I am thinking about this.",
-            "DO" => "I can act on this.",
-            "SAY" => "I can explain this.",
-            "WANT" => "I want to clarify this.",
-            "FEEL" => "I feel this state changing.",
-            "WITH" => "I am relating this to nearby context.",
-            "MAYBE" => "I am uncertain about this.",
-            _ if patient == "SOMETHING" => "I am attending to something.",
-            _ => "I am attending to this.",
-        },
+        StructuredIntent::Clarify => "I want to clarify the request.",
+        StructuredIntent::Propose => "I can propose a concrete next step.",
+        StructuredIntent::Uncertainty => "The available information leaves this uncertain.",
+        StructuredIntent::Reflect => "I am reflecting on the current state.",
+        StructuredIntent::Continue => "I will continue from the current context.",
+        StructuredIntent::Unknown => "I cannot classify the requested intent reliably.",
     }
 }
 
@@ -372,7 +406,12 @@ mod tests {
         ];
 
         for (index, expected_intent, expected_action, expected_phrase) in cases {
-            let channels = ThoughtChannels::with_intent(index);
+            let mut channels = ThoughtChannels::with_intent(index);
+            // The uncertainty intent is paired with an uncertain epistemic status
+            // so the test does not construct contradictory input signals.
+            if index == 4 {
+                channels.set_epistemic(2.0);
+            }
             let readout = decoder.decode(&channels);
             let translation = translator.translate(&readout);
 
