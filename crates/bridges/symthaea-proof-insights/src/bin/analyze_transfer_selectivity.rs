@@ -37,8 +37,7 @@ const REVIEW_REASON_CODES: &[&str] = &[
     "unknown",
 ];
 const TRANSFER_MISMATCH_CODES: &[&str] = REVIEW_REASON_CODES;
-const PRECONDITION_OUTCOMES: &[&str] =
-    &["satisfied", "violated", "unknown", "not_applicable"];
+const PRECONDITION_OUTCOMES: &[&str] = &["satisfied", "violated", "unknown", "not_applicable"];
 
 #[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -164,9 +163,7 @@ struct CellCounts {
 impl CellCounts {
     fn add_outcome(&mut self, outcome: &Outcome) {
         match outcome.adjudication.label {
-            Label::Compatible
-                if outcome.adjudication.status == AdjudicationStatus::Adjudicated =>
-            {
+            Label::Compatible if outcome.adjudication.status == AdjudicationStatus::Adjudicated => {
                 self.compatible += 1;
                 match outcome.prediction.decision {
                     Decision::Accept => self.compatible_accept += 1,
@@ -231,10 +228,7 @@ impl CellCounts {
                 "incompatible_abstention_rate",
                 ratio(self.incompatible_abstain, self.incompatible),
             ),
-            (
-                "binary_coverage",
-                ratio(accepted_or_rejected, total_binary),
-            ),
+            ("binary_coverage", ratio(accepted_or_rejected, total_binary)),
             (
                 "selective_risk",
                 ratio(false_decisions, accepted_or_rejected),
@@ -351,9 +345,15 @@ fn run_from_args() -> Result<()> {
     if args.len() < 4 || args.len() > 6 || args[1] == "--help" || args[1] == "-h" {
         eprintln!(
             "usage: {} <outcomes.jsonl> <test|external_challenge> <report.json> [bootstrap_replicates] [seed]",
-            args.first().map(String::as_str).unwrap_or("analyze_transfer_selectivity")
+            args.first()
+                .map(String::as_str)
+                .unwrap_or("analyze_transfer_selectivity")
         );
-        if args.len() < 4 && args.get(1).is_some_and(|arg| arg == "--help" || arg == "-h") {
+        if args.len() < 4
+            && args
+                .get(1)
+                .is_some_and(|arg| arg == "--help" || arg == "-h")
+        {
             return Ok(());
         }
         bail!("invalid command-line arguments");
@@ -362,11 +362,17 @@ fn run_from_args() -> Result<()> {
     let expected_split: Split = match args[2].as_str() {
         "test" => Split::Test,
         "external_challenge" => Split::ExternalChallenge,
-        other => bail!("confirmatory analysis only accepts test or external_challenge, found {other:?}"),
+        other => {
+            bail!("confirmatory analysis only accepts test or external_challenge, found {other:?}")
+        }
     };
     let replicates = args
         .get(4)
-        .map(|value| value.parse::<usize>().context("parse bootstrap replicate count"))
+        .map(|value| {
+            value
+                .parse::<usize>()
+                .context("parse bootstrap replicate count")
+        })
         .transpose()?
         .unwrap_or(DEFAULT_BOOTSTRAP_REPLICATES);
     if replicates < 1_000 {
@@ -545,9 +551,11 @@ fn validate_outcome_contract(value: &Value, context: &str) -> Result<()> {
     }
     let artifact_path = required_nonempty_string(target, "artifact_path", &target_ctx)?;
     let path = Path::new(artifact_path);
-    if path.is_absolute() || path.components().any(|component| {
-        matches!(component, std::path::Component::ParentDir)
-    }) {
+    if path.is_absolute()
+        || path
+            .components()
+            .any(|component| matches!(component, std::path::Component::ParentDir))
+    {
         bail!("{target_ctx}.artifact_path must be a safe repository-relative path");
     }
     if let Some(labels) = target.get("domain_labels") {
@@ -555,15 +563,17 @@ fn validate_outcome_contract(value: &Value, context: &str) -> Result<()> {
             .as_array()
             .with_context(|| format!("{target_ctx}.domain_labels must be an array"))?;
         if labels.is_empty()
-            || labels.iter().any(|label| {
-                label.as_str().is_none_or(|value| value.trim().is_empty())
-            })
+            || labels
+                .iter()
+                .any(|label| label.as_str().is_none_or(|value| value.trim().is_empty()))
         {
             bail!("{target_ctx}.domain_labels must contain non-empty strings");
         }
         let mut unique_labels = BTreeSet::new();
         for label in labels {
-            let label = label.as_str().expect("non-empty string labels validated above");
+            let label = label
+                .as_str()
+                .expect("non-empty string labels validated above");
             if !unique_labels.insert(label) {
                 bail!("{target_ctx}.domain_labels contains duplicate label {label:?}");
             }
@@ -572,7 +582,8 @@ fn validate_outcome_contract(value: &Value, context: &str) -> Result<()> {
 
     let adjudication_ctx = format!("{context}.adjudication");
     let adjudication = require_exact_keys(
-        root.get("adjudication").context("adjudication field missing")?,
+        root.get("adjudication")
+            .context("adjudication field missing")?,
         &adjudication_ctx,
         &[
             "status",
@@ -585,8 +596,7 @@ fn validate_outcome_contract(value: &Value, context: &str) -> Result<()> {
     )?;
     required_nonempty_string(adjudication, "rubric_version", &adjudication_ctx)?;
     validate_digest_field(adjudication, "receipt_sha256", 64, &adjudication_ctx)?;
-    let adjudication_status =
-        required_nonempty_string(adjudication, "status", &adjudication_ctx)?;
+    let adjudication_status = required_nonempty_string(adjudication, "status", &adjudication_ctx)?;
     let reviewers = adjudication
         .get("reviewer_decisions")
         .and_then(Value::as_array)
@@ -663,9 +673,9 @@ fn validate_outcome_contract(value: &Value, context: &str) -> Result<()> {
                 bail!("{prediction_ctx}.compatibility_probability must be null or lie in [0, 1]");
             }
         }
-        None => bail!(
-            "{prediction_ctx}.compatibility_probability is required; use null when unscored"
-        ),
+        None => {
+            bail!("{prediction_ctx}.compatibility_probability is required; use null when unscored")
+        }
     }
     validate_digest_field(prediction, "receipt_sha256", 64, &prediction_ctx)?;
     let mismatch_codes = prediction
@@ -725,22 +735,42 @@ fn validate_outcome_contract(value: &Value, context: &str) -> Result<()> {
     for key in ["model_id", "model_version"] {
         required_nonempty_string(run, key, &run_ctx)?;
     }
-    for key in ["prompt_sha256", "config_sha256", "input_sha256", "output_sha256"] {
+    for key in [
+        "prompt_sha256",
+        "config_sha256",
+        "input_sha256",
+        "output_sha256",
+    ] {
         validate_digest_field(run, key, 64, &run_ctx)?;
     }
     let budget_ctx = format!("{run_ctx}.budget");
     let budget = require_exact_keys(
         run.get("budget").context("run budget missing")?,
         &budget_ctx,
-        &["max_model_calls", "max_tokens", "max_wall_ms", "max_cost_microusd"],
+        &[
+            "max_model_calls",
+            "max_tokens",
+            "max_wall_ms",
+            "max_cost_microusd",
+        ],
         &[],
     )?;
-    for key in ["max_model_calls", "max_tokens", "max_wall_ms", "max_cost_microusd"] {
+    for key in [
+        "max_model_calls",
+        "max_tokens",
+        "max_wall_ms",
+        "max_cost_microusd",
+    ] {
         if budget.get(key).and_then(Value::as_u64).is_none() {
             bail!("{budget_ctx}.{key} must be a non-negative integer");
         }
     }
-    for key in ["actual_model_calls", "actual_tokens", "actual_wall_ms", "actual_cost_microusd"] {
+    for key in [
+        "actual_model_calls",
+        "actual_tokens",
+        "actual_wall_ms",
+        "actual_cost_microusd",
+    ] {
         if run.get(key).is_some_and(|value| value.as_u64().is_none()) {
             bail!("{run_ctx}.{key} must be a non-negative integer when present");
         }
@@ -757,9 +787,7 @@ fn validate_outcome_contract(value: &Value, context: &str) -> Result<()> {
                 .and_then(Value::as_u64)
                 .context("validated run budget unexpectedly disappeared")?;
             if actual > limit {
-                bail!(
-                    "{run_ctx}.{actual_key}={actual} exceeds declared {budget_key}={limit}"
-                );
+                bail!("{run_ctx}.{actual_key}={actual} exceeds declared {budget_key}={limit}");
             }
         }
     }
@@ -821,8 +849,7 @@ fn parse_jsonl(text: &str, expected_split: Split) -> Result<Vec<Outcome>> {
 
         let mut reviewer_ids = BTreeSet::new();
         for reviewer in &outcome.adjudication.reviewer_decisions {
-            if reviewer.reviewer_id.trim().is_empty()
-                || !reviewer_ids.insert(&reviewer.reviewer_id)
+            if reviewer.reviewer_id.trim().is_empty() || !reviewer_ids.insert(&reviewer.reviewer_id)
             {
                 bail!(
                     "pair {} has an empty or duplicate reviewer ID",
@@ -836,7 +863,10 @@ fn parse_jsonl(text: &str, expected_split: Split) -> Result<Vec<Outcome>> {
                     outcome.adjudication.label,
                     Label::Compatible | Label::Incompatible | Label::Partial
                 ) {
-                    bail!("adjudicated pair {} cannot have unknown gold label", outcome.pair_id);
+                    bail!(
+                        "adjudicated pair {} cannot have unknown gold label",
+                        outcome.pair_id
+                    );
                 }
                 if reviewer_ids.len() < REQUIRED_REVIEWERS {
                     bail!(
@@ -872,11 +902,17 @@ fn parse_jsonl(text: &str, expected_split: Split) -> Result<Vec<Outcome>> {
                 !probability.is_finite() || !(0.0..=1.0).contains(&probability)
             })
         {
-            bail!("pair {} has compatibility probability outside [0, 1]", outcome.pair_id);
+            bail!(
+                "pair {} has compatibility probability outside [0, 1]",
+                outcome.pair_id
+            );
         }
         match outcome.prediction.decision {
             Decision::Accept if outcome.prediction.predicted_label != Label::Compatible => {
-                bail!("pair {} accepts but does not predict compatible", outcome.pair_id);
+                bail!(
+                    "pair {} accepts but does not predict compatible",
+                    outcome.pair_id
+                );
             }
             Decision::Reject
                 if !matches!(
@@ -884,7 +920,10 @@ fn parse_jsonl(text: &str, expected_split: Split) -> Result<Vec<Outcome>> {
                     Label::Incompatible | Label::Partial
                 ) =>
             {
-                bail!("pair {} rejects without predicting incompatible/partial", outcome.pair_id);
+                bail!(
+                    "pair {} rejects without predicting incompatible/partial",
+                    outcome.pair_id
+                );
             }
             _ => {}
         }
@@ -894,7 +933,9 @@ fn parse_jsonl(text: &str, expected_split: Split) -> Result<Vec<Outcome>> {
                 if previous != &outcome.component_id {
                     bail!(
                         "family {} appears in components {} and {}; component IDs must encode family-connected components",
-                        family_id, previous, outcome.component_id
+                        family_id,
+                        previous,
+                        outcome.component_id
                     );
                 }
             } else {
@@ -998,9 +1039,14 @@ fn analyze(
         }
         for (name, value) in sample.metric_values() {
             if let Some(value) = value {
-                bootstrap_values.get_mut(name).expect("metric registered").push(value);
+                bootstrap_values
+                    .get_mut(name)
+                    .expect("metric registered")
+                    .push(value);
             } else {
-                *undefined_replicates.get_mut(name).expect("metric registered") += 1;
+                *undefined_replicates
+                    .get_mut(name)
+                    .expect("metric registered") += 1;
             }
         }
     }
@@ -1108,11 +1154,7 @@ fn calibration_assessment(
                 .push((*probability, *truth));
         }
     }
-    let scored: Vec<(f64, bool)> = scored_by_component
-        .values()
-        .flatten()
-        .copied()
-        .collect();
+    let scored: Vec<(f64, bool)> = scored_by_component.values().flatten().copied().collect();
     let probability_coverage = ratio(scored.len(), binary_rows.len()).unwrap_or(0.0);
     if scored.is_empty() {
         return CalibrationAssessment {
@@ -1143,8 +1185,7 @@ fn calibration_assessment(
         }
         let count = values.len();
         let mean_probability = values.iter().map(|(p, _)| *p).sum::<f64>() / count as f64;
-        let observed_rate =
-            values.iter().filter(|(_, truth)| *truth).count() as f64 / count as f64;
+        let observed_rate = values.iter().filter(|(_, truth)| *truth).count() as f64 / count as f64;
         reliability_bins.push(ReliabilityBin {
             bin_index: index,
             lower_bound: index as f64 / 10.0,
@@ -1272,9 +1313,9 @@ where
     D: serde::Deserializer<'de>,
 {
     let value = Option::<f64>::deserialize(deserializer)?;
-    if value.is_some_and(|probability| {
-        !probability.is_finite() || !(0.0..=1.0).contains(&probability)
-    }) {
+    if value
+        .is_some_and(|probability| !probability.is_finite() || !(0.0..=1.0).contains(&probability))
+    {
         return Err(<D::Error as serde::de::Error>::custom(
             "compatibility_probability must be null or a finite value in [0, 1]",
         ));
@@ -1305,8 +1346,14 @@ mod tests {
             Decision::Abstain => Label::Unknown,
         };
         let reviewer_decisions = vec![
-            ReviewerDecision { reviewer_id: "reviewer-a".to_string(), label },
-            ReviewerDecision { reviewer_id: "reviewer-b".to_string(), label },
+            ReviewerDecision {
+                reviewer_id: "reviewer-a".to_string(),
+                label,
+            },
+            ReviewerDecision {
+                reviewer_id: "reviewer-b".to_string(),
+                label,
+            },
         ];
         let json = json!({
             "schema_version": SCHEMA_VERSION,
@@ -1485,13 +1532,8 @@ mod tests {
         let mut invalid_precondition = valid.clone();
         invalid_precondition["prediction"]["precondition_checks"][0]["outcome"] =
             json!("probably-satisfied");
-        assert!(
-            validate_outcome_contract(
-                &invalid_precondition,
-                "invalid precondition outcome"
-            )
-            .is_err()
-        );
+        assert!(validate_outcome_contract(&invalid_precondition, "invalid precondition outcome")
+            .is_err());
 
         let mut extra_field = valid;
         extra_field["unregistered_authority"] = json!(true);
@@ -1500,13 +1542,33 @@ mod tests {
 
     #[test]
     fn computes_transfer_selectivity_metrics_and_excludes_partial_rows() {
-        let positive = outcome("p", "cp", "sf-p", "tf-p", Label::Compatible, Decision::Accept);
-        let negative = outcome("n", "cn", "sf-n", "tf-n", Label::Incompatible, Decision::Reject);
+        let positive = outcome(
+            "p",
+            "cp",
+            "sf-p",
+            "tf-p",
+            Label::Compatible,
+            Decision::Accept,
+        );
+        let negative = outcome(
+            "n",
+            "cn",
+            "sf-n",
+            "tf-n",
+            Label::Incompatible,
+            Decision::Reject,
+        );
         let report = analyze(&[positive, negative], Split::Test, "a".repeat(64), 1_000, 7)
             .expect("analyze synthetic fixture");
         assert_eq!(report.counts.binary_evaluable_pairs, 2);
-        assert_eq!(report.metrics["compatible_accept_recall"].estimate, Some(1.0));
-        assert_eq!(report.metrics["incompatible_false_accept_rate"].estimate, Some(0.0));
+        assert_eq!(
+            report.metrics["compatible_accept_recall"].estimate,
+            Some(1.0)
+        );
+        assert_eq!(
+            report.metrics["incompatible_false_accept_rate"].estimate,
+            Some(0.0)
+        );
         assert_eq!(report.metrics["binary_coverage"].estimate, Some(1.0));
         assert_eq!(report.metrics["selective_risk"].estimate, Some(0.0));
         assert_eq!(report.calibration.probability_scored_pairs, 2);
@@ -1514,7 +1576,12 @@ mod tests {
         assert!(report.calibration.brier_score.is_some());
         assert!((report.calibration.brier_score.unwrap() - 0.01).abs() < 1e-12);
         assert!(report.calibration.brier_score_ci_95.is_some());
-        assert!(report.calibration.expected_calibration_error_10_bins.is_some());
+        assert!(
+            report
+                .calibration
+                .expected_calibration_error_10_bins
+                .is_some()
+        );
         assert!(report.calibration.calibration_error_ci_95.is_some());
         assert_eq!(
             report.proposed_gates.overall_confirmatory_decision,
@@ -1524,12 +1591,32 @@ mod tests {
 
     #[test]
     fn abstention_is_not_silently_counted_as_accept_or_reject() {
-        let positive = outcome("p", "cp", "sf-p", "tf-p", Label::Compatible, Decision::Abstain);
-        let negative = outcome("n", "cn", "sf-n", "tf-n", Label::Incompatible, Decision::Abstain);
+        let positive = outcome(
+            "p",
+            "cp",
+            "sf-p",
+            "tf-p",
+            Label::Compatible,
+            Decision::Abstain,
+        );
+        let negative = outcome(
+            "n",
+            "cn",
+            "sf-n",
+            "tf-n",
+            Label::Incompatible,
+            Decision::Abstain,
+        );
         let report = analyze(&[positive, negative], Split::Test, "b".repeat(64), 1_000, 8)
             .expect("analyze abstention fixture");
-        assert_eq!(report.metrics["compatible_accept_recall"].estimate, Some(0.0));
-        assert_eq!(report.metrics["incompatible_false_accept_rate"].estimate, Some(0.0));
+        assert_eq!(
+            report.metrics["compatible_accept_recall"].estimate,
+            Some(0.0)
+        );
+        assert_eq!(
+            report.metrics["incompatible_false_accept_rate"].estimate,
+            Some(0.0)
+        );
         assert_eq!(report.metrics["binary_coverage"].estimate, Some(0.0));
         assert_eq!(report.metrics["selective_risk"].estimate, None);
         assert_eq!(report.calibration.probability_scored_pairs, 0);
@@ -1539,10 +1626,38 @@ mod tests {
     #[test]
     fn deterministic_bootstrap_yields_stable_intervals() {
         let outcomes = vec![
-            outcome("p1", "c1", "sf1", "tf1", Label::Compatible, Decision::Accept),
-            outcome("n1", "c2", "sf2", "tf2", Label::Incompatible, Decision::Accept),
-            outcome("p2", "c3", "sf3", "tf3", Label::Compatible, Decision::Reject),
-            outcome("n2", "c4", "sf4", "tf4", Label::Incompatible, Decision::Reject),
+            outcome(
+                "p1",
+                "c1",
+                "sf1",
+                "tf1",
+                Label::Compatible,
+                Decision::Accept,
+            ),
+            outcome(
+                "n1",
+                "c2",
+                "sf2",
+                "tf2",
+                Label::Incompatible,
+                Decision::Accept,
+            ),
+            outcome(
+                "p2",
+                "c3",
+                "sf3",
+                "tf3",
+                Label::Compatible,
+                Decision::Reject,
+            ),
+            outcome(
+                "n2",
+                "c4",
+                "sf4",
+                "tf4",
+                Label::Incompatible,
+                Decision::Reject,
+            ),
         ];
         let first = analyze(&outcomes, Split::Test, "c".repeat(64), 1_000, 42).unwrap();
         let second = analyze(&outcomes, Split::Test, "c".repeat(64), 1_000, 42).unwrap();
