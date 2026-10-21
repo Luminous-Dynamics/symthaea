@@ -182,13 +182,13 @@ fn main() -> Result<(), Box<dyn Error>> {
             &test_queries,
             &test,
             &prototypes,
-            conformal_cutoff_similarity,
+            conformal_q,
         )?;
         let conformal_near_unknown = score_conformal_sets(
             &near_unknown_queries,
             &near_unknown,
             &prototypes,
-            conformal_cutoff_similarity,
+            conformal_q,
         )?;
         println!(
             "# conformal_calibration=seed:{seed},alpha:{CONFORMAL_ALPHA:.4},q:{conformal_q:.6},cutoff_similarity:{conformal_cutoff_similarity:.6},known_calibration_n:{conformal_calibration_n}"
@@ -895,11 +895,12 @@ fn score_conformal_sets(
     queries: &[QuerySample],
     scored: &[ScoredQuery],
     prototypes: &[PatternVector],
-    cutoff_similarity: f64,
+    conformal_q: f64,
 ) -> Result<Vec<ConformalQueryResult>, Box<dyn Error>> {
     if queries.len() != scored.len() {
         return Err("query and score collections must be aligned".into());
     }
+    let cutoff_similarity = 1.0 - conformal_q;
     let mut results = Vec::with_capacity(queries.len());
     for (query, score) in queries.iter().zip(scored) {
         let mut set_size = 0;
@@ -910,7 +911,7 @@ fn score_conformal_sets(
         }
         let covered = score
             .target_similarity
-            .is_some_and(|similarity| 1.0 - similarity <= 1.0 - cutoff_similarity);
+            .is_some_and(|similarity| 1.0 - similarity <= conformal_q);
         results.push(ConformalQueryResult {
             kind: query.kind,
             labeled: score.target_similarity.is_some(),
@@ -1390,6 +1391,93 @@ mod tests {
             later_certificate.passed,
             "the final candidate should be safe, but fixed-sequence testing must stop earlier"
         );
+    }
+
+    #[test]
+    fn split_conformal_quantile_uses_labeled_known_order_statistic() {
+        let samples = vec![
+            ScoredQuery {
+                best_similarity: 0.9,
+                top_two_margin: 0.2,
+                correct: true,
+                target_similarity: Some(0.9),
+                kind: QueryKind::Known { noise_index: 0 },
+            },
+            ScoredQuery {
+                best_similarity: 0.85,
+                top_two_margin: 0.1,
+                correct: true,
+                target_similarity: Some(0.8),
+                kind: QueryKind::Known { noise_index: 1 },
+            },
+            ScoredQuery {
+                best_similarity: 0.7,
+                top_two_margin: 0.05,
+                correct: true,
+                target_similarity: Some(0.7),
+                kind: QueryKind::Known { noise_index: 2 },
+            },
+            ScoredQuery {
+                best_similarity: 0.6,
+                top_two_margin: 0.03,
+                correct: false,
+                target_similarity: Some(0.6),
+                kind: QueryKind::Known { noise_index: 3 },
+            },
+            ScoredQuery {
+                best_similarity: 0.99,
+                top_two_margin: 0.9,
+                correct: false,
+                target_similarity: None,
+                kind: QueryKind::RandomOod,
+            },
+        ];
+        let (quantile, calibration_n) =
+            split_conformal_quantile(&samples, 0.5).expect("quantile");
+        assert_eq!(calibration_n, 4);
+        // Scores 1 - sim are [0.1, 0.2, 0.3, 0.4]; ceil((4+1)*.5)=3.
+        assert!((quantile - 0.3).abs() < 1e-12);
+    }
+
+    #[test]
+    fn conformal_returns_sets_and_cannot_separate_identical_identity_vectors() {
+        let prototypes = (0..8)
+            .map(|index| PatternVector::seeded_random(4_096, 800 + index as u64))
+            .collect::<Result<Vec<_>, _>>()
+            .expect("prototypes");
+        let known = QuerySample {
+            vector: prototypes[0].clone(),
+            target: Some(0),
+            kind: QueryKind::Known { noise_index: 0 },
+        };
+        let unknown = QuerySample {
+            vector: prototypes[0].clone(),
+            target: None,
+            kind: QueryKind::NearPrototypeUnknown { distance_index: 0 },
+        };
+        let queries = vec![known, unknown];
+        let scores = score_queries(&queries, &prototypes).expect("scores");
+        let set_results =
+            score_conformal_sets(&queries, &scores, &prototypes, 0.0).expect("sets");
+        assert_eq!(set_results[0].set_size, 1);
+        assert_eq!(set_results[0].set_size, set_results[1].set_size);
+        assert!(set_results[0].covered);
+        assert!(!set_results[1].labeled);
+    }
+
+    #[test]
+    fn conformal_uses_full_set_when_finite_sample_rank_exceeds_calibration_size() {
+        let sample = ScoredQuery {
+            best_similarity: 1.0,
+            top_two_margin: 0.5,
+            correct: true,
+            target_similarity: Some(1.0),
+            kind: QueryKind::Known { noise_index: 0 },
+        };
+        let (quantile, count) =
+            split_conformal_quantile(&[sample], 0.05).expect("full-set quantile");
+        assert_eq!(count, 1);
+        assert!(quantile.is_infinite());
     }
 
     #[test]
