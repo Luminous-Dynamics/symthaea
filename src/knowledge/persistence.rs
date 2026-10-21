@@ -509,6 +509,7 @@ mod tests {
 
         let facts = vec![
             FactRecord {
+                fact_id: None,
                 vector_bytes: vec![0u8; 2048],
                 source_text: "Test fact one".into(),
                 confidence: 0.9,
@@ -517,6 +518,7 @@ mod tests {
                 is_causal: false,
             },
             FactRecord {
+                fact_id: None,
                 vector_bytes: vec![1u8; 2048],
                 source_text: "Test fact two".into(),
                 confidence: 0.8,
