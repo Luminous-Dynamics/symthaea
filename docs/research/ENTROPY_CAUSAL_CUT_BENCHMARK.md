@@ -113,7 +113,7 @@ These are research targets, not current results:
 5. No failed reference call can produce a number presented as measured.
 6. On held-out cases, report Pearson r, Spearman rho, MAE, RMSE, rank reversals, confidence intervals, and per-family breakdown. Use r and rho >= 0.90 only as an initial target, never as the only pass criterion.
 7. Report false-positive rates on negative controls. Do not assert consciousness from any scalar score.
-8. A validator PASS requires all cases paired, equal per-case reference/approximation model digests, an explicit shared-model attestation, a stable (non-RC) PyPhi version, the declared formalism, Pearson and Spearman > 0.90, and >= 90% of cases within 10% relative error.
+8. A validator PASS requires all cases paired, equal per-case reference/approximation model digests and prior digests, an explicit shared-model attestation, a stable (non-RC) PyPhi version, the declared formalism, Pearson and Spearman > 0.90, and >= 90% of cases within 10% relative error.
 9. Publish exact source commit, tool versions, formalism preset, inputs, outputs, and verification receipt for every claimed pass. Queued or skipped workflows are not passes.
 
 ## SOTA and industry comparison protocol
