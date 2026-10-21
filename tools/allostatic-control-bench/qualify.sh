@@ -10,6 +10,7 @@ source_files=(
   "tools/allostatic-control-bench/Cargo.toml"
   "tools/allostatic-control-bench/Cargo.lock"
   "tools/allostatic-control-bench/src/lib.rs"
+  "tools/allostatic-control-bench/src/calibration.rs"
   "tools/allostatic-control-bench/src/robust_viability.rs"
   "tools/allostatic-control-bench/src/main.rs"
   "tools/allostatic-control-bench/src/bin/allostatic-control-report.rs"
