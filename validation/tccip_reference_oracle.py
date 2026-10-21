@@ -566,14 +566,18 @@ def render_artifact(fixtures: Sequence[Fixture], manifest_bytes: bytes, source_s
     output.write(f"# manifest_sha256={hashlib.sha256(manifest_bytes).hexdigest()}\n")
     output.write("# oracle=independent Python standard-library implementation; this is not Rust execution output\n")
     writer = csv.writer(output, delimiter="\t", lineterminator="\n")
-    writer.writerow(["record_type", "fixture", "input_state_weights", "task_target", "intervention_id",
-                     "kind", "source", "target", "cost", "intact_utility", "utility", "utility_loss",
-                     "partition_mask", "partition_labels", "cross_mean_loss", "control_mean_loss",
-                     "tccip", "n_cross", "n_control", "target_entropy_bits",
-                     "individual_input_mi_bits", "joint_input_mi_bits", "first_intervention_id",
-                     "second_intervention_id", "first_cut_utility", "second_cut_utility",
-                     "joint_cut_utility", "utility_interaction_contrast"])
-    writer.writerows(rows)
+    header = ["record_type", "fixture", "input_state_weights", "task_target", "intervention_id",
+              "kind", "source", "target", "cost", "intact_utility", "utility", "utility_loss",
+              "partition_mask", "partition_labels", "cross_mean_loss", "control_mean_loss",
+              "tccip", "n_cross", "n_control", "target_entropy_bits",
+              "individual_input_mi_bits", "joint_input_mi_bits", "first_intervention_id",
+              "second_intervention_id", "first_cut_utility", "second_cut_utility",
+              "joint_cut_utility", "utility_interaction_contrast"]
+    writer.writerow(header)
+    for row in rows:
+        if len(row) > len(header):
+            raise ValueError(f"artifact row has {len(row)} fields; schema allows {len(header)}")
+        writer.writerow(row + [""] * (len(header) - len(row)))
     return output.getvalue()
 
 
