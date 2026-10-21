@@ -47,6 +47,11 @@ run_validator pair \
   benchmarks/mythology-bench/v0/metamorphic-pairs.jsonl \
   "$reports_dir/metamorphic-pairs.json"
 
+run_validator source \
+  benchmarks/source-catalog/v0/source.schema.json \
+  benchmarks/source-catalog/v0/sources.jsonl \
+  "$reports_dir/source-catalog.json"
+
 run_validator graph \
   benchmarks/mythology-bench/v0/narrative-graph.schema.json \
   benchmarks/mythology-bench/v0/narrative-graph-fixtures.jsonl \
