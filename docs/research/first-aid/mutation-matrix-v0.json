@@ -8,10 +8,10 @@
     "trajectory_corpus_sha256": "1ac414e6b920a6259d68a20c273a0a9465e98c7a596393f9777be9976d6e3fd3"
   },
   "count_summary": {
-    "case_count": 38,
+    "case_count": 39,
     "frozen_trace_count": 12,
-    "mutation_case_count": 26,
-    "implemented_or_frozen_count": 38,
+    "mutation_case_count": 27,
+    "implemented_or_frozen_count": 39,
     "planned_not_yet_executable_count": 0
   },
   "evidence_status_definitions": {
@@ -585,12 +585,30 @@
       "evidence_status": "unit_test_added",
       "test_name": "resuming_session_without_interrupt_clears_prior_bundle_verification",
       "note": "Resume explicitly invalidates verified state even if a malformed trace lacks an interruption; exact-head validation pending."
+    },
+    {
+      "case_id": "MUT-027",
+      "invariant_id": "SESSION-004",
+      "mode": "mutation_or_control",
+      "source_trace_id": "FA-TRACE-001",
+      "mutation": "interrupt the session between bundle load and verification, then continue to render",
+      "expected": {
+        "outcome": "evaluate",
+        "violation_codes": [
+          "invalid_bundle_verification",
+          "render_without_active_session",
+          "render_without_verified_bundle"
+        ]
+      },
+      "evidence_status": "unit_test_added",
+      "test_name": "verification_outside_active_session_is_rejected",
+      "note": "Implemented in the production inspector, JSON reference interpreter and separate finite-state model precondition; exact-head validation pending."
     }
   ],
   "differential_oracle": {
     "status": "unit_test_added",
     "implementation": "JSON-value-based reference interpreter compared against the production typed-state interpreter",
-    "coverage": "all 12 frozen traces plus 11 adversarial mutations: session lifecycle, wrong bundle identity, digest failure, expired bundle, uncertainty re-entry, uncertainty loss across session boundaries, revocation across sessions, stale-resource claims, intermittent connectivity, non-sensitive egress, and resume without interruption",
+    "coverage": "all 12 frozen traces plus 12 adversarial mutations: session lifecycle, wrong bundle identity, digest failure, expired bundle, uncertainty re-entry, uncertainty loss across session boundaries, revocation across sessions, stale-resource claims, intermittent connectivity, non-sensitive egress, resume without interruption, and verification outside an active session",
     "limits": "same maintainers and frozen fixture; implementation-diversity cross-check only, not external clinical adjudication or a formally verified specification",
     "test_name": "differential_json_reference_agrees_on_frozen_traces",
     "mutation_suite_test_name": "differential_json_reference_agrees_on_adversarial_mutation_suite",
