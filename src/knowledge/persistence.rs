@@ -512,6 +512,7 @@ mod tests {
         let facts = vec![
             FactRecord {
                 fact_id: None,
+                claim_context: None,
                 vector_bytes: vec![0u8; 2048],
                 source_text: "Test fact one".into(),
                 confidence: 0.9,
@@ -521,6 +522,7 @@ mod tests {
             },
             FactRecord {
                 fact_id: None,
+                claim_context: None,
                 vector_bytes: vec![1u8; 2048],
                 source_text: "Test fact two".into(),
                 confidence: 0.8,
@@ -540,6 +542,101 @@ mod tests {
         assert_eq!(loaded[1].source_text, "Test fact one");
 
         // Cleanup
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn save_load_preserves_stable_fact_ids_and_claim_context() {
+        let dir = std::env::temp_dir().join(format!("symthaea_claim_context_test_{}", std::process::id()));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+        let context = ClaimContext {
+            subject: "Osiris".into(),
+            predicate: "associated_with".into(),
+            object: "renewal".into(),
+            witness_id: "witness-a".into(),
+            source_family_id: "family-a".into(),
+            context_id: "Dendera:late-period".into(),
+            temporal_scope: Some("late_period".into()),
+            event_time: Some(-300),
+            claim_kind: super::super::claim_provenance::ClaimKind::SourceAttested,
+            polarity: super::super::claim_provenance::ClaimPolarity::Positive,
+            evidence_ids: vec!["evidence-a".into()],
+        };
+        let record = FactRecord {
+            fact_id: Some(42),
+            vector_bytes: vec![7u8; 2048],
+            source_text: "Osiris is associated with renewal".into(),
+            confidence: 0.7,
+            domain: Some("mythology".into()),
+            cycle: 9,
+            is_causal: false,
+            claim_context: Some(context.clone()),
+        };
+        let mut persistence = KnowledgePersistence::new(&db_path);
+        persistence.save_facts(&[record]).unwrap();
+        let loaded = persistence.load_facts().unwrap();
+        assert_eq!(loaded.len(), 1);
+        assert_eq!(loaded[0].fact_id, Some(42));
+        assert_eq!(loaded[0].claim_context, Some(context));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn legacy_fact_schema_migrates_additive_provenance_columns() {
+        let dir = std::env::temp_dir().join(format!("symthaea_legacy_schema_test_{}", std::process::id()));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+        {
+            let connection = rusqlite::Connection::open(&db_path).unwrap();
+            connection.execute_batch(
+                "CREATE TABLE knowledge_facts (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    vector_blob BLOB NOT NULL,
+                    source_text TEXT NOT NULL,
+                    confidence REAL NOT NULL,
+                    domain TEXT,
+                    cycle INTEGER NOT NULL,
+                    is_causal INTEGER NOT NULL DEFAULT 0
+                );
+                INSERT INTO knowledge_facts (vector_blob, source_text, confidence, domain, cycle, is_causal)
+                VALUES (zeroblob(2048), 'legacy fact', 0.6, NULL, 1, 0);"
+            ).unwrap();
+        }
+        let mut persistence = KnowledgePersistence::new(&db_path);
+        let loaded = persistence.load_facts().unwrap();
+        assert_eq!(loaded.len(), 1);
+        assert_eq!(loaded[0].source_text, "legacy fact");
+        assert_eq!(loaded[0].fact_id, None);
+        assert_eq!(loaded[0].claim_context, None);
+        persistence.save_facts(&loaded).unwrap();
+        let loaded_after_snapshot = persistence.load_facts().unwrap();
+        assert_eq!(loaded_after_snapshot.len(), 1);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn save_load_round_trips_typed_evidence_links() {
+        let dir = std::env::temp_dir().join(format!("symthaea_evidence_links_test_{}", std::process::id()));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+        let link = EvidenceLink {
+            from_fact_id: 10,
+            to_fact_id: 20,
+            relation: super::super::claim_provenance::EvidenceRelation::Corroborates,
+            status: super::super::claim_provenance::EvidenceLinkStatus::Adjudicated,
+            evidence_ids: vec!["evidence-a".into(), "evidence-b".into()],
+            rationale: Some("Independent source witnesses support the same scoped claim".into()),
+            causal_argument: None,
+            transmission_chain: None,
+            detected_at_cycle: 12,
+        };
+        let mut persistence = KnowledgePersistence::new(&db_path);
+        persistence.save_evidence_links(&[link.clone()]).unwrap();
+        assert_eq!(persistence.load_evidence_links().unwrap(), vec![link]);
+
         let _ = std::fs::remove_dir_all(&dir);
     }
 
