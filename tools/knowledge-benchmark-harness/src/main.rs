@@ -611,7 +611,7 @@ fn validate_pair_contract(pair: &Value) -> Vec<String> {
         if !synthetic_only
             && (state_rights == "synthetic_only"
                 || (matches!(split, "test" | "holdout")
-                    && matches!(state_rights, "unknown" | "restricted" | "permission_required")))
+                    && matches!(state_rights, "unknown" | "restricted")))
         {
             errors.push(format!(
                 "{state_name} rights_status is not admissible for split {split:?}"
@@ -1187,7 +1187,7 @@ fn validate_pair_catalog_refs(pair: &Value) -> Vec<String> {
                     "pair {pair_id:?} source {source_id:?} is in split {catalog_split:?}, not pair split {split:?}"
                 ));
             }
-            if state_source_id == source_id
+            if state_source_id == source_id.as_str()
                 && string_field(state, "rights_status") != Some(rights_status)
             {
                 errors.push(format!(
