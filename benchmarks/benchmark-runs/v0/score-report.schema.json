@@ -24,6 +24,7 @@
     "source_pack_sha256",
     "bootstrap_replicates",
     "bootstrap_seed",
+    "minimum_independent_clusters",
     "confidence_level",
     "source_family_cluster_count",
     "comparisons",
@@ -151,6 +152,10 @@
       "items": {
         "$ref": "#/$defs/pairwiseComparison"
       }
+    },
+    "minimum_independent_clusters": {
+      "type": "integer",
+      "minimum": 20
     }
   },
   "$defs": {
