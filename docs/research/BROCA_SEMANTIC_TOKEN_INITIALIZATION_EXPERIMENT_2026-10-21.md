@@ -60,7 +60,10 @@ Required for every exact head:
 - identical genesis, vocabulary, and configuration produce repeatable initialized vectors;
 - absent/unknown lexemes use the documented fallback;
 - false-positive lexical controls such as unicorn, disaster, king, thing, and wonder do not obtain semantics from accidental affix spelling;
-- positive controls preserve the grounded root's primes when a supported affix is applied;
+- positive morphology controls preserve the grounded root's primes when a supported affix is applied;
+- equivalent lexical prime sequences are near-identical, while a multi-pair contrastive probe separates them from opposite/contrastive concepts;
+- non-finite genesis-blend weights fall back to the documented default instead of propagating non-finite embedding values;
+- the training and held-out smoke fixtures have intent labels and epistemic ordinals aligned with their intended targets (channel 4 is uncertainty, not answer/certainty);
 - legacy configuration deserialization keeps semantic initialization disabled unless explicitly enabled;
 - checkpoint load/save and GPU cache paths remain aligned with the exact token IDs.
 
