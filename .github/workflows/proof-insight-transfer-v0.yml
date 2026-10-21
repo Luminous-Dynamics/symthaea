@@ -735,7 +735,7 @@ jobs:
           cd "$(dirname "$PITB_MANIFEST")"
           cargo run --release --locked --bin symthaea-proof-insights -- \
             --audit-temporal-dataset "$dalek" proof_timeline.csv dataset.jsonl "$audit"
-          python - "$audit" "$dalek" "$GITHUB_WORKSPACE" <<'PY'
+          "$RUNNER_TEMP/jsonschema-venv/bin/python" - "$audit" "$dalek" "$GITHUB_WORKSPACE" <<'PY'
           import hashlib
           import json
           import sys
