@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://luminousdynamics.io/schemas/pitb.temporal-dataset-join-audit.v0.json",
+  "$id": "https://luminousdynamics.io/schemas/pitb.temporal-dataset-join-audit.v1.json",
   "title": "PITB temporal dataset-to-timeline join audit",
   "description": "Read-only join and statement-drift audit for a pinned chronological proof dataset. Ambiguous file-path joins remain ambiguous and are never resolved by selecting an arbitrary first row. Unsafe machine-local timeline paths are counted and excluded from the join index, without being read or echoed.",
   "type": "object",
