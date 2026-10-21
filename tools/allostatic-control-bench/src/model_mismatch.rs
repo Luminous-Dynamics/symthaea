@@ -6,8 +6,10 @@
 //! candidate action and the frozen stress grid, not only the selected action.
 
 use super::calibration::{
-    calibrate_episode_radii, enclose_predicted_action_effects, enclose_predicted_state,
-    CalibratedEnvelopeRadii,
+    calibrate_action_specific_episode_radii, calibrate_episode_radii,
+    enclose_action_specific_predicted_effects, enclose_action_specific_predicted_state,
+    enclose_predicted_action_effects, enclose_predicted_state,
+    ActionSpecificCalibratedEnvelopeRadii, CalibratedEnvelopeRadii,
 };
 use super::robust_viability::{
     next_state_envelope, robustly_viable, ActionEffectBounds, Interval, StateEnvelope,
@@ -145,6 +147,65 @@ pub fn episode_residual_scores(
     })
 }
 
+/// Episode-level maxima with independent reserve/load effects for every action.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ActionSpecificEpisodeResidualScores {
+    pub reserve_state: f64,
+    pub load_state: f64,
+    pub push_reserve_effect: f64,
+    pub push_load_effect: f64,
+    pub maintain_reserve_effect: f64,
+    pub maintain_load_effect: f64,
+    pub recovery_reserve_effect: f64,
+    pub recovery_load_effect: f64,
+}
+
+/// Maximize action-effect residuals per action across the complete stress grid.
+/// Keeping these six residual families separate avoids charging Maintain with
+/// the larger worst-case residual of Push when the two dynamics differ.
+pub fn action_specific_episode_residual_scores(
+    mismatch: MismatchProfile,
+    stress_grid: &[f64],
+) -> Option<ActionSpecificEpisodeResidualScores> {
+    if stress_grid.is_empty()
+        || stress_grid
+            .iter()
+            .any(|stress| !stress.is_finite() || !(0.0..=1.0).contains(stress))
+    {
+        return None;
+    }
+
+    let mut push_reserve = 0.0_f64;
+    let mut push_load = 0.0_f64;
+    let mut maintain_reserve = 0.0_f64;
+    let mut maintain_load = 0.0_f64;
+    let mut recovery_reserve = 0.0_f64;
+    let mut recovery_load = 0.0_f64;
+    for stress in stress_grid {
+        nominal_action_effect(Action::Push, *stress)?;
+        nominal_action_effect(Action::Maintain, *stress)?;
+        nominal_action_effect(Action::EmergencyRecover, *stress)?;
+        push_reserve = push_reserve.max(mismatch.push.reserve_delta_error.abs());
+        push_load = push_load.max(mismatch.push.load_delta_error.abs());
+        maintain_reserve = maintain_reserve.max(mismatch.maintain.reserve_delta_error.abs());
+        maintain_load = maintain_load.max(mismatch.maintain.load_delta_error.abs());
+        recovery_reserve =
+            recovery_reserve.max(mismatch.emergency_recover.reserve_delta_error.abs());
+        recovery_load = recovery_load.max(mismatch.emergency_recover.load_delta_error.abs());
+    }
+
+    Some(ActionSpecificEpisodeResidualScores {
+        reserve_state: mismatch.reserve_state_error.abs(),
+        load_state: mismatch.load_state_error.abs(),
+        push_reserve_effect: push_reserve,
+        push_load_effect: push_load,
+        maintain_reserve_effect: maintain_reserve,
+        maintain_load_effect: maintain_load,
+        recovery_reserve_effect: recovery_reserve,
+        recovery_load_effect: recovery_load,
+    })
+}
+
 /// Calibrate episode-level radii from a supplied independent calibration panel.
 /// There must be one worst-case score per independent episode, not per timestep.
 pub fn calibrate_mismatch_panel(
@@ -170,6 +231,54 @@ pub fn calibrate_mismatch_panel(
         &load_effect,
         target_coverage,
     )
+}
+
+/// Calibrate state and per-action effect radii from independent episode scores.
+pub fn calibrate_action_specific_mismatch_panel(
+    profiles: &[MismatchProfile],
+    stress_grid: &[f64],
+    target_coverage: f64,
+) -> Option<ActionSpecificCalibratedEnvelopeRadii> {
+    if profiles.is_empty() {
+        return None;
+    }
+    let scores: Vec<ActionSpecificEpisodeResidualScores> = profiles
+        .iter()
+        .map(|profile| action_specific_episode_residual_scores(*profile, stress_grid))
+        .collect::<Option<Vec<_>>>()?;
+    let reserve_state: Vec<f64> = scores.iter().map(|score| score.reserve_state).collect();
+    let load_state: Vec<f64> = scores.iter().map(|score| score.load_state).collect();
+    let push_reserve: Vec<f64> = scores.iter().map(|score| score.push_reserve_effect).collect();
+    let push_load: Vec<f64> = scores.iter().map(|score| score.push_load_effect).collect();
+    let maintain_reserve: Vec<f64> =
+        scores.iter().map(|score| score.maintain_reserve_effect).collect();
+    let maintain_load: Vec<f64> =
+        scores.iter().map(|score| score.maintain_load_effect).collect();
+    let recovery_reserve: Vec<f64> =
+        scores.iter().map(|score| score.recovery_reserve_effect).collect();
+    let recovery_load: Vec<f64> =
+        scores.iter().map(|score| score.recovery_load_effect).collect();
+
+    calibrate_action_specific_episode_radii(
+        &reserve_state,
+        &load_state,
+        &push_reserve,
+        &push_load,
+        &maintain_reserve,
+        &maintain_load,
+        &recovery_reserve,
+        &recovery_load,
+        target_coverage,
+    )
+}
+
+/// Expand a nominal action effect by that action's own calibrated uncertainty.
+pub fn action_specific_calibrated_action_effect(
+    action: Action,
+    stress: f64,
+    radii: ActionSpecificCalibratedEnvelopeRadii,
+) -> Option<ActionEffectBounds> {
+    enclose_action_specific_predicted_effects(nominal_action_effect(action, stress)?, action, radii)
 }
 
 /// Estimated action effect expanded by its calibrated residual envelope.
@@ -277,6 +386,45 @@ pub fn synthetic_mismatch_profile(seed: u64, scale: f64) -> Option<MismatchProfi
     }
     let coordinates = std::array::from_fn(|dimension| deterministic_trit(seed, dimension) * scale);
     Some(make_profile_from_coordinates(coordinates))
+}
+
+/// Compare point, action-specific robust, and realized one-step safety.
+/// True safety evaluates the model at the estimated interval shifted by its
+/// actual state error; it does not collapse a wider state set to its midpoint.
+pub fn point_and_action_specific_robust_vs_true(
+    state: StateEnvelope,
+    action: Action,
+    stress: f64,
+    mismatch: MismatchProfile,
+    radii: ActionSpecificCalibratedEnvelopeRadii,
+    limits: ViabilityLimits,
+) -> Option<(bool, bool, bool)> {
+    let point_effect = nominal_action_effect(action, stress)?;
+    let robust_effect = action_specific_calibrated_action_effect(action, stress, radii)?;
+    let true_effect = true_action_effect(action, stress, mismatch)?;
+    let true_state = StateEnvelope::new(
+        Interval::new(
+            (state.reserve().lower() + mismatch.reserve_state_error).clamp(0.0, 1.0),
+            (state.reserve().upper() + mismatch.reserve_state_error).clamp(0.0, 1.0),
+        )?,
+        Interval::new(
+            (state.load().lower() + mismatch.load_state_error).clamp(0.0, 1.0),
+            (state.load().upper() + mismatch.load_state_error).clamp(0.0, 1.0),
+        )?,
+    )?;
+    let robust_state = enclose_action_specific_predicted_state(state, radii)?;
+    let point_certified = robustly_viable(state, point_effect, limits);
+    let robust_certified = robustly_viable(robust_state, robust_effect, limits);
+    let true_next = next_state_envelope(
+        true_state,
+        ActionEffectBounds::new(
+            Interval::point(true_effect.0)?,
+            Interval::point(true_effect.1)?,
+        )?,
+    )?;
+    let true_safe = true_next.reserve().lower() >= limits.min_reserve()
+        && true_next.load().upper() <= limits.max_load();
+    Some((point_certified, robust_certified, true_safe))
 }
 
 /// Compare nominal certification, robust certification, and true one-step safety.
