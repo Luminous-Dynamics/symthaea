@@ -141,6 +141,35 @@ A result can establish “improves over the strongest registered baseline on thi
 3. Add an informal research-proof track with blind grading of correctness, exposition and attribution; never mix those scores with Lean exact-target success.
 4. Only after comparable baseline reruns and an independent replication should the project make a broad SOTA claim.
 
+
+## 21 October 2026 update: formal infrastructure and the critic are separate frontiers
+
+Two useful benchmark lines expand the comparison surface beyond isolated proof completion.
+
+**AutoformBench — infrastructure construction, not just proof search.** Released 13 October 2026, it contains 341 Lean 4 formalization tasks from 24 advanced-mathematics sources, with human-formalized and audited targets; the solver must also construct missing definitions, intermediate lemmas and proof infrastructure ([benchmark report](https://ai.meta.com/research/publications/autoformbench-a-lean-formalization-benchmark-for-advanced-mathematics/)). This exposes a limitation of any transfer score that assumes the target's formal scaffolding already exists. PITB should keep its current exact-target task definition intact, then add a separately reported challenge stratum where a solver must build the formal context before the target proof can be checked.
+
+For that stratum, measure the full chain: intended-statement fidelity, definition/helper-lemma construction, final target proof, dependent-successor tests, and resource cost. Track whether the retrieved insight reduces the missing-infrastructure gap or merely helps after that gap has been manually removed. Count incomplete scaffolding as a failure/partial outcome, not as a proof success. Audit provenance, licensing and task eligibility before adapting external artifacts; don't assume that a benchmark page alone grants permission to republish its data.
+
+**FormalRewardBench — proof judgment, not theorem solving.** Its 250 Lean preference pairs include five curated error-injection strategies; the paper reports 59.8% for its best frontier LLM evaluator and 24.4% for specialized theorem-prover models in the studied setting ([paper](https://arxiv.org/abs/2605.10141)). These scores cannot be compared numerically with PITB. The key methodological lesson is to evaluate the *critic* independently: can it recognize when an insight's preconditions fail or a seemingly minor theorem mutation invalidates the move, even when the text remains plausible?
+
+### Updated benchmark architecture
+
+Use a benchmark ladder, not a single blended leaderboard:
+
+| Track | Capability under test | Required evidence |
+|---|---|---|
+| A. Retrieval/selectivity | Retrieve compatible strategies and reject hard negatives | Dual-reviewed labels, leakage-safe components, false-accept/false-reject/abstention and calibration |
+| B. Exact-target transfer | Does the strategy improve proof completion on the same target? | Paired arms, target-side kernel receipt, statement correspondence, dependent successors and mutations |
+| C. Infrastructure construction | Can it create missing definitions and supporting lemmas? | Vetted informal target, audited formal statement, complete helper-declaration trace, final proof and successor tests |
+| D. Proof criticism | Can it detect a strategically invalid move or a broken precondition? | Matched minimal counterfactual pairs, independent labels, error-class recall and false acceptance |
+| E. Repository / portability | Does it work in real dependency-rich projects or another prover? | Pinned project context, dependency closure, native checker, maintenance/regression tests and per-system semantic correspondence |
+
+Keep all five scores separate. AutoformBench informs Track C; FormalRewardBench informs the adversarial-pair methodology for Track D; neither is an apples-to-apples SOTA baseline for Track B. The strongest comparison remains a rerun of current retrieval/prover baselines on a common target set under matched context, checker and budget.
+
+**Immediate experiment after the integrity gate passes:** select a small, independently reviewed pilot from an eligible advanced-mathematics or repository task source; run full insight, surface-matched incompatible decoy, precondition ablation and no-insight control on identical targets; retain every missing-context, timeout and construction failure. First validate the complete receipt pipeline and token/accounting controls. Do not promote a pilot into a confirmatory or SOTA claim until component counts, power, leakage audit and the frozen analysis gate are satisfied.
+
+This is a new evaluation design and research hypothesis, not a measured PITB gain. No transfer result, AutoformBench score reproduction, or SOTA claim is implied.
+
 ## Research references
 
 - Kim, Han & Hwang, [Benchmarking Testing in Automated Theorem Proving](https://aclanthology.org/2026.acl-industry.150/), ACL 2026 Industry Track.
