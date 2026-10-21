@@ -1,12 +1,18 @@
 use std::error::Error;
+use std::mem::size_of;
+use std::time::Instant;
 
 use symthaea_core::hdc::pattern_interaction::{
     run_pattern_interaction_suite, PatternInteractionConfig,
 };
 
 fn main() -> Result<(), Box<dyn Error>> {
+    let started = Instant::now();
     let config = PatternInteractionConfig::default();
     let report = run_pattern_interaction_suite(0x4c45_5649_4e, &config)?;
+    let elapsed_ms = started.elapsed().as_millis();
+    let estimated_prototype_payload_bytes =
+        report.dimension * report.prototype_count * size_of::<i8>();
 
     println!("experiment,seed,dimension,prototypes,baseline");
     println!(
@@ -24,6 +30,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     );
     println!("sequence_order_similarity,{:.6}", report.sequence_order_similarity);
     println!("basis_equivariance_exact,{}", report.basis_equivariance_exact);
+    println!("run_elapsed_ms,{elapsed_ms}");
+    println!("pattern_storage_encoding,bipolar_i8");
+    println!("estimated_prototype_payload_bytes,{estimated_prototype_payload_bytes}");
+    println!("storage_estimate_excludes,Vec metadata and transient working allocations");
 
     println!();
     println!("noise_fraction,nearest_top1,nearest_margin,cleanup_top1,cleanup_margin");
