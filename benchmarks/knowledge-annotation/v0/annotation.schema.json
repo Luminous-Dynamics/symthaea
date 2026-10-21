@@ -1,0 +1,259 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/benchmarks/knowledge-annotation/v0/annotation.schema.json",
+  "title": "Knowledge Benchmark Annotation v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "annotation_id",
+    "case_id",
+    "answer_id",
+    "annotator_id",
+    "annotation_role",
+    "answerability",
+    "abstention_assessment",
+    "valid_alternatives",
+    "claim_annotations",
+    "review_status",
+    "reviewer_confidence",
+    "source_family_ids",
+    "notes"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "knowledge-annotation-v0"
+    },
+    "annotation_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "answer_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "annotator_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Pseudonymous annotator identifier; do not store personal names or contact details."
+    },
+    "annotation_role": {
+      "enum": [
+        "independent_reviewer",
+        "subject_expert",
+        "adjudicator",
+        "calibration_reviewer",
+        "synthetic_fixture"
+      ]
+    },
+    "answerability": {
+      "enum": [
+        "fully_answerable",
+        "partially_answerable",
+        "unanswerable_from_pack",
+        "not_assessable",
+        "rights_prohibited"
+      ]
+    },
+    "abstention_assessment": {
+      "enum": [
+        "appropriate",
+        "overabstention",
+        "underabstention",
+        "not_applicable"
+      ]
+    },
+    "valid_alternatives": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "alternative_id",
+          "summary",
+          "source_ids",
+          "interpretive_scope"
+        ],
+        "properties": {
+          "alternative_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "summary": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 1
+          },
+          "interpretive_scope": {
+            "type": "string",
+            "minLength": 1
+          },
+          "notes": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "claim_annotations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "claim_id",
+          "span",
+          "support_label",
+          "epistemic_lane",
+          "severity",
+          "failure_tags",
+          "evidence_refs",
+          "reviewer_confidence",
+          "notes"
+        ],
+        "properties": {
+          "claim_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "span": {
+            "type": "string",
+            "minLength": 1
+          },
+          "support_label": {
+            "enum": [
+              "supported",
+              "partially_supported",
+              "unsupported",
+              "contradicted",
+              "not_verifiable",
+              "source_mismatch"
+            ]
+          },
+          "epistemic_lane": {
+            "enum": [
+              "source_attested",
+              "tradition_internal",
+              "scholarly_interpretation",
+              "comparative_hypothesis",
+              "empirical_claim",
+              "procedural",
+              "unknown"
+            ]
+          },
+          "severity": {
+            "enum": [
+              "none",
+              "minor",
+              "major",
+              "release_blocker"
+            ]
+          },
+          "failure_tags": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "none",
+                "false_lineage",
+                "variant_fusion",
+                "universalization",
+                "fabricated_citation",
+                "sequence_causality_collapse",
+                "unsupported_confidence",
+                "ignored_counterevidence",
+                "rights_violation",
+                "wrong_source_witness",
+                "single_answer_collapse",
+                "cultural_projection",
+                "other"
+              ]
+            }
+          },
+          "evidence_refs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "source_id",
+                "locator"
+              ],
+              "properties": {
+                "source_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "locator": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              }
+            }
+          },
+          "model_confidence": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
+          },
+          "reviewer_confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "notes": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "review_status": {
+      "enum": [
+        "independent",
+        "adjudicated",
+        "requires_subject_expert",
+        "synthetic_only"
+      ]
+    },
+    "prior_annotation_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "reviewer_confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "source_family_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "disagreement_notes": {
+      "type": "string"
+    },
+    "notes": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}
