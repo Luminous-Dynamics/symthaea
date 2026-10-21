@@ -76,6 +76,9 @@ jobs:
             .count_summary.frozen_trace_count == 12 and
             .count_summary.mutation_case_count == 24 and
             .count_summary.planned_not_yet_executable_count == 3 and
+            .differential_oracle.status == "unit_test_added" and
+            ([.differential_oracle.implementation, .differential_oracle.coverage,
+              .differential_oracle.limits] | all(type == "string" and length > 0)) and
             (.cases | length) == .count_summary.case_count and
             ([.cases[].case_id] | length) == ([.cases[].case_id] | unique | length) and
             ([.cases[] | select(.evidence_status == "planned_not_yet_executable")] | length) ==
