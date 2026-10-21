@@ -439,6 +439,31 @@ mod tests {
     }
 
     #[test]
+    fn noise_sweep_preserves_marginal_entropy_but_erases_temporal_information() {
+        let probabilities = [0.0, 0.05, 0.10, 0.20, 0.35, 0.50];
+        let metrics: Vec<_> = probabilities
+            .iter()
+            .map(|noise| measure(&directed_ring(3, *noise)))
+            .collect();
+
+        for point in &metrics {
+            close(point.state_entropy_bits, 3.0, 1e-12);
+        }
+        close(metrics[0].transition_entropy_bits, 0.0, 1e-12);
+        close(metrics[0].mutual_information_bits, 3.0, 1e-12);
+        close(metrics[0].min_cut_sensitivity, 0.75, 1e-12);
+        close(metrics[5].transition_entropy_bits, 3.0, 1e-12);
+        close(metrics[5].mutual_information_bits, 0.0, 1e-12);
+        close(metrics[5].min_cut_sensitivity, 0.0, 1e-12);
+
+        for pair in metrics.windows(2) {
+            assert!(pair[1].transition_entropy_bits > pair[0].transition_entropy_bits);
+            assert!(pair[1].mutual_information_bits < pair[0].mutual_information_bits);
+            assert!(pair[1].min_cut_sensitivity < pair[0].min_cut_sensitivity);
+        }
+    }
+
+    #[test]
     fn noise_changes_dynamics_without_being_misreported_as_entropy_alone() {
         let clean = measure(&directed_ring(3, 0.0));
         let noisy = measure(&directed_ring(3, 0.2));
