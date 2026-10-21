@@ -304,10 +304,18 @@ fn audit_manifest_bytes(bytes: &[u8]) -> DecisionReceipt {
     if manifest.minimum_independent_units < 2 {
         validation_errors.push("minimum_independent_units_must_be_at_least_2".to_owned());
     }
-    let design_gate_passed = manifest.design != Design::UncontrolledPrePost;
+    let design_gate_passed = match (manifest.evidence_class, manifest.design) {
+        (EvidenceClass::SyntheticContractFixture, Design::SyntheticFixture) => true,
+        (
+            EvidenceClass::MeasuredProspective,
+            Design::BlockRandomized | Design::MatchedControl,
+        ) => true,
+        _ => false,
+    };
     if !design_gate_passed {
-        validation_errors
-            .push("uncontrolled_pre_post_design_cannot_pass_decision_value_gate".to_owned());
+        validation_errors.push(
+            "design_must_match_evidence_class_and_uncontrolled_pre_post_is_rejected".to_owned(),
+        );
     }
 
     let mut checks = Checks {
