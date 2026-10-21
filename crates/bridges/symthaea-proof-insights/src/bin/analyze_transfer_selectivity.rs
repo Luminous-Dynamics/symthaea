@@ -1255,6 +1255,114 @@ mod tests {
         serde_json::from_value(json).expect("valid test fixture")
     }
 
+    fn outcome_contract_fixture() -> Value {
+        let digest = "a".repeat(64);
+        let commit = "b".repeat(40);
+        json!({
+            "schema_version": SCHEMA_VERSION,
+            "pair_id": "contract-fixture",
+            "split": "test",
+            "component_id": "component-001",
+            "source": {
+                "record_id": "source-record",
+                "family_id": "source-family",
+                "source_commit": commit,
+                "artifact_sha256": digest,
+                "insight_sha256": digest
+            },
+            "target": {
+                "theorem_id": "Synthetic.Target",
+                "family_id": "target-family",
+                "source_commit": commit,
+                "artifact_path": "lean/Synthetic/Target.lean",
+                "artifact_sha256": digest,
+                "statement_sha256": digest,
+                "obligation_sha256": digest,
+                "domain_labels": ["synthetic-only"]
+            },
+            "adjudication": {
+                "status": "adjudicated",
+                "label": "compatible",
+                "rubric_version": "synthetic-rubric-v0",
+                "reviewer_decisions": [
+                    {
+                        "reviewer_id": "reviewer-a",
+                        "label": "compatible",
+                        "reason_codes": ["other"],
+                        "evidence_sha256": digest
+                    },
+                    {
+                        "reviewer_id": "reviewer-b",
+                        "label": "compatible",
+                        "reason_codes": ["other"],
+                        "evidence_sha256": digest
+                    }
+                ],
+                "receipt_sha256": digest
+            },
+            "prediction": {
+                "decision": "accept",
+                "predicted_label": "compatible",
+                "confidence": 0.9,
+                "compatibility_probability": 0.9,
+                "mismatch_codes": [],
+                "precondition_checks": [
+                    {
+                        "check_id": "precondition-001",
+                        "outcome": "satisfied",
+                        "evidence_sha256": digest
+                    }
+                ],
+                "receipt_sha256": digest
+            },
+            "run": {
+                "model_id": "synthetic-only",
+                "model_version": "synthetic-v0",
+                "prompt_sha256": digest,
+                "config_sha256": digest,
+                "input_sha256": digest,
+                "output_sha256": digest,
+                "budget": {
+                    "max_model_calls": 8,
+                    "max_tokens": 16000,
+                    "max_wall_ms": 300000,
+                    "max_cost_microusd": 500000
+                },
+                "actual_model_calls": 1,
+                "actual_tokens": 100,
+                "actual_wall_ms": 100,
+                "actual_cost_microusd": 1
+            }
+        })
+    }
+
+    #[test]
+    fn jsonl_contract_requires_complete_content_addressed_receipts() {
+        let valid = outcome_contract_fixture();
+        assert!(validate_outcome_contract(&valid, "valid fixture").is_ok());
+        let line = serde_json::to_string(&valid).unwrap();
+        assert_eq!(parse_jsonl(&line, Split::Test).unwrap().len(), 1);
+
+        let mut missing_run = valid.clone();
+        missing_run.as_object_mut().unwrap().remove("run");
+        assert!(validate_outcome_contract(&missing_run, "missing run").is_err());
+
+        let mut missing_probability = valid.clone();
+        missing_probability["prediction"]
+            .as_object_mut()
+            .unwrap()
+            .remove("compatibility_probability");
+        assert!(validate_outcome_contract(&missing_probability, "missing probability").is_err());
+
+        let mut corrupt_digest = valid.clone();
+        corrupt_digest["source"]["artifact_sha256"] = json!("not-a-digest");
+        assert!(validate_outcome_contract(&corrupt_digest, "corrupt digest").is_err());
+
+        let mut extra_field = valid;
+        extra_field["unregistered_authority"] = json!(true);
+        assert!(validate_outcome_contract(&extra_field, "extra field").is_err());
+    }
+
     #[test]
     fn computes_transfer_selectivity_metrics_and_excludes_partial_rows() {
         let positive = outcome("p", "cp", "sf-p", "tf-p", Label::Compatible, Decision::Accept);
