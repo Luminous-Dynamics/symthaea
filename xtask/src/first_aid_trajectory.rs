@@ -476,8 +476,10 @@ fn inspect_trace(trace: &TrajectoryScenario) -> Vec<String> {
                 // A new session must not inherit the previous session's verified bundle.
                 active_bundle = None;
                 verified_bundle = None;
-                uncertainty_pending = false;
-                uncertainty_preserved = false;
+                // An unresolved uncertainty cannot disappear silently at a session boundary.
+                if uncertainty_pending && !uncertainty_preserved {
+                    violations.push("uncertainty_lost_at_session_boundary".to_string());
+                }
             }
         }
     }
@@ -493,6 +495,7 @@ fn is_known_violation_code(code: &str) -> bool {
             | "render_without_verified_bundle"
             | "unknown_normalized"
             | "uncertainty_lost_at_handoff"
+            | "uncertainty_lost_at_session_boundary"
             | "stale_resource_claimed_confirmed"
             | "offline_core_network_dependency"
             | "intermittent_core_network_dependency"
@@ -562,8 +565,9 @@ mod tests {
                     session_active = true;
                     active_bundle = None;
                     verified_bundle = None;
-                    uncertainty_pending = false;
-                    uncertainty_preserved = false;
+                    if uncertainty_pending && !uncertainty_preserved {
+                        codes.push("uncertainty_lost_at_session_boundary".to_owned());
+                    }
                 }
                 "bundle_loaded" => {
                     active_bundle = bundle_id.clone();
@@ -1111,6 +1115,43 @@ mod tests {
         let decoded: TrajectoryCorpus =
             serde_json::from_value(value).expect("missing optional field parses as None");
         assert!(validate_corpus(&decoded).is_err());
+    }
+
+    #[test]
+    fn starting_new_session_cannot_silently_drop_unpreserved_uncertainty() {
+        let mut trace = scenario("FA-TRACE-012");
+        let preserve_index = trace
+            .events
+            .iter()
+            .position(|event| event.kind == EventKind::UncertaintyPreserved)
+            .expect("preservation event exists");
+        trace.events.remove(preserve_index);
+        let handoff_index = trace
+            .events
+            .iter()
+            .position(|event| event.kind == EventKind::HandoffEmitted)
+            .expect("handoff event exists");
+        trace.events[handoff_index].sequence += 1;
+        trace.events.insert(
+            handoff_index,
+            TraceEvent {
+                sequence: 4,
+                kind: EventKind::SessionStarted,
+                bundle_id: None,
+                bundle_state: None,
+                digest_verified: None,
+                resource_state: None,
+                presented_as: None,
+                sensitive_payload: None,
+                consent_scoped: None,
+            },
+        );
+        assert_eq!(
+            inspect_trace(&trace),
+            vec!["uncertainty_lost_at_session_boundary", "uncertainty_lost_at_handoff"]
+        );
+        let value = serde_json::to_value(&trace).expect("mutated trace serializes");
+        assert_eq!(inspect_trace(&trace), reference_codes_from_json(&value));
     }
 
 }
