@@ -110,8 +110,9 @@ We provide: (1) a formalized equity gap scoring methodology, (2) an open-source 
 ### 2.6 Implementation
 - Rust implementation (~900 LOC), AGPL-3.0 license
 - Module unit tests cover frequency/distribution arithmetic, equity flags, unsupported guideline and gene-mismatch abstention; execution status must be checked against the exact reviewed revision
-- Research-only API: `equity_analysis(drug, gene)`, `adjusted_recommendation(drug, gene, population_context, phenotype_context)`, `population_report(gene)`
-- **Not qualified for clinical decision support or individual prescribing.** The ancestry/population model is aggregate exploratory research, and the guideline projection returns `Indeterminate` when the exact drug/gene/phenotype tuple is unsupported.
+- Research-only API: `equity_analysis(drug, gene)`, `research_guideline_projection(drug, gene, population_context, phenotype_context)`, `population_report(gene)`
+- The guideline projection returns only reference metadata and aggregate equity context. Its type contains no dose, medication choice, contraindication, or treatment instruction; unsupported tuples return `Indeterminate`.
+- **Not qualified for clinical decision support or individual prescribing.** Population categories are not patient genotype evidence.
 
 ---
 
