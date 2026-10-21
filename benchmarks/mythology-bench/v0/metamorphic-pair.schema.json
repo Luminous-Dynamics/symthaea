@@ -65,6 +65,7 @@
             "tradition_scope",
             "counterevidence",
             "rights_status",
+            "access_decision",
             "alias",
             "source_text"
           ]
@@ -155,7 +156,8 @@
         "variant_id",
         "prompt",
         "rights_status",
-        "evidence_pack"
+        "evidence_pack",
+        "access_decision"
       ],
       "properties": {
         "context_id": {
@@ -252,6 +254,15 @@
         },
         "source_text": {
           "type": "string"
+        },
+        "access_decision": {
+          "enum": [
+            "synthetic_only",
+            "allow",
+            "deny",
+            "require_permission",
+            "metadata_only"
+          ]
         }
       }
     }
