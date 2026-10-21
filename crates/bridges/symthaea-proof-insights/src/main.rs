@@ -2709,16 +2709,13 @@ fn normalized_full_proof_body(block: &str) -> Result<String> {
     let normalized_block = normalize_lean_for_leakage(block);
     let normalized_prefix = normalize_lean_for_leakage(&statement_prefix);
     let mut boundaries = normalized_block.match_indices(&normalized_prefix);
-    let (_, _) = boundaries
+    let (prefix_start, matched_prefix) = boundaries
         .next()
         .context("source declaration prefix was not found after normalization")?;
     if boundaries.next().is_some() {
         bail!("source declaration prefix is ambiguous after normalization");
     }
-    let proof_start = normalized_block
-        .find(&normalized_prefix)
-        .context("source declaration prefix was not found after normalization")?
-        + normalized_prefix.len();
+    let proof_start = prefix_start + matched_prefix.len();
     let proof_region = normalized_block[proof_start..].split_whitespace().collect::<Vec<_>>();
     let mut proof_tokens = proof_region;
     loop {
