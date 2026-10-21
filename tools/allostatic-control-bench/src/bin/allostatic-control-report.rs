@@ -9,6 +9,7 @@ use std::env;
 use std::error::Error;
 use std::fs;
 use std::io::{self, ErrorKind};
+use allostatic_control_bench::{EPISODE_CSV_HEADER, HORIZON};
 
 #[derive(Clone, Debug)]
 struct Episode {
@@ -133,18 +134,26 @@ fn bootstrap_mean_ci(values: &[f64], seed: u64) -> (f64, f64) {
 fn parse_episodes(csv: &str) -> Result<BTreeMap<ConditionKey, EpisodesBySeed>, Box<dyn Error>> {
     let mut lines = csv.lines();
     let header_line = lines.next().ok_or_else(|| invalid_data("CSV is empty"))?;
-    let header: BTreeMap<String, usize> = header_line
-        .split(',')
+    if header_line != EPISODE_CSV_HEADER {
+        return Err(invalid_data("CSV header does not match the declared episode schema").into());
+    }
+    let header_fields: Vec<&str> = header_line.split(',').collect();
+    let header: BTreeMap<String, usize> = header_fields
+        .iter()
         .enumerate()
-        .map(|(index, name)| (name.to_string(), index))
+        .map(|(index, name)| ((*name).to_string(), index))
         .collect();
+    if header.len() != header_fields.len() {
+        return Err(invalid_data("CSV header contains duplicate column names").into());
+    }
 
     let required = [
         "scenario", "seed", "policy", "shielded", "task_reward",
         "cumulative_exposure", "unsafe_ticks", "unsafe_episode",
         "violation_exposure", "max_violation_severity", "minimum_reserve",
         "missed_limits", "shield_vetoes", "emergency_recover_steps",
-        "no_safe_action_ticks", "false_alarms", "failed",
+        "no_safe_action_ticks", "false_alarms", "false_alarm_opportunities", "push_steps",
+        "maintain_steps", "resource_cost", "recovery_steps", "failed",
     ];
     for name in required {
         column_index(&header, name)?;
@@ -156,7 +165,7 @@ fn parse_episodes(csv: &str) -> Result<BTreeMap<ConditionKey, EpisodesBySeed>, B
             continue;
         }
         let values: Vec<&str> = line.split(',').collect();
-        if values.len() != header_line.split(',').count() {
+        if values.len() != header_fields.len() {
             return Err(invalid_data(format!("CSV column count mismatch on line {}", line_index + 2)).into());
         }
         let scenario = cell(&values, &header, "scenario")?.to_string();
@@ -165,26 +174,75 @@ fn parse_episodes(csv: &str) -> Result<BTreeMap<ConditionKey, EpisodesBySeed>, B
         let seed: u64 = cell(&values, &header, "seed")?.parse()?;
         let unsafe_ticks = parse_usize(&values, &header, "unsafe_ticks")?;
         let unsafe_episode = parse_bool(&values, &header, "unsafe_episode")?;
+        let cumulative_load = parse_f64(&values, &header, "cumulative_exposure")?;
+        let mean_load = parse_f64(&values, &header, "mean_load")?;
+        let peak_load = parse_f64(&values, &header, "peak_load")?;
+        let violation_exposure = parse_f64(&values, &header, "violation_exposure")?;
+        let max_violation_severity = parse_f64(&values, &header, "max_violation_severity")?;
+        let minimum_reserve = parse_f64(&values, &header, "minimum_reserve")?;
+        let terminal_reserve = parse_f64(&values, &header, "terminal_reserve")?;
+        let terminal_load = parse_f64(&values, &header, "terminal_load")?;
+        let false_alarms = parse_usize(&values, &header, "false_alarms")?;
+        let false_alarm_opportunities = parse_usize(&values, &header, "false_alarm_opportunities")?;
+        let missed_limits = parse_usize(&values, &header, "missed_limits")?;
+        let shield_vetoes = parse_usize(&values, &header, "shield_vetoes")?;
+        let no_safe_action_ticks = parse_usize(&values, &header, "no_safe_action_ticks")?;
+        let push_steps = parse_usize(&values, &header, "push_steps")?;
+        let maintain_steps = parse_usize(&values, &header, "maintain_steps")?;
+        let emergency_recover_steps = parse_usize(&values, &header, "emergency_recover_steps")?;
+        let resource_cost = parse_f64(&values, &header, "resource_cost")?;
+        let recovery_text = cell(&values, &header, "recovery_steps")?;
         if unsafe_episode != (unsafe_ticks > 0) {
             return Err(invalid_data(format!(
                 "unsafe_episode disagrees with unsafe_ticks on line {}",
                 line_index + 2
             )).into());
         }
+        for (name, value) in [
+            ("mean_load", mean_load),
+            ("peak_load", peak_load),
+            ("minimum_reserve", minimum_reserve),
+            ("terminal_reserve", terminal_reserve),
+            ("terminal_load", terminal_load),
+            ("max_violation_severity", max_violation_severity),
+        ] {
+            if !(0.0..=1.0).contains(&value) {
+                return Err(invalid_data(format!("{name} outside declared [0,1] range on line {}", line_index + 2)).into());
+            }
+        }
+        if cumulative_load < 0.0 || violation_exposure < 0.0 || resource_cost < 0.0 {
+            return Err(invalid_data(format!("negative accumulated metric on line {}", line_index + 2)).into());
+        }
+        if unsafe_ticks > HORIZON
+            || false_alarms > false_alarm_opportunities
+            || false_alarm_opportunities > HORIZON
+            || missed_limits > HORIZON
+            || shield_vetoes > HORIZON
+            || no_safe_action_ticks > HORIZON
+            || push_steps + maintain_steps + emergency_recover_steps != HORIZON
+        {
+            return Err(invalid_data(format!("episode counters violate horizon/denominator contract on line {}", line_index + 2)).into());
+        }
+        if recovery_text != "NA" {
+            let recovery: usize = recovery_text.parse()?;
+            if recovery > HORIZON {
+                return Err(invalid_data(format!("recovery_steps outside horizon on line {}", line_index + 2)).into());
+            }
+        }
         let episode = Episode {
             task_reward: parse_f64(&values, &header, "task_reward")?,
-            cumulative_exposure: parse_f64(&values, &header, "cumulative_exposure")?,
+            cumulative_exposure: cumulative_load,
             unsafe_ticks,
             unsafe_episode,
-            violation_exposure: parse_f64(&values, &header, "violation_exposure")?,
-            max_violation_severity: parse_f64(&values, &header, "max_violation_severity")?,
-            minimum_reserve: parse_f64(&values, &header, "minimum_reserve")?,
-            missed_limits: parse_usize(&values, &header, "missed_limits")?,
-            shield_vetoes: parse_usize(&values, &header, "shield_vetoes")?,
-            no_safe_action_ticks: parse_usize(&values, &header, "no_safe_action_ticks")?,
-            emergency_recover_steps: parse_usize(&values, &header, "emergency_recover_steps")?,
-            false_alarms: parse_usize(&values, &header, "false_alarms")?,
-            false_alarm_opportunities: parse_usize(&values, &header, "false_alarm_opportunities")?,
+            violation_exposure,
+            max_violation_severity,
+            minimum_reserve,
+            missed_limits,
+            shield_vetoes,
+            no_safe_action_ticks,
+            emergency_recover_steps,
+            false_alarms,
+            false_alarm_opportunities,
             failed: parse_bool(&values, &header, "failed")?,
         };
         let group = groups.entry((scenario, policy, shielded)).or_default();
@@ -338,7 +396,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 mod tests {
     use super::*;
 
-    const SAMPLE_HEADER: &str = "scenario,seed,policy,shielded,task_reward,cumulative_exposure,mean_load,peak_load,minimum_reserve,terminal_reserve,terminal_load,unsafe_ticks,unsafe_episode,violation_exposure,max_violation_severity,missed_limits,shield_vetoes,no_safe_action_ticks,false_alarms,false_alarm_opportunities,push_steps,maintain_steps,emergency_recover_steps,resource_cost,failed,recovery_steps";
+    const SAMPLE_HEADER: &str = EPISODE_CSV_HEADER;
 
     const SAMPLE_ROW: &str = "calm,0,task_only,false,1.0,2.0,0.1,0.2,0.8,0.8,0.2,0,false,0.0,0.0,0,0,0,0,1,1,46,0,0.2,false,NA";
 
