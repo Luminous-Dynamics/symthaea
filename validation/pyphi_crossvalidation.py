@@ -509,6 +509,7 @@ class PyPhiValidator:
             numeric_pairs_complete
             and model_pairs_verified
             and stable_reference
+            and report.reference_formalism == "IIT_3_0"
             and report.correlation is not None
             and np.isfinite(report.correlation)
             and report.correlation > 0.90
