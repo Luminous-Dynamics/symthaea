@@ -40,7 +40,7 @@ Sources: `tools/allostatic-control-bench/src/robust_viability.rs`, `tools/allost
 
 - `Interval` rejects nonfinite and inverted ranges.
 - `calibrate_episode_radii` uses episode-level maximum residuals and Bonferroni-adjusts reserve-state, load-state, reserve-effect, and load-effect coverage to target simultaneous envelope coverage. Too few calibration episodes returns `None`; it never invents a finite radius.
-- `model_mismatch.rs` keeps the nominal and true transition models separate, builds residual scores over all candidate actions and stress levels, and compares point certification, robust certification, and realized safety. Its fixed synthetic profiles are falsification tests—not a calibrated real-world dynamics model.
+- `model_mismatch.rs` keeps the nominal and true transition models separate, builds residual scores over all candidate actions and stress levels, and compares point certification, robust certification, and realized safety. Its synthetic calibration panel combines one-axis extrema and mixed eight-coordinate perturbations; it is a software falsification panel, not an empirical calibration dataset or a calibrated real-world dynamics model.
 - `SafetyAvailabilityMetrics` reports candidate-action count, point/robust certifications, true-safe actions, false certifications, and false vetoes separately so a filter cannot look successful merely by rejecting every action.
 - `StateEnvelope` constrains reserve/load intervals to [0, 1].
 - `ActionEffectBounds` constrains one-step reserve/load deltas to [-1, 1].
@@ -68,7 +68,7 @@ These tests are authored but do not count as passing until the exact-head Rust q
 
 ## Qualification and comparison plan
 
-First qualify the interval arithmetic and action-set semantics in the existing dependency-free Rust crate. The new `model_mismatch.rs` now supplies the first deterministic true-versus-estimated model falsification cell. Extend it under issue #8243 with:
+First qualify the interval arithmetic and action-set semantics in the existing dependency-free Rust crate. The new `model_mismatch.rs` now supplies the first deterministic true-versus-estimated model falsification panel: zero error, both extrema of eight independent error coordinates, and mixed perturbation combinations. Extend it under issue #8243 with:
 
 - true transition dynamics and shield-estimated dynamics must be distinct values;
 - vary state-estimation width and action-effect uncertainty separately;
