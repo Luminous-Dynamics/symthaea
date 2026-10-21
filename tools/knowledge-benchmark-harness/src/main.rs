@@ -17,6 +17,7 @@ enum Kind {
     Claim,
     Pair,
     Source,
+    Annotation,
 }
 
 impl Kind {
@@ -27,8 +28,9 @@ impl Kind {
             "claim" => Ok(Self::Claim),
             "pair" => Ok(Self::Pair),
             "source" => Ok(Self::Source),
+            "annotation" => Ok(Self::Annotation),
             _ => Err(format!(
-                "unknown --kind {raw:?}; expected case, graph, claim, pair, or source"
+                "unknown --kind {raw:?}; expected case, graph, claim, pair, source, or annotation"
             )),
         }
     }
@@ -40,6 +42,7 @@ impl Kind {
             Self::Claim => "claim",
             Self::Pair => "pair",
             Self::Source => "source",
+            Self::Annotation => "annotation",
         }
     }
 }
@@ -82,7 +85,7 @@ struct Report {
 }
 
 fn usage() -> &'static str {
-    "Usage: knowledge-benchmark-harness --schema FILE --input JSONL --kind case|graph|claim|pair|source [--out FILE] [--subject-revision SHA]\n\nValidates local data only. It never fetches source URLs or remote schemas."
+    "Usage: knowledge-benchmark-harness --schema FILE --input JSONL --kind case|graph|claim|pair|source|annotation [--out FILE] [--subject-revision SHA]\n\nValidates local data only. It never fetches source URLs or remote schemas."
 }
 
 fn parse_args() -> Result<Config, String> {
@@ -300,6 +303,7 @@ fn record_identity(kind: Kind, value: &Value, line: usize) -> String {
         Kind::Case | Kind::Claim => "id",
         Kind::Pair => "pair_id",
         Kind::Source => "source_id",
+        Kind::Annotation => "annotation_id",
     };
     string_field(value, key)
         .map(str::to_string)
@@ -648,6 +652,121 @@ fn validate_source_contract(value: &Value, seen_ids: &mut HashSet<String>) -> Ve
     errors
 }
 
+fn validate_annotation_contract(annotation: &Value) -> Vec<String> {
+    let mut errors = Vec::new();
+    let answerability = string_field(annotation, "answerability").unwrap_or("");
+    let review_status = string_field(annotation, "review_status").unwrap_or("");
+    let annotation_role = string_field(annotation, "annotation_role").unwrap_or("");
+    let mut claim_ids = HashSet::new();
+    let claims = annotation
+        .get("claim_annotations")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+
+    for claim in &claims {
+        if let Some(claim_id) = string_field(claim, "claim_id") {
+            if !claim_ids.insert(claim_id.to_string()) {
+                errors.push(format!("duplicate claim annotation ID {claim_id:?}"));
+            }
+        }
+        let support_label = string_field(claim, "support_label").unwrap_or("");
+        let epistemic_lane = string_field(claim, "epistemic_lane").unwrap_or("");
+        let severity = string_field(claim, "severity").unwrap_or("");
+        let failure_tags = string_array(claim, "failure_tags");
+        let evidence_refs = claim
+            .get("evidence_refs")
+            .and_then(Value::as_array)
+            .cloned()
+            .unwrap_or_default();
+
+        if matches!(epistemic_lane, "source_attested" | "scholarly_interpretation")
+            && matches!(support_label, "supported" | "partially_supported")
+            && evidence_refs.is_empty()
+        {
+            errors.push(format!(
+                "claim {:?}: source-grounded positive label requires at least one evidence reference",
+                string_field(claim, "claim_id").unwrap_or("<missing>")
+            ));
+        }
+        if severity == "release_blocker"
+            && (failure_tags.is_empty()
+                || failure_tags.iter().any(|tag| tag == "none"))
+        {
+            errors.push(format!(
+                "claim {:?}: release_blocker requires explicit non-none failure tags",
+                string_field(claim, "claim_id").unwrap_or("<missing>")
+            ));
+        }
+        if failure_tags.iter().any(|tag| tag == "rights_violation")
+            && severity != "release_blocker"
+        {
+            errors.push(format!(
+                "claim {:?}: rights_violation must be a release_blocker",
+                string_field(claim, "claim_id").unwrap_or("<missing>")
+            ));
+        }
+        if failure_tags.iter().any(|tag| tag == "none") && failure_tags.len() > 1 {
+            errors.push(format!(
+                "claim {:?}: failure tag none cannot be combined with an error tag",
+                string_field(claim, "claim_id").unwrap_or("<missing>")
+            ));
+        }
+    }
+
+    let mut alternative_ids = HashSet::new();
+    let alternatives = annotation
+        .get("valid_alternatives")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    for alternative in &alternatives {
+        if let Some(alternative_id) = string_field(alternative, "alternative_id") {
+            if !alternative_ids.insert(alternative_id.to_string()) {
+                errors.push(format!("duplicate alternative ID {alternative_id:?}"));
+            }
+        }
+        if string_array(alternative, "source_ids").is_empty() {
+            errors.push(format!(
+                "alternative {:?}: every accepted interpretation must cite at least one source ID",
+                string_field(alternative, "alternative_id").unwrap_or("<missing>")
+            ));
+        }
+    }
+
+    if matches!(annotation_role, "independent_reviewer" | "subject_expert" | "calibration_reviewer")
+        && review_status == "independent"
+        && !string_array(annotation, "prior_annotation_ids").is_empty()
+    {
+        errors.push(
+            "independent annotations must not cite prior annotation IDs; preserve blind review"
+                .into(),
+        );
+    }
+    if review_status == "adjudicated" && string_array(annotation, "prior_annotation_ids").len() < 2
+    {
+        errors.push(
+            "adjudicated annotations must retain at least two independent annotation IDs".into(),
+        );
+    }
+    if answerability == "rights_prohibited"
+        && string_field(annotation, "abstention_assessment") == Some("appropriate")
+        && (!claims.is_empty() || !alternatives.is_empty())
+    {
+        errors.push(
+            "an appropriate rights-prohibited abstention must not expose claim content or alternatives"
+                .into(),
+        );
+    }
+
+    let family_ids = string_array(annotation, "source_family_ids");
+    if family_ids.iter().collect::<HashSet<_>>().len() != family_ids.len() {
+        errors.push("duplicate source_family_id in annotation scope".into());
+    }
+
+    errors
+}
+
 fn validate_domain_contract(
     kind: Kind,
     value: &Value,
@@ -696,6 +815,7 @@ fn validate_domain_contract(
         Kind::Graph => errors.extend(validate_graph_contract(value)),
         Kind::Pair => errors.extend(validate_pair_contract(value)),
         Kind::Source => errors.extend(validate_source_contract(value, seen_ids)),
+        Kind::Annotation => errors.extend(validate_annotation_contract(value)),
     }
     errors
 }
