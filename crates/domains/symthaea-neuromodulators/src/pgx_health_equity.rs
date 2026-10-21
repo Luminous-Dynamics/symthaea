@@ -1282,7 +1282,7 @@ impl PgxHealthEquityEngine {
         for &anc in &ancestries {
             let dist = self.metabolizer_distribution(gene, anc);
 
-            // Adverse event risk: driven by PM (drug accumulation) + UM for prodrugs.
+            // Toxicity-oriented heuristic index; this is not an adverse-event probability.
             let pm_frac = dist
                 .get(&MetabolizerPhenotype::Poor)
                 .copied()
@@ -1292,7 +1292,7 @@ impl PgxHealthEquityEngine {
                 .copied()
                 .unwrap_or(0.0);
 
-            // For prodrugs (codeine, clopidogrel, tamoxifen), UM is dangerous; for others, PM is.
+            // Simplified class distinction for a heuristic score; not a validated clinical model.
             let is_prodrug = drug == "codeine" || drug == "clopidogrel" || drug == "tamoxifen";
             let adverse = if is_prodrug {
                 um_frac * 0.8 + pm_frac * 0.3
@@ -1300,14 +1300,14 @@ impl PgxHealthEquityEngine {
                 pm_frac * 0.8 + um_frac * 0.2
             };
 
-            // Efficacy risk: PM for prodrugs (no activation), UM for active drugs (sub-therapeutic).
+            // Efficacy-oriented heuristic index; not a treatment-failure probability.
             let efficacy_heuristic_index = if is_prodrug {
                 pm_frac * 0.9
             } else {
                 um_frac * 0.7 + pm_frac * 0.3
             };
 
-            // Guideline applicability: penalize populations far from European distributions.
+            // Reference-vector similarity only; it does not measure guideline applicability.
             let eur_dist = self.metabolizer_distribution(gene, AncestryGroup::European);
             let dist_divergence: f64 = dist
                 .iter()
@@ -1336,12 +1336,12 @@ impl PgxHealthEquityEngine {
             );
         }
 
-        // Equity gap: maximum inter-population variance in combined risk.
+        // Model-score spread across population labels; not a validated inequity or harm measure.
         let adverse_range = max_adverse - min_adverse;
         let efficacy_range = max_efficacy_heuristic_index - min_efficacy_heuristic_index;
         let model_gap_score = ((adverse_range + efficacy_range) / 2.0).clamp(0.0, 1.0);
 
-        // Flag underserved populations.
+        // Flag labels crossing prototype thresholds; this does not establish clinical underservice.
         let underserved: Vec<AncestryGroup> = population_profiles
             .iter()
             .filter(|(anc, risk)| {
@@ -1352,7 +1352,7 @@ impl PgxHealthEquityEngine {
             .map(|(anc, _)| *anc)
             .collect();
 
-        let recommendation = if underserved.is_empty() {
+        let research_note = if underserved.is_empty() {
             format!(
                 "{}/{}: No population label crossed the prototype's current heuristic thresholds. This is not a clinical equity or guideline-applicability finding.",
                 drug, gene
@@ -1370,8 +1370,7 @@ impl PgxHealthEquityEngine {
                 })
                 .collect();
             format!(
-                "{}/{}: Equity gap {:.2}. Underserved populations: {}. \
-                 This aggregate result is not an individual dose, monitoring, or treatment recommendation.",
+                "{}/{}: Prototype model score {:.2}; labels crossing heuristic thresholds: {}. Exploratory aggregate output only; not a clinical risk or treatment recommendation.",
                 drug,
                 gene,
                 model_gap_score,
@@ -1385,7 +1384,7 @@ impl PgxHealthEquityEngine {
             population_profiles,
             model_gap_score,
             model_flagged_populations: underserved,
-            research_note: recommendation,
+            research_note,
         }
     }
 
