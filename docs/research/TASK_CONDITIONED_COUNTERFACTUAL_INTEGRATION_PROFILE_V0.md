@@ -1,0 +1,183 @@
+# Task-Conditioned Counterfactual Integration Profile (TCCIP), v0
+
+**Status:** Candidate research proposal. This is not an established metric, not evidence of novelty, not an IIT substitute, and not a consciousness measure. Its definitions and predictions are deliberately falsifiable. Do not promote a single scalar to production until the fixture suite discriminates it from simpler baselines.
+
+## Executive proposal
+
+Symthaea should investigate a measure aimed at a different question from IIT Φ:
+
+> Given a declared task and environment distribution, do cross-component causal interactions make a measurable, reproducible contribution to competent behavior—and how does that contribution trade off against fragility and recovery?
+
+IIT asks a theory-specific question about intrinsic cause-effect structure. Entropy measures uncertainty; mutual information measures dependence under a distribution; graph/spectral measures describe connectivity. None should be relabeled as task competence. This candidate makes **task performance under counterfactual interventions** the outcome and reports integration, baseline capability, robustness, and recovery as a profile.
+
+The working name is **Task-Conditioned Counterfactual Integration Profile (TCCIP)**. The name is provisional and makes no priority or novelty claim. The research contribution, if it survives tests, would be the operational definition plus matched intervention controls and the evidence protocol—not merely attaching a new label to edge ablation.
+
+## Why investigate this alongside Φ?
+
+A high integration value need not imply that a system performs a useful task well. Conversely, a modular system with redundancy may lose little utility after one cross-component link is cut, despite relying on rich coordination under harder interventions. Those are different questions.
+
+We should retain formal IIT calculations as a separate comparison where relevant. A task-oriented metric must not claim to replace IIT on IIT's own theoretical target. It can be better for an engineering question only if the benchmark demonstrates that it predicts or diagnoses the engineering outcome better.
+
+## Operational setup
+
+Before evaluating a candidate system, specify and version:
+
+- a causal transition model or an independently supported intervention interface;
+- components and cross-component links, with the partition chosen independently of evaluation outcomes or frozen on a discovery split;
+- task/environment distribution \(\mathcal D\), initial-state distribution, random seeds, and evaluation horizon;
+- bounded task utility \(J\in[0,1]\), or a documented normalization for another utility scale;
+- admissible edge/component interventions and their costs;
+- a matched-control generator for sham/random interventions;
+- a held-out environment split and an uncertainty procedure.
+
+If the causal graph or intervention semantics are unknown, report that limitation and do not silently treat correlation or ordinary feature masking as a causal intervention.
+
+## Candidate quantity: cross-component counterfactual task contribution
+
+Let \(M\) be the system, \(\mathcal D\) the frozen task/environment distribution, and \(J(M;\mathcal D)\) its expected task utility under a declared rollout protocol.
+
+For an intervention set \(C\), define the task loss:
+
+\[
+L(C)=J(M;\mathcal D)-J(M\mid do(C);\mathcal D).
+\]
+
+Here \(do(C)\) must name an executable intervention—for example, replace selected cross-component messages by a predeclared null signal while keeping all other execution rules fixed. “Remove an edge” is insufficient unless the affected transition probabilities, timing, and downstream behavior are specified.
+
+For cut budget / intervention stratum \(k\), draw interventions from two frozen distributions:
+
+- \(\mathcal C^{cross}_k\): cross-component causal cuts;
+- \(\mathcal C^{matched}_k\): sham or control interventions matched on intervention count/cost, node/edge degree where possible, target interface, and intervention mechanism, but not selected for task outcomes.
+
+Define the candidate contrast:
+
+\[
+\operatorname{TCCIP}_k =
+\mathbb E_{C\sim\mathcal C^{cross}_k}[L(C)]
+-
+\mathbb E_{C'\sim\mathcal C^{matched}_k}[L(C')].
+\]
+
+With utility bounded to [0,1], this contrast lies in [-1, 1]. Positive values mean the chosen cross-component cuts damage task utility more than matched controls; near zero means no detected excess effect under this design; negative values mean those cuts are less harmful than the controls or even improve performance. Negative values are valid results and must not be clamped to zero.
+
+**Important:** this is a contrast in task effect, not a pure property of topology. It is conditional on task, environment, intervention semantics, partition, rollout horizon, and control distribution. Report those alongside the contrast. If matching is poor, report the mismatch and treat the estimate as exploratory.
+
+## Do not reduce the profile to one number
+
+The proposed output vector should include:
+
+1. **Intact competence:** \(J_0=J(M;\mathcal D)\). Prevents “integrated but useless” systems from ranking well.
+2. **Counterfactual contribution curve:** \(\operatorname{TCCIP}_k\) for multiple intervention budgets/cut strata.
+3. **Worst-case utility:** minimum or a declared lower quantile of task utility over admissible interventions at cost \(k\), with the search procedure reported.
+4. **Redundancy/recoverability:** task utility after one or more independent paths are removed, and utility after an explicit repair/recovery protocol.
+5. **Distribution-shift stability:** the same profile on held-out environments, state priors, noise levels, and task variants.
+6. **Uncertainty and execution cost:** confidence interval / bootstrap procedure, number of independent seeds and environments, runtime, memory, and intervention-evaluation budget.
+
+These dimensions can conflict. A tightly coupled controller can have a strong positive TCCIP curve and poor fault tolerance. A modular redundant system may have low single-cut loss and higher multi-cut resilience. Neither should be declared universally superior. Publish the vector and Pareto frontier; use a composite only for a named decision with pre-registered weights and sensitivity analysis.
+
+## Hypotheses that would make this worth keeping
+
+- **H1: task relevance.** Cross-component interactions that are irrelevant to the evaluated task yield TCCIP near zero after matched controls, even if graph connectivity is high.
+- **H2: useful coordination.** When a task genuinely requires coordination across a frozen component boundary, cross-component cuts cause larger utility loss than matched controls, giving positive TCCIP.
+- **H3: synergy.** Tasks with XOR-like or other joint-input requirements exhibit a different cut-response profile from systems whose task inputs act independently. We must compare against well-defined PID/SURD or conditional-information baselines rather than infer synergy from a positive cut score alone.
+- **H4: confounding resistance.** An observational common-driver fixture does not receive false cross-component causal credit when interventions sever only a non-causal association.
+- **H5: redundancy.** Duplicate, independently sufficient paths can preserve utility after single cuts, while coordinated multi-cut interventions may reveal dependence. The profile should show this difference without equating resilience with absence of integration.
+- **H6: harmful coordination.** If cross-component interactions degrade task utility, TCCIP can be negative. This is a feature, not a failure of sign convention.
+- **H7: transfer.** A profile estimated on the discovery environments predicts intervention-induced utility degradation in frozen held-out environments better than graph density, spectral connectivity, entropy, raw MI, and pairwise-only baselines.
+
+A result that fails any hypothesis should narrow the claim and possibly reject this candidate. Do not adjust definitions after inspecting held-out results.
+
+## Minimal adversarial fixture suite
+
+| Fixture | What it tests | Required result/property |
+|---|---|---|
+| Independent noise / irrelevant cross-links | Connected graph versus task relevance | Graph density may rise while task-conditioned contribution remains near zero |
+| Cross-component XOR task | Joint dependence | Cross-boundary cuts should damage utility more than properly matched controls |
+| Common driver / collider | Correlation versus intervention | Avoid attributing the driver's shared variation to a direct cross-component edge |
+| Useful coordination | Task-relevant communication | Positive contribution on the predeclared task distribution |
+| Harmful coupling | Bad coordination | Negative contribution is retained and correctly interpreted |
+| Redundant dual path | Resilience versus dependence | One-cut utility remains high; multi-cut curve exposes joint reliance |
+| Edge-count/degree-matched sham cuts | Generic damage control | Contrast is not driven only by cutting more/high-degree edges |
+| Prior and environment shift | Generalization | Report the full degradation curve and uncertainty; no evaluation-set retuning |
+| No-op intervention | Instrumentation validity | Zero effect up to numerical tolerance |
+| Randomized/disconnected negative control | False-positive control | No unexplained positive task-causal credit |
+| Node/label permutation | Representation dependence | Invariant results remain invariant, if the intervention/task mapping is permuted consistently |
+| Unequal rollout/runtime budget | Measurement confound | Reject comparisons with materially unequal budget or normalize prospectively |
+
+For stochastic systems, repeat across independently generated environment/rollout seeds. Do not count timesteps from one trajectory as independent experimental replicates.
+
+## Baselines that must be beaten or complemented
+
+1. **Task-only baseline:** intact task utility and task utility after generic resource degradation. TCCIP must explain something beyond task success itself.
+2. **Edge ablation / causal effect baseline:** unadjusted cross-cut task loss. The matched-control contrast must improve interpretation, not merely add complexity.
+3. **Graph density, degree, spectral connectivity:** structural baselines.
+4. **Entropy, mutual information, conditional mutual information, transfer entropy:** information/predictive baselines.
+5. **PID / SURD or another explicitly specified information decomposition:** where the fixture supports a well-defined comparison.
+6. **Effective information / causal-emergence baselines:** where transition models, interventions, and state distributions satisfy their assumptions.
+7. **PyPhi under a pinned named IIT formalism:** a separate reference track, not a task-utility gold standard.
+8. **Ablation-matched randomized control:** tests whether the proposed quantity adds anything over a simpler intervention experiment.
+
+Do not compare numbers across incompatible units and call the largest the winner. Compare each method on the outcome it claims to predict, using held-out systems and preregistered evaluation.
+
+## Qualification gates
+
+**Gate 0 — executable semantics**
+- A complete public definition of each intervention and task rollout.
+- Utility normalization, intervention/control sampling, partition, prior, and horizon frozen in a versioned manifest.
+- Reproducible results from fixed seeds; exact model, task and intervention digests in receipts.
+
+**Gate 1 — implementation correctness**
+- A deterministic toy fixture with an analytically calculable task-utility difference.
+- No-op invariance and consistent node-label permutation.
+- Matched-control tests with deliberately mismatched controls rejected or marked unqualified.
+- Uncertainty intervals verified on simulated nulls; false-positive rate assessed over independent generated systems, not just one handpicked topology.
+
+**Gate 2 — construct validity**
+- H1–H6 tested on a preregistered synthetic fixture set.
+- TCCIP compared with the simpler unadjusted cut-loss and all baselines above that apply.
+- Ablation and null controls show that positive values do not arise merely from dense graphs, high-degree components, common drivers, or generic damage.
+
+**Gate 3 — held-out predictive validity**
+- Freeze the method and thresholds using the discovery split.
+- Test the association between the precomputed profile and realized utility degradation on unseen dynamics and environment families.
+- Report performance with uncertainty, failed/ambiguous cases and calibration. A correlation is not enough; compare predictive errors and calibration against baselines.
+
+**Gate 4 — useful deployment**
+- On a real Symthaea control or planning task, show that the profile helps select a more reliable architecture, identify harmful coupling, or allocate testing/repair effort compared with simpler baselines.
+- Measure task performance, compute overhead, fault tolerance and transfer under a fixed budget.
+- Until this gate passes, the metric remains research-only and must not affect production control or any consciousness-related output.
+
+## Why it may fail
+
+- Task utility may be the right engineering target, but a poor substitute for intrinsic integration.
+- TCCIP depends on task selection; adversarial reward shaping can reverse rankings.
+- Partitions and matched controls may be ambiguous or impossible to construct fairly.
+- Edge-cut results can be artifacts of the chosen null-signal or simulator, not a stable system property.
+- Redundancy may hide integration under single cuts and appear only under compound interventions.
+- A complicated matched-control protocol may not outperform the simpler causal-ablation curve enough to justify its costs.
+
+These are testable reasons to reject or narrow the proposal, not caveats to bury after favorable results.
+
+## Relationship to prior work and novelty boundary
+
+Relevant prior families already include effective information and causal emergence, information-geometric causal integration (including Φ_CIS/Φ_CII), partial information decomposition, and SURD's synergistic/unique/redundant decomposition of causality. Recent state-aware causal-inference work also emphasizes that causal influence can depend on the specific system state.
+
+This proposal is therefore **not claimed to be the first causal integration metric**. Its candidate distinction is the task-utility estimand plus matched counterfactual cut controls, explicit resilience/recovery dimensions, and a fail-closed benchmark receipt. A literature review and implementation comparison must establish whether that combination adds a measurable capability before claiming novelty.
+
+References for the first research pass:
+- Tononi & Sporns, “Measuring information integration” (2003): https://pmc.ncbi.nlm.nih.gov/articles/PMC331407/
+- Langer & Ay, “Complexity as Causal Information Integration” (2020): https://arxiv.org/abs/2008.11430
+- Martínez-Sánchez et al., “Decomposing causality into its synergistic, unique, and redundant components” (SURD, 2024): https://www.nature.com/articles/s41467-024-53373-4
+- “Observational causality by states and interaction type for scientific discovery” (2025): https://www.nature.com/articles/s42005-025-02447-w
+- PyPhi formalism differences: https://pyphi.readthedocs.io/en/latest/theory/formalism-versions.html
+
+## Immediate implementation plan
+
+1. Add a declarative task-and-intervention fixture format; keep task, model, environment and prior identities separate.
+2. Implement a tiny dependency-free evaluator for finite-state toy tasks, with intact, cross-cut and matched-control rollouts.
+3. Publish raw per-intervention task outcomes rather than only aggregate TCCIP.
+4. Test the adversarial matrix and compare with unadjusted cut-loss plus simple graph/information baselines.
+5. Only after the synthetic gates pass, connect a real Symthaea task and evaluate on held-out environments.
+6. Keep the feature research-only until external review and evidence support a specific engineering use.
+
+**Current evidence status:** specification only. No implementation accuracy, novel-metric claim, IIT correspondence, consciousness inference, SOTA result, or passing test is asserted.
