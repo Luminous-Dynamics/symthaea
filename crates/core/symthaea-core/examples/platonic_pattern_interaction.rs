@@ -21,6 +21,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let elapsed_ms = started.elapsed().as_millis();
     let estimated_prototype_payload_bytes =
         report.dimension * report.prototype_count * size_of::<i8>();
+    let estimated_hrr_candidate_payload_bytes =
+        hrr_report.dimension * hrr_report.candidate_count * size_of::<f64>();
 
     println!("experiment,seed,dimension,prototypes,baseline");
     println!(
@@ -40,8 +42,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("basis_equivariance_exact,{}", report.basis_equivariance_exact);
     println!("run_elapsed_ms,{elapsed_ms}");
     println!("pattern_storage_encoding,bipolar_i8");
-    println!("estimated_prototype_payload_bytes,{estimated_prototype_payload_bytes}");
+    println!("estimated_map_candidate_payload_bytes,{estimated_prototype_payload_bytes}");
+    println!("hrr_storage_encoding,f64");
+    println!("estimated_hrr_candidate_payload_bytes,{estimated_hrr_candidate_payload_bytes}");
     println!("storage_estimate_excludes,Vec metadata and transient working allocations");
+    println!("capacity_comparison,matched dimension but not matched payload bytes");
 
     println!();
     println!(
