@@ -43,6 +43,7 @@ jobs:
           }
 
           test -s "$GITHUB_WORKSPACE/$BOARD_REL"
+          cp "$GITHUB_WORKSPACE/$BOARD_REL" "$OUT_HOST/continuity-coupon.kicad_pcb"
           kicad version > "$OUT_HOST/kicad-version.txt"
           grep -q "9.0.9" "$OUT_HOST/kicad-version.txt"
 
@@ -154,15 +155,91 @@ jobs:
           grep -qx '%' "$OUT_HOST/drill/continuity-coupon.drl"
           grep -q '^T1C1\.000$' "$OUT_HOST/drill/continuity-coupon.drl"
 
-          board_sha=$(sha256sum "$GITHUB_WORKSPACE/$BOARD_REL" | cut -d ' ' -f 1)
+          board_sha=$(sha256sum "$OUT_HOST/continuity-coupon.kicad_pcb" | cut -d ' ' -f 1)
           git_head=$(git rev-parse HEAD)
           image_digest="sha256:cef4a572df1465b98fa63cdac88780e0f8d39f03c5493434802bcd92f62123fb"
           kicad_version=$(cat "$OUT_HOST/kicad-version.txt")
+
+          # Materialize a structured CAM manifest. Every file is opened and
+          # hashed after generation; roles and paths are explicit and unique.
+          artifact_entries_json="$(
+            while IFS= read -r -d '' file; do
+              relative="${file#"$OUT_HOST/"}"
+              case "$relative" in
+                continuity-coupon.kicad_pcb) role=native_board ;;
+                continuity-coupon-shorted.kicad_pcb) role=negative_control_board ;;
+                kicad-version.txt) role=tool_version ;;
+                clean-drc.json) role=clean_drc_report ;;
+                clean-drc-repeat.json) role=clean_drc_repeat_report ;;
+                shorted-drc.json) role=shorted_drc_report ;;
+                gerbers/continuity-coupon-F_Cu.gbr) role=gerber_f_cu ;;
+                gerbers/continuity-coupon-B_Cu.gbr) role=gerber_b_cu ;;
+                gerbers/continuity-coupon-F_Mask.gbr) role=gerber_f_mask ;;
+                gerbers/continuity-coupon-B_Mask.gbr) role=gerber_b_mask ;;
+                gerbers/continuity-coupon-F_Silkscreen.gbr) role=gerber_f_silkscreen ;;
+                gerbers/continuity-coupon-Edge_Cuts.gbr) role=gerber_edge_cuts ;;
+                gerbers-repeat/continuity-coupon-F_Cu.gbr) role=repeated_gerber_f_cu ;;
+                gerbers-repeat/continuity-coupon-B_Cu.gbr) role=repeated_gerber_b_cu ;;
+                gerbers-repeat/continuity-coupon-F_Mask.gbr) role=repeated_gerber_f_mask ;;
+                gerbers-repeat/continuity-coupon-B_Mask.gbr) role=repeated_gerber_b_mask ;;
+                gerbers-repeat/continuity-coupon-F_Silkscreen.gbr) role=repeated_gerber_f_silkscreen ;;
+                gerbers-repeat/continuity-coupon-Edge_Cuts.gbr) role=repeated_gerber_edge_cuts ;;
+                drill/continuity-coupon.drl) role=excellon_drill ;;
+                drill-repeat/continuity-coupon.drl) role=repeated_excellon_drill ;;
+                *) echo "unclassified CAM artifact: $relative" >&2; exit 42 ;;
+              esac
+              digest=$(sha256sum "$file" | cut -d ' ' -f 1)
+              byte_len=$(wc -c < "$file" | tr -d '[:space:]')
+              jq -cn --arg path "$relative" --arg role "$role" --arg sha256 "$digest" \
+                --argjson byte_len "$byte_len" \
+                '{path:$path,role:$role,byte_len:$byte_len,sha256:$sha256}'
+            done < <(find "$OUT_HOST" -type f -print0 | sort -z) | jq -s 'sort_by(.path)'
+          )"
+
+          jq -n -S \
+            --arg schema "atomfab-native-cam-artifact-manifest-v0.1" \
+            --arg git_head "$git_head" \
+            --arg board_path "$BOARD_REL" \
+            --arg board_sha256 "$board_sha" \
+            --arg image_digest "$image_digest" \
+            --arg kicad_version "$kicad_version" \
+            --argjson artifacts "$artifact_entries_json" \
+            '{
+              schema: $schema,
+              git_head: $git_head,
+              board_path: $board_path,
+              board_sha256: $board_sha256,
+              tool: {
+                image: "kicad/kicad@sha256:cef4a572df1465b98fa63cdac88780e0f8d39f03c5493434802bcd92f62123fb",
+                image_digest: $image_digest,
+                version_output: $kicad_version
+              },
+              artifacts: $artifacts,
+              artifact_count: ($artifacts | length),
+              authority: "native_eda_input_report_and_export_inventory_only_no_physical_or_production_release_authority",
+              claim_ceiling: "Manifest binds actual source/report/export bytes; it does not prove physical board conformity, electrical safety, assembly quality, or product qualification."
+            }' > "$OUT_HOST/artifact-manifest.json"
+
+          jq -e --arg head "$git_head" --arg board_sha "$board_sha" '
+            .schema == "atomfab-native-cam-artifact-manifest-v0.1"
+            and .git_head == $head
+            and .board_sha256 == $board_sha
+            and .artifact_count == 20
+            and (.artifacts | length) == 20
+            and ([.artifacts[].path] | unique | length) == 20
+            and ([.artifacts[].role] | unique | length) == 20
+            and all(.artifacts[]; (.byte_len > 0) and (.sha256 | test("^[0-9a-f]{64}$")))
+            and .tool.image_digest == "sha256:cef4a572df1465b98fa63cdac88780e0f8d39f03c5493434802bcd92f62123fb"
+          ' "$OUT_HOST/artifact-manifest.json" > /dev/null
+          manifest_sha=$(sha256sum "$OUT_HOST/artifact-manifest.json" | cut -d ' ' -f 1)
+
           jq -n \
             --arg schema "atomfab-kicad-cli-smoke-receipt-v0.1" \
             --arg git_head "$git_head" \
             --arg board_path "$BOARD_REL" \
             --arg board_sha256 "$board_sha" \
+            --arg artifact_manifest_sha256 "$manifest_sha" \
+            --argjson artifact_count "$(jq '.artifact_count' "$OUT_HOST/artifact-manifest.json")" \
             --arg image "$IMAGE" \
             --arg image_digest "$image_digest" \
             --arg kicad_version "$kicad_version" \
@@ -175,6 +252,11 @@ jobs:
               git_head: $git_head,
               board_path: $board_path,
               board_sha256: $board_sha256,
+              artifact_manifest: {
+                path: "artifact-manifest.json",
+                sha256: $artifact_manifest_sha256,
+                artifact_count: $artifact_count
+              },
               tool: {
                 image: $image,
                 pinned_image_digest: $image_digest,
@@ -209,6 +291,8 @@ jobs:
             "$OUT_HOST/clean-drc.json" \
             "$OUT_HOST/clean-drc-repeat.json" \
             "$OUT_HOST/shorted-drc.json" \
+            "$OUT_HOST/continuity-coupon.kicad_pcb" \
+            "$OUT_HOST/artifact-manifest.json" \
             "$OUT_HOST"/gerbers/* \
             "$OUT_HOST"/gerbers-repeat/* \
             "$OUT_HOST"/drill/* \
