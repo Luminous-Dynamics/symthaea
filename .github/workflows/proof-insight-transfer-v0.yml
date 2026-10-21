@@ -868,6 +868,27 @@ jobs:
           out.write_text("".join(json.dumps(row, sort_keys=True) + "\n" for row in rows))
           print(f"PITB_TRANSFER_SELECTIVITY_FIXTURE: rows={len(rows)} path={out}")
           PY
+          "$RUNNER_TEMP/jsonschema-venv/bin/python" - "$RUNNER_TEMP/pitb-transfer-selectivity-synthetic.jsonl" "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/transfer-selectivity-outcome.schema.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+          from jsonschema import Draft202012Validator, FormatChecker
+
+          outcomes_path, schema_path = map(Path, sys.argv[1:])
+          schema = json.loads(schema_path.read_text())
+          Draft202012Validator.check_schema(schema)
+          validator = Draft202012Validator(schema, format_checker=FormatChecker())
+          rows = [json.loads(line) for line in outcomes_path.read_text().splitlines() if line.strip()]
+          if len(rows) != 42:
+              raise SystemExit(f"expected exactly 42 synthetic outcome rows, found {len(rows)}")
+          for index, row in enumerate(rows, start=1):
+              validator.validate(row)
+              if row["split"] != "test":
+                  raise SystemExit(f"synthetic analyzer row {index} has a non-test split")
+          if len({row["pair_id"] for row in rows}) != len(rows):
+              raise SystemExit("synthetic analyzer fixture contains duplicate pair IDs")
+          print(f"PITB_TRANSFER_SELECTIVITY_INPUT_SCHEMA_PASS: {len(rows)} analyzer input rows conform to Draft 2020-12")
+          PY
           report="$RUNNER_TEMP/pitb-transfer-selectivity-synthetic-report.json"
           cargo run --locked --bin analyze_transfer_selectivity -- "$RUNNER_TEMP/pitb-transfer-selectivity-synthetic.jsonl" test "$report" 1000 20261021
           python - "$report" <<'PY'
