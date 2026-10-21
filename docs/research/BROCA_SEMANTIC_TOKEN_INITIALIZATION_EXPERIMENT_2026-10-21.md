@@ -52,6 +52,8 @@ The benchmark trains each arm independently with the same training split, epoch 
 
 The phrase split is intentionally small. It validates the experimental wiring and can reveal obvious regressions; it is **not** sufficient to establish SOTA, broad semantic fidelity, or robust statistical generalization.
 
+For repeatable smoke runs, `broca_fusion_bench --json-out report.json` emits a versioned JSON receipt with the evidence level, evaluation mode, vocabulary size, train/held-out pair counts, SHA-256 digests of the serialized fixtures, epochs per arm, and per-arm evaluation metrics. Set `GIT_COMMIT_SHA=$(git rev-parse HEAD)` in the build environment to include the exact source revision. The receipt remains explicitly labelled `smoke`; it is not a substitute for a larger sealed corpus or external comparison.
+
 ## Proposed evaluation ladder
 
 ### Gate A — implementation invariants
