@@ -1079,27 +1079,44 @@ mod tests {
     }
 
     #[test]
-    fn fixed_sequence_stops_at_first_uncertified_candidate() {
-        let samples = (0..512)
-            .map(|index| ScoredQuery {
-                best_similarity: if index < 400 { 0.9 } else { 0.48 },
-                top_two_margin: if index < 400 { 0.2 } else { 0.01 },
-                correct: index < 400,
-                kind: if index < 400 {
-                    QueryKind::Known { noise_index: 0 }
-                } else {
-                    QueryKind::AmbiguousMixture
-                },
-            })
-            .collect::<Vec<_>>();
+    fn fixed_sequence_stops_before_a_later_safe_nonmonotone_threshold() {
+        // Strict candidates accept 400 correct examples. At threshold 0.60,
+        // 50 errors enter and the risk certificate fails. At the final 0.45
+        // candidate, 2,000 additional correct examples dilute the observed
+        // error rate enough to pass again. Fixed-sequence CIC must nevertheless
+        // stop at the first failure rather than selecting that later point.
+        let mut samples = Vec::with_capacity(2_450);
+        samples.extend((0..400).map(|_| ScoredQuery {
+            best_similarity: 0.9,
+            top_two_margin: 0.2,
+            correct: true,
+            kind: QueryKind::Known { noise_index: 0 },
+        }));
+        samples.extend((0..50).map(|_| ScoredQuery {
+            best_similarity: 0.6,
+            top_two_margin: 0.1,
+            correct: false,
+            kind: QueryKind::AmbiguousMixture,
+        }));
+        samples.extend((0..2_000).map(|_| ScoredQuery {
+            best_similarity: 0.45,
+            top_two_margin: 0.05,
+            correct: true,
+            kind: QueryKind::Known { noise_index: 1 },
+        }));
+
+        let candidates = fixed_sequence_candidates(CalibrationMode::ScoreOnly);
         let result = calibrate_fixed_sequence_rule(&samples, CalibrationMode::ScoreOnly);
         assert!(result.certified_prefix_len > 0);
-        assert!(result.stopped_at_index.is_some());
-        assert_eq!(
-            result.selected_candidate_index,
-            Some(result.certified_prefix_len - 1)
-        );
+        assert_eq!(result.stopped_at_index, Some(5));
+        assert_eq!(result.selected_candidate_index, Some(4));
         assert!(result.certificate.passed);
+
+        let later_certificate = certify_rule(&samples, *candidates.last().expect("candidate grid"));
+        assert!(
+            later_certificate.passed,
+            "the final candidate should be safe, but fixed-sequence testing must stop earlier"
+        );
     }
 
     #[test]
