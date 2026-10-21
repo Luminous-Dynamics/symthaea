@@ -119,6 +119,20 @@ Freeze negative fixtures before running the model. Include (where meaningful): t
 
 The gate should reject **100% of this finite, versioned fixture suite** before a benchmark run is accepted. This is a finite test-suite requirement, not a claim of 100% semantic correctness on arbitrary mathematics. Each fixture has an expected failure code, and each observed result must be stored with a receipt/hash.
 
+## Transfer-selectivity secondary track
+
+This track evaluates whether the typed transfer gate distinguishes genuinely reusable strategies from superficially similar but incompatible targets. It is **secondary** to the primary exact-target solve comparison: a good rejection score cannot compensate for failing to improve verified target solves, and a high solve score cannot conceal unsafe transfer judgments.
+
+Construct source-insight/target-obligation pairs with labels assigned before any model or retrieval output is inspected. Two independent reviewers classify each pair as `compatible`, `incompatible`, `partial`, or `unknown`; preserve both labels and adjudication. If disagreement remains unresolved, retain `unknown` rather than forcing a binary ground truth. Each label must cite the source proof move, target obligation, required preconditions, and a concrete reason code.
+
+The pair set must contain both compatible positive controls and incompatible negatives. Include hard negatives with high lexical or topical overlap, not only obvious out-of-domain pairs. Cover at least: missing preconditions, object/domain mismatch, reversed inequality direction, predicate mismatch, changed quantifier scope, unavailable target premise, and irrelevant near-neighbour. Keep the existing finite mutation suite as an integrity gate; 100% rejection of that finite suite is not a population-level false-accept estimate.
+
+Prevent family leakage in this track separately from the theorem-solve split: a source insight may not appear in more than one partition, and source/target family edges must not cross partitions. If the transfer-pair graph has connected components that make this impossible under the intended split, keep each whole component in one partition and use those components—not individual pairs—as the independent statistical units. Report raw pair counts, source-family counts, target-family counts, component counts, unknown labels, and all exclusions.
+
+For every pair, the system must emit one of `accept`, `reject`, or `abstain`, plus specific precondition checks and mismatch codes. Report (a) false-accept rate among adjudicated incompatible pairs, (b) recall among compatible pairs, (c) false-reject rate, (d) abstention and accepted coverage, and (e) selective risk as coverage varies. If the system emits calibrated probabilities, also report a proper scoring rule and a reliability plot; do not infer calibration from cosine similarity or uncalibrated model confidence.
+
+Proposed transfer-gate adoption targets are: reject every item in the frozen finite negative-control suite; at least 90% point recall on compatible held-out positive controls; and at least 20 independent pair-graph components in each of the compatible and incompatible classes before any confirmatory transfer-selectivity claim. Report component-clustered 95% intervals for rates. These are conservative project-specific targets, not achieved results or a substitute for power analysis. If the sample-size floor is unmet, report a pilot and extend the independently adjudicated pair set without tuning against the held-out labels.
+
 ## 8. Go / no-go decisions
 
 **Proceed to a larger study** only when the indexer reproduces the frozen split, source/statement fingerprints and proof-audit receipts match, the schema validates with an independent JSON Schema implementation, and the mutation suite passes.
