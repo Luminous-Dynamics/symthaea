@@ -174,6 +174,8 @@ pub enum SimulationError {
     NonFiniteInitialState {
         index: usize,
     },
+    /// A zero-dimensional system has no state to integrate.
+    ZeroStateDimension,
     InvalidIntegratorStateDimension {
         step: usize,
         expected: usize,
@@ -250,6 +252,9 @@ pub fn try_simulate(
     }
 
     let expected_dim = system.state_dim();
+    if expected_dim == 0 {
+        return Err(SimulationError::ZeroStateDimension);
+    }
     if initial_state.len() != expected_dim {
         return Err(SimulationError::StateDimensionMismatch {
             expected: expected_dim,
@@ -515,8 +520,10 @@ impl Rk45Tolerances {
     }
 
     fn validate(&self, dimension: usize) -> Result<(), SimulationError> {
-        if dimension == 0
-            || !self.relative.is_finite()
+        if dimension == 0 {
+            return Err(SimulationError::ZeroStateDimension);
+        }
+        if !self.relative.is_finite()
             || self.relative < 0.0
             || self.absolute.len() != dimension
             || self
@@ -740,6 +747,9 @@ impl Rk45Integrator {
             return Err(SimulationError::InvalidTimeStep);
         }
         let expected_dim = system.state_dim();
+        if expected_dim == 0 {
+            return Err(SimulationError::ZeroStateDimension);
+        }
         if state.len() != expected_dim {
             return Err(SimulationError::StateDimensionMismatch {
                 expected: expected_dim,
@@ -903,6 +913,9 @@ impl Rk45Integrator {
     ) -> Result<(Vec<f64>, f64, f64), SimulationError> {
         self.validate()?;
         let expected_dim = system.state_dim();
+        if expected_dim == 0 {
+            return Err(SimulationError::ZeroStateDimension);
+        }
         if state.len() != expected_dim {
             return Err(SimulationError::StateDimensionMismatch {
                 expected: expected_dim,
@@ -976,6 +989,9 @@ impl Rk45Integrator {
         }
 
         let expected_dim = system.state_dim();
+        if expected_dim == 0 {
+            return Err(SimulationError::ZeroStateDimension);
+        }
         if initial_state.len() != expected_dim {
             return Err(SimulationError::StateDimensionMismatch {
                 expected: expected_dim,
@@ -2589,6 +2605,46 @@ mod tests {
                 Err(SimulationError::InvalidRk45Tolerances)
             );
         }
+    }
+
+    struct ZeroDimensionalSystem;
+
+    impl DynamicalSystem for ZeroDimensionalSystem {
+        fn state_dim(&self) -> usize {
+            0
+        }
+
+        fn derivatives(&self, _state: &[f64], _t: f64) -> Vec<f64> {
+            Vec::new()
+        }
+
+        fn name(&self) -> &str {
+            "ZeroDimensionalSystem"
+        }
+    }
+
+    #[test]
+    fn checked_simulation_rejects_zero_dimensional_systems() {
+        let system = ZeroDimensionalSystem;
+        let integrator = Rk45Integrator::new(1e-8);
+        assert_eq!(
+            try_simulate(&system, &Rk4Integrator, &[], 0.0, 1.0, 0.1),
+            Err(SimulationError::ZeroStateDimension)
+        );
+        assert_eq!(
+            integrator.try_adaptive_step(&system, &[], 0.0, 0.1),
+            Err(SimulationError::ZeroStateDimension)
+        );
+        assert_eq!(
+            integrator.try_adaptive_step_with_tolerances(
+                &system,
+                &[],
+                0.0,
+                0.1,
+                &Rk45Tolerances::new(1e-6, Vec::new()),
+            ),
+            Err(SimulationError::ZeroStateDimension)
+        );
     }
 
     #[test]
