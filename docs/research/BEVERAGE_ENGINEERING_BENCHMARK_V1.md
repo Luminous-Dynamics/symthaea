@@ -89,6 +89,36 @@ Primary split rules:
 
 Random row splits may be reported only as a diagnostic comparison, never as the primary evidence for generalization.
 
+## Executable split-leakage and time-cutoff audit
+
+The split policy now has a separate fail-closed Rust audit at `tools/beverage-benchmark-harness/src/bin/split_leakage_audit.rs`. This addresses an important failure mode in fermentation ML: correlated rows or time windows can make random splits look excellent without showing transfer to a new experimental unit. The recent batch-aware fermentation benchmark and the 2026 food-bioprocess review both emphasize batch-level partitioning and external validation rather than relying on within-data accuracy alone.
+
+The checked-in manifest and schema are:
+
+- `docs/research/beverage-split-manifest-v1.schema.json`
+- `docs/research/beverage-split-manifest-synthetic-v1.json`
+
+For every record, the manifest declares a unique sample ID, experimental-unit group ID, split, latest feature-availability time, prediction cutoff and target-observation time. The auditor requires:
+- every declared group remains within exactly one of train, validation and test;
+- no duplicated sample IDs;
+- every feature was available at or before its prediction cutoff;
+- the target is observed strictly after that cutoff;
+- at least two declared groups in each of train, validation and test;
+- a 64-character lowercase SHA-256 digest declaration, with all metadata and time-coordinate fields present.
+
+Example invocation:
+
+```bash
+cargo test --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin split_leakage_audit
+cargo run --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin split_leakage_audit -- \
+  --input docs/research/beverage-split-manifest-synthetic-v1.json \
+  --out /tmp/beverage-split-receipt.json
+```
+
+The focused workflow separately validates this manifest/schema pair with the pinned Draft 2020-12 schema auditor, runs the synthetic positive and negative controls, and runs Clippy with warnings denied. Its receipt binds the exact manifest bytes and reports the declared counts and violations. The synthetic fixture is not a beverage dataset.
+
+**Critical limit:** group IDs and the dataset digest are caller-declared. The tool cannot prove a group ID corresponds to a genuinely independent biological fermentation unit, authenticate source bytes from the digest string alone, or detect derived duplicates that have different sample IDs unless their lineage is supplied. The study design must justify group identity. In particular, technical replicate labels and repeated timepoints must not be promoted to independent batches. Passing this audit establishes manifest integrity only; it does not qualify model performance, calibration, transfer, sensory quality, food safety or process improvement.
+
 ## 5. Required comparators
 
 Every forecast task with suitable inputs should compare:
