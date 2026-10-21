@@ -62,6 +62,7 @@ struct BootstrapPlan {
     seed: u64,
     confidence_level: f64,
     multiple_comparison_correction: String,
+    minimum_independent_clusters: usize,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -187,6 +188,7 @@ struct PairwiseComparison {
     source_family_cluster_count: usize,
     bootstrap_replicates: usize,
     bootstrap_seed: u64,
+    minimum_independent_clusters: usize,
     multiple_comparison_correction: String,
     candidate_improvement_supported: bool,
 }
@@ -431,6 +433,9 @@ fn validate_plan_eligibility(plan: &Plan) -> Result<(), String> {
 
     if plan.bootstrap.replicates < 1_000 || plan.bootstrap.replicates > 100_000 {
         return Err("bootstrap replicates must be between 1000 and 100000".into());
+    }
+    if plan.bootstrap.minimum_independent_clusters < 20 {
+        return Err("minimum_independent_clusters must be at least 20".into());
     }
     if !(plan.bootstrap.confidence_level > 0.5 && plan.bootstrap.confidence_level < 1.0) {
         return Err("bootstrap confidence_level must be in (0.5, 1.0)".into());
@@ -851,6 +856,15 @@ fn compute_pairwise_comparisons(
 ) -> Result<Vec<PairwiseComparison>, String> {
     if clusters.is_empty() {
         return Err("cannot compare systems without source-family clusters".into());
+    }
+    if plan.phase == "preregistered_held_out"
+        && clusters.len() < plan.bootstrap.minimum_independent_clusters
+    {
+        return Err(format!(
+            "held-out inference requires at least {} independent source-family clusters; found {}",
+            plan.bootstrap.minimum_independent_clusters,
+            clusters.len()
+        ));
     }
     let mut observations_by_system: HashMap<&str, HashMap<&str, &Observation>> = HashMap::new();
     for observation in observations {
@@ -1452,6 +1466,7 @@ fn run() -> Result<(), String> {
         source_pack_sha256: actual_source_pack_sha256,
         bootstrap_replicates: plan.bootstrap.replicates,
         bootstrap_seed: plan.bootstrap.seed,
+        minimum_independent_clusters: plan.bootstrap.minimum_independent_clusters,
         confidence_level: plan.bootstrap.confidence_level,
         source_family_cluster_count,
         pair_count,
@@ -1543,7 +1558,7 @@ mod tests {
             "synthetic_only":true,
             "primary_endpoint":"paired_intervention_fidelity",
             "candidate_system_id":"s2",
-            "bootstrap":{"replicates":2000,"seed":7,"confidence_level":0.95,"multiple_comparison_correction":"bonferroni"},
+            "bootstrap":{"replicates":2000,"seed":7,"confidence_level":0.95,"multiple_comparison_correction":"bonferroni","minimum_independent_clusters":20},
             "benchmark":{
                 "split":"synthetic",
                 "source_family_disjoint":true,
@@ -1723,6 +1738,15 @@ mod tests {
         )
         .unwrap_err();
         assert!(error.contains("does not match pair"));
+    }
+
+    #[test]
+    fn held_out_inference_rejects_too_few_independent_clusters() {
+        let mut plan = fixture_plan();
+        plan.phase = "preregistered_held_out".into();
+        let error = compute_pairwise_comparisons(&plan, &[], &[], &[vec![0]])
+            .unwrap_err();
+        assert!(error.contains("at least 20 independent source-family clusters"));
     }
 
     #[test]
