@@ -1267,6 +1267,61 @@ mod tests {
     }
 
     #[test]
+    fn contradiction_resolution_requires_adjudication_and_runs_once() {
+        let mut graph = EnhancedKnowledgeGraph::new(100);
+        let positive_context = make_claim_context(
+            "witness-a",
+            "family-a",
+            "evidence-a",
+            "rise",
+            ClaimPolarity::Positive,
+            Some(1),
+        );
+        let negative_context = make_claim_context(
+            "witness-b",
+            "family-b",
+            "evidence-b",
+            "rise",
+            ClaimPolarity::Negative,
+            Some(1),
+        );
+        let (positive_id, _) = graph
+            .insert_grounded(
+                make_encoding("oil prices rose", 0.8),
+                1,
+                None,
+                false,
+                positive_context,
+            )
+            .unwrap();
+        let mut negative_encoding = make_encoding("oil prices did not rise", 0.6);
+        negative_encoding.vector = graph
+            .get_fact(positive_id)
+            .unwrap()
+            .encoding
+            .vector
+            .clone();
+        let (negative_id, candidates) = graph
+            .insert_grounded(negative_encoding, 2, None, false, negative_context)
+            .unwrap();
+        assert_eq!(candidates.len(), 1);
+        assert_eq!(graph.resolve_contradictions(&candidates), 0);
+        assert_eq!(graph.get_fact(negative_id).unwrap().confidence, 0.6);
+
+        graph
+            .adjudicate_contradiction(
+                &candidates[0],
+                vec!["evidence-a".into(), "evidence-b".into()],
+                "Both source claims address the same scoped proposition with opposite polarity".into(),
+            )
+            .unwrap();
+        assert_eq!(graph.resolve_contradictions(&candidates), 1);
+        assert!((graph.get_fact(negative_id).unwrap().confidence - 0.3).abs() < f32::EPSILON);
+        assert_eq!(graph.resolve_contradictions(&candidates), 0);
+        assert!((graph.get_fact(negative_id).unwrap().confidence - 0.3).abs() < f32::EPSILON);
+    }
+
+    #[test]
     fn test_domain_search() {
         let mut graph = EnhancedKnowledgeGraph::new(100);
 
