@@ -51,3 +51,6 @@ Observed exact-head experiment on `f49ccec0bc8db0a4ed5a1ba23f9e2de6af13acc0`:
 - Gerber replay exposed creation-time metadata (`%TF.CreationDate` and a generated-by KiCad date comment), so raw Gerber bytes differed across valid runs even though geometry output was expected to match.
 
 The next run now changes the GND trace into a continuous crossover through the VCC trace, asserts a KiCad `shorting_items` violation and zero unconnected items, and compares the normalized DRC/export payload after excluding only documented time fields. Original reports/exports are still retained and raw-file SHA-256 checksums still include those timestamps. We do **not** claim raw output bytes are identical when KiCad intentionally writes wall-clock metadata; the repeatability target is identical design/export payload plus separately hashed provenance-bearing files.
+
+
+The native-output gate now verifies each expected layer file explicitly: `F_Cu`, `B_Cu`, `F_Mask`, `B_Mask`, `F_Silkscreen` and `Edge_Cuts`, alongside `continuity-coupon.drl` with an Excellon `M48` header and drill tool declaration. This avoids counting six unrelated nonempty files as equivalent to a complete fabrication set.
