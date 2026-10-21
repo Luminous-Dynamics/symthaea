@@ -423,9 +423,18 @@ mod tests {
             point_and_robust_vs_true(state(), Action::Push, 0.5, held_out, radii, limits())
                 .expect("valid test contracts");
 
-        assert!(point_certified, "point shield should demonstrate the false positive");
-        assert!(!robust_certified, "calibrated shield should reject the action");
-        assert!(!true_safe, "the held-out true transition should violate constraints");
+        assert!(
+            point_certified,
+            "point shield should demonstrate the false positive"
+        );
+        assert!(
+            !robust_certified,
+            "calibrated shield should reject the action"
+        );
+        assert!(
+            !true_safe,
+            "the held-out true transition should violate constraints"
+        );
     }
 
     #[test]
