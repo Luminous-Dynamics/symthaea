@@ -92,8 +92,7 @@ fn hex_sha256(bytes: &[u8]) -> String {
     let digest = Sha256::digest(bytes);
     let mut output = String::with_capacity(64);
     for byte in digest {
-        write!(&mut output, "{byte:02x}")
-            .expect("writing to a String cannot fail");
+        write!(&mut output, "{byte:02x}").expect("writing to a String cannot fail");
     }
     output
 }
@@ -172,12 +171,9 @@ fn audit_manifest_bytes(bytes: &[u8]) -> SplitAuditReceipt {
     if !clean_required_value(&manifest.time_coordinate) {
         validation_errors.push("invalid_time_coordinate".to_owned());
     }
-    let dataset_sha256_format_valid =
-        digest_is_lower_hex_sha256(&manifest.dataset_sha256);
+    let dataset_sha256_format_valid = digest_is_lower_hex_sha256(&manifest.dataset_sha256);
     if !dataset_sha256_format_valid {
-        validation_errors.push(
-            "dataset_sha256_must_be_64_lowercase_hex_characters".to_owned(),
-        );
+        validation_errors.push("dataset_sha256_must_be_64_lowercase_hex_characters".to_owned());
     }
 
     let mut records_per_split = empty_split_counts();
@@ -217,8 +213,7 @@ fn audit_manifest_bytes(bytes: &[u8]) -> SplitAuditReceipt {
                 }
                 Some(_) => {}
                 None => {
-                    group_assignments
-                        .insert(record.group_id.clone(), record.split);
+                    group_assignments.insert(record.group_id.clone(), record.split);
                 }
             }
         }
@@ -227,10 +222,7 @@ fn audit_manifest_bytes(bytes: &[u8]) -> SplitAuditReceipt {
             || !record.prediction_cutoff_time.is_finite()
             || !record.target_observed_time.is_finite()
         {
-            validation_errors.push(format!(
-                "non_finite_time_value:{}",
-                record.sample_id
-            ));
+            validation_errors.push(format!("non_finite_time_value:{}", record.sample_id));
             continue;
         }
 
@@ -251,17 +243,13 @@ fn audit_manifest_bytes(bytes: &[u8]) -> SplitAuditReceipt {
         .into_iter()
         .all(|split| records_per_split.get(&split).copied().unwrap_or(0) > 0);
     if !required_splits_present {
-        validation_errors
-            .push("train_validation_test_splits_are_all_required".to_owned());
+        validation_errors.push("train_validation_test_splits_are_all_required".to_owned());
     }
 
     let minimum_group_count_met =
         manifest.minimum_groups_per_split >= MINIMUM_REQUIRED_GROUPS
         && Split::ALL.into_iter().all(|split| {
-            declared_groups_per_split
-                .get(&split)
-                .copied()
-                .unwrap_or(0)
+            declared_groups_per_split.get(&split).copied().unwrap_or(0)
                 >= manifest.minimum_groups_per_split
         });
     if manifest.minimum_groups_per_split < MINIMUM_REQUIRED_GROUPS {
@@ -272,10 +260,7 @@ fn audit_manifest_bytes(bytes: &[u8]) -> SplitAuditReceipt {
     let groups_below_minimum = Split::ALL
         .into_iter()
         .filter(|split| {
-            declared_groups_per_split
-                .get(split)
-                .copied()
-                .unwrap_or(0)
+            declared_groups_per_split.get(split).copied().unwrap_or(0)
                 < manifest.minimum_groups_per_split
         })
         .map(|split| format!("{split:?}"))
@@ -293,23 +278,15 @@ fn audit_manifest_bytes(bytes: &[u8]) -> SplitAuditReceipt {
     }
     let group_assignments_isolated = groups_crossing_splits.is_empty();
     if !group_assignments_isolated {
-        validation_errors.push(
-            "group_ids_cross_train_validation_test_boundaries".to_owned(),
-        );
+        validation_errors.push("group_ids_cross_train_validation_test_boundaries".to_owned());
     }
-    let features_respect_prediction_cutoff =
-        post_cutoff_feature_records.is_empty();
+    let features_respect_prediction_cutoff = post_cutoff_feature_records.is_empty();
     if !features_respect_prediction_cutoff {
-        validation_errors.push(
-            "features_available_after_prediction_cutoff_detected".to_owned(),
-        );
+        validation_errors.push("features_available_after_prediction_cutoff_detected".to_owned());
     }
-    let targets_observed_after_prediction_cutoff =
-        non_future_target_records.is_empty();
+    let targets_observed_after_prediction_cutoff = non_future_target_records.is_empty();
     if !targets_observed_after_prediction_cutoff {
-        validation_errors.push(
-            "target_not_strictly_after_prediction_cutoff_detected".to_owned(),
-        );
+        validation_errors.push("target_not_strictly_after_prediction_cutoff_detected".to_owned());
     }
 
     let passed = validation_errors.is_empty()
@@ -343,12 +320,8 @@ fn audit_manifest_bytes(bytes: &[u8]) -> SplitAuditReceipt {
         minimum_group_count_met,
         duplicate_sample_ids: duplicate_sample_ids.into_iter().collect(),
         groups_crossing_splits: groups_crossing_splits.into_iter().collect(),
-        post_cutoff_feature_records: post_cutoff_feature_records
-            .into_iter()
-            .collect(),
-        non_future_target_records: non_future_target_records
-            .into_iter()
-            .collect(),
+        post_cutoff_feature_records: post_cutoff_feature_records.into_iter().collect(),
+        non_future_target_records: non_future_target_records.into_iter().collect(),
         groups_below_minimum,
         validation_errors,
         claim_ceiling: CLAIM_CEILING,
@@ -379,14 +352,13 @@ fn parse_args() -> Result<(PathBuf, PathBuf), String> {
 
 fn run() -> Result<ExitCode, String> {
     let (input_path, output_path) = parse_args()?;
-    let input_bytes = fs::read(&input_path)
-        .map_err(|error| format!("manifest_read_failed:{error}"))?;
+    let input_bytes =
+        fs::read(&input_path).map_err(|error| format!("manifest_read_failed:{error}"))?;
     let receipt = audit_manifest_bytes(&input_bytes);
     let passed = receipt.status == "PASS";
     let serialized = serde_json::to_vec_pretty(&receipt)
         .map_err(|error| format!("receipt_serialization_failed:{error}"))?;
-    fs::write(&output_path, serialized)
-        .map_err(|error| format!("receipt_write_failed:{error}"))?;
+    fs::write(&output_path, serialized).map_err(|error| format!("receipt_write_failed:{error}"))?;
     if passed {
         Ok(ExitCode::SUCCESS)
     } else {
@@ -413,13 +385,11 @@ mod tests {
         include_bytes!("../../../../docs/research/beverage-split-manifest-synthetic-v1.json");
 
     fn fixture_value() -> Value {
-        serde_json::from_slice(FIXTURE)
-            .expect("checked-in fixture must be valid JSON")
+        serde_json::from_slice(FIXTURE).expect("checked-in fixture must be valid JSON")
     }
 
     fn audit_value(value: Value) -> SplitAuditReceipt {
-        let bytes = serde_json::to_vec(&value)
-            .expect("test fixture serialization must succeed");
+        let bytes = serde_json::to_vec(&value).expect("test fixture serialization must succeed");
         audit_manifest_bytes(&bytes)
     }
 
@@ -501,9 +471,10 @@ mod tests {
     #[test]
     fn missing_validation_split_fails() {
         let mut value = fixture_value();
-        value["records"].as_array_mut().unwrap().retain(|record| {
-            record["split"].as_str() != Some("validation")
-        });
+        value["records"]
+            .as_array_mut()
+            .unwrap()
+            .retain(|record| record["split"].as_str() != Some("validation"));
         let receipt = audit_value(value);
         assert_eq!(receipt.status, "FAIL");
         assert!(!receipt.required_splits_present);
