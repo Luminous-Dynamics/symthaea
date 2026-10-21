@@ -30,12 +30,24 @@ fn main() -> ExitCode {
             return ExitCode::from(66);
         }
     };
-    let input_sha256 = format!("{:x}", Sha256::digest(&bytes));
+    let report = validate_bytes(&bytes);
+    match serde_json::to_string_pretty(&report) {
+        Ok(value) => println!("{value}"),
+        Err(error) => {
+            eprintln!("Could not serialize validation report: {error}");
+            return ExitCode::from(70);
+        }
+    }
+    if report["valid"].as_bool() == Some(true) { ExitCode::SUCCESS } else { ExitCode::from(2) }
+}
+
+fn validate_bytes(bytes: &[u8]) -> serde_json::Value {
+    let input_sha256 = format!("{:x}", Sha256::digest(bytes));
     let mut errors = Vec::new();
     if bytes.len() > MAX_INPUT_BYTES {
         errors.push(format!("input exceeds maximum of {MAX_INPUT_BYTES} bytes"));
     } else {
-        match serde_json::from_slice(&bytes) {
+        match serde_json::from_slice(bytes) {
             Ok(value) => {
                 if let Err(violations) = validate_review(&value) {
                     errors = violations;
@@ -45,23 +57,48 @@ fn main() -> ExitCode {
         }
     }
     let valid = errors.is_empty();
-    let report = json!({
+    json!({
         "report_schema": REPORT_SCHEMA,
         "schema_uri": REPORT_SCHEMA_URI,
         "review_schema": REVIEW_SCHEMA,
         "review_schema_uri": REVIEW_SCHEMA_URI,
         "input_sha256": input_sha256,
         "input_bytes": bytes.len(),
-        "valid": errors.is_empty(),
+        "valid": valid,
         "errors": errors,
         "interpretation_limit": "structural-policy-validation-does-not-prove-scientific-validity-or-impact"
-    });
-    match serde_json::to_string_pretty(&report) {
-        Ok(value) => println!("{value}"),
-        Err(error) => {
-            eprintln!("Could not serialize validation report: {error}");
-            return ExitCode::from(70);
-        }
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn canonical_unranked_fixture_produces_repeatable_valid_report() {
+        let bytes = include_bytes!("../../../../../fixtures/landscape/review-unranked-v0.json");
+        let first = validate_bytes(bytes);
+        let second = validate_bytes(bytes);
+        assert_eq!(first, second);
+        assert_eq!(first["valid"], true);
+        assert_eq!(first["report_schema"], REPORT_SCHEMA);
+        assert_eq!(first["schema_uri"], REPORT_SCHEMA_URI);
+        assert_eq!(first["errors"].as_array().unwrap().len(), 0);
     }
-    if valid { ExitCode::SUCCESS } else { ExitCode::from(2) }
+
+    #[test]
+    fn invalid_json_emits_deterministic_hashed_failure_report() {
+        let report = validate_bytes(b"{invalid json");
+        assert_eq!(report["valid"], false);
+        assert_eq!(report["input_sha256"].as_str().unwrap().len(), 64);
+        assert!(report["errors"][0].as_str().unwrap().contains("invalid JSON"));
+    }
+
+    #[test]
+    fn overlarge_input_is_rejected_before_parsing() {
+        let bytes = vec![b' '; MAX_INPUT_BYTES + 1];
+        let report = validate_bytes(&bytes);
+        assert_eq!(report["valid"], false);
+        assert!(report["errors"][0].as_str().unwrap().contains("exceeds maximum"));
+    }
 }
