@@ -6,6 +6,7 @@ on:
     paths:
       - ".github/workflows/levin-pattern-experiments.yml"
       - "crates/core/symthaea-core/src/hdc/pattern_interaction.rs"
+      - "crates/core/symthaea-core/src/hdc/hrr_baseline.rs"
       - "crates/core/symthaea-core/src/hdc/mod.rs"
       - "crates/core/symthaea-core/examples/platonic_pattern_interaction.rs"
       - "crates/core/symthaea-core/Cargo.toml"
