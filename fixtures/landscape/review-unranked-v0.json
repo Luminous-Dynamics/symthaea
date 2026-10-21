@@ -28,7 +28,7 @@
   "alternatives": [
     {
       "alternative_id": "baseline-canopy-water",
-      "snapshot_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "snapshot_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "scope": "site-parcel",
       "coordinate_frame_kind": "LOCAL_CARTESIAN_DRAWING_UNITS",
       "geometry_status": "schematic-design-intent",
