@@ -63,7 +63,33 @@ struct PairCase {
     dimension: String,
     expected_relation: String,
     criticality: String,
+    baseline: PairState,
+    mutated: PairState,
     acceptance: Acceptance,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct PairState {
+    source_id: String,
+    rights_status: String,
+    access_decision: String,
+    evidence_pack: Vec<PairEvidence>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct PairEvidence {
+    source_id: String,
+    kind: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct SourceRecord {
+    source_id: String,
+    source_family_id: String,
+    split: String,
+    rights_status: String,
+    content_access: String,
+    rights_review: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -352,6 +378,78 @@ fn validate_plan_eligibility(plan: &Plan) -> Result<(), String> {
             plan.primary_endpoint
         ));
     }
+    Ok(())
+}
+
+fn validate_real_pair_state(
+    pair_id: &str,
+    split: &str,
+    state_name: &str,
+    state: &PairState,
+    source_catalog: &HashMap<&str, &SourceRecord>,
+) -> Result<(), String> {
+    if !matches!(
+        state.access_decision.as_str(),
+        "allow" | "deny" | "require_permission" | "metadata_only"
+    ) {
+        return Err(format!(
+            "pair {pair_id:?} {state_name} has unsupported access_decision {:?}",
+            state.access_decision
+        ));
+    }
+    if state.access_decision != "allow" && !state.evidence_pack.is_empty() {
+        return Err(format!(
+            "pair {pair_id:?} {state_name} has a non-allow access decision but still exposes an evidence pack"
+        ));
+    }
+
+    let mut referenced_ids = HashSet::new();
+    referenced_ids.insert(state.source_id.as_str());
+    for evidence in &state.evidence_pack {
+        if matches!(evidence.kind.as_str(), "synthetic_control" | "metadata_only") {
+            return Err(format!(
+                "pair {pair_id:?} {state_name} uses inadmissible evidence kind {:?}",
+                evidence.kind
+            ));
+        }
+        referenced_ids.insert(evidence.source_id.as_str());
+    }
+
+    for source_id in referenced_ids {
+        let Some(source) = source_catalog.get(source_id) else {
+            return Err(format!(
+                "pair {pair_id:?} {state_name} references source {source_id:?} absent from catalog"
+            ));
+        };
+        if source.split != split {
+            return Err(format!(
+                "pair {pair_id:?} source {source_id:?} is in split {:?}, expected {:?}",
+                source.split, split
+            ));
+        }
+        if source.rights_review != "approved_limited_use"
+            || matches!(source.rights_status.as_str(), "unknown" | "restricted")
+            || !matches!(
+                source.content_access.as_str(),
+                "verified_open_content" | "permissioned_full_text"
+            )
+        {
+            return Err(format!(
+                "pair {pair_id:?} source {source_id:?} lacks approved content access"
+            ));
+        }
+    }
+
+    let primary_source = source_catalog
+        .get(state.source_id.as_str())
+        .expect("primary source ID was checked above");
+    if state.rights_status != primary_source.rights_status {
+        return Err(format!(
+            "pair {pair_id:?} {state_name} rights_status differs from catalog for source {:?}",
+            state.source_id
+        ));
+    }
+
     Ok(())
 }
 
