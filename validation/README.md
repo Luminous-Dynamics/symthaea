@@ -6,7 +6,7 @@ Research validation is evidence only when both implementations compute a clearly
 
 `pyphi_crossvalidation.py` is a legacy scaffold, not a qualified validation pipeline. Its former implementation substituted hard-coded topology estimates when the Rust subprocess failed. The Rust example it invoked is absent from the maintained `examples/` path, and its abandoned sketch used spectral connectivity rather than IIT integrated information.
 
-The current scaffold now fails closed until a maintained Rust adapter can produce a measurement from the same explicit causal model. A missing result is not zero and is not a pass. The pinned PyPhi `2.0.0rc4` package is a pre-release, and the `emd` extra is installed for IIT 3.0 compatibility; this environment must be requalified against a final release before publication claims.
+The current scaffold now fails closed until a maintained Rust adapter can produce a measurement from the same explicit causal model. A missing result is not zero and is not a pass. The pinned PyPhi `2.0.0rc4` package is a pre-release, and the `emd` extra is installed for IIT 3.0 compatibility; this environment must be requalified against a final release before publication claims. The canonical TSV model manifest is checked by both a Python parser and a Rust test; that parity test is still unexecuted.
 
 ## PyPhi formalism
 
@@ -19,11 +19,11 @@ Reference: https://pyphi.readthedocs.io/en/latest/reference/configuration.html
 ~~~bash
 nix develop .#python-research
 python -m pip install -r validation/requirements-pyphi.txt
-python -m unittest validation.test_pyphi_crossvalidation_fail_closed -v
+python -m unittest validation.test_pyphi_crossvalidation_fail_closed validation.test_shared_boolean_network -v
 python validation/pyphi_crossvalidation.py
 ~~~
 
-This currently produces unavailable/failed measurements by design, until the adapter exists. It writes a NOT QUALIFIED Markdown report to results/pyphi_validation_results.md and returns a nonzero exit status. The eleven Python regression tests are source definitions until the command above has actually run successfully. Do not interpret the output as evidence of agreement.
+This currently produces unavailable/failed measurements by design, until the adapter exists. It writes a NOT QUALIFIED Markdown report to results/pyphi_validation_results.md and returns a nonzero exit status. The twenty Python regression tests are source definitions until the command above has actually run successfully. Do not interpret the output as evidence of agreement.
 
 ## Required before qualification
 
