@@ -219,6 +219,65 @@ impl KnowledgePersistence {
         Ok(facts.len())
     }
 
+    /// Atomically replace the graph-fact and evidence-link snapshots.
+    ///
+    /// This prevents a crash between separate fact/link writes from leaving links
+    /// pointed at a newer set of facts with recycled identifiers.
+    pub fn save_graph_snapshot(
+        &mut self,
+        facts: &[GraphFactRecord],
+        links: &[EvidenceLink],
+    ) -> Result<(usize, usize), String> {
+        if !self.is_configured() {
+            return Err("No database path configured".into());
+        }
+        let conn = self.open_connection()?;
+        self.ensure_schema(&conn)?;
+        let tx = conn.unchecked_transaction().map_err(|error| error.to_string())?;
+
+        tx.execute("DELETE FROM knowledge_facts", [])
+            .map_err(|error| error.to_string())?;
+        for item in facts {
+            let claim_context_json = item
+                .claim_context
+                .as_ref()
+                .map(serde_json::to_string)
+                .transpose()
+                .map_err(|error| error.to_string())?;
+            tx.execute(
+                "INSERT INTO knowledge_facts
+                 (fact_id, vector_blob, source_text, confidence, domain, cycle, is_causal, claim_context_json)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                rusqlite::params![
+                    item.fact_id.map(|id| id as i64),
+                    item.fact.vector_bytes,
+                    item.fact.source_text,
+                    item.fact.confidence,
+                    item.fact.domain,
+                    item.fact.cycle as i64,
+                    item.fact.is_causal,
+                    claim_context_json,
+                ],
+            )
+            .map_err(|error| error.to_string())?;
+        }
+
+        tx.execute("DELETE FROM knowledge_evidence_links", [])
+            .map_err(|error| error.to_string())?;
+        for link in links {
+            let encoded = serde_json::to_string(link).map_err(|error| error.to_string())?;
+            tx.execute(
+                "INSERT INTO knowledge_evidence_links (link_json) VALUES (?1)",
+                rusqlite::params![encoded],
+            )
+            .map_err(|error| error.to_string())?;
+        }
+
+        tx.commit().map_err(|error| error.to_string())?;
+        self.total_saved += facts.len() as u64 + links.len() as u64;
+        Ok((facts.len(), links.len()))
+    }
+
     /// Load the graph snapshot, preserving IDs used by typed evidence-link endpoints.
     pub fn load_graph_facts(&mut self) -> Result<Vec<GraphFactRecord>, String> {
         if !self.is_configured() {
@@ -627,6 +686,52 @@ mod tests {
         persistence.save_graph_facts(&loaded).unwrap();
         let loaded_after_snapshot = persistence.load_graph_facts().unwrap();
         assert_eq!(loaded_after_snapshot.len(), 1);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn atomic_graph_snapshot_replaces_facts_and_links_together() {
+        let dir = std::env::temp_dir().join(format!("symthaea_atomic_snapshot_test_{}", std::process::id()));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+        let fact = |id: u64, source: &str| GraphFactRecord {
+            fact_id: Some(id),
+            fact: FactRecord {
+                vector_bytes: vec![id as u8; 2048],
+                source_text: source.into(),
+                confidence: 0.7,
+                domain: Some("test".into()),
+                cycle: id,
+                is_causal: false,
+            },
+            claim_context: None,
+        };
+        let link = EvidenceLink {
+            from_fact_id: 1,
+            to_fact_id: 2,
+            relation: super::super::claim_provenance::EvidenceRelation::SemanticNeighbor,
+            status: super::super::claim_provenance::EvidenceLinkStatus::Candidate,
+            evidence_ids: Vec::new(),
+            rationale: Some("similarity candidate only".into()),
+            causal_argument: None,
+            transmission_chain: None,
+            detected_at_cycle: 2,
+        };
+        let mut persistence = KnowledgePersistence::new(&db_path);
+        assert_eq!(
+            persistence.save_graph_snapshot(&[fact(1, "old-a"), fact(2, "old-b")], &[link.clone()]).unwrap(),
+            (2, 1)
+        );
+        assert_eq!(
+            persistence.save_graph_snapshot(&[fact(3, "new-a")], &[]).unwrap(),
+            (1, 0)
+        );
+        let facts = persistence.load_graph_facts().unwrap();
+        let links = persistence.load_evidence_links().unwrap();
+        assert_eq!(facts.len(), 1);
+        assert_eq!(facts[0].fact_id, Some(3));
+        assert!(links.is_empty());
 
         let _ = std::fs::remove_dir_all(&dir);
     }
