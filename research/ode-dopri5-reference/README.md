@@ -6,7 +6,7 @@
 
 Compare Symthaea's checked Cash–Karp RK45 implementation against the independently implemented Dormand–Prince 5(4) method in `ode_solvers = 0.6.2` on a frozen analytical harmonic oscillator.
 
-The comparison reuses the source-included numerical module from `research/ode-verify-001`; the external solver lives only in this isolated research crate and is not a production dependency.
+The comparison reuses the source-included numerical module from `research/ode-verify-001`; the external solver lives only in this isolated research crate and is not a production dependency. The direct/transitive Rust dependency graph is committed in `research/ode-dopri5-reference/Cargo.lock`; every qualification command uses `--locked`. The CI gate validates the tracked lockfile and records its SHA-256 in the comparison receipt, so the runner cannot silently resolve a newer graph during qualification.
 
 ## Frozen problem
 
