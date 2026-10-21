@@ -7,6 +7,7 @@
 //! engineering abstractions; they are not evidence of biological or subjective
 //! experience. Oracle and shuffled-forecast policies are diagnostic controls.
 
+pub mod calibration;
 pub mod robust_viability;
 
 pub const HORIZON: usize = 48;
