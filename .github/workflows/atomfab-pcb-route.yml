@@ -16,6 +16,7 @@ on:
       - "docs/research/fixtures/ATOMFAB_PCB_ARTIFACT_INVENTORY_V0_1.json"
       - "docs/research/fixtures/atomfab-pcb-artifact-inventory-v0_1/**"
       - ".github/workflows/atomfab-pcb-route.yml"
+      - ".github/workflows/atomfab-kicad-cli-smoke.yml"
   push:
     branches: [main]
     paths:
@@ -32,6 +33,7 @@ on:
       - "docs/research/fixtures/ATOMFAB_PCB_ARTIFACT_INVENTORY_V0_1.json"
       - "docs/research/fixtures/atomfab-pcb-artifact-inventory-v0_1/**"
       - ".github/workflows/atomfab-pcb-route.yml"
+      - ".github/workflows/atomfab-kicad-cli-smoke.yml"
   workflow_dispatch:
 
 permissions:
