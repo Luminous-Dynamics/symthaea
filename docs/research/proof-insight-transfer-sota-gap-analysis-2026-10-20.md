@@ -51,6 +51,21 @@ First Proof Batch 3, published **14 October 2026**, tested five systems on ten r
 
 6. **From raw solve rate to useful verified work.** Measure verified solves per fixed dollar / wall-clock hour, median and tail latency, tokens per verified solve, downstream regression, proof portability/maintenance, and abstention quality. Do not trade a lower correctness rate for high raw throughput.
 
+## A measurement metric the field often underreports: temporal resolution coverage
+
+Before any proof model is run, publish a **task-resolution funnel** alongside solve rates:
+1. raw source rows,
+2. safe canonical-path joins,
+3. exact declaration-name matches,
+4. proof-transition matches (dataset proof appears inside the named declaration at the completion commit and is absent from every direct parent),
+5. exact statement stability at the pre-state and completion commit,
+6. buildable/replayable target states,
+7. eligible scored targets.
+
+These are separate evidence gates, not an aggregate quality score. A benchmark that starts with only its easiest-to-resolve rows can make proof accuracy appear high even if its task mapping is weak. PITB's new temporal dataset auditor maintains path-only counts as a baseline diagnostic and adds a second, declaration-scoped theorem/proof-transition join; it only calls a join stable when statement text matches at both historical points and the proof was absent at target time. That is a **textual provenance gate**, not a semantic equivalence oracle: it deliberately leaves mismatched or ambiguous cases unresolved instead of promoting them into the denominator.
+
+For external reporting, give both the raw corpus coverage and the eligible-task solve rate. Also report exclusions and unknowns by reason. If the strict identity join resolves only a small fraction of the corpus, increase the annotated sample or improve source mapping before making comparisons; never remove ambiguous rows from the published denominator.
+
 ## Proposed benchmark scorecard
 
 The current preregistered primary gate is unchanged unless another explicit pre-outcome amendment is committed.
