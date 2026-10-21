@@ -3629,6 +3629,59 @@ mod tests {
     }
 
     #[test]
+    fn normalized_lean_leakage_matching_ignores_comments_but_preserves_strings() {
+        let canonical = normalize_lean_for_leakage(
+            "by\n  exact Nat.add_comm a b\n",
+        );
+        let commented = normalize_lean_for_leakage(
+            "by /- copied explanation /- nested -/ -/\n  exact Nat.add_comm a b -- trailing note\n",
+        );
+        assert_eq!(canonical, commented);
+        let string_literal = normalize_lean_for_leakage(
+            r#"exact String.contains value "-- /- remain literal -/"#,
+        );
+        assert!(string_literal.contains(r#""-- /- remain literal -/""#));
+    }
+
+    #[test]
+    fn normalized_future_proof_copy_is_rejected_across_whitespace_and_comments() {
+        let future_proof = "by\n  have h := Nat.add_comm a b\n  have h2 := Nat.add_comm b a\n  exact Eq.trans h h2\n";
+        let visible_copy = "by /- copied with explanation -/ have h := Nat.add_comm a b -- line comment\n have h2 := Nat.add_comm b a\n exact Eq.trans h h2";
+        let mut manifest = temporal_manifest_fixture();
+        manifest.events[0].visible_artifact_ids = vec!["context-early".to_string()];
+        manifest.artifacts.push(TemporalEvidenceArtifact {
+            artifact_id: "context-early".to_string(),
+            path: "lean/Context.lean".to_string(),
+            artifact_kind: "module_context".to_string(),
+            content_sha256: "a".repeat(64),
+            content_start_line: 1,
+            content_end_line: 8,
+            source_file_sha256: "b".repeat(64),
+            source_commit: "3".repeat(40),
+            available_at_position: Some(0),
+            target_position: None,
+            theorem_id: None,
+        });
+        let mut normalized = BTreeMap::new();
+        for artifact in &manifest.artifacts {
+            let content = match artifact.artifact_id.as_str() {
+                "context-early" => visible_copy,
+                "proof-001" => future_proof,
+                _ => "rfl",
+            };
+            normalized.insert(
+                artifact.artifact_id.clone(),
+                normalize_lean_for_leakage(content),
+            );
+        }
+        let error = validate_normalized_future_proof_leakage(&manifest, &normalized)
+            .expect_err("comment/whitespace changes must not hide a copied future proof");
+        assert!(error.to_string().contains("normalized future-proof leakage"));
+        assert!(error.to_string().contains("target-000"));
+        assert!(error.to_string().contains("target-001"));
+    }
+
+    #[test]
     fn temporal_artifact_identity_checks_the_proposition_and_proof_region() {
         let source = b"theorem first : True := by\n  exact True.intro\n\ntheorem second : True := by\n  trivial\n";
         let first_statement = b"theorem first : True := by\n";
