@@ -10,10 +10,12 @@ source_files=(
   "tools/allostatic-control-bench/Cargo.toml"
   "tools/allostatic-control-bench/Cargo.lock"
   "tools/allostatic-control-bench/src/lib.rs"
+  "tools/allostatic-control-bench/src/robust_viability.rs"
   "tools/allostatic-control-bench/src/main.rs"
   "tools/allostatic-control-bench/src/bin/allostatic-control-report.rs"
   "tools/allostatic-control-bench/qualify.sh"
   "docs/research/ALLOSTATIC_CONTROL_BENCHMARK_V1.md"
+  "docs/research/ROBUST_VIABILITY_ENVELOPE_V1.md"
 )
 expected_head="${1:-$(git rev-parse HEAD)}"
 actual_head="$(git rev-parse HEAD)"
