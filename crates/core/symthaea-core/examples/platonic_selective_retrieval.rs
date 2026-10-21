@@ -15,10 +15,12 @@ use symthaea_core::hdc::pattern_interaction::PatternVector;
 
 const DIMENSION: usize = 4_096;
 const PROTOTYPE_COUNT: usize = 64;
-const CALIBRATION_PER_NOISE: usize = 32;
-const TEST_PER_NOISE: usize = 64;
-const CALIBRATION_UNKNOWN: usize = 64;
-const TEST_UNKNOWN: usize = 128;
+const SELECTION_QUERY_COUNT: usize = 352;
+const CERTIFICATION_QUERY_COUNT: usize = 352;
+const TEST_QUERY_COUNT: usize = 704;
+const KNOWN_QUERY_WEIGHT: usize = 7;
+const OOD_QUERY_WEIGHT: usize = 2;
+const MIXTURE_QUERY_WEIGHT: usize = 2;
 const MAX_VALIDATION_RISK: f64 = 0.05;
 const MIN_ACCEPTED_FOR_CALIBRATION: usize = 30;
 const MIN_ACCEPTED_FOR_CERTIFICATION: usize = 80;
@@ -66,7 +68,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("# protocol=selective-retrieval-v1");
     println!("# calibration_rule=selection_split_max_coverage_then_independent_certification");
     println!("# certification=one_sided_clopper_pearson_upper_bound_bonferroni_adjusted_for_3_rules");
-    println!("# query_mix=known-noise+random-ood+two-prototype-mixture");
+    println!("# query_mix_weights=known:random_ood:ambiguous_mixture=7:2:2");
+    println!("# known_query_noise_level=uniform_over_0,0.10,0.20,0.30,0.40,0.45,0.50");
     println!(
         "seed,strategy,dimension,prototypes,selection_n,certification_n,certified,test_n,min_similarity,min_margin,accepted,coverage,errors,selective_risk,risk95_low,risk95_high,top1_accuracy"
     );
@@ -86,23 +89,17 @@ fn main() -> Result<(), Box<dyn Error>> {
         let selection_queries = generate_queries(
             &prototypes,
             derive_seed(seed, 0x5345_4c45, 0),
-            CALIBRATION_PER_NOISE,
-            CALIBRATION_UNKNOWN,
-            CALIBRATION_UNKNOWN,
+            SELECTION_QUERY_COUNT,
         )?;
         let certification_queries = generate_queries(
             &prototypes,
             derive_seed(seed, 0x4345_5254, 0),
-            CALIBRATION_PER_NOISE,
-            CALIBRATION_UNKNOWN,
-            CALIBRATION_UNKNOWN,
+            CERTIFICATION_QUERY_COUNT,
         )?;
         let test_queries = generate_queries(
             &prototypes,
             derive_seed(seed, 0x5445_5354, 0),
-            TEST_PER_NOISE,
-            TEST_UNKNOWN,
-            TEST_UNKNOWN,
+            TEST_QUERY_COUNT,
         )?;
         let selection = score_queries(&selection_queries, &prototypes)?;
         let certification = score_queries(&certification_queries, &prototypes)?;
@@ -156,47 +153,70 @@ fn main() -> Result<(), Box<dyn Error>> {
 fn generate_queries(
     prototypes: &[PatternVector],
     seed: u64,
-    positives_per_noise: usize,
-    unknown_count: usize,
-    mixture_count: usize,
+    query_count: usize,
 ) -> Result<Vec<(PatternVector, Option<usize>)>, Box<dyn Error>> {
-    let mut queries = Vec::new();
+    if prototypes.len() < 2 {
+        return Err("selective retrieval requires at least two prototypes".into());
+    }
 
-    for (noise_index, noise) in NOISE_LEVELS.iter().copied().enumerate() {
-        for sample_index in 0..positives_per_noise {
-            let target = (sample_index * 13 + noise_index * 17) % prototypes.len();
+    // Draw each query independently from a fixed synthetic mixture: 7/11
+    // known-pattern queries, 2/11 random OOD, and 2/11 ambiguous mixtures.
+    // Known queries sample both the target prototype and corruption level
+    // uniformly; this makes the pooled risk gate meaningful for this declared
+    // mixture, instead of treating a hand-balanced set of strata as iid.
+    let query_type_count = KNOWN_QUERY_WEIGHT + OOD_QUERY_WEIGHT + MIXTURE_QUERY_WEIGHT;
+    let mut rng_state = seed;
+    let mut queries = Vec::with_capacity(query_count);
+
+    for _ in 0..query_count {
+        let query_type = sample_bounded(&mut rng_state, query_type_count);
+        if query_type < KNOWN_QUERY_WEIGHT {
+            let target = sample_bounded(&mut rng_state, prototypes.len());
+            let noise_index = sample_bounded(&mut rng_state, NOISE_LEVELS.len());
             let query = prototypes[target].with_noise(
-                noise,
-                derive_seed(seed, noise_index as u64, sample_index as u64),
+                NOISE_LEVELS[noise_index],
+                next_u64(&mut rng_state),
             )?;
             queries.push((query, Some(target)));
+        } else if query_type < KNOWN_QUERY_WEIGHT + OOD_QUERY_WEIGHT {
+            let query = PatternVector::seeded_random(
+                prototypes[0].dimension(),
+                next_u64(&mut rng_state),
+            )?;
+            queries.push((query, None));
+        } else {
+            let left = sample_bounded(&mut rng_state, prototypes.len());
+            let offset = 1 + sample_bounded(&mut rng_state, prototypes.len() - 1);
+            let right = (left + offset) % prototypes.len();
+            let mixture = PatternVector::bundle(
+                &[prototypes[left].clone(), prototypes[right].clone()],
+                next_u64(&mut rng_state),
+            )?;
+            // A mixture is intentionally ambiguous: accepting either component
+            // as a unique answer is counted as a selective-classification error.
+            queries.push((mixture, None));
         }
     }
 
-    for index in 0..unknown_count {
-        queries.push((
-            PatternVector::seeded_random(
-                prototypes[0].dimension(),
-                derive_seed(seed, 0x4f4f_4421, index as u64),
-            )?,
-            None,
-        ));
-    }
-
-    for index in 0..mixture_count {
-        let left = index % prototypes.len();
-        let offset = 1 + (index * 17) % (prototypes.len() - 1);
-        let right = (left + offset) % prototypes.len();
-        let mixture = PatternVector::bundle(
-            &[prototypes[left].clone(), prototypes[right].clone()],
-            derive_seed(seed, 0x4d49_5854, index as u64),
-        )?;
-        // A mixture is intentionally ambiguous: accepting either component as
-        // a unique answer is counted as a selective-classification error.
-        queries.push((mixture, None));
-    }
-
     Ok(queries)
+}
+
+fn sample_bounded(state: &mut u64, upper_exclusive: usize) -> usize {
+    let bound = upper_exclusive as u64;
+    assert!(bound > 0, "sampling bound must be non-zero");
+    // Rejection sampling avoids the modulo bias of simply reducing every u64.
+    let rejection_floor = bound.wrapping_neg() % bound;
+    loop {
+        let value = next_u64(state);
+        if value >= rejection_floor {
+            return (value % bound) as usize;
+        }
+    }
+}
+
+fn next_u64(state: &mut u64) -> u64 {
+    *state = state.wrapping_add(0x9e37_79b9_7f4a_7c15);
+    mix64(*state)
 }
 
 fn score_queries(
