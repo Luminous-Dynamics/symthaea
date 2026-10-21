@@ -148,7 +148,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("# known_query_noise_level=uniform_over_0,0.10,0.20,0.30,0.40,0.45,0.50");
     println!("# separate_near_unknown_challenge_distances=0.05,0.10,0.20");
     println!("# near_unknown_challenge_is_not_in_certification_distribution=true");
-    println!("# identifiability_control=paired known/unknown labels share identical PatternVector; vector-only prediction must agree");
+    println!(
+        "# identifiability_control=paired known/unknown labels share identical PatternVector; vector-only prediction must agree"
+    );
     println!(
         "record_type,seed,strategy,query_kind,noise_fraction,dimension,prototypes,selection_n,certification_n,certified,cert_accept,cert_errors,cert_risk_upper95,test_n,min_similarity,min_margin,n,accepted,coverage,errors,selective_risk,risk95_low,risk95_high,top1_accuracy"
     );
@@ -882,20 +884,6 @@ fn split_conformal_quantile(
     Ok((quantile, count))
 }
 
-fn conformal_set_size(
-    query: &PatternVector,
-    prototypes: &[PatternVector],
-    cutoff_similarity: f64,
-) -> Result<usize, Box<dyn Error>> {
-    let mut size = 0;
-    for prototype in prototypes {
-        if query.similarity(prototype)? >= cutoff_similarity {
-            size += 1;
-        }
-    }
-    Ok(size)
-}
-
 fn score_conformal_sets(
     scored: &[ScoredQuery],
     conformal_q: f64,
@@ -1069,7 +1057,9 @@ fn report_identity_collision_controls(
                 || known.prototype_similarities != unknown.prototype_similarities
                 || known.correct == unknown.correct
             {
-                return Err("identity collision control failed feature/label contradiction invariant".into());
+                return Err(
+                    "identity collision control failed feature/label contradiction invariant".into(),
+                );
             }
         }
 
@@ -1494,8 +1484,7 @@ mod tests {
         };
         let queries = vec![known, unknown];
         let scores = score_queries(&queries, &prototypes).expect("scores");
-        let set_results =
-            score_conformal_sets(&queries, &scores, &prototypes, 0.0).expect("sets");
+        let set_results = score_conformal_sets(&scores, 0.0);
         assert_eq!(set_results[0].set_size, 1);
         assert_eq!(set_results[0].set_size, set_results[1].set_size);
         assert!(set_results[0].covered);
