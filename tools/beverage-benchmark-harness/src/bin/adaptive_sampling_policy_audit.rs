@@ -66,6 +66,7 @@ struct DecisionRecord {
     policy_config_sha256: String,
     input_prefix_sha256: String,
     decision_time_ms: u64,
+    decision_deadline_ms: u64,
     available_channels: Vec<String>,
     observations: Vec<ObservationRef>,
     required_tests_due: Vec<String>,
@@ -74,9 +75,13 @@ struct DecisionRecord {
     action: PolicyAction,
     requested_channel: Option<String>,
     requested_at_ms: Option<u64>,
+    expected_result_available_at_ms: Option<u64>,
     next_review_at_ms: Option<u64>,
+    expected_loss_without_sample_units: f64,
+    expected_loss_with_sample_units: Option<f64>,
+    estimated_sampling_cost_units: Option<f64>,
+    estimated_delay_cost_units: Option<f64>,
     reason_code: String,
-    estimated_cost_units: f64,
 }
 
 #[derive(Debug, Serialize)]
@@ -184,9 +189,20 @@ fn audit_record(record: &DecisionRecord) -> Vec<String> {
         }
     }
 
-    if !record.estimated_cost_units.is_finite() || record.estimated_cost_units < 0.0 {
-        violations.push("estimated_cost_units_invalid".to_string());
+    if record.decision_deadline_ms < record.decision_time_ms {
+        violations.push("decision_deadline_precedes_decision".to_string());
     }
+    if !record.expected_loss_without_sample_units.is_finite()
+        || record.expected_loss_without_sample_units < 0.0
+    {
+        violations.push("expected_loss_without_sample_invalid".to_string());
+    }
+
+    let mut validate_optional_nonnegative = |field: &str, value: Option<f64>| {
+        if value.is_some_and(|value| !value.is_finite() || value < 0.0) {
+            violations.push(format!("{field}_invalid"));
+        }
+    };
 
     match record.action {
         PolicyAction::Sample => {
@@ -197,11 +213,61 @@ fn audit_record(record: &DecisionRecord) -> Vec<String> {
                 }
                 None => violations.push("sample_missing_requested_channel".to_string()),
             }
+
             match record.requested_at_ms {
                 Some(timestamp) if timestamp >= record.decision_time_ms => {}
                 Some(_) => violations.push("sample_request_precedes_decision".to_string()),
                 None => violations.push("sample_missing_requested_at".to_string()),
             }
+
+            match record.expected_result_available_at_ms {
+                Some(timestamp) => {
+                    if let Some(requested_at) = record.requested_at_ms {
+                        if timestamp < requested_at {
+                            violations.push("sample_result_precedes_request".to_string());
+                        }
+                    }
+                    if timestamp > record.decision_deadline_ms {
+                        violations.push("sample_result_after_decision_deadline".to_string());
+                    }
+                }
+                None => violations.push("sample_missing_result_availability_estimate".to_string()),
+            }
+
+            let loss_with_sample = match record.expected_loss_with_sample_units {
+                Some(value) if value.is_finite() && value >= 0.0 => Some(value),
+                Some(_) => {
+                    violations.push("expected_loss_with_sample_invalid".to_string());
+                    None
+                }
+                None => {
+                    violations.push("sample_missing_expected_loss_with_sample".to_string());
+                    None
+                }
+            };
+            validate_optional_nonnegative("estimated_sampling_cost_units", record.estimated_sampling_cost_units);
+            validate_optional_nonnegative("estimated_delay_cost_units", record.estimated_delay_cost_units);
+
+            match (loss_with_sample, record.estimated_sampling_cost_units, record.estimated_delay_cost_units) {
+                (Some(loss_after), Some(sample_cost), Some(delay_cost))
+                    if sample_cost.is_finite() && delay_cost.is_finite()
+                        && sample_cost >= 0.0 && delay_cost >= 0.0 =>
+                {
+                    let net_value = record.expected_loss_without_sample_units - loss_after - sample_cost - delay_cost;
+                    if net_value <= 0.0 {
+                        violations.push("sample_expected_net_value_not_positive".to_string());
+                    }
+                }
+                _ => {
+                    if record.estimated_sampling_cost_units.is_none() {
+                        violations.push("sample_missing_sampling_cost_estimate".to_string());
+                    }
+                    if record.estimated_delay_cost_units.is_none() {
+                        violations.push("sample_missing_delay_cost_estimate".to_string());
+                    }
+                }
+            }
+
             if record.next_review_at_ms.is_some() {
                 violations.push("sample_must_not_set_defer_review_time".to_string());
             }
@@ -210,9 +276,20 @@ fn audit_record(record: &DecisionRecord) -> Vec<String> {
             if record.requested_channel.is_some() || record.requested_at_ms.is_some() {
                 violations.push("defer_must_not_contain_sample_request".to_string());
             }
+            if record.expected_result_available_at_ms.is_some()
+                || record.expected_loss_with_sample_units.is_some()
+                || record.estimated_sampling_cost_units.is_some()
+                || record.estimated_delay_cost_units.is_some()
+            {
+                violations.push("non_sample_contains_value_of_information_fields".to_string());
+            }
             match record.next_review_at_ms {
-                Some(timestamp) if timestamp > record.decision_time_ms => {}
-                Some(_) => violations.push("defer_review_not_in_future".to_string()),
+                Some(timestamp) if timestamp > record.decision_time_ms
+                    && timestamp <= record.decision_deadline_ms => {}
+                Some(timestamp) if timestamp <= record.decision_time_ms => {
+                    violations.push("defer_review_not_in_future".to_string());
+                }
+                Some(_) => violations.push("defer_review_after_decision_deadline".to_string()),
                 None => violations.push("defer_missing_next_review".to_string()),
             }
             if record.calibration_state != CalibrationState::Calibrated {
@@ -222,6 +299,13 @@ fn audit_record(record: &DecisionRecord) -> Vec<String> {
         PolicyAction::Escalate | PolicyAction::Abstain => {
             if record.requested_channel.is_some() || record.requested_at_ms.is_some() {
                 violations.push("escalate_or_abstain_must_not_issue_sample_request".to_string());
+            }
+            if record.expected_result_available_at_ms.is_some()
+                || record.expected_loss_with_sample_units.is_some()
+                || record.estimated_sampling_cost_units.is_some()
+                || record.estimated_delay_cost_units.is_some()
+            {
+                violations.push("non_sample_contains_value_of_information_fields".to_string());
             }
             if record.next_review_at_ms.is_some() {
                 violations.push("escalate_or_abstain_must_not_set_defer_review_time".to_string());
@@ -328,6 +412,7 @@ mod tests {
             policy_config_sha256: "a".repeat(64),
             input_prefix_sha256: "b".repeat(64),
             decision_time_ms: 1_000,
+            decision_deadline_ms: 1_500,
             available_channels: vec!["temperature".to_string(), "off_gas".to_string()],
             observations: vec![ObservationRef {
                 observation_id: "obs-001".to_string(),
@@ -345,10 +430,25 @@ mod tests {
             action: PolicyAction::Sample,
             requested_channel: Some("off_gas".to_string()),
             requested_at_ms: Some(1_000),
+            expected_result_available_at_ms: Some(1_200),
             next_review_at_ms: None,
+            expected_loss_without_sample_units: 10.0,
+            expected_loss_with_sample_units: Some(2.0),
+            estimated_sampling_cost_units: Some(3.0),
+            estimated_delay_cost_units: Some(1.0),
             reason_code: "decision_value_exceeds_cost".to_string(),
-            estimated_cost_units: 2.0,
         }
+    }
+
+    fn make_defer(record: &mut DecisionRecord, next_review_at_ms: u64) {
+        record.action = PolicyAction::Defer;
+        record.requested_channel = None;
+        record.requested_at_ms = None;
+        record.expected_result_available_at_ms = None;
+        record.next_review_at_ms = Some(next_review_at_ms);
+        record.expected_loss_with_sample_units = None;
+        record.estimated_sampling_cost_units = None;
+        record.estimated_delay_cost_units = None;
     }
 
     #[test]
@@ -403,10 +503,7 @@ mod tests {
     #[test]
     fn rejects_deferral_when_calibration_is_unavailable() {
         let mut record = valid_record();
-        record.action = PolicyAction::Defer;
-        record.requested_channel = None;
-        record.requested_at_ms = None;
-        record.next_review_at_ms = Some(2_000);
+        make_defer(&mut record, 1_200);
         record.calibration_state = CalibrationState::Unavailable;
         assert!(
             audit_record(&record)
@@ -418,10 +515,7 @@ mod tests {
     #[test]
     fn rejects_non_future_deferral_review() {
         let mut record = valid_record();
-        record.action = PolicyAction::Defer;
-        record.requested_channel = None;
-        record.requested_at_ms = None;
-        record.next_review_at_ms = Some(record.decision_time_ms);
+        make_defer(&mut record, record.decision_time_ms);
         assert!(
             audit_record(&record)
                 .iter()
@@ -441,9 +535,9 @@ mod tests {
     }
 
     #[test]
-    fn rejects_negative_cost() {
+    fn rejects_negative_sampling_cost() {
         let mut record = valid_record();
-        record.estimated_cost_units = -0.1;
+        record.estimated_sampling_cost_units = Some(-0.1);
         assert!(
             audit_record(&record)
                 .iter()
@@ -507,4 +601,34 @@ mod tests {
                 .any(|issue| issue == "observation_digest_invalid:obs-001")
         );
     }
+    #[test]
+    fn rejects_sample_with_nonpositive_expected_net_value() {
+        let mut record = valid_record();
+        record.expected_loss_with_sample_units = Some(6.0);
+        record.estimated_sampling_cost_units = Some(3.0);
+        record.estimated_delay_cost_units = Some(1.0);
+        assert!(audit_record(&record).iter().any(|issue| issue == "sample_expected_net_value_not_positive"));
+    }
+
+    #[test]
+    fn rejects_sample_result_after_decision_deadline() {
+        let mut record = valid_record();
+        record.expected_result_available_at_ms = Some(record.decision_deadline_ms + 1);
+        assert!(audit_record(&record).iter().any(|issue| issue == "sample_result_after_decision_deadline"));
+    }
+
+    #[test]
+    fn rejects_deferral_past_decision_deadline() {
+        let mut record = valid_record();
+        make_defer(&mut record, record.decision_deadline_ms + 1);
+        assert!(audit_record(&record).iter().any(|issue| issue == "defer_review_after_decision_deadline"));
+    }
+
+    #[test]
+    fn rejects_decision_deadline_before_decision_time() {
+        let mut record = valid_record();
+        record.decision_deadline_ms = record.decision_time_ms - 1;
+        assert!(audit_record(&record).iter().any(|issue| issue == "decision_deadline_precedes_decision"));
+    }
+
 }
