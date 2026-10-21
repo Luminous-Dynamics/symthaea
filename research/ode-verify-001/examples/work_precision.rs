@@ -16,6 +16,7 @@ const T_END: f64 = 10.0;
 const INITIAL_DT: f64 = 0.2;
 const SCALES: [f64; 3] = [1.0e-6, 1.0, 1.0e6];
 const RELATIVE_TOLERANCES: [f64; 3] = [1.0e-3, 1.0e-5, 1.0e-7];
+const GLOBAL_ERROR_MULTIPLIER: f64 = 10.0;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let source_sha = env::var("ODE_BENCH_SOURCE_SHA").unwrap_or_else(|_| "unknown".to_string());
@@ -63,11 +64,13 @@ fn main() -> Result<(), Box<dyn Error>> {
                         })
                         .fold(0.0f64, f64::max);
 
+                    let endpoint_error_limit = GLOBAL_ERROR_MULTIPLIER * relative_tolerance;
+                    let energy_drift_limit = GLOBAL_ERROR_MULTIPLIER * relative_tolerance;
                     let completed = result
                         .simulation
                         .times
                         .last()
-                        .is_some_and(|time| *time == T_END);
+                        .is_some_and(|time| (*time - T_END).abs() <= f64::EPSILON * T_END.abs().max(1.0));
                     let finite = endpoint_error.is_finite()
                         && max_relative_energy_drift.is_finite()
                         && result
@@ -76,33 +79,47 @@ fn main() -> Result<(), Box<dyn Error>> {
                             .iter()
                             .flatten()
                             .all(|value| value.is_finite());
+                    let endpoint_error_within_limit = endpoint_error <= endpoint_error_limit;
+                    let energy_drift_within_limit =
+                        max_relative_energy_drift <= energy_drift_limit;
                     let accepted = completed
                         && finite
                         && result.diagnostics.max_error_norm <= 1.0
+                        && endpoint_error_within_limit
+                        && energy_drift_within_limit
                         && result.diagnostics.accepted_steps == result.simulation.steps;
                     all_passed &= accepted;
 
                     observations.push(format!(
-                        "{{\"scale\":{:.17e},\"relative_tolerance\":{:.17e},\"absolute_tolerance\":{:.17e},\"endpoint_error_l2_scaled\":{:.17e},\"max_relative_energy_drift\":{:.17e},\"accepted_steps\":{},\"rejected_steps\":{},\"derivative_evaluations\":{},\"max_accepted_error_norm\":{:.17e},\"completed\":{},\"finite\":{},\"numerical_contract_pass\":{}}}",
+                        "{{\"scale\":{:.17e},\"relative_tolerance\":{:.17e},\"absolute_tolerance\":{:.17e},\"endpoint_error_l2_scaled\":{:.17e},\"endpoint_error_limit\":{:.17e},\"max_relative_energy_drift\":{:.17e},\"energy_drift_limit\":{:.17e},\"accepted_steps\":{},\"rejected_steps\":{},\"derivative_evaluations\":{},\"max_accepted_error_norm\":{:.17e},\"completed\":{},\"finite\":{},\"endpoint_error_within_limit\":{},\"energy_drift_within_limit\":{},\"numerical_contract_pass\":{}}}",
                         scale,
                         relative_tolerance,
                         absolute_tolerance,
                         endpoint_error,
+                        endpoint_error_limit,
                         max_relative_energy_drift,
+                        energy_drift_limit,
                         result.diagnostics.accepted_steps,
                         result.diagnostics.rejected_steps,
                         result.diagnostics.derivative_evaluations,
                         result.diagnostics.max_error_norm,
                         completed,
                         finite,
+                        endpoint_error_within_limit,
+                        energy_drift_within_limit,
                         accepted
                     ));
                 }
                 Err(error) => {
                     all_passed = false;
                     observations.push(format!(
-                        "{{\"scale\":{:.17e},\"relative_tolerance\":{:.17e},\"absolute_tolerance\":{:.17e},\"numerical_contract_pass\":false,\"error\":\"{:?}\"}}",
-                        scale, relative_tolerance, absolute_tolerance, error
+                        "{{\"scale\":{:.17e},\"relative_tolerance\":{:.17e},\"absolute_tolerance\":{:.17e},\"endpoint_error_limit\":{:.17e},\"energy_drift_limit\":{:.17e},\"numerical_contract_pass\":false,\"error\":\"{:?}\"}}",
+                        scale,
+                        relative_tolerance,
+                        absolute_tolerance,
+                        GLOBAL_ERROR_MULTIPLIER * relative_tolerance,
+                        GLOBAL_ERROR_MULTIPLIER * relative_tolerance,
+                        error
                     ));
                 }
             }
