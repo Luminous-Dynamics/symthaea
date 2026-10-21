@@ -244,16 +244,12 @@ impl StructuredProseTranslator {
     }
 
     pub fn translate(&self, readout: &StructuredReadout) -> StructuredTranslation {
-        let action = role_prime(readout, "ACTION").unwrap_or("MAYBE");
         let evaluator = role_prime(readout, "EVALUATOR").unwrap_or("TRUE");
-        let patient = role_prime(readout, "PATIENT").unwrap_or("SOMETHING");
         let urgent = role_prime(readout, "TIME") == Some("NOW");
         let uncertain_reason = role_prime(readout, "REASON") == Some("MAYBE");
 
         let mut clauses = vec![action_sentence(
             StructuredIntent::from_name(readout.intent.as_str()),
-            action,
-            patient,
             readout.epistemic_status,
         )
         .to_string()];
@@ -324,8 +320,6 @@ fn role_prime<'a>(readout: &'a StructuredReadout, role: &str) -> Option<&'a str>
 
 fn action_sentence(
     intent: StructuredIntent,
-    action: &str,
-    patient: &str,
     epistemic_status: EpistemicDisposition,
 ) -> &'static str {
     // Only the Answer intent is permitted to use answer-specific wording, and
