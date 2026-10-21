@@ -34,3 +34,7 @@ path = "../../crates/domains/symthaea-culinary/src/bin/fermentation_time_series_
 [[bin]]
 name = "schema_contract_audit"
 path = "src/bin/schema_contract_audit.rs"
+
+[[bin]]
+name = "split_leakage_audit"
+path = "src/bin/split_leakage_audit.rs"
