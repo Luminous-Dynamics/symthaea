@@ -1359,6 +1359,58 @@ mod tests {
     }
 
     #[test]
+    fn rights_prohibited_annotation_cannot_leak_content() {
+        let annotation = json!({
+            "answerability":"rights_prohibited",
+            "abstention_assessment":"appropriate",
+            "review_status":"synthetic_only",
+            "annotation_role":"synthetic_fixture",
+            "claim_annotations":[{"claim_id":"c1","span":"restricted text","support_label":"supported","epistemic_lane":"source_attested","severity":"none","failure_tags":["none"],"evidence_refs":[],"reviewer_confidence":1.0}],
+            "valid_alternatives":[]
+        });
+        let errors = validate_annotation_contract(&annotation);
+        assert!(
+            errors.iter().any(|e| e.contains("must not expose claim content or alternatives"))
+        );
+    }
+
+    #[test]
+    fn duplicate_claim_annotation_ids_are_rejected() {
+        let annotation = json!({
+            "answerability":"fully_answerable",
+            "review_status":"synthetic_only",
+            "annotation_role":"synthetic_fixture",
+            "claim_annotations":[
+                {"claim_id":"c1","support_label":"unsupported","epistemic_lane":"unknown","severity":"minor","failure_tags":["universalization"],"evidence_refs":[]},
+                {"claim_id":"c1","support_label":"unsupported","epistemic_lane":"unknown","severity":"minor","failure_tags":["universalization"],"evidence_refs":[]}
+            ]
+        });
+        let errors = validate_annotation_contract(&annotation);
+        assert!(errors.iter().any(|e| e.contains("duplicate claim annotation ID")));
+    }
+
+    #[test]
+    fn bundled_annotation_fixtures_satisfy_domain_contract() {
+        let mut seen_ids = HashSet::new();
+        for (index, raw_line) in
+            include_str!("../../../benchmarks/knowledge-annotation/v0/synthetic-fixtures.jsonl")
+                .lines()
+                .enumerate()
+        {
+            let annotation: Value = serde_json::from_str(raw_line).unwrap_or_else(|error| {
+                panic!("invalid annotation JSONL at line {}: {error}", index + 1)
+            });
+            let errors = validate_domain_contract(Kind::Annotation, &annotation, &mut seen_ids);
+            assert!(
+                errors.is_empty(),
+                "annotation fixture line {} failed: {}",
+                index + 1,
+                errors.join("; ")
+            );
+        }
+    }
+
+    #[test]
     fn bundled_metamorphic_pairs_satisfy_domain_contract() {
         let mut seen_ids = HashSet::new();
         for (index, raw_line) in
