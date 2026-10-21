@@ -94,6 +94,20 @@ pub trait Integrator {
         (self.step(system, state, t, dt), dt)
     }
 
+    /// Fallible step contract for checked simulations.
+    ///
+    /// Fixed-step integrators inherit this adapter. Adaptive integrators should
+    /// override it when satisfying the requested tolerance is not guaranteed.
+    fn try_step_with_dt(
+        &self,
+        system: &dyn DynamicalSystem,
+        state: &[f64],
+        t: f64,
+        dt: f64,
+    ) -> Result<(Vec<f64>, f64), SimulationError> {
+        Ok(self.step_with_dt(system, state, t, dt))
+    }
+
     /// Human-readable name of the integrator.
     fn name(&self) -> &str;
 }
@@ -170,6 +184,8 @@ pub enum SimulationError {
         index: usize,
     },
     InvalidIntegratorConfiguration,
+    /// RK45 reached its minimum step while the embedded error still exceeded tolerance.
+    AdaptiveToleranceNotMet,
     InvalidIntegratorStepSize {
         step: usize,
     },
@@ -292,7 +308,8 @@ pub fn try_simulate(
             });
         }
 
-        let (next_state, accepted_dt) = integrator.step_with_dt(system, &state, t, requested_dt);
+        let (next_state, accepted_dt) =
+            integrator.try_step_with_dt(system, &state, t, requested_dt)?;
         if !accepted_dt.is_finite() || accepted_dt <= 0.0 || accepted_dt > requested_dt {
             return Err(SimulationError::InvalidIntegratorStepSize {
                 step: completed_steps + 1,
@@ -465,18 +482,18 @@ impl Rk45Integrator {
         }
     }
 
-    /// Take one adaptive step, returning (new_state, actual_dt, error_estimate).
+    /// Attempt one adaptive step, returning state, accepted step size and error estimate.
     ///
-    /// This is the core method. The checked simulation driver uses
-    /// `step_with_dt` to advance by each accepted substep; the legacy `step`
-    /// method repeats adaptive substeps until the full requested interval elapses.
-    pub fn adaptive_step(
+    /// A step is accepted only when the embedded error is within `tol`. If the
+    /// minimum step is reached first, return an explicit error instead of silently
+    /// accepting a result outside the configured tolerance.
+    pub fn try_adaptive_step(
         &self,
         system: &dyn DynamicalSystem,
         state: &[f64],
         t: f64,
         dt: f64,
-    ) -> (Vec<f64>, f64, f64) {
+    ) -> Result<(Vec<f64>, f64, f64), SimulationError> {
         assert!(
             self.validate().is_ok(),
             "RK45 requires finite tol > 0 and finite 0 < dt_min <= dt_max"
@@ -560,21 +577,40 @@ impl Rk45Integrator {
                 .map(|(&a, &b)| (a - b).abs())
                 .fold(0.0f64, f64::max);
 
-            if error <= self.tol || h <= self.dt_min {
-                // Accept the step; compute next step size
+            if error <= self.tol {
+                // Accept only steps that actually satisfy the configured tolerance.
                 let scale = if error > 1e-30 {
                     0.9 * (self.tol / error).powf(0.2)
                 } else {
                     2.0
                 };
                 let _next_h = (h * scale).clamp(self.dt_min, self.dt_max);
-                return (y5, h, error);
+                return Ok((y5, h, error));
+            }
+            if h <= self.dt_min {
+                return Err(SimulationError::AdaptiveToleranceNotMet);
             }
 
-            // Reject step; shrink h and retry
+            // Reject step; shrink h and retry.
             let scale = 0.9 * (self.tol / error).powf(0.25);
             h = (h * scale).max(self.dt_min);
         }
+    }
+
+    /// Compatibility wrapper for callers that require a tuple-returning API.
+    ///
+    /// Panics explicitly when the configured tolerance cannot be met. Checked
+    /// simulations should use `try_simulate` so this condition is returned as
+    /// `SimulationError::AdaptiveToleranceNotMet`.
+    pub fn adaptive_step(
+        &self,
+        system: &dyn DynamicalSystem,
+        state: &[f64],
+        t: f64,
+        dt: f64,
+    ) -> (Vec<f64>, f64, f64) {
+        self.try_adaptive_step(system, state, t, dt)
+            .unwrap_or_else(|error| panic!("RK45 could not satisfy its tolerance: {error:?}"))
     }
 }
 
@@ -646,6 +682,18 @@ impl Integrator for Rk45Integrator {
     ) -> (Vec<f64>, f64) {
         let (new_state, actual_dt, _error) = self.adaptive_step(system, state, t, dt);
         (new_state, actual_dt)
+    }
+
+    fn try_step_with_dt(
+        &self,
+        system: &dyn DynamicalSystem,
+        state: &[f64],
+        t: f64,
+        dt: f64,
+    ) -> Result<(Vec<f64>, f64), SimulationError> {
+        let (new_state, accepted_dt, _error) =
+            self.try_adaptive_step(system, state, t, dt)?;
+        Ok((new_state, accepted_dt))
     }
 
     fn name(&self) -> &str {
@@ -1919,6 +1967,18 @@ mod tests {
             "RK45 energy drift {:.2e} should be < 1e-8",
             max_drift
         );
+    }
+
+    #[test]
+    fn checked_simulation_rejects_rk45_minimum_step_tolerance_shortfall() {
+        let oscillator = HarmonicOscillator::simple(1.0);
+        let integrator = Rk45Integrator {
+            tol: 1e-14,
+            dt_min: 0.1,
+            dt_max: 0.1,
+        };
+        let result = try_simulate(&oscillator, &integrator, &[1.0, 0.0], 0.0, 0.1, 0.1);
+        assert_eq!(result, Err(SimulationError::AdaptiveToleranceNotMet));
     }
 
     #[test]
