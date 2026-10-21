@@ -66,6 +66,7 @@ class ValidationResult:
     hdc_computation_time: float = 0.0
     error_message: Optional[str] = None
     reference_model_digest: Optional[str] = None
+    symthaea_model_digest: Optional[str] = None
     reference_formalism: str = "IIT_3_0"
 
 
@@ -74,9 +75,14 @@ class ValidationReport:
     """Complete cross-validation report."""
     results: List[ValidationResult] = field(default_factory=list)
     correlation: Optional[float] = None
+    spearman_correlation: Optional[float] = None
     mean_absolute_error: Optional[float] = None
+    root_mean_square_error: Optional[float] = None
     max_absolute_error: Optional[float] = None
     agreement_within_10_percent: Optional[float] = None
+    pyphi_version: Optional[str] = None
+    reference_formalism: str = "IIT_3_0"
+    shared_model_verified: bool = False
     n_validated: int = 0
     n_failed: int = 0
 
