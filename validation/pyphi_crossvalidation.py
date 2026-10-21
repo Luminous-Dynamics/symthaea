@@ -543,7 +543,7 @@ class PyPhiValidator:
             "",
             "## Summary statistics",
             "",
-            f"- Paired measurements: {paired_count}",
+            f"- Finite numeric score pairs: {paired_count}",
             f"- Failed or unavailable cases: {report.n_failed}",
             f"- Actual PyPhi reference version: {report.pyphi_version or 'N/A'}",
             f"- Declared reference formalism: {report.reference_formalism}",
@@ -627,7 +627,7 @@ def main() -> int:
     )
     qualified = validator.is_qualified(report)
     status = "PASS" if qualified else "NOT QUALIFIED"
-    print(f"Status: {status} (paired measurements={paired_count}, failures={report.n_failed})")
+    print(f"Status: {status} (finite score pairs={paired_count}, failures={report.n_failed})")
     print(f"Report: {args.output}")
     return 0 if qualified else 2
 
