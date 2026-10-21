@@ -195,7 +195,7 @@ The output includes canonical fixture definitions and one row per intervention p
 
 ## First exact finite-state evaluator prototype (2026-10-21)
 
-Added `examples/task_conditioned_finite_state_eval.rs`. Unlike the earlier scorer, this evaluator computes intact and intervention utility by exhaustive enumeration of all two-bit exogenous inputs and both outcomes of the fair-coin replacement signal. The expected fixture parameters and oracle outputs are also recorded in `validation/fixtures/tccip_toy_expectations.tsv`, and a Rust test binds the manifest to the fixture rule strings, partition labels, utilities, and partition-sweep counts. The cut is applied to a declared edge in an acyclic Boolean rule graph; whether it crosses the declared two-component partition is derived from endpoint labels, not supplied by the score caller. Raw intervention outcomes and aggregate profile rows are emitted separately.
+Added `examples/task_conditioned_finite_state_eval.rs`. Unlike the earlier scorer, this evaluator computes intact and intervention utility by exhaustive enumeration of all two-bit exogenous inputs and both outcomes of the fair-coin replacement signal. The expected fixture parameters, input-state weights, intervention edges, and oracle outputs are recorded in schema-v3 `validation/fixtures/tccip_toy_expectations.tsv`; both the Rust evaluator and independent Python oracle parse it. The cut is applied to a declared edge in an acyclic Boolean rule graph; whether it crosses the declared two-component partition is derived from endpoint labels, not supplied by the score caller. Raw intervention outcomes and aggregate profile rows are emitted separately.
 
 The first fixtures test three deliberately different situations:
 
@@ -205,7 +205,7 @@ The first fixtures test three deliberately different situations:
 | Irrelevant cross-component branch | 1.0 | 1.0 | 1.0 | 0.0 |
 | Harmful constant-bias coupling | 0.0 | 0.5 | 0.0 | -0.5 |
 
-These exact expectations were independently checked with a separate, small enumerator. **That is not a Rust compilation or test pass.** The Rust example now has 14 test definitions covering exact toy contrasts, partition sensitivity/sign reversal, prior-dependent sign changes, malformed interventions, fail-closed strata, determinism, bounds, and manifest parity. Rust/cargo are unavailable in the current execution environment, so this example remains uncompiled and unexecuted.
+These exact expectations were independently checked with a separate, small enumerator. **That is not a Rust compilation or test pass.** The Rust example now has 15 test definitions covering exact toy contrasts, partition sensitivity/sign reversal, prior-dependent score changes, a higher-order XOR-information counterexample, malformed interventions, fail-closed strata, determinism, bounds, and manifest parity. Rust/cargo are unavailable in the current execution environment, so this example remains uncompiled and unexecuted.
 
 These first three fixtures are conformance/sign tests, not evidence of empirical usefulness. In particular, the XOR and harmful-coupling cases originally compared task-output edges with controls on an unused side branch; that is not a fair role-matched effect estimate. They are retained as negative/sign-convention controls only. The new AND prior pair improves this design because both tested edges enter the same task-output gate, but it still does not solve all matching issues involving degree, path redundancy, latency, bandwidth, or network centrality. A real evaluation must report intact capability and per-edge effects alongside the profile and use held-out systems.
 
@@ -225,13 +225,13 @@ A separate exhaustive Python enumerator (used as a cross-check, **not a Rust tes
 
 This is an important warning, not a result to hide: for the same fixed toy causal model and intervention outcome table, the contrast can reverse sign with the partition. The declared partitions recover the expected +0.5, 0.0 and -0.5 fixture scores, but these score ranges show that the contrast is **partition-relative**, not an intrinsic scalar property of the network. This is why the metric must expose the full partition profile and freeze partition selection before held-out evaluation. It also makes independent control selection and matched-stratum quality central requirements. The toy sweep still does not prove that TCCIP is useful or better than existing methods.
 
-The 13 authored test definitions include exact expected sign reversals, the invariant that the declared partition appears in the exhaustive sweep, and parity checks against `validation/fixtures/tccip_toy_expectations.tsv`. The TSV is an expectation oracle, not a run receipt. The source remains uncompiled and unexecuted in this environment. The independent Python oracle's core calculation was separately cross-checked during development, but the committed `validation/tccip_reference_oracle.py` and its nine unittest definitions have not themselves been run as committed files.
+The 15 authored Rust test definitions include partition sign reversals, input-prior effects, XOR-information baselines, and schema-v3 manifest parity. The independent Python oracle has 11 authored unittest definitions. Neither committed suite has been executed here; Cargo/rustc are unavailable, and the committed Python module/tests have not themselves been run. A separate ad-hoc enumerator independently checked all six manifest fixture utilities, TCCIP values, partition ranges, and the XOR information calculation, but this is not a test run of either committed implementation.
 
 ## State-prior conditioning with role-matched task-gate cuts (new experiment)
 
 The previous positive fixture compared a task-relevant edge against an edge into an unused branch. That contrast was too easy to game: different task roles were being compared. The manifest now adds a stronger pair of fixtures in which the cross-partition edge and within-partition control edge both enter the same AND gate that directly computes the task output. Both edges have the same target node, gate type, intervention operation, and cost. The only changed input is the declared input-state distribution.
 
-Input states use bit 0 for input 0 and bit 1 for input 1; integer weights are listed in binary-state order 00, 01, 10, 11 only if explicitly specified by that schema. In schema v3 the ordering is instead **least-significant-bit state index** (00, 10, 01, 11), so weights `4,1,16,4` give (P(x_0=1)=0.2), (P(x_1=1)=0.8). The reverse weights `4,16,1,4` give (P(x_0=1)=0.8), (P(x_1=1)=0.2).
+Input states use bit 0 for input 0 and bit 1 for input 1; integer weights are listed in binary-state order 00, 01, 10, 11 only if explicitly specified by that schema. In schema v3, weights are listed by least-significant-bit state index (00, 10, 01, 11). Thus weights `4,1,16,4` give \(P(x_0=1)=0.2\) and \(P(x_1=1)=0.8\); reverse weights `4,16,1,4` give \(P(x_0=1)=0.8\) and \(P(x_1=1)=0.2\).
 
 | Same causal graph and task, different input-state weights | Cross-cut mean loss | Internal-control mean loss | TCCIP |
 |---|---:|---:|---:|
@@ -241,6 +241,28 @@ Input states use bit 0 for input 0 and bit 1 for input 1; integer weights are li
 The intact system performs perfectly in both cases. The underlying rules, task, component labels, and intervention edges are identical; only the state prior changes. The cross-cut term has greater expected task influence under the first prior and lower expected influence under the second. This is a useful positive result for a **task- and distribution-conditioned engineering profile**, but a disqualifying result if anyone tries to describe TCCIP as an intrinsic, prior-free integration scalar.
 
 This does not show that TCCIP is better than a direct conditional intervention-effect curve. In this simple example, the main effect is already understandable from the marginal activity of the other AND input. The next requirement is to show added predictive or diagnostic value on harder held-out systems after controlling for such simpler explanations.
+
+## A stronger negative control: balanced XOR synergy is invisible to TCCIP
+
+Added `role_matched_xor_synergy_uniform_prior` to the schema-v3 manifest. Both inputs of an XOR task are equally important; the tested cross-partition and within-partition edges enter the same XOR gate. Under the uniform input prior:
+
+| Measurement | Result |
+|---|---:|
+| Intact task accuracy | 1.0 |
+| Accuracy after cutting either edge | 0.5 |
+| Cross-cut mean utility loss | 0.5 |
+| Matched internal-edge mean loss | 0.5 |
+| TCCIP contrast | 0.0 |
+| Target entropy \(H(Y)\) | 1 bit |
+| Individual MI \(I(X_0;Y)\) | 0 bits |
+| Individual MI \(I(X_1;Y)\) | 0 bits |
+| Joint MI \(I((X_0,X_1);Y)\) | 1 bit |
+
+The zero TCCIP is correct for the *difference of edge-loss means*: the cross-cut and internal control edges have equal task effects. But if we marketed TCCIP as a universal measure of integration or higher-order synergy, this would be a serious false negative. The XOR target contains one bit of information jointly available from both inputs even though neither input alone carries information about it.
+
+**Resulting paradigm change:** TCCIP cannot be the headline scalar. Keep the raw per-intervention response curve, task utility, partition profile, and input-state-conditioned effects as primary outputs; add explicit higher-order information diagnostics and, where estimators' assumptions apply, compare against PID/SURD or effective-information baselines. A task-performance metric and a synergy/integration metric should remain distinct unless an independently validated bridge between them is demonstrated.
+
+This fixture is deliberately a falsification test, not a victory claim. The additional exact mutual-information baseline is computed from the same declared state weights and emitted by the independent Python oracle; the Rust evaluator also reports \(H(Y)\), individual-input MI values, and joint-input MI in its output. These implementations and their 15 Rust / 11 Python authored tests remain unexecuted.
 
 ## Literature-aware scope and a stronger next paradigm
 
@@ -275,11 +297,11 @@ These commands intentionally produce separately labeled Python and Rust artifact
 
 ## Immediate implementation plan
 
-1. Move the remaining hard-coded fixture and intervention definitions into a declarative manifest. The current TSV binds canonical model/task/partition expectations and aggregate oracles, but the Rust source still defines the executable edge interventions.
+1. The model/task/input-prior/partition/intervention definitions now come from schema-v3 TSV. Next, version the intervention *semantics* explicitly, rather than only encoding an implicit fair-coin edge replacement in the evaluator.
 2. Sweep predeclared alternate partitions / coarse-grainings and retain the full multiscale profile; do not select the best partition on the evaluation set.
 3. Add state-conditioned and controlled prior-shift fixtures, plus degree/delay/bandwidth-matched intervention controls where meaningful.
 4. Compare against raw task ablation, graph/spectral measures, entropy/MI/transfer entropy, and relevant PID/SURD/effective-information baselines.
 5. Test the preregistered adversarial matrix, then connect a real Symthaea task only after exact synthetic gates pass.
 6. Keep the feature research-only until external review and evidence support a concrete engineering use.
 
-**Current evidence status:** research specification plus a dependency-free exact toy evaluator, exhaustive partition-sensitivity code, an expected-output TSV, and an independent reference calculation have been authored. The Rust executable and its 13 tests have not been compiled or run. There is no demonstrated empirical usefulness, no validated advantage over established baselines, no novelty/SOTA claim, no IIT correspondence, and no consciousness inference.
+**Current evidence status:** research specification plus a dependency-free exact toy evaluator, exhaustive partition-sensitivity code, an expected-output TSV, and an independent reference calculation have been authored. The Rust executable and its 15 tests have not been compiled or run; the committed independent Python oracle's 11 tests have also not been run. There is no demonstrated empirical usefulness, no validated advantage over established baselines, no novelty/SOTA claim, no IIT correspondence, and no consciousness inference.
