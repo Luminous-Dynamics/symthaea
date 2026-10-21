@@ -3819,6 +3819,18 @@ end Second
         assert_eq!(dataset_audit["ambiguous_path_join_count"], 1);
         assert_eq!(dataset_audit["unmatched_path_join_count"], 1);
         assert_eq!(dataset_audit["invalid_dataset_path_count"], 1);
+        assert_eq!(dataset_audit["unique_theorem_identity_join_count"], 2);
+        assert_eq!(dataset_audit["ambiguous_theorem_identity_join_count"], 0);
+        assert_eq!(dataset_audit["unmatched_theorem_identity_join_count"], 5);
+        assert_eq!(
+            dataset_audit["theorem_identity_status_counts"]
+                .as_object()
+                .expect("identity status counts are an object")
+                .values()
+                .map(|count| count.as_u64().expect("status count is nonnegative") as usize)
+                .sum::<usize>(),
+            7
+        );
         assert_eq!(dataset_audit["commit_before_ancestor_of_head_count"], 5);
         assert_eq!(
             dataset_audit["commit_before_missing_commit_object_count"],
@@ -3840,6 +3852,20 @@ end Second
         assert_eq!(dataset_events[0]["statement_match_at_commit_before"], true);
         assert_eq!(dataset_events[0]["statement_match_at_completion"], true);
         assert_eq!(
+            dataset_events[0]["identity_join_status"],
+            "unique_stable_theorem_proof_transition"
+        );
+        assert_eq!(dataset_events[0]["identity_candidate_timeline_positions"][0], 3);
+        assert_eq!(dataset_events[0]["identity_statement_match_at_commit_before"], true);
+        assert_eq!(dataset_events[0]["identity_statement_match_at_completion"], true);
+        assert_eq!(dataset_events[0]["identity_proof_matches_completion"], true);
+        assert_eq!(dataset_events[0]["identity_proof_absent_at_commit_before"], true);
+        assert_eq!(
+            dataset_events[1]["identity_join_status"],
+            "unique_stable_theorem_proof_transition"
+        );
+        assert_eq!(dataset_events[1]["identity_candidate_timeline_positions"][0], 0);
+        assert_eq!(
             dataset_events[1]["path_join_status"],
             "ambiguous_path_match"
         );
@@ -3849,10 +3875,18 @@ end Second
         );
         assert_eq!(dataset_events[2]["path_join_status"], "no_path_match");
         assert_eq!(
+            dataset_events[2]["identity_join_status"],
+            "not_checked_no_path_candidate"
+        );
+        assert_eq!(
             dataset_events[2]["statement_match_relation"],
             "not_checked_due_to_unmatched_path"
         );
         assert_eq!(dataset_events[3]["path_join_status"], "unique_path_match");
+        assert_eq!(
+            dataset_events[3]["identity_join_status"],
+            "declared_name_unavailable"
+        );
         assert_eq!(
             dataset_events[3]["statement_match_relation"],
             "empty_formal_statement"
