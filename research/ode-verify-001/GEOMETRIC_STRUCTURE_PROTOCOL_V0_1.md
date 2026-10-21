@@ -73,3 +73,7 @@ It cannot support a universal solver ranking, physical-law discovery, measured p
 - Roache, [Code Verification by the Method of Manufactured Solutions](https://doi.org/10.1115/1.1436090), Journal of Fluids Engineering (2002): use sufficiently rich known solutions to expose implementation errors.
 
 These references motivate the design; they do not certify this repository or establish a head-to-head performance result.
+
+## Nonlinear extension
+
+The follow-on [GEOM-ODE-002 protocol](NONLINEAR_SYMPLECTICITY_PROTOCOL_V0_1.md) extends the one-step map tests to the nonlinear, two-degree-of-freedom Hénon–Heiles Hamiltonian. It estimates the tangent map with a frozen centered finite-difference rule and checks M^T J M - J over nine state/timestep pairs, with RK4 as a negative control. This numerical-map test is separate from the symbolic polynomial conservation obligation in [PR #8177](https://github.com/Luminous-Dynamics/symthaea/pull/8177); neither one alone establishes empirical physical validity.
