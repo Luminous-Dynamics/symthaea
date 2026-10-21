@@ -1191,8 +1191,9 @@ mod tests {
             );
             let id = string_field(&source, "source_id").unwrap().to_string();
             let uri = string_field(&source, "uri").unwrap().to_string();
+            let split = string_field(&source, "split").unwrap().to_string();
             assert!(
-                catalog.insert(id.clone(), uri).is_none(),
+                catalog.insert(id.clone(), (uri, split)).is_none(),
                 "duplicate source catalog ID {id:?}"
             );
         }
@@ -1214,7 +1215,7 @@ mod tests {
                     for source_ref in source_refs {
                         let source_id = string_field(source_ref, "source_id").unwrap_or("");
                         let uri = string_field(source_ref, "uri").unwrap_or("");
-                        let catalog_uri = catalog.get(source_id).unwrap_or_else(|| {
+                        let (catalog_uri, source_split) = catalog.get(source_id).unwrap_or_else(|| {
                             panic!(
                                 "case {} references source ID {source_id:?} absent from catalog",
                                 string_field(&case, "id").unwrap_or("<unknown>")
@@ -1223,6 +1224,12 @@ mod tests {
                         assert_eq!(
                             uri, catalog_uri,
                             "case {} source URI differs from catalog for {source_id:?}",
+                            string_field(&case, "id").unwrap_or("<unknown>")
+                        );
+                        assert_eq!(
+                            string_field(&case, "split").unwrap_or(""),
+                            source_split,
+                            "case {} split differs from source family split for {source_id:?}",
                             string_field(&case, "id").unwrap_or("<unknown>")
                         );
                     }
