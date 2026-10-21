@@ -16,8 +16,7 @@ use std::{
 pub const ARTIFACT_INVENTORY_SCHEMA: &str = "atomfab-pcb-artifact-inventory-v0.1";
 pub const ARTIFACT_INVENTORY_AUTHORITY: &str =
     "artifact_presence_and_digest_inventory_only_no_design_or_production_authority";
-pub const ARTIFACT_INVENTORY_CLAIM_CEILING: &str =
-    "Artifact presence and SHA-256 inventory only; no KiCad DRC, design manufacturability, physical quality, safety, or production-release authority.";
+pub const ARTIFACT_INVENTORY_CLAIM_CEILING: &str = "Artifact presence and SHA-256 inventory only; no KiCad DRC, design manufacturability, physical quality, safety, or production-release authority.";
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -87,10 +86,7 @@ pub fn evaluate_artifact_inventory(
         return Err("artifact inventory authority boundary weakened or missing".into());
     }
     if manifest.required_roles.is_empty()
-        || manifest
-            .required_roles
-            .iter()
-            .any(|role| !valid_role(role))
+        || manifest.required_roles.iter().any(|role| !valid_role(role))
     {
         return Err("required artifact roles must be nonempty, unique tokens".into());
     }
@@ -282,7 +278,10 @@ fn safe_relative_path(raw: &str) -> Result<PathBuf, &'static str> {
     for component in path.components() {
         match component {
             Component::Normal(_) => has_normal_component = true,
-            Component::CurDir | Component::ParentDir | Component::RootDir | Component::Prefix(_) => {
+            Component::CurDir
+            | Component::ParentDir
+            | Component::RootDir
+            | Component::Prefix(_) => {
                 return Err("UNSAFE_ARTIFACT_PATH");
             }
         }
@@ -373,8 +372,14 @@ mod tests {
         assert_eq!(receipt.status, "complete");
         assert_eq!(receipt.required_role_count, 2);
         assert_eq!(receipt.observed_artifact_count, 2);
-        assert_eq!(receipt.artifacts[0].sha256.clone().unwrap(), sha256_hex(b"gerber bytes"));
-        assert_eq!(receipt.artifacts[1].sha256.clone().unwrap(), sha256_hex(b"board bytes"));
+        assert_eq!(
+            receipt.artifacts[0].sha256.clone().unwrap(),
+            sha256_hex(b"gerber bytes")
+        );
+        assert_eq!(
+            receipt.artifacts[1].sha256.clone().unwrap(),
+            sha256_hex(b"board bytes")
+        );
         assert!(receipt.problems.is_empty());
     }
 
@@ -396,7 +401,11 @@ mod tests {
     #[test]
     fn path_traversal_is_rejected_without_reading_outside_root() {
         let root = TempRoot::new();
-        let outside = root.path().parent().expect("parent").join("atomfab-outside-fixture");
+        let outside = root
+            .path()
+            .parent()
+            .expect("parent")
+            .join("atomfab-outside-fixture");
         fs::write(&outside, b"must not be read").expect("write outside fixture");
         let input = manifest(
             serde_json::json!([{"role":"native_board","path":"../atomfab-outside-fixture"}]),
@@ -406,7 +415,12 @@ mod tests {
         let receipt =
             evaluate_artifact_inventory(&input, root.path()).expect("inventory evaluation");
         assert_eq!(receipt.status, "rejected");
-        assert!(receipt.problems.iter().any(|value| value.starts_with("UNSAFE_ARTIFACT_PATH:")));
+        assert!(
+            receipt
+                .problems
+                .iter()
+                .any(|value| value.starts_with("UNSAFE_ARTIFACT_PATH:"))
+        );
         assert_eq!(receipt.artifacts[0].sha256, None);
         let _ = fs::remove_file(outside);
     }
@@ -428,7 +442,12 @@ mod tests {
             evaluate_artifact_inventory(&input, root.path()).expect("inventory evaluation");
         assert_eq!(receipt.status, "rejected");
         assert_eq!(receipt.observed_artifact_count, 0);
-        assert!(receipt.problems.iter().any(|value| value.starts_with("EXPECTED_SHA256_MISMATCH:")));
+        assert!(
+            receipt
+                .problems
+                .iter()
+                .any(|value| value.starts_with("EXPECTED_SHA256_MISMATCH:"))
+        );
     }
 
     #[test]
@@ -448,8 +467,18 @@ mod tests {
         let receipt =
             evaluate_artifact_inventory(&input, root.path()).expect("inventory evaluation");
         assert_eq!(receipt.status, "rejected");
-        assert!(receipt.problems.iter().any(|value| value.starts_with("DUPLICATE_ROLE:")));
-        assert!(receipt.problems.iter().any(|value| value.starts_with("UNDECLARED_ROLE:")));
+        assert!(
+            receipt
+                .problems
+                .iter()
+                .any(|value| value.starts_with("DUPLICATE_ROLE:"))
+        );
+        assert!(
+            receipt
+                .problems
+                .iter()
+                .any(|value| value.starts_with("UNDECLARED_ROLE:"))
+        );
     }
 
     #[test]
@@ -475,11 +504,9 @@ mod tests {
     #[test]
     fn weakened_authority_and_malformed_manifest_are_rejected() {
         let root = TempRoot::new();
-        let mut value: serde_json::Value = serde_json::from_slice(&manifest(
-            serde_json::json!([]),
-            &["native_board"],
-        ))
-        .expect("fixture JSON");
+        let mut value: serde_json::Value =
+            serde_json::from_slice(&manifest(serde_json::json!([]), &["native_board"]))
+                .expect("fixture JSON");
         value["authority"] = serde_json::Value::String("production_ready".to_string());
         let weakened = serde_json::to_vec(&value).expect("serialize weakened manifest");
         assert!(evaluate_artifact_inventory(&weakened, root.path()).is_err());
