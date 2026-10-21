@@ -81,6 +81,17 @@ pub enum TokenEmbeddingSeedScheme {
     DomainSeparatedV2,
 }
 
+fn token_embedding_from_seed(
+    genesis: &GenesisSeed,
+    label: &str,
+    scheme: TokenEmbeddingSeedScheme,
+) -> ContinuousHV {
+    match scheme {
+        TokenEmbeddingSeedScheme::LegacyV1 => ContinuousHV::from_genesis(genesis, label, HDC_DIMENSION),
+        TokenEmbeddingSeedScheme::DomainSeparatedV2 => genesis.hv_v2(label, HDC_DIMENSION),
+    }
+}
+
 /// Configuration for the language controller.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct LanguageControllerConfig {
@@ -92,6 +103,9 @@ pub struct LanguageControllerConfig {
     pub learning_rate: f32,
     /// Vocabulary size (number of token embeddings).
     pub vocab_size: usize,
+    /// Versioned token-row initializer; old serialized configs default to V1.
+    #[serde(default)]
+    pub token_embedding_seed_scheme: TokenEmbeddingSeedScheme,
     /// Maximum sequence length.
     pub max_seq_len: usize,
     /// Time step per token (seconds). Can be dynamically adjusted for
@@ -243,6 +257,7 @@ impl Default for LanguageControllerConfig {
             neurons_per_layer: 8,
             learning_rate: 0.001,
             vocab_size: 256, // Minimal default, override for real use
+            token_embedding_seed_scheme: TokenEmbeddingSeedScheme::LegacyV1,
             max_seq_len: 512,
             dt_per_token: 0.02, // 20ms per token step
             logit_temperature: 1.0,
@@ -331,7 +346,7 @@ impl LanguageController {
         Self::new_with_token_embedding_seed_scheme(
             genesis,
             config,
-            TokenEmbeddingSeedScheme::LegacyV1,
+            config.token_embedding_seed_scheme,
         )
     }
 
@@ -344,6 +359,10 @@ impl LanguageController {
         config: &LanguageControllerConfig,
         seed_scheme: TokenEmbeddingSeedScheme,
     ) -> Self {
+        let mut effective_config = config.clone();
+        effective_config.token_embedding_seed_scheme = seed_scheme;
+        let config = &effective_config;
+
         let neuron_config = UnifiedConfig {
             tau_base: 0.02,                    // 20ms — matches token generation rate
             backbone_tau: config.backbone_tau, // Configurable state dependency for coherent sequences
@@ -364,17 +383,7 @@ impl LanguageController {
         // Seed scheme is isolated to token rows; the recurrent network above
         // intentionally retains its existing initialization for controlled A/B.
         let token_embeddings: Vec<ContinuousHV> = (0..config.vocab_size)
-            .map(|i| {
-                let label = format!("broca::token_emb::{i}");
-                match seed_scheme {
-                    TokenEmbeddingSeedScheme::LegacyV1 => {
-                        ContinuousHV::from_genesis(genesis, &label, HDC_DIMENSION)
-                    }
-                    TokenEmbeddingSeedScheme::DomainSeparatedV2 => {
-                        genesis.hv_v2(&label, HDC_DIMENSION)
-                    }
-                }
-            })
+            .map(|i| token_embedding_from_seed(genesis, &format!("broca::token_emb::{i}"), seed_scheme))
             .collect();
 
         let position_base =
@@ -889,18 +898,22 @@ impl LanguageController {
         context_hvs: Option<&[&ContinuousHV]>,
     ) {
         let emb = if let Some(ctx) = context_hvs {
-            // Algebraically compose from surrounding semantics
+            // Algebraically compose from surrounding semantics when context exists.
             if ctx.is_empty() {
-                ContinuousHV::from_genesis(
+                token_embedding_from_seed(
                     genesis,
                     &format!("broca::token_emb::{name}"),
-                    HDC_DIMENSION,
+                    self.config.token_embedding_seed_scheme,
                 )
             } else {
                 ContinuousHV::bundle(ctx)
             }
         } else {
-            ContinuousHV::from_genesis(genesis, &format!("broca::token_emb::{name}"), HDC_DIMENSION)
+            token_embedding_from_seed(
+                genesis,
+                &format!("broca::token_emb::{name}"),
+                self.config.token_embedding_seed_scheme,
+            )
         };
         self.token_embeddings.push(emb);
         // Invalidate GPU cache — will be rebuilt on next compute_logits if needed
@@ -1644,6 +1657,50 @@ mod tests {
             first.token_embeddings()[0].values,
             legacy.token_embeddings()[0].values,
             "V2 must be independently distinguishable from legacy initialization"
+        );
+    }
+
+    #[test]
+    fn token_seed_scheme_serialization_is_backward_compatible() {
+        let mut config = test_config();
+        config.token_embedding_seed_scheme = TokenEmbeddingSeedScheme::DomainSeparatedV2;
+
+        let encoded = serde_json::to_value(&config).expect("config should serialize");
+        let decoded: LanguageControllerConfig =
+            serde_json::from_value(encoded.clone()).expect("V2 config should deserialize");
+        assert_eq!(
+            decoded.token_embedding_seed_scheme,
+            TokenEmbeddingSeedScheme::DomainSeparatedV2
+        );
+
+        let mut legacy_json = encoded;
+        legacy_json
+            .as_object_mut()
+            .expect("serialized config should be an object")
+            .remove("token_embedding_seed_scheme");
+        let legacy: LanguageControllerConfig =
+            serde_json::from_value(legacy_json).expect("old config should deserialize");
+        assert_eq!(
+            legacy.token_embedding_seed_scheme,
+            TokenEmbeddingSeedScheme::LegacyV1
+        );
+    }
+
+    #[test]
+    fn appended_tokens_follow_the_active_seed_scheme() {
+        let genesis = test_genesis();
+        let mut config = test_config();
+        config.token_embedding_seed_scheme = TokenEmbeddingSeedScheme::DomainSeparatedV2;
+        let mut controller = LanguageController::new(&genesis, &config);
+        let old_vocab_size = controller.vocab_size();
+
+        controller.append_token(&genesis, "new-token", None);
+
+        assert_eq!(controller.vocab_size(), old_vocab_size + 1);
+        assert_eq!(
+            controller.token_embeddings()[old_vocab_size].values,
+            genesis.hv_v2("broca::token_emb::new-token", HDC_DIMENSION).values,
+            "appended V2 rows must not silently revert to the legacy stream"
         );
     }
 
