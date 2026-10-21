@@ -1300,6 +1300,60 @@ mod tests {
     }
 
     #[test]
+    fn corroboration_rejects_two_witnesses_from_one_source_family() {
+        let mut graph = EnhancedKnowledgeGraph::new(100);
+        let context_a = make_claim_context(
+            "witness-a",
+            "same-work-family",
+            "evidence-a",
+            "renewal",
+            ClaimPolarity::Positive,
+            Some(1),
+        );
+        let context_b = make_claim_context(
+            "witness-b",
+            "same-work-family",
+            "evidence-b",
+            "renewal",
+            ClaimPolarity::Positive,
+            Some(1),
+        );
+        let (id_a, _) = graph
+            .insert_grounded(
+                make_encoding("same proposition", 0.7),
+                1,
+                None,
+                false,
+                context_a,
+            )
+            .unwrap();
+        let (id_b, _) = graph
+            .insert_grounded(
+                make_encoding("same proposition", 0.7),
+                2,
+                None,
+                false,
+                context_b,
+            )
+            .unwrap();
+        let error = graph
+            .adjudicate_evidence_relation(
+                id_a,
+                id_b,
+                EvidenceRelation::Corroborates,
+                vec!["evidence-a".into(), "evidence-b".into()],
+                "Two witnesses from one shared source family".into(),
+                None,
+                None,
+                3,
+            )
+            .unwrap_err();
+        assert!(error.contains("independent source evidence"));
+        assert_eq!(graph.get_fact(id_a).unwrap().corroboration_count, 0);
+        assert_eq!(graph.get_fact(id_a).unwrap().confidence, 0.7);
+    }
+
+    #[test]
     fn corroboration_cannot_boost_twice_for_reverse_orientation_or_new_evidence_subset() {
         let mut graph = EnhancedKnowledgeGraph::new(100);
         let mut context_a = make_claim_context(
