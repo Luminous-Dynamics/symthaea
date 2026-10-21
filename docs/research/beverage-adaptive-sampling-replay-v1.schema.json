@@ -26,7 +26,8 @@
     "min_high_severity_events",
     "bootstrap_seed",
     "bootstrap_replicates",
-    "pairs"
+    "pairs",
+    "max_pair_loss_degradation_units"
   ],
   "properties": {
     "schema_version": {
@@ -118,6 +119,10 @@
       "items": {
         "$ref": "#/$defs/pair"
       }
+    },
+    "max_pair_loss_degradation_units": {
+      "type": "number",
+      "minimum": 0
     }
   },
   "allOf": [
