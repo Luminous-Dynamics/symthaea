@@ -23,6 +23,7 @@ use symthaea_core::hdc::ContinuousHV;
 
 const BASE_VOCAB_SIZE: usize = 64;
 const NEW_TOKEN_COUNT: usize = 8;
+const QUERY_COUNT: usize = 16;
 const CONTEXTS: [[usize; 3]; NEW_TOKEN_COUNT] = [
     [1, 2, 3],
     [4, 5, 6],
@@ -41,13 +42,16 @@ struct ExtensionMetrics {
     strategy: &'static str,
     old_rows_bit_identical: bool,
     old_vocab_max_abs_logit_delta: f32,
-    old_vocab_top1_preserved: bool,
+    old_vocab_top1_preserved_fraction: f64,
+    old_top1_remains_global_fraction: f64,
+    minimum_old_top1_margin_over_new_tokens: f32,
     median_new_to_old_norm_ratio: f64,
     mean_context_cosine: f64,
     mean_abs_pairwise_new_cosine: f64,
     max_abs_pairwise_new_cosine: f64,
-    new_token_probability_mass: f64,
-    conditional_old_vocab_kl_nats: f64,
+    mean_new_token_probability_mass: f64,
+    max_new_token_probability_mass: f64,
+    mean_conditional_old_vocab_kl_nats: f64,
     non_finite_logit_count: usize,
     finite_new_coordinate_count: usize,
     non_finite_new_coordinate_count: usize,
@@ -67,6 +71,7 @@ struct ExtensionReceipt {
     appended_token_count: usize,
     context_index_digest_sha256: String,
     fixed_query_domain: &'static str,
+    query_count: usize,
     results: Vec<ExtensionMetrics>,
     claim_boundary: &'static str,
 }
@@ -142,8 +147,8 @@ fn create_base_controller(genesis: &GenesisSeed) -> LanguageController {
 fn run_arm(
     base: &LanguageController,
     genesis: &GenesisSeed,
-    query: &ContinuousHV,
-    baseline_logits: &[f32],
+    queries: &[ContinuousHV],
+    baseline_logits: &[Vec<f32>],
     strategy: BenchStrategy,
 ) -> Result<ExtensionMetrics, Box<dyn Error>> {
     let old_vocab_size = base.vocab_size();
@@ -215,47 +220,107 @@ fn run_arm(
         .zip(old_rows.iter())
         .all(|(row, expected)| row.values.as_slice() == expected.as_slice());
 
-    controller.reset();
-    let extended_logits = controller.forward_step(query, 0, 0);
-    let non_finite_logit_count = extended_logits.iter().filter(|logit| !logit.is_finite()).count();
-    let old_vocab_max_abs_logit_delta = baseline_logits
-        .iter()
-        .zip(extended_logits[..old_vocab_size].iter())
-        .map(|(before, after)| (before - after).abs())
-        .fold(0.0f32, f32::max);
-    let base_top1 = baseline_logits
-        .iter()
-        .enumerate()
-        .max_by(|a, b| a.1.total_cmp(b.1))
-        .map(|(index, _)| index);
-    let extended_old_top1 = extended_logits[..old_vocab_size]
-        .iter()
-        .enumerate()
-        .max_by(|a, b| a.1.total_cmp(b.1))
-        .map(|(index, _)| index);
-    let old_vocab_top1_preserved = base_top1 == extended_old_top1;
+    let mut old_vocab_max_abs_logit_delta = 0.0f32;
+    let mut old_vocab_top1_preserved_count = 0usize;
+    let mut old_top1_remains_global_count = 0usize;
+    let mut minimum_old_top1_margin_over_new_tokens = f32::INFINITY;
+    let mut new_token_probability_masses = Vec::with_capacity(queries.len());
+    let mut conditional_old_vocab_kls = Vec::with_capacity(queries.len());
+    let mut non_finite_logit_count = 0usize;
 
-    let base_probs = stable_softmax(baseline_logits);
-    let extended_probs = stable_softmax(&extended_logits);
-    let new_token_probability_mass: f64 = extended_probs[old_vocab_size..].iter().sum();
-    let extended_old_mass = 1.0 - new_token_probability_mass;
-    let conditional_old_vocab_kl_nats = if extended_old_mass > 0.0 {
-        base_probs
+    for (query, baseline) in queries.iter().zip(baseline_logits.iter()) {
+        controller.reset();
+        let extended_logits = controller.forward_step(query, 0, 0);
+        non_finite_logit_count += extended_logits
             .iter()
-            .zip(extended_probs[..old_vocab_size].iter())
-            .filter(|(p, _)| **p > 0.0)
-            .map(|(p, q)| {
-                let conditional_q = *q / extended_old_mass;
-                if conditional_q > 0.0 {
-                    *p * (*p / conditional_q).ln()
-                } else {
-                    f64::INFINITY
-                }
-            })
-            .sum()
-    } else {
-        f64::INFINITY
-    };
+            .filter(|logit| !logit.is_finite())
+            .count();
+
+        for (before, after) in baseline
+            .iter()
+            .zip(extended_logits[..old_vocab_size].iter())
+        {
+            let delta = (before - after).abs();
+            if delta.is_finite() {
+                old_vocab_max_abs_logit_delta =
+                    old_vocab_max_abs_logit_delta.max(delta);
+            } else {
+                old_vocab_max_abs_logit_delta = f32::INFINITY;
+            }
+        }
+
+        let base_top1 = baseline
+            .iter()
+            .enumerate()
+            .max_by(|a, b| a.1.total_cmp(b.1))
+            .map(|(index, _)| index);
+        let extended_old_top1 = extended_logits[..old_vocab_size]
+            .iter()
+            .enumerate()
+            .max_by(|a, b| a.1.total_cmp(b.1))
+            .map(|(index, _)| index);
+        let extended_global_top1 = extended_logits
+            .iter()
+            .enumerate()
+            .max_by(|a, b| a.1.total_cmp(b.1))
+            .map(|(index, _)| index);
+        if base_top1 == extended_old_top1 {
+            old_vocab_top1_preserved_count += 1;
+        }
+        if base_top1 == extended_global_top1 {
+            old_top1_remains_global_count += 1;
+        }
+
+        let best_old_logit = baseline
+            .iter()
+            .copied()
+            .fold(f32::NEG_INFINITY, f32::max);
+        let best_new_logit = extended_logits[old_vocab_size..]
+            .iter()
+            .copied()
+            .fold(f32::NEG_INFINITY, f32::max);
+        let margin = best_old_logit - best_new_logit;
+        if margin.is_finite() {
+            minimum_old_top1_margin_over_new_tokens =
+                minimum_old_top1_margin_over_new_tokens.min(margin);
+        } else {
+            minimum_old_top1_margin_over_new_tokens = f32::NEG_INFINITY;
+        }
+
+        let base_probs = stable_softmax(baseline);
+        let extended_probs = stable_softmax(&extended_logits);
+        let new_mass: f64 = extended_probs[old_vocab_size..].iter().sum();
+        new_token_probability_masses.push(new_mass);
+        let extended_old_mass = 1.0 - new_mass;
+        let conditional_kl = if extended_old_mass > 0.0 {
+            base_probs
+                .iter()
+                .zip(extended_probs[..old_vocab_size].iter())
+                .filter(|(p, _)| **p > 0.0)
+                .map(|(p, q)| {
+                    let conditional_q = *q / extended_old_mass;
+                    if conditional_q > 0.0 {
+                        *p * (*p / conditional_q).ln()
+                    } else {
+                        f64::INFINITY
+                    }
+                })
+                .sum()
+        } else {
+            f64::INFINITY
+        };
+        conditional_old_vocab_kls.push(conditional_kl);
+    }
+
+    let query_count = queries.len().max(1) as f64;
+    let mean_new_token_probability_mass =
+        new_token_probability_masses.iter().sum::<f64>() / query_count;
+    let max_new_token_probability_mass = new_token_probability_masses
+        .iter()
+        .copied()
+        .fold(0.0f64, f64::max);
+    let mean_conditional_old_vocab_kl_nats =
+        conditional_old_vocab_kls.iter().sum::<f64>() / query_count;
 
     let new_rows: Vec<&ContinuousHV> = new_indices
         .iter()
@@ -297,7 +362,11 @@ fn run_arm(
         strategy: strategy.label(),
         old_rows_bit_identical,
         old_vocab_max_abs_logit_delta,
-        old_vocab_top1_preserved,
+        old_vocab_top1_preserved_fraction:
+            old_vocab_top1_preserved_count as f64 / query_count,
+        old_top1_remains_global_fraction:
+            old_top1_remains_global_count as f64 / query_count,
+        minimum_old_top1_margin_over_new_tokens,
         median_new_to_old_norm_ratio: new_norm_ratio,
         mean_context_cosine: if context_similarities.is_empty() {
             0.0
@@ -310,8 +379,9 @@ fn run_arm(
             pairwise.iter().sum::<f64>() / pairwise.len() as f64
         },
         max_abs_pairwise_new_cosine: pairwise.iter().copied().fold(0.0, f64::max),
-        new_token_probability_mass,
-        conditional_old_vocab_kl_nats,
+        mean_new_token_probability_mass,
+        max_new_token_probability_mass,
+        mean_conditional_old_vocab_kl_nats,
         non_finite_logit_count,
         finite_new_coordinate_count,
         non_finite_new_coordinate_count,
@@ -332,42 +402,49 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let genesis = GenesisSeed::from_phrase("broca-vocab-extension-smoke-v1");
     let base = create_base_controller(&genesis);
+    let fixed_query_domain = "extension-smoke::query";
+    let queries: Vec<ContinuousHV> = (0..QUERY_COUNT)
+        .map(|index| {
+            ContinuousHV::from_genesis(
+                &genesis,
+                &format!("{fixed_query_domain}::{index}"),
+                symthaea_core::hdc::HDC_DIMENSION,
+            )
+        })
+        .collect();
     let mut base_for_logits = base.clone();
-    let fixed_query_domain = "extension-smoke::fixed-query";
-    let query = ContinuousHV::from_genesis(
-        &genesis,
-        fixed_query_domain,
-        symthaea_core::hdc::HDC_DIMENSION,
-    );
-    base_for_logits.reset();
-    let baseline_logits = base_for_logits.forward_step(&query, 0, 0);
+    let mut baseline_logits = Vec::with_capacity(queries.len());
+    for query in &queries {
+        base_for_logits.reset();
+        baseline_logits.push(base_for_logits.forward_step(query, 0, 0));
+    }
 
     let results = vec![
         run_arm(
             &base,
             &genesis,
-            &query,
+            &queries,
             &baseline_logits,
             BenchStrategy::SeededRandomV1,
         )?,
         run_arm(
             &base,
             &genesis,
-            &query,
+            &queries,
             &baseline_logits,
             BenchStrategy::LegacyContextBundle,
         )?,
         run_arm(
             &base,
             &genesis,
-            &query,
+            &queries,
             &baseline_logits,
             BenchStrategy::ContextBundleNormMatched,
         )?,
         run_arm(
             &base,
             &genesis,
-            &query,
+            &queries,
             &baseline_logits,
             BenchStrategy::ContextBundleNormMatchedWithResidual {
                 residual_weight: 0.15,
@@ -388,6 +465,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         appended_token_count: NEW_TOKEN_COUNT,
         context_index_digest_sha256: digest(&CONTEXTS)?,
         fixed_query_domain,
+        query_count: QUERY_COUNT,
         results,
         claim_boundary: "Synthetic vector contexts only; no semantic labels, training, or SOTA claim.",
     };
@@ -398,18 +476,23 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     println!(
-        "{:<42} {:>9} {:>13} {:>12} {:>12} {:>12}",
-        "Strategy", "Rows kept", "Max Δ logit", "Norm ratio", "Context cos", "New mass"
+        "evaluated {} fixed queries across {} initializer strategies",
+        receipt.query_count,
+        receipt.results.len()
+    );
+    println!(
+        "{:<42} {:>9} {:>13} {:>11} {:>11} {:>11}",
+        "Strategy", "Rows kept", "Max Δ logit", "Old top1 %", "Global %", "Mean new mass"
     );
     for result in &receipt.results {
         println!(
-            "{:<42} {:>9} {:>13.6} {:>12.4} {:>12.4} {:>12.6}",
+            "{:<42} {:>9} {:>13.6} {:>11.3} {:>11.3} {:>11.6}",
             result.strategy,
             result.old_rows_bit_identical,
             result.old_vocab_max_abs_logit_delta,
-            result.median_new_to_old_norm_ratio,
-            result.mean_context_cosine,
-            result.new_token_probability_mass,
+            result.old_vocab_top1_preserved_fraction,
+            result.old_top1_remains_global_fraction,
+            result.mean_new_token_probability_mass,
         );
     }
     println!();
