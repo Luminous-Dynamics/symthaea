@@ -352,6 +352,43 @@ def task_utility(fixture: Fixture, intervention: Intervention | None = None) -> 
     return correct_weight / (total_input_weight * len(coin_assignments))
 
 
+def entropy_bits_from_counts(counts: Sequence[int]) -> float:
+    total = sum(counts)
+    if total <= 0:
+        return 0.0
+    return -sum((count / total) * math.log2(count / total)
+                for count in counts if count > 0)
+
+
+def input_information_baseline(fixture: Fixture) -> dict[str, object]:
+    """Exact H(Y), I(X_i;Y), and I(all inputs;Y) under the manifest prior."""
+    total_weight = sum(fixture.input_state_weights)
+    target_counts = [0, 0]
+    joint_counts = [[[0, 0] for _ in range(2)] for _ in range(fixture.input_count)]
+    for state in range(1 << fixture.input_count):
+        inputs = tuple(bool((state >> index) & 1) for index in range(fixture.input_count))
+        target_value = int(expected_task(fixture, inputs))
+        weight = fixture.input_state_weights[state]
+        target_counts[target_value] += weight
+        for index, input_value in enumerate(inputs):
+            joint_counts[index][int(input_value)][target_value] += weight
+    target_entropy = entropy_bits_from_counts(target_counts)
+    individual_mi = []
+    for counts in joint_counts:
+        conditional_entropy = 0.0
+        for row in counts:
+            row_weight = sum(row)
+            if row_weight:
+                conditional_entropy += row_weight / total_weight * entropy_bits_from_counts(row)
+        mi = target_entropy - conditional_entropy
+        individual_mi.append(0.0 if abs(mi) < TOLERANCE else mi)
+    return {
+        "target_entropy_bits": target_entropy,
+        "individual_input_mi_bits": individual_mi,
+        "joint_input_mi_bits": target_entropy,
+    }
+
+
 def evaluate_fixture(fixture: Fixture) -> tuple[list[InterventionScore], list[PartitionScore], dict[str, float | int]]:
     intact = task_utility(fixture)
     scores = []
@@ -409,6 +446,7 @@ def render_artifact(fixtures: Sequence[Fixture], manifest_bytes: bytes, source_s
     rows: list[list[str]] = []
     for fixture in fixtures:
         interventions, partitions, summary = evaluate_fixture(fixture)
+        information = input_information_baseline(fixture)
         prior = ",".join(map(str, fixture.input_state_weights))
         target = canonical_target(fixture.target)
         for result in interventions:
@@ -416,20 +454,27 @@ def render_artifact(fixtures: Sequence[Fixture], manifest_bytes: bytes, source_s
                 "intervention", result.fixture, prior, target, result.identifier, result.kind,
                 str(result.source), str(result.target), str(result.cost),
                 f"{result.intact:.12g}", f"{result.utility:.12g}", f"{result.loss:.12g}",
-                "", "", "", "", "", "", "",
+                "", "", "", "", "", "", "", "", "", "",
             ])
         for point in partitions:
             rows.append([
                 "partition", point.fixture, prior, target, "", "", "", "", "",
                 "", "", "", str(point.mask), point.labels,
                 f"{point.cross_loss:.12g}", f"{point.control_loss:.12g}",
-                f"{point.tccip:.12g}", str(point.n_cross), str(point.n_control),
+                f"{point.tccip:.12g}", str(point.n_cross), str(point.n_control), "", "", "",
             ])
         rows.append([
             "summary", fixture.name, prior, target, "", "", "", "", "",
             f"{summary['intact']:.12g}", "", "", "", "",
             f"{summary['cross_loss']:.12g}", f"{summary['control_loss']:.12g}",
-            f"{summary['tccip']:.12g}", str(summary['usable']), str(summary['skipped']),
+            f"{summary['tccip']:.12g}", str(summary['usable']), str(summary['skipped']), "", "", "",
+        ])
+        rows.append([
+            "information_baseline", fixture.name, prior, target, "", "", "", "", "",
+            "", "", "", "", "", "", "", "", "", "",
+            f"{information['target_entropy_bits']:.12g}",
+            ",".join(f"{value:.12g}" for value in information["individual_input_mi_bits"]),
+            f"{information['joint_input_mi_bits']:.12g}",
         ])
     output = io.StringIO()
     output.write("# schema=tccip-independent-reference-v1\n")
@@ -440,7 +485,8 @@ def render_artifact(fixtures: Sequence[Fixture], manifest_bytes: bytes, source_s
     writer.writerow(["record_type", "fixture", "input_state_weights", "task_target", "intervention_id",
                      "kind", "source", "target", "cost", "intact_utility", "utility", "utility_loss",
                      "partition_mask", "partition_labels", "cross_mean_loss", "control_mean_loss",
-                     "tccip", "n_cross", "n_control"])
+                     "tccip", "n_cross", "n_control", "target_entropy_bits",
+                     "individual_input_mi_bits", "joint_input_mi_bits"])
     writer.writerows(rows)
     return output.getvalue()
 
