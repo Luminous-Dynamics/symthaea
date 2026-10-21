@@ -1116,7 +1116,10 @@ fn validate_source_pack_contract(record: &Value) -> Vec<String> {
             "source-pack snapshot {pair_id:?} has unsupported access_decision {access_decision:?}"
         ));
     }
-    if access_decision != "allow" && !evidence.is_empty() {
+    if access_decision != "allow"
+        && !(synthetic_only && access_decision == "synthetic_only")
+        && !evidence.is_empty()
+    {
         errors.push(format!(
             "source-pack snapshot {pair_id:?} exposes evidence despite access_decision={access_decision:?}"
         ));
