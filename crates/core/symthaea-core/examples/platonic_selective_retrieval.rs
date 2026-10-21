@@ -10,6 +10,7 @@
 //! have no single correct label and count as errors whenever accepted.
 
 use std::error::Error;
+use std::sync::Arc;
 use std::time::Instant;
 
 use symthaea_core::hdc::pattern_interaction::PatternVector;
@@ -58,6 +59,8 @@ struct ScoredQuery {
     correct: bool,
     /// Cosine similarity of the ground-truth label, when the query is labeled.
     target_similarity: Option<f64>,
+    /// Cached similarity to each prototype, also reused for set-valued retrieval.
+    prototype_similarities: Arc<[f64]>,
     kind: QueryKind,
 }
 
@@ -178,18 +181,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         let (conformal_q, conformal_calibration_n) =
             split_conformal_quantile(&selection, CONFORMAL_ALPHA)?;
         let conformal_cutoff_similarity = 1.0 - conformal_q;
-        let conformal_test = score_conformal_sets(
-            &test_queries,
-            &test,
-            &prototypes,
-            conformal_q,
-        )?;
-        let conformal_near_unknown = score_conformal_sets(
-            &near_unknown_queries,
-            &near_unknown,
-            &prototypes,
-            conformal_q,
-        )?;
+        let conformal_test = score_conformal_sets(&test, conformal_q);
+        let conformal_near_unknown = score_conformal_sets(&near_unknown, conformal_q);
         println!(
             "# conformal_calibration=seed:{seed},alpha:{CONFORMAL_ALPHA:.4},q:{conformal_q:.6},cutoff_similarity:{conformal_cutoff_similarity:.6},known_calibration_n:{conformal_calibration_n}"
         );
@@ -234,9 +227,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             None,
             &near_unknown,
         );
-        report_identity_collision_controls(
-            seed, &prototypes, "always_top1", always_accept, conformal_cutoff_similarity,
-        )?;
+        let mut identity_policies = vec![("always_top1".to_owned(), always_accept)];
 
         for (mode_name, mode) in [
             ("score_only", CalibrationMode::ScoreOnly),
@@ -268,9 +259,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 None,
                 &near_unknown,
             );
-            report_identity_collision_controls(
-                seed, &prototypes, &baseline_name, rule, conformal_cutoff_similarity,
-            )?;
+            identity_policies.push((baseline_name.clone(), rule));
 
             // Baseline B: fixed-sequence confidence-interval calibration (CIC).
             // The score/margin threshold schedule is fixed before observing the
@@ -311,11 +300,10 @@ fn main() -> Result<(), Box<dyn Error>> {
                 None,
                 &near_unknown,
             );
-            report_identity_collision_controls(
-                seed, &prototypes, &cic_name, cic.rule, conformal_cutoff_similarity,
-            )?;
+            identity_policies.push((cic_name.clone(), cic.rule));
             report_risk_coverage_curve(seed, mode_name, mode, &test);
         }
+        report_identity_collision_controls(seed, &prototypes, &identity_policies)?;
     }
 
     println!("# wall_ms={}", start.elapsed().as_millis());
@@ -443,9 +431,11 @@ fn score_queries(
         let mut best_index = 0;
         let mut best = f64::NEG_INFINITY;
         let mut second = f64::NEG_INFINITY;
+        let mut prototype_similarities = Vec::with_capacity(prototypes.len());
 
         for (index, prototype) in prototypes.iter().enumerate() {
             let similarity = query.similarity(prototype)?;
+            prototype_similarities.push(similarity);
             if similarity > best {
                 second = best;
                 best = similarity;
@@ -470,6 +460,7 @@ fn score_queries(
             top_two_margin: best - second,
             correct: sample.target.is_some_and(|target_index| target_index == best_index),
             target_similarity,
+            prototype_similarities: Arc::from(prototype_similarities),
             kind: sample.kind,
         });
     }
@@ -892,34 +883,29 @@ fn conformal_set_size(
 }
 
 fn score_conformal_sets(
-    queries: &[QuerySample],
     scored: &[ScoredQuery],
-    prototypes: &[PatternVector],
     conformal_q: f64,
-) -> Result<Vec<ConformalQueryResult>, Box<dyn Error>> {
-    if queries.len() != scored.len() {
-        return Err("query and score collections must be aligned".into());
-    }
+) -> Vec<ConformalQueryResult> {
     let cutoff_similarity = 1.0 - conformal_q;
-    let mut results = Vec::with_capacity(queries.len());
-    for (query, score) in queries.iter().zip(scored) {
-        let mut set_size = 0;
-        for prototype in prototypes {
-            if query.vector.similarity(prototype)? >= cutoff_similarity {
-                set_size += 1;
+    scored
+        .iter()
+        .map(|score| {
+            let set_size = score
+                .prototype_similarities
+                .iter()
+                .filter(|&&similarity| similarity >= cutoff_similarity)
+                .count();
+            let covered = score
+                .target_similarity
+                .is_some_and(|similarity| 1.0 - similarity <= conformal_q);
+            ConformalQueryResult {
+                kind: score.kind,
+                labeled: score.target_similarity.is_some(),
+                covered,
+                set_size,
             }
-        }
-        let covered = score
-            .target_similarity
-            .is_some_and(|similarity| 1.0 - similarity <= conformal_q);
-        results.push(ConformalQueryResult {
-            kind: query.kind,
-            labeled: score.target_similarity.is_some(),
-            covered,
-            set_size,
-        });
-    }
-    Ok(results)
+        })
+        .collect()
 }
 
 fn report_conformal_set_summaries(
@@ -984,21 +970,18 @@ fn report_conformal_set_summaries(
 fn report_identity_collision_controls(
     seed: u64,
     prototypes: &[PatternVector],
-    strategy: &str,
-    rule: DecisionRule,
-    conformal_cutoff_similarity: f64,
+    policies: &[(String, DecisionRule)],
 ) -> Result<(), Box<dyn Error>> {
-    // These paired records differ only in their declared identity status. The
-    // underlying observed vectors are byte-for-byte identical: a valid noisy
-    // observation of an enrolled prototype versus an unregistered item with
-    // the same vector. No vector-only score or margin can distinguish them.
+    // Each vector is scored once. The "unknown identity" variant is derived by
+    // changing only its semantic registration label; its cached feature scores
+    // are identical by construction, while its correctness label conflicts.
+    let not_applicable = ("not_applicable", "NA", "NA", "NA");
     for noise_index in [1usize, 2usize] {
         let noise_fraction = NOISE_LEVELS[noise_index];
         let distance_index = NEAR_UNKNOWN_DISTANCES
             .iter()
             .position(|distance| *distance == noise_fraction)
             .ok_or("identity-collision noise rate missing from near-unknown distances")?;
-
         let mut rng_state = derive_seed(seed, 0x4944_434f, noise_index as u64);
         let mut known_queries = Vec::with_capacity(NEAR_UNKNOWN_PER_DISTANCE);
         let mut unknown_queries = Vec::with_capacity(NEAR_UNKNOWN_PER_DISTANCE);
@@ -1028,54 +1011,59 @@ fn report_identity_collision_controls(
         {
             return Err("identity collision control did not preserve exact vector equality".into());
         }
-        for (known, unknown) in known_queries.iter().zip(&unknown_queries) {
-            let known_set_size = conformal_set_size(&known.vector, prototypes, conformal_cutoff_similarity)?;
-            let unknown_set_size = conformal_set_size(&unknown.vector, prototypes, conformal_cutoff_similarity)?;
-            if known_set_size != unknown_set_size {
-                return Err("conformal prediction set changed for an identical feature vector".into());
-            }
-        }
-
         let known_scored = score_queries(&known_queries, prototypes)?;
-        let unknown_scored = score_queries(&unknown_queries, prototypes)?;
+        let unknown_scored: Vec<ScoredQuery> = known_scored
+            .iter()
+            .zip(&unknown_queries)
+            .map(|(known, unknown)| {
+                let mut score = known.clone();
+                score.correct = false;
+                score.target_similarity = None;
+                score.kind = unknown.kind;
+                score
+            })
+            .collect();
+
         for (known, unknown) in known_scored.iter().zip(&unknown_scored) {
             if known.best_similarity != unknown.best_similarity
                 || known.top_two_margin != unknown.top_two_margin
+                || known.prototype_similarities != unknown.prototype_similarities
                 || known.correct == unknown.correct
             {
-                return Err("identity collision control failed score/label contradiction invariant".into());
+                return Err("identity collision control failed feature/label contradiction invariant".into());
             }
         }
 
-        let not_applicable = ("not_applicable", "NA", "NA", "NA");
-        for (record_type, label, scored) in [
-            (
-                "identifiability_control_known",
-                format!("same_vector_known_noise_{noise_index}"),
-                &known_scored,
-            ),
-            (
-                "identifiability_control_unknown",
-                format!("same_vector_unknown_noise_{noise_index}"),
-                &unknown_scored,
-            ),
-        ] {
-            write_evaluation_row(
-                record_type,
-                seed,
-                strategy,
-                &label,
-                Some(noise_fraction),
-                rule,
-                0,
-                0,
-                not_applicable.0,
-                not_applicable.1,
-                not_applicable.2,
-                not_applicable.3,
-                scored.len(),
-                evaluate(scored, rule),
-            );
+        for (strategy, rule) in policies {
+            for (record_type, label, scored) in [
+                (
+                    "identifiability_control_known",
+                    format!("same_vector_known_noise_{noise_index}"),
+                    &known_scored,
+                ),
+                (
+                    "identifiability_control_unknown",
+                    format!("same_vector_unknown_noise_{noise_index}"),
+                    &unknown_scored,
+                ),
+            ] {
+                write_evaluation_row(
+                    record_type,
+                    seed,
+                    strategy,
+                    &label,
+                    Some(noise_fraction),
+                    *rule,
+                    0,
+                    0,
+                    not_applicable.0,
+                    not_applicable.1,
+                    not_applicable.2,
+                    not_applicable.3,
+                    scored.len(),
+                    evaluate(scored, *rule),
+                );
+            }
         }
     }
     Ok(())
@@ -1259,6 +1247,7 @@ mod tests {
                 top_two_margin: 0.2,
                 correct: true,
                 target_similarity: Some(0.5),
+                prototype_similarities: Arc::<[f64]>::from(Vec::<f64>::new()),
                 kind: QueryKind::Known { noise_index: 0 },
             };
             MIN_ACCEPTED_FOR_CERTIFICATION - 1
@@ -1271,6 +1260,7 @@ mod tests {
                 top_two_margin: 0.2,
                 correct: true,
                 target_similarity: Some(0.5),
+                prototype_similarities: Arc::<[f64]>::from(Vec::<f64>::new()),
                 kind: QueryKind::Known { noise_index: 0 },
             };
             MIN_ACCEPTED_FOR_CERTIFICATION
@@ -1311,6 +1301,7 @@ mod tests {
                 top_two_margin: 0.2,
                 correct: true,
                 target_similarity: Some(0.5),
+                prototype_similarities: Arc::<[f64]>::from(Vec::<f64>::new()),
                 kind: QueryKind::Known { noise_index: 0 },
             },
             ScoredQuery {
@@ -1318,6 +1309,7 @@ mod tests {
                 top_two_margin: 0.1,
                 correct: false,
                 target_similarity: None,
+                prototype_similarities: Arc::<[f64]>::from(Vec::<f64>::new()),
                 kind: QueryKind::RandomOod,
             },
         ];
@@ -1362,6 +1354,7 @@ mod tests {
             top_two_margin: 0.2,
             correct: true,
             target_similarity: Some(0.5),
+            prototype_similarities: Arc::<[f64]>::from(Vec::<f64>::new()),
             kind: QueryKind::Known { noise_index: 0 },
         }));
         samples.extend((0..50).map(|_| ScoredQuery {
@@ -1369,6 +1362,7 @@ mod tests {
             top_two_margin: 0.1,
             correct: false,
             target_similarity: Some(0.5),
+            prototype_similarities: Arc::<[f64]>::from(Vec::<f64>::new()),
             kind: QueryKind::AmbiguousMixture,
         }));
         samples.extend((0..2_000).map(|_| ScoredQuery {
@@ -1376,6 +1370,7 @@ mod tests {
             top_two_margin: 0.05,
             correct: true,
             target_similarity: Some(0.5),
+            prototype_similarities: Arc::<[f64]>::from(Vec::<f64>::new()),
             kind: QueryKind::Known { noise_index: 1 },
         }));
 
@@ -1401,6 +1396,7 @@ mod tests {
                 top_two_margin: 0.2,
                 correct: true,
                 target_similarity: Some(0.9),
+                prototype_similarities: Arc::<[f64]>::from(Vec::<f64>::new()),
                 kind: QueryKind::Known { noise_index: 0 },
             },
             ScoredQuery {
@@ -1408,6 +1404,7 @@ mod tests {
                 top_two_margin: 0.1,
                 correct: true,
                 target_similarity: Some(0.8),
+                prototype_similarities: Arc::<[f64]>::from(Vec::<f64>::new()),
                 kind: QueryKind::Known { noise_index: 1 },
             },
             ScoredQuery {
@@ -1415,6 +1412,7 @@ mod tests {
                 top_two_margin: 0.05,
                 correct: true,
                 target_similarity: Some(0.7),
+                prototype_similarities: Arc::<[f64]>::from(Vec::<f64>::new()),
                 kind: QueryKind::Known { noise_index: 2 },
             },
             ScoredQuery {
@@ -1422,6 +1420,7 @@ mod tests {
                 top_two_margin: 0.03,
                 correct: false,
                 target_similarity: Some(0.6),
+                prototype_similarities: Arc::<[f64]>::from(Vec::<f64>::new()),
                 kind: QueryKind::Known { noise_index: 3 },
             },
             ScoredQuery {
@@ -1429,6 +1428,7 @@ mod tests {
                 top_two_margin: 0.9,
                 correct: false,
                 target_similarity: None,
+                prototype_similarities: Arc::<[f64]>::from(Vec::<f64>::new()),
                 kind: QueryKind::RandomOod,
             },
         ];
@@ -1472,6 +1472,7 @@ mod tests {
             top_two_margin: 0.5,
             correct: true,
             target_similarity: Some(1.0),
+            prototype_similarities: Arc::<[f64]>::from(Vec::<f64>::new()),
             kind: QueryKind::Known { noise_index: 0 },
         };
         let (quantile, count) =
