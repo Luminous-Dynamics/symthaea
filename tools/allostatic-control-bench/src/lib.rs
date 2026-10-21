@@ -11,7 +11,7 @@ pub mod calibration;
 pub mod robust_viability;
 
 pub const HORIZON: usize = 48;
-pub const EPISODE_CSV_HEADER: &str = "scenario,seed,policy,shielded,task_reward,cumulative_exposure,mean_load,peak_load,minimum_reserve,mean_safe_action_options,minimum_safe_action_options,terminal_reserve,terminal_load,unsafe_ticks,unsafe_episode,violation_exposure,max_violation_severity,missed_limits,shield_vetoes,no_safe_action_ticks,false_alarms,false_alarm_opportunities,push_steps,maintain_steps,emergency_recover_steps,resource_cost,failed,recovery_steps";
+pub const EPISODE_CSV_HEADER: &str = "scenario,seed,policy,shielded,task_reward,cumulative_exposure,mean_load,peak_load,minimum_reserve,mean_safe_action_options,minimum_safe_action_options,terminal_reserve,terminal_load,unsafe_ticks,unsafe_episode,violation_exposure,max_violation_severity,missed_limits,shield_vetoes,no_safe_action_ticks,false_alarms,false_alarm_opportunities,push_steps,maintain_steps,emergency_recover_steps,resource_cost,failed,had_disturbance,recovery_steps";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Scenario {
@@ -377,7 +377,9 @@ pub struct EpisodeMetrics {
     pub emergency_recover_steps: usize,
     pub resource_cost: f64,
     pub failed: bool,
-    /// None means recovery was not observed before the fixed horizon ended.
+    /// True when the episode includes at least one stress sample above the declared disturbance threshold.
+    pub had_disturbance: bool,
+    /// None means no qualifying disturbance occurred or recovery was not observed; interpret with had_disturbance.
     pub recovery_steps: Option<usize>,
 }
 
@@ -563,6 +565,7 @@ pub fn run_episode_with_shield(
         emergency_recover_steps,
         resource_cost,
         failed,
+        had_disturbance: last_disturbance.is_some(),
         recovery_steps,
     }
 }
@@ -706,6 +709,11 @@ mod tests {
                 for policy in Policy::all() {
                     for shielded in [false, true] {
                         let result = run_episode_with_shield(policy, scenario, seed, shielded);
+                        assert_eq!(
+                            result.had_disturbance,
+                            scenario != Scenario::Calm,
+                            "disturbance semantics should match the declared scenario"
+                        );
                         assert!(result.task_reward.is_finite());
                         assert!(result.cumulative_exposure.is_finite());
                         assert!((0.0..=1.0).contains(&result.mean_load));
