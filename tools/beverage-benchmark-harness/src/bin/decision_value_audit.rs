@@ -42,15 +42,6 @@ enum ResourceMetric {
     Energy,
 }
 
-impl ResourceMetric {
-    fn label(self) -> &'static str {
-        match self {
-            Self::Water => "water",
-            Self::Energy => "energy",
-        }
-    }
-}
-
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct DecisionManifest {
@@ -140,6 +131,10 @@ struct DecisionReceipt {
 struct Checks {
     comparison_ids: BTreeSet<String>,
     independent_units: BTreeSet<String>,
+    product_strata: BTreeSet<String>,
+    cohort_meter_boundaries: BTreeSet<String>,
+    cohort_functional_units: BTreeSet<String>,
+    cohort_product_mixes: BTreeSet<String>,
     meter_boundaries_match: bool,
     functional_units_match: bool,
     product_mix_matches: bool,
@@ -228,7 +223,7 @@ fn bootstrap_mean_interval(values: &[f64], seed: u64) -> (f64, f64) {
         *state ^= *state >> 12;
         *state ^= *state << 25;
         *state ^= *state >> 27;
-        let value = state.wrapping_mul(0x2545f4914f6cdd1d);
+        let value = (*state).wrapping_mul(0x2545f4914f6cdd1d);
         (value as usize) % values.len()
     };
 
@@ -347,6 +342,24 @@ fn audit_manifest_bytes(bytes: &[u8]) -> DecisionReceipt {
             && comparison.baseline_functional_unit == comparison.intervention_functional_unit;
         checks.product_mix_matches &= clean(&comparison.baseline_product_mix_ref)
             && comparison.baseline_product_mix_ref == comparison.intervention_product_mix_ref;
+        if clean(&comparison.product_stratum) {
+            checks.product_strata.insert(comparison.product_stratum.clone());
+        }
+        if clean(&comparison.baseline_meter_boundary_ref) {
+            checks
+                .cohort_meter_boundaries
+                .insert(comparison.baseline_meter_boundary_ref.clone());
+        }
+        if clean(&comparison.baseline_functional_unit) {
+            checks
+                .cohort_functional_units
+                .insert(comparison.baseline_functional_unit.clone());
+        }
+        if clean(&comparison.baseline_product_mix_ref) {
+            checks
+                .cohort_product_mixes
+                .insert(comparison.baseline_product_mix_ref.clone());
+        }
         checks.saleable_output_basis_passed &=
             comparison.baseline_output_basis == "SALEABLE_QUALITY_CONFORMING_OUTPUT"
                 && comparison.intervention_output_basis == "SALEABLE_QUALITY_CONFORMING_OUTPUT";
@@ -379,14 +392,22 @@ fn audit_manifest_bytes(bytes: &[u8]) -> DecisionReceipt {
         energy_intervention.push(comparison.intervention_energy_kwh / intervention_volume_k_l);
     }
 
+    checks.meter_boundaries_match &= checks.cohort_meter_boundaries.len() == 1;
+    checks.functional_units_match &= checks.cohort_functional_units.len() == 1;
+    checks.product_mix_matches &= checks.cohort_product_mixes.len() == 1;
+    let single_product_stratum = checks.product_strata.len() == 1;
+
     if !checks.meter_boundaries_match {
-        validation_errors.push("meter_boundary_refs_must_match_within_each_pair".to_owned());
+        validation_errors.push("meter_boundary_refs_must_match_within_pairs_and_across_cohort".to_owned());
     }
     if !checks.functional_units_match {
-        validation_errors.push("functional_units_must_match_within_each_pair".to_owned());
+        validation_errors.push("functional_units_must_match_within_pairs_and_across_cohort".to_owned());
     }
     if !checks.product_mix_matches {
-        validation_errors.push("product_mix_refs_must_match_within_each_pair".to_owned());
+        validation_errors.push("product_mix_refs_must_match_within_pairs_and_across_cohort".to_owned());
+    }
+    if !single_product_stratum {
+        validation_errors.push("product_strata_must_not_be_pooled_in_v1".to_owned());
     }
     if !checks.saleable_output_basis_passed {
         validation_errors.push("both_periods_must_use_saleable_quality_conforming_output".to_owned());
@@ -399,6 +420,17 @@ fn audit_manifest_bytes(bytes: &[u8]) -> DecisionReceipt {
     }
     if !checks.safety_gates_passed {
         validation_errors.push("safety_gate_failure_is_non_compensatory".to_owned());
+    }
+
+    let normalized_intensities_are_finite = water_baseline
+        .iter()
+        .chain(&water_intervention)
+        .chain(&energy_baseline)
+        .chain(&energy_intervention)
+        .all(|value| value.is_finite() && *value > 0.0);
+    checks.positive_finite_measurements &= normalized_intensities_are_finite;
+    if !normalized_intensities_are_finite {
+        validation_errors.push("normalized_resource_intensities_must_be_finite_and_positive".to_owned());
     }
 
     let independent_unit_count = checks.independent_units.len();
@@ -427,6 +459,7 @@ fn audit_manifest_bytes(bytes: &[u8]) -> DecisionReceipt {
         && checks.meter_boundaries_match
         && checks.functional_units_match
         && checks.product_mix_matches
+        && single_product_stratum
         && checks.saleable_output_basis_passed
         && checks.positive_finite_measurements
         && checks.quality_gates_passed
@@ -466,6 +499,7 @@ fn audit_manifest_bytes(bytes: &[u8]) -> DecisionReceipt {
         && checks.meter_boundaries_match
         && checks.functional_units_match
         && checks.product_mix_matches
+        && single_product_stratum
         && checks.saleable_output_basis_passed
         && checks.positive_finite_measurements
         && checks.quality_gates_passed
