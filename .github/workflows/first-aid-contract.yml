@@ -78,9 +78,10 @@ jobs:
             .status == "research_coverage_inventory" and
             .clinical_use_authorized == false and
             .count_summary.case_count == 36 and
+            .count_summary.implemented_or_frozen_count == 36 and
             .count_summary.frozen_trace_count == 12 and
             .count_summary.mutation_case_count == 24 and
-            .count_summary.planned_not_yet_executable_count == 3 and
+            .count_summary.planned_not_yet_executable_count == 0 and
             .differential_oracle.status == "unit_test_added" and
             ([.differential_oracle.implementation, .differential_oracle.coverage,
               .differential_oracle.limits] | all(type == "string" and length > 0)) and
@@ -92,6 +93,10 @@ jobs:
             ([.cases[] | select(
               (.evidence_status == "unit_test_added" or .evidence_status == "unit_test_existing") and
               (.test_name == null or (.test_name | length == 0))
+            )] | length) == 0 and
+            ([.cases[] | select(
+              .evidence_status == "workflow_gate_existing" and
+              ((.gate_ref | type) != "string" or (.gate_ref | length) == 0)
             )] | length) == 0
           ' "$matrix"
           while IFS= read -r test_name; do
@@ -99,6 +104,9 @@ jobs:
           done < <(jq -r '.cases[] | select(.evidence_status == "unit_test_added" or .evidence_status == "unit_test_existing") | .test_name' "$matrix")
           oracle_test="$(jq -r '.differential_oracle.test_name' "$matrix")"
           grep -Fq "fn ${oracle_test}(" xtask/src/first_aid_trajectory.rs
+          while IFS= read -r gate_ref; do
+            grep -Fq -- "$gate_ref" .github/workflows/first-aid-contract.yml
+          done < <(jq -r '.cases[] | select(.evidence_status == "workflow_gate_existing") | .gate_ref' "$matrix")
           expected_corpus_sha="$(jq -r '.fixture_binding.trajectory_corpus_sha256' "$matrix")"
           actual_corpus_sha="$(sha256sum "$corpus" | awk '{print $1}')"
           test "$actual_corpus_sha" = "$expected_corpus_sha"
