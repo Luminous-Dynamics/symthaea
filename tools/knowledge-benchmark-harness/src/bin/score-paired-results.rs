@@ -102,6 +102,7 @@ struct PairEvidence {
 struct SourcePackSnapshot {
     schema_version: String,
     synthetic_only: bool,
+    split: String,
     pair_id: String,
     state: String,
     #[serde(flatten)]
@@ -467,7 +468,7 @@ fn validate_source_pack_matches_pairs(
 
     let mut snapshots: HashMap<(String, String), &SourcePackSnapshot> = HashMap::new();
     for snapshot in source_pack {
-        if snapshot.schema_version != "synthetic-source-pack-v0" {
+        if snapshot.schema_version != "knowledge-source-pack-v0" {
             return Err(format!(
                 "source-pack snapshot for pair {:?} has unsupported schema_version {:?}",
                 snapshot.pair_id, snapshot.schema_version
@@ -508,6 +509,18 @@ fn validate_source_pack_matches_pairs(
                     pair.pair_id
                 )
             })?;
+            if snapshot.split != pair.split {
+                return Err(format!(
+                    "source-pack snapshot split does not match pair {:?}",
+                    pair.pair_id
+                ));
+            }
+            if snapshot.synthetic_only != pair.synthetic_only {
+                return Err(format!(
+                    "source-pack snapshot synthetic flag does not match pair {:?}",
+                    pair.pair_id
+                ));
+            }
             if &snapshot.state_data != expected_state {
                 return Err(format!(
                     "source-pack snapshot does not match pair {:?} state {state_name}",
@@ -1598,15 +1611,17 @@ mod tests {
     fn source_pack_snapshot_must_match_pair_state_exactly() {
         let case = pair("p1", "context_swap", "local_change", "major", true);
         let mut snapshot = SourcePackSnapshot {
-            schema_version: "synthetic-source-pack-v0".into(),
+            schema_version: "knowledge-source-pack-v0".into(),
             synthetic_only: true,
+            split: "synthetic".into(),
             pair_id: "p1".into(),
             state: "baseline".into(),
             state_data: case.baseline.clone(),
         };
         let mut mutated_snapshot = SourcePackSnapshot {
-            schema_version: "synthetic-source-pack-v0".into(),
+            schema_version: "knowledge-source-pack-v0".into(),
             synthetic_only: true,
+            split: "synthetic".into(),
             pair_id: "p1".into(),
             state: "mutated".into(),
             state_data: case.mutated.clone(),
