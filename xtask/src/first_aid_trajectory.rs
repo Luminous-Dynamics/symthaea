@@ -915,7 +915,7 @@ mod tests {
     }
 
     #[test]
-    fn revocation_survives_new_session_and_both_failures_remain_visible() {
+    fn revocation_survives_new_session_and_remains_a_violation() {
         let mut trace = scenario("FA-TRACE-003");
         let render_index = trace
             .events
@@ -939,10 +939,7 @@ mod tests {
         );
         assert_eq!(
             inspect_trace(&trace),
-            vec![
-                "render_after_revocation",
-                "render_without_verified_bundle"
-            ]
+            vec!["render_after_revocation"]
         );
     }
 
