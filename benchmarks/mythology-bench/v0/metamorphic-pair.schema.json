@@ -205,6 +205,26 @@
               }
             }
           }
+        },
+        "proposed_relation": {
+          "type": "string",
+          "enum": [
+            "resembles",
+            "historically_influences",
+            "precedes",
+            "causes",
+            "supports",
+            "contradicts",
+            "co_occurs",
+            "same_entity",
+            "unknown"
+          ]
+        },
+        "alias": {
+          "type": "string"
+        },
+        "source_text": {
+          "type": "string"
         }
       }
     }
