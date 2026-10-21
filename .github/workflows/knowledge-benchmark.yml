@@ -56,6 +56,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: knowledge-benchmark-contract-reports-${{ github.event.pull_request.head.sha || github.sha }}
-          path: target/knowledge-benchmark-reports/
+          path: |
+            target/knowledge-benchmark-reports/
+            tools/knowledge-benchmark-harness/Cargo.lock
           if-no-files-found: warn
           retention-days: 30
