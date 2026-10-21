@@ -103,6 +103,19 @@ The public code search surfaced these existing areas on the inspected main head:
 - The neuromodulator research bridge contains a research pathway for stress/sleep/psychoneuroimmunology-inspired and pharmacogenomic modulation. A simulation of biological pathways is not a validated human physiology model by default.
 - API and benchmark telemetry expose variables such as current Φ, bath entropy, allostatic load, and related state. Their existence makes data analysis possible; it does not establish construct validity or causal relationships.
 
+### Concrete construct-validity concern found in source inspection
+
+The initial source review is more than a list of possible metrics. It found specific pathways that can make the dyadic estimate circular:
+
+- `src/symthaea/relational.rs::compute_phi_dyad` creates its `human_states` by transforming recent AI hypervectors, rather than using independently observed human-state inputs.
+- `RelationalCore::update_partnership(consciousness)` derives depth, emotional safety, and mutuality from the system's own consciousness scalar, then feeds those derived values back into the partner model.
+- That call path maps trust to the `synchrony` field and reciprocity to `mutual_information`, despite those being distinct constructs.
+- `crates/core/symthaea-core/src/hdc/relational_consciousness.rs` computes a relational Phi field as a weighted sum of synchrony, turn-taking, and mutual-information values. The source comments make stronger claims about relationship consciousness and love than the visible sanity tests establish.
+
+The plausible failure is circularity: an internally generated consciousness-related scalar influences synthetic “human”/relationship inputs, which are then returned as a relationship/dyad Φ estimate. This is not an established measurement of a human relationship, love, or another subject's consciousness.
+
+**Follow-up opened:** [Issue #8274 — audit Φ-dyad construct validity](https://github.com/Luminous-Dynamics/symthaea/issues/8274). It calls for provenance-aware types, separation of trust/reciprocity/synchrony/mutual information, negative controls, and tests showing that high synchrony or high Φ does not imply care-consistent behavior. Keep changes MeasurementOnly until qualified.
+
 These observations are code-inspection starting points, not a comprehensive audit of all call paths. The next step is to inspect implementations, units, normalization, update timing, missing-value behavior, calibration, and existing tests before proposing code changes.
 
 ## 5. Falsifiable research hypotheses
