@@ -29,3 +29,8 @@ KiCad's [official CLI reference](https://docs.kicad.org/9.0/en/cli/cli.html) doc
 ## Claim ceiling and next step
 
 A passing run proves only this bounded CAD command/export smoke contract, not that the board is manufacturable, physically conforming, safe, correctly assembled, or functionally qualified. The next step is a source-native project with schematic/netlist parity, an explicit design/acceptance profile, pinned DRC rule assumptions, a BOM/placement export contract and clean/violated fixtures. Physical claims require fabricated boards, calibrated metrology, functional tests, full denominator/sample sizes and independent inspection evidence.
+
+
+## Exact-head and container write semantics
+
+The receipt runner checks out the pull request head SHA rather than the synthetic merge ref, so the `git_head` is the proposed source commit. The pinned container runs non-root; the CI workspace's output directory is made writable before launch, and the output inventory is checksum-bound after the tool has exited. This addresses reproducibility and artifact collection only; it is not a security sandbox for untrusted board files.
