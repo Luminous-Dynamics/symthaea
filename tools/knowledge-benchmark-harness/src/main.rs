@@ -356,6 +356,16 @@ fn validate_pair_contract(pair: &Value) -> Vec<String> {
     let mut errors = Vec::new();
     let dimension = string_field(pair, "dimension").unwrap_or("");
     let expected = string_field(pair, "expected_relation").unwrap_or("");
+    let split = string_field(pair, "split").unwrap_or("");
+    let synthetic_only = pair
+        .get("synthetic_only")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    if synthetic_only != (split == "synthetic") {
+        errors.push(
+            "pair split must be synthetic exactly when synthetic_only=true".into(),
+        );
+    }
     let baseline = pair.get("baseline").unwrap_or(&Value::Null);
     let mutated = pair.get("mutated").unwrap_or(&Value::Null);
     let intervention = pair.get("intervention").unwrap_or(&Value::Null);
@@ -587,8 +597,34 @@ fn validate_pair_contract(pair: &Value) -> Vec<String> {
 
     for (state_name, state) in [("baseline", baseline), ("mutated", mutated)] {
         let mut evidence_ids = HashSet::new();
+        let state_rights = string_field(state, "rights_status").unwrap_or("");
+        if synthetic_only && state_rights != "synthetic_only" {
+            errors.push(format!(
+                "{state_name} rights_status must be synthetic_only for a synthetic pair"
+            ));
+        }
+        if !synthetic_only
+            && (state_rights == "synthetic_only"
+                || (matches!(split, "test" | "holdout")
+                    && matches!(state_rights, "unknown" | "restricted" | "permission_required")))
+        {
+            errors.push(format!(
+                "{state_name} rights_status is not admissible for split {split:?}"
+            ));
+        }
         if let Some(items) = state.get("evidence_pack").and_then(Value::as_array) {
             for item in items {
+                let kind = string_field(item, "kind").unwrap_or("");
+                if synthetic_only && kind != "synthetic_control" {
+                    errors.push(format!(
+                        "{state_name} synthetic pair contains non-synthetic evidence kind {kind:?}"
+                    ));
+                }
+                if !synthetic_only && matches!(kind, "synthetic_control" | "metadata_only") {
+                    errors.push(format!(
+                        "{state_name} non-synthetic pair contains inadmissible evidence kind {kind:?}"
+                    ));
+                }
                 if let Some(id) = string_field(item, "evidence_id") {
                     if !evidence_ids.insert(id.to_string()) {
                         errors.push(format!(
@@ -1478,6 +1514,61 @@ mod tests {
         });
         assert!(validate_graph_contract(&graph).is_empty());
     }
+    #[test]
+    fn synthetic_pair_requires_synthetic_split_and_evidence() {
+        let pair = json!({
+            "schema_version":"mythology-metamorphic-pair-v0",
+            "split":"synthetic",
+            "synthetic_only":true,
+            "pair_id":"synthetic-1",
+            "dimension":"context_swap",
+            "expected_relation":"local_change",
+            "baseline":{
+                "context_id":"ctx-A","tradition_scope":"synthetic","source_id":"s1","variant_id":"v1",
+                "prompt":"synthetic prompt","rights_status":"synthetic_only",
+                "evidence_pack":[{"evidence_id":"e1","source_id":"s1","statement":"control","kind":"source_attestation"}]
+            },
+            "mutated":{
+                "context_id":"ctx-B","tradition_scope":"synthetic","source_id":"s1","variant_id":"v1",
+                "prompt":"synthetic prompt","rights_status":"synthetic_only",
+                "evidence_pack":[{"evidence_id":"e2","source_id":"s1","statement":"control","kind":"synthetic_control"}]
+            },
+            "intervention":{"field":"context_id","before_value":"ctx-A","after_value":"ctx-B","operation":"swap"},
+            "acceptance":{"must_preserve":["source"],"must_change":["context"],"must_not":["false source"]},
+            "criticality":"major"
+        });
+        let errors = validate_pair_contract(&pair);
+        assert!(errors.iter().any(|e| e.contains("non-synthetic evidence kind")));
+    }
+
+    #[test]
+    fn held_out_pair_cannot_use_unknown_rights_or_synthetic_evidence() {
+        let pair = json!({
+            "schema_version":"mythology-metamorphic-pair-v0",
+            "split":"holdout",
+            "synthetic_only":false,
+            "pair_id":"holdout-1",
+            "dimension":"source_swap",
+            "expected_relation":"local_change",
+            "baseline":{
+                "context_id":"ctx-A","tradition_scope":"example","source_id":"s1","variant_id":"v1",
+                "prompt":"summarize","rights_status":"unknown",
+                "evidence_pack":[{"evidence_id":"e1","source_id":"s1","statement":"content","kind":"synthetic_control"}]
+            },
+            "mutated":{
+                "context_id":"ctx-B","tradition_scope":"example","source_id":"s2","variant_id":"v2",
+                "prompt":"summarize","rights_status":"open_license_verified",
+                "evidence_pack":[{"evidence_id":"e2","source_id":"s2","statement":"content","kind":"source_attestation"}]
+            },
+            "intervention":{"field":"source_id","before_value":"s1","after_value":"s2","operation":"swap"},
+            "acceptance":{"must_preserve":["source lineage"],"must_change":["citation"],"must_not":["false citation"]},
+            "criticality":"release_blocker"
+        });
+        let errors = validate_pair_contract(&pair);
+        assert!(errors.iter().any(|e| e.contains("not admissible for split")));
+        assert!(errors.iter().any(|e| e.contains("inadmissible evidence kind")));
+    }
+
     #[test]
     fn context_swap_pair_rejects_unchanged_context() {
         let pair = json!({
