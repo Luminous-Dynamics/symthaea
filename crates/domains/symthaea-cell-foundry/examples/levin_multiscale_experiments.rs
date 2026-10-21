@@ -146,23 +146,17 @@ fn main() -> Result<(), Box<dyn Error>> {
 
                 for homing_enabled in [false, true] {
                     let config = AdaptiveCouplingConfig::default();
-                    let policy_runs = [
-                        (
-                            "trend",
-                            run_adaptive_coupling_experiment(
-                                template, perturbation, RECOVERY_DAYS, homing_enabled, config,
-                            ),
-                        ),
-                        (
-                            "counterfactual",
-                            run_counterfactual_coupling_experiment(
-                                template, perturbation, RECOVERY_DAYS, homing_enabled, config,
-                            ),
-                        ),
-                    ];
-                    for (controller, adaptive_result) in policy_runs {
+                    for controller in ["trend", "counterfactual"] {
                         let start = Instant::now();
-                        let adaptive = adaptive_result?;
+                        let adaptive = match controller {
+                            "trend" => run_adaptive_coupling_experiment(
+                                template, perturbation, RECOVERY_DAYS, homing_enabled, config,
+                            )?,
+                            "counterfactual" => run_counterfactual_coupling_experiment(
+                                template, perturbation, RECOVERY_DAYS, homing_enabled, config,
+                            )?,
+                            _ => unreachable!("controller is from a fixed internal list"),
+                        };
                         let wall_time_ms = start.elapsed().as_millis();
                         let control_values: Vec<f64> = records.iter()
                             .filter(|record| {
