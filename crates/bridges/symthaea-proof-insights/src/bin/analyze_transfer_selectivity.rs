@@ -542,12 +542,21 @@ fn validate_outcome_contract(value: &Value, context: &str) -> Result<()> {
     )?;
     required_nonempty_string(adjudication, "rubric_version", &adjudication_ctx)?;
     validate_digest_field(adjudication, "receipt_sha256", 64, &adjudication_ctx)?;
+    let adjudication_status =
+        required_nonempty_string(adjudication, "status", &adjudication_ctx)?;
     let reviewers = adjudication
         .get("reviewer_decisions")
         .and_then(Value::as_array)
         .with_context(|| format!("{adjudication_ctx}.reviewer_decisions must be an array"))?;
-    if reviewers.len() < REQUIRED_REVIEWERS {
-        bail!("{adjudication_ctx}.reviewer_decisions requires at least two independent reviewers");
+    let minimum_reviewers = match adjudication_status {
+        "adjudicated" | "unresolved" => REQUIRED_REVIEWERS,
+        "pending" => 0,
+        other => bail!("{adjudication_ctx}.status has unsupported value {other:?}"),
+    };
+    if reviewers.len() < minimum_reviewers {
+        bail!(
+            "{adjudication_ctx}.reviewer_decisions requires at least {minimum_reviewers} independent reviewers for status {adjudication_status:?}"
+        );
     }
     for (index, reviewer) in reviewers.iter().enumerate() {
         let reviewer_ctx = format!("{adjudication_ctx}.reviewer_decisions[{index}]");
