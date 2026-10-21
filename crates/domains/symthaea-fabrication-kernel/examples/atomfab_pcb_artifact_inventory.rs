@@ -82,6 +82,7 @@ fn main() -> ExitCode {
         }
     };
 
+    let is_complete = inventory.status == "complete";
     let receipt = HeadBoundReceipt {
         schema: "atomfab-pcb-artifact-inventory-head-receipt-v0.1",
         git_head: actual_head,
@@ -92,10 +93,10 @@ fn main() -> ExitCode {
     match serde_json::to_string_pretty(&receipt) {
         Ok(json) => {
             println!("{json}");
-            if receipt_status_rejected(&json) {
-                ExitCode::from(1)
-            } else {
+            if is_complete {
                 ExitCode::SUCCESS
+            } else {
+                ExitCode::from(1)
             }
         }
         Err(error) => {
@@ -103,9 +104,4 @@ fn main() -> ExitCode {
             ExitCode::from(2)
         }
     }
-}
-
-fn receipt_status_rejected(json: &str) -> bool {
-    // Keep process failure tied to the receipt's fail-closed disposition without reparsing JSON.
-    json.contains("\"status\": \"rejected\"")
 }
