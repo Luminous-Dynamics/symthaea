@@ -117,18 +117,20 @@ fn alpha_sweep_configs() -> Vec<BenchRun> {
 
 fn make_datasets(tok: &BpeTokenizer) -> (TrainingDataset, TrainingDataset) {
     let mut training = TrainingDataset::default();
-    let training_texts = [
-        "I understand",
-        "the answer is",
-        "let me clarify",
-        "perhaps we should",
-        "this is certain",
-        "reflecting on it",
-        "continuing now",
-        "something new",
+    let training_cases = [
+        // (intent channel, epistemic ordinal, target phrase)
+        (0, 1.0, "I understand"),
+        (1, 1.0, "the answer is"),
+        (2, 1.0, "let me clarify"),
+        (3, 1.0, "perhaps we should"),
+        (4, 2.0, "I am not certain"),
+        (5, 1.0, "reflecting on it"),
+        (6, 1.0, "continuing now"),
+        (7, 3.0, "something new"),
     ];
-    for (i, text) in training_texts.iter().enumerate() {
-        let channels = ThoughtChannels::with_intent(i % 8);
+    for (intent, epistemic, text) in training_cases {
+        let mut channels = ThoughtChannels::with_intent(intent);
+        channels.set_epistemic(epistemic);
         for _ in 0..3 {
             training.push(TrainingPair::new(channels, text.to_string(), tok));
         }
@@ -138,18 +140,20 @@ fn make_datasets(tok: &BpeTokenizer) -> (TrainingDataset, TrainingDataset) {
     // not a general language-capability benchmark, but it avoids reporting
     // training-set perplexity as held-out generalization.
     let mut evaluation = TrainingDataset::default();
-    let held_out_texts = [
-        "I may analyze this",
-        "a likely answer",
-        "could you explain",
-        "we should maybe wait",
-        "the result is known",
-        "consider this again",
-        "please continue later",
-        "an unknown thing",
+    let held_out_cases = [
+        // Different surface forms preserve the same intent target as training.
+        (0, 1.0, "I hear what you mean"),
+        (1, 1.0, "a likely answer"),
+        (2, 1.0, "could you clarify this"),
+        (3, 1.0, "we should maybe wait"),
+        (4, 2.0, "the result is uncertain"),
+        (5, 1.0, "consider this again"),
+        (6, 1.0, "please continue later"),
+        (7, 3.0, "I cannot classify this request"),
     ];
-    for (i, text) in held_out_texts.iter().enumerate() {
-        let channels = ThoughtChannels::with_intent(i % 8);
+    for (intent, epistemic, text) in held_out_cases {
+        let mut channels = ThoughtChannels::with_intent(intent);
+        channels.set_epistemic(epistemic);
         evaluation.push(TrainingPair::new(channels, text.to_string(), tok));
     }
 
@@ -192,6 +196,49 @@ fn run_eval(
         compute_contrastive_intent: true,
     };
     evaluation::evaluate(&mut r#gen, &eval_cfg)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn train_and_held_out_fixtures_preserve_intent_and_epistemic_targets() {
+        let tokenizer = BpeTokenizer::default_minimal();
+        let (training, evaluation) = make_datasets(&tokenizer);
+
+        assert_eq!(training.pairs.len(), 24);
+        assert_eq!(evaluation.pairs.len(), 8);
+
+        // Three repeated training examples per intent and one held-out example
+        // per intent. Channel 4 is uncertainty, not certainty.
+        for intent in 0..8 {
+            let train_case = &training.pairs[intent * 3];
+            let eval_case = &evaluation.pairs[intent];
+
+            assert_eq!(
+                train_case.channels[0..8]
+                    .iter()
+                    .position(|value| *value == 1.0),
+                Some(intent),
+                "training intent mismatch at index {intent}"
+            );
+            assert_eq!(
+                eval_case.channels[0..8]
+                    .iter()
+                    .position(|value| *value == 1.0),
+                Some(intent),
+                "held-out intent mismatch at index {intent}"
+            );
+        }
+
+        assert_eq!(training.pairs[4 * 3].channels[8], 2.0);
+        assert_eq!(evaluation.pairs[4].channels[8], 2.0);
+        assert_eq!(training.pairs[7 * 3].channels[8], 3.0);
+        assert_eq!(evaluation.pairs[7].channels[8], 3.0);
+        assert!(training.pairs[4 * 3].target_text.to_lowercase().contains("not certain"));
+        assert!(evaluation.pairs[4].target_text.to_lowercase().contains("uncertain"));
+    }
 }
 
 fn print_table(results: &[(&str, EvalResult)]) {
