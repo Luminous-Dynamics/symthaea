@@ -2048,32 +2048,31 @@ mod tests {
     }
 
     #[test]
-    fn test_efavirenz_equity_analysis_flags_african() {
+    fn test_efavirenz_model_produces_population_variation() {
         let e = engine();
         let analysis = e.equity_analysis("efavirenz", "CYP2B6");
-        // African populations have the highest CYP2B6*6 frequency (~38%),
-        // leading to more PMs who accumulate efavirenz to toxic levels.
+        // The selected frequency inputs produce model variation; this is not a prediction
+        // of individual metabolism, toxicity, or treatment failure.
         assert!(
             analysis
                 .model_flagged_populations
                 .contains(&AncestryGroup::African)
                 || analysis.model_gap_score > 0.01,
-            "Efavirenz/CYP2B6 should show an equity gap or flag African: gap={:.3}, underserved={:?}",
+            "Efavirenz/CYP2B6 should show model variation or a threshold flag: gap={:.3}, flags={:?}",
             analysis.model_gap_score,
             analysis.model_flagged_populations
         );
     }
 
     #[test]
-    fn test_tacrolimus_equity_analysis_flags_african() {
+    fn test_tacrolimus_model_produces_population_variation() {
         let e = engine();
         let analysis = e.equity_analysis("tacrolimus", "CYP3A5");
-        // African populations have the lowest CYP3A5*3 frequency (~18%),
-        // meaning ~82% are CYP3A5 expressors who metabolize tacrolimus faster
-        // and are systematically underdosed.
+        // This model's CYP3A5*3 inputs produce population-label variation, but the
+        // simplified output is not a phenotype-prevalence or dose-estimation method.
         assert!(
             analysis.model_gap_score > 0.05,
-            "Tacrolimus/CYP3A5 should show a significant equity gap: {:.3}",
+            "Tacrolimus/CYP3A5 should show variation in this prototype score: {:.3}",
             analysis.model_gap_score
         );
     }
@@ -2101,29 +2100,26 @@ mod tests {
     }
 
     #[test]
-    fn test_clinical_impact_total_equals_sum_of_per_population_scenario() {
+    fn test_population_scenario_products_sum_to_total() {
         let e = engine();
         let estimate = e.population_scenario_estimate("efavirenz", "CYP2B6");
         let sum: u64 = estimate.per_population_scenario.iter().map(|(_, _, _, c)| c).sum();
         assert_eq!(
             estimate.sum_of_modelled_products, sum,
-            "Total at risk ({}) should equal sum of per-ancestry counts ({})",
+            "Total modelled product ({}) should equal sum of population scenario products ({})",
             estimate.sum_of_modelled_products, sum
         );
     }
 
     #[test]
-    fn test_clinical_impact_tacrolimus_largest_modelled_product_group() {
+    fn test_tacrolimus_scenario_largest_arithmetic_product_group() {
         let e = engine();
         let estimate = e.population_scenario_estimate("tacrolimus", "CYP3A5");
-        // For tacrolimus, European has the largest absolute population with
-        // standard dosing already correct (*3/*3 non-expressors = PM = standard dose).
-        // But the at-risk expressors are concentrated in African and Mixed groups.
-        // European has huge population but low expressor rate (~6%).
-        // The largest_modelled_product_group should be the group with highest absolute at-risk count.
+        // This checks only the largest arithmetic product under the prototype's special
+        // NM + IM scenario convention. It does not establish phenotype prevalence or dose need.
         assert!(
             estimate.sum_of_modelled_products > 0,
-            "Should have at-risk patients for tacrolimus/CYP3A5"
+            "Expected a nonzero arithmetic scenario for tacrolimus/CYP3A5"
         );
     }
 
