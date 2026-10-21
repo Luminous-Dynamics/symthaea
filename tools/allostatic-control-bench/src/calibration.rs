@@ -68,9 +68,12 @@ pub fn calibrate_episode_radii(
         return None;
     }
 
+    // Bonferroni-adjust the per-component coverage so the pair of reserve/load
+    // intervals has at least the declared joint coverage under the assumptions.
+    let component_coverage = 1.0 - (1.0 - target_coverage) / 2.0;
     Some(CalibratedEnvelopeRadii {
-        reserve_radius: finite_conformal_radius(reserve_episode_scores, target_coverage)?,
-        load_radius: finite_conformal_radius(load_episode_scores, target_coverage)?,
+        reserve_radius: finite_conformal_radius(reserve_episode_scores, component_coverage)?,
+        load_radius: finite_conformal_radius(load_episode_scores, component_coverage)?,
         target_coverage,
         calibration_episodes: reserve_episode_scores.len(),
     })
@@ -121,14 +124,14 @@ mod tests {
     #[test]
     fn calibration_uses_episode_order_statistic_not_a_timestep_pool() {
         let radii = calibrate_episode_radii(
-            &[0.01, 0.04, 0.02],
-            &[0.10, 0.30, 0.20],
+            &[0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09],
+            &[0.10, 0.20, 0.30, 0.40, 0.50, 0.60, 0.70, 0.80, 0.90],
             0.50,
         )
-        .expect("rank fits the three-episode calibration set");
-        assert!((radii.reserve_radius() - 0.02).abs() < 1e-12);
-        assert!((radii.load_radius() - 0.20).abs() < 1e-12);
-        assert_eq!(radii.calibration_episodes(), 3);
+        .expect("Bonferroni-adjusted rank fits the nine-episode calibration set");
+        assert!((radii.reserve_radius() - 0.08).abs() < 1e-12);
+        assert!((radii.load_radius() - 0.80).abs() < 1e-12);
+        assert_eq!(radii.calibration_episodes(), 9);
     }
 
     #[test]
@@ -136,7 +139,9 @@ mod tests {
         let scores = [0.01; 8];
         assert!(calibrate_episode_radii(&scores, &scores, 0.90).is_none());
         let nineteen = [0.01; 19];
-        assert!(calibrate_episode_radii(&nineteen, &nineteen, 0.95).is_some());
+        assert!(calibrate_episode_radii(&nineteen, &nineteen, 0.90).is_some());
+        let thirty_nine = [0.01; 39];
+        assert!(calibrate_episode_radii(&thirty_nine, &thirty_nine, 0.95).is_some());
     }
 
     #[test]
@@ -150,11 +155,11 @@ mod tests {
     #[test]
     fn calibrated_radii_expand_the_predicted_state_envelope() {
         let radii = calibrate_episode_radii(
-            &[0.10; 9],
-            &[0.25; 9],
+            &[0.10; 19],
+            &[0.25; 19],
             0.90,
         )
-        .expect("nine episodes support this finite rank");
+        .expect("nineteen episodes support this finite rank");
         let envelope = enclose_predicted_state(state(), radii).expect("valid envelope");
 
         assert!((envelope.reserve().lower() - 0.35).abs() < 1e-12);
@@ -165,9 +170,9 @@ mod tests {
 
     #[test]
     fn larger_radii_never_shrink_the_conservative_state_envelope() {
-        let small = calibrate_episode_radii(&[0.05; 9], &[0.10; 9], 0.90)
+        let small = calibrate_episode_radii(&[0.05; 19], &[0.10; 19], 0.90)
             .expect("finite calibration");
-        let large = calibrate_episode_radii(&[0.15; 9], &[0.20; 9], 0.90)
+        let large = calibrate_episode_radii(&[0.15; 19], &[0.20; 19], 0.90)
             .expect("finite calibration");
         let small_envelope = enclose_predicted_state(state(), small).expect("small envelope");
         let large_envelope = enclose_predicted_state(state(), large).expect("large envelope");
