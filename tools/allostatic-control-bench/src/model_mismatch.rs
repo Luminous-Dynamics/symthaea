@@ -1,0 +1,322 @@
+//! Separate nominal and true one-step action models for mismatch falsification.
+//!
+//! This module is a deterministic synthetic harness. The nominal model is the
+//! controller's estimate; each episode's true model applies explicit additive
+//! residuals by action. Calibration scores take a maximum over the full stress
+//! grid and every available action, never just the selected action.
+
+use super::calibration::{
+    calibrate_episode_radii, enclose_predicted_action_effects, CalibratedEnvelopeRadii,
+};
+use super::robust_viability::{
+    ActionEffectBounds, Interval, StateEnvelope, ViabilityLimits, next_state_envelope,
+    robustly_viable,
+};
+use super::Action;
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ActionEffectError {
+    pub reserve_delta_error: f64,
+    pub load_delta_error: f64,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct MismatchProfile {
+    pub reserve_state_error: f64,
+    pub load_state_error: f64,
+    pub push: ActionEffectError,
+    pub maintain: ActionEffectError,
+    pub emergency_recover: ActionEffectError,
+}
+
+impl MismatchProfile {
+    pub fn new(
+        reserve_state_error: f64,
+        load_state_error: f64,
+        push: ActionEffectError,
+        maintain: ActionEffectError,
+        emergency_recover: ActionEffectError,
+    ) -> Option<Self> {
+        let values = [
+            reserve_state_error,
+            load_state_error,
+            push.reserve_delta_error,
+            push.load_delta_error,
+            maintain.reserve_delta_error,
+            maintain.load_delta_error,
+            emergency_recover.reserve_delta_error,
+            emergency_recover.load_delta_error,
+        ];
+        values.iter().all(|value| value.is_finite()).then_some(Self {
+            reserve_state_error,
+            load_state_error,
+            push,
+            maintain,
+            emergency_recover,
+        })
+    }
+
+    const fn error(self, action: Action) -> ActionEffectError {
+        match action {
+            Action::Push => self.push,
+            Action::Maintain => self.maintain,
+            Action::EmergencyRecover => self.emergency_recover,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct EpisodeResidualScores {
+    pub reserve_state: f64,
+    pub load_state: f64,
+    pub reserve_effect: f64,
+    pub load_effect: f64,
+}
+
+/// Controller-side nominal action effect, copied as an explicit model contract.
+/// It does not consult the episode's true mismatch profile.
+pub fn nominal_action_effect(action: Action, stress: f64) -> Option<ActionEffectBounds> {
+    if !stress.is_finite() || !(0.0..=1.0).contains(&stress) {
+        return None;
+    }
+    let (reserve_delta, load_delta) = match action {
+        Action::Push => (-0.055 - 0.025 * stress, 0.026 + 0.032 * stress),
+        Action::Maintain => (
+            0.08 * (1.0 - 0.7 * stress),
+            0.008 + stress * 0.032 - if stress < 0.25 { 0.055 } else { 0.020 },
+        ),
+        Action::EmergencyRecover => (0.10 * (1.0 - 0.5 * stress), -0.092 + 0.032 * stress),
+    };
+    ActionEffectBounds::new(
+        Interval::point(reserve_delta)?,
+        Interval::point(load_delta)?,
+    )
+}
+
+/// Environment-side true action effect. The mismatch residual is deliberately
+/// separate from the nominal equation so a point-estimate shield can be wrong.
+pub fn true_action_effect(
+    action: Action,
+    stress: f64,
+    mismatch: MismatchProfile,
+) -> Option<(f64, f64)> {
+    let nominal = nominal_action_effect(action, stress)?;
+    let error = mismatch.error(action);
+    Some((
+        nominal.reserve_delta().lower() + error.reserve_delta_error,
+        nominal.load_delta().lower() + error.load_delta_error,
+    ))
+}
+
+/// Produce the four episode scores required by the calibrated-envelope module.
+/// Effect errors are maximized over all actions and all stress values in the grid.
+pub fn episode_residual_scores(
+    mismatch: MismatchProfile,
+    stress_grid: &[f64],
+) -> Option<EpisodeResidualScores> {
+    if stress_grid.is_empty()
+        || stress_grid
+            .iter()
+            .any(|stress| !stress.is_finite() || !(0.0..=1.0).contains(stress))
+    {
+        return None;
+    }
+
+    let mut reserve_effect = 0.0_f64;
+    let mut load_effect = 0.0_f64;
+    for stress in stress_grid {
+        for action in [Action::Push, Action::Maintain, Action::EmergencyRecover] {
+            let error = mismatch.error(action);
+            reserve_effect = reserve_effect.max(error.reserve_delta_error.abs());
+            load_effect = load_effect.max(error.load_delta_error.abs());
+            // Also require nominal and true model functions to accept the same
+            // stress domain; errors are additive but never conceal invalid input.
+            nominal_action_effect(action, *stress)?;
+        }
+    }
+
+    Some(EpisodeResidualScores {
+        reserve_state: mismatch.reserve_state_error.abs(),
+        load_state: mismatch.load_state_error.abs(),
+        reserve_effect,
+        load_effect,
+    })
+}
+
+/// Calibrate episode-level radii over a supplied independent calibration panel.
+/// Callers must pass one worst-case score per independent episode, not timesteps.
+pub fn calibrate_mismatch_panel(
+    profiles: &[MismatchProfile],
+    stress_grid: &[f64],
+    target_coverage: f64,
+) -> Option<CalibratedEnvelopeRadii> {
+    if profiles.is_empty() {
+        return None;
+    }
+    let scores: Vec<EpisodeResidualScores> = profiles
+        .iter()
+        .map(|profile| episode_residual_scores(*profile, stress_grid))
+        .collect::<Option<Vec<_>>>()?;
+    let reserve_state: Vec<f64> = scores.iter().map(|score| score.reserve_state).collect();
+    let load_state: Vec<f64> = scores.iter().map(|score| score.load_state).collect();
+    let reserve_effect: Vec<f64> = scores.iter().map(|score| score.reserve_effect).collect();
+    let load_effect: Vec<f64> = scores.iter().map(|score| score.load_effect).collect();
+    calibrate_episode_radii(
+        &reserve_state,
+        &load_state,
+        &reserve_effect,
+        &load_effect,
+        target_coverage,
+    )
+}
+
+/// Estimated action effect expanded by a calibrated residual envelope.
+pub fn calibrated_action_effect(
+    action: Action,
+    stress: f64,
+    radii: CalibratedEnvelopeRadii,
+) -> Option<ActionEffectBounds> {
+    enclose_predicted_action_effects(nominal_action_effect(action, stress)?, radii)
+}
+
+/// Check both robust predicted viability and the separate true transition.
+/// This exists for falsification tests: a point estimate may pass while the true
+/// model violates the constraint; a calibrated envelope should reject it when
+/// the held-out model error is enclosed by its calibration radius.
+pub fn point_and_robust_vs_true(
+    state: StateEnvelope,
+    action: Action,
+    stress: f64,
+    mismatch: MismatchProfile,
+    radii: CalibratedEnvelopeRadii,
+    limits: ViabilityLimits,
+) -> Option<(bool, bool, bool)> {
+    let point_effect = nominal_action_effect(action, stress)?;
+    let robust_effect = calibrated_action_effect(action, stress, radii)?;
+    let true_effect = true_action_effect(action, stress, mismatch)?;
+    let point_certified = robustly_viable(state, point_effect, limits);
+    let robust_certified = robustly_viable(state, robust_effect, limits);
+    let true_next = next_state_envelope(
+        state,
+        ActionEffectBounds::new(
+            Interval::point(true_effect.0)?,
+            Interval::point(true_effect.1)?,
+        )?,
+    )?;
+    let true_safe = true_next.reserve().lower() >= 0.15 && true_next.load().upper() <= 0.88;
+    Some((point_certified, robust_certified, true_safe))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const STRESS_GRID: [f64; 5] = [0.0, 0.25, 0.5, 0.75, 1.0];
+
+    fn error(reserve: f64, load: f64) -> ActionEffectError {
+        ActionEffectError {
+            reserve_delta_error: reserve,
+            load_delta_error: load,
+        }
+    }
+
+    fn profile(scale: f64) -> MismatchProfile {
+        MismatchProfile::new(
+            0.01 * scale,
+            -0.02 * scale,
+            error(-0.03 * scale, 0.06 * scale),
+            error(0.01 * scale, -0.025 * scale),
+            error(-0.015 * scale, 0.04 * scale),
+        )
+        .expect("finite synthetic mismatch")
+    }
+
+    fn state() -> StateEnvelope {
+        StateEnvelope::new(
+            Interval::point(0.22).expect("finite point"),
+            Interval::point(0.80).expect("finite point"),
+        )
+        .expect("valid state")
+    }
+
+    fn limits() -> ViabilityLimits {
+        ViabilityLimits::new(0.15, 0.88).expect("valid limits")
+    }
+
+    #[test]
+    fn zero_mismatch_matches_nominal_model_across_all_actions_and_stress_levels() {
+        let zero = profile(0.0);
+        for stress in STRESS_GRID {
+            for action in [Action::Push, Action::Maintain, Action::EmergencyRecover] {
+                let nominal = nominal_action_effect(action, stress).expect("nominal effect");
+                let actual = true_action_effect(action, stress, zero).expect("true effect");
+                assert!((nominal.reserve_delta().lower() - actual.0).abs() < 1e-12);
+                assert!((nominal.load_delta().lower() - actual.1).abs() < 1e-12);
+            }
+        }
+    }
+
+    #[test]
+    fn episode_score_covers_the_largest_error_across_all_actions() {
+        let mismatch = MismatchProfile::new(
+            -0.03,
+            0.04,
+            error(0.01, -0.02),
+            error(-0.05, 0.03),
+            error(0.02, 0.08),
+        )
+        .expect("finite profile");
+        let scores = episode_residual_scores(mismatch, &STRESS_GRID).expect("valid grid");
+        assert!((scores.reserve_state - 0.03).abs() < 1e-12);
+        assert!((scores.load_state - 0.04).abs() < 1e-12);
+        assert!((scores.reserve_effect - 0.05).abs() < 1e-12);
+        assert!((scores.load_effect - 0.08).abs() < 1e-12);
+    }
+
+    #[test]
+    fn malformed_profiles_or_stress_grids_fail_closed() {
+        assert!(MismatchProfile::new(f64::NAN, 0.0, error(0.0, 0.0), error(0.0, 0.0), error(0.0, 0.0)).is_none());
+        let valid = profile(1.0);
+        assert!(episode_residual_scores(valid, &[]).is_none());
+        assert!(episode_residual_scores(valid, &[0.0, f64::NAN]).is_none());
+        assert!(nominal_action_effect(Action::Push, 1.1).is_none());
+    }
+
+    #[test]
+    fn point_shield_false_positive_is_rejected_by_a_calibrated_envelope() {
+        // Every calibration episode contains <= this held-out error magnitude.
+        let calibration: Vec<MismatchProfile> = (1..=39).map(|i| profile(i as f64 / 39.0)).collect();
+        let radii = calibrate_mismatch_panel(&calibration, &STRESS_GRID, 0.90)
+            .expect("39 episodes meet the 90% four-family finite-rank gate");
+        let held_out = profile(1.0);
+
+        // Nominal Push predicts reserve 0.1525 and load 0.842; true effects
+        // cross both boundaries. Robust bounds should refuse the action.
+        let (point_certified, robust_certified, true_safe) = point_and_robust_vs_true(
+            state(),
+            Action::Push,
+            0.5,
+            held_out,
+            radii,
+            limits(),
+        )
+        .expect("valid test contracts");
+
+        assert!(point_certified, "point shield should demonstrate the false positive");
+        assert!(!robust_certified, "calibrated shield should reject the action");
+        assert!(!true_safe, "the held-out true transition should violate constraints");
+    }
+
+    #[test]
+    fn model_error_outside_calibration_envelope_is_an_explicit_negative_control() {
+        let calibration: Vec<MismatchProfile> = (1..=39).map(|i| profile(0.2 * i as f64 / 39.0)).collect();
+        let radii = calibrate_mismatch_panel(&calibration, &STRESS_GRID, 0.90)
+            .expect("calibration panel");
+        let out_of_family = profile(2.0);
+        let scores = episode_residual_scores(out_of_family, &STRESS_GRID).expect("valid profile");
+
+        assert!(scores.reserve_effect > radii.reserve_effect_radius());
+        assert!(scores.load_effect > radii.load_effect_radius());
+        // A finite-sample envelope is conditional, not a promise against shifts.
+    }
+}
