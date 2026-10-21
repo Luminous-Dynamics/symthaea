@@ -850,6 +850,9 @@ fn audit_temporal_dataset(
     let mut theorem_identity_status_counts = BTreeMap::new();
     let mut head_ancestry_cache: BTreeMap<String, bool> = BTreeMap::new();
     let mut commit_existence_cache: BTreeMap<String, bool> = BTreeMap::new();
+    let mut identity_ancestry_cache: BTreeMap<(String, String), bool> = BTreeMap::new();
+    let mut proof_presence_cache: BTreeMap<(String, String, String, String), Option<bool>> =
+        BTreeMap::new();
 
     for (dataset_position, line) in dataset_text.lines().enumerate() {
         if line.trim().is_empty() {
@@ -2650,6 +2653,44 @@ fn git_parent_commits(root: &Path, commit: &str) -> Result<Vec<String>> {
         );
     }
     Ok(parts.map(str::to_owned).collect())
+}
+
+fn cached_git_is_ancestor(
+    root: &Path,
+    ancestor: &str,
+    descendant: &str,
+    cache: &mut BTreeMap<(String, String), bool>,
+) -> Result<bool> {
+    let key = (ancestor.to_owned(), descendant.to_owned());
+    if let Some(result) = cache.get(&key) {
+        return Ok(*result);
+    }
+    let result = git_is_ancestor(root, ancestor, descendant)?;
+    cache.insert(key, result);
+    Ok(result)
+}
+
+fn cached_proof_present_in_declaration(
+    root: &Path,
+    commit: &str,
+    path: &str,
+    theorem_name: &str,
+    proof: &str,
+    cache: &mut BTreeMap<(String, String, String, String), Option<bool>>,
+) -> Result<Option<bool>> {
+    let proof_digest = format!("{:x}", Sha256::digest(proof.as_bytes()));
+    let key = (
+        commit.to_owned(),
+        path.to_owned(),
+        theorem_name.to_owned(),
+        proof_digest,
+    );
+    if let Some(result) = cache.get(&key) {
+        return Ok(*result);
+    }
+    let result = proof_present_in_declaration(root, commit, path, theorem_name, proof)?;
+    cache.insert(key, result);
+    Ok(result)
 }
 
 fn proof_present_in_declaration(
