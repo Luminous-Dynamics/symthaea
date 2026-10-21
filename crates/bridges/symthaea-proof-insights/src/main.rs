@@ -2928,7 +2928,7 @@ fn normalize_lean_relative_path(path: &str) -> Result<String> {
 
 fn declared_name_from_statement(statement: &str) -> Option<String> {
     let declaration = Regex::new(
-        r"(?m)^[ \\t]*(?:theorem|lemma|def|abbrev|opaque|instance)[ \\t]+([A-Za-z_][A-Za-z0-9_'.]*)\\b",
+        r"(?m)^[ \t]*(?:theorem|lemma|def|abbrev|opaque|instance)[ \t]+([A-Za-z_][A-Za-z0-9_'.]*)\b",
     )
     .ok()?;
     declaration
@@ -2939,7 +2939,7 @@ fn declared_name_from_statement(statement: &str) -> Option<String> {
 
 fn statement_declaration_prefix(statement: &str) -> Option<String> {
     let declaration = Regex::new(
-        r"(?m)^[ \\t]*(?:theorem|lemma|def|abbrev|opaque|instance)[ \\t]+[A-Za-z_][A-Za-z0-9_'.]*\\b",
+        r"(?m)^[ \t]*(?:theorem|lemma|def|abbrev|opaque|instance)[ \t]+[A-Za-z_][A-Za-z0-9_'.]*\b",
     )
     .ok()?;
     let start = declaration.find(statement)?.start();
@@ -2948,7 +2948,7 @@ fn statement_declaration_prefix(statement: &str) -> Option<String> {
 
 fn named_declaration_blocks(source: &str, requested_name: &str) -> Result<Vec<String>> {
     let declarations = Regex::new(
-        r"(?m)^[ \\t]*(?:@\\[[^\\]\\n]*\\][ \\t]*)*(?:(?:private|protected|noncomputable|unsafe|partial)[ \\t]+)*(?:theorem|lemma|def|abbrev|opaque|instance|structure|class|inductive|axiom)[ \\t]+([A-Za-z_][A-Za-z0-9_'.]*)\\b",
+        r"(?m)^[ \t]*(?:@\[[^\]\n]*\][ \t]*)*(?:(?:private|protected|noncomputable|unsafe|partial)[ \t]+)*(?:theorem|lemma|def|abbrev|opaque|instance|structure|class|inductive|axiom)[ \t]+([A-Za-z_][A-Za-z0-9_'.]*)\b",
     )
     .context("compile Lean declaration identity expression")?;
     let target = requested_name.rsplit('.').next().unwrap_or(requested_name);
