@@ -121,6 +121,7 @@ struct TrajectoryReceipt {
     corpus_sha256: String,
     evaluation_protocol_sha256: String,
     mutation_matrix_sha256: String,
+    state_model_sha256: String,
     cargo_lock_sha256: String,
     rustc_version: String,
     cargo_version: String,
@@ -168,6 +169,9 @@ pub fn run(root: &Path, corpus_arg: &Path, out_arg: Option<&Path>) -> Result<()>
     let mutation_matrix = fs::read(root.join("docs/research/first-aid/mutation-matrix-v0.json"))
         .context("read mutation matrix for receipt identity")?;
     let mutation_matrix_digest = sha256_hex(&mutation_matrix);
+    let state_model = fs::read(root.join("xtask/src/first_aid_model.rs"))
+        .context("read finite-state model for receipt identity")?;
+    let state_model_digest = sha256_hex(&state_model);
     let cargo_lock = fs::read(root.join("Cargo.lock"))
         .context("read Cargo.lock for dependency-resolution identity")?;
     let cargo_lock_digest = sha256_hex(&cargo_lock);
@@ -191,6 +195,7 @@ pub fn run(root: &Path, corpus_arg: &Path, out_arg: Option<&Path>) -> Result<()>
         corpus_sha256: corpus_digest,
         evaluation_protocol_sha256: evaluation_protocol_digest,
         mutation_matrix_sha256: mutation_matrix_digest,
+        state_model_sha256: state_model_digest,
         cargo_lock_sha256: cargo_lock_digest,
         rustc_version,
         cargo_version,
@@ -428,6 +433,7 @@ fn inspect_trace(trace: &TrajectoryScenario) -> Vec<String> {
             EventKind::SessionResumed => {
                 // Resume reactivates the session but never restores the prior verification.
                 session_active = true;
+                verified_bundle = None;
             }
             EventKind::UncertaintyDetected => {
                 uncertainty_pending = true;
@@ -608,7 +614,10 @@ mod tests {
                     session_active = false;
                     verified_bundle = None;
                 }
-                "session_resumed" => session_active = true,
+                "session_resumed" => {
+                    session_active = true;
+                    verified_bundle = None;
+                }
                 "uncertainty_detected" => {
                     uncertainty_pending = true;
                     uncertainty_preserved = false;
@@ -937,6 +946,37 @@ mod tests {
         trace.expected_violation_codes = vec!["render_without_active_session".to_string()];
         value.scenarios = vec![trace];
         validate_corpus(&value).expect("render without session must fail its frozen oracle");
+    }
+
+    #[test]
+    fn resuming_session_without_interrupt_clears_prior_bundle_verification() {
+        let mut trace = scenario("FA-TRACE-001");
+        let render_index = trace
+            .events
+            .iter()
+            .position(|event| event.kind == EventKind::ProtocolRendered)
+            .expect("render event exists");
+        trace.events[render_index].sequence += 1;
+        trace.events.insert(
+            render_index,
+            TraceEvent {
+                sequence: 4,
+                kind: EventKind::SessionResumed,
+                bundle_id: None,
+                bundle_state: None,
+                digest_verified: None,
+                resource_state: None,
+                presented_as: None,
+                sensitive_payload: None,
+                consent_scoped: None,
+            },
+        );
+        assert_eq!(
+            inspect_trace(&trace),
+            vec!["render_without_verified_bundle"]
+        );
+        let value = serde_json::to_value(&trace).expect("mutated trace serializes");
+        assert_eq!(inspect_trace(&trace), reference_codes_from_json(&value));
     }
 
     #[test]
