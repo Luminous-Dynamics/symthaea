@@ -643,14 +643,18 @@ mod tests {
     }
 
     #[test]
-    fn semantic_lexical_probe_separates_equivalent_and_contrastive_pairs() {
+    fn grounded_prime_probe_separates_equivalent_and_contrastive_pairs() {
         let basis = SemanticQuarkBasis::new(&test_genesis());
+        // Only include pairs whose shared grounded primes are a defensible
+        // equivalence target for this narrow projection probe. Do not count
+        // category-related words as synonym evidence: the current core lexicon
+        // maps "mother" and "father" to the same [Someone, Live] primes, which
+        // is a known representational alias, not proof that the words are equivalent.
         let equivalent_pairs = [
             ("happy", "joy"),
             ("joy", "joyful"),
             ("fear", "afraid"),
             ("calm", "peaceful"),
-            ("mother", "father"),
         ];
         let contrastive_pairs = [
             ("happy", "angry"),
