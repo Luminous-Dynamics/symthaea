@@ -277,9 +277,9 @@ if ! cmp -s "$tmpdir/ood-a.csv" "$tmpdir/ood-b.csv" ||
 fi
 
 if ! awk -F, '
-  NR == 1 { if (NF != 22) failed = 1; next }
+  NR == 1 { if (NF != 24) failed = 1; next }
   {
-    if (NF != 22) failed = 1
+    if (NF != 24) failed = 1
     if ($1 != "critical_low_reserve_high_load" && $1 != "reserve_limited" &&
         $1 != "load_limited" && $1 != "balanced" && $1 != "high_margin") failed = 1
     if ($2 != "nominal" && $2 != "moderate_shift" && $2 != "strong_shift") failed = 1
@@ -294,7 +294,7 @@ if ! awk -F, '
       if ($i != "push" && $i != "maintain" && $i != "emergency_recover" && $i != "none") failed = 1
     for (i = 14; i <= 17; i++) if ($i != "true" && $i != "false") failed = 1
     if ($18 !~ /^[0-3]$/ || $19 !~ /^[0-3]$/) failed = 1
-    for (i = 20; i <= 22; i++) if ($i != "true" && $i != "false") failed = 1
+    for (i = 20; i <= 24; i++) if ($i != "true" && $i != "false") failed = 1
     if (($4 > $5) != ($6 == "true")) failed = 1
     if (($6 == "false" && $13 != $11) || ($6 == "true" && $13 != $12)) failed = 1
     if (($13 == "none") != ($15 == "true")) failed = 1
@@ -302,7 +302,9 @@ if ! awk -F, '
     if (($13 != "none" && $20 == "false") != ($22 == "true")) failed = 1
     if ($21 == "true" && $20 == "false") failed = 1
     if ($6 == "true" && $13 != "none" && $21 != "true") failed = 1
-    if ($2 == "nominal" && $22 == "true") failed = 1
+    if ($2 == "nominal" &&
+        ($22 == "true" || $23 != "true" || $24 != "true")) failed = 1
+    if ($2 != "nominal" && ($23 != "false" || $24 != "true")) failed = 1
     if ($2 == "strong_shift" && ($6 != "true" || $22 == "true")) failed = 1
     key = $1 SUBSEP $2 SUBSEP $3
     if (seen[key]++) failed = 1
@@ -315,9 +317,9 @@ if ! awk -F, '
 fi
 
 if ! awk -F, '
-  NR == 1 { if (NF != 21) failed = 1; next }
+  NR == 1 { if (NF != 23) failed = 1; next }
   {
-    if (NF != 21) failed = 1
+    if (NF != 23) failed = 1
     if ($1 != "critical_low_reserve_high_load" && $1 != "reserve_limited" &&
         $1 != "load_limited" && $1 != "balanced" && $1 != "high_margin") failed = 1
     if ($2 != "nominal" && $2 != "moderate_shift" && $2 != "strong_shift") failed = 1
@@ -328,13 +330,17 @@ if ! awk -F, '
     if ($13 < 0 || $13 > 3 || $14 < 0 || $14 > 3 || $15 < 0 || $15 > 3 || $16 < 0 || $16 > 3) failed = 1
     if ($17 < 0 || $17 > 300 || $18 < 0 || $18 > $17 ||
         $19 < 0 || $19 > $18 || $20 < 0 || $20 > $17) failed = 1
+    if ($22 < 0 || $22 > 300 || $23 != 300) failed = 1
     if (($18 + $20) != $17) failed = 1
     if ($17 == 0) {
       if ($21 != "NA" || $20 != 0) failed = 1
     } else if (($20 / $17 - $21 > 0.00001) || ($21 - $20 / $17 > 0.00001)) failed = 1
-    if ($2 == "nominal" && ($5 != $4 || $6 != 0 || $7 > 0.10 || $20 != 0)) failed = 1
-    if ($2 == "moderate_shift" && ($5 != 0 || $6 > 150)) failed = 1
-    if ($2 == "strong_shift" && ($5 != 0 || $6 != 0 || $20 != 0)) failed = 1
+    if ($2 == "nominal" &&
+        ($5 != $4 || $6 != 0 || $7 > 0.10 || $20 != 0 || $22 != 300)) failed = 1
+    if ($2 == "moderate_shift" &&
+        ($5 != 0 || $6 > 150 || $22 != 0)) failed = 1
+    if ($2 == "strong_shift" &&
+        ($5 != 0 || $6 != 0 || $20 != 0 || $22 != 0)) failed = 1
     key = $1 SUBSEP $2
     if (seen[key]++) failed = 1
     rows++
