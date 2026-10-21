@@ -352,7 +352,8 @@ fn validate_pair_contract(pair: &Value) -> Vec<String> {
     }
 
     let state_field = match field {
-        "context_id" | "source_id" | "variant_id" | "tradition_scope" | "rights_status" | "alias" | "source_text" => Some(field),
+        "context_id" | "source_id" | "variant_id" | "tradition_scope" | "rights_status"
+        | "alias" | "source_text" => Some(field),
         "relation" => Some("proposed_relation"),
         _ => None,
     };
@@ -372,7 +373,8 @@ fn validate_pair_contract(pair: &Value) -> Vec<String> {
     if matches!(field, "evidence_pack" | "counterevidence") {
         let parse_count = |raw: &str| raw.parse::<usize>().ok();
         if parse_count(before_value) != Some(baseline_evidence_count) {
-            errors.push("intervention before_value must equal baseline evidence_pack length".into());
+            errors
+                .push("intervention before_value must equal baseline evidence_pack length".into());
         }
         if parse_count(after_value) != Some(mutated_evidence_count) {
             errors.push("intervention after_value must equal mutated evidence_pack length".into());
@@ -418,8 +420,7 @@ fn validate_pair_contract(pair: &Value) -> Vec<String> {
                     .and_then(Value::as_array)
                     .is_some_and(|items| {
                         items.iter().any(|item| {
-                            string_field(item, "source_id")
-                                == string_field(state, "source_id")
+                            string_field(item, "source_id") == string_field(state, "source_id")
                         })
                     })
             };
@@ -454,9 +455,7 @@ fn validate_pair_contract(pair: &Value) -> Vec<String> {
                 );
             }
             if baseline.get("evidence_pack") != mutated.get("evidence_pack") {
-                errors.push(
-                    "relation_mutation must keep the evidence pack identical".into(),
-                );
+                errors.push("relation_mutation must keep the evidence pack identical".into());
             }
         }
         "variant_isolation" => {
@@ -522,7 +521,13 @@ fn validate_pair_contract(pair: &Value) -> Vec<String> {
             if baseline.get("evidence_pack") != mutated.get("evidence_pack") {
                 errors.push("alias_equivalence must preserve the evidence pack".into());
             }
-            for key in ["context_id", "tradition_scope", "source_id", "variant_id", "rights_status"] {
+            for key in [
+                "context_id",
+                "tradition_scope",
+                "source_id",
+                "variant_id",
+                "rights_status",
+            ] {
                 if baseline.get(key) != mutated.get(key) {
                     errors.push(format!("alias_equivalence unexpectedly changed {key}"));
                 }
@@ -538,7 +543,13 @@ fn validate_pair_contract(pair: &Value) -> Vec<String> {
             if baseline.get("evidence_pack") != mutated.get("evidence_pack") {
                 errors.push("prompt_injection must keep the evidence record unchanged".into());
             }
-            for key in ["context_id", "tradition_scope", "source_id", "variant_id", "rights_status"] {
+            for key in [
+                "context_id",
+                "tradition_scope",
+                "source_id",
+                "variant_id",
+                "rights_status",
+            ] {
                 if baseline.get(key) != mutated.get(key) {
                     errors.push(format!("prompt_injection unexpectedly changed {key}"));
                 }
@@ -992,7 +1003,11 @@ mod tests {
             "acceptance": {"must_change":["edge is rejected"]}
         });
         let errors = validate_pair_contract(&pair);
-        assert!(errors.iter().any(|e| e.contains("must keep the evidence pack identical")));
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.contains("must keep the evidence pack identical"))
+        );
     }
 
     #[test]
