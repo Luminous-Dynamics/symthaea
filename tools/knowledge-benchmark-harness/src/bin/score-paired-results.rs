@@ -1005,6 +1005,57 @@ mod tests {
     }
 
     #[test]
+    fn nonsynthetic_pair_rejects_metadata_only_source() {
+        let source = SourceRecord {
+            source_id: "source-1".into(),
+            source_family_id: "family-1".into(),
+            split: "holdout".into(),
+            rights_status: "unknown".into(),
+            content_access: "metadata_only".into(),
+            rights_review: "pending".into(),
+        };
+        let catalog = HashMap::from([("source-1", &source)]);
+        let state = PairState {
+            source_id: "source-1".into(),
+            rights_status: "unknown".into(),
+            access_decision: "allow".into(),
+            evidence_pack: vec![PairEvidence {
+                source_id: "source-1".into(),
+                kind: "source_attestation".into(),
+            }],
+        };
+        let error = validate_real_pair_state("pair-1", "holdout", "baseline", &state, &catalog)
+            .unwrap_err();
+        assert!(error.contains("lacks approved content access"));
+    }
+
+    #[test]
+    fn nonsynthetic_pair_accepts_approved_content_sources() {
+        let source = SourceRecord {
+            source_id: "source-1".into(),
+            source_family_id: "family-1".into(),
+            split: "holdout".into(),
+            rights_status: "open_license_verified".into(),
+            content_access: "verified_open_content".into(),
+            rights_review: "approved_limited_use".into(),
+        };
+        let catalog = HashMap::from([("source-1", &source)]);
+        let state = PairState {
+            source_id: "source-1".into(),
+            rights_status: "open_license_verified".into(),
+            access_decision: "allow".into(),
+            evidence_pack: vec![PairEvidence {
+                source_id: "source-1".into(),
+                kind: "source_attestation".into(),
+            }],
+        };
+        assert!(
+            validate_real_pair_state("pair-1", "holdout", "baseline", &state, &catalog)
+                .is_ok()
+        );
+    }
+
+    #[test]
     fn declared_input_digest_mismatch_fails_closed() {
         let error = verify_sha256("source pack", b"observed bytes", &"0".repeat(64)).unwrap_err();
         assert!(error.contains("source pack digest mismatch"));
