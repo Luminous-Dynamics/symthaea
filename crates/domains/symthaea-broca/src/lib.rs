@@ -90,7 +90,10 @@ pub use affective_sculpting::{AffectiveSculptor, AffectiveStyle};
 pub use architectural_memory::ArchitecturalMemory;
 pub use checkpoint::{AdamState, BrocaCheckpoint, BrocaCheckpointMetadata};
 pub use consensus_engine::{ChangeProposal, ConsensusEngine, ConsensusResult};
-pub use controller::{LanguageController, LanguageControllerConfig, NetworkSnapshot};
+pub use controller::{
+    LanguageController, LanguageControllerConfig, NetworkSnapshot, TokenExtensionInitError,
+    TokenExtensionInitialization,
+};
 pub use decoder::{
     StructuredDecoder, StructuredProseTranslator, StructuredReadout, StructuredRoleFill,
     StructuredTranslation,
