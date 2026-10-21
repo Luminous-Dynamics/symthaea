@@ -37,3 +37,6 @@ The receipt runner uses a shallow sparse checkout of the required fixture direct
 
 
 The PR trigger is intentionally limited to changes in this benchmark document and its fixture directory, so adding or editing the CI contract in the parent roadmap PR does not run a smoke benchmark against a branch that lacks the board fixture.
+
+
+On the first execution, KiCad found two violations on the purported clean coupon and returned its documented violation code. This is a fixture defect until the report proves otherwise; the workflow now preserves and prints full DRC diagnostics even when a gate fails, rather than stopping before the evidence is retained. The fixture is not called clean unless the pinned tool says exit code 0.
