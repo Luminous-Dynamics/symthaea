@@ -169,13 +169,15 @@ impl Network {
 #[derive(Clone, Copy, Debug)]
 struct Metrics {
     nodes: usize,
-    /// H(X[t+1]) under a uniform distribution over X[t].
+    /// H(X[t]) under the explicitly supplied distribution over previous states.
+    input_state_entropy_bits: f64,
+    /// H(X[t+1]) under the explicitly supplied distribution over previous states.
     state_entropy_bits: f64,
-    /// H(X[t+1] | X[t]) under a uniform distribution over X[t].
+    /// H(X[t+1] | X[t]) under the explicitly supplied distribution over previous states.
     transition_entropy_bits: f64,
     /// I(X[t]; X[t+1]) = H(X[t+1]) - H(X[t+1] | X[t]).
     mutual_information_bits: f64,
-    /// Minimum over nontrivial cuts of mean conditional-distribution TV distance.
+    /// Minimum over nontrivial cuts of prior-weighted conditional-row TV distance.
     /// This is a proposed causal-cut sensitivity proxy, NOT IIT Phi.
     min_cut_sensitivity: f64,
 }
@@ -189,39 +191,95 @@ fn entropy_bits(probabilities: &[f64]) -> f64 {
         .sum()
 }
 
-fn mean_output_distribution(tpm: &[Vec<f64>]) -> Vec<f64> {
-    let rows = tpm.len();
+fn weighted_output_distribution(
+    tpm: &[Vec<f64>],
+    previous_state_distribution: &[f64],
+) -> Vec<f64> {
+    assert_eq!(tpm.len(), previous_state_distribution.len());
     let states = tpm.first().map_or(0, Vec::len);
     let mut marginal = vec![0.0; states];
-    for row in tpm {
+    for (row, weight) in tpm.iter().zip(previous_state_distribution) {
         for (next, probability) in row.iter().copied().enumerate() {
-            marginal[next] += probability / rows as f64;
+            marginal[next] += weight * probability;
         }
     }
     marginal
 }
 
-fn mean_row_entropy(tpm: &[Vec<f64>]) -> f64 {
-    tpm.iter().map(|row| entropy_bits(row)).sum::<f64>() / tpm.len() as f64
+fn weighted_mean_row_entropy(
+    tpm: &[Vec<f64>],
+    previous_state_distribution: &[f64],
+) -> f64 {
+    assert_eq!(tpm.len(), previous_state_distribution.len());
+    tpm.iter()
+        .zip(previous_state_distribution)
+        .map(|(row, weight)| weight * entropy_bits(row))
+        .sum()
 }
 
-fn mean_row_total_variation(left: &[Vec<f64>], right: &[Vec<f64>]) -> f64 {
+fn weighted_mean_row_total_variation(
+    left: &[Vec<f64>],
+    right: &[Vec<f64>],
+    previous_state_distribution: &[f64],
+) -> f64 {
     assert_eq!(left.len(), right.len());
+    assert_eq!(left.len(), previous_state_distribution.len());
     left.iter()
         .zip(right)
-        .map(|(a, b)| {
+        .zip(previous_state_distribution)
+        .map(|((a, b), weight)| {
             assert_eq!(a.len(), b.len());
-            0.5 * a.iter().zip(b).map(|(x, y)| (x - y).abs()).sum::<f64>()
+            weight * 0.5 * a.iter().zip(b).map(|(x, y)| (x - y).abs()).sum::<f64>()
         })
-        .sum::<f64>()
-        / left.len() as f64
+        .sum()
+}
+
+fn uniform_state_distribution(network: &Network) -> Vec<f64> {
+    vec![1.0 / network.state_count() as f64; network.state_count()]
+}
+
+fn canonical_prior_specification(probabilities: &[f64]) -> String {
+    let entries = probabilities
+        .iter()
+        .enumerate()
+        .map(|(state, probability)| format!("{state}:{probability:.6}"))
+        .collect::<Vec<_>>()
+        .join(",");
+    format!("prior={entries}")
 }
 
 fn measure(network: &Network) -> Metrics {
+    measure_with_state_distribution(network, &uniform_state_distribution(network))
+}
+
+fn measure_with_state_distribution(
+    network: &Network,
+    previous_state_distribution: &[f64],
+) -> Metrics {
+    assert_eq!(
+        previous_state_distribution.len(),
+        network.state_count(),
+        "state distribution must have one probability per previous state"
+    );
+    assert!(
+        previous_state_distribution
+            .iter()
+            .all(|p| p.is_finite() && *p >= 0.0),
+        "state distribution values must be finite and nonnegative"
+    );
+    let probability_sum: f64 = previous_state_distribution.iter().sum();
+    assert!(
+        (probability_sum - 1.0).abs() <= 1e-12,
+        "state distribution must sum to 1 (got {probability_sum})"
+    );
+
     let original_tpm = network.transition_matrix(None);
-    let output_marginal = mean_output_distribution(&original_tpm);
+    let output_marginal =
+        weighted_output_distribution(&original_tpm, previous_state_distribution);
     let state_entropy_bits = entropy_bits(&output_marginal);
-    let transition_entropy_bits = mean_row_entropy(&original_tpm);
+    let input_state_entropy_bits = entropy_bits(previous_state_distribution);
+    let transition_entropy_bits =
+        weighted_mean_row_entropy(&original_tpm, previous_state_distribution);
     let mutual_information_bits = (state_entropy_bits - transition_entropy_bits).max(0.0);
 
     let full_mask = network.state_count() - 1;
@@ -234,7 +292,11 @@ fn measure(network: &Network) -> Metrics {
             continue;
         }
         let cut_tpm = network.transition_matrix(Some(cut_mask));
-        min_cut_sensitivity = min_cut_sensitivity.min(mean_row_total_variation(&original_tpm, &cut_tpm));
+        min_cut_sensitivity = min_cut_sensitivity.min(weighted_mean_row_total_variation(
+            &original_tpm,
+            &cut_tpm,
+            previous_state_distribution,
+        ));
     }
 
     if !min_cut_sensitivity.is_finite() {
@@ -243,6 +305,7 @@ fn measure(network: &Network) -> Metrics {
 
     Metrics {
         nodes: network.node_count(),
+        input_state_entropy_bits,
         state_entropy_bits,
         transition_entropy_bits,
         mutual_information_bits,
@@ -300,31 +363,75 @@ fn feed_forward_chain(nodes: usize, noise: f64) -> Network {
 }
 
 fn main() {
-    let mut cases: Vec<(String, Network)> = vec![
-        ("independent_max_noise".to_string(), self_memory(3, 0.5)),
-        ("recurrent_ring_no_noise".to_string(), directed_ring(3, 0.0)),
-        ("common_driver_no_noise".to_string(), common_driver(3, 0.0)),
-        ("feed_forward_chain_no_noise".to_string(), feed_forward_chain(4, 0.0)),
-        ("xor_synergy_no_noise".to_string(), xor_synergy(0.0)),
-        ("and_synergy_no_noise".to_string(), and_circuit(0.0)),
-    ];
+    let mut cases: Vec<(String, Network, Vec<f64>)> = Vec::new();
+
+    let independent = self_memory(3, 0.5);
+    cases.push((
+        "independent_max_noise".to_string(),
+        independent.clone(),
+        uniform_state_distribution(&independent),
+    ));
+
+    let clean_ring = directed_ring(3, 0.0);
+    cases.push((
+        "recurrent_ring_uniform_prior".to_string(),
+        clean_ring.clone(),
+        uniform_state_distribution(&clean_ring),
+    ));
+    let mut skewed_prior = vec![0.0; clean_ring.state_count()];
+    skewed_prior[0] = 0.7;
+    skewed_prior[1] = 0.3;
+    cases.push((
+        "recurrent_ring_skewed_prior".to_string(),
+        clean_ring,
+        skewed_prior,
+    ));
+
+    let common = common_driver(3, 0.0);
+    cases.push((
+        "common_driver_no_noise".to_string(),
+        common.clone(),
+        uniform_state_distribution(&common),
+    ));
+    let chain = feed_forward_chain(4, 0.0);
+    cases.push((
+        "feed_forward_chain_no_noise".to_string(),
+        chain.clone(),
+        uniform_state_distribution(&chain),
+    ));
+    let xor = xor_synergy(0.0);
+    cases.push((
+        "xor_synergy_no_noise".to_string(),
+        xor.clone(),
+        uniform_state_distribution(&xor),
+    ));
+    let and = and_circuit(0.0);
+    cases.push((
+        "and_synergy_no_noise".to_string(),
+        and.clone(),
+        uniform_state_distribution(&and),
+    ));
 
     // Sweep noise explicitly instead of assuming entropy and integration share
     // one monotonic relationship.
     for noise in [0.0, 0.05, 0.10, 0.20, 0.35, 0.50] {
+        let ring = directed_ring(3, noise);
         cases.push((
             format!("ring_noise_{:.2}", noise),
-            directed_ring(3, noise),
+            ring.clone(),
+            uniform_state_distribution(&ring),
         ));
     }
 
-    println!("network\tnodes\tmodel_spec\tH_next_bits\tH_next_given_prev_bits\tI_prev_next_bits\tmin_cut_sensitivity_tv");
-    for (name, network) in cases {
-        let m = measure(&network);
+    println!("network\tnodes\tmodel_spec\tprior_spec\tH_prev_bits\tH_next_bits\tH_next_given_prev_bits\tI_prev_next_bits\tmin_cut_sensitivity_tv");
+    for (name, network, prior) in cases {
+        let m = measure_with_state_distribution(&network, &prior);
         println!(
-            "{name}\t{}\t{}\t{:.6}\t{:.6}\t{:.6}\t{:.6}",
+            "{name}\t{}\t{}\t{}\t{:.6}\t{:.6}\t{:.6}\t{:.6}\t{:.6}",
             m.nodes,
             network.canonical_specification(),
+            canonical_prior_specification(&prior),
+            m.input_state_entropy_bits,
             m.state_entropy_bits,
             m.transition_entropy_bits,
             m.mutual_information_bits,
@@ -444,6 +551,35 @@ mod tests {
             0.17,
         );
         close(measure(&network).min_cut_sensitivity, 0.0, 1e-12);
+    }
+
+    #[test]
+    fn same_transition_rules_change_entropy_under_a_skewed_state_ensemble() {
+        let network = directed_ring(3, 0.0);
+        let uniform = uniform_state_distribution(&network);
+        let mut skewed = vec![0.0; network.state_count()];
+        skewed[0] = 0.7;
+        skewed[1] = 0.3;
+
+        let uniform_metrics = measure_with_state_distribution(&network, &uniform);
+        let skewed_metrics = measure_with_state_distribution(&network, &skewed);
+
+        close(uniform_metrics.input_state_entropy_bits, 3.0, 1e-12);
+        close(uniform_metrics.state_entropy_bits, 3.0, 1e-12);
+        close(skewed_metrics.input_state_entropy_bits, entropy_bits(&[0.7, 0.3]), 1e-12);
+        close(skewed_metrics.state_entropy_bits, entropy_bits(&[0.7, 0.3]), 1e-12);
+        close(skewed_metrics.transition_entropy_bits, 0.0, 1e-12);
+        close(skewed_metrics.mutual_information_bits, entropy_bits(&[0.7, 0.3]), 1e-12);
+        assert!(skewed_metrics.state_entropy_bits < uniform_metrics.state_entropy_bits);
+        // The transition rules are identical: only the prior over states changed.
+        assert_eq!(network.canonical_specification(), directed_ring(3, 0.0).canonical_specification());
+    }
+
+    #[test]
+    #[should_panic(expected = "state distribution must sum to 1")]
+    fn invalid_state_ensemble_fails_closed() {
+        let network = directed_ring(3, 0.0);
+        let _ = measure_with_state_distribution(&network, &[1.0; 8]);
     }
 
     #[test]
