@@ -13,7 +13,7 @@
 //!          Belief revision (AGM theory, Alchourrón et al. 1985)
 
 use super::claim_provenance::{
-    ClaimContext, EvidenceLink, EvidenceLinkStatus, EvidenceRelation,
+    ClaimContext, ClaimKind, ClaimPolarity, EvidenceLink, EvidenceLinkStatus, EvidenceRelation,
 };
 use super::encoding::FactEncoding;
 use std::collections::{HashMap, HashSet};
@@ -1024,6 +1024,29 @@ mod tests {
         }
     }
 
+    fn make_claim_context(
+        witness_id: &str,
+        source_family_id: &str,
+        evidence_id: &str,
+        object: &str,
+        polarity: ClaimPolarity,
+        event_time: Option<i64>,
+    ) -> ClaimContext {
+        ClaimContext {
+            subject: "Oil prices".into(),
+            predicate: "rose".into(),
+            object: object.into(),
+            witness_id: witness_id.into(),
+            source_family_id: source_family_id.into(),
+            context_id: "market-report:day-1".into(),
+            temporal_scope: Some("day-1".into()),
+            event_time,
+            claim_kind: ClaimKind::SourceAttested,
+            polarity,
+            evidence_ids: vec![evidence_id.into()],
+        }
+    }
+
     #[test]
     fn test_insert_and_search() {
         let mut graph = EnhancedKnowledgeGraph::new(100);
@@ -1059,20 +1082,140 @@ mod tests {
     }
 
     #[test]
-    fn test_corroboration() {
+    fn semantic_similarity_does_not_merge_or_boost_generic_facts() {
         let mut graph = EnhancedKnowledgeGraph::new(100);
 
-        let enc1 = make_encoding("oil prices rose", 0.7);
-        let (id1, _) = graph.insert(enc1, 1, None, false);
+        let (id1, _) = graph.insert(make_encoding("oil prices rose", 0.7), 1, None, false);
+        let before = graph.get_fact(id1).unwrap().confidence;
+        let (id2, _) = graph.insert(make_encoding("oil prices rose", 0.8), 2, None, false);
 
-        // Insert same fact again — should corroborate, not duplicate
-        let enc2 = make_encoding("oil prices rose", 0.8);
-        let (id2, _) = graph.insert(enc2, 2, None, false);
+        assert_ne!(id1, id2);
+        assert_eq!(graph.len(), 2);
+        assert_eq!(graph.get_fact(id1).unwrap().corroboration_count, 0);
+        assert_eq!(graph.get_fact(id1).unwrap().confidence, before);
+        assert!(graph.evidence_links().iter().any(|link| {
+            link.from_fact_id == id1
+                && link.to_fact_id == id2
+                && link.relation == EvidenceRelation::SemanticNeighbor
+                && link.status == EvidenceLinkStatus::Candidate
+        }));
+    }
 
-        assert_eq!(id1, id2); // Same ID = corroborated
-        assert_eq!(graph.len(), 1); // Still one fact
-        let fact = graph.get_fact(id1).unwrap();
-        assert_eq!(fact.corroboration_count, 1);
+    #[test]
+    fn grounded_similarity_creates_candidate_not_corroboration() {
+        let mut graph = EnhancedKnowledgeGraph::new(100);
+        let context_a = make_claim_context(
+            "witness-a", "family-a", "evidence-a", "renewal", ClaimPolarity::Positive, Some(1),
+        );
+        let context_b = make_claim_context(
+            "witness-b", "family-b", "evidence-b", "renewal", ClaimPolarity::Positive, Some(1),
+        );
+        let (id_a, _) = graph
+            .insert_grounded(make_encoding("oil prices rose", 0.7), 1, None, false, context_a)
+            .unwrap();
+        let (id_b, _) = graph
+            .insert_grounded(make_encoding("oil prices rose", 0.7), 2, None, false, context_b)
+            .unwrap();
+
+        let link = graph.evidence_links().iter().find(|link| {
+            link.from_fact_id == id_a && link.to_fact_id == id_b
+        }).unwrap();
+        assert_eq!(link.relation, EvidenceRelation::Corroborates);
+        assert_eq!(link.status, EvidenceLinkStatus::Candidate);
+        assert_eq!(graph.get_fact(id_a).unwrap().corroboration_count, 0);
+        assert_eq!(graph.get_fact(id_a).unwrap().confidence, 0.7);
+        assert_eq!(graph.get_fact(id_b).unwrap().confidence, 0.7);
+    }
+
+    #[test]
+    fn explicit_independent_corroboration_boosts_once() {
+        let mut graph = EnhancedKnowledgeGraph::new(100);
+        let context_a = make_claim_context(
+            "witness-a", "family-a", "evidence-a", "renewal", ClaimPolarity::Positive, Some(1),
+        );
+        let context_b = make_claim_context(
+            "witness-b", "family-b", "evidence-b", "renewal", ClaimPolarity::Positive, Some(1),
+        );
+        let (id_a, _) = graph
+            .insert_grounded(make_encoding("oil prices rose", 0.7), 1, None, false, context_a)
+            .unwrap();
+        let (id_b, _) = graph
+            .insert_grounded(make_encoding("oil prices rose", 0.7), 2, None, false, context_b)
+            .unwrap();
+        let evidence = vec!["evidence-a".to_string(), "evidence-b".to_string()];
+
+        let link = graph.adjudicate_evidence_relation(
+            id_a,
+            id_b,
+            EvidenceRelation::Corroborates,
+            evidence.clone(),
+            "Independent witnesses support the same scoped proposition".into(),
+            None,
+            None,
+            3,
+        ).unwrap();
+        assert_eq!(link.status, EvidenceLinkStatus::Adjudicated);
+        assert_eq!(graph.get_fact(id_a).unwrap().corroboration_count, 1);
+        assert_eq!(graph.get_fact(id_a).unwrap().confidence, 0.75);
+
+        graph.adjudicate_evidence_relation(
+            id_a,
+            id_b,
+            EvidenceRelation::Corroborates,
+            evidence,
+            "Same evidence adjudication repeated".into(),
+            None,
+            None,
+            4,
+        ).unwrap();
+        assert_eq!(graph.get_fact(id_a).unwrap().corroboration_count, 1);
+        assert_eq!(graph.get_fact(id_a).unwrap().confidence, 0.75);
+    }
+
+    #[test]
+    fn historical_influence_requires_explicit_transmission_chain() {
+        let mut graph = EnhancedKnowledgeGraph::new(100);
+        let earlier = make_claim_context(
+            "witness-a", "family-a", "evidence-a", "renewal", ClaimPolarity::Positive, Some(-300),
+        );
+        let later = make_claim_context(
+            "witness-b", "family-b", "evidence-b", "renewal", ClaimPolarity::Positive, Some(-200),
+        );
+        let (from, _) = graph.insert_grounded(
+            make_encoding("earlier myth", 0.7), 1, None, false, earlier,
+        ).unwrap();
+        let (to, _) = graph.insert_grounded(
+            make_encoding("later myth", 0.7), 2, None, false, later,
+        ).unwrap();
+        let error = graph.adjudicate_evidence_relation(
+            from, to, EvidenceRelation::HistoricallyInfluences,
+            vec!["evidence-a".into(), "evidence-b".into()],
+            "Motif similarity only".into(), None, None, 3,
+        ).unwrap_err();
+        assert!(error.contains("transmission_chain"));
+
+        assert!(graph.adjudicate_evidence_relation(
+            from, to, EvidenceRelation::HistoricallyInfluences,
+            vec!["evidence-a".into(), "evidence-b".into()],
+            "Documented transmission argument".into(), None,
+            Some("source A -> intermediary -> source B".into()), 3,
+        ).is_ok());
+    }
+
+    #[test]
+    fn contradiction_candidates_do_not_demote_facts_before_adjudication() {
+        let mut graph = EnhancedKnowledgeGraph::new(100);
+        let (id_a, _) = graph.insert(make_encoding("oil prices rose", 0.8), 1, None, false);
+        let before = graph.get_fact(id_a).unwrap().confidence;
+        let mut negative = make_encoding("oil prices did not rise", 0.8);
+        negative.vector = graph.get_fact(id_a).unwrap().encoding.vector.clone();
+        let (id_b, alerts) = graph.insert(negative, 2, None, false);
+        assert_eq!(alerts.len(), 1);
+        assert!(!alerts[0].adjudicated);
+        assert_eq!(graph.resolve_contradictions(&alerts), 0);
+        assert_eq!(graph.get_fact(id_a).unwrap().confidence, before);
+        assert_eq!(graph.get_fact(id_a).unwrap().contradiction_count, 0);
+        assert!(graph.get_fact(id_b).is_some());
     }
 
     #[test]
