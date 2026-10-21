@@ -5,6 +5,7 @@ on:
     paths:
       - "crates/core/symthaea-core/src/hdc/conjecture_engine.rs"
       - "crates/core/symthaea-core/src/hdc/conjecture_engine/experiment_selection.rs"
+      - "crates/bridges/symthaea-physics-bridge/src/integrated_discovery.rs"
       - ".github/workflows/active-experiment-score-validity.yml"
   workflow_dispatch:
 
