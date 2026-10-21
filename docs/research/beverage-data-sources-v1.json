@@ -291,7 +291,21 @@
         "pooled_mae_kg_rs_h": 99.1193,
         "pooled_mape_percent": 10.4589,
         "pooled_r2": 0.901,
-        "caveat": "Numbers are reported in the public code companion; not independently reproduced. Per-batch errors vary materially, and only 10 full-process batches are in this result."
+        "caveat": "Numbers are reported in the public code companion; not independently reproduced. Per-batch errors vary materially, and only 10 full-process batches are in this result.",
+        "worst_fold": {
+          "batch_id": "B04",
+          "mape_percent": 32.9842,
+          "mae_kg_rs_h": 146.6107,
+          "rmse_kg_rs_h": 202.4703,
+          "test_windows": 13
+        },
+        "second_notable_fold": {
+          "batch_id": "B05",
+          "mape_percent": 17.9196,
+          "mae_kg_rs_h": 113.6546,
+          "test_windows": 13
+        },
+        "additional_caveat": "Pooled MAPE of about 10.46% masks the B04 held-out batch MAPE of about 32.98%. Report batch-level distributions and worst-batch error rather than only pooled metrics."
       },
       "domain": [
         "industrial_baker_yeast",
