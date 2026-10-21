@@ -8,6 +8,8 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 const TOOL_VERSION: &str = "score-paired-results-v0.1.0";
+const SCORE_REPORT_SCHEMA: &str =
+    include_str!("../../../../benchmarks/benchmark-runs/v0/score-report.schema.json");
 
 #[derive(Debug)]
 struct Args {
@@ -124,6 +126,7 @@ struct Report {
     primary_endpoint: String,
     candidate_system_id: String,
     candidate_critical_gates_pass: bool,
+    report_schema_sha256: String,
     plan_sha256: String,
     pair_manifest_sha256: String,
     result_rows_sha256: String,
@@ -626,6 +629,7 @@ fn run() -> Result<(), String> {
             .iter()
             .find(|metrics| metrics.system_id == plan.candidate_system_id)
             .is_some_and(|metrics| metrics.critical_gates_pass),
+        report_schema_sha256: sha256_hex(SCORE_REPORT_SCHEMA.as_bytes()),
         plan_sha256: sha256_hex(&plan_bytes),
         pair_manifest_sha256: sha256_hex(&pair_bytes),
         result_rows_sha256: sha256_hex(&result_bytes),
@@ -643,7 +647,30 @@ fn run() -> Result<(), String> {
             "Results generalize only to the documented source-family split and annotation process.",
         ],
     };
-    let bytes = serde_json::to_vec_pretty(&report)
+    let report_value = serde_json::to_value(&report)
+        .map_err(|error| format!("cannot serialize score report: {error}"))?;
+    let report_schema: Value = serde_json::from_str(SCORE_REPORT_SCHEMA)
+        .map_err(|error| format!("bundled score-report schema is invalid JSON: {error}"))?;
+    let meta_validator = jsonschema::meta::validator_for(&report_schema)
+        .map_err(|error| format!("cannot compile score-report meta-schema validator: {error}"))?;
+    if !meta_validator.evaluate(&report_schema).flag().valid {
+        return Err("bundled score-report schema does not validate against its meta-schema".into());
+    }
+    let validator = jsonschema::draft202012::options()
+        .should_validate_formats(true)
+        .build(&report_schema)
+        .map_err(|error| format!("cannot compile score-report schema: {error}"))?;
+    let validation_errors: Vec<String> = validator
+        .iter_errors(&report_value)
+        .map(|error| error.to_string())
+        .collect();
+    if !validation_errors.is_empty() {
+        return Err(format!(
+            "generated score report violates its schema: {}",
+            validation_errors.join("; ")
+        ));
+    }
+    let bytes = serde_json::to_vec_pretty(&report_value)
         .map_err(|error| format!("cannot serialize score report: {error}"))?;
     if let Some(parent) = args.output.parent().filter(|parent| !parent.as_os_str().is_empty()) {
         fs::create_dir_all(parent).map_err(|error| {
@@ -736,6 +763,21 @@ mod tests {
             adjudication_status:"synthetic_only".into(),
             notes:"synthetic test label".into(),
         }
+    }
+
+    #[test]
+    fn bundled_score_report_schema_is_valid_draft_2020_12() {
+        let schema: Value = serde_json::from_str(SCORE_REPORT_SCHEMA).unwrap();
+        assert_eq!(
+            schema.get("$schema").and_then(Value::as_str),
+            Some("https://json-schema.org/draft/2020-12/schema")
+        );
+        let meta_validator = jsonschema::meta::validator_for(&schema).unwrap();
+        assert!(meta_validator.evaluate(&schema).flag().valid);
+        jsonschema::draft202012::options()
+            .should_validate_formats(true)
+            .build(&schema)
+            .unwrap();
     }
 
     #[test]
