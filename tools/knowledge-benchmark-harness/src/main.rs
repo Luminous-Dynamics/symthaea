@@ -389,7 +389,8 @@ fn validate_pair_contract(pair: &Value) -> Vec<String> {
             }
             if field != "context_id" || expected != "local_change" {
                 errors.push(
-                    "context_swap requires context_id intervention and local_change expectation".into(),
+                    "context_swap requires context_id intervention and local_change expectation"
+                        .into(),
                 );
             }
         }
@@ -436,8 +437,7 @@ fn validate_pair_contract(pair: &Value) -> Vec<String> {
             }
         }
         "tradition_transfer" => {
-            if string_field(baseline, "tradition_scope")
-                == string_field(mutated, "tradition_scope")
+            if string_field(baseline, "tradition_scope") == string_field(mutated, "tradition_scope")
             {
                 errors.push("tradition_transfer must change tradition_scope".into());
             }
@@ -449,9 +449,8 @@ fn validate_pair_contract(pair: &Value) -> Vec<String> {
         }
         "counterevidence_addition" => {
             if mutated_evidence_count <= baseline_evidence_count {
-                errors.push(
-                    "counterevidence_addition must add at least one evidence record".into(),
-                );
+                errors
+                    .push("counterevidence_addition must add at least one evidence record".into());
             }
             if field != "counterevidence" || expected != "local_change" {
                 errors.push(
@@ -483,14 +482,16 @@ fn validate_pair_contract(pair: &Value) -> Vec<String> {
             }
             if field != "alias" || expected != "invariant" {
                 errors.push(
-                    "alias_equivalence requires alias intervention and invariant expectation".into(),
+                    "alias_equivalence requires alias intervention and invariant expectation"
+                        .into(),
                 );
             }
         }
         "prompt_injection" => {
             if field != "source_text" || expected != "invariant" {
                 errors.push(
-                    "prompt_injection must preserve governing behavior under source-text injection".into(),
+                    "prompt_injection must preserve governing behavior under source-text injection"
+                        .into(),
                 );
             }
         }
@@ -503,7 +504,9 @@ fn validate_pair_contract(pair: &Value) -> Vec<String> {
             for item in items {
                 if let Some(id) = string_field(item, "evidence_id") {
                     if !evidence_ids.insert(id.to_string()) {
-                        errors.push(format!("{state_name} contains duplicate evidence_id {id:?}"));
+                        errors.push(format!(
+                            "{state_name} contains duplicate evidence_id {id:?}"
+                        ));
                     }
                 }
             }
@@ -536,8 +539,13 @@ fn validate_domain_contract(
             );
         }
         Kind::Claim => {
-            let source_ids =
-                collect_unique_object_ids(value, "sources", "source_id", "claim source", &mut errors);
+            let source_ids = collect_unique_object_ids(
+                value,
+                "sources",
+                "source_id",
+                "claim source",
+                &mut errors,
+            );
             let counterclaims = value
                 .get("counterclaims")
                 .and_then(Value::as_array)
@@ -907,7 +915,11 @@ mod tests {
             "acceptance": {"must_change":["edge is rejected"]}
         });
         let errors = validate_pair_contract(&pair);
-        assert!(errors.iter().any(|e| e.contains("must reject an unsupported relation change")));
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.contains("must reject an unsupported relation change"))
+        );
     }
 
     #[test]
@@ -950,5 +962,4 @@ mod tests {
         let errors = validate_pair_contract(&pair);
         assert!(errors.iter().any(|e| e.contains("before_value does not match baseline source_id")));
     }
-
 }
