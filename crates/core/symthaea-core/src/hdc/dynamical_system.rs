@@ -174,6 +174,8 @@ pub enum SimulationError {
     NonFiniteInitialState {
         index: usize,
     },
+    /// A zero-dimensional system has no state to integrate.
+    ZeroStateDimension,
     InvalidIntegratorStateDimension {
         step: usize,
         expected: usize,
@@ -181,6 +183,11 @@ pub enum SimulationError {
     },
     NonFiniteIntegratorState {
         step: usize,
+        index: usize,
+    },
+    /// An intermediate Cash–Karp stage state became non-finite before derivative evaluation.
+    NonFiniteIntermediateState {
+        stage: u8,
         index: usize,
     },
     InvalidIntegratorConfiguration,
@@ -193,6 +200,12 @@ pub enum SimulationError {
     /// RK45 derivative evaluation returned a non-finite component.
     NonFiniteDerivative {
         stage: u8,
+        index: usize,
+    },
+    /// The per-component absolute/relative tolerance profile is invalid.
+    InvalidRk45Tolerances,
+    /// RK45 generated a non-finite embedded error estimate.
+    NonFiniteErrorEstimate {
         index: usize,
     },
     /// RK45 reached its minimum step while the embedded error still exceeded tolerance.
@@ -239,6 +252,9 @@ pub fn try_simulate(
     }
 
     let expected_dim = system.state_dim();
+    if expected_dim == 0 {
+        return Err(SimulationError::ZeroStateDimension);
+    }
     if initial_state.len() != expected_dim {
         return Err(SimulationError::StateDimensionMismatch {
             expected: expected_dim,
@@ -484,6 +500,202 @@ impl Default for Rk45Integrator {
     }
 }
 
+/// Component-aware error tolerances for adaptive RK45 integration.
+///
+/// Each absolute tolerance must be finite and strictly positive. The relative
+/// tolerance may be zero, but must be finite and non-negative. A component's
+/// error scale is `absolute[i] + relative * max(abs(y_old[i]), abs(y_new[i]))`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Rk45Tolerances {
+    /// Shared relative tolerance applied to every state component.
+    pub relative: f64,
+    /// Positive absolute tolerance for each state component, in that component's units.
+    pub absolute: Vec<f64>,
+}
+
+impl Rk45Tolerances {
+    /// Construct a tolerance profile. Validation occurs when an integration is requested.
+    pub fn new(relative: f64, absolute: Vec<f64>) -> Self {
+        Self { relative, absolute }
+    }
+
+    fn validate(&self, dimension: usize) -> Result<(), SimulationError> {
+        if dimension == 0 {
+            return Err(SimulationError::ZeroStateDimension);
+        }
+        if !self.relative.is_finite()
+            || self.relative < 0.0
+            || self.absolute.len() != dimension
+            || self
+                .absolute
+                .iter()
+                .any(|value| !value.is_finite() || *value <= 0.0)
+        {
+            return Err(SimulationError::InvalidRk45Tolerances);
+        }
+        Ok(())
+    }
+}
+
+/// One accepted RK45 step and the next controller proposal.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Rk45StepReport {
+    /// Accepted state at `t + accepted_dt`.
+    pub state: Vec<f64>,
+    /// Accepted timestep (which may be smaller than the requested maximum).
+    pub accepted_dt: f64,
+    /// Maximum absolute difference between the embedded formulas.
+    pub max_absolute_error: f64,
+    /// Dimensionless error score; accepted steps have `error_norm <= 1`.
+    pub error_norm: f64,
+    /// Suggested timestep for the next controller call.
+    pub proposed_next_dt: f64,
+    /// Total attempted Cash–Karp steps, including rejected attempts.
+    pub attempted_steps: usize,
+    /// Number of rejected attempts before this accepted step.
+    pub rejected_steps: usize,
+    /// Number of derivative callback invocations (six per Cash–Karp attempt).
+    pub derivative_evaluations: usize,
+}
+
+/// Stateful step-size controller. It persists the next-step proposal across
+/// accepted steps without making the integrator itself mutable or shared stateful.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Rk45Controller {
+    next_step_size: Option<f64>,
+}
+
+impl Rk45Controller {
+    /// Create a controller seeded with its first proposed timestep.
+    pub fn new(initial_step_size: f64) -> Result<Self, SimulationError> {
+        if !initial_step_size.is_finite() || initial_step_size <= 0.0 {
+            return Err(SimulationError::InvalidTimeStep);
+        }
+        Ok(Self {
+            next_step_size: Some(initial_step_size),
+        })
+    }
+
+    /// Return the currently persisted proposal, if a successful step has occurred.
+    pub fn next_step_size(&self) -> Option<f64> {
+        self.next_step_size
+    }
+
+    /// Reset the controller to a new initial timestep.
+    pub fn reset(&mut self, initial_step_size: f64) -> Result<(), SimulationError> {
+        if !initial_step_size.is_finite() || initial_step_size <= 0.0 {
+            return Err(SimulationError::InvalidTimeStep);
+        }
+        self.next_step_size = Some(initial_step_size);
+        Ok(())
+    }
+
+    /// Execute one accepted adaptive step and persist its next-step proposal.
+    ///
+    /// `maximum_dt` is a per-call upper bound, usually the remaining simulation
+    /// interval or the integrator's configured maximum timestep.
+    pub fn try_step(
+        &mut self,
+        integrator: &Rk45Integrator,
+        system: &dyn DynamicalSystem,
+        state: &[f64],
+        t: f64,
+        maximum_dt: f64,
+        tolerances: &Rk45Tolerances,
+    ) -> Result<Rk45StepReport, SimulationError> {
+        if !t.is_finite() {
+            return Err(SimulationError::NonFiniteTimeBounds);
+        }
+        if !maximum_dt.is_finite() || maximum_dt <= 0.0 {
+            return Err(SimulationError::InvalidTimeStep);
+        }
+        tolerances.validate(system.state_dim())?;
+        self.try_step_validated(integrator, system, state, t, maximum_dt, tolerances)
+    }
+
+    fn try_step_validated(
+        &mut self,
+        integrator: &Rk45Integrator,
+        system: &dyn DynamicalSystem,
+        state: &[f64],
+        t: f64,
+        maximum_dt: f64,
+        tolerances: &Rk45Tolerances,
+    ) -> Result<Rk45StepReport, SimulationError> {
+        if !t.is_finite() {
+            return Err(SimulationError::NonFiniteTimeBounds);
+        }
+        if !maximum_dt.is_finite() || maximum_dt <= 0.0 {
+            return Err(SimulationError::InvalidTimeStep);
+        }
+        let requested_dt = self.next_step_size.unwrap_or(maximum_dt).min(maximum_dt);
+        let report = integrator.try_adaptive_step_impl(
+            system,
+            state,
+            t,
+            requested_dt,
+            Rk45ErrorControl::Scaled(tolerances),
+            Rk45ErrorNorm::WeightedRms,
+        )?;
+        self.next_step_size = Some(report.proposed_next_dt);
+        Ok(report)
+    }
+}
+
+/// Aggregate diagnostics for a scale-aware adaptive simulation.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Rk45Diagnostics {
+    /// Number of accepted timesteps in the complete simulation.
+    pub accepted_steps: usize,
+    /// Total rejected Cash–Karp attempts across the simulation.
+    pub rejected_steps: usize,
+    /// Total derivative callback evaluations across accepted and rejected attempts.
+    pub derivative_evaluations: usize,
+    /// Smallest accepted timestep, or `None` for a zero-duration simulation.
+    pub min_accepted_dt: Option<f64>,
+    /// Largest accepted timestep, or `None` for a zero-duration simulation.
+    pub max_accepted_dt: Option<f64>,
+    /// Largest normalized error norm among accepted steps.
+    pub max_error_norm: f64,
+}
+
+/// Numerical trajectory plus adaptive-controller diagnostics.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Rk45SimulationReport {
+    /// Recorded numerical trajectory.
+    pub simulation: SimulationResult,
+    /// Work/error diagnostics produced by the adaptive controller.
+    pub diagnostics: Rk45Diagnostics,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Rk45ErrorNorm {
+    WeightedInfinity,
+    WeightedRms,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum Rk45ErrorControl<'a> {
+    LegacyScalarAbsolute(f64),
+    Scaled(&'a Rk45Tolerances),
+}
+
+impl Rk45ErrorControl<'_> {
+    fn relative(&self) -> f64 {
+        match self {
+            Self::LegacyScalarAbsolute(_) => 0.0,
+            Self::Scaled(tolerances) => tolerances.relative,
+        }
+    }
+
+    fn absolute(&self, index: usize) -> f64 {
+        match self {
+            Self::LegacyScalarAbsolute(value) => *value,
+            Self::Scaled(tolerances) => tolerances.absolute[index],
+        }
+    }
+}
+
 impl Rk45Integrator {
     /// Create a new adaptive integrator with given tolerance.
     pub fn new(tol: f64) -> Self {
@@ -500,6 +712,9 @@ impl Rk45Integrator {
         expected_dim: usize,
         stage: u8,
     ) -> Result<Vec<f64>, SimulationError> {
+        if let Some(index) = state.iter().position(|value| !value.is_finite()) {
+            return Err(SimulationError::NonFiniteIntermediateState { stage, index });
+        }
         let derivatives = system.derivatives(state, t);
         if derivatives.len() != expected_dim {
             return Err(SimulationError::DerivativeDimensionMismatch {
@@ -514,18 +729,16 @@ impl Rk45Integrator {
         Ok(derivatives)
     }
 
-    /// Attempt one adaptive step, returning state, accepted step size and error estimate.
-    ///
-    /// A step is accepted only when the embedded error is within `tol`. If the
-    /// minimum step is reached first, return an explicit error instead of silently
-    /// accepting a result outside the configured tolerance.
-    pub fn try_adaptive_step(
+    /// Compute one Cash–Karp step with the selected error norm.
+    fn try_adaptive_step_impl(
         &self,
         system: &dyn DynamicalSystem,
         state: &[f64],
         t: f64,
         dt: f64,
-    ) -> Result<(Vec<f64>, f64, f64), SimulationError> {
+        error_control: Rk45ErrorControl<'_>,
+        norm: Rk45ErrorNorm,
+    ) -> Result<Rk45StepReport, SimulationError> {
         self.validate()?;
         if !t.is_finite() {
             return Err(SimulationError::NonFiniteTimeBounds);
@@ -534,6 +747,9 @@ impl Rk45Integrator {
             return Err(SimulationError::InvalidTimeStep);
         }
         let expected_dim = system.state_dim();
+        if expected_dim == 0 {
+            return Err(SimulationError::ZeroStateDimension);
+        }
         if state.len() != expected_dim {
             return Err(SimulationError::StateDimensionMismatch {
                 expected: expected_dim,
@@ -545,9 +761,13 @@ impl Rk45Integrator {
         }
         let dim = state.len();
         let mut h = dt.min(self.dt_max);
+        let mut attempted_steps = 0usize;
 
         loop {
-            // Cash-Karp coefficients
+            attempted_steps += 1;
+            // Cash–Karp 4(5) embedded pair. The six checked derivative calls
+            // are deliberately kept in this one implementation for both legacy
+            // and scale-aware callers.
             let k1 = Self::checked_derivatives(system, state, t, dim, 1)?;
 
             let x2: Vec<f64> = (0..dim)
@@ -588,7 +808,7 @@ impl Rk45Integrator {
                 .collect();
             let k6 = Self::checked_derivatives(system, &x6, t + 7.0 * h / 8.0, dim, 6)?;
 
-            // 5th order solution
+            // Fifth-order solution used to advance the state.
             let y5: Vec<f64> = (0..dim)
                 .map(|i| {
                     state[i]
@@ -599,7 +819,7 @@ impl Rk45Integrator {
                 })
                 .collect();
 
-            // 4th order solution (for error estimate)
+            // Fourth-order embedded solution used only for error estimation.
             let y4: Vec<f64> = (0..dim)
                 .map(|i| {
                     state[i]
@@ -611,31 +831,282 @@ impl Rk45Integrator {
                 })
                 .collect();
 
-            // Error estimate (max norm)
-            let error: f64 = y5
-                .iter()
-                .zip(y4.iter())
-                .map(|(&a, &b)| (a - b).abs())
-                .fold(0.0f64, f64::max);
+            let mut max_absolute_error = 0.0f64;
+            let mut max_scaled_error = 0.0f64;
+            let mut scaled_error_squares = 0.0f64;
+            for index in 0..dim {
+                if !y5[index].is_finite() || !y4[index].is_finite() {
+                    return Err(SimulationError::NonFiniteErrorEstimate { index });
+                }
+                let component_error = (y5[index] - y4[index]).abs();
+                if !component_error.is_finite() {
+                    return Err(SimulationError::NonFiniteErrorEstimate { index });
+                }
+                max_absolute_error = max_absolute_error.max(component_error);
 
-            if error <= self.tol {
-                // Accept only steps that actually satisfy the configured tolerance.
-                let scale = if error > 1e-30 {
-                    0.9 * (self.tol / error).powf(0.2)
-                } else {
-                    2.0
-                };
-                let _next_h = (h * scale).clamp(self.dt_min, self.dt_max);
-                return Ok((y5, h, error));
+                let component_scale = error_control.absolute(index)
+                    + error_control.relative() * state[index].abs().max(y5[index].abs());
+                if !component_scale.is_finite() || component_scale <= 0.0 {
+                    return Err(SimulationError::InvalidRk45Tolerances);
+                }
+                let scaled = component_error / component_scale;
+                if !scaled.is_finite() {
+                    return Err(SimulationError::NonFiniteErrorEstimate { index });
+                }
+                max_scaled_error = max_scaled_error.max(scaled);
+                scaled_error_squares += scaled * scaled;
+                if !scaled_error_squares.is_finite() {
+                    return Err(SimulationError::NonFiniteErrorEstimate { index });
+                }
             }
+
+            let error_norm = match norm {
+                Rk45ErrorNorm::WeightedInfinity => max_scaled_error,
+                Rk45ErrorNorm::WeightedRms => (scaled_error_squares / dim as f64).sqrt(),
+            };
+            if !error_norm.is_finite() {
+                return Err(SimulationError::NonFiniteErrorEstimate { index: 0 });
+            }
+
+            if error_norm <= 1.0 {
+                // Propose a next step using the embedded-pair order (5). The
+                // caller-owned controller persists this proposal across steps.
+                let factor = if error_norm <= 1.0e-14 {
+                    5.0
+                } else {
+                    (0.9 * error_norm.powf(-0.2)).clamp(0.2, 5.0)
+                };
+                let proposed_next_dt = (h * factor).clamp(self.dt_min, self.dt_max);
+                return Ok(Rk45StepReport {
+                    state: y5,
+                    accepted_dt: h,
+                    max_absolute_error,
+                    error_norm,
+                    proposed_next_dt,
+                    attempted_steps,
+                    rejected_steps: attempted_steps - 1,
+                    derivative_evaluations: attempted_steps * 6,
+                });
+            }
+
             if h <= self.dt_min {
                 return Err(SimulationError::AdaptiveToleranceNotMet);
             }
 
-            // Reject step; shrink h and retry.
-            let scale = 0.9 * (self.tol / error).powf(0.25);
-            h = (h * scale).max(self.dt_min);
+            // Rejected steps always shrink. Bound the shrink factor to avoid
+            // both near-zero progress and repeated unchanged attempts.
+            let factor = (0.9 * error_norm.powf(-0.2)).clamp(0.1, 0.5);
+            h = (h * factor).max(self.dt_min);
         }
+    }
+
+    /// Advance using the legacy scalar absolute tolerance and weighted-infinity norm.
+    ///
+    /// The tuple shape and absolute error return value remain compatible with
+    /// existing callers. New code should prefer `try_adaptive_step_with_tolerances`.
+    pub fn try_adaptive_step(
+        &self,
+        system: &dyn DynamicalSystem,
+        state: &[f64],
+        t: f64,
+        dt: f64,
+    ) -> Result<(Vec<f64>, f64, f64), SimulationError> {
+        self.validate()?;
+        let expected_dim = system.state_dim();
+        if expected_dim == 0 {
+            return Err(SimulationError::ZeroStateDimension);
+        }
+        if state.len() != expected_dim {
+            return Err(SimulationError::StateDimensionMismatch {
+                expected: expected_dim,
+                actual: state.len(),
+            });
+        }
+        let report = self.try_adaptive_step_impl(
+            system,
+            state,
+            t,
+            dt,
+            Rk45ErrorControl::LegacyScalarAbsolute(self.tol),
+            Rk45ErrorNorm::WeightedInfinity,
+        )?;
+        Ok((report.state, report.accepted_dt, report.max_absolute_error))
+    }
+
+    /// Advance one step using weighted-RMS scale-aware error control.
+    ///
+    /// A step is accepted when the weighted RMS norm of its embedded error is
+    /// at most one. Every state component uses its own absolute tolerance plus
+    /// a shared relative tolerance, making the criterion meaningful when state
+    /// components have different magnitudes or units.
+    pub fn try_adaptive_step_with_tolerances(
+        &self,
+        system: &dyn DynamicalSystem,
+        state: &[f64],
+        t: f64,
+        dt: f64,
+        tolerances: &Rk45Tolerances,
+    ) -> Result<Rk45StepReport, SimulationError> {
+        tolerances.validate(system.state_dim())?;
+        self.try_adaptive_step_impl(
+            system,
+            state,
+            t,
+            dt,
+            Rk45ErrorControl::Scaled(tolerances),
+            Rk45ErrorNorm::WeightedRms,
+        )
+    }
+
+    /// Integrate a complete trajectory with scale-aware error control and a
+    /// persistent step-size controller.
+    ///
+    /// Unlike the legacy `try_simulate` entry point, this API explicitly accepts
+    /// component-wise absolute tolerances and a relative tolerance, and returns
+    /// accepted/rejected-step and derivative-evaluation diagnostics.
+    pub fn try_simulate_with_tolerances(
+        &self,
+        system: &dyn DynamicalSystem,
+        initial_state: &[f64],
+        t_start: f64,
+        t_end: f64,
+        initial_dt: f64,
+        tolerances: &Rk45Tolerances,
+    ) -> Result<Rk45SimulationReport, SimulationError> {
+        self.validate()?;
+        if !t_start.is_finite() || !t_end.is_finite() {
+            return Err(SimulationError::NonFiniteTimeBounds);
+        }
+        if t_end < t_start {
+            return Err(SimulationError::ReversedTimeRange);
+        }
+        if !initial_dt.is_finite() || initial_dt <= 0.0 {
+            return Err(SimulationError::InvalidTimeStep);
+        }
+        let elapsed = t_end - t_start;
+        if !elapsed.is_finite() {
+            return Err(SimulationError::NonFiniteTimeSpan);
+        }
+
+        let expected_dim = system.state_dim();
+        if expected_dim == 0 {
+            return Err(SimulationError::ZeroStateDimension);
+        }
+        if initial_state.len() != expected_dim {
+            return Err(SimulationError::StateDimensionMismatch {
+                expected: expected_dim,
+                actual: initial_state.len(),
+            });
+        }
+        if let Some(index) = initial_state.iter().position(|value| !value.is_finite()) {
+            return Err(SimulationError::NonFiniteInitialState { index });
+        }
+        tolerances.validate(expected_dim)?;
+        if expected_dim > MAX_TRAJECTORY_STATE_VALUES {
+            return Err(SimulationError::TrajectoryBudgetExceeded {
+                maximum_state_values: MAX_TRAJECTORY_STATE_VALUES,
+            });
+        }
+
+        let mut times = Vec::new();
+        let mut states = Vec::new();
+        times.push(t_start);
+        states.push(initial_state.to_vec());
+        let mut time = t_start;
+        let mut state = initial_state.to_vec();
+        let mut controller = Rk45Controller::new(initial_dt)?;
+        let mut diagnostics = Rk45Diagnostics {
+            accepted_steps: 0,
+            rejected_steps: 0,
+            derivative_evaluations: 0,
+            min_accepted_dt: None,
+            max_accepted_dt: None,
+            max_error_norm: 0.0,
+        };
+
+        while time < t_end {
+            if diagnostics.accepted_steps >= MAX_SIMULATION_STEPS {
+                return Err(SimulationError::StepBudgetExceeded {
+                    maximum_steps: MAX_SIMULATION_STEPS,
+                });
+            }
+
+            let next_sample_count =
+                states
+                    .len()
+                    .checked_add(1)
+                    .ok_or(SimulationError::TrajectoryBudgetExceeded {
+                        maximum_state_values: MAX_TRAJECTORY_STATE_VALUES,
+                    })?;
+            let state_value_count = next_sample_count.checked_mul(expected_dim).ok_or(
+                SimulationError::TrajectoryBudgetExceeded {
+                    maximum_state_values: MAX_TRAJECTORY_STATE_VALUES,
+                },
+            )?;
+            if state_value_count > MAX_TRAJECTORY_STATE_VALUES {
+                return Err(SimulationError::TrajectoryBudgetExceeded {
+                    maximum_state_values: MAX_TRAJECTORY_STATE_VALUES,
+                });
+            }
+
+            let remaining = t_end - time;
+            let maximum_dt = self.dt_max.min(remaining);
+            let step = controller
+                .try_step_validated(self, system, &state, time, maximum_dt, tolerances)?;
+            if !step.accepted_dt.is_finite()
+                || step.accepted_dt <= 0.0
+                || step.accepted_dt > remaining
+                || step.state.len() != expected_dim
+                || step.state.iter().any(|value| !value.is_finite())
+            {
+                return Err(SimulationError::InvalidIntegratorStepSize {
+                    step: diagnostics.accepted_steps + 1,
+                });
+            }
+
+            let next_time = if step.accepted_dt >= remaining {
+                t_end
+            } else {
+                time + step.accepted_dt
+            };
+            if !next_time.is_finite() || next_time <= time {
+                return Err(SimulationError::TimeDidNotAdvance {
+                    step: diagnostics.accepted_steps + 1,
+                });
+            }
+
+            diagnostics.accepted_steps += 1;
+            diagnostics.rejected_steps += step.rejected_steps;
+            diagnostics.derivative_evaluations += step.derivative_evaluations;
+            diagnostics.min_accepted_dt = Some(
+                diagnostics
+                    .min_accepted_dt
+                    .map_or(step.accepted_dt, |value| value.min(step.accepted_dt)),
+            );
+            diagnostics.max_accepted_dt = Some(
+                diagnostics
+                    .max_accepted_dt
+                    .map_or(step.accepted_dt, |value| value.max(step.accepted_dt)),
+            );
+            diagnostics.max_error_norm = diagnostics.max_error_norm.max(step.error_norm);
+
+            time = next_time;
+            state = step.state;
+            times.push(time);
+            states.push(state.clone());
+        }
+
+        let simulation = SimulationResult {
+            times,
+            steps: diagnostics.accepted_steps,
+            states,
+            total_time: elapsed,
+            system_name: system.name().to_string(),
+        };
+        Ok(Rk45SimulationReport {
+            simulation,
+            diagnostics,
+        })
     }
 
     /// Compatibility wrapper for callers that require a tuple-returning API.
@@ -732,8 +1203,7 @@ impl Integrator for Rk45Integrator {
         t: f64,
         dt: f64,
     ) -> Result<(Vec<f64>, f64), SimulationError> {
-        let (new_state, accepted_dt, _error) =
-            self.try_adaptive_step(system, state, t, dt)?;
+        let (new_state, accepted_dt, _error) = self.try_adaptive_step(system, state, t, dt)?;
         Ok((new_state, accepted_dt))
     }
 
@@ -2011,6 +2481,173 @@ mod tests {
     }
 
     #[test]
+    fn scale_aware_rk45_reuses_controller_proposal_and_reports_work() {
+        let oscillator = HarmonicOscillator::simple(1.0);
+        let integrator = Rk45Integrator {
+            tol: 1.0e-8,
+            dt_min: 1.0e-12,
+            dt_max: 0.1,
+        };
+        let tolerances = Rk45Tolerances::new(1.0e-6, vec![1.0e-8; 2]);
+        let mut controller = Rk45Controller::new(1.0e-3).unwrap();
+
+        let first = controller
+            .try_step(&integrator, &oscillator, &[1.0, 0.0], 0.0, 0.1, &tolerances)
+            .unwrap();
+        assert!(first.error_norm <= 1.0);
+        assert_eq!(first.derivative_evaluations, first.attempted_steps * 6);
+        assert_eq!(first.rejected_steps + 1, first.attempted_steps);
+        assert_eq!(controller.next_step_size(), Some(first.proposed_next_dt));
+
+        let second = controller
+            .try_step(
+                &integrator,
+                &oscillator,
+                &first.state,
+                first.accepted_dt,
+                0.1,
+                &tolerances,
+            )
+            .unwrap();
+        assert_eq!(
+            second.attempted_steps, 1,
+            "the persisted proposal should avoid repeating the rejected startup attempts"
+        );
+        assert!(
+            (second.accepted_dt - first.proposed_next_dt).abs() < 1.0e-14,
+            "second step {} should reuse proposal {}",
+            second.accepted_dt,
+            first.proposed_next_dt
+        );
+    }
+
+    #[test]
+    fn scale_aware_simulation_is_invariant_to_uniform_state_rescaling() {
+        let oscillator = HarmonicOscillator::simple(1.0);
+        let integrator = Rk45Integrator::new(1.0e-8);
+        let scale = 1.0e6;
+        let small_tolerances = Rk45Tolerances::new(1.0e-7, vec![1.0e-10; 2]);
+        let large_tolerances = Rk45Tolerances::new(1.0e-7, vec![1.0e-4; 2]);
+
+        let small = integrator
+            .try_simulate_with_tolerances(
+                &oscillator,
+                &[1.0, 0.0],
+                0.0,
+                10.0,
+                0.2,
+                &small_tolerances,
+            )
+            .unwrap();
+        let large = integrator
+            .try_simulate_with_tolerances(
+                &oscillator,
+                &[scale, 0.0],
+                0.0,
+                10.0,
+                0.2,
+                &large_tolerances,
+            )
+            .unwrap();
+
+        assert_eq!(small.simulation.steps, large.simulation.steps);
+        assert_eq!(
+            small.diagnostics.rejected_steps,
+            large.diagnostics.rejected_steps
+        );
+        assert!(
+            (small.diagnostics.max_error_norm - large.diagnostics.max_error_norm).abs() < 1.0e-5,
+            "normalized error should be invariant under scaled units: small={}, large={}",
+            small.diagnostics.max_error_norm,
+            large.diagnostics.max_error_norm
+        );
+        for (small_state, large_state) in small
+            .simulation
+            .final_state()
+            .iter()
+            .zip(large.simulation.final_state())
+        {
+            assert!(
+                (scale * small_state - large_state).abs() / scale < 1.0e-8,
+                "scaled final states should agree: small={}, large={}",
+                small_state,
+                large_state
+            );
+        }
+        assert_eq!(
+            large.diagnostics.derivative_evaluations,
+            6 * (large.diagnostics.accepted_steps + large.diagnostics.rejected_steps)
+        );
+        assert!(large.diagnostics.max_error_norm <= 1.0);
+        assert_eq!(large.simulation.times.last().copied(), Some(10.0));
+    }
+
+    #[test]
+    fn scale_aware_rk45_rejects_invalid_tolerance_profiles() {
+        let oscillator = HarmonicOscillator::simple(1.0);
+        let integrator = Rk45Integrator::new(1.0e-8);
+        let invalid_profiles = [
+            Rk45Tolerances::new(f64::NAN, vec![1.0e-8; 2]),
+            Rk45Tolerances::new(-1.0, vec![1.0e-8; 2]),
+            Rk45Tolerances::new(1.0e-6, vec![1.0e-8]),
+            Rk45Tolerances::new(1.0e-6, vec![0.0, 1.0e-8]),
+            Rk45Tolerances::new(1.0e-6, vec![f64::INFINITY, 1.0e-8]),
+        ];
+        for profile in invalid_profiles {
+            assert_eq!(
+                integrator.try_adaptive_step_with_tolerances(
+                    &oscillator,
+                    &[1.0, 0.0],
+                    0.0,
+                    0.1,
+                    &profile,
+                ),
+                Err(SimulationError::InvalidRk45Tolerances)
+            );
+        }
+    }
+
+    struct ZeroDimensionalSystem;
+
+    impl DynamicalSystem for ZeroDimensionalSystem {
+        fn state_dim(&self) -> usize {
+            0
+        }
+
+        fn derivatives(&self, _state: &[f64], _t: f64) -> Vec<f64> {
+            Vec::new()
+        }
+
+        fn name(&self) -> &str {
+            "ZeroDimensionalSystem"
+        }
+    }
+
+    #[test]
+    fn checked_simulation_rejects_zero_dimensional_systems() {
+        let system = ZeroDimensionalSystem;
+        let integrator = Rk45Integrator::new(1e-8);
+        assert_eq!(
+            try_simulate(&system, &Rk4Integrator, &[], 0.0, 1.0, 0.1),
+            Err(SimulationError::ZeroStateDimension)
+        );
+        assert_eq!(
+            integrator.try_adaptive_step(&system, &[], 0.0, 0.1),
+            Err(SimulationError::ZeroStateDimension)
+        );
+        assert_eq!(
+            integrator.try_adaptive_step_with_tolerances(
+                &system,
+                &[],
+                0.0,
+                0.1,
+                &Rk45Tolerances::new(1e-6, Vec::new()),
+            ),
+            Err(SimulationError::ZeroStateDimension)
+        );
+    }
+
+    #[test]
     fn checked_simulation_rejects_rk45_minimum_step_tolerance_shortfall() {
         let oscillator = HarmonicOscillator::simple(1.0);
         let integrator = Rk45Integrator {
@@ -2043,12 +2680,7 @@ mod tests {
     #[test]
     fn checked_rk45_rejects_wrong_dimension_derivatives() {
         let system = MalformedDerivativeSystem { output: vec![0.0] };
-        let result = Rk45Integrator::new(1e-8).try_adaptive_step(
-            &system,
-            &[1.0, 0.0],
-            0.0,
-            0.1,
-        );
+        let result = Rk45Integrator::new(1e-8).try_adaptive_step(&system, &[1.0, 0.0], 0.0, 0.1);
         assert_eq!(
             result,
             Err(SimulationError::DerivativeDimensionMismatch {
@@ -2064,12 +2696,7 @@ mod tests {
         let system = MalformedDerivativeSystem {
             output: vec![f64::NAN, 0.0],
         };
-        let result = Rk45Integrator::new(1e-8).try_adaptive_step(
-            &system,
-            &[1.0, 0.0],
-            0.0,
-            0.1,
-        );
+        let result = Rk45Integrator::new(1e-8).try_adaptive_step(&system, &[1.0, 0.0], 0.0, 0.1);
         assert_eq!(
             result,
             Err(SimulationError::NonFiniteDerivative { stage: 1, index: 0 })
