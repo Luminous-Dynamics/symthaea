@@ -4,12 +4,12 @@
 //! The bootstrap is descriptive for this frozen synthetic seed panel; it does
 //! not by itself establish generalization to new scenario families.
 
+use allostatic_control_bench::{Policy, Scenario, EPISODE_CSV_HEADER, HORIZON};
 use std::collections::BTreeMap;
 use std::env;
 use std::error::Error;
 use std::fs;
 use std::io::{self, ErrorKind};
-use allostatic_control_bench::{EPISODE_CSV_HEADER, HORIZON, Policy, Scenario};
 
 #[derive(Clone, Debug)]
 struct Episode {
@@ -58,7 +58,11 @@ fn cell<'a>(
         .ok_or_else(|| invalid_data(format!("row missing column {name}")).into())
 }
 
-fn parse_f64(values: &[&str], header: &BTreeMap<String, usize>, name: &str) -> Result<f64, Box<dyn Error>> {
+fn parse_f64(
+    values: &[&str],
+    header: &BTreeMap<String, usize>,
+    name: &str,
+) -> Result<f64, Box<dyn Error>> {
     let parsed: f64 = cell(values, header, name)?.parse()?;
     if !parsed.is_finite() {
         return Err(invalid_data(format!("nonfinite numeric value in {name}")).into());
@@ -66,11 +70,19 @@ fn parse_f64(values: &[&str], header: &BTreeMap<String, usize>, name: &str) -> R
     Ok(parsed)
 }
 
-fn parse_usize(values: &[&str], header: &BTreeMap<String, usize>, name: &str) -> Result<usize, Box<dyn Error>> {
+fn parse_usize(
+    values: &[&str],
+    header: &BTreeMap<String, usize>,
+    name: &str,
+) -> Result<usize, Box<dyn Error>> {
     Ok(cell(values, header, name)?.parse()?)
 }
 
-fn parse_bool(values: &[&str], header: &BTreeMap<String, usize>, name: &str) -> Result<bool, Box<dyn Error>> {
+fn parse_bool(
+    values: &[&str],
+    header: &BTreeMap<String, usize>,
+    name: &str,
+) -> Result<bool, Box<dyn Error>> {
     match cell(values, header, name)? {
         "true" => Ok(true),
         "false" => Ok(false),
@@ -131,7 +143,10 @@ fn bootstrap_mean_ci(values: &[f64], seed: u64) -> (f64, f64) {
         }
         boot_means.push(total / values.len() as f64);
     }
-    (percentile_nearest_rank(&boot_means, 0.025), percentile_nearest_rank(&boot_means, 0.975))
+    (
+        percentile_nearest_rank(&boot_means, 0.025),
+        percentile_nearest_rank(&boot_means, 0.975),
+    )
 }
 
 fn parse_episodes(csv: &str) -> Result<BTreeMap<ConditionKey, EpisodesBySeed>, Box<dyn Error>> {
@@ -151,13 +166,30 @@ fn parse_episodes(csv: &str) -> Result<BTreeMap<ConditionKey, EpisodesBySeed>, B
     }
 
     let required = [
-        "scenario", "seed", "policy", "shielded", "task_reward",
-        "cumulative_exposure", "unsafe_ticks", "unsafe_episode",
-        "violation_exposure", "max_violation_severity", "minimum_reserve",
-        "missed_limits", "shield_vetoes", "emergency_recover_steps",
-        "no_safe_action_ticks", "mean_safe_action_options", "minimum_safe_action_options",
-        "false_alarms", "false_alarm_opportunities", "push_steps",
-        "maintain_steps", "resource_cost", "recovery_steps", "failed",
+        "scenario",
+        "seed",
+        "policy",
+        "shielded",
+        "task_reward",
+        "cumulative_exposure",
+        "unsafe_ticks",
+        "unsafe_episode",
+        "violation_exposure",
+        "max_violation_severity",
+        "minimum_reserve",
+        "missed_limits",
+        "shield_vetoes",
+        "emergency_recover_steps",
+        "no_safe_action_ticks",
+        "mean_safe_action_options",
+        "minimum_safe_action_options",
+        "false_alarms",
+        "false_alarm_opportunities",
+        "push_steps",
+        "maintain_steps",
+        "resource_cost",
+        "recovery_steps",
+        "failed",
     ];
     for name in required {
         column_index(&header, name)?;
@@ -170,20 +202,29 @@ fn parse_episodes(csv: &str) -> Result<BTreeMap<ConditionKey, EpisodesBySeed>, B
         }
         let values: Vec<&str> = line.split(',').collect();
         if values.len() != header_fields.len() {
-            return Err(invalid_data(format!("CSV column count mismatch on line {}", line_index + 2)).into());
+            return Err(invalid_data(format!(
+                "CSV column count mismatch on line {}",
+                line_index + 2
+            ))
+            .into());
         }
         let scenario = cell(&values, &header, "scenario")?.to_string();
         let policy = cell(&values, &header, "policy")?.to_string();
         let shielded = parse_bool(&values, &header, "shielded")?;
         let seed: u64 = cell(&values, &header, "seed")?.parse()?;
-        if !Scenario::all().iter().any(|candidate| candidate.name() == scenario.as_str())
-            || !Policy::all().iter().any(|candidate| candidate.name() == policy.as_str())
+        if !Scenario::all()
+            .iter()
+            .any(|candidate| candidate.name() == scenario.as_str())
+            || !Policy::all()
+                .iter()
+                .any(|candidate| candidate.name() == policy.as_str())
             || seed >= 32
         {
             return Err(invalid_data(format!(
                 "unknown scenario/policy or out-of-panel seed on line {}",
                 line_index + 2
-            )).into());
+            ))
+            .into());
         }
         let unsafe_ticks = parse_usize(&values, &header, "unsafe_ticks")?;
         let unsafe_episode = parse_bool(&values, &header, "unsafe_episode")?;
@@ -225,7 +266,11 @@ fn parse_episodes(csv: &str) -> Result<BTreeMap<ConditionKey, EpisodesBySeed>, B
             ("max_violation_severity", max_violation_severity),
         ] {
             if !(0.0..=1.0).contains(&value) {
-                return Err(invalid_data(format!("{name} outside declared [0,1] range on line {}", line_index + 2)).into());
+                return Err(invalid_data(format!(
+                    "{name} outside declared [0,1] range on line {}",
+                    line_index + 2
+                ))
+                .into());
             }
         }
         let mean_tolerance = 1e-5;
@@ -233,17 +278,29 @@ fn parse_episodes(csv: &str) -> Result<BTreeMap<ConditionKey, EpisodesBySeed>, B
             || minimum_safe_action_options > 3
             || mean_safe_action_options + mean_tolerance < minimum_safe_action_options as f64
         {
-            return Err(invalid_data(format!("safe-action option metric violates contract on line {}", line_index + 2)).into());
+            return Err(invalid_data(format!(
+                "safe-action option metric violates contract on line {}",
+                line_index + 2
+            ))
+            .into());
         }
         if cumulative_load < 0.0 || violation_exposure < 0.0 || resource_cost < 0.0 {
-            return Err(invalid_data(format!("negative accumulated metric on line {}", line_index + 2)).into());
+            return Err(invalid_data(format!(
+                "negative accumulated metric on line {}",
+                line_index + 2
+            ))
+            .into());
         }
         if (mean_load - cumulative_load / HORIZON as f64).abs() > mean_tolerance
             || peak_load + mean_tolerance < mean_load
             || peak_load + mean_tolerance < terminal_load
             || minimum_reserve > terminal_reserve + mean_tolerance
         {
-            return Err(invalid_data(format!("inconsistent trajectory summary on line {}", line_index + 2)).into());
+            return Err(invalid_data(format!(
+                "inconsistent trajectory summary on line {}",
+                line_index + 2
+            ))
+            .into());
         }
         if unsafe_ticks > HORIZON
             || false_alarms > false_alarm_opportunities
@@ -256,10 +313,18 @@ fn parse_episodes(csv: &str) -> Result<BTreeMap<ConditionKey, EpisodesBySeed>, B
             || emergency_recover_steps > HORIZON
             || push_steps + maintain_steps + emergency_recover_steps != HORIZON
         {
-            return Err(invalid_data(format!("episode counters violate horizon/denominator contract on line {}", line_index + 2)).into());
+            return Err(invalid_data(format!(
+                "episode counters violate horizon/denominator contract on line {}",
+                line_index + 2
+            ))
+            .into());
         }
         if recovery_steps.is_some_and(|steps| steps > HORIZON) {
-            return Err(invalid_data(format!("recovery_steps outside horizon on line {}", line_index + 2)).into());
+            return Err(invalid_data(format!(
+                "recovery_steps outside horizon on line {}",
+                line_index + 2
+            ))
+            .into());
         }
         let episode = Episode {
             task_reward: parse_f64(&values, &header, "task_reward")?,
@@ -282,7 +347,11 @@ fn parse_episodes(csv: &str) -> Result<BTreeMap<ConditionKey, EpisodesBySeed>, B
         };
         let group = groups.entry((scenario, policy, shielded)).or_default();
         if group.insert(seed, episode).is_some() {
-            return Err(invalid_data(format!("duplicate episode seed {seed} on line {}", line_index + 2)).into());
+            return Err(invalid_data(format!(
+                "duplicate episode seed {seed} on line {}",
+                line_index + 2
+            ))
+            .into());
         }
     }
     if groups.is_empty() {
@@ -291,7 +360,10 @@ fn parse_episodes(csv: &str) -> Result<BTreeMap<ConditionKey, EpisodesBySeed>, B
     Ok(groups)
 }
 
-fn write_summary(groups: &BTreeMap<ConditionKey, EpisodesBySeed>, path: &str) -> Result<usize, Box<dyn Error>> {
+fn write_summary(
+    groups: &BTreeMap<ConditionKey, EpisodesBySeed>,
+    path: &str,
+) -> Result<usize, Box<dyn Error>> {
     let mut output = String::from(
         "scenario,policy,shielded,n,mean_task_reward,mean_cumulative_load,p95_cumulative_load,episode_violation_rate,mean_unsafe_ticks,mean_violation_exposure,p95_violation_exposure,mean_conditional_peak_violation,mean_minimum_reserve,mean_missed_limits,mean_shield_vetoes,mean_no_safe_action_ticks,mean_emergency_recover_steps,mean_false_alarms,mean_false_alarm_opportunities,false_alarm_rate_when_opportunity,recovery_observed_n,mean_observed_recovery_steps,recovery_censored_rate,mean_viable_action_options,worst_episode_minimum_viable_action_options,episode_failure_rate\n"
     );
@@ -300,46 +372,75 @@ fn write_summary(groups: &BTreeMap<ConditionKey, EpisodesBySeed>, path: &str) ->
         let rewards: Vec<f64> = episodes.iter().map(|row| row.task_reward).collect();
         let exposure: Vec<f64> = episodes.iter().map(|row| row.cumulative_exposure).collect();
         let unsafe_ticks: Vec<f64> = episodes.iter().map(|row| row.unsafe_ticks as f64).collect();
-        let violation_exposure: Vec<f64> = episodes.iter().map(|row| row.violation_exposure).collect();
-        let conditional_severity: Vec<f64> = episodes.iter()
+        let violation_exposure: Vec<f64> =
+            episodes.iter().map(|row| row.violation_exposure).collect();
+        let conditional_severity: Vec<f64> = episodes
+            .iter()
             .filter(|row| row.unsafe_episode)
             .map(|row| row.max_violation_severity)
             .collect();
         let minimum_reserve: Vec<f64> = episodes.iter().map(|row| row.minimum_reserve).collect();
-        let mean_viable_options: Vec<f64> =
-            episodes.iter().map(|row| row.mean_safe_action_options).collect();
-        let worst_episode_minimum_viable_options: usize = episodes.iter()
+        let mean_viable_options: Vec<f64> = episodes
+            .iter()
+            .map(|row| row.mean_safe_action_options)
+            .collect();
+        let worst_episode_minimum_viable_options: usize = episodes
+            .iter()
             .map(|row| row.minimum_safe_action_options)
             .min()
             .unwrap_or(0);
-        let missed: Vec<f64> = episodes.iter().map(|row| row.missed_limits as f64).collect();
-        let vetoes: Vec<f64> = episodes.iter().map(|row| row.shield_vetoes as f64).collect();
-        let no_safe_actions: Vec<f64> = episodes.iter().map(|row| row.no_safe_action_ticks as f64).collect();
-        let emergency_steps: Vec<f64> = episodes.iter().map(|row| row.emergency_recover_steps as f64).collect();
+        let missed: Vec<f64> = episodes
+            .iter()
+            .map(|row| row.missed_limits as f64)
+            .collect();
+        let vetoes: Vec<f64> = episodes
+            .iter()
+            .map(|row| row.shield_vetoes as f64)
+            .collect();
+        let no_safe_actions: Vec<f64> = episodes
+            .iter()
+            .map(|row| row.no_safe_action_ticks as f64)
+            .collect();
+        let emergency_steps: Vec<f64> = episodes
+            .iter()
+            .map(|row| row.emergency_recover_steps as f64)
+            .collect();
         let false_alarms: Vec<f64> = episodes.iter().map(|row| row.false_alarms as f64).collect();
-        let false_alarm_opportunities: Vec<f64> = episodes.iter()
+        let false_alarm_opportunities: Vec<f64> = episodes
+            .iter()
             .map(|row| row.false_alarm_opportunities as f64)
             .collect();
         let false_alarm_total: usize = episodes.iter().map(|row| row.false_alarms).sum();
-        let false_alarm_opportunity_total: usize =
-            episodes.iter().map(|row| row.false_alarm_opportunities).sum();
+        let false_alarm_opportunity_total: usize = episodes
+            .iter()
+            .map(|row| row.false_alarm_opportunities)
+            .sum();
         let false_alarm_rate = if false_alarm_opportunity_total == 0 {
             "NA".to_string()
         } else {
-            format!("{:.6}", false_alarm_total as f64 / false_alarm_opportunity_total as f64)
+            format!(
+                "{:.6}",
+                false_alarm_total as f64 / false_alarm_opportunity_total as f64
+            )
         };
-        let observed_recovery: Vec<f64> = episodes.iter()
+        let observed_recovery: Vec<f64> = episodes
+            .iter()
             .filter_map(|row| row.recovery_steps.map(|steps| steps as f64))
             .collect();
-        let recovery_censored = episodes.iter().filter(|row| row.recovery_steps.is_none()).count();
+        let recovery_censored = episodes
+            .iter()
+            .filter(|row| row.recovery_steps.is_none())
+            .count();
         let recovery_mean = if observed_recovery.is_empty() {
             "NA".to_string()
         } else {
             format!("{:.6}", mean(&observed_recovery))
         };
         let recovery_censored_rate = recovery_censored as f64 / episodes.len() as f64;
-        let violation_rate = episodes.iter().filter(|row| row.unsafe_episode).count() as f64 / episodes.len() as f64;
-        let failure_rate = episodes.iter().filter(|row| row.failed).count() as f64 / episodes.len() as f64;
+        let violation_rate =
+            episodes.iter().filter(|row| row.unsafe_episode).count() as f64 / episodes.len() as f64;
+        let failure_rate =
+            episodes.iter().filter(|row| row.failed).count() as f64 / episodes.len() as f64;
         let conditional = if conditional_severity.is_empty() {
             "NA".to_string()
         } else {
@@ -374,7 +475,10 @@ fn write_summary(groups: &BTreeMap<ConditionKey, EpisodesBySeed>, path: &str) ->
     Ok(rows)
 }
 
-fn write_paired_deltas(groups: &BTreeMap<ConditionKey, EpisodesBySeed>, path: &str) -> Result<usize, Box<dyn Error>> {
+fn write_paired_deltas(
+    groups: &BTreeMap<ConditionKey, EpisodesBySeed>,
+    path: &str,
+) -> Result<usize, Box<dyn Error>> {
     let mut output = String::from(
         "scenario,policy,n,delta_task_reward_mean,delta_task_reward_ci95_low,delta_task_reward_ci95_high,delta_cumulative_load_mean,delta_cumulative_load_ci95_low,delta_cumulative_load_ci95_high,delta_violation_exposure_mean,delta_violation_exposure_ci95_low,delta_violation_exposure_ci95_high,delta_episode_violation_rate_mean,delta_episode_violation_rate_ci95_low,delta_episode_violation_rate_ci95_high,delta_peak_violation_severity_mean,delta_peak_violation_severity_ci95_low,delta_peak_violation_severity_ci95_high\n"
     );
@@ -386,9 +490,14 @@ fn write_paired_deltas(groups: &BTreeMap<ConditionKey, EpisodesBySeed>, path: &s
         }
         let unshielded_rows = groups
             .get(&(scenario.to_string(), policy.to_string(), false))
-            .ok_or_else(|| invalid_data(format!("missing unshielded pair for {scenario}/{policy}")))?;
+            .ok_or_else(|| {
+                invalid_data(format!("missing unshielded pair for {scenario}/{policy}"))
+            })?;
         if shielded_rows.len() != unshielded_rows.len() {
-            return Err(invalid_data(format!("paired sample count mismatch for {scenario}/{policy}")).into());
+            return Err(invalid_data(format!(
+                "paired sample count mismatch for {scenario}/{policy}"
+            ))
+            .into());
         }
         let mut reward_delta = Vec::new();
         let mut load_delta = Vec::new();
@@ -396,22 +505,44 @@ fn write_paired_deltas(groups: &BTreeMap<ConditionKey, EpisodesBySeed>, path: &s
         let mut violation_rate_delta = Vec::new();
         let mut severity_delta = Vec::new();
         for (seed, shielded_episode) in shielded_rows {
-            let baseline = unshielded_rows
-                .get(seed)
-                .ok_or_else(|| invalid_data(format!("missing paired seed {seed} for {scenario}/{policy}")))?;
+            let baseline = unshielded_rows.get(seed).ok_or_else(|| {
+                invalid_data(format!(
+                    "missing paired seed {seed} for {scenario}/{policy}"
+                ))
+            })?;
             reward_delta.push(shielded_episode.task_reward - baseline.task_reward);
             load_delta.push(shielded_episode.cumulative_exposure - baseline.cumulative_exposure);
             exposure_delta.push(shielded_episode.violation_exposure - baseline.violation_exposure);
-            let shielded_violation = if shielded_episode.unsafe_episode { 1.0 } else { 0.0 };
+            let shielded_violation = if shielded_episode.unsafe_episode {
+                1.0
+            } else {
+                0.0
+            };
             let baseline_violation = if baseline.unsafe_episode { 1.0 } else { 0.0 };
             violation_rate_delta.push(shielded_violation - baseline_violation);
-            severity_delta.push(shielded_episode.max_violation_severity - baseline.max_violation_severity);
+            severity_delta
+                .push(shielded_episode.max_violation_severity - baseline.max_violation_severity);
         }
-        let reward_ci = bootstrap_mean_ci(&reward_delta, stable_seed(&format!("{scenario}/{policy}/reward")));
-        let load_ci = bootstrap_mean_ci(&load_delta, stable_seed(&format!("{scenario}/{policy}/load")));
-        let exposure_ci = bootstrap_mean_ci(&exposure_delta, stable_seed(&format!("{scenario}/{policy}/violation-exposure")));
-        let rate_ci = bootstrap_mean_ci(&violation_rate_delta, stable_seed(&format!("{scenario}/{policy}/violation-rate")));
-        let severity_ci = bootstrap_mean_ci(&severity_delta, stable_seed(&format!("{scenario}/{policy}/severity")));
+        let reward_ci = bootstrap_mean_ci(
+            &reward_delta,
+            stable_seed(&format!("{scenario}/{policy}/reward")),
+        );
+        let load_ci = bootstrap_mean_ci(
+            &load_delta,
+            stable_seed(&format!("{scenario}/{policy}/load")),
+        );
+        let exposure_ci = bootstrap_mean_ci(
+            &exposure_delta,
+            stable_seed(&format!("{scenario}/{policy}/violation-exposure")),
+        );
+        let rate_ci = bootstrap_mean_ci(
+            &violation_rate_delta,
+            stable_seed(&format!("{scenario}/{policy}/violation-rate")),
+        );
+        let severity_ci = bootstrap_mean_ci(
+            &severity_delta,
+            stable_seed(&format!("{scenario}/{policy}/severity")),
+        );
         output.push_str(&format!(
             "{scenario},{policy},{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6}\n",
             reward_delta.len(),
@@ -435,8 +566,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = env::args().collect();
     if args.len() != 4 {
         return Err(invalid_data(
-            "usage: allostatic-control-report <episode.csv> <summary.csv> <paired-deltas.csv>"
-        ).into());
+            "usage: allostatic-control-report <episode.csv> <summary.csv> <paired-deltas.csv>",
+        )
+        .into());
     }
     let input = fs::read_to_string(&args[1])?;
     let groups = parse_episodes(&input)?;
@@ -467,7 +599,10 @@ mod tests {
 
     #[test]
     fn parser_rejects_noncanonical_header() {
-        let altered = format!("{}\n{SAMPLE_ROW}\n", SAMPLE_HEADER.replace("scenario,seed", "scenario,id"));
+        let altered = format!(
+            "{}\n{SAMPLE_ROW}\n",
+            SAMPLE_HEADER.replace("scenario,seed", "scenario,id")
+        );
         assert!(parse_episodes(&altered).is_err());
     }
 
