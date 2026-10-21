@@ -895,6 +895,62 @@ fn report_row(
             evaluate(&subset, rule),
         );
     }
+
+    if matches!(report_family, "evaluation" | "evaluation_cic") {
+        report_predicted_class_risk_profile(seed, report_family, name, rule, samples);
+    }
+}
+
+/// Return the predicted prototype index using the same first-maximum tie-break
+/// as `score_queries`. Empty score vectors are only used in unit fixtures.
+fn predicted_class_index(sample: &ScoredQuery) -> Option<usize> {
+    let mut best_index = None;
+    let mut best_similarity = f64::NEG_INFINITY;
+    for (index, &similarity) in sample.prototype_similarities.iter().enumerate() {
+        if similarity > best_similarity {
+            best_similarity = similarity;
+            best_index = Some(index);
+        }
+    }
+    best_index
+}
+
+/// Emit per-predicted-class risk/coverage diagnostics on held-out queries.
+/// These are *not* per-class certificates; they expose heterogeneity that pooled
+/// risk can hide and motivate future class-wise OSP or threshold-map baselines.
+fn report_predicted_class_risk_profile(
+    seed: u64,
+    split: &str,
+    strategy: &str,
+    rule: DecisionRule,
+    samples: &[ScoredQuery],
+) {
+    for predicted_class in 0..PROTOTYPE_COUNT {
+        let class_samples: Vec<ScoredQuery> = samples
+            .iter()
+            .filter(|sample| predicted_class_index(sample) == Some(predicted_class))
+            .cloned()
+            .collect();
+        if class_samples.is_empty() {
+            continue;
+        }
+        let result = evaluate(&class_samples, rule);
+        let (risk_low, risk_high) = wilson_interval_95(result.errors, result.accepted);
+        let risk = result
+            .selective_risk()
+            .map(|value| format!("{value:.6}"))
+            .unwrap_or_else(|| "NA".to_owned());
+        println!(
+            "# classwise_risk_profile=seed:{seed},split:{split},strategy:{strategy},predicted_class:{predicted_class},n:{},accepted:{},coverage:{:.6},errors:{},selective_risk:{risk},risk95_low:{risk_low:.6},risk95_high:{risk_high:.6},rejected_score_only:{},rejected_margin_only:{},rejected_both:{}",
+            result.total,
+            result.accepted,
+            result.coverage(),
+            result.errors,
+            result.rejected_score_only,
+            result.rejected_margin_only,
+            result.rejected_both
+        );
+    }
 }
 
 /// Emit held-out risk/coverage points for every predeclared threshold and
@@ -1499,6 +1555,77 @@ mod tests {
                 + result.rejected_both,
             result.total
         );
+    }
+
+    #[test]
+    fn predicted_class_index_uses_the_same_first_maximum_tie_break() {
+        let sample = ScoredQuery {
+            best_similarity: 0.8,
+            top_two_margin: 0.0,
+            correct: true,
+            target_similarity: Some(0.8),
+            prototype_similarities: Arc::<[f64]>::from(vec![0.8, 0.8, 0.1]),
+            kind: QueryKind::Known { noise_index: 0 },
+        };
+        assert_eq!(predicted_class_index(&sample), Some(0));
+    }
+
+    #[test]
+    fn classwise_risk_partitions_scored_queries_without_changing_pooled_result() {
+        let samples = vec![
+            ScoredQuery {
+                best_similarity: 0.9,
+                top_two_margin: 0.4,
+                correct: true,
+                target_similarity: Some(0.9),
+                prototype_similarities: Arc::<[f64]>::from(vec![0.9, 0.5]),
+                kind: QueryKind::Known { noise_index: 0 },
+            },
+            ScoredQuery {
+                best_similarity: 0.8,
+                top_two_margin: 0.2,
+                correct: false,
+                target_similarity: None,
+                prototype_similarities: Arc::<[f64]>::from(vec![0.3, 0.8]),
+                kind: QueryKind::RandomOod,
+            },
+            ScoredQuery {
+                best_similarity: 0.85,
+                top_two_margin: 0.1,
+                correct: false,
+                target_similarity: Some(0.75),
+                prototype_similarities: Arc::<[f64]>::from(vec![0.85, 0.75]),
+                kind: QueryKind::Known { noise_index: 1 },
+            },
+        ];
+        let rule = DecisionRule {
+            min_similarity: 0.7,
+            min_margin: 0.05,
+        };
+        let class_zero: Vec<_> = samples
+            .iter()
+            .filter(|sample| predicted_class_index(sample) == Some(0))
+            .cloned()
+            .collect();
+        let class_one: Vec<_> = samples
+            .iter()
+            .filter(|sample| predicted_class_index(sample) == Some(1))
+            .cloned()
+            .collect();
+
+        let pooled = evaluate(&samples, rule);
+        let classwise_accepted =
+            evaluate(&class_zero, rule).accepted + evaluate(&class_one, rule).accepted;
+        let classwise_errors =
+            evaluate(&class_zero, rule).errors + evaluate(&class_one, rule).errors;
+        let classwise_total =
+            evaluate(&class_zero, rule).total + evaluate(&class_one, rule).total;
+
+        assert_eq!(classwise_accepted, pooled.accepted);
+        assert_eq!(classwise_errors, pooled.errors);
+        assert_eq!(classwise_total, pooled.total);
+        assert_eq!(evaluate(&class_zero, rule).errors, 1);
+        assert_eq!(evaluate(&class_one, rule).errors, 1);
     }
 
     #[test]
