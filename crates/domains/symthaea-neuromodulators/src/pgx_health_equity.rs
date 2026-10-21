@@ -2,19 +2,19 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 
-//! Pharmacogenomics Health Equity: addressing ancestry bias in drug dosing.
+//! Pharmacogenomics population-equity research (not prescribing software).
 //!
-//! Standard pharmacogenomic guidelines (CPIC, DPWG) are predominantly
-//! calibrated to European-ancestry populations. This module quantifies
-//! the equity gap and provides ancestry-adjusted dosing recommendations.
+//! This module contains exploratory population-level frequency approximations.
+//! It is not a validated patient-level genotype interpreter or dosing engine.
+//! Ancestry categories are not proxies for an individual's genotype. Clinical
+//! use requires gene/drug-specific diplotype interpretation, copy-number and
+//! structural-variant handling where relevant, a current guideline, independent
+//! validation, and qualification for a defined context of use. Never use outputs
+//! here to initiate, stop, select, or change medication.
 //!
-//! Key findings driving this work:
-//! - 64% of CYP2D6 "drug response" alleles most frequent in East Asian populations
-//! - 29% of African populations are CYP2D6 ultra-rapid metabolizers (vs 7% European)
-//! - Standard SSRI doses may be ineffective for ~29% of African-ancestry patients
-//! - CYP2C19 poor metabolizer frequency: 2-5% European, 12-23% East Asian
-//! - CYP2B6*6 slow metabolizer allele: ~38% African vs ~26% European (HIV equity)
-//! - CYP3A5*3 loss-of-function: ~94% European vs ~18% African (transplant equity)
+//! Historical exploratory estimates have known discrepancies documented in
+//! `papers/applications/pgx-health-equity/HWE_VALIDATION.md` and issue #7428.
+//! This boundary does not qualify any clinical use.
 //!
 //! References:
 //! - Gaedigk et al. (2017). CYP2D6 allele frequencies worldwide.
@@ -96,6 +96,10 @@ pub enum DosingAction {
     UseAlternative(String),
     /// No dose change, but mandate plasma-level monitoring.
     TherapeuticDrugMonitoring,
+    /// The requested drug/phenotype has no supported guideline in this model.
+    ///
+    /// This is a fail-closed research status, not a treatment recommendation.
+    Indeterminate,
 }
 
 // ---------------------------------------------------------------------------
@@ -138,7 +142,12 @@ pub struct CpicGuideline {
     pub source_population: AncestryGroup,
 }
 
-/// Dosing recommendation with optional adjustment details.
+/// Structured representation of a guideline action for research fixtures.
+///
+/// This type is not a patient-specific recommendation and must not be used to
+/// prescribe, select, stop, clear, or change a medication. A populated action
+/// does not establish that a patient's genotype, diplotype, context, or
+/// guideline applicability has been validated.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DosingRecommendation {
     /// Primary dosing action.
@@ -1358,48 +1367,50 @@ impl PgxHealthEquityEngine {
         }
     }
 
-    /// Generate an ancestry-adjusted dosing recommendation.
+    /// Produce a research-only projection of a guideline for an aggregate context.
     ///
-    /// Starts from the CPIC base guideline for the given phenotype, then
-    /// applies ancestry-specific adjustments when the patient belongs to
-    /// an underserved population.
+    /// This compatibility API accepts a coarse population label and a phenotype
+    /// label; those inputs are not sufficient to infer an individual's genotype,
+    /// diplotype, or dose. The returned guideline action is not qualified for
+    /// patient use, and the population model must not be used for prescribing,
+    /// drug selection, medication clearance, or dose changes.
     pub fn adjusted_recommendation(
         &self,
         drug: &str,
-        patient_ancestry: AncestryGroup,
-        patient_phenotype: MetabolizerPhenotype,
+        population_context: AncestryGroup,
+        phenotype_context: MetabolizerPhenotype,
     ) -> DosingRecommendation {
         // Find matching CPIC guideline.
         let base = self
             .cpic_guidelines
             .iter()
-            .find(|g| g.drug == drug && g.phenotype == patient_phenotype);
+            .find(|g| g.drug == drug && g.phenotype == phenotype_context);
 
         let base_rec = match base {
             Some(g) => g.recommendation.clone(),
             None => {
-                // No specific guideline — default to standard dose with monitoring note.
+                // Unknown guidance must never silently turn into a standard-dose action.
                 return DosingRecommendation {
-                    action: DosingAction::StandardDose,
-                    dose_adjustment: Some(1.0),
+                    action: DosingAction::Indeterminate,
+                    dose_adjustment: None,
                     alternative_drug: None,
                     monitoring: Some(format!(
-                        "No CPIC guideline for {}/{:?}. Monitor clinically.",
-                        drug, patient_phenotype
+                        "No applicable CPIC guideline for {}/{:?}; result is indeterminate.                          This research helper does not recommend a dose, alternative, or clearance.",
+                        drug, phenotype_context
                     )),
                 };
             }
         };
 
-        // Check if this patient's ancestry is underserved for this drug-gene pair.
+        // Check whether this aggregate population context is flagged in the research estimate.
         let equity = self.equity_analysis(drug, base.unwrap().gene.as_str());
-        let is_underserved = equity.underserved_populations.contains(&patient_ancestry);
+        let is_underserved = equity.underserved_populations.contains(&population_context);
 
         if is_underserved {
             // Enhance monitoring for underserved populations.
             let ancestry_note = format!(
-                "Patient ancestry may be underserved by current guidelines (equity gap: {:.2}). \
-                 Recommend therapeutic drug monitoring.",
+                "Population context may be underserved in this exploratory estimate (equity gap: {:.2}); \
+                 this is not an individual risk estimate or a clinical monitoring instruction.",
                 equity.equity_gap_score
             );
             let monitoring = match base_rec.monitoring {
@@ -2346,4 +2357,28 @@ mod tests {
         assert!(s.contains("Afr"), "Should contain 'Afr': {s}");
         assert!(s.contains("Eur"), "Should contain 'Eur': {s}");
     }
+
+    #[test]
+    fn test_unsupported_drug_fails_closed_as_indeterminate() {
+        let e = engine();
+        let rec = e.adjusted_recommendation(
+            "unsupported-drug",
+            AncestryGroup::European,
+            MetabolizerPhenotype::Normal,
+        );
+
+        assert!(
+            matches!(rec.action, DosingAction::Indeterminate),
+            "Unsupported drug must not silently default to a standard dose"
+        );
+        assert!(rec.dose_adjustment.is_none());
+        assert!(rec.alternative_drug.is_none());
+        assert!(
+            rec.monitoring
+                .as_deref()
+                .is_some_and(|message| message.contains("indeterminate")),
+            "The fallback should disclose that no applicable guideline was found"
+        );
+    }
+
 }
