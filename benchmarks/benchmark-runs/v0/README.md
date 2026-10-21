@@ -8,6 +8,17 @@ Measure the value of source-witness/context-aware reasoning over strong, simple 
 
 The JSON Schema contracts are `comparison-plan.schema.json`, `pair-result.schema.json`, and `score-report.schema.json`. `synthetic-plans.jsonl`, `synthetic-pair-results.jsonl`, and `synthetic-source-pack.jsonl` are intentionally fabricated qualification fixtures. Their digests, system labels, and observation labels are fake and must never be treated as real runs or model results. The `score-paired-results` Rust binary scores adjudicated paired results under a preregistered plan, validates the generated report against `score-report.schema.json`, and writes a digest-bound report; it does not execute a model or verify human labels against source material. Before scoring, it recomputes and compares the exact bytes of the paired case manifest, source catalog, and source pack with the predeclared SHA-256 digests; a mismatch fails closed. It additionally requires the source-pack baseline/mutated snapshots to match the pair states field-for-field and evidence-item-for-evidence-item, and checks non-synthetic source rights/access against the catalog.
 
+## Current benchmark landscape and resulting controls
+
+This design should be compared to, not substituted for, adjacent benchmarks:
+
+- [BRINK (EACL 2026)](https://aclanthology.org/2026.eacl-long.114/) argues that knowledge-graph RAG evaluations can accidentally reward reading a directly present triple instead of reasoning with incomplete knowledge. For MythologyBench, explicitly separate one-edge lookup from multi-hop composition, remove necessary links as a paired intervention, and score abstention when the remaining graph cannot justify the answer.
+- [KGHaluBench (Findings EACL 2026)](https://aclanthology.org/2026.findings-eacl.206/) uses dynamically generated knowledge-graph questions and checks hallucinations at conceptual and correctness levels. The corresponding opportunity here is a deterministic, digest-pinned case generator that creates fresh source-family-safe contrastive questions and negative controls after the schema, generator and grader are frozen.
+- [Measuring Meta-Cultural Competency (ICML 2026)](https://proceedings.mlr.press/v306/saha26a.html) argues that cultural structure/pluralism are not captured by exact-answer accuracy alone. We should report structure-preservation and unfamiliar-tradition transfer as separate endpoints, while explicitly prohibiting graph-structure similarity from serving as evidence of historical origin or shared meaning.
+- [CulturalBench](https://aclanthology.org/2025.acl-long.1247/) highlights multi-answer and region-coverage failures; use human-adjudicated answer sets and report worst-group performance, not only a pooled score.
+
+These papers motivate additional benchmark tracks; they do **not** show that Symthaea has beaten those systems. The current ten paired interventions remain synthetic contract tests, and the source catalog still has no eligible held-out set.
+
 ## Baseline ladder
 
 Run as much of the following ladder as the research question needs, with pinned identities:
