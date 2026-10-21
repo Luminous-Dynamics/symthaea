@@ -26,11 +26,15 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("basis_equivariance_exact,{}", report.basis_equivariance_exact);
 
     println!();
-    println!("noise_fraction,top1_accuracy,mean_similarity_margin");
+    println!("noise_fraction,nearest_top1,nearest_margin,cleanup_top1,cleanup_margin");
     for result in &report.noise_results {
         println!(
-            "{:.3},{:.6},{:.6}",
-            result.noise_fraction, result.top1_accuracy, result.mean_similarity_margin
+            "{:.3},{:.6},{:.6},{:.6},{:.6}",
+            result.noise_fraction,
+            result.top1_accuracy,
+            result.mean_similarity_margin,
+            result.cleanup_top1_accuracy,
+            result.cleanup_mean_similarity_margin
         );
     }
 
