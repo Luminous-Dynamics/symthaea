@@ -20,6 +20,8 @@ const GLOBAL_ERROR_MULTIPLIER: f64 = 10.0;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let source_sha = env::var("ODE_BENCH_SOURCE_SHA").unwrap_or_else(|_| "unknown".to_string());
+    let checkout_sha =
+        env::var("ODE_BENCH_CHECKOUT_SHA").unwrap_or_else(|_| "unknown".to_string());
     let oscillator = HarmonicOscillator::simple(1.0);
     let integrator = Rk45Integrator::new(1.0e-8);
     let mut observations = Vec::new();
@@ -123,8 +125,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     println!(
-        "{{\"schema_version\":\"0.1.0\",\"benchmark_id\":\"ODE-WP-ANALYTIC-OSCILLATOR-001\",\"source_sha\":\"{}\",\"reference\":\"analytic_harmonic_oscillator\",\"t_end\":{:.17e},\"observations\":[",
-        source_sha, T_END
+        "{{\"schema_version\":\"0.1.0\",\"benchmark_id\":\"ODE-WP-ANALYTIC-OSCILLATOR-001\",\"source_sha\":\"{}\",\"checkout_sha\":\"{}\",\"reference\":\"analytic_harmonic_oscillator\",\"t_end\":{:.17e},\"observations\":[",
+        source_sha, checkout_sha, T_END
     );
     for (index, observation) in observations.iter().enumerate() {
         if index > 0 {
