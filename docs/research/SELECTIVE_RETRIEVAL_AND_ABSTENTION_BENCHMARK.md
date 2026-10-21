@@ -12,13 +12,13 @@ This deliberately tests a practical systems property rather than treating exact 
 
 ## Protocol v1
 
-The executable uses three deterministic seeds, 4,096-dimensional bipolar patterns, and 64 stored prototypes per seed.
+The executable uses five deterministic seeds, 4,096-dimensional bipolar patterns, and 64 stored prototypes per seed.
 
 | Split | Expected known-pattern queries | Expected random OOD queries | Expected two-prototype mixtures | Total draws |
 |---|---:|---:|---:|---:|
-| Threshold selection | ~224 | ~64 | ~64 | 352 |
-| Independent certification | ~224 | ~64 | ~64 | 352 |
-| Final evaluation | ~448 | ~128 | ~128 | 704 |
+| Threshold selection | ~1,303 | ~372 | ~372 | 2,048 |
+| Independent certification | ~1,303 | ~372 | ~372 | 2,048 |
+| Final evaluation | ~2,608 | ~744 | ~744 | 4,096 |
 
 Every query is sampled from the declared 7:2:2 mixture of known/noisy patterns, random OOD patterns, and ambiguous two-prototype mixtures; the observed category counts are random, not forced to these expectations. For known queries, target prototype and one of seven corruption rates (0%, 10%, 20%, 30%, 40%, 45%, 50%) are sampled uniformly. The splits use independently derived seeds. Threshold selection and certification never use final evaluation queries. All splits share the stored prototype memory, because this protocol tests threshold calibration for a fixed memory; a separate memory-held-out generalization test remains a required next phase.
 
@@ -31,7 +31,7 @@ The random OOD samples have no registered target. A bundled pair of stored proto
 3. **Margin-only:** accept when the best-versus-second-best similarity margin passes a calibration-selected threshold.
 4. **Score + margin:** accept only when both calibrated conditions pass.
 
-Thresholds are chosen only on the selection split by maximizing coverage subject to a preliminary one-sided 95% Wilson upper-risk bound of at most 5%, and at least 30 accepted selection queries. This is candidate selection, not a risk guarantee. The selected threshold for each candidate rule is then evaluated on a second, independent certification split. A rule is marked `certified=pass` only when it accepts at least 102 certification queries and its one-sided Clopper–Pearson exact-binomial upper bound is at most 5%, using per-rule `alpha=0.05/9` (Bonferroni correction across three candidate policies and three reported seeds). This gate uses an independent certification split, never the data used to tune thresholds; final evaluation is a third held-out split. The query generator samples each query independently from a fixed mixture, allowing the pooled accepted-query error count to be treated as binomial under the declared synthetic model. It is therefore a scoped benchmark certificate—not a distribution-free guarantee for arbitrary inputs, class-mixture changes, or deployment distribution shift. If certification fails, the rule's held-out metrics are still reported for diagnosis, but it must not be described as risk-certified.
+Thresholds are chosen only on the selection split by maximizing coverage subject to a preliminary one-sided 95% Wilson upper-risk bound of at most 5%, and at least 30 accepted selection queries. This is candidate selection, not a risk guarantee. The selected threshold for each candidate rule is then evaluated on a second, independent certification split. A rule is marked `certified=pass` only when it accepts at least 112 certification queries and its one-sided Clopper–Pearson exact-binomial upper bound is at most 5%, using per-rule `alpha=0.05/15` (Bonferroni correction across three candidate policies and five reported seeds). This gate uses an independent certification split, never the data used to tune thresholds; final evaluation is a third held-out split. The query generator samples each query independently from a fixed mixture, allowing the pooled accepted-query error count to be treated as binomial under the declared synthetic model. It is therefore a scoped benchmark certificate—not a distribution-free guarantee for arbitrary inputs, class-mixture changes, or deployment distribution shift. If certification fails, the rule's held-out metrics are still reported for diagnosis, but it must not be described as risk-certified.
 
 ## Reported metrics
 
