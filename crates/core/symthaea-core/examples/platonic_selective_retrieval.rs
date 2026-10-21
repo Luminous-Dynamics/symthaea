@@ -23,8 +23,9 @@ const OOD_QUERY_WEIGHT: usize = 2;
 const MIXTURE_QUERY_WEIGHT: usize = 2;
 const MAX_VALIDATION_RISK: f64 = 0.05;
 const MIN_ACCEPTED_FOR_CALIBRATION: usize = 30;
-const MIN_ACCEPTED_FOR_CERTIFICATION: usize = 80;
-const CERTIFICATION_ALPHA_PER_RULE: f64 = 0.05 / 3.0;
+// Family-wise error control across 3 policy candidates × 3 reported seeds.
+const MIN_ACCEPTED_FOR_CERTIFICATION: usize = 102;
+const CERTIFICATION_ALPHA_PER_RULE: f64 = 0.05 / 9.0;
 const NOISE_LEVELS: [f64; 7] = [0.0, 0.10, 0.20, 0.30, 0.40, 0.45, 0.50];
 const SEEDS: [u64; 3] = [17, 29, 41];
 
@@ -57,6 +58,14 @@ struct DecisionRule {
 }
 
 #[derive(Debug, Clone, Copy)]
+struct CertificationResult {
+    accepted: usize,
+    errors: usize,
+    upper_risk: f64,
+    passed: bool,
+}
+
+#[derive(Debug, Clone, Copy)]
 struct Evaluation {
     accepted: usize,
     errors: usize,
@@ -86,7 +95,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("# query_mix_weights=known:random_ood:ambiguous_mixture=7:2:2");
     println!("# known_query_noise_level=uniform_over_0,0.10,0.20,0.30,0.40,0.45,0.50");
     println!(
-        "record_type,seed,strategy,query_kind,noise_fraction,dimension,prototypes,selection_n,certification_n,certified,test_n,min_similarity,min_margin,n,accepted,coverage,errors,selective_risk,risk95_low,risk95_high,top1_accuracy"
+        "record_type,seed,strategy,query_kind,noise_fraction,dimension,prototypes,selection_n,certification_n,certified,cert_accept,cert_errors,cert_risk_upper95,test_n,min_similarity,min_margin,n,accepted,coverage,errors,selective_risk,risk95_low,risk95_high,top1_accuracy"
     );
 
     for seed in SEEDS {
@@ -130,7 +139,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             always_accept,
             0,
             0,
-            "not_applicable",
+            None,
             &test,
         );
 
@@ -148,14 +157,14 @@ fn main() -> Result<(), Box<dyn Error>> {
                 calibrate_rule(&selection, CalibrationMode::ScoreAndMargin),
             ),
         ] {
-            let certified = certify_rule(&certification, rule);
+            let certificate = certify_rule(&certification, rule);
             report_row(
                 seed,
                 name,
                 rule,
                 selection.len(),
                 certification.len(),
-                if certified { "pass" } else { "fail" },
+                Some(certificate),
                 &test,
             );
         }
@@ -379,14 +388,20 @@ fn evaluate(samples: &[ScoredQuery], rule: DecisionRule) -> Evaluation {
     }
 }
 
-fn certify_rule(samples: &[ScoredQuery], rule: DecisionRule) -> bool {
+fn certify_rule(samples: &[ScoredQuery], rule: DecisionRule) -> CertificationResult {
     let result = evaluate(samples, rule);
-    result.accepted >= MIN_ACCEPTED_FOR_CERTIFICATION
-        && clopper_pearson_upper_bound(
-            result.errors,
-            result.accepted,
-            CERTIFICATION_ALPHA_PER_RULE,
-        ) <= MAX_VALIDATION_RISK
+    let upper_risk = clopper_pearson_upper_bound(
+        result.errors,
+        result.accepted,
+        CERTIFICATION_ALPHA_PER_RULE,
+    );
+    CertificationResult {
+        accepted: result.accepted,
+        errors: result.errors,
+        upper_risk,
+        passed: result.accepted >= MIN_ACCEPTED_FOR_CERTIFICATION
+            && upper_risk <= MAX_VALIDATION_RISK,
+    }
 }
 
 fn report_row(
@@ -395,9 +410,20 @@ fn report_row(
     rule: DecisionRule,
     selection_n: usize,
     certification_n: usize,
-    certified: &str,
+    certificate: Option<CertificationResult>,
     samples: &[ScoredQuery],
 ) {
+    let (certified, cert_accepted, cert_errors, cert_upper_risk) =
+        certificate.map_or(
+            ("not_applicable", "NA".to_owned(), "NA".to_owned(), "NA".to_owned()),
+            |certificate| (
+                if certificate.passed { "pass" } else { "fail" },
+                certificate.accepted.to_string(),
+                certificate.errors.to_string(),
+                format!("{:.6}", certificate.upper_risk),
+            ),
+        );
+
     write_evaluation_row(
         "overall",
         seed,
@@ -408,6 +434,9 @@ fn report_row(
         selection_n,
         certification_n,
         certified,
+        &cert_accepted,
+        &cert_errors,
+        &cert_upper_risk,
         samples.len(),
         evaluate(samples, rule),
     );
@@ -429,6 +458,9 @@ fn report_row(
             selection_n,
             certification_n,
             certified,
+            &cert_accepted,
+            &cert_errors,
+            &cert_upper_risk,
             samples.len(),
             evaluate(&subset, rule),
         );
@@ -453,6 +485,9 @@ fn report_row(
             selection_n,
             certification_n,
             certified,
+            &cert_accepted,
+            &cert_errors,
+            &cert_upper_risk,
             samples.len(),
             evaluate(&subset, rule),
         );
@@ -469,6 +504,9 @@ fn write_evaluation_row(
     selection_n: usize,
     certification_n: usize,
     certified: &str,
+    cert_accepted: &str,
+    cert_errors: &str,
+    cert_upper_risk: &str,
     test_n: usize,
     result: Evaluation,
 ) {
@@ -482,7 +520,7 @@ fn write_evaluation_row(
         .unwrap_or_else(|| "NA".to_owned());
 
     println!(
-        "{record_type},{seed},{strategy},{query_kind},{noise},{DIMENSION},{PROTOTYPE_COUNT},{selection_n},{certification_n},{certified},{test_n},{:.6},{:.6},{},{},{:.6},{},{},{:.6},{:.6},{:.6}",
+        "{record_type},{seed},{strategy},{query_kind},{noise},{DIMENSION},{PROTOTYPE_COUNT},{selection_n},{certification_n},{certified},{cert_accepted},{cert_errors},{cert_upper_risk},{test_n},{:.6},{:.6},{},{},{:.6},{},{},{:.6},{:.6},{:.6}",
         rule.min_similarity,
         rule.min_margin,
         result.total,
@@ -609,15 +647,15 @@ mod tests {
     #[test]
     fn bonferroni_exact_binomial_certificate_respects_sample_floor() {
         assert!(
-            clopper_pearson_upper_bound(0, 79, CERTIFICATION_ALPHA_PER_RULE)
+            clopper_pearson_upper_bound(0, 101, CERTIFICATION_ALPHA_PER_RULE)
                 > MAX_VALIDATION_RISK
         );
         assert!(
-            clopper_pearson_upper_bound(0, 80, CERTIFICATION_ALPHA_PER_RULE)
+            clopper_pearson_upper_bound(0, 102, CERTIFICATION_ALPHA_PER_RULE)
                 <= MAX_VALIDATION_RISK
         );
         assert!(
-            clopper_pearson_upper_bound(1, 80, CERTIFICATION_ALPHA_PER_RULE)
+            clopper_pearson_upper_bound(1, 102, CERTIFICATION_ALPHA_PER_RULE)
                 > MAX_VALIDATION_RISK
         );
     }
@@ -637,7 +675,7 @@ mod tests {
             };
             MIN_ACCEPTED_FOR_CERTIFICATION - 1
         ];
-        assert!(!certify_rule(&too_small, rule));
+        assert!(!certify_rule(&too_small, rule).passed);
 
         let enough_clean = vec![
             ScoredQuery {
@@ -648,7 +686,7 @@ mod tests {
             };
             MIN_ACCEPTED_FOR_CERTIFICATION
         ];
-        assert!(certify_rule(&enough_clean, rule));
+        assert!(certify_rule(&enough_clean, rule).passed);
     }
 
     #[test]
