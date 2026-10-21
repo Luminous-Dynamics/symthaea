@@ -16,10 +16,11 @@ The executable uses three deterministic seeds, 4,096-dimensional bipolar pattern
 
 | Split | Known-pattern queries | Random out-of-distribution (OOD) queries | Two-prototype mixtures | Total |
 |---|---:|---:|---:|---:|
-| Calibration | 224 | 64 | 64 | 352 |
-| Evaluation | 448 | 128 | 128 | 704 |
+| Threshold selection | 224 | 64 | 64 | 352 |
+| Independent certification | 224 | 64 | 64 | 352 |
+| Final evaluation | 448 | 128 | 128 | 704 |
 
-Known queries span exact retrieval and bit-flip corruption levels of 0%, 10%, 20%, 30%, 40%, 45%, and 50%. Evaluation queries use independent corruption and OOD-generation seeds. Calibration and evaluation share the same stored prototype memory, because the question is threshold calibration for a fixed memory; a separate memory-held-out generalization test is a required next phase.
+Known queries span exact retrieval and bit-flip corruption levels of 0%, 10%, 20%, 30%, 40%, 45%, and 50%. Each split uses independent corruption and OOD-generation seeds. Threshold selection and certification never use final evaluation queries. All splits share the stored prototype memory, because this protocol tests threshold calibration for a fixed memory; a separate memory-held-out generalization test remains a required next phase.
 
 The random OOD samples have no registered target. A bundled pair of stored prototypes is intentionally ambiguous, so a unique-label acceptance counts as an error. This avoids giving the system credit for confidently guessing one component of a genuinely multi-pattern query.
 
@@ -30,7 +31,7 @@ The random OOD samples have no registered target. A bundled pair of stored proto
 3. **Margin-only:** accept when the best-versus-second-best similarity margin passes a calibration-selected threshold.
 4. **Score + margin:** accept only when both calibrated conditions pass.
 
-Thresholds are chosen using the calibration split. The selected rule maximizes calibration coverage while requiring the one-sided 95% Wilson upper bound on calibration selective risk to be at most 5%, and at least 30 calibration queries to be accepted. Threshold search uses a deterministic grid of empirical score/margin quantiles. Evaluation queries are never used to choose thresholds.
+Thresholds are chosen only on the selection split by maximizing coverage subject to a preliminary one-sided 95% Wilson upper-risk bound of at most 5%, and at least 30 accepted selection queries. This is candidate selection, not a risk guarantee. The selected threshold for each candidate rule is then evaluated on a second, independent certification split. A rule is marked `certified=pass` only when it accepts at least 52 certification queries and its one-sided Wilson upper risk bound is at most 5% using the Bonferroni-adjusted critical value for the three candidate policies compared per seed. The certification split is never used to tune thresholds, and final evaluation is a third held-out split. If certification fails, the rule's held-out metrics are still reported for diagnosis, but it must not be described as risk-certified.
 
 ## Reported metrics
 
@@ -38,7 +39,7 @@ Thresholds are chosen using the calibration split. The selected rule maximizes c
 - **Coverage:** fraction of evaluation queries accepted rather than rejected.
 - **Selective risk:** fraction of accepted queries that are incorrect. Risk is undefined when the system accepts no queries.
 - **95% Wilson interval:** uncertainty interval for errors among accepted queries.
-- **Thresholds and counts:** calibration/evaluation sample counts, similarity and margin thresholds, accepted count and errors.
+- **Thresholds and counts:** selection, certification, and evaluation sample counts; score/margin thresholds; independent certification pass/fail; accepted count and errors.
 - **Runtime:** total benchmark wall time per invocation, recorded separately from per-row decision quality.
 
 The first version reports risk/coverage points rather than claiming a complete area-under-risk-coverage result. A later protocol should add full risk–coverage curves and normalized area under the risk–coverage curve (AURC), as well as calibration cost and query latency distributions.
@@ -49,8 +50,9 @@ A rule is not better merely because it abstains more. The primary comparisons ar
 
 - At a fixed evaluation coverage, lower selective risk than score-only and margin-only.
 - At a predeclared risk ceiling, higher coverage than each one-dimensional threshold baseline.
+- Certification and final evaluation remain independent of threshold selection. Comparisons among three candidate policies use the predeclared Bonferroni correction.
 - The direction of the difference persists across at least five independent seeds and multiple memory sizes.
-- The risk claim is based on held-out evaluation intervals, not only the calibration threshold constraint.
+- Final evaluation risk/coverage is reported with intervals; certification on its own does not replace final evaluation.
 - Unknown-pattern and mixture rejection remains effective as stored memory grows and distractors become correlated or near-duplicates.
 
 A reasonable next target is an evaluation-set upper 95% Wilson bound on accepted-query risk below 5% while retaining at least 70% coverage on this protocol. This is a **target to test**, not a result or a universal product guarantee. If no rule meets it, preserve that negative result.
