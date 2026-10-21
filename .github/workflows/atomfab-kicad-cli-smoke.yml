@@ -58,9 +58,11 @@ jobs:
             echo "Positive-control board has DRC violations (exit=$clean_exit). Findings follow:"
             jq -c '.violations[]? // empty | {severity: .severity, type: .type, description: .description, items: .items}' "$OUT_HOST/clean-drc.json" || cat "$OUT_HOST/clean-drc.json"
           fi
+          set +e
           kicad pcb drc --severity-all --format json \
             --output "$OUT/clean-drc-repeat.json" --exit-code-violations "$BOARD"
           repeat_clean_exit=$?
+          set -e
           test "$repeat_clean_exit" -eq "$clean_exit"
           cmp "$OUT_HOST/clean-drc.json" "$OUT_HOST/clean-drc-repeat.json"
 
