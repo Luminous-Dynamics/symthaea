@@ -456,7 +456,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         schema_version: 1,
         benchmark_id: "broca-vocab-extension-init-smoke-v1",
         evidence_level: "smoke",
-        evaluation_mode: "initialization_only_fixed_query",
+        evaluation_mode: "initialization_only_query_bank",
         source_revision: option_env!("GIT_COMMIT_SHA"),
         genesis_phrase: "broca-vocab-extension-smoke-v1",
         seed_scheme: "legacy_v1_for_compatibility",
@@ -490,8 +490,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             result.strategy,
             result.old_rows_bit_identical,
             result.old_vocab_max_abs_logit_delta,
-            result.old_vocab_top1_preserved_fraction,
-            result.old_top1_remains_global_fraction,
+            result.old_vocab_top1_preserved_fraction * 100.0,
+            result.old_top1_remains_global_fraction * 100.0,
             result.mean_new_token_probability_mass,
         );
     }
