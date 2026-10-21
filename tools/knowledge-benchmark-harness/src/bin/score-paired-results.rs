@@ -413,6 +413,13 @@ fn validate_plan_eligibility(plan: &Plan) -> Result<(), String> {
         return Err("cannot score source material whose rights review is denied".into());
     }
 
+    if plan.bootstrap.replicates < 1_000 || plan.bootstrap.replicates > 100_000 {
+        return Err("bootstrap replicates must be between 1000 and 100000".into());
+    }
+    if !(plan.bootstrap.confidence_level > 0.5 && plan.bootstrap.confidence_level < 1.0) {
+        return Err("bootstrap confidence_level must be in (0.5, 1.0)".into());
+    }
+
     if !matches!(
         plan.primary_endpoint.as_str(),
         "paired_intervention_fidelity"
@@ -1062,6 +1069,7 @@ mod tests {
             "synthetic_only":true,
             "primary_endpoint":"paired_intervention_fidelity",
             "candidate_system_id":"s2",
+            "bootstrap":{"replicates":2000,"seed":7,"confidence_level":0.95},
             "benchmark":{
                 "split":"synthetic",
                 "source_family_disjoint":true,
@@ -1104,6 +1112,7 @@ mod tests {
             dimension: dimension.into(),
             expected_relation: expected.into(),
             criticality: criticality.into(),
+            source_family_ids: vec![format!("SYN-FAMILY-{id}")],
             baseline: synthetic_pair_state(),
             mutated: synthetic_pair_state(),
             acceptance: Acceptance {
