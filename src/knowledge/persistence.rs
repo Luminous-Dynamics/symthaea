@@ -527,8 +527,6 @@ mod tests {
 
         let facts = vec![
             FactRecord {
-                fact_id: None,
-                claim_context: None,
                 vector_bytes: vec![0u8; 2048],
                 source_text: "Test fact one".into(),
                 confidence: 0.9,
@@ -537,8 +535,6 @@ mod tests {
                 is_causal: false,
             },
             FactRecord {
-                fact_id: None,
-                claim_context: None,
                 vector_bytes: vec![1u8; 2048],
                 source_text: "Test fact two".into(),
                 confidence: 0.8,
@@ -579,19 +575,21 @@ mod tests {
             polarity: super::super::claim_provenance::ClaimPolarity::Positive,
             evidence_ids: vec!["evidence-a".into()],
         };
-        let record = FactRecord {
+        let record = GraphFactRecord {
             fact_id: Some(42),
-            vector_bytes: vec![7u8; 2048],
-            source_text: "Osiris is associated with renewal".into(),
-            confidence: 0.7,
-            domain: Some("mythology".into()),
-            cycle: 9,
-            is_causal: false,
+            fact: FactRecord {
+                vector_bytes: vec![7u8; 2048],
+                source_text: "Osiris is associated with renewal".into(),
+                confidence: 0.7,
+                domain: Some("mythology".into()),
+                cycle: 9,
+                is_causal: false,
+            },
             claim_context: Some(context.clone()),
         };
         let mut persistence = KnowledgePersistence::new(&db_path);
-        persistence.save_facts(&[record]).unwrap();
-        let loaded = persistence.load_facts().unwrap();
+        persistence.save_graph_facts(&[record]).unwrap();
+        let loaded = persistence.load_graph_facts().unwrap();
         assert_eq!(loaded.len(), 1);
         assert_eq!(loaded[0].fact_id, Some(42));
         assert_eq!(loaded[0].claim_context, Some(context));
@@ -621,13 +619,13 @@ mod tests {
             ).unwrap();
         }
         let mut persistence = KnowledgePersistence::new(&db_path);
-        let loaded = persistence.load_facts().unwrap();
+        let loaded = persistence.load_graph_facts().unwrap();
         assert_eq!(loaded.len(), 1);
-        assert_eq!(loaded[0].source_text, "legacy fact");
+        assert_eq!(loaded[0].fact.source_text, "legacy fact");
         assert_eq!(loaded[0].fact_id, None);
         assert_eq!(loaded[0].claim_context, None);
-        persistence.save_facts(&loaded).unwrap();
-        let loaded_after_snapshot = persistence.load_facts().unwrap();
+        persistence.save_graph_facts(&loaded).unwrap();
+        let loaded_after_snapshot = persistence.load_graph_facts().unwrap();
         assert_eq!(loaded_after_snapshot.len(), 1);
 
         let _ = std::fs::remove_dir_all(&dir);
