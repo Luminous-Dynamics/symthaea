@@ -401,10 +401,12 @@ mod tests {
 
         for (index, expected_intent, expected_action, expected_phrase) in cases {
             let mut channels = ThoughtChannels::with_intent(index);
-            // The uncertainty intent is paired with an uncertain epistemic status
-            // so the test does not construct contradictory input signals.
-            if index == 4 {
-                channels.set_epistemic(2.0);
+            // Keep intent coverage independent of epistemic disposition while
+            // avoiding contradictory fixtures for Answer and Uncertainty.
+            match index {
+                1 => channels.set_epistemic(0.0),
+                4 => channels.set_epistemic(2.0),
+                _ => {}
             }
             let readout = decoder.decode(&channels);
             let translation = translator.translate(&readout);
