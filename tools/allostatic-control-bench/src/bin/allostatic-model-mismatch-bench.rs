@@ -114,6 +114,15 @@ fn rate(numerator: usize, denominator: usize) -> String {
     }
 }
 
+fn push_row(output: &mut String, fields: Vec<String>) {
+    output.push_str(&fields.join(","));
+    output.push('\n');
+}
+
+fn b(value: bool) -> String {
+    value.to_string()
+}
+
 fn summarize_panel(
     panel: &str,
     operating_point: &str,
