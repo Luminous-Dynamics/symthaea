@@ -63,6 +63,42 @@ Consume the shared graph to create explicitly labeled reconstructions of places,
 
 Map only grounded place/time relations. Visualize source travel, historical contact, observatories, material sites and changing networks across time. Distinguish documented transmission from resemblance-only links, uncertain coordinates, mythical geography and present-day locations. Any asserted route/contact should carry its sources and uncertainty.
 
+## Mythology is a first-class neighbor, not a synonym for esotericism
+
+Mythologies and religious narratives belong in the shared knowledge fabric, but not every mythology is an esoteric tradition. Keep the domain tags distinct while reusing the same source, claim, context, relation, provenance and access contracts.
+
+### Why Egypt is a strong first case study
+
+Ancient Egyptian evidence is a strong stress test precisely because it resists a simplistic one-canon model:
+
+- The Metropolitan Museum's *Divine Egypt* account describes distinct local creation traditions, including Heliopolitan accounts associated with the Ennead and Memphite theology in which Ptah creates through speech. It also describes divine roles and imagery as flexible, locally diverse and historically changing.
+- UCL's Digital Egypt distinguishes major bodies of funerary literature—Pyramid Texts, Coffin Texts and the Book of the Dead—by historical context and surviving support.
+- The Book of the Dead is a modern name for a variable repertoire of formulae. Individual manuscripts contain selections; it should not be modeled as one unchanged book with one universal table of contents.
+- Scholarship on ancient Egyptian religion draws on diverse textual, artistic, epigraphic and archaeological evidence rather than a single canonical scripture. Concepts such as maat should retain their contextual and interpretive range rather than being collapsed into one English synonym.
+
+Sources used for the Egypt-first seed cases: [Metropolitan Museum, *Divine Egypt*](https://www.metmuseum.org/exhibitions/divine-egypt/inside-the-exhibition); [UCL Digital Egypt, religious texts](https://www.ucl.ac.uk/museums-static/digitalegypt/literature/religious/index.html); [UCL Digital Egypt, Book of the Dead](https://www.ucl.ac.uk/museums-static/digitalegypt/literature/religious/bdquestions.html); [Fitzwilliam Museum, Egyptian funerary literature](https://book-of-the-dead.fitzmuseum.cam.ac.uk/explore/book-of-the-dead/funerary-literature); [Cambridge, Egyptian Religion](https://www.cambridge.org/core/books/abs/cambridge-history-of-religions-in-the-ancient-world/egyptian-religion/C83766991A320AEE4BFEC436D8F1FED5); [Oxford Research Encyclopedia, Ancient Egyptian Religion](https://academic.oup.com/edited-volume/62249/chapter-abstract/551373292).
+
+### What Symthaea could learn from Egyptian mythology
+
+Treat these as representational and reasoning research hypotheses, not claims that myths secretly encode modern physics or that a model has already acquired these skills:
+
+1. **Context-conditioned concepts:** one deity or symbol may have different, overlapping or merged roles across place and time.
+2. **Coexisting explanatory models:** different local cosmogonies need not be flattened into one account or forced into a winner-takes-all contradiction.
+3. **Temporal inheritance and change:** later texts can reuse older passages while ritual settings, audience, selection and interpretation change.
+4. **Narrative graphs:** characters, kinship, agency, conflict, transformation, succession, ritual action and social institutions can be modeled as attributed relations.
+5. **Narrative-to-institution connections:** investigate how narratives relate to kingship, funerary practices, ethics, agricultural cycles or place-specific worship, while preserving the line between the source and modern scholarly interpretation.
+6. **Epistemic discipline:** a source that records a belief or ritual is evidence of that record, not automatically experimental proof of the metaphysical interpretation.
+
+### MythologyBench v0
+
+An Egypt-first seed pack lives in [`benchmarks/mythology-bench/v0/`](../../benchmarks/mythology-bench/v0/README.md). It currently contains 14 development fixtures and a versioned case schema. The fixture set tests local creation traditions, evidence mosaics, funerary-text chronology and variation, flexible divine identity, maat's semantic range, the Osiris cycle, textual continuity, emic/etic perspective, false mythic lineages, narrative variants, myth/science overreach, and evidence-aware abstention.
+
+The cases are **development prompts, not gold-standard expert judgments**. They must be reviewed by Egyptologists and appropriate cultural scholars before being used to make claims about model quality. Extend coverage to Greek, Mesopotamian, South Asian, East Asian, African, Indigenous and contemporary community traditions through appropriate expertise and permissions; do not frame Egyptian mythology as a universal template for every culture.
+
+### Mythology-specific evaluation
+
+In addition to the general EsotericaBench metrics, measure variant preservation, narrative relation accuracy, event/causal ordering, source- and period-conditioned symbol interpretation, mythic motif similarity versus historically supported transmission, and calibrated uncertainty about oral-history dates. Report subgroup performance by tradition, language, source genre and period. Protect community-controlled material through governance rules; more ingestion is not always better.
+
 ## EsotericaBench v0
 
 The seed cases are in `cases.jsonl`. This is a **curated starter specification**, not yet a complete executable harness or a published leaderboard. Before claiming performance, add a deterministic loader, source-pack manifests, baseline adapters and expert review.
@@ -157,6 +193,11 @@ For every result bind the dataset version/hash, source-pack manifest, code revis
 - [FRAMES](https://aclanthology.org/2025.naacl-long.243/): combined factuality, retrieval and reasoning evaluation.
 - [LongCite](https://aclanthology.org/2025.findings-acl.264/): fine-grained citation generation for long-context QA.
 - [CARE principles for Indigenous data governance](https://www.gida-global.org/care): collective benefit, authority to control, responsibility and ethics. Treat CARE as a governance starting point, not a license to ingest community knowledge.
+- [The Met, *Divine Egypt*](https://www.metmuseum.org/exhibitions/divine-egypt/inside-the-exhibition): local creation traditions and changing/overlapping divine identities.
+- [UCL Digital Egypt, religious texts](https://www.ucl.ac.uk/museums-static/digitalegypt/literature/religious/index.html) and [Book of the Dead](https://www.ucl.ac.uk/museums-static/digitalegypt/literature/religious/bdquestions.html): textual corpora, manuscript selections and historical context.
+- [Cambridge History of Religions in the Ancient World, Egyptian Religion](https://www.cambridge.org/core/books/abs/cambridge-history-of-religions-in-the-ancient-world/egyptian-religion/C83766991A320AEE4BFEC436D8F1FED5): methodological limits of reconstructing Egyptian religion from disparate evidence.
+- [Oxford Research Encyclopedia, Ancient Egyptian Religion](https://academic.oup.com/edited-volume/62249/chapter-abstract/551373292): creation and solar cycles and the Osiris cycle in scholarly context.
+- [Historical/legal discussion of maat](https://www.scielo.org.za/scielo.php?lng=en&nrm=iso&pid=S1021-545X2018000100004&script=sci_arttext&tlng=en): a historically situated treatment of ethics, law, truth and order.
 - [IIIF Authorization Flow API](https://iiif.io/api/auth/2.0/): access-control interoperability context.
 
 ## Nonclaims
