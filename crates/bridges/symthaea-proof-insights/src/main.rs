@@ -253,6 +253,7 @@ struct TemporalTimelineAudit {
     mathlib_revision: String,
     total_timeline_rows: usize,
     unique_completion_commit_count: usize,
+    non_ancestral_adjacent_transition_count: usize,
     source_path_present_at_completion_count: usize,
     source_path_missing_at_completion_count: usize,
     source_path_not_recorded_count: usize,
@@ -319,6 +320,8 @@ struct TemporalTimelineAuditEvent {
     completion_commit: String,
     commit_message: String,
     completion_commit_ancestor_verified: bool,
+    previous_completion_commit: Option<String>,
+    previous_completion_is_ancestor: Option<bool>,
     source_file_status: String,
     source_file_sha256: Option<String>,
     source_file_bytes: Option<u64>,
@@ -1241,6 +1244,7 @@ fn audit_temporal_timeline(
     let mut source_path_not_recorded_count = 0_usize;
     let mut verification_status_counts = BTreeMap::new();
     let mut previous_completion_commit: Option<String> = None;
+    let mut non_ancestral_adjacent_transition_count = 0_usize;
 
     for (zero_based_position, row_result) in reader.records().enumerate() {
         let row = row_result
@@ -1281,13 +1285,24 @@ fn audit_temporal_timeline(
                 event_key
             );
         }
-        if let Some(previous) = previous_completion_commit.as_deref()
-            && !git_is_ancestor(&root, previous, &completion_commit)?
-        {
-            bail!(
-                "timeline order violation: completion commit for {} does not descend from the previous timeline commit",
-                event_key
-            );
+        // The CSV is an ordered inventory, but Git history is a DAG: adjacent
+        // historical entries may come from parallel branches. Preserve source
+        // row order and report ancestry instead of imposing a false linear-chain
+        // requirement. Each completion is still independently pinned to HEAD.
+        let prior_completion_commit = previous_completion_commit.clone();
+        let previous_completion_is_ancestor = match prior_completion_commit.as_deref() {
+            Some(previous) => Some(
+                git_is_ancestor(&root, previous, &completion_commit).with_context(|| {
+                    format!(
+                        "compare adjacent timeline commit ancestry for row {}",
+                        zero_based_position + 2
+                    )
+                })?,
+            ),
+            None => None,
+        };
+        if previous_completion_is_ancestor == Some(false) {
+            non_ancestral_adjacent_transition_count += 1;
         }
         previous_completion_commit = Some(completion_commit.clone());
         unique_commits.insert(completion_commit.clone());
@@ -1357,6 +1372,8 @@ fn audit_temporal_timeline(
             completion_commit,
             commit_message: get(message_col).to_owned(),
             completion_commit_ancestor_verified,
+            previous_completion_commit: prior_completion_commit,
+            previous_completion_is_ancestor,
             source_file_status,
             source_file_sha256,
             source_file_bytes,
@@ -1383,6 +1400,7 @@ fn audit_temporal_timeline(
         mathlib_revision,
         total_timeline_rows: events.len(),
         unique_completion_commit_count: unique_commits.len(),
+        non_ancestral_adjacent_transition_count,
         source_path_present_at_completion_count,
         source_path_missing_at_completion_count,
         source_path_not_recorded_count,
@@ -1427,9 +1445,10 @@ fn audit_temporal_timeline(
         )
     })?;
     println!(
-        "PITB_TEMPORAL_TIMELINE_AUDIT_PASS: rows={} unique_completion_commits={} source_present={} source_missing={} source_not_recorded={} timeline_sha256={} output={}",
+        "PITB_TEMPORAL_TIMELINE_AUDIT_PASS: rows={} unique_completion_commits={} non_ancestral_adjacent_transitions={} source_present={} source_missing={} source_not_recorded={} timeline_sha256={} output={}",
         audit.total_timeline_rows,
         audit.unique_completion_commit_count,
+        audit.non_ancestral_adjacent_transition_count,
         audit.source_path_present_at_completion_count,
         audit.source_path_missing_at_completion_count,
         audit.source_path_not_recorded_count,
