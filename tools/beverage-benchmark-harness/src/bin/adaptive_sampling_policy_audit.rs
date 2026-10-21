@@ -18,7 +18,7 @@ use std::{
 const SCHEMA_VERSION: &str = "beverage-adaptive-sampling-decision-v1";
 const CLAIM_CEILING: &str = "This audit checks declared channel feasibility, decision-time availability, digest syntax, required-test preservation, calibration-aware deferral, and action fields. It does not authenticate measurement truth, recompute the input-prefix digest, prove that the required-test inventory is complete, qualify a plant process, or authorize actuation.";
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Eq, Clone, Copy)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 enum EvidenceClass {
     SyntheticContractFixture,
@@ -27,7 +27,7 @@ enum EvidenceClass {
     ProspectivePilot,
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Eq, Clone, Copy)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 enum CalibrationState {
     Calibrated,
@@ -36,7 +36,7 @@ enum CalibrationState {
     NotApplicable,
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Eq, Clone, Copy)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 enum PolicyAction {
     Sample,
@@ -484,7 +484,7 @@ mod tests {
         let value = serde_json::to_value(valid_record()).expect("record serializes");
         let mut object = value.as_object().expect("object").clone();
         object.insert("override_safety_floor".to_string(), serde_json::json!(true));
-        assert!(serde_json::from_value::<DecisionRecord>(object).is_err());
+        assert!(serde_json::from_value::<DecisionRecord>(serde_json::Value::Object(object)).is_err());
     }
 
     #[test]
