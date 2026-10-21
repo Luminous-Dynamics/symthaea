@@ -16,7 +16,7 @@ agreement. Validation remains blocked until a maintained Rust adapter and matchi
 causal model are available.
 
 Requirements:
-    pip install pyphi numpy scipy matplotlib seaborn
+    python -m pip install -r validation/requirements-pyphi.txt
 
 Author: Tristan Stoltz & Claude
 Date: 2026-01-04
@@ -292,12 +292,12 @@ class PyPhiValidator:
         # fastest. Include both adjacency and TPM in the digest to prevent topology
         # names alone from serving as provenance.
         digest = hashlib.sha256()
-        digest.update(b"symthaea-pyphi-reference-model/v1\\0")
+        digest.update(b"symthaea-pyphi-reference-model/v1\0")
         digest.update(repr(adjacency.shape).encode("ascii"))
         digest.update(np.ascontiguousarray(adjacency, dtype=np.uint8).tobytes())
         digest.update(repr(tpm.shape).encode("ascii"))
         digest.update(np.ascontiguousarray(tpm, dtype="<f8").tobytes())
-        digest.update(b"state=all-ones\\0formalism=IIT_3_0\\0")
+        digest.update(b"state=all-ones\0formalism=IIT_3_0\0")
         return adjacency, tpm, digest.hexdigest()
 
     def compute_pyphi_phi(self, topology: TopologySpec) -> Tuple[float, float]:
