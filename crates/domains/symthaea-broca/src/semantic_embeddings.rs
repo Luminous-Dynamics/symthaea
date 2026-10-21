@@ -38,6 +38,9 @@ use crate::tokenizer::BpeTokenizer;
 /// Maximum number of role-position vectors (max primes per word).
 const MAX_ROLES: usize = 8;
 
+/// Safe default blend weight when a configuration value is non-finite.
+const DEFAULT_GENESIS_BLEND: f32 = 0.3;
+
 /// Configuration for semantic embedding composition.
 #[derive(Debug, Clone)]
 pub struct SemanticEmbeddingConfig {
@@ -48,7 +51,19 @@ pub struct SemanticEmbeddingConfig {
 
 impl Default for SemanticEmbeddingConfig {
     fn default() -> Self {
-        Self { genesis_blend: 0.3 }
+        Self {
+            genesis_blend: DEFAULT_GENESIS_BLEND,
+        }
+    }
+}
+
+/// Clamp a valid blend weight into [0, 1]. Non-finite values fall back to the
+/// documented default instead of propagating NaNs through every token vector.
+fn resolve_genesis_blend(value: f32) -> f32 {
+    if value.is_finite() {
+        value.clamp(0.0, 1.0)
+    } else {
+        DEFAULT_GENESIS_BLEND
     }
 }
 
@@ -252,7 +267,7 @@ impl SemanticQuarkBasis {
         config: &SemanticEmbeddingConfig,
     ) -> (Vec<ContinuousHV>, EmbeddingCoverageStats) {
         let vocab_size = tokenizer.vocab_size();
-        let alpha = config.genesis_blend.clamp(0.0, 1.0);
+        let alpha = resolve_genesis_blend(config.genesis_blend);
         let mut stats = EmbeddingCoverageStats {
             total_tokens: vocab_size,
             tier1_direct: 0,
@@ -578,21 +593,53 @@ mod tests {
     fn test_semantic_similarity_preserved() {
         let basis = SemanticQuarkBasis::new(&test_genesis());
 
-        // "happy" and "joy" should be more similar than "happy" and "angry"
-        let happy = basis.compose_token_embedding("happy");
-        let joy = basis.compose_token_embedding("joy");
-        let angry = basis.compose_token_embedding("angry");
+        // happy, joy, and joyful have the same explicit grounded decomposition.
+        // This verifies the embedding preserves the lexical prior, not that it
+        // demonstrates broad semantic understanding.
+        let happy = basis
+            .compose_token_embedding("happy")
+            .expect("happy should have a grounded decomposition");
+        let joy = basis
+            .compose_token_embedding("joy")
+            .expect("joy should have a grounded decomposition");
+        let joyful = basis
+            .compose_token_embedding("joyful")
+            .expect("joyful should have a grounded decomposition");
+        let angry = basis
+            .compose_token_embedding("angry")
+            .expect("angry should have a grounded decomposition");
 
-        if let (Some(h), Some(j), Some(a)) = (happy, joy, angry) {
-            let sim_hj = h.similarity(&j);
-            let sim_ha = h.similarity(&a);
-            // Both share FEEL, but happy=GOOD vs angry=BAD
-            // At minimum they should have different similarity magnitudes
-            assert!(
-                sim_hj != sim_ha,
-                "happy-joy ({sim_hj:.3}) and happy-angry ({sim_ha:.3}) should differ"
+        let sim_happy_joy = happy.similarity(&joy);
+        let sim_happy_joyful = happy.similarity(&joyful);
+        let sim_happy_angry = happy.similarity(&angry);
+
+        assert!(
+            sim_happy_joy > 0.999,
+            "identical grounded prime sequences should yield near-identical vectors, got {sim_happy_joy:.4}"
+        );
+        assert!(
+            sim_happy_joyful > 0.999,
+            "joyful's grounded decomposition should match happy's, got {sim_happy_joyful:.4}"
+        );
+        assert!(
+            sim_happy_joy > sim_happy_angry + 0.2,
+            "same-polarity happy/joy should be clearly closer than happy/angry: {sim_happy_joy:.4} vs {sim_happy_angry:.4}"
+        );
+    }
+
+    #[test]
+    fn non_finite_genesis_blend_falls_back_to_safe_default() {
+        for invalid in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+            assert_eq!(
+                resolve_genesis_blend(invalid),
+                DEFAULT_GENESIS_BLEND,
+                "non-finite blend {invalid} must not propagate"
             );
         }
+        assert_eq!(resolve_genesis_blend(-1.0), 0.0);
+        assert_eq!(resolve_genesis_blend(2.0), 1.0);
+        assert_eq!(resolve_genesis_blend(0.0), 0.0);
+        assert_eq!(resolve_genesis_blend(1.0), 1.0);
     }
 
     #[test]
