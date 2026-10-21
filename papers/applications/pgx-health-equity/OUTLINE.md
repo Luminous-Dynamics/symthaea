@@ -47,12 +47,12 @@ Pharmacogenomic guidelines from the Clinical Pharmacogenetics Implementation Con
 - 40 PGx tools identified in scoping review; ALL developed in high-income countries (PMC11789506, 2025)
 - NIH All of Us (2025) shows self-reported race is a poor proxy for genetic ancestry, yet guidelines still implicitly calibrated to "European normal"
 
-### 1.3 Concrete clinical harm
-- CYP2D6 ultra-rapid metabolizers: 29% Ethiopian-specific (Aklillu 1996), ~3-5% pan-African (Gaedigk 2017) -- codeine toxicity risk
-- CYP2C19*2 frequency: 29% East Asian vs 15% European (Ionova 2020) -- clopidogrel non-response risk
-- CYP2D6*10: 43% East Asian vs 2% European -- intermediate metabolizer phenotype massively underestimated by European-calibrated guidelines
-- A 2026 Frontiers study on All of Us found 64% of CYP2D6 "drug response" alleles most frequent in East Asian populations
-- Ancestry-linked regulatory haplotype influences CYP2D6 expression (Nature PGx Journal, 2026) -- variants at 45% frequency in East Asian vs 2.5% European
+### 1.3 Published pharmacogenomic context (separate from this model)
+- Cite published allele-frequency and gene–drug evidence for CYP2D6, CYP2C19, CYP2B6, and CYP3A5; distinguish frequency observations from observed clinical outcomes.
+- CYP2D6 ultra-rapid-metabolizer estimates vary by specific population and reference cohort; Ethiopia-specific estimates must not be generalized to all African populations.
+- CYP2C19*2 frequency differences can motivate external study of guideline coverage, but frequency differences alone do not establish individual phenotype or treatment failure.
+- Published findings on CYP2D6*10 and regulatory haplotypes provide context for why variant coverage and gene-specific interpretation matter.
+- This literature section motivates a reference-coverage audit. It is not evidence that this implementation's current phenotype estimates or equity scores are clinically valid.
 
 ### 1.4 What is missing
 - PharmCAT operates at individual genotype level; no population-level equity scoring
@@ -118,23 +118,17 @@ We provide: (1) a formalized equity gap scoring methodology, (2) an open-source 
 
 ## 3. Results (~1,500 words)
 
-### 3.1 Metabolizer phenotype distributions across ancestry groups
-- **Figure 1**: Stacked bar charts showing UM/NM/IM/PM distributions for CYP2D6, CYP2C19, CYP2C9 across 6 ancestry groups
-- Key findings from engine output:
-  - CYP2D6: East Asian IM frequency dramatically elevated (driven by *10 at 43%); European PM highest (~4% from *4 alone)
-  - CYP2C19: East Asian and South Asian PM frequencies substantially higher than European (driven by *2 at 29%/32% vs 15%)
-  - CYP2C9: South Asian populations have highest combined loss-of-function burden (*3 at 11%)
-  - CYP3A4: *22 decreased-function allele almost exclusively European (5% vs <0.1% African)
-- Validate against published literature: compare our HWE-derived PM/UM frequencies with directly measured values from All of Us, UK Biobank, and published meta-analyses
+### 3.1 Exploratory phenotype-frequency outputs
+- **Figure 1**: Display the prototype's HWE/functional-bin outputs with a conspicuous “exploratory model output—not prevalence” label.
+- List the source allele frequencies and functional-bin assumptions that dominate each displayed difference.
+- Compare the outputs with independently published genotype/diplotype phenotype estimates only where phenotype definitions, cohort population, and source edition are comparable.
+- Explicitly show discrepancies and unsupported coverage; do not present agreement in selected cases as validation of the whole model.
 
-### 3.2 Equity gap analysis across drug-gene pairs
-- **Figure 2**: Heatmap -- drugs (rows) x ancestry groups (columns), cell color = composite risk score, underserved populations marked
-- **Table 2**: Full equity analysis results per drug-gene pair: equity gap score, underserved populations, guideline applicability per ancestry
-- Expected findings:
-  - Codeine/CYP2D6: African populations flagged (UM-driven toxicity risk from gene duplications); East Asian flagged (IM-driven efficacy risk from *10)
-  - Clopidogrel/CYP2C19: East Asian and South Asian flagged (PM-driven non-response from *2)
-  - Warfarin/CYP2C9: South Asian flagged (*3 at 11%); African populations may show low gap (CYP2C9*2/*3 rare in Africa -- but NOTE: CYP2C9*8 and *11 are common in African populations and are NOT yet in our allele set -- acknowledge as limitation)
-  - Sertraline/CYP2C19: Same populations as clopidogrel but with different risk profile (accumulation vs non-activation)
+### 3.2 Exploratory model-score audit across drug-gene pairs
+- **Figure 2**: Heatmap of the prototype's heuristic scores by drug–gene tuple and broad population label. Label the scores as uncalibrated model outputs, not risk probabilities.
+- **Table 2**: Show score, threshold flags, source version, included-allele coverage, and known missing-variant warnings for every tuple.
+- Interpret differences as hypotheses for source and method review only. Do not infer that a population is clinically underserved, that standard care is inadequate, or that specific treatments should change.
+- Include negative controls: remove a known allele, add an unsupported tuple, perturb functional-bin assignments, change population denominators, and check whether the output remains interpretable. Preserve rank reversals and indeterminate outcomes rather than tuning them away.
 
 ### 3.3 Modelled population scenario arithmetic (not clinical impact)
 - Show multiplication of rounded population denominators by prototype model-output fractions only as an illustrative calculation.
