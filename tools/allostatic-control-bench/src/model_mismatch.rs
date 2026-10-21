@@ -248,16 +248,27 @@ pub fn calibrate_action_specific_mismatch_panel(
         .collect::<Option<Vec<_>>>()?;
     let reserve_state: Vec<f64> = scores.iter().map(|score| score.reserve_state).collect();
     let load_state: Vec<f64> = scores.iter().map(|score| score.load_state).collect();
-    let push_reserve: Vec<f64> = scores.iter().map(|score| score.push_reserve_effect).collect();
+    let push_reserve: Vec<f64> = scores
+        .iter()
+        .map(|score| score.push_reserve_effect)
+        .collect();
     let push_load: Vec<f64> = scores.iter().map(|score| score.push_load_effect).collect();
-    let maintain_reserve: Vec<f64> =
-        scores.iter().map(|score| score.maintain_reserve_effect).collect();
-    let maintain_load: Vec<f64> =
-        scores.iter().map(|score| score.maintain_load_effect).collect();
-    let recovery_reserve: Vec<f64> =
-        scores.iter().map(|score| score.recovery_reserve_effect).collect();
-    let recovery_load: Vec<f64> =
-        scores.iter().map(|score| score.recovery_load_effect).collect();
+    let maintain_reserve: Vec<f64> = scores
+        .iter()
+        .map(|score| score.maintain_reserve_effect)
+        .collect();
+    let maintain_load: Vec<f64> = scores
+        .iter()
+        .map(|score| score.maintain_load_effect)
+        .collect();
+    let recovery_reserve: Vec<f64> = scores
+        .iter()
+        .map(|score| score.recovery_reserve_effect)
+        .collect();
+    let recovery_load: Vec<f64> = scores
+        .iter()
+        .map(|score| score.recovery_load_effect)
+        .collect();
 
     calibrate_action_specific_episode_radii(
         &reserve_state,
@@ -536,12 +547,60 @@ mod tests {
             .collect();
         assert!((scores.iter().map(|s| s.reserve_state).fold(0.0, f64::max) - 0.01).abs() < 1e-12);
         assert!((scores.iter().map(|s| s.load_state).fold(0.0, f64::max) - 0.02).abs() < 1e-12);
-        assert!((scores.iter().map(|s| s.push_reserve_effect).fold(0.0, f64::max) - 0.03).abs() < 1e-12);
-        assert!((scores.iter().map(|s| s.push_load_effect).fold(0.0, f64::max) - 0.06).abs() < 1e-12);
-        assert!((scores.iter().map(|s| s.maintain_reserve_effect).fold(0.0, f64::max) - 0.01).abs() < 1e-12);
-        assert!((scores.iter().map(|s| s.maintain_load_effect).fold(0.0, f64::max) - 0.025).abs() < 1e-12);
-        assert!((scores.iter().map(|s| s.recovery_reserve_effect).fold(0.0, f64::max) - 0.015).abs() < 1e-12);
-        assert!((scores.iter().map(|s| s.recovery_load_effect).fold(0.0, f64::max) - 0.04).abs() < 1e-12);
+        assert!(
+            (scores
+                .iter()
+                .map(|s| s.push_reserve_effect)
+                .fold(0.0, f64::max)
+                - 0.03)
+                .abs()
+                < 1e-12
+        );
+        assert!(
+            (scores
+                .iter()
+                .map(|s| s.push_load_effect)
+                .fold(0.0, f64::max)
+                - 0.06)
+                .abs()
+                < 1e-12
+        );
+        assert!(
+            (scores
+                .iter()
+                .map(|s| s.maintain_reserve_effect)
+                .fold(0.0, f64::max)
+                - 0.01)
+                .abs()
+                < 1e-12
+        );
+        assert!(
+            (scores
+                .iter()
+                .map(|s| s.maintain_load_effect)
+                .fold(0.0, f64::max)
+                - 0.025)
+                .abs()
+                < 1e-12
+        );
+        assert!(
+            (scores
+                .iter()
+                .map(|s| s.recovery_reserve_effect)
+                .fold(0.0, f64::max)
+                - 0.015)
+                .abs()
+                < 1e-12
+        );
+        assert!(
+            (scores
+                .iter()
+                .map(|s| s.recovery_load_effect)
+                .fold(0.0, f64::max)
+                - 0.04)
+                .abs()
+                < 1e-12
+        );
     }
 
     #[test]
@@ -550,12 +609,9 @@ mod tests {
         let global = calibrate_mismatch_panel(&global_panel, &STRESS_GRID, 0.90)
             .expect("global four-family calibration");
         let specific_panel = action_specific_calibration_panel();
-        let specific = calibrate_action_specific_mismatch_panel(
-            &specific_panel,
-            &STRESS_GRID,
-            0.95,
-        )
-        .expect("159 episodes meet the eight-family 95% finite-rank gate");
+        let specific =
+            calibrate_action_specific_mismatch_panel(&specific_panel, &STRESS_GRID, 0.95)
+                .expect("159 episodes meet the eight-family 95% finite-rank gate");
         let mismatch = profile(1.0);
         let (point, global_robust, global_true_safe) =
             point_and_robust_vs_true(state(), Action::Maintain, 0.5, mismatch, global, limits())
