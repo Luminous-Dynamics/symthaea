@@ -131,6 +131,7 @@
         "declared_name_matches_dataset",
         "dataset_proof_sha256",
         "identity_candidate_timeline_positions",
+        "ambiguous_declaration_timeline_positions",
         "identity_join_status",
         "identity_statement_match_at_commit_before",
         "identity_statement_match_at_completion",
@@ -198,6 +199,11 @@
           "uniqueItems": true,
           "items": {"type": "integer", "minimum": 0}
         },
+        "ambiguous_declaration_timeline_positions": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "integer", "minimum": 0}
+        },
         "identity_join_status": {
           "enum": [
             "declared_name_unavailable",
@@ -205,6 +211,7 @@
             "not_checked_invalid_path",
             "not_checked_empty_dataset_proof",
             "not_checked_no_path_candidate",
+            "ambiguous_declaration_identity",
             "no_exact_proof_transition",
             "ambiguous_proof_transition",
             "unique_proof_transition_with_statement_or_visibility_mismatch",
