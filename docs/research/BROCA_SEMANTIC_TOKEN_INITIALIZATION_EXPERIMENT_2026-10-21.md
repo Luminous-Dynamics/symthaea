@@ -52,6 +52,8 @@ The benchmark trains each arm independently with the same training split, epoch 
 
 The phrase split is intentionally small. It validates the experimental wiring and can reveal obvious regressions; it is **not** sufficient to establish SOTA, broad semantic fidelity, or robust statistical generalization.
 
+A construct-validity review also removed `mother/father` from the positive equivalence probe. The current core `LexicalGrounding` maps both words to the same `[Someone, Live]` prime sequence, so their embeddings collapse despite the words not being interchangeable. That collision is a known representation limitation—not a benchmark success—and remains open work for a richer typed lexical-feature model. The current four-pair probe measures consistency with a small set of chosen lexical priors only; it is **not** an independent semantic oracle.
+
 For repeatable smoke runs, `broca_fusion_bench --json-out report.json` emits a versioned JSON receipt with the evidence level, evaluation mode, vocabulary size, train/held-out pair counts, SHA-256 digests of the serialized fixtures, epochs per arm, and per-arm evaluation metrics. Set `GIT_COMMIT_SHA=$(git rev-parse HEAD)` in the build environment to include the exact source revision. The receipt remains explicitly labelled `smoke`; it is not a substitute for a larger sealed corpus or external comparison.
 
 ## Proposed evaluation ladder
@@ -66,7 +68,7 @@ Required for every exact head:
 - absent/unknown lexemes use the documented fallback;
 - false-positive lexical controls such as unicorn, disaster, king, thing, and wonder do not obtain semantics from accidental affix spelling;
 - positive morphology controls preserve the grounded root's primes when a supported affix is applied;
-- equivalent lexical prime sequences are near-identical, while a multi-pair contrastive probe separates them from opposite/contrastive concepts;
+- the four positive lexical-prior pairs are near-identical, while a separate multi-pair probe separates the chosen contrastive pairs; do not treat related-but-non-equivalent lexemes as positive equivalence labels;
 - non-finite genesis-blend weights fall back to the documented default instead of propagating non-finite embedding values;
 - the training and held-out smoke fixtures have intent labels and epistemic ordinals aligned with their intended targets (channel 4 is uncertainty, not answer/certainty);
 - legacy configuration deserialization keeps semantic initialization disabled unless explicitly enabled;
