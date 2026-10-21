@@ -55,8 +55,8 @@ struct Network {
 
 impl Network {
     fn validate(&self) -> Result<(), String> {
-        if self.rules.is_empty() || self.rules.len() > 16 {
-            return Err("node count must be in 1..=16".into());
+        if self.rules.is_empty() || self.rules.len() > 12 {
+            return Err("node count must be in 1..=12 for bounded partition enumeration".into());
         }
         if self.input_count == 0 || self.input_count > 8 {
             return Err("input count must be in 1..=8 for exact enumeration".into());
@@ -248,6 +248,70 @@ struct ProfilePoint {
     worst_cross_cut_utility: f64,
     n_cross_cut: usize,
     n_matched_control: usize,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+struct PartitionProfilePoint {
+    fixture: String,
+    partition_mask: usize,
+    partition_labels: String,
+    cross_cut_mean_loss: f64,
+    matched_control_mean_loss: f64,
+    tccip: f64,
+    n_cross_cut: usize,
+    n_matched_control: usize,
+}
+
+/// Enumerate every nontrivial bipartition, canonicalizing complements by fixing
+/// node 0 to component A. All partitions are reported or counted as skipped;
+/// the evaluator never selects the best partition as its only reported result.
+fn all_partition_profiles(
+    fixture_name: &str,
+    node_count: usize,
+    results: &[InterventionResult],
+) -> (Vec<PartitionProfilePoint>, usize, usize) {
+    let total_partitions = (1usize << (node_count - 1)) - 1;
+    let mut profiles = Vec::new();
+
+    for mask in 1usize..(1usize << node_count) {
+        if mask & 1 == 1 {
+            continue; // complement of a canonical representative
+        }
+        let labels = (0..node_count)
+            .map(|node| if (mask >> node) & 1 == 1 { 'B' } else { 'A' })
+            .collect::<String>();
+        let mut cross_losses = Vec::new();
+        let mut control_losses = Vec::new();
+
+        for result in results {
+            let source_side = (mask >> result.source) & 1;
+            let target_side = (mask >> result.target) & 1;
+            if source_side != target_side {
+                cross_losses.push(result.utility_loss);
+            } else {
+                control_losses.push(result.utility_loss);
+            }
+        }
+
+        if cross_losses.is_empty() || control_losses.is_empty() {
+            continue;
+        }
+        let cross_mean = cross_losses.iter().sum::<f64>() / cross_losses.len() as f64;
+        let control_mean =
+            control_losses.iter().sum::<f64>() / control_losses.len() as f64;
+        profiles.push(PartitionProfilePoint {
+            fixture: fixture_name.into(),
+            partition_mask: mask,
+            partition_labels: labels,
+            cross_cut_mean_loss: cross_mean,
+            matched_control_mean_loss: control_mean,
+            tccip: cross_mean - control_mean,
+            n_cross_cut: cross_losses.len(),
+            n_matched_control: control_losses.len(),
+        });
+    }
+    let skipped = total_partitions.saturating_sub(profiles.len());
+    (profiles, total_partitions, skipped)
 }
 
 impl Fixture {
@@ -541,6 +605,28 @@ fn main() {
                         point.n_matched_control
                     );
                 }
+                let (partition_profiles, total_partitions, skipped) =
+                    all_partition_profiles(&fixture.name, fixture.network.rules.len(), &results);
+                println!(
+                    "# partition_sweep_summary fixture={} total={} usable={} skipped={}",
+                    fixture.name,
+                    total_partitions,
+                    partition_profiles.len(),
+                    skipped
+                );
+                for point in partition_profiles {
+                    println!(
+                        "# partition_profile fixture={} mask={} labels={} cross_loss={:.9} control_loss={:.9} tccip={:.9} n_cross={} n_control={}",
+                        point.fixture,
+                        point.partition_mask,
+                        point.partition_labels,
+                        point.cross_cut_mean_loss,
+                        point.matched_control_mean_loss,
+                        point.tccip,
+                        point.n_cross_cut,
+                        point.n_matched_control
+                    );
+                }
             }
             Err(error) => {
                 eprintln!("NOT QUALIFIED: fixture {}: {error}", fixture.name);
@@ -670,5 +756,39 @@ mod tests {
         let mut fixture = fixtures().remove(1);
         fixture.interventions[0].cost = 0;
         assert!(fixture.validate().unwrap_err().contains("positive cost"));
+    }
+
+    #[test]
+    fn exhaustive_partition_sweep_contains_the_declared_partition_result() {
+        for fixture in fixtures() {
+            let (results, declared_profile) = fixture.run().unwrap();
+            let mask = fixture.network.components.iter().enumerate().fold(
+                0usize,
+                |acc, (index, component)| acc | ((*component as usize) << index),
+            );
+            let (sweep, total, skipped) =
+                all_partition_profiles(&fixture.name, fixture.network.rules.len(), &results);
+            assert_eq!(total, sweep.len() + skipped);
+            let alternate = sweep.iter().find(|point| point.partition_mask == mask)
+                .expect("declared nontrivial partition must be reported");
+            assert!((alternate.tccip - declared_profile[0].tccip).abs() < 1e-12);
+        }
+    }
+
+    #[test]
+    fn partition_sweep_is_stable_and_reports_all_unusable_partitions() {
+        for fixture in fixtures() {
+            let (results, _) = fixture.run().unwrap();
+            let (first, total, skipped) =
+                all_partition_profiles(&fixture.name, fixture.network.rules.len(), &results);
+            let (second, total_again, skipped_again) =
+                all_partition_profiles(&fixture.name, fixture.network.rules.len(), &results);
+            assert_eq!(first, second);
+            assert_eq!(total, total_again);
+            assert_eq!(skipped, skipped_again);
+            assert_eq!(total, first.len() + skipped);
+            assert!(first.windows(2).all(|pair| pair[0].partition_mask < pair[1].partition_mask));
+            assert!(first.iter().all(|point| (-1.0..=1.0).contains(&point.tccip)));
+        }
     }
 }
