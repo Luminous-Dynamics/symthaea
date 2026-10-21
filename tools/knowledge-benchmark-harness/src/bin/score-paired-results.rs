@@ -7,7 +7,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-const TOOL_VERSION: &str = "score-paired-results-v0.9.0";
+const TOOL_VERSION: &str = "score-paired-results-v0.10.0";
 const SCORE_REPORT_SCHEMA: &str =
     include_str!("../../../../benchmarks/benchmark-runs/v0/score-report.schema.json");
 
