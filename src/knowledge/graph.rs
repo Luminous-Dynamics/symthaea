@@ -768,23 +768,12 @@ impl EnhancedKnowledgeGraph {
 
     // ── Persistence Support ─────────────────────────────────────────────
 
-    /// Import a fact from a persistence record.
+    /// Import a legacy fact record, assigning an in-memory identity.
     pub fn import_fact_record(&mut self, record: &super::persistence::FactRecord) {
-        if record.vector_bytes.len() != 2048 {
-            return;
-        }
-        let mut arr = [0u8; 2048];
-        arr.copy_from_slice(&record.vector_bytes);
-        let encoding = super::encoding::FactEncoding {
-            vector: symthaea_core::hdc::binary_hv::BinaryHV(arr),
-            role_vectors: std::collections::HashMap::new(),
-            source_text: record.source_text.clone(),
-            confidence: record.confidence,
-        };
         self.import_fact_record_with_provenance(record, None, None);
     }
 
-    /// Import a stable graph record and optional typed provenance.
+    /// Import a graph snapshot record with stable identity and optional provenance.
     pub fn import_graph_fact_record(&mut self, record: &super::persistence::GraphFactRecord) {
         self.import_fact_record_with_provenance(
             &record.fact,
@@ -849,7 +838,6 @@ impl EnhancedKnowledgeGraph {
                 domain: f.domain.clone(),
                 cycle: f.inserted_at_cycle,
                 is_causal: f.has_causal_relations,
-                claim_context: f.claim_context.clone(),
             })
             .collect()
     }
