@@ -329,9 +329,9 @@ if ! awk -F, '
     if ($17 < 0 || $17 > 300 || $18 < 0 || $18 > $17 ||
         $19 < 0 || $19 > $18 || $20 < 0 || $20 > $17) failed = 1
     if (($18 + $20) != $17) failed = 1
-    if ($21 > 1 || $21 < 0) failed = 1
-    if (($17 == 0 && $21 != 0) ||
-        ($17 > 0 && ($20 / $17 - $21 > 0.00001 || $21 - $20 / $17 > 0.00001))) failed = 1
+    if ($17 == 0) {
+      if ($21 != "NA" || $20 != 0) failed = 1
+    } else if (($20 / $17 - $21 > 0.00001) || ($21 - $20 / $17 > 0.00001)) failed = 1
     if ($2 == "nominal" && ($5 != $4 || $6 != 0 || $7 > 0.10 || $20 != 0)) failed = 1
     if ($2 == "moderate_shift" && ($5 != 0 || $6 > 150)) failed = 1
     if ($2 == "strong_shift" && ($5 != 0 || $6 != 0 || $20 != 0)) failed = 1
@@ -341,7 +341,7 @@ if ! awk -F, '
   }
   END { if (NR != 16 || rows != 15 || failed) exit 1 }
 ' "$tmpdir/ood-summary-a.csv"; then
-  printf 'FAIL: OOD fallback per-state false-alarm, miss, actual-safety or availability summary is invalid\n' >&2
+  printf 'FAIL: OOD fallback per-state alarm, miss, true-safety or availability summary is invalid\n' >&2
   exit 1
 fi
 
