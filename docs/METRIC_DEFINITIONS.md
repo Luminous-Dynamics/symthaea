@@ -73,7 +73,7 @@ sim(A, B) = (A . B) / (||A|| * ||B||)
 | **Symbol** | R or reversibility |
 | **Range** | [0, 1] |
 | **Measures** | Information preservation through bind/unbind cycle |
-| **Significance** | Relates to phenomenal structure in consciousness |
+| **Significance** | Representation reversibility diagnostic; does not establish phenomenal structure or consciousness |
 
 **Definition:**
 ```
