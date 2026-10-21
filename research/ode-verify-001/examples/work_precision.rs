@@ -30,8 +30,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             // Scale the absolute floor with the state units so this experiment
             // tests relative-error semantics, not arbitrary unit selection.
             let absolute_tolerance = scale * relative_tolerance * 1.0e-3;
-            let tolerances =
-                Rk45Tolerances::new(relative_tolerance, vec![absolute_tolerance; 2]);
+            let tolerances = Rk45Tolerances::new(relative_tolerance, vec![absolute_tolerance; 2]);
 
             match integrator.try_simulate_with_tolerances(
                 &oscillator,
@@ -66,11 +65,9 @@ fn main() -> Result<(), Box<dyn Error>> {
 
                     let endpoint_error_limit = GLOBAL_ERROR_MULTIPLIER * relative_tolerance;
                     let energy_drift_limit = GLOBAL_ERROR_MULTIPLIER * relative_tolerance;
-                    let completed = result
-                        .simulation
-                        .times
-                        .last()
-                        .is_some_and(|time| (*time - T_END).abs() <= f64::EPSILON * T_END.abs().max(1.0));
+                    let completed = result.simulation.times.last().is_some_and(|time| {
+                        (*time - T_END).abs() <= f64::EPSILON * T_END.abs().max(1.0)
+                    });
                     let finite = endpoint_error.is_finite()
                         && max_relative_energy_drift.is_finite()
                         && result
@@ -80,8 +77,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                             .flatten()
                             .all(|value| value.is_finite());
                     let endpoint_error_within_limit = endpoint_error <= endpoint_error_limit;
-                    let energy_drift_within_limit =
-                        max_relative_energy_drift <= energy_drift_limit;
+                    let energy_drift_within_limit = max_relative_energy_drift <= energy_drift_limit;
                     let accepted = completed
                         && finite
                         && result.diagnostics.max_error_norm <= 1.0
