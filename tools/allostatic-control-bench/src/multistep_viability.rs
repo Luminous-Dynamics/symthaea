@@ -273,6 +273,128 @@ mod tests {
         state((0.17, 0.17), (0.80, 0.80))
     }
 
+    fn independent_next_tube(
+        state: StateEnvelope,
+        action: Action,
+        dynamics: DynamicsBounds,
+    ) -> Option<StateEnvelope> {
+        let effects = dynamics.effect_for_action(action);
+        let reserve_effect = effects.reserve_delta();
+        let load_effect = effects.load_delta();
+        let reserve = Interval::new(
+            (state.reserve().lower() + reserve_effect.lower()).clamp(0.0, 1.0),
+            (state.reserve().upper() + reserve_effect.upper()).clamp(0.0, 1.0),
+        )?;
+        let load = Interval::new(
+            (state.load().lower() + load_effect.lower()).clamp(0.0, 1.0),
+            (state.load().upper() + load_effect.upper()).clamp(0.0, 1.0),
+        )?;
+        StateEnvelope::new(reserve, load)
+    }
+
+    fn independent_safe_transition(
+        state: StateEnvelope,
+        action: Action,
+        dynamics: DynamicsBounds,
+        limits: ViabilityLimits,
+    ) -> Option<StateEnvelope> {
+        let next = independent_next_tube(state, action, dynamics)?;
+        (next.reserve().lower() >= limits.min_reserve()
+            && next.load().upper() <= limits.max_load())
+        .then_some(next)
+    }
+
+    fn independently_has_safe_suffix(
+        state: StateEnvelope,
+        dynamics: DynamicsBounds,
+        limits: ViabilityLimits,
+        remaining: usize,
+        authority: bool,
+    ) -> bool {
+        if remaining == 0 {
+            return true;
+        }
+        let actions: &[Action] = if authority {
+            &ALL_ACTIONS
+        } else {
+            &NO_RECOVERY_ACTIONS
+        };
+        actions.iter().any(|action| {
+            independent_safe_transition(state, *action, dynamics, limits).is_some_and(|next| {
+                independently_has_safe_suffix(
+                    next,
+                    dynamics,
+                    limits,
+                    remaining - 1,
+                    authority,
+                )
+            })
+        })
+    }
+
+    #[test]
+    fn horizon_sets_match_independent_exhaustive_sequence_enumeration() {
+        let states = [
+            state((0.16, 0.20), (0.40, 0.50)),
+            state((0.22, 0.28), (0.80, 0.84)),
+            state((0.40, 0.50), (0.50, 0.60)),
+        ];
+        let dynamics_panels = [
+            deadline_dynamics(),
+            DynamicsBounds::new(
+                effects((-0.005, -0.005), (0.09, 0.10)),
+                effects((0.02, 0.03), (0.03, 0.04)),
+                effects((0.02, 0.03), (-0.30, -0.25)),
+            ),
+            DynamicsBounds::new(
+                effects((-0.05, -0.02), (-0.01, 0.03)),
+                effects((0.00, 0.02), (-0.05, -0.01)),
+                effects((0.02, 0.05), (-0.20, -0.10)),
+            ),
+        ];
+
+        for initial_state in states {
+            for dynamics in dynamics_panels {
+                for authority in [false, true] {
+                    for horizon in 1..=4 {
+                        let actual = evaluate_horizon_action_set(
+                            initial_state,
+                            dynamics,
+                            limits(),
+                            authority,
+                            horizon,
+                        )
+                        .expect("small horizon fits the default budget");
+                        for action in ALL_ACTIONS {
+                            let expected = authority || action != Action::EmergencyRecover;
+                            let expected = expected
+                                && independent_safe_transition(
+                                    initial_state,
+                                    action,
+                                    dynamics,
+                                    limits(),
+                                )
+                                .is_some_and(|next| {
+                                    independently_has_safe_suffix(
+                                        next,
+                                        dynamics,
+                                        limits(),
+                                        horizon - 1,
+                                        authority,
+                                    )
+                                });
+                            assert_eq!(
+                                actual.contains(action),
+                                expected,
+                                "state={initial_state:?} horizon={horizon} authority={authority} action={action:?}"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     #[test]
     fn horizon_one_matches_the_one_step_viability_set() {
         let initial_state = boundary_state();
