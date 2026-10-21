@@ -1097,7 +1097,11 @@ fn audit_temporal_dataset(
                             .context("theorem-identity completion source is not UTF-8")?;
                         let completion_blocks =
                             named_declaration_blocks(completion_source, theorem_short_name)?;
-                        if completion_blocks.len() != 1
+                        if completion_blocks.len() > 1 {
+                            ambiguous_declaration_timeline_positions.push(candidate.position);
+                            continue;
+                        }
+                        if completion_blocks.is_empty()
                             || !normalized_contains(&completion_blocks[0], &dataset_proof)
                         {
                             continue;
