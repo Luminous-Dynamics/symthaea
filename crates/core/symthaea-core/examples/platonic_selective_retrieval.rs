@@ -24,8 +24,9 @@ const MIXTURE_QUERY_WEIGHT: usize = 2;
 const MAX_VALIDATION_RISK: f64 = 0.05;
 const MIN_ACCEPTED_FOR_CALIBRATION: usize = 30;
 // Family-wise error control across 3 policy candidates × 5 reported seeds.
-const MIN_ACCEPTED_FOR_CERTIFICATION: usize = 112;
-const CERTIFICATION_ALPHA_PER_RULE: f64 = 0.05 / 15.0;
+const MIN_ACCEPTED_FOR_CERTIFICATION: usize = 125;
+// Six threshold strategies × five seeds, controlling family-wise certification error.
+const CERTIFICATION_ALPHA_PER_RULE: f64 = 0.05 / 30.0;
 const NOISE_LEVELS: [f64; 7] = [0.0, 0.10, 0.20, 0.30, 0.40, 0.45, 0.50];
 // Novel unregistered templates deliberately correlated with known prototypes.
 // This is a separate identifiability challenge, not part of risk certification.
@@ -71,6 +72,16 @@ struct CertificationResult {
 }
 
 #[derive(Debug, Clone, Copy)]
+struct FixedSequenceCalibration {
+    rule: DecisionRule,
+    certificate: CertificationResult,
+    certified_prefix_len: usize,
+    candidate_count: usize,
+    selected_candidate_index: Option<usize>,
+    stopped_at_index: Option<usize>,
+}
+
+#[derive(Debug, Clone, Copy)]
 struct Evaluation {
     accepted: usize,
     errors: usize,
@@ -95,8 +106,10 @@ impl Evaluation {
 fn main() -> Result<(), Box<dyn Error>> {
     let start = Instant::now();
     println!("# protocol=selective-retrieval-v1");
-    println!("# calibration_rule=selection_split_max_coverage_then_independent_certification");
-    println!("# certification=one_sided_clopper_pearson_upper_bound_bonferroni_adjusted_for_3_rules_x_5_seeds");
+    println!("# calibration_rule=empirical_threshold_search_plus_independent_certification_and_fixed_sequence_CIC");
+    println!("# certification=one_sided_clopper_pearson_upper_bound_bonferroni_adjusted_for_6_rules_x_5_seeds");
+    println!("# fixed_sequence_rule=predeclared_strict_to_permissive_candidates_stop_at_first_failed_certificate");
+    println!("# fixed_sequence_uses_one_calibration_split=true");
     println!("# query_mix_weights=known:random_ood:ambiguous_mixture=7:2:2");
     println!("# known_query_noise_level=uniform_over_0,0.10,0.20,0.30,0.40,0.45,0.50");
     println!("# separate_near_unknown_challenge_distances=0.05,0.10,0.20");
@@ -169,25 +182,20 @@ fn main() -> Result<(), Box<dyn Error>> {
         );
         report_identity_collision_controls(seed, &prototypes, "always_top1", always_accept)?;
 
-        for (name, rule) in [
-            (
-                "calibrated_score_only",
-                calibrate_rule(&selection, CalibrationMode::ScoreOnly),
-            ),
-            (
-                "calibrated_margin_only",
-                calibrate_rule(&selection, CalibrationMode::MarginOnly),
-            ),
-            (
-                "calibrated_score_and_margin",
-                calibrate_rule(&selection, CalibrationMode::ScoreAndMargin),
-            ),
+        for (mode_name, mode) in [
+            ("score_only", CalibrationMode::ScoreOnly),
+            ("margin_only", CalibrationMode::MarginOnly),
+            ("score_and_margin", CalibrationMode::ScoreAndMargin),
         ] {
+            // Baseline A: use the selection split to optimize thresholds and the
+            // independent certification split to verify the chosen point.
+            let baseline_name = format!("calibrated_{mode_name}");
+            let rule = calibrate_rule(&selection, mode);
             let certificate = certify_rule(&certification, rule);
             report_row(
                 "evaluation",
                 seed,
-                name,
+                &baseline_name,
                 rule,
                 selection.len(),
                 certification.len(),
@@ -197,14 +205,55 @@ fn main() -> Result<(), Box<dyn Error>> {
             report_row(
                 "near_unknown_challenge",
                 seed,
-                name,
+                &baseline_name,
                 rule,
                 0,
                 0,
                 None,
                 &near_unknown,
             );
-            report_identity_collision_controls(seed, &prototypes, name, rule)?;
+            report_identity_collision_controls(seed, &prototypes, &baseline_name, rule)?;
+
+            // Baseline B: fixed-sequence confidence-interval calibration (CIC).
+            // The score/margin threshold schedule is fixed before observing the
+            // calibration sample. One sample both certifies each candidate and
+            // selects the last point in the consecutively certified prefix.
+            let cic = calibrate_fixed_sequence_rule(&selection, mode);
+            let stop_at = cic
+                .stopped_at_index
+                .map(|index| index.to_string())
+                .unwrap_or_else(|| "none".to_owned());
+            println!(
+                "# fixed_sequence_seed={seed},policy={mode_name},certified_prefix={},candidate_count={},stopped_at_index={stop_at},selected_index={}",
+                cic.certified_prefix_len,
+                cic.candidate_count,
+                cic.selected_candidate_index
+                    .map(|index| index.to_string())
+                    .unwrap_or_else(|| "none".to_owned())
+            );
+
+            let cic_name = format!("fixed_sequence_{mode_name}");
+            report_row(
+                "evaluation_cic",
+                seed,
+                &cic_name,
+                cic.rule,
+                0,
+                selection.len(),
+                Some(cic.certificate),
+                &test,
+            );
+            report_row(
+                "near_unknown_challenge_cic",
+                seed,
+                &cic_name,
+                cic.rule,
+                0,
+                0,
+                None,
+                &near_unknown,
+            );
+            report_identity_collision_controls(seed, &prototypes, &cic_name, cic.rule)?;
         }
     }
 
@@ -407,6 +456,83 @@ fn calibrate_rule(samples: &[ScoredQuery], mode: CalibrationMode) -> DecisionRul
     }
 
     best_rule
+}
+
+/// A predeclared threshold grid in strict-to-permissive order. Each next
+/// candidate relaxes (never tightens) its acceptance rule, so the accepted sets
+/// are nested. Threshold values do not depend on the observed calibration data.
+fn fixed_sequence_candidates(mode: CalibrationMode) -> Vec<DecisionRule> {
+    match mode {
+        CalibrationMode::ScoreOnly => (0..=20)
+            .map(|step| DecisionRule {
+                min_similarity: 0.65 - 0.01 * step as f64,
+                min_margin: -1.0,
+            })
+            .collect(),
+        CalibrationMode::MarginOnly => (0..=16)
+            .map(|step| DecisionRule {
+                min_similarity: -1.0,
+                min_margin: 0.10 - 0.005 * step as f64,
+            })
+            .collect(),
+        CalibrationMode::ScoreAndMargin => (0..=20)
+            .map(|step| DecisionRule {
+                min_similarity: 0.65 - 0.01 * step as f64,
+                min_margin: 0.10 - 0.004 * step as f64,
+            })
+            .collect(),
+    }
+}
+
+/// Fixed-sequence confidence-interval calibration. Start from a strict point,
+/// certify using an exact one-sided Clopper-Pearson bound, then relax the
+/// threshold. Stop at the first failed candidate; later candidates are not
+/// examined, even if their empirical risk might happen to fall again. Family-wise
+/// alpha is corrected over strategy × seed, but not over candidates: the
+/// predeclared fixed sequence controls that selection effect.
+fn calibrate_fixed_sequence_rule(
+    samples: &[ScoredQuery],
+    mode: CalibrationMode,
+) -> FixedSequenceCalibration {
+    let candidates = fixed_sequence_candidates(mode);
+    let abstain_rule = DecisionRule {
+        min_similarity: 2.0,
+        min_margin: 3.0,
+    };
+    let empty_certificate = CertificationResult {
+        accepted: 0,
+        errors: 0,
+        upper_risk: 1.0,
+        passed: false,
+    };
+
+    let mut selected_rule = None;
+    let mut selected_certificate = empty_certificate;
+    let mut selected_candidate_index = None;
+    let mut certified_prefix_len = 0;
+    let mut stopped_at_index = None;
+
+    for (index, candidate) in candidates.iter().copied().enumerate() {
+        let certificate = certify_rule(samples, candidate);
+        if !certificate.passed {
+            stopped_at_index = Some(index);
+            break;
+        }
+
+        selected_rule = Some(candidate);
+        selected_certificate = certificate;
+        selected_candidate_index = Some(index);
+        certified_prefix_len += 1;
+    }
+
+    FixedSequenceCalibration {
+        rule: selected_rule.unwrap_or(abstain_rule),
+        certificate: selected_certificate,
+        certified_prefix_len,
+        candidate_count: candidates.len(),
+        selected_candidate_index,
+        stopped_at_index,
+    }
 }
 
 fn thresholds(samples: &[ScoredQuery], metric: fn(&ScoredQuery) -> f64) -> Vec<f64> {
@@ -841,15 +967,15 @@ mod tests {
     #[test]
     fn bonferroni_exact_binomial_certificate_respects_sample_floor() {
         assert!(
-            clopper_pearson_upper_bound(0, 111, CERTIFICATION_ALPHA_PER_RULE)
+            clopper_pearson_upper_bound(0, 124, CERTIFICATION_ALPHA_PER_RULE)
                 > MAX_VALIDATION_RISK
         );
         assert!(
-            clopper_pearson_upper_bound(0, 112, CERTIFICATION_ALPHA_PER_RULE)
+            clopper_pearson_upper_bound(0, 125, CERTIFICATION_ALPHA_PER_RULE)
                 <= MAX_VALIDATION_RISK
         );
         assert!(
-            clopper_pearson_upper_bound(1, 112, CERTIFICATION_ALPHA_PER_RULE)
+            clopper_pearson_upper_bound(1, 125, CERTIFICATION_ALPHA_PER_RULE)
                 > MAX_VALIDATION_RISK
         );
     }
@@ -934,6 +1060,46 @@ mod tests {
         assert_eq!(result.accepted, 2);
         assert_eq!(result.errors, 1);
         assert_eq!(result.selective_risk(), Some(0.5));
+    }
+
+    #[test]
+    fn fixed_sequence_candidates_are_nested_and_predeclared() {
+        for mode in [
+            CalibrationMode::ScoreOnly,
+            CalibrationMode::MarginOnly,
+            CalibrationMode::ScoreAndMargin,
+        ] {
+            let candidates = fixed_sequence_candidates(mode);
+            assert!(candidates.len() >= 2);
+            for pair in candidates.windows(2) {
+                assert!(pair[1].min_similarity <= pair[0].min_similarity);
+                assert!(pair[1].min_margin <= pair[0].min_margin);
+            }
+        }
+    }
+
+    #[test]
+    fn fixed_sequence_stops_at_first_uncertified_candidate() {
+        let samples = (0..512)
+            .map(|index| ScoredQuery {
+                best_similarity: if index < 400 { 0.9 } else { 0.48 },
+                top_two_margin: if index < 400 { 0.2 } else { 0.01 },
+                correct: index < 400,
+                kind: if index < 400 {
+                    QueryKind::Known { noise_index: 0 }
+                } else {
+                    QueryKind::AmbiguousMixture
+                },
+            })
+            .collect::<Vec<_>>();
+        let result = calibrate_fixed_sequence_rule(&samples, CalibrationMode::ScoreOnly);
+        assert!(result.certified_prefix_len > 0);
+        assert!(result.stopped_at_index.is_some());
+        assert_eq!(
+            result.selected_candidate_index,
+            Some(result.certified_prefix_len - 1)
+        );
+        assert!(result.certificate.passed);
     }
 
     #[test]
