@@ -159,7 +159,7 @@ fn main() {
     let mut accepted_steps = 0usize;
     let mut rejected_steps = 0usize;
     let mut attempted_steps = 0usize;
-    let mut derivative_evaluations = 0usize;
+    let mut derivative_evaluations = system.derivative_evaluations.load(Ordering::Relaxed);
     let mut min_state = INITIAL_STATE;
     let mut max_negative_excursion = [0.0_f64; 3];
     let mut max_invariant_defect = 0.0_f64;
