@@ -1,0 +1,2 @@
+SYNTHETIC ARTIFACT-INVENTORY FIXTURE ONLY.
+Not Gerber syntax and not a manufacturing output.
