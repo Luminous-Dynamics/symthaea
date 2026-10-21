@@ -359,9 +359,9 @@ impl Fixture {
         self.utility(None)
     }
 
-    /// Exact expected accuracy under uniform exogenous inputs. When an edge is
-    /// cut, the replacement signal is an independent fair coin, exhaustively
-    /// enumerated instead of sampled.
+    /// Exact expected accuracy under the declared integer-weighted input-state
+    /// distribution. A cut replaces one edge signal with an independent fair
+    /// coin, exhaustively enumerated instead of sampled.
     fn utility(&self, intervention: Option<&Intervention>) -> f64 {
         let input_states = 1usize << self.network.input_count;
         let coin_states = if intervention.is_some() { 2usize } else { 1usize };
@@ -712,7 +712,7 @@ fn fixtures() -> Result<Vec<Fixture>, String> {
 }
 
 fn main() {
-    println!("# schema=tccip-exact-finite-state-v1");
+    println!("# schema=tccip-exact-finite-state-v2");
     let source_revision = std::env::var("SYMTHAEA_SOURCE_SHA")
         .unwrap_or_else(|_| "UNBOUND".to_string());
     println!("# source_revision={source_revision}");
@@ -736,11 +736,12 @@ fn main() {
             continue;
         }
         println!(
-            "# fixture={} target={} output_node={} input_count={} components={:?} rules={}",
+            "# fixture={} target={} output_node={} input_count={} input_state_weights={:?} components={:?} rules={}",
             fixture.name,
             fixture.task_target.canonical(),
             fixture.network.output_node,
             fixture.network.input_count,
+            fixture.input_state_weights,
             fixture.network.components,
             fixture.network.canonical_rules()
         );
