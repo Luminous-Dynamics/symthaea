@@ -81,6 +81,45 @@ class FailClosedPyPhiValidationTests(unittest.TestCase):
             text = destination.read_text(encoding="utf-8")
         self.assertIn("Status: NOT QUALIFIED", text)
 
+
+    def test_reference_model_digest_is_stable_and_covers_graph_dynamics(self) -> None:
+        adjacency_a, tpm_a, digest_a = self.validator.build_reference_model(self.topology)
+        adjacency_b, tpm_b, digest_b = self.validator.build_reference_model(self.topology)
+        self.assertEqual(digest_a, digest_b)
+        self.assertEqual(adjacency_a.tolist(), adjacency_b.tolist())
+        self.assertEqual(tpm_a.tolist(), tpm_b.tolist())
+        self.assertEqual(tpm_a.shape, (4, 2))
+        self.assertTrue((tpm_a >= 0.0).all())
+        self.assertTrue((tpm_a <= 1.0).all())
+
+        no_edges = TopologySpec(
+            name="isolated_pair",
+            n_nodes=2,
+            edges=[],
+            description="two self-memory nodes",
+        )
+        adjacency_isolated, _, digest_isolated = self.validator.build_reference_model(no_edges)
+        self.assertNotEqual(digest_a, digest_isolated)
+        self.assertEqual(adjacency_isolated[0, 0], 1)
+        self.assertEqual(adjacency_isolated[1, 1], 1)
+
+    def test_reference_model_rejects_invalid_edges_and_excessive_size(self) -> None:
+        invalid_edge = TopologySpec(
+            name="invalid",
+            n_nodes=2,
+            edges=[(0, 2)],
+        )
+        with self.assertRaisesRegex(ValueError, "outside"):
+            self.validator.build_reference_model(invalid_edge)
+
+        too_large = TopologySpec(
+            name="too_large",
+            n_nodes=9,
+            edges=[],
+        )
+        with self.assertRaisesRegex(ValueError, "capped at 8"):
+            self.validator.build_reference_model(too_large)
+
     def test_pyphi_version_and_iit_formalism_are_explicit(self) -> None:
         source = inspect.getsource(PyPhiValidator.compute_pyphi_phi)
         self.assertIn('installed_version != "2.0.0rc4"', source)
