@@ -28,6 +28,7 @@
     },
     "design": {
       "enum": [
+        "SYNTHETIC_FIXTURE",
         "BLOCK_RANDOMIZED",
         "MATCHED_CONTROL",
         "UNCONTROLLED_PRE_POST"
