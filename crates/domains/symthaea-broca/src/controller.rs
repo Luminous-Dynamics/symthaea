@@ -103,9 +103,6 @@ pub struct LanguageControllerConfig {
     pub learning_rate: f32,
     /// Vocabulary size (number of token embeddings).
     pub vocab_size: usize,
-    /// Versioned token-row initializer; old serialized configs default to V1.
-    #[serde(default)]
-    pub token_embedding_seed_scheme: TokenEmbeddingSeedScheme,
     /// Maximum sequence length.
     pub max_seq_len: usize,
     /// Time step per token (seconds). Can be dynamically adjusted for
@@ -204,6 +201,10 @@ pub struct LanguageControllerConfig {
     /// Number of highway layers (1-3 recommended).
     #[serde(default = "default_highway_layers")]
     pub highway_layers: usize,
+
+    /// Versioned token-row initializer; placed last to preserve positional legacy config fields.
+    #[serde(default)]
+    pub token_embedding_seed_scheme: TokenEmbeddingSeedScheme,
 }
 
 fn default_highway_layers() -> usize {
