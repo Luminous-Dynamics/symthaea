@@ -53,3 +53,4 @@ jobs:
             allostatic-control-v1-mismatch-frontier.csv
             allostatic-control-v1-mismatch-frontier-summary.csv
             allostatic-control-v1-multistep-horizon.csv
+            allostatic-control-v1-multistep-horizon-summary.csv
