@@ -954,6 +954,155 @@ jobs:
               raise SystemExit(f"analysis report schema negative control {index} unexpectedly passed")
           print("PITB_TRANSFER_SELECTIVITY_REPORT_SCHEMA_PASS: valid report accepted; 3 malformed/overclaiming mutations rejected")
           PY
+      - name: Validate proof-progress trace schema and trace invariants
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/jsonschema-venv/bin/python" - <<'PY'
+          import copy
+          import json
+          import re
+          from pathlib import Path
+          from jsonschema import Draft202012Validator, FormatChecker, ValidationError
+
+          base = Path("data/benchmarks/proof-insight-transfer-v0")
+          schema = json.loads((base / "proof-progress-trace.schema.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          validator = Draft202012Validator(schema, format_checker=FormatChecker())
+          fixture = json.loads((base / "fixtures/proof-progress-trace.synthetic.json").read_text())
+
+          def validate_trace(trace):
+              validator.validate(trace)
+              events = trace["events"]
+              if [event["sequence"] for event in events] != list(range(len(events))):
+                  raise ValueError("event sequence must be contiguous from zero")
+              if len({event["event_id"] for event in events}) != len(events):
+                  raise ValueError("event IDs must be unique")
+              if events[0]["kind"] != "attempt_started":
+                  raise ValueError("first event must start the attempt")
+              terminal_indices = [i for i, event in enumerate(events) if event["kind"] == "attempt_terminated"]
+              if terminal_indices != [len(events) - 1]:
+                  raise ValueError("exactly one terminal event must be last")
+              budget = trace["run"]["budget"]
+              previous = {"elapsed_ms": -1, "cumulative_model_calls": -1,
+                          "cumulative_tokens": -1, "cumulative_cost_microusd": -1}
+              limits = {"elapsed_ms": budget["max_wall_ms"],
+                        "cumulative_model_calls": budget["max_model_calls"],
+                        "cumulative_tokens": budget["max_tokens"],
+                        "cumulative_cost_microusd": budget["max_cost_microusd"]}
+              closed = set()
+              verified_closures = 0
+              for event in events:
+                  for field, limit in limits.items():
+                      value = event[field]
+                      if value < previous[field]:
+                          raise ValueError(f"{field} must be monotonic")
+                      if value > limit:
+                          raise ValueError(f"{field} exceeds frozen run budget")
+                      previous[field] = value
+                  for transition in event["obligation_transitions"]:
+                      obligation = transition["obligation_sha256"]
+                      kind = transition["transition"]
+                      receipt = transition["checker_receipt_sha256"]
+                      children = transition["child_obligation_sha256s"]
+                      if kind == "split":
+                          if receipt is not None or len(children) < 2:
+                              raise ValueError("splitting obligations is not a verified closure")
+                      elif kind == "discharged":
+                          if not receipt or children:
+                              raise ValueError("discharge requires checker receipt and no child obligations")
+                          if obligation in closed:
+                              raise ValueError("an obligation cannot be counted as newly discharged twice")
+                          closed.add(obligation)
+                          verified_closures += 1
+                      elif receipt is not None:
+                          raise ValueError("non-discharge transition cannot claim discharge receipt")
+
+              outcome = trace["outcome"]
+              final = events[-1]
+              observed = {
+                  "actual_model_calls": final["cumulative_model_calls"],
+                  "actual_tokens": final["cumulative_tokens"],
+                  "actual_wall_ms": final["elapsed_ms"],
+                  "actual_cost_microusd": final["cumulative_cost_microusd"],
+              }
+              for field, value in observed.items():
+                  if outcome[field] != value:
+                      raise ValueError(f"{field} differs from final event")
+              if outcome["terminal_status"] == "verified_success":
+                  if (outcome["target_kernel_status"] != "passed"
+                      or outcome["semantic_gate_status"] != "passed"
+                      or outcome["successor_status"] not in ("passed", "not_applicable")):
+                      raise ValueError("verified success requires kernel, semantic gate, and applicable successor checks")
+                  for kind in ("target_kernel_checked", "semantic_gate_checked"):
+                      matches = [e for e in events if e["kind"] == kind and e["checker_receipt_sha256"]]
+                      if len(matches) != 1:
+                          raise ValueError(f"verified success requires one receipt-backed {kind} event")
+                  if outcome["successor_status"] == "passed":
+                      matches = [e for e in events if e["kind"] == "successor_check" and e["checker_receipt_sha256"]]
+                      if len(matches) != 1:
+                          raise ValueError("passed successor status requires one receipt-backed successor event")
+              return verified_closures
+
+          validator.validate(fixture)
+          if validate_trace(fixture) != 2:
+              raise SystemExit("synthetic fixture must count its two receipt-backed discharges, not its split")
+          mutants = []
+
+          gap = copy.deepcopy(fixture)
+          gap["events"][3]["sequence"] = 99
+          mutants.append(gap)
+
+          decreasing_tokens = copy.deepcopy(fixture)
+          decreasing_tokens["events"][3]["cumulative_tokens"] = 100
+          mutants.append(decreasing_tokens)
+
+          split_as_closure = copy.deepcopy(fixture)
+          split_as_closure["events"][2]["obligation_transitions"][0]["checker_receipt_sha256"] = "f" * 64
+          mutants.append(split_as_closure)
+
+          discharge_without_receipt = copy.deepcopy(fixture)
+          discharge_without_receipt["events"][3]["obligation_transitions"][0]["checker_receipt_sha256"] = None
+          mutants.append(discharge_without_receipt)
+
+          double_discharge = copy.deepcopy(fixture)
+          double_discharge["events"][4]["obligation_transitions"] = copy.deepcopy(
+              double_discharge["events"][3]["obligation_transitions"]
+          )
+          mutants.append(double_discharge)
+
+          over_budget = copy.deepcopy(fixture)
+          over_budget["events"][-1]["cumulative_tokens"] = 1001
+          over_budget["outcome"]["actual_tokens"] = 1001
+          mutants.append(over_budget)
+
+          false_success = copy.deepcopy(fixture)
+          false_success["outcome"]["semantic_gate_status"] = "failed"
+          mutants.append(false_success)
+
+          unreceipted_kernel_success = copy.deepcopy(fixture)
+          next(e for e in unreceipted_kernel_success["events"] if e["kind"] == "target_kernel_checked")["checker_receipt_sha256"] = None
+          mutants.append(unreceipted_kernel_success)
+
+          missing_event_receipt = copy.deepcopy(fixture)
+          missing_event_receipt["events"][1]["event_receipt_sha256"] = "not-a-sha256"
+          mutants.append(missing_event_receipt)
+
+          terminal_not_last = copy.deepcopy(fixture)
+          terminal_not_last["events"][-1], terminal_not_last["events"][-2] = (
+              terminal_not_last["events"][-2], terminal_not_last["events"][-1]
+          )
+          mutants.append(terminal_not_last)
+
+          for index, mutant in enumerate(mutants, start=1):
+              try:
+                  validate_trace(mutant)
+              except (ValidationError, ValueError):
+                  continue
+              raise SystemExit(f"proof-progress trace negative control {index} unexpectedly passed")
+
+          print("PITB_PROOF_PROGRESS_TRACE_PASS: schema valid; monotonic budgeted trace; terminal evidence gate; 2 receipt-backed closures; 10 negative controls rejected")
+          PY
       - name: Audit pinned Dalek Lean Bench timeline
         shell: bash
         run: |
