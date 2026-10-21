@@ -193,6 +193,24 @@ impl TaskTarget {
     }
 }
 
+fn entropy_bits(counts: &[u128]) -> f64 {
+    let total = counts.iter().copied().sum::<u128>();
+    if total == 0 {
+        return 0.0;
+    }
+    counts.iter().copied().filter(|count| *count > 0).map(|count| {
+        let probability = count as f64 / total as f64;
+        -probability * probability.log2()
+    }).sum()
+}
+
+#[derive(Clone, Debug, PartialEq)]
+struct InformationBaseline {
+    target_entropy_bits: f64,
+    individual_input_mi_bits: Vec<f64>,
+    joint_input_mi_bits: f64,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum InterventionKind {
     CrossCut,
@@ -388,6 +406,50 @@ impl Fixture {
         }
         let denominator = total_input_weight * coin_states as u128;
         correct_weight as f64 / denominator as f64
+    }
+
+    /// Exact information-theoretic baseline under the declared input prior.
+    /// Since the task target is a deterministic function of all external inputs,
+    /// I(all_inputs; target) = H(target). Individual MI values reveal whether
+    /// the target's information is available from each input separately.
+    fn information_baseline(&self) -> InformationBaseline {
+        let state_count = 1usize << self.network.input_count;
+        let total_weight = self.input_state_weights.iter().map(|w| *w as u128).sum::<u128>();
+        let mut target_counts = [0u128; 2];
+        let mut joint_counts = vec![[[0u128; 2]; 2]; self.network.input_count];
+
+        for state in 0..state_count {
+            let inputs = (0..self.network.input_count)
+                .map(|index| ((state >> index) & 1) != 0)
+                .collect::<Vec<_>>();
+            let target = usize::from(self.task_target.evaluate(&inputs));
+            let weight = self.input_state_weights[state] as u128;
+            target_counts[target] += weight;
+            for index in 0..self.network.input_count {
+                let input_value = usize::from(inputs[index]);
+                joint_counts[index][input_value][target] += weight;
+            }
+        }
+
+        let target_entropy = entropy_bits(&target_counts);
+        let individual_input_mi_bits = joint_counts.iter().map(|counts| {
+            let mut conditional_target_entropy = 0.0;
+            for input_value in 0..2 {
+                let input_weight = counts[input_value].iter().copied().sum::<u128>();
+                if input_weight > 0 {
+                    conditional_target_entropy +=
+                        input_weight as f64 / total_weight as f64 * entropy_bits(&counts[input_value]);
+                }
+            }
+            let mi = target_entropy - conditional_target_entropy;
+            if mi.abs() < 1e-12 { 0.0 } else { mi }
+        }).collect::<Vec<_>>();
+
+        InformationBaseline {
+            target_entropy_bits: target_entropy,
+            individual_input_mi_bits,
+            joint_input_mi_bits: target_entropy,
+        }
     }
 
     fn run(&self) -> Result<(Vec<InterventionResult>, Vec<ProfilePoint>), String> {
@@ -735,6 +797,14 @@ fn main() {
             any_failed = true;
             continue;
         }
+        let information = fixture.information_baseline();
+        println!(
+            "# information_baseline fixture={} target_entropy_bits={:.12} individual_input_mi_bits={:?} joint_input_mi_bits={:.12}",
+            fixture.name,
+            information.target_entropy_bits,
+            information.individual_input_mi_bits,
+            information.joint_input_mi_bits
+        );
         println!(
             "# fixture={} target={} output_node={} input_count={} input_state_weights={:?} components={:?} rules={}",
             fixture.name,
@@ -992,6 +1062,20 @@ mod tests {
         assert_eq!(min, -0.5);
         assert_eq!(max, 0.5);
     }
+    #[test]
+    fn xor_synergy_baseline_detects_joint_information_when_each_input_mi_is_zero() {
+        let fixture = fixtures().unwrap().into_iter()
+            .find(|fixture| fixture.name == "role_matched_xor_synergy_uniform_prior")
+            .unwrap();
+        let information = fixture.information_baseline();
+        assert!((information.target_entropy_bits - 1.0).abs() < 1e-12);
+        assert_eq!(information.individual_input_mi_bits.len(), 2);
+        assert!(information.individual_input_mi_bits.iter().all(|mi| mi.abs() < 1e-12));
+        assert!((information.joint_input_mi_bits - 1.0).abs() < 1e-12);
+        let (_, profile) = fixture.run().unwrap();
+        assert!((profile[0].tccip).abs() < 1e-12);
+    }
+
     #[test]
     fn same_causal_graph_prior_change_reverses_task_conditioned_score() {
         let fixtures = fixtures().unwrap();
