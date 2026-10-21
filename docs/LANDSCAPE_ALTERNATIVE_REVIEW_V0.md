@@ -80,7 +80,7 @@ Acceptance: invalid/stale/mismatched inputs fail closed, preserve exact digest r
 ## Acceptance criteria
 
 - The schema validates structurally and the canonical fixture round-trips under a strict validator.
-- The exact baseline and each alternative have valid distinct 64-hex digests, scopes and declared coordinate frame.
+- At least one alternative must reference the exact baseline-design SHA-256, and each genuinely different alternative must have its own distinct snapshot digest, scope and declared coordinate frame. Every scenario run must bind to one named alternative and its exact snapshot digest. Paired runs may be compared only when model ID/version, boundary-condition digest, evaluation-plan digest, metric-registry digest, seed and scope agree; the scenario-manifest digests and design-snapshot digests must remain distinct.
 - Every computed metric names unit, method, evidence class, input digests and uncertainty; blocked/conflicted metrics cannot contain a value.
 - Prefer-alternative cannot coexist with a non-qualified comparison; all-blocked outcomes produce no-defensible-ranking.
 - Scenario-review records use only pinned Symtropy inputs/results and preserve status/evidence class.
