@@ -101,6 +101,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("# known_query_noise_level=uniform_over_0,0.10,0.20,0.30,0.40,0.45,0.50");
     println!("# separate_near_unknown_challenge_distances=0.05,0.10,0.20");
     println!("# near_unknown_challenge_is_not_in_certification_distribution=true");
+    println!("# identifiability_control=paired known/unknown labels share identical PatternVector; vector-only prediction must agree");
     println!(
         "record_type,seed,strategy,query_kind,noise_fraction,dimension,prototypes,selection_n,certification_n,certified,cert_accept,cert_errors,cert_risk_upper95,test_n,min_similarity,min_margin,n,accepted,coverage,errors,selective_risk,risk95_low,risk95_high,top1_accuracy"
     );
@@ -166,6 +167,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             None,
             &near_unknown,
         );
+        report_identity_collision_controls(seed, &prototypes, "always_top1", always_accept)?;
 
         for (name, rule) in [
             (
@@ -202,6 +204,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 None,
                 &near_unknown,
             );
+            report_identity_collision_controls(seed, &prototypes, name, rule)?;
         }
     }
 
@@ -593,6 +596,98 @@ fn report_row(
     }
 }
 
+fn report_identity_collision_controls(
+    seed: u64,
+    prototypes: &[PatternVector],
+    strategy: &str,
+    rule: DecisionRule,
+) -> Result<(), Box<dyn Error>> {
+    // These paired records differ only in their declared identity status. The
+    // underlying observed vectors are byte-for-byte identical: a valid noisy
+    // observation of an enrolled prototype versus an unregistered item with
+    // the same vector. No vector-only score or margin can distinguish them.
+    for noise_index in [1usize, 2usize] {
+        let noise_fraction = NOISE_LEVELS[noise_index];
+        let distance_index = NEAR_UNKNOWN_DISTANCES
+            .iter()
+            .position(|distance| *distance == noise_fraction)
+            .ok_or("identity-collision noise rate missing from near-unknown distances")?;
+
+        let mut rng_state = derive_seed(seed, 0x4944_434f, noise_index as u64);
+        let mut known_queries = Vec::with_capacity(NEAR_UNKNOWN_PER_DISTANCE);
+        let mut unknown_queries = Vec::with_capacity(NEAR_UNKNOWN_PER_DISTANCE);
+
+        for _ in 0..NEAR_UNKNOWN_PER_DISTANCE {
+            let source = sample_bounded(&mut rng_state, prototypes.len());
+            let observed = prototypes[source].with_noise(
+                noise_fraction,
+                next_u64(&mut rng_state),
+            )?;
+            known_queries.push(QuerySample {
+                vector: observed.clone(),
+                target: Some(source),
+                kind: QueryKind::Known { noise_index },
+            });
+            unknown_queries.push(QuerySample {
+                vector: observed,
+                target: None,
+                kind: QueryKind::NearPrototypeUnknown { distance_index },
+            });
+        }
+
+        if known_queries
+            .iter()
+            .zip(&unknown_queries)
+            .any(|(known, unknown)| known.vector != unknown.vector)
+        {
+            return Err("identity collision control did not preserve exact vector equality".into());
+        }
+
+        let known_scored = score_queries(&known_queries, prototypes)?;
+        let unknown_scored = score_queries(&unknown_queries, prototypes)?;
+        for (known, unknown) in known_scored.iter().zip(&unknown_scored) {
+            if known.best_similarity != unknown.best_similarity
+                || known.top_two_margin != unknown.top_two_margin
+                || known.correct == unknown.correct
+            {
+                return Err("identity collision control failed score/label contradiction invariant".into());
+            }
+        }
+
+        let not_applicable = ("not_applicable", "NA", "NA", "NA");
+        for (record_type, label, scored) in [
+            (
+                "identifiability_control_known",
+                format!("same_vector_known_noise_{noise_index}"),
+                &known_scored,
+            ),
+            (
+                "identifiability_control_unknown",
+                format!("same_vector_unknown_noise_{noise_index}"),
+                &unknown_scored,
+            ),
+        ] {
+            write_evaluation_row(
+                record_type,
+                seed,
+                strategy,
+                &label,
+                Some(noise_fraction),
+                rule,
+                0,
+                0,
+                not_applicable.0,
+                not_applicable.1,
+                not_applicable.2,
+                not_applicable.3,
+                scored.len(),
+                evaluate(scored, rule),
+            );
+        }
+    }
+    Ok(())
+}
+
 fn write_evaluation_row(
     record_type: &str,
     seed: u64,
@@ -839,6 +934,51 @@ mod tests {
         assert_eq!(result.accepted, 2);
         assert_eq!(result.errors, 1);
         assert_eq!(result.selective_risk(), Some(0.5));
+    }
+
+    #[test]
+    fn identical_vectors_with_different_registration_labels_are_unidentifiable() {
+        let prototypes = (0..8)
+            .map(|index| PatternVector::seeded_random(4_096, 100 + index as u64))
+            .collect::<Result<Vec<_>, _>>()
+            .expect("prototypes");
+        let source = 0;
+        let noise_index = 1;
+        let vector = prototypes[source]
+            .with_noise(NOISE_LEVELS[noise_index], 0xabc)
+            .expect("noisy observation");
+        let known = QuerySample {
+            vector: vector.clone(),
+            target: Some(source),
+            kind: QueryKind::Known { noise_index },
+        };
+        let unknown = QuerySample {
+            vector,
+            target: None,
+            kind: QueryKind::NearPrototypeUnknown { distance_index: 1 },
+        };
+
+        assert_eq!(known.vector, unknown.vector);
+        let known_score = score_queries(std::slice::from_ref(&known), &prototypes)
+            .expect("known score");
+        let unknown_score = score_queries(std::slice::from_ref(&unknown), &prototypes)
+            .expect("unknown score");
+        assert_eq!(known_score[0].best_similarity, unknown_score[0].best_similarity);
+        assert_eq!(known_score[0].top_two_margin, unknown_score[0].top_two_margin);
+        assert_ne!(known_score[0].correct, unknown_score[0].correct);
+
+        for rule in [
+            DecisionRule { min_similarity: -1.0, min_margin: -1.0 },
+            DecisionRule { min_similarity: 0.5, min_margin: -1.0 },
+            DecisionRule { min_similarity: -1.0, min_margin: 0.05 },
+            DecisionRule { min_similarity: 0.5, min_margin: 0.05 },
+        ] {
+            assert_eq!(
+                evaluate(&known_score, rule).accepted,
+                evaluate(&unknown_score, rule).accepted,
+                "same features must lead to the same vector-only acceptance decision"
+            );
+        }
     }
 }
 
