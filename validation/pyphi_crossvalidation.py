@@ -303,7 +303,8 @@ class PyPhiValidator:
         digest.update(np.ascontiguousarray(adjacency, dtype=np.uint8).tobytes())
         digest.update(repr(tpm.shape).encode("ascii"))
         digest.update(np.ascontiguousarray(tpm, dtype="<f8").tobytes())
-        digest.update(b"state=all-ones\0formalism=IIT_3_0\0")
+        # Keep mathematical model identity separate from analysis state/formalism,
+        # which are recorded alongside the digest and can vary across reference lanes.
         return adjacency, tpm, digest.hexdigest()
 
     def compute_pyphi_phi(self, topology: TopologySpec) -> Tuple[float, float]:
