@@ -98,6 +98,21 @@ When the answer/witness is unknown, do not reuse the theorem-proving success fla
 
 Research-level informal proof quality is another separate track. Blindly score correctness, exposition, citation/attribution, and abstention. First Proof Batch 3's 10-problem, expert-reviewed scores and its cost differences illustrate important dimensions, but are not comparable with Lean exact-target pass rates ([results, 14 October 2026](https://1stproof.org/third-batch-press-release.html)).
 
+
+### Proof-progress traces: distinguish exploration from verified advancement
+
+The terminal exact-target semantic-gate outcome remains the primary endpoint. A separate optional trace records the retained execution path: state fingerprints, obligation-instance lineage, action and checker events, monotonic resource counters, and content-addressed receipts. This supports diagnosis and resource attribution without promoting a progress proxy into proof success.
+
+- Every obligation instance has an ID distinct from its statement digest. This matters because two branches may contain the same formula but represent different proof obligations.
+- A `split` or `refined` transition is **not** a verified closure. Count progress only when an obligation is explicitly `discharged` with a checker receipt; a decomposed parent is not counted as a solved leaf.
+- For `verified_success`, every terminal obligation leaf must be receipt-backed discharged, the exact target must pass the kernel, semantic gates must pass, and successor checks must pass or be explicitly not applicable.
+- Event sequence, event identities, elapsed time, cumulative model calls/tokens/cost, and declared budgets are validated. A duplicate close, orphan obligation, non-monotonic counter, missing receipt, unsupported final success, or budget overrun is a trace-integrity failure.
+- For all arms, report terminal semantic-gate success as the primary outcome. Proposed diagnostics are receipt-backed leaf closures per 1,000 generated tokens, tokens/time to first receipt-backed closure, terminal leaf-closure fraction, and the distribution of no-closure tactic events. No progress diagnostic is currently a confirmatory score; no-progress attribution across backtracking branches is out of scope until a branch-aware trace is designed.
+
+The schema and CI fixture are a **contract and synthetic guardrail**, not a running Lean telemetry collector and not measured proof-progress results. The v0 fixture deliberately splits one root obligation into two children, then closes both with distinct receipts; the validator must count exactly two closures, never count the split itself, and reject mutated traces. Future instrumentation should emit the trace from the prover/checker boundary rather than reconstruct it from model narration.
+
+This track follows two complementary findings: *Discover and Prove* separates answer discovery from formal proof in Hard Mode, while OptProver explicitly penalizes valid but non-progressing proof steps in its training objective ([DAP / ACL 2026](https://aclanthology.org/2026.acl-long.3/); [OptProver / ICML 2026](https://proceedings.mlr.press/v306/li26ek.html)). These studies motivate the experiment design; their scores are not PITB baselines.
+
 ## 5. Statistical analysis (lock before the first confirmatory run)
 
 - Define a trial as a target-level, matched arm comparison; define the related-result family as the resampling cluster. Do not treat several theorems or retries from one family as independent families.
@@ -112,6 +127,7 @@ Research-level informal proof quality is another separate track. Blindly score c
 This is a protocol template; the alpha level, power assumptions, eligibility denominator, model budget, and any deviation must be recorded in the final run manifest **before** inspecting confirmatory test results.
 
 ## Protocol amendment log
+- **2026-10-22, before confirmatory outcomes were collected or inspected:** added an optional proof-progress trace contract. It records obligation-instance lineage and receipt-backed discharges but explicitly excludes goal splits from progress, retains the terminal semantic-gate endpoint as primary, and adds synthetic relational invariants / anti-gaming controls. No trace collector or target-level progress result is claimed. Future run configs must hash this protocol revision.
 - **2026-10-21, before confirmatory outcomes were collected or inspected:** elevated benchmark-row validity from a broad semantic-gate principle to an explicit audit track. Confirmatory targets require two independent statement-correspondence reviews, full dependency/axiom receipts, pinned static defect screens, nearby statement mutations, and raw/eligible/excluded/unknown/defect accounting. This follows the June 2026 published audit of five Lean benchmarks that found 4,833 findings across 10,318 problems, including 398 mechanically certified issues. These requirements do not claim that finite static checks prove universal benchmark validity. All future frozen run configs must hash this protocol revision.
 
 - **2026-10-21, before confirmatory outcomes were collected or inspected:** made `compatibility_probability` a distinct nullable field from action confidence in the transfer-selectivity schema and defined it as probability of mathematical compatibility independent of accept/reject/abstain. The Rust analyzer reports probability coverage, Brier score, ten-bin reliability data, ECE, and component-clustered 95% bootstrap intervals for Brier/ECE when at least two scored components are present; nulls are not imputed. Calibration outputs remain descriptive in v0 because no calibration acceptance threshold is preregistered. Any run config must hash the current protocol bytes.
