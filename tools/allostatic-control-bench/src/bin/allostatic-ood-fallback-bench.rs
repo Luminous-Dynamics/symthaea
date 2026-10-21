@@ -1,16 +1,19 @@
-//! Evaluate an episode-calibrated OOD monitor with a multi-step reachability fallback.
+//! Evaluate a calibrated OOD monitor and a separately widened reachability fallback.
 //!
 //! Usage: allostatic-ood-fallback-bench <raw.csv> <summary.csv>
-//! The score distributions are synthetic controls. They test mode switching and
-//! accounting, not empirical false-alarm guarantees on a physical controller.
+//! The score distributions and true transition models are deterministic synthetic
+//! controls. They test fail-closed switching and metric accounting, not real-world
+//! detector calibration or guarantees on a physical controller.
 
 use allostatic_control_bench::drift_monitor::{
     calibrate_drift_threshold, select_control_action, ControlMode,
 };
-use allostatic_control_bench::multistep_viability::evaluate_horizon_action_set;
+use allostatic_control_bench::multistep_viability::{
+    evaluate_horizon_action_set, HorizonViableActionSet,
+};
 use allostatic_control_bench::robust_viability::{
-    evaluate_action_set, ActionEffectBounds, DynamicsBounds, Interval, StateEnvelope,
-    ViabilityLimits,
+    evaluate_action_set, ActionEffectBounds, DynamicsBounds, Interval, RobustActionSet,
+    StateEnvelope, ViabilityLimits,
 };
 use allostatic_control_bench::Action;
 use std::error::Error;
@@ -21,8 +24,8 @@ const TARGET_FALSE_ALARM_RATE: f64 = 0.05;
 const CALIBRATION_EPISODES: u64 = 159;
 const EVALUATION_EPISODES: u64 = 300;
 const FALLBACK_HORIZON: usize = 3;
-const RAW_HEADER: &str = "operating_point,condition,episode_seed,ood_score,score_threshold,drift_detected,control_mode,proposed_action,predictive_viable_count,fallback_viable_count,predictive_action,fallback_action,selected_action,selected_action_certified,no_certified_action,predictive_proposal_preserved,fallback_proposal_preserved";
-const SUMMARY_HEADER: &str = "operating_point,condition,episodes,alarms,false_alarms,missed_detections,false_alarm_rate,miss_rate,fallback_activations,fallback_no_action,predictive_proposal_preserved,fallback_proposal_preserved,mean_predictive_viable_actions,mean_fallback_viable_actions";
+const RAW_HEADER: &str = "operating_point,condition,episode_seed,ood_score,score_threshold,drift_detected,control_mode,proposed_action,predictive_viable_count,fallback_viable_count,predictive_action,fallback_action,selected_action,active_filter_certified,no_certified_action,predictive_proposal_preserved,fallback_proposal_preserved,actual_one_step_viable_count,actual_horizon_viable_count,selected_true_one_step_safe,selected_true_horizon_viable,false_one_step_safety_certificate";
+const SUMMARY_HEADER: &str = "operating_point,condition,episodes,alarms,false_alarms,missed_detections,false_alarm_rate,miss_rate,fallback_activations,fallback_no_action,predictive_proposal_preserved,fallback_proposal_preserved,mean_predictive_viable_actions,mean_fallback_viable_actions,mean_actual_one_step_viable_actions,mean_actual_horizon_viable_actions,selected_actions,selected_true_one_step_safe,selected_true_horizon_viable,false_one_step_safety_certificates,false_one_step_certificate_rate";
 
 #[derive(Clone, Copy, Debug)]
 struct OperatingPoint {
@@ -92,6 +95,12 @@ struct Counters {
     fallback_proposal_preserved: usize,
     predictive_viable_actions: usize,
     fallback_viable_actions: usize,
+    actual_one_step_viable_actions: usize,
+    actual_horizon_viable_actions: usize,
+    selected_actions: usize,
+    selected_true_one_step_safe: usize,
+    selected_true_horizon_viable: usize,
+    false_one_step_safety_certificates: usize,
 }
 
 impl Counters {
@@ -102,20 +111,33 @@ impl Counters {
         selected_action: Option<Action>,
         predictive_count: usize,
         fallback_count: usize,
+        actual_one_step_count: usize,
+        actual_horizon_count: usize,
         predictive_preserves_proposal: bool,
         fallback_preserves_proposal: bool,
+        selected_true_one_step_safe: bool,
+        selected_true_horizon_viable: bool,
     ) {
         self.episodes += 1;
         self.alarms += usize::from(detected);
         self.false_alarms += usize::from(!condition.shifted && detected);
         self.missed_detections += usize::from(condition.shifted && !detected);
         self.fallback_activations += usize::from(detected);
-        self.fallback_no_action +=
-            usize::from(detected && selected_action.is_none());
+        self.fallback_no_action += usize::from(detected && selected_action.is_none());
         self.predictive_proposal_preserved += usize::from(predictive_preserves_proposal);
         self.fallback_proposal_preserved += usize::from(fallback_preserves_proposal);
         self.predictive_viable_actions += predictive_count;
         self.fallback_viable_actions += fallback_count;
+        self.actual_one_step_viable_actions += actual_one_step_count;
+        self.actual_horizon_viable_actions += actual_horizon_count;
+        self.selected_actions += usize::from(selected_action.is_some());
+        self.selected_true_one_step_safe +=
+            usize::from(selected_action.is_some() && selected_true_one_step_safe);
+        self.selected_true_horizon_viable +=
+            usize::from(selected_action.is_some() && selected_true_horizon_viable);
+        self.false_one_step_safety_certificates += usize::from(
+            selected_action.is_some() && !selected_true_one_step_safe,
+        );
     }
 }
 
@@ -129,7 +151,7 @@ fn unit_interval(seed: u64) -> f64 {
 
 /// Synthetic scalar episode score. Nominal scores lie in [0,.25); moderate
 /// shifts overlap that range; strong shifts lie in [.50,1). This is a designed
-/// test distribution, not a trained or validated OOD detector.
+/// control distribution, not a trained or validated OOD detector.
 fn score_for(condition: Condition, seed: u64) -> f64 {
     let unit = unit_interval(seed);
     match condition.name {
@@ -160,11 +182,79 @@ fn shifted_effect(
     .ok_or_else(|| IoError::new(ErrorKind::InvalidData, "invalid action-effect envelope").into())
 }
 
-fn dynamics_for(seed: u64) -> Result<DynamicsBounds, Box<dyn Error>> {
+fn predictive_dynamics_for(seed: u64) -> Result<DynamicsBounds, Box<dyn Error>> {
     let push = shifted_effect((-0.030, -0.005), (0.030, 0.070), seed, 0)?;
     let maintain = shifted_effect((0.010, 0.040), (-0.010, 0.030), seed, 1)?;
     let emergency_recover = shifted_effect((0.025, 0.060), (-0.160, -0.080), seed, 2)?;
     Ok(DynamicsBounds::new(push, maintain, emergency_recover))
+}
+
+/// OOD fallback uses a wider, predeclared reachability envelope rather than
+/// reusing the predictive model's narrower intervals.
+fn fallback_dynamics() -> Result<DynamicsBounds, Box<dyn Error>> {
+    let push = ActionEffectBounds::new(
+        interval(-0.09, -0.005)?,
+        interval(0.02, 0.18)?,
+    )
+    .ok_or_else(|| IoError::new(ErrorKind::InvalidData, "invalid fallback push bounds"))?;
+    let maintain = ActionEffectBounds::new(
+        interval(-0.03, 0.04)?,
+        interval(-0.02, 0.10)?,
+    )
+    .ok_or_else(|| IoError::new(ErrorKind::InvalidData, "invalid fallback maintain bounds"))?;
+    let emergency_recover = ActionEffectBounds::new(
+        interval(-0.02, 0.08)?,
+        interval(-0.20, -0.02)?,
+    )
+    .ok_or_else(|| IoError::new(ErrorKind::InvalidData, "invalid fallback recovery bounds"))?;
+    Ok(DynamicsBounds::new(push, maintain, emergency_recover))
+}
+
+fn center(bounds: ActionEffectBounds) -> (f64, f64) {
+    (
+        (bounds.reserve_delta().lower() + bounds.reserve_delta().upper()) * 0.5,
+        (bounds.load_delta().lower() + bounds.load_delta().upper()) * 0.5,
+    )
+}
+
+fn point_effect(reserve: f64, load: f64) -> Result<ActionEffectBounds, Box<dyn Error>> {
+    ActionEffectBounds::new(
+        interval(reserve, reserve)?,
+        interval(load, load)?,
+    )
+    .ok_or_else(|| IoError::new(ErrorKind::InvalidData, "invalid true point effect").into())
+}
+
+/// The synthetic actual plant starts at the predictive interval center. Shift
+/// offsets move it out of the narrow predictive envelope, but inside the widened
+/// OOD fallback envelope. The offsets are designed falsification controls.
+fn actual_dynamics_for(
+    seed: u64,
+    condition: Condition,
+) -> Result<DynamicsBounds, Box<dyn Error>> {
+    let estimate = predictive_dynamics_for(seed)?;
+    let offsets = match condition.name {
+        "nominal" => [(0.0, 0.0), (0.0, 0.0), (0.0, 0.0)],
+        "moderate_shift" => [
+            (-0.025, 0.050),
+            (-0.015, 0.035),
+            (-0.020, 0.040),
+        ],
+        "strong_shift" => [
+            (-0.055, 0.100),
+            (-0.025, 0.070),
+            (-0.035, 0.080),
+        ],
+        _ => return Err(IoError::new(ErrorKind::InvalidInput, "unknown shift condition").into()),
+    };
+    let (push_r, push_l) = center(estimate.effect_for_action(Action::Push));
+    let (maintain_r, maintain_l) = center(estimate.effect_for_action(Action::Maintain));
+    let (recover_r, recover_l) = center(estimate.effect_for_action(Action::EmergencyRecover));
+    Ok(DynamicsBounds::new(
+        point_effect(push_r + offsets[0].0, push_l + offsets[0].1)?,
+        point_effect(maintain_r + offsets[1].0, maintain_l + offsets[1].1)?,
+        point_effect(recover_r + offsets[2].0, recover_l + offsets[2].1)?,
+    ))
 }
 
 fn state_for(point: OperatingPoint) -> Result<StateEnvelope, Box<dyn Error>> {
@@ -207,29 +297,56 @@ fn rate(numerator: usize, denominator: usize) -> String {
     }
 }
 
+fn csv_row(output: &mut String, fields: Vec<String>) {
+    output.push_str(&fields.join(","));
+    output.push('\n');
+}
+
 fn summary_row(
     output: &mut String,
     operating_point: &str,
     condition: Condition,
     counters: Counters,
 ) {
-    output.push_str(&format!(
-        "{},{},{},{},{},{},{},{},{},{},{},{},{:.6},{:.6}\n",
-        operating_point,
-        condition.name,
-        counters.episodes,
-        counters.alarms,
-        counters.false_alarms,
-        counters.missed_detections,
+    let fields = vec![
+        operating_point.to_string(),
+        condition.name.to_string(),
+        counters.episodes.to_string(),
+        counters.alarms.to_string(),
+        counters.false_alarms.to_string(),
+        counters.missed_detections.to_string(),
         rate(counters.false_alarms, counters.episodes),
         rate(counters.missed_detections, counters.episodes),
-        counters.fallback_activations,
-        counters.fallback_no_action,
-        counters.predictive_proposal_preserved,
-        counters.fallback_proposal_preserved,
-        counters.predictive_viable_actions as f64 / counters.episodes as f64,
-        counters.fallback_viable_actions as f64 / counters.episodes as f64,
-    ));
+        counters.fallback_activations.to_string(),
+        counters.fallback_no_action.to_string(),
+        counters.predictive_proposal_preserved.to_string(),
+        counters.fallback_proposal_preserved.to_string(),
+        format!(
+            "{:.6}",
+            counters.predictive_viable_actions as f64 / counters.episodes as f64
+        ),
+        format!(
+            "{:.6}",
+            counters.fallback_viable_actions as f64 / counters.episodes as f64
+        ),
+        format!(
+            "{:.6}",
+            counters.actual_one_step_viable_actions as f64 / counters.episodes as f64
+        ),
+        format!(
+            "{:.6}",
+            counters.actual_horizon_viable_actions as f64 / counters.episodes as f64
+        ),
+        counters.selected_actions.to_string(),
+        counters.selected_true_one_step_safe.to_string(),
+        counters.selected_true_horizon_viable.to_string(),
+        counters.false_one_step_safety_certificates.to_string(),
+        rate(
+            counters.false_one_step_safety_certificates,
+            counters.selected_actions
+        ),
+    ];
+    csv_row(output, fields);
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -249,6 +366,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .ok_or_else(|| IoError::new(ErrorKind::InvalidData, "drift calibration failed"))?;
     let limits = ViabilityLimits::new(0.15, 0.88)
         .ok_or_else(|| IoError::new(ErrorKind::InvalidData, "invalid viability limits"))?;
+    let fallback_dynamics = fallback_dynamics()?;
 
     let mut raw = format!("{RAW_HEADER}\n");
     let mut summary = format!("{SUMMARY_HEADER}\n");
@@ -260,16 +378,42 @@ fn main() -> Result<(), Box<dyn Error>> {
             let mut counters = Counters::default();
             for episode in 0..EVALUATION_EPISODES {
                 let seed = 20_000 + episode;
-                let dynamics = dynamics_for(seed)?;
-                let predictive = evaluate_action_set(state, dynamics, limits, true);
-                let fallback =
-                    evaluate_horizon_action_set(state, dynamics, limits, true, FALLBACK_HORIZON)
-                        .ok_or_else(|| {
-                            IoError::new(
-                                ErrorKind::InvalidData,
-                                "reachability fallback evaluator failed",
-                            )
-                        })?;
+                let predictive_dynamics = predictive_dynamics_for(seed)?;
+                let actual_dynamics = actual_dynamics_for(seed, condition)?;
+                let predictive = evaluate_action_set(
+                    state,
+                    predictive_dynamics,
+                    limits,
+                    true,
+                );
+                let fallback = evaluate_horizon_action_set(
+                    state,
+                    fallback_dynamics,
+                    limits,
+                    true,
+                    FALLBACK_HORIZON,
+                )
+                .ok_or_else(|| {
+                    IoError::new(
+                        ErrorKind::InvalidData,
+                        "reachability fallback evaluator failed",
+                    )
+                })?;
+                let actual_one_step = evaluate_action_set(state, actual_dynamics, limits, true);
+                let actual_horizon = evaluate_horizon_action_set(
+                    state,
+                    actual_dynamics,
+                    limits,
+                    true,
+                    FALLBACK_HORIZON,
+                )
+                .ok_or_else(|| {
+                    IoError::new(
+                        ErrorKind::InvalidData,
+                        "actual-system horizon evaluator failed",
+                    )
+                })?;
+
                 let score = score_for(condition, seed + point.reserve.to_bits());
                 let proposed = Action::Push;
                 let decision = select_control_action(
@@ -301,6 +445,12 @@ fn main() -> Result<(), Box<dyn Error>> {
                     )
                     .into());
                 }
+                let selected_true_one_step_safe =
+                    selected.is_some_and(|action| actual_one_step.contains(action));
+                let selected_true_horizon_viable =
+                    selected.is_some_and(|action| actual_horizon.contains(action));
+                let false_safety_certificate =
+                    selected.is_some() && !selected_true_one_step_safe;
 
                 counters.observe(
                     condition,
@@ -308,30 +458,39 @@ fn main() -> Result<(), Box<dyn Error>> {
                     selected,
                     predictive.count(),
                     fallback.count(),
+                    actual_one_step.count(),
+                    actual_horizon.count(),
                     predictive.contains(proposed),
                     fallback.contains(proposed),
+                    selected_true_one_step_safe,
+                    selected_true_horizon_viable,
                 );
 
-                raw.push_str(&format!(
-                    "{},{},{},{:.9},{:.9},{},{},{},{},{},{},{},{},{},{},{},{}\n",
-                    point.name,
-                    condition.name,
-                    episode,
-                    score,
-                    threshold.score_threshold(),
-                    csv_bool(detected),
-                    control_mode_name(decision.assessment().mode()),
-                    action_name(Some(proposed)),
-                    predictive.count(),
-                    fallback.count(),
-                    action_name(predictive.filter(proposed)),
-                    action_name(fallback.filter(proposed)),
-                    action_name(selected),
-                    csv_bool(selected_certified),
-                    csv_bool(decision.no_certified_action()),
-                    csv_bool(predictive.contains(proposed)),
-                    csv_bool(fallback.contains(proposed)),
-                ));
+                let fields = vec![
+                    point.name.to_string(),
+                    condition.name.to_string(),
+                    episode.to_string(),
+                    format!("{score:.9}"),
+                    format!("{:.9}", threshold.score_threshold()),
+                    csv_bool(detected).to_string(),
+                    control_mode_name(decision.assessment().mode()).to_string(),
+                    action_name(Some(proposed)).to_string(),
+                    predictive.count().to_string(),
+                    fallback.count().to_string(),
+                    action_name(predictive.filter(proposed)).to_string(),
+                    action_name(fallback.filter(proposed)).to_string(),
+                    action_name(selected).to_string(),
+                    csv_bool(selected_certified).to_string(),
+                    csv_bool(decision.no_certified_action()).to_string(),
+                    csv_bool(predictive.contains(proposed)).to_string(),
+                    csv_bool(fallback.contains(proposed)).to_string(),
+                    actual_one_step.count().to_string(),
+                    actual_horizon.count().to_string(),
+                    csv_bool(selected_true_one_step_safe).to_string(),
+                    csv_bool(selected_true_horizon_viable).to_string(),
+                    csv_bool(false_safety_certificate).to_string(),
+                ];
+                csv_row(&mut raw, fields);
                 row_count += 1;
             }
             summary_row(&mut summary, point.name, condition, counters);
