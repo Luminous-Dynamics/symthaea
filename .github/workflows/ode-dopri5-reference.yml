@@ -30,10 +30,14 @@ jobs:
         with:
           components: rustfmt, clippy
 
-      # Bootstrap only. After reviewing the generated lock artifact, commit it
-      # and remove this step so future runs use only the reviewed lockfile.
-      - name: Bootstrap candidate dependency lock
-        run: cargo generate-lockfile --manifest-path research/ode-dopri5-reference/Cargo.toml
+      - name: Verify reviewed dependency lockfile is committed
+        shell: bash
+        run: |
+          set -euo pipefail
+          git ls-files --error-unmatch research/ode-dopri5-reference/Cargo.lock
+          test -s research/ode-dopri5-reference/Cargo.lock
+          sha256sum research/ode-dopri5-reference/Cargo.lock
+          cargo metadata --locked --no-deps --manifest-path research/ode-dopri5-reference/Cargo.toml > /tmp/ode-dopri5-metadata.json
 
       - name: Format
         run: cargo fmt --manifest-path research/ode-dopri5-reference/Cargo.toml -- --check
