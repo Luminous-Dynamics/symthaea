@@ -1,0 +1,750 @@
+use serde::{Deserialize, Serialize};
+use serde_json::{Value, json};
+use sha2::{Digest, Sha256};
+use std::collections::{BTreeMap, HashMap, HashSet};
+use std::env;
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::process::ExitCode;
+
+const TOOL_VERSION: &str = "score-paired-results-v0.1.0";
+
+#[derive(Debug)]
+struct Args {
+    plan: PathBuf,
+    pairs: PathBuf,
+    results: PathBuf,
+    output: PathBuf,
+}
+
+#[derive(Debug, Deserialize)]
+struct Plan {
+    plan_id: String,
+    phase: String,
+    synthetic_only: bool,
+    primary_endpoint: String,
+    benchmark: Benchmark,
+    systems: Vec<System>,
+    preregistration: Preregistration,
+}
+
+#[derive(Debug, Deserialize)]
+struct Benchmark {
+    split: String,
+    source_family_disjoint: bool,
+    rights_review_status: String,
+    case_manifest_sha256: String,
+    source_catalog_sha256: String,
+    source_pack_sha256: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct System {
+    system_id: String,
+    baseline_family: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct Preregistration {
+    held_out_access: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct PairCase {
+    pair_id: String,
+    dimension: String,
+    expected_relation: String,
+    criticality: String,
+    acceptance: Acceptance,
+}
+
+#[derive(Debug, Deserialize)]
+struct Acceptance {
+    must_preserve: Vec<String>,
+    must_change: Vec<String>,
+    must_not: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct Observation {
+    schema_version: String,
+    result_id: String,
+    plan_id: String,
+    system_id: String,
+    pair_id: String,
+    observed_relation: String,
+    preservation_satisfied: bool,
+    change_satisfied: bool,
+    forbidden_behaviors: Vec<String>,
+    citation_identity_valid: bool,
+    adjudication_status: String,
+    notes: String,
+}
+
+#[derive(Debug, Serialize)]
+struct DimensionMetrics {
+    pair_count: usize,
+    relation_accuracy: f64,
+    preservation_rate: f64,
+    change_satisfaction_rate: Option<f64>,
+    citation_identity_rate: f64,
+    forbidden_behavior_rows: usize,
+    paired_intervention_fidelity: f64,
+}
+
+#[derive(Debug, Serialize)]
+struct SystemMetrics {
+    system_id: String,
+    baseline_family: String,
+    pair_count: usize,
+    relation_accuracy: f64,
+    preservation_rate: f64,
+    change_satisfaction_rate: f64,
+    citation_identity_rate: f64,
+    forbidden_behavior_rows: usize,
+    critical_gate_violations: usize,
+    critical_gates_pass: bool,
+    paired_intervention_fidelity: f64,
+    typed_relation_macro_f1: f64,
+    worst_dimension_score: f64,
+    primary_metric: String,
+    primary_metric_value: f64,
+    per_dimension: BTreeMap<String, DimensionMetrics>,
+}
+
+#[derive(Debug, Serialize)]
+struct Report {
+    report_schema_version: &'static str,
+    tool_version: &'static str,
+    plan_id: String,
+    phase: String,
+    synthetic_only: bool,
+    qualification_only: bool,
+    primary_endpoint: String,
+    plan_sha256: String,
+    pair_manifest_sha256: String,
+    result_rows_sha256: String,
+    dependency_lock_sha256: String,
+    benchmark_case_manifest_sha256: String,
+    source_catalog_sha256: String,
+    source_pack_sha256: String,
+    pair_count: usize,
+    system_count: usize,
+    systems: Vec<SystemMetrics>,
+    nonclaims: Vec<&'static str>,
+}
+
+fn usage() -> &'static str {
+    "Usage: score-paired-results --plan FILE --pairs JSONL --results JSONL --out FILE\n\
+     Scores blinded/adjudicated paired-intervention observations against a frozen comparison plan.\n\
+     It does not run models, infer labels, or turn synthetic controls into benchmark results."
+}
+
+fn parse_args() -> Result<Args, String> {
+    let mut raw = env::args().skip(1);
+    let mut plan = None;
+    let mut pairs = None;
+    let mut results = None;
+    let mut output = None;
+
+    while let Some(arg) = raw.next() {
+        let value = |raw: &mut std::iter::Skip<std::env::Args>, flag: &str| {
+            raw.next().ok_or_else(|| format!("{flag} requires a value"))
+        };
+        match arg.as_str() {
+            "--plan" => plan = Some(PathBuf::from(value(&mut raw, "--plan")?)),
+            "--pairs" => pairs = Some(PathBuf::from(value(&mut raw, "--pairs")?)),
+            "--results" => results = Some(PathBuf::from(value(&mut raw, "--results")?)),
+            "--out" => output = Some(PathBuf::from(value(&mut raw, "--out")?)),
+            "--help" | "-h" => return Err(usage().to_string()),
+            other => return Err(format!("unknown argument {other:?}\n{}", usage())),
+        }
+    }
+
+    Ok(Args {
+        plan: plan.ok_or_else(|| format!("missing --plan\n{}", usage()))?,
+        pairs: pairs.ok_or_else(|| format!("missing --pairs\n{}", usage()))?,
+        results: results.ok_or_else(|| format!("missing --results\n{}", usage()))?,
+        output: output.ok_or_else(|| format!("missing --out\n{}", usage()))?,
+    })
+}
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    let mut digest = Sha256::new();
+    digest.update(bytes);
+    format!("{:x}", digest.finalize())
+}
+
+fn parse_jsonl<T: for<'de> Deserialize<'de>>(bytes: &[u8], label: &str) -> Result<Vec<T>, String> {
+    let text = std::str::from_utf8(bytes).map_err(|error| format!("{label} is not UTF-8: {error}"))?;
+    let mut values = Vec::new();
+    for (index, line) in text.lines().enumerate() {
+        if line.trim().is_empty() {
+            return Err(format!("{label} contains an empty line at {}", index + 1));
+        }
+        values.push(serde_json::from_str(line).map_err(|error| {
+            format!("{label} has invalid JSON at line {}: {error}", index + 1)
+        })?);
+    }
+    if values.is_empty() {
+        return Err(format!("{label} contains no records"));
+    }
+    Ok(values)
+}
+
+fn ratio(numerator: usize, denominator: usize) -> f64 {
+    if denominator == 0 {
+        0.0
+    } else {
+        numerator as f64 / denominator as f64
+    }
+}
+
+fn macro_f1(pairs: &[PairCase], observations: &[&Observation]) -> f64 {
+    let labels: HashSet<&str> = pairs.iter().map(|pair| pair.expected_relation.as_str()).collect();
+    if labels.is_empty() {
+        return 0.0;
+    }
+    let mut f1_sum = 0.0;
+    let mut label_count = 0usize;
+    for label in labels {
+        let mut true_positive = 0usize;
+        let mut false_positive = 0usize;
+        let mut false_negative = 0usize;
+        for (pair, observation) in pairs.iter().zip(observations.iter()) {
+            let expected = pair.expected_relation.as_str();
+            let observed = observation.observed_relation.as_str();
+            if expected == label && observed == label {
+                true_positive += 1;
+            } else {
+                if expected != label && observed == label {
+                    false_positive += 1;
+                }
+                if expected == label && observed != label {
+                    false_negative += 1;
+                }
+            }
+        }
+        let denominator = 2 * true_positive + false_positive + false_negative;
+        if denominator > 0 {
+            f1_sum += 2.0 * true_positive as f64 / denominator as f64;
+            label_count += 1;
+        }
+    }
+    if label_count == 0 {
+        0.0
+    } else {
+        f1_sum / label_count as f64
+    }
+}
+
+fn validate_plan_eligibility(plan: &Plan) -> Result<(), String> {
+    let systems: HashSet<&str> = plan.systems.iter().map(|system| system.system_id.as_str()).collect();
+    let families: HashSet<&str> = plan.systems.iter().map(|system| system.baseline_family.as_str()).collect();
+    if plan.systems.len() < 2 || systems.len() != plan.systems.len() {
+        return Err("plan must contain at least two systems with unique system_id values".into());
+    }
+    if families.len() < 2 {
+        return Err("plan must include at least two distinct baseline families".into());
+    }
+
+    let digests = [
+        plan.benchmark.case_manifest_sha256.as_str(),
+        plan.benchmark.source_catalog_sha256.as_str(),
+        plan.benchmark.source_pack_sha256.as_str(),
+    ];
+    if digests.iter().any(|digest| {
+        digest.len() != 64
+            || !digest
+                .bytes()
+                .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+    }) {
+        return Err("plan must use valid lowercase SHA-256 digests".into());
+    }
+
+    if plan.phase == "synthetic_control" {
+        if !plan.synthetic_only
+            || plan.benchmark.split != "synthetic"
+            || plan.preregistration.held_out_access != "not_applicable_synthetic"
+        {
+            return Err("synthetic plan must be marked synthetic_only, use split=synthetic, and declare held_out_access=not_applicable_synthetic".into());
+        }
+    } else if plan.phase == "preregistered_held_out" {
+        if plan.synthetic_only
+            || !matches!(plan.benchmark.split.as_str(), "test" | "holdout")
+            || !plan.benchmark.source_family_disjoint
+            || plan.benchmark.rights_review_status != "approved"
+            || !matches!(
+                plan.preregistration.held_out_access.as_str(),
+                "sealed_until_freeze" | "independent_evaluator"
+            )
+        {
+            return Err("held-out scoring requires real test/holdout data, source-family disjointness, approved rights, and sealed/independent evaluation access".into());
+        }
+    } else if plan.synthetic_only {
+        return Err("only synthetic_control plans may set synthetic_only=true".into());
+    }
+
+    if !matches!(
+        plan.primary_endpoint.as_str(),
+        "paired_intervention_fidelity"
+            | "citation_identity_rate"
+            | "typed_relation_macro_f1"
+            | "worst_dimension_score"
+    ) {
+        return Err(format!(
+            "primary endpoint {:?} is not computed by this paired-results scorer",
+            plan.primary_endpoint
+        ));
+    }
+    Ok(())
+}
+
+fn compute_system_metrics(
+    system: &System,
+    pair_cases: &[PairCase],
+    observations: &[&Observation],
+    primary_endpoint: &str,
+) -> SystemMetrics {
+    let pair_count = pair_cases.len();
+    let mut relation_correct = 0usize;
+    let mut preservation_correct = 0usize;
+    let mut change_denominator = 0usize;
+    let mut change_correct = 0usize;
+    let mut citation_correct = 0usize;
+    let mut forbidden_rows = 0usize;
+    let mut critical_violations = 0usize;
+    let mut full_fidelity = 0usize;
+    let mut per_dimension_counts: BTreeMap<String, Vec<(bool, bool, bool, bool, bool)>> = BTreeMap::new();
+
+    for (pair, observation) in pair_cases.iter().zip(observations.iter()) {
+        let relation_ok = pair.expected_relation == observation.observed_relation;
+        let preservation_ok = observation.preservation_satisfied;
+        let change_required = !pair.acceptance.must_change.is_empty();
+        let change_ok = !change_required || observation.change_satisfied;
+        let forbidden_ok = observation.forbidden_behaviors.is_empty();
+        let citation_ok = observation.citation_identity_valid;
+        let fidelity_ok = relation_ok && preservation_ok && change_ok && forbidden_ok && citation_ok;
+
+        relation_correct += usize::from(relation_ok);
+        preservation_correct += usize::from(preservation_ok);
+        if change_required {
+            change_denominator += 1;
+            change_correct += usize::from(observation.change_satisfied);
+        }
+        citation_correct += usize::from(citation_ok);
+        forbidden_rows += usize::from(!forbidden_ok);
+        full_fidelity += usize::from(fidelity_ok);
+        if pair.criticality == "release_blocker" && !fidelity_ok {
+            critical_violations += 1;
+        }
+
+        per_dimension_counts
+            .entry(pair.dimension.clone())
+            .or_default()
+            .push((relation_ok, preservation_ok, change_ok, citation_ok, fidelity_ok));
+    }
+
+    let mut per_dimension = BTreeMap::new();
+    for (dimension, items) in per_dimension_counts {
+        let n = items.len();
+        let relation = items.iter().filter(|i| i.0).count();
+        let preserve = items.iter().filter(|i| i.1).count();
+        let change = items.iter().filter(|i| i.2).count();
+        let citation = items.iter().filter(|i| i.3).count();
+        let fidelity = items.iter().filter(|i| i.4).count();
+        let required_change_count = pair_cases
+            .iter()
+            .filter(|pair| pair.dimension == dimension && !pair.acceptance.must_change.is_empty())
+            .count();
+        let dimension_change_correct = pair_cases
+            .iter()
+            .zip(observations.iter())
+            .filter(|(pair, _)| pair.dimension == dimension && !pair.acceptance.must_change.is_empty())
+            .filter(|(_, observation)| observation.change_satisfied)
+            .count();
+
+        per_dimension.insert(
+            dimension,
+            DimensionMetrics {
+                pair_count: n,
+                relation_accuracy: ratio(relation, n),
+                preservation_rate: ratio(preserve, n),
+                change_satisfaction_rate: if required_change_count == 0 {
+                    None
+                } else {
+                    Some(ratio(dimension_change_correct, required_change_count))
+                },
+                citation_identity_rate: ratio(citation, n),
+                forbidden_behavior_rows: n - items.iter().filter(|i| i.4 || i.3 == false || i.0 == false || i.1 == false || i.2 == false).count().min(n),
+                paired_intervention_fidelity: ratio(fidelity, n),
+            },
+        );
+    }
+
+    let relation_f1 = macro_f1(pair_cases, observations);
+    let worst_dimension_score = per_dimension
+        .values()
+        .map(|metrics| metrics.paired_intervention_fidelity)
+        .fold(1.0_f64, f64::min);
+    let paired_fidelity = ratio(full_fidelity, pair_count);
+    let citation_identity_rate = ratio(citation_correct, pair_count);
+    let primary_metric_value = match primary_endpoint {
+        "paired_intervention_fidelity" => paired_fidelity,
+        "citation_identity_rate" => citation_identity_rate,
+        "typed_relation_macro_f1" => relation_f1,
+        "worst_dimension_score" => worst_dimension_score,
+        _ => unreachable!("endpoint validated before scoring"),
+    };
+
+    SystemMetrics {
+        system_id: system.system_id.clone(),
+        baseline_family: system.baseline_family.clone(),
+        pair_count,
+        relation_accuracy: ratio(relation_correct, pair_count),
+        preservation_rate: ratio(preservation_correct, pair_count),
+        change_satisfaction_rate: ratio(change_correct, change_denominator),
+        citation_identity_rate,
+        forbidden_behavior_rows: forbidden_rows,
+        critical_gate_violations: critical_violations,
+        critical_gates_pass: critical_violations == 0,
+        paired_intervention_fidelity: paired_fidelity,
+        typed_relation_macro_f1: relation_f1,
+        worst_dimension_score,
+        primary_metric: primary_endpoint.to_string(),
+        primary_metric_value,
+        per_dimension,
+    }
+}
+
+fn score(
+    plan: &Plan,
+    pairs: Vec<PairCase>,
+    observations: Vec<Observation>,
+) -> Result<Vec<SystemMetrics>, String> {
+    validate_plan_eligibility(plan)?;
+    let mut pair_by_id = HashMap::new();
+    for pair in &pairs {
+        if pair_by_id.insert(pair.pair_id.as_str(), pair).is_some() {
+            return Err(format!("duplicate pair_id {:?}", pair.pair_id));
+        }
+    }
+    if pair_by_id.is_empty() {
+        return Err("pair manifest contains no pairs".into());
+    }
+
+    let plan_systems: HashMap<&str, &System> = plan
+        .systems
+        .iter()
+        .map(|system| (system.system_id.as_str(), system))
+        .collect();
+    let mut result_ids = HashSet::new();
+    let mut seen_pairs: HashMap<&str, HashSet<&str>> = HashMap::new();
+    let mut grouped: HashMap<&str, Vec<&Observation>> = HashMap::new();
+
+    for observation in &observations {
+        if observation.schema_version != "paired-intervention-result-v0" {
+            return Err(format!(
+                "result {:?} has unsupported schema_version {:?}",
+                observation.result_id, observation.schema_version
+            ));
+        }
+        if observation.plan_id != plan.plan_id {
+            return Err(format!(
+                "result {:?} belongs to plan {:?}, expected {:?}",
+                observation.result_id, observation.plan_id, plan.plan_id
+            ));
+        }
+        if !result_ids.insert(observation.result_id.as_str()) {
+            return Err(format!("duplicate result_id {:?}", observation.result_id));
+        }
+        if !plan_systems.contains_key(observation.system_id.as_str()) {
+            return Err(format!(
+                "result {:?} references unknown system_id {:?}",
+                observation.result_id, observation.system_id
+            ));
+        }
+        if !pair_by_id.contains_key(observation.pair_id.as_str()) {
+            return Err(format!(
+                "result {:?} references unknown pair_id {:?}",
+                observation.result_id, observation.pair_id
+            ));
+        }
+        if !seen_pairs
+            .entry(observation.system_id.as_str())
+            .or_default()
+            .insert(observation.pair_id.as_str())
+        {
+            return Err(format!(
+                "system {:?} has duplicate result for pair {:?}",
+                observation.system_id, observation.pair_id
+            ));
+        }
+        if plan.synthetic_only {
+            if observation.adjudication_status != "synthetic_only" {
+                return Err(format!(
+                    "synthetic plan result {:?} must be marked synthetic_only",
+                    observation.result_id
+                ));
+            }
+        } else if plan.phase == "preregistered_held_out"
+            && observation.adjudication_status != "blind_human_adjudicated"
+        {
+            return Err(format!(
+                "held-out result {:?} requires blind_human_adjudicated status",
+                observation.result_id
+            ));
+        } else if !matches!(
+            observation.adjudication_status.as_str(),
+            "independent_review" | "blind_human_adjudicated"
+        ) {
+            return Err(format!(
+                "non-synthetic result {:?} requires reviewed adjudication status",
+                observation.result_id
+            ));
+        }
+
+        grouped
+            .entry(observation.system_id.as_str())
+            .or_default()
+            .push(observation);
+    }
+
+    let mut metrics = Vec::new();
+    for system in &plan.systems {
+        let expected_pairs: HashSet<&str> = pair_by_id.keys().copied().collect();
+        let actual_pairs = seen_pairs.get(system.system_id.as_str());
+        if actual_pairs.is_none_or(|actual| *actual != expected_pairs) {
+            let observed_count = actual_pairs.map_or(0, HashSet::len);
+            return Err(format!(
+                "system {:?} has incomplete pair coverage: {observed_count}/{}",
+                system.system_id,
+                expected_pairs.len()
+            ));
+        }
+
+        let mut ordered_observations: Vec<&Observation> = grouped
+            .get(system.system_id.as_str())
+            .into_iter()
+            .flatten()
+            .copied()
+            .collect();
+        ordered_observations.sort_by_key(|observation| {
+            pair_by_id
+                .get(observation.pair_id.as_str())
+                .map(|pair| pair.pair_id.as_str())
+                .unwrap_or("")
+        });
+        let mut ordered_pairs: Vec<PairCase> = ordered_observations
+            .iter()
+            .map(|observation| {
+                pair_by_id
+                    .get(observation.pair_id.as_str())
+                    .expect("pair existence was checked")
+                    .to_owned()
+                    .clone()
+            })
+            .collect();
+        if ordered_pairs.len() != pairs.len() {
+            return Err(format!(
+                "internal pair alignment failure for system {:?}",
+                system.system_id
+            ));
+        }
+        // The zipped vectors are aligned by pair ID above. Output order is deterministic.
+        metrics.push(compute_system_metrics(
+            system,
+            &ordered_pairs,
+            &ordered_observations,
+            &plan.primary_endpoint,
+        ));
+    }
+    Ok(metrics)
+}
+
+fn run() -> Result<(), String> {
+    let args = parse_args()?;
+    let plan_bytes = fs::read(&args.plan)
+        .map_err(|error| format!("cannot read plan {}: {error}", args.plan.display()))?;
+    let pair_bytes = fs::read(&args.pairs)
+        .map_err(|error| format!("cannot read pairs {}: {error}", args.pairs.display()))?;
+    let result_bytes = fs::read(&args.results)
+        .map_err(|error| format!("cannot read results {}: {error}", args.results.display()))?;
+    let plan: Plan = serde_json::from_slice(&plan_bytes)
+        .map_err(|error| format!("plan JSON is invalid: {error}"))?;
+    let pairs = parse_jsonl::<PairCase>(&pair_bytes, "pair manifest")?;
+    let results = parse_jsonl::<Observation>(&result_bytes, "paired-intervention results")?;
+    let system_metrics = score(&plan, pairs, results)?;
+
+    let manifest_lock_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("Cargo.lock");
+    let lock_bytes = fs::read(&manifest_lock_path).map_err(|error| {
+        format!(
+            "cannot read dependency lockfile {}: {error}",
+            manifest_lock_path.display()
+        )
+    })?;
+
+    let report = Report {
+        report_schema_version: "paired-intervention-score-report-v0",
+        tool_version: TOOL_VERSION,
+        plan_id: plan.plan_id.clone(),
+        phase: plan.phase.clone(),
+        synthetic_only: plan.synthetic_only,
+        qualification_only: plan.synthetic_only,
+        primary_endpoint: plan.primary_endpoint.clone(),
+        plan_sha256: sha256_hex(&plan_bytes),
+        pair_manifest_sha256: sha256_hex(&pair_bytes),
+        result_rows_sha256: sha256_hex(&result_bytes),
+        dependency_lock_sha256: sha256_hex(&lock_bytes),
+        benchmark_case_manifest_sha256: plan.benchmark.case_manifest_sha256,
+        source_catalog_sha256: plan.benchmark.source_catalog_sha256,
+        source_pack_sha256: plan.benchmark.source_pack_sha256,
+        pair_count: pairs.len(),
+        system_count: system_metrics.len(),
+        systems: system_metrics,
+        nonclaims: vec![
+            "This tool scores adjudicated labels; it does not execute models or verify the labels against source material.",
+            "Synthetic-control metrics are qualification fixtures, not evidence of model performance or SOTA.",
+            "A high average cannot offset a release-blocker provenance, citation, rights, or lineage failure.",
+            "Results generalize only to the documented source-family split and annotation process.",
+        ],
+    };
+    let bytes = serde_json::to_vec_pretty(&report)
+        .map_err(|error| format!("cannot serialize score report: {error}"))?;
+    if let Some(parent) = args.output.parent() {
+        fs::create_dir_all(parent).map_err(|error| {
+            format!("cannot create output directory {}: {error}", parent.display())
+        })?;
+    }
+    fs::write(&args.output, &bytes)
+        .map_err(|error| format!("cannot write report {}: {error}", args.output.display()))?;
+    println!(
+        "Scored {} paired cases for {} systems; qualification_only={}; report={}",
+        report.pair_count,
+        report.system_count,
+        report.qualification_only,
+        args.output.display()
+    );
+    Ok(())
+}
+
+fn main() -> ExitCode {
+    match run() {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(error) => {
+            eprintln!("score-paired-results: {error}");
+            ExitCode::from(1)
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn fixture_plan() -> Plan {
+        serde_json::from_value(json!({
+            "plan_id":"test-plan",
+            "phase":"synthetic_control",
+            "synthetic_only":true,
+            "primary_endpoint":"paired_intervention_fidelity",
+            "benchmark":{
+                "split":"synthetic",
+                "source_family_disjoint":true,
+                "rights_review_status":"metadata_only",
+                "case_manifest_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "source_catalog_sha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "source_pack_sha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+            },
+            "systems":[
+                {"system_id":"s1","baseline_family":"bm25"},
+                {"system_id":"s2","baseline_family":"typed_graph"}
+            ],
+            "preregistration":{"held_out_access":"not_applicable_synthetic"}
+        })).unwrap()
+    }
+
+    fn pair(id: &str, dimension: &str, expected: &str, criticality: &str, must_change: bool) -> PairCase {
+        PairCase {
+            pair_id: id.into(),
+            dimension: dimension.into(),
+            expected_relation: expected.into(),
+            criticality: criticality.into(),
+            acceptance: Acceptance {
+                must_preserve: vec!["source identity".into()],
+                must_change: if must_change { vec!["expected behavior changes".into()] } else { vec![] },
+                must_not: vec!["fabricated citation".into()],
+            },
+        }
+    }
+
+    fn observation(id: &str, system: &str, pair: &str, relation: &str) -> Observation {
+        Observation {
+            schema_version:"paired-intervention-result-v0".into(),
+            result_id:format!("{system}-{pair}"),
+            plan_id:"test-plan".into(),
+            system_id:system.into(),
+            pair_id:pair.into(),
+            observed_relation:relation.into(),
+            preservation_satisfied:true,
+            change_satisfied:true,
+            forbidden_behaviors:vec![],
+            citation_identity_valid:true,
+            adjudication_status:"synthetic_only".into(),
+            notes:"synthetic test label".into(),
+        }
+    }
+
+    #[test]
+    fn paired_fidelity_is_non_compensatory_on_critical_failures() {
+        let plan = fixture_plan();
+        let pairs = vec![
+            pair("p1", "context_swap", "local_change", "release_blocker", true),
+            pair("p2", "alias_equivalence", "invariant", "diagnostic", false),
+        ];
+        let mut results = Vec::new();
+        for system in ["s1", "s2"] {
+            results.push(observation("r1", system, "p1", "local_change"));
+            results.push(observation("r2", system, "p2", "invariant"));
+        }
+        let index = results.iter().position(|row| row.system_id == "s1" && row.pair_id == "p1").unwrap();
+        results[index].forbidden_behaviors.push("source fabrication".into());
+        let metrics = score(&plan, pairs, results).unwrap();
+        let s1 = metrics.iter().find(|m| m.system_id == "s1").unwrap();
+        let s2 = metrics.iter().find(|m| m.system_id == "s2").unwrap();
+        assert_eq!(s1.critical_gate_violations, 1);
+        assert!(!s1.critical_gates_pass);
+        assert_eq!(s2.critical_gate_violations, 0);
+        assert!(s2.critical_gates_pass);
+        assert!(s1.paired_intervention_fidelity < s2.paired_intervention_fidelity);
+    }
+
+    #[test]
+    fn missing_pair_result_fails_closed() {
+        let plan = fixture_plan();
+        let pairs = vec![
+            pair("p1", "context_swap", "local_change", "major", true),
+            pair("p2", "alias_equivalence", "invariant", "diagnostic", false),
+        ];
+        let results = vec![
+            observation("r1", "s1", "p1", "local_change"),
+            observation("r2", "s2", "p1", "local_change"),
+            observation("r3", "s2", "p2", "invariant"),
+        ];
+        let error = score(&plan, pairs, results).unwrap_err();
+        assert!(error.contains("incomplete pair coverage"));
+    }
+
+    #[test]
+    fn held_out_scoring_requires_rights_and_source_family_isolation() {
+        let mut plan = fixture_plan();
+        plan.phase = "preregistered_held_out".into();
+        plan.synthetic_only = false;
+        plan.benchmark.split = "holdout".into();
+        plan.benchmark.source_family_disjoint = false;
+        plan.benchmark.rights_review_status = "pending".into();
+        plan.preregistration.held_out_access = "not_sealed".into();
+        let error = validate_plan_eligibility(&plan).unwrap_err();
+        assert!(error.contains("held-out scoring requires"));
+    }
+}
