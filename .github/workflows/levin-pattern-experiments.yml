@@ -18,6 +18,7 @@ on:
       - "docs/research/ABSTRACT_PATTERN_MEMORY_EVALUATION_PLAN.md"
       - "docs/research/LEVIN_MULTISCALE_EXPERIMENT_PROTOCOL.md"
       - "docs/research/PLATONIC_PATTERN_INTERACTION_BENCHMARK.md"
+      - "docs/research/SELECTIVE_RETRIEVAL_AND_ABSTENTION_BENCHMARK.md"
   push:
     branches: [main]
     paths:
