@@ -8,6 +8,7 @@ on:
       - "schemas/landscape-review-validation-report-v0.schema.json"
       - "fixtures/landscape/review-unranked-v0.json"
       - "crates/domains/symthaea-landscape-review/**"
+      - "Cargo.lock"
       - "docs/LANDSCAPE_ALTERNATIVE_REVIEW_V0.md"
       - ".github/workflows/landscape-review.yml"
   push:
