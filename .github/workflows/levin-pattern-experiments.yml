@@ -103,6 +103,9 @@ jobs:
       - name: Run abstract pattern interaction benchmark
         run: cargo run --locked --release -p symthaea-core --example platonic_pattern_interaction 2>&1 | tee research-results/platonic-pattern-interaction.log
 
+      - name: Run high-capacity MAP versus HRR stress sweep
+        run: cargo run --locked --release -p symthaea-core --example platonic_pattern_interaction -- --stress 2>&1 | tee research-results/platonic-pattern-interaction-stress.log
+
       - name: Verify Cell Foundry equifinality tests
         run: cargo test --locked --release -p symthaea-cell-foundry experiments::tests -- --nocapture
 
