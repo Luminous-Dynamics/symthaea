@@ -12,7 +12,7 @@ fn main() {
                         .recovery_steps
                         .map_or_else(|| "NA".to_string(), |steps| steps.to_string());
                     println!(
-                        "{},{},{},{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{},{:.6},{:.6},{},{},{:.6},{:.6},{},{},{},{},{},{},{},{},{:.6},{},{}",
+                        "{},{},{},{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{},{:.6},{:.6},{},{},{:.6},{:.6},{},{},{},{},{},{},{},{},{:.6},{},{},{}",
                         scenario.name(),
                         seed,
                         policy.name(),
@@ -40,6 +40,7 @@ fn main() {
                         m.emergency_recover_steps,
                         m.resource_cost,
                         m.failed,
+                        m.had_disturbance,
                         recovery
                     );
                 }

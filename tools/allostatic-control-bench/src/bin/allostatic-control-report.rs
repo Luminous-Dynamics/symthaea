@@ -28,6 +28,7 @@ struct Episode {
     emergency_recover_steps: usize,
     false_alarms: usize,
     false_alarm_opportunities: usize,
+    had_disturbance: bool,
     recovery_steps: Option<usize>,
     failed: bool,
 }
@@ -188,8 +189,9 @@ fn parse_episodes(csv: &str) -> Result<BTreeMap<ConditionKey, EpisodesBySeed>, B
         "push_steps",
         "maintain_steps",
         "resource_cost",
-        "recovery_steps",
         "failed",
+        "had_disturbance",
+        "recovery_steps",
     ];
     for name in required {
         column_index(&header, name)?;
@@ -248,6 +250,8 @@ fn parse_episodes(csv: &str) -> Result<BTreeMap<ConditionKey, EpisodesBySeed>, B
         let maintain_steps = parse_usize(&values, &header, "maintain_steps")?;
         let emergency_recover_steps = parse_usize(&values, &header, "emergency_recover_steps")?;
         let resource_cost = parse_f64(&values, &header, "resource_cost")?;
+        let failed = parse_bool(&values, &header, "failed")?;
+        let had_disturbance = parse_bool(&values, &header, "had_disturbance")?;
         let recovery_text = cell(&values, &header, "recovery_steps")?;
         let recovery_steps = if recovery_text == "NA" {
             None
@@ -330,6 +334,13 @@ fn parse_episodes(csv: &str) -> Result<BTreeMap<ConditionKey, EpisodesBySeed>, B
             ))
             .into());
         }
+        if recovery_steps.is_some() && !had_disturbance {
+            return Err(invalid_data(format!(
+                "recovery recorded without a disturbance on line {}",
+                line_index + 2
+            ))
+            .into());
+        }
         let episode = Episode {
             task_reward: parse_f64(&values, &header, "task_reward")?,
             cumulative_exposure: cumulative_load,
@@ -346,8 +357,9 @@ fn parse_episodes(csv: &str) -> Result<BTreeMap<ConditionKey, EpisodesBySeed>, B
             emergency_recover_steps,
             false_alarms,
             false_alarm_opportunities,
+            had_disturbance,
             recovery_steps,
-            failed: parse_bool(&values, &header, "failed")?,
+            failed,
         };
         let group = groups.entry((scenario, policy, shielded)).or_default();
         if group.insert(seed, episode).is_some() {
@@ -364,12 +376,54 @@ fn parse_episodes(csv: &str) -> Result<BTreeMap<ConditionKey, EpisodesBySeed>, B
     Ok(groups)
 }
 
+#[derive(Clone, Debug, PartialEq)]
+struct RecoverySummary {
+    disturbed_episodes: usize,
+    observed_recovery_count: usize,
+    censored_count: usize,
+    mean_observed_recovery_steps: String,
+    censored_rate: String,
+}
+
+fn summarize_recovery(samples: impl IntoIterator<Item = (bool, Option<usize>)>) -> RecoverySummary {
+    let mut disturbed_episodes = 0;
+    let mut observed = Vec::new();
+    let mut censored_count = 0;
+    for (had_disturbance, recovery_steps) in samples {
+        if !had_disturbance {
+            continue;
+        }
+        disturbed_episodes += 1;
+        match recovery_steps {
+            Some(steps) => observed.push(steps as f64),
+            None => censored_count += 1,
+        }
+    }
+    let mean_observed_recovery_steps = if observed.is_empty() {
+        "NA".to_string()
+    } else {
+        format!("{:.6}", mean(&observed))
+    };
+    let censored_rate = if disturbed_episodes == 0 {
+        "NA".to_string()
+    } else {
+        format!("{:.6}", censored_count as f64 / disturbed_episodes as f64)
+    };
+    RecoverySummary {
+        disturbed_episodes,
+        observed_recovery_count: observed.len(),
+        censored_count,
+        mean_observed_recovery_steps,
+        censored_rate,
+    }
+}
+
 fn write_summary(
     groups: &BTreeMap<ConditionKey, EpisodesBySeed>,
     path: &str,
 ) -> Result<usize, Box<dyn Error>> {
     let mut output = String::from(
-        "scenario,policy,shielded,n,mean_task_reward,mean_cumulative_load,p95_cumulative_load,episode_violation_rate,mean_unsafe_ticks,mean_violation_exposure,p95_violation_exposure,mean_conditional_peak_violation,mean_minimum_reserve,mean_missed_limits,mean_shield_vetoes,mean_no_safe_action_ticks,mean_emergency_recover_steps,mean_false_alarms,mean_false_alarm_opportunities,false_alarm_rate_when_opportunity,recovery_observed_n,mean_observed_recovery_steps,recovery_censored_rate,mean_viable_action_options,worst_episode_minimum_viable_action_options,episode_failure_rate\n"
+        "scenario,policy,shielded,n,episodes_with_disturbance_n,mean_task_reward,mean_cumulative_load,p95_cumulative_load,episode_violation_rate,mean_unsafe_ticks,mean_violation_exposure,p95_violation_exposure,mean_conditional_peak_violation,mean_minimum_reserve,mean_missed_limits,mean_shield_vetoes,mean_no_safe_action_ticks,mean_emergency_recover_steps,mean_false_alarms,mean_false_alarm_opportunities,false_alarm_rate_when_opportunity,recovery_observed_n,recovery_censored_n,mean_observed_recovery_steps,recovery_censored_rate,mean_viable_action_options,worst_episode_minimum_viable_action_options,episode_failure_rate\n"
     );
     for ((scenario, policy, shielded), by_seed) in groups {
         let episodes: Vec<&Episode> = by_seed.values().collect();
@@ -427,20 +481,11 @@ fn write_summary(
                 false_alarm_total as f64 / false_alarm_opportunity_total as f64
             )
         };
-        let observed_recovery: Vec<f64> = episodes
-            .iter()
-            .filter_map(|row| row.recovery_steps.map(|steps| steps as f64))
-            .collect();
-        let recovery_censored = episodes
-            .iter()
-            .filter(|row| row.recovery_steps.is_none())
-            .count();
-        let recovery_mean = if observed_recovery.is_empty() {
-            "NA".to_string()
-        } else {
-            format!("{:.6}", mean(&observed_recovery))
-        };
-        let recovery_censored_rate = recovery_censored as f64 / episodes.len() as f64;
+        let recovery = summarize_recovery(
+            episodes
+                .iter()
+                .map(|row| (row.had_disturbance, row.recovery_steps)),
+        );
         let violation_rate =
             episodes.iter().filter(|row| row.unsafe_episode).count() as f64 / episodes.len() as f64;
         let failure_rate =
@@ -451,8 +496,9 @@ fn write_summary(
             format!("{:.6}", mean(&conditional_severity))
         };
         output.push_str(&format!(
-            "{scenario},{policy},{shielded},{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{conditional},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{false_alarm_rate},{},{recovery_mean},{:.6},{:.6},{},{:.6}\n",
+            "{scenario},{policy},{shielded},{},{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{conditional},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{false_alarm_rate},{},{},{},{},{:.6},{},{:.6}\n",
             episodes.len(),
+            recovery.disturbed_episodes,
             mean(&rewards),
             mean(&exposure),
             percentile_nearest_rank(&exposure, 0.95),
@@ -467,8 +513,10 @@ fn write_summary(
             mean(&emergency_steps),
             mean(&false_alarms),
             mean(&false_alarm_opportunities),
-            observed_recovery.len(),
-            recovery_censored_rate,
+            recovery.observed_recovery_count,
+            recovery.censored_count,
+            recovery.mean_observed_recovery_steps,
+            recovery.censored_rate,
             mean(&mean_viable_options),
             worst_episode_minimum_viable_options,
             failure_rate,
@@ -589,7 +637,7 @@ mod tests {
 
     const SAMPLE_HEADER: &str = EPISODE_CSV_HEADER;
 
-    const SAMPLE_ROW: &str = "calm,0,task_only,false,1.0,4.8,0.1,0.2,0.8,1.5,1,0.8,0.2,0,false,0.0,0.0,0,0,0,0,1,1,47,0,0.2,false,NA";
+    const SAMPLE_ROW: &str = "calm,0,task_only,false,1.0,4.8,0.1,0.2,0.8,1.5,1,0.8,0.2,0,false,0.0,0.0,0,0,0,0,1,1,47,0,0.2,false,false,NA";
 
     #[test]
     fn parser_requires_episode_violation_flag_to_match_tick_count() {
@@ -645,6 +693,27 @@ mod tests {
     fn parser_rejects_duplicate_condition_seed_rows() {
         let duplicate = format!("{SAMPLE_HEADER}\n{SAMPLE_ROW}\n{SAMPLE_ROW}\n");
         assert!(parse_episodes(&duplicate).is_err());
+    }
+
+    #[test]
+    fn recovery_summary_excludes_no_disturbance_episodes_from_censoring_denominator() {
+        let no_disturbance = summarize_recovery([(false, None), (false, None)]);
+        assert_eq!(no_disturbance.disturbed_episodes, 0);
+        assert_eq!(no_disturbance.observed_recovery_count, 0);
+        assert_eq!(no_disturbance.censored_count, 0);
+        assert_eq!(no_disturbance.censored_rate, "NA");
+
+        let mixed = summarize_recovery([
+            (false, None),
+            (true, Some(4)),
+            (true, None),
+            (true, Some(6)),
+        ]);
+        assert_eq!(mixed.disturbed_episodes, 3);
+        assert_eq!(mixed.observed_recovery_count, 2);
+        assert_eq!(mixed.censored_count, 1);
+        assert_eq!(mixed.mean_observed_recovery_steps, "5.000000");
+        assert_eq!(mixed.censored_rate, "0.333333");
     }
 
     #[test]
