@@ -1582,4 +1582,69 @@ mod tests {
 
         assert_eq!(ctrl.highway_weights(), ctrl2.highway_weights());
     }
+    #[test]
+    fn legacy_token_seed_scheme_remains_the_exact_default() {
+        let genesis = test_genesis();
+        let config = test_config();
+        let default_controller = LanguageController::new(&genesis, &config);
+        let explicit_legacy = LanguageController::new_with_token_embedding_seed_scheme(
+            &genesis,
+            &config,
+            TokenEmbeddingSeedScheme::LegacyV1,
+        );
+
+        assert_eq!(
+            default_controller.token_embeddings().len(),
+            explicit_legacy.token_embeddings().len()
+        );
+        for (index, (default, explicit)) in default_controller
+            .token_embeddings()
+            .iter()
+            .zip(explicit_legacy.token_embeddings())
+            .enumerate()
+        {
+            assert_eq!(
+                default.values,
+                explicit.values,
+                "default initialization changed at token row {index}"
+            );
+        }
+    }
+
+    #[test]
+    fn domain_separated_token_seed_scheme_is_repeatable_and_distinct() {
+        let genesis = test_genesis();
+        let config = test_config();
+        let first = LanguageController::new_with_token_embedding_seed_scheme(
+            &genesis,
+            &config,
+            TokenEmbeddingSeedScheme::DomainSeparatedV2,
+        );
+        let second = LanguageController::new_with_token_embedding_seed_scheme(
+            &genesis,
+            &config,
+            TokenEmbeddingSeedScheme::DomainSeparatedV2,
+        );
+        let legacy = LanguageController::new(&genesis, &config);
+
+        assert_eq!(first.token_embeddings().len(), config.vocab_size);
+        for (index, (a, b)) in first
+            .token_embeddings()
+            .iter()
+            .zip(second.token_embeddings())
+            .enumerate()
+        {
+            assert_eq!(a.values, b.values, "V2 is not repeatable at row {index}");
+            assert!(
+                a.values.iter().all(|value| value.is_finite()),
+                "V2 emitted a non-finite coordinate at row {index}"
+            );
+        }
+        assert_ne!(
+            first.token_embeddings()[0].values,
+            legacy.token_embeddings()[0].values,
+            "V2 must be independently distinguishable from legacy initialization"
+        );
+    }
+
 }
