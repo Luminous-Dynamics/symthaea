@@ -19,10 +19,11 @@ Reference: https://pyphi.readthedocs.io/en/latest/reference/configuration.html
 ~~~bash
 nix develop .#python-research
 python -m pip install -r validation/requirements-pyphi.txt
+python -m unittest validation.test_pyphi_crossvalidation_fail_closed -v
 python validation/pyphi_crossvalidation.py
 ~~~
 
-This currently produces unavailable/failed measurements by design, until the adapter exists. It writes a NOT QUALIFIED Markdown report to results/pyphi_validation_results.md and returns a nonzero exit status. Do not interpret the output as evidence of agreement.
+This currently produces unavailable/failed measurements by design, until the adapter exists. It writes a NOT QUALIFIED Markdown report to results/pyphi_validation_results.md and returns a nonzero exit status. The nine Python regression tests are source definitions until the command above has actually run successfully. Do not interpret the output as evidence of agreement.
 
 ## Required before qualification
 
