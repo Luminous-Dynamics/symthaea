@@ -205,7 +205,7 @@ The first fixtures test three deliberately different situations:
 | Irrelevant cross-component branch | 1.0 | 1.0 | 1.0 | 0.0 |
 | Harmful constant-bias coupling | 0.0 | 0.5 | 0.0 | -0.5 |
 
-These exact expectations were independently checked with a separate, small enumerator. **That is not a Rust compilation or test pass.** The Rust example now has 15 test definitions covering exact toy contrasts, partition sensitivity/sign reversal, prior-dependent score changes, a higher-order XOR-information counterexample, malformed interventions, fail-closed strata, determinism, bounds, and manifest parity. Rust/cargo are unavailable in the current execution environment, so this example remains uncompiled and unexecuted.
+These exact expectations were independently checked with a separate, small enumerator. **That is not a Rust compilation or test pass.** The Rust example now has 19 test definitions covering exact toy contrasts, partition sensitivity/sign reversal, prior-dependent score changes, a higher-order XOR-information counterexample, malformed interventions, fail-closed strata, determinism, bounds, and manifest parity. Rust/cargo are unavailable in the current execution environment, so this example remains uncompiled and unexecuted.
 
 These first three fixtures are conformance/sign tests, not evidence of empirical usefulness. In particular, the XOR and harmful-coupling cases originally compared task-output edges with controls on an unused side branch; that is not a fair role-matched effect estimate. They are retained as negative/sign-convention controls only. The new AND prior pair improves this design because both tested edges enter the same task-output gate, but it still does not solve all matching issues involving degree, path redundancy, latency, bandwidth, or network centrality. A real evaluation must report intact capability and per-edge effects alongside the profile and use held-out systems.
 
@@ -226,7 +226,7 @@ A separate exhaustive Python enumerator (used as a cross-check, **not a Rust tes
 
 This is an important warning, not a result to hide: for the same fixed toy causal model and intervention outcome table, the contrast can reverse sign with the partition. The declared partitions recover the expected +0.5, 0.0 and -0.5 fixture scores, but these score ranges show that the contrast is **partition-relative**, not an intrinsic scalar property of the network. This is why the metric must expose the full partition profile and freeze partition selection before held-out evaluation. It also makes independent control selection and matched-stratum quality central requirements. The toy sweep still does not prove that TCCIP is useful or better than existing methods.
 
-The 15 authored Rust test definitions include partition sign reversals, input-prior effects, XOR-information baselines, and schema-v3 manifest parity. The independent Python oracle has 12 authored unittest definitions. Neither committed suite has been executed here; Cargo/rustc are unavailable, and the committed Python module/tests have not themselves been run. A separate ad-hoc enumerator independently checked all six manifest fixture utilities, TCCIP values, partition ranges, and the XOR information calculation, but this is not a test run of either committed implementation.
+The 19 authored Rust test definitions include partition sign reversals, input-prior effects, XOR-information baselines, and schema-v3 manifest parity. The independent Python oracle has 16 authored unittest definitions. Neither committed suite has been executed here; Cargo/rustc are unavailable, and the committed Python module/tests have not themselves been run. A separate ad-hoc enumerator independently checked all six manifest fixture utilities, TCCIP values, partition ranges, and the XOR information calculation, but this is not a test run of either committed implementation.
 
 ## State-prior conditioning with role-matched task-gate cuts (new experiment)
 
@@ -265,6 +265,31 @@ The zero TCCIP is correct for the *difference of edge-loss means*: the cross-cut
 
 This fixture is deliberately a falsification test, not a victory claim. The additional exact mutual-information baseline is computed from the same declared state weights and emitted by the independent Python oracle; the Rust evaluator also reports \(H(Y)\), individual-input MI values, and joint-input MI in its output. These implementations and their 15 Rust / 11 Python authored tests remain unexecuted.
 
+## Second-order counterfactual utility interactions (new diagnostic; not a synergy metric)
+
+To capture interactions between failures rather than merely compare classes of edges, the Rust evaluator and independent Python reference now calculate a second-order finite difference of task utility for every pair of declared edge interventions:
+
+\[
+\Delta^2 J_{ij}=J(\varnothing)-J(\{i\})-J(\{j\})+J(\{i,j\}).
+\]
+
+Each simultaneous cut replaces its own edge signal with an independent fair coin. Positive values mean the two single-cut losses overlap or saturate (the combined loss is less than their sum); negative values mean compound failure amplifies utility loss beyond the additive prediction; zero means the interaction contrast is additive under this intervention definition. These signs concern *utility response to cuts*, not positive/negative information synergy.
+
+The canonical pairwise oracle is `validation/fixtures/tccip_pairwise_utility_interactions.tsv` (16 intervention pairs across the six fixtures). A Rust test and Python test compare every individual and joint intervention outcome against this file. The independent exhaustive reference calculation produced this illustrative subset:
+
+| Fixture / pair | \(J_0\) | \(J_i\) | \(J_j\) | \(J_{ij}\) | \(\Delta^2J\) |
+|---|---:|---:|---:|---:|---:|
+| XOR: cut input edge 1 | 1.0 | 0.5 | — | — | — |
+| XOR: cut input edge 2 | 1.0 | — | 0.5 | — | — |
+| XOR: cut both task edges | 1.0 | 0.5 | 0.5 | 0.5 | +0.5 |
+| Harmful bias: cut correct path and bias path | 0.0 | 0.5 | 0.5 | 0.5 | −0.5 |
+| AND task, prior A: cut both task inputs | 1.0 | 0.6 | 0.9 | 0.67 | +0.17 |
+| AND task, prior B: same cuts, reversed prior | 1.0 | 0.9 | 0.6 | 0.67 | +0.17 |
+
+In the XOR case, the positive value means cutting either input already destroys half the task accuracy; cutting both does not double the damage. It is a *non-additivity/saturation* result. The system's informational synergy is captured by a different baseline: H(Y)=1 bit, I(X0;Y)=I(X1;Y)=0, I((X0,X1);Y)=1 bit. Do not relabel \(\Delta^2J\) as PID synergy, PEID, or IIT \(\Phi\).
+
+This is an established class of interaction-effect calculation in mathematical form; our contribution is to make it an exact, manifest-driven, task-utility diagnostic in this benchmark and test it against prior art—not a claim to have invented finite differences or causal interaction effects. The next comparison must include simple second-order utility-response baselines and, when assumptions permit, PID/SURD and the 2026 preprint *Partial Effective Information Decomposition for Synergistic Causality* (PEID, https://arxiv.org/abs/2605.03267).
+
 ## Literature-aware scope and a stronger next paradigm
 
 The initial literature check confirms that the broad territory is populated: information-geometric integrated-information measures such as Φ_CIS/Φ_CII, causal emergence/effective information, and SURD already address related questions about causal integration, scale, and synergistic/unique/redundant contributions. SURD is designed to decompose future information contributions, including hidden-variable "causality leak"; see [Martínez-Sánchez et al. (2024)](https://www.nature.com/articles/s41467-024-53373-4). Information geometry already defines integrated information as a divergence from a constrained causally disconnected model; see [Oizumi et al. (2016)](https://pmc.ncbi.nlm.nih.gov/articles/PMC5187746/). Recent work on causal emergence also argues that a single maximizing scale omits the distribution of causal contribution across multiple scales; see [A reframed landscape of causal emergence (2025)](https://doi.org/10.1016/j.patter.2025.101476).
@@ -298,11 +323,11 @@ These commands intentionally produce separately labeled Python and Rust artifact
 
 ## Immediate implementation plan
 
-1. The model/task/input-prior/partition/intervention definitions now come from schema-v3 TSV. Next, version the intervention *semantics* explicitly, rather than only encoding an implicit fair-coin edge replacement in the evaluator.
+1. The model/task/input-prior/partition/intervention definitions now come from schema-v3 TSV; a second TSV lists expected pairwise cut outcomes. Next, version the intervention *semantics* explicitly, rather than only encoding an implicit fair-coin edge replacement in the evaluator.
 2. Sweep predeclared alternate partitions / coarse-grainings and retain the full multiscale profile; do not select the best partition on the evaluation set.
 3. Add state-conditioned and controlled prior-shift fixtures, plus degree/delay/bandwidth-matched intervention controls where meaningful.
 4. Compare against raw task ablation, graph/spectral measures, entropy/MI/transfer entropy, and relevant PID/SURD/effective-information baselines.
 5. Test the preregistered adversarial matrix, then connect a real Symthaea task only after exact synthetic gates pass.
 6. Keep the feature research-only until external review and evidence support a concrete engineering use.
 
-**Current evidence status:** research specification plus a dependency-free exact toy evaluator, exhaustive partition-sensitivity code, an expected-output TSV, and an independent reference calculation have been authored. The Rust executable and its 15 tests have not been compiled or run; the committed independent Python oracle's 12 tests have also not been run. There is no demonstrated empirical usefulness, no validated advantage over established baselines, no novelty/SOTA claim, no IIT correspondence, and no consciousness inference.
+**Current evidence status:** research specification plus a dependency-free exact toy evaluator, exhaustive partition-sensitivity code, an expected-output TSV, and an independent reference calculation have been authored. The Rust executable and its 15 tests have not been compiled or run; the committed independent Python oracle's 16 tests have also not been run. There is no demonstrated empirical usefulness, no validated advantage over established baselines, no novelty/SOTA claim, no IIT correspondence, and no consciousness inference.
