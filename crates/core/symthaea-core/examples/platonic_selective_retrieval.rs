@@ -106,7 +106,11 @@ struct Evaluation {
 
 impl Evaluation {
     fn coverage(self) -> f64 {
-        if self.total == 0 { 0.0 } else { self.accepted as f64 / self.total as f64 }
+        if self.total == 0 {
+            0.0
+        } else {
+            self.accepted as f64 / self.total as f64
+        }
     }
 
     fn selective_risk(self) -> Option<f64> {
@@ -114,20 +118,32 @@ impl Evaluation {
     }
 
     fn raw_accuracy(self) -> f64 {
-        if self.total == 0 { 0.0 } else { self.raw_correct as f64 / self.total as f64 }
+        if self.total == 0 {
+            0.0
+        } else {
+            self.raw_correct as f64 / self.total as f64
+        }
     }
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
     let start = Instant::now();
     println!("# protocol=selective-retrieval-v1");
-    println!("# calibration_rule=empirical_threshold_search_plus_independent_certification_and_fixed_sequence_CIC");
-    println!("# certification=one_sided_clopper_pearson_upper_bound_bonferroni_adjusted_for_6_rules_x_5_seeds");
-    println!("# fixed_sequence_rule=predeclared_strict_to_permissive_candidates_stop_at_first_failed_certificate");
+    println!(
+        "# calibration_rule=empirical_threshold_search_plus_independent_certification_and_fixed_sequence_CIC"
+    );
+    println!(
+        "# certification=one_sided_clopper_pearson_upper_bound_bonferroni_adjusted_for_6_rules_x_5_seeds"
+    );
+    println!(
+        "# fixed_sequence_rule=predeclared_strict_to_permissive_candidates_stop_at_first_failed_certificate"
+    );
     println!("# fixed_sequence_uses_one_calibration_split=true");
     println!("# set_valued_baseline=split_conformal_prediction_sets");
     println!("# conformal_alpha=0.05; marginal_known_query_coverage_target=0.95");
-    println!("# conformal_scope=exchangeable_known_queries_from_same_synthetic_generator; strata_are_descriptive");
+    println!(
+        "# conformal_scope=exchangeable_known_queries_from_same_synthetic_generator; strata_are_descriptive"
+    );
     println!("# query_mix_weights=known:random_ood:ambiguous_mixture=7:2:2");
     println!("# known_query_noise_level=uniform_over_0,0.10,0.20,0.30,0.40,0.45,0.50");
     println!("# separate_near_unknown_challenge_distances=0.05,0.10,0.20");
@@ -362,20 +378,16 @@ fn generate_queries(
         if query_type < KNOWN_QUERY_WEIGHT {
             let target = sample_bounded(&mut rng_state, prototypes.len());
             let noise_index = sample_bounded(&mut rng_state, NOISE_LEVELS.len());
-            let query = prototypes[target].with_noise(
-                NOISE_LEVELS[noise_index],
-                next_u64(&mut rng_state),
-            )?;
+            let query = prototypes[target]
+                .with_noise(NOISE_LEVELS[noise_index], next_u64(&mut rng_state))?;
             queries.push(QuerySample {
                 vector: query,
                 target: Some(target),
                 kind: QueryKind::Known { noise_index },
             });
         } else if query_type < KNOWN_QUERY_WEIGHT + OOD_QUERY_WEIGHT {
-            let query = PatternVector::seeded_random(
-                prototypes[0].dimension(),
-                next_u64(&mut rng_state),
-            )?;
+            let query =
+                PatternVector::seeded_random(prototypes[0].dimension(), next_u64(&mut rng_state))?;
             queries.push(QuerySample {
                 vector: query,
                 target: None,
@@ -458,7 +470,9 @@ fn score_queries(
         scored.push(ScoredQuery {
             best_similarity: best,
             top_two_margin: best - second,
-            correct: sample.target.is_some_and(|target_index| target_index == best_index),
+            correct: sample
+                .target
+                .is_some_and(|target_index| target_index == best_index),
             target_similarity,
             prototype_similarities: Arc::from(prototype_similarities),
             kind: sample.kind,
@@ -929,7 +943,10 @@ fn report_conformal_set_summaries(
             return;
         }
         let labeled_n = samples.iter().filter(|sample| sample.labeled).count();
-        let covered = samples.iter().filter(|sample| sample.labeled && sample.covered).count();
+        let covered = samples
+            .iter()
+            .filter(|sample| sample.labeled && sample.covered)
+            .count();
         let set_sum: usize = samples.iter().map(|sample| sample.set_size).sum();
         let singleton = samples.iter().filter(|sample| sample.set_size == 1).count();
         let empty = samples.iter().filter(|sample| sample.set_size == 0).count();
@@ -950,8 +967,20 @@ fn report_conformal_set_summaries(
     emit(seed, split, "all", alpha, quantile, calibration_n, samples);
     for noise_index in 0..NOISE_LEVELS.len() {
         let kind = QueryKind::Known { noise_index };
-        let subset: Vec<_> = samples.iter().copied().filter(|sample| sample.kind == kind).collect();
-        emit(seed, split, &format!("known_noise_{noise_index}"), alpha, quantile, calibration_n, &subset);
+        let subset: Vec<_> = samples
+            .iter()
+            .copied()
+            .filter(|sample| sample.kind == kind)
+            .collect();
+        emit(
+            seed,
+            split,
+            &format!("known_noise_{noise_index}"),
+            alpha,
+            quantile,
+            calibration_n,
+            &subset,
+        );
     }
     for (kind, label) in [
         (QueryKind::RandomOod, "random_ood"),
@@ -962,8 +991,20 @@ fn report_conformal_set_summaries(
     }
     for distance_index in 0..NEAR_UNKNOWN_DISTANCES.len() {
         let kind = QueryKind::NearPrototypeUnknown { distance_index };
-        let subset: Vec<_> = samples.iter().copied().filter(|sample| sample.kind == kind).collect();
-        emit(seed, split, &format!("near_unknown_{distance_index}"), alpha, quantile, calibration_n, &subset);
+        let subset: Vec<_> = samples
+            .iter()
+            .copied()
+            .filter(|sample| sample.kind == kind)
+            .collect();
+        emit(
+            seed,
+            split,
+            &format!("near_unknown_{distance_index}"),
+            alpha,
+            quantile,
+            calibration_n,
+            &subset,
+        );
     }
 }
 
@@ -988,10 +1029,8 @@ fn report_identity_collision_controls(
 
         for _ in 0..NEAR_UNKNOWN_PER_DISTANCE {
             let source = sample_bounded(&mut rng_state, prototypes.len());
-            let observed = prototypes[source].with_noise(
-                noise_fraction,
-                next_u64(&mut rng_state),
-            )?;
+            let observed =
+                prototypes[source].with_noise(noise_fraction, next_u64(&mut rng_state))?;
             known_queries.push(QuerySample {
                 vector: observed.clone(),
                 target: Some(source),
@@ -1175,19 +1214,20 @@ fn binomial_cdf_at_most(errors: usize, trials: usize, probability: f64) -> f64 {
         if successes > 0 {
             log_choose += ((trials - successes + 1) as f64 / successes as f64).ln();
         }
-        terms.push(
-            log_choose
-                + successes as f64 * log_p
-                + (trials - successes) as f64 * log_q,
-        );
+        terms.push(log_choose + successes as f64 * log_p + (trials - successes) as f64 * log_q);
     }
     let max_log = terms.iter().copied().fold(f64::NEG_INFINITY, f64::max);
     if !max_log.is_finite() {
         return 0.0;
     }
-    (max_log + terms.iter().map(|value| (value - max_log).exp()).sum::<f64>().ln())
-        .exp()
-        .clamp(0.0, 1.0)
+    (max_log
+        + terms
+            .iter()
+            .map(|value| (value - max_log).exp())
+            .sum::<f64>()
+            .ln())
+    .exp()
+    .clamp(0.0, 1.0)
 }
 
 fn wilson_upper_bound(errors: usize, accepted: usize, z: f64) -> f64 {
@@ -1222,16 +1262,14 @@ mod tests {
     #[test]
     fn bonferroni_exact_binomial_certificate_respects_sample_floor() {
         assert!(
-            clopper_pearson_upper_bound(0, 124, CERTIFICATION_ALPHA_PER_RULE)
-                > MAX_VALIDATION_RISK
+            clopper_pearson_upper_bound(0, 124, CERTIFICATION_ALPHA_PER_RULE) > MAX_VALIDATION_RISK
         );
         assert!(
             clopper_pearson_upper_bound(0, 125, CERTIFICATION_ALPHA_PER_RULE)
                 <= MAX_VALIDATION_RISK
         );
         assert!(
-            clopper_pearson_upper_bound(1, 125, CERTIFICATION_ALPHA_PER_RULE)
-                > MAX_VALIDATION_RISK
+            clopper_pearson_upper_bound(1, 125, CERTIFICATION_ALPHA_PER_RULE) > MAX_VALIDATION_RISK
         );
     }
 
@@ -1432,8 +1470,7 @@ mod tests {
                 kind: QueryKind::RandomOod,
             },
         ];
-        let (quantile, calibration_n) =
-            split_conformal_quantile(&samples, 0.5).expect("quantile");
+        let (quantile, calibration_n) = split_conformal_quantile(&samples, 0.5).expect("quantile");
         assert_eq!(calibration_n, 4);
         // Scores 1 - sim are [0.1, 0.2, 0.3, 0.4]; ceil((4+1)*.5)=3.
         assert!((quantile - 0.3).abs() < 1e-12);
@@ -1504,19 +1541,37 @@ mod tests {
         };
 
         assert_eq!(known.vector, unknown.vector);
-        let known_score = score_queries(std::slice::from_ref(&known), &prototypes)
-            .expect("known score");
-        let unknown_score = score_queries(std::slice::from_ref(&unknown), &prototypes)
-            .expect("unknown score");
-        assert_eq!(known_score[0].best_similarity, unknown_score[0].best_similarity);
-        assert_eq!(known_score[0].top_two_margin, unknown_score[0].top_two_margin);
+        let known_score =
+            score_queries(std::slice::from_ref(&known), &prototypes).expect("known score");
+        let unknown_score =
+            score_queries(std::slice::from_ref(&unknown), &prototypes).expect("unknown score");
+        assert_eq!(
+            known_score[0].best_similarity,
+            unknown_score[0].best_similarity
+        );
+        assert_eq!(
+            known_score[0].top_two_margin,
+            unknown_score[0].top_two_margin
+        );
         assert_ne!(known_score[0].correct, unknown_score[0].correct);
 
         for rule in [
-            DecisionRule { min_similarity: -1.0, min_margin: -1.0 },
-            DecisionRule { min_similarity: 0.5, min_margin: -1.0 },
-            DecisionRule { min_similarity: -1.0, min_margin: 0.05 },
-            DecisionRule { min_similarity: 0.5, min_margin: 0.05 },
+            DecisionRule {
+                min_similarity: -1.0,
+                min_margin: -1.0,
+            },
+            DecisionRule {
+                min_similarity: 0.5,
+                min_margin: -1.0,
+            },
+            DecisionRule {
+                min_similarity: -1.0,
+                min_margin: 0.05,
+            },
+            DecisionRule {
+                min_similarity: 0.5,
+                min_margin: 0.05,
+            },
         ] {
             assert_eq!(
                 evaluate(&known_score, rule).accepted,
