@@ -96,6 +96,9 @@ jobs:
       - name: Verify HDC pattern invariants and retrieval tests
         run: cargo test --locked --release -p symthaea-core pattern_interaction -- --nocapture
 
+      - name: Verify HRR binding, unbinding and capacity tests
+        run: cargo test --locked --release -p symthaea-core hrr_baseline -- --nocapture
+
       - name: Run abstract pattern interaction benchmark
         run: cargo run --locked --release -p symthaea-core --example platonic_pattern_interaction 2>&1 | tee research-results/platonic-pattern-interaction.log
 
