@@ -276,15 +276,25 @@ fn satisfies_one_step_viability(action: Action, reserve: f64, load: f64, stress:
 /// Count how many currently available actions stay inside the declared
 /// one-step viability region. This measures local option breadth, not long-horizon
 /// reachability or the value of those options.
-pub fn safe_action_option_count(reserve: f64, load: f64, stress: f64) -> usize {
-    [
-        Action::Push,
-        Action::Maintain,
-        Action::EmergencyRecover,
-    ]
-    .iter()
-    .filter(|action| satisfies_one_step_viability(**action, reserve, load, stress))
-    .count()
+pub fn safe_action_option_count(
+    reserve: f64,
+    load: f64,
+    stress: f64,
+    shield_can_recover: bool,
+) -> usize {
+    let mut count = 0;
+    if satisfies_one_step_viability(Action::Push, reserve, load, stress) {
+        count += 1;
+    }
+    if satisfies_one_step_viability(Action::Maintain, reserve, load, stress) {
+        count += 1;
+    }
+    if shield_can_recover
+        && satisfies_one_step_viability(Action::EmergencyRecover, reserve, load, stress)
+    {
+        count += 1;
+    }
+    count
 }
 
 /// Model-perfect one-step shield for the synthetic environment. This is not a
@@ -418,7 +428,7 @@ pub fn run_episode_with_shield(
         // Count false-alarm opportunities from the pre-action state; do not
         // let the action itself change the denominator or hide the opportunity.
         let safe_options =
-            safe_action_option_count(reserve, allostatic_load, stress);
+            safe_action_option_count(reserve, allostatic_load, stress, shielded);
         safe_action_options_total += safe_options;
         minimum_safe_action_options = minimum_safe_action_options.min(safe_options);
 
@@ -628,9 +638,12 @@ mod tests {
 
     #[test]
     fn viable_action_breadth_distinguishes_full_reduced_and_empty_sets() {
-        assert_eq!(safe_action_option_count(0.80, 0.20, 0.10), 3);
-        assert_eq!(safe_action_option_count(0.16, 0.87, 0.90), 1);
-        assert_eq!(safe_action_option_count(0.0, 0.95, 1.0), 0);
+        assert_eq!(safe_action_option_count(0.80, 0.20, 0.10, false), 2);
+        assert_eq!(safe_action_option_count(0.80, 0.20, 0.10, true), 3);
+        assert_eq!(safe_action_option_count(0.16, 0.87, 0.90, false), 0);
+        assert_eq!(safe_action_option_count(0.16, 0.87, 0.90, true), 1);
+        assert_eq!(safe_action_option_count(0.0, 0.95, 1.0, false), 0);
+        assert_eq!(safe_action_option_count(0.0, 0.95, 1.0, true), 0);
     }
 
     #[test]
