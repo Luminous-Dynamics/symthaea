@@ -22,3 +22,8 @@ This pack is not yet an executable benchmark runner, a fully expert-annotated co
 7. Report risk/coverage, citation precision, false lineage, abstention and rights-policy failures separately.
 
 Critical access/provenance failures are release blockers. No queued CI result or planned test may be reported as a pass.
+
+
+## Related module: MythologyBench
+
+Mythology is a first-class adjacent domain, not a synonym for esotericism. The Egypt-first development pack is in [`benchmarks/mythology-bench/v0/`](../../mythology-bench/v0/README.md). It reuses the overall evidence/provenance design but keeps mythology-specific evaluation separate so results are not conflated with esotericism.
