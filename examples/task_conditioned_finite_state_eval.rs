@@ -486,6 +486,10 @@ fn fixtures() -> Vec<Fixture> {
 
 fn main() {
     println!("# schema=tccip-exact-finite-state-v1");
+    let source_revision = std::env::var("SYMTHAEA_SOURCE_SHA")
+        .unwrap_or_else(|_| "UNBOUND".to_string());
+    println!("# source_revision={source_revision}");
+    println!("# UNBOUND means exploratory output only; bind SYMTHAEA_SOURCE_SHA to the exact git HEAD for a reproducibility receipt");
     println!("# inputs are enumerated uniformly; cut source is replaced by an independent fair coin");
     println!("# component labels: 0=A, 1=B; intervention kind is derived from source/target labels");
     println!("fixture\tintervention\tkind\tsource\ttarget\tcost\tintact_utility\tutility\tutility_loss");
@@ -497,7 +501,7 @@ fn main() {
             any_failed = true;
             continue;
         }
-        eprintln!(
+        println!(
             "# fixture={} target={} output_node={} input_count={} components={:?} rules={}",
             fixture.name,
             fixture.task_target.canonical(),
@@ -524,7 +528,7 @@ fn main() {
                     );
                 }
                 for point in profile {
-                    eprintln!(
+                    println!(
                         "# profile={} budget={} intact={:.9} cross_loss={:.9} control_loss={:.9} tccip={:.9} worst_cross_utility={:.9} n_cross={} n_control={}",
                         point.fixture,
                         point.max_cost,
