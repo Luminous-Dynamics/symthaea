@@ -39,13 +39,17 @@
 //! Deliberately generic over the hypothesis and experiment representations
 //! (via a `predict` closure) rather than hardcoded to `Expr` -- this makes
 //! it reusable for whatever the next discovery task looks like, not just
-//! the closed M2 wave-chain problem. [`epistemic_value`] scores a single
-//! candidate experiment; [`select_most_informative_experiment`] picks the
-//! best of a candidate pool. `predict` returning `None` for a hypothesis
-//! (e.g. the expression is undefined/non-finite at that experiment) means
-//! that hypothesis contributes no signal for this experiment, not that the
-//! experiment is uninformative -- it's simply excluded from that
-//! experiment's variance computation.
+//! the closed M2 wave-chain problem. `None` and non-finite predictions are
+//! excluded from the variance calculation. If fewer than two finite
+//! predictions remain, the typed assessment reports insufficient support and
+//! the selector will not rank the experiment as a zero-score tie.
+//!
+//! The score remains prediction variance (query-by-committee), not a Bayesian
+//! posterior, calibrated expected information gain, or a cost-normalized
+//! experiment utility. Decision-bearing callers should use
+//! `assess_epistemic_value` instead of the compatibility scalar API when they
+//! need to distinguish agreement, insufficient support, and unrepresentable
+//! scores.
 
 /// A typed result for scoring a candidate experiment against live hypotheses.
 ///
