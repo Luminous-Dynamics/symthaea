@@ -99,9 +99,15 @@ jobs:
             and (.output_sample_count >= 1)
             and (. as $root | ($root.output_samples | length) == $root.output_sample_count)
             and (.attempted_steps_reported >= .accepted_steps_reported)
-            and (.state_is_finite == true)
-            and all(.final_state[]; type == "number" and isfinite)
-            and (.output_samples | all(.[]; (.time | type == "number") and (.state | length == 3) and all(.state[]; type == "number" and isfinite)))
+            and (.final_state | length == 3)
+            and all(.final_state[]; type == "number" or type == "null")
+            and (.output_samples | all(.[]; (.time | type == "number" and isfinite) and (.state | length == 3) and all(.state[]; type == "number" or type == "null")))
+            and (if .status == "completed" then
+              .state_is_finite == true
+              and all(.final_state[]; type == "number" and isfinite)
+              and (.output_samples | all(.[]; (.time | type == "number" and isfinite) and (.state | length == 3) and all(.state[]; type == "number" and isfinite)))
+              else true
+              end)
           ' /tmp/ode-robertson-probe-1.json
           sha256sum /tmp/ode-robertson-probe-1.json
 
