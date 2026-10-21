@@ -13,7 +13,7 @@ This protocol expands the existing Cell Foundry equifinality and dose-response e
 - **Replication:** four independent deterministic seeds (17, 29, 41, 53).
 - **Outcomes:** final morphology discrepancy, mean discrepancy over the trajectory, first observed day below a fixed 0.05 tolerance, and wall-clock time per condition.
 
-The benchmark writes every trajectory to **levin_multiscale_results.json**, prints per-condition CSV-like rows, and reports mean and population standard deviation of final discrepancy across seeds. Use the same source revision, build profile, machine, and configuration when comparing runtimes.
+The fixed sweep covers 240 conditions (four seeds × two pattern families × three perturbations × two homing settings × five fixed permeability values). The adaptive extension adds 96 controller conditions (48 seed/family/perturbation/homing contexts × two policies: trend-only and counterfactual). The fixed trajectories are written to **levin_multiscale_results.json** and adaptive traces to **levin_adaptive_coupling_results.json**. The runner prints per-condition rows and grouped means/population standard deviations. Use the same source revision, build profile, machine, and configuration when comparing runtimes.
 
 ## Run
 
