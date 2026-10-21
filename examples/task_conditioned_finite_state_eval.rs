@@ -408,9 +408,13 @@ impl Fixture {
             return Err("fixture must have at least one intervention".into());
         }
         let mut ids = HashSet::new();
+        let mut edges = HashSet::new();
         for cut in &self.interventions {
             if cut.id.trim().is_empty() || !ids.insert(cut.id.as_str()) {
                 return Err("intervention IDs must be unique and non-empty".into());
+            }
+            if !edges.insert((cut.source, cut.target)) {
+                return Err(format!("duplicate intervention edge {}->{}", cut.source, cut.target));
             }
             if cut.cost == 0 {
                 return Err(format!("intervention {} must have positive cost", cut.id));
@@ -1200,6 +1204,20 @@ mod tests {
         assert!((pair.second_cut_utility - 0.5).abs() < 1e-12);
         assert!((pair.joint_cut_utility - 0.5).abs() < 1e-12);
         assert!((pair.interaction_contrast - 0.5).abs() < 1e-12);
+    }
+
+    #[test]
+    fn duplicate_intervention_edges_are_rejected_before_pairwise_interactions() {
+        let mut fixture = fixtures().unwrap().into_iter()
+            .find(|fixture| fixture.name == "role_matched_xor_synergy_uniform_prior")
+            .unwrap();
+        fixture.interventions.push(Intervention {
+            id: "duplicate_edge_other_id".into(),
+            source: 2,
+            target: 4,
+            cost: 1,
+        });
+        assert!(fixture.validate().unwrap_err().contains("duplicate intervention edge"));
     }
 
     #[test]
