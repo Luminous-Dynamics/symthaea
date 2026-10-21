@@ -99,6 +99,12 @@ struct FixedSequenceCalibration {
 #[derive(Debug, Clone, Copy)]
 struct Evaluation {
     accepted: usize,
+    /// Rejected because the best match failed its similarity threshold only.
+    rejected_score_only: usize,
+    /// Rejected because top-two separation failed its margin threshold only.
+    rejected_margin_only: usize,
+    /// Rejected because both score and separation thresholds failed.
+    rejected_both: usize,
     errors: usize,
     raw_correct: usize,
     total: usize,
@@ -152,7 +158,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         "# identifiability_control=paired known/unknown labels share identical PatternVector; vector-only prediction must agree"
     );
     println!(
-        "record_type,seed,strategy,query_kind,noise_fraction,dimension,prototypes,selection_n,certification_n,certified,cert_accept,cert_errors,cert_risk_upper95,test_n,min_similarity,min_margin,n,accepted,coverage,errors,selective_risk,risk95_low,risk95_high,top1_accuracy"
+        "record_type,seed,strategy,query_kind,noise_fraction,dimension,prototypes,selection_n,certification_n,certified,cert_accept,cert_errors,cert_risk_upper95,test_n,min_similarity,min_margin,n,accepted,rejected_score_only,rejected_margin_only,rejected_both,coverage,errors,selective_risk,risk95_low,risk95_high,top1_accuracy"
     );
 
     for seed in SEEDS {
@@ -635,6 +641,9 @@ fn thresholds(samples: &[ScoredQuery], metric: fn(&ScoredQuery) -> f64) -> Vec<f
 
 fn evaluate(samples: &[ScoredQuery], rule: DecisionRule) -> Evaluation {
     let mut accepted = 0;
+    let mut rejected_score_only = 0;
+    let mut rejected_margin_only = 0;
+    let mut rejected_both = 0;
     let mut errors = 0;
     let mut raw_correct = 0;
 
@@ -642,18 +651,26 @@ fn evaluate(samples: &[ScoredQuery], rule: DecisionRule) -> Evaluation {
         if sample.correct {
             raw_correct += 1;
         }
-        let is_accepted = sample.best_similarity >= rule.min_similarity
-            && sample.top_two_margin >= rule.min_margin;
-        if is_accepted {
-            accepted += 1;
-            if !sample.correct {
-                errors += 1;
+        let score_pass = sample.best_similarity >= rule.min_similarity;
+        let margin_pass = sample.top_two_margin >= rule.min_margin;
+        match (score_pass, margin_pass) {
+            (true, true) => {
+                accepted += 1;
+                if !sample.correct {
+                    errors += 1;
+                }
             }
+            (false, true) => rejected_score_only += 1,
+            (true, false) => rejected_margin_only += 1,
+            (false, false) => rejected_both += 1,
         }
     }
 
     Evaluation {
         accepted,
+        rejected_score_only,
+        rejected_margin_only,
+        rejected_both,
         errors,
         raw_correct,
         total: samples.len(),
@@ -1154,11 +1171,14 @@ fn write_evaluation_row(
         .unwrap_or_else(|| "NA".to_owned());
 
     println!(
-        "{record_type},{seed},{strategy},{query_kind},{noise},{DIMENSION},{PROTOTYPE_COUNT},{selection_n},{certification_n},{certified},{cert_accepted},{cert_errors},{cert_upper_risk},{test_n},{:.6},{:.6},{},{},{:.6},{},{},{:.6},{:.6},{:.6}",
+        "{record_type},{seed},{strategy},{query_kind},{noise},{DIMENSION},{PROTOTYPE_COUNT},{selection_n},{certification_n},{certified},{cert_accepted},{cert_errors},{cert_upper_risk},{test_n},{:.6},{:.6},{},{},{},{},{},{:.6},{},{},{:.6},{:.6},{:.6}",
         rule.min_similarity,
         rule.min_margin,
         result.total,
         result.accepted,
+        result.rejected_score_only,
+        result.rejected_margin_only,
+        result.rejected_both,
         result.coverage(),
         result.errors,
         risk_text,
@@ -1274,6 +1294,62 @@ fn derive_seed(seed: u64, first: u64, second: u64) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn rejection_reasons_partition_nonaccepted_queries() {
+        let samples = vec![
+            ScoredQuery {
+                best_similarity: 0.9,
+                top_two_margin: 0.2,
+                correct: true,
+                target_similarity: Some(0.9),
+                prototype_similarities: Arc::<[f64]>::from(Vec::<f64>::new()),
+                kind: QueryKind::Known { noise_index: 0 },
+            },
+            ScoredQuery {
+                best_similarity: 0.1,
+                top_two_margin: 0.2,
+                correct: false,
+                target_similarity: None,
+                prototype_similarities: Arc::<[f64]>::from(Vec::<f64>::new()),
+                kind: QueryKind::RandomOod,
+            },
+            ScoredQuery {
+                best_similarity: 0.9,
+                top_two_margin: 0.01,
+                correct: false,
+                target_similarity: None,
+                prototype_similarities: Arc::<[f64]>::from(Vec::<f64>::new()),
+                kind: QueryKind::AmbiguousMixture,
+            },
+            ScoredQuery {
+                best_similarity: 0.1,
+                top_two_margin: 0.01,
+                correct: false,
+                target_similarity: None,
+                prototype_similarities: Arc::<[f64]>::from(Vec::<f64>::new()),
+                kind: QueryKind::NearPrototypeUnknown { distance_index: 0 },
+            },
+        ];
+        let result = evaluate(
+            &samples,
+            DecisionRule {
+                min_similarity: 0.5,
+                min_margin: 0.05,
+            },
+        );
+        assert_eq!(result.accepted, 1);
+        assert_eq!(result.rejected_score_only, 1);
+        assert_eq!(result.rejected_margin_only, 1);
+        assert_eq!(result.rejected_both, 1);
+        assert_eq!(
+            result.accepted
+                + result.rejected_score_only
+                + result.rejected_margin_only
+                + result.rejected_both,
+            result.total
+        );
+    }
 
     #[test]
     fn bonferroni_exact_binomial_certificate_respects_sample_floor() {
