@@ -27,6 +27,7 @@ on:
       - "crates/core/symthaea-core/src/hdc/mod.rs"
       - "crates/core/symthaea-core/examples/platonic_pattern_interaction.rs"
       - "crates/core/symthaea-core/examples/platonic_selective_retrieval.rs"
+      - "crates/core/symthaea-core/Cargo.toml"
       - "crates/domains/symthaea-cell-foundry/**"
       - "Cargo.toml"
       - "Cargo.lock"
@@ -108,6 +109,9 @@ jobs:
 
       - name: Run high-capacity MAP versus HRR stress sweep
         run: cargo run --locked --release -p symthaea-core --example platonic_pattern_interaction -- --stress 2>&1 | tee research-results/platonic-pattern-interaction-stress.log
+
+      - name: Test selective retrieval calibration and certification
+        run: cargo test --locked --release -p symthaea-core --example platonic_selective_retrieval -- --nocapture
 
       - name: Run calibrated selective retrieval benchmark
         run: cargo run --locked --release -p symthaea-core --example platonic_selective_retrieval 2>&1 | tee research-results/platonic-selective-retrieval.log
