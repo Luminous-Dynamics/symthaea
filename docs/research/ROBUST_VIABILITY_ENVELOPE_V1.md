@@ -74,7 +74,7 @@ First qualify the interval arithmetic and action-set semantics in the existing d
 - report false vetoes, missed constraints, no-certified-action frequency, task reward, reserve, load, viable-action breadth, recovery and p95/worst-case outcomes;
 - freeze held-out uncertainty scenarios before tuning and publish raw results plus deterministic provenance.
 
-The existing benchmark can provide a local accounting harness. For an external control comparison, adapt only where observation/action semantics match. Safe-Control-Gym includes symbolic safety constraints, injected disturbances, MPC variants and control-barrier safety filters; SafeRLEval recommends that safety evaluations report violation rate and severity alongside reward, rather than only average cost. References:
+The existing benchmark can provide a local accounting harness. It now separates episodes with no qualifying disturbance from disturbed episodes whose recovery is right-censored; report recovery rates over disturbed episodes only. This is important because a calm episode cannot be counted as a failed recovery. For an external control comparison, adapt only where observation/action semantics match. Safe-Control-Gym includes symbolic safety constraints, injected disturbances, MPC variants and control-barrier safety filters; SafeRLEval recommends that safety evaluations report violation rate and severity alongside reward, rather than only average cost. References:
 - [Safe-Control-Gym](https://github.com/learnsyslab/safe-control-gym)
 - [SafeRLEval / Evaluation Metrics for Safe Reinforcement Learning (September 2026)](https://arxiv.org/abs/2609.15315)
 
