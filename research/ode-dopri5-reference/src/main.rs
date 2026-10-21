@@ -47,8 +47,7 @@ fn max_relative_energy_drift(states: impl Iterator<Item = [f64; 2]>, scale: f64)
 
 fn main() -> Result<(), Box<dyn Error>> {
     let source_sha = env::var("ODE_BENCH_SOURCE_SHA").unwrap_or_else(|_| "unknown".to_string());
-    let checkout_sha =
-        env::var("ODE_BENCH_CHECKOUT_SHA").unwrap_or_else(|_| "unknown".to_string());
+    let checkout_sha = env::var("ODE_BENCH_CHECKOUT_SHA").unwrap_or_else(|_| "unknown".to_string());
     let lock_sha = env::var("ODE_BENCH_LOCK_SHA").unwrap_or_else(|_| "unknown".to_string());
 
     let custom_integrator = Rk45Integrator::new(1.0e-8);
@@ -77,17 +76,25 @@ fn main() -> Result<(), Box<dyn Error>> {
                     let endpoint = report.simulation.final_state();
                     let endpoint_error = scaled_endpoint_error(endpoint, scale, T_END);
                     let energy_drift = max_relative_energy_drift(
-                        report.simulation.states.iter().map(|state| [state[0], state[1]]),
+                        report
+                            .simulation
+                            .states
+                            .iter()
+                            .map(|state| [state[0], state[1]]),
                         scale,
                     );
-                    let completed = report
-                        .simulation
-                        .times
-                        .last()
-                        .is_some_and(|time| (*time - T_END).abs() <= f64::EPSILON * T_END.max(1.0));
+                    let completed =
+                        report.simulation.times.last().is_some_and(|time| {
+                            (*time - T_END).abs() <= f64::EPSILON * T_END.max(1.0)
+                        });
                     let finite = endpoint_error.is_finite()
                         && energy_drift.is_finite()
-                        && report.simulation.states.iter().flatten().all(|value| value.is_finite());
+                        && report
+                            .simulation
+                            .states
+                            .iter()
+                            .flatten()
+                            .all(|value| value.is_finite());
                     let pass = completed
                         && finite
                         && endpoint_error <= endpoint_error_limit
@@ -143,7 +150,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                         continue;
                     };
                     let endpoint_time = reference_times.last().copied().unwrap_or(f64::NAN);
-                    let endpoint_error = scaled_endpoint_error(&[endpoint[0], endpoint[1]], scale, T_END);
+                    let endpoint_error =
+                        scaled_endpoint_error(&[endpoint[0], endpoint[1]], scale, T_END);
                     let energy_drift = max_relative_energy_drift(
                         reference_states.iter().map(|state| [state[0], state[1]]),
                         scale,
@@ -152,7 +160,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                         && (endpoint_time - T_END).abs() <= f64::EPSILON * T_END.max(1.0);
                     let finite = endpoint_error.is_finite()
                         && energy_drift.is_finite()
-                        && reference_states.iter().all(|state| state.iter().all(|value| value.is_finite()));
+                        && reference_states
+                            .iter()
+                            .all(|state| state.iter().all(|value| value.is_finite()));
                     let pass = completed
                         && finite
                         && endpoint_error <= endpoint_error_limit
