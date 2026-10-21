@@ -364,8 +364,8 @@ impl AdmixedPopulation {
 /// Pharmacogenomics health equity engine.
 ///
 /// Loads reference allele frequencies and CPIC guidelines, then provides
-/// methods for equity analysis, ancestry-adjusted dosing, and population
-/// reporting.
+/// methods for aggregate equity analysis, research-only guideline projections,
+/// and population reporting.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PgxHealthEquityEngine {
     /// Reference allele frequency data.
@@ -1349,7 +1349,7 @@ impl PgxHealthEquityEngine {
                 .collect();
             format!(
                 "{}/{}: Equity gap {:.2}. Underserved populations: {}. \
-                 Consider ancestry-adjusted dosing or therapeutic drug monitoring.",
+                 This aggregate result is not an individual dose, monitoring, or treatment recommendation.",
                 drug,
                 gene,
                 equity_gap_score,
