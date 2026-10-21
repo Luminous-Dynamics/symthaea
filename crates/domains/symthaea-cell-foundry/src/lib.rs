@@ -47,10 +47,10 @@ pub use epigenetics::{encode_methylation_pattern, methylation_similarity, valida
 pub use ethics_gate::EthicsGate;
 pub use experiments::{
     AXIS_HEAD_VMEM, AXIS_TAIL_VMEM, AdaptiveConditionResult, AdaptiveCouplingConfig,
-    ConditionResult, EquifinalityResult, Perturbation,
-    build_linear_axis_template, build_radial_bipolar_template, mean_vmem_in_x_band,
-    run_adaptive_coupling_experiment, run_counterfactual_coupling_experiment,
-    run_dose_response_experiment, run_equifinality_experiment,
+    ConditionResult, EquifinalityResult, Perturbation, build_linear_axis_template,
+    build_radial_bipolar_template, mean_vmem_in_x_band, run_adaptive_coupling_experiment,
+    run_counterfactual_coupling_experiment, run_dose_response_experiment,
+    run_equifinality_experiment,
 };
 pub use fep_agent::{CultureAction, CultureFepAgent};
 pub use ivg_protocol::IvgProtocol;
