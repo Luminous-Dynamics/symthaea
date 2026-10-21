@@ -18,7 +18,7 @@ A confidence scalar is not a bound on model error. The prototype treats uncertai
 - action-effect envelope: possible reserve and load deltas under each action;
 - viability limits: minimum reserve and maximum allowed load;
 - authority: whether the controller is permitted to invoke emergency recovery;
-- calibration: a frozen predictor is evaluated on independent calibration episodes, and each score is the maximum absolute residual over the full episode for reserve or load. Bonferroni-adjusted component coverage produces a joint state-envelope coverage target.
+- calibration: a frozen predictor is evaluated on independent calibration episodes, and each score is the maximum absolute residual over the full episode for reserve or load. Four-way Bonferroni-adjusted component coverage produces a joint state-and-action-effect envelope target.
 
 For one-step interval propagation, a candidate action is robustly viable only when:
 
@@ -30,16 +30,16 @@ For one-step interval propagation, a candidate action is robustly viable only wh
 
 Here the lower next-reserve bound and upper next-load bound are computed over the declared interval set. State variables are clipped to their declared [0, 1] domain after interval addition, matching the synthetic simulator's saturation semantics.
 
-The calibration executable contract is in `tools/allostatic-control-bench/src/calibration.rs`. For target joint coverage C across the two state channels, it uses per-channel coverage (1-(1-C)/2) and a finite split-conformal order statistic. If the requested rank exceeds the number of independent calibration episodes, it returns `None` rather than inventing a finite radius. That rule creates a useful minimum-sample-size gate—for example, a finite bound at 95% joint coverage requires at least 39 exchangeable calibration episodes with these two-channel Bonferroni radii.
+The calibration executable contract is in `tools/allostatic-control-bench/src/calibration.rs`. For target joint coverage C across four residual families, it uses per-family coverage (1-(1-C)/4) and a finite split-conformal order statistic. If the requested rank exceeds the number of independent calibration episodes, it returns `None` rather than inventing a finite radius. That rule creates a useful minimum-sample-size gate—for example, a finite bound at 95% joint coverage requires at least 39 exchangeable calibration episodes for 90% joint coverage and at least 79 for 95% joint coverage.
 
-These intervals must be calibrated with independent episode-level data or justified by a conservative physical argument in a real deployment. The current unit tests use synthetic scores and validate only the software contract; they do not establish empirical coverage. The finite-sample calibration statement assumes exchangeable calibration/test episodes and a predictor frozen before calibration. Distribution shift, serial leakage across split groups, under-bounded model classes, or a changing online predictor voids that interpretation.
+These intervals must be calibrated with independent episode-level data or justified by a conservative physical argument in a real deployment. The current unit tests use synthetic scores and validate only the software contract; they do not establish empirical coverage. State and action-effect intervals are both widened by their calibrated residual radii. The finite-sample calibration statement assumes exchangeable calibration/test episodes and a predictor frozen before calibration. Distribution shift, serial leakage across split groups, under-bounded model classes, or a changing online predictor voids that interpretation.
 
 ## Implementation
 
 Sources: `tools/allostatic-control-bench/src/robust_viability.rs` and `tools/allostatic-control-bench/src/calibration.rs`.
 
 - `Interval` rejects nonfinite and inverted ranges.
-- `calibrate_episode_radii` uses episode-level maximum residuals and Bonferroni-adjusts reserve/load coverage to target simultaneous envelope coverage. Too few calibration episodes returns `None`; it never invents a finite radius.
+- `calibrate_episode_radii` uses episode-level maximum residuals and Bonferroni-adjusts reserve-state, load-state, reserve-effect, and load-effect coverage to target simultaneous envelope coverage. Too few calibration episodes returns `None`; it never invents a finite radius.
 - `StateEnvelope` constrains reserve/load intervals to [0, 1].
 - `ActionEffectBounds` constrains one-step reserve/load deltas to [-1, 1].
 - `ViabilityLimits` validates the reserve floor and load ceiling independently; they represent different axes and must not be compared to each other.
