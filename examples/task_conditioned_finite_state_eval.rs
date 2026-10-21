@@ -221,8 +221,8 @@ struct Fixture {
     name: String,
     network: Network,
     task_target: TaskTarget,
+    input_state_weights: Vec<u64>,
     interventions: Vec<Intervention>,
-}
 
 #[derive(Clone, Debug, PartialEq)]
 struct InterventionResult {
@@ -325,6 +325,12 @@ impl Fixture {
     fn validate(&self) -> Result<(), String> {
         self.network.validate()?;
         self.task_target.validate(self.network.input_count)?;
+        if self.input_state_weights.len() != (1usize << self.network.input_count) {
+            return Err(format!("{}: input-state weight count must equal 2^input_count", self.name));
+        }
+        if self.input_state_weights.iter().all(|weight| *weight == 0) {
+            return Err(format!("{}: at least one input-state weight must be positive", self.name));
+        }
         if self.interventions.is_empty() {
             return Err("fixture must have at least one intervention".into());
         }
@@ -358,13 +364,17 @@ impl Fixture {
     /// enumerated instead of sampled.
     fn utility(&self, intervention: Option<&Intervention>) -> f64 {
         let input_states = 1usize << self.network.input_count;
-        let coin_states = if intervention.is_some() { 2 } else { 1 };
-        let mut correct = 0usize;
+        let coin_states = if intervention.is_some() { 2usize } else { 1usize };
+        let total_input_weight = self.input_state_weights.iter()
+            .map(|weight| *weight as u128)
+            .sum::<u128>();
+        let mut correct_weight = 0u128;
         for state in 0..input_states {
             let inputs = (0..self.network.input_count)
                 .map(|index| ((state >> index) & 1) != 0)
                 .collect::<Vec<_>>();
             let expected = self.task_target.evaluate(&inputs);
+            let weight = self.input_state_weights[state] as u128;
             for coin_state in 0..coin_states {
                 let values = self.network.evaluate_nodes(
                     &inputs,
@@ -372,11 +382,12 @@ impl Fixture {
                     coin_state != 0,
                 );
                 if values[self.network.output_node] == expected {
-                    correct += 1;
+                    correct_weight += weight;
                 }
             }
         }
-        correct as f64 / (input_states * coin_states) as f64
+        let denominator = total_input_weight * coin_states as u128;
+        correct_weight as f64 / denominator as f64
     }
 
     fn run(&self) -> Result<(Vec<InterventionResult>, Vec<ProfilePoint>), String> {
@@ -502,6 +513,15 @@ fn parse_rule(spec: &str) -> Result<Rule, String> {
     }
 }
 
+fn parse_input_state_weights(spec: &str) -> Result<Vec<u64>, String> {
+    spec.split(',')
+        .map(|token| {
+            token.parse::<u64>()
+                .map_err(|error| format!("invalid input-state weight {token:?}: {error}"))
+        })
+        .collect()
+}
+
 fn parse_task_target(spec: &str) -> Result<TaskTarget, String> {
     let parts = spec.split(':').collect::<Vec<_>>();
     match parts.as_slice() {
@@ -546,7 +566,7 @@ fn parse_interventions(spec: &str) -> Result<Vec<Intervention>, String> {
 /// Load executable fixture definitions from one versioned manifest.
 fn fixtures() -> Result<Vec<Fixture>, String> {
     const MANIFEST: &str = include_str!("../validation/fixtures/tccip_toy_expectations.tsv");
-    const SCHEMA: &str = "# schema=tccip-toy-expectations-v2";
+    const SCHEMA: &str = "# schema=tccip-toy-expectations-v3";
     if !MANIFEST.lines().any(|line| line.trim() == SCHEMA) {
         return Err(format!("fixture manifest must declare {SCHEMA}"));
     }
@@ -559,9 +579,9 @@ fn fixtures() -> Result<Vec<Fixture>, String> {
             continue;
         }
         let fields = line.split('\t').collect::<Vec<_>>();
-        if fields.len() != 18 {
+        if fields.len() != 19 {
             return Err(format!(
-                "manifest line {} has {} fields; expected 18",
+                "manifest line {} has {} fields; expected 19",
                 line_number + 1, fields.len()
             ));
         }
@@ -569,9 +589,10 @@ fn fixtures() -> Result<Vec<Fixture>, String> {
             return Err(format!("manifest line {} has empty or duplicate fixture name", line_number + 1));
         }
 
-        let rules = fields[5].split(',').map(parse_rule)
+        let input_state_weights = parse_input_state_weights(fields[5])?;
+        let rules = fields[6].split(',').map(parse_rule)
             .collect::<Result<Vec<_>, _>>()?;
-        let components = fields[6].chars().map(|label| match label {
+        let components = fields[7].chars().map(|label| match label {
             'A' => Ok(0),
             'B' => Ok(1),
             _ => Err(format!("invalid component label {label:?} in {}", fields[0])),
@@ -586,41 +607,42 @@ fn fixtures() -> Result<Vec<Fixture>, String> {
                 components,
             },
             task_target: parse_task_target(fields[4])?,
-            interventions: parse_interventions(fields[7])?,
+            input_state_weights,
+            interventions: parse_interventions(fields[8])?,
         };
         fixture.validate()?;
         if fixture.network.rules.len() != parse_usize(fields[1], "node count")? {
             return Err(format!("node count disagrees with rules in fixture {}", fixture.name));
         }
-        if fixture.network.canonical_rules() != fields[5] {
+        if fixture.network.canonical_rules() != fields[6] {
             return Err(format!("noncanonical rule list in fixture {}", fixture.name));
         }
         let component_labels = fixture.network.components.iter()
             .map(|component| if *component == 0 { 'A' } else { 'B' })
             .collect::<String>();
-        if component_labels != fields[6] {
+        if component_labels != fields[7] {
             return Err(format!("component labels disagree with parsed network in {}", fixture.name));
         }
         if fixture.task_target.canonical() != fields[4] {
             return Err(format!("noncanonical task target in fixture {}", fixture.name));
         }
-        if fixture.canonical_interventions() != fields[7] {
+        if fixture.canonical_interventions() != fields[8] {
             return Err(format!("noncanonical interventions in fixture {}", fixture.name));
         }
         let partition_mask = fixture.network.components.iter().enumerate().fold(
             0usize,
             |acc, (index, component)| acc | ((*component as usize) << index),
         );
-        if partition_mask != parse_usize(fields[8], "partition mask")? {
+        if partition_mask != parse_usize(fields[9], "partition mask")? {
             return Err(format!("partition mask disagrees with labels in fixture {}", fixture.name));
         }
         for (column, field_name) in [
-            (9, "intact utility"),
-            (10, "cross-cut mean loss"),
-            (11, "control mean loss"),
-            (12, "TCCIP"),
-            (16, "minimum partition TCCIP"),
-            (17, "maximum partition TCCIP"),
+            (10, "intact utility"),
+            (11, "cross-cut mean loss"),
+            (12, "control mean loss"),
+            (13, "TCCIP"),
+            (17, "minimum partition TCCIP"),
+            (18, "maximum partition TCCIP"),
         ] {
             let value = fields[column].parse::<f64>()
                 .map_err(|error| format!("invalid {field_name} in {}: {error}", fixture.name))?;
@@ -629,15 +651,15 @@ fn fixtures() -> Result<Vec<Fixture>, String> {
             }
         }
         let expected_counts = [
-            parse_usize(fields[13], "partition count")?,
-            parse_usize(fields[14], "usable partition count")?,
-            parse_usize(fields[15], "skipped partition count")?,
+            parse_usize(fields[14], "partition count")?,
+            parse_usize(fields[15], "usable partition count")?,
+            parse_usize(fields[16], "skipped partition count")?,
         ];
         let expected_values = [
-            fields[9].parse::<f64>().map_err(|error| format!("invalid intact utility: {error}"))?,
-            fields[10].parse::<f64>().map_err(|error| format!("invalid cross-cut mean loss: {error}"))?,
-            fields[11].parse::<f64>().map_err(|error| format!("invalid control mean loss: {error}"))?,
-            fields[12].parse::<f64>().map_err(|error| format!("invalid TCCIP: {error}"))?,
+            fields[10].parse::<f64>().map_err(|error| format!("invalid intact utility: {error}"))?,
+            fields[11].parse::<f64>().map_err(|error| format!("invalid cross-cut mean loss: {error}"))?,
+            fields[12].parse::<f64>().map_err(|error| format!("invalid control mean loss: {error}"))?,
+            fields[13].parse::<f64>().map_err(|error| format!("invalid TCCIP: {error}"))?,
         ];
         let (results, profile) = fixture.run()?;
         let point = profile.first().ok_or_else(|| format!("no profile point for {}", fixture.name))?;
@@ -692,7 +714,7 @@ fn main() {
         .unwrap_or_else(|_| "UNBOUND".to_string());
     println!("# source_revision={source_revision}");
     println!("# UNBOUND means exploratory output only; bind SYMTHAEA_SOURCE_SHA to the exact git HEAD for a reproducibility receipt");
-    println!("# inputs are enumerated uniformly; cut source is replaced by an independent fair coin");
+    println!("# input-state integer weights are enumerated exactly; cut source is replaced by an independent fair coin");
     println!("# component labels: 0=A, 1=B; intervention kind is derived from source/target labels");
     println!("fixture\tintervention\tkind\tsource\ttarget\tcost\tintact_utility\tutility\tutility_loss");
     let mut any_failed = false;
@@ -977,7 +999,7 @@ mod tests {
             !line.is_empty() && !line.starts_with('#')
         }) {
             let fields = line.split('\t').collect::<Vec<_>>();
-            assert_eq!(fields.len(), 18, "bad manifest row: {line}");
+            assert_eq!(fields.len(), 19, "bad manifest row: {line}");
             assert!(seen.insert(fields[0].to_string()), "duplicate fixture {}", fields[0]);
             let fixture = all_fixtures.iter()
                 .find(|fixture| fixture.name == fields[0])
@@ -987,12 +1009,12 @@ mod tests {
             assert_eq!(fixture.network.input_count, fields[2].parse::<usize>().unwrap());
             assert_eq!(fixture.network.output_node, fields[3].parse::<usize>().unwrap());
             assert_eq!(fixture.task_target.canonical(), fields[4]);
-            assert_eq!(fixture.network.canonical_rules(), fields[5]);
+            assert_eq!(fixture.network.canonical_rules(), fields[6]);
             let component_labels = fixture.network.components.iter()
                 .map(|component| if *component == 0 { 'A' } else { 'B' })
                 .collect::<String>();
-            assert_eq!(component_labels, fields[6]);
-            assert_eq!(fixture.canonical_interventions(), fields[7]);
+            assert_eq!(component_labels, fields[7]);
+            assert_eq!(fixture.canonical_interventions(), fields[8]);
             let mask = fixture.network.components.iter().enumerate().fold(
                 0usize,
                 |acc, (index, component)| acc | ((*component as usize) << index),
@@ -1012,23 +1034,23 @@ mod tests {
                     actual
                 );
             };
-            close(point.intact_utility, 9);
-            close(point.cross_cut_mean_loss, 10);
-            close(point.matched_control_mean_loss, 11);
-            close(point.tccip, 12);
+            close(point.intact_utility, 10);
+            close(point.cross_cut_mean_loss, 11);
+            close(point.matched_control_mean_loss, 12);
+            close(point.tccip, 13);
 
             let (sweep, total, skipped) =
                 all_partition_profiles(&fixture.name, fixture.network.rules.len(), &results);
-            assert_eq!(total, fields[13].parse::<usize>().unwrap());
+            assert_eq!(total, fields[16].parse::<usize>().unwrap());
             assert_eq!(sweep.len(), fields[14].parse::<usize>().unwrap());
             assert_eq!(skipped, fields[15].parse::<usize>().unwrap());
             close(
                 sweep.iter().map(|point| point.tccip).fold(f64::INFINITY, f64::min),
-                16,
+                17,
             );
             close(
                 sweep.iter().map(|point| point.tccip).fold(f64::NEG_INFINITY, f64::max),
-                17,
+                18,
             );
         }
 
