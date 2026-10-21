@@ -259,7 +259,7 @@ pub fn run_hrr_associative_capacity(
             let memory = algebra.bundle(&bound_pairs)?;
 
             let target_index = (derived_seed(
-                seed ^ 0x4852_525f_5155_4552,
+                seed ^ 0x5155_4552_595f_4944,
                 trial as u64,
                 association_count as u64,
             ) % association_count as u64) as usize;
