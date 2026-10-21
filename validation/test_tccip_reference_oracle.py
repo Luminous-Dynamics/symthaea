@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import csv
+import io
 import tempfile
 import unittest
 from dataclasses import replace
@@ -140,6 +142,24 @@ class TccipReferenceOracleTests(unittest.TestCase):
         self.assertIn("partition\tuseful_xor_coordination", first)
         self.assertIn("information_baseline\trole_matched_xor_synergy_uniform_prior", first)
         self.assertIn("\t1\t0,0\t1", first)
+        data_lines = [line for line in first.splitlines() if line and not line.startswith("#")]
+        table = list(csv.reader(io.StringIO("\n".join(data_lines)), delimiter="\t"))
+        self.assertEqual(len(table[0]), 22)
+        self.assertTrue(all(len(row) == 22 for row in table[1:]))
+        xor_info = next(
+            row for row in table
+            if row[0] == "information_baseline" and row[1] == "role_matched_xor_synergy_uniform_prior"
+        )
+        self.assertEqual(xor_info[-3:], ["1", "0,0", "1"])
+
+    def test_declared_partition_mask_mismatch_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "wrong-mask.tsv"
+            manifest = self.manifest_bytes.decode("utf-8")
+            self.assertIn("\t240\t1.0\t", manifest)
+            path.write_text(manifest.replace("\t240\t1.0\t", "\t241\t1.0\t", 1), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "partition mask"):
+                parse_manifest(path)
 
     def test_malformed_manifest_row_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
