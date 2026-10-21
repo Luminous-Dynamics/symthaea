@@ -320,7 +320,7 @@ fn write_summary(groups: &BTreeMap<ConditionKey, EpisodesBySeed>, path: &str) ->
             format!("{:.6}", mean(&conditional_severity))
         };
         output.push_str(&format!(
-            "{scenario},{policy},{shielded},{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{conditional},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{false_alarm_rate},{:.6}\n",
+            "{scenario},{policy},{shielded},{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{conditional},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{false_alarm_rate},{},{recovery_mean},{:.6},{:.6}\n",
             episodes.len(),
             mean(&rewards),
             mean(&exposure),
