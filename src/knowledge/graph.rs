@@ -47,8 +47,6 @@ pub struct TemporalFact {
     pub domain: Option<String>,
     /// Whether this fact has causal relations (eligible for DAG)
     pub has_causal_relations: bool,
-    /// Optional source-witness-grounded claim envelope.
-    pub claim_context: Option<ClaimContext>,
 }
 
 /// Alert raised when a new fact contradicts an existing one
@@ -64,12 +62,6 @@ pub struct ContradictionAlert {
     pub higher_confidence_id: FactId,
     /// Cycle when detected
     pub detected_at_cycle: u64,
-    /// Similarity/text detections remain candidates until explicitly adjudicated.
-    pub adjudicated: bool,
-    /// Evidence IDs supporting the adjudication.
-    pub evidence_ids: Vec<String>,
-    /// Human/verifier-readable rationale.
-    pub rationale: Option<String>,
 }
 
 /// Search result from the knowledge graph
@@ -104,8 +96,12 @@ pub struct EnhancedKnowledgeGraph {
     domain_index: HashMap<String, Vec<FactId>>,
     /// Pending contradiction candidates (drained by the knowledge manager each cycle)
     pending_contradictions: Vec<ContradictionAlert>,
+    /// Source-grounded claim context indexed separately to preserve TemporalFact's public shape.
+    claim_contexts: HashMap<FactId, ClaimContext>,
     /// Explicit and candidate typed links between facts.
     evidence_links: Vec<EvidenceLink>,
+    /// Contradiction alert identities already resolved, for idempotent resolution.
+    resolved_contradictions: HashSet<(FactId, FactId, Vec<String>)>,
     /// Statistics
     total_insertions: u64,
     total_evictions: u64,
@@ -129,7 +125,9 @@ impl EnhancedKnowledgeGraph {
             contradiction_threshold: 0.7,
             domain_index: HashMap::new(),
             pending_contradictions: Vec::new(),
+            claim_contexts: HashMap::new(),
             evidence_links: Vec::new(),
+            resolved_contradictions: HashSet::new(),
             total_insertions: 0,
             total_evictions: 0,
             total_contradictions: 0,
@@ -198,6 +196,7 @@ impl EnhancedKnowledgeGraph {
         let id = self.next_id;
         self.next_id += 1;
         let confidence = encoding.confidence;
+        let context_for_index = claim_context.clone();
         let fact = TemporalFact {
             id,
             encoding,
@@ -209,9 +208,11 @@ impl EnhancedKnowledgeGraph {
             contradiction_count: 0,
             domain: domain.clone(),
             has_causal_relations: has_causal,
-            claim_context,
         };
         self.facts.insert(id, fact);
+        if let Some(context) = context_for_index {
+            self.claim_contexts.insert(id, context);
+        }
         self.total_insertions += 1;
 
         if let Some(ref d) = domain {
@@ -224,15 +225,10 @@ impl EnhancedKnowledgeGraph {
                 continue;
             }
             let (relation, evidence_ids) = {
-                let new_context = self
-                    .facts
-                    .get(&id)
-                    .and_then(|fact| fact.claim_context.as_ref());
-                let old_context = self
-                    .facts
-                    .get(&existing_id)
-                    .and_then(|fact| fact.claim_context.as_ref());
-                candidate_relation(new_context, old_context)
+                candidate_relation(
+                    self.claim_contexts.get(&id),
+                    self.claim_contexts.get(&existing_id),
+                )
             };
             self.evidence_links.push(EvidenceLink {
                 from_fact_id: existing_id,
@@ -297,14 +293,12 @@ impl EnhancedKnowledgeGraph {
         }
 
         let from_context = self
-            .facts
+            .claim_contexts
             .get(&from_fact_id)
-            .and_then(|fact| fact.claim_context.as_ref())
             .ok_or_else(|| format!("fact {from_fact_id} has no claim provenance"))?;
         let to_context = self
-            .facts
+            .claim_contexts
             .get(&to_fact_id)
-            .and_then(|fact| fact.claim_context.as_ref())
             .ok_or_else(|| format!("fact {to_fact_id} has no claim provenance"))?;
         let from_has_evidence = from_context
             .evidence_ids
@@ -404,22 +398,18 @@ impl EnhancedKnowledgeGraph {
         alert: &ContradictionAlert,
         evidence_ids: Vec<String>,
         rationale: String,
-    ) -> Result<ContradictionAlert, String> {
+    ) -> Result<(), String> {
         self.adjudicate_evidence_relation(
             alert.existing_fact_id,
             alert.new_fact_id,
             EvidenceRelation::Contradicts,
-            evidence_ids.clone(),
-            rationale.clone(),
+            evidence_ids,
+            rationale,
             None,
             None,
             alert.detected_at_cycle,
         )?;
-        let mut adjudicated = alert.clone();
-        adjudicated.adjudicated = true;
-        adjudicated.evidence_ids = evidence_ids;
-        adjudicated.rationale = Some(rationale);
-        Ok(adjudicated)
+        Ok(())
     }
 
     /// Search for facts similar to a query vector, returning top-k results
@@ -731,10 +721,27 @@ impl EnhancedKnowledgeGraph {
     pub fn resolve_contradictions(&mut self, alerts: &[ContradictionAlert]) -> usize {
         let mut resolved = 0;
         for alert in alerts {
-            if !alert.adjudicated
-                || alert.evidence_ids.is_empty()
-                || alert.rationale.as_deref().is_none_or(str::is_empty)
-            {
+            let Some(evidence_ids) = self
+                .evidence_links
+                .iter()
+                .find(|link| {
+                    link.from_fact_id == alert.existing_fact_id
+                        && link.to_fact_id == alert.new_fact_id
+                        && link.relation == EvidenceRelation::Contradicts
+                        && link.status == EvidenceLinkStatus::Adjudicated
+                        && !link.evidence_ids.is_empty()
+                        && link.rationale.as_deref().is_some_and(|text| !text.trim().is_empty())
+                })
+                .map(|link| link.evidence_ids.clone())
+            else {
+                continue;
+            };
+            let resolution_key = (
+                alert.new_fact_id,
+                alert.existing_fact_id,
+                evidence_ids,
+            );
+            if self.resolved_contradictions.contains(&resolution_key) {
                 continue;
             }
             let weaker_id = if alert.higher_confidence_id == alert.new_fact_id {
@@ -749,6 +756,9 @@ impl EnhancedKnowledgeGraph {
             } else {
                 false
             };
+            if resolved > 0 {
+                self.resolved_contradictions.insert(resolution_key);
+            }
             if should_remove {
                 self.remove_fact(weaker_id);
             }
@@ -771,8 +781,36 @@ impl EnhancedKnowledgeGraph {
             source_text: record.source_text.clone(),
             confidence: record.confidence,
         };
-        let id = record
-            .fact_id
+        self.import_fact_record_with_provenance(record, None, None);
+    }
+
+    /// Import a stable graph record and optional typed provenance.
+    pub fn import_graph_fact_record(&mut self, record: &super::persistence::GraphFactRecord) {
+        self.import_fact_record_with_provenance(
+            &record.fact,
+            record.fact_id,
+            record.claim_context.clone(),
+        );
+    }
+
+    fn import_fact_record_with_provenance(
+        &mut self,
+        record: &super::persistence::FactRecord,
+        fact_id: Option<FactId>,
+        claim_context: Option<ClaimContext>,
+    ) {
+        if record.vector_bytes.len() != 2048 {
+            return;
+        }
+        let mut arr = [0u8; 2048];
+        arr.copy_from_slice(&record.vector_bytes);
+        let encoding = super::encoding::FactEncoding {
+            vector: symthaea_core::hdc::binary_hv::BinaryHV(arr),
+            role_vectors: std::collections::HashMap::new(),
+            source_text: record.source_text.clone(),
+            confidence: record.confidence,
+        };
+        let id = fact_id
             .filter(|candidate| !self.facts.contains_key(candidate))
             .unwrap_or(self.next_id);
         self.next_id = self.next_id.max(id.saturating_add(1));
@@ -787,8 +825,10 @@ impl EnhancedKnowledgeGraph {
             contradiction_count: 0,
             domain: record.domain.clone(),
             has_causal_relations: record.is_causal,
-            claim_context: record.claim_context.clone(),
         };
+        if let Some(context) = claim_context {
+            self.claim_contexts.insert(id, context);
+        }
         if let Some(ref domain) = fact.domain {
             self.domain_index
                 .entry(domain.clone())
@@ -803,7 +843,6 @@ impl EnhancedKnowledgeGraph {
         self.facts
             .values()
             .map(|f| super::persistence::FactRecord {
-                fact_id: Some(f.id),
                 vector_bytes: f.encoding.vector.0.to_vec(),
                 source_text: f.encoding.source_text.clone(),
                 confidence: f.confidence,
@@ -811,6 +850,25 @@ impl EnhancedKnowledgeGraph {
                 cycle: f.inserted_at_cycle,
                 is_causal: f.has_causal_relations,
                 claim_context: f.claim_context.clone(),
+            })
+            .collect()
+    }
+
+    /// Export stable graph identities alongside the legacy persistence record shape.
+    pub fn export_graph_fact_records(&self) -> Vec<super::persistence::GraphFactRecord> {
+        self.facts
+            .values()
+            .map(|fact| super::persistence::GraphFactRecord {
+                fact_id: Some(fact.id),
+                fact: super::persistence::FactRecord {
+                    vector_bytes: fact.encoding.vector.0.to_vec(),
+                    source_text: fact.encoding.source_text.clone(),
+                    confidence: fact.confidence,
+                    domain: fact.domain.clone(),
+                    cycle: fact.inserted_at_cycle,
+                    is_causal: fact.has_causal_relations,
+                },
+                claim_context: self.claim_contexts.get(&fact.id).cloned(),
             })
             .collect()
     }
@@ -915,9 +973,6 @@ impl EnhancedKnowledgeGraph {
                         similarity: sim,
                         higher_confidence_id,
                         detected_at_cycle: current_cycle,
-                        adjudicated: false,
-                        evidence_ids: Vec::new(),
-                        rationale: None,
                     });
                 }
             }
@@ -939,8 +994,11 @@ impl EnhancedKnowledgeGraph {
 
     fn remove_fact(&mut self, id: FactId) {
         if let Some(fact) = self.facts.remove(&id) {
+            self.claim_contexts.remove(&id);
             self.evidence_links
                 .retain(|link| link.from_fact_id != id && link.to_fact_id != id);
+            self.resolved_contradictions
+                .retain(|(new_id, existing_id, _)| *new_id != id && *existing_id != id);
             // Clean domain index
             if let Some(ref domain) = fact.domain {
                 if let Some(ids) = self.domain_index.get_mut(domain) {
@@ -1212,7 +1270,6 @@ mod tests {
         negative.vector = graph.get_fact(id_a).unwrap().encoding.vector.clone();
         let (id_b, alerts) = graph.insert(negative, 2, None, false);
         assert_eq!(alerts.len(), 1);
-        assert!(!alerts[0].adjudicated);
         assert_eq!(graph.resolve_contradictions(&alerts), 0);
         assert_eq!(graph.get_fact(id_a).unwrap().confidence, before);
         assert_eq!(graph.get_fact(id_a).unwrap().contradiction_count, 0);
