@@ -218,26 +218,6 @@ pub struct PopulationScenarioEstimate {
     pub scenario_note: String,
 }
 
-/// Estimate of clinical impact for a drug-gene pair across US populations.
-///
-/// Quantifies how many patients are affected by ancestry-biased dosing
-/// guidelines, using US census population data and allele frequency distributions.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PopulationScenarioEstimate {
-    /// Drug name.
-    pub drug: String,
-    /// Gene name.
-    pub gene: String,
-    /// Per-ancestry breakdown: (ancestry, population_millions, at_risk_fraction, at_risk_count).
-    pub per_population_scenario: Vec<(AncestryGroup, f64, f64, u64)>,
-    /// Total patients at risk across all US populations.
-    pub sum_of_modelled_products: u64,
-    /// Ancestry group with the highest absolute at-risk count.
-    pub largest_modelled_product_group: AncestryGroup,
-    /// Human-readable risk description.
-    pub scenario_note: String,
-}
-
 /// Outputs of the current aggregate pharmacogenomics heuristic model.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EquityAnalysis {
