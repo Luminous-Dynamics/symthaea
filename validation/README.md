@@ -25,6 +25,34 @@ python validation/pyphi_crossvalidation.py
 
 This currently produces unavailable/failed measurements by design, until the adapter exists. It writes a NOT QUALIFIED Markdown report to results/pyphi_validation_results.md and returns a nonzero exit status. The twenty Python regression tests are source definitions until the command above has actually run successfully. Do not interpret the output as evidence of agreement.
 
+## TCCIP independent finite-state reference
+
+The task-conditioned counterfactual integration candidate has a small, exact Boolean-network evaluator and a separate standard-library Python oracle. The executable source of fixture rules, partitions, intervention edges, and analytical expectations is `fixtures/tccip_toy_expectations.tsv` (schema v2). The Rust example parses this file rather than duplicating the three networks and intervention lists in source.
+
+Run the independent reference oracle:
+
+~~~bash
+python validation/tccip_reference_oracle.py \
+  --source-sha "$(git rev-parse HEAD)" \
+  --output results/tccip_python_reference.tsv
+sha256sum results/tccip_python_reference.tsv
+python -m unittest validation.test_tccip_reference_oracle -v
+~~~
+
+Run the Rust implementation separately:
+
+~~~bash
+cargo test --example task_conditioned_finite_state_eval
+SYMTHAEA_SOURCE_SHA="$(git rev-parse HEAD)" \
+  cargo run --release --example task_conditioned_finite_state_eval \
+  > results/tccip_rust_reference.tsv
+sha256sum results/tccip_rust_reference.tsv
+~~~
+
+Keep both artifacts and their source SHAs/hashes. They are independently authored calculations over the same manifest; do not call the Python output a Rust run. A `UNBOUND` source SHA marks the output exploratory. Current fixture expectations show that partition changes can reverse the sign of TCCIP, so report the full partition profile and never select the most favorable partition after seeing outcomes.
+
+The oracle and nine Python regression-test definitions are newly authored research code. They have not yet been run from the committed files in this environment. The Rust evaluator has 13 authored tests and has not been compiled. No qualification or performance claim is made by adding the harness.
+
 ## Required before qualification
 
 - A maintained Rust adapter that emits scores for the same causal transition model as PyPhi.
