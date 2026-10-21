@@ -1054,6 +1054,7 @@ fn audit_temporal_dataset(
         let mut identity_candidates: Vec<(usize, String, bool)> = Vec::new();
         let mut identity_join_status = String::new();
         let mut identity_candidate_timeline_positions = Vec::new();
+        let mut ambiguous_declaration_timeline_positions = Vec::new();
         let mut identity_statement_match_at_commit_before = None;
         let mut identity_statement_match_at_completion = None;
         let mut identity_proof_matches_completion = None;
