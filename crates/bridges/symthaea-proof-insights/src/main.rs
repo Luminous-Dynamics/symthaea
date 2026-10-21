@@ -3670,6 +3670,22 @@ mod tests {
     }
 
     #[test]
+    fn temporal_leakage_report_counts_short_proof_pairs_that_skip_substring_matching() {
+        let manifest = temporal_manifest_fixture();
+        let normalized = manifest
+            .artifacts
+            .iter()
+            .map(|artifact| (artifact.artifact_id.clone(), "rfl".to_string()))
+            .collect::<BTreeMap<_, _>>();
+        let summary = validate_normalized_future_proof_leakage(&manifest, &normalized)
+            .expect("short/common tactics must not trigger substring leakage matches");
+        assert_eq!(summary.hidden_proof_artifact_count, 2);
+        assert_eq!(summary.short_proof_body_count, 2);
+        assert_eq!(summary.visible_proof_pairs_screened, 0);
+        assert_eq!(summary.visible_proof_pairs_skipped_short_body, 5);
+    }
+
+    #[test]
     fn normalized_future_proof_copy_is_rejected_across_whitespace_and_comments() {
         let future_proof = "by\n  have h := Nat.add_comm a b\n  have h2 := Nat.add_comm b a\n  exact Eq.trans h h2\n";
         let visible_copy = "by /- copied with explanation -/ have h := Nat.add_comm a b -- line comment\n have h2 := Nat.add_comm b a\n exact Eq.trans h h2";
