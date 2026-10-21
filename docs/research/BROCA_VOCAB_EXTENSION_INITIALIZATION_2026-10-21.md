@@ -82,6 +82,12 @@ Treat vocabulary extension as a constrained, measurable state transition rather 
 
 The next likely iteration is a **preservation-constrained initializer**: select a candidate in the existing embedding space, optionally use subword or grounded directions, add a small name-specific residual to prevent collapse, and choose scale through an explicit norm/calibration rule. Avoid a mean-only approach without testing pairwise collapse; avoid calling context vectors "semantic" unless the contexts and labels support that claim.
 
+## Geometry finding: stored norm is not a logit control
+
+Broca's current `compute_logits` path is explicitly `logit_scale * cosine_similarity(output_hv, token_embedding)`; the accelerated path also describes embeddings as pre-normalized. A positive rescaling of a token row therefore leaves its cosine logit unchanged (subject only to floating-point tolerance). Norm matching is still a stored-vector invariant and may matter to other consumers, but it must not be presented as a mechanism for controlling this path's new-token activation or preserving old predictions.
+
+A metamorphic unit test now checks this scale invariance through `compute_logits`, including any enabled backend selected by the build. The next quality-oriented work is angular candidate selection with labelled protected-old and intended-new calibration contexts, plus a held-out false-activation measurement. See [issue #8285](https://github.com/Luminous-Dynamics/symthaea/issues/8285). This is a design finding, not benchmark evidence; Rust tests remain unrun in this environment.
+
 ## Validation boundary
 
 - GitHub read-back confirms the experimental strategy API, benchmark, Cargo registration, and regression tests are present on this branch.
