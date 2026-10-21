@@ -207,6 +207,51 @@ pub fn point_and_robust_vs_true(
     Some((point_certified, robust_certified, true_safe))
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct SafetyAvailabilityMetrics {
+    pub candidate_actions: usize,
+    pub point_certified_actions: usize,
+    pub robust_certified_actions: usize,
+    pub true_safe_actions: usize,
+    pub point_false_certifications: usize,
+    pub robust_false_certifications: usize,
+    pub robust_false_vetoes: usize,
+}
+
+/// Evaluate a candidate action set against a distinct true model. This makes
+/// the safety/availability trade-off visible: fewer certificates are not
+/// automatically better unless false certificates also fall without excessive
+/// rejection of actions that are actually safe.
+pub fn evaluate_safety_availability(
+    state: StateEnvelope,
+    stress: f64,
+    mismatch: MismatchProfile,
+    radii: CalibratedEnvelopeRadii,
+    limits: ViabilityLimits,
+    shield_can_recover: bool,
+) -> Option<SafetyAvailabilityMetrics> {
+    let actions: &[Action] = if shield_can_recover {
+        &[Action::Push, Action::Maintain, Action::EmergencyRecover]
+    } else {
+        &[Action::Push, Action::Maintain]
+    };
+    let mut metrics = SafetyAvailabilityMetrics {
+        candidate_actions: actions.len(),
+        ..SafetyAvailabilityMetrics::default()
+    };
+    for action in actions {
+        let (point_certified, robust_certified, true_safe) =
+            point_and_robust_vs_true(state, *action, stress, mismatch, radii, limits)?;
+        metrics.point_certified_actions += usize::from(point_certified);
+        metrics.robust_certified_actions += usize::from(robust_certified);
+        metrics.true_safe_actions += usize::from(true_safe);
+        metrics.point_false_certifications += usize::from(point_certified && !true_safe);
+        metrics.robust_false_certifications += usize::from(robust_certified && !true_safe);
+        metrics.robust_false_vetoes += usize::from(!robust_certified && true_safe);
+    }
+    Some(metrics)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -305,6 +350,29 @@ mod tests {
         assert!(point_certified, "point shield should demonstrate the false positive");
         assert!(!robust_certified, "calibrated shield should reject the action");
         assert!(!true_safe, "the held-out true transition should violate constraints");
+    }
+
+    #[test]
+    fn robustness_is_scored_with_false_certifications_and_false_vetoes_separate() {
+        let calibration: Vec<MismatchProfile> =
+            (1..=39).map(|i| profile(i as f64 / 39.0)).collect();
+        let radii = calibrate_mismatch_panel(&calibration, &STRESS_GRID, 0.90)
+            .expect("calibration panel");
+        let metrics = evaluate_safety_availability(
+            state(),
+            0.5,
+            profile(1.0),
+            radii,
+            limits(),
+            true,
+        )
+        .expect("complete metrics");
+
+        assert_eq!(metrics.candidate_actions, 3);
+        assert_eq!(metrics.point_false_certifications, 1);
+        assert_eq!(metrics.robust_false_certifications, 0);
+        assert!(metrics.robust_certified_actions <= metrics.point_certified_actions);
+        assert!(metrics.true_safe_actions > 0);
     }
 
     #[test]
