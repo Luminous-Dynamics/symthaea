@@ -960,6 +960,10 @@ mod tests {
             "acceptance": {"must_change":["citation target changes"]}
         });
         let errors = validate_pair_contract(&pair);
-        assert!(errors.iter().any(|e| e.contains("before_value does not match baseline source_id")));
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.contains("before_value does not match baseline source_id"))
+        );
     }
 }
