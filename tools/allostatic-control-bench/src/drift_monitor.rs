@@ -83,8 +83,8 @@ impl FallbackDecision {
         self.selected_action
     }
 
-    pub const fn proposal_preserved(self) -> bool {
-        matches!(self.selected_action, Some(action) if action as u8 == self.proposed_action as u8)
+    pub fn proposal_preserved(self) -> bool {
+        self.selected_action == Some(self.proposed_action)
     }
 
     pub const fn no_certified_action(self) -> bool {
