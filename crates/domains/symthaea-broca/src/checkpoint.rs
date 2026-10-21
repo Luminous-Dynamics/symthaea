@@ -216,6 +216,7 @@ impl BrocaCheckpoint {
         // otherwise setting `train_loss_candidate_count` before saving would be silently
         // discarded here, which is exactly the class of silent loss this field exists to fix.
         let caller_train_loss_candidates = self.metadata.train_loss_candidate_count;
+        let caller_feature_set = self.metadata.feature_set.clone();
         self.metadata = Self::metadata_for(
             &self.token_embeddings,
             &self.vocab,
@@ -223,6 +224,9 @@ impl BrocaCheckpoint {
             &self.liquid_mamba_config,
         );
         self.metadata.train_loss_candidate_count = caller_train_loss_candidates;
+        // Preserve caller-supplied feature markers (such as versioned token seed
+        // schemes) while refreshing metadata that is derived from the tensors.
+        self.metadata.feature_set = caller_feature_set;
         self.checksum = [0u8; 32];
         let payload = rmp_serde::to_vec(self).context("Failed to serialize BrocaCheckpoint")?;
         self.checksum = *blake3::hash(&payload).as_bytes();
