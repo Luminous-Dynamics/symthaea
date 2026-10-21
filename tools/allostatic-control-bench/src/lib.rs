@@ -432,7 +432,8 @@ pub fn run_episode_with_shield(
 
         let proposed_action = choose_action(policy, observation);
         let projected = projected_state(proposed_action, reserve, allostatic_load, stress);
-        if proposed_action == Action::Push && (projected.0 < 0.15 || projected.1 > 0.88) {
+        if projected.0 < 0.15 || projected.1 > 0.88 {
+            // Counterfactual raw-policy proposal, before any shield veto.
             missed_limits += 1;
         }
         let (action, vetoed, no_safe_action) = if shielded {
@@ -623,6 +624,16 @@ mod tests {
         assert_eq!(choose_action(Policy::StressReactive, observation), Action::Push);
         assert_eq!(choose_action(Policy::PredictiveViability, observation), Action::Maintain);
         assert_eq!(choose_action(Policy::ShuffledForecastControl, observation), Action::Push);
+    }
+
+    #[test]
+    fn maintain_can_still_violate_load_limit_under_high_burden() {
+        assert!(!satisfies_one_step_viability(
+            Action::Maintain,
+            0.50,
+            0.87,
+            0.90
+        ));
     }
 
     #[test]
