@@ -509,23 +509,26 @@ fn structured_translation_role_coverage(
     expected.push(readout.intent.as_str());
     for fill in &readout.roles {
         match (fill.role.as_str(), fill.prime.as_str()) {
-            // For answer intent, the surface must preserve the answer request
-            // without forcing an epistemically overconfident action verb.
-            ("ACTION", _) if readout.intent == "answer" => {}
+            // Score the action against the encoder's intent contract, not
+            // a legacy alternative label set (an answer is channel 1, not 4).
+            ("ACTION", _) => expected.push(match readout.intent.as_str() {
+                "acknowledge" => "acknowledge",
+                "answer" => "answer",
+                "clarify" => "clarify",
+                "propose" => "propose",
+                "uncertainty" => "uncertain",
+                "reflect" => "reflecting",
+                "continue" => "continue",
+                "unknown" => "unknown",
+                _ => "intent",
+            }),
             ("PREDICATE", _) => expected.push(match readout.epistemic_status {
                 symthaea_broca::decoder::EpistemicDisposition::Certain => "known",
-                symthaea_broca::decoder::EpistemicDisposition::Probable => "certain",
+                symthaea_broca::decoder::EpistemicDisposition::Probable => "supported",
                 symthaea_broca::decoder::EpistemicDisposition::Uncertain => "uncertain",
                 symthaea_broca::decoder::EpistemicDisposition::Unknown => "information",
                 symthaea_broca::decoder::EpistemicDisposition::OutOfDomain => "outside",
             }),
-            ("ACTION", "THINK") => expected.push("thinking"),
-            ("ACTION", "DO") => expected.push("act"),
-            ("ACTION", "SAY") => expected.push("explain"),
-            ("ACTION", "WANT") => expected.push("clarify"),
-            ("ACTION", "KNOW") => expected.push("answer"),
-            ("ACTION", "FEEL") => expected.push("state"),
-            ("ACTION", "WITH") => expected.push("relating"),
             ("EVALUATOR", "TRUE") => expected.push("consistent"),
             ("EVALUATOR", "GOOD") => expected.push("favorable"),
             ("EVALUATOR", "BAD") => expected.push("unfavorable"),
