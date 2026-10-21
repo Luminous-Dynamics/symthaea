@@ -485,6 +485,7 @@ fn write_evaluation_row(
         "{record_type},{seed},{strategy},{query_kind},{noise},{DIMENSION},{PROTOTYPE_COUNT},{selection_n},{certification_n},{certified},{test_n},{:.6},{:.6},{},{},{:.6},{},{},{:.6},{:.6},{:.6}",
         rule.min_similarity,
         rule.min_margin,
+        result.total,
         result.accepted,
         result.coverage(),
         result.errors,
