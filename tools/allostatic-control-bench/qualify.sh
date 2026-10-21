@@ -8,6 +8,7 @@ manifest="tools/allostatic-control-bench/Cargo.toml"
 source_files=(
   ".github/workflows/allostatic-control-bench.yml"
   "tools/allostatic-control-bench/Cargo.toml"
+  "tools/allostatic-control-bench/Cargo.lock"
   "tools/allostatic-control-bench/src/lib.rs"
   "tools/allostatic-control-bench/src/main.rs"
   "tools/allostatic-control-bench/src/bin/allostatic-control-report.rs"
@@ -37,11 +38,11 @@ paired_out="${out_base}-paired-deltas.csv"
 receipt="${out_csv}.receipt.txt"
 
 cargo fmt --manifest-path "$manifest" -- --check
-cargo test --manifest-path "$manifest"
-cargo clippy --manifest-path "$manifest" --all-targets -- -D warnings
+cargo test --locked --manifest-path "$manifest"
+cargo clippy --locked --manifest-path "$manifest" --all-targets -- -D warnings
 
-cargo run --release --manifest-path "$manifest" > "$tmpdir/run-a.csv"
-cargo run --release --manifest-path "$manifest" > "$tmpdir/run-b.csv"
+cargo run --locked --release --manifest-path "$manifest" > "$tmpdir/run-a.csv"
+cargo run --locked --release --manifest-path "$manifest" > "$tmpdir/run-b.csv"
 if ! cmp -s "$tmpdir/run-a.csv" "$tmpdir/run-b.csv"; then
   printf 'FAIL: repeated benchmark output is not byte-identical\n' >&2
   exit 1
@@ -69,7 +70,7 @@ if ! awk -F, '
   exit 1
 fi
 
-cargo run --release --manifest-path "$manifest" --bin allostatic-control-report -- \
+cargo run --locked --release --manifest-path "$manifest" --bin allostatic-control-report -- \
   "$tmpdir/run-a.csv" "$tmpdir/summary-a.csv" "$tmpdir/paired-a.csv" > "$tmpdir/report-a.log"
 cargo run --release --manifest-path "$manifest" --bin allostatic-control-report -- \
   "$tmpdir/run-b.csv" "$tmpdir/summary-b.csv" "$tmpdir/paired-b.csv" > "$tmpdir/report-b.log"
