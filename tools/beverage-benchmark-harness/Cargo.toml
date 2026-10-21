@@ -42,3 +42,7 @@ path = "src/bin/split_leakage_audit.rs"
 [[bin]]
 name = "decision_value_audit"
 path = "src/bin/decision_value_audit.rs"
+
+[[bin]]
+name = "adaptive_sampling_policy_audit"
+path = "src/bin/adaptive_sampling_policy_audit.rs"
