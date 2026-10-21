@@ -2459,6 +2459,43 @@ fn git_path_exists_at_commit(root: &Path, commit: &str, path: &str) -> Result<bo
     Ok(entries.lines().any(|entry| entry == path))
 }
 
+fn git_parent_commits(root: &Path, commit: &str) -> Result<Vec<String>> {
+    let output = git_output(root, &["rev-list", "--parents", "-n", "1", commit])?;
+    let mut parts = output.split_whitespace();
+    let resolved_commit = parts
+        .next()
+        .context("git rev-list returned an empty commit row")?;
+    if resolved_commit != commit {
+        bail!(
+            "git rev-list returned commit {resolved_commit}, expected {commit}"
+        );
+    }
+    Ok(parts.map(str::to_owned).collect())
+}
+
+fn proof_present_in_declaration(
+    root: &Path,
+    commit: &str,
+    path: &str,
+    theorem_name: &str,
+    proof: &str,
+) -> Result<Option<bool>> {
+    if !git_path_exists_at_commit(root, commit, path)? {
+        return Ok(Some(false));
+    }
+    let bytes = git_show_file(root, commit, path)?;
+    let source = std::str::from_utf8(&bytes)
+        .with_context(|| format!("Lean source {commit}:{path} is not UTF-8"))?;
+    let blocks = named_declaration_blocks(source, theorem_name)?;
+    if blocks.is_empty() {
+        return Ok(Some(false));
+    }
+    if blocks.len() != 1 {
+        return Ok(None);
+    }
+    Ok(Some(normalized_contains(&blocks[0], proof)))
+}
+
 fn git_show_file(root: &Path, commit: &str, path: &str) -> Result<Vec<u8>> {
     let revision = format!("{commit}:{path}");
     let output = Command::new("git")
