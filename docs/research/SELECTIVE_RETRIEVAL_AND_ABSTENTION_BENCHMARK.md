@@ -6,7 +6,7 @@
 
 ## Research question
 
-A nearest-neighbour retriever always returns a label—even when the query is an unseen pattern, a corrupted signal, or a mixture that has no unique correct answer. Can a simple calibration layer reject unsafe guesses while preserving useful recall?
+A nearest-neighbour retriever always returns a label—even when the query is an unseen pattern, a corrupted signal, or a mixture that has no unique correct answer. Can calibration reduce incorrect singleton answers, and can set-valued prediction express ambiguity more usefully than a binary answer/abstain decision?
 
 This deliberately tests a practical systems property rather than treating exact algebraic identities as evidence of intelligence. A successful result would establish a selective-retrieval capability on this synthetic protocol, not general reasoning, biological cognition, or state-of-the-art performance.
 
@@ -23,6 +23,14 @@ The executable uses five deterministic seeds, 4,096-dimensional bipolar patterns
 Every query is sampled from the declared 7:2:2 mixture of known/noisy patterns, random OOD patterns, and ambiguous two-prototype mixtures; the observed category counts are random, not forced to these expectations. For known queries, target prototype and one of seven corruption rates (0%, 10%, 20%, 30%, 40%, 45%, 50%) are sampled uniformly. The splits use independently derived seeds. Threshold selection and certification never use final evaluation queries. All splits share the stored prototype memory, because this protocol tests threshold calibration for a fixed memory; a separate memory-held-out generalization test remains a required next phase.
 
 The random OOD samples have no registered target. A bundled pair of stored prototypes is intentionally ambiguous, so a unique-label acceptance counts as an error. This avoids giving the system credit for confidently guessing one component of a genuinely multi-pattern query.
+
+### Set-valued retrieval: split-conformal prediction sets
+
+The runner now includes a split-conformal baseline alongside selective thresholding. It fits a nonconformity quantile on the **labeled known-query subset only** of the selection split, using the score a(x,y) = 1 - sim(x,p_y). For target miscoverage level `alpha=0.05`, it chooses the `ceil((n+1)(1-alpha))`-th ordered calibration score (or q = +infinity if that rank exceeds the sample count) and returns every prototype whose similarity to the query is at least 1 - q.
+
+The runner reports the quantile, calibration count, pooled known-query marginal coverage, mean set size, singleton fraction and empty-set fraction, plus descriptive per-noise strata. This is a **marginal coverage target over the generator’s known-query distribution**, assuming calibration and future known queries are exchangeable conditional on being known. It is not a class-conditional or per-noise guarantee, and it does not provide semantic coverage for random OOD, ambiguous mixtures, or unregistered identities with no ground-truth prototype in the bank. Set sizes for those probes are diagnostic only.
+
+This changes the interface from “pick one class or abstain” to “return the candidate set justified by calibration.” If set size grows at 40–50% corruption, that is not a free win; it is the visible price of uncertainty. We must compare coverage against set size and singleton coverage, not celebrate marginal coverage alone. The exact-vector identity control remains: no vector-only set rule can distinguish different registry states with identical observed vectors; identity still requires enrollment/provenance evidence.
 
 ### Identifiability boundary: vector content is not registry identity
 
@@ -50,8 +58,9 @@ A second baseline, fixed-sequence confidence-interval calibration (CIC), uses **
 - **Thresholds and counts:** selection, certification, and evaluation sample counts; score/margin thresholds; independent certification pass/fail; accepted certification count, certification errors, exact-binomial upper-risk bound, and held-out accepted count/errors.
 - **Stratified diagnostics:** each seed/rule emits an overall row plus separate rows for every corruption level, random OOD queries, and ambiguous mixtures. This prevents pooled risk from hiding failures on a particular query type.
 - **Runtime:** total benchmark wall time per invocation, recorded separately from per-row decision quality.
+- **Conformal set-valued output:** calibration quantile q, known-query calibration count, marginal target coverage among labeled known test queries, mean prediction-set size, singleton fraction, and empty-set fraction. Per-noise coverage rows are diagnostic only; the guarantee is pooled over known queries, not conditional on a specific corruption rate.
 
-The current executable emits the full predeclared 101-point risk–coverage curves plus per-run trapezoidal AURC summaries. Confidence intervals for AURC and query-latency distributions remain future work.
+The current executable emits the predeclared 101-point risk–coverage curves plus per-run trapezoidal AURC summaries. Confidence intervals for AURC and query-latency distributions remain future work.
 
 ## Preliminary result from a completed earlier head
 
@@ -118,6 +127,7 @@ A useful capacity metric for the expanded suite is **K95**: the largest stored-m
 - Gangrade, Kag, and Saligrama (2021), “Selective Classification via One-Sided Prediction,” AISTATS/PMLR. A published high-accuracy/low-error selective-classification baseline to study and reproduce; it is not implemented in protocol v1. <https://proceedings.mlr.press/v130/gangrade21a.html>
 - Xu, Guo, and Wei (2025), “Selective Conformal Risk Control,” preprint. A relevant conformal/selective risk-control comparator. <https://arxiv.org/abs/2512.12844>
 - Dong, Hao, and Shinnou (2026), “Fixed-Sequence Confidence-Interval Calibration for Finite-Sample Selective Risk Control,” *Stats* 9(5), 109. The paper uses a predeclared strict-to-permissive threshold sequence with one-sided Hoeffding or Clopper–Pearson bounds, stopping at the first uncertified point. The HDC port is a benchmark adaptation and must be validated on its exact head before being treated as evidence. <https://doi.org/10.3390/stats9050109>
+- Bates, Angelopoulos, Lei, Malik, and Jordan (2021), “Distribution-Free, Risk-Controlling Prediction Sets.” A relevant reference for finite-sample-calibrated set-valued output and risk control; the current HDC implementation is a simpler split-conformal classification adaptation, not a reproduction of every method in that paper. <https://arxiv.org/abs/2101.02703>
 - Yu and Liu (2026), “A Joint Finite-Sample Certificate for Adaptive Selective Conformal Risk Control,” preprint. It studies simultaneous certification of risk and acceptance probability under adaptive threshold selection; reported results are on specific image/panoptic settings and are not assumed to transfer to HDC. <https://arxiv.org/abs/2606.08517>
 - IEEE CIS Task Force on Hyperdimensional Computing and Vector Symbolic Architectures. <https://cis.taskforce.ieee.org/hdcvsa/>
 - Kleyko et al. (2023), “A Survey on Hyperdimensional Computing aka Vector Symbolic Architectures, Part II: Applications, Cognitive Models, and Challenges,” *ACM Computing Surveys*. <https://doi.org/10.1145/3558000>
