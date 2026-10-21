@@ -71,6 +71,9 @@ cargo run --locked --manifest-path "$manifest" --bin score-paired-results -- \
   --plan benchmarks/benchmark-runs/v0/synthetic-plans.jsonl \
   --pairs benchmarks/mythology-bench/v0/metamorphic-pairs.jsonl \
   --results benchmarks/benchmark-runs/v0/synthetic-pair-results.jsonl \
+  --case-manifest benchmarks/mythology-bench/v0/metamorphic-pairs.jsonl \
+  --source-catalog benchmarks/source-catalog/v0/sources.jsonl \
+  --source-pack benchmarks/benchmark-runs/v0/synthetic-source-pack.jsonl \
   --out "$reports_dir/paired-intervention-score.json"
 
 run_validator graph \
