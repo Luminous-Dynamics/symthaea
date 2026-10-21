@@ -62,14 +62,13 @@ fn main() -> ExitCode {
         },
         None => EMBEDDED_PACKAGE_CORPUS.as_bytes().to_vec(),
     };
-    let receipt =
-        match evaluate_package_corpus_bytes(&bytes, &declared_head, &actual_head) {
-            Ok(receipt) => receipt,
-            Err(error) => {
-                eprintln!("AtomFab package corpus rejected: {error}");
-                return ExitCode::from(2);
-            }
-        };
+    let receipt = match evaluate_package_corpus_bytes(&bytes, &declared_head, &actual_head) {
+        Ok(receipt) => receipt,
+        Err(error) => {
+            eprintln!("AtomFab package corpus rejected: {error}");
+            return ExitCode::from(2);
+        }
+    };
 
     match serde_json::to_string_pretty(&receipt) {
         Ok(json) => println!("{json}"),
