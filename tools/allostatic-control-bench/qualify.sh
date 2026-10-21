@@ -107,7 +107,7 @@ cp "$tmpdir/paired-a.csv" "$paired_out"
   printf 'rustc=%s\n' "$(rustc -V)"
   printf 'cargo=%s\n' "$(cargo -V)"
   printf 'target=%s\n' "$(rustc -vV | sed -n 's/^host: //p')"
-  printf 'command=cargo run --release --manifest-path %s\n' "$manifest"
+  printf 'command=cargo run --locked --release --manifest-path %s\n' "$manifest"
   printf 'deterministic_repeat=byte-identical\n'
   printf 'csv_sha256=%s\n' "$(sha256sum "$out_csv" | awk '{print $1}')"
   printf 'csv_rows_excluding_header=%s\n' "$(( $(wc -l < "$out_csv") - 1 ))"
