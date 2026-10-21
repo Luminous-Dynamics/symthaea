@@ -1377,14 +1377,15 @@ impl PgxHealthEquityEngine {
     pub fn adjusted_recommendation(
         &self,
         drug: &str,
+        gene: &str,
         population_context: AncestryGroup,
         phenotype_context: MetabolizerPhenotype,
     ) -> DosingRecommendation {
-        // Find matching CPIC guideline.
+        // A drug/phenotype match is insufficient: the gene must also match.
         let base = self
             .cpic_guidelines
             .iter()
-            .find(|g| g.drug == drug && g.phenotype == phenotype_context);
+            .find(|g| g.drug == drug && g.gene == gene && g.phenotype == phenotype_context);
 
         let base_rec = match base {
             Some(g) => g.recommendation.clone(),
@@ -1403,7 +1404,7 @@ impl PgxHealthEquityEngine {
         };
 
         // Check whether this aggregate population context is flagged in the research estimate.
-        let equity = self.equity_analysis(drug, base.unwrap().gene.as_str());
+        let equity = self.equity_analysis(drug, gene);
         let is_underserved = equity.underserved_populations.contains(&population_context);
 
         if is_underserved {
@@ -1879,6 +1880,7 @@ mod tests {
         let e = engine();
         let rec = e.adjusted_recommendation(
             "codeine",
+            "CYP2D6",
             AncestryGroup::African,
             MetabolizerPhenotype::UltraRapid,
         );
@@ -1944,6 +1946,7 @@ mod tests {
         let e = engine();
         let rec = e.adjusted_recommendation(
             "codeine",
+            "CYP2D6",
             AncestryGroup::European,
             MetabolizerPhenotype::Normal,
         );
@@ -1959,6 +1962,7 @@ mod tests {
         let e = engine();
         let rec = e.adjusted_recommendation(
             "codeine",
+            "CYP2D6",
             AncestryGroup::European,
             MetabolizerPhenotype::Poor,
         );
@@ -2359,10 +2363,29 @@ mod tests {
     }
 
     #[test]
+    fn test_gene_mismatch_fails_closed_as_indeterminate() {
+        let e = engine();
+        let rec = e.adjusted_recommendation(
+            "codeine",
+            "CYP2C19",
+            AncestryGroup::European,
+            MetabolizerPhenotype::UltraRapid,
+        );
+
+        assert!(
+            matches!(rec.action, DosingAction::Indeterminate),
+            "A guideline for another gene must not be reused"
+        );
+        assert!(rec.dose_adjustment.is_none());
+        assert!(rec.alternative_drug.is_none());
+    }
+
+    #[test]
     fn test_unsupported_drug_fails_closed_as_indeterminate() {
         let e = engine();
         let rec = e.adjusted_recommendation(
             "unsupported-drug",
+            "CYP2D6",
             AncestryGroup::European,
             MetabolizerPhenotype::Normal,
         );
