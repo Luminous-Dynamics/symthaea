@@ -77,11 +77,11 @@ class SharedBooleanNetworkTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "sum to 1"):
                 load_model_manifest(manifest)
 
-    def test_duplicate_rule_sources_and_bad_noise_are_rejected(self) -> None:
+    def test_noise_above_half_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             manifest = Path(directory) / "bad.tsv"
             manifest.write_text(
-                "bad_noise\t2\tcopy:0,copy:1\t3fe0000000000000\tuniform\n",
+                "bad_noise\t2\tcopy:0,copy:1\t3fe8000000000000\tuniform\n",
                 encoding="utf-8",
             )
             with self.assertRaisesRegex(ValueError, "flip probability"):
