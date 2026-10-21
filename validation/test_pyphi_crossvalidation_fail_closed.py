@@ -123,6 +123,7 @@ class FailClosedPyPhiValidationTests(unittest.TestCase):
     def test_pyphi_version_and_iit_formalism_are_explicit(self) -> None:
         source = inspect.getsource(PyPhiValidator.compute_pyphi_phi)
         self.assertIn('installed_version != "2.0.0rc4"', source)
+        self.assertIn("pyphi.Substrate(", source)
         self.assertIn('formalism="IIT_3_0"', source)
 
 
