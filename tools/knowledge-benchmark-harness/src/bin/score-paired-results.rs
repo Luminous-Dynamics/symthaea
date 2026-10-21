@@ -1066,6 +1066,14 @@ fn score(
                 plan.synthetic_only
             ));
         }
+        if pair.source_family_ids.is_empty() {
+            return Err(format!("pair {:?} has no source_family_ids", pair.pair_id));
+        }
+        let declared_families: HashSet<&str> =
+            pair.source_family_ids.iter().map(String::as_str).collect();
+        if declared_families.len() != pair.source_family_ids.len() {
+            return Err(format!("pair {:?} repeats source_family_ids", pair.pair_id));
+        }
         if pair.synthetic_only {
             for (state_name, state) in [("baseline", &pair.baseline), ("mutated", &pair.mutated)] {
                 if state.evidence_pack.iter().any(|evidence| evidence.kind != "synthetic_control") {
@@ -1090,6 +1098,25 @@ fn score(
                 &pair.mutated,
                 &source_catalog,
             )?;
+            let mut observed_families = HashSet::<String>::new();
+            for state in [&pair.baseline, &pair.mutated] {
+                let source_ids = std::iter::once(state.source_id.as_str())
+                    .chain(state.evidence_pack.iter().map(|evidence| evidence.source_id.as_str()));
+                for source_id in source_ids {
+                    let source = source_catalog.get(source_id).ok_or_else(|| {
+                        format!("pair {:?} references source {:?} absent from catalog", pair.pair_id, source_id)
+                    })?;
+                    observed_families.insert(source.source_family_id.clone());
+                }
+            }
+            let observed: HashSet<&str> =
+                observed_families.iter().map(String::as_str).collect();
+            if observed != declared_families {
+                return Err(format!(
+                    "pair {:?} declared source_family_ids do not match catalog references",
+                    pair.pair_id
+                ));
+            }
         }
         if pair.acceptance.must_preserve.is_empty() {
             return Err(format!("pair {:?} must declare at least one must_preserve criterion", pair.pair_id));
@@ -1289,6 +1316,9 @@ fn run() -> Result<(), String> {
     let source_pack_records =
         parse_jsonl::<SourcePackSnapshot>(&source_pack_bytes, "source pack")?;
     validate_source_pack_matches_pairs(&pairs, &source_pack_records, plan.synthetic_only)?;
+    let clusters = source_family_clusters(&pairs)?;
+    let comparisons = compute_pairwise_comparisons(&plan, &pairs, &results, &clusters)?;
+    let source_family_cluster_count = clusters.len();
     let system_metrics = score(&plan, pairs, results, &source_records)?;
 
     let manifest_lock_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("Cargo.lock");
@@ -1320,9 +1350,14 @@ fn run() -> Result<(), String> {
         benchmark_case_manifest_sha256: actual_case_manifest_sha256,
         source_catalog_sha256: actual_source_catalog_sha256,
         source_pack_sha256: actual_source_pack_sha256,
+        bootstrap_replicates: plan.bootstrap.replicates,
+        bootstrap_seed: plan.bootstrap.seed,
+        confidence_level: plan.bootstrap.confidence_level,
+        source_family_cluster_count,
         pair_count,
         system_count: system_metrics.len(),
         systems: system_metrics,
+        comparisons,
         nonclaims: vec![
             "This tool scores adjudicated labels; it does not execute models or verify the labels against source material.",
             "Synthetic-control metrics are qualification fixtures, not evidence of model performance or SOTA.",
