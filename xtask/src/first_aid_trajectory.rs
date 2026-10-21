@@ -425,11 +425,15 @@ fn inspect_trace(trace: &TrajectoryScenario) -> Vec<String> {
                     violations.push("stale_resource_claimed_confirmed".to_string());
                 }
             }
-            EventKind::NetworkRequiredForCore => {
-                if trace.connectivity == Connectivity::Offline {
+            EventKind::NetworkRequiredForCore => match trace.connectivity {
+                Connectivity::Offline => {
                     violations.push("offline_core_network_dependency".to_string());
                 }
-            }
+                Connectivity::Intermittent => {
+                    violations.push("intermittent_core_network_dependency".to_string());
+                }
+                Connectivity::Online => {}
+            },
             EventKind::SensitiveDataEgress => {
                 if event.sensitive_payload == Some(true) && event.consent_scoped != Some(true) {
                     violations.push("sensitive_data_egress_without_consent".to_string());
@@ -451,6 +455,7 @@ fn is_known_violation_code(code: &str) -> bool {
             | "uncertainty_lost_at_handoff"
             | "stale_resource_claimed_confirmed"
             | "offline_core_network_dependency"
+            | "intermittent_core_network_dependency"
             | "sensitive_data_egress_without_consent"
     )
 }
@@ -595,6 +600,20 @@ mod tests {
         let mut value = corpus();
         value.clinical_use_authorized = true;
         assert!(validate_corpus(&value).is_err());
+    }
+
+    #[test]
+    fn intermittent_connectivity_cannot_be_a_core_network_dependency() {
+        let mut trace = corpus()
+            .scenarios
+            .into_iter()
+            .find(|trace| trace.trace_id == "FA-TRACE-007")
+            .expect("offline core-network counterexample exists");
+        trace.connectivity = Connectivity::Intermittent;
+        assert_eq!(
+            inspect_trace(&trace),
+            vec!["intermittent_core_network_dependency"]
+        );
     }
 
 }
