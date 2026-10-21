@@ -80,7 +80,7 @@ The shield and simulator deliberately share the same synthetic transition functi
 - **Violation exposure:** sum across ticks of normalized reserve shortfall `max(0, 0.15 - reserve) / 0.15` plus normalized load excess `max(0, load - 0.88) / 0.12`.
 - **Peak violation severity:** maximum single-tick normalized severity across the two limits; conditional mean over violating episodes is reported as `NA` when no episode violates.
 - Shield veto count, no-safe-action count, and emergency-recovery steps, so avoided hazards and the cost of the shield remain visible.
-- False-alarm maintenance ticks under calm, apparently safe conditions.
+- False-alarm maintenance count, number of pre-action false-alarm opportunities, and false-alarm rate given opportunity. The denominator is measured before action so controller behavior cannot change whether a timestep counts as an opportunity; a zero denominator is reported as `NA`.
 - Resource cost, minimum reserve, terminal reserve, and terminal allostatic load as separate future-option proxies.
 - Episode failure indicator and time from the last disturbance to a declared recovered state.
 - Recovery not observed by the end of the horizon is emitted as NA (right-censored), not fabricated as a successful recovery.
@@ -154,9 +154,9 @@ Only after the synthetic tournament, connect the model to validated telemetry su
 The candidate should advance only if it meets all applicable gates on frozen held-out tasks:
 
 - **Safety:** zero observed hard-limit violations in the declared constrained test envelope, with a separate uncertainty bound and clear statement that this is not a universal guarantee.
-- **Burden:** at least 25% lower 95th-percentile unsafe exposure than the strongest reactive baseline, with the paired 95% interval excluding zero improvement.
+- **Burden:** at least 25% lower 95th-percentile normalized violation exposure than the strongest reactive baseline, with the paired 95% interval excluding zero improvement.
 - **Benign performance:** no more than 3% task-reward loss against the strongest reactive baseline that satisfies the declared viability limits in the calm regime. Report task-only reward separately as a throughput reference, even if task-only violates those limits.
-- **False alarms:** no more than a 5-percentage-point increase in calm-regime false-alarm rate.
+- **False alarms:** no more than a 5-percentage-point increase in calm-regime false-alarm rate, calculated as false-alarm actions divided by pre-action opportunities.
 - **Recovery:** lower recovery exposure or time without hiding right-censored episodes.
 - **Forecast value:** predictive controller must outperform the shuffled-forecast negative control on held-out regime changes; otherwise the forecast mechanism has not been shown useful.
 - **Compute:** quantify p50/p95 decision latency and memory overhead; a provisional target is under 10% decision-path overhead versus the same base controller, subject to the actual runtime budget.
@@ -179,6 +179,6 @@ From the repository root, on a Rust-enabled checkout:
 
     bash tools/allostatic-control-bench/qualify.sh <exact-tested-commit>
 
-The script checks that the checkout matches the supplied commit; runs formatting, tests, and Clippy; executes the episode benchmark twice; rejects non-byte-identical episode and report outputs; checks complete scenario × seed × policy × shield coverage; and writes a SHA-256 provenance receipt for all outputs and source inputs. By default it produces `allostatic-control-v1.csv`, `allostatic-control-v1-summary.csv`, `allostatic-control-v1-paired-deltas.csv`, and `allostatic-control-v1.csv.receipt.txt`. Pass a second argument to choose a different episode CSV path; the summary and paired filenames follow that base name. Keep all outputs and the receipt together when publishing results. The script intentionally does not decide whether the benchmark passes the scientific advancement gates; those require analysis of the output.
+The repository includes a path-filtered [Allostatic Control Benchmark workflow](https://github.com/Luminous-Dynamics/symthaea/blob/research/capability-preserving-allostasis-v1/.github/workflows/allostatic-control-bench.yml) intended to run this same qualification on the exact PR head and preserve artifacts. The qualification script checks that the checkout matches the supplied commit; runs formatting, locked tests, and Clippy; executes the episode benchmark twice; rejects non-byte-identical episode and report outputs; checks complete scenario × seed × policy × shield coverage; and writes a SHA-256 provenance receipt for all outputs and source inputs. By default it produces `allostatic-control-v1.csv`, `allostatic-control-v1-summary.csv`, `allostatic-control-v1-paired-deltas.csv`, and `allostatic-control-v1.csv.receipt.txt`. Pass a second argument to choose a different episode CSV path; the summary and paired filenames follow that base name. Keep all outputs and the receipt together when publishing results. The script intentionally does not decide whether the benchmark passes the scientific advancement gates; those require analysis of the output.
 
-The authoring environment used for this initial draft had no Rust toolchain available. The qualification script and Rust tests have therefore **not** been executed here. This specification and prototype are not qualified until a Rust-enabled environment runs the script on the exact PR head and the receipt is independently checked.
+The authoring environment used for this draft has no Rust toolchain available. The qualification script and Rust tests have therefore **not** been executed here; the repository query at the time of authoring also returned no workflow run or check status for the current PR head. This specification and prototype are not qualified until a Rust-enabled environment runs the script on the exact PR head and the receipt is independently checked.
