@@ -250,7 +250,11 @@ fn audit_record(record: &DecisionRecord) -> Vec<String> {
                 violations.push("estimated_delay_cost_units_invalid".to_string());
             }
 
-            match (loss_with_sample, record.estimated_sampling_cost_units, record.estimated_delay_cost_units) {
+            match (
+                loss_with_sample,
+                record.estimated_sampling_cost_units,
+                record.estimated_delay_cost_units,
+            ) {
                 (Some(loss_after), Some(sample_cost), Some(delay_cost))
                     if sample_cost.is_finite()
                         && delay_cost.is_finite()
@@ -522,7 +526,8 @@ mod tests {
     #[test]
     fn rejects_non_future_deferral_review() {
         let mut record = valid_record();
-        make_defer(&mut record, record.decision_time_ms);
+        let decision_time = record.decision_time_ms;
+        make_defer(&mut record, decision_time);
         assert!(
             audit_record(&record)
                 .iter()
@@ -634,7 +639,8 @@ mod tests {
     #[test]
     fn rejects_deferral_past_decision_deadline() {
         let mut record = valid_record();
-        make_defer(&mut record, record.decision_deadline_ms + 1);
+        let next_review = record.decision_deadline_ms + 1;
+        make_defer(&mut record, next_review);
         assert!(
             audit_record(&record)
                 .iter()
