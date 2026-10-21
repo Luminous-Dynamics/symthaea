@@ -16,6 +16,8 @@ on:
       - "docs/research/beverage-split-manifest-synthetic-v1.json"
       - "docs/research/beverage-decision-value-v1.schema.json"
       - "docs/research/beverage-decision-value-synthetic-v1.json"
+      - "docs/research/beverage-adaptive-sampling-decision-v1.schema.json"
+      - "docs/research/beverage-adaptive-sampling-decision-synthetic-v1.json"
       - ".github/workflows/beverage-benchmark.yml"
   pull_request:
     paths:
@@ -31,6 +33,8 @@ on:
       - "docs/research/beverage-split-manifest-synthetic-v1.json"
       - "docs/research/beverage-decision-value-v1.schema.json"
       - "docs/research/beverage-decision-value-synthetic-v1.json"
+      - "docs/research/beverage-adaptive-sampling-decision-v1.schema.json"
+      - "docs/research/beverage-adaptive-sampling-decision-synthetic-v1.json"
       - ".github/workflows/beverage-benchmark.yml"
   workflow_dispatch:
 
