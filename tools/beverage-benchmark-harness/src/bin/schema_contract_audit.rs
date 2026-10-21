@@ -108,9 +108,8 @@ fn audit_schema(
 
         external_references_absent = find_external_reference(schema).is_none();
         if !external_references_absent {
-            validation_errors.push(
-                "external_schema_reference_refused_by_local_only_auditor".to_owned(),
-            );
+            validation_errors
+                .push("external_schema_reference_refused_by_local_only_auditor".to_owned());
         }
 
         if declared_draft_2020_12 && schema_meta_valid && external_references_absent {
@@ -124,10 +123,7 @@ fn audit_schema(
                         let errors = validator
                             .iter_errors(instance)
                             .map(|error| {
-                                format!(
-                                    "instance_invalid_at_{}:{error}",
-                                    error.instance_path()
-                                )
+                                format!("instance_invalid_at_{}:{error}", error.instance_path())
                             })
                             .collect::<Vec<_>>();
                         instance_valid = errors.is_empty();
@@ -171,7 +167,9 @@ fn parse_args() -> Result<(PathBuf, PathBuf, PathBuf), String> {
     let mut args = env::args().skip(1);
 
     while let Some(flag) = args.next() {
-        let value = args.next().ok_or_else(|| format!("missing_value_for_{flag}"))?;
+        let value = args
+            .next()
+            .ok_or_else(|| format!("missing_value_for_{flag}"))?;
         match flag.as_str() {
             "--schema" => schema = Some(PathBuf::from(value)),
             "--instance" => instance = Some(PathBuf::from(value)),
@@ -296,7 +294,12 @@ mod tests {
     fn external_references_are_refused_without_network_access() {
         let schema =
             br#"{"$schema":"https://json-schema.org/draft/2020-12/schema","$ref":"https://example.invalid/schema.json"}"#;
-        let receipt = audit_schema(schema, br#"{}"#, "schema.json".to_owned(), "data.json".to_owned());
+        let receipt = audit_schema(
+            schema,
+            br#"{}"#,
+            "schema.json".to_owned(),
+            "data.json".to_owned(),
+        );
         assert_eq!(receipt.status, "FAIL");
         assert!(!receipt.external_references_absent);
         assert!(
