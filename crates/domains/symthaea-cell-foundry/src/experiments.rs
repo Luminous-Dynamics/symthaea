@@ -492,6 +492,115 @@ pub fn run_adaptive_coupling_experiment(
         first_day_below_tolerance,
     })
 }
+/// Counterfactual model-predictive coupling control.
+///
+/// At each decision point, clone the same complete organoid state and evaluate
+/// lower, current, and higher coupling over an identical short horizon. Each
+/// clone starts with the same RNG state, making the candidate comparison paired.
+/// The chosen permeability is then applied to the real trajectory for one window.
+/// This controls the simple time-trend confound of the trend-only controller,
+/// but is only as trustworthy as the simulator's short-horizon predictions.
+pub fn run_counterfactual_coupling_experiment(
+    template: &NeuralOrganoid,
+    perturbation: &Perturbation,
+    recovery_days: u32,
+    homing: bool,
+    config: AdaptiveCouplingConfig,
+) -> Result<AdaptiveConditionResult, &'static str> {
+    config.validate()?;
+    if recovery_days == 0 {
+        return Err("recovery_days must be positive");
+    }
+
+    let mut organoid = template.clone();
+    organoid.set_positional_homing(homing);
+    organoid.set_gap_junction_permeability(config.initial_permeability);
+    perturbation.apply(&mut organoid);
+
+    let mut permeability = config.initial_permeability;
+    let mut day = 0_u32;
+    let mut permeability_trajectory = Vec::with_capacity(recovery_days as usize);
+    let mut discrepancy_trajectory = Vec::with_capacity(recovery_days as usize);
+    let mut first_day_below_tolerance = None;
+    let mut integrated_discrepancy = 0.0;
+
+    while day < recovery_days {
+        let horizon = config.decision_window_days.min(recovery_days - day);
+        let candidates = [
+            permeability,
+            (permeability - config.decrease_step).max(config.min_permeability),
+            (permeability + config.increase_step).min(config.max_permeability),
+        ];
+        let mut selected_permeability = permeability;
+        let mut selected_score = forecast_mean_discrepancy(
+            &organoid, permeability, horizon,
+        );
+
+        for candidate in candidates {
+            if (candidate - selected_permeability).abs() <= f32::EPSILON {
+                continue;
+            }
+            let candidate_score = forecast_mean_discrepancy(&organoid, candidate, horizon);
+            if candidate_score + config.improvement_tolerance < selected_score {
+                selected_score = candidate_score;
+                selected_permeability = candidate;
+            }
+        }
+        permeability = selected_permeability;
+
+        for _ in 0..horizon {
+            day += 1;
+            organoid.set_gap_junction_permeability(permeability);
+            organoid.advance_day();
+            let discrepancy = organoid
+                .morphology_discrepancy()
+                .filter(|value| value.is_finite())
+                .unwrap_or(1.0)
+                .max(0.0);
+            permeability_trajectory.push((day, permeability));
+            discrepancy_trajectory.push((day, discrepancy));
+            integrated_discrepancy += discrepancy;
+            if first_day_below_tolerance.is_none()
+                && discrepancy <= config.recovery_tolerance
+            {
+                first_day_below_tolerance = Some(day);
+            }
+        }
+    }
+
+    let final_discrepancy = discrepancy_trajectory
+        .last()
+        .map(|(_, value)| *value)
+        .unwrap_or(1.0);
+    Ok(AdaptiveConditionResult {
+        perturbation_label: perturbation.label(),
+        homing_enabled: homing,
+        permeability_trajectory,
+        discrepancy_trajectory,
+        final_discrepancy,
+        integrated_discrepancy,
+        first_day_below_tolerance,
+    })
+}
+
+fn forecast_mean_discrepancy(
+    source: &NeuralOrganoid,
+    permeability: f32,
+    horizon_days: u32,
+) -> f64 {
+    let mut candidate = source.clone();
+    candidate.set_gap_junction_permeability(permeability);
+    let mut total = 0.0;
+    for _ in 0..horizon_days {
+        candidate.advance_day();
+        total += candidate
+            .morphology_discrepancy()
+            .filter(|value| value.is_finite())
+            .unwrap_or(1.0)
+            .max(0.0);
+    }
+    total / horizon_days.max(1) as f64
+}
 /// Run the equifinality experiment: for each perturbation in
 /// `perturbations`, clone `template` (which must already have a captured
 /// target morphology — see [`build_radial_bipolar_template`]), run it under
