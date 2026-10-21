@@ -1395,7 +1395,7 @@ impl PgxHealthEquityEngine {
                     dose_adjustment: None,
                     alternative_drug: None,
                     monitoring: Some(format!(
-                        "No applicable CPIC guideline for {}/{:?}; result is indeterminate.                          This research helper does not recommend a dose, alternative, or clearance.",
+                        "No applicable CPIC guideline for {}/{:?}; result is indeterminate. No medication action is supported.",
                         drug, phenotype_context
                     )),
                 };
