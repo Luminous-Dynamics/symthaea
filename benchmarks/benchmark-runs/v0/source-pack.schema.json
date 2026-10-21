@@ -13,6 +13,7 @@
     "tradition_scope",
     "source_id",
     "variant_id",
+    "prompt",
     "rights_status",
     "evidence_pack",
     "access_decision"
@@ -100,6 +101,10 @@
         "require_permission",
         "metadata_only"
       ]
+    },
+    "prompt": {
+      "type": "string",
+      "minLength": 1
     }
   }
 }
