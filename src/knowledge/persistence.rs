@@ -463,11 +463,13 @@ impl KnowledgePersistence {
             let mut statement = conn
                 .prepare("PRAGMA table_info(knowledge_facts)")
                 .map_err(|error| format!("Schema inspection: {error}"))?;
-            statement
+            let rows = statement
                 .query_map([], |row| row.get::<_, String>(1))
-                .map_err(|error| format!("Schema inspection: {error}"))?
+                .map_err(|error| format!("Schema inspection: {error}"))?;
+            let collected = rows
                 .collect::<Result<Vec<_>, _>>()
-                .map_err(|error| format!("Schema inspection: {error}"))?
+                .map_err(|error| format!("Schema inspection: {error}"))?;
+            collected
         };
         if !columns.iter().any(|column| column == "fact_id") {
             conn.execute("ALTER TABLE knowledge_facts ADD COLUMN fact_id INTEGER", [])
