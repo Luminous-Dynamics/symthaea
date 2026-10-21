@@ -284,8 +284,14 @@ pub enum TokenExtensionInitialization {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TokenExtensionInitError {
     MissingContext,
-    ContextDimensionMismatch { index: usize, expected: usize, actual: usize },
-    NonFiniteContext { index: usize },
+    ContextDimensionMismatch {
+        index: usize,
+        expected: usize,
+        actual: usize,
+    },
+    NonFiniteContext {
+        index: usize,
+    },
     InvalidResidualWeight,
     EmptyReferenceVocabulary,
     DegenerateContext,
@@ -295,15 +301,25 @@ pub enum TokenExtensionInitError {
 impl std::fmt::Display for TokenExtensionInitError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::MissingContext => write!(f, "context-based initialization requires at least one context vector"),
+            Self::MissingContext => {
+                write!(f, "context-based initialization requires at least one context vector")
+            }
             Self::ContextDimensionMismatch { index, expected, actual } => {
                 write!(f, "context vector {index} has dimension {actual}; expected {expected}")
             }
-            Self::NonFiniteContext { index } => write!(f, "context vector {index} contains non-finite coordinates"),
+            Self::NonFiniteContext { index } => {
+                write!(f, "context vector {index} contains non-finite coordinates")
+            }
             Self::InvalidResidualWeight => write!(f, "residual weight must be finite and in [0, 1]"),
-            Self::EmptyReferenceVocabulary => write!(f, "norm matching requires at least one existing embedding"),
-            Self::DegenerateContext => write!(f, "context composition has zero or non-finite norm"),
-            Self::NonFiniteCandidate => write!(f, "candidate embedding contains non-finite coordinates"),
+            Self::EmptyReferenceVocabulary => {
+                write!(f, "norm matching requires at least one existing embedding")
+            }
+            Self::DegenerateContext => {
+                write!(f, "context composition has zero or non-finite norm")
+            }
+            Self::NonFiniteCandidate => {
+                write!(f, "candidate embedding contains non-finite coordinates")
+            }
         }
     }
 }
@@ -908,7 +924,8 @@ impl LanguageController {
             ),
             TokenExtensionInitialization::ContextBundleNormMatched
             | TokenExtensionInitialization::ContextBundleNormMatchedWithResidual { .. } => {
-                let contexts = context_hvs.filter(|vectors| !vectors.is_empty())
+                let contexts = context_hvs
+                    .filter(|vectors| !vectors.is_empty())
                     .ok_or(TokenExtensionInitError::MissingContext)?;
                 for (index, context) in contexts.iter().enumerate() {
                     if context.dim() != HDC_DIMENSION {
@@ -924,7 +941,8 @@ impl LanguageController {
                 }
 
                 let context_bundle = ContinuousHV::bundle(contexts);
-                if !context_bundle.norm().is_finite() || context_bundle.norm() <= 1e-8 {
+                let context_norm = context_bundle.norm();
+                if !context_norm.is_finite() || context_norm <= 1e-8 {
                     return Err(TokenExtensionInitError::DegenerateContext);
                 }
 
@@ -933,7 +951,9 @@ impl LanguageController {
                     TokenExtensionInitialization::ContextBundleNormMatchedWithResidual {
                         residual_weight,
                     } => {
-                        if !residual_weight.is_finite() || !(0.0..=1.0).contains(&residual_weight) {
+                        if !residual_weight.is_finite()
+                            || !(0.0..=1.0).contains(&residual_weight)
+                        {
                             return Err(TokenExtensionInitError::InvalidResidualWeight);
                         }
                         let residual = ContinuousHV::from_genesis(
@@ -959,7 +979,9 @@ impl LanguageController {
                     return Err(TokenExtensionInitError::DegenerateContext);
                 }
 
-                let mut existing_norms: Vec<f32> = self.token_embeddings.iter()
+                let mut existing_norms: Vec<f32> = self
+                    .token_embeddings
+                    .iter()
                     .map(ContinuousHV::norm)
                     .filter(|norm| norm.is_finite() && *norm > 1e-8)
                     .collect();
@@ -1544,7 +1566,11 @@ mod tests {
             .iter()
             .map(|row| row.values.clone())
             .collect();
-        let old_norms: Vec<f32> = controller.token_embeddings().iter().map(ContinuousHV::norm).collect();
+        let old_norms: Vec<f32> = controller
+            .token_embeddings()
+            .iter()
+            .map(ContinuousHV::norm)
+            .collect();
         let mut sorted_norms = old_norms;
         sorted_norms.sort_by(f32::total_cmp);
         let expected_norm = if sorted_norms.len() % 2 == 0 {
@@ -1569,8 +1595,15 @@ mod tests {
             .expect("context extension should succeed");
 
         assert_eq!(index, original.len());
-        for (row, expected) in controller.token_embeddings()[..original.len()].iter().zip(original) {
-            assert_eq!(row.values, expected, "old token vectors must remain bit-identical");
+        for (row, expected) in controller.token_embeddings()[..original.len()]
+            .iter()
+            .zip(original)
+        {
+            assert_eq!(
+                row.values.as_slice(),
+                expected.as_slice(),
+                "old token vectors must remain bit-identical"
+            );
         }
         let actual_norm = controller.token_embeddings()[index].norm();
         assert!(
@@ -1598,7 +1631,12 @@ mod tests {
         let mut second = base.clone();
 
         let first_index = first
-            .append_token_with_initialization(&genesis, "new-token", Some(&context_refs), strategy)
+            .append_token_with_initialization(
+                &genesis,
+                "new-token",
+                Some(&context_refs),
+                strategy,
+            )
             .expect("first context+residual extension should succeed");
         let second_index = second
             .append_token_with_initialization(&genesis, "new-token", Some(&context_refs), strategy)
@@ -1728,7 +1766,11 @@ mod tests {
         let genesis = test_genesis();
         let config = test_config();
         let base = LanguageController::new(&genesis, &config);
-        let query = ContinuousHV::from_genesis(&genesis, "vocab_extension_fixed_query", HDC_DIMENSION);
+        let query = ContinuousHV::from_genesis(
+            &genesis,
+            "vocab_extension_fixed_query",
+            HDC_DIMENSION,
+        );
         let contexts = vec![
             base.token_embeddings()[1].clone(),
             base.token_embeddings()[2].clone(),
