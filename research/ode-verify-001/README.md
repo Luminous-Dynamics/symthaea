@@ -89,3 +89,7 @@ Use the active [NASA-STD-7009B](https://standards.nasa.gov/standard/NASA/NASA-ST
 Every published comparison should retain: exact repository/source commit, lockfile digest, Rust/Cargo versions, target triple, command and configuration, reference dataset/license/digest, tolerances and norm definitions, raw outputs, machine-readable summary, run identity, negative controls, and an explicit status for missing evidence.
 
 Queued, skipped, formatting-only, and synthetic-known-answer passes are never described as complete physical validation. The source-visible open-world law evaluator is a separate model-selection benchmark; it must not be conflated with ODE numerical accuracy or blind physical-law discovery.
+
+## Geometric-structure extension
+
+The separate [GEOM-ODE-001 protocol](GEOMETRIC_STRUCTURE_PROTOCOL_V0_1.md) adds direct one-step checks for canonical phase-space area and signed-step reversibility. The frozen unit oscillator uses Velocity-Verlet as the structure-preserving candidate and RK4 as an intentional negative control. These are distinct from the long-horizon conservation checks in `tests/conservative_orbits.rs`; none of these synthetic numerical checks establishes physical validation or solver-SOTA superiority.
