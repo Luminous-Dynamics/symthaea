@@ -894,10 +894,7 @@ fn split_conformal_quantile(
     Ok((quantile, count))
 }
 
-fn score_conformal_sets(
-    scored: &[ScoredQuery],
-    conformal_q: f64,
-) -> Vec<ConformalQueryResult> {
+fn score_conformal_sets(scored: &[ScoredQuery], conformal_q: f64) -> Vec<ConformalQueryResult> {
     let cutoff_similarity = 1.0 - conformal_q;
     scored
         .iter()
@@ -967,8 +964,24 @@ fn report_conformal_set_summaries(
         .copied()
         .filter(|sample| matches!(sample.kind, QueryKind::Known { .. }))
         .collect();
-    emit(seed, split, "known_all", alpha, quantile, calibration_n, &known_only);
-    emit(seed, split, "all_diagnostic", alpha, quantile, calibration_n, samples);
+    emit(
+        seed,
+        split,
+        "known_all",
+        alpha,
+        quantile,
+        calibration_n,
+        &known_only,
+    );
+    emit(
+        seed,
+        split,
+        "all_diagnostic",
+        alpha,
+        quantile,
+        calibration_n,
+        samples,
+    );
     for noise_index in 0..NOISE_LEVELS.len() {
         let kind = QueryKind::Known { noise_index };
         let subset: Vec<_> = samples
@@ -1076,9 +1089,7 @@ fn report_identity_collision_controls(
                 || known.top_two_margin != unknown.top_two_margin
                 || known.prototype_similarities != unknown.prototype_similarities
             {
-                return Err(
-                    "identity collision control failed feature equality invariant".into(),
-                );
+                return Err("identity collision control failed feature equality invariant".into());
             }
         }
 
