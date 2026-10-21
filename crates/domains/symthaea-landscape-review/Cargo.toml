@@ -1,0 +1,10 @@
+[package]
+name = "symthaea-landscape-review"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "Strict evidence-bound landscape alternative review contract and checker"
+
+[dependencies]
+serde_json = "1.0"
+sha2 = "0.10"
