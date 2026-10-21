@@ -1426,6 +1426,25 @@ mod tests {
             .remove("compatibility_probability");
         assert!(validate_outcome_contract(&missing_probability, "missing probability").is_err());
 
+        let mut pending = valid.clone();
+        pending["pair_id"] = json!("pending-pair");
+        pending["adjudication"]["status"] = json!("pending");
+        pending["adjudication"]["label"] = json!("unknown");
+        pending["adjudication"]["reviewer_decisions"] = json!([]);
+        assert!(validate_outcome_contract(&pending, "pending adjudication").is_ok());
+        let pending_line = serde_json::to_string(&pending).unwrap();
+        assert_eq!(parse_jsonl(&pending_line, Split::Test).unwrap().len(), 1);
+
+        let mut unresolved = valid.clone();
+        unresolved["pair_id"] = json!("unresolved-pair");
+        unresolved["adjudication"]["status"] = json!("unresolved");
+        unresolved["adjudication"]["label"] = json!("unknown");
+        unresolved["adjudication"]["reviewer_decisions"][0]["label"] = json!("compatible");
+        unresolved["adjudication"]["reviewer_decisions"][1]["label"] = json!("partial");
+        assert!(validate_outcome_contract(&unresolved, "unresolved disagreement").is_ok());
+        let unresolved_line = serde_json::to_string(&unresolved).unwrap();
+        assert_eq!(parse_jsonl(&unresolved_line, Split::Test).unwrap().len(), 1);
+
         let mut corrupt_digest = valid.clone();
         corrupt_digest["source"]["artifact_sha256"] = json!("not-a-digest");
         assert!(validate_outcome_contract(&corrupt_digest, "corrupt digest").is_err());
