@@ -32,6 +32,20 @@ An item enters the *confirmatory formal-transfer denominator* only after a human
 
 If statement correspondence is unresolved, a formal artifact is missing, or the checker is unavailable, record the reason and status; do not count it as a verified success or quietly discard it. Compilation by itself is not semantic validation. This is material: the T² ACL 2026 study tested generated declarations against dependent successor theorems across 2,206 problems and reported only 38.9% Testing Accuracy for its best model in the cited setup despite substantially higher compilation success ([paper](https://aclanthology.org/2026.acl-industry.150/), [implementation](https://github.com/ldilab/T2)).
 
+### Benchmark-row validity audit
+
+A checked Lean proof establishes its formal statement; it does not by itself establish that the statement matches the intended mathematics or that a benchmark harness excludes trivial/vacuous targets. This is now an explicit dataset-quality track informed by *Faults in Our Formal Benchmarking* (June 2026), which reported 4,833 findings across 10,318 problems from five benchmark families, including 398 mechanically certified issues such as counterexamples, vacuous theorems, and unsound axioms ([paper and released audit artifacts](https://paperswithlean.com/paper/2606.29493.html)).
+
+Before any target contributes to a confirmatory denominator:
+
+- Preserve the exact source problem, formal statement, source commit, and every dependency/axiom receipt. Audit the full dependency closure, not just the final declaration text.
+- Obtain two independently authored statement-correspondence reviews blinded to model outcomes. Record each reviewer decision and its evidence digest separately. Unresolved disagreement stays `unknown` and is excluded from verified-success claims, while remaining in raw/unknown accounting.
+- Run pinned static checks for placeholders (`sorry`/`admit`), unexpected axioms, invalid/counterexample-susceptible statements where mechanically detectable, vacuity/trivialization, and evaluation-harness shortcuts. Record each check as passed, failed, unavailable, or not applicable; never infer a universal absence of defects from a finite checker suite.
+- For each target class, include nearby statement mutations that alter a critical hypothesis, conclusion, quantifier, or logical direction. Verify that the semantic/statement gate catches the intended mutation before scoring the associated target. Publish detected/undetected controls by failure class.
+- Report raw rows, eligible rows, excluded rows, unknown rows, confirmed defect counts by severity, unresolved semantic-review fraction, and mutation detection. Corrections create a new content-addressed artifact and a new audit receipt; never silently repair or remove a defective row from the frozen source.
+
+The benchmark-row validity report is a prerequisite for calling a formal-transfer score a qualified result. Its defect rates are an audit report, not a weighted component of the proof-success metric. Static checks may miss defects; human review may disagree; both limitations must remain explicit.
+
 ## 3. Fixed comparison arms
 
 Use one common task set and a single frozen base model/checker setup for the confirmatory *retrieval ablation*. The only intended difference among arms is the information supplied by the retrieval/insight intervention.
@@ -98,6 +112,8 @@ Research-level informal proof quality is another separate track. Blindly score c
 This is a protocol template; the alpha level, power assumptions, eligibility denominator, model budget, and any deviation must be recorded in the final run manifest **before** inspecting confirmatory test results.
 
 ## Protocol amendment log
+- **2026-10-21, before confirmatory outcomes were collected or inspected:** elevated benchmark-row validity from a broad semantic-gate principle to an explicit audit track. Confirmatory targets require two independent statement-correspondence reviews, full dependency/axiom receipts, pinned static defect screens, nearby statement mutations, and raw/eligible/excluded/unknown/defect accounting. This follows the June 2026 published audit of five Lean benchmarks that found 4,833 findings across 10,318 problems, including 398 mechanically certified issues. These requirements do not claim that finite static checks prove universal benchmark validity. All future frozen run configs must hash this protocol revision.
+
 - **2026-10-21, before confirmatory outcomes were collected or inspected:** made `compatibility_probability` a distinct nullable field from action confidence in the transfer-selectivity schema and defined it as probability of mathematical compatibility independent of accept/reject/abstain. The Rust analyzer reports probability coverage, Brier score, ten-bin reliability data and ECE when available; nulls are not imputed. Calibration outputs are descriptive in v0 and must not support a confirmatory calibration claim without component-level uncertainty analysis and adequate coverage. Any run config must hash the current protocol bytes.
 
 - **2026-10-21, before any confirmatory outcomes were collected or inspected:** added a separate insight-component intervention track. It preregisters full insight versus a high-similarity incompatible decoy, precondition/failure-boundary/evidence ablations, and a no-insight control under matched task budgets. This is a secondary causal experiment and does not change the primary A-I retrieval contrast. Confirmatory component claims require same-token matching, paired target outcomes, family/component-clustered uncertainty, and content-addressed condition/input receipts. No ablation or transfer result is claimed; any run config must hash the current protocol bytes.
