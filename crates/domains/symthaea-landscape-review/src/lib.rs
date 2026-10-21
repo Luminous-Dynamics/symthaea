@@ -127,6 +127,23 @@ pub fn validate_review(review: &Value) -> Result<(), Vec<String>> {
         validate_pairwise_tradeoffs(comparison.get("pairwise_tradeoffs"), &alternatives, &mut errors);
     }
 
+    let scenario_runs_value = inputs.and_then(|value| value.get("scenario_runs"));
+    let baseline_scope = inputs
+        .and_then(|value| value.get("baseline_design"))
+        .map(|value| string_value(value.get("scope")))
+        .unwrap_or("");
+    let expected_metric_registry_sha256 = inputs
+        .map(|value| string_value(value.get("metric_registry_sha256")))
+        .unwrap_or("");
+    validate_scenario_pairing(
+        scenario_runs_value,
+        review.get("alternatives"),
+        baseline_scope,
+        expected_metric_registry_sha256,
+        ranking_status,
+        &mut errors,
+    );
+
     let recommendation = object_field(review, "recommendation", "$", &mut errors);
     if let Some(recommendation) = recommendation {
         let recommendation_status = string_value(recommendation.get("status"));
@@ -230,6 +247,26 @@ fn validate_scenario_runs(value: Option<&Value>, errors: &mut Vec<String>) {
         }
         require_nonblank(run, "model_id", &path, errors);
         require_nonblank(run, "model_version", &path, errors);
+        let context_path = format!("{path}.pairing_context");
+        let context = object_field(run, "pairing_context", &path, errors);
+        if let Some(context) = context {
+            require_nonblank(context, "alternative_id", &context_path, errors);
+            for field in [
+                "design_snapshot_sha256",
+                "boundary_conditions_sha256",
+                "evaluation_plan_sha256",
+                "metric_registry_sha256",
+            ] {
+                require_sha256(context, field, &context_path, errors);
+            }
+            if context.get("seed").and_then(Value::as_u64).is_none() {
+                errors.push(format!("{context_path}.seed: expected a non-negative integer"));
+            }
+            let scope = string_value(context.get("scope"));
+            if !VALID_SCOPES.contains(&scope) {
+                errors.push(format!("{context_path}.scope: unsupported scope"));
+            }
+        }
         if status == "qualified" {
             require_sha256(run, "result_sha256", &path, errors);
         }
@@ -240,6 +277,130 @@ fn validate_scenario_runs(value: Option<&Value>, errors: &mut Vec<String>) {
             errors.push(format!(
                 "{path}.status: analytical simulation cannot be qualified for the current schematic frame"
             ));
+        }
+    }
+}
+
+fn validate_scenario_pairing(
+    value: Option<&Value>,
+    alternatives_value: Option<&Value>,
+    baseline_scope: &str,
+    expected_metric_registry_sha256: &str,
+    ranking_status: &str,
+    errors: &mut Vec<String>,
+) {
+    let Some(runs) = value.and_then(Value::as_array) else {
+        return;
+    };
+    let Some(alternatives) = alternatives_value.and_then(Value::as_array) else {
+        if !runs.is_empty() {
+            errors.push("$.alternatives: paired scenarios require alternative definitions".to_string());
+        }
+        return;
+    };
+
+    let mut seen_alternatives = HashSet::new();
+    let mut design_digests = HashSet::new();
+    let mut manifest_digests = HashSet::new();
+    let mut common_context: Option<(String, String, String, u64, String, String, String)> = None;
+
+    for (index, run) in runs.iter().enumerate() {
+        let path = format!("$.inputs.scenario_runs[{index}]");
+        let manifest_sha = string_value(run.get("manifest_sha256"));
+        if !manifest_digests.insert(manifest_sha.to_string()) {
+            errors.push(format!("{path}.manifest_sha256: duplicate scenario manifest"));
+        }
+        let Some(context) = run.get("pairing_context").filter(|value| value.is_object()) else {
+            continue;
+        };
+        let alternative_id = string_value(context.get("alternative_id"));
+        if alternative_id.is_empty() || !seen_alternatives.insert(alternative_id.to_string()) {
+            errors.push(format!("{path}.pairing_context.alternative_id: missing or duplicate alternative ID"));
+        }
+
+        let design_sha = string_value(context.get("design_snapshot_sha256"));
+        let boundary_sha = string_value(context.get("boundary_conditions_sha256"));
+        let evaluation_sha = string_value(context.get("evaluation_plan_sha256"));
+        let registry_sha = string_value(context.get("metric_registry_sha256"));
+        let scope = string_value(context.get("scope"));
+        let seed = context.get("seed").and_then(Value::as_u64).unwrap_or(u64::MAX);
+        let model_id = string_value(run.get("model_id"));
+        let model_version = string_value(run.get("model_version"));
+
+        design_digests.insert(design_sha.to_string());
+        if registry_sha != expected_metric_registry_sha256 {
+            errors.push(format!("{path}.pairing_context.metric_registry_sha256: must match the review's pinned metric registry"));
+        }
+        if scope != baseline_scope {
+            errors.push(format!("{path}.pairing_context.scope: must match the baseline design scope"));
+        }
+
+        match alternatives.iter().find(|alternative| {
+            string_value(alternative.get("alternative_id")) == alternative_id
+        }) {
+            Some(alternative) => {
+                if string_value(alternative.get("snapshot_sha256")) != design_sha {
+                    errors.push(format!("{path}.pairing_context.design_snapshot_sha256: does not match the exact alternative snapshot"));
+                }
+                if string_value(alternative.get("scope")) != scope {
+                    errors.push(format!("{path}.pairing_context.scope: does not match the referenced alternative scope"));
+                }
+            }
+            None => errors.push(format!("{path}.pairing_context.alternative_id: unknown alternative")),
+        }
+
+        let context_tuple = (
+            boundary_sha.to_string(),
+            evaluation_sha.to_string(),
+            registry_sha.to_string(),
+            seed,
+            scope.to_string(),
+            model_id.to_string(),
+            model_version.to_string(),
+        );
+        if let Some(reference) = &common_context {
+            if reference != &context_tuple {
+                errors.push(format!(
+                    "{path}.pairing_context: model/version, boundary conditions, evaluation plan, metric registry, seed and scope must match across paired alternatives"
+                ));
+            }
+        } else {
+            common_context = Some(context_tuple);
+        }
+    }
+
+    if runs.len() >= 2 && design_digests.len() != runs.len() {
+        errors.push(
+            "$.inputs.scenario_runs: paired alternatives must use distinct exact design snapshots"
+                .to_string(),
+        );
+    }
+    if runs.len() >= 2 && manifest_digests.len() != runs.len() {
+        errors.push(
+            "$.inputs.scenario_runs: each paired scenario must have a distinct manifest digest"
+                .to_string(),
+        );
+    }
+
+    if ranking_status == "qualified-comparison" {
+        let expected_ids: HashSet<&str> = alternatives
+            .iter()
+            .map(|alternative| string_value(alternative.get("alternative_id")))
+            .collect();
+        if runs.len() != alternatives.len()
+            || seen_alternatives.len() != alternatives.len()
+            || !expected_ids.iter().all(|id| seen_alternatives.contains(*id))
+        {
+            errors.push(
+                "$.inputs.scenario_runs: qualified comparison requires one qualified run per exact alternative"
+                    .to_string(),
+            );
+        }
+        if runs.iter().any(|run| string_value(run.get("status")) != "qualified") {
+            errors.push(
+                "$.inputs.scenario_runs: qualified comparison cannot include blocked or conflicted runs"
+                    .to_string(),
+            );
         }
     }
 }
