@@ -1515,6 +1515,62 @@ mod tests {
     }
 
     #[test]
+    fn bundled_comparison_plans_satisfy_domain_contract() {
+        let mut seen_ids = HashSet::new();
+        for (index, raw_line) in
+            include_str!("../../../benchmarks/benchmark-runs/v0/synthetic-plans.jsonl")
+                .lines()
+                .enumerate()
+        {
+            let plan: Value = serde_json::from_str(raw_line).unwrap_or_else(|error| {
+                panic!("invalid comparison plan JSONL at line {}: {error}", index + 1)
+            });
+            let errors = validate_domain_contract(Kind::Run, &plan, &mut seen_ids);
+            assert!(
+                errors.is_empty(),
+                "comparison plan line {} failed: {}",
+                index + 1,
+                errors.join("; ")
+            );
+        }
+    }
+
+    #[test]
+    fn held_out_plan_rejects_unreviewed_or_leaky_data() {
+        let mut plan = json!({
+            "phase":"preregistered_held_out",
+            "synthetic_only":false,
+            "benchmark":{
+                "split":"holdout",
+                "source_family_disjoint":false,
+                "rights_review_status":"pending",
+                "case_manifest_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "source_catalog_sha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "source_pack_sha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+            },
+            "preregistration":{"held_out_access":"not_sealed"},
+            "systems":[
+                {"system_id":"bm25","baseline_family":"bm25","implementation":"x","revision":"r1","prompt_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","retriever_revision":"r1"},
+                {"system_id":"graph","baseline_family":"typed_graph","implementation":"x","revision":"r1","prompt_sha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","retriever_revision":"r1"}
+            ]
+        });
+        let errors = validate_run_contract(&plan);
+        assert!(errors.iter().any(|e| e.contains("source-family-disjoint")));
+        assert!(errors.iter().any(|e| e.contains("rights_review_status=approved")));
+        assert!(errors.iter().any(|e| e.contains("sealed or independent-evaluator")));
+        plan["benchmark"]["source_family_disjoint"] = Value::Bool(true);
+        plan["benchmark"]["rights_review_status"] = Value::String("approved".into());
+        plan["preregistration"]["held_out_access"] = Value::String("sealed_until_freeze".into());
+        assert!(
+            !validate_run_contract(&plan)
+                .iter()
+                .any(|e| e.contains("source-family-disjoint")
+                    || e.contains("rights_review_status=approved")
+                    || e.contains("sealed or independent-evaluator"))
+        );
+    }
+
+    #[test]
     fn bundled_annotation_fixtures_satisfy_domain_contract() {
         let mut seen_ids = HashSet::new();
         for (index, raw_line) in
