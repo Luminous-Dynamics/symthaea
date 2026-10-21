@@ -897,6 +897,41 @@ jobs:
           assert report["proposed_gates"]["overall_confirmatory_decision"].startswith("not_evaluated_")
           print("PITB_TRANSFER_SELECTIVITY_ANALYZER_PASS: 42 synthetic rows, clustered intervals, class metrics, abstention accounting, and fail-closed overall decision")
           PY
+      - name: Validate transfer-selectivity analysis report schema
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/jsonschema-venv/bin/python" - "$RUNNER_TEMP/pitb-transfer-selectivity-synthetic-report.json" "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/transfer-selectivity-analysis-report.schema.json" <<'PY'
+          import copy
+          import json
+          import sys
+          from pathlib import Path
+          from jsonschema import Draft202012Validator, FormatChecker, ValidationError
+
+          report = json.loads(Path(sys.argv[1]).read_text())
+          schema = json.loads(Path(sys.argv[2]).read_text())
+          Draft202012Validator.check_schema(schema)
+          validator = Draft202012Validator(schema, format_checker=FormatChecker())
+          validator.validate(report)
+
+          mutants = []
+          missing_digest = copy.deepcopy(report)
+          del missing_digest["input_sha256"]
+          mutants.append(missing_digest)
+          false_overall_pass = copy.deepcopy(report)
+          false_overall_pass["proposed_gates"]["overall_confirmatory_decision"] = "pass"
+          mutants.append(false_overall_pass)
+          malformed_interval = copy.deepcopy(report)
+          malformed_interval["calibration"]["brier_score_ci_95"] = {"lower": 0.9}
+          mutants.append(malformed_interval)
+          for index, mutant in enumerate(mutants, start=1):
+              try:
+                  validator.validate(mutant)
+              except ValidationError:
+                  continue
+              raise SystemExit(f"analysis report schema negative control {index} unexpectedly passed")
+          print("PITB_TRANSFER_SELECTIVITY_REPORT_SCHEMA_PASS: valid report accepted; 3 malformed/overclaiming mutations rejected")
+          PY
       - name: Audit pinned Dalek Lean Bench timeline
         shell: bash
         run: |
