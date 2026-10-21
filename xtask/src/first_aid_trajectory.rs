@@ -536,7 +536,7 @@ mod tests {
                     let id = bundle_id.as_deref().unwrap_or_default();
                     if active_bundle.as_deref() == Some(id)
                         && event["bundle_state"] == "valid"
-                        && event["digest_verified"] == true
+                        && event["digest_verified"].as_bool() == Some(true)
                         && !revoked_bundles.contains(id)
                     {
                         verified_bundle = Some(id.to_owned());
@@ -601,8 +601,8 @@ mod tests {
                     _ => {}
                 },
                 "sensitive_data_egress" => {
-                    if event["sensitive_payload"] == true
-                        && event["consent_scoped"] != true
+                    if event["sensitive_payload"].as_bool() == Some(true)
+                        && event["consent_scoped"].as_bool() != Some(true)
                     {
                         codes.push("sensitive_data_egress_without_consent".to_owned());
                     }
