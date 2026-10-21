@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://luminousdynamics.io/schemas/pitb.temporal-timeline-audit.v0.json",
   "title": "PITB historical theorem timeline audit",
-  "description": "Read-only inventory of a pinned historical proof timeline. Each completion commit must be an ancestor of pinned HEAD; adjacent rows preserve CSV source order and report Git DAG ancestry without requiring a linear commit chain. This is provenance evidence, not a verified replay manifest and not benchmark outcome data.",
+  "description": "Read-only inventory of a pinned historical proof timeline. Each completion commit must be an ancestor of pinned HEAD; adjacent rows preserve CSV source order and report Git DAG ancestry without requiring a linear commit chain. Unsafe or machine-local source paths are rejected and redacted rather than read. This is provenance evidence, not a verified replay manifest and not benchmark outcome data.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -25,6 +25,7 @@
     "source_path_present_at_completion_count",
     "source_path_missing_at_completion_count",
     "source_path_not_recorded_count",
+    "source_path_rejected_count",
     "verification_status_counts",
     "events"
   ],
@@ -63,6 +64,7 @@
     "source_path_present_at_completion_count": {"type": "integer", "minimum": 0},
     "source_path_missing_at_completion_count": {"type": "integer", "minimum": 0},
     "source_path_not_recorded_count": {"type": "integer", "minimum": 0},
+    "source_path_rejected_count": {"type": "integer", "minimum": 0},
     "verification_status_counts": {
       "type": "object",
       "minProperties": 1,
@@ -148,7 +150,8 @@
           "enum": [
             "present_at_completion",
             "missing_at_completion",
-            "not_recorded"
+            "not_recorded",
+            "rejected_unsafe_path"
           ]
         },
         "source_file_sha256": {
@@ -195,6 +198,16 @@
         },
         {
           "if": {"properties": {"source_file_status": {"const": "not_recorded"}}},
+          "then": {
+            "properties": {
+              "spec_theorem_path": {"type": "null"},
+              "source_file_sha256": {"type": "null"},
+              "source_file_bytes": {"type": "null"}
+            }
+          }
+        },
+        {
+          "if": {"properties": {"source_file_status": {"const": "rejected_unsafe_path"}}},
           "then": {
             "properties": {
               "spec_theorem_path": {"type": "null"},
