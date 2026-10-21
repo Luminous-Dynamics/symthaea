@@ -213,10 +213,15 @@ def validate_fixture(fixture: Fixture) -> None:
         raise ValueError(f"{fixture.name}: task target input index out of range")
 
     ids = set()
+    edges = set()
     for item in fixture.interventions:
         if item.identifier in ids:
             raise ValueError(f"{fixture.name}: duplicate intervention id {item.identifier}")
         ids.add(item.identifier)
+        edge = (item.source, item.target)
+        if edge in edges:
+            raise ValueError(f"{fixture.name}: duplicate intervention edge {item.source}->{item.target}")
+        edges.add(edge)
         if item.source >= fixture.node_count or item.target >= fixture.node_count:
             raise ValueError(f"{fixture.name}: intervention node out of range")
         if item.source >= item.target:
