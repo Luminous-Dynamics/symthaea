@@ -309,7 +309,9 @@ fn main() {
         "Maximum gap score delta across all perturbations: {:.3}",
         max_delta_overall
     );
-    println!("This does not validate the model assumptions, omitted variants, phenotype estimates, or the validity");
+    println!(
+        "This does not validate the model assumptions, omitted variants, phenotype estimates, or the validity"
+    );
     println!("of any clinical equity conclusion. It is only an internal sensitivity report.");
 
     println!(
