@@ -749,14 +749,16 @@ impl EnhancedKnowledgeGraph {
             } else {
                 alert.new_fact_id
             };
+            let mut resolution_applied = false;
             let should_remove = if let Some(fact) = self.facts.get_mut(&weaker_id) {
                 fact.confidence *= 0.5;
                 resolved += 1;
+                resolution_applied = true;
                 fact.confidence < 0.05
             } else {
                 false
             };
-            if resolved > 0 {
+            if resolution_applied {
                 self.resolved_contradictions.insert(resolution_key);
             }
             if should_remove {
