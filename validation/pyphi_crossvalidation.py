@@ -545,41 +545,57 @@ class PyPhiValidator:
             "",
             f"- Paired measurements: {paired_count}",
             f"- Failed or unavailable cases: {report.n_failed}",
-            "- Pinned PyPhi reference version: 2.0.0rc4 (pre-release)",
-            "- Declared reference formalism: IIT_3_0",
+            f"- Actual PyPhi reference version: {report.pyphi_version or 'N/A'}",
+            f"- Declared reference formalism: {report.reference_formalism}",
+            f"- Shared causal model verified: {'yes' if report.shared_model_verified else 'no'}",
             "- Reference state: all nodes ON; PyPhi bit order is least-significant node first.",
             "- Reference TPM: noisy OR-neighbor update with per-node next-state probability 0.01 or 0.99.",
-            f"- Correlation: {fmt(report.correlation, '.4f')}",
+            f"- Pearson correlation: {fmt(report.correlation, '.4f')}",
+            f"- Spearman rank correlation: {fmt(report.spearman_correlation, '.4f')}",
             f"- Mean absolute error: {fmt(report.mean_absolute_error, '.4f')}",
+            f"- Root mean square error: {fmt(report.root_mean_square_error, '.4f')}",
             f"- Maximum absolute error: {fmt(report.max_absolute_error, '.4f')}",
             f"- Agreement within 10%: {fmt(report.agreement_within_10_percent, '.1f')}%",
             "",
             "## Detailed results",
             "",
-            "| Topology | Nodes | Reference model SHA-256 | Symthaea score | PyPhi score | Absolute error | Status |",
-            "|---|---:|---|---:|---:|---:|---|",
+            "| Topology | Nodes | PyPhi model SHA-256 | Symthaea model SHA-256 | Symthaea score | PyPhi score | Absolute error | Status |",
+            "|---|---:|---|---|---:|---:|---:|---|",
         ]
         for result in report.results:
             hdc = fmt(result.hdc_phi, ".6f")
             reference = fmt(result.pyphi_phi, ".6f")
-            if result.hdc_phi is not None and result.pyphi_phi is not None:
+            if (
+                result.hdc_phi is not None
+                and result.pyphi_phi is not None
+                and np.isfinite(result.hdc_phi)
+                and np.isfinite(result.pyphi_phi)
+            ):
                 error = fmt(abs(result.hdc_phi - result.pyphi_phi), ".6f")
-                case_status = "PAIRED"
+                if (
+                    result.reference_model_digest is not None
+                    and result.reference_model_digest == result.symthaea_model_digest
+                ):
+                    case_status = "PAIRED / MODEL MATCH"
+                else:
+                    case_status = "SCORES PRESENT / MODEL UNVERIFIED"
             else:
                 error = "N/A"
                 case_status = "FAILED / NOT RUN"
-            model_digest = result.reference_model_digest or "N/A"
+            reference_digest = result.reference_model_digest or "N/A"
+            symthaea_digest = result.symthaea_model_digest or "N/A"
             md.append(
-                f"| {result.topology_name} | {result.n_nodes} | {model_digest} | "
-                f"{hdc} | {reference} | {error} | {case_status} |"
+                f"| {result.topology_name} | {result.n_nodes} | {reference_digest} | "
+                f"{symthaea_digest} | {hdc} | {reference} | {error} | {case_status} |"
             )
         md.extend([
             "",
             "## Qualification notes",
             "",
             "- The Symthaea adapter is intentionally blocked; numeric fallback estimates are prohibited.",
-            "- The PyPhi reference call explicitly selects IIT_3_0; exact PyPhi version and causal-model digest must be recorded by a maintained runner.",
-            "- A pass requires at least three finite pairs, no failed cases, and correlation greater than 0.90; correlation alone does not establish scientific equivalence.",
+            "- The PyPhi reference call uses the declared formalism; exact package version and matching Rust/PyPhi model digests are mandatory.",
+            "- A pass requires every case paired, equal per-case model digests, explicit shared-model verification, a stable PyPhi release, Pearson and Spearman > 0.90, and at least 90% of pairs within 10% relative error.",
+            "- Release-candidate versions are not eligible for qualification even if correlations are high.",
             "- Spectral connectivity is not IIT Phi.",
             "- N/A means a valid paired measurement was not produced.",
             "",
