@@ -42,7 +42,7 @@ Never average away a critical invariant failure: publish per-invariant counts an
 3. **Interruption and recovery:** interruption clears verified state; resume does not restore verification implicitly; require a fresh verification before rendering again.
 4. **Uncertainty and handoff:** detect uncertainty then drop it at handoff; preserve it and hand off; preserve without a prior detection; introduce a second uncertainty event after an earlier preservation.
 5. **Privacy and consent:** sensitive payload with missing, false, or true consent scope; non-sensitive payload with missing scope; verify malformed or contradictory consent facts fail closed.
-6. **Connectivity:** offline core-network dependency is rejected; non-core optional network use is not automatically treated as a failure.
+6. **Connectivity:** offline and intermittent core-network dependencies are rejected; non-core optional network use is not automatically treated as a failure.
 7. **Receipt adversaries:** mutate the fixture by one byte, use an unexpected head, remove an input digest, corrupt a digest, or change the evaluation protocol; none may produce a passing receipt.
 8. **Metamorphic controls:** reorder irrelevant JSON object keys or add allowed non-semantic metadata without changing outcomes; do **not** reorder events, since event order is semantic.
 9. **Counterfactual controls:** for every fault trace, include a near-identical benign counterpart where the unsafe precondition is removed. This measures whether the checker detects the invariant rather than merely the scenario identifier.
