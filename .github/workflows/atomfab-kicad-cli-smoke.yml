@@ -32,6 +32,7 @@ jobs:
           OUT_HOST="$GITHUB_WORKSPACE/atomfab-kicad-smoke-out"
           OUT="/work/atomfab-kicad-smoke-out"
           mkdir -p "$OUT_HOST/gerbers" "$OUT_HOST/drill"
+          chmod -R a+rwX "$OUT_HOST"
 
           docker pull --platform linux/amd64 "$IMAGE"
           kicad() {
