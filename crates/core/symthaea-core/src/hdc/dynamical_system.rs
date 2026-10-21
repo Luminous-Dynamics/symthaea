@@ -644,18 +644,16 @@ impl Rk45Integrator {
         Ok(derivatives)
     }
 
-    /// Attempt one adaptive step, returning state, accepted step size and error estimate.
-    ///
-    /// A step is accepted only when the embedded error is within `tol`. If the
-    /// minimum step is reached first, return an explicit error instead of silently
-    /// accepting a result outside the configured tolerance.
-    pub fn try_adaptive_step(
+    /// Compute one Cash–Karp step with the selected error norm.
+    fn try_adaptive_step_impl(
         &self,
         system: &dyn DynamicalSystem,
         state: &[f64],
         t: f64,
         dt: f64,
-    ) -> Result<(Vec<f64>, f64, f64), SimulationError> {
+        tolerances: &Rk45Tolerances,
+        norm: Rk45ErrorNorm,
+    ) -> Result<Rk45StepReport, SimulationError> {
         self.validate()?;
         if !t.is_finite() {
             return Err(SimulationError::NonFiniteTimeBounds);
@@ -673,11 +671,16 @@ impl Rk45Integrator {
         if let Some(index) = state.iter().position(|value| !value.is_finite()) {
             return Err(SimulationError::NonFiniteInitialState { index });
         }
+        tolerances.validate(expected_dim)?;
         let dim = state.len();
         let mut h = dt.min(self.dt_max);
+        let mut attempted_steps = 0usize;
 
         loop {
-            // Cash-Karp coefficients
+            attempted_steps += 1;
+            // Cash–Karp 4(5) embedded pair. The six checked derivative calls
+            // are deliberately kept in this one implementation for both legacy
+            // and scale-aware callers.
             let k1 = Self::checked_derivatives(system, state, t, dim, 1)?;
 
             let x2: Vec<f64> = (0..dim)
@@ -688,84 +691,172 @@ impl Rk45Integrator {
             let x3: Vec<f64> = (0..dim)
                 .map(|i| state[i] + h * (3.0 / 40.0 * k1[i] + 9.0 / 40.0 * k2[i]))
                 .collect();
-            let k3 = Self::checked_derivatives(system, &x3, t + 3.0 * h / 10.0, dim, 3)?;
+            let k3 =
+                Self::checked_derivatives(system, &x3, t + 3.0 * h / 10.0, dim, 3)?;
 
             let x4: Vec<f64> = (0..dim)
                 .map(|i| {
-                    state[i] + h * (3.0 / 10.0 * k1[i] - 9.0 / 10.0 * k2[i] + 6.0 / 5.0 * k3[i])
+                    state[i] + h * (3.0 / 10.0 * k1[i] - 9.0 / 10.0 * k2[i]
+                        + 6.0 / 5.0 * k3[i])
                 })
                 .collect();
             let k4 = Self::checked_derivatives(system, &x4, t + 3.0 * h / 5.0, dim, 4)?;
 
             let x5: Vec<f64> = (0..dim)
                 .map(|i| {
-                    state[i]
-                        + h * (-11.0 / 54.0 * k1[i] + 5.0 / 2.0 * k2[i] - 70.0 / 27.0 * k3[i]
-                            + 35.0 / 27.0 * k4[i])
+                    state[i] + h * (-11.0 / 54.0 * k1[i] + 5.0 / 2.0 * k2[i]
+                        - 70.0 / 27.0 * k3[i] + 35.0 / 27.0 * k4[i])
                 })
                 .collect();
             let k5 = Self::checked_derivatives(system, &x5, t + h, dim, 5)?;
 
             let x6: Vec<f64> = (0..dim)
                 .map(|i| {
-                    state[i]
-                        + h * (1631.0 / 55296.0 * k1[i]
-                            + 175.0 / 512.0 * k2[i]
-                            + 575.0 / 13824.0 * k3[i]
-                            + 44275.0 / 110592.0 * k4[i]
-                            + 253.0 / 4096.0 * k5[i])
+                    state[i] + h * (1631.0 / 55296.0 * k1[i]
+                        + 175.0 / 512.0 * k2[i]
+                        + 575.0 / 13824.0 * k3[i]
+                        + 44275.0 / 110592.0 * k4[i]
+                        + 253.0 / 4096.0 * k5[i])
                 })
                 .collect();
             let k6 = Self::checked_derivatives(system, &x6, t + 7.0 * h / 8.0, dim, 6)?;
 
-            // 5th order solution
+            // Fifth-order solution used to advance the state.
             let y5: Vec<f64> = (0..dim)
                 .map(|i| {
-                    state[i]
-                        + h * (37.0 / 378.0 * k1[i]
-                            + 250.0 / 621.0 * k3[i]
-                            + 125.0 / 594.0 * k4[i]
-                            + 512.0 / 1771.0 * k6[i])
+                    state[i] + h * (37.0 / 378.0 * k1[i]
+                        + 250.0 / 621.0 * k3[i]
+                        + 125.0 / 594.0 * k4[i]
+                        + 512.0 / 1771.0 * k6[i])
                 })
                 .collect();
 
-            // 4th order solution (for error estimate)
+            // Fourth-order embedded solution used only for error estimation.
             let y4: Vec<f64> = (0..dim)
                 .map(|i| {
-                    state[i]
-                        + h * (2825.0 / 27648.0 * k1[i]
-                            + 18575.0 / 48384.0 * k3[i]
-                            + 13525.0 / 55296.0 * k4[i]
-                            + 277.0 / 14336.0 * k5[i]
-                            + 1.0 / 4.0 * k6[i])
+                    state[i] + h * (2825.0 / 27648.0 * k1[i]
+                        + 18575.0 / 48384.0 * k3[i]
+                        + 13525.0 / 55296.0 * k4[i]
+                        + 277.0 / 14336.0 * k5[i]
+                        + 1.0 / 4.0 * k6[i])
                 })
                 .collect();
 
-            // Error estimate (max norm)
-            let error: f64 = y5
-                .iter()
-                .zip(y4.iter())
-                .map(|(&a, &b)| (a - b).abs())
-                .fold(0.0f64, f64::max);
+            let mut max_absolute_error = 0.0f64;
+            let mut max_scaled_error = 0.0f64;
+            let mut scaled_error_squares = 0.0f64;
+            for index in 0..dim {
+                if !y5[index].is_finite() || !y4[index].is_finite() {
+                    return Err(SimulationError::NonFiniteErrorEstimate { index });
+                }
+                let component_error = (y5[index] - y4[index]).abs();
+                if !component_error.is_finite() {
+                    return Err(SimulationError::NonFiniteErrorEstimate { index });
+                }
+                max_absolute_error = max_absolute_error.max(component_error);
 
-            if error <= self.tol {
-                // Accept only steps that actually satisfy the configured tolerance.
-                let scale = if error > 1e-30 {
-                    0.9 * (self.tol / error).powf(0.2)
-                } else {
-                    2.0
-                };
-                let _next_h = (h * scale).clamp(self.dt_min, self.dt_max);
-                return Ok((y5, h, error));
+                let component_scale = tolerances.absolute[index]
+                    + tolerances.relative * state[index].abs().max(y5[index].abs());
+                if !component_scale.is_finite() || component_scale <= 0.0 {
+                    return Err(SimulationError::InvalidRk45Tolerances);
+                }
+                let scaled = component_error / component_scale;
+                if !scaled.is_finite() {
+                    return Err(SimulationError::NonFiniteErrorEstimate { index });
+                }
+                max_scaled_error = max_scaled_error.max(scaled);
+                scaled_error_squares += scaled * scaled;
+                if !scaled_error_squares.is_finite() {
+                    return Err(SimulationError::NonFiniteErrorEstimate { index });
+                }
             }
+
+            let error_norm = match norm {
+                Rk45ErrorNorm::WeightedInfinity => max_scaled_error,
+                Rk45ErrorNorm::WeightedRms => (scaled_error_squares / dim as f64).sqrt(),
+            };
+            if !error_norm.is_finite() {
+                return Err(SimulationError::NonFiniteErrorEstimate { index: 0 });
+            }
+
+            if error_norm <= 1.0 {
+                // Propose a next step using the embedded-pair order (5). The
+                // caller-owned controller persists this proposal across steps.
+                let factor = if error_norm <= 1.0e-14 {
+                    5.0
+                } else {
+                    (0.9 * error_norm.powf(-0.2)).clamp(0.2, 5.0)
+                };
+                let proposed_next_dt = (h * factor).clamp(self.dt_min, self.dt_max);
+                return Ok(Rk45StepReport {
+                    state: y5,
+                    accepted_dt: h,
+                    max_absolute_error,
+                    error_norm,
+                    proposed_next_dt,
+                    attempted_steps,
+                    rejected_steps: attempted_steps - 1,
+                    derivative_evaluations: attempted_steps * 6,
+                });
+            }
+
             if h <= self.dt_min {
                 return Err(SimulationError::AdaptiveToleranceNotMet);
             }
 
-            // Reject step; shrink h and retry.
-            let scale = 0.9 * (self.tol / error).powf(0.25);
-            h = (h * scale).max(self.dt_min);
+            // Rejected steps always shrink. Bound the shrink factor to avoid
+            // both near-zero progress and repeated unchanged attempts.
+            let factor = (0.9 * error_norm.powf(-0.2)).clamp(0.1, 0.5);
+            h = (h * factor).max(self.dt_min);
         }
+    }
+
+    /// Advance using the legacy scalar absolute tolerance and weighted-infinity norm.
+    ///
+    /// The tuple shape and absolute error return value remain compatible with
+    /// existing callers. New code should prefer `try_adaptive_step_with_tolerances`.
+    pub fn try_adaptive_step(
+        &self,
+        system: &dyn DynamicalSystem,
+        state: &[f64],
+        t: f64,
+        dt: f64,
+    ) -> Result<(Vec<f64>, f64, f64), SimulationError> {
+        self.validate()?;
+        let tolerances = Rk45Tolerances::new(0.0, vec![self.tol; state.len()]);
+        let report = self.try_adaptive_step_impl(
+            system,
+            state,
+            t,
+            dt,
+            &tolerances,
+            Rk45ErrorNorm::WeightedInfinity,
+        )?;
+        Ok((report.state, report.accepted_dt, report.max_absolute_error))
+    }
+
+    /// Advance one step using weighted-RMS scale-aware error control.
+    ///
+    /// A step is accepted when the weighted RMS norm of its embedded error is
+    /// at most one. Every state component uses its own absolute tolerance plus
+    /// a shared relative tolerance, making the criterion meaningful when state
+    /// components have different magnitudes or units.
+    pub fn try_adaptive_step_with_tolerances(
+        &self,
+        system: &dyn DynamicalSystem,
+        state: &[f64],
+        t: f64,
+        dt: f64,
+        tolerances: &Rk45Tolerances,
+    ) -> Result<Rk45StepReport, SimulationError> {
+        self.try_adaptive_step_impl(
+            system,
+            state,
+            t,
+            dt,
+            tolerances,
+            Rk45ErrorNorm::WeightedRms,
+        )
     }
 
     /// Compatibility wrapper for callers that require a tuple-returning API.
