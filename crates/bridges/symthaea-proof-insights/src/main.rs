@@ -1159,9 +1159,10 @@ fn audit_temporal_dataset(
                     let before_blocks =
                         named_declaration_blocks(before_source, theorem_short_name)?;
                     if before_blocks.len() == 1 {
-                        identity_statement_match_at_commit_before =
-                            Some(!statement_prefix.as_ref().is_none_or(String::is_empty)
-                                && normalized_contains(&before_blocks[0], &statement_prefix));
+                        identity_statement_match_at_commit_before = statement_prefix
+                            .as_deref()
+                            .filter(|prefix| !prefix.is_empty())
+                            .map(|prefix| normalized_contains(&before_blocks[0], prefix));
                         identity_proof_absent_at_commit_before =
                             Some(!normalized_contains(&before_blocks[0], &dataset_proof));
                     }
