@@ -682,6 +682,30 @@ mod tests {
     }
 
     #[test]
+    fn pooling_different_product_strata_fails_closed() {
+        let mut value = fixture_value();
+        value["comparisons"][2]["product_stratum"] = "beer_stout".into();
+        let receipt = audit_value(value);
+        assert_eq!(receipt.status, "FAIL");
+        assert!(receipt
+            .validation_errors
+            .iter()
+            .any(|error| error == "product_strata_must_not_be_pooled_in_v1"));
+    }
+
+    #[test]
+    fn secondary_resource_guardrail_is_non_compensatory() {
+        let mut value = fixture_value();
+        for row in value["comparisons"].as_array_mut().unwrap() {
+            let baseline = row["baseline_energy_kwh"].as_f64().unwrap();
+            row["intervention_energy_kwh"] = (baseline * 1.05).into();
+        }
+        let receipt = audit_value(value);
+        assert_eq!(receipt.status, "FAIL");
+        assert!(!receipt.secondary_resource_guardrail_passed);
+    }
+
+    #[test]
     fn unsupported_dataset_digest_fails_closed() {
         let mut value = fixture_value();
         value["dataset_sha256"] = "z".repeat(64).into();
