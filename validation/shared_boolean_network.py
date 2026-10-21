@@ -199,13 +199,7 @@ def connectivity_matrix(case: BooleanNetworkCase) -> np.ndarray:
 
 
 def model_digest(case: BooleanNetworkCase) -> str:
-    """Digest the exact TPM and adjacency bytes, independently of state/formalism."""
-    cm = connectivity_matrix(case)
-    tpm = transition_tpm(case)
+    """Hash the canonical rule/noise specification shared with the Rust fixture."""
     digest = hashlib.sha256()
-    digest.update(b"symthaea-boolean-network-model/v1\0")
-    digest.update(repr(cm.shape).encode("ascii"))
-    digest.update(np.ascontiguousarray(cm, dtype=np.uint8).tobytes())
-    digest.update(repr(tpm.shape).encode("ascii"))
-    digest.update(np.ascontiguousarray(tpm, dtype="<f8").tobytes())
+    digest.update(case.canonical_model_specification().encode("ascii"))
     return digest.hexdigest()
