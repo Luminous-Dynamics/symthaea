@@ -3867,8 +3867,8 @@ end Second
             &fs::read(&timeline_audit_path).expect("read temporal timeline audit"),
         )
         .expect("parse temporal timeline audit JSON");
-        assert_eq!(timeline_audit["total_timeline_rows"], 4);
-        assert_eq!(timeline_audit["readme_claimed_timeline_row_count"], 5);
+        assert_eq!(timeline_audit["total_timeline_rows"], 5);
+        assert_eq!(timeline_audit["readme_claimed_timeline_row_count"], 6);
         assert_eq!(
             timeline_audit["timeline_row_count_matches_readme_claim"],
             false
@@ -3880,7 +3880,7 @@ end Second
                 .as_slice())
         );
         assert_eq!(timeline_audit["unique_completion_commit_count"], 2);
-        assert_eq!(timeline_audit["source_path_present_at_completion_count"], 3);
+        assert_eq!(timeline_audit["source_path_present_at_completion_count"], 4);
         assert_eq!(timeline_audit["source_path_missing_at_completion_count"], 1);
         assert_eq!(timeline_audit["source_path_not_recorded_count"], 0);
         assert_eq!(
@@ -3905,16 +3905,16 @@ end Second
             &fs::read(&dataset_audit_path).expect("read synthetic dataset join audit"),
         )
         .expect("parse synthetic dataset join audit JSON");
-        assert_eq!(dataset_audit["total_timeline_rows"], 4);
-        assert_eq!(dataset_audit["unique_timeline_path_count"], 3);
-        assert_eq!(dataset_audit["total_dataset_records"], 8);
-        assert_eq!(dataset_audit["unique_dataset_id_count"], 8);
-        assert_eq!(dataset_audit["unique_path_join_count"], 4);
+        assert_eq!(dataset_audit["total_timeline_rows"], 5);
+        assert_eq!(dataset_audit["unique_timeline_path_count"], 4);
+        assert_eq!(dataset_audit["total_dataset_records"], 9);
+        assert_eq!(dataset_audit["unique_dataset_id_count"], 9);
+        assert_eq!(dataset_audit["unique_path_join_count"], 5);
         assert_eq!(dataset_audit["ambiguous_path_join_count"], 2);
         assert_eq!(dataset_audit["unmatched_path_join_count"], 1);
         assert_eq!(dataset_audit["invalid_dataset_path_count"], 1);
         assert_eq!(dataset_audit["unique_theorem_identity_join_count"], 2);
-        assert_eq!(dataset_audit["ambiguous_theorem_identity_join_count"], 0);
+        assert_eq!(dataset_audit["ambiguous_theorem_identity_join_count"], 1);
         assert_eq!(dataset_audit["unmatched_theorem_identity_join_count"], 6);
         assert_eq!(
             dataset_audit["theorem_identity_status_counts"]
@@ -3923,9 +3923,9 @@ end Second
                 .values()
                 .map(|count| count.as_u64().expect("status count is nonnegative") as usize)
                 .sum::<usize>(),
-            8
+            9
         );
-        assert_eq!(dataset_audit["commit_before_ancestor_of_head_count"], 6);
+        assert_eq!(dataset_audit["commit_before_ancestor_of_head_count"], 7);
         assert_eq!(
             dataset_audit["commit_before_missing_commit_object_count"],
             1
@@ -3933,7 +3933,7 @@ end Second
         assert_eq!(dataset_audit["commit_before_invalid_sha_count"], 1);
         assert_eq!(
             dataset_audit["commit_before_ancestor_of_completion_count"],
-            2
+            3
         );
         let dataset_events = dataset_audit["events"]
             .as_array()
@@ -4018,6 +4018,16 @@ end Second
             dataset_events[7]["statement_match_relation"],
             "completion_match_pre_state_unavailable"
         );
+        assert_eq!(
+            dataset_events[8]["path_join_status"],
+            "unique_path_match"
+        );
+        assert_eq!(
+            dataset_events[8]["identity_join_status"],
+            "ambiguous_declaration_identity"
+        );
+        assert_eq!(dataset_events[8]["identity_candidate_timeline_positions"], serde_json::json!([]));
+        assert_eq!(dataset_events[8]["ambiguous_declaration_timeline_positions"], serde_json::json!([4]));
 
         let target_bundle_path = base.join("target-001-bundle.json");
         materialize_temporal_target(&root, &manifest_path, "target-001", &target_bundle_path)
