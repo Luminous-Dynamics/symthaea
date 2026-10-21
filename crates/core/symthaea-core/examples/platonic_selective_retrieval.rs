@@ -21,8 +21,8 @@ const CALIBRATION_UNKNOWN: usize = 64;
 const TEST_UNKNOWN: usize = 128;
 const MAX_VALIDATION_RISK: f64 = 0.05;
 const MIN_ACCEPTED_FOR_CALIBRATION: usize = 30;
-const MIN_ACCEPTED_FOR_CERTIFICATION: usize = 87;
-const BONFERRONI_Z_ONE_SIDED_95: f64 = 2.128_045_234_184_984;
+const MIN_ACCEPTED_FOR_CERTIFICATION: usize = 80;
+const CERTIFICATION_ALPHA_PER_RULE: f64 = 0.05 / 3.0;
 const NOISE_LEVELS: [f64; 7] = [0.0, 0.10, 0.20, 0.30, 0.40, 0.45, 0.50];
 const SEEDS: [u64; 3] = [17, 29, 41];
 
@@ -65,7 +65,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let start = Instant::now();
     println!("# protocol=selective-retrieval-v1");
     println!("# calibration_rule=selection_split_max_coverage_then_independent_certification");
-    println!("# certification=one_sided_wilson_upper_bound_bonferroni_adjusted_for_3_rules");
+    println!("# certification=one_sided_clopper_pearson_upper_bound_bonferroni_adjusted_for_3_rules");
     println!("# query_mix=known-noise+random-ood+two-prototype-mixture");
     println!(
         "seed,strategy,dimension,prototypes,selection_n,certification_n,certified,test_n,min_similarity,min_margin,accepted,coverage,errors,selective_risk,risk95_low,risk95_high,top1_accuracy"
@@ -333,8 +333,11 @@ fn evaluate(samples: &[ScoredQuery], rule: DecisionRule) -> Evaluation {
 fn certify_rule(samples: &[ScoredQuery], rule: DecisionRule) -> bool {
     let result = evaluate(samples, rule);
     result.accepted >= MIN_ACCEPTED_FOR_CERTIFICATION
-        && wilson_upper_bonferroni_95(result.errors, result.accepted)
-            <= MAX_VALIDATION_RISK
+        && clopper_pearson_upper_bound(
+            result.errors,
+            result.accepted,
+            CERTIFICATION_ALPHA_PER_RULE,
+        ) <= MAX_VALIDATION_RISK
 }
 
 fn report_row(
@@ -391,10 +394,62 @@ fn wilson_upper_95(errors: usize, accepted: usize) -> f64 {
     wilson_upper_bound(errors, accepted, 1.644_853_626_951_472_2_f64)
 }
 
-/// Per-rule certification uses a Bonferroni-adjusted one-sided bound for the
-/// three candidate threshold policies compared per seed.
-fn wilson_upper_bonferroni_95(errors: usize, accepted: usize) -> f64 {
-    wilson_upper_bound(errors, accepted, BONFERRONI_Z_ONE_SIDED_95)
+/// Exact one-sided Clopper-Pearson upper bound for a binomial error rate.
+/// The caller supplies per-policy alpha; certification uses alpha = 0.05 / 3
+/// for the three candidate threshold policies compared per seed.
+fn clopper_pearson_upper_bound(errors: usize, accepted: usize, alpha: f64) -> f64 {
+    if accepted == 0 || errors >= accepted || !alpha.is_finite() || !(0.0..1.0).contains(&alpha) {
+        return 1.0;
+    }
+    if errors == 0 {
+        return 1.0 - alpha.powf(1.0 / accepted as f64);
+    }
+
+    // For k observed errors in n accepted queries, the one-sided upper bound
+    // solves P_p[X <= k] = alpha. The binomial CDF is monotone in p, so bisection
+    // gives a deterministic numerical solution without a statistics dependency.
+    let mut lower = 0.0;
+    let mut upper = 1.0;
+    for _ in 0..64 {
+        let midpoint = (lower + upper) / 2.0;
+        if binomial_cdf_at_most(errors, accepted, midpoint) > alpha {
+            lower = midpoint;
+        } else {
+            upper = midpoint;
+        }
+    }
+    upper
+}
+
+fn binomial_cdf_at_most(errors: usize, trials: usize, probability: f64) -> f64 {
+    if probability <= 0.0 {
+        return 1.0;
+    }
+    if probability >= 1.0 {
+        return if errors >= trials { 1.0 } else { 0.0 };
+    }
+
+    let log_p = probability.ln();
+    let log_q = (-probability).ln_1p();
+    let mut log_choose = 0.0;
+    let mut terms = Vec::with_capacity(errors + 1);
+    for successes in 0..=errors {
+        if successes > 0 {
+            log_choose += ((trials - successes + 1) as f64 / successes as f64).ln();
+        }
+        terms.push(
+            log_choose
+                + successes as f64 * log_p
+                + (trials - successes) as f64 * log_q,
+        );
+    }
+    let max_log = terms.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+    if !max_log.is_finite() {
+        return 0.0;
+    }
+    (max_log + terms.iter().map(|value| (value - max_log).exp()).sum::<f64>().ln())
+        .exp()
+        .clamp(0.0, 1.0)
 }
 
 fn wilson_upper_bound(errors: usize, accepted: usize, z: f64) -> f64 {
@@ -427,10 +482,19 @@ mod tests {
     use super::*;
 
     #[test]
-    fn bonferroni_wilson_certificate_respects_sample_floor() {
-        assert!(wilson_upper_bonferroni_95(0, 86) > MAX_VALIDATION_RISK);
-        assert!(wilson_upper_bonferroni_95(0, 87) <= MAX_VALIDATION_RISK);
-        assert!(wilson_upper_bonferroni_95(1, 87) > MAX_VALIDATION_RISK);
+    fn bonferroni_exact_binomial_certificate_respects_sample_floor() {
+        assert!(
+            clopper_pearson_upper_bound(0, 79, CERTIFICATION_ALPHA_PER_RULE)
+                > MAX_VALIDATION_RISK
+        );
+        assert!(
+            clopper_pearson_upper_bound(0, 80, CERTIFICATION_ALPHA_PER_RULE)
+                <= MAX_VALIDATION_RISK
+        );
+        assert!(
+            clopper_pearson_upper_bound(1, 80, CERTIFICATION_ALPHA_PER_RULE)
+                > MAX_VALIDATION_RISK
+        );
     }
 
     #[test]
