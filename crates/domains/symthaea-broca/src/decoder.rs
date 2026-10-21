@@ -226,7 +226,7 @@ pub fn active_intent_name(channels: &ThoughtChannels) -> &'static str {
     channels.semantic_intent().as_str()
 }
 
-fn intent_prime(intent: StructuredIntent, epistemic_status: EpistemicDisposition) -> SemanticPrime {
+fn intent_prime(intent: IntentChannel, epistemic_status: EpistemicDisposition) -> SemanticPrime {
     match intent {
         // Acknowledgement is a communicative act, not a factual confidence claim.
         IntentChannel::Acknowledge => SemanticPrime::Say,
@@ -254,7 +254,7 @@ fn role_prime<'a>(readout: &'a StructuredReadout, role: &str) -> Option<&'a str>
 }
 
 fn action_sentence(
-    intent: StructuredIntent,
+    intent: IntentChannel,
     epistemic_status: EpistemicDisposition,
 ) -> &'static str {
     // Only the Answer intent is permitted to use answer-specific wording, and
