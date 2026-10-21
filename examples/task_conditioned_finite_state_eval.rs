@@ -791,4 +791,34 @@ mod tests {
             assert!(first.iter().all(|point| (-1.0..=1.0).contains(&point.tccip)));
         }
     }
+
+    #[test]
+    fn useful_xor_partition_sweep_exposes_sign_reversal() {
+        let fixture = fixtures().into_iter()
+            .find(|fixture| fixture.name == "useful_xor_coordination").unwrap();
+        let (results, _) = fixture.run().unwrap();
+        let (profiles, total, skipped) =
+            all_partition_profiles(&fixture.name, fixture.network.rules.len(), &results);
+        assert_eq!(total, 127);
+        assert_eq!(skipped, 15);
+        let min = profiles.iter().map(|point| point.tccip).fold(f64::INFINITY, f64::min);
+        let max = profiles.iter().map(|point| point.tccip).fold(f64::NEG_INFINITY, f64::max);
+        assert_eq!(min, -0.5);
+        assert_eq!(max, 0.5);
+    }
+
+    #[test]
+    fn harmful_coupling_partition_sweep_also_exposes_sign_reversal() {
+        let fixture = fixtures().into_iter()
+            .find(|fixture| fixture.name == "harmful_cross_component_coupling").unwrap();
+        let (results, _) = fixture.run().unwrap();
+        let (profiles, total, skipped) =
+            all_partition_profiles(&fixture.name, fixture.network.rules.len(), &results);
+        assert_eq!(total, 511);
+        assert_eq!(skipped, 63);
+        let min = profiles.iter().map(|point| point.tccip).fold(f64::INFINITY, f64::min);
+        let max = profiles.iter().map(|point| point.tccip).fold(f64::NEG_INFINITY, f64::max);
+        assert_eq!(min, -0.5);
+        assert_eq!(max, 0.5);
+    }
 }
