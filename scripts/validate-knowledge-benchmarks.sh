@@ -62,6 +62,17 @@ run_validator run \
   benchmarks/benchmark-runs/v0/synthetic-plans.jsonl \
   "$reports_dir/comparison-plans.json"
 
+run_validator pair-result \
+  benchmarks/benchmark-runs/v0/pair-result.schema.json \
+  benchmarks/benchmark-runs/v0/synthetic-pair-results.jsonl \
+  "$reports_dir/pair-results.json"
+
+cargo run --locked --manifest-path "$manifest" --bin score-paired-results -- \
+  --plan benchmarks/benchmark-runs/v0/synthetic-plans.jsonl \
+  --pairs benchmarks/mythology-bench/v0/metamorphic-pairs.jsonl \
+  --results benchmarks/benchmark-runs/v0/synthetic-pair-results.jsonl \
+  --out "$reports_dir/paired-intervention-score.json"
+
 run_validator graph \
   benchmarks/mythology-bench/v0/narrative-graph.schema.json \
   benchmarks/mythology-bench/v0/narrative-graph-fixtures.jsonl \
