@@ -992,6 +992,30 @@ mod tests {
         assert_eq!(max, 0.5);
     }
     #[test]
+    fn same_causal_graph_prior_change_reverses_task_conditioned_score() {
+        let fixtures = fixtures().unwrap();
+        let high_x1 = fixtures.iter()
+            .find(|fixture| fixture.name == "task_relevant_high_x1_prior").unwrap();
+        let high_x0 = fixtures.iter()
+            .find(|fixture| fixture.name == "task_relevant_high_x0_prior").unwrap();
+
+        assert_eq!(high_x1.network.canonical_rules(), high_x0.network.canonical_rules());
+        assert_eq!(high_x1.network.components, high_x0.network.components);
+        assert_eq!(high_x1.task_target.canonical(), high_x0.task_target.canonical());
+        assert_eq!(high_x1.canonical_interventions(), high_x0.canonical_interventions());
+        assert_ne!(high_x1.input_state_weights, high_x0.input_state_weights);
+
+        let (_, high_profile) = high_x1.run().unwrap();
+        let (_, low_profile) = high_x0.run().unwrap();
+        assert!((high_profile[0].cross_cut_mean_loss - 0.4).abs() < 1e-12);
+        assert!((high_profile[0].matched_control_mean_loss - 0.1).abs() < 1e-12);
+        assert!((high_profile[0].tccip - 0.3).abs() < 1e-12);
+        assert!((low_profile[0].cross_cut_mean_loss - 0.1).abs() < 1e-12);
+        assert!((low_profile[0].matched_control_mean_loss - 0.4).abs() < 1e-12);
+        assert!((low_profile[0].tccip + 0.3).abs() < 1e-12);
+    }
+
+    #[test]
     fn declarative_oracle_manifest_matches_fixture_rules_and_metrics() {
         const MANIFEST: &str =
             include_str!("../validation/fixtures/tccip_toy_expectations.tsv");
@@ -1012,6 +1036,7 @@ mod tests {
             assert_eq!(fixture.network.input_count, fields[2].parse::<usize>().unwrap());
             assert_eq!(fixture.network.output_node, fields[3].parse::<usize>().unwrap());
             assert_eq!(fixture.task_target.canonical(), fields[4]);
+            assert_eq!(fixture.input_state_weights.iter().map(u64::to_string).collect::<Vec<_>>().join(","), fields[5]);
             assert_eq!(fixture.network.canonical_rules(), fields[6]);
             let component_labels = fixture.network.components.iter()
                 .map(|component| if *component == 0 { 'A' } else { 'B' })
