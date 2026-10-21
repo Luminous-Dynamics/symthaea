@@ -291,8 +291,8 @@ mod tests {
         [-1.0, 0.0, 1.0][index % 3]
     }
 
-    /// Forty? Use 39 episodes to exactly exercise the finite 90% four-family
-    /// calibration gate while varying eight error coordinates independently.
+    /// Use 39 episodes to exercise the finite 90% four-family calibration gate
+    /// while varying eight error coordinates independently.
     fn factorial_profiles() -> Vec<MismatchProfile> {
         (0..39)
             .map(|index| {
@@ -337,10 +337,18 @@ mod tests {
             .iter()
             .map(|mismatch| episode_residual_scores(*mismatch, &STRESS_GRID).expect("scores"))
             .collect();
-        assert!((scores.iter().map(|s| s.reserve_state).fold(0.0, f64::max) - 0.01).abs() < 1e-12);
-        assert!((scores.iter().map(|s| s.load_state).fold(0.0, f64::max) - 0.02).abs() < 1e-12);
-        assert!((scores.iter().map(|s| s.reserve_effect).fold(0.0, f64::max) - 0.03).abs() < 1e-12);
-        assert!((scores.iter().map(|s| s.load_effect).fold(0.0, f64::max) - 0.06).abs() < 1e-12);
+        assert!(
+            (scores.iter().map(|s| s.reserve_state).fold(0.0, f64::max) - 0.01).abs() < 1e-12
+        );
+        assert!(
+            (scores.iter().map(|s| s.load_state).fold(0.0, f64::max) - 0.02).abs() < 1e-12
+        );
+        assert!(
+            (scores.iter().map(|s| s.reserve_effect).fold(0.0, f64::max) - 0.03).abs() < 1e-12
+        );
+        assert!(
+            (scores.iter().map(|s| s.load_effect).fold(0.0, f64::max) - 0.06).abs() < 1e-12
+        );
     }
 
     #[test]
@@ -435,9 +443,7 @@ mod tests {
 
     #[test]
     fn calibrated_certificate_matches_realized_safety_for_the_enclosed_model_panel() {
-        let calibration: Vec<MismatchProfile> = (1..=39)
-            .map(|i| profile(i as f64 / 39.0))
-            .collect();
+        let calibration = factorial_profiles();
         let radii =
             calibrate_mismatch_panel(&calibration, &STRESS_GRID, 0.90).expect("calibration panel");
         for mismatch in calibration {
