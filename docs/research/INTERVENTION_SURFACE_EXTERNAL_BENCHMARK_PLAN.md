@@ -106,6 +106,15 @@ These are acceptance proposals, not achieved results.
 5. Compare raw edge effects, pairwise (Delta^2J), PID/SURD, PEID, and applicable causal-graph baselines on the *same model, prior and interventions*.
 6. Publish error/cost frontiers and failure cases. Only then decide whether there is a new method or merely a good measurement harness.
 
+## Exact manifest audit performed during development (2026-10-22)
+
+A separately written, standard-library-only exhaustive checker (distinct from `tccip_reference_oracle.py` and the Rust evaluator) was run against local copies of both current TSV manifests. It recomputed individual-cut utilities, TCCIP summaries, every usable partition and the 16 pairwise simultaneous-cut utilities / \(\Delta^2J\) contrasts. All six fixture summaries, all partition counts/ranges, and all 16 pairwise rows matched their declared expectations. The audit produced these input-file SHA-256 digests:
+
+- `tccip_toy_expectations.tsv`: `94cce47ae396e2dee7ce742a039ec8a09f3544293b9bf4a28cf4317eccaf1b7f`
+- `tccip_pairwise_utility_interactions.tsv`: `a426a8cfd14a9ee3e2073a18f45439024064945480c2caeba60fa7073bafe9b4`
+
+A reusable checker has now been committed at `validation/tccip_independent_check.py`; its standard reproduction command is in `validation/README.md`. **The digests above bind the copied manifest bytes used by the one-off audit; the newly committed checker has not yet been executed as committed.** This does not replace source-bound test/CI receipts.
+
 ## Evidence status
 
 This document is a research plan. CausalVerse and PEID are prior art to evaluate; no benchmark adaptation has been implemented yet. The exact toy manifest and pairwise oracle are authored. The independent finite-state audit run during the current session matched the six task-summary and partition oracles and the XOR pair-contrast expectation. The committed Rust tests have not been compiled, and the committed Python tests have not been run. No SOTA or novelty claim is made.
