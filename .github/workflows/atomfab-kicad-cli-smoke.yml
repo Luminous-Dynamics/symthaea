@@ -116,9 +116,22 @@ jobs:
           # declared volatile date metadata.
           for generated in "$OUT_HOST"/gerbers/*; do
             repeated="$OUT_HOST/gerbers-repeat/$(basename "$generated")"
-            diff -u \
-              <(sed -E -e '/^%TF\.CreationDate,/d' -e '/^G04 Created by KiCad .* date /d' "$generated") \
-              <(sed -E -e '/^%TF\.CreationDate,/d' -e '/^G04 Created by KiCad .* date /d' "$repeated")
+            case "$generated" in
+              *.gbr)
+                diff -u \
+                  <(sed -E -e '/^%TF\.CreationDate,/d' -e '/^G04 Created by KiCad .* date /d' "$generated") \
+                  <(sed -E -e '/^%TF\.CreationDate,/d' -e '/^G04 Created by KiCad .* date /d' "$repeated")
+                ;;
+              *.gbrjob)
+                diff -u \
+                  <(jq -S 'del(.Header.CreationDate)' "$generated") \
+                  <(jq -S 'del(.Header.CreationDate)' "$repeated")
+                ;;
+              *)
+                echo "unexpected Gerber output type: $generated" >&2
+                exit 43
+                ;;
+            esac
           done
           for generated in "$OUT_HOST"/drill/*; do
             repeated="$OUT_HOST/drill-repeat/$(basename "$generated")"
@@ -144,6 +157,8 @@ jobs:
             test -s "$OUT_HOST/gerbers/$expected"
             test -s "$OUT_HOST/gerbers-repeat/$expected"
           done
+          test -s "$OUT_HOST/gerbers/continuity-coupon-job.gbrjob"
+          test -s "$OUT_HOST/gerbers-repeat/continuity-coupon-job.gbrjob"
           test -s "$OUT_HOST/drill/continuity-coupon.drl"
           grep -qx 'M48' "$OUT_HOST/drill/continuity-coupon.drl"
           grep -qx '%' "$OUT_HOST/drill/continuity-coupon.drl"
@@ -172,12 +187,14 @@ jobs:
                 gerbers/continuity-coupon-B_Mask.gbr) role=gerber_b_mask ;;
                 gerbers/continuity-coupon-F_Silkscreen.gbr) role=gerber_f_silkscreen ;;
                 gerbers/continuity-coupon-Edge_Cuts.gbr) role=gerber_edge_cuts ;;
+                gerbers/continuity-coupon-job.gbrjob) role=gerber_job_metadata ;;
                 gerbers-repeat/continuity-coupon-F_Cu.gbr) role=repeated_gerber_f_cu ;;
                 gerbers-repeat/continuity-coupon-B_Cu.gbr) role=repeated_gerber_b_cu ;;
                 gerbers-repeat/continuity-coupon-F_Mask.gbr) role=repeated_gerber_f_mask ;;
                 gerbers-repeat/continuity-coupon-B_Mask.gbr) role=repeated_gerber_b_mask ;;
                 gerbers-repeat/continuity-coupon-F_Silkscreen.gbr) role=repeated_gerber_f_silkscreen ;;
                 gerbers-repeat/continuity-coupon-Edge_Cuts.gbr) role=repeated_gerber_edge_cuts ;;
+                gerbers-repeat/continuity-coupon-job.gbrjob) role=repeated_gerber_job_metadata ;;
                 drill/continuity-coupon.drl) role=excellon_drill ;;
                 drill-repeat/continuity-coupon.drl) role=repeated_excellon_drill ;;
                 *) echo "unclassified CAM artifact: $relative" >&2; exit 42 ;;
@@ -208,9 +225,9 @@ jobs:
             and .authority == "artifact_presence_and_digest_inventory_only_no_design_or_production_authority"
             and .claim_ceiling == "Artifact presence and SHA-256 inventory only; no KiCad DRC, design manufacturability, physical quality, safety, or production-release authority."
             and .required_roles == ([.artifacts[].role] | unique)
-            and (.artifacts | length) == 20
-            and ([.artifacts[].path] | unique | length) == 20
-            and ([.artifacts[].role] | unique | length) == 20
+            and (.artifacts | length) == 22
+            and ([.artifacts[].path] | unique | length) == 22
+            and ([.artifacts[].role] | unique | length) == 22
             and all(.artifacts[]; .expected_sha256 | test("^[0-9a-f]{64}$"))
           ' "$OUT_HOST/artifact-manifest.json" > /dev/null
           manifest_sha=$(sha256sum "$OUT_HOST/artifact-manifest.json" | cut -d ' ' -f 1)
@@ -296,7 +313,7 @@ jobs:
             and (.board_sha256 | test("^[0-9a-f]{64}$"))
             and .artifact_manifest.path == "artifact-manifest.json"
             and (.artifact_manifest.sha256 | test("^[0-9a-f]{64}$"))
-            and .artifact_manifest.artifact_count == 20
+            and .artifact_manifest.artifact_count == 22
             and .controls.clean_board_drc_exit_code == 0
             and .controls.clean_board_violation_count == 0
             and .controls.clean_board_unconnected_item_count == 0
