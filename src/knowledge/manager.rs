@@ -283,7 +283,10 @@ impl KnowledgeManager {
         let persistence = config.db_path.as_ref().map(|path| {
             let mut p = KnowledgePersistence::new(path);
             // Load graph facts with stable fact IDs and optional claim provenance.
-            if let Ok(facts) = p.load_graph_facts() {
+            if let Ok(mut facts) = p.load_graph_facts() {
+                // Restore explicit stable IDs before legacy NULL-ID rows so an old row
+                // cannot consume an ID referenced by a persisted evidence link.
+                facts.sort_by_key(|record| record.fact_id.is_none());
                 for record in &facts {
                     graph.import_graph_fact_record(record);
                 }
