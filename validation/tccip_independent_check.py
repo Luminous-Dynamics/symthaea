@@ -122,6 +122,10 @@ def read_cases(path: Path) -> tuple[dict[str, dict], bytes]:
         if name in cases:
             raise ValueError(f"duplicate fixture {name}")
         node_count, input_count, output = int(fields[1]), int(fields[2]), int(fields[3])
+        if not 1 <= node_count <= 12:
+            raise ValueError(f"node count outside 1..=12 in {name}")
+        if not 1 <= input_count <= 8:
+            raise ValueError(f"input count outside 1..=8 in {name}")
         weights = tuple(map(int, fields[5].split(",")))
         rules = tuple(map(rule, fields[6].split(",")))
         components = tuple(0 if label == "A" else 1 if label == "B" else -1 for label in fields[7])
@@ -163,9 +167,13 @@ def read_cases(path: Path) -> tuple[dict[str, dict], bytes]:
             )
             if source not in sources:
                 raise ValueError(f"intervention {identifier} is not a graph edge in {name}")
+        parsed_task = task(fields[4])
+        task_inputs = parsed_task[1:] if parsed_task[0] in ("xor", "and") else parsed_task[1:2] if parsed_task[0] == "input" else ()
+        if any(index < 0 or index >= input_count for index in task_inputs):
+            raise ValueError(f"task target references invalid external input in {name}")
         cases[name] = {
             "name": name, "node_count": node_count, "input_count": input_count,
-            "output": output, "task": task(fields[4]), "weights": weights,
+            "output": output, "task": parsed_task, "weights": weights,
             "rules": rules, "components": components, "interventions": interventions,
             "mask": int(fields[9]), "expected": tuple(map(float, fields[10:14])),
             "part_counts": tuple(map(int, fields[14:17])),
