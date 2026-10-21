@@ -504,6 +504,143 @@ mod tests {
         validate_corpus(&corpus()).expect("frozen trace oracles must match");
     }
 
+    // A second, JSON-value-based implementation intentionally avoids the production
+    // event enums and state structs. This provides implementation-diversity checks,
+    // but is not an independent clinical oracle or expert adjudication.
+    fn reference_codes_from_json(trace: &serde_json::Value) -> Vec<String> {
+        let connectivity = trace["connectivity"].as_str().unwrap_or_default();
+        let mut codes = Vec::new();
+        let mut session_active = false;
+        let mut active_bundle: Option<String> = None;
+        let mut verified_bundle: Option<String> = None;
+        let mut revoked_bundles = HashSet::new();
+        let mut uncertainty_pending = false;
+        let mut uncertainty_preserved = false;
+
+        for event in trace["events"].as_array().into_iter().flatten() {
+            let kind = event["kind"].as_str().unwrap_or_default();
+            let bundle_id = event["bundle_id"].as_str().map(str::to_owned);
+            match kind {
+                "session_started" => {
+                    session_active = true;
+                    active_bundle = None;
+                    verified_bundle = None;
+                    uncertainty_pending = false;
+                    uncertainty_preserved = false;
+                }
+                "bundle_loaded" => {
+                    active_bundle = bundle_id.clone();
+                    verified_bundle = None;
+                }
+                "bundle_verified" => {
+                    let id = bundle_id.as_deref().unwrap_or_default();
+                    if active_bundle.as_deref() == Some(id)
+                        && event["bundle_state"] == "valid"
+                        && event["digest_verified"] == true
+                        && !revoked_bundles.contains(id)
+                    {
+                        verified_bundle = Some(id.to_owned());
+                    } else {
+                        verified_bundle = None;
+                        codes.push("invalid_bundle_verification".to_owned());
+                    }
+                }
+                "protocol_rendered" => {
+                    let id = bundle_id.as_deref().unwrap_or_default();
+                    if !session_active {
+                        codes.push("render_without_active_session".to_owned());
+                    }
+                    if revoked_bundles.contains(id) || event["bundle_state"] == "revoked" {
+                        codes.push("render_after_revocation".to_owned());
+                    } else if verified_bundle.as_deref() != Some(id) {
+                        codes.push("render_without_verified_bundle".to_owned());
+                    }
+                }
+                "bundle_revoked" => {
+                    let id = bundle_id.unwrap_or_default();
+                    revoked_bundles.insert(id.clone());
+                    if active_bundle.as_deref() == Some(id.as_str()) {
+                        verified_bundle = None;
+                    }
+                }
+                "session_interrupted" => {
+                    session_active = false;
+                    verified_bundle = None;
+                }
+                "session_resumed" => session_active = true,
+                "uncertainty_detected" => {
+                    uncertainty_pending = true;
+                    uncertainty_preserved = false;
+                }
+                "uncertainty_preserved" => {
+                    if uncertainty_pending {
+                        uncertainty_preserved = true;
+                    }
+                }
+                "unknown_normalized" => codes.push("unknown_normalized".to_owned()),
+                "handoff_emitted" => {
+                    if uncertainty_pending && !uncertainty_preserved {
+                        codes.push("uncertainty_lost_at_handoff".to_owned());
+                    }
+                    uncertainty_pending = false;
+                    uncertainty_preserved = false;
+                }
+                "resource_presented" => {
+                    let state = event["resource_state"].as_str().unwrap_or_default();
+                    if matches!(state, "stale" | "unknown")
+                        && event["presented_as"] == "confirmed"
+                    {
+                        codes.push("stale_resource_claimed_confirmed".to_owned());
+                    }
+                }
+                "network_required_for_core" => match connectivity {
+                    "offline" => codes.push("offline_core_network_dependency".to_owned()),
+                    "intermittent" => {
+                        codes.push("intermittent_core_network_dependency".to_owned())
+                    }
+                    _ => {}
+                },
+                "sensitive_data_egress" => {
+                    if event["sensitive_payload"] == true
+                        && event["consent_scoped"] != true
+                    {
+                        codes.push("sensitive_data_egress_without_consent".to_owned());
+                    }
+                }
+                _ => {}
+            }
+        }
+        codes
+    }
+
+    #[test]
+    fn differential_json_reference_agrees_on_frozen_traces() {
+        let json: serde_json::Value =
+            serde_json::from_str(CORPUS_JSON).expect("frozen corpus JSON must parse");
+        for value in json["scenarios"].as_array().expect("scenario list") {
+            let trace: TrajectoryScenario =
+                serde_json::from_value(value.clone()).expect("scenario must deserialize");
+            assert_eq!(
+                inspect_trace(&trace),
+                reference_codes_from_json(value),
+                "differential trace mismatch: {}",
+                trace.trace_id
+            );
+        }
+    }
+
+    #[test]
+    fn differential_json_reference_agrees_on_session_mutations() {
+        let mut trace = corpus().scenarios.remove(0);
+        trace.events.remove(0);
+        trace.expected_violation_codes = vec!["render_without_active_session".to_owned()];
+        let value = serde_json::to_value(&trace).expect("mutated trace serializes");
+        assert_eq!(
+            inspect_trace(&trace),
+            reference_codes_from_json(&value)
+        );
+    }
+
     #[test]
     fn revocation_mutation_detects_post_revoke_render() {
         let mut trace = corpus().scenarios.remove(0);
