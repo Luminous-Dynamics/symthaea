@@ -56,8 +56,14 @@ fn summarize_panel(panel: &str, counters: PanelCounters, summary: &mut String) {
         counters.point_false_certifications,
         counters.robust_false_certifications,
         counters.robust_false_vetoes,
-        rate(counters.point_false_certifications, counters.point_certified),
-        rate(counters.robust_false_certifications, counters.robust_certified),
+        rate(
+            counters.point_false_certifications,
+            counters.point_certified
+        ),
+        rate(
+            counters.robust_false_certifications,
+            counters.robust_certified
+        ),
         rate(counters.robust_false_vetoes, counters.true_safe),
         rate(counters.point_certified, counters.candidate_actions),
         rate(counters.robust_certified, counters.candidate_actions),
@@ -93,18 +99,15 @@ fn run_panel(
             .ok_or_else(|| IoError::new(ErrorKind::InvalidData, "invalid mismatch scale"))?;
         for stress in STRESS_GRID {
             for action in actions {
-                let (point_certified, robust_certified, true_safe) =
-                    point_and_robust_vs_true(
-                        state,
-                        action,
-                        stress,
-                        mismatch,
-                        calibration_radii,
-                        limits,
-                    )
-                    .ok_or_else(|| {
-                        IoError::new(ErrorKind::InvalidData, "invalid comparison inputs")
-                    })?;
+                let (point_certified, robust_certified, true_safe) = point_and_robust_vs_true(
+                    state,
+                    action,
+                    stress,
+                    mismatch,
+                    calibration_radii,
+                    limits,
+                )
+                .ok_or_else(|| IoError::new(ErrorKind::InvalidData, "invalid comparison inputs"))?;
                 let point_false = point_certified && !true_safe;
                 let robust_false = robust_certified && !true_safe;
                 let robust_false_veto = !robust_certified && true_safe;
