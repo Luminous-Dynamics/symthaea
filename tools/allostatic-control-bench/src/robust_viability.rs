@@ -120,7 +120,8 @@ impl DynamicsBounds {
         }
     }
 
-    const fn effect(self, action: Action) -> ActionEffectBounds {
+    /// Return the transition envelope for one available action.
+    pub const fn effect_for_action(self, action: Action) -> ActionEffectBounds {
         match action {
             Action::Push => self.push,
             Action::Maintain => self.maintain,
@@ -237,10 +238,10 @@ pub fn evaluate_action_set(
     shield_can_recover: bool,
 ) -> RobustActionSet {
     RobustActionSet {
-        push: robustly_viable(state, dynamics.effect(Action::Push), limits),
-        maintain: robustly_viable(state, dynamics.effect(Action::Maintain), limits),
+        push: robustly_viable(state, dynamics.effect_for_action(Action::Push), limits),
+        maintain: robustly_viable(state, dynamics.effect_for_action(Action::Maintain), limits),
         emergency_recover: shield_can_recover
-            && robustly_viable(state, dynamics.effect(Action::EmergencyRecover), limits),
+            && robustly_viable(state, dynamics.effect_for_action(Action::EmergencyRecover), limits),
     }
 }
 
