@@ -287,6 +287,10 @@ struct TemporalDatasetJoinAudit {
     commit_before_invalid_sha_count: usize,
     commit_before_ancestor_of_completion_count: usize,
     statement_match_relation_counts: BTreeMap<String, usize>,
+    unique_theorem_identity_join_count: usize,
+    ambiguous_theorem_identity_join_count: usize,
+    unmatched_theorem_identity_join_count: usize,
+    theorem_identity_status_counts: BTreeMap<String, usize>,
     events: Vec<TemporalDatasetJoinAuditEvent>,
 }
 
