@@ -11,8 +11,8 @@
     "case_count": 36,
     "frozen_trace_count": 12,
     "mutation_case_count": 24,
-    "implemented_or_frozen_count": 25,
-    "planned_not_yet_executable_count": 11
+    "implemented_or_frozen_count": 33,
+    "planned_not_yet_executable_count": 3
   },
   "evidence_status_definitions": {
     "frozen_fixture": "Expected output resides in the frozen corpus and is checked by the trajectory validator.",
@@ -359,8 +359,8 @@
         "outcome": "evaluate",
         "violation_codes": []
       },
-      "evidence_status": "planned_not_yet_executable",
-      "note": "Need negative control to verify non-sensitive payload does not spuriously fail."
+      "evidence_status": "unit_test_added",
+      "note": "Implemented in non_sensitive_egress_does_not_require_sensitive_data_consent_scope. Exact-head workflow validation is pending."
     },
     {
       "case_id": "MUT-013",
@@ -374,8 +374,8 @@
           "render_without_verified_bundle"
         ]
       },
-      "evidence_status": "planned_not_yet_executable",
-      "note": "Add as a separate transformation with a frozen expected result."
+      "evidence_status": "unit_test_added",
+      "note": "Implemented in rendering_different_bundle_from_verified_bundle_is_rejected. Exact-head workflow validation is pending."
     },
     {
       "case_id": "MUT-014",
@@ -389,8 +389,8 @@
           "invalid_bundle_verification"
         ]
       },
-      "evidence_status": "planned_not_yet_executable",
-      "note": "Exercise digest-failure transition explicitly."
+      "evidence_status": "unit_test_added",
+      "note": "Implemented in failed_digest_verification_blocks_rendering. Exact-head workflow validation is pending."
     },
     {
       "case_id": "MUT-015",
@@ -404,8 +404,8 @@
           "invalid_bundle_verification"
         ]
       },
-      "evidence_status": "planned_not_yet_executable",
-      "note": "Exercise stale/expired bundle state explicitly."
+      "evidence_status": "unit_test_added",
+      "note": "Implemented in expired_bundle_cannot_be_verified_or_rendered. Exact-head workflow validation is pending."
     },
     {
       "case_id": "MUT-016",
@@ -419,8 +419,8 @@
           "uncertainty_lost_at_handoff"
         ]
       },
-      "evidence_status": "planned_not_yet_executable",
-      "note": "Tests reset and re-entry into uncertainty state."
+      "evidence_status": "unit_test_added",
+      "note": "Implemented in new_uncertainty_after_prior_preservation_is_not_lost_at_handoff. Exact-head workflow validation is pending."
     },
     {
       "case_id": "MUT-017",
@@ -435,8 +435,8 @@
           "render_without_verified_bundle"
         ]
       },
-      "evidence_status": "planned_not_yet_executable",
-      "note": "Ensure separate safety invariants remain visible together."
+      "evidence_status": "unit_test_added",
+      "note": "Implemented in revocation_survives_new_session_and_both_failures_remain_visible. Exact-head workflow validation is pending."
     },
     {
       "case_id": "MUT-018",
@@ -487,8 +487,8 @@
         "outcome": "reject",
         "violation_codes": []
       },
-      "evidence_status": "planned_not_yet_executable",
-      "note": "Test enum decoding and fail-closed behavior."
+      "evidence_status": "unit_test_added",
+      "note": "Implemented in unknown_event_kind_is_rejected_by_schema_deserialization. Exact-head workflow validation is pending."
     },
     {
       "case_id": "MUT-022",
@@ -500,8 +500,8 @@
         "outcome": "reject",
         "violation_codes": []
       },
-      "evidence_status": "planned_not_yet_executable",
-      "note": "Test event-specific required metadata."
+      "evidence_status": "unit_test_added",
+      "note": "Implemented in bundle_verification_requires_digest_metadata. Exact-head workflow validation is pending."
     },
     {
       "case_id": "MUT-023",
