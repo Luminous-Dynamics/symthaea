@@ -79,6 +79,7 @@ struct ReplayManifest {
     discretionary_budget_cap_units: f64,
     target_cost_reduction_percent: f64,
     max_mean_loss_degradation_units: f64,
+    max_pair_loss_degradation_units: f64,
     max_false_alarms_per_100_decisions: f64,
     max_deadline_miss_rate_degradation_per_100_decisions: f64,
     min_independent_pairs: usize,
@@ -113,6 +114,7 @@ struct ReplayMetrics {
     discretionary_assay_count_baseline: u64,
     measurement_cost_reduction_percent: MetricInterval,
     mean_paired_decision_loss_degradation_units: MetricInterval,
+    worst_pair_decision_loss_degradation_units: f64,
     false_alarms_per_100_decisions_policy: f64,
     false_alarms_per_100_decisions_baseline: f64,
     deadline_misses_per_100_decisions_policy: f64,
@@ -322,6 +324,9 @@ fn audit_manifest(manifest: &ReplayManifest) -> AuditResult {
     }
     if !nonnegative_finite(manifest.max_mean_loss_degradation_units) {
         violations.push("max_mean_loss_degradation_invalid".to_string());
+    }
+    if !nonnegative_finite(manifest.max_pair_loss_degradation_units) {
+        violations.push("max_pair_loss_degradation_invalid".to_string());
     }
     if !nonnegative_finite(manifest.max_false_alarms_per_100_decisions) {
         violations.push("max_false_alarm_rate_invalid".to_string());
@@ -537,6 +542,14 @@ fn audit_manifest(manifest: &ReplayManifest) -> AuditResult {
         if loss_ci.upper_95 > manifest.max_mean_loss_degradation_units {
             violations.push("mean_decision_loss_degradation_upper_ci_exceeds_margin".to_string());
         }
+        let worst_pair_loss_delta = manifest
+            .pairs
+            .iter()
+            .map(|pair| pair.policy.decision_loss_units - pair.baseline.decision_loss_units)
+            .fold(f64::NEG_INFINITY, f64::max);
+        if worst_pair_loss_delta > manifest.max_pair_loss_degradation_units {
+            violations.push("worst_pair_decision_loss_degradation_exceeds_margin".to_string());
+        }
 
         let metrics = ReplayMetrics {
             pair_count: manifest.pairs.len(),
@@ -555,6 +568,7 @@ fn audit_manifest(manifest: &ReplayManifest) -> AuditResult {
             discretionary_assay_count_baseline: baseline_assays,
             measurement_cost_reduction_percent: cost_ci,
             mean_paired_decision_loss_degradation_units: loss_ci,
+            worst_pair_decision_loss_degradation_units: worst_pair_loss_delta,
             false_alarms_per_100_decisions_policy: false_rate_policy,
             false_alarms_per_100_decisions_baseline: false_rate_baseline,
             deadline_misses_per_100_decisions_policy: deadline_rate_policy,
@@ -717,6 +731,7 @@ mod tests {
             discretionary_budget_cap_units: 12.0,
             target_cost_reduction_percent: 20.0,
             max_mean_loss_degradation_units: 0.25,
+            max_pair_loss_degradation_units: 0.25,
             max_false_alarms_per_100_decisions: 5.0,
             max_deadline_miss_rate_degradation_per_100_decisions: 0.0,
             min_independent_pairs: 5,
@@ -864,6 +879,20 @@ mod tests {
                 .violations
                 .iter()
                 .any(|issue| issue == "mean_decision_loss_degradation_upper_ci_exceeds_margin")
+        );
+    }
+
+    #[test]
+    fn rejects_worst_pair_loss_even_when_mean_margin_is_loose() {
+        let mut manifest = valid_manifest();
+        manifest.max_mean_loss_degradation_units = 10.0;
+        manifest.pairs[0].policy.decision_loss_units = 3.0;
+        let result = audit_manifest(&manifest);
+        assert!(
+            result
+                .violations
+                .iter()
+                .any(|issue| issue == "worst_pair_decision_loss_degradation_exceeds_margin")
         );
     }
 
