@@ -183,6 +183,11 @@ pub enum SimulationError {
         step: usize,
         index: usize,
     },
+    /// An intermediate Cash–Karp stage state became non-finite before derivative evaluation.
+    NonFiniteIntermediateState {
+        stage: u8,
+        index: usize,
+    },
     InvalidIntegratorConfiguration,
     /// RK45 derivative evaluation returned a vector with the wrong dimension.
     DerivativeDimensionMismatch {
@@ -632,10 +637,7 @@ impl Rk45Integrator {
         stage: u8,
     ) -> Result<Vec<f64>, SimulationError> {
         if let Some(index) = state.iter().position(|value| !value.is_finite()) {
-            return Err(SimulationError::NonFiniteIntegratorState {
-                step: usize::from(stage),
-                index,
-            });
+            return Err(SimulationError::NonFiniteIntermediateState { stage, index });
         }
         let derivatives = system.derivatives(state, t);
         if derivatives.len() != expected_dim {
@@ -830,6 +832,13 @@ impl Rk45Integrator {
         dt: f64,
     ) -> Result<(Vec<f64>, f64, f64), SimulationError> {
         self.validate()?;
+        let expected_dim = system.state_dim();
+        if state.len() != expected_dim {
+            return Err(SimulationError::StateDimensionMismatch {
+                expected: expected_dim,
+                actual: state.len(),
+            });
+        }
         let tolerances = Rk45Tolerances::new(0.0, vec![self.tol; state.len()]);
         let report = self.try_adaptive_step_impl(
             system,
