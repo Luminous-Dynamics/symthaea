@@ -223,6 +223,7 @@
         "decision",
         "predicted_label",
         "confidence",
+        "compatibility_probability",
         "mismatch_codes",
         "precondition_checks",
         "receipt_sha256"
@@ -305,6 +306,15 @@
         "receipt_sha256": {
           "type": "string",
           "pattern": "^[0-9a-f]{64}$"
+        },
+        "compatibility_probability": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Estimated probability that the proposed transfer is compatible with the target obligation, regardless of whether the action is accept, reject, or abstain. Null means the system did not emit a probability; calibration metrics must report coverage and must not impute missing probabilities."
         }
       },
       "allOf": [
