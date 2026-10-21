@@ -1156,56 +1156,58 @@ fn audit_temporal_dataset(
             ambiguous_theorem_identity_join_count += 1;
         } else {
             match identity_candidates.as_slice() {
-            [] => {
-                if identity_join_status.is_empty() {
-                    identity_join_status = "no_exact_proof_transition".to_string();
-                }
-                unmatched_theorem_identity_join_count += 1;
-            }
-            [(_position, completion_commit, completion_statement_match)] => {
-                identity_statement_match_at_completion = Some(*completion_statement_match);
-                identity_proof_matches_completion = Some(true);
-                let pre_state_is_ancestor = commit_before_object_exists == Some(true)
-                    && cached_git_is_ancestor(
-                        &root,
-                        &commit_before,
-                        completion_commit,
-                        &mut identity_ancestry_cache,
-                    )?;
-                if pre_state_is_ancestor
-                    && git_path_exists_at_commit(&root, &commit_before, &raw_file_path)?
-                {
-                    let before_bytes = git_show_file(&root, &commit_before, &raw_file_path)?;
-                    let before_source = std::str::from_utf8(&before_bytes)
-                        .context("theorem-identity target-state source is not UTF-8")?;
-                    let before_blocks =
-                        named_declaration_blocks(before_source, theorem_short_name)?;
-                    if before_blocks.len() == 1 {
-                        identity_statement_match_at_commit_before = statement_prefix
-                            .as_deref()
-                            .filter(|prefix| !prefix.is_empty())
-                            .map(|prefix| normalized_contains(&before_blocks[0], prefix));
-                        identity_proof_absent_at_commit_before =
-                            Some(!normalized_contains(&before_blocks[0], &dataset_proof));
+                [] => {
+                    if identity_join_status.is_empty() {
+                        identity_join_status = "no_exact_proof_transition".to_string();
                     }
-                }
-
-                let statement_stable = identity_statement_match_at_commit_before == Some(true)
-                    && identity_statement_match_at_completion == Some(true);
-                let proof_hidden_at_target = identity_proof_absent_at_commit_before == Some(true);
-                if statement_stable && proof_hidden_at_target {
-                    identity_join_status = "unique_stable_theorem_proof_transition".to_string();
-                    unique_theorem_identity_join_count += 1;
-                } else {
-                    identity_join_status =
-                        "unique_proof_transition_with_statement_or_visibility_mismatch".to_string();
                     unmatched_theorem_identity_join_count += 1;
                 }
-            }
-            _ => {
-                identity_join_status = "ambiguous_proof_transition".to_string();
-                ambiguous_theorem_identity_join_count += 1;
-            }
+                [(_position, completion_commit, completion_statement_match)] => {
+                    identity_statement_match_at_completion = Some(*completion_statement_match);
+                    identity_proof_matches_completion = Some(true);
+                    let pre_state_is_ancestor = commit_before_object_exists == Some(true)
+                        && cached_git_is_ancestor(
+                            &root,
+                            &commit_before,
+                            completion_commit,
+                            &mut identity_ancestry_cache,
+                        )?;
+                    if pre_state_is_ancestor
+                        && git_path_exists_at_commit(&root, &commit_before, &raw_file_path)?
+                    {
+                        let before_bytes = git_show_file(&root, &commit_before, &raw_file_path)?;
+                        let before_source = std::str::from_utf8(&before_bytes)
+                            .context("theorem-identity target-state source is not UTF-8")?;
+                        let before_blocks =
+                            named_declaration_blocks(before_source, theorem_short_name)?;
+                        if before_blocks.len() == 1 {
+                            identity_statement_match_at_commit_before = statement_prefix
+                                .as_deref()
+                                .filter(|prefix| !prefix.is_empty())
+                                .map(|prefix| normalized_contains(&before_blocks[0], prefix));
+                            identity_proof_absent_at_commit_before =
+                                Some(!normalized_contains(&before_blocks[0], &dataset_proof));
+                        }
+                    }
+
+                    let statement_stable = identity_statement_match_at_commit_before == Some(true)
+                        && identity_statement_match_at_completion == Some(true);
+                    let proof_hidden_at_target =
+                        identity_proof_absent_at_commit_before == Some(true);
+                    if statement_stable && proof_hidden_at_target {
+                        identity_join_status = "unique_stable_theorem_proof_transition".to_string();
+                        unique_theorem_identity_join_count += 1;
+                    } else {
+                        identity_join_status =
+                            "unique_proof_transition_with_statement_or_visibility_mismatch"
+                                .to_string();
+                        unmatched_theorem_identity_join_count += 1;
+                    }
+                }
+                _ => {
+                    identity_join_status = "ambiguous_proof_transition".to_string();
+                    ambiguous_theorem_identity_join_count += 1;
+                }
             }
         }
         *theorem_identity_status_counts
