@@ -131,17 +131,17 @@ fn main() -> anyhow::Result<()> {
             let fanouts = parse_list(&fanouts)?;
             let policies = policies.split(',').map(|s| s.to_string()).collect();
 
-            rhn_sweep::run_sweep(
+            rhn_sweep::run_sweep(rhn_sweep::SweepConfig {
                 dims,
                 objects,
                 seeds,
-                branching,
-                split_thresholds,
+                branchings: branching,
+                thresholds: split_thresholds,
                 redundancy_ks,
                 fanouts,
                 policies,
                 out,
-            )?;
+            })?;
         }
         Commands::RhnFinalize { input, out } => {
             rhn_sweep::run_finalize(input, out)?;
