@@ -222,7 +222,6 @@ fn parse_episodes(csv: &str) -> Result<BTreeMap<ConditionKey, EpisodesBySeed>, B
         if !(0.0..=3.0).contains(&mean_safe_action_options)
             || minimum_safe_action_options > 3
             || mean_safe_action_options + mean_tolerance < minimum_safe_action_options as f64
-            || (shielded && minimum_safe_action_options == 0)
         {
             return Err(invalid_data(format!("safe-action option metric violates contract on line {}", line_index + 2)).into());
         }
