@@ -30,6 +30,17 @@ From the repository root:
 
 The smoke mode uses 16,384 coordinates, 64 candidate prototypes, 16 trials, noise rates 5/10/20/30/35/40/45/50%, and bundle/association sizes 1/3/5/9/17/33/49. The stress mode is invoked with --stress and uses 4,096 coordinates, 256 candidates, 128 trials, and capacities 1/7/31/63/127/255 to probe a much higher interference regime. The larger stress trial count narrows single-run binomial intervals relative to the original 32-trial sweep, but is still one predeclared seed; multiple seeds remain mandatory for publication-grade comparisons. Both emit paired MAP-versus-HRR capacity results, but these initial settings do not yet establish matched-byte K_95 or state-of-the-art performance.
 
+## Capacity target: K95 (tested-grid estimate)
+
+The runner now emits `max_tested_k95` for MAP raw retrieval, MAP projected-softmax cleanup, same-dimension HRR, and byte-matched HRR. Here K95 means the **largest capacity actually present in the configured sweep** for which the lower 95% Wilson bound on Recall@1 is at least 95%. The output says `k95_tested_grid_only=true` deliberately: this is not a claim about untested capacity values or a continuous maximum.
+
+Two important qualifications:
+
+- The smoke run has only 16 trials. Even 16/16 observed successes do not make the lower Wilson bound reach 95%, so smoke-mode K95 may correctly be `NA`. Do not replace that with observed accuracy or omit the row.
+- The stress run now uses 128 trials but remains a single fixed seed. It may provide a useful high-interference diagnostic and narrower intervals, but publication-grade K95 needs multiple independent seeds, larger test counts near the 95% boundary, and a budget sweep that accounts for total memory (not only candidate payload).
+
+K95 is an explicit target metric for the next cross-algebra study, not a reported win. Compare methods only at the same operational definition, byte budget, candidate count, noise/composition conditions, and confidence procedure.
+
 ## Interpretation and controls
 
 - Exact unbinding and basis equivariance are algebraic invariants, not learning results.
