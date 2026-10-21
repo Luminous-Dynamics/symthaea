@@ -1261,8 +1261,7 @@ fn calibration_scores(values: &[(f64, bool)]) -> (f64, f64) {
     for bin in bins.into_iter().filter(|bin| !bin.is_empty()) {
         let count = bin.len();
         let mean_probability = bin.iter().map(|(p, _)| *p).sum::<f64>() / count as f64;
-        let observed_rate =
-            bin.iter().filter(|(_, truth)| *truth).count() as f64 / count as f64;
+        let observed_rate = bin.iter().filter(|(_, truth)| *truth).count() as f64 / count as f64;
         ece += count as f64 / values.len() as f64 * (mean_probability - observed_rate).abs();
     }
     (brier, ece)
