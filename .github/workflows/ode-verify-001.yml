@@ -35,5 +35,11 @@ jobs:
       - name: Unit and numerical verification tests
         run: cargo test --locked --manifest-path research/ode-verify-001/Cargo.toml
 
+      - name: Work-precision numerical tests
+        run: cargo test --locked --manifest-path research/ode-verify-001/Cargo.toml --example oscillator_work_precision
+
+      - name: Emit harmonic-oscillator work-precision report
+        run: cargo run --locked --release --manifest-path research/ode-verify-001/Cargo.toml --example oscillator_work_precision
+
       - name: Strict Clippy
         run: cargo clippy --locked --manifest-path research/ode-verify-001/Cargo.toml --all-targets -- -D warnings
