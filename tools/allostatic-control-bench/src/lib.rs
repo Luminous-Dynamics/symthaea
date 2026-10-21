@@ -21,7 +21,13 @@ pub enum Scenario {
 
 impl Scenario {
     pub const fn all() -> [Self; 5] {
-        [Self::Calm, Self::Acute, Self::Chronic, Self::Repeated, Self::RegimeShift]
+        [
+            Self::Calm,
+            Self::Acute,
+            Self::Chronic,
+            Self::Repeated,
+            Self::RegimeShift,
+        ]
     }
 
     pub const fn name(self) -> &'static str {
@@ -127,10 +133,18 @@ pub fn environmental_load(scenario: Scenario, tick: usize, seed: u64) -> f64 {
     let base = match scenario {
         Scenario::Calm => 0.06,
         Scenario::Acute => {
-            if (8..12).contains(&tick) { 0.94 } else { 0.07 }
+            if (8..12).contains(&tick) {
+                0.94
+            } else {
+                0.07
+            }
         }
         Scenario::Chronic => {
-            if (5..35).contains(&tick) { 0.58 } else { 0.09 }
+            if (5..35).contains(&tick) {
+                0.58
+            } else {
+                0.09
+            }
         }
         Scenario::Repeated => {
             if (4..7).contains(&tick)
@@ -144,7 +158,11 @@ pub fn environmental_load(scenario: Scenario, tick: usize, seed: u64) -> f64 {
             }
         }
         Scenario::RegimeShift => {
-            if tick < HORIZON / 2 { 0.08 } else { 0.72 }
+            if tick < HORIZON / 2 {
+                0.08
+            } else {
+                0.72
+            }
         }
     };
     let jitter = (unit_noise(seed, tick) - 0.5) * 0.04;
@@ -158,10 +176,18 @@ fn forecast_signal(scenario: Scenario, tick: usize, seed: u64) -> f64 {
     let base = match scenario {
         Scenario::Calm => 0.06,
         Scenario::Acute => {
-            if (5..12).contains(&tick) { 0.92 } else { 0.07 }
+            if (5..12).contains(&tick) {
+                0.92
+            } else {
+                0.07
+            }
         }
         Scenario::Chronic => {
-            if (3..35).contains(&tick) { 0.58 } else { 0.09 }
+            if (3..35).contains(&tick) {
+                0.58
+            } else {
+                0.09
+            }
         }
         Scenario::Repeated => {
             if (2..7).contains(&tick)
@@ -215,11 +241,9 @@ fn choose_action(policy: Policy, observation: Observation) -> Action {
             // three-step horizon over-rests in calm conditions because decisions
             // are re-evaluated after every action.
             let horizon = 1.0 + 2.0 * conservative_forecast;
-            let projected_reserve =
-                reserve - horizon * (0.055 + 0.025 * conservative_forecast);
+            let projected_reserve = reserve - horizon * (0.055 + 0.025 * conservative_forecast);
             let reserve_floor = 0.15 + 0.10 * conservative_forecast;
-            let projected_load =
-                load + horizon * (0.026 + 0.032 * conservative_forecast);
+            let projected_load = load + horizon * (0.026 + 0.032 * conservative_forecast);
             projected_reserve < reserve_floor || projected_load > 0.68 || reserve < 0.22
         }
         Policy::ShuffledForecastControl => {
@@ -258,8 +282,7 @@ fn projected_state(action: Action, reserve: f64, load: f64, stress: f64) -> (f64
         ),
         Action::Maintain => (
             reserve + 0.08 * (1.0 - 0.7 * stress),
-            load + 0.008 + stress * 0.032
-                - if stress < 0.25 { 0.055 } else { 0.020 },
+            load + 0.008 + stress * 0.032 - if stress < 0.25 { 0.055 } else { 0.020 },
         ),
         Action::EmergencyRecover => (
             reserve + 0.10 * (1.0 - 0.5 * stress),
@@ -398,11 +421,9 @@ pub fn run_episode_with_shield(
         // Candidate policies receive a noisy exogenous warning stream. Confidence
         // controls forecast noise but does not expose the scenario or future state.
         // Only OraclePredictive receives actual future environment values.
-        let forecast_confidence =
-            0.65 + 0.30 * unit_noise(seed.wrapping_add(777), tick);
+        let forecast_confidence = 0.65 + 0.30 * unit_noise(seed.wrapping_add(777), tick);
         let forecast_noise_scale = 0.10 + 0.35 * (1.0 - forecast_confidence);
-        let forecast_noise =
-            (unit_noise(seed.wrapping_add(91), tick) - 0.5) * forecast_noise_scale;
+        let forecast_noise = (unit_noise(seed.wrapping_add(91), tick) - 0.5) * forecast_noise_scale;
         let forecast_load =
             (forecast_signal(scenario, tick, seed) + forecast_noise).clamp(0.0, 1.0);
         let shuffled_start = shuffled_forecast_index(tick, seed);
@@ -427,15 +448,12 @@ pub fn run_episode_with_shield(
         };
         // Count false-alarm opportunities from the pre-action state; do not
         // let the action itself change the denominator or hide the opportunity.
-        let safe_options =
-            safe_action_option_count(reserve, allostatic_load, stress, shielded);
+        let safe_options = safe_action_option_count(reserve, allostatic_load, stress, shielded);
         safe_action_options_total += safe_options;
         minimum_safe_action_options = minimum_safe_action_options.min(safe_options);
 
-        let false_alarm_opportunity = stress < 0.20
-            && reserve > 0.30
-            && allostatic_load < 0.25
-            && forecast_load < 0.25;
+        let false_alarm_opportunity =
+            stress < 0.20 && reserve > 0.30 && allostatic_load < 0.25 && forecast_load < 0.25;
         if false_alarm_opportunity {
             false_alarm_opportunities += 1;
         }
@@ -477,8 +495,7 @@ pub fn run_episode_with_shield(
                 emergency_recover_steps += 1;
             }
         }
-        let (next_reserve, next_load) =
-            projected_state(action, reserve, allostatic_load, stress);
+        let (next_reserve, next_load) = projected_state(action, reserve, allostatic_load, stress);
         reserve = next_reserve;
         allostatic_load = next_load;
 
@@ -506,13 +523,16 @@ pub fn run_episode_with_shield(
     }
 
     let recovery_steps = last_disturbance.and_then(|last| {
-        trace.iter().enumerate().find_map(|(tick, (reserve, load))| {
-            if tick > last && *reserve >= 0.75 && *load <= 0.25 {
-                Some(tick - last)
-            } else {
-                None
-            }
-        })
+        trace
+            .iter()
+            .enumerate()
+            .find_map(|(tick, (reserve, load))| {
+                if tick > last && *reserve >= 0.75 && *load <= 0.25 {
+                    Some(tick - last)
+                } else {
+                    None
+                }
+            })
     });
 
     EpisodeMetrics {
@@ -553,8 +573,10 @@ mod tests {
         let short = vec![0.4; 8];
         let long = vec![0.4; 16];
         assert!((mean_burden(&short) - mean_burden(&long)).abs() < 1e-12);
-        assert!((cumulative_exposure(&long, 1.0)
-            - 2.0 * cumulative_exposure(&short, 1.0)).abs() < 1e-12);
+        assert!(
+            (cumulative_exposure(&long, 1.0) - 2.0 * cumulative_exposure(&short, 1.0)).abs()
+                < 1e-12
+        );
     }
 
     #[test]
@@ -569,14 +591,10 @@ mod tests {
     fn confidence_change_does_not_erase_viability_burden() {
         let high_confidence = (0.8, 1.5, 0.9);
         let low_confidence = (0.8, 1.5, 0.2);
-        let burden_high_confidence =
-            viability_burden(high_confidence.0, high_confidence.1);
-        let burden_low_confidence =
-            viability_burden(low_confidence.0, low_confidence.1);
+        let burden_high_confidence = viability_burden(high_confidence.0, high_confidence.1);
+        let burden_low_confidence = viability_burden(low_confidence.0, low_confidence.1);
         assert!((burden_high_confidence - burden_low_confidence).abs() < 1e-12);
-        assert!(
-            epistemic_uncertainty(low_confidence.2) > epistemic_uncertainty(high_confidence.2)
-        );
+        assert!(epistemic_uncertainty(low_confidence.2) > epistemic_uncertainty(high_confidence.2));
     }
 
     #[test]
@@ -584,23 +602,27 @@ mod tests {
         let acute = [1.0, 0.0];
         let chronic = [0.5, 0.5];
         assert!((mean_burden(&acute) - mean_burden(&chronic)).abs() < 1e-12);
-        assert!(acute.iter().copied().fold(0.0, f64::max)
-            > chronic.iter().copied().fold(0.0, f64::max));
-        assert!((cumulative_exposure(&acute, 1.0)
-            - cumulative_exposure(&chronic, 1.0)).abs() < 1e-12);
+        assert!(
+            acute.iter().copied().fold(0.0, f64::max) > chronic.iter().copied().fold(0.0, f64::max)
+        );
+        assert!(
+            (cumulative_exposure(&acute, 1.0) - cumulative_exposure(&chronic, 1.0)).abs() < 1e-12
+        );
     }
 
     #[test]
     fn shuffled_forecast_preserves_all_indices_but_breaks_time_order() {
         for seed in 0..32 {
-            let mut indices: Vec<usize> =
-                (0..HORIZON).map(|tick| shuffled_forecast_index(tick, seed)).collect();
+            let mut indices: Vec<usize> = (0..HORIZON)
+                .map(|tick| shuffled_forecast_index(tick, seed))
+                .collect();
             indices.sort_unstable();
             assert_eq!(indices, (0..HORIZON).collect::<Vec<_>>());
         }
         let ordered: Vec<usize> = (0..HORIZON).collect();
-        let shuffled: Vec<usize> =
-            (0..HORIZON).map(|tick| shuffled_forecast_index(tick, 0)).collect();
+        let shuffled: Vec<usize> = (0..HORIZON)
+            .map(|tick| shuffled_forecast_index(tick, 0))
+            .collect();
         assert_ne!(shuffled, ordered);
     }
 
@@ -631,9 +653,18 @@ mod tests {
             shuffled_forecast_confidence: 0.90,
             oracle_forecast_load: 0.90,
         };
-        assert_eq!(choose_action(Policy::StressReactive, observation), Action::Push);
-        assert_eq!(choose_action(Policy::PredictiveViability, observation), Action::Maintain);
-        assert_eq!(choose_action(Policy::ShuffledForecastControl, observation), Action::Push);
+        assert_eq!(
+            choose_action(Policy::StressReactive, observation),
+            Action::Push
+        );
+        assert_eq!(
+            choose_action(Policy::PredictiveViability, observation),
+            Action::Maintain
+        );
+        assert_eq!(
+            choose_action(Policy::ShuffledForecastControl, observation),
+            Action::Push
+        );
     }
 
     #[test]
@@ -658,8 +689,7 @@ mod tests {
 
     #[test]
     fn safety_shield_vetoes_unsafe_push_and_selects_recovery_if_needed() {
-        let (action, vetoed, no_safe_action) =
-            apply_safety_shield(Action::Push, 0.16, 0.87, 0.90);
+        let (action, vetoed, no_safe_action) = apply_safety_shield(Action::Push, 0.16, 0.87, 0.90);
         assert_eq!(action, Action::EmergencyRecover);
         assert!(vetoed);
         assert!(!no_safe_action);
@@ -674,20 +704,22 @@ mod tests {
                     for shielded in [false, true] {
                         let result = run_episode_with_shield(policy, scenario, seed, shielded);
                         assert!(result.task_reward.is_finite());
-                    assert!(result.cumulative_exposure.is_finite());
-                    assert!((0.0..=1.0).contains(&result.mean_load));
-                    assert!((0.0..=1.0).contains(&result.peak_load));
-                    assert!((0.0..=1.0).contains(&result.minimum_reserve));
-                    assert!((0.0..=3.0).contains(&result.mean_safe_action_options));
-                    assert!(result.minimum_safe_action_options <= 3);
-                    assert!((0.0..=1.0).contains(&result.terminal_reserve));
+                        assert!(result.cumulative_exposure.is_finite());
+                        assert!((0.0..=1.0).contains(&result.mean_load));
+                        assert!((0.0..=1.0).contains(&result.peak_load));
+                        assert!((0.0..=1.0).contains(&result.minimum_reserve));
+                        assert!((0.0..=3.0).contains(&result.mean_safe_action_options));
+                        assert!(result.minimum_safe_action_options <= 3);
+                        assert!((0.0..=1.0).contains(&result.terminal_reserve));
                         assert!((0.0..=1.0).contains(&result.terminal_load));
                         assert!(result.violation_exposure.is_finite());
                         assert!((0.0..=1.0).contains(&result.max_violation_severity));
                         assert!(result.unsafe_ticks <= HORIZON);
                         assert_eq!(result.unsafe_episode, result.unsafe_ticks > 0);
                         assert!(
-                            result.push_steps + result.maintain_steps + result.emergency_recover_steps
+                            result.push_steps
+                                + result.maintain_steps
+                                + result.emergency_recover_steps
                                 == HORIZON
                         );
                         if shielded {
