@@ -55,6 +55,10 @@ jobs:
         id: pgx-tests
         run: cargo test -p symthaea-neuromodulators pgx_health_equity::tests -- --nocapture
 
+      - name: Compile PGx report examples
+        id: pgx-examples
+        run: cargo check -p symthaea-neuromodulators --examples
+
       - name: Write exact-head software-contract receipt
         id: receipt
         if: always()
@@ -62,6 +66,7 @@ jobs:
           EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
           FORMAT_OUTCOME: ${{ steps.format.outcome }}
           TEST_OUTCOME: ${{ steps.pgx-tests.outcome }}
+          EXAMPLES_OUTCOME: ${{ steps.pgx-examples.outcome }}
         run: |
           set -euo pipefail
           tested_head="$(git rev-parse HEAD)"
@@ -72,7 +77,7 @@ jobs:
           boundary_sha="$(sha256sum docs/research/PGX_RESEARCH_ONLY_BOUNDARY_V0.md | awk '{print $1}')"
           manifest_sha="$(sha256sum Cargo.toml | awk '{print $1}')"
           receipt_status=PASS
-          if [[ "$tested_head" != "$EXPECTED_HEAD" || "$FORMAT_OUTCOME" != "success" || "$TEST_OUTCOME" != "success" ]]; then
+          if [[ "$tested_head" != "$EXPECTED_HEAD" || "$FORMAT_OUTCOME" != "success" || "$TEST_OUTCOME" != "success" || "$EXAMPLES_OUTCOME" != "success" ]]; then
             receipt_status=FAIL
           fi
           mkdir -p target/pgx-research
@@ -81,6 +86,7 @@ jobs:
             --arg tested_head "$tested_head" \
             --arg format_outcome "$FORMAT_OUTCOME" \
             --arg test_outcome "$TEST_OUTCOME" \
+            --arg examples_outcome "$EXAMPLES_OUTCOME" \
             --arg source_sha256 "$source_sha" \
             --arg pharmacogenomics_sha256 "$pharmacogenomics_sha" \
             --arg manuscript_sha256 "$manuscript_sha" \
@@ -93,7 +99,8 @@ jobs:
               tested_head: $tested_head,
               checks: {
                 rustfmt: $format_outcome,
-                pgx_module_tests: $test_outcome
+                pgx_module_tests: $test_outcome,
+                report_examples: $examples_outcome
               },
               input_sha256: {
                 pgx_health_equity_rs: $source_sha256,
