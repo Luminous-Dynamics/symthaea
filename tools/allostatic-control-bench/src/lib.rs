@@ -433,7 +433,7 @@ pub fn run_episode_with_shield(
         reserve = next_reserve;
         allostatic_load = next_load;
 
-        if action != Action::Push
+        if action == Action::Maintain
             && stress < 0.20
             && reserve > 0.30
             && allostatic_load < 0.25
@@ -622,6 +622,7 @@ mod tests {
                                 == HORIZON
                         );
                         if shielded {
+                            assert_eq!(result.no_safe_action_ticks, 0);
                             assert_eq!(
                                 result.unsafe_ticks, 0,
                                 "model-perfect shield should maintain one-step viability: {scenario:?} {policy:?} seed={seed}"
