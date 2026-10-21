@@ -3684,7 +3684,7 @@ mod tests {
         );
         assert_eq!(canonical, commented);
         let string_literal =
-            normalize_lean_for_leakage(r#"exact String.contains value "-- /- remain literal -/"#);
+            normalize_lean_for_leakage(r##"exact String.contains value "-- /- remain literal -/""##);
         assert!(string_literal.contains(r#""-- /- remain literal -/""#));
     }
 
