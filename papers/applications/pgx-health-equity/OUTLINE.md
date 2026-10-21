@@ -136,19 +136,15 @@ We provide: (1) a formalized equity gap scoring methodology, (2) an open-source 
   - Warfarin/CYP2C9: South Asian flagged (*3 at 11%); African populations may show low gap (CYP2C9*2/*3 rare in Africa -- but NOTE: CYP2C9*8 and *11 are common in African populations and are NOT yet in our allele set -- acknowledge as limitation)
   - Sertraline/CYP2C19: Same populations as clopidogrel but with different risk profile (accumulation vs non-activation)
 
-### 3.3 Population-level clinical impact estimates
-- **Figure 3**: Bar chart -- estimated patients at risk per drug-gene pair, stratified by ancestry
-- Frame carefully: "Under the assumption that X million patients in [ancestry group] are prescribed [drug] annually, and Y% carry actionable phenotypes not adequately addressed by current guidelines, an estimated Z patients may receive suboptimal dosing."
-- Compare: East Asian clopidogrel impact (>8% PM prevalence from CYP2C19*2^2, applied to cardiovascular disease burden in East Asia) vs European codeine impact (7% PM -- but already addressed by CPIC guidelines)
+### 3.3 Modelled population scenario arithmetic (not clinical impact)
+- Show multiplication of rounded population denominators by prototype model-output fractions only as an illustrative calculation.
+- Explicitly state that these are not counts of patients prescribed a drug, people needing dose adjustment, adverse events, or people likely to benefit from an intervention.
+- Include model-coverage and phenotype-reference limitations; do not use the phrase “patients at risk” for these products.
 
-### 3.4 Ancestry-adjusted vs standard recommendations
-- **Figure 4**: Decision tree comparison -- standard CPIC pathway vs ancestry-adjusted pathway for 2-3 example scenarios
-- Show concrete cases:
-  - African patient, CYP2D6 ultra-rapid, prescribed codeine: Standard CPIC says "avoid" (correct), but our engine additionally flags the population-level context and equity gap score
-  - East Asian patient, CYP2C19 poor metabolizer, prescribed clopidogrel: Standard CPIC says "use alternative" (correct), but engine quantifies that 8% of East Asian patients fall in this category vs 2% European
-  - South Asian patient, CYP2C9 intermediate, prescribed warfarin: Standard CPIC says "reduce dose 25%", engine flags that South Asian populations have higher combined loss-of-function burden and recommends enhanced INR monitoring
-
----
+### 3.4 Reference metadata versus individual treatment actions
+- Describe the non-actionable `research_guideline_projection(drug, gene, population_context, phenotype_context)` API.
+- Test exact drug/gene/phenotype matching, reference-found versus indeterminate states, and omission of medication-action fields.
+- State that serialized-output tests establish a software contract only, not genotype interpretation accuracy, dosing validity, or clinical utility.
 
 ## 4. Discussion (~1,200 words)
 
