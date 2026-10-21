@@ -42,7 +42,7 @@ try:
 except ImportError:
     PYPHI_AVAILABLE = False
     logger.warning("PyPhi not installed. Exact Φ validation unavailable.")
-    logger.warning("Install with: pip install pyphi")
+    logger.warning("Install with: python -m pip install -r validation/requirements-pyphi.txt")
 
 
 @dataclass
@@ -477,6 +477,8 @@ class PyPhiValidator:
             f"- Failed or unavailable cases: {report.n_failed}",
             "- Pinned PyPhi reference version: 2.0.0rc4 (pre-release)",
             "- Declared reference formalism: IIT_3_0",
+            "- Reference state: all nodes ON; PyPhi bit order is least-significant node first.",
+            "- Reference TPM: noisy OR-neighbor update with per-node next-state probability 0.01 or 0.99.",
             f"- Correlation: {fmt(report.correlation, '.4f')}",
             f"- Mean absolute error: {fmt(report.mean_absolute_error, '.4f')}",
             f"- Maximum absolute error: {fmt(report.max_absolute_error, '.4f')}",
