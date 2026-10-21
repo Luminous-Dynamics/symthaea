@@ -1,0 +1,197 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/beverage-decision-value-v1.schema.json",
+  "title": "Beverage Decision Value Manifest V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "evidence_class",
+    "design",
+    "dataset_id",
+    "dataset_sha256",
+    "primary_resource_metric",
+    "required_primary_reduction_pct",
+    "maximum_secondary_resource_increase_pct",
+    "minimum_independent_units",
+    "comparisons"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "beverage-decision-value-v1"
+    },
+    "evidence_class": {
+      "enum": [
+        "SYNTHETIC_CONTRACT_FIXTURE",
+        "MEASURED_PROSPECTIVE"
+      ]
+    },
+    "design": {
+      "enum": [
+        "BLOCK_RANDOMIZED",
+        "MATCHED_CONTROL",
+        "UNCONTROLLED_PRE_POST"
+      ]
+    },
+    "dataset_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "dataset_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "primary_resource_metric": {
+      "enum": [
+        "WATER",
+        "ENERGY"
+      ]
+    },
+    "required_primary_reduction_pct": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "exclusiveMaximum": 100
+    },
+    "maximum_secondary_resource_increase_pct": {
+      "type": "number",
+      "minimum": 0,
+      "exclusiveMaximum": 100
+    },
+    "minimum_independent_units": {
+      "type": "integer",
+      "minimum": 2
+    },
+    "comparisons": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "comparison_id",
+          "independent_unit_id",
+          "product_stratum",
+          "baseline_period_id",
+          "intervention_period_id",
+          "baseline_meter_boundary_ref",
+          "intervention_meter_boundary_ref",
+          "baseline_functional_unit",
+          "intervention_functional_unit",
+          "baseline_product_mix_ref",
+          "intervention_product_mix_ref",
+          "baseline_output_basis",
+          "intervention_output_basis",
+          "baseline_saleable_output_l",
+          "intervention_saleable_output_l",
+          "baseline_water_l",
+          "intervention_water_l",
+          "baseline_energy_kwh",
+          "intervention_energy_kwh",
+          "baseline_quality_gate_passed",
+          "intervention_quality_gate_passed",
+          "baseline_safety_gate_passed",
+          "intervention_safety_gate_passed"
+        ],
+        "properties": {
+          "comparison_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "independent_unit_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Independent experimental unit defined from the real study design; rows, timepoints and technical replicates are not automatically independent."
+          },
+          "product_stratum": {
+            "type": "string",
+            "minLength": 1
+          },
+          "baseline_period_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "intervention_period_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "baseline_meter_boundary_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "intervention_meter_boundary_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "baseline_functional_unit": {
+            "type": "string",
+            "minLength": 1
+          },
+          "intervention_functional_unit": {
+            "type": "string",
+            "minLength": 1
+          },
+          "baseline_product_mix_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "intervention_product_mix_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "baseline_output_basis": {
+            "enum": [
+              "SALEABLE_QUALITY_CONFORMING_OUTPUT",
+              "TOTAL_OUTPUT",
+              "INPUT_VOLUME",
+              "OTHER"
+            ]
+          },
+          "intervention_output_basis": {
+            "enum": [
+              "SALEABLE_QUALITY_CONFORMING_OUTPUT",
+              "TOTAL_OUTPUT",
+              "INPUT_VOLUME",
+              "OTHER"
+            ]
+          },
+          "baseline_saleable_output_l": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "intervention_saleable_output_l": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "baseline_water_l": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "intervention_water_l": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "baseline_energy_kwh": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "intervention_energy_kwh": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "baseline_quality_gate_passed": {
+            "type": "boolean"
+          },
+          "intervention_quality_gate_passed": {
+            "type": "boolean"
+          },
+          "baseline_safety_gate_passed": {
+            "type": "boolean"
+          },
+          "intervention_safety_gate_passed": {
+            "type": "boolean"
+          }
+        }
+      }
+    }
+  }
+}
