@@ -7,6 +7,7 @@
 //! exchangeability/frozen-predictor assumptions described in the research note.
 
 use super::robust_viability::{ActionEffectBounds, Interval, StateEnvelope};
+use super::Action;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct CalibratedEnvelopeRadii {
@@ -175,6 +176,182 @@ pub fn enclose_predicted_action_effects(
         (load.upper() + radii.load_effect_radius).min(1.0),
     )?;
     ActionEffectBounds::new(reserve_effect, load_effect)
+}
+
+/// Action-conditioned calibration radii prevent the worst error observed for
+/// one action from being applied to every other action. The joint target covers
+/// two state and six action-effect residual families (eight in total).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ActionSpecificCalibratedEnvelopeRadii {
+    reserve_state_radius: f64,
+    load_state_radius: f64,
+    push_reserve_effect_radius: f64,
+    push_load_effect_radius: f64,
+    maintain_reserve_effect_radius: f64,
+    maintain_load_effect_radius: f64,
+    recovery_reserve_effect_radius: f64,
+    recovery_load_effect_radius: f64,
+    target_coverage: f64,
+    calibration_episodes: usize,
+}
+
+impl ActionSpecificCalibratedEnvelopeRadii {
+    pub const fn reserve_state_radius(self) -> f64 {
+        self.reserve_state_radius
+    }
+
+    pub const fn load_state_radius(self) -> f64 {
+        self.load_state_radius
+    }
+
+    pub const fn target_coverage(self) -> f64 {
+        self.target_coverage
+    }
+
+    pub const fn calibration_episodes(self) -> usize {
+        self.calibration_episodes
+    }
+
+    pub const fn effect_radii(self, action: Action) -> (f64, f64) {
+        match action {
+            Action::Push => (
+                self.push_reserve_effect_radius,
+                self.push_load_effect_radius,
+            ),
+            Action::Maintain => (
+                self.maintain_reserve_effect_radius,
+                self.maintain_load_effect_radius,
+            ),
+            Action::EmergencyRecover => (
+                self.recovery_reserve_effect_radius,
+                self.recovery_load_effect_radius,
+            ),
+        }
+    }
+}
+
+/// Calibrate eight episode-level score families with a Bonferroni joint-coverage
+/// target. Each input contains exactly one maximum absolute residual per
+/// independent calibration episode. This does not make a deterministic design
+/// panel exchangeable; distribution-free coverage only applies under the usual
+/// exchangeability and frozen-predictor assumptions.
+#[allow(clippy::too_many_arguments)]
+pub fn calibrate_action_specific_episode_radii(
+    reserve_state_episode_scores: &[f64],
+    load_state_episode_scores: &[f64],
+    push_reserve_episode_scores: &[f64],
+    push_load_episode_scores: &[f64],
+    maintain_reserve_episode_scores: &[f64],
+    maintain_load_episode_scores: &[f64],
+    recovery_reserve_episode_scores: &[f64],
+    recovery_load_episode_scores: &[f64],
+    target_coverage: f64,
+) -> Option<ActionSpecificCalibratedEnvelopeRadii> {
+    let n = reserve_state_episode_scores.len();
+    let score_families = [
+        reserve_state_episode_scores,
+        load_state_episode_scores,
+        push_reserve_episode_scores,
+        push_load_episode_scores,
+        maintain_reserve_episode_scores,
+        maintain_load_episode_scores,
+        recovery_reserve_episode_scores,
+        recovery_load_episode_scores,
+    ];
+    if n == 0
+        || score_families.iter().any(|scores| scores.len() != n)
+        || !target_coverage.is_finite()
+        || target_coverage <= 0.0
+        || target_coverage >= 1.0
+    {
+        return None;
+    }
+
+    let component_coverage = 1.0 - (1.0 - target_coverage) / 8.0;
+    Some(ActionSpecificCalibratedEnvelopeRadii {
+        reserve_state_radius: finite_conformal_radius(
+            reserve_state_episode_scores,
+            component_coverage,
+        )?,
+        load_state_radius: finite_conformal_radius(load_state_episode_scores, component_coverage)?,
+        push_reserve_effect_radius: finite_conformal_radius(
+            push_reserve_episode_scores,
+            component_coverage,
+        )?,
+        push_load_effect_radius: finite_conformal_radius(
+            push_load_episode_scores,
+            component_coverage,
+        )?,
+        maintain_reserve_effect_radius: finite_conformal_radius(
+            maintain_reserve_episode_scores,
+            component_coverage,
+        )?,
+        maintain_load_effect_radius: finite_conformal_radius(
+            maintain_load_episode_scores,
+            component_coverage,
+        )?,
+        recovery_reserve_effect_radius: finite_conformal_radius(
+            recovery_reserve_episode_scores,
+            component_coverage,
+        )?,
+        recovery_load_effect_radius: finite_conformal_radius(
+            recovery_load_episode_scores,
+            component_coverage,
+        )?,
+        target_coverage,
+        calibration_episodes: n,
+    })
+}
+
+/// Expand a state estimate with action-specific calibration's state radii.
+pub fn enclose_action_specific_predicted_state(
+    predicted: StateEnvelope,
+    radii: ActionSpecificCalibratedEnvelopeRadii,
+) -> Option<StateEnvelope> {
+    let state_only = CalibratedEnvelopeRadii {
+        reserve_state_radius: radii.reserve_state_radius,
+        load_state_radius: radii.load_state_radius,
+        reserve_effect_radius: 0.0,
+        load_effect_radius: 0.0,
+        target_coverage: radii.target_coverage,
+        calibration_episodes: radii.calibration_episodes,
+    };
+    enclose_predicted_state(predicted, state_only)
+}
+
+/// Expand one action's nominal effect with only that action's residual radii.
+pub fn enclose_action_specific_predicted_effects(
+    predicted: ActionEffectBounds,
+    action: Action,
+    radii: ActionSpecificCalibratedEnvelopeRadii,
+) -> Option<ActionEffectBounds> {
+    if !radii.target_coverage.is_finite()
+        || !(0.0..1.0).contains(&radii.target_coverage)
+        || radii.calibration_episodes == 0
+    {
+        return None;
+    }
+    let (reserve_radius, load_radius) = radii.effect_radii(action);
+    if !reserve_radius.is_finite()
+        || !load_radius.is_finite()
+        || reserve_radius < 0.0
+        || load_radius < 0.0
+    {
+        return None;
+    }
+
+    let reserve = predicted.reserve_delta();
+    let load = predicted.load_delta();
+    ActionEffectBounds::new(
+        Interval::new(
+            (reserve.lower() - reserve_radius).max(-1.0),
+            (reserve.upper() + reserve_radius).min(1.0),
+        )?,
+        Interval::new(
+            (load.lower() - load_radius).max(-1.0),
+            (load.upper() + load_radius).min(1.0),
+        )?,
+    )
 }
 
 #[cfg(test)]
