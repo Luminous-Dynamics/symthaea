@@ -24,12 +24,15 @@ The harness intentionally caps exhaustive enumeration at 8 nodes: it evaluates e
 
 ## Measures
 
-For a uniform distribution over current states X(t) and transition model P(X(t+1) | X(t)), the program reports:
+For a supplied distribution over current states X(t) and transition model P(X(t+1) | X(t)), the program reports:
 
+- **H_prev_bits:** Shannon entropy H(X(t)) under the declared input-state ensemble.
 - **H_next_bits:** Shannon entropy H(X(t+1)), in bits.
 - **H_next_given_prev_bits:** conditional entropy H(X(t+1) | X(t)), in bits.
-- **I_prev_next_bits:** mutual information I(X(t); X(t+1)) = H(X(t+1)) - H(X(t+1) | X(t)), in bits, under the chosen uniform input distribution.
-- **min_cut_sensitivity_tv:** minimum across nontrivial bipartitions of the mean, per-current-state total-variation distance between the original transition row and a diagnostic cut model.
+- **I_prev_next_bits:** mutual information I(X(t); X(t+1)) = H(X(t+1)) - H(X(t+1) | X(t)), in bits, under that ensemble.
+- **min_cut_sensitivity_tv:** minimum across nontrivial bipartitions of the prior-weighted mean total-variation distance between original and diagnostic cut transition rows.
+
+Every TSV row now records both a canonical rule/noise specification and the full input-state distribution; no ensemble is implicit in the emitted artifact. The public helper `measure()` is a uniform-prior convenience wrapper around `measure_with_state_distribution()`, which rejects invalid weights instead of silently renormalizing them.
 
 For the cut diagnostic, a target whose rule has an input dependency crossing the cut receives a fair-random unnoised output before the same bit-flip noise is applied. The diagnostic compares the full and cut conditional distributions. It is operationally defined, bounded by 1, and exhaustively computable; **it is not IIT's formal partition operation and must not be called phi**. Results depend on this explicit cut convention and the uniform distribution over current states.
 
@@ -44,13 +47,15 @@ The strongest smoke test compares two three-node networks:
 
 The same marginal entropy can therefore coexist with very different dynamics. This is a constructive counterexample to any universal claim that entropy alone is an adequate integration score. It does not show that this diagnostic equals IIT phi.
 
-Other fixtures exercise common-driver dependence, feed-forward chains, XOR and AND nonlinearities, noise sweeps, transition normalization, and node-relabeling invariance.
+A second counterexample holds the transition rules fixed but changes the state ensemble. For a deterministic 3-node ring, a uniform input prior gives H(X(t+1)) = 3 bits and I(X(t); X(t+1)) = 3 bits. Concentrating prior mass 0.7 and 0.3 on two input states yields H(X(t)) = H(X(t+1)) = 0.881291 bits and temporal mutual information of 0.881291 bits; transition entropy remains zero. This value is a direct analytic calculation, not Rust-run output. The lesson is that an entropy/dependence number is a property of **dynamics plus the stated state distribution**, not dynamics alone.
+
+Other fixtures exercise common-driver dependence, feed-forward chains, XOR and AND nonlinearities, noise sweeps, prior-distribution sensitivity, transition normalization, and node-relabeling invariance.
 
 ## Next experimental program
 
 ### Phase A — qualify the kernel
 
-- Execute all twelve Rust tests on the exact branch head.
+- Execute all fourteen Rust tests on the exact branch head.
 - Add property-based checks for stochastic-row normalization, nonnegativity, entropy bounds, deterministic/noise extremes, and permutation invariance.
 - Independently implement the tiny transition-model calculations or use a separately written analytical enumerator; cross-check every TPM row and metric, not just summary statistics.
 - Freeze emitted rows as a versioned deterministic CSV/JSON artifact with schema, input-model digest, source SHA, and run receipt. Do not hand-edit measurements into documentation.
