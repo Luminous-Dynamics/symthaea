@@ -15,6 +15,7 @@ source_files=(
   "tools/allostatic-control-bench/src/robust_viability.rs"
   "tools/allostatic-control-bench/src/main.rs"
   "tools/allostatic-control-bench/src/bin/allostatic-control-report.rs"
+  "tools/allostatic-control-bench/src/bin/allostatic-model-mismatch-bench.rs"
   "tools/allostatic-control-bench/qualify.sh"
   "docs/research/ALLOSTATIC_CONTROL_BENCHMARK_V1.md"
   "docs/research/ROBUST_VIABILITY_ENVELOPE_V1.md"
@@ -39,6 +40,8 @@ out_csv="${2:-allostatic-control-v1.csv}"
 out_base="${out_csv%.csv}"
 summary_out="${out_base}-summary.csv"
 paired_out="${out_base}-paired-deltas.csv"
+mismatch_out="${out_base}-mismatch-frontier.csv"
+mismatch_summary_out="${out_base}-mismatch-frontier-summary.csv"
 receipt="${out_csv}.receipt.txt"
 
 cargo fmt --manifest-path "$manifest" -- --check
@@ -84,6 +87,60 @@ if ! cmp -s "$tmpdir/summary-a.csv" "$tmpdir/summary-b.csv" ||
   exit 1
 fi
 
+# Compare the point-estimate and robust-envelope filters on held-out synthetic
+# profiles. The out-of-envelope panel is a negative control, not a safety claim.
+cargo run --locked --release --manifest-path "$manifest" --bin allostatic-model-mismatch-bench -- \
+  "$tmpdir/mismatch-a.csv" "$tmpdir/mismatch-summary-a.csv"
+cargo run --locked --release --manifest-path "$manifest" --bin allostatic-model-mismatch-bench -- \
+  "$tmpdir/mismatch-b.csv" "$tmpdir/mismatch-summary-b.csv"
+if ! cmp -s "$tmpdir/mismatch-a.csv" "$tmpdir/mismatch-b.csv" ||
+   ! cmp -s "$tmpdir/mismatch-summary-a.csv" "$tmpdir/mismatch-summary-b.csv"; then
+  printf 'FAIL: repeated mismatch frontier is not byte-identical\n' >&2
+  exit 1
+fi
+
+# 300 bounded profiles and 32 out-of-family profiles × 5 stress levels × 3 actions.
+if ! awk -F, '
+  NR == 1 { if (NF != 10) failed = 1; next }
+  {
+    if (NF != 10) failed = 1
+    if ($1 != "within_envelope" && $1 != "out_of_envelope") failed = 1
+    if ($2 !~ /^[0-9]+$/) failed = 1
+    if ($4 != "push" && $4 != "maintain" && $4 != "emergency_recover") failed = 1
+    for (i = 5; i <= 10; i++) if ($i != "true" && $i != "false") failed = 1
+    if ($1 == "within_envelope") {
+      within_rows++
+      if ($6 == "true" && $7 == "false") failed = 1
+    }
+    if ($1 == "out_of_envelope") out_rows++
+    key = $1 SUBSEP $2 SUBSEP $3 SUBSEP $4
+    if (seen[key]++) failed = 1
+  }
+  END { if (NR != 4981 || within_rows != 4500 || out_rows != 480 || failed) exit 1 }
+' "$tmpdir/mismatch-a.csv"; then
+  printf 'FAIL: mismatch frontier schema, coverage, or in-envelope safety contract is invalid\n' >&2
+  exit 1
+fi
+
+if ! awk -F, '
+  NR == 1 { if (NF != 14) failed = 1; next }
+  {
+    if (NF != 14) failed = 1
+    if ($5 > $4) failed = 1
+    if ($1 == "within_envelope") {
+      within_rows++
+      if ($2 != 300 || $3 != 4500 || $8 != 0) failed = 1
+    } else if ($1 == "out_of_envelope") {
+      out_rows++
+      if ($2 != 32 || $3 != 480 || $7 < 1) failed = 1
+    } else failed = 1
+  }
+  END { if (NR != 3 || within_rows != 1 || out_rows != 1 || failed) exit 1 }
+' "$tmpdir/mismatch-summary-a.csv"; then
+  printf 'FAIL: mismatch summary missing safety/availability or negative-control evidence\n' >&2
+  exit 1
+fi
+
 # Summary must contain 5 scenarios × 6 policies × 2 shield settings.
 if ! awk -F, 'NR == 1 { if (NF != 28) failed = 1; next }
   { if (NF != 28) failed = 1; rows++ }
@@ -104,6 +161,8 @@ fi
 cp "$tmpdir/run-a.csv" "$out_csv"
 cp "$tmpdir/summary-a.csv" "$summary_out"
 cp "$tmpdir/paired-a.csv" "$paired_out"
+cp "$tmpdir/mismatch-a.csv" "$mismatch_out"
+cp "$tmpdir/mismatch-summary-a.csv" "$mismatch_summary_out"
 {
   printf 'status=pass\n'
   printf 'git_commit=%s\n' "$actual_head"
@@ -119,6 +178,10 @@ cp "$tmpdir/paired-a.csv" "$paired_out"
   printf 'summary_rows_excluding_header=%s\n' "$(( $(wc -l < "$summary_out") - 1 ))"
   printf 'paired_deltas_sha256=%s\n' "$(sha256sum "$paired_out" | awk '{print $1}')"
   printf 'paired_delta_rows_excluding_header=%s\n' "$(( $(wc -l < "$paired_out") - 1 ))"
+  printf 'mismatch_frontier_sha256=%s\n' "$(sha256sum "$mismatch_out" | awk '{print $1}')"
+  printf 'mismatch_frontier_rows_excluding_header=%s\n' "$(( $(wc -l < "$mismatch_out") - 1 ))"
+  printf 'mismatch_summary_sha256=%s\n' "$(sha256sum "$mismatch_summary_out" | awk '{print $1}')"
+  printf 'mismatch_summary_rows_excluding_header=%s\n' "$(( $(wc -l < "$mismatch_summary_out") - 1 ))"
   printf '\nsource_sha256:\n'
   sha256sum "${source_files[@]}"
 } > "$receipt"
@@ -126,4 +189,6 @@ cp "$tmpdir/paired-a.csv" "$paired_out"
 printf 'Qualified episodes: %s\n' "$out_csv"
 printf 'Distributional summary: %s\n' "$summary_out"
 printf 'Paired shield deltas: %s\n' "$paired_out"
+printf 'Model-mismatch safety frontier: %s\n' "$mismatch_out"
+printf 'Model-mismatch frontier summary: %s\n' "$mismatch_summary_out"
 printf 'Provenance receipt: %s\n' "$receipt"
