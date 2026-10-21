@@ -2393,6 +2393,133 @@ mod tests {
     }
 
     #[test]
+    fn scale_aware_rk45_reuses_controller_proposal_and_reports_work() {
+        let oscillator = HarmonicOscillator::simple(1.0);
+        let integrator = Rk45Integrator {
+            tol: 1.0e-8,
+            dt_min: 1.0e-12,
+            dt_max: 0.1,
+        };
+        let tolerances = Rk45Tolerances::new(1.0e-6, vec![1.0e-8; 2]);
+        let mut controller = Rk45Controller::new(1.0e-3).unwrap();
+
+        let first = controller
+            .try_step(&integrator, &oscillator, &[1.0, 0.0], 0.0, 0.1, &tolerances)
+            .unwrap();
+        assert!(first.error_norm <= 1.0);
+        assert_eq!(first.derivative_evaluations, first.attempted_steps * 6);
+        assert_eq!(first.rejected_steps + 1, first.attempted_steps);
+        assert_eq!(controller.next_step_size(), Some(first.proposed_next_dt));
+
+        let second = controller
+            .try_step(
+                &integrator,
+                &oscillator,
+                &first.state,
+                first.accepted_dt,
+                0.1,
+                &tolerances,
+            )
+            .unwrap();
+        assert_eq!(
+            second.attempted_steps, 1,
+            "the persisted proposal should avoid repeating the rejected startup attempts"
+        );
+        assert!(
+            (second.accepted_dt - first.proposed_next_dt).abs() < 1.0e-14,
+            "second step {} should reuse proposal {}",
+            second.accepted_dt,
+            first.proposed_next_dt
+        );
+    }
+
+    #[test]
+    fn scale_aware_simulation_is_invariant_to_uniform_state_rescaling() {
+        let oscillator = HarmonicOscillator::simple(1.0);
+        let integrator = Rk45Integrator::new(1.0e-8);
+        let scale = 1.0e6;
+        let small_tolerances = Rk45Tolerances::new(1.0e-7, vec![1.0e-10; 2]);
+        let large_tolerances = Rk45Tolerances::new(1.0e-7, vec![1.0e-4; 2]);
+
+        let small = integrator
+            .try_simulate_with_tolerances(
+                &oscillator,
+                &[1.0, 0.0],
+                0.0,
+                10.0,
+                0.2,
+                &small_tolerances,
+            )
+            .unwrap();
+        let large = integrator
+            .try_simulate_with_tolerances(
+                &oscillator,
+                &[scale, 0.0],
+                0.0,
+                10.0,
+                0.2,
+                &large_tolerances,
+            )
+            .unwrap();
+
+        assert_eq!(small.simulation.steps, large.simulation.steps);
+        assert_eq!(
+            small.diagnostics.rejected_steps,
+            large.diagnostics.rejected_steps
+        );
+        assert!(
+            (small.diagnostics.max_error_norm - large.diagnostics.max_error_norm).abs() < 1.0e-5,
+            "normalized error should be invariant under scaled units: small={}, large={}",
+            small.diagnostics.max_error_norm,
+            large.diagnostics.max_error_norm
+        );
+        for (small_state, large_state) in small
+            .simulation
+            .final_state()
+            .iter()
+            .zip(large.simulation.final_state())
+        {
+            assert!(
+                (scale * small_state - large_state).abs() / scale < 1.0e-8,
+                "scaled final states should agree: small={}, large={}",
+                small_state,
+                large_state
+            );
+        }
+        assert_eq!(
+            large.diagnostics.derivative_evaluations,
+            6 * (large.diagnostics.accepted_steps + large.diagnostics.rejected_steps)
+        );
+        assert!(large.diagnostics.max_error_norm <= 1.0);
+        assert_eq!(large.simulation.times.last().copied(), Some(10.0));
+    }
+
+    #[test]
+    fn scale_aware_rk45_rejects_invalid_tolerance_profiles() {
+        let oscillator = HarmonicOscillator::simple(1.0);
+        let integrator = Rk45Integrator::new(1.0e-8);
+        let invalid_profiles = [
+            Rk45Tolerances::new(f64::NAN, vec![1.0e-8; 2]),
+            Rk45Tolerances::new(-1.0, vec![1.0e-8; 2]),
+            Rk45Tolerances::new(1.0e-6, vec![1.0e-8]),
+            Rk45Tolerances::new(1.0e-6, vec![0.0, 1.0e-8]),
+            Rk45Tolerances::new(1.0e-6, vec![f64::INFINITY, 1.0e-8]),
+        ];
+        for profile in invalid_profiles {
+            assert_eq!(
+                integrator.try_adaptive_step_with_tolerances(
+                    &oscillator,
+                    &[1.0, 0.0],
+                    0.0,
+                    0.1,
+                    &profile,
+                ),
+                Err(SimulationError::InvalidRk45Tolerances)
+            );
+        }
+    }
+
+    #[test]
     fn checked_simulation_rejects_rk45_minimum_step_tolerance_shortfall() {
         let oscillator = HarmonicOscillator::simple(1.0);
         let integrator = Rk45Integrator {
