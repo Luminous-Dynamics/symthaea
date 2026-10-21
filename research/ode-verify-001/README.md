@@ -93,3 +93,5 @@ Queued, skipped, formatting-only, and synthetic-known-answer passes are never de
 ## Geometric-structure extension
 
 The separate [GEOM-ODE-001 protocol](GEOMETRIC_STRUCTURE_PROTOCOL_V0_1.md) adds direct one-step checks for canonical phase-space area and signed-step reversibility. The frozen unit oscillator uses Velocity-Verlet as the structure-preserving candidate and RK4 as an intentional negative control. These are distinct from the long-horizon conservation checks in `tests/conservative_orbits.rs`; none of these synthetic numerical checks establishes physical validation or solver-SOTA superiority.
+
+The nonlinear follow-on is specified in [NONLINEAR_SYMPLECTICITY_PROTOCOL_V0_1.md](NONLINEAR_SYMPLECTICITY_PROTOCOL_V0_1.md) and implemented in tests/nonlinear_symplecticity.rs. It extends the fixed oscillator fixture to a nonlinear Hamiltonian and retains RK4 as a negative control. No Rust test pass is claimed until the focused workflow succeeds on the exact PR head.
