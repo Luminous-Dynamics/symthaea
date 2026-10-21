@@ -5,6 +5,8 @@ mod crate_status;
 mod duplicate_scan;
 mod first_aid;
 mod first_aid_trajectory;
+#[cfg(test)]
+mod first_aid_model;
 mod guideline_change_impact;
 mod manifest;
 mod rhn_sweep;
