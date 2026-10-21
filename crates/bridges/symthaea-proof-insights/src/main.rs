@@ -3375,6 +3375,58 @@ mod tests {
     }
 
     #[test]
+    fn theorem_identity_parser_scopes_statement_and_proof_to_one_declaration() {
+        let formal_statement = r#"
+@[externally_verified]
+theorem encode_spec (x : Nat) : encode x = x := by
+"#;
+        let declared_name =
+            declared_name_from_statement(formal_statement).expect("declaration name parses");
+        assert_eq!(declared_name, "encode_spec");
+        let statement_prefix =
+            statement_declaration_prefix(formal_statement).expect("statement prefix parses");
+        let source = r#"
+theorem prior_spec (x : Nat) : x = x := by
+  rfl
+
+@[externally_verified]
+theorem encode_spec (x : Nat) : encode x = x := by
+  simp [encode]
+  rfl
+
+theorem following_spec (x : Nat) : x = x := by
+  exact Eq.rfl
+"#;
+        let blocks = named_declaration_blocks(source, "encode_spec")
+            .expect("Lean declaration blocks should parse");
+        assert_eq!(blocks.len(), 1);
+        assert!(normalized_contains(&blocks[0], &statement_prefix));
+        assert!(normalized_contains(&blocks[0], "simp [encode] rfl"));
+        assert!(!normalized_contains(&blocks[0], "exact Eq.rfl"));
+        assert!(!normalized_contains(&blocks[0], "rfl theorem following_spec"));
+    }
+
+    #[test]
+    fn theorem_identity_parser_keeps_duplicate_short_names_ambiguous() {
+        let source = r#"
+namespace First
+theorem shared (x : Nat) : x = x := by
+  rfl
+end First
+
+namespace Second
+theorem shared (x : Nat) : x = x := by
+  exact Eq.rfl
+end Second
+"#;
+        let blocks = named_declaration_blocks(source, "shared")
+            .expect("short-name extraction should be well-formed");
+        assert_eq!(blocks.len(), 2);
+        assert!(blocks.iter().any(|block| normalized_contains(block, "exact Eq.rfl")));
+        assert!(blocks.iter().any(|block| normalized_contains(block, "rfl")));
+    }
+
+    #[test]
     fn temporal_manifest_replays_against_real_pinned_git_bytes() {
         use std::time::{SystemTime, UNIX_EPOCH};
 
