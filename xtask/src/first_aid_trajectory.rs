@@ -122,6 +122,7 @@ struct TrajectoryReceipt {
     evaluation_protocol_sha256: String,
     mutation_matrix_sha256: String,
     state_model_sha256: String,
+    state_model_spec_sha256: String,
     state_model_test_outcome: String,
     cargo_lock_sha256: String,
     rustc_version: String,
@@ -173,6 +174,9 @@ pub fn run(root: &Path, corpus_arg: &Path, out_arg: Option<&Path>) -> Result<()>
     let state_model = fs::read(root.join("xtask/src/first_aid_model.rs"))
         .context("read finite-state model for receipt identity")?;
     let state_model_digest = sha256_hex(&state_model);
+    let state_model_spec = fs::read(root.join("docs/research/first-aid/STATE_MODEL_V0.md"))
+        .context("read state model specification for receipt identity")?;
+    let state_model_spec_digest = sha256_hex(&state_model_spec);
     let cargo_lock = fs::read(root.join("Cargo.lock"))
         .context("read Cargo.lock for dependency-resolution identity")?;
     let cargo_lock_digest = sha256_hex(&cargo_lock);
@@ -197,6 +201,7 @@ pub fn run(root: &Path, corpus_arg: &Path, out_arg: Option<&Path>) -> Result<()>
         evaluation_protocol_sha256: evaluation_protocol_digest,
         mutation_matrix_sha256: mutation_matrix_digest,
         state_model_sha256: state_model_digest,
+        state_model_spec_sha256: state_model_spec_digest,
         state_model_test_outcome: std::env::var("STATE_MODEL_TEST_OUTCOME")
             .unwrap_or_else(|_| "not-provided".to_string()),
         cargo_lock_sha256: cargo_lock_digest,
