@@ -1,0 +1,285 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/beverage-adaptive-sampling-replay-v1.schema.json",
+  "title": "Adaptive sampling paired replay audit schema v1",
+  "description": "A paired comparison contract for adaptive-sampling policy cost, decision loss, event detection, and hard guardrails. Schema validity is not proof of causal attribution or physical plant qualification.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "evidence_class",
+    "design",
+    "benchmark_id",
+    "policy_id",
+    "baseline_id",
+    "policy_config_sha256",
+    "baseline_config_sha256",
+    "decision_loss_definition_sha256",
+    "measurement_cost_unit",
+    "decision_loss_unit",
+    "discretionary_budget_cap_units",
+    "target_cost_reduction_percent",
+    "max_mean_loss_degradation_units",
+    "max_false_alarms_per_100_decisions",
+    "max_deadline_miss_rate_degradation_per_100_decisions",
+    "min_independent_pairs",
+    "min_high_severity_events",
+    "bootstrap_seed",
+    "bootstrap_replicates",
+    "pairs"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "beverage-adaptive-sampling-replay-v1"
+    },
+    "evidence_class": {
+      "enum": [
+        "SYNTHETIC_CONTRACT_FIXTURE",
+        "RETROSPECTIVE_REPLAY",
+        "PROSPECTIVE_PILOT"
+      ]
+    },
+    "design": {
+      "enum": [
+        "SYNTHETIC_FIXTURE",
+        "RETROSPECTIVE_REPLAY",
+        "BLOCK_RANDOMIZED",
+        "MATCHED_CONTROL"
+      ]
+    },
+    "benchmark_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "policy_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "baseline_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "policy_config_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "baseline_config_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "decision_loss_definition_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "measurement_cost_unit": {
+      "type": "string",
+      "minLength": 1
+    },
+    "decision_loss_unit": {
+      "type": "string",
+      "minLength": 1
+    },
+    "discretionary_budget_cap_units": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "target_cost_reduction_percent": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100
+    },
+    "max_mean_loss_degradation_units": {
+      "type": "number",
+      "minimum": 0
+    },
+    "max_false_alarms_per_100_decisions": {
+      "type": "number",
+      "minimum": 0
+    },
+    "max_deadline_miss_rate_degradation_per_100_decisions": {
+      "type": "number",
+      "minimum": 0
+    },
+    "min_independent_pairs": {
+      "type": "integer",
+      "minimum": 5
+    },
+    "min_high_severity_events": {
+      "type": "integer",
+      "minimum": 5
+    },
+    "bootstrap_seed": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "bootstrap_replicates": {
+      "const": 5000
+    },
+    "pairs": {
+      "type": "array",
+      "minItems": 5,
+      "items": {
+        "$ref": "#/$defs/pair"
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "evidence_class": {
+            "const": "SYNTHETIC_CONTRACT_FIXTURE"
+          }
+        },
+        "required": [
+          "evidence_class"
+        ]
+      },
+      "then": {
+        "properties": {
+          "design": {
+            "const": "SYNTHETIC_FIXTURE"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "evidence_class": {
+            "const": "RETROSPECTIVE_REPLAY"
+          }
+        },
+        "required": [
+          "evidence_class"
+        ]
+      },
+      "then": {
+        "properties": {
+          "design": {
+            "const": "RETROSPECTIVE_REPLAY"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "evidence_class": {
+            "const": "PROSPECTIVE_PILOT"
+          }
+        },
+        "required": [
+          "evidence_class"
+        ]
+      },
+      "then": {
+        "properties": {
+          "design": {
+            "enum": [
+              "BLOCK_RANDOMIZED",
+              "MATCHED_CONTROL"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "arm": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "independent_unit_id",
+        "discretionary_measurement_cost_units",
+        "discretionary_assay_count",
+        "eligible_decisions",
+        "decision_loss_units",
+        "high_severity_events",
+        "missed_high_severity_events",
+        "false_alarms",
+        "hard_constraint_violations",
+        "required_test_violations",
+        "decision_deadline_misses",
+        "quality_failures"
+      ],
+      "properties": {
+        "independent_unit_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "discretionary_measurement_cost_units": {
+          "type": "number",
+          "minimum": 0
+        },
+        "discretionary_assay_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "eligible_decisions": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "decision_loss_units": {
+          "type": "number",
+          "minimum": 0
+        },
+        "high_severity_events": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "missed_high_severity_events": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "false_alarms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "hard_constraint_violations": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "required_test_violations": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "decision_deadline_misses": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "quality_failures": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "pair": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pair_id",
+        "cohort_id",
+        "policy",
+        "baseline"
+      ],
+      "properties": {
+        "pair_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cohort_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "policy": {
+          "$ref": "#/$defs/arm"
+        },
+        "baseline": {
+          "$ref": "#/$defs/arm"
+        }
+      }
+    }
+  }
+}
