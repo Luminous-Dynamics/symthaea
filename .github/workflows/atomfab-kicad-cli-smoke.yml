@@ -18,8 +18,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 1
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          sparse-checkout: |
+            docs/research/fixtures/atomfab-kicad-cli-smoke
+          sparse-checkout-cone-mode: true
 
       - name: Run pinned official KiCad CLI
         shell: bash
