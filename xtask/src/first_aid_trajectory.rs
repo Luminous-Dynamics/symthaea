@@ -797,6 +797,58 @@ mod tests {
             .sensitive_payload = Some(false);
         cases.push(("non-sensitive egress control", non_sensitive));
 
+        let mut uncertain_session_boundary = scenario("FA-TRACE-012");
+        let preserve_index = uncertain_session_boundary
+            .events
+            .iter()
+            .position(|event| event.kind == EventKind::UncertaintyPreserved)
+            .expect("preservation event exists");
+        uncertain_session_boundary.events.remove(preserve_index);
+        let handoff_index = uncertain_session_boundary
+            .events
+            .iter()
+            .position(|event| event.kind == EventKind::HandoffEmitted)
+            .expect("handoff event exists");
+        uncertain_session_boundary.events[handoff_index].sequence += 1;
+        uncertain_session_boundary.events.insert(
+            handoff_index,
+            TraceEvent {
+                sequence: 4,
+                kind: EventKind::SessionStarted,
+                bundle_id: None,
+                bundle_state: None,
+                digest_verified: None,
+                resource_state: None,
+                presented_as: None,
+                sensitive_payload: None,
+                consent_scoped: None,
+            },
+        );
+        cases.push(("unresolved uncertainty across new session", uncertain_session_boundary));
+
+        let mut resume_without_interrupt = scenario("FA-TRACE-001");
+        let render_index = resume_without_interrupt
+            .events
+            .iter()
+            .position(|event| event.kind == EventKind::ProtocolRendered)
+            .expect("render event exists");
+        resume_without_interrupt.events[render_index].sequence += 1;
+        resume_without_interrupt.events.insert(
+            render_index,
+            TraceEvent {
+                sequence: 4,
+                kind: EventKind::SessionResumed,
+                bundle_id: None,
+                bundle_state: None,
+                digest_verified: None,
+                resource_state: None,
+                presented_as: None,
+                sensitive_payload: None,
+                consent_scoped: None,
+            },
+        );
+        cases.push(("resume without interruption", resume_without_interrupt));
+
         for (label, trace) in cases {
             let value = serde_json::to_value(&trace).expect("mutated trace serializes");
             assert_eq!(
