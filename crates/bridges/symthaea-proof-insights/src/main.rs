@@ -257,6 +257,7 @@ struct TemporalTimelineAudit {
     source_path_present_at_completion_count: usize,
     source_path_missing_at_completion_count: usize,
     source_path_not_recorded_count: usize,
+    source_path_rejected_count: usize,
     verification_status_counts: BTreeMap<String, usize>,
     events: Vec<TemporalTimelineAuditEvent>,
 }
@@ -1242,6 +1243,7 @@ fn audit_temporal_timeline(
     let mut source_path_present_at_completion_count = 0_usize;
     let mut source_path_missing_at_completion_count = 0_usize;
     let mut source_path_not_recorded_count = 0_usize;
+    let mut source_path_rejected_count = 0_usize;
     let mut verification_status_counts = BTreeMap::new();
     let mut previous_completion_commit: Option<String> = None;
     let mut non_ancestral_adjacent_transition_count = 0_usize;
@@ -1324,39 +1326,40 @@ fn audit_temporal_timeline(
                 source_path_not_recorded_count += 1;
                 (None, "not_recorded".to_string(), None, None)
             } else {
-                let normalized = normalize_root_relative_path(raw_path).with_context(|| {
-                    format!("unsafe spec theorem path on timeline row {event_key}")
-                })?;
-                if normalized != raw_path {
-                    bail!(
-                        "spec theorem path on timeline row {} is not canonical: {}",
-                        event_key,
-                        raw_path
-                    );
-                }
-                if git_path_exists_at_commit(&root, &completion_commit, &normalized)? {
-                    let bytes = git_show_file(&root, &completion_commit, &normalized)
-                        .with_context(|| {
-                            format!(
-                                "read source file {} at verified completion commit {}",
-                                normalized, completion_commit
+                match normalize_root_relative_path(raw_path) {
+                    Ok(normalized) if normalized == raw_path => {
+                        if git_path_exists_at_commit(&root, &completion_commit, &normalized)? {
+                            let bytes = git_show_file(&root, &completion_commit, &normalized)
+                                .with_context(|| {
+                                    format!(
+                                        "read source file {} at verified completion commit {}",
+                                        normalized, completion_commit
+                                    )
+                                })?;
+                            source_path_present_at_completion_count += 1;
+                            (
+                                Some(normalized),
+                                "present_at_completion".to_string(),
+                                Some(format!("{:x}", Sha256::digest(&bytes))),
+                                Some(bytes.len() as u64),
                             )
-                        })?;
-                    source_path_present_at_completion_count += 1;
-                    (
-                        Some(normalized),
-                        "present_at_completion".to_string(),
-                        Some(format!("{:x}", Sha256::digest(&bytes))),
-                        Some(bytes.len() as u64),
-                    )
-                } else {
-                    source_path_missing_at_completion_count += 1;
-                    (
-                        Some(normalized),
-                        "missing_at_completion".to_string(),
-                        None,
-                        None,
-                    )
+                        } else {
+                            source_path_missing_at_completion_count += 1;
+                            (
+                                Some(normalized),
+                                "missing_at_completion".to_string(),
+                                None,
+                                None,
+                            )
+                        }
+                    }
+                    // Historical CSVs can contain machine-local absolute paths.
+                    // Preserve row-level accounting, but never read or echo such
+                    // paths. They remain explicit rejected evidence, not omissions.
+                    _ => {
+                        source_path_rejected_count += 1;
+                        (None, "rejected_unsafe_path".to_string(), None, None)
+                    }
                 }
             };
 
@@ -1404,6 +1407,7 @@ fn audit_temporal_timeline(
         source_path_present_at_completion_count,
         source_path_missing_at_completion_count,
         source_path_not_recorded_count,
+        source_path_rejected_count,
         verification_status_counts,
         events,
     };
@@ -1445,13 +1449,14 @@ fn audit_temporal_timeline(
         )
     })?;
     println!(
-        "PITB_TEMPORAL_TIMELINE_AUDIT_PASS: rows={} unique_completion_commits={} non_ancestral_adjacent_transitions={} source_present={} source_missing={} source_not_recorded={} timeline_sha256={} output={}",
+        "PITB_TEMPORAL_TIMELINE_AUDIT_PASS: rows={} unique_completion_commits={} non_ancestral_adjacent_transitions={} source_present={} source_missing={} source_not_recorded={} source_path_rejected={} timeline_sha256={} output={}",
         audit.total_timeline_rows,
         audit.unique_completion_commit_count,
         audit.non_ancestral_adjacent_transition_count,
         audit.source_path_present_at_completion_count,
         audit.source_path_missing_at_completion_count,
         audit.source_path_not_recorded_count,
+        audit.source_path_rejected_count,
         audit.timeline_sha256,
         resolved_output.display()
     );
