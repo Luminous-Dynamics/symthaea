@@ -72,12 +72,15 @@ Run the analytical oscillator sweep:
 
 ```sh
 ODE_BENCH_SOURCE_SHA="$(git rev-parse HEAD)" \
+ODE_BENCH_CHECKOUT_SHA="$(git rev-parse HEAD)" \
   cargo run --locked --release \
     --manifest-path research/ode-verify-001/Cargo.toml \
     --example work_precision > ode-work-precision.json
 ```
 
-The receipt `ODE-WP-ANALYTIC-OSCILLATOR-001` crosses three state scales (`1e-6`, `1`, `1e6`) with three relative tolerances (`1e-3`, `1e-5`, `1e-7`). The absolute tolerance is scaled with the state units to test relative-error semantics. It records endpoint error against the analytical oscillator solution, maximum relative energy drift, accepted and rejected steps, derivative-evaluation count, maximum accepted normalized error, completion/finiteness, source SHA, and an explicit numerical-contract disposition.
+The receipt `ODE-WP-ANALYTIC-OSCILLATOR-001` crosses three state scales (`1e-6`, `1`, `1e6`) with three relative tolerances (`1e-3`, `1e-5`, `1e-7`). The absolute tolerance is scaled with the state units to test relative-error semantics. It records endpoint error against the analytical oscillator solution, maximum relative energy drift, accepted and rejected steps, derivative-evaluation count, maximum accepted normalized error, completion/finiteness, the source revision, the actual checkout revision, and an explicit numerical-contract disposition. In a pull-request run, `source_sha` names the proposed PR head while `checkout_sha` names the tree the runner executed (typically GitHub's merge ref); manual runs fall back to the triggering commit for the source identity.
+
+The focused workflow validates both identities as 40-character lowercase hexadecimal commit IDs. This avoids confusing the proposed source revision with the synthetic merge commit used for pull-request testing.
 
 For this initial smooth oscillator fixture, the predeclared global error envelope is `10 * rtol` for both scaled endpoint error and maximum relative energy drift, in addition to requiring every accepted local weighted-RMS error norm to be at most one. The factor of ten is a benchmark-specific regression bound, not a universal theorem or a published standard. If the case violates it, preserve the observation as a non-pass rather than widening the bound after seeing results.
 
