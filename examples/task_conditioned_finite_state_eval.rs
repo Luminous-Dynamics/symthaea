@@ -40,7 +40,7 @@ impl Rule {
             Rule::Copy { from } => format!("copy:{from}"),
             Rule::Xor { left, right } => format!("xor:{left}:{right}"),
             Rule::And { left, right } => format!("and:{left}:{right}"),
-            Rule::Constant(value) => format!("constant:{}", usize::from(value)),
+            Rule::Constant(value) => format!("constant:{}", if value { 1 } else { 0 }),
         }
     }
 }
@@ -174,7 +174,7 @@ impl TaskTarget {
             TaskTarget::XorInputs { left, right } => format!("xor-inputs:{left}:{right}"),
             TaskTarget::AndInputs { left, right } => format!("and-inputs:{left}:{right}"),
             TaskTarget::CopyInput { index } => format!("copy-input:{index}"),
-            TaskTarget::Constant(value) => format!("constant:{}", usize::from(value)),
+            TaskTarget::Constant(value) => format!("constant:{}", if value { 1 } else { 0 }),
         }
     }
 
