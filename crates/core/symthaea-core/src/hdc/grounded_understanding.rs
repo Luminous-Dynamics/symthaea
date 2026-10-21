@@ -1179,6 +1179,11 @@ mod tests {
                 "words within each group must be sorted and unique: {words:?}"
             );
         }
+        let participating_words: usize = groups.iter().map(|(_, words)| words.len()).sum();
+        assert!(
+            participating_words <= lexicon.lexicon_size(),
+            "a lexeme cannot appear in more than one exact-sequence collision group"
+        );
 
         let mother_father = groups
             .iter()
