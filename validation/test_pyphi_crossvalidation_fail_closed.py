@@ -120,6 +120,55 @@ class FailClosedPyPhiValidationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "capped at 8"):
             self.validator.build_reference_model(too_large)
 
+
+    def test_failed_case_prevents_pass_even_when_remaining_pairs_correlate(self) -> None:
+        results = [
+            ValidationResult(
+                topology_name=f"valid_{index}",
+                n_nodes=2,
+                hdc_phi=value,
+                pyphi_phi=value,
+            )
+            for index, value in enumerate((0.1, 0.2, 0.3))
+        ]
+        results.append(
+            ValidationResult(
+                topology_name="failed_case",
+                n_nodes=2,
+                hdc_phi=None,
+                pyphi_phi=None,
+                error_message="reference unavailable",
+            )
+        )
+        report = ValidationReport(results=results, n_validated=3, n_failed=1)
+        self.validator._compute_report_metrics(report)
+        self.assertAlmostEqual(report.correlation or 0.0, 1.0)
+
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            destination = Path(temporary_directory) / "report.md"
+            self.validator.generate_report(report, destination)
+            text = destination.read_text(encoding="utf-8")
+        self.assertIn("Status: NOT QUALIFIED", text)
+        self.assertIn("FAILED / NOT RUN", text)
+
+    def test_nonfinite_measurements_do_not_count_as_valid_pairs(self) -> None:
+        report = ValidationReport(
+            results=[
+                ValidationResult("finite_1", 2, 0.1, 0.1),
+                ValidationResult("finite_2", 2, 0.2, 0.2),
+                ValidationResult("infinite", 2, float("inf"), 0.3),
+            ]
+        )
+        self.validator._compute_report_metrics(report)
+        self.assertIsNone(report.correlation)
+
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            destination = Path(temporary_directory) / "report.md"
+            self.validator.generate_report(report, destination)
+            text = destination.read_text(encoding="utf-8")
+        self.assertIn("Status: NOT QUALIFIED", text)
+        self.assertIn("N/A", text)
+
     def test_pyphi_version_and_iit_formalism_are_explicit(self) -> None:
         source = inspect.getsource(PyPhiValidator.compute_pyphi_phi)
         self.assertIn('installed_version != "2.0.0rc4"', source)
