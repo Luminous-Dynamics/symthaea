@@ -54,3 +54,10 @@ The next run now changes the GND trace into a continuous crossover through the V
 
 
 The native-output gate now verifies each expected layer file explicitly: `F_Cu`, `B_Cu`, `F_Mask`, `B_Mask`, `F_Silkscreen` and `Edge_Cuts`, alongside `continuity-coupon.drl` with an Excellon `M48` header and drill tool declaration. This avoids counting six unrelated nonempty files as equivalent to a complete fabrication set.
+
+
+## Proof-carrying CAM manifest
+
+The CI bundle now includes `artifact-manifest.json`: a deterministic, path-sorted inventory of the native input board, negative-control board, KiCad version output, both clean DRC reports, the short-control report, each of the six primary Gerbers, each repeated Gerber, and both Excellon files. Each entry records a unique role, relative path, byte length and SHA-256 computed from the actual bytes. The manifest itself binds the exact Git head, board digest, pinned image identity, tool version and the bounded claim ceiling; the final receipt binds the manifest's SHA-256.
+
+The raw files and a checksum list are preserved. For repeatability comparisons, the validator removes only known clock fields from DRC JSON, Gerber and Excellon files; raw file hashes still include those clock values. The clean DRC must have zero violations and zero unconnected items. The deliberately shorted board must have a `shorting_items` or `tracks_crossing` violation and zero unconnected items; a bare nonzero process exit is insufficient.
