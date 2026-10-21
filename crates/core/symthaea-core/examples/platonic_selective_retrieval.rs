@@ -3,7 +3,8 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Calibrate an HDC retriever to abstain on low-confidence and ambiguous queries.
 //!
-//! This is a selective-classification benchmark, not a learning or SOTA claim.
+//! Compares selective classification with split-conformal, set-valued retrieval.
+//! This is a synthetic benchmark, not a learning or SOTA claim.
 //! Thresholds are selected on a calibration split, then evaluated on independently
 //! generated queries. Unknown random patterns and mixtures of stored patterns
 //! have no single correct label and count as errors whenever accepted.
@@ -22,6 +23,7 @@ const KNOWN_QUERY_WEIGHT: usize = 7;
 const OOD_QUERY_WEIGHT: usize = 2;
 const MIXTURE_QUERY_WEIGHT: usize = 2;
 const MAX_VALIDATION_RISK: f64 = 0.05;
+const CONFORMAL_ALPHA: f64 = 0.05;
 const MIN_ACCEPTED_FOR_CALIBRATION: usize = 30;
 // Family-wise error control across 3 policy candidates × 5 reported seeds.
 const MIN_ACCEPTED_FOR_CERTIFICATION: usize = 125;
@@ -54,7 +56,17 @@ struct ScoredQuery {
     best_similarity: f64,
     top_two_margin: f64,
     correct: bool,
+    /// Cosine similarity of the ground-truth label, when the query is labeled.
+    target_similarity: Option<f64>,
     kind: QueryKind,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct ConformalQueryResult {
+    kind: QueryKind,
+    labeled: bool,
+    covered: bool,
+    set_size: usize,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -110,6 +122,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("# certification=one_sided_clopper_pearson_upper_bound_bonferroni_adjusted_for_6_rules_x_5_seeds");
     println!("# fixed_sequence_rule=predeclared_strict_to_permissive_candidates_stop_at_first_failed_certificate");
     println!("# fixed_sequence_uses_one_calibration_split=true");
+    println!("# set_valued_baseline=split_conformal_prediction_sets");
+    println!("# conformal_alpha=0.05; marginal_known_query_coverage_target=0.95");
+    println!("# conformal_scope=exchangeable_known_queries_from_same_synthetic_generator; strata_are_descriptive");
     println!("# query_mix_weights=known:random_ood:ambiguous_mixture=7:2:2");
     println!("# known_query_noise_level=uniform_over_0,0.10,0.20,0.30,0.40,0.45,0.50");
     println!("# separate_near_unknown_challenge_distances=0.05,0.10,0.20");
@@ -156,6 +171,45 @@ fn main() -> Result<(), Box<dyn Error>> {
         )?;
         let near_unknown = score_queries(&near_unknown_queries, &prototypes)?;
 
+        // Split conformal uses only the labeled known-query part of the selection
+        // split. Its finite-sample guarantee is marginal over this generator's
+        // known-query distribution; per-noise rows are descriptive, not conditional
+        // coverage guarantees.
+        let (conformal_q, conformal_calibration_n) =
+            split_conformal_quantile(&selection, CONFORMAL_ALPHA)?;
+        let conformal_cutoff_similarity = 1.0 - conformal_q;
+        let conformal_test = score_conformal_sets(
+            &test_queries,
+            &test,
+            &prototypes,
+            conformal_cutoff_similarity,
+        )?;
+        let conformal_near_unknown = score_conformal_sets(
+            &near_unknown_queries,
+            &near_unknown,
+            &prototypes,
+            conformal_cutoff_similarity,
+        )?;
+        println!(
+            "# conformal_calibration=seed:{seed},alpha:{CONFORMAL_ALPHA:.4},q:{conformal_q:.6},cutoff_similarity:{conformal_cutoff_similarity:.6},known_calibration_n:{conformal_calibration_n}"
+        );
+        report_conformal_set_summaries(
+            seed,
+            "evaluation",
+            CONFORMAL_ALPHA,
+            conformal_q,
+            conformal_calibration_n,
+            &conformal_test,
+        );
+        report_conformal_set_summaries(
+            seed,
+            "near_unknown_challenge",
+            CONFORMAL_ALPHA,
+            conformal_q,
+            conformal_calibration_n,
+            &conformal_near_unknown,
+        );
+
         let always_accept = DecisionRule {
             min_similarity: -1.0,
             min_margin: -1.0,
@@ -180,7 +234,9 @@ fn main() -> Result<(), Box<dyn Error>> {
             None,
             &near_unknown,
         );
-        report_identity_collision_controls(seed, &prototypes, "always_top1", always_accept)?;
+        report_identity_collision_controls(
+            seed, &prototypes, "always_top1", always_accept, conformal_cutoff_similarity,
+        )?;
 
         for (mode_name, mode) in [
             ("score_only", CalibrationMode::ScoreOnly),
@@ -212,7 +268,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                 None,
                 &near_unknown,
             );
-            report_identity_collision_controls(seed, &prototypes, &baseline_name, rule)?;
+            report_identity_collision_controls(
+                seed, &prototypes, &baseline_name, rule, conformal_cutoff_similarity,
+            )?;
 
             // Baseline B: fixed-sequence confidence-interval calibration (CIC).
             // The score/margin threshold schedule is fixed before observing the
@@ -253,7 +311,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                 None,
                 &near_unknown,
             );
-            report_identity_collision_controls(seed, &prototypes, &cic_name, cic.rule)?;
+            report_identity_collision_controls(
+                seed, &prototypes, &cic_name, cic.rule, conformal_cutoff_similarity,
+            )?;
             report_risk_coverage_curve(seed, mode_name, mode, &test);
         }
     }
@@ -395,10 +455,21 @@ fn score_queries(
             }
         }
 
+        let target_similarity = match sample.target {
+            Some(target_index) => Some(
+                query.similarity(
+                    prototypes
+                        .get(target_index)
+                        .ok_or("query target index is outside the prototype bank")?,
+                )?,
+            ),
+            None => None,
+        };
         scored.push(ScoredQuery {
             best_similarity: best,
             top_two_margin: best - second,
             correct: sample.target.is_some_and(|target_index| target_index == best_index),
+            target_similarity,
             kind: sample.kind,
         });
     }
@@ -777,11 +848,144 @@ fn report_risk_coverage_curve(
     );
 }
 
+/// Conformal nonconformity is 1 - similarity to the true target. The
+/// finite-sample split-conformal quantile uses ceil((n+1)(1-alpha))-th order
+/// statistic; if that rank exceeds n, q=+infinity gives the conservative full set.
+fn split_conformal_quantile(
+    calibration: &[ScoredQuery],
+    alpha: f64,
+) -> Result<(f64, usize), Box<dyn Error>> {
+    if !alpha.is_finite() || !(0.0..1.0).contains(&alpha) {
+        return Err("conformal alpha must be finite and strictly between zero and one".into());
+    }
+    let mut nonconformity: Vec<f64> = calibration
+        .iter()
+        .filter(|sample| matches!(sample.kind, QueryKind::Known { .. }))
+        .filter_map(|sample| sample.target_similarity.map(|similarity| 1.0 - similarity))
+        .collect();
+    if nonconformity.is_empty() {
+        return Err("split conformal needs at least one labeled known calibration query".into());
+    }
+    nonconformity.sort_by(f64::total_cmp);
+    let count = nonconformity.len();
+    let rank = (((count + 1) as f64) * (1.0 - alpha)).ceil() as usize;
+    let quantile = if rank == 0 || rank > count {
+        f64::INFINITY
+    } else {
+        nonconformity[rank - 1]
+    };
+    Ok((quantile, count))
+}
+
+fn conformal_set_size(
+    query: &PatternVector,
+    prototypes: &[PatternVector],
+    cutoff_similarity: f64,
+) -> Result<usize, Box<dyn Error>> {
+    let mut size = 0;
+    for prototype in prototypes {
+        if query.similarity(prototype)? >= cutoff_similarity {
+            size += 1;
+        }
+    }
+    Ok(size)
+}
+
+fn score_conformal_sets(
+    queries: &[QuerySample],
+    scored: &[ScoredQuery],
+    prototypes: &[PatternVector],
+    cutoff_similarity: f64,
+) -> Result<Vec<ConformalQueryResult>, Box<dyn Error>> {
+    if queries.len() != scored.len() {
+        return Err("query and score collections must be aligned".into());
+    }
+    let mut results = Vec::with_capacity(queries.len());
+    for (query, score) in queries.iter().zip(scored) {
+        let mut set_size = 0;
+        for prototype in prototypes {
+            if query.vector.similarity(prototype)? >= cutoff_similarity {
+                set_size += 1;
+            }
+        }
+        let covered = score
+            .target_similarity
+            .is_some_and(|similarity| 1.0 - similarity <= 1.0 - cutoff_similarity);
+        results.push(ConformalQueryResult {
+            kind: query.kind,
+            labeled: score.target_similarity.is_some(),
+            covered,
+            set_size,
+        });
+    }
+    Ok(results)
+}
+
+fn report_conformal_set_summaries(
+    seed: u64,
+    split: &str,
+    alpha: f64,
+    quantile: f64,
+    calibration_n: usize,
+    samples: &[ConformalQueryResult],
+) {
+    fn emit(
+        seed: u64,
+        split: &str,
+        label: &str,
+        alpha: f64,
+        quantile: f64,
+        calibration_n: usize,
+        samples: &[ConformalQueryResult],
+    ) {
+        if samples.is_empty() {
+            return;
+        }
+        let labeled_n = samples.iter().filter(|sample| sample.labeled).count();
+        let covered = samples.iter().filter(|sample| sample.labeled && sample.covered).count();
+        let set_sum: usize = samples.iter().map(|sample| sample.set_size).sum();
+        let singleton = samples.iter().filter(|sample| sample.set_size == 1).count();
+        let empty = samples.iter().filter(|sample| sample.set_size == 0).count();
+        let coverage = if labeled_n > 0 {
+            format!("{:.6}", covered as f64 / labeled_n as f64)
+        } else {
+            "NA".to_owned()
+        };
+        println!(
+            "# conformal_set=seed:{seed},split:{split},kind:{label},alpha:{alpha:.4},q:{quantile:.6},calibration_known_n:{calibration_n},n:{},labeled_n:{labeled_n},covered:{covered},marginal_coverage:{coverage},mean_set_size:{:.6},singleton_fraction:{:.6},empty_fraction:{:.6}",
+            samples.len(),
+            set_sum as f64 / samples.len() as f64,
+            singleton as f64 / samples.len() as f64,
+            empty as f64 / samples.len() as f64
+        );
+    }
+
+    emit(seed, split, "all", alpha, quantile, calibration_n, samples);
+    for noise_index in 0..NOISE_LEVELS.len() {
+        let kind = QueryKind::Known { noise_index };
+        let subset: Vec<_> = samples.iter().copied().filter(|sample| sample.kind == kind).collect();
+        emit(seed, split, &format!("known_noise_{noise_index}"), alpha, quantile, calibration_n, &subset);
+    }
+    for (kind, label) in [
+        (QueryKind::RandomOod, "random_ood"),
+        (QueryKind::AmbiguousMixture, "ambiguous_mixture"),
+    ] {
+        let subset: Vec<_> = samples.iter().copied().filter(|sample| sample.kind == kind).collect();
+        emit(seed, split, label, alpha, quantile, calibration_n, &subset);
+    }
+    for distance_index in 0..NEAR_UNKNOWN_DISTANCES.len() {
+        let kind = QueryKind::NearPrototypeUnknown { distance_index };
+        let subset: Vec<_> = samples.iter().copied().filter(|sample| sample.kind == kind).collect();
+        emit(seed, split, &format!("near_unknown_{distance_index}"), alpha, quantile, calibration_n, &subset);
+    }
+}
+
 fn report_identity_collision_controls(
     seed: u64,
     prototypes: &[PatternVector],
     strategy: &str,
     rule: DecisionRule,
+    conformal_cutoff_similarity: f64,
 ) -> Result<(), Box<dyn Error>> {
     // These paired records differ only in their declared identity status. The
     // underlying observed vectors are byte-for-byte identical: a valid noisy
@@ -822,6 +1026,13 @@ fn report_identity_collision_controls(
             .any(|(known, unknown)| known.vector != unknown.vector)
         {
             return Err("identity collision control did not preserve exact vector equality".into());
+        }
+        for (known, unknown) in known_queries.iter().zip(&unknown_queries) {
+            let known_set_size = conformal_set_size(&known.vector, prototypes, conformal_cutoff_similarity)?;
+            let unknown_set_size = conformal_set_size(&unknown.vector, prototypes, conformal_cutoff_similarity)?;
+            if known_set_size != unknown_set_size {
+                return Err("conformal prediction set changed for an identical feature vector".into());
+            }
         }
 
         let known_scored = score_queries(&known_queries, prototypes)?;
@@ -1046,6 +1257,7 @@ mod tests {
                 best_similarity: 0.5,
                 top_two_margin: 0.2,
                 correct: true,
+                target_similarity: Some(0.5),
                 kind: QueryKind::Known { noise_index: 0 },
             };
             MIN_ACCEPTED_FOR_CERTIFICATION - 1
@@ -1057,6 +1269,7 @@ mod tests {
                 best_similarity: 0.5,
                 top_two_margin: 0.2,
                 correct: true,
+                target_similarity: Some(0.5),
                 kind: QueryKind::Known { noise_index: 0 },
             };
             MIN_ACCEPTED_FOR_CERTIFICATION
@@ -1096,12 +1309,14 @@ mod tests {
                 best_similarity: 0.9,
                 top_two_margin: 0.2,
                 correct: true,
+                target_similarity: Some(0.5),
                 kind: QueryKind::Known { noise_index: 0 },
             },
             ScoredQuery {
                 best_similarity: 0.8,
                 top_two_margin: 0.1,
                 correct: false,
+                target_similarity: None,
                 kind: QueryKind::RandomOod,
             },
         ];
@@ -1145,18 +1360,21 @@ mod tests {
             best_similarity: 0.9,
             top_two_margin: 0.2,
             correct: true,
+            target_similarity: Some(0.5),
             kind: QueryKind::Known { noise_index: 0 },
         }));
         samples.extend((0..50).map(|_| ScoredQuery {
             best_similarity: 0.6,
             top_two_margin: 0.1,
             correct: false,
+            target_similarity: Some(0.5),
             kind: QueryKind::AmbiguousMixture,
         }));
         samples.extend((0..2_000).map(|_| ScoredQuery {
             best_similarity: 0.45,
             top_two_margin: 0.05,
             correct: true,
+            target_similarity: Some(0.5),
             kind: QueryKind::Known { noise_index: 1 },
         }));
 
