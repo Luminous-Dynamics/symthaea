@@ -54,6 +54,7 @@ jobs:
           clean_exit=$?
           set -e
           jq empty "$OUT_HOST/clean-drc.json"
+          jq -e '(.violations | length) == 0 and (.unconnected_items | length) == 0' "$OUT_HOST/clean-drc.json" > /dev/null
           if [ "$clean_exit" -ne 0 ]; then
             echo "Positive-control board has DRC violations (exit=$clean_exit). Findings follow:"
             jq -c '.violations[]? // empty | {severity: .severity, type: .type, description: .description, items: .items}' "$OUT_HOST/clean-drc.json" || cat "$OUT_HOST/clean-drc.json"
@@ -64,14 +65,24 @@ jobs:
           repeat_clean_exit=$?
           set -e
           test "$repeat_clean_exit" -eq "$clean_exit"
-          cmp "$OUT_HOST/clean-drc.json" "$OUT_HOST/clean-drc-repeat.json"
+          diff -u <(jq -S 'del(.date)' "$OUT_HOST/clean-drc.json") <(jq -S 'del(.date)' "$OUT_HOST/clean-drc-repeat.json")
 
-          # Negative control: move the GND track onto the VCC track. Assert the
-          # transformation occurred, then require the documented DRC violation
-          # exit code instead of accepting a parse-only or silently clean run.
-          sed 's/(segment (start 105 102.54) (end 115 102.54) (width 0.5) (layer "F.Cu") (net 2)/(segment (start 105 100) (end 115 100) (width 0.5) (layer "F.Cu") (net 2)/' \
-            "$GITHUB_WORKSPACE/$BOARD_REL" > "$OUT_HOST/continuity-coupon-shorted.kicad_pcb"
-          grep -Fq '(segment (start 105 100) (end 115 100) (width 0.5) (layer "F.Cu") (net 2)' \
+          # Negative control: reroute GND through VCC while keeping both GND
+          # pads connected. An exit code alone is insufficient: require KiCad's
+          # two-net short diagnostic and zero unconnected items.
+          awk '
+            /segment \(start 105 102\.54\) \(end 115 102\.54\).*uuid "30000000-0000-4000-8000-000000000002"/ {
+              print "  (segment (start 105 102.54) (end 110 100) (width 0.5) (layer \"F.Cu\") (net 2) (uuid \"30000000-0000-4000-8000-000000000002\"))"
+              print "  (segment (start 110 100) (end 115 102.54) (width 0.5) (layer \"F.Cu\") (net 2) (uuid \"30000000-0000-4000-8000-000000000003\"))"
+              changed++
+              next
+            }
+            { print }
+            END { if (changed != 1) exit 41 }
+          ' "$GITHUB_WORKSPACE/$BOARD_REL" > "$OUT_HOST/continuity-coupon-shorted.kicad_pcb"
+          grep -Fq '(segment (start 105 102.54) (end 110 100) (width 0.5) (layer "F.Cu") (net 2)' \
+            "$OUT_HOST/continuity-coupon-shorted.kicad_pcb"
+          grep -Fq '(segment (start 110 100) (end 115 102.54) (width 0.5) (layer "F.Cu") (net 2)' \
             "$OUT_HOST/continuity-coupon-shorted.kicad_pcb"
 
           set +e
@@ -82,6 +93,10 @@ jobs:
           set -e
           jq empty "$OUT_HOST/shorted-drc.json"
           test "$shorted_exit" -eq 5
+          jq -e '
+            any(.violations[]?; .type == "shorting_items")
+            and (.unconnected_items | length) == 0
+          ' "$OUT_HOST/shorted-drc.json" > /dev/null
 
           # Export actual files from the real board with the pinned CLI.
           kicad pcb export gerbers --output "$OUT/gerbers/" \
@@ -101,11 +116,20 @@ jobs:
             <(find "$OUT_HOST/gerbers-repeat" -maxdepth 1 -type f -printf '%f\\n' | sort)
           diff <(find "$OUT_HOST/drill" -maxdepth 1 -type f -printf '%f\\n' | sort) \
             <(find "$OUT_HOST/drill-repeat" -maxdepth 1 -type f -printf '%f\\n' | sort)
+          # KiCad embeds wall-clock creation timestamps in fabrication files.
+          # Retain/hash raw files, but compare the payload after removing only
+          # declared volatile date metadata.
           for generated in "$OUT_HOST"/gerbers/*; do
-            cmp "$generated" "$OUT_HOST/gerbers-repeat/$(basename "$generated")"
+            repeated="$OUT_HOST/gerbers-repeat/$(basename "$generated")"
+            diff -u \
+              <(sed -E -e '/^%TF\.CreationDate,/d' -e '/^G04 Created by KiCad .* date /d' "$generated") \
+              <(sed -E -e '/^%TF\.CreationDate,/d' -e '/^G04 Created by KiCad .* date /d' "$repeated")
           done
           for generated in "$OUT_HOST"/drill/*; do
-            cmp "$generated" "$OUT_HOST/drill-repeat/$(basename "$generated")"
+            repeated="$OUT_HOST/drill-repeat/$(basename "$generated")"
+            diff -u \
+              <(sed -E -e '/^; DRILL file \{KiCad [^}]+\} date /d' -e '/^; #@! TF\.CreationDate,/d' "$generated") \
+              <(sed -E -e '/^; DRILL file \{KiCad [^}]+\} date /d' -e '/^; #@! TF\.CreationDate,/d' "$repeated")
           done
 
           gerber_count=$(find "$OUT_HOST/gerbers" -maxdepth 1 -type f -name '*.gbr' -size +0c | wc -l)
@@ -142,11 +166,14 @@ jobs:
               controls: {
                 clean_board_drc_exit_code: ($clean_drc_exit_code | tonumber),
                 clean_board_report_parsed_as_json: true,
-                repeated_clean_drc_report_byte_identical: true,
-                repeated_gerber_and_drill_exports_byte_identical: true,
+                repeated_clean_drc_semantically_equal_after_date_normalization: true,
+                repeated_gerber_payloads_match_after_timestamp_normalization: true,
+                repeated_drill_payloads_match_after_timestamp_normalization: true,
                 intentionally_shorted_board_drc_exit_code: ($shorted_drc_exit_code | tonumber),
                 expected_shorted_board_exit_code: 5,
-                intentional_short_detected_by_exit_code: true
+                intentional_short_detected_by_exit_code: true,
+                intentional_short_type_checked_as_shorting_items: true,
+                short_control_has_zero_unconnected_items: true
               },
               generated_outputs: {
                 nonempty_gerber_files: $gerber_count,
@@ -174,11 +201,14 @@ jobs:
             and (.git_head | test("^[0-9a-f]{40}$"))
             and (.board_sha256 | test("^[0-9a-f]{64}$"))
             and .controls.clean_board_drc_exit_code == 0
-            and .controls.repeated_clean_drc_report_byte_identical
-            and .controls.repeated_gerber_and_drill_exports_byte_identical
+            and .controls.repeated_clean_drc_semantically_equal_after_date_normalization
+            and .controls.repeated_gerber_payloads_match_after_timestamp_normalization
+            and .controls.repeated_drill_payloads_match_after_timestamp_normalization
             and .controls.intentionally_shorted_board_drc_exit_code == 5
             and .controls.expected_shorted_board_exit_code == 5
             and .controls.intentional_short_detected_by_exit_code
+            and .controls.intentional_short_type_checked_as_shorting_items
+            and .controls.short_control_has_zero_unconnected_items
             and .generated_outputs.nonempty_gerber_files >= 5
             and .generated_outputs.nonempty_drill_files >= 1
             and .authority == "native_eda_cli_drc_and_export_smoke_only_no_physical_or_production_release_authority"
