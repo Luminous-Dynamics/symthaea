@@ -755,6 +755,9 @@ jobs:
           inconsistent_action = copy.deepcopy(fixtures[0])
           inconsistent_action["prediction"]["predicted_label"] = "incompatible"
           mutants.append(inconsistent_action)
+          invalid_probability = copy.deepcopy(fixtures[0])
+          invalid_probability["prediction"]["compatibility_probability"] = 1.01
+          mutants.append(invalid_probability)
           for index, mutant in enumerate(mutants, start=1):
               try:
                   validator.validate(mutant)
