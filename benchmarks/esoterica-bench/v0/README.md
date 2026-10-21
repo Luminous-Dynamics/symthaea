@@ -27,3 +27,10 @@ Critical access/provenance failures are release blockers. No queued CI result or
 ## Related module: MythologyBench
 
 Mythology is a first-class adjacent domain, not a synonym for esotericism. The Egypt-first development pack is in [`benchmarks/mythology-bench/v0/`](../../mythology-bench/v0/README.md). It reuses the overall evidence/provenance design but keeps mythology-specific evaluation separate so results are not conflated with esotericism.
+
+
+## Local validator
+
+The isolated Rust validator lives in [`tools/knowledge-benchmark-harness/`](../../../tools/knowledge-benchmark-harness/). Run [`scripts/validate-knowledge-benchmarks.sh`](../../../scripts/validate-knowledge-benchmarks.sh) from a repository checkout. It validates the schema against the Draft 2020-12 meta-schema, validates instances with format checking enabled, refuses remote/file schema references, verifies graph IDs and evidence references, hashes exact input bytes and the dependency lockfile, and emits one JSON report per fixture set. It never fetches the source URLs.
+
+The harness has been authored on the research branch but has **not been compiled or executed in this environment**; this container has no Rust/Cargo toolchain and cannot resolve GitHub network hosts. Do not interpret the source code or CI workflow as a passing qualification result. The generated lockfile must be reviewed and committed before calling repeated runs fully dependency-reproducible.
