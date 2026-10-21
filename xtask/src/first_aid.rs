@@ -573,7 +573,7 @@ mod tests {
     fn checked_in_contracts_are_consistent() {
         let (corpus, benchmark, _) = fixtures();
         assert_eq!(corpus.scenarios.len(), 24);
-        assert_eq!(benchmark.benchmarks.len(), 17);
+        assert_eq!(benchmark.benchmarks.len(), 18);
         assert_eq!(benchmark.status, "proposed_targets_unmeasured");
         assert!(!corpus.clinical_use_authorized);
         assert!(!benchmark.clinical_use_authorized);
@@ -610,6 +610,21 @@ mod tests {
             .expect("expired negative control exists");
         expired.expected_disposition = "render_approved_bundle_only".to_string();
         assert!(validate_corpus(&corpus, &schema).is_err());
+    }
+
+    #[test]
+    fn sequential_process_benchmark_has_risk_weighted_release_gate() {
+        let (_, benchmark, _) = fixtures();
+        let item = benchmark
+            .benchmarks
+            .iter()
+            .find(|item| item.id == "FA-BM-018")
+            .expect("sequential process benchmark must be present");
+
+        assert!(item.measure.contains("event traces"));
+        assert!(item.target.contains("zero critical forbidden transitions"));
+        assert!(item.gate.contains("Any critical forbidden transition blocks"));
+        assert!(item.claim_ceiling.contains("Synthetic process-integrity"));
     }
 
     #[test]
@@ -672,7 +687,7 @@ mod tests {
             runtime_os: "test-os".to_string(),
             runtime_arch: "test-arch".to_string(),
             scenario_count: 24,
-            benchmark_count: 16,
+            benchmark_count: 18,
             baseline_count: 6,
             claim_ceiling: "synthetic contract integrity only; no clinical validation",
         })
@@ -681,6 +696,6 @@ mod tests {
             value["source_revision_sha"].as_str(),
             Some("ffffffffffffffffffffffffffffffffffffffff")
         );
-        assert_eq!(value["benchmark_count"], 16);
+        assert_eq!(value["benchmark_count"], 18);
     }
 }
