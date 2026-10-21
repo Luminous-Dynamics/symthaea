@@ -241,11 +241,11 @@ This only becomes a contribution if those additions improve held-out prediction 
 
 ## Immediate implementation plan
 
-1. Extend the now-added exact evaluator to a declarative fixture manifest with separate model, task, partition, and intervention identities.
+1. Move the remaining hard-coded fixture and intervention definitions into a declarative manifest. The current TSV binds canonical model/task/partition expectations and aggregate oracles, but the Rust source still defines the executable edge interventions.
 2. Sweep predeclared alternate partitions / coarse-grainings and retain the full multiscale profile; do not select the best partition on the evaluation set.
 3. Add state-conditioned and controlled prior-shift fixtures, plus degree/delay/bandwidth-matched intervention controls where meaningful.
 4. Compare against raw task ablation, graph/spectral measures, entropy/MI/transfer entropy, and relevant PID/SURD/effective-information baselines.
 5. Test the preregistered adversarial matrix, then connect a real Symthaea task only after exact synthetic gates pass.
 6. Keep the feature research-only until external review and evidence support a concrete engineering use.
 
-**Current evidence status:** specification only. No implementation accuracy, novel-metric claim, IIT correspondence, consciousness inference, SOTA result, or passing test is asserted.
+**Current evidence status:** research specification plus a dependency-free exact toy evaluator, exhaustive partition-sensitivity code, an expected-output TSV, and an independent reference calculation have been authored. The Rust executable and its 13 tests have not been compiled or run. There is no demonstrated empirical usefulness, no validated advantage over established baselines, no novelty/SOTA claim, no IIT correspondence, and no consciousness inference.
