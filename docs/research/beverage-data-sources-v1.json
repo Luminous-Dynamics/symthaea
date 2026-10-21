@@ -315,6 +315,59 @@
         "https://github.com/tyrone1979/yeast",
         "https://github.com/tyrone1979/yeast/blob/main/usage/results/lobo_metrics.json"
       ]
+    },
+    {
+      "id": "ABNORMAL-FERMENTATION-ADAPTATION-2026",
+      "title": "Effect of data availability on in-line adaptation of fermentation mechanistic models under abnormal conditions",
+      "uri": "https://doi.org/10.1016/j.ceja.2026.101157",
+      "article_uri": "https://www.sciencedirect.com/science/article/pii/S2666821126001262",
+      "publisher": "Chemical Engineering Journal Advances",
+      "publication_date": "2026-05",
+      "evidence_class": "PUBLISHED_RESULT_CONFIDENTIAL_SOURCE_DATA",
+      "domain": [
+        "industrial_fed_batch_fermentation",
+        "abnormality_detection",
+        "mechanistic_model_adaptation",
+        "substrate_prediction",
+        "product_prediction"
+      ],
+      "reported_scope": {
+        "industrial_contaminated_batches": 30,
+        "process_duration_hours": 32,
+        "measurement_frequency_hours": 4,
+        "states": [
+          "substrate_concentration",
+          "biomass_concentration",
+          "product_concentration"
+        ],
+        "method": "Monod-type kinetics with empirical decay terms; posterior Bayesian parameter inference on truncated post-detection data; genetic-algorithm fitting as more data accumulate; phase-dependent switch"
+      },
+      "reported_results": {
+        "early_sparse_data_bayesian_relative_error_reduction_percent_vs_ga": {
+          "substrate_prediction": 26,
+          "product_prediction": 44
+        },
+        "larger_data_ga_prediction_accuracy_improvement_percent_vs_bayesian": {
+          "substrate_prediction": 25,
+          "product_prediction": 19
+        },
+        "abnormal_batch_final_product_titer_mean_g_l": 87.37,
+        "abnormal_batch_final_product_titer_sd_g_l": 25.22,
+        "simulated_normal_final_product_titer_g_l": 217.9
+      },
+      "rights_status": "ARTICLE_OPEN_ACCESS_CC_BY_STATED; UNDERLYING_INDUSTRIAL_DATA_CONFIDENTIAL",
+      "data_availability": "Article states underlying data are confidential; the full industrial dataset is not a public reproducibility benchmark.",
+      "use_gate": "Treat published numbers as study-specific literature comparators. Build synthetic contract tests from method structure only. Require an open/licensed independent dataset before empirical re-analysis; do not reconstruct private trajectories from figures without checking reuse terms.",
+      "benchmark_value": "A reference for phase-aware estimation under different data availability regimes and model-process mismatch, not a beverage-specific baseline.",
+      "claims_not_supported": [
+        "independent reproduction without source data",
+        "beer/wine/spirits transfer",
+        "the same numeric improvement on a different process",
+        "contamination diagnosis accuracy without detection labels and protocol",
+        "causal production recovery, safer control, or feed-policy benefit",
+        "model superiority on the full industrial data"
+      ],
+      "research_question": "Can a predeclared model-switch policy choose a better-calibrated estimator as the available post-detection prefix grows, while preserving abstention and hard process constraints?"
     }
   ],
   "research_notes": [
@@ -324,6 +377,8 @@
     "Transcriptome time courses are biological evidence, not direct process-sensor or final-quality targets.",
     "Synthetic fermentation data are for pipeline and fault-injection tests only.",
     "An additional industrial process-data candidate is a baker's-yeast fed-batch dataset (59 batches/1,090 hourly rows reported by its code companion). It is not alcoholic beverage data; use it as an external process-method validation only after the Figshare license and source bytes are verified.",
-    "Reported current-hour feed-rate prediction may not be a prospective control task unless all inputs are proven available before the target decision. Evaluate next-hour and decision-cutoff tasks separately."
+    "Reported current-hour feed-rate prediction may not be a prospective control task unless all inputs are proven available before the target decision. Evaluate next-hour and decision-cutoff tasks separately.",
+    "Published 2026 abnormal-fermentation adaptation results use 30 confidential industrial contaminated runs. They motivate the evaluation protocol but cannot be independently reproduced from the cited dataset.",
+    "The novel open benchmark target is decision quality under truncated data and model mismatch: compare fixed estimators and a declared switch policy at each detection prefix, with calibration, abstention and constraint-violation metrics."
   ]
 }
