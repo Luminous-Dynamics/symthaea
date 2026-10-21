@@ -35,8 +35,7 @@
     },
     "input_bytes": {
       "type": "integer",
-      "minimum": 0,
-      "maximum": 8388608
+      "minimum": 0
     },
     "valid": {
       "type": "boolean"
