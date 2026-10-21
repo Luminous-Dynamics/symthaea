@@ -3159,7 +3159,15 @@ fn statement_declaration_prefix(statement: &str) -> Option<String> {
     )
     .ok()?;
     let start = declaration.find(statement)?.start();
-    Some(statement[start..].trim().to_owned())
+    let declaration_text = &statement[start..];
+
+    // The dataset's formal_statement field retains the declaration and an
+    // opening proof block, but not a trusted proof receipt. Compare the entire
+    // typed proposition through that boundary, not just "theorem <name>". If
+    // the boundary cannot be parsed conservatively, the identity join abstains.
+    let proof_boundary = Regex::new(r":=[ \t\r\n]*by\b").ok()?;
+    let boundary_end = proof_boundary.find(declaration_text)?.end();
+    Some(declaration_text[..boundary_end].trim().to_owned())
 }
 
 fn named_declaration_blocks(source: &str, requested_name: &str) -> Result<Vec<String>> {
@@ -3385,6 +3393,15 @@ theorem encode_spec (x : Nat) : encode x = x := by
         assert_eq!(declared_name, "encode_spec");
         let statement_prefix =
             statement_declaration_prefix(formal_statement).expect("statement prefix parses");
+        assert!(statement_prefix.contains(": encode x = x := by"));
+        let changed_proposition =
+            statement_declaration_prefix("theorem encode_spec (x : Nat) : encode x = 0 := by")
+                .expect("changed proposition has a parseable prefix");
+        assert_ne!(statement_prefix, changed_proposition);
+        assert!(
+            statement_declaration_prefix("theorem encode_spec (x : Nat) : encode x = x").is_none(),
+            "signature without a recognized proof boundary must abstain"
+        );
         let source = r#"
 theorem prior_spec (x : Nat) : x = x := by
   rfl
