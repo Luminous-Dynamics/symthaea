@@ -4,6 +4,7 @@
 //! but does not use an approved reference trajectory and cannot qualify solver accuracy.
 
 use std::env;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use ode_verify_001_harness::dynamical_system::{
     DynamicalSystem, Rk45Controller, Rk45Integrator, Rk45Tolerances, SimulationError,
@@ -20,7 +21,9 @@ const INITIAL_DT: f64 = 1.0e-8;
 const MAX_ATTEMPTS: usize = 100_000;
 const TOLERANCE_MULTIPLIER: f64 = 10.0;
 
-struct Robertson;
+struct Robertson {
+    derivative_evaluations: AtomicUsize,
+}
 
 impl DynamicalSystem for Robertson {
     fn state_dim(&self) -> usize {
@@ -28,6 +31,7 @@ impl DynamicalSystem for Robertson {
     }
 
     fn derivatives(&self, state: &[f64], _time: f64) -> Vec<f64> {
+        self.derivative_evaluations.fetch_add(1, Ordering::Relaxed);
         let y1 = state[0];
         let y2 = state[1];
         let y3 = state[2];
@@ -132,7 +136,9 @@ fn main() {
         RELATIVE_TOLERANCE,
         ABSOLUTE_TOLERANCES.to_vec(),
     );
-    let system = Robertson;
+    let system = Robertson {
+        derivative_evaluations: AtomicUsize::new(0),
+    };
     let mut controller = match Rk45Controller::new(INITIAL_DT) {
         Ok(controller) => controller,
         Err(error) => {
@@ -180,19 +186,32 @@ fn main() {
             break;
         }
 
-        match controller.try_step(
+        let rhs_before = system.derivative_evaluations.load(Ordering::Relaxed);
+        let step_result = controller.try_step(
             &integrator,
             &system,
             &state,
             time,
             remaining,
             &tolerances,
-        ) {
+        );
+        let rhs_after = system.derivative_evaluations.load(Ordering::Relaxed);
+        let rhs_delta = rhs_after.saturating_sub(rhs_before);
+        derivative_evaluations = rhs_after;
+
+        match step_result {
             Ok(step) => {
                 attempted_steps = attempted_steps.saturating_add(step.attempted_steps);
                 rejected_steps = rejected_steps.saturating_add(step.rejected_steps);
-                derivative_evaluations =
-                    derivative_evaluations.saturating_add(step.derivative_evaluations);
+                if rhs_delta != step.derivative_evaluations {
+                    status = "rhs_counter_mismatch";
+                    status_detail = format!(
+                        "independent RHS callback count {rhs_delta} differs from step report {}",
+                        step.derivative_evaluations
+                    );
+                    failed_step_work_complete = false;
+                    break;
+                }
                 accepted_steps = accepted_steps.saturating_add(1);
 
                 if !step.accepted_dt.is_finite()
