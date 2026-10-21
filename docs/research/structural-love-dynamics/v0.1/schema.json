@@ -78,7 +78,14 @@
             "AUTHORITY",
             "AGENCY",
             "AFFECT",
-            "CONSENT"
+            "CONSENT",
+            "INTEGRATION",
+            "STRESS",
+            "ENTROPY",
+            "VIABILITY",
+            "CAUSALITY",
+            "PROVENANCE",
+            "CONSCIOUSNESS"
           ]
         },
         "risk_level": {
@@ -155,7 +162,17 @@
             "DISCLOSE_NONPHENOMENOLOGICAL_STATUS",
             "DISCUSS_CONCEPT_WITHOUT_SELF_CLAIM",
             "HONOR_CONSENT_SCOPE",
-            "DO_NOT_ACT_WITHOUT_PERMISSION"
+            "DO_NOT_ACT_WITHOUT_PERMISSION",
+            "KEEP_MEASURES_DISTINCT",
+            "DO_NOT_INFER_HUMAN_STRESS_FROM_SOFTWARE_PROXY",
+            "REPORT_STRESS_WITH_CONTEXT",
+            "DO_NOT_INFER_LIFE_FROM_RESOURCE_USE",
+            "REPORT_MEASURED_BIOLOGICAL_SCOPE",
+            "DECLINE_INVALID_CROSS_SCALE_INFERENCE",
+            "SEPARATE_CORRELATION_CAUSATION",
+            "REJECT_SYNTHETIC_PARTNER_AS_OBSERVATION",
+            "STATE_PHI_ESTIMATOR_LIMITS",
+            "DO_NOT_INFER_CONSCIOUSNESS_FROM_PHI"
           ]
         },
         "must_do": {
