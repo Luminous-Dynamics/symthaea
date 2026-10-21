@@ -398,7 +398,8 @@ fn inspect_trace(trace: &TrajectoryScenario) -> Vec<String> {
             }
             EventKind::BundleVerified => {
                 let bundle_id = event.bundle_id.as_deref().unwrap_or_default();
-                let is_valid = active_bundle.as_deref() == Some(bundle_id)
+                let is_valid = session_active
+                    && active_bundle.as_deref() == Some(bundle_id)
                     && event.bundle_state == Some(BundleState::Valid)
                     && event.digest_verified == Some(true)
                     && !revoked_bundles.contains(bundle_id);
@@ -584,7 +585,8 @@ mod tests {
                 }
                 "bundle_verified" => {
                     let id = bundle_id.as_deref().unwrap_or_default();
-                    if active_bundle.as_deref() == Some(id)
+                    if session_active
+                        && active_bundle.as_deref() == Some(id)
                         && event["bundle_state"] == "valid"
                         && event["digest_verified"].as_bool() == Some(true)
                         && !revoked_bundles.contains(id)
@@ -1245,6 +1247,45 @@ mod tests {
             inspect_trace(&trace),
             vec!["uncertainty_lost_at_session_boundary", "uncertainty_lost_at_handoff"]
         );
+        let value = serde_json::to_value(&trace).expect("mutated trace serializes");
+        assert_eq!(inspect_trace(&trace), reference_codes_from_json(&value));
+    }
+
+    #[test]
+    fn verification_outside_active_session_is_rejected() {
+        let mut trace = scenario("FA-TRACE-001");
+        let verify_index = trace
+            .events
+            .iter()
+            .position(|event| event.kind == EventKind::BundleVerified)
+            .expect("verification event exists");
+        trace.events[verify_index].sequence += 1;
+        let render_index = trace
+            .events
+            .iter()
+            .position(|event| event.kind == EventKind::ProtocolRendered)
+            .expect("render event exists");
+        trace.events[render_index].sequence += 1;
+        trace.events.insert(
+            verify_index,
+            TraceEvent {
+                sequence: 3,
+                kind: EventKind::SessionInterrupted,
+                bundle_id: None,
+                bundle_state: None,
+                digest_verified: None,
+                resource_state: None,
+                presented_as: None,
+                sensitive_payload: None,
+                consent_scoped: None,
+            },
+        );
+        let expected = vec![
+            "invalid_bundle_verification",
+            "render_without_active_session",
+            "render_without_verified_bundle",
+        ];
+        assert_eq!(inspect_trace(&trace), expected);
         let value = serde_json::to_value(&trace).expect("mutated trace serializes");
         assert_eq!(inspect_trace(&trace), reference_codes_from_json(&value));
     }
