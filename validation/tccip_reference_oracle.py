@@ -338,13 +338,15 @@ def expected_task(fixture: Fixture, inputs: Sequence[bool]) -> bool:
 def task_utility(fixture: Fixture, intervention: Intervention | None = None) -> float:
     input_assignments = list(__import__("itertools").product((False, True), repeat=fixture.input_count))
     coin_assignments = (False, True) if intervention else (False,)
-    correct = 0
-    total = len(input_assignments) * len(coin_assignments)
-    for inputs in input_assignments:
+    total_input_weight = sum(fixture.input_state_weights)
+    correct_weight = 0
+    for state, inputs in enumerate(input_assignments):
+        weight = fixture.input_state_weights[state]
         target = expected_task(fixture, inputs)
         for coin in coin_assignments:
-            correct += eval_network(fixture, inputs, intervention, coin) == target
-    return correct / total
+            if eval_network(fixture, inputs, intervention, coin) == target:
+                correct_weight += weight
+    return correct_weight / (total_input_weight * len(coin_assignments))
 
 
 def evaluate_fixture(fixture: Fixture) -> tuple[list[InterventionScore], list[PartitionScore], dict[str, float | int]]:
@@ -404,22 +406,24 @@ def render_artifact(fixtures: Sequence[Fixture], manifest_bytes: bytes, source_s
     rows: list[list[str]] = []
     for fixture in fixtures:
         interventions, partitions, summary = evaluate_fixture(fixture)
+        prior = ",".join(map(str, fixture.input_state_weights))
+        target = canonical_target(fixture.target)
         for result in interventions:
             rows.append([
-                "intervention", result.fixture, result.identifier, result.kind,
+                "intervention", result.fixture, prior, target, result.identifier, result.kind,
                 str(result.source), str(result.target), str(result.cost),
                 f"{result.intact:.12g}", f"{result.utility:.12g}", f"{result.loss:.12g}",
                 "", "", "", "", "", "", "",
             ])
         for point in partitions:
             rows.append([
-                "partition", point.fixture, "", "", "", "", "",
+                "partition", point.fixture, prior, target, "", "", "", "", "",
                 "", "", "", str(point.mask), point.labels,
                 f"{point.cross_loss:.12g}", f"{point.control_loss:.12g}",
                 f"{point.tccip:.12g}", str(point.n_cross), str(point.n_control),
             ])
         rows.append([
-            "summary", fixture.name, "", "", "", "", "",
+            "summary", fixture.name, prior, target, "", "", "", "", "",
             f"{summary['intact']:.12g}", "", "", "", "",
             f"{summary['cross_loss']:.12g}", f"{summary['control_loss']:.12g}",
             f"{summary['tccip']:.12g}", str(summary['usable']), str(summary['skipped']),
@@ -430,9 +434,10 @@ def render_artifact(fixtures: Sequence[Fixture], manifest_bytes: bytes, source_s
     output.write(f"# manifest_sha256={hashlib.sha256(manifest_bytes).hexdigest()}\n")
     output.write("# oracle=independent Python standard-library implementation; this is not Rust execution output\n")
     writer = csv.writer(output, delimiter="\t", lineterminator="\n")
-    writer.writerow(["record_type", "fixture", "intervention_id", "kind", "source", "target", "cost",
-                     "intact_utility", "utility", "utility_loss", "partition_mask", "partition_labels",
-                     "cross_mean_loss", "control_mean_loss", "tccip", "n_cross", "n_control"])
+    writer.writerow(["record_type", "fixture", "input_state_weights", "task_target", "intervention_id",
+                     "kind", "source", "target", "cost", "intact_utility", "utility", "utility_loss",
+                     "partition_mask", "partition_labels", "cross_mean_loss", "control_mean_loss",
+                     "tccip", "n_cross", "n_control"])
     writer.writerows(rows)
     return output.getvalue()
 
