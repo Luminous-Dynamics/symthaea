@@ -9,7 +9,18 @@ use symthaea_core::hdc::pattern_interaction::{
 
 fn main() -> Result<(), Box<dyn Error>> {
     let started = Instant::now();
-    let config = PatternInteractionConfig::default();
+    let stress_mode = std::env::args().skip(1).any(|arg| arg == "--stress");
+    let config = if stress_mode {
+        PatternInteractionConfig {
+            dimension: 4_096,
+            prototype_count: 256,
+            trials: 8,
+            noise_fractions: vec![0.05, 0.10, 0.20, 0.30, 0.40, 0.50],
+            bundle_sizes: vec![1, 7, 31, 63, 127, 255],
+        }
+    } else {
+        PatternInteractionConfig::default()
+    };
     let report = run_pattern_interaction_suite(0x4c45_5649_4e, &config)?;
     let hrr_report = run_hrr_associative_capacity(
         0x4c45_5649_4e,
@@ -24,7 +35,16 @@ fn main() -> Result<(), Box<dyn Error>> {
     let estimated_hrr_candidate_payload_bytes =
         hrr_report.dimension * hrr_report.candidate_count * size_of::<f64>();
 
-    println!("experiment,seed,dimension,prototypes,baseline");
+    println!("experiment,mode,seed,dimension,prototypes,trials,random_baseline");
+    println!(
+        "pattern_interaction,{}, {},{},{},{},{},{}",
+        if stress_mode { "stress" } else { "smoke" },
+        report.seed,
+        report.dimension,
+        report.prototype_count,
+        config.trials,
+        report.random_chance_baseline
+    );
     println!(
         "pattern_interaction,{},{},{},{}",
         report.seed, report.dimension, report.prototype_count, report.random_chance_baseline
