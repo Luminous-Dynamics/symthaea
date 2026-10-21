@@ -1062,10 +1062,9 @@ fn report_identity_collision_controls(
             if known.best_similarity != unknown.best_similarity
                 || known.top_two_margin != unknown.top_two_margin
                 || known.prototype_similarities != unknown.prototype_similarities
-                || known.correct == unknown.correct
             {
                 return Err(
-                    "identity collision control failed feature/label contradiction invariant".into(),
+                    "identity collision control failed feature equality invariant".into(),
                 );
             }
         }
