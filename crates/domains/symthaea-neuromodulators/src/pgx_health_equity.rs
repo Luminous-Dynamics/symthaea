@@ -2476,5 +2476,4 @@ mod tests {
         );
         assert_eq!(projection.status, ResearchProjectionStatus::Indeterminate);
     }
-
 }
