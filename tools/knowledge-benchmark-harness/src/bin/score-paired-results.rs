@@ -578,6 +578,338 @@ fn validate_real_pair_state(
     Ok(())
 }
 
+fn source_family_clusters(pairs: &[PairCase]) -> Result<Vec<Vec<usize>>, String> {
+    if pairs.is_empty() {
+        return Err("cannot bootstrap an empty pair manifest".into());
+    }
+
+    let mut family_to_pairs: HashMap<&str, Vec<usize>> = HashMap::new();
+    for (index, pair) in pairs.iter().enumerate() {
+        if pair.source_family_ids.is_empty() {
+            return Err(format!("pair {:?} has no source_family_ids", pair.pair_id));
+        }
+        let unique: HashSet<&str> = pair.source_family_ids.iter().map(String::as_str).collect();
+        if unique.len() != pair.source_family_ids.len() {
+            return Err(format!("pair {:?} repeats source_family_ids", pair.pair_id));
+        }
+        for family_id in &pair.source_family_ids {
+            family_to_pairs.entry(family_id.as_str()).or_default().push(index);
+        }
+    }
+
+    // Any pair connecting two families joins those families into one dependency
+    // cluster. Bootstrap resampling these connected components avoids treating
+    // questions that share source families as independent observations.
+    let mut adjacency: Vec<HashSet<usize>> = vec![HashSet::new(); pairs.len()];
+    for indices in family_to_pairs.values() {
+        for &a in indices {
+            for &b in indices {
+                if a != b {
+                    adjacency[a].insert(b);
+                }
+            }
+        }
+    }
+
+    let mut visited = vec![false; pairs.len()];
+    let mut clusters = Vec::new();
+    for start in 0..pairs.len() {
+        if visited[start] {
+            continue;
+        }
+        let mut stack = vec![start];
+        let mut cluster = Vec::new();
+        visited[start] = true;
+        while let Some(index) = stack.pop() {
+            cluster.push(index);
+            for &neighbor in &adjacency[index] {
+                if !visited[neighbor] {
+                    visited[neighbor] = true;
+                    stack.push(neighbor);
+                }
+            }
+        }
+        cluster.sort_unstable();
+        clusters.push(cluster);
+    }
+    Ok(clusters)
+}
+
+struct SplitMix64 {
+    state: u64,
+}
+
+impl SplitMix64 {
+    fn new(seed: u64) -> Self {
+        Self { state: seed }
+    }
+
+    fn next_u64(&mut self) -> u64 {
+        self.state = self.state.wrapping_add(0x9E3779B97F4A7C15);
+        let mut z = self.state;
+        z = (z ^ (z >> 30)).wrapping_mul(0xBF58476D1CE4E5B9);
+        z = (z ^ (z >> 27)).wrapping_mul(0x94D049BB133111EB);
+        z ^ (z >> 31)
+    }
+
+    fn index(&mut self, upper_exclusive: usize) -> usize {
+        (((self.next_u64() as u128) * (upper_exclusive as u128)) >> 64) as usize
+    }
+}
+
+fn fidelity_for(pair: &PairCase, observation: &Observation) -> bool {
+    pair.expected_relation == observation.observed_relation
+        && observation.preservation_satisfied
+        && (pair.acceptance.must_change.is_empty() || observation.change_satisfied)
+        && observation.forbidden_behaviors.is_empty()
+        && observation.citation_identity_valid
+}
+
+fn metric_for_sample(
+    endpoint: &str,
+    sample_indices: &[usize],
+    pairs: &[PairCase],
+    observations_by_system: &HashMap<&str, HashMap<&str, &Observation>>,
+    system_id: &str,
+    fixed_relation_labels: &[String],
+    fixed_dimensions: &[String],
+) -> Result<f64, String> {
+    if sample_indices.is_empty() {
+        return Err("bootstrap replicate contains no pairs".into());
+    }
+    let system_rows = observations_by_system
+        .get(system_id)
+        .ok_or_else(|| format!("bootstrap has no observations for system {system_id:?}"))?;
+    let observation_for = |index: usize| -> Result<&Observation, String> {
+        let pair = pairs
+            .get(index)
+            .ok_or_else(|| format!("bootstrap pair index {index} is out of range"))?;
+        system_rows
+            .get(pair.pair_id.as_str())
+            .copied()
+            .ok_or_else(|| {
+                format!(
+                    "system {system_id:?} has no observation for pair {:?}",
+                    pair.pair_id
+                )
+            })
+    };
+
+    match endpoint {
+        "paired_intervention_fidelity" => {
+            let mut successes = 0usize;
+            for &index in sample_indices {
+                if fidelity_for(&pairs[index], observation_for(index)?) {
+                    successes += 1;
+                }
+            }
+            Ok(ratio(successes, sample_indices.len()))
+        }
+        "citation_identity_rate" => {
+            let mut successes = 0usize;
+            for &index in sample_indices {
+                successes += usize::from(observation_for(index)?.citation_identity_valid);
+            }
+            Ok(ratio(successes, sample_indices.len()))
+        }
+        "typed_relation_macro_f1" => {
+            if fixed_relation_labels.is_empty() {
+                return Ok(0.0);
+            }
+            let mut f1_sum = 0.0;
+            for label in fixed_relation_labels {
+                let mut true_positive = 0usize;
+                let mut false_positive = 0usize;
+                let mut false_negative = 0usize;
+                for &index in sample_indices {
+                    let expected = pairs[index].expected_relation.as_str();
+                    let observed = observation_for(index)?.observed_relation.as_str();
+                    if expected == label && observed == label {
+                        true_positive += 1;
+                    } else {
+                        if expected != label && observed == label {
+                            false_positive += 1;
+                        }
+                        if expected == label && observed != label {
+                            false_negative += 1;
+                        }
+                    }
+                }
+                let denominator = 2 * true_positive + false_positive + false_negative;
+                let f1 = if denominator == 0 {
+                    // A preregistered relation absent from a resample contributes
+                    // zero rather than disappearing from the metric denominator.
+                    0.0
+                } else {
+                    2.0 * true_positive as f64 / denominator as f64
+                };
+                f1_sum += f1;
+            }
+            Ok(f1_sum / fixed_relation_labels.len() as f64)
+        }
+        "worst_dimension_score" => {
+            if fixed_dimensions.is_empty() {
+                return Ok(0.0);
+            }
+            let mut totals: HashMap<&str, (usize, usize)> = fixed_dimensions
+                .iter()
+                .map(|dimension| (dimension.as_str(), (0usize, 0usize)))
+                .collect();
+            for &index in sample_indices {
+                let pair = &pairs[index];
+                let row = observation_for(index)?;
+                if let Some((count, success)) = totals.get_mut(pair.dimension.as_str()) {
+                    *count += 1;
+                    *success += usize::from(fidelity_for(pair, row));
+                }
+            }
+            // A dimension omitted by a cluster bootstrap replicate is assigned
+            // zero conservatively rather than silently dropped from worst-group
+            // evaluation.
+            Ok(totals
+                .values()
+                .map(|(count, success)| if *count == 0 { 0.0 } else { ratio(*success, *count) })
+                .fold(1.0_f64, f64::min))
+        }
+        _ => Err(format!("unsupported bootstrap endpoint {endpoint:?}")),
+    }
+}
+
+fn percentile(sorted_values: &[f64], probability: f64) -> f64 {
+    if sorted_values.len() == 1 {
+        return sorted_values[0];
+    }
+    let position = probability.clamp(0.0, 1.0) * (sorted_values.len() - 1) as f64;
+    let lower = position.floor() as usize;
+    let upper = position.ceil() as usize;
+    if lower == upper {
+        sorted_values[lower]
+    } else {
+        let fraction = position - lower as f64;
+        sorted_values[lower] + (sorted_values[upper] - sorted_values[lower]) * fraction
+    }
+}
+
+fn compute_pairwise_comparisons(
+    plan: &Plan,
+    pairs: &[PairCase],
+    observations: &[Observation],
+    clusters: &[Vec<usize>],
+) -> Result<Vec<PairwiseComparison>, String> {
+    if clusters.is_empty() {
+        return Err("cannot compare systems without source-family clusters".into());
+    }
+    let mut observations_by_system: HashMap<&str, HashMap<&str, &Observation>> = HashMap::new();
+    for observation in observations {
+        let rows = observations_by_system
+            .entry(observation.system_id.as_str())
+            .or_default();
+        if rows.insert(observation.pair_id.as_str(), observation).is_some() {
+            return Err(format!(
+                "duplicate observation for system {:?} pair {:?} during bootstrap setup",
+                observation.system_id, observation.pair_id
+            ));
+        }
+    }
+
+    let relation_labels: Vec<String> = pairs
+        .iter()
+        .map(|pair| pair.expected_relation.clone())
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect();
+    let dimensions: Vec<String> = pairs
+        .iter()
+        .map(|pair| pair.dimension.clone())
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect();
+
+    let all_indices: Vec<usize> = (0..pairs.len()).collect();
+    let candidate_id = plan.candidate_system_id.as_str();
+    let candidate_value = metric_for_sample(
+        &plan.primary_endpoint,
+        &all_indices,
+        pairs,
+        &observations_by_system,
+        candidate_id,
+        &relation_labels,
+        &dimensions,
+    )?;
+
+    // Generate a single set of cluster resamples and reuse it for each baseline,
+    // ensuring that each reported candidate-versus-baseline interval is paired.
+    let mut rng = SplitMix64::new(plan.bootstrap.seed);
+    let mut bootstrap_samples: Vec<Vec<usize>> = Vec::with_capacity(plan.bootstrap.replicates);
+    for _ in 0..plan.bootstrap.replicates {
+        let mut sample = Vec::new();
+        for _ in 0..clusters.len() {
+            let selected_cluster = rng.index(clusters.len());
+            sample.extend_from_slice(&clusters[selected_cluster]);
+        }
+        bootstrap_samples.push(sample);
+    }
+
+    let mut comparisons = Vec::new();
+    for system in &plan.systems {
+        if system.system_id == candidate_id {
+            continue;
+        }
+        let baseline_id = system.system_id.as_str();
+        let baseline_value = metric_for_sample(
+            &plan.primary_endpoint,
+            &all_indices,
+            pairs,
+            &observations_by_system,
+            baseline_id,
+            &relation_labels,
+            &dimensions,
+        )?;
+        let mut differences = Vec::with_capacity(bootstrap_samples.len());
+        for sample in &bootstrap_samples {
+            let candidate_bootstrap = metric_for_sample(
+                &plan.primary_endpoint,
+                sample,
+                pairs,
+                &observations_by_system,
+                candidate_id,
+                &relation_labels,
+                &dimensions,
+            )?;
+            let baseline_bootstrap = metric_for_sample(
+                &plan.primary_endpoint,
+                sample,
+                pairs,
+                &observations_by_system,
+                baseline_id,
+                &relation_labels,
+                &dimensions,
+            )?;
+            differences.push(candidate_bootstrap - baseline_bootstrap);
+        }
+        differences.sort_by(f64::total_cmp);
+        let alpha = 1.0 - plan.bootstrap.confidence_level;
+        let confidence_interval_low = percentile(&differences, alpha / 2.0);
+        let confidence_interval_high = percentile(&differences, 1.0 - alpha / 2.0);
+        comparisons.push(PairwiseComparison {
+            baseline_system_id: system.system_id.clone(),
+            candidate_system_id: plan.candidate_system_id.clone(),
+            primary_endpoint: plan.primary_endpoint.clone(),
+            baseline_value,
+            candidate_value,
+            absolute_difference: candidate_value - baseline_value,
+            confidence_interval_low,
+            confidence_interval_high,
+            confidence_level: plan.bootstrap.confidence_level,
+            source_family_cluster_count: clusters.len(),
+            bootstrap_replicates: plan.bootstrap.replicates,
+            bootstrap_seed: plan.bootstrap.seed,
+            candidate_improvement_supported: confidence_interval_low > 0.0,
+        });
+    }
+    Ok(comparisons)
+}
+
 fn compute_system_metrics(
     system: &System,
     pair_cases: &[PairCase],
