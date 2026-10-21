@@ -251,3 +251,24 @@ Passing proves only that bounded end-to-end capability. It does not prove univer
 The workflow includes an **explicitly synthetic I/O smoke fixture** so the path and digest contract can be exercised without pretending that this repository already has a real native KiCad design. Those files are placeholders, not a KiCad board, not a DRC report, and not actual Gerber output. The receipt proves only that the named fixture files were present and hashed. It does not promote a package to manufacturable, physically qualified, safe, or releasable.
 
 The next substantive product-facing step is to feed a frozen native KiCad project through pinned `kicad-cli` DRC and export commands, retain the real tool version/argv/exit status, hash the generated Gerber/drill/BOM/placement files, and parse the actual DRC report before any `ready_for_review` decision. KiCad 9 documents the command-line DRC and Gerber/drill exporters in its [official CLI reference](https://docs.kicad.org/9.0/en/cli/cli.html). That adapter must have clean and violated-design controls; an artifact digest alone is not DRC evidence.
+
+
+## Copper-trace routing: separate benchmark, stronger external baselines
+
+Do not confuse **manufacturing-process route selection** (local vs outsourced fabrication, assembly, inspection, test, and cost per accepted assembly) with **copper-trace routing** (the geometric task of connecting nets under board rules). Manufacturing economics remains with AtomFab / Symtropy PCB-CELL-001 and PCB-COST-001. The copper-routing benchmark/evaluator is the separate Symtropy program [PCB-ROUTE-BENCH-001 issue #2473](https://github.com/Luminous-Dynamics/symtropy/issues/2473) and [draft PR #2482](https://github.com/Luminous-Dynamics/symtropy/pull/2482).
+
+### Public baseline landscape checked 2026-10-21
+
+- [PCBWorld-Bench](https://github.com/LGAI-Research/PCBWorld), from the 2026 paper ([arXiv:2607.05915](https://arxiv.org/abs/2607.05915)), is the primary engine-grounded benchmark: 679 source boards, with the shipped D3 pool reduced to 677 under documented exclusions and D3-A covering 99 small real boards. The exact pinned KiCad engine, original board bytes and policy must match.
+- [FreeRouting's official benchmark page](https://github.com/freerouting/freerouting/blob/master/website/benchmarks.html) reports a 2026-09-30 v1.9.0 snapshot over 1,157 fixtures: 568/1,157 fully routed (49.1%) and 415/1,157 with zero DRC (35.9%). This is useful because it separates connectivity from DRC cleanliness, but its aggregate is from a different corpus and is not directly comparable to PCBWorld.
+- [FastRoute](https://fastroute.baltavista.com/) reports a 20-board parity-mode runtime of 2,102 s for its comparator versus 420 s for FastRoute and 20–300 MB versus 1–2 GB memory. Those are project-published, small-suite measurements; parity mode and quality-optimizing output are distinct experiment arms.
+- [ProtoFlow's public benchmark page](https://www.protoflow.ai/benchmarks) reports 98/99 D3-A boards KiCad-clean and 30/30 D3-B attempts clean (10 boards with three attempts each) for its commercial model/router stack. It is a current external point of comparison, but should be treated as vendor-reported until reproduced with matching versions and rules.
+- [PUNKFAB's four-router case study](https://punkfab.com/blog/route-evals/) on one 4-layer board reports trade-offs across open nets, shorts, clearances and board-manufacturing limits—and states none of its tested outputs was immediately orderable. That small case is not a general benchmark, but illustrates why route DRC and orderability need separate gates.
+
+### What “better than SOTA” should mean
+
+First reproduce a pinned rule-based baseline on D3-A (99 boards), then D3-B (10 boards × three attempts if matching its published protocol), and finally the hard D3-C stratum. Freeze board IDs and bytes, routing policy, KiCad build, hardware, timeout and output-verification method before tuning. Compare all attempts, keep timeouts in the denominator, and report zero-DRC completion separately from mere connectedness.
+
+The evaluator now has a multi-seed, board-clustered comparison path in Symtropy. This is important for D3-B: the board is the generalization unit, not each repeated attempt. Report per-board outcomes and confidence intervals resampling board IDs with their repeated attempts kept together. The current evidence is still synthetic for Symtropy PR #2482; no external route score or SOTA win has been measured.
+
+A DRC-clean route remains only a geometry-level gate. A later orderability gate needs the correct netlist, copper refill, holes/plating/annular rings, trace/via supplier minima, outline, mask/clearance, critical-net policy and target-supplier DFM; physical fabrication and functional checks remain separate.
