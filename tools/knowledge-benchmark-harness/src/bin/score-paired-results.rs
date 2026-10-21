@@ -49,7 +49,7 @@ struct Preregistration {
     held_out_access: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 struct PairCase {
     pair_id: String,
     dimension: String,
@@ -58,7 +58,7 @@ struct PairCase {
     acceptance: Acceptance,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 struct Acceptance {
     must_preserve: Vec<String>,
     must_change: Vec<String>,
@@ -315,7 +315,7 @@ fn compute_system_metrics(
     let mut forbidden_rows = 0usize;
     let mut critical_violations = 0usize;
     let mut full_fidelity = 0usize;
-    let mut per_dimension_counts: BTreeMap<String, Vec<(bool, bool, bool, bool, bool)>> = BTreeMap::new();
+    let mut per_dimension_counts: BTreeMap<String, Vec<(bool, bool, bool, bool, bool, bool)>> = BTreeMap::new();
 
     for (pair, observation) in pair_cases.iter().zip(observations.iter()) {
         let relation_ok = pair.expected_relation == observation.observed_relation;
@@ -342,7 +342,7 @@ fn compute_system_metrics(
         per_dimension_counts
             .entry(pair.dimension.clone())
             .or_default()
-            .push((relation_ok, preservation_ok, change_ok, citation_ok, fidelity_ok));
+            .push((relation_ok, preservation_ok, change_ok, citation_ok, forbidden_ok, fidelity_ok));
     }
 
     let mut per_dimension = BTreeMap::new();
@@ -352,7 +352,8 @@ fn compute_system_metrics(
         let preserve = items.iter().filter(|i| i.1).count();
         let change = items.iter().filter(|i| i.2).count();
         let citation = items.iter().filter(|i| i.3).count();
-        let fidelity = items.iter().filter(|i| i.4).count();
+        let forbidden_behavior_rows = items.iter().filter(|i| !i.4).count();
+        let fidelity = items.iter().filter(|i| i.5).count();
         let required_change_count = pair_cases
             .iter()
             .filter(|pair| pair.dimension == dimension && !pair.acceptance.must_change.is_empty())
@@ -376,7 +377,7 @@ fn compute_system_metrics(
                     Some(ratio(dimension_change_correct, required_change_count))
                 },
                 citation_identity_rate: ratio(citation, n),
-                forbidden_behavior_rows: n - items.iter().filter(|i| i.4 || i.3 == false || i.0 == false || i.1 == false || i.2 == false).count().min(n),
+                forbidden_behavior_rows,
                 paired_intervention_fidelity: ratio(fidelity, n),
             },
         );
@@ -538,10 +539,9 @@ fn score(
         let mut ordered_pairs: Vec<PairCase> = ordered_observations
             .iter()
             .map(|observation| {
-                pair_by_id
+                (**pair_by_id
                     .get(observation.pair_id.as_str())
-                    .expect("pair existence was checked")
-                    .to_owned()
+                    .expect("pair existence was checked"))
                     .clone()
             })
             .collect();
