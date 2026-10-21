@@ -11,7 +11,9 @@ Mythology deserves a first-class module in the shared knowledge fabric, but myth
 - [`narrative-graph.schema.json`](narrative-graph.schema.json): a source-grounded narrative-graph shape contract.
 - [`narrative-graph-fixtures.jsonl`](narrative-graph-fixtures.jsonl): four explicitly synthetic graph fixtures.
 - [`TRANSFER_PROTOCOL.md`](TRANSFER_PROTOCOL.md): cross-source splits, transfer metrics, metamorphic tests, baselines and nonclaims.
-- [Validator harness](../../../tools/knowledge-benchmark-harness/): offline Rust JSON Schema validation, source-reference checks, and digest-bound reports.
+- [`metamorphic-pair.schema.json`](metamorphic-pair.schema.json) and [`metamorphic-pairs.jsonl`](metamorphic-pairs.jsonl): ten synthetic baseline/intervention pairs, covering context/source changes, evidence removal, relation mutation, variant isolation, transfer, counterevidence, access revocation, aliases and prompt injection.
+- [`STRUCTURAL_TRANSFER_SCORE.md`](STRUCTURAL_TRANSFER_SCORE.md): proposed evidence-bounded structural-transfer scorecard, controls, SOTA comparison protocol and provisional targets.
+- [Validator harness](../../../tools/knowledge-benchmark-harness/): offline Rust JSON Schema validation, source-reference checks, paired intervention contracts, and digest-bound reports.
 
 Schema validation checks data structure only. A separate domain validator must verify graph endpoint/source references, relation-specific evidence, interval consistency, permissions, and variant isolation.
 
