@@ -845,15 +845,22 @@ fn report_risk_coverage_curve(
     // Coverage is non-decreasing by construction, but sort defensively so the
     // area calculation remains correct if the candidate generator changes.
     points.sort_by(|left, right| left.0.total_cmp(&right.0));
-    let aurc = points
+    let trapezoidal_aurc = points
         .windows(2)
         .map(|pair| {
             let width = pair[1].0 - pair[0].0;
             width * (pair[0].1 + pair[1].1) / 2.0
         })
         .sum::<f64>();
+    // Right-continuous step integral: each newly reached coverage interval is
+    // assigned the risk observed at its permissive (right-hand) endpoint. This
+    // avoids relying on a visually smooth linear interpolation between thresholds.
+    let step_aurc = points
+        .windows(2)
+        .map(|pair| (pair[1].0 - pair[0].0) * pair[1].1)
+        .sum::<f64>();
     println!(
-        "# risk_coverage_summary=seed:{seed},strategy:{strategy},aurc:{aurc:.6},curve_points:{}",
+        "# risk_coverage_summary=seed:{seed},strategy:{strategy},aurc_trapezoid:{trapezoidal_aurc:.6},aurc_step:{step_aurc:.6},curve_points:{}",
         points.len()
     );
 }
@@ -955,7 +962,13 @@ fn report_conformal_set_summaries(
         );
     }
 
-    emit(seed, split, "all", alpha, quantile, calibration_n, samples);
+    let known_only: Vec<_> = samples
+        .iter()
+        .copied()
+        .filter(|sample| matches!(sample.kind, QueryKind::Known { .. }))
+        .collect();
+    emit(seed, split, "known_all", alpha, quantile, calibration_n, &known_only);
+    emit(seed, split, "all_diagnostic", alpha, quantile, calibration_n, samples);
     for noise_index in 0..NOISE_LEVELS.len() {
         let kind = QueryKind::Known { noise_index };
         let subset: Vec<_> = samples
