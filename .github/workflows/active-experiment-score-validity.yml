@@ -32,8 +32,13 @@ jobs:
       - name: Format affected crate
         run: cargo fmt --manifest-path crates/core/symthaea-core/Cargo.toml -- --check
 
-      - name: Focused active-experiment tests
+      - name: Focused active-experiment score tests
         run: cargo test --locked -p symthaea-core --lib hdc::conjecture_engine::experiment_selection -- --nocapture
 
-      - name: Strict Clippy for affected library
-        run: cargo clippy --locked -p symthaea-core --lib -- -D warnings
+      - name: Active-discovery integration tests
+        run: cargo test --locked -p symthaea-physics-bridge --lib integrated_discovery -- --nocapture
+
+      - name: Strict Clippy for affected libraries
+        run: |
+          cargo clippy --locked -p symthaea-core --lib -- -D warnings
+          cargo clippy --locked -p symthaea-physics-bridge --lib -- -D warnings
