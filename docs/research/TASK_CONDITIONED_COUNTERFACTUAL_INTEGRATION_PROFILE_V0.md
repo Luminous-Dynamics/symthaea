@@ -209,6 +209,22 @@ These exact expectations were independently checked with a separate, small enume
 
 These are conformance fixtures, not evidence of empirical usefulness. The controls are deliberately simple matched edge-signal replacements; they do not yet solve all practical matching problems involving degree, delay, bandwidth, component role, or network centrality. The harmful-coupling fixture also begins with zero task accuracy, so it demonstrates the required sign behavior, not a competitive architecture. A real evaluation must report intact capability and matched-control quality alongside the profile and use held-out systems.
 
+### New result: partition choice can reverse the score
+
+The evaluator now enumerates every nontrivial bipartition of each small network, fixing node 0 to side A to avoid counting complementary partitions twice. For each partition, the same predeclared edge interventions are reclassified by their endpoint labels. Partitions with no cross-cut or no internal-control observations are explicitly counted as skipped rather than receiving fabricated scores.
+
+A separate exhaustive Python enumerator (used as a cross-check, **not a Rust test run**) gives:
+
+| Fixture | Nontrivial partitions | With both strata | Skipped | TCCIP range across usable partitions |
+|---|---:|---:|---:|---:|
+| XOR coordination | 127 | 112 | 15 | [-0.5, +0.5] |
+| Irrelevant branch | 15 | 8 | 7 | [0.0, 0.0] |
+| Harmful coupling | 511 | 448 | 63 | [-0.5, +0.5] |
+
+This is an important warning, not a result to hide: for the same fixed toy causal model and intervention outcome table, the contrast can reverse sign with the partition. The declared partitions recover the expected +0.5, 0.0 and -0.5 fixture scores, but these score ranges show that the contrast is **partition-relative**, not an intrinsic scalar property of the network. This is why the metric must expose the full partition profile and freeze partition selection before held-out evaluation. It also makes independent control selection and matched-stratum quality central requirements. The toy sweep still does not prove that TCCIP is useful or better than existing methods.
+
+Twelve Rust test definitions are now authored, including exact expected sign reversals and the invariant that the declared partition appears in the exhaustive sweep. The source remains uncompiled and unexecuted in this environment.
+
 ## Literature-aware scope and a stronger next paradigm
 
 The initial literature check confirms that the broad territory is populated: information-geometric integrated-information measures such as Φ_CIS/Φ_CII, causal emergence/effective information, and SURD already address related questions about causal integration, scale, and synergistic/unique/redundant contributions. SURD is designed to decompose future information contributions, including hidden-variable "causality leak"; see [Martínez-Sánchez et al. (2024)](https://www.nature.com/articles/s41467-024-53373-4). Information geometry already defines integrated information as a divergence from a constrained causally disconnected model; see [Oizumi et al. (2016)](https://pmc.ncbi.nlm.nih.gov/articles/PMC5187746/). Recent work on causal emergence also argues that a single maximizing scale omits the distribution of causal contribution across multiple scales; see [A reframed landscape of causal emergence (2025)](https://doi.org/10.1016/j.patter.2025.101476).
