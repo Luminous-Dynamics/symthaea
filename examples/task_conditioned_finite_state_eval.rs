@@ -821,4 +821,72 @@ mod tests {
         assert_eq!(min, -0.5);
         assert_eq!(max, 0.5);
     }
+    #[test]
+    fn declarative_oracle_manifest_matches_fixture_rules_and_metrics() {
+        const MANIFEST: &str =
+            include_str!("../validation/fixtures/tccip_toy_expectations.tsv");
+        let all_fixtures = fixtures();
+        let mut seen = HashSet::new();
+
+        for line in MANIFEST.lines().map(str::trim).filter(|line| {
+            !line.is_empty() && !line.starts_with('#')
+        }) {
+            let fields = line.split('\t').collect::<Vec<_>>();
+            assert_eq!(fields.len(), 17, "bad manifest row: {line}");
+            assert!(seen.insert(fields[0].to_string()), "duplicate fixture {}", fields[0]);
+            let fixture = all_fixtures.iter()
+                .find(|fixture| fixture.name == fields[0])
+                .expect("manifest fixture must exist in the evaluator");
+
+            assert_eq!(fixture.network.rules.len(), fields[1].parse::<usize>().unwrap());
+            assert_eq!(fixture.network.input_count, fields[2].parse::<usize>().unwrap());
+            assert_eq!(fixture.network.output_node, fields[3].parse::<usize>().unwrap());
+            assert_eq!(fixture.task_target.canonical(), fields[4]);
+            assert_eq!(fixture.network.canonical_rules(), fields[5]);
+            let component_labels = fixture.network.components.iter()
+                .map(|component| if *component == 0 { 'A' } else { 'B' })
+                .collect::<String>();
+            assert_eq!(component_labels, fields[6]);
+            let mask = fixture.network.components.iter().enumerate().fold(
+                0usize,
+                |acc, (index, component)| acc | ((*component as usize) << index),
+            );
+            assert_eq!(mask, fields[7].parse::<usize>().unwrap());
+
+            let (results, declared) = fixture.run().unwrap();
+            let point = &declared[0];
+            let close = |actual: f64, col: usize| {
+                let expected = fields[col].parse::<f64>().unwrap();
+                assert!(
+                    (actual - expected).abs() < 1e-12,
+                    "{} column {} expected {}, got {}",
+                    fixture.name,
+                    col,
+                    expected,
+                    actual
+                );
+            };
+            close(point.intact_utility, 8);
+            close(point.cross_cut_mean_loss, 9);
+            close(point.matched_control_mean_loss, 10);
+            close(point.tccip, 11);
+
+            let (sweep, total, skipped) =
+                all_partition_profiles(&fixture.name, fixture.network.rules.len(), &results);
+            assert_eq!(total, fields[12].parse::<usize>().unwrap());
+            assert_eq!(sweep.len(), fields[13].parse::<usize>().unwrap());
+            assert_eq!(skipped, fields[14].parse::<usize>().unwrap());
+            close(
+                sweep.iter().map(|point| point.tccip).fold(f64::INFINITY, f64::min),
+                15,
+            );
+            close(
+                sweep.iter().map(|point| point.tccip).fold(f64::NEG_INFINITY, f64::max),
+                16,
+            );
+        }
+
+        assert_eq!(seen.len(), all_fixtures.len(), "manifest must cover every fixture");
+    }
+
 }
