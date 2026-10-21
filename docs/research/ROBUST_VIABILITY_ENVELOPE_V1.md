@@ -12,12 +12,13 @@ Can the allostatic controller make more defensible safety decisions by represent
 
 ## Paradigm shift: from confidence score to uncertainty set
 
-A confidence scalar is not a bound on model error. The first prototype treats uncertainty as explicit intervals:
+A confidence scalar is not a bound on model error. The prototype treats uncertainty as explicit intervals and adds episode-level split-conformal calibration for the interval radii:
 
 - state envelope: reserve and allostatic-load intervals;
 - action-effect envelope: possible reserve and load deltas under each action;
 - viability limits: minimum reserve and maximum allowed load;
-- authority: whether the controller is permitted to invoke emergency recovery.
+- authority: whether the controller is permitted to invoke emergency recovery;
+- calibration: a frozen predictor is evaluated on independent calibration episodes, and each score is the maximum absolute residual over the full episode for reserve or load. Bonferroni-adjusted component coverage produces a joint state-envelope coverage target.
 
 For one-step interval propagation, a candidate action is robustly viable only when:
 
@@ -29,7 +30,9 @@ For one-step interval propagation, a candidate action is robustly viable only wh
 
 Here the lower next-reserve bound and upper next-load bound are computed over the declared interval set. State variables are clipped to their declared [0, 1] domain after interval addition, matching the synthetic simulator's saturation semantics.
 
-The uncertainty intervals must be justified by a model calibration or conservative physical argument in a real deployment. This prototype only validates the software contract for declared intervals; it does not estimate those intervals from data.
+The calibration executable contract is in `tools/allostatic-control-bench/src/calibration.rs`. For target joint coverage C across the two state channels, it uses per-channel coverage (1-(1-C)/2) and a finite split-conformal order statistic. If the requested rank exceeds the number of independent calibration episodes, it returns `None` rather than inventing a finite radius. That rule creates a useful minimum-sample-size gate—for example, a finite bound at 95% joint coverage requires at least 39 exchangeable calibration episodes with these two-channel Bonferroni radii.
+
+These intervals must be calibrated with independent episode-level data or justified by a conservative physical argument in a real deployment. The current unit tests use synthetic scores and validate only the software contract; they do not establish empirical coverage. The finite-sample calibration statement assumes exchangeable calibration/test episodes and a predictor frozen before calibration. Distribution shift, serial leakage across split groups, under-bounded model classes, or a changing online predictor voids that interpretation.
 
 ## Implementation
 
@@ -46,7 +49,7 @@ The interval bounds use a rectangular uncertainty set: reserve and load changes 
 
 ## Testable contracts
 
-The Rust unit tests cover:
+The combined unit tests cover:
 1. Rejection of invalid/nonfinite/inverted intervals and invalid state bounds.
 2. A point/midpoint-safe action rejected when its worst-case load effect exceeds the limit.
 3. State-estimation uncertainty that straddles a reserve floor.
@@ -54,6 +57,7 @@ The Rust unit tests cover:
 5. Emergency-action authorization kept separate from physical feasibility.
 6. No safe action is reported when every candidate violates at least one bound.
 7. A safe proposal is preserved and unsafe proposals use only a fallback that is itself robustly viable.
+8. Episode-level calibration uses the correct order statistic, rejects insufficient/nonfinite/mismatched samples, expands state bounds conservatively, and never shrinks an envelope when the residual radii increase.
 
 These tests are authored but do not count as passing until the exact-head Rust qualification workflow compiles and executes them.
 
