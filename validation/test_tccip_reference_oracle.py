@@ -126,6 +126,37 @@ class TccipReferenceOracleTests(unittest.TestCase):
         self.assertAlmostEqual(low_summary["control_loss"], 0.4, places=12)
         self.assertAlmostEqual(low_summary["tccip"], -0.3, places=12)
 
+    def test_pairwise_utility_interaction_detects_xor_complementarity(self) -> None:
+        fixture = self.by_name["role_matched_xor_synergy_uniform_prior"]
+        pairs = pairwise_utility_interactions(fixture)
+        pair = next(
+            row for row in pairs
+            if row["first_intervention_id"] == "cross_cut_xor_left"
+            and row["second_intervention_id"] == "matched_internal_xor_right"
+        )
+        self.assertEqual(pair["intact_utility"], 1.0)
+        self.assertEqual(pair["first_cut_utility"], 0.5)
+        self.assertEqual(pair["second_cut_utility"], 0.5)
+        self.assertEqual(pair["joint_cut_utility"], 0.5)
+        self.assertEqual(pair["utility_interaction_contrast"], 0.5)
+
+    def test_pairwise_utility_interaction_is_zero_for_irrelevant_branch(self) -> None:
+        fixture = self.by_name["irrelevant_cross_component_connectivity"]
+        pairs = pairwise_utility_interactions(fixture)
+        self.assertEqual(len(pairs), 1)
+        self.assertEqual(pairs[0]["utility_interaction_contrast"], 0.0)
+
+    def test_duplicate_edge_interventions_are_rejected(self) -> None:
+        fixture = self.by_name["role_matched_xor_synergy_uniform_prior"]
+        duplicate = replace(
+            fixture,
+            interventions=fixture.interventions + (
+                Intervention("duplicate-edge", source=2, target=4, cost=1),
+            ),
+        )
+        with self.assertRaisesRegex(ValueError, "duplicate intervention edge"):
+            validate_fixture(duplicate)
+
     def test_nonexistent_intervention_edge_is_rejected(self) -> None:
         fixture = self.by_name["useful_xor_coordination"]
         bad = replace(
