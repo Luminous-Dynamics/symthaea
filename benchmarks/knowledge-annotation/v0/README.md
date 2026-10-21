@@ -28,6 +28,8 @@ This contract represents evaluator judgments at the **claim and interpretation l
 
 ## Synthetic qualification fixtures
 
+The schema and these controls are also run through the focused Rust harness as `--kind annotation`. Contract checks reject positive source-grounded labels without evidence references, duplicate claim/alternative IDs, rights violations below release-blocker severity, invalid independent-review trails, and content leakage in rights-prohibited abstentions.
+
 `synthetic-fixtures.jsonl` contains five controls covering multi-answer interpretation, two intentionally disagreeing independent labels, appropriate abstention when the evidence pack is insufficient, and rights-based abstention. The source IDs used by those fixtures are synthetic placeholders, not catalog entries.
 
 The schema validates record shape; the Rust harness adds identity and per-record integrity checks. This does not assess scholarly truth or reviewer competence. Real annotations should be added only through a documented expert workflow with rights-reviewed evidence.
