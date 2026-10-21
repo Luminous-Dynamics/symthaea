@@ -50,7 +50,17 @@ Do not demand conservation from dissipative, driven, stochastic, or chaotic syst
 
 The recorded simulation time must advance by the **accepted** adaptive step, not the requested maximum step. Retain accepted-step count, rejected-step count if available, derivative/function evaluation count, achieved error estimate, min/median/max step sizes, and any tolerance shortfall. An adaptive run that reaches its minimum step while violating tolerance must not be silently described as meeting tolerance.
 
-**Fail-closed rule:** if RK45 reaches `dt_min` while its embedded error estimate still exceeds `tol`, the checked simulation returns `SimulationError::AdaptiveToleranceNotMet`. The checked path must never turn this into a successful-looking trajectory. The legacy tuple-returning RK45 API remains a panic-on-failure compatibility wrapper; new checked callers should use `try_simulate` / `try_adaptive_step`. A minimum-step failure is a model/solver resolution limit to report, not permission to relax tolerance after observing the result.
+**Fail-closed rule:** if RK45 reaches `dt_min` while its embedded error estimate still exceeds `tol`, the checked simulation returns `SimulationError::AdaptiveToleranceNotMet`. The checked path must never turn this into a successful-looking trajectory. The legacy tuple-returning RK45 API remains a panic-on-failure compatibility wrapper; new checked callers should use `try_simulate` / `try_adaptive_step`, or `try_simulate_with_tolerances` / `try_adaptive_step_with_tolerances` for scale-aware control. A minimum-step failure is a model/solver resolution limit to report, not permission to relax tolerance after observing the result.
+
+**Scale-aware extension:** the new `try_simulate_with_tolerances` path uses a component-specific error scale `atol[i] + rtol * max(abs(y_old[i]), abs(y_new[i]))` and a weighted-RMS norm. Each accepted step reports the normalized error, maximum absolute embedded difference, proposed next step, attempt/rejection counts, and derivative-evaluation count. A caller-owned `Rk45Controller` preserves the proposal across steps; the integrator itself remains immutable. The legacy scalar-tolerance APIs retain their existing tuple shape and weighted-infinity acceptance rule for compatibility.
+
+Acceptance controls for the scale-aware path:
+- A uniform rescaling of a linear problem and its component absolute tolerances should preserve the accepted/rejected step sequence (within floating-point tolerance).
+- The normalized error of every accepted step must be `<= 1`; invalid tolerance lengths, non-finite values, non-positive absolute tolerances and negative relative tolerances are rejected.
+- The aggregate derivative-evaluation count must equal six times the total accepted-plus-rejected Cash–Karp attempts.
+- The persistent controller's second step must use the previous step's recorded proposal, rather than restart from the original initial timestep.
+- Report the controller's work and error diagnostics separately from the physical-model validity claim.
+
 
 ### E — Work–precision comparison
 
