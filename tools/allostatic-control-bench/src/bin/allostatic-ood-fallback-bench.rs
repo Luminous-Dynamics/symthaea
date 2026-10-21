@@ -24,8 +24,8 @@ const TARGET_FALSE_ALARM_RATE: f64 = 0.05;
 const CALIBRATION_EPISODES: u64 = 159;
 const EVALUATION_EPISODES: u64 = 300;
 const FALLBACK_HORIZON: usize = 3;
-const RAW_HEADER: &str = "operating_point,condition,episode_seed,ood_score,score_threshold,drift_detected,control_mode,proposed_action,predictive_viable_count,fallback_viable_count,predictive_action,fallback_action,selected_action,active_filter_certified,no_certified_action,predictive_proposal_preserved,fallback_proposal_preserved,actual_one_step_viable_count,actual_horizon_viable_count,selected_true_one_step_safe,selected_true_horizon_viable,false_one_step_safety_certificate";
-const SUMMARY_HEADER: &str = "operating_point,condition,episodes,alarms,false_alarms,missed_detections,false_alarm_rate,miss_rate,fallback_activations,fallback_no_action,predictive_proposal_preserved,fallback_proposal_preserved,mean_predictive_viable_actions,mean_fallback_viable_actions,mean_actual_one_step_viable_actions,mean_actual_horizon_viable_actions,selected_actions,selected_true_one_step_safe,selected_true_horizon_viable,false_one_step_safety_certificates,false_one_step_certificate_rate";
+const RAW_HEADER: &str = "operating_point,condition,episode_seed,ood_score,score_threshold,drift_detected,control_mode,proposed_action,predictive_viable_count,fallback_viable_count,predictive_action,fallback_action,selected_action,active_filter_certified,no_certified_action,predictive_proposal_preserved,fallback_proposal_preserved,actual_one_step_viable_count,actual_horizon_viable_count,selected_true_one_step_safe,selected_true_horizon_viable,false_one_step_safety_certificate,actual_inside_predictive_envelope,actual_inside_fallback_envelope";
+const SUMMARY_HEADER: &str = "operating_point,condition,episodes,alarms,false_alarms,missed_detections,false_alarm_rate,miss_rate,fallback_activations,fallback_no_action,predictive_proposal_preserved,fallback_proposal_preserved,mean_predictive_viable_actions,mean_fallback_viable_actions,mean_actual_one_step_viable_actions,mean_actual_horizon_viable_actions,selected_actions,selected_true_one_step_safe,selected_true_horizon_viable,false_one_step_safety_certificates,false_one_step_certificate_rate,actual_inside_predictive_envelope,actual_inside_fallback_envelope";
 
 #[derive(Clone, Copy, Debug)]
 struct OperatingPoint {
@@ -101,6 +101,8 @@ struct Counters {
     selected_true_one_step_safe: usize,
     selected_true_horizon_viable: usize,
     false_one_step_safety_certificates: usize,
+    actual_inside_predictive_envelope: usize,
+    actual_inside_fallback_envelope: usize,
 }
 
 impl Counters {
@@ -117,6 +119,8 @@ impl Counters {
         fallback_preserves_proposal: bool,
         selected_true_one_step_safe: bool,
         selected_true_horizon_viable: bool,
+        actual_inside_predictive_envelope: bool,
+        actual_inside_fallback_envelope: bool,
     ) {
         self.episodes += 1;
         self.alarms += usize::from(detected);
@@ -138,6 +142,8 @@ impl Counters {
         self.false_one_step_safety_certificates += usize::from(
             selected_action.is_some() && !selected_true_one_step_safe,
         );
+        self.actual_inside_predictive_envelope += usize::from(actual_inside_predictive_envelope);
+        self.actual_inside_fallback_envelope += usize::from(actual_inside_fallback_envelope);
     }
 }
 
@@ -257,6 +263,19 @@ fn actual_dynamics_for(
     ))
 }
 
+fn dynamics_contained(actual: DynamicsBounds, envelope: DynamicsBounds) -> bool {
+    [Action::Push, Action::Maintain, Action::EmergencyRecover]
+        .into_iter()
+        .all(|action| {
+            let observed = actual.effect_for_action(action);
+            let allowed = envelope.effect_for_action(action);
+            observed.reserve_delta().lower() >= allowed.reserve_delta().lower()
+                && observed.reserve_delta().upper() <= allowed.reserve_delta().upper()
+                && observed.load_delta().lower() >= allowed.load_delta().lower()
+                && observed.load_delta().upper() <= allowed.load_delta().upper()
+        })
+}
+
 fn state_for(point: OperatingPoint) -> Result<StateEnvelope, Box<dyn Error>> {
     StateEnvelope::new(
         interval(point.reserve, point.reserve)?,
@@ -345,6 +364,8 @@ fn summary_row(
             counters.false_one_step_safety_certificates,
             counters.selected_actions
         ),
+        counters.actual_inside_predictive_envelope.to_string(),
+        counters.actual_inside_fallback_envelope.to_string(),
     ];
     csv_row(output, fields);
 }
@@ -380,6 +401,22 @@ fn main() -> Result<(), Box<dyn Error>> {
                 let seed = 20_000 + episode;
                 let predictive_dynamics = predictive_dynamics_for(seed)?;
                 let actual_dynamics = actual_dynamics_for(seed, condition)?;
+                let actual_inside_predictive =
+                    dynamics_contained(actual_dynamics, predictive_dynamics);
+                let actual_inside_fallback = dynamics_contained(actual_dynamics, fallback_dynamics);
+                if (condition.name == "nominal" && !actual_inside_predictive)
+                    || (condition.name != "nominal" && actual_inside_predictive)
+                    || !actual_inside_fallback
+                {
+                    return Err(IoError::new(
+                        ErrorKind::InvalidData,
+                        format!(
+                            "synthetic model-containment label mismatch: condition={}",
+                            condition.name
+                        ),
+                    )
+                    .into());
+                }
                 let predictive = evaluate_action_set(
                     state,
                     predictive_dynamics,
@@ -464,6 +501,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                     fallback.contains(proposed),
                     selected_true_one_step_safe,
                     selected_true_horizon_viable,
+                    actual_inside_predictive,
+                    actual_inside_fallback,
                 );
 
                 let fields = vec![
@@ -489,6 +528,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                     csv_bool(selected_true_one_step_safe).to_string(),
                     csv_bool(selected_true_horizon_viable).to_string(),
                     csv_bool(false_safety_certificate).to_string(),
+                    csv_bool(actual_inside_predictive).to_string(),
+                    csv_bool(actual_inside_fallback).to_string(),
                 ];
                 csv_row(&mut raw, fields);
                 row_count += 1;
