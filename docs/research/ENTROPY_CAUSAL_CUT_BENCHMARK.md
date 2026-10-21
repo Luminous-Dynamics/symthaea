@@ -57,7 +57,7 @@ Other fixtures exercise common-driver dependence, feed-forward chains, XOR and A
 
 ### Phase A — qualify the kernel
 
-- Execute all fourteen Rust tests on the exact branch head.
+- Execute all fifteen Rust tests on the exact branch head.
 - Add property-based checks for stochastic-row normalization, nonnegativity, entropy bounds, deterministic/noise extremes, and permutation invariance.
 - Independently implement the tiny transition-model calculations or use a separately written analytical enumerator; cross-check every TPM row and metric, not just summary statistics.
 - Freeze emitted rows as a versioned deterministic CSV/JSON artifact with schema, input-model digest, source SHA, and run receipt. Do not hand-edit measurements into documentation.
