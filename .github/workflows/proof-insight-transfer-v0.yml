@@ -961,7 +961,6 @@ jobs:
           "$RUNNER_TEMP/jsonschema-venv/bin/python" - <<'PY'
           import copy
           import json
-          import re
           from pathlib import Path
           from jsonschema import Draft202012Validator, FormatChecker, ValidationError
 
@@ -983,6 +982,7 @@ jobs:
               terminal_indices = [i for i, event in enumerate(events) if event["kind"] == "attempt_terminated"]
               if terminal_indices != [len(events) - 1]:
                   raise ValueError("exactly one terminal event must be last")
+
               budget = trace["run"]["budget"]
               previous = {"elapsed_ms": -1, "cumulative_model_calls": -1,
                           "cumulative_tokens": -1, "cumulative_cost_microusd": -1}
@@ -990,8 +990,13 @@ jobs:
                         "cumulative_model_calls": budget["max_model_calls"],
                         "cumulative_tokens": budget["max_tokens"],
                         "cumulative_cost_microusd": budget["max_cost_microusd"]}
+              root_id = trace["target"]["root_obligation_id"]
+              known = {root_id: trace["target"]["root_obligation_sha256"]}
+              expanded = {}
+              latest_transition = {root_id: "open"}
               closed = set()
               verified_closures = 0
+
               for event in events:
                   for field, limit in limits.items():
                       value = event[field]
@@ -1000,23 +1005,50 @@ jobs:
                       if value > limit:
                           raise ValueError(f"{field} exceeds frozen run budget")
                       previous[field] = value
+
                   for transition in event["obligation_transitions"]:
-                      obligation = transition["obligation_sha256"]
+                      obligation_id = transition["obligation_id"]
+                      obligation_sha = transition["obligation_sha256"]
                       kind = transition["transition"]
                       receipt = transition["checker_receipt_sha256"]
-                      children = transition["child_obligation_sha256s"]
-                      if kind == "split":
-                          if receipt is not None or len(children) < 2:
-                              raise ValueError("splitting obligations is not a verified closure")
+                      children = transition["children"]
+                      if obligation_id not in known or known[obligation_id] != obligation_sha:
+                          raise ValueError("transition references an unknown obligation instance or digest")
+                      child_ids = [child["obligation_id"] for child in children]
+                      if len(set(child_ids)) != len(child_ids):
+                          raise ValueError("child obligation IDs must be unique within a transition")
+                      if kind in ("split", "refined"):
+                          if receipt is not None:
+                              raise ValueError("goal decomposition/refinement is not itself a verified closure")
+                          if obligation_id in expanded:
+                              raise ValueError("obligation lineage cannot be expanded twice")
+                          if kind == "split" and len(children) < 2:
+                              raise ValueError("split must identify at least two child obligations")
+                          if kind == "refined" and len(children) > 1:
+                              raise ValueError("refined transition can introduce at most one replacement obligation")
+                          for child in children:
+                              child_id = child["obligation_id"]
+                              if child_id in known:
+                                  raise ValueError("child obligation instance IDs must be globally unique in a trace")
+                              known[child_id] = child["obligation_sha256"]
+                              latest_transition[child_id] = "open"
+                          if children:
+                              expanded[obligation_id] = child_ids
+                          latest_transition[obligation_id] = kind
                       elif kind == "discharged":
                           if not receipt or children:
                               raise ValueError("discharge requires checker receipt and no child obligations")
-                          if obligation in closed:
+                          if obligation_id in closed:
                               raise ValueError("an obligation cannot be counted as newly discharged twice")
-                          closed.add(obligation)
+                          if obligation_id in expanded:
+                              raise ValueError("an expanded parent cannot be counted as a discharged leaf")
+                          closed.add(obligation_id)
+                          latest_transition[obligation_id] = "discharged"
                           verified_closures += 1
-                      elif receipt is not None:
-                          raise ValueError("non-discharge transition cannot claim discharge receipt")
+                      else:
+                          if receipt is not None or children:
+                              raise ValueError("non-discharge/non-expansion transition cannot claim receipts or children")
+                          latest_transition[obligation_id] = kind
 
               outcome = trace["outcome"]
               final = events[-1]
@@ -1034,6 +1066,9 @@ jobs:
                       or outcome["semantic_gate_status"] != "passed"
                       or outcome["successor_status"] not in ("passed", "not_applicable")):
                       raise ValueError("verified success requires kernel, semantic gate, and applicable successor checks")
+                  leaves = [obligation_id for obligation_id in known if obligation_id not in expanded]
+                  if not leaves or any(latest_transition.get(obligation_id) != "discharged" for obligation_id in leaves):
+                      raise ValueError("verified success requires every terminal obligation leaf to be receipt-backed discharged")
                   for kind in ("target_kernel_checked", "semantic_gate_checked"):
                       matches = [e for e in events if e["kind"] == kind and e["checker_receipt_sha256"]]
                       if len(matches) != 1:
@@ -1046,7 +1081,7 @@ jobs:
 
           validator.validate(fixture)
           if validate_trace(fixture) != 2:
-              raise SystemExit("synthetic fixture must count its two receipt-backed discharges, not its split")
+              raise SystemExit("synthetic fixture must count its two receipt-backed discharged leaves, not its split")
           mutants = []
 
           gap = copy.deepcopy(fixture)
@@ -1094,6 +1129,10 @@ jobs:
           )
           mutants.append(terminal_not_last)
 
+          orphan_obligation = copy.deepcopy(fixture)
+          orphan_obligation["events"][3]["obligation_transitions"][0]["obligation_id"] = "orphan"
+          mutants.append(orphan_obligation)
+
           for index, mutant in enumerate(mutants, start=1):
               try:
                   validate_trace(mutant)
@@ -1101,7 +1140,7 @@ jobs:
                   continue
               raise SystemExit(f"proof-progress trace negative control {index} unexpectedly passed")
 
-          print("PITB_PROOF_PROGRESS_TRACE_PASS: schema valid; monotonic budgeted trace; terminal evidence gate; 2 receipt-backed closures; 10 negative controls rejected")
+          print("PITB_PROOF_PROGRESS_TRACE_PASS: schema valid; obligation lineage; monotonic budgeted trace; terminal evidence gate; 2 receipt-backed closures; 11 negative controls rejected")
           PY
       - name: Audit pinned Dalek Lean Bench timeline
         shell: bash
