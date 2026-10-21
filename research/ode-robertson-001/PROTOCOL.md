@@ -92,6 +92,14 @@ Start with a protective cap of two million accepted-plus-rejected step attempts.
 
 The initial thresholds qualify only this fixture and tolerance grid; they are not a claim of general correctness or physical validation.
 
+## First implementation increment: bounded explicit diagnostic
+
+The bounded first probe lives at `research/ode-verify-001/examples/robertson_explicit_probe.rs`. It invokes Symthaea's current Cash–Karp controller over the frozen 17-point output grid, with a 100,000-reported-attempt budget. It preserves named outcomes, accepted-endpoint invariant/positivity diagnostics, work counters, source/checkout SHAs, and deterministic output samples; CI runs the receipt twice and compares the bytes.
+
+This is a **stress diagnostic**, not a qualified solver benchmark. It does not use the exploratory SciPy samples as an oracle, does not silently clip negative concentrations, and explicitly labels every receipt `UNQUALIFIED_DIAGNOSTIC_ONLY`. Its 100,000-attempt cap is a quick diagnostic budget, not the 2,000,000-attempt budget proposed for the full qualification matrix.
+
+One API limitation is now made visible: `Rk45Controller::try_step` returns attempted/rejected-step counters for successful steps, but a failed call returns only `SimulationError` without the partial work counters or last attempted timestep. The probe therefore marks the failed-step work counters incomplete if an error occurs. A final work–precision benchmark must not infer total work from that partial count. A follow-up solver API should return a failure receipt containing last accepted state/time, attempted/rejected internal steps, RHS evaluations, minimum step reached, and the typed failure reason.
+
 ## Work–precision and runtime protocol
 
 1. Run correctness gates before timing.
@@ -125,7 +133,7 @@ The first milestone is **not** “beat CVODE.” It is to produce a deterministi
 
 Only after that should the project consider an implicit BDF/Rosenbrock path, stiffness detection, or an automatic explicit-to-implicit switch. Any such method-selection claim should be evaluated against the same locked problem corpus with the decision logic included in the receipt.
 
-**No run, benchmark result, SOTA ranking, real-world chemical validation, or safety claim is asserted by this protocol document.**
+**No qualified reference run, solver-comparison result, SOTA ranking, real-world chemical validation, or safety claim is asserted by this protocol document.**
 
 ## References
 
