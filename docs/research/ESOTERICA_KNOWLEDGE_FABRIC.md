@@ -203,3 +203,15 @@ For every result bind the dataset version/hash, source-pack manifest, code revis
 ## Nonclaims
 
 This proposal does not assert that any tradition's metaphysical claims are true or false by category. It does not establish consciousness, general intelligence, historical accuracy, community endorsement, legal permissions, or state-of-the-art superiority. Those are separate questions requiring evidence appropriate to each claim.
+
+
+## Benchmark landscape update (October 2026)
+
+The Egypt-first mythology work should use neighboring research as complementary foundations instead of claiming that mythological reasoning has no prior benchmark coverage:
+
+- **CulturalBench (ACL 2025)**: 1,696 human-written and human-verified questions across 45 global regions, each checked by five independent annotators. It reports a human score of 92.4% and frontier model scores of 28.7–61.5% on its hard version, highlighting failures on questions with multiple plausible answers. This motivates expert-reviewed, plural-answer and underrepresented-region evaluation. [Paper](https://aclanthology.org/2025.acl-long.1247/)
+- **Nunchi-Bench (Findings ACL 2025)**: 247 Korean-superstition questions covering 31 topics, with Korean/English evaluation; it emphasizes contextual application beyond factual recall. [Paper](https://aclanthology.org/2025.findings-acl.794/)
+- **EventRelBench (Findings EMNLP 2025)**: 35K event-relation questions over coreference, temporal, causal and supersub relations. It motivates explicit relation types and tests against narrative extraction/reasoning failures. [Paper](https://aclanthology.org/2025.findings-emnlp.482/)
+- **ChronoSense (ACL 2025)** and **ETRQA (Findings ACL 2025)** evaluate temporal intervals, time arithmetic and compound event-temporal reasoning. MythologyBench should test whether these relations remain attached to the correct source witness and historical context, not just whether a model recalls a date. [ChronoSense](https://aclanthology.org/2025.acl-short.46/) · [ETRQA](https://aclanthology.org/2025.findings-acl.1198/)
+
+The intended contribution is a **source-grounded, versioned narrative-reasoning evaluation**, not another broad culture quiz. Its distinctive tests are held-out witness/work/tradition generalization, context swaps, source swaps, event relation typing, preservation of narrative variants, relation mutation, rights revocation and calibrated abstention. The new protocol is at [`benchmarks/mythology-bench/v0/TRANSFER_PROTOCOL.md`](../../benchmarks/mythology-bench/v0/TRANSFER_PROTOCOL.md). All associated cases remain development fixtures; these benchmark papers are rationale for methodology, not evidence that this prototype outperforms them.
