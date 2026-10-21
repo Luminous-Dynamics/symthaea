@@ -113,6 +113,7 @@ path = "examples/cross_domain_query.rs"
 [[example]]
 name = "platonic_pattern_interaction"
 path = "examples/platonic_pattern_interaction.rs"
+test = true
 
 [[example]]
 name = "platonic_selective_retrieval"
