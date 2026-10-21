@@ -7,6 +7,20 @@ use symthaea_core::hdc::pattern_interaction::{
     run_pattern_interaction_suite, PatternInteractionConfig,
 };
 
+fn k95(
+    observations: impl IntoIterator<Item = (usize, f64)>,
+) -> Option<usize> {
+    observations
+        .into_iter()
+        .filter(|(_, lower_recall_bound)| *lower_recall_bound >= 0.95)
+        .map(|(capacity, _)| capacity)
+        .max()
+}
+
+fn format_k95(value: Option<usize>) -> String {
+    value.map_or_else(|| "NA".to_owned(), |capacity| capacity.to_string())
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
     let started = Instant::now();
     let stress_mode = std::env::args().skip(1).any(|arg| arg == "--stress");
@@ -46,6 +60,34 @@ fn main() -> Result<(), Box<dyn Error>> {
         matched_bytes_hrr_report.dimension
             * matched_bytes_hrr_report.candidate_count
             * size_of::<f64>();
+    let map_raw_k95 = k95(
+        report
+            .associative_capacity_results
+            .iter()
+            .map(|result| (result.association_count, result.recall_at_1_ci95.0)),
+    );
+    let map_cleanup_k95 = k95(
+        report
+            .associative_capacity_results
+            .iter()
+            .map(|result| (result.association_count, result.cleanup_recall_at_1_ci95.0)),
+    );
+    let hrr_same_dimension_k95 = k95(
+        config
+            .bundle_sizes
+            .iter()
+            .copied()
+            .zip(&hrr_report.results)
+            .map(|(capacity, result)| (capacity, result.raw_recall_ci95.0)),
+    );
+    let hrr_matched_bytes_k95 = k95(
+        config
+            .bundle_sizes
+            .iter()
+            .copied()
+            .zip(&matched_bytes_hrr_report.results)
+            .map(|(capacity, result)| (capacity, result.raw_recall_ci95.0)),
+    );
 
     println!("experiment,mode,seed,dimension,prototypes,trials,random_baseline");
     println!(
@@ -77,6 +119,41 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("estimated_matched_bytes_hrr_payload_bytes,{estimated_matched_bytes_hrr_payload_bytes}");
     println!("storage_estimate_excludes,Vec metadata and transient working allocations");
     println!("capacity_comparisons,same_dimension_and_matched_payload_bytes");
+    println!("k95_criterion,lower_95_percent_recall_bound_at_least_0.95");
+    println!("k95_tested_grid_only,true");
+    println!("k95_metric,mode,dimension,prototypes,trials,estimated_candidate_payload_bytes,max_tested_k95");
+    println!(
+        "max_tested_k95,map_raw,{},{},{},{},{}",
+        report.dimension,
+        report.prototype_count,
+        config.trials,
+        estimated_prototype_payload_bytes,
+        format_k95(map_raw_k95)
+    );
+    println!(
+        "max_tested_k95,map_cleanup,{},{},{},{},{}",
+        report.dimension,
+        report.prototype_count,
+        config.trials,
+        estimated_prototype_payload_bytes,
+        format_k95(map_cleanup_k95)
+    );
+    println!(
+        "max_tested_k95,hrr_same_dimension,{},{},{},{},{}",
+        hrr_report.dimension,
+        hrr_report.candidate_count,
+        config.trials,
+        estimated_hrr_candidate_payload_bytes,
+        format_k95(hrr_same_dimension_k95)
+    );
+    println!(
+        "max_tested_k95,hrr_matched_bytes,{},{},{},{},{}",
+        matched_bytes_hrr_report.dimension,
+        matched_bytes_hrr_report.candidate_count,
+        config.trials,
+        estimated_matched_bytes_hrr_payload_bytes,
+        format_k95(hrr_matched_bytes_k95)
+    );
 
     println!();
     println!(
@@ -145,4 +222,22 @@ fn main() -> Result<(), Box<dyn Error>> {
         );
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::k95;
+
+    #[test]
+    fn k95_reports_largest_tested_capacity_meeting_lower_bound() {
+        assert_eq!(
+            k95([(1, 1.0), (7, 0.98), (31, 0.95), (63, 0.949)]),
+            Some(31)
+        );
+    }
+
+    #[test]
+    fn k95_is_na_when_no_tested_capacity_meets_the_recall_bound() {
+        assert_eq!(k95([(1, 0.90), (7, 0.949)]), None);
+    }
 }
