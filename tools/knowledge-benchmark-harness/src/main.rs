@@ -1132,25 +1132,42 @@ fn validate_pair_catalog_refs(pair: &Value) -> Vec<String> {
             continue;
         };
         let state_source_id = string_field(state, "source_id").unwrap_or("");
+        let access_decision = string_field(state, "access_decision").unwrap_or("");
+        if !matches!(
+            access_decision,
+            "allow" | "deny" | "require_permission" | "metadata_only"
+        ) {
+            errors.push(format!(
+                "pair {pair_id:?} {state_name} has unsupported access_decision {access_decision:?}"
+            ));
+        }
+        let evidence_items = state
+            .get("evidence_pack")
+            .and_then(Value::as_array)
+            .cloned()
+            .unwrap_or_default();
+        if access_decision != "allow" && !evidence_items.is_empty() {
+            errors.push(format!(
+                "pair {pair_id:?} {state_name} has a non-allow access_decision but exposes an evidence pack"
+            ));
+        }
         let mut referenced_ids = HashSet::new();
         if !state_source_id.is_empty() {
             referenced_ids.insert(state_source_id.to_string());
         }
-        if let Some(items) = state.get("evidence_pack").and_then(Value::as_array) {
-            for item in items {
-                if let Some(source_id) = string_field(item, "source_id") {
-                    referenced_ids.insert(source_id.to_string());
-                } else {
-                    errors.push(format!(
-                        "pair {pair_id:?} {state_name} evidence item has no source_id"
-                    ));
-                }
-                let kind = string_field(item, "kind").unwrap_or("");
-                if matches!(kind, "synthetic_control" | "metadata_only") {
-                    errors.push(format!(
-                        "pair {pair_id:?} {state_name} uses inadmissible real-evidence kind {kind:?}"
-                    ));
-                }
+        for item in &evidence_items {
+            if let Some(source_id) = string_field(item, "source_id") {
+                referenced_ids.insert(source_id.to_string());
+            } else {
+                errors.push(format!(
+                    "pair {pair_id:?} {state_name} evidence item has no source_id"
+                ));
+            }
+            let kind = string_field(item, "kind").unwrap_or("");
+            if matches!(kind, "synthetic_control" | "metadata_only") {
+                errors.push(format!(
+                    "pair {pair_id:?} {state_name} uses inadmissible real-evidence kind {kind:?}"
+                ));
             }
         }
 
