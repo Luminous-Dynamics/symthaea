@@ -92,7 +92,8 @@ fn hex_sha256(bytes: &[u8]) -> String {
     let digest = Sha256::digest(bytes);
     let mut output = String::with_capacity(64);
     for byte in digest {
-        write!(&mut output, "{byte:02x}").expect("writing to a String cannot fail");
+        write!(&mut output, "{byte:02x}")
+            .expect("writing to a String cannot fail");
     }
     output
 }
@@ -174,8 +175,9 @@ fn audit_manifest_bytes(bytes: &[u8]) -> SplitAuditReceipt {
     let dataset_sha256_format_valid =
         digest_is_lower_hex_sha256(&manifest.dataset_sha256);
     if !dataset_sha256_format_valid {
-        validation_errors
-            .push("dataset_sha256_must_be_64_lowercase_hex_characters".to_owned());
+        validation_errors.push(
+            "dataset_sha256_must_be_64_lowercase_hex_characters".to_owned(),
+        );
     }
 
     let mut records_per_split = empty_split_counts();
@@ -291,20 +293,23 @@ fn audit_manifest_bytes(bytes: &[u8]) -> SplitAuditReceipt {
     }
     let group_assignments_isolated = groups_crossing_splits.is_empty();
     if !group_assignments_isolated {
-        validation_errors
-            .push("group_ids_cross_train_validation_test_boundaries".to_owned());
+        validation_errors.push(
+            "group_ids_cross_train_validation_test_boundaries".to_owned(),
+        );
     }
     let features_respect_prediction_cutoff =
         post_cutoff_feature_records.is_empty();
     if !features_respect_prediction_cutoff {
-        validation_errors
-            .push("features_available_after_prediction_cutoff_detected".to_owned());
+        validation_errors.push(
+            "features_available_after_prediction_cutoff_detected".to_owned(),
+        );
     }
     let targets_observed_after_prediction_cutoff =
         non_future_target_records.is_empty();
     if !targets_observed_after_prediction_cutoff {
-        validation_errors
-            .push("target_not_strictly_after_prediction_cutoff_detected".to_owned());
+        validation_errors.push(
+            "target_not_strictly_after_prediction_cutoff_detected".to_owned(),
+        );
     }
 
     let passed = validation_errors.is_empty()
@@ -408,7 +413,8 @@ mod tests {
         include_bytes!("../../../../docs/research/beverage-split-manifest-synthetic-v1.json");
 
     fn fixture_value() -> Value {
-        serde_json::from_slice(FIXTURE).expect("checked-in fixture must be valid JSON")
+        serde_json::from_slice(FIXTURE)
+            .expect("checked-in fixture must be valid JSON")
     }
 
     fn audit_value(value: Value) -> SplitAuditReceipt {
