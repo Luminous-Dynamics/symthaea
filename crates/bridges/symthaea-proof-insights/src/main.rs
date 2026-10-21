@@ -1073,10 +1073,11 @@ fn audit_temporal_dataset(
                     let statement_prefix = statement_prefix.as_deref().unwrap_or_default();
                     for candidate in candidates {
                         if commit_before_object_exists != Some(true)
-                            || !git_is_ancestor(
+                            || !cached_git_is_ancestor(
                                 &root,
                                 &commit_before,
                                 &candidate.completion_commit,
+                                &mut identity_ancestry_cache,
                             )?
                         {
                             continue;
@@ -1106,12 +1107,13 @@ fn audit_temporal_dataset(
                         // proof introduction.
                         let mut introduced_at_commit = true;
                         for parent in git_parent_commits(&root, &candidate.completion_commit)? {
-                            match proof_present_in_declaration(
+                            match cached_proof_present_in_declaration(
                                 &root,
                                 &parent,
                                 &raw_file_path,
                                 theorem_short_name,
                                 &dataset_proof,
+                                &mut proof_presence_cache,
                             )? {
                                 Some(false) => {}
                                 Some(true) | None => introduced_at_commit = false,
@@ -1152,7 +1154,12 @@ fn audit_temporal_dataset(
                 identity_statement_match_at_completion = Some(*completion_statement_match);
                 identity_proof_matches_completion = Some(true);
                 let pre_state_is_ancestor = commit_before_object_exists == Some(true)
-                    && git_is_ancestor(&root, &commit_before, completion_commit)?;
+                    && cached_git_is_ancestor(
+                        &root,
+                        &commit_before,
+                        completion_commit,
+                        &mut identity_ancestry_cache,
+                    )?;
                 if pre_state_is_ancestor
                     && git_path_exists_at_commit(&root, &commit_before, &raw_file_path)?
                 {
