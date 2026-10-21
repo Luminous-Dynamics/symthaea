@@ -120,6 +120,7 @@ struct TrajectoryReceipt {
     status: &'static str,
     corpus_sha256: String,
     evaluation_protocol_sha256: String,
+    mutation_matrix_sha256: String,
     source_revision_sha: String,
     validator_source_sha256: String,
     entrypoint_source_sha256: String,
@@ -156,6 +157,9 @@ pub fn run(root: &Path, corpus_arg: &Path, out_arg: Option<&Path>) -> Result<()>
         fs::read(root.join("docs/research/first-aid/EVALUATION_PROTOCOL_V0.md"))
             .context("read evaluation protocol for receipt identity")?;
     let evaluation_protocol_digest = sha256_hex(&evaluation_protocol);
+    let mutation_matrix = fs::read(root.join("docs/research/first-aid/mutation-matrix-v0.json"))
+        .context("read mutation matrix for receipt identity")?;
+    let mutation_matrix_digest = sha256_hex(&mutation_matrix);
     let validator_source = fs::read(root.join("xtask/src/first_aid_trajectory.rs"))
         .context("read trajectory validator source for receipt identity")?;
     let entrypoint_source = fs::read(root.join("xtask/src/main.rs"))
@@ -171,6 +175,7 @@ pub fn run(root: &Path, corpus_arg: &Path, out_arg: Option<&Path>) -> Result<()>
         status: "synthetic_trajectory_contract_passed",
         corpus_sha256: corpus_digest,
         evaluation_protocol_sha256: evaluation_protocol_digest,
+        mutation_matrix_sha256: mutation_matrix_digest,
         source_revision_sha: std::env::var("FIRST_AID_SOURCE_REVISION")
             .unwrap_or_else(|_| "not-provided".to_string()),
         validator_source_sha256: sha256_hex(&validator_source),
