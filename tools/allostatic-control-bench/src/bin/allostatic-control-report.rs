@@ -20,6 +20,8 @@ struct Episode {
     violation_exposure: f64,
     max_violation_severity: f64,
     minimum_reserve: f64,
+    mean_safe_action_options: f64,
+    minimum_safe_action_options: usize,
     missed_limits: usize,
     shield_vetoes: usize,
     no_safe_action_ticks: usize,
@@ -153,7 +155,8 @@ fn parse_episodes(csv: &str) -> Result<BTreeMap<ConditionKey, EpisodesBySeed>, B
         "cumulative_exposure", "unsafe_ticks", "unsafe_episode",
         "violation_exposure", "max_violation_severity", "minimum_reserve",
         "missed_limits", "shield_vetoes", "emergency_recover_steps",
-        "no_safe_action_ticks", "false_alarms", "false_alarm_opportunities", "push_steps",
+        "no_safe_action_ticks", "mean_safe_action_options", "minimum_safe_action_options",
+        "false_alarms", "false_alarm_opportunities", "push_steps",
         "maintain_steps", "resource_cost", "recovery_steps", "failed",
     ];
     for name in required {
@@ -216,6 +219,13 @@ fn parse_episodes(csv: &str) -> Result<BTreeMap<ConditionKey, EpisodesBySeed>, B
                 return Err(invalid_data(format!("{name} outside declared [0,1] range on line {}", line_index + 2)).into());
             }
         }
+        if !(0.0..=3.0).contains(&mean_safe_action_options)
+            || minimum_safe_action_options > 3
+            || mean_safe_action_options + mean_tolerance < minimum_safe_action_options as f64
+            || (shielded && minimum_safe_action_options == 0)
+        {
+            return Err(invalid_data(format!("safe-action option metric violates contract on line {}", line_index + 2)).into());
+        }
         if cumulative_load < 0.0 || violation_exposure < 0.0 || resource_cost < 0.0 {
             return Err(invalid_data(format!("negative accumulated metric on line {}", line_index + 2)).into());
         }
@@ -251,6 +261,8 @@ fn parse_episodes(csv: &str) -> Result<BTreeMap<ConditionKey, EpisodesBySeed>, B
             violation_exposure,
             max_violation_severity,
             minimum_reserve,
+            mean_safe_action_options,
+            minimum_safe_action_options,
             missed_limits,
             shield_vetoes,
             no_safe_action_ticks,
@@ -273,7 +285,7 @@ fn parse_episodes(csv: &str) -> Result<BTreeMap<ConditionKey, EpisodesBySeed>, B
 
 fn write_summary(groups: &BTreeMap<ConditionKey, EpisodesBySeed>, path: &str) -> Result<usize, Box<dyn Error>> {
     let mut output = String::from(
-        "scenario,policy,shielded,n,mean_task_reward,mean_cumulative_load,p95_cumulative_load,episode_violation_rate,mean_unsafe_ticks,mean_violation_exposure,p95_violation_exposure,mean_conditional_peak_violation,mean_minimum_reserve,mean_missed_limits,mean_shield_vetoes,mean_no_safe_action_ticks,mean_emergency_recover_steps,mean_false_alarms,mean_false_alarm_opportunities,false_alarm_rate_when_opportunity,recovery_observed_n,mean_observed_recovery_steps,recovery_censored_rate,episode_failure_rate\n"
+        "scenario,policy,shielded,n,mean_task_reward,mean_cumulative_load,p95_cumulative_load,episode_violation_rate,mean_unsafe_ticks,mean_violation_exposure,p95_violation_exposure,mean_conditional_peak_violation,mean_minimum_reserve,mean_missed_limits,mean_shield_vetoes,mean_no_safe_action_ticks,mean_emergency_recover_steps,mean_false_alarms,mean_false_alarm_opportunities,false_alarm_rate_when_opportunity,recovery_observed_n,mean_observed_recovery_steps,recovery_censored_rate,mean_viable_action_options,worst_episode_minimum_viable_action_options,episode_failure_rate\n"
     );
     for ((scenario, policy, shielded), by_seed) in groups {
         let episodes: Vec<&Episode> = by_seed.values().collect();
@@ -286,6 +298,12 @@ fn write_summary(groups: &BTreeMap<ConditionKey, EpisodesBySeed>, path: &str) ->
             .map(|row| row.max_violation_severity)
             .collect();
         let minimum_reserve: Vec<f64> = episodes.iter().map(|row| row.minimum_reserve).collect();
+        let mean_viable_options: Vec<f64> =
+            episodes.iter().map(|row| row.mean_safe_action_options).collect();
+        let worst_episode_minimum_viable_options: usize = episodes.iter()
+            .map(|row| row.minimum_safe_action_options)
+            .min()
+            .unwrap_or(0);
         let missed: Vec<f64> = episodes.iter().map(|row| row.missed_limits as f64).collect();
         let vetoes: Vec<f64> = episodes.iter().map(|row| row.shield_vetoes as f64).collect();
         let no_safe_actions: Vec<f64> = episodes.iter().map(|row| row.no_safe_action_ticks as f64).collect();
@@ -320,7 +338,7 @@ fn write_summary(groups: &BTreeMap<ConditionKey, EpisodesBySeed>, path: &str) ->
             format!("{:.6}", mean(&conditional_severity))
         };
         output.push_str(&format!(
-            "{scenario},{policy},{shielded},{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{conditional},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{false_alarm_rate},{},{recovery_mean},{:.6},{:.6}\n",
+            "{scenario},{policy},{shielded},{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{conditional},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{false_alarm_rate},{},{recovery_mean},{:.6},{:.6},{:.6},{},{:.6}\n",
             episodes.len(),
             mean(&rewards),
             mean(&exposure),
@@ -338,6 +356,8 @@ fn write_summary(groups: &BTreeMap<ConditionKey, EpisodesBySeed>, path: &str) ->
             mean(&false_alarm_opportunities),
             observed_recovery.len(),
             recovery_censored_rate,
+            mean(&mean_viable_options),
+            worst_episode_minimum_viable_options,
             failure_rate,
         ));
     }
