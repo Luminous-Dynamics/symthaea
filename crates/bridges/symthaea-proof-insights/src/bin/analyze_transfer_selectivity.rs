@@ -111,6 +111,7 @@ struct ReviewerDecision {
 struct Prediction {
     decision: Decision,
     predicted_label: Label,
+    compatibility_probability: Option<f64>,
 }
 
 #[derive(Debug, Default, Clone, Copy, Serialize)]
@@ -251,8 +252,30 @@ struct Report {
     bootstrap_replicates: usize,
     counts: Counts,
     metrics: BTreeMap<String, MetricReport>,
+    calibration: CalibrationAssessment,
     proposed_gates: ProposedGates,
     limitations: Vec<&'static str>,
+}
+
+#[derive(Debug, Serialize)]
+struct CalibrationAssessment {
+    eligible_binary_pairs: usize,
+    probability_scored_pairs: usize,
+    probability_coverage: f64,
+    complete_binary_coverage: bool,
+    brier_score: Option<f64>,
+    expected_calibration_error_10_bins: Option<f64>,
+    reliability_bins: Vec<ReliabilityBin>,
+}
+
+#[derive(Debug, Serialize)]
+struct ReliabilityBin {
+    bin_index: usize,
+    lower_bound: f64,
+    upper_bound: f64,
+    count: usize,
+    mean_predicted_compatibility: f64,
+    observed_compatibility_rate: f64,
 }
 
 #[derive(Debug, Serialize)]
@@ -452,6 +475,13 @@ fn parse_jsonl(text: &str, expected_split: Split) -> Result<Vec<Outcome>> {
                 }
             }
         }
+        if outcome
+            .prediction
+            .compatibility_probability
+            .is_some_and(|probability| !probability.is_finite() || !(0.0..=1.0).contains(&probability))
+        {
+            bail!("pair {} has compatibility probability outside [0, 1]", outcome.pair_id);
+        }
         match outcome.prediction.decision {
             Decision::Accept if outcome.prediction.predicted_label != Label::Compatible => {
                 bail!("pair {} accepts but does not predict compatible", outcome.pair_id);
@@ -602,6 +632,7 @@ fn analyze(
         );
     }
 
+    let calibration = calibration_assessment(outcomes);
     let recall = metrics["compatible_accept_recall"].estimate;
     let compatible_floor_met = counts.compatible_components >= MIN_COMPONENTS_PER_CLASS;
     let incompatible_floor_met = counts.incompatible_components >= MIN_COMPONENTS_PER_CLASS;
@@ -629,15 +660,91 @@ fn analyze(
         bootstrap_replicates,
         counts,
         metrics,
+        calibration,
         proposed_gates: gates,
         limitations: vec![
             "This analyzer computes metrics against supplied adjudication labels; it does not establish that the labels are mathematically correct.",
             "Bootstrap intervals resample declared family-connected components, not individual pairs; incorrect component IDs invalidate the inference.",
             "Unknown, pending, and partial labels are accounted for but excluded from binary compatibility metrics.",
+            "Brier score and ten-bin expected calibration error are descriptive and require compatibility_probability coverage; missing probabilities are never imputed.",
             "The finite mutation-control suite must be checked through a separately retained receipt; this analyzer never converts a pass of pair metrics into an overall confirmatory claim.",
             "These outcomes concern transfer selectivity and do not replace the primary verified-proof utility comparison.",
         ],
     })
+}
+
+fn calibration_assessment(outcomes: &[Outcome]) -> CalibrationAssessment {
+    let binary_rows: Vec<(Option<f64>, bool)> = outcomes
+        .iter()
+        .filter(|outcome| outcome.adjudication.status == AdjudicationStatus::Adjudicated)
+        .filter_map(|outcome| match outcome.adjudication.label {
+            Label::Compatible => Some((outcome.prediction.compatibility_probability, true)),
+            Label::Incompatible => Some((outcome.prediction.compatibility_probability, false)),
+            Label::Partial | Label::Unknown => None,
+        })
+        .collect();
+    let scored: Vec<(f64, bool)> = binary_rows
+        .iter()
+        .filter_map(|(probability, truth)| probability.map(|value| (value, *truth)))
+        .collect();
+    let probability_coverage = ratio(scored.len(), binary_rows.len()).unwrap_or(0.0);
+    if scored.is_empty() {
+        return CalibrationAssessment {
+            eligible_binary_pairs: binary_rows.len(),
+            probability_scored_pairs: 0,
+            probability_coverage,
+            complete_binary_coverage: binary_rows.is_empty(),
+            brier_score: None,
+            expected_calibration_error_10_bins: None,
+            reliability_bins: Vec::new(),
+        };
+    }
+
+    let brier_score = scored
+        .iter()
+        .map(|(probability, truth)| {
+            let target = if *truth { 1.0 } else { 0.0 };
+            (probability - target).powi(2)
+        })
+        .sum::<f64>()
+        / scored.len() as f64;
+
+    let mut bins: Vec<Vec<(f64, bool)>> = (0..10).map(|_| Vec::new()).collect();
+    for (probability, truth) in &scored {
+        let bin_index = ((*probability * 10.0).floor() as usize).min(9);
+        bins[bin_index].push((*probability, *truth));
+    }
+
+    let mut ece = 0.0;
+    let mut reliability_bins = Vec::new();
+    for (index, values) in bins.into_iter().enumerate() {
+        if values.is_empty() {
+            continue;
+        }
+        let count = values.len();
+        let mean_probability = values.iter().map(|(p, _)| p).sum::<f64>() / count as f64;
+        let observed_rate =
+            values.iter().filter(|(_, truth)| *truth).count() as f64 / count as f64;
+        ece += count as f64 / scored.len() as f64 * (mean_probability - observed_rate).abs();
+        reliability_bins.push(ReliabilityBin {
+            bin_index: index,
+            lower_bound: index as f64 / 10.0,
+            upper_bound: (index + 1) as f64 / 10.0,
+            count,
+            mean_predicted_compatibility: mean_probability,
+            observed_compatibility_rate: observed_rate,
+        });
+    }
+
+    CalibrationAssessment {
+        eligible_binary_pairs: binary_rows.len(),
+        probability_scored_pairs: scored.len(),
+        probability_coverage,
+        complete_binary_coverage: scored.len() == binary_rows.len(),
+        brier_score: Some(brier_score),
+        expected_calibration_error_10_bins: Some(ece),
+        reliability_bins,
+    }
 }
 
 fn metric_counts(name: &str, cells: CellCounts) -> (usize, usize) {
@@ -719,7 +826,7 @@ mod tests {
                     "label": review.label
                 })).collect::<Vec<_>>()
             },
-            "prediction": {"decision": decision, "predicted_label": predicted_label}
+            "prediction": {"decision": decision, "predicted_label": predicted_label, "compatibility_probability": if decision == Decision::Accept { Some(0.9) } else if decision == Decision::Reject { Some(0.1) } else { None }}
         });
         serde_json::from_value(json).expect("valid test fixture")
     }
@@ -735,6 +842,9 @@ mod tests {
         assert_eq!(report.metrics["incompatible_false_accept_rate"].estimate, Some(0.0));
         assert_eq!(report.metrics["binary_coverage"].estimate, Some(1.0));
         assert_eq!(report.metrics["selective_risk"].estimate, Some(0.0));
+        assert_eq!(report.calibration.probability_scored_pairs, 2);
+        assert!(report.calibration.complete_binary_coverage);
+        assert!(report.calibration.brier_score.is_some());
         assert_eq!(
             report.proposed_gates.overall_confirmatory_decision,
             "not_evaluated_requires_independent_mutation_receipt_and_protocol_audit"
@@ -751,6 +861,8 @@ mod tests {
         assert_eq!(report.metrics["incompatible_false_accept_rate"].estimate, Some(0.0));
         assert_eq!(report.metrics["binary_coverage"].estimate, Some(0.0));
         assert_eq!(report.metrics["selective_risk"].estimate, None);
+        assert_eq!(report.calibration.probability_scored_pairs, 0);
+        assert_eq!(report.calibration.probability_coverage, 0.0);
     }
 
     #[test]
