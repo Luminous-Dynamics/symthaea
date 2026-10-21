@@ -341,7 +341,7 @@ fn print_admixed_population_analysis(engine: &PgxHealthEquityEngine) {
 fn print_key_findings(engine: &PgxHealthEquityEngine) {
     println!("=== KEY FINDINGS ===\n");
 
-    // 1. Largest equity gap
+    // 1. Largest spread in prototype heuristic outputs
     let mut largest_gap = 0.0_f64;
     let mut largest_drug = "";
     let mut largest_gene = "";
@@ -354,11 +354,11 @@ fn print_key_findings(engine: &PgxHealthEquityEngine) {
         }
     }
     println!(
-        "1. Largest equity gap: {}/{} (score {:.3})",
+        "1. Largest model-score spread: {}/{} (score {:.3})",
         largest_drug, largest_gene, largest_gap
     );
 
-    // 2. Most affected population overall (appears underserved most often)
+    // 2. Most frequently model-flagged broad population label
     let mut underserved_counts: Vec<(AncestryGroup, usize)> = ANCESTRY_ORDER
         .iter()
         .map(|&(anc, _)| {
@@ -377,44 +377,15 @@ fn print_key_findings(engine: &PgxHealthEquityEngine) {
     underserved_counts.sort_by(|a, b| b.1.cmp(&a.1));
     let (most_affected_anc, most_affected_count) = underserved_counts[0];
     println!(
-        "2. Most affected population overall: {} (underserved in {}/{} drug-gene pairs)",
+        "2. Most frequently model-flagged label: {} (flagged in {}/{} modelled drug-gene pairs)",
         ancestry_name(&most_affected_anc),
         most_affected_count,
         DRUG_GENE_PAIRS.len()
     );
 
-    // 3. Total patients at risk across all guidelines
-    let mut grand_total = 0.0_f64;
-    for &(drug, gene) in DRUG_GENE_PAIRS {
-        let analysis = engine.equity_analysis(drug, gene);
-        let is_prodrug = drug == "codeine" || drug == "clopidogrel" || drug == "tamoxifen";
-        for &(anc, pop, _) in US_POP {
-            if let Some(risk) = analysis.population_profiles.get(&anc) {
-                let dist = &risk.phenotype_distribution;
-                let frac = if is_prodrug {
-                    dist.get(&MetabolizerPhenotype::UltraRapid)
-                        .copied()
-                        .unwrap_or(0.0)
-                        + dist
-                            .get(&MetabolizerPhenotype::Poor)
-                            .copied()
-                            .unwrap_or(0.0)
-                } else {
-                    dist.get(&MetabolizerPhenotype::Poor)
-                        .copied()
-                        .unwrap_or(0.0)
-                        + dist
-                            .get(&MetabolizerPhenotype::UltraRapid)
-                            .copied()
-                            .unwrap_or(0.0)
-                };
-                grand_total += pop * frac;
-            }
-        }
-    }
+    // 3. Claim ceiling for population-scenario arithmetic.
     println!(
-        "3. Total patients at risk across all Level A guidelines: {:.1} million (US)",
-        grand_total
+        "3. Population scenario totals are arithmetic outputs from unvalidated model fractions; not patient-risk or clinical-impact estimates."
     );
 
     // 4. Gene with greatest inter-ancestry variation
