@@ -4,6 +4,7 @@ use std::path::PathBuf;
 mod crate_status;
 mod duplicate_scan;
 mod first_aid;
+mod first_aid_trajectory;
 mod guideline_change_impact;
 mod manifest;
 mod rhn_sweep;
@@ -81,6 +82,16 @@ enum Commands {
         #[arg(long)]
         out: Option<PathBuf>,
     },
+    /// Validate synthetic first-aid workflow event traces; not clinical validation.
+    FirstAidTrajectoryValidate {
+        #[arg(
+            long,
+            default_value = "docs/research/first-aid/trajectory-corpus-v0.json"
+        )]
+        corpus: PathBuf,
+        #[arg(long)]
+        out: Option<PathBuf>,
+    },
     /// Validate synthetic source-to-requirement change impact; not clinical validation.
     FirstAidChangeImpactValidate {
         #[arg(
@@ -146,6 +157,13 @@ fn main() -> anyhow::Result<()> {
                 .expect("xtask lives one level below the workspace root")
                 .to_path_buf();
             first_aid::run(&root, &corpus, &benchmark, &schema, out.as_deref())?;
+        }
+        Commands::FirstAidTrajectoryValidate { corpus, out } => {
+            let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .expect("xtask lives one level below the workspace root")
+                .to_path_buf();
+            first_aid_trajectory::run(&root, &corpus, out.as_deref())?;
         }
         Commands::FirstAidChangeImpactValidate { contract, out } => {
             let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
