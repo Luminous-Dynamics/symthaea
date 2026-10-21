@@ -27,7 +27,7 @@ This currently produces unavailable/failed measurements by design, until the ada
 
 ## TCCIP independent finite-state reference
 
-The task-conditioned counterfactual integration candidate has a small, exact Boolean-network evaluator and a separate standard-library Python oracle. The executable source of fixture rules, partitions, intervention edges, and analytical expectations is `fixtures/tccip_toy_expectations.tsv` (schema v3, including integer-weighted input-state priors). The Rust example parses this file rather than duplicating the three networks and intervention lists in source.
+The task-conditioned counterfactual integration candidate has a small, exact Boolean-network evaluator and a separate standard-library Python oracle. The executable source of fixture rules, task targets, input-state weights, component partitions, intervention edges, and expected outcomes is `fixtures/tccip_toy_expectations.tsv` (schema v3). Both the Rust example and independent Python oracle parse this manifest.
 
 Run the independent reference oracle:
 
@@ -49,7 +49,7 @@ SYMTHAEA_SOURCE_SHA="$(git rev-parse HEAD)" \
 sha256sum results/tccip_rust_reference.tsv
 ~~~
 
-Keep both artifacts and their source SHAs/hashes. They are independently authored calculations over the same manifest; do not call the Python output a Rust run. A `UNBOUND` source SHA marks the output exploratory. Current fixtures show two distinct sensitivity effects: arbitrary partition changes can reverse the sign of TCCIP, and reversing the input-state prior can flip TCCIP (+0.3 to −0.3) even when the causal rules, task, partition, and intervention edges are identical. The latter pair uses edges into the same task-output AND gate as a stronger role-matched comparison. Report the full partition and state-prior profile; never select the most favorable result after seeing outcomes.
+Keep both artifacts and their source SHAs/hashes. They are independently authored calculations over the same manifest; do not call the Python output a Rust run. A `UNBOUND` source SHA marks the output exploratory. Current fixtures show three limitations: arbitrary partition changes can reverse TCCIP's sign; reversing the input-state prior can reverse it for the same graph/task; and in balanced XOR, equally essential cross-cut/internal edges each reduce accuracy by 0.5, so TCCIP is zero even though joint input MI is 1 bit while either individual input MI is zero. The Rust output and independent Python artifact now include this information baseline. Report per-edge effects, partition and prior profiles, and higher-order information separately; do not use TCCIP as a standalone integration/synergy scalar.
 
 The oracle and eleven Python regression-test definitions are newly authored research code. They have not yet been run from the committed files in this environment. The Rust evaluator has 15 authored tests and has not been compiled. No qualification or performance claim is made by adding the harness.
 
