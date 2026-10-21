@@ -88,8 +88,15 @@ jobs:
             ([.cases[].case_id] | length) == ([.cases[].case_id] | unique | length) and
             ([.cases[] | select(.evidence_status == "planned_not_yet_executable")] | length) ==
               .count_summary.planned_not_yet_executable_count and
-            ([.cases[] | select(.expected == null or .evidence_status == null)] | length) == 0
+            ([.cases[] | select(.expected == null or .evidence_status == null)] | length) == 0 and
+            ([.cases[] | select(
+              (.evidence_status == "unit_test_added" or .evidence_status == "unit_test_existing") and
+              (.test_name == null or (.test_name | length == 0))
+            )] | length) == 0
           ' "$matrix"
+          while IFS= read -r test_name; do
+            grep -Fq "fn ${test_name}(" xtask/src/first_aid_trajectory.rs
+          done < <(jq -r '.cases[] | select(.evidence_status == "unit_test_added" or .evidence_status == "unit_test_existing") | .test_name' "$matrix")
           expected_corpus_sha="$(jq -r '.fixture_binding.trajectory_corpus_sha256' "$matrix")"
           actual_corpus_sha="$(sha256sum "$corpus" | awk '{print $1}')"
           test "$actual_corpus_sha" = "$expected_corpus_sha"
