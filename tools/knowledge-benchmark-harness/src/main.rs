@@ -16,6 +16,7 @@ enum Kind {
     Graph,
     Claim,
     Pair,
+    Source,
 }
 
 impl Kind {
@@ -25,8 +26,9 @@ impl Kind {
             "graph" => Ok(Self::Graph),
             "claim" => Ok(Self::Claim),
             "pair" => Ok(Self::Pair),
+            "source" => Ok(Self::Source),
             _ => Err(format!(
-                "unknown --kind {raw:?}; expected case, graph, claim, or pair"
+                "unknown --kind {raw:?}; expected case, graph, claim, pair, or source"
             )),
         }
     }
@@ -37,6 +39,7 @@ impl Kind {
             Self::Graph => "graph",
             Self::Claim => "claim",
             Self::Pair => "pair",
+            Self::Source => "source",
         }
     }
 }
@@ -79,7 +82,7 @@ struct Report {
 }
 
 fn usage() -> &'static str {
-    "Usage: knowledge-benchmark-harness --schema FILE --input JSONL --kind case|graph|claim|pair [--out FILE] [--subject-revision SHA]\n\nValidates local data only. It never fetches source URLs or remote schemas."
+    "Usage: knowledge-benchmark-harness --schema FILE --input JSONL --kind case|graph|claim|pair|source [--out FILE] [--subject-revision SHA]\n\nValidates local data only. It never fetches source URLs or remote schemas."
 }
 
 fn parse_args() -> Result<Config, String> {
@@ -296,6 +299,7 @@ fn record_identity(kind: Kind, value: &Value, line: usize) -> String {
         Kind::Graph => "graph_id",
         Kind::Case | Kind::Claim => "id",
         Kind::Pair => "pair_id",
+        Kind::Source => "source_id",
     };
     string_field(value, key)
         .map(str::to_string)
@@ -576,6 +580,74 @@ fn validate_pair_contract(pair: &Value) -> Vec<String> {
     errors
 }
 
+fn validate_source_contract(value: &Value, seen_ids: &mut HashSet<String>) -> Vec<String> {
+    let mut errors = Vec::new();
+    let source_id = string_field(value, "source_id").unwrap_or("");
+    let source_family_id = string_field(value, "source_family_id").unwrap_or("");
+    let split = string_field(value, "split").unwrap_or("");
+    let rights_status = string_field(value, "rights_status").unwrap_or("");
+    let content_access = string_field(value, "content_access").unwrap_or("");
+    let rights_review = string_field(value, "rights_review").unwrap_or("");
+
+    if source_id.is_empty() {
+        errors.push("source_id must be a non-empty string".into());
+    }
+    if source_family_id.is_empty() {
+        errors.push("source_family_id must be a non-empty string".into());
+    }
+
+    let splits = ["development", "validation", "test", "holdout"];
+    if splits.iter().any(|candidate| {
+        *candidate != split
+            && seen_ids.contains(&format!(
+                "source-family-split:{source_family_id}:{candidate}"
+            ))
+    }) {
+        errors.push(format!(
+            "source family {source_family_id:?} spans multiple evaluation splits"
+        ));
+    } else if !source_family_id.is_empty() && !split.is_empty() {
+        // Multiple source IDs from one family may share a split. The marker is
+        // intentionally idempotent; a family crossing splits is never allowed.
+        seen_ids.insert(format!("source-family-split:{source_family_id}:{split}"));
+    }
+
+    if rights_status == "unknown" && content_access != "metadata_only" {
+        errors.push(
+            "rights_status=unknown requires content_access=metadata_only".into(),
+        );
+    }
+    if rights_review == "approved_limited_use"
+        && matches!(rights_status, "unknown" | "restricted")
+    {
+        errors.push(
+            "rights review cannot approve limited use while rights are unknown or restricted"
+                .into(),
+        );
+    }
+    if content_access == "verified_open_content"
+        && !matches!(rights_status, "public_domain_verified" | "open_license_verified")
+    {
+        errors.push(
+            "verified_open_content requires public-domain or open-license verification".into(),
+        );
+    }
+    if content_access == "verified_open_content" && rights_review != "approved_limited_use" {
+        errors.push(
+            "verified_open_content requires rights_review=approved_limited_use".into(),
+        );
+    }
+    if matches!(
+        rights_status,
+        "permission_required" | "restricted" | "community_governed"
+    ) && content_access == "verified_open_content"
+    {
+        errors.push("restricted or permissioned source cannot be marked verified open".into());
+    }
+
+    errors
+}
+
 fn validate_domain_contract(
     kind: Kind,
     value: &Value,
@@ -623,6 +695,7 @@ fn validate_domain_contract(
         }
         Kind::Graph => errors.extend(validate_graph_contract(value)),
         Kind::Pair => errors.extend(validate_pair_contract(value)),
+        Kind::Source => errors.extend(validate_source_contract(value, seen_ids)),
     }
     errors
 }
