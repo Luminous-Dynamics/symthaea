@@ -31,9 +31,11 @@ The script is intentionally a research runner, not part of the default test suit
 
 ## Adaptive coupling extension
 
-The current runner includes a predeclared discrepancy-trend controller. It starts at permeability 0.5, examines three-day windows, raises coupling by 0.1 if the mean discrepancy improves beyond a 0.002 tolerance, lowers coupling by 0.2 if it deteriorates beyond that tolerance, and otherwise holds the setting. Permeability is clamped to [0, 1]. Every day's applied permeability and discrepancy are recorded.
+The current runner compares two predeclared controllers. The trend-only heuristic starts at permeability 0.5, examines three-day windows, raises coupling by 0.1 if mean discrepancy improves beyond 0.002, lowers it by 0.2 if it deteriorates beyond that tolerance, and otherwise holds. This controller is intentionally a simple baseline: natural improvement over time can confound the feedback signal.
 
-The adaptive result is paired per seed with the mean of fixed-permeability controls at 0.0, 0.5, and 1.0. A negative final-error delta means adaptive outperformed that fixed-control mean. This is a simple baseline policy, not an optimized or biologically justified controller; test it against fixed controls on held-out seeds before drawing conclusions.
+The counterfactual controller starts from the same complete simulated state, clones it, evaluates lower/current/higher permeability branches over an identical three-day horizon with matched RNG state, and chooses the candidate with lowest forecast discrepancy if it beats the current action by the tolerance. It then applies that setting until the next decision. This reduces the time-trend confound, but its conclusions are still limited by model accuracy and short-horizon prediction.
+
+Both policies clamp permeability to [0, 1], record each day's applied permeability and discrepancy, and are paired per seed with the mean of fixed-permeability controls at 0.0, 0.5, and 1.0. A negative final-error delta means a controller outperformed that fixed-control mean in that condition. Neither controller is presumed superior; preserve results even when fixed controls win.
 
 ## Required next controls
 
