@@ -91,3 +91,23 @@ This protocol does not prove any mythic event happened literally, prove/disprove
 ## Contract validation tool
 
 A focused implementation is in [`tools/knowledge-benchmark-harness/`](../../../tools/knowledge-benchmark-harness/) and is invoked by [`scripts/validate-knowledge-benchmarks.sh`](../../../scripts/validate-knowledge-benchmarks.sh). It uses the pinned jsonschema 0.59.0 Rust crate with remote/file schema references disabled by a preflight scan, validates the declared Draft 2020-12 dialect and instance formats, and checks graph referential integrity plus limited relation-evidence invariants. Validation reports bind schema/input SHA-256 digests and the resolved Cargo lockfile digest. Because this environment lacks Rust/Cargo, it remains uncompiled and unexecuted; all code-level outcomes require real test/build evidence before qualification. The initial cargo invocation will create a lockfile; review and commit that lockfile before treating dependency resolution as fixed across runs.
+
+
+## Meta-cultural structure and narrative diversity
+
+Recent work suggests evaluation should test more than recall of culturally labeled facts:
+
+- **Measuring Meta-Cultural Competency (ICML 2026)** proposes comparing large-scale cultural knowledge structures using a spectral framework and reports that larger model size alone does not consistently improve this dimension. Its result is a methodological lead, not an established mythology metric. [PMLR paper](https://proceedings.mlr.press/v306/saha26a.html)
+- **FrameNet-Cultures (Findings ACL 2026)** uses cross-cultural frame semantics and open-ended model outputs, addressing limitations of closed-form questionnaires. The authors explicitly treat reference profiles as structured comparisons, not definitive representations of every society. [Paper](https://aclanthology.org/2026.findings-acl.491/)
+- **CulturalBench (ACL 2025)** shows why expert-verified multi-answer questions and coverage of underrepresented regions matter. [Paper](https://aclanthology.org/2025.acl-long.1247/)
+
+For mythological source graphs, adapt these ideas cautiously:
+
+1. Collect multiple expert-coded views for an interpretive corpus; do not assume one canonical graph represents every community or period.
+2. Compare predicted edge distributions, typed relation profiles, graph motifs and (as an exploratory metric) spectral signatures against source- and context-conditioned expert profiles.
+3. Measure plurality retention and minority/alternate-interpretation recall alongside average structural similarity. A model that imitates an aggregate profile while erasing a well-attested local variant should not pass.
+4. Stratify graph comparison by period, language, genre, source status and locality. Use source-family-held-out splits and bootstrap uncertainty intervals; state how graph size and sparsity affect the metrics.
+5. Keep structural similarity strictly separate from claims of identical meaning, common origin, cultural consensus or historical influence. A matching spectrum or graph embedding is not historical evidence.
+6. Publish raw annotations, aggregation choices and disagreement, with permissions and access restrictions honored. For living or community-held traditions, community authority should govern whether data and aggregate profiles may be released.
+
+This creates an additional **structural competence** track complementary to question answering: can the system preserve the shape and diversity of an evidence-bounded knowledge domain without turning that shape into a universal cultural stereotype?
