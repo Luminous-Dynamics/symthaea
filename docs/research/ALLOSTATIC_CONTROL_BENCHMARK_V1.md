@@ -18,7 +18,7 @@ Move from one scalar objective to a measured, constrained control problem:
 4. **Epistemic uncertainty** — uncertainty about state/forecast, not a multiplier that erases estimated severity.
 5. **Future viability** — projected resource and load margins under candidate actions.
 6. **Future capability** — the ability to recover, switch strategies, and complete later tasks.
-7. **Viable option breadth** — how many presently available actions remain inside the declared one-step viability region, reported as both a time-average and an episode minimum.
+7. **Viable option breadth** — how many actions the current condition is actually authorized to choose remain inside the declared one-step viability region, reported as both a time-average and an episode minimum. Policy-only conditions count Push and Maintain; shielded conditions may also count EmergencyRecover.
 
 No single weighted score can hide a safety violation. Report task reward, breach counts, exposure, peak, resource cost, recovery, and conservatism separately. A later Pareto or constrained-selection layer may compare trade-offs; v1 does not assign normative weights or claim a universally optimal policy.
 
@@ -84,7 +84,7 @@ The shield and simulator deliberately share the same synthetic transition functi
 - Shield veto count, no-safe-action count, and emergency-recovery steps, so avoided hazards and the cost of the shield remain visible.
 - False-alarm maintenance count, number of pre-action false-alarm opportunities, and false-alarm rate given opportunity. The denominator is measured before action so controller behavior cannot change whether a timestep counts as an opportunity; a zero denominator is reported as `NA`.
 - Resource cost, minimum reserve, terminal reserve, and terminal allostatic load as separate future-option proxies.
-- Viable action-set capacity: mean safe one-step action count, per-episode minimum safe-action count, and the worst episode's minimum across seeds. These measure local option breadth under the toy model, not long-horizon reachability or value of future options.
+- Viable action-set capacity: mean safe one-step action count, per-episode minimum safe-action count, and the worst episode's minimum across seeds. Counts respect action authority: unshielded policies can select Push/Maintain; the shielded condition may also invoke EmergencyRecover. These measure local option breadth under the toy model, not long-horizon reachability or value of future options.
 - Episode failure indicator and time from the last disturbance to a declared recovered state.
 - The summary reports observed recovery count and mean among observed recoveries **alongside the right-censoring rate**; it does not treat unrecovered episodes as successful or silently use the observed-only mean as an unconditional estimate. It also reports mean viable action breadth and the worst episode-minimum viable-action count across the seed panel.
 - Recovery not observed by the end of the horizon is emitted as NA (right-censored), not fabricated as a successful recovery.
