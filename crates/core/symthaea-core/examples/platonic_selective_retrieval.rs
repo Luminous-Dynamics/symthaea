@@ -41,7 +41,7 @@ enum QueryKind {
     NearPrototypeUnknown { distance_index: usize },
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct QuerySample {
     vector: PatternVector,
     target: Option<usize>,
@@ -786,6 +786,31 @@ mod tests {
             MIN_ACCEPTED_FOR_CERTIFICATION
         ];
         assert!(certify_rule(&enough_clean, rule).passed);
+    }
+
+    #[test]
+    fn near_unknown_challenge_is_deterministic_and_unlabelled() {
+        let prototypes = (0..8)
+            .map(|index| PatternVector::seeded_random(256, 100 + index))
+            .collect::<Result<Vec<_>, _>>()
+            .expect("prototype bank");
+        let first = generate_near_unknown_challenges(&prototypes, 0x4e45_4152, 8)
+            .expect("challenge queries");
+        let second = generate_near_unknown_challenges(&prototypes, 0x4e45_4152, 8)
+            .expect("challenge repeat");
+
+        assert_eq!(first, second);
+        assert_eq!(first.len(), NEAR_UNKNOWN_DISTANCES.len() * 8);
+        assert!(first.iter().all(|query| query.target.is_none()));
+        for distance_index in 0..NEAR_UNKNOWN_DISTANCES.len() {
+            assert_eq!(
+                first
+                    .iter()
+                    .filter(|query| query.kind == QueryKind::NearPrototypeUnknown { distance_index })
+                    .count(),
+                8
+            );
+        }
     }
 
     #[test]
