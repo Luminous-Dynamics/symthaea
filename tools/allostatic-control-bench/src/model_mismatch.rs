@@ -194,16 +194,24 @@ pub fn point_and_robust_vs_true(
     let point_effect = nominal_action_effect(action, stress)?;
     let robust_effect = calibrated_action_effect(action, stress, radii)?;
     let true_effect = true_action_effect(action, stress, mismatch)?;
+    let nominal_reserve = (state.reserve().lower() + state.reserve().upper()) * 0.5;
+    let nominal_load = (state.load().lower() + state.load().upper()) * 0.5;
+    let true_state = StateEnvelope::new(
+        Interval::point((nominal_reserve + mismatch.reserve_state_error).clamp(0.0, 1.0))?,
+        Interval::point((nominal_load + mismatch.load_state_error).clamp(0.0, 1.0))?,
+    )?;
+    let robust_state = super::calibration::enclose_predicted_state(state, radii)?;
     let point_certified = robustly_viable(state, point_effect, limits);
-    let robust_certified = robustly_viable(state, robust_effect, limits);
+    let robust_certified = robustly_viable(robust_state, robust_effect, limits);
     let true_next = next_state_envelope(
-        state,
+        true_state,
         ActionEffectBounds::new(
             Interval::point(true_effect.0)?,
             Interval::point(true_effect.1)?,
         )?,
     )?;
-    let true_safe = true_next.reserve().lower() >= 0.15 && true_next.load().upper() <= 0.88;
+    let true_safe = true_next.reserve().lower() >= limits.min_reserve()
+        && true_next.load().upper() <= limits.max_load();
     Some((point_certified, robust_certified, true_safe))
 }
 
