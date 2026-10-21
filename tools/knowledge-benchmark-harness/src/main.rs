@@ -390,7 +390,7 @@ fn validate_pair_contract(pair: &Value) -> Vec<String> {
 
     let state_field = match field {
         "context_id" | "source_id" | "variant_id" | "tradition_scope" | "rights_status"
-        | "alias" | "source_text" => Some(field),
+        | "access_decision" | "alias" | "source_text" => Some(field),
         "relation" => Some("proposed_relation"),
         _ => None,
     };
@@ -528,20 +528,28 @@ fn validate_pair_contract(pair: &Value) -> Vec<String> {
             }
         }
         "rights_revocation" => {
-            let revoked = matches!(
-                string_field(mutated, "rights_status"),
-                Some("restricted" | "community_governed" | "permission_required")
+            let denied = matches!(
+                string_field(mutated, "access_decision"),
+                Some("deny" | "require_permission" | "metadata_only")
             );
-            if !revoked
-                || string_field(baseline, "rights_status") == string_field(mutated, "rights_status")
+            if !denied
+                || string_field(baseline, "access_decision")
+                    == string_field(mutated, "access_decision")
             {
                 errors.push(
-                    "rights_revocation must change rights_status to a restricted state".into(),
+                    "rights_revocation must change access_decision to deny or a more restrictive state"
+                        .into(),
                 );
             }
-            if field != "rights_status" || expected != "deny_access" {
+            if string_field(baseline, "rights_status") != string_field(mutated, "rights_status") {
                 errors.push(
-                    "rights_revocation requires rights_status intervention and deny_access expectation".into(),
+                    "rights_revocation must preserve the source's underlying rights_status".into(),
+                );
+            }
+            if field != "access_decision" || expected != "deny_access" {
+                errors.push(
+                    "rights_revocation requires access_decision intervention and deny_access expectation"
+                        .into(),
                 );
             }
         }
