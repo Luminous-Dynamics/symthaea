@@ -1207,6 +1207,58 @@ mod tests {
     }
 
     #[test]
+    fn pairwise_utility_interaction_manifest_matches_all_exact_joint_cut_values() {
+        const MANIFEST: &str =
+            include_str!("../validation/fixtures/tccip_pairwise_utility_interactions.tsv");
+        const SCHEMA: &str = "# schema=tccip-pairwise-utility-interaction-expectations-v1";
+        assert!(MANIFEST.lines().any(|line| line.trim() == SCHEMA));
+
+        let fixtures = fixtures().unwrap();
+        let mut seen = HashSet::new();
+        for line in MANIFEST.lines().map(str::trim).filter(|line| {
+            !line.is_empty() && !line.starts_with('#')
+        }) {
+            let fields = line.split('\t').collect::<Vec<_>>();
+            assert_eq!(fields.len(), 8, "bad pairwise interaction row: {line}");
+            let key = (fields[0].to_string(), fields[1].to_string(), fields[2].to_string());
+            assert!(seen.insert(key.clone()), "duplicate pairwise interaction row: {key:?}");
+            let fixture = fixtures.iter()
+                .find(|fixture| fixture.name == fields[0])
+                .expect("pairwise manifest fixture must exist");
+            let first = fixture.interventions.iter()
+                .find(|item| item.id == fields[1])
+                .expect("first intervention must exist");
+            let second = fixture.interventions.iter()
+                .find(|item| item.id == fields[2])
+                .expect("second intervention must exist");
+
+            let actual = [
+                fixture.utility(None),
+                fixture.utility(Some(first)),
+                fixture.utility(Some(second)),
+                fixture.utility_for_cuts(&[first, second]),
+            ];
+            let expected = [
+                fields[3].parse::<f64>().unwrap(),
+                fields[4].parse::<f64>().unwrap(),
+                fields[5].parse::<f64>().unwrap(),
+                fields[6].parse::<f64>().unwrap(),
+            ];
+            for (index, (got, wanted)) in actual.iter().zip(expected.iter()).enumerate() {
+                assert!(
+                    (got - wanted).abs() < 1e-12,
+                    "fixture {} pair ({}, {}) joint outcome {} expected {}, got {}",
+                    fields[0], fields[1], fields[2], index, wanted, got
+                );
+            }
+            let contrast = actual[0] - actual[1] - actual[2] + actual[3];
+            let expected_contrast = fields[7].parse::<f64>().unwrap();
+            assert!((contrast - expected_contrast).abs() < 1e-12);
+        }
+        assert_eq!(seen.len(), 16, "pairwise manifest should cover all 16 declared pairs");
+    }
+
+    #[test]
     fn duplicate_intervention_edges_are_rejected_before_pairwise_interactions() {
         let mut fixture = fixtures().unwrap().into_iter()
             .find(|fixture| fixture.name == "role_matched_xor_synergy_uniform_prior")
