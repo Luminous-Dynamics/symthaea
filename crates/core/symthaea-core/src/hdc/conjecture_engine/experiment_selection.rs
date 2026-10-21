@@ -174,7 +174,7 @@ pub fn select_most_informative_experiment<'a, H, E>(
             continue;
         }
 
-        if best.map_or(true, |(_, best_value)| value > best_value) {
+        if best.is_none_or(|(_, best_value)| value > best_value) {
             best = Some((candidate, value));
         }
     }
