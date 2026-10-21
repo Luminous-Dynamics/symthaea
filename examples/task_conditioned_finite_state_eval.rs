@@ -123,6 +123,49 @@ impl Network {
         }
     }
 
+    fn read_source_multi(
+        &self,
+        source: usize,
+        target: usize,
+        values: &[bool],
+        interventions: &[&Intervention],
+        cut_mask: usize,
+    ) -> bool {
+        for (index, intervention) in interventions.iter().enumerate() {
+            if intervention.source == source && intervention.target == target {
+                return ((cut_mask >> index) & 1) != 0;
+            }
+        }
+        values[source]
+    }
+
+    fn evaluate_nodes_multi(
+        &self,
+        inputs: &[bool],
+        interventions: &[&Intervention],
+        cut_mask: usize,
+    ) -> Vec<bool> {
+        let mut values = vec![false; self.rules.len()];
+        for (target, rule) in self.rules.iter().copied().enumerate() {
+            values[target] = match rule {
+                Rule::Input { index } => inputs[index],
+                Rule::Constant(value) => value,
+                Rule::Copy { from } => self.read_source_multi(
+                    from, target, &values, interventions, cut_mask,
+                ),
+                Rule::Xor { left, right } => {
+                    self.read_source_multi(left, target, &values, interventions, cut_mask)
+                        ^ self.read_source_multi(right, target, &values, interventions, cut_mask)
+                }
+                Rule::And { left, right } => {
+                    self.read_source_multi(left, target, &values, interventions, cut_mask)
+                        & self.read_source_multi(right, target, &values, interventions, cut_mask)
+                }
+            };
+        }
+        values
+    }
+
     fn evaluate_nodes(
         &self,
         inputs: &[bool],
@@ -209,6 +252,18 @@ struct InformationBaseline {
     target_entropy_bits: f64,
     individual_input_mi_bits: Vec<f64>,
     joint_input_mi_bits: f64,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+struct CounterfactualUtilityInteraction {
+    fixture: String,
+    first_id: String,
+    second_id: String,
+    intact_utility: f64,
+    first_cut_utility: f64,
+    second_cut_utility: f64,
+    joint_cut_utility: f64,
+    interaction_contrast: f64,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -406,6 +461,61 @@ impl Fixture {
         }
         let denominator = total_input_weight * coin_states as u128;
         correct_weight as f64 / denominator as f64
+    }
+
+    /// Exact task-utility interaction contrast for a pair of edge interventions:
+    /// Δ_ij = J(∅) - J(i) - J(j) + J({i,j}).
+    ///
+    /// Every cut replaces that edge's input with its own independent fair coin.
+    /// This is a task-utility finite difference, not PID synergy or IIT Φ.
+    fn pairwise_utility_interactions(&self) -> Vec<CounterfactualUtilityInteraction> {
+        let intact = self.utility(None);
+        let mut output = Vec::new();
+        for first_index in 0..self.interventions.len() {
+            for second_index in (first_index + 1)..self.interventions.len() {
+                let first = &self.interventions[first_index];
+                let second = &self.interventions[second_index];
+                let first_utility = self.utility(Some(first));
+                let second_utility = self.utility(Some(second));
+                let joint_utility = self.utility_for_cuts(&[first, second]);
+                output.push(CounterfactualUtilityInteraction {
+                    fixture: self.name.clone(),
+                    first_id: first.id.clone(),
+                    second_id: second.id.clone(),
+                    intact_utility: intact,
+                    first_cut_utility: first_utility,
+                    second_cut_utility: second_utility,
+                    joint_cut_utility: joint_utility,
+                    interaction_contrast: intact - first_utility - second_utility + joint_utility,
+                });
+            }
+        }
+        output
+    }
+
+    /// Exact expected task accuracy after simultaneously cutting any specified
+    /// subset of edges. Each cut edge receives an independent fair-coin input.
+    fn utility_for_cuts(&self, cuts: &[&Intervention]) -> f64 {
+        let input_states = 1usize << self.network.input_count;
+        let coin_states = 1usize << cuts.len();
+        let total_input_weight = self.input_state_weights.iter()
+            .map(|weight| *weight as u128)
+            .sum::<u128>();
+        let mut correct_weight = 0u128;
+        for state in 0..input_states {
+            let inputs = (0..self.network.input_count)
+                .map(|index| ((state >> index) & 1) != 0)
+                .collect::<Vec<_>>();
+            let expected = self.task_target.evaluate(&inputs);
+            let weight = self.input_state_weights[state] as u128;
+            for cut_mask in 0..coin_states {
+                let values = self.network.evaluate_nodes_multi(&inputs, cuts, cut_mask);
+                if values[self.network.output_node] == expected {
+                    correct_weight += weight;
+                }
+            }
+        }
+        correct_weight as f64 / (total_input_weight * coin_states as u128) as f64
     }
 
     /// Exact information-theoretic baseline under the declared input prior.
@@ -805,6 +915,19 @@ fn main() {
             information.individual_input_mi_bits,
             information.joint_input_mi_bits
         );
+        for interaction in fixture.pairwise_utility_interactions() {
+            println!(
+                "# utility_interaction fixture={} first={} second={} intact={:.12} first_cut={:.12} second_cut={:.12} joint_cut={:.12} contrast={:.12}",
+                interaction.fixture,
+                interaction.first_id,
+                interaction.second_id,
+                interaction.intact_utility,
+                interaction.first_cut_utility,
+                interaction.second_cut_utility,
+                interaction.joint_cut_utility,
+                interaction.interaction_contrast
+            );
+        }
         println!(
             "# fixture={} target={} output_node={} input_count={} input_state_weights={:?} components={:?} rules={}",
             fixture.name,
@@ -1062,6 +1185,33 @@ mod tests {
         assert_eq!(min, -0.5);
         assert_eq!(max, 0.5);
     }
+    #[test]
+    fn pairwise_utility_interaction_detects_xor_complementarity() {
+        let fixture = fixtures().unwrap().into_iter()
+            .find(|fixture| fixture.name == "role_matched_xor_synergy_uniform_prior")
+            .unwrap();
+        let interactions = fixture.pairwise_utility_interactions();
+        assert_eq!(interactions.len(), 6);
+        let pair = interactions.iter().find(|item| {
+            item.first_id == "cross_cut_xor_left" && item.second_id == "matched_internal_xor_right"
+        }).unwrap();
+        assert!((pair.intact_utility - 1.0).abs() < 1e-12);
+        assert!((pair.first_cut_utility - 0.5).abs() < 1e-12);
+        assert!((pair.second_cut_utility - 0.5).abs() < 1e-12);
+        assert!((pair.joint_cut_utility - 0.5).abs() < 1e-12);
+        assert!((pair.interaction_contrast - 0.5).abs() < 1e-12);
+    }
+
+    #[test]
+    fn pairwise_utility_interaction_is_zero_for_unused_branch_controls() {
+        let fixture = fixtures().unwrap().into_iter()
+            .find(|fixture| fixture.name == "irrelevant_cross_component_connectivity")
+            .unwrap();
+        let interactions = fixture.pairwise_utility_interactions();
+        assert_eq!(interactions.len(), 1);
+        assert!(interactions[0].interaction_contrast.abs() < 1e-12);
+    }
+
     #[test]
     fn xor_synergy_baseline_detects_joint_information_when_each_input_mi_is_zero() {
         let fixture = fixtures().unwrap().into_iter()
