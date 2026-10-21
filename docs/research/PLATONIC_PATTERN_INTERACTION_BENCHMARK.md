@@ -17,6 +17,7 @@ This benchmark asks a narrow, testable question: when patterns are represented a
 6. **Superposition capacity.** Bundle K stored patterns and compare mean member similarity, maximum distractor similarity, and top-1 member recall as K increases.
 7. **Associative capacity.** Bind distinct role/filler pairs, bundle all pairs into one memory trace, query by unbinding one role, and measure target similarity, strongest distractor similarity, and top-1 retrieval as the number of relations increases. This is the most direct abstract-pattern test of whether composition preserves relationships under interference.
 8. **Iterative associative cleanup.** Compare nearest-prototype retrieval with a projected softmax-weighted pattern update over the same stored library. The latter is a Hopfield-inspired baseline (softmax attention over stored patterns plus bipolar projection), not an exact replication of a named modern Hopfield model. Report both accuracy and target/distractor margin across the same corruption rates.
+9. **Cross-algebra associative capacity.** Compare the current bipolar MAP/BSC-style majority-bundle memory with an HRR implementation using circular convolution, correlation unbinding, and additive superposition, on matched relation counts, trial IDs, candidate-library size and seeded target queries. Report Recall@1, Wilson intervals, and target/distractor similarity. This is an initial comparison; it does not yet cover FHRR, tensor-product representations, or an exact modern Hopfield model.
 
 Every random pattern and noise mask is deterministic for the supplied seed. The report exposes random-chance retrieval as a baseline. Use multiple independent seeds for publication-quality comparisons; the included default seed is for reproducibility, not statistical evidence.
 
@@ -27,7 +28,7 @@ From the repository root:
     cargo test -p symthaea-core pattern_interaction
     cargo run -p symthaea-core --example platonic_pattern_interaction
 
-Default experiment dimensions are 16,384 bipolar coordinates, 64 prototypes, 16 trials per condition, noise rates 5/10/20/30%, and bundle sizes 1/3/5/9/17. Override these in research code to study scaling and uncertainty.
+Default dimensions are 16,384 coordinates, 64 candidate prototypes, 16 trials per condition, noise rates 5/10/20/30/35/40/45/50%, and bundle/association sizes 1/3/5/9/17/33/49. The output includes paired MAP-versus-HRR associative-capacity results. These are exploratory smoke settings, not publication-grade sample sizes.
 
 ## Interpretation and controls
 
