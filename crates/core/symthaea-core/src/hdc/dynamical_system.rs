@@ -195,6 +195,12 @@ pub enum SimulationError {
         stage: u8,
         index: usize,
     },
+    /// The per-component absolute/relative tolerance profile is invalid.
+    InvalidRk45Tolerances,
+    /// RK45 generated a non-finite embedded error estimate.
+    NonFiniteErrorEstimate {
+        index: usize,
+    },
     /// RK45 reached its minimum step while the embedded error still exceeded tolerance.
     AdaptiveToleranceNotMet,
     InvalidIntegratorStepSize {
@@ -482,6 +488,130 @@ impl Default for Rk45Integrator {
             dt_max: 1.0,
         }
     }
+}
+
+/// Component-aware error tolerances for adaptive RK45 integration.
+///
+/// Each absolute tolerance must be finite and strictly positive. The relative
+/// tolerance may be zero, but must be finite and non-negative. A component's
+/// error scale is `absolute[i] + relative * max(abs(y_old[i]), abs(y_new[i]))`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Rk45Tolerances {
+    pub relative: f64,
+    pub absolute: Vec<f64>,
+}
+
+impl Rk45Tolerances {
+    pub fn new(relative: f64, absolute: Vec<f64>) -> Self {
+        Self { relative, absolute }
+    }
+
+    fn validate(&self, dimension: usize) -> Result<(), SimulationError> {
+        if !self.relative.is_finite()
+            || self.relative < 0.0
+            || self.absolute.len() != dimension
+            || self.absolute.iter().any(|value| !value.is_finite() || *value <= 0.0)
+        {
+            return Err(SimulationError::InvalidRk45Tolerances);
+        }
+        Ok(())
+    }
+}
+
+/// One accepted RK45 step and the next controller proposal.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Rk45StepReport {
+    pub state: Vec<f64>,
+    pub accepted_dt: f64,
+    /// Maximum absolute difference between the embedded formulas.
+    pub max_absolute_error: f64,
+    /// Dimensionless error score; accepted steps have `error_norm <= 1`.
+    pub error_norm: f64,
+    pub proposed_next_dt: f64,
+    pub attempted_steps: usize,
+    pub rejected_steps: usize,
+    pub derivative_evaluations: usize,
+}
+
+/// Stateful step-size controller. It persists the next-step proposal across
+/// accepted steps without making the integrator itself mutable or shared stateful.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Rk45Controller {
+    next_step_size: Option<f64>,
+}
+
+impl Rk45Controller {
+    pub fn new(initial_step_size: f64) -> Result<Self, SimulationError> {
+        if !initial_step_size.is_finite() || initial_step_size <= 0.0 {
+            return Err(SimulationError::InvalidTimeStep);
+        }
+        Ok(Self {
+            next_step_size: Some(initial_step_size),
+        })
+    }
+
+    pub fn next_step_size(&self) -> Option<f64> {
+        self.next_step_size
+    }
+
+    pub fn reset(&mut self, initial_step_size: f64) -> Result<(), SimulationError> {
+        if !initial_step_size.is_finite() || initial_step_size <= 0.0 {
+            return Err(SimulationError::InvalidTimeStep);
+        }
+        self.next_step_size = Some(initial_step_size);
+        Ok(())
+    }
+
+    pub fn try_step(
+        &mut self,
+        integrator: &Rk45Integrator,
+        system: &dyn DynamicalSystem,
+        state: &[f64],
+        t: f64,
+        maximum_dt: f64,
+        tolerances: &Rk45Tolerances,
+    ) -> Result<Rk45StepReport, SimulationError> {
+        if !maximum_dt.is_finite() || maximum_dt <= 0.0 || !t.is_finite() {
+            return Err(SimulationError::InvalidTimeStep);
+        }
+        let requested_dt = self
+            .next_step_size
+            .unwrap_or(maximum_dt)
+            .min(maximum_dt);
+        let report = integrator.try_adaptive_step_with_tolerances(
+            system,
+            state,
+            t,
+            requested_dt,
+            tolerances,
+        )?;
+        self.next_step_size = Some(report.proposed_next_dt);
+        Ok(report)
+    }
+}
+
+/// Aggregate diagnostics for a scale-aware adaptive simulation.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Rk45Diagnostics {
+    pub accepted_steps: usize,
+    pub rejected_steps: usize,
+    pub derivative_evaluations: usize,
+    pub min_accepted_dt: Option<f64>,
+    pub max_accepted_dt: Option<f64>,
+    pub max_error_norm: f64,
+}
+
+/// Numerical trajectory plus adaptive-controller diagnostics.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Rk45SimulationReport {
+    pub simulation: SimulationResult,
+    pub diagnostics: Rk45Diagnostics,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Rk45ErrorNorm {
+    WeightedInfinity,
+    WeightedRms,
 }
 
 impl Rk45Integrator {
