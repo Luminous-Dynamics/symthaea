@@ -52,6 +52,11 @@ run_validator source \
   benchmarks/source-catalog/v0/sources.jsonl \
   "$reports_dir/source-catalog.json"
 
+run_validator source-pack \
+  benchmarks/benchmark-runs/v0/source-pack.schema.json \
+  benchmarks/benchmark-runs/v0/synthetic-source-pack.jsonl \
+  "$reports_dir/source-pack.json"
+
 run_validator annotation \
   benchmarks/knowledge-annotation/v0/annotation.schema.json \
   benchmarks/knowledge-annotation/v0/synthetic-fixtures.jsonl \
