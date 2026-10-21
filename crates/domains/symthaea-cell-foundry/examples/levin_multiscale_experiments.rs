@@ -17,7 +17,7 @@ use serde::Serialize;
 use symthaea_cell_foundry::experiments::{
     AdaptiveCouplingConfig, Perturbation, build_linear_axis_template,
     build_radial_bipolar_template, run_adaptive_coupling_experiment,
-    run_dose_response_experiment,
+    run_counterfactual_coupling_experiment, run_dose_response_experiment,
 };
 
 const SEEDS: [u64; 4] = [17, 29, 41, 53];
@@ -29,6 +29,7 @@ const RECOVERY_TOLERANCE: f64 = 0.05;
 
 #[derive(Debug, Serialize)]
 struct AdaptiveRunRecord {
+    controller: String,
     seed: u64,
     template_family: String,
     perturbation: String,
@@ -145,53 +146,70 @@ fn main() -> Result<(), Box<dyn Error>> {
 
                 for homing_enabled in [false, true] {
                     let config = AdaptiveCouplingConfig::default();
-                    let start = Instant::now();
-                    let adaptive = run_adaptive_coupling_experiment(
-                        template, perturbation, RECOVERY_DAYS, homing_enabled, config,
-                    )?;
-                    let wall_time_ms = start.elapsed().as_millis();
-                    let control_values: Vec<f64> = records.iter()
-                        .filter(|record| {
-                            record.seed == seed
-                                && record.template_family == family
-                                && record.perturbation == adaptive.perturbation_label
-                                && record.homing_enabled == homing_enabled
-                                && [0.0_f32, 0.5_f32, 1.0_f32].contains(&record.permeability)
-                        })
-                        .map(|record| record.final_discrepancy)
-                        .collect();
-                    if control_values.len() != 3 {
-                        return Err(format!(
-                            "expected 3 fixed controls for {family}/{}; got {}",
-                            adaptive.perturbation_label, control_values.len()
-                        ).into());
+                    let policy_runs = [
+                        (
+                            "trend",
+                            run_adaptive_coupling_experiment(
+                                template, perturbation, RECOVERY_DAYS, homing_enabled, config,
+                            ),
+                        ),
+                        (
+                            "counterfactual",
+                            run_counterfactual_coupling_experiment(
+                                template, perturbation, RECOVERY_DAYS, homing_enabled, config,
+                            ),
+                        ),
+                    ];
+                    for (controller, adaptive_result) in policy_runs {
+                        let start = Instant::now();
+                        let adaptive = adaptive_result?;
+                        let wall_time_ms = start.elapsed().as_millis();
+                        let control_values: Vec<f64> = records.iter()
+                            .filter(|record| {
+                                record.seed == seed
+                                    && record.template_family == family
+                                    && record.perturbation == adaptive.perturbation_label
+                                    && record.homing_enabled == homing_enabled
+                                    && [0.0_f32, 0.5_f32, 1.0_f32]
+                                        .contains(&record.permeability)
+                            })
+                            .map(|record| record.final_discrepancy)
+                            .collect();
+                        if control_values.len() != 3 {
+                            return Err(format!(
+                                "expected 3 fixed controls for {family}/{}; got {}",
+                                adaptive.perturbation_label, control_values.len()
+                            ).into());
+                        }
+                        let fixed_control_mean_discrepancy =
+                            control_values.iter().sum::<f64>() / control_values.len() as f64;
+                        let final_applied_permeability = adaptive.permeability_trajectory
+                            .last().map(|(_, value)| *value)
+                            .unwrap_or(config.initial_permeability);
+                        let controller_trajectory = adaptive.discrepancy_trajectory.iter()
+                            .zip(&adaptive.permeability_trajectory)
+                            .map(|((day, discrepancy), (_, permeability))| {
+                                (*day, *permeability, *discrepancy)
+                            })
+                            .collect();
+                        adaptive_records.push(AdaptiveRunRecord {
+                            controller: controller.to_string(),
+                            seed,
+                            template_family: family.to_string(),
+                            perturbation: adaptive.perturbation_label,
+                            homing_enabled,
+                            initial_permeability: config.initial_permeability,
+                            final_applied_permeability,
+                            final_discrepancy: adaptive.final_discrepancy,
+                            integrated_discrepancy: adaptive.integrated_discrepancy,
+                            fixed_control_mean_discrepancy,
+                            adaptive_minus_fixed_mean: adaptive.final_discrepancy
+                                - fixed_control_mean_discrepancy,
+                            first_day_below_tolerance: adaptive.first_day_below_tolerance,
+                            wall_time_ms,
+                            controller_trajectory,
+                        });
                     }
-                    let fixed_control_mean_discrepancy =
-                        control_values.iter().sum::<f64>() / control_values.len() as f64;
-                    let final_applied_permeability = adaptive.permeability_trajectory
-                        .last().map(|(_, value)| *value).unwrap_or(config.initial_permeability);
-                    let controller_trajectory = adaptive.discrepancy_trajectory.iter()
-                        .zip(&adaptive.permeability_trajectory)
-                        .map(|((day, discrepancy), (_, permeability))| {
-                            (*day, *permeability, *discrepancy)
-                        })
-                        .collect();
-                    adaptive_records.push(AdaptiveRunRecord {
-                        seed,
-                        template_family: family.to_string(),
-                        perturbation: adaptive.perturbation_label,
-                        homing_enabled,
-                        initial_permeability: config.initial_permeability,
-                        final_applied_permeability,
-                        final_discrepancy: adaptive.final_discrepancy,
-                        integrated_discrepancy: adaptive.integrated_discrepancy,
-                        fixed_control_mean_discrepancy,
-                        adaptive_minus_fixed_mean: adaptive.final_discrepancy
-                            - fixed_control_mean_discrepancy,
-                        first_day_below_tolerance: adaptive.first_day_below_tolerance,
-                        wall_time_ms,
-                        controller_trajectory,
-                    });
                 }
             }
         }
@@ -239,11 +257,12 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     println!();
     println!("ADAPTIVE COUPLING COMPARISON (paired per seed with fixed permeability 0.0/0.5/1.0 mean)");
-    println!("seed,template,perturbation,homing,initial_p,final_applied_p,final_error,integrated_error,fixed_mean_error,adaptive_minus_fixed_mean,recovery_day,wall_ms");
-    let mut adaptive_grouped: BTreeMap<(String, String, bool), Vec<(f64, f64)>> = BTreeMap::new();
+    println!("controller,seed,template,perturbation,homing,initial_p,final_applied_p,final_error,integrated_error,fixed_mean_error,adaptive_minus_fixed_mean,recovery_day,wall_ms");
+    let mut adaptive_grouped: BTreeMap<(String, String, bool, String), Vec<(f64, f64)>> = BTreeMap::new();
     for record in &adaptive_records {
         println!(
-            "{},{},\"{}\",{},{:.2},{:.2},{:.6},{:.6},{:.6},{:.6},{},{}",
+            "{},{},{},\"{}\",{},{:.2},{:.2},{:.6},{:.6},{:.6},{:.6},{},{}",
+            record.controller,
             record.seed,
             record.template_family,
             record.perturbation,
@@ -269,6 +288,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             record.template_family.clone(),
             summary_perturbation,
             record.homing_enabled,
+            record.controller.clone(),
         )).or_default().push((
             record.adaptive_minus_fixed_mean,
             record.final_discrepancy
@@ -276,8 +296,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
     println!();
     println!("ADAPTIVE GROUP SUMMARY (four independent seeds; negative delta means adaptive beat fixed-control mean)");
-    println!("template,perturbation,homing,n,mean_adaptive_minus_fixed,sd_delta,mean_adaptive_error");
-    for ((family, perturbation, homing), values) in &adaptive_grouped {
+    println!("template,perturbation,homing,controller,n,mean_adaptive_minus_fixed,sd_delta,mean_adaptive_error");
+    for ((family, perturbation, homing, controller), values) in &adaptive_grouped {
         let deltas: Vec<f64> = values.iter().map(|(delta, _)| *delta).collect();
         let errors: Vec<f64> = values.iter().map(|(_, error)| *error).collect();
         let n = deltas.len() as f64;
@@ -285,8 +305,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         let variance = deltas.iter().map(|delta| (delta - mean_delta).powi(2)).sum::<f64>() / n;
         let mean_error = errors.iter().sum::<f64>() / n;
         println!(
-            "{},\"{}\",{},{},{:.6},{:.6},{:.6}",
-            family, perturbation, homing, values.len(), mean_delta, variance.sqrt(), mean_error
+            "{},\"{}\",{},{},{},{:.6},{:.6},{:.6}",
+            family, perturbation, homing, controller, values.len(), mean_delta, variance.sqrt(), mean_error
         );
     }
     let adaptive_json = serde_json::to_string_pretty(&adaptive_records)?;
