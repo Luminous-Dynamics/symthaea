@@ -342,6 +342,8 @@ pub struct BrocaGenerator {
     emotional_modulator: EmotionalModulator,
     coherence_feedback: CoherenceFeedback,
     config: BrocaConfig,
+    /// Token initializer used for newly created rows; restored from checkpoint metadata.
+    token_embedding_seed_scheme: crate::controller::TokenEmbeddingSeedScheme,
     /// Seeded RNG for reproducible sampling (TopK/TopP). Recreated each generation
     /// from `config.sampling_seed`. If `None`, uses thread-local RNG.
     sampling_rng: Option<StdRng>,
@@ -353,6 +355,10 @@ pub struct BrocaGenerator {
     code_gate: crate::gating::CodeGate,
 }
 
+/// Existing checkpoint metadata marker for the opt-in V2 token seed scheme.
+/// An absent marker means the historical V1 initializer.
+const TOKEN_SEED_SCHEME_V2_FEATURE: &str = "broca.token-seed-scheme.v2";
+
 /// Result of loading a `BrocaGenerator` from a checkpoint: the generator
 /// itself plus optional recovered optimizer/embedding/genesis-phrase state.
 type CheckpointLoadResult = anyhow::Result<(
@@ -363,10 +369,13 @@ type CheckpointLoadResult = anyhow::Result<(
 )>;
 
 impl BrocaGenerator {
-    /// Create a generator using the configured token initializer (V1 by default).
+    /// Create a generator using the historical token initializer.
     pub fn new(genesis: &GenesisSeed, config: BrocaConfig) -> Self {
-        let seed_scheme = config.controller.token_embedding_seed_scheme;
-        Self::new_with_token_embedding_seed_scheme(genesis, config, seed_scheme)
+        Self::new_with_token_embedding_seed_scheme(
+            genesis,
+            config,
+            crate::controller::TokenEmbeddingSeedScheme::LegacyV1,
+        )
     }
 
     /// Create a generator with an explicit token embedding seed scheme.
@@ -375,10 +384,9 @@ impl BrocaGenerator {
     /// the token-row initializer without changing network weights or configuration.
     pub fn new_with_token_embedding_seed_scheme(
         genesis: &GenesisSeed,
-        mut config: BrocaConfig,
+        config: BrocaConfig,
         seed_scheme: crate::controller::TokenEmbeddingSeedScheme,
     ) -> Self {
-        config.controller.token_embedding_seed_scheme = seed_scheme;
         let tokenizer = BpeTokenizer::default_minimal();
         Self::with_tokenizer_and_token_embedding_seed_scheme(
             genesis,
@@ -430,23 +438,21 @@ impl BrocaGenerator {
         config: BrocaConfig,
         tokenizer: BpeTokenizer,
     ) -> Self {
-        let seed_scheme = config.controller.token_embedding_seed_scheme;
         Self::with_tokenizer_and_token_embedding_seed_scheme(
             genesis,
             config,
             tokenizer,
-            seed_scheme,
+            crate::controller::TokenEmbeddingSeedScheme::LegacyV1,
         )
     }
 
     /// Create a generator with a custom tokenizer and an explicit token seed scheme.
     pub fn with_tokenizer_and_token_embedding_seed_scheme(
         genesis: &GenesisSeed,
-        mut config: BrocaConfig,
+        config: BrocaConfig,
         tokenizer: BpeTokenizer,
         seed_scheme: crate::controller::TokenEmbeddingSeedScheme,
     ) -> Self {
-        config.controller.token_embedding_seed_scheme = seed_scheme;
         let mut ctrl_config = config.controller.clone();
         ctrl_config.vocab_size = tokenizer.vocab_size();
 
@@ -490,6 +496,7 @@ impl BrocaGenerator {
             nsm_gate,
             code_gate,
             config,
+            token_embedding_seed_scheme: seed_scheme,
         }
     }
 
@@ -615,8 +622,23 @@ impl BrocaGenerator {
         // hardcoded common words). The checkpoint already carries its own vocab
         // (`vocab: self.tokenizer.export_vocab()` in `save_checkpoint`) — it was just never
         // read back. Reconstruct the tokenizer from that saved vocab instead.
+        let seed_scheme = if checkpoint
+            .metadata
+            .feature_set
+            .iter()
+            .any(|feature| feature == TOKEN_SEED_SCHEME_V2_FEATURE)
+        {
+            crate::controller::TokenEmbeddingSeedScheme::DomainSeparatedV2
+        } else {
+            crate::controller::TokenEmbeddingSeedScheme::LegacyV1
+        };
         let tokenizer = crate::tokenizer::BpeTokenizer::from_vocab_file(&checkpoint.vocab);
-        let mut r#gen = Self::with_tokenizer(genesis, checkpoint.config, tokenizer);
+        let mut r#gen = Self::with_tokenizer_and_token_embedding_seed_scheme(
+            genesis,
+            checkpoint.config,
+            tokenizer,
+            seed_scheme,
+        );
         r#gen.controller.restore_network(checkpoint.network_state);
         r#gen
             .controller
@@ -649,7 +671,16 @@ impl BrocaGenerator {
             projection_weights,
             highway_weights: self.controller.highway_weights(),
             liquid_mamba_config,
-            metadata: crate::checkpoint::BrocaCheckpointMetadata::default(), // Will be populated in save_to_file eventually
+            metadata: crate::checkpoint::BrocaCheckpointMetadata {
+                feature_set: if self.token_embedding_seed_scheme
+                    == crate::controller::TokenEmbeddingSeedScheme::DomainSeparatedV2
+                {
+                    vec![TOKEN_SEED_SCHEME_V2_FEATURE.to_string()]
+                } else {
+                    vec![]
+                },
+                ..Default::default()
+            },
             checksum: [0u8; 32],
         };
         checkpoint.save_to_file(path)
@@ -2661,7 +2692,7 @@ mod tests {
             crate::controller::TokenEmbeddingSeedScheme::DomainSeparatedV2,
         );
         assert_eq!(
-            generator.config.controller.token_embedding_seed_scheme,
+            generator.token_embedding_seed_scheme,
             crate::controller::TokenEmbeddingSeedScheme::DomainSeparatedV2
         );
 
@@ -2671,10 +2702,21 @@ mod tests {
             .save_checkpoint(&path, 0, 0.0, None, None, None)
             .expect("save V2 checkpoint");
 
+        let checkpoint = crate::checkpoint::BrocaCheckpoint::load_from_file(&path)
+            .expect("read V2 checkpoint metadata");
+        assert!(
+            checkpoint
+                .metadata
+                .feature_set
+                .iter()
+                .any(|feature| feature == TOKEN_SEED_SCHEME_V2_FEATURE),
+            "V2 scheme must be persisted in the existing checkpoint feature_set"
+        );
+
         let (mut reloaded, ..) =
             BrocaGenerator::from_checkpoint(&path, &genesis).expect("reload V2 checkpoint");
         assert_eq!(
-            reloaded.config.controller.token_embedding_seed_scheme,
+            reloaded.token_embedding_seed_scheme,
             crate::controller::TokenEmbeddingSeedScheme::DomainSeparatedV2,
             "checkpoint reconstruction must retain the token initializer for future vocabulary growth"
         );
@@ -2685,9 +2727,12 @@ mod tests {
             .append_token(&genesis, "after-reload", None);
         assert_eq!(
             reloaded.controller.token_embeddings()[old_vocab_size].values,
-            genesis.hv_v2("broca::token_emb::after-reload", symthaea_core::hdc::HDC_DIMENSION).values,
+            genesis.hv_v2(
+                "broca::token_emb::after-reload",
+                symthaea_core::hdc::HDC_DIMENSION,
+            )
+            .values,
             "a reloaded V2 model must not append legacy-seeded token rows"
         );
     }
-
 }
