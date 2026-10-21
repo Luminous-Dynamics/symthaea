@@ -449,6 +449,97 @@ mod tests {
     }
 
     #[test]
+    fn canonical_manifest_matches_rust_model_and_prior_encodings() {
+        let manifest = include_str!("../validation/fixtures/entropy_causality_models.tsv");
+        let mut cases = 0usize;
+        for (line_index, raw_line) in manifest.lines().enumerate() {
+            let line = raw_line.trim();
+            if line.is_empty() || line.starts_with('#') {
+                continue;
+            }
+            let fields: Vec<&str> = line.split('\t').collect();
+            assert_eq!(fields.len(), 5, "manifest line {}", line_index + 1);
+            let (name, node_count, rules_text, noise_hex, prior_text) =
+                (fields[0], fields[1], fields[2], fields[3], fields[4]);
+            let node_count: usize = node_count.parse().expect("valid node count");
+            let noise_bits = u64::from_str_radix(noise_hex, 16).expect("valid noise f64 bits");
+            let noise = f64::from_bits(noise_bits);
+            let rules: Vec<Rule> = rules_text
+                .split(',')
+                .map(|token| {
+                    let parts: Vec<&str> = token.split(':').collect();
+                    match parts.as_slice() {
+                        ["copy", from] => Rule::Copy {
+                            from: from.parse().expect("copy source"),
+                        },
+                        ["xor", left, right] => Rule::Xor {
+                            left: left.parse().expect("xor left source"),
+                            right: right.parse().expect("xor right source"),
+                        },
+                        ["and", left, right] => Rule::And {
+                            left: left.parse().expect("and left source"),
+                            right: right.parse().expect("and right source"),
+                        },
+                        ["constant", "0"] => Rule::Constant(false),
+                        ["constant", "1"] => Rule::Constant(true),
+                        _ => panic!("unsupported manifest rule at line {}: {token}", line_index + 1),
+                    }
+                })
+                .collect();
+            assert_eq!(rules.len(), node_count, "rule count for {name}");
+            let network = Network::new(rules, noise);
+            assert_eq!(
+                network.canonical_specification(),
+                format!(
+                    "schema=boolean-network-v1;rules={rules_text};flip={:.6};flip_bits={:016x}",
+                    noise, noise_bits
+                ),
+                "canonical model mismatch for {name}"
+            );
+
+            let prior = if prior_text == "uniform" {
+                uniform_state_distribution(&network)
+            } else {
+                let entries = prior_text
+                    .strip_prefix("sparse:")
+                    .expect("supported prior spec");
+                let mut prior = vec![0.0; network.state_count()];
+                for entry in entries.split(',') {
+                    let (state_text, probability_hex) = entry.split_once(':').expect("prior entry");
+                    let state: usize = state_text.parse().expect("prior state index");
+                    let probability_bits =
+                        u64::from_str_radix(probability_hex, 16).expect("prior f64 bits");
+                    assert!(state < prior.len(), "prior state outside model for {name}");
+                    prior[state] = f64::from_bits(probability_bits);
+                }
+                prior
+            };
+            assert_eq!(prior.len(), 1usize << node_count, "prior length for {name}");
+            assert!(
+                (prior.iter().sum::<f64>() - 1.0).abs() <= 1e-12,
+                "prior mass for {name}"
+            );
+            assert_eq!(
+                canonical_prior_specification(&prior),
+                {
+                    let entries = prior
+                        .iter()
+                        .enumerate()
+                        .map(|(state, probability)| {
+                            format!("{state}:{probability:.6}:{:016x}", probability.to_bits())
+                        })
+                        .collect::<Vec<_>>()
+                        .join(",");
+                    format!("schema=state-prior-v1;prior={entries}")
+                },
+                "canonical prior mismatch for {name}"
+            );
+            cases += 1;
+        }
+        assert_eq!(cases, 13, "manifest fixture count changed; update this assertion deliberately");
+    }
+
+    #[test]
     fn entropy_has_correct_binary_extremes() {
         close(entropy_bits(&[1.0, 0.0]), 0.0, 1e-12);
         close(entropy_bits(&[0.5, 0.5]), 1.0, 1e-12);
