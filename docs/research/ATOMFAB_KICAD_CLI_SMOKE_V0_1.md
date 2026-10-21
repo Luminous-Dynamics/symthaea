@@ -73,3 +73,12 @@ The latest executed run confirmed the connected negative-control mutation is now
 The remaining replay failure came from KiCad's generated `continuity-coupon-job.gbrjob` JSON. It contains `Header.CreationDate`, which changes between otherwise equivalent exports; this is separate from the timestamp lines in the Gerber layer files. The workflow now compares `.gbrjob` files with canonical JSON after deleting only `Header.CreationDate`, compares raw Gerber layer payloads after removing the known creation-date lines, and preserves raw files plus SHA-256 hashes.
 
 The artifact manifest includes the two job-metadata files in addition to the six primary Gerber layers, six repeat layers, two Excellon outputs, three DRC reports, native/negative board, and tool-version output: **22 uniquely role-bound files**. The manifest uses the same strict schema as the Rust actual-byte inventory gate in parent PR #8222. This rerun still needs to validate the latest code; no green native-EDA claim is made until it passes at its exact head.
+
+
+## First complete native-EDA smoke pass and portable bundle follow-up
+
+Exact-head run [#39549790807](https://github.com/Luminous-Dynamics/symthaea/actions/runs/39549790807) succeeded for commit `ac67123180d6537235acddab89bf9452a477c7ce`. The receipt reports KiCad 9.0.9, zero clean-board DRC violations/unconnected items, two `tracks_crossing` violations on the deliberately crossed-net control and zero unconnected items there, repeat-equivalent DRC/exports after explicit date normalization, six named Gerbers, one validated Excellon drill file, and a 22-entry actual-byte manifest.
+
+Receipt artifact: [`atomfab-kicad-cli-smoke-receipt`](https://github.com/Luminous-Dynamics/symthaea/actions/runs/39549790807/artifacts/12322464083), uploaded ZIP digest `sha256:1ba5f03077abaa24823a33f937cd2587244ca70e81cf27db5e9b5d9c77ab881c`. The embedded receipt binds the manifest digest `0913ce50225fb1b238fdfc764193f60e8bbc2d547441febdabc2cfeee655f1b8` and the exact board/tool revision.
+
+Reviewing the downloaded bundle then revealed a handoff issue: `SHA256SUMS` recorded runner-absolute paths, so the manifest and CAM outputs were intact but the checksum file could not verify after extraction on another host. The workflow now writes artifact-root-relative checksums and runs `sha256sum -c SHA256SUMS` before upload. The next exact-head run must prove the exported ZIP is portable, not merely that its files were generated on the hosted runner.
