@@ -44,7 +44,7 @@ The recommendation may be no-ranking, candidate-next-action, or prefer-alternati
 ## Safety and authority boundaries
 
 - Review artifacts are read-only: no mutation of the authoritative project and no actuator authority.
-- In the current Sol-Atlas v0 frame (LOCAL_CARTESIAN_DRAWING_UNITS, georeferenced=false), the review does not authorize analytical or scientific simulation claims. A real coordinate transform and typed, validated geometry are prerequisites.
+- In the current Sol-Atlas v0 frame (LOCAL_CARTESIAN_DRAWING_UNITS, georeferenced=false), the review does not authorize analytical or scientific simulation claims or any computed spatial/physical outcome metric. A real coordinate transform and typed, validated geometry are prerequisites.
 - Symtropy currently allows schema qualification and synthetic benchmarking for v0 geometry only. It blocks analytical/scientific claims with schematic anchors.
 - A Mycelix decision/consent record may attest that an authorized decision was made; it does not prove physical outcomes, title, or ecological causality.
 - Never represent synthetic/modelled evidence as observed evidence; preserve the evidence class in every display/export.
