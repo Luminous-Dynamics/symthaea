@@ -519,7 +519,10 @@ impl Rk45Tolerances {
             || !self.relative.is_finite()
             || self.relative < 0.0
             || self.absolute.len() != dimension
-            || self.absolute.iter().any(|value| !value.is_finite() || *value <= 0.0)
+            || self
+                .absolute
+                .iter()
+                .any(|value| !value.is_finite() || *value <= 0.0)
         {
             return Err(SimulationError::InvalidRk45Tolerances);
         }
@@ -618,10 +621,7 @@ impl Rk45Controller {
         if !maximum_dt.is_finite() || maximum_dt <= 0.0 {
             return Err(SimulationError::InvalidTimeStep);
         }
-        let requested_dt = self
-            .next_step_size
-            .unwrap_or(maximum_dt)
-            .min(maximum_dt);
+        let requested_dt = self.next_step_size.unwrap_or(maximum_dt).min(maximum_dt);
         let report = integrator.try_adaptive_step_impl(
             system,
             state,
@@ -768,32 +768,32 @@ impl Rk45Integrator {
             let x3: Vec<f64> = (0..dim)
                 .map(|i| state[i] + h * (3.0 / 40.0 * k1[i] + 9.0 / 40.0 * k2[i]))
                 .collect();
-            let k3 =
-                Self::checked_derivatives(system, &x3, t + 3.0 * h / 10.0, dim, 3)?;
+            let k3 = Self::checked_derivatives(system, &x3, t + 3.0 * h / 10.0, dim, 3)?;
 
             let x4: Vec<f64> = (0..dim)
                 .map(|i| {
-                    state[i] + h * (3.0 / 10.0 * k1[i] - 9.0 / 10.0 * k2[i]
-                        + 6.0 / 5.0 * k3[i])
+                    state[i] + h * (3.0 / 10.0 * k1[i] - 9.0 / 10.0 * k2[i] + 6.0 / 5.0 * k3[i])
                 })
                 .collect();
             let k4 = Self::checked_derivatives(system, &x4, t + 3.0 * h / 5.0, dim, 4)?;
 
             let x5: Vec<f64> = (0..dim)
                 .map(|i| {
-                    state[i] + h * (-11.0 / 54.0 * k1[i] + 5.0 / 2.0 * k2[i]
-                        - 70.0 / 27.0 * k3[i] + 35.0 / 27.0 * k4[i])
+                    state[i]
+                        + h * (-11.0 / 54.0 * k1[i] + 5.0 / 2.0 * k2[i] - 70.0 / 27.0 * k3[i]
+                            + 35.0 / 27.0 * k4[i])
                 })
                 .collect();
             let k5 = Self::checked_derivatives(system, &x5, t + h, dim, 5)?;
 
             let x6: Vec<f64> = (0..dim)
                 .map(|i| {
-                    state[i] + h * (1631.0 / 55296.0 * k1[i]
-                        + 175.0 / 512.0 * k2[i]
-                        + 575.0 / 13824.0 * k3[i]
-                        + 44275.0 / 110592.0 * k4[i]
-                        + 253.0 / 4096.0 * k5[i])
+                    state[i]
+                        + h * (1631.0 / 55296.0 * k1[i]
+                            + 175.0 / 512.0 * k2[i]
+                            + 575.0 / 13824.0 * k3[i]
+                            + 44275.0 / 110592.0 * k4[i]
+                            + 253.0 / 4096.0 * k5[i])
                 })
                 .collect();
             let k6 = Self::checked_derivatives(system, &x6, t + 7.0 * h / 8.0, dim, 6)?;
@@ -801,21 +801,23 @@ impl Rk45Integrator {
             // Fifth-order solution used to advance the state.
             let y5: Vec<f64> = (0..dim)
                 .map(|i| {
-                    state[i] + h * (37.0 / 378.0 * k1[i]
-                        + 250.0 / 621.0 * k3[i]
-                        + 125.0 / 594.0 * k4[i]
-                        + 512.0 / 1771.0 * k6[i])
+                    state[i]
+                        + h * (37.0 / 378.0 * k1[i]
+                            + 250.0 / 621.0 * k3[i]
+                            + 125.0 / 594.0 * k4[i]
+                            + 512.0 / 1771.0 * k6[i])
                 })
                 .collect();
 
             // Fourth-order embedded solution used only for error estimation.
             let y4: Vec<f64> = (0..dim)
                 .map(|i| {
-                    state[i] + h * (2825.0 / 27648.0 * k1[i]
-                        + 18575.0 / 48384.0 * k3[i]
-                        + 13525.0 / 55296.0 * k4[i]
-                        + 277.0 / 14336.0 * k5[i]
-                        + 1.0 / 4.0 * k6[i])
+                    state[i]
+                        + h * (2825.0 / 27648.0 * k1[i]
+                            + 18575.0 / 48384.0 * k3[i]
+                            + 13525.0 / 55296.0 * k4[i]
+                            + 277.0 / 14336.0 * k5[i]
+                            + 1.0 / 4.0 * k6[i])
                 })
                 .collect();
 
@@ -1033,14 +1035,8 @@ impl Rk45Integrator {
 
             let remaining = t_end - time;
             let maximum_dt = self.dt_max.min(remaining);
-            let step = controller.try_step_validated(
-                self,
-                system,
-                &state,
-                time,
-                maximum_dt,
-                tolerances,
-            )?;
+            let step = controller
+                .try_step_validated(self, system, &state, time, maximum_dt, tolerances)?;
             if !step.accepted_dt.is_finite()
                 || step.accepted_dt <= 0.0
                 || step.accepted_dt > remaining
@@ -1191,8 +1187,7 @@ impl Integrator for Rk45Integrator {
         t: f64,
         dt: f64,
     ) -> Result<(Vec<f64>, f64), SimulationError> {
-        let (new_state, accepted_dt, _error) =
-            self.try_adaptive_step(system, state, t, dt)?;
+        let (new_state, accepted_dt, _error) = self.try_adaptive_step(system, state, t, dt)?;
         Ok((new_state, accepted_dt))
     }
 
@@ -2629,12 +2624,7 @@ mod tests {
     #[test]
     fn checked_rk45_rejects_wrong_dimension_derivatives() {
         let system = MalformedDerivativeSystem { output: vec![0.0] };
-        let result = Rk45Integrator::new(1e-8).try_adaptive_step(
-            &system,
-            &[1.0, 0.0],
-            0.0,
-            0.1,
-        );
+        let result = Rk45Integrator::new(1e-8).try_adaptive_step(&system, &[1.0, 0.0], 0.0, 0.1);
         assert_eq!(
             result,
             Err(SimulationError::DerivativeDimensionMismatch {
@@ -2650,12 +2640,7 @@ mod tests {
         let system = MalformedDerivativeSystem {
             output: vec![f64::NAN, 0.0],
         };
-        let result = Rk45Integrator::new(1e-8).try_adaptive_step(
-            &system,
-            &[1.0, 0.0],
-            0.0,
-            0.1,
-        );
+        let result = Rk45Integrator::new(1e-8).try_adaptive_step(&system, &[1.0, 0.0], 0.0, 0.1);
         assert_eq!(
             result,
             Err(SimulationError::NonFiniteDerivative { stage: 1, index: 0 })
