@@ -916,7 +916,7 @@ impl LanguageController {
                 token_embedding_from_seed(
                     genesis,
                     &format!("broca::token_emb::{name}"),
-                    self.config.token_embedding_seed_scheme,
+                    self.token_embedding_seed_scheme,
                 )
             } else {
                 ContinuousHV::bundle(ctx)
@@ -925,7 +925,7 @@ impl LanguageController {
             token_embedding_from_seed(
                 genesis,
                 &format!("broca::token_emb::{name}"),
-                self.config.token_embedding_seed_scheme,
+                self.token_embedding_seed_scheme,
             )
         };
         self.token_embeddings.push(emb);
@@ -1676,9 +1676,12 @@ mod tests {
     #[test]
     fn appended_tokens_follow_the_active_seed_scheme() {
         let genesis = test_genesis();
-        let mut config = test_config();
-        config.token_embedding_seed_scheme = TokenEmbeddingSeedScheme::DomainSeparatedV2;
-        let mut controller = LanguageController::new(&genesis, &config);
+        let config = test_config();
+        let mut controller = LanguageController::new_with_token_embedding_seed_scheme(
+            &genesis,
+            &config,
+            TokenEmbeddingSeedScheme::DomainSeparatedV2,
+        );
         let old_vocab_size = controller.vocab_size();
 
         controller.append_token(&genesis, "new-token", None);
@@ -1686,7 +1689,9 @@ mod tests {
         assert_eq!(controller.vocab_size(), old_vocab_size + 1);
         assert_eq!(
             controller.token_embeddings()[old_vocab_size].values,
-            genesis.hv_v2("broca::token_emb::new-token", HDC_DIMENSION).values,
+            genesis
+                .hv_v2("broca::token_emb::new-token", HDC_DIMENSION)
+                .values,
             "appended V2 rows must not silently revert to the legacy stream"
         );
     }
