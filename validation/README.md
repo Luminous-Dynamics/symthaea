@@ -32,6 +32,7 @@ The task-conditioned counterfactual integration candidate has a small, exact Boo
 Run the independent reference oracle:
 
 ~~~bash
+set -euo pipefail
 python validation/tccip_reference_oracle.py \
   --source-sha "$(git rev-parse HEAD)" \
   --output results/tccip_python_reference.tsv
@@ -42,6 +43,7 @@ python -m unittest validation.test_tccip_reference_oracle -v
 Run the Rust implementation separately:
 
 ~~~bash
+set -euo pipefail
 cargo test --example task_conditioned_finite_state_eval
 SYMTHAEA_SOURCE_SHA="$(git rev-parse HEAD)" \
   cargo run --release --example task_conditioned_finite_state_eval \
