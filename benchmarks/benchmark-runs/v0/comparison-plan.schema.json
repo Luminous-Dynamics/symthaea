@@ -313,7 +313,8 @@
       "required": [
         "replicates",
         "seed",
-        "confidence_level"
+        "confidence_level",
+        "multiple_comparison_correction"
       ],
       "properties": {
         "replicates": {
@@ -328,6 +329,12 @@
           "type": "number",
           "exclusiveMinimum": 0.5,
           "exclusiveMaximum": 1
+        },
+        "multiple_comparison_correction": {
+          "enum": [
+            "none",
+            "bonferroni"
+          ]
         }
       }
     }
