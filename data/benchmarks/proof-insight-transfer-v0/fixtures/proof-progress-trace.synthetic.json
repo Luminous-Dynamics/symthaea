@@ -1,0 +1,203 @@
+{
+  "schema_version": "pitb.proof-progress-trace.v0",
+  "trace_id": "synthetic-progress-trace-v0",
+  "split": "train",
+  "source_insight": {
+    "record_id": "synthetic-insight",
+    "family_id": "synthetic-source-family",
+    "insight_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "target": {
+    "target_id": "synthetic-target",
+    "family_id": "synthetic-target-family",
+    "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "artifact_path": "synthetic/Target.lean",
+    "artifact_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "statement_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "root_obligation_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "toolchain": "synthetic Lean toolchain (fixture only)",
+    "checker": "synthetic checker (fixture only)"
+  },
+  "run": {
+    "run_id": "synthetic-run",
+    "arm_id": "F",
+    "model_id": "synthetic-model",
+    "model_version": "fixture-only",
+    "prompt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "config_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "input_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "budget": {
+      "max_model_calls": 4,
+      "max_tokens": 1000,
+      "max_wall_ms": 5000,
+      "max_cost_microusd": 1000000
+    }
+  },
+  "events": [
+    {
+      "sequence": 0,
+      "event_id": "e0",
+      "kind": "attempt_started",
+      "elapsed_ms": 0,
+      "cumulative_model_calls": 0,
+      "cumulative_tokens": 0,
+      "cumulative_cost_microusd": 0,
+      "state_before_sha256": null,
+      "state_after_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "obligation_transitions": [],
+      "event_receipt_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "checker_receipt_sha256": null
+    },
+    {
+      "sequence": 1,
+      "event_id": "e1",
+      "kind": "strategy_presented",
+      "elapsed_ms": 10,
+      "cumulative_model_calls": 1,
+      "cumulative_tokens": 160,
+      "cumulative_cost_microusd": 100,
+      "state_before_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "state_after_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "obligation_transitions": [],
+      "event_receipt_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "checker_receipt_sha256": null
+    },
+    {
+      "sequence": 2,
+      "event_id": "e2",
+      "kind": "tactic_attempted",
+      "elapsed_ms": 50,
+      "cumulative_model_calls": 1,
+      "cumulative_tokens": 240,
+      "cumulative_cost_microusd": 100,
+      "state_before_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "state_after_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "obligation_transitions": [
+        {
+          "obligation_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "transition": "split",
+          "child_obligation_sha256s": [
+            "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          ],
+          "checker_receipt_sha256": null
+        }
+      ],
+      "event_receipt_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "checker_receipt_sha256": null
+    },
+    {
+      "sequence": 3,
+      "event_id": "e3",
+      "kind": "obligation_state_changed",
+      "elapsed_ms": 100,
+      "cumulative_model_calls": 2,
+      "cumulative_tokens": 400,
+      "cumulative_cost_microusd": 200,
+      "state_before_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "state_after_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "obligation_transitions": [
+        {
+          "obligation_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "transition": "discharged",
+          "child_obligation_sha256s": [],
+          "checker_receipt_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+        }
+      ],
+      "event_receipt_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "checker_receipt_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+    },
+    {
+      "sequence": 4,
+      "event_id": "e4",
+      "kind": "obligation_state_changed",
+      "elapsed_ms": 120,
+      "cumulative_model_calls": 2,
+      "cumulative_tokens": 480,
+      "cumulative_cost_microusd": 200,
+      "state_before_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "state_after_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "obligation_transitions": [
+        {
+          "obligation_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "transition": "discharged",
+          "child_obligation_sha256s": [],
+          "checker_receipt_sha256": "7777777777777777777777777777777777777777777777777777777777777777"
+        }
+      ],
+      "event_receipt_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+      "checker_receipt_sha256": "7777777777777777777777777777777777777777777777777777777777777777"
+    },
+    {
+      "sequence": 5,
+      "event_id": "e5",
+      "kind": "target_kernel_checked",
+      "elapsed_ms": 130,
+      "cumulative_model_calls": 2,
+      "cumulative_tokens": 480,
+      "cumulative_cost_microusd": 200,
+      "state_before_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "state_after_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "obligation_transitions": [],
+      "event_receipt_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+      "checker_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "sequence": 6,
+      "event_id": "e6",
+      "kind": "successor_check",
+      "elapsed_ms": 140,
+      "cumulative_model_calls": 2,
+      "cumulative_tokens": 480,
+      "cumulative_cost_microusd": 200,
+      "state_before_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "state_after_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "obligation_transitions": [],
+      "event_receipt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "checker_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    },
+    {
+      "sequence": 7,
+      "event_id": "e7",
+      "kind": "semantic_gate_checked",
+      "elapsed_ms": 150,
+      "cumulative_model_calls": 2,
+      "cumulative_tokens": 480,
+      "cumulative_cost_microusd": 200,
+      "state_before_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "state_after_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "obligation_transitions": [],
+      "event_receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "checker_receipt_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    },
+    {
+      "sequence": 8,
+      "event_id": "e8",
+      "kind": "attempt_terminated",
+      "elapsed_ms": 160,
+      "cumulative_model_calls": 2,
+      "cumulative_tokens": 480,
+      "cumulative_cost_microusd": 200,
+      "state_before_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "state_after_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "obligation_transitions": [],
+      "event_receipt_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "checker_receipt_sha256": null
+    }
+  ],
+  "outcome": {
+    "terminal_status": "verified_success",
+    "target_kernel_status": "passed",
+    "semantic_gate_status": "passed",
+    "successor_status": "passed",
+    "actual_model_calls": 2,
+    "actual_tokens": 480,
+    "actual_wall_ms": 160,
+    "actual_cost_microusd": 200,
+    "outcome_receipt_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "notes": [
+      "Synthetic schema/trace-validation fixture only; not a Lean proof or benchmark result."
+    ]
+  },
+  "trace_receipt_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+}
