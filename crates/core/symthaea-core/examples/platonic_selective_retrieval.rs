@@ -28,11 +28,26 @@ const CERTIFICATION_ALPHA_PER_RULE: f64 = 0.05 / 3.0;
 const NOISE_LEVELS: [f64; 7] = [0.0, 0.10, 0.20, 0.30, 0.40, 0.45, 0.50];
 const SEEDS: [u64; 3] = [17, 29, 41];
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum QueryKind {
+    Known { noise_index: usize },
+    RandomOod,
+    AmbiguousMixture,
+}
+
+#[derive(Debug, Clone)]
+struct QuerySample {
+    vector: PatternVector,
+    target: Option<usize>,
+    kind: QueryKind,
+}
+
 #[derive(Debug, Clone)]
 struct ScoredQuery {
     best_similarity: f64,
     top_two_margin: f64,
     correct: bool,
+    kind: QueryKind,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -51,7 +66,7 @@ struct Evaluation {
 
 impl Evaluation {
     fn coverage(self) -> f64 {
-        self.accepted as f64 / self.total as f64
+        if self.total == 0 { 0.0 } else { self.accepted as f64 / self.total as f64 }
     }
 
     fn selective_risk(self) -> Option<f64> {
@@ -59,7 +74,7 @@ impl Evaluation {
     }
 
     fn raw_accuracy(self) -> f64 {
-        self.raw_correct as f64 / self.total as f64
+        if self.total == 0 { 0.0 } else { self.raw_correct as f64 / self.total as f64 }
     }
 }
 
@@ -71,7 +86,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("# query_mix_weights=known:random_ood:ambiguous_mixture=7:2:2");
     println!("# known_query_noise_level=uniform_over_0,0.10,0.20,0.30,0.40,0.45,0.50");
     println!(
-        "seed,strategy,dimension,prototypes,selection_n,certification_n,certified,test_n,min_similarity,min_margin,accepted,coverage,errors,selective_risk,risk95_low,risk95_high,top1_accuracy"
+        "record_type,seed,strategy,query_kind,noise_fraction,dimension,prototypes,selection_n,certification_n,certified,test_n,min_similarity,min_margin,n,accepted,coverage,errors,selective_risk,risk95_low,risk95_high,top1_accuracy"
     );
 
     for seed in SEEDS {
@@ -154,7 +169,7 @@ fn generate_queries(
     prototypes: &[PatternVector],
     seed: u64,
     query_count: usize,
-) -> Result<Vec<(PatternVector, Option<usize>)>, Box<dyn Error>> {
+) -> Result<Vec<QuerySample>, Box<dyn Error>> {
     if prototypes.len() < 2 {
         return Err("selective retrieval requires at least two prototypes".into());
     }
@@ -177,13 +192,21 @@ fn generate_queries(
                 NOISE_LEVELS[noise_index],
                 next_u64(&mut rng_state),
             )?;
-            queries.push((query, Some(target)));
+            queries.push(QuerySample {
+                vector: query,
+                target: Some(target),
+                kind: QueryKind::Known { noise_index },
+            });
         } else if query_type < KNOWN_QUERY_WEIGHT + OOD_QUERY_WEIGHT {
             let query = PatternVector::seeded_random(
                 prototypes[0].dimension(),
                 next_u64(&mut rng_state),
             )?;
-            queries.push((query, None));
+            queries.push(QuerySample {
+                vector: query,
+                target: None,
+                kind: QueryKind::RandomOod,
+            });
         } else {
             let left = sample_bounded(&mut rng_state, prototypes.len());
             let offset = 1 + sample_bounded(&mut rng_state, prototypes.len() - 1);
@@ -194,7 +217,11 @@ fn generate_queries(
             )?;
             // A mixture is intentionally ambiguous: accepting either component
             // as a unique answer is counted as a selective-classification error.
-            queries.push((mixture, None));
+            queries.push(QuerySample {
+                vector: mixture,
+                target: None,
+                kind: QueryKind::AmbiguousMixture,
+            });
         }
     }
 
@@ -220,12 +247,13 @@ fn next_u64(state: &mut u64) -> u64 {
 }
 
 fn score_queries(
-    queries: &[(PatternVector, Option<usize>)],
+    queries: &[QuerySample],
     prototypes: &[PatternVector],
 ) -> Result<Vec<ScoredQuery>, Box<dyn Error>> {
     let mut scored = Vec::with_capacity(queries.len());
 
-    for (query, target) in queries {
+    for sample in queries {
+        let query = &sample.vector;
         let mut best_index = 0;
         let mut best = f64::NEG_INFINITY;
         let mut second = f64::NEG_INFINITY;
@@ -244,7 +272,8 @@ fn score_queries(
         scored.push(ScoredQuery {
             best_similarity: best,
             top_two_margin: best - second,
-            correct: target.is_some_and(|target_index| target_index == best_index),
+            correct: sample.target.is_some_and(|target_index| target_index == best_index),
+            kind: sample.kind,
         });
     }
 
