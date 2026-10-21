@@ -84,7 +84,7 @@ The current preregistered primary gate is unchanged unless another explicit pre-
 | External replication | Repeat the registered contrast on at least one separately sourced, contamination-audited challenge suite; use a second independent suite before making broad SOTA claims | Separates an internal result from generalization |
 | Negative-transfer calibration | Publish transfer precision/recall, calibration and coverage-risk; include cost of false acceptance explicitly | Mathematical analogies can be damaging when directions or assumptions differ |
 
-The ≥90% positive-control recall target and external replication milestones above are **proposed project targets**, not yet added to the frozen protocol or measured. Before using them as confirmatory gates, record an explicit protocol amendment and freeze the annotator rubric and sample. Do not silently retrofit this table into an already-frozen run manifest.
+The ≥90% positive-control recall target is now included in the protocol's **secondary transfer-selectivity track** by a pre-outcome amendment dated 2026-10-21; that track also requires at least 20 independent pair-graph components in each of the compatible and incompatible classes before a confirmatory transfer-selectivity claim. These are acceptance targets, not measured results. The external replication milestones remain proposed and still require a separately frozen challenge-set design. Hash the current protocol bytes into any future run config; do not reuse a digest from an earlier protocol revision.
 
 ## Baseline matrix and honest SOTA language
 
