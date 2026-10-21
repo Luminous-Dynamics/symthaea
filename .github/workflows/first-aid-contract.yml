@@ -84,8 +84,10 @@ jobs:
             .count_summary.mutation_case_count == 27 and
             .count_summary.planned_not_yet_executable_count == 0 and
             .differential_oracle.status == "unit_test_added" and
+            .differential_oracle.state_model_spec_path == "docs/research/first-aid/STATE_MODEL_V0.md" and
             ([.differential_oracle.implementation, .differential_oracle.coverage,
-              .differential_oracle.limits] | all(type == "string" and length > 0)) and
+              .differential_oracle.limits, .differential_oracle.state_model_scope] |
+              all(type == "string" and length > 0)) and
             (.cases | length) == .count_summary.case_count and
             ([.cases[].case_id] | length) == ([.cases[].case_id] | unique | length) and
             ([.cases[] | select(.evidence_status == "planned_not_yet_executable")] | length) ==
@@ -112,6 +114,8 @@ jobs:
           while IFS= read -r gate_ref; do
             grep -Fq -- "$gate_ref" .github/workflows/first-aid-contract.yml
           done < <(jq -r '.cases[] | select(.evidence_status == "workflow_gate_existing") | .gate_ref' "$matrix")
+          state_model_spec="$(jq -r '.differential_oracle.state_model_spec_path' "$matrix")"
+          test -s "$state_model_spec"
           expected_corpus_sha="$(jq -r '.fixture_binding.trajectory_corpus_sha256' "$matrix")"
           actual_corpus_sha="$(sha256sum "$corpus" | awk '{print $1}')"
           test "$actual_corpus_sha" = "$expected_corpus_sha"
