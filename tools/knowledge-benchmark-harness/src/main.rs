@@ -15,6 +15,7 @@ enum Kind {
     Case,
     Graph,
     Claim,
+    Pair,
 }
 
 impl Kind {
@@ -23,8 +24,9 @@ impl Kind {
             "case" => Ok(Self::Case),
             "graph" => Ok(Self::Graph),
             "claim" => Ok(Self::Claim),
+            "pair" => Ok(Self::Pair),
             _ => Err(format!(
-                "unknown --kind {raw:?}; expected case, graph, or claim"
+                "unknown --kind {raw:?}; expected case, graph, claim, or pair"
             )),
         }
     }
@@ -34,6 +36,7 @@ impl Kind {
             Self::Case => "case",
             Self::Graph => "graph",
             Self::Claim => "claim",
+            Self::Pair => "pair",
         }
     }
 }
@@ -76,7 +79,7 @@ struct Report {
 }
 
 fn usage() -> &'static str {
-    "Usage: knowledge-benchmark-harness --schema FILE --input JSONL --kind case|graph|claim [--out FILE] [--subject-revision SHA]\n\nValidates local data only. It never fetches source URLs or remote schemas."
+    "Usage: knowledge-benchmark-harness --schema FILE --input JSONL --kind case|graph|claim|pair [--out FILE] [--subject-revision SHA]\n\nValidates local data only. It never fetches source URLs or remote schemas."
 }
 
 fn parse_args() -> Result<Config, String> {
@@ -292,6 +295,7 @@ fn record_identity(kind: Kind, value: &Value, line: usize) -> String {
     let key = match kind {
         Kind::Graph => "graph_id",
         Kind::Case | Kind::Claim => "id",
+        Kind::Pair => "pair_id",
     };
     string_field(value, key)
         .map(str::to_string)
@@ -319,6 +323,142 @@ fn collect_unique_object_ids(
         }
     }
     ids
+}
+
+fn validate_pair_contract(pair: &Value) -> Vec<String> {
+    let mut errors = Vec::new();
+    let dimension = string_field(pair, "dimension").unwrap_or("");
+    let expected = string_field(pair, "expected_relation").unwrap_or("");
+    let baseline = pair.get("baseline").unwrap_or(&Value::Null);
+    let mutated = pair.get("mutated").unwrap_or(&Value::Null);
+    let intervention = pair.get("intervention").unwrap_or(&Value::Null);
+    let field = string_field(intervention, "field").unwrap_or("");
+    let before_value = string_field(intervention, "before_value").unwrap_or("");
+    let after_value = string_field(intervention, "after_value").unwrap_or("");
+
+    let baseline_evidence_count = baseline
+        .get("evidence_pack")
+        .and_then(Value::as_array)
+        .map(Vec::len)
+        .unwrap_or(0);
+    let mutated_evidence_count = mutated
+        .get("evidence_pack")
+        .and_then(Value::as_array)
+        .map(Vec::len)
+        .unwrap_or(0);
+
+    if before_value == after_value {
+        errors.push("pair intervention before_value and after_value must differ".into());
+    }
+
+    if matches!(
+        expected,
+        "local_change" | "abstain_or_revise" | "reject_unsupported_relation" | "deny_access"
+    ) && pair
+        .get("acceptance")
+        .and_then(|a| a.get("must_change"))
+        .and_then(Value::as_array)
+        .is_none_or(Vec::is_empty)
+    {
+        errors.push("non-invariant pair requires at least one must_change criterion".into());
+    }
+
+    match dimension {
+        "context_swap" => {
+            if string_field(baseline, "context_id") == string_field(mutated, "context_id") {
+                errors.push("context_swap must change context_id".into());
+            }
+            if field != "context_id" || expected != "local_change" {
+                errors.push("context_swap requires context_id intervention and local_change expectation".into());
+            }
+        }
+        "source_swap" => {
+            if string_field(baseline, "source_id") == string_field(mutated, "source_id") {
+                errors.push("source_swap must change source_id".into());
+            }
+            if field != "source_id" || !matches!(expected, "local_change" | "abstain_or_revise") {
+                errors.push("source_swap requires source_id intervention and a change-or-abstain expectation".into());
+            }
+        }
+        "evidence_removal" => {
+            if baseline_evidence_count <= mutated_evidence_count {
+                errors.push("evidence_removal must reduce the evidence_pack size".into());
+            }
+            if field != "evidence_pack" || expected != "abstain_or_revise" {
+                errors.push("evidence_removal requires evidence_pack intervention and abstain_or_revise expectation".into());
+            }
+        }
+        "relation_mutation" => {
+            if field != "relation" || expected != "reject_unsupported_relation" {
+                errors.push("relation_mutation must reject an unsupported relation change".into());
+            }
+        }
+        "variant_isolation" => {
+            if string_field(baseline, "variant_id") == string_field(mutated, "variant_id") {
+                errors.push("variant_isolation must change variant_id".into());
+            }
+            if field != "variant_id" || expected != "local_change" {
+                errors.push("variant_isolation requires variant_id intervention and local_change expectation".into());
+            }
+        }
+        "tradition_transfer" => {
+            if string_field(baseline, "tradition_scope") == string_field(mutated, "tradition_scope") {
+                errors.push("tradition_transfer must change tradition_scope".into());
+            }
+            if field != "tradition_scope" || expected != "local_change" {
+                errors.push("tradition_transfer requires tradition_scope intervention and local_change expectation".into());
+            }
+        }
+        "counterevidence_addition" => {
+            if mutated_evidence_count <= baseline_evidence_count {
+                errors.push("counterevidence_addition must add at least one evidence record".into());
+            }
+            if field != "counterevidence" || expected != "local_change" {
+                errors.push("counterevidence_addition requires counterevidence intervention and local_change expectation".into());
+            }
+        }
+        "rights_revocation" => {
+            let revoked = matches!(
+                string_field(mutated, "rights_status"),
+                Some("restricted" | "community_governed" | "permission_required")
+            );
+            if !revoked || string_field(baseline, "rights_status") == string_field(mutated, "rights_status") {
+                errors.push("rights_revocation must change rights_status to a restricted state".into());
+            }
+            if field != "rights_status" || expected != "deny_access" {
+                errors.push("rights_revocation requires rights_status intervention and deny_access expectation".into());
+            }
+        }
+        "alias_equivalence" => {
+            if string_field(baseline, "source_id") != string_field(mutated, "source_id") {
+                errors.push("alias_equivalence must preserve source identity".into());
+            }
+            if field != "alias" || expected != "invariant" {
+                errors.push("alias_equivalence requires alias intervention and invariant expectation".into());
+            }
+        }
+        "prompt_injection" => {
+            if field != "source_text" || expected != "invariant" {
+                errors.push("prompt_injection must preserve governing behavior under source-text injection".into());
+            }
+        }
+        _ => errors.push(format!("unknown pair dimension {dimension:?}")),
+    }
+
+    for (state_name, state) in [("baseline", baseline), ("mutated", mutated)] {
+        let mut evidence_ids = HashSet::new();
+        if let Some(items) = state.get("evidence_pack").and_then(Value::as_array) {
+            for item in items {
+                if let Some(id) = string_field(item, "evidence_id") {
+                    if !evidence_ids.insert(id.to_string()) {
+                        errors.push(format!("{state_name} contains duplicate evidence_id {id:?}"));
+                    }
+                }
+            }
+        }
+    }
+
+    errors
 }
 
 fn validate_domain_contract(
@@ -362,6 +502,7 @@ fn validate_domain_contract(
             }
         }
         Kind::Graph => errors.extend(validate_graph_contract(value)),
+        Kind::Pair => errors.extend(validate_pair_contract(value)),
     }
     errors
 }
