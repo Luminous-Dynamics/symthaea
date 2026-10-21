@@ -6,9 +6,7 @@
 //! provides simultaneous coverage across four score families only under the
 //! exchangeability/frozen-predictor assumptions described in the research note.
 
-use super::robust_viability::{
-    ActionEffectBounds, Interval, StateEnvelope,
-};
+use super::robust_viability::{ActionEffectBounds, Interval, StateEnvelope};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct CalibratedEnvelopeRadii {
@@ -106,10 +104,7 @@ pub fn calibrate_episode_radii(
             reserve_state_episode_scores,
             component_coverage,
         )?,
-        load_state_radius: finite_conformal_radius(
-            load_state_episode_scores,
-            component_coverage,
-        )?,
+        load_state_radius: finite_conformal_radius(load_state_episode_scores, component_coverage)?,
         reserve_effect_radius: finite_conformal_radius(
             reserve_effect_episode_scores,
             component_coverage,
@@ -191,8 +186,7 @@ mod tests {
     }
 
     fn state() -> StateEnvelope {
-        StateEnvelope::new(interval(0.45, 0.50), interval(0.20, 0.40))
-            .expect("valid test state")
+        StateEnvelope::new(interval(0.45, 0.50), interval(0.20, 0.40)).expect("valid test state")
     }
 
     fn nominal_effects() -> ActionEffectBounds {
