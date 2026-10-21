@@ -21,7 +21,7 @@ const CALIBRATION_UNKNOWN: usize = 64;
 const TEST_UNKNOWN: usize = 128;
 const MAX_VALIDATION_RISK: f64 = 0.05;
 const MIN_ACCEPTED_FOR_CALIBRATION: usize = 30;
-const MIN_ACCEPTED_FOR_CERTIFICATION: usize = 52;
+const MIN_ACCEPTED_FOR_CERTIFICATION: usize = 87;
 const BONFERRONI_Z_ONE_SIDED_95: f64 = 2.128_045_234_184_984;
 const NOISE_LEVELS: [f64; 7] = [0.0, 0.10, 0.20, 0.30, 0.40, 0.45, 0.50];
 const SEEDS: [u64; 3] = [17, 29, 41];
@@ -421,3 +421,69 @@ fn mix64(mut value: u64) -> u64 {
 fn derive_seed(seed: u64, first: u64, second: u64) -> u64 {
     mix64(seed ^ mix64(first) ^ mix64(second.wrapping_add(0x9e37_79b9_7f4a_7c15)))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn bonferroni_wilson_certificate_respects_sample_floor() {
+        assert!(wilson_upper_bonferroni_95(0, 86) > MAX_VALIDATION_RISK);
+        assert!(wilson_upper_bonferroni_95(0, 87) <= MAX_VALIDATION_RISK);
+        assert!(wilson_upper_bonferroni_95(1, 87) > MAX_VALIDATION_RISK);
+    }
+
+    #[test]
+    fn certification_requires_minimum_accepted_examples_and_bounded_risk() {
+        let rule = DecisionRule {
+            min_similarity: 0.0,
+            min_margin: 0.0,
+        };
+        let too_small = vec![
+            ScoredQuery {
+                best_similarity: 0.5,
+                top_two_margin: 0.2,
+                correct: true,
+            };
+            MIN_ACCEPTED_FOR_CERTIFICATION - 1
+        ];
+        assert!(!certify_rule(&too_small, rule));
+
+        let enough_clean = vec![
+            ScoredQuery {
+                best_similarity: 0.5,
+                top_two_margin: 0.2,
+                correct: true,
+            };
+            MIN_ACCEPTED_FOR_CERTIFICATION
+        ];
+        assert!(certify_rule(&enough_clean, rule));
+    }
+
+    #[test]
+    fn accepted_unknown_queries_count_as_selective_errors() {
+        let samples = vec![
+            ScoredQuery {
+                best_similarity: 0.9,
+                top_two_margin: 0.2,
+                correct: true,
+            },
+            ScoredQuery {
+                best_similarity: 0.8,
+                top_two_margin: 0.1,
+                correct: false,
+            },
+        ];
+        let result = evaluate(
+            &samples,
+            DecisionRule {
+                min_similarity: -1.0,
+                min_margin: -1.0,
+            },
+        );
+        assert_eq!(result.accepted, 2);
+        assert_eq!(result.errors, 1);
+        assert_eq!(result.selective_risk(), Some(0.5));
+    }
+}
+
