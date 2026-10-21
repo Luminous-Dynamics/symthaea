@@ -627,6 +627,13 @@ mod tests {
     }
 
     #[test]
+    fn viable_action_breadth_distinguishes_full_reduced_and_empty_sets() {
+        assert_eq!(safe_action_option_count(0.80, 0.20, 0.10), 3);
+        assert_eq!(safe_action_option_count(0.16, 0.87, 0.90), 1);
+        assert_eq!(safe_action_option_count(0.0, 0.95, 1.0), 0);
+    }
+
+    #[test]
     fn maintain_can_still_violate_load_limit_under_high_burden() {
         assert!(!satisfies_one_step_viability(
             Action::Maintain,
