@@ -51,7 +51,7 @@ Current source catalog entries are all development-only, metadata-only, rights-u
 ## Statistics and human evaluation
 
 - For paired tasks, evaluate each system on the same input/intervention pairs. For deterministic systems, one execution may be enough for exact reproducible outputs; for stochastic or hosted APIs, predeclare seeds/repeats and report variability.
-- Bootstrap confidence intervals by source family, not individual questions or edges, to avoid treating many items from one source as independent evidence.
+- Bootstrap confidence intervals by **connected source-family clusters**, not individual questions or edges. If a paired intervention references multiple families, those families join one connected component; pairs sharing any family are resampled together. The scorer uses the preregistered seed/replicate count, the same cluster resamples for candidate and all baselines, and percentile intervals on paired differences. For held-out comparisons against multiple baselines, the scorer requires a preregistered familywise correction (`bonferroni`); the report records the correction method and cluster count.
 - Report paired differences against each baseline and confidence intervals on the primary endpoint; correct for multiple comparisons if making multiple primary claims.
 - Report mean, lower-tail and worst-group scores by tradition, period/genre, source type, language/translation, answerability and access status where sample sizes permit. Make sparse-group uncertainty explicit.
 - Require blinded reviewers for open-ended interpretations. Preserve their independent labels and disagreement. Report agreement/reliability before adjudication; split compound claims into atomic claims rather than forcing one label.
