@@ -6,6 +6,7 @@ on:
     paths:
       - "tools/allostatic-control-bench/**"
       - "docs/research/ALLOSTATIC_CONTROL_BENCHMARK_V1.md"
+      - "docs/research/MULTISTEP_VIABILITY_TUBES_V1.md"
       - ".github/workflows/allostatic-control-bench.yml"
   workflow_dispatch:
 
@@ -51,3 +52,4 @@ jobs:
             allostatic-control-v1-paired-deltas.csv
             allostatic-control-v1-mismatch-frontier.csv
             allostatic-control-v1-mismatch-frontier-summary.csv
+            allostatic-control-v1-multistep-horizon.csv
