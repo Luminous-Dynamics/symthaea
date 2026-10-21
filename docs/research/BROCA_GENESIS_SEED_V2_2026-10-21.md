@@ -37,11 +37,13 @@ No production default changes. Pretrained checkpoint embedding tables are restor
 
 ## Relevant external methods
 
-- NIST SP 800-185 describes SHAKE-derived customizable functions and TupleHash, whose purpose includes unambiguous processing of tuple elements: https://csrc.nist.gov/pubs/sp/800/185/final
-- RFC 5869's `info` input is used to bind derived key material to application- and context-specific information: https://www.rfc-editor.org/rfc/rfc5869/
-- A 2026 reproducible HDC experiment compares HRR and MAP against an encoder-defined similarity reference across dimensions and random seeds. Its methodological lesson is to preserve the reference task and vary one representational factor at a time—not that its measured outcome transfers to Broca: https://hyperdimensionalcomputing.ai/blog/hrr-map-similarity/
+- NIST SP 800-185 specifies TupleHash for unambiguous tuple hashing over SHA-3-derived functions. V2 uses its own simpler length-prefix convention; it is not an implementation of TupleHash/cSHAKE: https://csrc.nist.gov/pubs/sp/800/185/final
+- RFC 5869 describes binding derived key material to application/context-specific information with the HKDF `info` field: https://www.rfc-editor.org/rfc/rfc5869/
+- A 2024 *Journal of Big Data* HDC review describes how random high-dimensional hypervectors become quasi-orthogonal with high probability due to concentration of measure. This supports measuring geometry, not treating geometry as semantic competence: https://link.springer.com/article/10.1186/s40537-024-01010-8
+- A 2024 ACL study of vocabulary expansion compares initialization strategies, including constrained word2vec, and discusses initialization within the convex hull of existing embeddings: https://aclanthology.org/2024.conll-1.8/
+- An August 2026 study examines more than 20 token-initialization approaches for Hindi vocabulary extension in a pretrained LLM. It reports strong context-specific results for subword composition and norm calibration, and cautions that initialization loss alone did not reliably predict downstream convergence. That is a different task from Broca's random from-scratch symbol table, so treat it as a rationale for a separate vocabulary-extension experiment—not proof that its winning method transfers: https://arxiv.org/abs/2608.03494
 
-V2 is an internal reproducibility scheme inspired by these principles, not an implementation of TupleHash/cSHAKE or a cryptographic protocol. Seed phrases are model initialization inputs, not secrets; this work makes no security claim.
+V2 is an internal reproducibility convention inspired by unambiguous tuple encoding, not a cryptographic protocol. Seed phrases are model initialization inputs, not secrets; this work makes no security claim.
 
 ## Benchmark interpretation
 
@@ -66,6 +68,22 @@ These are targets to preregister, not achieved results:
 4. **Seed robustness:** at least 5 matched genesis replicates and a larger fixture before interpreting downstream performance.
 5. **Quality non-inferiority:** on a sealed, larger dataset, no more than a 2 percentage-point regression on core language controls; report paired uncertainty and all strata.
 6. **Migration threshold:** make V2 a default only after backward-compatibility evidence and reproducible downstream improvement (or a justified correctness migration where quality neutrality has been demonstrated). If V2 only improves domain identity and geometric diagnostics without task-level gains, describe it as hardening—not a language-quality advance.
+
+## Beyond V2: separate symbol initialization from vocabulary extension
+
+The V1-versus-V2 comparison is primarily a **domain-encoding and reproducibility correction**. Both are pseudorandom, high-dimensional symbol initializers with similar intended coordinate geometry. V2 should not be expected to improve language quality solely because it fixes tuple-boundary ambiguity. A neutral task-quality result can still justify V2 as a correctness hardening, but not as a model-quality improvement.
+
+Broca has a second and different initialization problem: `append_token` extends an existing vocabulary after a model may already be trained. Treating a genuinely new token as another unrelated random symbol may discard structure that is available from known subwords or context. That calls for its own experiment, separate from the from-scratch V1/V2 baseline.
+
+Proposed follow-on arms for vocabulary extension:
+
+- **Seeded random:** current V1 and V2 fallback, as low-prior controls.
+- **Subword composition:** bundle or average known constituent/subword vectors, with explicitly tested normalization.
+- **Contextual composition:** initialize from caller-supplied known-context vectors using the existing context-bundle path.
+- **Grounded composition plus residual:** construct a grounded candidate and add a bounded, deterministic residual to preserve separability; keep this opt-in and define the scale before evaluation.
+- **Norm-matched random control:** test whether any improvement is due to compositional direction or simply vector norm/scale.
+
+For each method, freeze the old embedding table and compare: initial distribution shift on a fixed prompt suite, excess probability mass assigned to new tokens, KL divergence against the model before extension, held-out token/word quality, calibration, and fine-tuning steps/compute required to reach a fixed quality threshold. Use unseen lexical families and independent relation labels. Proposed go/no-go: at least 2× median reduction in steps-to-target over the seeded-random control, paired confidence interval excluding zero, and no more than a 2-percentage-point regression on old-vocabulary controls. This is a proposed target, not a claim or current measurement.
 
 ## Next research step
 
