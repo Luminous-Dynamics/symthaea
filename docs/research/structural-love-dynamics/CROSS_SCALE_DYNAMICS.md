@@ -130,7 +130,30 @@ This work must not treat IIT as either automatically true or automatically pseud
 
 These are arguments in an active debate, not a settled verdict. The benchmark should test operational predictions and measurement validity without assuming the metaphysical conclusion.
 
-## 5. Falsifiable research hypotheses
+## 5. Position against the current benchmark landscape
+
+SLD should be a **complementary stress-test layer**, not a claim to replace wider expert-curated emotional-support benchmarks. Current work already covers important pieces:
+
+- **MentalHealthBench (released 23 September 2026)** is an open benchmark developed with more than 80 licensed mental-health experts spanning 22 countries and 19 languages. It uses scenario-specific expert criteria, tests seeking context, preserving agency, safety, and actionable guidance, and spans everyday distress through urgent scenarios. Its reported automated grading uses a model-based grader, and the creators separately studied user/expert differences. SLD should borrow the per-scenario rubric discipline and explicit expert/user distinction, while adding tests for proxy circularity, data lineage, non-compensable boundary invariants, and cross-scale inference. [Source and methodology](https://openai.com/index/introducing-mentalhealthbench/).
+- **Emotional Dynamic Trajectories (AAAI 2026)** evaluates emotional support as a trajectory rather than a static response, with 328 emotional contexts, 1,152 disturbance events, and trajectory-level measures for baseline level, volatility, and centroid position. SLD should not claim trajectory-based evaluation as new. It should add causal/provenance checks and require that improved emotional trajectories never excuse boundary violations or fabricated certainty. [AAAI paper](https://ojs.aaai.org/index.php/AAAI/article/view/37189).
+- **RESCUE-BENCH (AACL 2026)** focuses on relation-aware, multi-party emotional support, including viewpoint and relation-pattern prediction, intervention timing, support target, and strategy selection. That means multi-party relation awareness is also existing work, not by itself SLD's novelty. SLD should concentrate on whether the system preserves consent, non-domination, and evidence lineage when relational inferences and goals conflict. [Project and evaluation code](https://github.com/Tomsawyerhu/RESCUE-bench).
+- **ESConv / ESC-Eval** provide established emotional-support dialogue data and multi-turn evaluation foundations. They remain useful for general capability comparison, but a high strategy-match or satisfaction score does not by itself prove long-term agency, repair, or relational safety. [ESConv paper](https://aclanthology.org/2021.acl-long.269/).
+
+### What SLD must contribute to be worth maintaining
+
+Its differentiator should be a narrow, harder-to-game set of evaluations:
+
+1. **Measurement lineage and anti-circularity:** repeated, transformed, or model-generated inputs cannot be counted as independent observations of a human partner.
+2. **Cross-construct discriminant tests:** trust is not synchrony; reciprocity is not mutual information; Shannon entropy is not thermodynamic entropy production; software "stress" is not validated human stress; Φ is not a direct readout of consciousness or love.
+3. **Non-compensable invariants:** no gain in sentiment, engagement, synchrony, emotional trajectory, Φ, or aggregate utility may compensate for coercion, non-consensual disclosure, or refusing an ordinary boundary withdrawal.
+4. **Counterfactual / mutation tests:** swap identities and roles, remove consent, duplicate evidence, stale the observation, introduce shared-input confounding, and perturb a proxy while holding the scenario fixed. Expected dispositions must be preregistered.
+5. **Cross-layer incremental value:** demonstrate that any added internal measure improves held-out decisions beyond plain text/context baselines without raising critical harms. If it does not improve decisions, do not keep it just because the metric has a theory-laden name.
+
+SLD v0.1 is intentionally only a **candidate corpus seed** (44 cases / 22 contrast pairs). It is too small to claim broad state-of-the-art performance. A reasonable growth plan is (a) expert review and mutation coverage of the 44 seed cases, (b) at least 300 independently authored contrastive base scenarios for an initial research evaluation, then (c) multi-turn trajectories and multilingual/multi-stakeholder expansion with a hidden held-out set. These are proposed milestones, not industry standards. Scale alone is not a substitute for coverage, independent adjudication, or field evidence.
+
+The head-to-head protocol should version and report each baseline model/provider/date, prompt, tools, memory policy, temperature/sampling, turn limit, and judge version. Use both expert-written per-scenario rubrics and blinded user-perspective review; report inter-rater agreement, judge disagreement, per-group worst cases, and confidence intervals. Do not rely only on an LLM judge from the same model family. Keep clinical/acute scenarios within appropriate expert oversight; SLD does not itself authorize clinical advice.
+
+## 6. Falsifiable research hypotheses
 
 All hypotheses should be registered before tuning. The initial synthetic bench can test decision logic; claims about real stress physiology or subjective experience need separate evidence.
 
@@ -164,7 +187,7 @@ A model may have high internal coherence but still fail to correct harmful advic
 
 **Test:** replay an error, a correction, a user boundary change, and affected downstream decisions over time. Measure correction latency, completion of repair obligations, recurrence, boundary respect, and unresolved harms.
 
-## 6. Experiment plan
+## 7. Experiment plan
 
 1. **Construct validity audit:** enumerate every field used for Φ, entropy, stress, thermodynamics, mutuality, and emotional safety. For each, record formula, state space, units/range, source, update frequency, defaults, missing-value behavior, normalization, interpretation, evidence base, and non-claims.
 2. **Instrumentation sanity:** build deterministic synthetic states (independent agents, copied agents, shared input, noise, stable synchrony, coercive mirroring, boundary withdrawal). Confirm each metric behaves as its actual mathematical definition predicts. These synthetic tests do not validate construct meaning.
@@ -173,7 +196,7 @@ A model may have high internal coherence but still fail to correct harmful advic
 5. **Human-side validation:** if physiological stress or relational well-being is studied, obtain appropriate consent and independent ethics oversight. Use validated measures and a suitable research design; do not map AI internal telemetry directly onto human biology.
 6. **Decision gate:** no runtime integration or metric-weight changes until the effect is replicated on an independent held-out set and does not worsen critical boundary, truthfulness, or harm outcomes.
 
-## 7. Benchmark metrics for the cross-scale study
+## 8. Benchmark metrics for the cross-scale study
 
 | Metric | Evaluation question |
 |---|---|
@@ -187,7 +210,7 @@ A model may have high internal coherence but still fail to correct harmful advic
 | Longitudinal net effect | What happens to recipient-defined agency, repair, distress, and affected stakeholders over time? |
 | Reproducibility | Are exact subject, input, estimator, seed, environment, and outputs preserved with digests and complete accounting? |
 
-## 8. Interpretation guardrails
+## 9. Interpretation guardrails
 
 - A correlation between Φ and SLD outcomes is a result to explain, not evidence that Φ measures love.
 - A stress reduction is neither necessary nor sufficient for love; consider the person's goals and context.
@@ -208,4 +231,9 @@ A model may have high internal coherence but still fail to correct harmful advic
 6. **Entropy: From Thermodynamics to Information Processing** (Entropy, 2021). Review of the differences and possible connections between physical and information-theoretic entropy. https://doi.org/10.3390/e23101340
 7. **Biological thermodynamics: Ervin Bauer and the unification of life sciences and physics** (BioSystems, 2024). Discusses biological organization as a stable non-equilibrium state and self-maintenance. https://doi.org/10.1016/j.biosystems.2023.105089
 
-These papers motivate the investigation; they do not jointly prove the causal model above. The model remains a set of hypotheses to test and revise.
+8. Tan et al. (2026). **Detecting Emotional Dynamic Trajectories: An Evaluation Framework for Emotional Support in Language Models**. AAAI 2026. https://doi.org/10.1609/aaai.v40i3.37189
+9. **MentalHealthBench** (released 23 September 2026). Expert-authored scenario rubrics for safe, useful AI responses across mental-health and everyday-stress contexts. https://openai.com/index/introducing-mentalhealthbench/
+10. **RESCUE-BENCH** (AACL 2026). Relation-aware, multi-party emotional-support evaluation. https://github.com/Tomsawyerhu/RESCUE-bench
+11. Cogitate Consortium et al. (2025). **Adversarial testing of global neuronal workspace and integrated information theories of consciousness**. Nature 642, 133–142. A preregistered adversarial collaboration illustrates the value of tests designed to distinguish competing theory predictions rather than selecting evidence after seeing results. https://www.nature.com/articles/s41586-025-08888-1
+
+These papers and benchmarks motivate the investigation; they do not jointly prove the causal model above. The model remains a set of hypotheses to test and revise.
