@@ -191,6 +191,8 @@ class FailClosedPyPhiValidationTests(unittest.TestCase):
                     pyphi_phi=value,
                     reference_model_digest=f"model-{index}",
                     symthaea_model_digest=f"model-{index}",
+                    reference_prior_digest=f"prior-{index}",
+                    symthaea_prior_digest=f"prior-{index}",
                 )
                 for index, value in enumerate(values)
             ],
@@ -208,6 +210,12 @@ class FailClosedPyPhiValidationTests(unittest.TestCase):
         report.shared_model_verified = False
         self.assertFalse(self.validator.is_qualified(report))
         report.shared_model_verified = True
+        self.assertTrue(self.validator.is_qualified(report))
+
+        # Matching transition rules are insufficient if state priors differ.
+        report.results[0].symthaea_prior_digest = "different-prior"
+        self.assertFalse(self.validator.is_qualified(report))
+        report.results[0].symthaea_prior_digest = "prior-0"
         self.assertTrue(self.validator.is_qualified(report))
 
         # A release candidate must never become publication-qualified.
