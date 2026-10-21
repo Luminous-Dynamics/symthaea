@@ -3,8 +3,9 @@
 This directory contains the initial claim schema and adversarial starter cases for the Luminous Dynamics Esoterica Knowledge Fabric.
 
 - `claim.schema.json`: JSON Schema Draft 2020-12 for evidence-linked claim records.
+- `case.schema.json`: JSON Schema Draft 2020-12 for evaluation case records.
 - `cases.jsonl`: one JSON object per case. Most current cases are development fixtures, not a held-out evaluation set.
-- `../../docs/research/ESOTERICA_KNOWLEDGE_FABRIC.md` (repository-relative path from this directory requires navigating up to docs separately): design, baseline protocol, metrics and nonclaims.
+- Design and evaluation protocol: [ESOTERICA_KNOWLEDGE_FABRIC.md](../../../docs/research/ESOTERICA_KNOWLEDGE_FABRIC.md).
 
 ## Important status
 
@@ -12,7 +13,7 @@ This pack is not yet an executable benchmark runner, a fully expert-annotated co
 
 ## Required before reporting a score
 
-1. Validate every line against a versioned JSON Schema and validate all case-level contracts.
+1. Validate every line against the versioned case schema and validate claim records against the claim schema.
 2. Pin a source-pack manifest and the exact source editions/locators used.
 3. Have domain reviewers adjudicate the historical and symbolic cases; retain disagreement labels.
 4. Keep synthetic controls clearly separated from factual source-grounded questions.
