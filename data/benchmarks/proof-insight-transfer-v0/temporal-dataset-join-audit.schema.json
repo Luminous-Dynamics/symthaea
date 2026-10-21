@@ -36,7 +36,7 @@
     "events"
   ],
   "properties": {
-    "schema_version": {"const": "pitb.temporal-dataset-join-audit.v0"},
+    "schema_version": {"const": "pitb.temporal-dataset-join-audit.v1"},
     "repository_url": {
       "type": "string",
       "format": "uri",
