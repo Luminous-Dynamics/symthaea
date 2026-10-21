@@ -59,4 +59,4 @@ Positional homing lowered discrepancy in the tested conditions, whereas stronger
 
 ## Next decision
 
-Keep the mixed coupling result. Add an adaptive-coupling condition with a predeclared rule based on target discrepancy and test it against fixed permeability settings on the same held-out seeds. On the abstract side, use the current high-capacity MAP/HRR stress runner, then expand to at least 100 trials per capacity point for credible K95 estimates; compare both equal dimensions and equal payload bytes.
+Keep the mixed coupling result. The branch now includes two adaptive-coupling conditions: a deliberately simple discrepancy-trend heuristic and a paired counterfactual controller that evaluates lower/current/higher permeability from cloned states using matched RNG state. The current-head experiment will compare both against the mean of fixed permeability settings 0.0, 0.5, and 1.0 on the same seed/target/damage/homing condition. On the abstract side, use the current high-capacity MAP/HRR stress runner, then expand to at least 100 trials per capacity point for credible K95 estimates; compare both equal dimensions and equal payload bytes.
