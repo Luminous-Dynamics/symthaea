@@ -2,6 +2,11 @@
 
 **Status:** Proposed experimental protocol; no performance result is claimed. This scorecard is a companion to `ENTROPY_CAUSAL_CUT_BENCHMARK.md`. It separates three questions that must not be collapsed into one leaderboard: (1) does a quantity correctly describe its mathematical target, (2) does it recover causal structure under interventions, and (3) is it computationally useful at scale?
 
+
+## Candidate new metric to investigate
+
+The companion proposal [Task-Conditioned Counterfactual Integration Profile v0](TASK_CONDITIONED_COUNTERFACTUAL_INTEGRATION_PROFILE_V0.md) investigates whether cross-component causal interactions improve a *declared task* under explicit counterfactual cuts, matched sham controls, and held-out environments. It is a profile (task competence, cut-response curve, worst-case utility, redundancy/recovery, and shift stability), not a single consciousness score. Existing effective-information, causal-integration, PID, SURD, and IIT work means novelty is not assumed; the candidate must outperform simple ablation and graph/information baselines before retention.
+
 ## Paradigm shift: stop asking one scalar to answer every question
 
 A single `phi`, entropy, similarity, or connectivity score cannot stand in for uncertainty, predictive dependence, causal influence, integration under a named formalism, calibration, and practical usefulness. Treat these as typed outputs with distinct estimands and failure modes.
