@@ -1,0 +1,146 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/benchmarks/esoterica-bench/v0/case.schema.json",
+  "title": "EsotericaBench Case v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "id",
+    "split",
+    "task",
+    "prompt",
+    "expected_behavior",
+    "grading"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "esoterica-case-v0"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "split": {
+      "enum": [
+        "development",
+        "validation",
+        "test",
+        "holdout"
+      ]
+    },
+    "task": {
+      "type": "string",
+      "minLength": 1
+    },
+    "prompt": {
+      "type": "string",
+      "minLength": 1
+    },
+    "expected_behavior": {
+      "type": "string",
+      "minLength": 1
+    },
+    "required_distinctions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "source_refs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "source_id",
+          "uri",
+          "role",
+          "rights_status"
+        ],
+        "properties": {
+          "source_id": {
+            "type": "string"
+          },
+          "uri": {
+            "type": "string",
+            "format": "uri"
+          },
+          "role": {
+            "type": "string"
+          },
+          "rights_status": {
+            "enum": [
+              "public_domain_verified",
+              "open_license_verified",
+              "metadata_only",
+              "permission_required",
+              "restricted",
+              "community_governed",
+              "unknown"
+            ]
+          },
+          "locator": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "evidence_pack": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "evidence_id",
+          "statement",
+          "kind"
+        ],
+        "properties": {
+          "evidence_id": {
+            "type": "string"
+          },
+          "statement": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "expected_type": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "must_not": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "grading": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "citation_required",
+        "critical_error"
+      ],
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "citation_required": {
+          "type": "boolean"
+        },
+        "critical_error": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}
