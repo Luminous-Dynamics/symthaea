@@ -40,6 +40,7 @@ Thresholds are chosen only on the selection split by maximizing coverage subject
 - **Selective risk:** fraction of accepted queries that are incorrect. Risk is undefined when the system accepts no queries.
 - **95% Wilson interval:** uncertainty interval for errors among accepted queries.
 - **Thresholds and counts:** selection, certification, and evaluation sample counts; score/margin thresholds; independent certification pass/fail; accepted count and errors.
+- **Stratified diagnostics:** each seed/rule emits an overall row plus separate rows for every corruption level, random OOD queries, and ambiguous mixtures. This prevents pooled risk from hiding failures on a particular query type.
 - **Runtime:** total benchmark wall time per invocation, recorded separately from per-row decision quality.
 
 The first version reports risk/coverage points rather than claiming a complete area-under-risk-coverage result. A later protocol should add full risk–coverage curves and normalized area under the risk–coverage curve (AURC), as well as calibration cost and query latency distributions.
