@@ -116,6 +116,7 @@ jobs:
         run: |
           cargo run --locked --release -p symthaea-cell-foundry --example levin_multiscale_experiments 2>&1 | tee research-results/levin-multiscale-experiments.log
           cp levin_multiscale_results.json research-results/levin-multiscale-results.json
+          cp levin_adaptive_coupling_results.json research-results/levin-adaptive-coupling-results.json
 
       - name: Fail closed on uncommitted lockfile drift
         if: always()
