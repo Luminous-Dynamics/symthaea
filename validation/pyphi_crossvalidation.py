@@ -456,6 +456,8 @@ class PyPhiValidator:
         )
         qualified = (
             paired_count >= 3
+            and paired_count == len(report.results)
+            and report.n_validated == paired_count
             and report.n_failed == 0
             and report.correlation is not None
             and np.isfinite(report.correlation)
