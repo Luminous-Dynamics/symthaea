@@ -3580,12 +3580,15 @@ end Second
         let other_initial_source = "theorem other : True := by\n  sorry\n";
         fs::write(root.join("lean/Other.lean"), other_initial_source)
             .expect("write second source file");
+        let initial_ambiguous_source = "namespace First\ntheorem shared (n : Nat) : n = n := by\n  sorry\nend First\n\nnamespace Second\ntheorem shared (n : Nat) : n = n := by\n  sorry\nend Second\n";
+        fs::write(root.join("lean/Ambiguous.lean"), &initial_ambiguous_source)
+            .expect("write duplicate short-name declarations");
 
-        // Deliberate source-document mismatch: the CSV will contain four rows,
-        // while README claims five, and the audit must preserve that discrepancy.
+        // Deliberate source-document mismatch: the CSV will contain five rows,
+        // while README claims six, and the audit must preserve that discrepancy.
         fs::write(
             root.join("README.md"),
-            "The proof_timeline.csv currently records 5 theorems in this fixture.\n",
+            "The proof_timeline.csv currently records 6 theorems in this fixture.\n",
         )
         .expect("write deliberately inconsistent timeline README");
         let commit_one = commit(&root, "historical target statements");
@@ -3607,6 +3610,9 @@ end Second
             other_initial_source.replacen("  sorry\n", "  exact True.intro\n", 1);
         fs::write(root.join("lean/Other.lean"), &other_completed_source)
             .expect("complete independent theorem");
+        let completed_ambiguous_source = initial_ambiguous_source.replace("  sorry\n", "  rfl\n");
+        fs::write(root.join("lean/Ambiguous.lean"), &completed_ambiguous_source)
+            .expect("complete duplicate-name declarations");
         let commit_three = commit(&root, "complete second and independent proofs");
         let source_three = git_show_file(&root, &commit_three, "lean/Example.lean")
             .expect("read third source revision");
@@ -3622,12 +3628,21 @@ end Second
              tl_0000_first,,lean/Example.lean,Example.first,verified,2026-10-20,{commit_two},complete first proof\n\
              tl_0001_second,,lean/Example.lean,Example.second,verified,2026-10-21,{commit_three},complete second proof\n\
              tl_0002_missing,,lean/Missing.lean,Example.missing,externally verified,2026-10-22,{commit_three},source intentionally absent\n\
-             tl_0003_other,,lean/Other.lean,Example.other,verified,2026-10-23,{commit_three},complete independent proof\n"
+             tl_0003_other,,lean/Other.lean,Example.other,verified,2026-10-23,{commit_three},complete independent proof\n\
+             tl_0004_ambiguous,,lean/Ambiguous.lean,shared,verified,2026-10-24,{commit_three},complete duplicate-name proofs\n"
         );
         fs::write(root.join("proof_timeline.csv"), &timeline)
             .expect("write full timeline inventory");
 
         let dataset_rows = [
+            serde_json::json!({
+                "id": "ambiguous-declarations",
+                "theorem_name": "shared",
+                "file_path": "lean/Ambiguous.lean",
+                "commit_before": commit_one,
+                "formal_statement": "theorem shared (n : Nat) : n = n := by",
+                "proof": "rfl"
+            }),
             serde_json::json!({
                 "id": "unique-other",
                 "theorem_name": "other",
