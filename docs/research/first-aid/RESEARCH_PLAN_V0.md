@@ -101,6 +101,10 @@ The first implementation should make these invariants executable:
 
 All numbers are **provisional engineering targets**, not measured results or accepted industry standards. Clinical reviewers must define critical error classes before scoring the corpus.
 
+Recent literature reinforces a process-level benchmark alongside answer/content accuracy. The 2025/2026 Clinical Safety-Effectiveness Dual-Track Benchmark (CSEDB) used 2,069 open-ended items prepared with 32 specialist physicians across 30 safety/effectiveness metrics; its tested models showed a 13.3% average performance drop in high-risk scenarios. These results are specific to that study's corpus and model conditions, not a direct estimate for this first-aid design. A 2026 review of clinical AI evaluation also describes a shift from knowledge-centric questions toward more naturalistic evaluation. Our addition is therefore **trajectory safety**: whether every state transition, evidence check, interruption recovery, and handoff in a complete workflow remains within the approved policy—not just whether the final text sounds correct.
+
+Sources: Wang et al., [CSEDB, *npj Digital Medicine* (published 26 December 2025; journal volume 2026)](https://www.nature.com/articles/s41746-025-02277-8); [State of clinical AI in 2026, *BMJ Digital Health & AI*](https://bmjdigitalhealth.bmj.com/content/2/1/e000113).
+
 | Metric | Proposed gate / target | Why it matters |
 |---|---|---|
 | Critical protocol deviations | Zero observed critical deviations in the frozen conformance and adversarial suite; any event blocks release pending disposition | A high average score cannot compensate for a critical unsafe action |
@@ -117,8 +121,11 @@ All numbers are **provisional engineering targets**, not measured results or acc
 | Local latency | p95 state transition/render below 100 ms on a declared reference device, excluding human reading and audio playback | Keeps the interface responsive under stress |
 | Deterministic replay | 100% identical decisions/receipt-relevant fields for pinned deterministic inputs and build | Enables reproducible review |
 | Privacy | Zero sensitive payloads in default telemetry/logs in static and fault-injection audits | Minimizes harm if devices or logs are exposed |
+| Sequential process integrity | 100% of frozen synthetic event traces satisfy pre-registered invariants; zero critical forbidden transitions; revocation/interruption/out-of-scope traces end in an explicitly permitted disposition | Final-answer scoring can hide unsafe intermediate steps, stale-evidence use, invalid ordering, or failed recovery |
 
 The 15% and 10-percentage-point figures are hypotheses for study planning, not universal clinical acceptance criteria. A pilot must estimate variance and feasibility; reviewers should revise or reject targets before preregistration. A zero-failure finite test suite does not prove zero real-world risk.
+
+Trajectory results must include the full ordered event trace and criticality-weighted failures; a high aggregate effectiveness score cannot compensate for a critical process violation. This is complementary to guideline conformance, not a replacement for clinical review or human-factors studies.
 
 ## Comparator design
 
