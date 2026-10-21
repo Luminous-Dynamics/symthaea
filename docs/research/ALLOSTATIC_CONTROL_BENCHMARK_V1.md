@@ -34,7 +34,7 @@ The new crate is independent of cognitive-loop internals so we can falsify the d
 
 Location: tools/allostatic-control-bench/
 
-The crate has no third-party dependencies. The executable emits a row-per-episode CSV for 5 scenario families × 32 deterministic seeds × 6 controller conditions (960 rows).
+The crate has no third-party dependencies. The episode executable emits 1,920 rows: 5 scenario families × 32 deterministic seeds × 6 controller policies × 2 shield settings. A second Rust binary emits a distributional summary and same-seed paired shield deltas with deterministic percentile-bootstrap intervals.
 
 ### Scenario families
 
@@ -46,7 +46,7 @@ The crate has no third-party dependencies. The executable emits a row-per-episod
 | Repeated | Test incomplete recovery between disturbances |
 | Regime shift | Test forecast uncertainty and changed operating conditions |
 
-These profiles are synthetic and intentionally small. They are not an industry benchmark, a physiological calibration, or evidence of real-world safety. The candidate forecaster receives an exogenous, noisy warning stream: acute, chronic, and repeated-disturbance profiles can supply lead signals, while the regime shift is unannounced until it occurs. The candidate controller does not read realized future loads; only the explicitly labeled oracle condition does. Forecast confidence is independently varied and controls forecast-noise scale. This isolates decision-rule value from perfect future information, but does not test how a real forecasting model learns or generalizes.
+These profiles are synthetic and intentionally small. They are not an industry benchmark, a physiological calibration, or evidence of real-world safety. The candidate forecaster receives an exogenous, noisy warning stream: acute, chronic, and repeated-disturbance profiles can supply lead signals, while the regime-shift warning deliberately remains at baseline through the shift. The candidate controller does not read realized future loads; only the explicitly labeled oracle condition does. Forecast confidence is independently varied and controls forecast-noise scale. This isolates decision-rule value from perfect future information, but does not test how a real forecasting model learns or generalizes.
 
 ### Controller conditions
 
@@ -61,17 +61,31 @@ These profiles are synthetic and intentionally small. They are not an industry b
 
 The oracle is not a fair competitor and must never be reported as a deployable baseline. The shuffled forecast is an offline negative control: it preserves the generated warning observations but permutes their time order, so it is not a deployable policy. Neither should count as independent evidence that predictive control generalizes.
 
+### Policy × shield factorial
+
+Each of the six policies is evaluated with the shield disabled and enabled, giving 12 condition cells per scenario/seed. The shield is separate from policy selection and checks the candidate action against the same declared one-step simulator transition model:
+
+- viability limits: next resource reserve ≥ 0.15 and next allostatic load ≤ 0.88;
+- if the proposed action is predicted to cross a limit, try `Maintain`;
+- if `Maintain` is also predicted to cross a limit, try the task-interrupting `EmergencyRecover`;
+- if none of the available actions is predicted to satisfy both limits, execute the best-effort recovery action and count the event as `no_safe_action_ticks`.
+
+The shield and simulator deliberately share the same synthetic transition function. This removes implementation drift between the prediction used for vetoing and the transition used for scoring, but it also means the shield is **model-perfect by construction**. Zero violations in shielded synthetic runs is a semantic regression test—not evidence of safety under model error, uncertain state estimates, physical dynamics, or external tasks. A later benchmark must perturb shield-model parameters and state estimates, and compare against independently implemented control-barrier/MPC filters.
+
 ### Reported metrics
 
 - Task reward and number of push/maintenance steps.
 - Cumulative exposure (discrete area under allostatic load), mean load, and peak load.
-- Unsafe ticks and missed-limit decisions under the harness's declared synthetic limits.
+- Unsafe ticks, per-episode violation indicator, and missed-limit proposals (counterfactual raw-policy actions), all under the harness's declared synthetic limits.
+- **Violation exposure:** sum across ticks of normalized reserve shortfall `max(0, 0.15 - reserve) / 0.15` plus normalized load excess `max(0, load - 0.88) / 0.12`.
+- **Peak violation severity:** maximum single-tick normalized severity across the two limits; conditional mean over violating episodes is reported as `NA` when no episode violates.
+- Shield veto count, no-safe-action count, and emergency-recovery steps, so avoided hazards and the cost of the shield remain visible.
 - False-alarm maintenance ticks under calm, apparently safe conditions.
 - Resource cost, minimum reserve, terminal reserve, and terminal allostatic load as separate future-option proxies.
 - Episode failure indicator and time from the last disturbance to a declared recovered state.
 - Recovery not observed by the end of the horizon is emitted as NA (right-censored), not fabricated as a successful recovery.
 
-A missed-limit counter is an early-warning diagnostic; it is not a proof that a runtime safety constraint was enforced. This first simulator does not yet contain an independent action shield or formal barrier certificate.
+A missed-limit counter counts raw policy proposals whose predicted next state crosses a limit, even when the shield vetoes the proposal. It must not be misreported as a realized violation. The shield is a model-perfect one-step filter for the toy simulator; it is not a formal barrier certificate and does not qualify a real runtime safety boundary.
 
 ## Measurement contract
 
@@ -81,7 +95,7 @@ Three semantics must remain separate:
 - Cumulative exposure: sum of nonnegative burden × declared abstract time step. It grows with longer exposure at constant burden.
 - Epistemic uncertainty: 1 − confidence in this toy harness. This is only a simple diagnostic proxy, not a calibrated probabilistic uncertainty model.
 
-The Rust unit tests check that extending constant burden changes cumulative exposure but not the mean, changing confidence alone does not erase viability burden, equal means can conceal different peaks, and a predictive action can differ from a reactive one before current stress rises.
+The Rust unit tests check duration-vs-mean semantics, reject non-finite exposure evidence, separate confidence from viability burden, test warning permutation and an unannounced regime shift, exercise a shield veto/recovery choice, and assert that shielded episodes preserve one-step viability under the exact synthetic model. The report binary also tests CSV flag consistency, duplicate condition/seed rejection, nearest-rank tail estimates, and deterministic paired-bootstrap calculations.
 
 Abstract model steps are not seconds. Cross-environment aggregation requires explicit time-step normalization. Missing forecasts, invalid model states, and unavailable evidence must remain explicit rather than being silently interpreted as safety.
 
@@ -111,7 +125,8 @@ The v1 harness implements none of these external algorithms. The next comparison
 
 ### Stage 1 — held-out synthetic tournament
 
-- Keep the 32 development seeds separate from a newly generated and frozen held-out seed set.
+- Treat the shipped 32-seed panel as development/qualification data, not final held-out evidence; freeze a separate held-out seed panel and new disturbance variants before tuning.
+- Use `allostatic-control-report` for the per-condition distribution summary and paired shield effects. Its 4,000-resample percentile bootstrap is deterministic and seed-paired; its intervals quantify variation over this synthetic seed panel only, not unseen scenario families.
 - Use paired scenario/seed comparisons across all policies.
 - Report per-scenario distributions, median and 95th percentile, worst case, failures, frequency/severity of limit violations, and uncertainty intervals; do not report only a pooled mean.
 - Bootstrap paired differences at the episode level (and at the scenario-family level where feasible); publish raw CSV, aggregation code, and frozen seeds.
@@ -164,6 +179,6 @@ From the repository root, on a Rust-enabled checkout:
 
     bash tools/allostatic-control-bench/qualify.sh <exact-tested-commit>
 
-The script checks that the checkout matches the supplied commit; runs formatting, tests, and Clippy; executes the benchmark twice; rejects non-byte-identical CSV output; and writes a SHA-256 provenance receipt for the benchmark output and source inputs. It defaults to writing `allostatic-control-v1.csv` and `allostatic-control-v1.csv.receipt.txt`; pass a second argument to choose a different CSV path. Keep the output and receipt together when publishing results. The script intentionally does not decide whether the benchmark passes the scientific advancement gates; those require analysis of the output.
+The script checks that the checkout matches the supplied commit; runs formatting, tests, and Clippy; executes the episode benchmark twice; rejects non-byte-identical episode and report outputs; checks complete scenario × seed × policy × shield coverage; and writes a SHA-256 provenance receipt for all outputs and source inputs. By default it produces `allostatic-control-v1.csv`, `allostatic-control-v1-summary.csv`, `allostatic-control-v1-paired-deltas.csv`, and `allostatic-control-v1.csv.receipt.txt`. Pass a second argument to choose a different episode CSV path; the summary and paired filenames follow that base name. Keep all outputs and the receipt together when publishing results. The script intentionally does not decide whether the benchmark passes the scientific advancement gates; those require analysis of the output.
 
 The authoring environment used for this initial draft had no Rust toolchain available. The qualification script and Rust tests have therefore **not** been executed here. This specification and prototype are not qualified until a Rust-enabled environment runs the script on the exact PR head and the receipt is independently checked.
