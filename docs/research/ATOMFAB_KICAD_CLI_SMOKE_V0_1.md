@@ -34,3 +34,6 @@ A passing run proves only this bounded CAD command/export smoke contract, not th
 ## Exact-head and container write semantics
 
 The receipt runner checks out the pull request head SHA rather than the synthetic merge ref, so the `git_head` is the proposed source commit. The pinned container runs non-root; the CI workspace's output directory is made writable before launch, and the output inventory is checksum-bound after the tool has exited. This addresses reproducibility and artifact collection only; it is not a security sandbox for untrusted board files.
+
+
+The PR trigger is intentionally limited to changes in this benchmark document and its fixture directory, so adding or editing the CI contract in the parent roadmap PR does not run a smoke benchmark against a branch that lacks the board fixture.
