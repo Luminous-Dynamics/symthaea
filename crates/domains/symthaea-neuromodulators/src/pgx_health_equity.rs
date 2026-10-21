@@ -160,6 +160,33 @@ pub struct DosingRecommendation {
     pub monitoring: Option<String>,
 }
 
+/// Outcome of a research-only lookup against the bundled guideline reference table.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ResearchProjectionStatus {
+    /// A record exists for the exact drug/gene/phenotype tuple.
+    ReferenceFound,
+    /// No record exists for the exact drug/gene/phenotype tuple.
+    Indeterminate,
+}
+
+/// Non-actionable metadata about a pharmacogenomics guideline reference.
+///
+/// This deliberately contains no dose, medication choice, contraindication,
+/// or treatment instruction. A reference match does not validate an individual's
+/// genotype/diplotype, determine clinical applicability, or authorize any use.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResearchGuidelineProjection {
+    pub status: ResearchProjectionStatus,
+    pub drug: String,
+    pub gene: String,
+    pub phenotype: MetabolizerPhenotype,
+    pub reference_evidence_level: Option<EvidenceLevel>,
+    pub reference_source_population: Option<AncestryGroup>,
+    pub population_equity_gap: Option<f64>,
+    pub population_context_flagged: Option<bool>,
+    pub claim_ceiling: String,
+}
+
 /// Risk profile for a single ancestry group relative to a drug-gene pair.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PopulationRisk {
@@ -1367,69 +1394,58 @@ impl PgxHealthEquityEngine {
         }
     }
 
-    /// Produce a research-only projection of a guideline for an aggregate context.
+    /// Return research-only metadata about an exact guideline-reference match.
     ///
-    /// This compatibility API accepts a coarse population label and a phenotype
-    /// label; those inputs are not sufficient to infer an individual's genotype,
-    /// diplotype, or dose. The returned guideline action is not qualified for
-    /// patient use, and the population model must not be used for prescribing,
-    /// drug selection, medication clearance, or dose changes.
-    pub fn adjusted_recommendation(
+    /// This is not a phenotype caller or prescribing helper. It returns no dose,
+    /// medication choice, contraindication, or monitoring instruction. Population
+    /// context is used only to annotate the existing exploratory aggregate equity
+    /// estimate; it is not a proxy for any individual's genotype.
+    pub fn research_guideline_projection(
         &self,
         drug: &str,
         gene: &str,
         population_context: AncestryGroup,
         phenotype_context: MetabolizerPhenotype,
-    ) -> DosingRecommendation {
-        // A drug/phenotype match is insufficient: the gene must also match.
+    ) -> ResearchGuidelineProjection {
         let base = self
             .cpic_guidelines
             .iter()
             .find(|g| g.drug == drug && g.gene == gene && g.phenotype == phenotype_context);
 
-        let base_rec = match base {
-            Some(g) => g.recommendation.clone(),
-            None => {
-                // Unknown guidance must never silently turn into a standard-dose action.
-                return DosingRecommendation {
-                    action: DosingAction::Indeterminate,
-                    dose_adjustment: None,
-                    alternative_drug: None,
-                    monitoring: Some(format!(
-                        "No applicable CPIC guideline for {}/{:?}; result is indeterminate. No medication action is supported.",
-                        drug, phenotype_context
-                    )),
-                };
-            }
+        let Some(guideline) = base else {
+            return ResearchGuidelineProjection {
+                status: ResearchProjectionStatus::Indeterminate,
+                drug: drug.to_string(),
+                gene: gene.to_string(),
+                phenotype: phenotype_context,
+                reference_evidence_level: None,
+                reference_source_population: None,
+                population_equity_gap: None,
+                population_context_flagged: None,
+                claim_ceiling: "No matching reference record; no medication action is inferred."
+                    .to_string(),
+            };
         };
 
-        // Check whether this aggregate population context is flagged in the research estimate.
         let equity = self.equity_analysis(drug, gene);
-        let is_underserved = equity.underserved_populations.contains(&population_context);
+        let population_context_flagged =
+            equity.underserved_populations.contains(&population_context);
 
-        if is_underserved {
-            // Enhance monitoring for underserved populations.
-            let ancestry_note = format!(
-                "Population context may be underserved in this exploratory estimate (equity gap: {:.2}); \
-                 this is not an individual risk estimate or a clinical monitoring instruction.",
-                equity.equity_gap_score
-            );
-            let monitoring = match base_rec.monitoring {
-                Some(ref m) => Some(format!("{} | {}", m, ancestry_note)),
-                None => Some(ancestry_note),
-            };
-            DosingRecommendation {
-                action: base_rec.action,
-                dose_adjustment: base_rec.dose_adjustment,
-                alternative_drug: base_rec.alternative_drug,
-                monitoring,
-            }
-        } else {
-            base_rec
+        ResearchGuidelineProjection {
+            status: ResearchProjectionStatus::ReferenceFound,
+            drug: drug.to_string(),
+            gene: gene.to_string(),
+            phenotype: phenotype_context,
+            reference_evidence_level: Some(guideline.evidence_level),
+            reference_source_population: Some(guideline.source_population),
+            population_equity_gap: Some(equity.equity_gap_score),
+            population_context_flagged: Some(population_context_flagged),
+            claim_ceiling: "Reference metadata and exploratory aggregate context only; no patient-level inference or medication action."
+                .to_string(),
         }
     }
 
-    /// Estimates the number of patients affected by ancestry-biased dosing
+        /// Estimates the number of patients affected by ancestry-biased dosing
     /// for a specific drug-gene pair, using US census population data (2024).
     ///
     /// "At risk" = fraction of population with an actionable phenotype (PM or UM)
@@ -1876,25 +1892,23 @@ mod tests {
     }
 
     #[test]
-    fn test_adjusted_recommendation_differs_for_ultra_rapid() {
+    fn test_projection_finds_exact_guideline_without_exposing_action() {
         let e = engine();
-        let rec = e.adjusted_recommendation(
+        let projection = e.research_guideline_projection(
             "codeine",
             "CYP2D6",
             AncestryGroup::African,
             MetabolizerPhenotype::UltraRapid,
         );
-        // UM + codeine = avoid drug (CPIC) + underserved ancestry note.
-        assert!(
-            matches!(rec.action, DosingAction::AvoidDrug),
-            "UM codeine should avoid drug, got {:?}",
-            rec.action
-        );
-        // UM codeine should have monitoring guidance regardless of underserved status
-        assert!(
-            rec.monitoring.is_some(),
-            "UM codeine should have monitoring recommendation"
-        );
+        assert_eq!(projection.status, ResearchProjectionStatus::ReferenceFound);
+        assert_eq!(projection.reference_evidence_level, Some(EvidenceLevel::Strong));
+        assert!(projection.population_equity_gap.is_some());
+        assert!(projection.population_context_flagged.is_some());
+
+        let encoded = serde_json::to_value(&projection).unwrap();
+        for forbidden in ["action", "dose_adjustment", "alternative_drug", "monitoring"] {
+            assert!(encoded.get(forbidden).is_none(), "projection must not expose {forbidden}");
+        }
     }
 
     #[test]
@@ -1942,39 +1956,37 @@ mod tests {
     }
 
     #[test]
-    fn test_standard_dose_for_normal_metabolizer() {
+    fn test_projection_for_normal_phenotype_contains_only_reference_metadata() {
         let e = engine();
-        let rec = e.adjusted_recommendation(
+        let projection = e.research_guideline_projection(
             "codeine",
             "CYP2D6",
             AncestryGroup::European,
             MetabolizerPhenotype::Normal,
         );
-        assert!(
-            matches!(rec.action, DosingAction::StandardDose),
-            "Normal metabolizer should get standard dose, got {:?}",
-            rec.action
-        );
+        assert_eq!(projection.status, ResearchProjectionStatus::ReferenceFound);
+        assert_eq!(projection.drug, "codeine");
+        assert_eq!(projection.gene, "CYP2D6");
+        assert_eq!(projection.phenotype, MetabolizerPhenotype::Normal);
+        assert!(projection.reference_source_population.is_some());
+        let encoded = serde_json::to_value(&projection).unwrap();
+        assert!(encoded.get("action").is_none());
+        assert!(encoded.get("dose_adjustment").is_none());
     }
 
     #[test]
-    fn test_alternative_drug_for_poor_metabolizer_codeine() {
+    fn test_projection_does_not_return_alternative_medication() {
         let e = engine();
-        let rec = e.adjusted_recommendation(
+        let projection = e.research_guideline_projection(
             "codeine",
             "CYP2D6",
             AncestryGroup::European,
             MetabolizerPhenotype::Poor,
         );
-        assert!(
-            matches!(rec.action, DosingAction::UseAlternative(_)),
-            "PM codeine should use alternative, got {:?}",
-            rec.action
-        );
-        assert!(
-            rec.alternative_drug.is_some(),
-            "Should suggest alternative drug"
-        );
+        assert_eq!(projection.status, ResearchProjectionStatus::ReferenceFound);
+        let encoded = serde_json::to_value(&projection).unwrap();
+        assert!(encoded.get("alternative_drug").is_none());
+        assert!(encoded.get("action").is_none());
     }
 
     #[test]
@@ -2363,63 +2375,48 @@ mod tests {
     }
 
     #[test]
-    fn test_gene_mismatch_fails_closed_as_indeterminate() {
+    fn test_gene_mismatch_is_indeterminate_without_action_fields() {
         let e = engine();
-        let rec = e.adjusted_recommendation(
+        let projection = e.research_guideline_projection(
             "codeine",
             "CYP2C19",
             AncestryGroup::European,
             MetabolizerPhenotype::UltraRapid,
         );
-
-        assert!(
-            matches!(rec.action, DosingAction::Indeterminate),
-            "A guideline for another gene must not be reused"
-        );
-        assert!(rec.dose_adjustment.is_none());
-        assert!(rec.alternative_drug.is_none());
+        assert_eq!(projection.status, ResearchProjectionStatus::Indeterminate);
+        assert!(projection.reference_evidence_level.is_none());
+        assert!(projection.population_equity_gap.is_none());
+        let encoded = serde_json::to_value(&projection).unwrap();
+        for forbidden in ["action", "dose_adjustment", "alternative_drug", "monitoring"] {
+            assert!(encoded.get(forbidden).is_none());
+        }
     }
 
     #[test]
-    fn test_unsupported_phenotype_fails_closed_as_indeterminate() {
+    fn test_unsupported_phenotype_is_indeterminate() {
         let e = engine();
-        let rec = e.adjusted_recommendation(
+        let projection = e.research_guideline_projection(
             "codeine",
             "CYP2D6",
             AncestryGroup::European,
             MetabolizerPhenotype::Intermediate,
         );
-
-        assert!(
-            matches!(rec.action, DosingAction::Indeterminate),
-            "A phenotype without a guideline must not inherit another action"
-        );
-        assert!(rec.dose_adjustment.is_none());
-        assert!(rec.alternative_drug.is_none());
+        assert_eq!(projection.status, ResearchProjectionStatus::Indeterminate);
+        assert!(projection.reference_evidence_level.is_none());
+        assert!(projection.population_context_flagged.is_none());
     }
 
     #[test]
-    fn test_unsupported_drug_fails_closed_as_indeterminate() {
+    fn test_unsupported_drug_is_indeterminate() {
         let e = engine();
-        let rec = e.adjusted_recommendation(
+        let projection = e.research_guideline_projection(
             "unsupported-drug",
             "CYP2D6",
             AncestryGroup::European,
             MetabolizerPhenotype::Normal,
         );
-
-        assert!(
-            matches!(rec.action, DosingAction::Indeterminate),
-            "Unsupported drug must not silently default to a standard dose"
-        );
-        assert!(rec.dose_adjustment.is_none());
-        assert!(rec.alternative_drug.is_none());
-        assert!(
-            rec.monitoring
-                .as_deref()
-                .is_some_and(|message| message.contains("indeterminate")),
-            "The fallback should disclose that no applicable guideline was found"
-        );
+        assert_eq!(projection.status, ResearchProjectionStatus::Indeterminate);
+        assert!(projection.reference_evidence_level.is_none());
+        assert!(projection.population_equity_gap.is_none());
     }
-
 }
