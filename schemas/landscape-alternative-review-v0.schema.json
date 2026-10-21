@@ -152,7 +152,8 @@
               "evidence_class",
               "status",
               "model_id",
-              "model_version"
+              "model_version",
+              "pairing_context"
             ],
             "properties": {
               "system": {
@@ -206,6 +207,55 @@
                 "items": {
                   "type": "string",
                   "minLength": 1
+                }
+              },
+              "pairing_context": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "alternative_id",
+                  "design_snapshot_sha256",
+                  "boundary_conditions_sha256",
+                  "evaluation_plan_sha256",
+                  "metric_registry_sha256",
+                  "seed",
+                  "scope"
+                ],
+                "properties": {
+                  "alternative_id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "design_snapshot_sha256": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
+                  },
+                  "boundary_conditions_sha256": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
+                  },
+                  "evaluation_plan_sha256": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
+                  },
+                  "metric_registry_sha256": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
+                  },
+                  "seed": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 4294967295
+                  },
+                  "scope": {
+                    "enum": [
+                      "site-parcel",
+                      "district",
+                      "watershed",
+                      "bioregion"
+                    ]
+                  }
                 }
               }
             },
