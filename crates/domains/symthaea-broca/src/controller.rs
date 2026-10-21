@@ -1613,6 +1613,60 @@ mod tests {
     }
 
     #[test]
+    fn name_specific_residual_breaks_duplicate_context_collisions() {
+        let genesis = test_genesis();
+        let config = test_config();
+        let base = LanguageController::new(&genesis, &config);
+        let contexts = vec![
+            base.token_embeddings()[1].clone(),
+            base.token_embeddings()[2].clone(),
+        ];
+        let refs: Vec<&ContinuousHV> = contexts.iter().collect();
+
+        let mut bundle_a = base.clone();
+        let mut bundle_b = base.clone();
+        let index_a = bundle_a
+            .append_token_with_initialization(
+                &genesis,
+                "duplicate-a",
+                Some(&refs),
+                TokenExtensionInitialization::ContextBundleNormMatched,
+            )
+            .expect("first context bundle should succeed");
+        let index_b = bundle_b
+            .append_token_with_initialization(
+                &genesis,
+                "duplicate-b",
+                Some(&refs),
+                TokenExtensionInitialization::ContextBundleNormMatched,
+            )
+            .expect("second context bundle should succeed");
+        assert_eq!(
+            bundle_a.token_embeddings()[index_a].values,
+            bundle_b.token_embeddings()[index_b].values,
+            "same context only cannot distinguish tokens with identical context vectors"
+        );
+
+        let strategy = TokenExtensionInitialization::ContextBundleNormMatchedWithResidual {
+            residual_weight: 0.15,
+        };
+        let mut residual_a = base.clone();
+        let mut residual_b = base.clone();
+        let index_a = residual_a
+            .append_token_with_initialization(&genesis, "duplicate-a", Some(&refs), strategy)
+            .expect("first residual vector should succeed");
+        let index_b = residual_b
+            .append_token_with_initialization(&genesis, "duplicate-b", Some(&refs), strategy)
+            .expect("second residual vector should succeed");
+        assert!(
+            residual_a.token_embeddings()[index_a]
+                .similarity(&residual_b.token_embeddings()[index_b])
+                < 0.999,
+            "name-specific residuals should avoid exact collapse"
+        );
+    }
+
+    #[test]
     fn context_extension_rejects_invalid_inputs_without_mutation() {
         let genesis = test_genesis();
         let config = test_config();
