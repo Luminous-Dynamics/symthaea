@@ -51,6 +51,9 @@ Each mutation should declare: invariant ID, mutation operator, precondition, exp
 
 ## 5. Baselines and industry comparison
 
+The current external benchmark landscape and comparison constraints are summarized separately in [INDUSTRY_COMPARISON_2026-10-21.md](INDUSTRY_COMPARISON_2026-10-21.md). It uses a 2026-10-21 literature snapshot and explicitly distinguishes whole-workflow execution from this synthetic trace validator.
+
+
 The benchmark is not directly comparable to medical question-answer, diagnostic-accuracy, or clinical-outcome benchmarks. Those evaluate different tasks and require different data and reference standards. It would be misleading to say this project is ahead of a clinical AI vendor on the basis of synthetic state-machine checks.
 
 Use the following as **complementary comparators for evidence quality**, not competing scores:
@@ -71,4 +74,4 @@ For a fair engineering baseline, implement a deliberately simple reference state
 
 ## 7. Reproducibility checklist
 
-Every published result should provide the exact Git revision; immutable corpus and oracle digests; validator and executable digests; toolchain and runner details; command lines; raw receipt; metric definitions; test/mutation inventory; failures and exclusions; and explicit claim ceiling. Queued, skipped, or partial job success is not a passing result. Any source, fixture, evaluator, or protocol change creates a new evidence revision and requires fresh exact-head validation.
+Every published result should provide the exact Git revision; immutable corpus, evaluation-protocol, mutation-matrix, dependency-lock and oracle digests; validator and executable digests; pinned Rust/Cargo versions and runner details; command lines; raw receipt; metric definitions; test/mutation inventory; failures and exclusions; and explicit claim ceiling. Queued, skipped, or partial job success is not a passing result. Any source, fixture, evaluator, or protocol change creates a new evidence revision and requires fresh exact-head validation.
