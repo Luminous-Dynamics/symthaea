@@ -975,11 +975,9 @@ mod tests {
             "acceptance": {"must_change":["edge is rejected"]}
         });
         let errors = validate_pair_contract(&pair);
-        assert!(
-            errors
-                .iter()
-                .any(|e| e.contains("must bind the proposed relation and reject unsupported promotion"))
-        );
+        assert!(errors.iter().any(|e| {
+            e.contains("must bind the proposed relation and reject unsupported promotion")
+        }));
     }
 
     #[test]
@@ -1057,9 +1055,10 @@ mod tests {
     #[test]
     fn bundled_metamorphic_pairs_satisfy_domain_contract() {
         let mut seen_ids = HashSet::new();
-        for (index, raw_line) in include_str!("../../../benchmarks/mythology-bench/v0/metamorphic-pairs.jsonl")
-            .lines()
-            .enumerate()
+        for (index, raw_line) in
+            include_str!("../../../benchmarks/mythology-bench/v0/metamorphic-pairs.jsonl")
+                .lines()
+                .enumerate()
         {
             let pair: Value = serde_json::from_str(raw_line).unwrap_or_else(|error| {
                 panic!("invalid metamorphic JSONL at line {}: {error}", index + 1)
@@ -1073,5 +1072,4 @@ mod tests {
             );
         }
     }
-
 }
