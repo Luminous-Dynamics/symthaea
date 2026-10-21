@@ -506,7 +506,11 @@ fn structured_translation_role_coverage(
 ) -> f32 {
     let text = translation.text.to_ascii_lowercase();
     let mut expected = Vec::new();
-    expected.push(readout.intent.as_str());
+    expected.push(match readout.intent.as_str() {
+        "uncertainty" => "uncertain",
+        "unknown" => "classify",
+        intent => intent,
+    });
     for fill in &readout.roles {
         match (fill.role.as_str(), fill.prime.as_str()) {
             // Score the action against the encoder's intent contract, not
@@ -519,7 +523,7 @@ fn structured_translation_role_coverage(
                 "uncertainty" => "uncertain",
                 "reflect" => "reflecting",
                 "continue" => "continue",
-                "unknown" => "unknown",
+                "unknown" => "classify",
                 _ => "intent",
             }),
             ("PREDICATE", _) => expected.push(match readout.epistemic_status {
