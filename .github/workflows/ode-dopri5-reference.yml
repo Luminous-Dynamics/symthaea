@@ -39,6 +39,29 @@ jobs:
           sha256sum research/ode-dopri5-reference/Cargo.lock
           cargo metadata --locked --no-deps --manifest-path research/ode-dopri5-reference/Cargo.toml > /tmp/ode-dopri5-metadata.json
 
+      - name: Diagnose dependency-lock drift without weakening the committed-lock gate
+        id: lock_refresh
+        shell: bash
+        run: |
+          set -uo pipefail
+          lock_path="research/ode-dopri5-reference/Cargo.lock"
+          before="$(sha256sum "$lock_path" | cut -d ' ' -f 1)"
+          set +e
+          cargo metadata --manifest-path research/ode-dopri5-reference/Cargo.toml --format-version 1 > /tmp/ode-dopri5-metadata-resolved.json
+          metadata_status=$?
+          set -e
+          after="$(sha256sum "$lock_path" | cut -d ' ' -f 1)"
+          changed=false
+          if [ "$before" != "$after" ]; then changed=true; fi
+          echo "lock_sha_before=$before" >> "$GITHUB_OUTPUT"
+          echo "lock_sha_after=$after" >> "$GITHUB_OUTPUT"
+          echo "lock_changed=$changed" >> "$GITHUB_OUTPUT"
+          echo "metadata_status=$metadata_status" >> "$GITHUB_OUTPUT"
+          printf 'lock_sha_before=%s\nlock_sha_after=%s\nlock_changed=%s\nmetadata_status=%s\n' "$before" "$after" "$changed" "$metadata_status"
+          # If resolution rewrites Cargo.lock, the generated candidate is uploaded below.
+          # The final qualification gate stays red until the reviewed file is committed.
+          exit 0
+
       - name: Format
         run: cargo fmt --manifest-path research/ode-dopri5-reference/Cargo.toml -- --check
 
@@ -64,6 +87,7 @@ jobs:
           set -e
           echo "first_status=$first_status" >> "$GITHUB_OUTPUT"
           echo "second_status=$second_status" >> "$GITHUB_OUTPUT"
+          cp /tmp/ode-dopri5-comparison-1.json research/ode-dopri5-reference/ode-dopri5-comparison.json
           cmp /tmp/ode-dopri5-comparison-1.json /tmp/ode-dopri5-comparison-2.json
           jq -e '
             .schema_version == "0.1.0"
@@ -73,8 +97,36 @@ jobs:
             and (.lock_sha | test("^[0-9a-f]{64}$"))
             and (.observations | length == 9)
           ' /tmp/ode-dopri5-comparison-1.json
-          cp /tmp/ode-dopri5-comparison-1.json research/ode-dopri5-reference/ode-dopri5-comparison.json
           sha256sum research/ode-dopri5-reference/Cargo.lock research/ode-dopri5-reference/ode-dopri5-comparison.json
+
+      - name: Generate deterministic exponential-decay comparison twice
+        id: decay_comparison
+        if: always()
+        shell: bash
+        run: |
+          set -uo pipefail
+          source_sha="${{ github.event.pull_request.head.sha || github.sha }}"
+          checkout_sha="$(git rev-parse HEAD)"
+          lock_sha="$(sha256sum research/ode-dopri5-reference/Cargo.lock | cut -d ' ' -f 1)"
+          set +e
+          ODE_BENCH_SOURCE_SHA="$source_sha" ODE_BENCH_CHECKOUT_SHA="$checkout_sha" ODE_BENCH_LOCK_SHA="$lock_sha" cargo run --locked --release --manifest-path research/ode-dopri5-reference/Cargo.toml --example decay_work_precision > /tmp/ode-decay-comparison-1.json
+          first_status=$?
+          ODE_BENCH_SOURCE_SHA="$source_sha" ODE_BENCH_CHECKOUT_SHA="$checkout_sha" ODE_BENCH_LOCK_SHA="$lock_sha" cargo run --locked --release --manifest-path research/ode-dopri5-reference/Cargo.toml --example decay_work_precision > /tmp/ode-decay-comparison-2.json
+          second_status=$?
+          set -e
+          echo "first_status=$first_status" >> "$GITHUB_OUTPUT"
+          echo "second_status=$second_status" >> "$GITHUB_OUTPUT"
+          cp /tmp/ode-decay-comparison-1.json research/ode-dopri5-reference/ode-decay-comparison.json
+          cmp /tmp/ode-decay-comparison-1.json /tmp/ode-decay-comparison-2.json
+          jq -e '
+            .schema_version == "0.1.0"
+            and .benchmark_id == "ODE-WP-DECAY-DOPRI5-001"
+            and (.source_sha | test("^[0-9a-f]{40}$"))
+            and (.checkout_sha | test("^[0-9a-f]{40}$"))
+            and (.lock_sha | test("^[0-9a-f]{64}$"))
+            and (.observations | length == 27)
+          ' /tmp/ode-decay-comparison-1.json
+          sha256sum /tmp/ode-decay-comparison-1.json research/ode-dopri5-reference/ode-decay-comparison.json
 
       - name: Upload comparison receipt and candidate lock
         if: always()
@@ -84,6 +136,7 @@ jobs:
           path: |
             research/ode-dopri5-reference/Cargo.lock
             research/ode-dopri5-reference/ode-dopri5-comparison.json
+            research/ode-dopri5-reference/ode-decay-comparison.json
           if-no-files-found: warn
 
       - name: Enforce source and numerical comparison gates
@@ -92,9 +145,21 @@ jobs:
           GENERATION_OUTCOME: ${{ steps.comparison.outcome }}
           FIRST_STATUS: ${{ steps.comparison.outputs.first_status }}
           SECOND_STATUS: ${{ steps.comparison.outputs.second_status }}
+          DECAY_GENERATION_OUTCOME: ${{ steps.decay_comparison.outcome }}
+          DECAY_FIRST_STATUS: ${{ steps.decay_comparison.outputs.first_status }}
+          DECAY_SECOND_STATUS: ${{ steps.decay_comparison.outputs.second_status }}
         run: |
           set -euo pipefail
           test "$GENERATION_OUTCOME" = "success"
           test "$FIRST_STATUS" = "0"
           test "$SECOND_STATUS" = "0"
           jq -e 'all(.observations[]; .custom_pass == true and .dopri5_pass == true)' research/ode-dopri5-reference/ode-dopri5-comparison.json
+          test "$DECAY_GENERATION_OUTCOME" = "success"
+          test "$DECAY_FIRST_STATUS" = "0"
+          test "$DECAY_SECOND_STATUS" = "0"
+          jq -e '
+            .schema_version == "0.1.0"
+            and .benchmark_id == "ODE-WP-DECAY-DOPRI5-001"
+            and (.observations | length == 27)
+            and all(.observations[]; .custom_pass == true and .dopri5_pass == true)
+          ' research/ode-dopri5-reference/ode-decay-comparison.json
