@@ -165,7 +165,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("# set_valued_baseline=split_conformal_and_dco_tuned_prediction_sets");
     println!("# conformal_alpha=0.05; marginal_known_query_coverage_target=0.95");
     println!("# dco_tuning_split=selection; fresh_conformal_calibration_split=true");
-    println!("# dco_tuning_objective=minimize_tuning_mean_set_size_subject_to_tuning_coverage_target");
+    println!(
+        "# dco_tuning_objective=minimize_tuning_mean_set_size_subject_to_tuning_coverage_target"
+    );
     println!("# dco_gap_penalty_candidates=0,0.25,0.5,1,2");
     println!(
         "# conformal_scope=exchangeable_known_queries_from_same_synthetic_generator; strata_are_descriptive"
@@ -236,11 +238,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             ConformalScoreMode::RawSimilarity,
         )?;
         let conformal_cutoff_similarity = 1.0 - conformal_q;
-        let conformal_test = score_conformal_sets(
-            &test,
-            conformal_q,
-            ConformalScoreMode::RawSimilarity,
-        );
+        let conformal_test =
+            score_conformal_sets(&test, conformal_q, ConformalScoreMode::RawSimilarity);
         let conformal_near_unknown = score_conformal_sets(
             &near_unknown,
             conformal_q,
@@ -281,10 +280,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         };
         println!(
             "# dco_selection=seed:{seed},score:{dco_mode_label},provisional_q:{:.6},tuning_n:{},tuning_known_coverage:{:.6},tuning_mean_set_size:{:.6},fresh_calibration_n:{dco_calibration_n},fresh_q:{dco_q:.6}",
-            dco.provisional_quantile,
-            dco.tuning_n,
-            dco.tuning_coverage,
-            dco.mean_set_size
+            dco.provisional_quantile, dco.tuning_n, dco.tuning_coverage, dco.mean_set_size
         );
         report_conformal_set_summaries(
             seed,
@@ -1029,9 +1025,9 @@ fn split_conformal_quantile(
         .iter()
         .filter(|sample| matches!(sample.kind, QueryKind::Known { .. }))
         .filter_map(|sample| {
-            sample.target_similarity.map(|similarity| {
-                conformal_nonconformity(similarity, sample.best_similarity, mode)
-            })
+            sample
+                .target_similarity
+                .map(|similarity| conformal_nonconformity(similarity, sample.best_similarity, mode))
         })
         .collect();
     if nonconformity.is_empty() {
@@ -1072,9 +1068,7 @@ fn score_conformal_sets(
             let set_size = score
                 .prototype_similarities
                 .iter()
-                .map(|&similarity| {
-                    conformal_nonconformity(similarity, score.best_similarity, mode)
-                })
+                .map(|&similarity| conformal_nonconformity(similarity, score.best_similarity, mode))
                 .filter(|&nonconformity| nonconformity <= conformal_q)
                 .count();
             let covered = score.target_similarity.is_some_and(|similarity| {
@@ -1090,14 +1084,15 @@ fn score_conformal_sets(
         .collect()
 }
 
-fn tune_dco_score(
-    tuning: &[ScoredQuery],
-    alpha: f64,
-) -> Result<DcoScoreSelection, Box<dyn Error>> {
+fn tune_dco_score(tuning: &[ScoredQuery], alpha: f64) -> Result<DcoScoreSelection, Box<dyn Error>> {
     let mut candidates = vec![ConformalScoreMode::RawSimilarity];
-    candidates.extend(DCO_GAP_PENALTY_CANDIDATES.iter().copied().skip(1).map(|penalty| {
-        ConformalScoreMode::GapAdjusted { penalty }
-    }));
+    candidates.extend(
+        DCO_GAP_PENALTY_CANDIDATES
+            .iter()
+            .copied()
+            .skip(1)
+            .map(|penalty| ConformalScoreMode::GapAdjusted { penalty }),
+    );
 
     let mut best: Option<DcoScoreSelection> = None;
     for mode in candidates {
@@ -1117,8 +1112,10 @@ fn tune_dco_score(
         if coverage + f64::EPSILON < 1.0 - alpha {
             continue;
         }
-        let mean_set_size = known.iter().map(|prediction| prediction.set_size).sum::<usize>()
-            as f64
+        let mean_set_size = known
+            .iter()
+            .map(|prediction| prediction.set_size)
+            .sum::<usize>() as f64
             / known.len() as f64;
         let candidate = DcoScoreSelection {
             mode,
@@ -1631,16 +1628,10 @@ mod tests {
     #[test]
     fn gap_adjusted_score_penalizes_non_top_candidates() {
         let raw = conformal_nonconformity(0.85, 0.90, ConformalScoreMode::RawSimilarity);
-        let top = conformal_nonconformity(
-            0.90,
-            0.90,
-            ConformalScoreMode::GapAdjusted { penalty: 2.0 },
-        );
-        let lower_rank = conformal_nonconformity(
-            0.85,
-            0.90,
-            ConformalScoreMode::GapAdjusted { penalty: 2.0 },
-        );
+        let top =
+            conformal_nonconformity(0.90, 0.90, ConformalScoreMode::GapAdjusted { penalty: 2.0 });
+        let lower_rank =
+            conformal_nonconformity(0.85, 0.90, ConformalScoreMode::GapAdjusted { penalty: 2.0 });
         assert!((raw - 0.15).abs() < 1e-12);
         assert!((top - 0.10).abs() < 1e-12);
         assert!((lower_rank - 0.25).abs() < 1e-12);
@@ -1670,12 +1661,9 @@ mod tests {
 
         // Selection does not receive the fresh-calibration data; calibration is
         // performed only after the DCO score mode is fixed.
-        let (fresh_quantile, fresh_count) = split_conformal_quantile(
-            &fresh_calibration,
-            CONFORMAL_ALPHA,
-            first.mode,
-        )
-        .expect("fresh conformal calibration");
+        let (fresh_quantile, fresh_count) =
+            split_conformal_quantile(&fresh_calibration, CONFORMAL_ALPHA, first.mode)
+                .expect("fresh conformal calibration");
         assert!(fresh_count > 0);
         let heldout_sets = score_conformal_sets(&fresh_calibration, fresh_quantile, first.mode);
         let known: Vec<_> = heldout_sets
@@ -1896,12 +1884,9 @@ mod tests {
                 kind: QueryKind::RandomOod,
             },
         ];
-        let (quantile, calibration_n) = split_conformal_quantile(
-            &samples,
-            0.5,
-            ConformalScoreMode::RawSimilarity,
-        )
-        .expect("quantile");
+        let (quantile, calibration_n) =
+            split_conformal_quantile(&samples, 0.5, ConformalScoreMode::RawSimilarity)
+                .expect("quantile");
         assert_eq!(calibration_n, 4);
         // Scores 1 - sim are [0.1, 0.2, 0.3, 0.4]; ceil((4+1)*.5)=3.
         assert!((quantile - 0.3).abs() < 1e-12);
