@@ -264,6 +264,8 @@ class PyPhiValidator:
         """
         if topology.n_nodes < 1:
             raise ValueError("topology must have at least one node")
+        if topology.n_nodes > 8:
+            raise ValueError("reference TPM construction is capped at 8 nodes")
         for source, target in topology.edges:
             if not (0 <= source < topology.n_nodes and 0 <= target < topology.n_nodes):
                 raise ValueError(
@@ -271,13 +273,18 @@ class PyPhiValidator:
                 )
 
         adjacency = self.edges_to_adjacency(topology.n_nodes, topology.edges)
+        # The fallback rule for an isolated node is self-memory. Reflect that
+        # dependency in the connectivity matrix so the graph and TPM agree.
+        for node in range(topology.n_nodes):
+            if not np.any(adjacency[node]):
+                adjacency[node, node] = 1
         n_states = 2 ** topology.n_nodes
         tpm = np.zeros((n_states, topology.n_nodes), dtype=np.float64)
         for state_index in range(n_states):
             state_bits = [(state_index >> i) & 1 for i in range(topology.n_nodes)]
             for node in range(topology.n_nodes):
                 neighbors = [j for j in range(topology.n_nodes) if adjacency[node, j] == 1]
-                output = any(state_bits[j] for j in neighbors) if neighbors else bool(state_bits[node])
+                output = any(state_bits[j] for j in neighbors)
                 probability = 1.0 if output else 0.0
                 tpm[state_index, node] = np.clip(probability * 0.98 + 0.01, 0.01, 0.99)
 
