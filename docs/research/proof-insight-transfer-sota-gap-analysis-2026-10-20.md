@@ -170,6 +170,23 @@ Keep all five scores separate. AutoformBench informs Track C; FormalRewardBench 
 
 This is a new evaluation design and research hypothesis, not a measured PITB gain. No transfer result, AutoformBench score reproduction, or SOTA claim is implied.
 
+
+## 22 October 2026 update: verified-progress telemetry, without proxy-score gaming
+
+Hard-mode theorem proving and learning-to-rank proof steps point to a missing measurement layer. DAP separates answer discovery from formal proving ([ACL 2026](https://aclanthology.org/2026.acl-long.3/)); OptProver's preference objective penalizes valid but non-progressing steps ([ICML 2026](https://proceedings.mlr.press/v306/li26ek.html)). Neither directly establishes that a proof-insight retrieval system benefits from intermediate-state metrics, but both motivate testing the gap between *doing formal work* and *making verified progress*.
+
+PITB now has a draft `proof-progress-trace.schema.json`, a synthetic trace, and CI-side relational checks. Trace records distinguish obligation instance IDs from formula digests, retain event-level resource counters and receipts, and represent splits/refinements separately from receipt-backed discharges. The checker rejects orphan obligations, duplicate closures, non-monotonic counters, over-budget events, and a claimed verified success without kernel/semantic-gate/successor receipts. A synthetic case splits one root into two child goals and then verifies both leaves; the split itself is not counted as a closure.
+
+### How to use this without corrupting the benchmark
+
+- Keep exact-target semantic-gate success as the primary endpoint.
+- Use trace diagnostics to investigate *why* a strategy helped or stalled: receipt-backed leaf closures per token, time/tokens to first verified closure, unresolved leaf fraction and no-closure event distribution.
+- Keep speculative search branches separate. A future branch-aware trace must distinguish tentative closures from closures on the retained proof trajectory.
+- Validate telemetry against the proof assistant/checker boundary; do not trust self-reported model narration about solved goals.
+- Do not claim telemetry makes a model better. It is instrumentation and evaluation design until a matched intervention shows a repeatable improvement in verified results.
+
+This creates a potential research contribution beyond another retrieval index: a common, content-addressed record of strategy use, proof-state lineage, verified intermediate progress and terminal semantic outcome. It can enable causal analysis and better credit assignment while refusing to use intermediate activity as a substitute for correctness.
+
 ## Research references
 
 - Kim, Han & Hwang, [Benchmarking Testing in Automated Theorem Proving](https://aclanthology.org/2026.acl-industry.150/), ACL 2026 Industry Track.
