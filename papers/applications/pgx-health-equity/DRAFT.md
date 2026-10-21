@@ -1,5 +1,9 @@
 # Quantifying Pharmacogenomic Health Inequity: An Open-Source Equity Scoring Engine for Ancestry-Aware Drug Dosing
 
+ 
+> **Research status:** This manuscript describes population-level, hypothesis-generating analysis only. The current Hardy–Weinberg/functional-bin approximation has material discrepancies against published phenotype estimates, and clinically relevant alleles/structural variants are missing. Do not use these outputs for individual genotype interpretation, medication selection, prescribing, dose adjustment, or clinical decision support. Numeric claims remain subject to independent data and methods re-audit.
+
+
 **Tristan Stoltz**
 
 Luminous Dynamics, Richardson, TX, USA
@@ -12,7 +16,12 @@ Correspondence: tristan.stoltz@evolvingresonantcocreationism.com
 
 ## Abstract
 
-Pharmacogenomic (PGx) guidelines from the Clinical Pharmacogenetics Implementation Consortium (CPIC) represent a major advance toward precision drug therapy, yet they are predominantly validated in European-ancestry populations. This creates a measurable equity gap for patients of non-European descent, who collectively represent the majority of the world's population. We present the Pharmacogenomic Health Equity Engine, an open-source tool that quantifies this gap by computing expected metabolizer phenotype distributions from published allele frequencies across six ancestry groups using Hardy-Weinberg equilibrium, then deriving per-drug, per-gene, per-population equity gap scores. Across 11 CPIC Level A drug-gene pairs spanning 6 pharmacogenes (CYP2D6, CYP2C19, CYP2C9, CYP2B6, CYP3A5, CYP3A4), 7 clinical domains, and 32 guideline recommendations, we flag multiple potentially underserved population-drug combinations where current guideline applicability falls below 85%. The largest inter-ancestry disparities emerge for tacrolimus/CYP3A5, where the CYP3A5*3 loss-of-function allele frequency differs from 94% in European to 18% in African populations, and for efavirenz/CYP2B6, where the slow-metabolizer CYP2B6*6 allele reaches 38% in African versus 26% in European populations. We extend the engine with admixed population modeling for four clinically relevant populations (African American, US Latino/Hispanic, Brazilian, South African Coloured) using linear allele blending with HWE applied to blended frequencies. Sensitivity analysis demonstrates perfect rank stability across +/-20% allele frequency perturbations, and external validation against gnomAD v4 confirms 26/32 allele-population comparisons within 30% relative agreement. Using US Census population data, we estimate tens of millions of individuals carry actionable phenotypes that may be inadequately addressed by European-calibrated guidelines. All code, reference data, and allele frequency tables are released under AGPL-3.0.
+Pharmacogenomic guidelines can be harder to apply equitably when the underlying evidence and reference data represent populations unevenly. We describe an open-source, exploratory engine that calculates population-level phenotype-frequency approximations from curated allele frequencies under simplified Hardy–Weinberg assumptions and reports per-drug, per-gene, per-group disparity measures. The intended research use is to identify evidence gaps for further investigation, not to interpret an individual's genotype or recommend medication.
+
+The current implementation aggregates alleles into broad functional categories and omits clinically material alleles and structural variants. Its own comparison against published phenotype estimates reveals substantial errors for some gene/population combinations, including severe CYP2D6 discrepancies. Consequently, the computed scores and estimated impacts are hypothesis-generating, not measurements of clinical harm or evidence of dosing validity. Population categories are not genotypes; blending population allele frequencies does not resolve individual diplotypes, phase, copy number, structural variation, or within-group diversity.
+
+Selected allele-frequency comparisons against reference resources can check source consistency, but do not validate phenotype estimates, clinical utility, or patient outcomes. The next qualification steps are independent gene-specific reference annotations, comprehensive variant handling for each supported gene, explicit indeterminate results, external evaluation with prespecified metrics, and—only after those gates—study of any defined clinical use. The project is research-only.
+
 
 ---
 
@@ -318,15 +327,15 @@ To assess robustness to allele frequency uncertainty, we perturbed all allele fr
 
 This demonstrates that our equity conclusions are robust to the known uncertainty in population-level allele frequency estimates. Even if individual allele frequencies in our reference table are off by 20% (a larger error than observed in the gnomAD validation for most alleles), the relative ranking of drugs by equity gap severity and the identification of underserved populations remain stable.
 
-### 3.7 External Validation Against gnomAD v4
+### 3.7 Selected allele-frequency reference comparison (not clinical validation)
 
-We cross-referenced 8 key pharmacogene alleles (32 population-allele comparisons) against gnomAD v4.1 (~149K whole genomes, 7 ancestry groups; Chen et al. 2024 [33]). Of 32 comparisons, 26 (81%) fell within 30% relative agreement with gnomAD population-stratified frequencies. The 6 divergences decompose as follows:
+We conducted an exploratory source-consistency check for 8 selected pharmacogene alleles (32 population/allele comparisons) against gnomAD v4.1 (~149K whole genomes, 7 ancestry groups; Chen et al. 2024 [33]). Of 32 comparisons, 26 (81%) fell within a chosen 30% relative-difference band. This is an allele-frequency source comparison only—not independent validation of our phenotype model, equity scores, treatment actions, or clinical utility. The six divergences decompose as follows:
 
 - **4 African-ancestry divergences** (CYP2D6*4, CYP3A5*3, CYP3A4*22, and CYP2C19*17 in the African group): These are explained by gnomAD's "African/African American" category representing a predominantly African American population (~75-80% from US biobanks) with ~20% European genetic admixture, while our engine targets continental African frequencies from primary literature. For health equity purposes, continental African frequencies better represent the populations most underserved by current pharmacogenomic guidelines.
 - **1 low-frequency flag** (CYP2C19*17 East Asian: our 0.04 vs gnomAD 0.010): Our value from the Ionova 2020 meta-analysis [7] is more conservative (slightly overestimates rapid metabolizer risk, the safer clinical direction). Absolute difference is only 0.03.
 - **1 code correction** (CYP3A4*22 South Asian: 0.03 corrected to 0.01): gnomAD v4 SAS showed 0.009 (n=4,810 genomes), a >3x discrepancy. The original value had no supporting literature and was corrected in the engine.
 
-Full validation details, including per-allele comparison tables and gnomAD query methodology, are provided in Supplementary Material S4.
+Per-allele comparison tables and query methodology are provided in Supplementary Material S4. These checks need independent reproduction against exact source versions and must not be presented as validation of patient-level phenotype predictions.
 
 ### 3.8 HWE vs Empirical Phenotype Comparison
 
