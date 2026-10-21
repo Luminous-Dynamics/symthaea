@@ -679,6 +679,119 @@ mod tests {
     }
 
     #[test]
+    fn differential_json_reference_agrees_on_adversarial_mutation_suite() {
+        let mut cases: Vec<(&str, TrajectoryScenario)> = Vec::new();
+
+        let mut outside_session = scenario("FA-TRACE-001");
+        outside_session.events.remove(0);
+        cases.push(("outside active session", outside_session));
+
+        let mut wrong_bundle = scenario("FA-TRACE-001");
+        wrong_bundle
+            .events
+            .iter_mut()
+            .find(|event| event.kind == EventKind::ProtocolRendered)
+            .expect("render event exists")
+            .bundle_id = Some("bundle-other".to_owned());
+        cases.push(("wrong bundle identity", wrong_bundle));
+
+        let mut bad_digest = scenario("FA-TRACE-001");
+        bad_digest
+            .events
+            .iter_mut()
+            .find(|event| event.kind == EventKind::BundleVerified)
+            .expect("verify event exists")
+            .digest_verified = Some(false);
+        cases.push(("bad digest", bad_digest));
+
+        let mut expired = scenario("FA-TRACE-001");
+        expired
+            .events
+            .iter_mut()
+            .find(|event| event.kind == EventKind::BundleVerified)
+            .expect("verify event exists")
+            .bundle_state = Some(BundleState::Expired);
+        cases.push(("expired bundle", expired));
+
+        let mut uncertainty_reentered = scenario("FA-TRACE-012");
+        let handoff_index = uncertainty_reentered
+            .events
+            .iter()
+            .position(|event| event.kind == EventKind::HandoffEmitted)
+            .expect("handoff event exists");
+        uncertainty_reentered.events[handoff_index].sequence += 1;
+        uncertainty_reentered.events.insert(
+            handoff_index,
+            TraceEvent {
+                sequence: 4,
+                kind: EventKind::UncertaintyDetected,
+                bundle_id: None,
+                bundle_state: None,
+                digest_verified: None,
+                resource_state: None,
+                presented_as: None,
+                sensitive_payload: None,
+                consent_scoped: None,
+            },
+        );
+        cases.push(("uncertainty re-entered", uncertainty_reentered));
+
+        let mut revoked_new_session = scenario("FA-TRACE-003");
+        let render_index = revoked_new_session
+            .events
+            .iter()
+            .position(|event| event.kind == EventKind::ProtocolRendered)
+            .expect("render event exists");
+        revoked_new_session.events[render_index].sequence += 1;
+        revoked_new_session.events.insert(
+            render_index,
+            TraceEvent {
+                sequence: 5,
+                kind: EventKind::SessionStarted,
+                bundle_id: None,
+                bundle_state: None,
+                digest_verified: None,
+                resource_state: None,
+                presented_as: None,
+                sensitive_payload: None,
+                consent_scoped: None,
+            },
+        );
+        cases.push(("revocation across session", revoked_new_session));
+
+        let mut stale_confirmed = scenario("FA-TRACE-011");
+        stale_confirmed
+            .events
+            .iter_mut()
+            .find(|event| event.kind == EventKind::ResourcePresented)
+            .expect("resource presentation exists")
+            .presented_as = Some(PresentedAs::Confirmed);
+        cases.push(("stale resource claimed confirmed", stale_confirmed));
+
+        let mut intermittent = scenario("FA-TRACE-007");
+        intermittent.connectivity = Connectivity::Intermittent;
+        cases.push(("intermittent core network", intermittent));
+
+        let mut non_sensitive = scenario("FA-TRACE-009");
+        non_sensitive
+            .events
+            .iter_mut()
+            .find(|event| event.kind == EventKind::SensitiveDataEgress)
+            .expect("egress event exists")
+            .sensitive_payload = Some(false);
+        cases.push(("non-sensitive egress control", non_sensitive));
+
+        for (label, trace) in cases {
+            let value = serde_json::to_value(&trace).expect("mutated trace serializes");
+            assert_eq!(
+                inspect_trace(&trace),
+                reference_codes_from_json(&value),
+                "differential mismatch for {label}"
+            );
+        }
+    }
+
+    #[test]
     fn revocation_mutation_detects_post_revoke_render() {
         let mut trace = corpus().scenarios.remove(0);
         trace.events.push(TraceEvent {
