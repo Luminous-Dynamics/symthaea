@@ -44,7 +44,7 @@ These links are scholarly context, not grants of full-text reuse rights:
 - [EventRelBench (Findings EMNLP 2025)](https://aclanthology.org/2025.findings-emnlp.482/) tests event relation extraction including coreference, temporal and causal relations.
 - [ChronoSense (ACL 2025)](https://aclanthology.org/2025.acl-short.46/) and [ETRQA (Findings ACL 2025)](https://aclanthology.org/2025.findings-acl.1198/) test time-interval, event-temporal and compound reasoning.
 
-MythologyBench should complement rather than duplicate them: its focus is source-witness attribution, versioned narratives, tradition/time-conditioned meaning, variant isolation, transmission claims, and transfer to unseen source families without cultural projection.
+MythologyBench should complement rather than duplicate them: its focus is source-witness attribution, versioned narratives, tradition/time-conditioned meaning, variant isolation, transmission claims, and transfer to unseen source families without cultural projection. Recent work adds two important controls to the roadmap: [BRINK (EACL 2026)](https://aclanthology.org/2026.eacl-long.114/) warns that graph QA may reward direct-triple lookup over reasoning under incomplete knowledge, while [KGHaluBench (Findings EACL 2026)](https://aclanthology.org/2026.findings-eacl.206/) motivates dynamically generated, graph-verified negative controls. Future revisions should pair multi-hop completeness with critical-edge removal and must abstain when a missing edge breaks the only justified path. These are proposed tracks, not capabilities measured by the current ten synthetic pairs.
 
 ## Acceptance boundary
 
