@@ -1,0 +1,268 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/beverage-adaptive-sampling-decision-v1.schema.json",
+  "title": "Adaptive sampling decision record v1",
+  "description": "Audit contract for one recommendation to sample, defer, escalate, or abstain. A syntactically valid record is not evidence that its measurements or declarations are true.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "evidence_class",
+    "decision_id",
+    "batch_id",
+    "policy_version",
+    "policy_config_sha256",
+    "input_prefix_sha256",
+    "decision_time_ms",
+    "available_channels",
+    "observations",
+    "required_tests_due",
+    "required_tests_scheduled",
+    "calibration_state",
+    "action",
+    "requested_channel",
+    "requested_at_ms",
+    "next_review_at_ms",
+    "reason_code",
+    "estimated_cost_units"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "beverage-adaptive-sampling-decision-v1"
+    },
+    "evidence_class": {
+      "enum": [
+        "SYNTHETIC_CONTRACT_FIXTURE",
+        "RETROSPECTIVE_REPLAY",
+        "PROSPECTIVE_SHADOW",
+        "PROSPECTIVE_PILOT"
+      ]
+    },
+    "decision_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160
+    },
+    "batch_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160
+    },
+    "policy_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160
+    },
+    "policy_config_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "input_prefix_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "decision_time_ms": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "available_channels": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "observations": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/observation"
+      }
+    },
+    "required_tests_due": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "required_tests_scheduled": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "calibration_state": {
+      "enum": [
+        "CALIBRATED",
+        "UNAVAILABLE",
+        "FAILED",
+        "NOT_APPLICABLE"
+      ]
+    },
+    "action": {
+      "enum": [
+        "SAMPLE",
+        "DEFER",
+        "ESCALATE",
+        "ABSTAIN"
+      ]
+    },
+    "requested_channel": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1
+    },
+    "requested_at_ms": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "next_review_at_ms": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "reason_code": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "estimated_cost_units": {
+      "type": "number",
+      "minimum": 0
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "action": {
+            "const": "SAMPLE"
+          }
+        },
+        "required": [
+          "action"
+        ]
+      },
+      "then": {
+        "properties": {
+          "requested_channel": {
+            "type": "string",
+            "minLength": 1
+          },
+          "requested_at_ms": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "next_review_at_ms": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "action": {
+            "const": "DEFER"
+          }
+        },
+        "required": [
+          "action"
+        ]
+      },
+      "then": {
+        "properties": {
+          "requested_channel": {
+            "type": "null"
+          },
+          "requested_at_ms": {
+            "type": "null"
+          },
+          "next_review_at_ms": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "calibration_state": {
+            "const": "CALIBRATED"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "action": {
+            "enum": [
+              "ESCALATE",
+              "ABSTAIN"
+            ]
+          }
+        },
+        "required": [
+          "action"
+        ]
+      },
+      "then": {
+        "properties": {
+          "requested_channel": {
+            "type": "null"
+          },
+          "requested_at_ms": {
+            "type": "null"
+          },
+          "next_review_at_ms": {
+            "type": "null"
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "observation_id",
+        "channel",
+        "observed_at_ms",
+        "available_at_ms",
+        "content_sha256"
+      ],
+      "properties": {
+        "observation_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "channel": {
+          "type": "string",
+          "minLength": 1
+        },
+        "observed_at_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "available_at_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "content_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    }
+  }
+}
