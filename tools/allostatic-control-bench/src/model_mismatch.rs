@@ -9,8 +9,8 @@ use super::calibration::{
     calibrate_episode_radii, enclose_predicted_action_effects, CalibratedEnvelopeRadii,
 };
 use super::robust_viability::{
-    ActionEffectBounds, Interval, StateEnvelope, ViabilityLimits, next_state_envelope,
-    robustly_viable,
+    next_state_envelope, robustly_viable, ActionEffectBounds, Interval, StateEnvelope,
+    ViabilityLimits,
 };
 use super::Action;
 
@@ -47,13 +47,16 @@ impl MismatchProfile {
             emergency_recover.reserve_delta_error,
             emergency_recover.load_delta_error,
         ];
-        values.iter().all(|value| value.is_finite()).then_some(Self {
-            reserve_state_error,
-            load_state_error,
-            push,
-            maintain,
-            emergency_recover,
-        })
+        values
+            .iter()
+            .all(|value| value.is_finite())
+            .then_some(Self {
+                reserve_state_error,
+                load_state_error,
+                push,
+                maintain,
+                emergency_recover,
+            })
     }
 
     const fn error(self, action: Action) -> ActionEffectError {
@@ -345,45 +348,41 @@ mod tests {
     #[test]
     fn point_shield_false_positive_is_rejected_by_a_calibrated_envelope() {
         // Every calibration episode contains <= this held-out error magnitude.
-        let calibration: Vec<MismatchProfile> = (1..=39)
-            .map(|i| profile(i as f64 / 39.0))
-            .collect();
+        let calibration: Vec<MismatchProfile> =
+            (1..=39).map(|i| profile(i as f64 / 39.0)).collect();
         let radii = calibrate_mismatch_panel(&calibration, &STRESS_GRID, 0.90)
             .expect("39 episodes meet the 90% four-family finite-rank gate");
         let held_out = profile(1.0);
 
         // Nominal Push predicts reserve 0.1525 and load 0.842; true effects
         // cross both boundaries. Robust bounds should refuse the action.
-        let (point_certified, robust_certified, true_safe) = point_and_robust_vs_true(
-            state(),
-            Action::Push,
-            0.5,
-            held_out,
-            radii,
-            limits(),
-        )
-        .expect("valid test contracts");
+        let (point_certified, robust_certified, true_safe) =
+            point_and_robust_vs_true(state(), Action::Push, 0.5, held_out, radii, limits())
+                .expect("valid test contracts");
 
-        assert!(point_certified, "point shield should demonstrate the false positive");
-        assert!(!robust_certified, "calibrated shield should reject the action");
-        assert!(!true_safe, "the held-out true transition should violate constraints");
+        assert!(
+            point_certified,
+            "point shield should demonstrate the false positive"
+        );
+        assert!(
+            !robust_certified,
+            "calibrated shield should reject the action"
+        );
+        assert!(
+            !true_safe,
+            "the held-out true transition should violate constraints"
+        );
     }
 
     #[test]
     fn robustness_is_scored_with_false_certifications_and_false_vetoes_separate() {
         let calibration: Vec<MismatchProfile> =
             (1..=39).map(|i| profile(i as f64 / 39.0)).collect();
-        let radii = calibrate_mismatch_panel(&calibration, &STRESS_GRID, 0.90)
-            .expect("calibration panel");
-        let metrics = evaluate_safety_availability(
-            state(),
-            0.5,
-            profile(1.0),
-            radii,
-            limits(),
-            true,
-        )
-        .expect("complete metrics");
+        let radii =
+            calibrate_mismatch_panel(&calibration, &STRESS_GRID, 0.90).expect("calibration panel");
+        let metrics =
+            evaluate_safety_availability(state(), 0.5, profile(1.0), radii, limits(), true)
+                .expect("complete metrics");
 
         assert_eq!(metrics.candidate_actions, 3);
         assert_eq!(metrics.point_false_certifications, 1);
@@ -397,8 +396,8 @@ mod tests {
         let calibration: Vec<MismatchProfile> = (1..=39)
             .map(|i| profile(i as f64 / 39.0))
             .collect();
-        let radii = calibrate_mismatch_panel(&calibration, &STRESS_GRID, 0.90)
-            .expect("calibration panel");
+        let radii =
+            calibrate_mismatch_panel(&calibration, &STRESS_GRID, 0.90).expect("calibration panel");
         for mismatch in calibration {
             for stress in STRESS_GRID {
                 for action in [Action::Push, Action::Maintain, Action::EmergencyRecover] {
@@ -422,11 +421,10 @@ mod tests {
 
     #[test]
     fn model_error_outside_calibration_envelope_is_an_explicit_negative_control() {
-        let calibration: Vec<MismatchProfile> = (1..=39)
-            .map(|i| profile(0.2 * i as f64 / 39.0))
-            .collect();
-        let radii = calibrate_mismatch_panel(&calibration, &STRESS_GRID, 0.90)
-            .expect("calibration panel");
+        let calibration: Vec<MismatchProfile> =
+            (1..=39).map(|i| profile(0.2 * i as f64 / 39.0)).collect();
+        let radii =
+            calibrate_mismatch_panel(&calibration, &STRESS_GRID, 0.90).expect("calibration panel");
         let out_of_family = profile(2.0);
         let scores = episode_residual_scores(out_of_family, &STRESS_GRID).expect("valid profile");
 
