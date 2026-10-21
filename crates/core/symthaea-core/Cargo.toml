@@ -114,6 +114,10 @@ path = "examples/cross_domain_query.rs"
 name = "platonic_pattern_interaction"
 path = "examples/platonic_pattern_interaction.rs"
 
+[[example]]
+name = "platonic_selective_retrieval"
+path = "examples/platonic_selective_retrieval.rs"
+
 # scaling_study_demo: module not yet wired into physics/mod.rs; exclude from default build
 [[example]]
 name = "scaling_study_demo"
