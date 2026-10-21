@@ -2682,6 +2682,11 @@ mod tests {
             "reloaded tokenizer vocab_size must match the checkpoint's saved vocab, \
              not silently fall back to a different default"
         );
+        assert_eq!(
+            reloaded.token_embedding_seed_scheme,
+            crate::controller::TokenEmbeddingSeedScheme::LegacyV1,
+            "checkpoints without a V2 feature marker must retain the historical initializer for vocabulary growth"
+        );
     }
     #[test]
     fn checkpoint_roundtrip_preserves_token_embedding_seed_scheme() {
