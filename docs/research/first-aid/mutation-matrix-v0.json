@@ -590,7 +590,7 @@
   "differential_oracle": {
     "status": "unit_test_added",
     "implementation": "JSON-value-based reference interpreter compared against the production typed-state interpreter",
-    "coverage": "all 12 frozen traces plus 9 adversarial mutations: session lifecycle, wrong bundle identity, digest failure, expired bundle, uncertainty re-entry, revocation across session changes, stale-resource claims, intermittent connectivity, and non-sensitive egress control",
+    "coverage": "all 12 frozen traces plus 11 adversarial mutations: session lifecycle, wrong bundle identity, digest failure, expired bundle, uncertainty re-entry, uncertainty loss across session boundaries, revocation across sessions, stale-resource claims, intermittent connectivity, non-sensitive egress, and resume without interruption",
     "limits": "same maintainers and frozen fixture; implementation-diversity cross-check only, not external clinical adjudication or a formally verified specification",
     "test_name": "differential_json_reference_agrees_on_frozen_traces",
     "mutation_suite_test_name": "differential_json_reference_agrees_on_adversarial_mutation_suite",
