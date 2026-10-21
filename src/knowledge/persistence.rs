@@ -294,43 +294,52 @@ impl KnowledgePersistence {
         Ok(rows)
     }
 
-    /// Replace the current graph snapshot with stable fact IDs and claim contexts.
+    /// Replace the graph-fact snapshot when there are no links to persist.
+    ///
+    /// Any prior typed links are cleared atomically so they cannot survive against
+    /// a replaced fact set. Missing legacy IDs are assigned deterministically.
     pub fn save_graph_facts(&mut self, facts: &[GraphFactRecord]) -> Result<usize, String> {
-        if !self.is_configured() {
-            return Err("No database path configured".into());
+        let mut used_ids = HashSet::new();
+        for fact in facts {
+            if let Some(id) = fact.fact_id {
+                if !used_ids.insert(id) {
+                    return Err(format!("duplicate graph snapshot fact ID {id}"));
+                }
+            }
         }
-        let conn = self.open_connection()?;
-        self.ensure_schema(&conn)?;
-        let tx = conn.unchecked_transaction().map_err(|error| error.to_string())?;
-        tx.execute("DELETE FROM knowledge_facts", [])
-            .map_err(|error| error.to_string())?;
-        for item in facts {
-            let claim_context_json = item
-                .claim_context
-                .as_ref()
-                .map(serde_json::to_string)
-                .transpose()
-                .map_err(|error| error.to_string())?;
-            tx.execute(
-                "INSERT INTO knowledge_facts
-                 (fact_id, vector_blob, source_text, confidence, domain, cycle, is_causal, claim_context_json)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-                rusqlite::params![
-                    item.fact_id.map(|id| id as i64),
-                    item.fact.vector_bytes,
-                    item.fact.source_text,
-                    item.fact.confidence,
-                    item.fact.domain,
-                    item.fact.cycle as i64,
-                    item.fact.is_causal,
-                    claim_context_json,
-                ],
-            )
-            .map_err(|error| error.to_string())?;
+        let mut next_id = used_ids
+            .iter()
+            .copied()
+            .max()
+            .unwrap_or(0)
+            .checked_add(1)
+            .ok_or_else(|| "no stable fact IDs available for graph snapshot".to_string())?;
+        let mut normalized = Vec::with_capacity(facts.len());
+        for fact in facts {
+            let fact_id = match fact.fact_id {
+                Some(id) => Some(id),
+                None => {
+                    while used_ids.contains(&next_id) {
+                        next_id = next_id
+                            .checked_add(1)
+                            .ok_or_else(|| "no stable fact IDs available for graph snapshot".to_string())?;
+                    }
+                    let assigned = next_id;
+                    used_ids.insert(assigned);
+                    next_id = next_id
+                        .checked_add(1)
+                        .ok_or_else(|| "no stable fact IDs available for graph snapshot".to_string())?;
+                    Some(assigned)
+                }
+            };
+            normalized.push(GraphFactRecord {
+                fact_id,
+                fact: fact.fact.clone(),
+                claim_context: fact.claim_context.clone(),
+            });
         }
-        tx.commit().map_err(|error| error.to_string())?;
-        self.total_saved += facts.len() as u64;
-        Ok(facts.len())
+        self.save_graph_snapshot(&normalized, &[])
+            .map(|(saved, _)| saved)
     }
 
     /// Atomically replace the graph-fact and evidence-link snapshots.
