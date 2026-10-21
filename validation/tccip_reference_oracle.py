@@ -338,6 +338,76 @@ def expected_task(fixture: Fixture, inputs: Sequence[bool]) -> bool:
     raise ValueError(f"unsupported task operation {op!r}")
 
 
+def eval_network_with_cuts(
+    fixture: Fixture,
+    inputs: Sequence[bool],
+    interventions: Sequence[Intervention],
+    cut_mask: int,
+) -> bool:
+    """Evaluate with independent replacement coins for several simultaneous edge cuts."""
+    values: list[bool] = []
+
+    def source_value(source: int, target: int) -> bool:
+        for index, intervention in enumerate(interventions):
+            if (intervention.source, intervention.target) == (source, target):
+                return bool((cut_mask >> index) & 1)
+        return values[source]
+
+    for target_index, rule in enumerate(fixture.rules):
+        if rule.op == "input":
+            value = inputs[int(rule.args[0])]
+        elif rule.op == "constant":
+            value = bool(rule.args[0])
+        elif rule.op == "copy":
+            value = source_value(int(rule.args[0]), target_index)
+        elif rule.op == "xor":
+            left, right = map(int, rule.args)
+            value = source_value(left, target_index) ^ source_value(right, target_index)
+        elif rule.op == "and":
+            left, right = map(int, rule.args)
+            value = source_value(left, target_index) & source_value(right, target_index)
+        else:
+            raise ValueError(f"unsupported operation {rule.op!r}")
+        values.append(bool(value))
+    return values[fixture.output_node]
+
+
+def task_utility_for_cuts(fixture: Fixture, interventions: Sequence[Intervention]) -> float:
+    input_count = 1 << fixture.input_count
+    cut_states = 1 << len(interventions)
+    total_input_weight = sum(fixture.input_state_weights)
+    correct_weight = 0
+    for state in range(input_count):
+        inputs = tuple(bool((state >> index) & 1) for index in range(fixture.input_count))
+        expected = expected_task(fixture, inputs)
+        weight = fixture.input_state_weights[state]
+        for cut_mask in range(cut_states):
+            if eval_network_with_cuts(fixture, inputs, interventions, cut_mask) == expected:
+                correct_weight += weight
+    return correct_weight / (total_input_weight * cut_states)
+
+
+def pairwise_utility_interactions(fixture: Fixture) -> list[dict[str, object]]:
+    """Second finite difference of task utility, not PID synergy or IIT Φ."""
+    intact = task_utility_for_cuts(fixture, ())
+    output: list[dict[str, object]] = []
+    for first_index, first in enumerate(fixture.interventions):
+        for second in fixture.interventions[first_index + 1:]:
+            first_utility = task_utility_for_cuts(fixture, (first,))
+            second_utility = task_utility_for_cuts(fixture, (second,))
+            joint_utility = task_utility_for_cuts(fixture, (first, second))
+            output.append({
+                "first_intervention_id": first.identifier,
+                "second_intervention_id": second.identifier,
+                "intact_utility": intact,
+                "first_cut_utility": first_utility,
+                "second_cut_utility": second_utility,
+                "joint_cut_utility": joint_utility,
+                "utility_interaction_contrast": intact - first_utility - second_utility + joint_utility,
+            })
+    return output
+
+
 def task_utility(fixture: Fixture, intervention: Intervention | None = None) -> float:
     input_assignments = [
         tuple(bool((state >> index) & 1) for index in range(fixture.input_count))
@@ -450,6 +520,7 @@ def render_artifact(fixtures: Sequence[Fixture], manifest_bytes: bytes, source_s
     for fixture in fixtures:
         interventions, partitions, summary = evaluate_fixture(fixture)
         information = input_information_baseline(fixture)
+        pair_interactions = pairwise_utility_interactions(fixture)
         prior = ",".join(map(str, fixture.input_state_weights))
         target = canonical_target(fixture.target)
         for result in interventions:
@@ -479,8 +550,18 @@ def render_artifact(fixtures: Sequence[Fixture], manifest_bytes: bytes, source_s
             ",".join(f"{value:.12g}" for value in information["individual_input_mi_bits"]),
             f"{information['joint_input_mi_bits']:.12g}",
         ])
+        for interaction in pair_interactions:
+            rows.append([
+                "utility_interaction", fixture.name, prior, target, "", "pairwise_utility_interaction",
+                "", "", "", f"{interaction['intact_utility']:.12g}", "", "", "", "", "", "", "", "", "",
+                "", "", "", interaction["first_intervention_id"], interaction["second_intervention_id"],
+                f"{interaction['first_cut_utility']:.12g}",
+                f"{interaction['second_cut_utility']:.12g}",
+                f"{interaction['joint_cut_utility']:.12g}",
+                f"{interaction['utility_interaction_contrast']:.12g}",
+            ])
     output = io.StringIO()
-    output.write("# schema=tccip-independent-reference-v1\n")
+    output.write("# schema=tccip-independent-reference-v2\n")
     output.write(f"# source_sha={source_sha or 'UNBOUND'}\n")
     output.write(f"# manifest_sha256={hashlib.sha256(manifest_bytes).hexdigest()}\n")
     output.write("# oracle=independent Python standard-library implementation; this is not Rust execution output\n")
@@ -489,7 +570,9 @@ def render_artifact(fixtures: Sequence[Fixture], manifest_bytes: bytes, source_s
                      "kind", "source", "target", "cost", "intact_utility", "utility", "utility_loss",
                      "partition_mask", "partition_labels", "cross_mean_loss", "control_mean_loss",
                      "tccip", "n_cross", "n_control", "target_entropy_bits",
-                     "individual_input_mi_bits", "joint_input_mi_bits"])
+                     "individual_input_mi_bits", "joint_input_mi_bits", "first_intervention_id",
+                     "second_intervention_id", "first_cut_utility", "second_cut_utility",
+                     "joint_cut_utility", "utility_interaction_contrast"])
     writer.writerows(rows)
     return output.getvalue()
 
