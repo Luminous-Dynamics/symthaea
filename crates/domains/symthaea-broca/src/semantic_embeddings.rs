@@ -643,6 +643,61 @@ mod tests {
     }
 
     #[test]
+    fn semantic_lexical_probe_separates_equivalent_and_contrastive_pairs() {
+        let basis = SemanticQuarkBasis::new(&test_genesis());
+        let equivalent_pairs = [
+            ("happy", "joy"),
+            ("joy", "joyful"),
+            ("fear", "afraid"),
+            ("calm", "peaceful"),
+            ("mother", "father"),
+        ];
+        let contrastive_pairs = [
+            ("happy", "angry"),
+            ("fear", "joy"),
+            ("before", "after"),
+            ("good", "bad"),
+        ];
+
+        let similarity = |left: &str, right: &str| {
+            let left = basis
+                .compose_token_embedding(left)
+                .unwrap_or_else(|| panic!("missing direct lexical grounding for {left}"));
+            let right = basis
+                .compose_token_embedding(right)
+                .unwrap_or_else(|| panic!("missing direct lexical grounding for {right}"));
+            left.similarity(&right)
+        };
+
+        let equivalent_scores: Vec<f32> = equivalent_pairs
+            .iter()
+            .map(|(left, right)| similarity(left, right))
+            .collect();
+        let contrastive_scores: Vec<f32> = contrastive_pairs
+            .iter()
+            .map(|(left, right)| similarity(left, right))
+            .collect();
+
+        let equivalent_mean =
+            equivalent_scores.iter().sum::<f32>() / equivalent_scores.len() as f32;
+        let contrastive_mean =
+            contrastive_scores.iter().sum::<f32>() / contrastive_scores.len() as f32;
+
+        assert!(
+            equivalent_scores.iter().all(|score| *score > 0.999),
+            "pairs with identical grounded prime sequences should be nearly identical: {equivalent_scores:?}"
+        );
+        assert!(
+            contrastive_scores.iter().all(|score| *score < 0.9),
+            "contrastive prime sequences must not collapse to the same vector: {contrastive_scores:?}"
+        );
+        assert!(
+            equivalent_mean > contrastive_mean + 0.2,
+            "equivalent-vs-contrastive margin too small: equivalent={equivalent_mean:.4}, contrastive={contrastive_mean:.4}"
+        );
+    }
+
+    #[test]
     fn test_morphological_decomposition() {
         let primes = morpheme_decompose("unhappiness");
         assert!(primes.contains(&SemanticPrime::Not)); // un-
