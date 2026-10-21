@@ -39,6 +39,29 @@ jobs:
           sha256sum research/ode-dopri5-reference/Cargo.lock
           cargo metadata --locked --no-deps --manifest-path research/ode-dopri5-reference/Cargo.toml > /tmp/ode-dopri5-metadata.json
 
+      - name: Diagnose dependency-lock drift without weakening the committed-lock gate
+        id: lock_refresh
+        shell: bash
+        run: |
+          set -uo pipefail
+          lock_path="research/ode-dopri5-reference/Cargo.lock"
+          before="$(sha256sum "$lock_path" | cut -d ' ' -f 1)"
+          set +e
+          cargo metadata --manifest-path research/ode-dopri5-reference/Cargo.toml --format-version 1 > /tmp/ode-dopri5-metadata-resolved.json
+          metadata_status=$?
+          set -e
+          after="$(sha256sum "$lock_path" | cut -d ' ' -f 1)"
+          changed=false
+          if [ "$before" != "$after" ]; then changed=true; fi
+          echo "lock_sha_before=$before" >> "$GITHUB_OUTPUT"
+          echo "lock_sha_after=$after" >> "$GITHUB_OUTPUT"
+          echo "lock_changed=$changed" >> "$GITHUB_OUTPUT"
+          echo "metadata_status=$metadata_status" >> "$GITHUB_OUTPUT"
+          printf 'lock_sha_before=%s\nlock_sha_after=%s\nlock_changed=%s\nmetadata_status=%s\n' "$before" "$after" "$changed" "$metadata_status"
+          # If resolution rewrites Cargo.lock, the generated candidate is uploaded below.
+          # The final qualification gate stays red until the reviewed file is committed.
+          exit 0
+
       - name: Format
         run: cargo fmt --manifest-path research/ode-dopri5-reference/Cargo.toml -- --check
 
