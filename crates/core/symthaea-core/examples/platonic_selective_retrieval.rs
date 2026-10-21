@@ -99,7 +99,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             min_similarity: -1.0,
             min_margin: -1.0,
         };
-        report_row(seed, "always_top1", always_accept, &test);
+        report_row(seed, "always_top1", always_accept, calibration.len(), &test);
 
         for (name, rule) in [
             (
@@ -115,7 +115,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 calibrate_rule(&calibration, CalibrationMode::ScoreAndMargin),
             ),
         ] {
-            report_row(seed, name, rule, &test);
+            report_row(seed, name, rule, calibration.len(), &test);
         }
     }
 
@@ -300,7 +300,13 @@ fn evaluate(samples: &[ScoredQuery], rule: DecisionRule) -> Evaluation {
     }
 }
 
-fn report_row(seed: u64, name: &str, rule: DecisionRule, samples: &[ScoredQuery]) {
+fn report_row(
+    seed: u64,
+    name: &str,
+    rule: DecisionRule,
+    calibration_n: usize,
+    samples: &[ScoredQuery],
+) {
     let result = evaluate(samples, rule);
     let (risk_low, risk_high) = wilson_interval_95(result.errors, result.accepted);
     let risk_text = result
@@ -309,7 +315,7 @@ fn report_row(seed: u64, name: &str, rule: DecisionRule, samples: &[ScoredQuery]
         .unwrap_or_else(|| "NA".to_owned());
 
     println!(
-        "{seed},{name},{DIMENSION},{PROTOTYPE_COUNT},NA,{}, {:.6},{:.6},{},{:.6},{},{},{:.6},{:.6},{:.6}",
+        "{seed},{name},{DIMENSION},{PROTOTYPE_COUNT},{calibration_n},{},{:.6},{:.6},{},{:.6},{},{},{:.6},{:.6},{:.6}",
         result.total,
         rule.min_similarity,
         rule.min_margin,
