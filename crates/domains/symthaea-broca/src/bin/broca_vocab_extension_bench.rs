@@ -67,6 +67,27 @@ struct ExtensionReceipt {
     claim_boundary: &'static str,
 }
 
+#[derive(Debug, Clone, Copy)]
+enum BenchStrategy {
+    SeededRandomV1,
+    LegacyContextBundle,
+    ContextBundleNormMatched,
+    ContextBundleNormMatchedWithResidual { residual_weight: f32 },
+}
+
+impl BenchStrategy {
+    fn label(self) -> &'static str {
+        match self {
+            Self::SeededRandomV1 => "seeded_random_v1",
+            Self::LegacyContextBundle => "legacy_context_bundle",
+            Self::ContextBundleNormMatched => "context_bundle_norm_matched",
+            Self::ContextBundleNormMatchedWithResidual { .. } => {
+                "context_bundle_norm_matched_residual_0_15"
+            }
+        }
+    }
+}
+
 fn digest<T: Serialize>(value: &T) -> Result<String, serde_json::Error> {
     Ok(format!("{:x}", Sha256::digest(serde_json::to_vec(value)?)))
 }
@@ -119,8 +140,7 @@ fn run_arm(
     genesis: &GenesisSeed,
     query: &ContinuousHV,
     baseline_logits: &[f32],
-    strategy: TokenExtensionInitialization,
-    strategy_name: &'static str,
+    strategy: BenchStrategy,
 ) -> Result<ExtensionMetrics, Box<dyn Error>> {
     let old_vocab_size = base.vocab_size();
     let old_rows: Vec<Vec<f32>> = base
@@ -149,12 +169,40 @@ fn run_arm(
     let mut new_indices = Vec::with_capacity(NEW_TOKEN_COUNT);
     for (new_index, rows) in context_rows.iter().enumerate() {
         let refs: Vec<&ContinuousHV> = rows.iter().collect();
-        let index = controller.append_token_with_initialization(
-            genesis,
-            &format!("extension-smoke-{new_index}"),
-            Some(&refs),
-            strategy,
-        )?;
+        let token_name = format!("extension-smoke-{new_index}");
+        let index = controller.vocab_size();
+        match strategy {
+            BenchStrategy::SeededRandomV1 => {
+                controller.append_token_with_initialization(
+                    genesis,
+                    &token_name,
+                    None,
+                    TokenExtensionInitialization::SeededRandomV1,
+                )?;
+            }
+            BenchStrategy::LegacyContextBundle => {
+                // Exact control for the existing append_token(context_hvs) behavior.
+                controller.append_token(genesis, &token_name, Some(&refs));
+            }
+            BenchStrategy::ContextBundleNormMatched => {
+                controller.append_token_with_initialization(
+                    genesis,
+                    &token_name,
+                    Some(&refs),
+                    TokenExtensionInitialization::ContextBundleNormMatched,
+                )?;
+            }
+            BenchStrategy::ContextBundleNormMatchedWithResidual { residual_weight } => {
+                controller.append_token_with_initialization(
+                    genesis,
+                    &token_name,
+                    Some(&refs),
+                    TokenExtensionInitialization::ContextBundleNormMatchedWithResidual {
+                        residual_weight,
+                    },
+                )?;
+            }
+        }
         new_indices.push(index);
     }
 
@@ -196,7 +244,7 @@ fn run_arm(
                 if conditional_q > 0.0 {
                     *p * (*p / conditional_q).ln()
                 } else {
-                    0.0
+                    f64::INFINITY
                 }
             })
             .sum()
@@ -241,7 +289,7 @@ fn run_arm(
     }
 
     Ok(ExtensionMetrics {
-        strategy: strategy_name,
+        strategy: strategy.label(),
         old_rows_bit_identical,
         old_vocab_max_abs_logit_delta,
         old_vocab_top1_preserved,
@@ -285,6 +333,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         fixed_query_domain,
         symthaea_core::hdc::HDC_DIMENSION,
     );
+    base_for_logits.reset();
     let baseline_logits = base_for_logits.forward_step(&query, 0, 0);
 
     let results = vec![
@@ -293,26 +342,30 @@ fn main() -> Result<(), Box<dyn Error>> {
             &genesis,
             &query,
             &baseline_logits,
-            TokenExtensionInitialization::SeededRandomV1,
-            "seeded_random_v1",
+            BenchStrategy::SeededRandomV1,
         )?,
         run_arm(
             &base,
             &genesis,
             &query,
             &baseline_logits,
-            TokenExtensionInitialization::ContextBundleNormMatched,
-            "context_bundle_norm_matched",
+            BenchStrategy::LegacyContextBundle,
         )?,
         run_arm(
             &base,
             &genesis,
             &query,
             &baseline_logits,
-            TokenExtensionInitialization::ContextBundleNormMatchedWithResidual {
+            BenchStrategy::ContextBundleNormMatched,
+        )?,
+        run_arm(
+            &base,
+            &genesis,
+            &query,
+            &baseline_logits,
+            BenchStrategy::ContextBundleNormMatchedWithResidual {
                 residual_weight: 0.15,
             },
-            "context_bundle_norm_matched_residual_0_15",
         )?,
     ];
 
