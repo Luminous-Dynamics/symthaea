@@ -34,6 +34,8 @@ pub struct KnowledgePersistence {
 /// A serializable fact record for persistence
 #[derive(Debug, Clone)]
 pub struct FactRecord {
+    /// Stable graph-level fact ID; absent only for pre-migration SQLite rows.
+    pub fact_id: Option<u64>,
     /// BinaryHV encoded as raw bytes (2048 bytes for 16,384 bits)
     pub vector_bytes: Vec<u8>,
     /// Source text of the fact
@@ -117,27 +119,34 @@ impl KnowledgePersistence {
 
         conn.execute_batch("BEGIN TRANSACTION")
             .map_err(|e| e.to_string())?;
+        // A save is a graph snapshot, not an append-only event log. Replacing the
+        // snapshot prevents stale rows and preserves stable graph fact IDs for links.
+        conn.execute("DELETE FROM knowledge_facts", [])
+            .map_err(|error| error.to_string())?;
 
         let mut count = 0;
         for fact in facts {
+            let claim_context_json = fact
+                .claim_context
+                .as_ref()
+                .map(serde_json::to_string)
+                .transpose()
+                .map_err(|error| error.to_string())?;
             conn.execute(
-                "INSERT INTO knowledge_facts (vector_blob, source_text, confidence, domain, cycle, is_causal, claim_context_json)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                "INSERT INTO knowledge_facts (fact_id, vector_blob, source_text, confidence, domain, cycle, is_causal, claim_context_json)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
                 rusqlite::params![
+                    fact.fact_id.map(|id| id as i64),
                     fact.vector_bytes,
                     fact.source_text,
                     fact.confidence,
                     fact.domain,
                     fact.cycle as i64,
                     fact.is_causal,
-                    fact.claim_context
-                        .as_ref()
-                        .map(serde_json::to_string)
-                        .transpose()
-                        .map_err(|error| error.to_string())?,
+                    claim_context_json,
                 ],
             )
-            .map_err(|e| e.to_string())?;
+            .map_err(|error| error.to_string())?;
             count += 1;
         }
 
@@ -158,22 +167,23 @@ impl KnowledgePersistence {
 
         let mut stmt = conn
             .prepare(
-                "SELECT vector_blob, source_text, confidence, domain, cycle, is_causal, claim_context_json
-                 FROM knowledge_facts ORDER BY cycle DESC",
+                "SELECT fact_id, vector_blob, source_text, confidence, domain, cycle, is_causal, claim_context_json
+                 FROM knowledge_facts ORDER BY cycle DESC, id DESC",
             )
             .map_err(|e| e.to_string())?;
 
         let facts: Vec<FactRecord> = stmt
             .query_map([], |row| {
                 Ok(FactRecord {
-                    vector_bytes: row.get(0)?,
-                    source_text: row.get(1)?,
-                    confidence: row.get(2)?,
-                    domain: row.get(3)?,
-                    cycle: row.get::<_, i64>(4)? as u64,
-                    is_causal: row.get(5)?,
+                    fact_id: row.get::<_, Option<i64>>(0)?.map(|id| id as u64),
+                    vector_bytes: row.get(1)?,
+                    source_text: row.get(2)?,
+                    confidence: row.get(3)?,
+                    domain: row.get(4)?,
+                    cycle: row.get::<_, i64>(5)? as u64,
+                    is_causal: row.get(6)?,
                     claim_context: row
-                        .get::<_, Option<String>>(6)?
+                        .get::<_, Option<String>>(7)?
                         .map(|raw| {
                             serde_json::from_str::<ClaimContext>(&raw).map_err(|error| {
                                 rusqlite::Error::FromSqlConversionFailure(
@@ -412,6 +422,7 @@ impl KnowledgePersistence {
         conn.execute_batch(
             "CREATE TABLE IF NOT EXISTS knowledge_facts (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                fact_id INTEGER,
                 vector_blob BLOB NOT NULL,
                 source_text TEXT NOT NULL,
                 confidence REAL NOT NULL,
@@ -458,6 +469,10 @@ impl KnowledgePersistence {
                 .collect::<Result<Vec<_>, _>>()
                 .map_err(|error| format!("Schema inspection: {error}"))?
         };
+        if !columns.iter().any(|column| column == "fact_id") {
+            conn.execute("ALTER TABLE knowledge_facts ADD COLUMN fact_id INTEGER", [])
+                .map_err(|error| format!("Schema migration: {error}"))?;
+        }
         if !columns.iter().any(|column| column == "claim_context_json") {
             conn.execute(
                 "ALTER TABLE knowledge_facts ADD COLUMN claim_context_json TEXT",
