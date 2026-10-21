@@ -1053,7 +1053,6 @@ fn audit_temporal_dataset(
         }
         let mut identity_candidates: Vec<(usize, String, bool)> = Vec::new();
         let mut identity_join_status = String::new();
-        let mut identity_candidate_timeline_positions = Vec::new();
         let mut ambiguous_declaration_timeline_positions = Vec::new();
         let mut identity_statement_match_at_commit_before = None;
         let mut identity_statement_match_at_completion = None;
@@ -1141,7 +1140,7 @@ fn audit_temporal_dataset(
             },
         }
 
-        identity_candidate_timeline_positions = identity_candidates
+        let identity_candidate_timeline_positions = identity_candidates
             .iter()
             .map(|(position, _, _)| *position)
             .collect();
@@ -3584,7 +3583,7 @@ end Second
         fs::write(root.join("lean/Other.lean"), other_initial_source)
             .expect("write second source file");
         let initial_ambiguous_source = "namespace First\ntheorem shared (n : Nat) : n = n := by\n  sorry\nend First\n\nnamespace Second\ntheorem shared (n : Nat) : n = n := by\n  sorry\nend Second\n";
-        fs::write(root.join("lean/Ambiguous.lean"), &initial_ambiguous_source)
+        fs::write(root.join("lean/Ambiguous.lean"), initial_ambiguous_source)
             .expect("write duplicate short-name declarations");
 
         // Deliberate source-document mismatch: the CSV will contain five rows,
