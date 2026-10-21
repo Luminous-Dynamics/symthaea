@@ -13,6 +13,7 @@ use std::process;
 use anyhow::{Context, Result};
 use serde::Serialize;
 use symthaea_broca::checkpoint::ProjectionCheckpoint;
+use symthaea_broca::encoder::ThoughtChannels;
 use symthaea_broca::evaluation::{CanonicalEvalCase, CanonicalEvalDataset};
 use symthaea_broca::generator::{GenerationResult, GenerationStepLogits, GenerationTopLogit};
 use symthaea_broca::liquid_mamba::{LiquidMambaConfig, LiquidMambaGenerator};
@@ -408,17 +409,11 @@ where
 }
 
 fn active_intent_name(channels: &[f32]) -> &'static str {
-    let names = [
-        "analyze", "create", "explain", "question", "answer", "reflect", "relate", "unknown",
-    ];
-    let idx = channels
-        .iter()
-        .take(names.len())
-        .enumerate()
-        .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
-        .map(|(idx, _)| idx)
-        .unwrap_or(7);
-    names[idx]
+    let mut thought = ThoughtChannels::default();
+    for (index, value) in channels.iter().take(8).enumerate() {
+        thought.channels[index] = *value;
+    }
+    thought.semantic_intent().as_str()
 }
 
 fn parse_args(args: &[String]) -> Result<Options> {
