@@ -6,7 +6,7 @@ Research validation is evidence only when both implementations compute a clearly
 
 `pyphi_crossvalidation.py` is a legacy scaffold, not a qualified validation pipeline. Its former implementation substituted hard-coded topology estimates when the Rust subprocess failed. The Rust example it invoked is absent from the maintained `examples/` path, and its abandoned sketch used spectral connectivity rather than IIT integrated information.
 
-The current scaffold now fails closed until a maintained Rust adapter can produce a measurement from the same explicit causal model. A missing result is not zero and is not a pass.
+The current scaffold now fails closed until a maintained Rust adapter can produce a measurement from the same explicit causal model. A missing result is not zero and is not a pass. The pinned PyPhi `2.0.0rc4` package is a pre-release, and the `emd` extra is installed for IIT 3.0 compatibility; this environment must be requalified against a final release before publication claims.
 
 ## PyPhi formalism
 
