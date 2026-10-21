@@ -109,13 +109,23 @@ impl StructuredDecoder {
     pub fn decode(&self, channels: &ThoughtChannels) -> StructuredReadout {
         let intent_kind = channels.semantic_intent();
         let intent = intent_kind.as_str();
-        let epistemic_status = EpistemicDisposition::from_ordinal(channels.epistemic_ordinal());
+        // Public channel arrays can be populated by older serializers or external
+        // callers; sanitize numeric inputs before they influence readout scores.
+        let epistemic_ordinal = finite_clamp(channels.epistemic_ordinal(), 0.0, 4.0, 3.0);
+        let valence = finite_clamp(channels.valence(), -1.0, 1.0, 0.0);
+        let arousal = finite_clamp(channels.arousal(), 0.0, 1.0, 0.5);
+        let psi = finite_clamp(channels.psi(), 0.0, 1.0, 0.5);
+        let coherence = finite_clamp(channels.coherence(), 0.0, 1.0, 0.5);
+        let time_pressure = finite_clamp(channels.time_pressure(), 0.0, 1.0, 0.0);
+        let domain_familiarity =
+            finite_clamp(channels.domain_familiarity(), 0.0, 1.0, 0.5);
+        let epistemic_status = EpistemicDisposition::from_ordinal(epistemic_ordinal);
         let action = intent_prime(intent_kind, epistemic_status);
-        let evaluator = if channels.valence() < -0.2 {
+        let evaluator = if valence < -0.2 {
             SemanticPrime::Bad
-        } else if channels.valence() > 0.2 {
+        } else if valence > 0.2 {
             SemanticPrime::Good
-        } else if channels.epistemic_ordinal() >= 2.5 {
+        } else if epistemic_ordinal >= 2.5 {
             SemanticPrime::Maybe
         } else {
             SemanticPrime::True
@@ -135,15 +145,14 @@ impl StructuredDecoder {
             (SyntacticRole::Predicate, predicate),
             (SyntacticRole::Evaluator, evaluator),
         ];
-        if channels.time_pressure() > 0.65 {
+        if time_pressure > 0.65 {
             structure.push((SyntacticRole::Time, SemanticPrime::Now));
         }
-        if channels.domain_familiarity() < 0.35 {
+        if domain_familiarity < 0.35 {
             structure.push((SyntacticRole::Reason, SemanticPrime::Maybe));
         }
 
-        let intensity =
-            ((channels.psi() + channels.arousal() + channels.coherence()) / 3.0).clamp(0.0, 1.0);
+        let intensity = ((psi + arousal + coherence) / 3.0).clamp(0.0, 1.0);
         let molecule = SemanticMolecule::new(&self.basis, structure.clone(), intensity);
         let roles: Vec<_> = structure
             .iter()
@@ -168,7 +177,7 @@ impl StructuredDecoder {
             epistemic_status,
             roles,
             intensity,
-            confidence: ((channels.coherence() + (1.0 - channels.epistemic_ordinal() / 4.0)) / 2.0)
+            confidence: ((coherence + (1.0 - epistemic_ordinal / 4.0)) / 2.0)
                 .clamp(0.0, 1.0),
             molecule,
         }
@@ -222,7 +231,15 @@ impl StructuredProseTranslator {
     }
 }
 
-pub fn active_intent_name(channels: &ThoughtChannels) -> &'static str {
+pub fn finite_clamp(value: f32, min: f32, max: f32, fallback: f32) -> f32 {
+    if value.is_finite() {
+        value.clamp(min, max)
+    } else {
+        fallback.clamp(min, max)
+    }
+}
+
+fn active_intent_name(channels: &ThoughtChannels) -> &'static str {
     channels.semantic_intent().as_str()
 }
 
@@ -404,6 +421,29 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn non_finite_channels_fail_closed_with_finite_scores() {
+        let genesis = GenesisSeed::from_phrase("structured-non-finite-input-test");
+        let decoder = StructuredDecoder::new(&genesis);
+        let mut channels = ThoughtChannels::default();
+        for value in &mut channels.channels {
+            *value = f32::NAN;
+        }
+
+        let readout = decoder.decode(&channels);
+        let translation = StructuredProseTranslator::new().translate(&readout);
+
+        assert_eq!(readout.intent, "unknown");
+        assert_eq!(readout.epistemic_status, EpistemicDisposition::Unknown);
+        assert!(readout.confidence.is_finite());
+        assert!((0.0..=1.0).contains(&readout.confidence));
+        assert!(readout.intensity.is_finite());
+        assert!((0.0..=1.0).contains(&readout.intensity));
+        assert!(translation.confidence.is_finite());
+        assert!(translation.text.contains("classify"));
+        assert!(!translation.text.contains("direct answer"));
     }
 
     #[test]
