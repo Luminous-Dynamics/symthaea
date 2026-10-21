@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/beverage-split-manifest-v1.schema.json",
+  "title": "Beverage Split Manifest V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "evidence_class",
+    "task_id",
+    "dataset_id",
+    "dataset_sha256",
+    "time_coordinate",
+    "minimum_groups_per_split",
+    "records"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "beverage-split-manifest-v1"
+    },
+    "evidence_class": {
+      "enum": [
+        "SYNTHETIC_CONTRACT_FIXTURE",
+        "MEASURED_SOURCE_SPLIT",
+        "SIMULATED_SOURCE_SPLIT"
+      ]
+    },
+    "task_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "dataset_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "dataset_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "time_coordinate": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Declared shared time coordinate and origin for all numeric record times, such as hours_since_inoculation."
+    },
+    "minimum_groups_per_split": {
+      "type": "integer",
+      "minimum": 2
+    },
+    "records": {
+      "type": "array",
+      "minItems": 6,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "sample_id",
+          "group_id",
+          "split",
+          "max_feature_available_time",
+          "prediction_cutoff_time",
+          "target_observed_time"
+        ],
+        "properties": {
+          "sample_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "group_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Declared independent experimental unit. Technical replicates must not be assigned separate group IDs merely because their row or replicate numbers differ."
+          },
+          "split": {
+            "enum": [
+              "train",
+              "validation",
+              "test"
+            ]
+          },
+          "max_feature_available_time": {
+            "type": "number"
+          },
+          "prediction_cutoff_time": {
+            "type": "number"
+          },
+          "target_observed_time": {
+            "type": "number"
+          }
+        }
+      }
+    }
+  }
+}
