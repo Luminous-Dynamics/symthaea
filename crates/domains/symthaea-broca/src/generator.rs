@@ -363,51 +363,26 @@ type CheckpointLoadResult = anyhow::Result<(
 )>;
 
 impl BrocaGenerator {
-    /// Create a new generator from genesis seed and config.
+    /// Create a new generator from genesis seed and config using the legacy token initializer.
     pub fn new(genesis: &GenesisSeed, config: BrocaConfig) -> Self {
-        let tokenizer = BpeTokenizer::default_minimal();
-
-        // Ensure controller vocab_size matches tokenizer
-        let mut ctrl_config = config.controller.clone();
-        ctrl_config.vocab_size = tokenizer.vocab_size();
-
-        let controller = LanguageController::new(genesis, &ctrl_config);
-        let encoder = ThoughtLanguageEncoder::new(genesis);
-        let epistemic_gate = EpistemicGate::new(&tokenizer, &config.gating);
-        let epistemic_cube_gate = crate::gating::EpistemicCubeGate::new(&tokenizer);
-        let emotional_modulator = EmotionalModulator::new(&tokenizer, &config.gating);
-        let mut coherence_feedback = CoherenceFeedback::with_veto_threshold(
-            config.gating.coherence_drift_threshold,
-            config.gating.veto_threshold,
-        );
-        // Phase 2: Enable algebraic coherence correction if configured
-        coherence_feedback.set_algebraic(
-            config.gating.enable_algebraic_correction,
-            config.gating.algebraic_correction_strength,
-        );
-        let sampling_rng = config.sampling_seed.map(StdRng::seed_from_u64);
-
-        let nsm_gate = if config.enable_nsm_gate {
-            Some(crate::gating::NsmSemanticGate::new_with_lexicon(&tokenizer))
-        } else {
-            None
-        };
-
-        let code_gate = crate::gating::CodeGate::new(&tokenizer, &config.gating);
-
-        Self {
-            controller,
-            tokenizer,
-            encoder,
-            epistemic_gate,
-            epistemic_cube_gate,
-            emotional_modulator,
-            coherence_feedback,
-            sampling_rng,
-            nsm_gate,
-            code_gate,
+        Self::new_with_token_embedding_seed_scheme(
+            genesis,
             config,
-        }
+            crate::controller::TokenEmbeddingSeedScheme::LegacyV1,
+        )
+    }
+
+    /// Create a generator with an explicit token embedding seed scheme.
+    ///
+    /// All other model construction stays identical, so experiments can isolate
+    /// the token-row initializer without changing network weights or configuration.
+    pub fn new_with_token_embedding_seed_scheme(
+        genesis: &GenesisSeed,
+        config: BrocaConfig,
+        seed_scheme: crate::controller::TokenEmbeddingSeedScheme,
+    ) -> Self {
+        let tokenizer = BpeTokenizer::default_minimal();
+        Self::with_tokenizer_and_token_embedding_seed_scheme(genesis, config, tokenizer, seed_scheme)
     }
 
     /// Create a generator for a specific coding substrate.
@@ -430,10 +405,20 @@ impl BrocaGenerator {
     ///
     /// Use this for production training and deployment. The 4K vocabulary covers
     /// common English words, morphological affixes, and consciousness-domain terms.
-    /// For unit tests, use `new()` which uses the faster minimal vocabulary (208 tokens).
+    /// For unit tests, use new() which uses the faster minimal vocabulary (208 tokens).
     pub fn new_4k(genesis: &GenesisSeed, config: BrocaConfig) -> Self {
         let tokenizer = BpeTokenizer::default_4k();
         Self::with_tokenizer(genesis, config, tokenizer)
+    }
+
+    /// Create a 4K-vocabulary generator with an explicit token seed scheme.
+    pub fn new_4k_with_token_embedding_seed_scheme(
+        genesis: &GenesisSeed,
+        config: BrocaConfig,
+        seed_scheme: crate::controller::TokenEmbeddingSeedScheme,
+    ) -> Self {
+        let tokenizer = BpeTokenizer::default_4k();
+        Self::with_tokenizer_and_token_embedding_seed_scheme(genesis, config, tokenizer, seed_scheme)
     }
 
     /// Create a generator with a custom tokenizer.
@@ -442,10 +427,29 @@ impl BrocaGenerator {
         config: BrocaConfig,
         tokenizer: BpeTokenizer,
     ) -> Self {
+        Self::with_tokenizer_and_token_embedding_seed_scheme(
+            genesis,
+            config,
+            tokenizer,
+            crate::controller::TokenEmbeddingSeedScheme::LegacyV1,
+        )
+    }
+
+    /// Create a generator with a custom tokenizer and an explicit token seed scheme.
+    pub fn with_tokenizer_and_token_embedding_seed_scheme(
+        genesis: &GenesisSeed,
+        config: BrocaConfig,
+        tokenizer: BpeTokenizer,
+        seed_scheme: crate::controller::TokenEmbeddingSeedScheme,
+    ) -> Self {
         let mut ctrl_config = config.controller.clone();
         ctrl_config.vocab_size = tokenizer.vocab_size();
 
-        let controller = LanguageController::new(genesis, &ctrl_config);
+        let controller = LanguageController::new_with_token_embedding_seed_scheme(
+            genesis,
+            &ctrl_config,
+            seed_scheme,
+        );
         let encoder = ThoughtLanguageEncoder::new(genesis);
         let epistemic_gate = EpistemicGate::new(&tokenizer, &config.gating);
         let epistemic_cube_gate = crate::gating::EpistemicCubeGate::new(&tokenizer);
