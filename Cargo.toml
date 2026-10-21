@@ -23,6 +23,8 @@ exclude = [
     "crates/core/symthaea-zkproof/methods",
     "crates/core/symthaea-zkproof/host",
     "crates/domains/symthaea-spore/fuzz",
+    # Documentation-only placeholder; it has no Cargo.toml and is not a workspace package.
+    "crates/domains/symthaea-rea-evidence-verifier",
     "crates/domains/spark-engine",
     "crates/domains/symthaea-lab",
     # ARCHIVED 2026-07-16 (vision review P2.2): real SigLIP/Moondream/ocrs ONNX
