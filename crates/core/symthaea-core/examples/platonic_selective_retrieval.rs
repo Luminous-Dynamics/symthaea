@@ -408,6 +408,7 @@ fn report_row(
         selection_n,
         certification_n,
         certified,
+        samples.len(),
         evaluate(samples, rule),
     );
 
@@ -428,6 +429,7 @@ fn report_row(
             selection_n,
             certification_n,
             certified,
+            samples.len(),
             evaluate(&subset, rule),
         );
     }
@@ -451,6 +453,7 @@ fn report_row(
             selection_n,
             certification_n,
             certified,
+            samples.len(),
             evaluate(&subset, rule),
         );
     }
@@ -466,6 +469,7 @@ fn write_evaluation_row(
     selection_n: usize,
     certification_n: usize,
     certified: &str,
+    test_n: usize,
     result: Evaluation,
 ) {
     let (risk_low, risk_high) = wilson_interval_95(result.errors, result.accepted);
@@ -478,8 +482,7 @@ fn write_evaluation_row(
         .unwrap_or_else(|| "NA".to_owned());
 
     println!(
-        "{record_type},{seed},{strategy},{query_kind},{noise},{DIMENSION},{PROTOTYPE_COUNT},{selection_n},{certification_n},{certified},{},{:.6},{:.6},{},{},{:.6},{},{},{:.6},{:.6},{:.6}",
-        result.total,
+        "{record_type},{seed},{strategy},{query_kind},{noise},{DIMENSION},{PROTOTYPE_COUNT},{selection_n},{certification_n},{certified},{test_n},{:.6},{:.6},{},{},{:.6},{},{},{:.6},{:.6},{:.6}",
         rule.min_similarity,
         rule.min_margin,
         result.accepted,
