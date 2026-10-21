@@ -434,8 +434,12 @@ impl EnhancedKnowledgeGraph {
             self.total_contradictions += 1;
         }
         if let Some(candidate_index) = self.evidence_links.iter().position(|candidate| {
-            candidate.from_fact_id == from_fact_id
-                && candidate.to_fact_id == to_fact_id
+            let same_direction =
+                candidate.from_fact_id == from_fact_id && candidate.to_fact_id == to_fact_id;
+            let reverse_direction = symmetric_relation
+                && candidate.from_fact_id == to_fact_id
+                && candidate.to_fact_id == from_fact_id;
+            (same_direction || reverse_direction)
                 && candidate.relation == relation
                 && candidate.status == EvidenceLinkStatus::Candidate
         }) {
@@ -1318,13 +1322,12 @@ mod tests {
             vec!["evidence-a".into(), "evidence-b".into()],
             "Two independent source families".into(), None, None, 3,
         ).unwrap();
-        assert_eq!(
+        assert!(
             graph.adjudicate_evidence_relation(
                 id_b, id_a, EvidenceRelation::Corroborates,
                 vec!["evidence-a".into(), "evidence-b".into()],
                 "Same adjudication requested in reverse".into(), None, None, 4,
-            ).unwrap_err().contains("different evidence set"),
-            false
+            ).is_ok()
         );
         let error = graph.adjudicate_evidence_relation(
             id_a, id_b, EvidenceRelation::Corroborates,
