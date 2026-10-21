@@ -1322,8 +1322,10 @@ impl PgxHealthEquityEngine {
 
             max_adverse = max_adverse.max(adverse);
             min_adverse = min_adverse.min(adverse);
-            max_efficacy_heuristic_index = max_efficacy_heuristic_index.max(efficacy_heuristic_index);
-            min_efficacy_heuristic_index = min_efficacy_heuristic_index.min(efficacy_heuristic_index);
+            max_efficacy_heuristic_index =
+                max_efficacy_heuristic_index.max(efficacy_heuristic_index);
+            min_efficacy_heuristic_index =
+                min_efficacy_heuristic_index.min(efficacy_heuristic_index);
 
             population_profiles.insert(
                 anc,
@@ -1422,8 +1424,9 @@ impl PgxHealthEquityEngine {
         };
 
         let equity = self.equity_analysis(drug, gene);
-        let population_context_crossed_model_threshold =
-            equity.model_flagged_populations.contains(&population_context);
+        let population_context_crossed_model_threshold = equity
+            .model_flagged_populations
+            .contains(&population_context);
 
         ResearchGuidelineProjection {
             status: ResearchProjectionStatus::ReferenceFound,
@@ -1439,7 +1442,7 @@ impl PgxHealthEquityEngine {
         }
     }
 
-        /// Computes arithmetic population scenarios from the model's aggregate phenotype fractions
+    /// Computes arithmetic population scenarios from the model's aggregate phenotype fractions
     /// and broad denominator values that require separate validation.
     ///
     /// The fraction is a prototype-defined phenotype-category sum, not a validated clinical-risk
@@ -1780,7 +1783,10 @@ impl PgxHealthEquityEngine {
                     flags.push(format!("adverse_risk={:.2}", adverse));
                 }
                 if efficacy_heuristic_index > UNDERSERVED_THRESHOLD {
-                    flags.push(format!("efficacy_heuristic_index={:.2}", efficacy_heuristic_index));
+                    flags.push(format!(
+                        "efficacy_heuristic_index={:.2}",
+                        efficacy_heuristic_index
+                    ));
                 }
 
                 (pop.name.clone(), gap_score, flags)
@@ -1895,13 +1901,28 @@ mod tests {
             MetabolizerPhenotype::UltraRapid,
         );
         assert_eq!(projection.status, ResearchProjectionStatus::ReferenceFound);
-        assert_eq!(projection.reference_evidence_level, Some(EvidenceLevel::Strong));
+        assert_eq!(
+            projection.reference_evidence_level,
+            Some(EvidenceLevel::Strong)
+        );
         assert!(projection.population_model_gap_score.is_some());
-        assert!(projection.population_context_crossed_model_threshold.is_some());
+        assert!(
+            projection
+                .population_context_crossed_model_threshold
+                .is_some()
+        );
 
         let encoded = serde_json::to_value(&projection).unwrap();
-        for forbidden in ["action", "dose_adjustment", "alternative_drug", "monitoring"] {
-            assert!(encoded.get(forbidden).is_none(), "projection must not expose {forbidden}");
+        for forbidden in [
+            "action",
+            "dose_adjustment",
+            "alternative_drug",
+            "monitoring",
+        ] {
+            assert!(
+                encoded.get(forbidden).is_none(),
+                "projection must not expose {forbidden}"
+            );
         }
     }
 
@@ -2096,14 +2117,22 @@ mod tests {
             .sum();
         assert_eq!(estimate.sum_of_modelled_products, sum_of_rows);
         assert!(estimate.scenario_note.contains("arithmetic scenario"));
-        assert!(estimate.scenario_note.contains("Not an estimate of patients at risk"));
+        assert!(
+            estimate
+                .scenario_note
+                .contains("Not an estimate of patients at risk")
+        );
     }
 
     #[test]
     fn test_population_scenario_products_sum_to_total() {
         let e = engine();
         let estimate = e.population_scenario_estimate("efavirenz", "CYP2B6");
-        let sum: u64 = estimate.per_population_scenario.iter().map(|(_, _, _, c)| c).sum();
+        let sum: u64 = estimate
+            .per_population_scenario
+            .iter()
+            .map(|(_, _, _, c)| c)
+            .sum();
         assert_eq!(
             estimate.sum_of_modelled_products, sum,
             "Total modelled product ({}) should equal sum of population scenario products ({})",
@@ -2397,7 +2426,11 @@ mod tests {
         );
         assert_eq!(projection.status, ResearchProjectionStatus::Indeterminate);
         assert!(projection.reference_evidence_level.is_none());
-        assert!(projection.population_context_crossed_model_threshold.is_none());
+        assert!(
+            projection
+                .population_context_crossed_model_threshold
+                .is_none()
+        );
     }
 
     #[test]
