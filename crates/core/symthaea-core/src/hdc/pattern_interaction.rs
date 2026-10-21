@@ -351,6 +351,11 @@ pub struct AssociativeCapacityResult {
     /// `None` when a single association means no distractor exists.
     pub mean_max_distractor_similarity: Option<f64>,
     pub recall_at_1: f64,
+    /// Recall after projected-softmax cleanup of the unbound query.
+    pub cleanup_recall_at_1: f64,
+    pub cleanup_mean_target_similarity: f64,
+    /// `None` when a single association means no distractor exists.
+    pub cleanup_mean_max_distractor_similarity: Option<f64>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -511,6 +516,10 @@ pub fn run_pattern_interaction_suite(
         let mut max_distractor_similarity_sum = 0.0;
         let mut has_distractors = false;
         let mut correct_count = 0usize;
+        let mut cleanup_target_similarity_sum = 0.0;
+        let mut cleanup_distractor_similarity_sum = 0.0;
+        let mut cleanup_has_distractors = false;
+        let mut cleanup_correct_count = 0usize;
 
         for trial in 0..config.trials {
             let fillers = make_prototypes(seed ^ 0x4153_534f_4349_4154, trial, config)?;
@@ -549,6 +558,32 @@ pub fn run_pattern_interaction_suite(
             if ranked.first().is_some_and(|result| result.label == format!("p{target_index}")) {
                 correct_count += 1;
             }
+
+            let cleaned = projected_softmax_cleanup(
+                &query,
+                &fillers,
+                CLEANUP_BETA,
+                CLEANUP_STEPS,
+            )?;
+            let cleaned_target_similarity = cleaned.similarity(&fillers[target_index])?;
+            cleanup_target_similarity_sum += cleaned_target_similarity;
+            let cleaned_max_distractor = fillers.iter()
+                .enumerate()
+                .filter(|(index, _)| *index != target_index)
+                .map(|(_, filler)| cleaned.similarity(filler))
+                .collect::<Result<Vec<_>, _>>()?
+                .into_iter()
+                .fold(f64::NEG_INFINITY, f64::max);
+            if cleaned_max_distractor.is_finite() {
+                cleanup_distractor_similarity_sum += cleaned_max_distractor;
+                cleanup_has_distractors = true;
+            }
+            let cleaned_ranked = space.rank(&cleaned)?;
+            if cleaned_ranked.first().is_some_and(|result| {
+                result.label == format!("p{target_index}")
+            }) {
+                cleanup_correct_count += 1;
+            }
         }
 
         associative_capacity_results.push(AssociativeCapacityResult {
@@ -558,6 +593,12 @@ pub fn run_pattern_interaction_suite(
                 max_distractor_similarity_sum / config.trials as f64
             ),
             recall_at_1: correct_count as f64 / config.trials as f64,
+            cleanup_recall_at_1: cleanup_correct_count as f64 / config.trials as f64,
+            cleanup_mean_target_similarity: cleanup_target_similarity_sum
+                / config.trials as f64,
+            cleanup_mean_max_distractor_similarity: cleanup_has_distractors.then_some(
+                cleanup_distractor_similarity_sum / config.trials as f64
+            ),
         });
     }
 
