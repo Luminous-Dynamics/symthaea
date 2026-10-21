@@ -440,7 +440,9 @@ fn parse_jsonl(text: &str, expected_split: Split) -> Result<Vec<Outcome>> {
 
         let mut reviewer_ids = BTreeSet::new();
         for reviewer in &outcome.adjudication.reviewer_decisions {
-            if reviewer.reviewer_id.trim().is_empty() || !reviewer_ids.insert(&reviewer.reviewer_id) {
+            if reviewer.reviewer_id.trim().is_empty()
+                || !reviewer_ids.insert(&reviewer.reviewer_id)
+            {
                 bail!(
                     "pair {} has an empty or duplicate reviewer ID",
                     outcome.pair_id
@@ -456,7 +458,10 @@ fn parse_jsonl(text: &str, expected_split: Split) -> Result<Vec<Outcome>> {
                     bail!("adjudicated pair {} cannot have unknown gold label", outcome.pair_id);
                 }
                 if reviewer_ids.len() < REQUIRED_REVIEWERS {
-                    bail!("adjudicated pair {} needs at least two independent reviewer IDs", outcome.pair_id);
+                    bail!(
+                        "adjudicated pair {} needs at least two independent reviewer IDs",
+                        outcome.pair_id
+                    );
                 }
                 if outcome
                     .adjudication
@@ -482,7 +487,9 @@ fn parse_jsonl(text: &str, expected_split: Split) -> Result<Vec<Outcome>> {
         if outcome
             .prediction
             .compatibility_probability
-            .is_some_and(|probability| !probability.is_finite() || !(0.0..=1.0).contains(&probability))
+            .is_some_and(|probability| {
+                !probability.is_finite() || !(0.0..=1.0).contains(&probability)
+            })
         {
             bail!("pair {} has compatibility probability outside [0, 1]", outcome.pair_id);
         }
@@ -658,7 +665,11 @@ fn analyze(
         incompatible_component_floor_met: incompatible_floor_met,
         minimum_compatible_recall: 0.90,
         compatible_recall_target_met: recall_target_met,
-        pair_selectivity_gate: if pair_gate_met { "pair_track_thresholds_met" } else { "pair_track_thresholds_not_met" },
+        pair_selectivity_gate: if pair_gate_met {
+            "pair_track_thresholds_met"
+        } else {
+            "pair_track_thresholds_not_met"
+        },
         finite_mutation_suite_gate: "not_evaluated_by_this_analyzer",
         overall_confirmatory_decision: "not_evaluated_requires_independent_mutation_receipt_and_protocol_audit",
     };
@@ -873,7 +884,9 @@ fn quantile(sorted_values: &[f64], q: f64) -> f64 {
     sorted_values[low] + (sorted_values[high] - sorted_values[low]) * weight
 }
 
-fn deserialize_required_nullable_f64<'de, D>(deserializer: D) -> std::result::Result<Option<f64>, D::Error>
+fn deserialize_required_nullable_f64<'de, D>(
+    deserializer: D,
+) -> std::result::Result<Option<f64>, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
@@ -920,7 +933,10 @@ mod tests {
             "split": "test",
             "component_id": component_id,
             "source": {"record_id": format!("source-{pair_id}"), "family_id": source_family},
-            "target": {"family_id": target_family, "obligation_sha256": format!("{:064x}", pair_id.len())},
+            "target": {
+                "family_id": target_family,
+                "obligation_sha256": format!("{:064x}", pair_id.len())
+            },
             "adjudication": {
                 "status": "adjudicated",
                 "label": label,
@@ -929,7 +945,15 @@ mod tests {
                     "label": review.label
                 })).collect::<Vec<_>>()
             },
-            "prediction": {"decision": decision, "predicted_label": predicted_label, "compatibility_probability": if decision == Decision::Accept { Some(0.9) } else if decision == Decision::Reject { Some(0.1) } else { None }}
+            "prediction": {
+                "decision": decision,
+                "predicted_label": predicted_label,
+                "compatibility_probability": match decision {
+                    Decision::Accept => Some(0.9),
+                    Decision::Reject => Some(0.1),
+                    Decision::Abstain => None
+                }
+            }
         });
         serde_json::from_value(json).expect("valid test fixture")
     }
@@ -990,9 +1014,30 @@ mod tests {
 
     #[test]
     fn family_component_floor_counts_components_not_pair_rows() {
-        let shared = outcome("p", "one-component", "shared-family", "target-p", Label::Compatible, Decision::Accept);
-        let different_edge = outcome("n", "one-component", "target-p", "target-n", Label::Incompatible, Decision::Reject);
-        let report = analyze(&[shared, different_edge], Split::Test, "d".repeat(64), 1_000, 9).unwrap();
+        let shared = outcome(
+            "p",
+            "one-component",
+            "shared-family",
+            "target-p",
+            Label::Compatible,
+            Decision::Accept,
+        );
+        let different_edge = outcome(
+            "n",
+            "one-component",
+            "target-p",
+            "target-n",
+            Label::Incompatible,
+            Decision::Reject,
+        );
+        let report = analyze(
+            &[shared, different_edge],
+            Split::Test,
+            "d".repeat(64),
+            1_000,
+            9,
+        )
+        .unwrap();
         assert_eq!(report.counts.compatible_components, 1);
         assert_eq!(report.counts.incompatible_components, 1);
         assert!(!report.proposed_gates.compatible_component_floor_met);
