@@ -97,7 +97,8 @@ pub use decoder::{
 };
 pub use dreaming::DreamingService;
 pub use encoder::{
-    EPISTEMIC_CUBE_BASE, EPISTEMIC_CUBE_CHANNELS, ThoughtChannels, ThoughtLanguageEncoder,
+    EPISTEMIC_CUBE_BASE, EPISTEMIC_CUBE_CHANNELS, IntentChannel, ThoughtChannels,
+    ThoughtLanguageEncoder,
 };
 pub use epistemic_dashboard::{CognitiveStyle, EpistemicDashboard};
 pub use epistemic_scorers::{compute_epistemic_reward, compute_idiomaticity};
