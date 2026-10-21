@@ -49,3 +49,5 @@ jobs:
             allostatic-control-v1.csv.receipt.txt
             allostatic-control-v1-summary.csv
             allostatic-control-v1-paired-deltas.csv
+            allostatic-control-v1-mismatch-frontier.csv
+            allostatic-control-v1-mismatch-frontier-summary.csv
