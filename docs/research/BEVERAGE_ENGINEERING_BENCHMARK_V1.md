@@ -154,6 +154,44 @@ Reference: Campo-Manzanares et al., *Critical assessment of machine learning app
 All numeric targets above are proposals derived from a published comparator, not results achieved by this project.
 
 
+## Executable paired decision-value audit
+
+Forecast accuracy does not show that following a model improves production. The next benchmark layer therefore scores a preregistered intervention against a matched baseline, with the accounting boundary and non-compensatory quality gates explicit.
+
+The isolated Rust runner is `tools/beverage-benchmark-harness/src/bin/decision_value_audit.rs`; its schema and synthetic fixture are:
+
+- `docs/research/beverage-decision-value-v1.schema.json`
+- `docs/research/beverage-decision-value-synthetic-v1.json`
+
+For each independent matched unit, the manifest declares baseline and intervention periods, meter-boundary references, functional units, product-mix references, saleable quality-conforming output, absolute water and energy readings, and quality/safety gate results. The auditor normalizes water to litres per 1,000 litres of saleable output and energy to kWh per 1,000 litres of saleable output. The v1 contract refuses to pool product strata or mismatched meter boundaries, functional units, or product mixes.
+
+It computes each independent unit's percentage reduction, then a deterministic 5,000-resample percentile bootstrap interval over those paired unit-level reductions. A contract passes only if:
+- the design declares block randomization or a matched control (uncontrolled before/after comparison is rejected);
+- every pair uses the same declared meter boundary, functional unit and product-mix reference;
+- only saleable, quality-conforming output is used as the denominator;
+- all predeclared quality and safety gates pass for both baseline and intervention;
+- the lower 95% bootstrap bound on the predeclared primary resource reduction reaches the target;
+- the lower bound for the other resource's reduction remains above the predeclared maximum-increase guardrail.
+
+Example invocation:
+
+```bash
+cargo test --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin decision_value_audit
+cargo run --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin decision_value_audit -- \
+  --input docs/research/beverage-decision-value-synthetic-v1.json \
+  --out /tmp/beverage-decision-receipt.json
+```
+
+The fixture is synthetic by design. Its only valid success state is `SYNTHETIC_CONTRACT_PASS_NOT_EMPIRICAL`; it must not be reported as a plant saving. A future measured manifest may return `DECISION_GATE_PASS_PENDING_INDEPENDENT_REVIEW`, but that still requires review of the experimental protocol, measurement provenance, group independence, statistical power, missingness, and whether the declared assignment/matching design supports the proposed inference.
+
+This is a first decision-value gate, not a complete causal-inference engine. The percentile bootstrap assumes the declared units are independent; the auditor cannot verify that from IDs. The minimum-unit count is a contract check, **not a power calculation**. The trial must preregister its sample-size rationale, outcome definitions, stopping rules, exclusions and intervention before collecting outcome data.
+
+Research motivation:
+- Siska et al. (2026), *A Guide to Bayesian Optimization in Bioprocess Engineering*, https://doi.org/10.1002/bit.70129, discusses the small-data and experimental-cost setting common in bioprocess optimization.
+- Lapierre et al. (2025), *Multi-cycle high-throughput growth media optimization using batch Bayesian optimization*, https://doi.org/10.1002/jctb.7860, reports simulation and wet-lab comparisons, including cases where Bayesian optimization did not outperform every comparator. This is why the decision contract should compare against strong baselines rather than assume that the more elaborate optimizer wins.
+
+The paradigm shift is from maximizing predicted yield or minimizing predicted resource use to **maximizing quality-conforming, saleable output under matched comparison, uncertainty, resource, and hard-quality constraints**.
+
 ## 6. Metrics and proposed targets
 
 Report exact endpoint units, sample and batch counts, target missingness, metric denominator, group-level results and uncertainty. Choose metrics to fit each task:
