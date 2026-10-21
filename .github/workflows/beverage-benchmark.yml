@@ -12,6 +12,8 @@ on:
       - "docs/research/beverage-engineering-scenarios-v1.json"
       - "docs/research/beverage-engineering-scenarios-v1.schema.json"
       - "docs/research/beverage-data-sources-v1.json"
+      - "docs/research/beverage-split-manifest-v1.schema.json"
+      - "docs/research/beverage-split-manifest-synthetic-v1.json"
       - ".github/workflows/beverage-benchmark.yml"
   pull_request:
     paths:
@@ -23,6 +25,8 @@ on:
       - "docs/research/beverage-engineering-scenarios-v1.json"
       - "docs/research/beverage-engineering-scenarios-v1.schema.json"
       - "docs/research/beverage-data-sources-v1.json"
+      - "docs/research/beverage-split-manifest-v1.schema.json"
+      - "docs/research/beverage-split-manifest-synthetic-v1.json"
       - ".github/workflows/beverage-benchmark.yml"
   workflow_dispatch:
 
@@ -54,6 +58,7 @@ jobs:
           rustfmt --edition 2024 --check crates/domains/symthaea-culinary/src/bin/wine_quality_source_audit.rs
           rustfmt --edition 2024 --check crates/domains/symthaea-culinary/src/bin/fermentation_time_series_audit.rs
           rustfmt --edition 2024 --check tools/beverage-benchmark-harness/src/bin/schema_contract_audit.rs
+          rustfmt --edition 2024 --check tools/beverage-benchmark-harness/src/bin/split_leakage_audit.rs
 
       - name: Test synthetic receipt contract
         run: cargo test --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin beverage_benchmark_receipt
@@ -67,6 +72,9 @@ jobs:
       - name: Test full Draft 2020-12 schema auditor
         run: cargo test --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin schema_contract_audit
 
+      - name: Test split leakage auditor
+        run: cargo test --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin split_leakage_audit
+
       - name: Independently validate synthetic corpus schema
         run: |
           cargo run --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin schema_contract_audit -- \
@@ -75,12 +83,28 @@ jobs:
             --out "$RUNNER_TEMP/beverage-schema-receipt.json"
           cat "$RUNNER_TEMP/beverage-schema-receipt.json"
 
+      - name: Independently validate split manifest schema
+        run: |
+          cargo run --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin schema_contract_audit -- \
+            --schema docs/research/beverage-split-manifest-v1.schema.json \
+            --instance docs/research/beverage-split-manifest-synthetic-v1.json \
+            --out "$RUNNER_TEMP/beverage-split-schema-receipt.json"
+          cat "$RUNNER_TEMP/beverage-split-schema-receipt.json"
+
+      - name: Audit synthetic split manifest
+        run: |
+          cargo run --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin split_leakage_audit -- \
+            --input docs/research/beverage-split-manifest-synthetic-v1.json \
+            --out "$RUNNER_TEMP/beverage-split-receipt.json"
+          cat "$RUNNER_TEMP/beverage-split-receipt.json"
+
       - name: Clippy focused runners
         run: |
           cargo clippy --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin beverage_benchmark_receipt -- -D warnings
           cargo clippy --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin wine_quality_source_audit -- -D warnings
           cargo clippy --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin fermentation_time_series_audit -- -D warnings
           cargo clippy --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin schema_contract_audit -- -D warnings
+          cargo clippy --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin split_leakage_audit -- -D warnings
 
       - name: Emit exact-head receipt
         env:
