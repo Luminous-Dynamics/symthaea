@@ -23,6 +23,7 @@ struct Plan {
     phase: String,
     synthetic_only: bool,
     primary_endpoint: String,
+    candidate_system_id: String,
     benchmark: Benchmark,
     systems: Vec<System>,
     preregistration: Preregistration,
@@ -121,6 +122,8 @@ struct Report {
     synthetic_only: bool,
     qualification_only: bool,
     primary_endpoint: String,
+    candidate_system_id: String,
+    candidate_critical_gates_pass: bool,
     plan_sha256: String,
     pair_manifest_sha256: String,
     result_rows_sha256: String,
@@ -246,6 +249,12 @@ fn validate_plan_eligibility(plan: &Plan) -> Result<(), String> {
     }
     if families.len() < 2 {
         return Err("plan must include at least two distinct baseline families".into());
+    }
+    if !systems.contains(plan.candidate_system_id.as_str()) {
+        return Err(format!(
+            "candidate_system_id {:?} must be declared in systems before evaluation",
+            plan.candidate_system_id
+        ));
     }
 
     let digests = [
@@ -601,6 +610,11 @@ fn run() -> Result<(), String> {
         synthetic_only: plan.synthetic_only,
         qualification_only: plan.synthetic_only,
         primary_endpoint: plan.primary_endpoint.clone(),
+        candidate_system_id: plan.candidate_system_id.clone(),
+        candidate_critical_gates_pass: system_metrics
+            .iter()
+            .find(|metrics| metrics.system_id == plan.candidate_system_id)
+            .is_some_and(|metrics| metrics.critical_gates_pass),
         plan_sha256: sha256_hex(&plan_bytes),
         pair_manifest_sha256: sha256_hex(&pair_bytes),
         result_rows_sha256: sha256_hex(&result_bytes),
@@ -628,12 +642,20 @@ fn run() -> Result<(), String> {
     fs::write(&args.output, &bytes)
         .map_err(|error| format!("cannot write report {}: {error}", args.output.display()))?;
     println!(
-        "Scored {} paired cases for {} systems; qualification_only={}; report={}",
+        "Scored {} paired cases for {} systems; qualification_only={}; candidate_critical_gates_pass={}; report={}",
         report.pair_count,
         report.system_count,
         report.qualification_only,
+        report.candidate_critical_gates_pass,
         args.output.display()
     );
+    if plan.phase == "preregistered_held_out" && !report.candidate_critical_gates_pass {
+        return Err(format!(
+            "candidate {:?} failed a non-compensatory critical gate; score report was preserved at {}",
+            report.candidate_system_id,
+            args.output.display()
+        ));
+    }
     Ok(())
 }
 
@@ -657,6 +679,7 @@ mod tests {
             "phase":"synthetic_control",
             "synthetic_only":true,
             "primary_endpoint":"paired_intervention_fidelity",
+            "candidate_system_id":"s2",
             "benchmark":{
                 "split":"synthetic",
                 "source_family_disjoint":true,
