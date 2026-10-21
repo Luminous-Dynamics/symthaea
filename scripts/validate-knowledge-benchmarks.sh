@@ -16,7 +16,7 @@ run_validator() {
   local output="$4"
 
   echo "==> Validating kind=$kind input=$input"
-  cargo run --manifest-path "$manifest" -- \
+  cargo run --locked --manifest-path "$manifest" -- \
     --kind "$kind" \
     --schema "$schema" \
     --input "$input" \
@@ -25,7 +25,7 @@ run_validator() {
 }
 
 cargo fmt --manifest-path "$manifest" -- --check
-cargo test --manifest-path "$manifest"
+cargo test --locked --manifest-path "$manifest"
 
 run_validator case \
   benchmarks/esoterica-bench/v0/case.schema.json \
