@@ -23,7 +23,9 @@ impl Kind {
             "case" => Ok(Self::Case),
             "graph" => Ok(Self::Graph),
             "claim" => Ok(Self::Claim),
-            _ => Err(format!("unknown --kind {raw:?}; expected case, graph, or claim")),
+            _ => Err(format!(
+                "unknown --kind {raw:?}; expected case, graph, or claim"
+            )),
         }
     }
 
@@ -87,7 +89,8 @@ fn parse_args() -> Result<Config, String> {
 
     while let Some(arg) = args.next() {
         let value = |args: &mut std::iter::Skip<std::env::Args>, flag: &str| {
-            args.next().ok_or_else(|| format!("{flag} requires a value"))
+            args.next()
+                .ok_or_else(|| format!("{flag} requires a value"))
         };
         match arg.as_str() {
             "--schema" => schema = Some(PathBuf::from(value(&mut args, "--schema")?)),
@@ -133,9 +136,9 @@ fn find_external_schema_refs(value: &Value, path: &str, errors: &mut Vec<String>
                         Some(target) => errors.push(format!(
                             "{path}/{key}: non-local schema reference {target:?} is refused"
                         )),
-                        None => errors.push(format!(
-                            "{path}/{key}: schema reference must be a string"
-                        )),
+                        None => {
+                            errors.push(format!("{path}/{key}: schema reference must be a string"))
+                        }
                     }
                 }
                 let next = format!("{path}/{}", key.replace('~', "~0").replace('/', "~1"));
@@ -251,13 +254,20 @@ fn validate_graph_contract(graph: &Value) -> Vec<String> {
                     string_field(source, "source_id") == Some(id)
                         && matches!(
                             string_field(source, "source_kind"),
-                            Some("primary_source" | "scholarly_analysis" | "community_authorized_source")
+                            Some(
+                                "primary_source"
+                                    | "scholarly_analysis"
+                                    | "community_authorized_source"
+                            )
                         )
                 })
             });
             if !has_non_synthetic_source
                 || !matches!(basis, "direct_source" | "scholarly_argument")
-                || !matches!(epistemic_status, "source_attested" | "scholarly_interpretation")
+                || !matches!(
+                    epistemic_status,
+                    "source_attested" | "scholarly_interpretation"
+                )
             {
                 errors.push(format!(
                     "edge {edge_id:?}: historically_influences requires admissible non-synthetic evidence, a direct_source/scholarly_argument basis, and an attested or scholarly status"
@@ -311,7 +321,11 @@ fn collect_unique_object_ids(
     ids
 }
 
-fn validate_domain_contract(kind: Kind, value: &Value, seen_ids: &mut HashSet<String>) -> Vec<String> {
+fn validate_domain_contract(
+    kind: Kind,
+    value: &Value,
+    seen_ids: &mut HashSet<String>,
+) -> Vec<String> {
     let mut errors = Vec::new();
     let id = record_identity(kind, value, 0);
     if !seen_ids.insert(id.clone()) {
@@ -321,7 +335,13 @@ fn validate_domain_contract(kind: Kind, value: &Value, seen_ids: &mut HashSet<St
     match kind {
         Kind::Case => {
             collect_unique_object_ids(value, "source_refs", "source_id", "source", &mut errors);
-            collect_unique_object_ids(value, "evidence_pack", "evidence_id", "evidence", &mut errors);
+            collect_unique_object_ids(
+                value,
+                "evidence_pack",
+                "evidence_id",
+                "evidence",
+                &mut errors,
+            );
         }
         Kind::Claim => {
             let source_ids =
@@ -374,7 +394,10 @@ fn run(config: Config) -> Result<(Report, bool), String> {
     let mut ref_errors = Vec::new();
     find_external_schema_refs(&schema, "$", &mut ref_errors);
     if !ref_errors.is_empty() {
-        return Err(format!("schema reference policy failed: {}", ref_errors.join("; ")));
+        return Err(format!(
+            "schema reference policy failed: {}",
+            ref_errors.join("; ")
+        ));
     }
 
     let meta_validator = jsonschema::meta::validator_for(&schema)
@@ -389,8 +412,8 @@ fn run(config: Config) -> Result<(Report, bool), String> {
         .build(&schema)
         .map_err(|e| format!("cannot compile case schema: {e}"))?;
 
-    let input_text = std::str::from_utf8(&input_bytes)
-        .map_err(|e| format!("input is not valid UTF-8: {e}"))?;
+    let input_text =
+        std::str::from_utf8(&input_bytes).map_err(|e| format!("input is not valid UTF-8: {e}"))?;
     let mut seen_ids = HashSet::new();
     let mut results = Vec::new();
 
@@ -443,10 +466,7 @@ fn run(config: Config) -> Result<(Report, bool), String> {
     }
 
     let schema_valid_records = results.iter().filter(|r| r.schema_valid).count();
-    let domain_valid_records = results
-        .iter()
-        .filter(|r| r.domain_contract_valid)
-        .count();
+    let domain_valid_records = results.iter().filter(|r| r.domain_contract_valid).count();
     let passed = results
         .iter()
         .all(|r| r.schema_valid && r.domain_contract_valid);
@@ -505,7 +525,11 @@ fn main() -> ExitCode {
                 eprintln!("{error}");
                 return ExitCode::from(2);
             }
-            if passed { ExitCode::SUCCESS } else { ExitCode::from(1) }
+            if passed {
+                ExitCode::SUCCESS
+            } else {
+                ExitCode::from(1)
+            }
         }
         Err(error) => {
             eprintln!("validation could not be completed: {error}");
@@ -599,7 +623,11 @@ mod tests {
             }]
         });
         let errors = validate_graph_contract(&graph);
-        assert!(errors.iter().any(|e| e.contains("cannot assert historical influence")));
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.contains("cannot assert historical influence"))
+        );
     }
 
     #[test]
@@ -612,7 +640,11 @@ mod tests {
             ]
         });
         let errors = validate_domain_contract(Kind::Case, &value, &mut HashSet::new());
-        assert!(errors.iter().any(|e| e.contains("duplicate evidence identifier")));
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.contains("duplicate evidence identifier"))
+        );
     }
 
     #[test]
