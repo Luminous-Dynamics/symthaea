@@ -13,7 +13,7 @@
 //!          Belief revision (AGM theory, Alchourrón et al. 1985)
 
 use super::claim_provenance::{
-    ClaimContext, ClaimKind, ClaimPolarity, EvidenceLink, EvidenceLinkStatus, EvidenceRelation,
+    ClaimContext, EvidenceLink, EvidenceLinkStatus, EvidenceRelation,
 };
 use super::encoding::FactEncoding;
 use std::collections::{HashMap, HashSet};
@@ -358,13 +358,15 @@ impl EnhancedKnowledgeGraph {
             }
         }
 
-        let already_adjudicated = self.evidence_links.iter().any(|link| {
+        if let Some(existing) = self.evidence_links.iter().find(|link| {
             link.from_fact_id == from_fact_id
                 && link.to_fact_id == to_fact_id
                 && link.relation == relation
                 && link.status == EvidenceLinkStatus::Adjudicated
                 && link.evidence_ids == evidence_ids
-        });
+        }) {
+            return Ok(existing.clone());
+        }
         let link = EvidenceLink {
             from_fact_id,
             to_fact_id,
@@ -376,23 +378,21 @@ impl EnhancedKnowledgeGraph {
             transmission_chain,
             detected_at_cycle: current_cycle,
         };
-        if !already_adjudicated {
-            if relation == EvidenceRelation::Corroborates {
-                for fact_id in [from_fact_id, to_fact_id] {
-                    if let Some(fact) = self.facts.get_mut(&fact_id) {
-                        fact.corroboration_count = fact.corroboration_count.saturating_add(1);
-                        fact.confidence = (fact.confidence + 0.05).clamp(0.0, 1.0);
-                        fact.last_accessed_cycle = current_cycle;
-                    }
+        if relation == EvidenceRelation::Corroborates {
+            for fact_id in [from_fact_id, to_fact_id] {
+                if let Some(fact) = self.facts.get_mut(&fact_id) {
+                    fact.corroboration_count = fact.corroboration_count.saturating_add(1);
+                    fact.confidence = (fact.confidence + 0.05).clamp(0.0, 1.0);
+                    fact.last_accessed_cycle = current_cycle;
                 }
-            } else if relation == EvidenceRelation::Contradicts {
-                for fact_id in [from_fact_id, to_fact_id] {
-                    if let Some(fact) = self.facts.get_mut(&fact_id) {
-                        fact.contradiction_count = fact.contradiction_count.saturating_add(1);
-                    }
-                }
-                self.total_contradictions += 1;
             }
+        } else if relation == EvidenceRelation::Contradicts {
+            for fact_id in [from_fact_id, to_fact_id] {
+                if let Some(fact) = self.facts.get_mut(&fact_id) {
+                    fact.contradiction_count = fact.contradiction_count.saturating_add(1);
+                }
+            }
+            self.total_contradictions += 1;
         }
         self.evidence_links.push(link.clone());
         Ok(link)
@@ -1014,6 +1014,7 @@ fn contains_negation(text: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::super::claim_provenance::{ClaimKind, ClaimPolarity};
 
     fn make_encoding(text: &str, confidence: f32) -> FactEncoding {
         FactEncoding {
