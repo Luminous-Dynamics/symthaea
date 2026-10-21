@@ -109,41 +109,37 @@ fn safe_transition(
     state_is_viable(next, limits).then_some(next)
 }
 
-/// Find one continuation sequence that keeps all represented trajectories safe.
-/// A resource-budget exhaustion returns None so callers cannot certify a partial
-/// search result as safe.
-fn has_safe_continuation(
-    state: StateEnvelope,
+/// Mutable search context keeps resource accounting and dynamics assumptions explicit.
+struct SearchContext {
     dynamics: DynamicsBounds,
     limits: ViabilityLimits,
-    remaining_steps: usize,
-    depth: usize,
     shield_can_recover: bool,
     max_expanded_nodes: usize,
-    stats: &mut HorizonSearchStats,
+    stats: HorizonSearchStats,
+}
+
+/// Find one continuation sequence that keeps all represented trajectories safe.
+/// Budget exhaustion returns None so a partial search cannot be certified.
+fn has_safe_continuation(
+    state: StateEnvelope,
+    remaining_steps: usize,
+    depth: usize,
+    context: &mut SearchContext,
 ) -> Option<bool> {
-    stats.expanded_nodes += 1;
-    stats.max_depth_reached = stats.max_depth_reached.max(depth);
-    if stats.expanded_nodes > max_expanded_nodes {
+    context.stats.expanded_nodes += 1;
+    context.stats.max_depth_reached = context.stats.max_depth_reached.max(depth);
+    if context.stats.expanded_nodes > context.max_expanded_nodes {
         return None;
     }
     if remaining_steps == 0 {
         return Some(true);
     }
 
-    for action in available_actions(shield_can_recover) {
-        stats.transition_evaluations += 1;
-        if let Some(next) = safe_transition(state, *action, dynamics, limits) {
-            if has_safe_continuation(
-                next,
-                dynamics,
-                limits,
-                remaining_steps - 1,
-                depth + 1,
-                shield_can_recover,
-                max_expanded_nodes,
-                stats,
-            )? {
+    let actions = available_actions(context.shield_can_recover);
+    for action in actions {
+        context.stats.transition_evaluations += 1;
+        if let Some(next) = safe_transition(state, *action, context.dynamics, context.limits) {
+            if has_safe_continuation(next, remaining_steps - 1, depth + 1, context)? {
                 return Some(true);
             }
         }
@@ -187,7 +183,13 @@ pub fn evaluate_horizon_action_set_with_budget(
         return None;
     }
 
-    let mut stats = HorizonSearchStats::default();
+    let mut context = SearchContext {
+        dynamics,
+        limits,
+        shield_can_recover,
+        max_expanded_nodes,
+        stats: HorizonSearchStats::default(),
+    };
     let mut set = HorizonViableActionSet {
         horizon,
         push: false,
@@ -197,23 +199,15 @@ pub fn evaluate_horizon_action_set_with_budget(
     if !state_is_viable(state, limits) {
         return Some(HorizonEvaluation {
             action_set: set,
-            stats,
+            stats: context.stats,
         });
     }
 
-    for action in available_actions(shield_can_recover) {
-        stats.transition_evaluations += 1;
+    let actions = available_actions(shield_can_recover);
+    for action in actions {
+        context.stats.transition_evaluations += 1;
         let certified = if let Some(next) = safe_transition(state, *action, dynamics, limits) {
-            has_safe_continuation(
-                next,
-                dynamics,
-                limits,
-                horizon - 1,
-                1,
-                shield_can_recover,
-                max_expanded_nodes,
-                &mut stats,
-            )?
+            has_safe_continuation(next, horizon - 1, 1, &mut context)?
         } else {
             false
         };
@@ -228,7 +222,7 @@ pub fn evaluate_horizon_action_set_with_budget(
 
     Some(HorizonEvaluation {
         action_set: set,
-        stats,
+        stats: context.stats,
     })
 }
 
