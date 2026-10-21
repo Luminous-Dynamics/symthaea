@@ -55,7 +55,6 @@ pub fn validate_review(review: &Value) -> Result<(), Vec<String>> {
     let inputs = object_field(review, "inputs", "$", &mut errors);
     let mut baseline_geometry_status = "";
     let mut source_catalog_status = "";
-    let mut baseline_sha = "";
     if let Some(inputs) = inputs {
         let baseline = object_field(inputs, "baseline_design", "$.inputs", &mut errors);
         if let Some(baseline) = baseline {
@@ -68,7 +67,7 @@ pub fn validate_review(review: &Value) -> Result<(), Vec<String>> {
                 "$.inputs.baseline_design",
                 &mut errors,
             );
-            baseline_sha = require_sha256(baseline, "sha256", "$.inputs.baseline_design", &mut errors);
+            require_sha256(baseline, "sha256", "$.inputs.baseline_design", &mut errors);
             let scope = string_value(baseline.get("scope"));
             if !VALID_SCOPES.contains(&scope) {
                 errors.push("$.inputs.baseline_design.scope: unsupported scope".to_string());
@@ -186,10 +185,6 @@ pub fn validate_review(review: &Value) -> Result<(), Vec<String>> {
         errors.push("$.limitations: at least one limitation is required".to_string());
     }
     validate_replay(review.get("replay"), &mut errors);
-
-    // Keep the baseline variable live in the contract: identical baseline
-    // digest and alternative digest is allowed but must not imply distinctness.
-    let _baseline_is_declared = is_sha256(baseline_sha);
 
     if errors.is_empty() { Ok(()) } else { Err(errors) }
 }
@@ -565,5 +560,28 @@ mod tests {
         let mut review = fixture();
         review["inputs"]["source_catalog_sha256"] = json!("not-a-digest");
         assert!(validate_review(&review).unwrap_err().iter().any(|error| error.contains("expected 64 lowercase hexadecimal")));
+    }
+}
+
+
+#[cfg(test)]
+mod schema_tests {
+    use super::*;
+
+    #[test]
+    fn review_schema_uri_matches_fixture_contract() {
+        let schema: Value = serde_json::from_str(include_str!(
+            "../../../../schemas/landscape-alternative-review-v0.schema.json"
+        ))
+        .expect("landscape review JSON Schema must be valid JSON");
+        let fixture: Value = serde_json::from_str(include_str!(
+            "../../../../fixtures/landscape/review-unranked-v0.json"
+        ))
+        .expect("canonical review fixture must be valid JSON");
+
+        assert_eq!(schema["$id"], REVIEW_SCHEMA_URI);
+        assert_eq!(schema["properties"]["schema"]["const"], REVIEW_SCHEMA);
+        assert_eq!(schema["properties"]["schema_uri"]["const"], REVIEW_SCHEMA_URI);
+        assert!(validate_review(&fixture).is_ok());
     }
 }
