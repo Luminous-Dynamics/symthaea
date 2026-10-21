@@ -82,12 +82,22 @@ struct ErrorMassCertificate {
 fn main() -> Result<(), Box<dyn Error>> {
     let started = Instant::now();
     println!("# protocol=classwise-osp-inspired-threshold-map-v1");
-    println!("# dimension={DIMENSION};classes={CLASS_COUNT};query_mix=known:random_ood:ambiguous_mixture=7:2:2");
-    println!("# selection_n={SELECTION_N};certification_n={CERTIFICATION_N};evaluation_n={EVALUATION_N}");
-    println!("# total_error_mass_budget={TOTAL_ERROR_MASS_BUDGET:.4};selection_error_mass_budget={SELECTION_ERROR_MASS_BUDGET:.4}");
-    println!("# certificate=one_sided_clopper_pearson;alpha_per_bound={CERTIFICATION_ALPHA:.8};families_per_seed=1_global_plus_{CLASS_COUNT}_classes");
+    println!(
+        "# dimension={DIMENSION};classes={CLASS_COUNT};query_mix=known:random_ood:ambiguous_mixture=7:2:2"
+    );
+    println!(
+        "# selection_n={SELECTION_N};certification_n={CERTIFICATION_N};evaluation_n={EVALUATION_N}"
+    );
+    println!(
+        "# total_error_mass_budget={TOTAL_ERROR_MASS_BUDGET:.4};selection_error_mass_budget={SELECTION_ERROR_MASS_BUDGET:.4}"
+    );
+    println!(
+        "# certificate=one_sided_clopper_pearson;alpha_per_bound={CERTIFICATION_ALPHA:.8};families_per_seed=1_global_plus_{CLASS_COUNT}_classes"
+    );
     println!("# comparison=global_scalar_threshold_vs_coverage_optimal_classwise_threshold_map");
-    println!("record_type,seed,strategy,class,threshold,selection_n,selection_fp,certification_n,cert_fp,cert_upper_error_mass,cert_sum_upper,certified,test_population,group_n,accepted,coverage_contribution,group_coverage,errors,error_mass,selective_risk,risk95_low,risk95_high");
+    println!(
+        "record_type,seed,strategy,class,threshold,selection_n,selection_fp,certification_n,cert_fp,cert_upper_error_mass,cert_sum_upper,certified,test_population,group_n,accepted,coverage_contribution,group_coverage,errors,error_mass,selective_risk,risk95_low,risk95_high"
+    );
 
     for seed in SEEDS {
         let prototypes = (0..CLASS_COUNT)
