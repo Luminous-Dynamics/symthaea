@@ -1098,6 +1098,106 @@ fn validate_source_pack_contract(record: &Value) -> Vec<String> {
     errors
 }
 
+fn validate_pair_catalog_refs(pair: &Value) -> Vec<String> {
+    if pair.get("synthetic_only").and_then(Value::as_bool) == Some(true) {
+        return Vec::new();
+    }
+
+    let mut errors = Vec::new();
+    let pair_id = string_field(pair, "pair_id").unwrap_or("<unknown>");
+    let split = string_field(pair, "split").unwrap_or("");
+    let mut catalog = std::collections::HashMap::<String, Value>::new();
+
+    for (index, raw_line) in
+        include_str!("../../../benchmarks/source-catalog/v0/sources.jsonl")
+            .lines()
+            .enumerate()
+    {
+        match serde_json::from_str::<Value>(raw_line) {
+            Ok(source) => {
+                if let Some(source_id) = string_field(&source, "source_id") {
+                    catalog.insert(source_id.to_string(), source);
+                }
+            }
+            Err(error) => errors.push(format!(
+                "bundled source catalog line {} is invalid JSON: {error}",
+                index + 1
+            )),
+        }
+    }
+
+    for (state_name, state) in [("baseline", pair.get("baseline")), ("mutated", pair.get("mutated"))] {
+        let Some(state) = state else {
+            errors.push(format!("pair {pair_id:?} has no {state_name} state"));
+            continue;
+        };
+        let state_source_id = string_field(state, "source_id").unwrap_or("");
+        let mut referenced_ids = HashSet::new();
+        if !state_source_id.is_empty() {
+            referenced_ids.insert(state_source_id.to_string());
+        }
+        if let Some(items) = state.get("evidence_pack").and_then(Value::as_array) {
+            for item in items {
+                if let Some(source_id) = string_field(item, "source_id") {
+                    referenced_ids.insert(source_id.to_string());
+                } else {
+                    errors.push(format!(
+                        "pair {pair_id:?} {state_name} evidence item has no source_id"
+                    ));
+                }
+                let kind = string_field(item, "kind").unwrap_or("");
+                if matches!(kind, "synthetic_control" | "metadata_only") {
+                    errors.push(format!(
+                        "pair {pair_id:?} {state_name} uses inadmissible real-evidence kind {kind:?}"
+                    ));
+                }
+            }
+        }
+
+        for source_id in referenced_ids {
+            let Some(source) = catalog.get(&source_id) else {
+                errors.push(format!(
+                    "pair {pair_id:?} {state_name} references source ID {source_id:?} absent from catalog"
+                ));
+                continue;
+            };
+            let catalog_split = string_field(source, "split").unwrap_or("");
+            let rights_status = string_field(source, "rights_status").unwrap_or("");
+            let content_access = string_field(source, "content_access").unwrap_or("");
+            let rights_review = string_field(source, "rights_review").unwrap_or("");
+            if catalog_split != split {
+                errors.push(format!(
+                    "pair {pair_id:?} source {source_id:?} is in split {catalog_split:?}, not pair split {split:?}"
+                ));
+            }
+            if state_source_id == source_id
+                && string_field(state, "rights_status") != Some(rights_status)
+            {
+                errors.push(format!(
+                    "pair {pair_id:?} {state_name} rights_status differs from catalog for source {source_id:?}"
+                ));
+            }
+            if !matches!(
+                content_access,
+                "verified_open_content" | "permissioned_full_text"
+            ) {
+                errors.push(format!(
+                    "pair {pair_id:?} source {source_id:?} is metadata-only and cannot provide pair evidence"
+                ));
+            }
+            if matches!(rights_status, "unknown" | "restricted")
+                || rights_review != "approved_limited_use"
+            {
+                errors.push(format!(
+                    "pair {pair_id:?} source {source_id:?} lacks approved rights for pair evidence"
+                ));
+            }
+        }
+    }
+
+    errors
+}
+
 fn validate_pair_result_contract(result: &Value) -> Vec<String> {
     let mut errors = Vec::new();
     let result_id = string_field(result, "result_id").unwrap_or("<missing>");
@@ -1191,7 +1291,10 @@ fn validate_domain_contract(
             }
         }
         Kind::Graph => errors.extend(validate_graph_contract(value)),
-        Kind::Pair => errors.extend(validate_pair_contract(value)),
+        Kind::Pair => {
+            errors.extend(validate_pair_contract(value));
+            errors.extend(validate_pair_catalog_refs(value));
+        },
         Kind::Source => errors.extend(validate_source_contract(value, seen_ids)),
         Kind::Annotation => {
             errors.extend(validate_annotation_contract(value));
@@ -1684,6 +1787,29 @@ mod tests {
                 .any(|e| e.contains("before_value does not match baseline source_id"))
         );
     }
+    #[test]
+    fn nonsynthetic_pair_requires_approved_catalog_sources() {
+        let pair = json!({
+            "pair_id":"real-pair-placeholder",
+            "split":"holdout",
+            "synthetic_only":false,
+            "baseline":{
+                "source_id":"met-divine-egypt",
+                "rights_status":"unknown",
+                "evidence_pack":[{"source_id":"met-divine-egypt","kind":"source_attestation"}]
+            },
+            "mutated":{
+                "source_id":"met-divine-egypt",
+                "rights_status":"unknown",
+                "evidence_pack":[{"source_id":"met-divine-egypt","kind":"source_attestation"}]
+            }
+        });
+        let errors = validate_pair_catalog_refs(&pair);
+        assert!(errors.iter().any(|e| e.contains("is in split")));
+        assert!(errors.iter().any(|e| e.contains("metadata-only")));
+        assert!(errors.iter().any(|e| e.contains("lacks approved rights")));
+    }
+
     #[test]
     fn source_family_split_leakage_is_rejected() {
         let mut seen_ids = HashSet::new();
