@@ -627,6 +627,146 @@ jobs:
               f"{len(bundle_mutants)} invalid-bundle controls rejected"
           )
           PY
+      - name: Validate transfer-selectivity outcome schema and synthetic controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/jsonschema-venv/bin/python" - <<'PY'
+          import copy
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator, FormatChecker, ValidationError
+
+          path = Path("data/benchmarks/proof-insight-transfer-v0/transfer-selectivity-outcome.schema.json")
+          schema = json.loads(path.read_text())
+          Draft202012Validator.check_schema(schema)
+          validator = Draft202012Validator(schema, format_checker=FormatChecker())
+
+          digest = "0" * 64
+          commit = "a" * 40
+          budget = {
+              "max_model_calls": 8,
+              "max_tokens": 16000,
+              "max_wall_ms": 300000,
+              "max_cost_microusd": 500000,
+          }
+
+          def make_pair(pair_id, label, decision, predicted_label, reviewer_labels=None, status="adjudicated", mismatch_codes=None):
+              reviewer_labels = reviewer_labels or [label, label]
+              code_by_label = {
+                  "compatible": "other",
+                  "incompatible": "inequality_direction",
+                  "partial": "missing_precondition",
+                  "unknown": "unknown",
+              }
+              return {
+                  "schema_version": "pitb.transfer-selectivity-outcome.v0",
+                  "pair_id": pair_id,
+                  "split": "train",
+                  "component_id": "synthetic-component-001",
+                  "source": {
+                      "record_id": "synthetic-source-insight",
+                      "family_id": "synthetic-source-family",
+                      "source_commit": commit,
+                      "artifact_sha256": digest,
+                      "insight_sha256": digest,
+                  },
+                  "target": {
+                      "theorem_id": "Synthetic.target",
+                      "family_id": "synthetic-target-family",
+                      "source_commit": commit,
+                      "artifact_path": "lean/Synthetic/Target.lean",
+                      "artifact_sha256": digest,
+                      "statement_sha256": digest,
+                      "obligation_sha256": digest,
+                      "domain_labels": ["synthetic-only"],
+                  },
+                  "adjudication": {
+                      "status": status,
+                      "label": label,
+                      "rubric_version": "synthetic-rubric-v0",
+                      "reviewer_decisions": [
+                          {
+                              "reviewer_id": reviewer_id,
+                              "label": reviewer_label,
+                              "reason_codes": [code_by_label[reviewer_label]],
+                              "evidence_sha256": digest,
+                          }
+                          for reviewer_id, reviewer_label in zip(["reviewer-a", "reviewer-b"], reviewer_labels)
+                      ],
+                      "receipt_sha256": digest,
+                      "adjudication_note": "Synthetic schema fixture; no mathematical claim is made.",
+                  },
+                  "prediction": {
+                      "decision": decision,
+                      "predicted_label": predicted_label,
+                      "confidence": 0.75,
+                      "mismatch_codes": mismatch_codes or [],
+                      "precondition_checks": [
+                          {
+                              "check_id": "synthetic-precondition",
+                              "outcome": "satisfied" if predicted_label == "compatible" else "violated",
+                              "evidence_sha256": digest,
+                          }
+                      ],
+                      "receipt_sha256": digest,
+                  },
+                  "run": {
+                      "model_id": "synthetic-only",
+                      "model_version": "synthetic-only-v0",
+                      "prompt_sha256": digest,
+                      "config_sha256": digest,
+                      "input_sha256": digest,
+                      "output_sha256": digest,
+                      "budget": budget,
+                      "actual_model_calls": 1,
+                      "actual_tokens": 100,
+                      "actual_wall_ms": 100,
+                      "actual_cost_microusd": 1,
+                  },
+              }
+
+          fixtures = [
+              make_pair("synthetic-positive-accept", "compatible", "accept", "compatible"),
+              make_pair("synthetic-negative-reject", "incompatible", "reject", "incompatible", mismatch_codes=["inequality_direction"]),
+              # A false accept must remain representable as an outcome so the evaluator can count it.
+              make_pair("synthetic-negative-false-accept", "incompatible", "accept", "compatible"),
+              make_pair("synthetic-unresolved-abstain", "unknown", "abstain", "unknown", ["unknown", "partial"], "unresolved"),
+          ]
+          for fixture in fixtures:
+              validator.validate(fixture)
+              reviewer_ids = [item["reviewer_id"] for item in fixture["adjudication"]["reviewer_decisions"]]
+              if len(reviewer_ids) != len(set(reviewer_ids)):
+                  raise SystemExit("independent reviewer IDs must be distinct")
+          if fixtures[2]["adjudication"]["label"] != "incompatible" or fixtures[2]["prediction"]["decision"] != "accept":
+              raise SystemExit("false-accept control must remain distinguishable from its adjudicated label")
+
+          mutants = []
+          missing_provenance = copy.deepcopy(fixtures[0])
+          del missing_provenance["source"]["insight_sha256"]
+          mutants.append(missing_provenance)
+          malformed_digest = copy.deepcopy(fixtures[0])
+          malformed_digest["target"]["statement_sha256"] = "not-a-sha256"
+          mutants.append(malformed_digest)
+          inconsistent_unresolved = copy.deepcopy(fixtures[3])
+          inconsistent_unresolved["adjudication"]["label"] = "compatible"
+          mutants.append(inconsistent_unresolved)
+          inconsistent_action = copy.deepcopy(fixtures[0])
+          inconsistent_action["prediction"]["predicted_label"] = "incompatible"
+          mutants.append(inconsistent_action)
+          for index, mutant in enumerate(mutants, start=1):
+              try:
+                  validator.validate(mutant)
+              except ValidationError:
+                  continue
+              raise SystemExit(f"transfer-selectivity schema negative control {index} unexpectedly passed")
+
+          print(
+              "PITB_TRANSFER_SELECTIVITY_SCHEMA_PASS: "
+              f"{len(fixtures)} synthetic controls valid; {len(mutants)} malformed controls rejected; "
+              "false-accept outcomes remain representable for evaluation"
+          )
+          PY
       - name: Audit pinned Dalek Lean Bench timeline
         shell: bash
         run: |
