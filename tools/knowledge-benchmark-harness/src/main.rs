@@ -907,6 +907,8 @@ fn validate_annotation_catalog_refs(annotation: &Value) -> Vec<String> {
     let mut errors = Vec::new();
     let mut source_ids = HashSet::new();
     let mut source_family_ids = HashSet::new();
+    let mut source_rights: std::collections::HashMap<String, (String, String, String)> =
+        std::collections::HashMap::new();
     for (index, raw_line) in
         include_str!("../../../benchmarks/source-catalog/v0/sources.jsonl")
             .lines()
@@ -919,6 +921,16 @@ fn validate_annotation_catalog_refs(annotation: &Value) -> Vec<String> {
                 }
                 if let Some(id) = string_field(&source, "source_family_id") {
                     source_family_ids.insert(id.to_string());
+                }
+                if let Some(id) = string_field(&source, "source_id") {
+                    source_rights.insert(
+                        id.to_string(),
+                        (
+                            string_field(&source, "rights_status").unwrap_or("").to_string(),
+                            string_field(&source, "content_access").unwrap_or("").to_string(),
+                            string_field(&source, "rights_review").unwrap_or("").to_string(),
+                        ),
+                    );
                 }
             }
             Err(error) => errors.push(format!(
@@ -943,6 +955,24 @@ fn validate_annotation_catalog_refs(annotation: &Value) -> Vec<String> {
                     errors.push(format!(
                         "annotation {annotation_id:?} claim {claim_id:?} references source ID {source_id:?} absent from catalog"
                     ));
+                } else if let Some((rights_status, content_access, rights_review)) =
+                    source_rights.get(source_id)
+                {
+                    if !matches!(
+                        content_access.as_str(),
+                        "verified_open_content" | "permissioned_full_text"
+                    ) {
+                        errors.push(format!(
+                            "annotation {annotation_id:?} claim {claim_id:?} source {source_id:?} is metadata-only and cannot support content-grounded adjudication"
+                        ));
+                    }
+                    if matches!(rights_status.as_str(), "unknown" | "restricted")
+                        || rights_review != "approved_limited_use"
+                    {
+                        errors.push(format!(
+                            "annotation {annotation_id:?} claim {claim_id:?} source {source_id:?} lacks approved rights review for content-grounded adjudication"
+                        ));
+                    }
                 }
             }
         }
@@ -960,6 +990,24 @@ fn validate_annotation_catalog_refs(annotation: &Value) -> Vec<String> {
                 errors.push(format!(
                     "annotation {annotation_id:?} alternative {alternative_id:?} references source ID {source_id:?} absent from catalog"
                 ));
+            } else if let Some((rights_status, content_access, rights_review)) =
+                source_rights.get(source_id)
+            {
+                if !matches!(
+                    content_access.as_str(),
+                    "verified_open_content" | "permissioned_full_text"
+                ) {
+                    errors.push(format!(
+                        "annotation {annotation_id:?} alternative {alternative_id:?} source {source_id:?} is metadata-only and cannot support content-grounded adjudication"
+                    ));
+                }
+                if matches!(rights_status.as_str(), "unknown" | "restricted")
+                    || rights_review != "approved_limited_use"
+                {
+                    errors.push(format!(
+                        "annotation {annotation_id:?} alternative {alternative_id:?} source {source_id:?} lacks approved rights review for content-grounded adjudication"
+                    ));
+                }
             }
         }
     }
@@ -1620,6 +1668,25 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn content_annotation_rejects_metadata_only_source_records() {
+        let annotation = json!({
+            "annotation_id":"ANN-METADATA-ONLY",
+            "annotation_role":"independent_reviewer",
+            "source_family_ids":["met-divine-egypt-exhibition"],
+            "claim_annotations":[
+                {
+                    "claim_id":"C1",
+                    "evidence_refs":[{"source_id":"met-divine-egypt","locator":"Creating the World"}]
+                }
+            ],
+            "valid_alternatives":[]
+        });
+        let errors = validate_annotation_catalog_refs(&annotation);
+        assert!(errors.iter().any(|e| e.contains("metadata-only")));
+        assert!(errors.iter().any(|e| e.contains("lacks approved rights review")));
     }
 
     #[test]
