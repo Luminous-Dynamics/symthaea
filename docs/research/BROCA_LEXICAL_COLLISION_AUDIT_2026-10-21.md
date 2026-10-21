@@ -36,7 +36,7 @@ Do not add arbitrary pseudo-universal primes simply to force words apart. The fe
 
 - Every exact collision group is reported exactly once.
 - Group order and word order are deterministic.
-- The number of groups and participating words reconciles with the enumerated lexicon.
+- Reported group count equals the number of groups emitted; participating-word count equals the sum of group sizes and never exceeds total lexicon size.
 - The report records schema version and exact source revision where supplied.
 - No report labels an exact collision as semantic equivalence.
 
