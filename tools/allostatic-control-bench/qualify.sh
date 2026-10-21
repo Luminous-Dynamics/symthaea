@@ -87,8 +87,8 @@ if ! cmp -s "$tmpdir/summary-a.csv" "$tmpdir/summary-b.csv" ||
   exit 1
 fi
 
-# Compare the point-estimate and robust-envelope filters on held-out synthetic
-# profiles. The out-of-envelope panel is a negative control, not a safety claim.
+# Compare point, globally widened, and action-conditioned robust envelopes on
+# held-out synthetic profiles. Out-of-envelope profiles are negative controls.
 cargo run --locked --release --manifest-path "$manifest" --bin allostatic-model-mismatch-bench -- \
   "$tmpdir/mismatch-a.csv" "$tmpdir/mismatch-summary-a.csv"
 cargo run --locked --release --manifest-path "$manifest" --bin allostatic-model-mismatch-bench -- \
@@ -99,18 +99,18 @@ if ! cmp -s "$tmpdir/mismatch-a.csv" "$tmpdir/mismatch-b.csv" ||
   exit 1
 fi
 
-# 300 bounded profiles and 32 out-of-family profiles × 5 stress levels × 3 actions.
+# 300 in-envelope and 32 out-of-envelope profiles × 5 stress levels × 3 actions.
 if ! awk -F, '
-  NR == 1 { if (NF != 10) failed = 1; next }
+  NR == 1 { if (NF != 13) failed = 1; next }
   {
-    if (NF != 10) failed = 1
+    if (NF != 13) failed = 1
     if ($1 != "within_envelope" && $1 != "out_of_envelope") failed = 1
     if ($2 !~ /^[0-9]+$/) failed = 1
     if ($4 != "push" && $4 != "maintain" && $4 != "emergency_recover") failed = 1
-    for (i = 5; i <= 10; i++) if ($i != "true" && $i != "false") failed = 1
+    for (i = 5; i <= 13; i++) if ($i != "true" && $i != "false") failed = 1
     if ($1 == "within_envelope") {
       within_rows++
-      if ($6 == "true" && $7 == "false") failed = 1
+      if (($6 == "true" || $7 == "true") && $8 == "false") failed = 1
     }
     if ($1 == "out_of_envelope") out_rows++
     key = $1 SUBSEP $2 SUBSEP $3 SUBSEP $4
@@ -123,16 +123,16 @@ if ! awk -F, '
 fi
 
 if ! awk -F, '
-  NR == 1 { if (NF != 14) failed = 1; next }
+  NR == 1 { if (NF != 20) failed = 1; next }
   {
-    if (NF != 14) failed = 1
-    if ($5 > $4) failed = 1
+    if (NF != 20) failed = 1
+    if ($5 > $4 || $6 > $4) failed = 1
     if ($1 == "within_envelope") {
       within_rows++
-      if ($2 != 300 || $3 != 4500 || $8 != 0) failed = 1
+      if ($2 != 300 || $3 != 4500 || $9 != 0 || $10 != 0) failed = 1
     } else if ($1 == "out_of_envelope") {
       out_rows++
-      if ($2 != 32 || $3 != 480 || $7 < 1) failed = 1
+      if ($2 != 32 || $3 != 480 || $8 < 1 || $9 < 1 || $10 < 1) failed = 1
     } else failed = 1
   }
   END { if (NR != 3 || within_rows != 1 || out_rows != 1 || failed) exit 1 }
