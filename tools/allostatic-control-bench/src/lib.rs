@@ -328,7 +328,7 @@ pub struct EpisodeMetrics {
     pub violation_exposure: f64,
     /// Largest normalized single-step violation, in [0, 1].
     pub max_violation_severity: f64,
-    /// Number of raw Push proposals whose predicted next state crossed a declared limit.
+    /// Number of raw-policy action proposals whose predicted next state crossed a declared limit.
     pub missed_limits: usize,
     /// Actions vetoed/replaced by the independent one-step viability filter.
     pub shield_vetoes: usize,
