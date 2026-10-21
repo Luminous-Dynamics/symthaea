@@ -561,6 +561,13 @@ fn validate_outcome_contract(value: &Value, context: &str) -> Result<()> {
         {
             bail!("{target_ctx}.domain_labels must contain non-empty strings");
         }
+        let mut unique_labels = BTreeSet::new();
+        for label in labels {
+            let label = label.as_str().expect("non-empty string labels validated above");
+            if !unique_labels.insert(label) {
+                bail!("{target_ctx}.domain_labels contains duplicate label {label:?}");
+            }
+        }
     }
 
     let adjudication_ctx = format!("{context}.adjudication");
@@ -634,12 +641,17 @@ fn validate_outcome_contract(value: &Value, context: &str) -> Result<()> {
         ],
         &[],
     )?;
-    let confidence = prediction
-        .get("confidence")
-        .and_then(Value::as_f64)
-        .with_context(|| format!("{prediction_ctx}.confidence must be numeric"))?;
-    if !(0.0..=1.0).contains(&confidence) {
-        bail!("{prediction_ctx}.confidence must lie in [0, 1]");
+    match prediction.get("confidence") {
+        Some(Value::Null) => {}
+        Some(value) => {
+            let confidence = value
+                .as_f64()
+                .with_context(|| format!("{prediction_ctx}.confidence must be null or numeric"))?;
+            if !confidence.is_finite() || !(0.0..=1.0).contains(&confidence) {
+                bail!("{prediction_ctx}.confidence must be null or lie in [0, 1]");
+            }
+        }
+        None => bail!("{prediction_ctx}.confidence is required; use null when unavailable"),
     }
     match prediction.get("compatibility_probability") {
         Some(Value::Null) => {}
@@ -1418,6 +1430,14 @@ mod tests {
         let mut missing_run = valid.clone();
         missing_run.as_object_mut().unwrap().remove("run");
         assert!(validate_outcome_contract(&missing_run, "missing run").is_err());
+
+        let mut null_confidence = valid.clone();
+        null_confidence["prediction"]["confidence"] = Value::Null;
+        assert!(validate_outcome_contract(&null_confidence, "null confidence").is_ok());
+
+        let mut invalid_confidence = valid.clone();
+        invalid_confidence["prediction"]["confidence"] = json!(1.01);
+        assert!(validate_outcome_contract(&invalid_confidence, "invalid confidence").is_err());
 
         let mut missing_probability = valid.clone();
         missing_probability["prediction"]
