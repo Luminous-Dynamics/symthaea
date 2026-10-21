@@ -1,0 +1,20 @@
+# schema=tccip-pairwise-utility-interaction-expectations-v1
+# Analytical expectations from independent exhaustive enumeration; these are not a Rust run receipt.
+# delta2J = J(no cuts) - J(first cut) - J(second cut) + J(both cuts), with independent fair-coin replacement for each cut.
+# columns: fixture<TAB>first_intervention_id<TAB>second_intervention_id<TAB>J_intact<TAB>J_first_cut<TAB>J_second_cut<TAB>J_joint_cut<TAB>delta2J
+useful_xor_coordination	cross_left_into_task_xor	cross_right_into_task_xor	1.0	0.5	0.5	0.5	0.5
+useful_xor_coordination	cross_left_into_task_xor	matched_cut_control_left	1.0	0.5	1.0	0.5	0.0
+useful_xor_coordination	cross_left_into_task_xor	matched_cut_control_right	1.0	0.5	1.0	0.5	0.0
+useful_xor_coordination	cross_right_into_task_xor	matched_cut_control_left	1.0	0.5	1.0	0.5	0.0
+useful_xor_coordination	cross_right_into_task_xor	matched_cut_control_right	1.0	0.5	1.0	0.5	0.0
+useful_xor_coordination	matched_cut_control_left	matched_cut_control_right	1.0	1.0	1.0	1.0	0.0
+irrelevant_cross_component_connectivity	cross_cut_irrelevant_branch	matched_internal_side_branch	1.0	1.0	1.0	1.0	0.0
+harmful_cross_component_coupling	cross_cut_correct_parity_path	cross_cut_harmful_bias_path	0.0	0.5	0.5	0.5	-0.5
+harmful_cross_component_coupling	cross_cut_correct_parity_path	matched_control_left	0.0	0.5	0.0	0.5	0.0
+harmful_cross_component_coupling	cross_cut_correct_parity_path	matched_control_right	0.0	0.5	0.0	0.5	0.0
+harmful_cross_component_coupling	cross_cut_harmful_bias_path	matched_control_left	0.0	0.5	0.0	0.5	0.0
+harmful_cross_component_coupling	cross_cut_harmful_bias_path	matched_control_right	0.0	0.5	0.0	0.5	0.0
+harmful_cross_component_coupling	matched_control_left	matched_control_right	0.0	0.0	0.0	0.0	0.0
+task_relevant_high_x1_prior	cross_cut_input0	matched_internal_input1	1.0	0.6	0.9	0.67	0.17
+task_relevant_high_x0_prior	cross_cut_input0	matched_internal_input1	1.0	0.9	0.6	0.67	0.17
+role_matched_xor_synergy_uniform_prior	cross_cut_xor_left	matched_internal_xor_right	1.0	0.5	0.5	0.5	0.5
