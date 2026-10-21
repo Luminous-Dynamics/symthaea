@@ -171,6 +171,12 @@ References for the first research pass:
 - “Observational causality by states and interaction type for scientific discovery” (2025): https://www.nature.com/articles/s42005-025-02447-w
 - PyPhi formalism differences: https://pyphi.readthedocs.io/en/latest/theory/formalism-versions.html
 
+## Prototype status (2026-10-21)
+
+Added `examples/task_conditioned_counterfactual_profile.rs`, a dependency-free Rust scoring kernel that consumes precomputed intact/cross-cut/matched-control utilities and emits a budget-wise profile. Seven test definitions cover positive, zero, and negative contrasts, cumulative budgets, missing-control fail-closed behavior, invalid utility, duplicate IDs, and budget ordering.
+
+This is intentionally only the **summary/scoring layer**. It does not run a causal simulator, generate matched controls, establish that a provided cut is a valid intervention, estimate uncertainty, or demonstrate usefulness. Example data in `main` are illustrative values only, not empirical or simulation results. Rust is unavailable in the current environment, so the example and tests have not been compiled or executed. The next step remains an end-to-end finite-state toy evaluator that produces raw utility outcomes from explicit model/task/intervention fixtures.
+
 ## Immediate implementation plan
 
 1. Add a declarative task-and-intervention fixture format; keep task, model, environment and prior identities separate.
