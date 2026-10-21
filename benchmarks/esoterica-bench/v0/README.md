@@ -4,7 +4,8 @@ This directory contains the initial claim schema and adversarial starter cases f
 
 - `claim.schema.json`: JSON Schema Draft 2020-12 for evidence-linked claim records.
 - `case.schema.json`: JSON Schema Draft 2020-12 for evaluation case records.
-- `cases.jsonl`: one JSON object per case. Most current cases are development fixtures, not a held-out evaluation set.
+- `cases.jsonl`: 12 development case fixtures; not a held-out evaluation set.
+- `claim-fixtures.jsonl`: four synthetic claim records that exercise distinct epistemic lanes; they are not historical evidence.
 - Design and evaluation protocol: [ESOTERICA_KNOWLEDGE_FABRIC.md](../../../docs/research/ESOTERICA_KNOWLEDGE_FABRIC.md).
 
 ## Important status
