@@ -18,6 +18,8 @@ on:
       - "docs/research/beverage-decision-value-synthetic-v1.json"
       - "docs/research/beverage-adaptive-sampling-decision-v1.schema.json"
       - "docs/research/beverage-adaptive-sampling-decision-synthetic-v1.json"
+      - "docs/research/beverage-adaptive-sampling-replay-v1.schema.json"
+      - "docs/research/beverage-adaptive-sampling-replay-synthetic-v1.json"
       - ".github/workflows/beverage-benchmark.yml"
   pull_request:
     paths:
@@ -35,6 +37,8 @@ on:
       - "docs/research/beverage-decision-value-synthetic-v1.json"
       - "docs/research/beverage-adaptive-sampling-decision-v1.schema.json"
       - "docs/research/beverage-adaptive-sampling-decision-synthetic-v1.json"
+      - "docs/research/beverage-adaptive-sampling-replay-v1.schema.json"
+      - "docs/research/beverage-adaptive-sampling-replay-synthetic-v1.json"
       - ".github/workflows/beverage-benchmark.yml"
   workflow_dispatch:
 
@@ -69,6 +73,7 @@ jobs:
           rustfmt --edition 2024 --check tools/beverage-benchmark-harness/src/bin/split_leakage_audit.rs
           rustfmt --edition 2024 --check tools/beverage-benchmark-harness/src/bin/decision_value_audit.rs
           rustfmt --edition 2024 --check tools/beverage-benchmark-harness/src/bin/adaptive_sampling_policy_audit.rs
+          rustfmt --edition 2024 --check tools/beverage-benchmark-harness/src/bin/adaptive_sampling_replay_audit.rs
 
       - name: Test synthetic receipt contract
         run: cargo test --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin beverage_benchmark_receipt
@@ -90,6 +95,9 @@ jobs:
 
       - name: Test adaptive-sampling policy auditor
         run: cargo test --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin adaptive_sampling_policy_audit
+
+      - name: Test adaptive-sampling replay audit
+        run: cargo test --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin adaptive_sampling_replay_audit
 
       - name: Independently validate synthetic corpus schema
         run: |
@@ -114,6 +122,21 @@ jobs:
             --instance docs/research/beverage-decision-value-synthetic-v1.json \
             --out "$RUNNER_TEMP/beverage-decision-schema-receipt.json"
           cat "$RUNNER_TEMP/beverage-decision-schema-receipt.json"
+
+      - name: Independently validate adaptive-sampling replay schema and fixture
+        run: |
+          cargo run --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin schema_contract_audit -- \\
+            --schema docs/research/beverage-adaptive-sampling-replay-v1.schema.json \\
+            --instance docs/research/beverage-adaptive-sampling-replay-synthetic-v1.json \\
+            --out "$RUNNER_TEMP/beverage-adaptive-sampling-replay-schema-receipt.json"
+          cat "$RUNNER_TEMP/beverage-adaptive-sampling-replay-schema-receipt.json"
+
+      - name: Audit synthetic adaptive-sampling replay
+        run: |
+          cargo run --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin adaptive_sampling_replay_audit -- \\
+            --input docs/research/beverage-adaptive-sampling-replay-synthetic-v1.json \\
+            --out "$RUNNER_TEMP/beverage-adaptive-sampling-replay-receipt.json"
+          cat "$RUNNER_TEMP/beverage-adaptive-sampling-replay-receipt.json"
 
       - name: Independently validate adaptive-sampling decision schema and fixture
         run: |
@@ -153,6 +176,7 @@ jobs:
           cargo clippy --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin split_leakage_audit -- -D warnings
           cargo clippy --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin decision_value_audit -- -D warnings
           cargo clippy --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin adaptive_sampling_policy_audit -- -D warnings
+          cargo clippy --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin adaptive_sampling_replay_audit -- -D warnings
 
       - name: Emit exact-head receipt
         env:
