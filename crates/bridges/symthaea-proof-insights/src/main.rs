@@ -1149,7 +1149,13 @@ fn audit_temporal_dataset(
             .iter()
             .map(|(position, _, _)| *position)
             .collect();
-        match identity_candidates.as_slice() {
+        ambiguous_declaration_timeline_positions.sort_unstable();
+        ambiguous_declaration_timeline_positions.dedup();
+        if !ambiguous_declaration_timeline_positions.is_empty() {
+            identity_join_status = "ambiguous_declaration_identity".to_string();
+            ambiguous_theorem_identity_join_count += 1;
+        } else {
+            match identity_candidates.as_slice() {
             [] => {
                 if identity_join_status.is_empty() {
                     identity_join_status = "no_exact_proof_transition".to_string();
@@ -1200,6 +1206,7 @@ fn audit_temporal_dataset(
                 identity_join_status = "ambiguous_proof_transition".to_string();
                 ambiguous_theorem_identity_join_count += 1;
             }
+            }
         }
         *theorem_identity_status_counts
             .entry(identity_join_status.clone())
@@ -1229,6 +1236,7 @@ fn audit_temporal_dataset(
             declared_name_matches_dataset,
             dataset_proof_sha256,
             identity_candidate_timeline_positions,
+            ambiguous_declaration_timeline_positions,
             identity_join_status,
             identity_statement_match_at_commit_before,
             identity_statement_match_at_completion,
