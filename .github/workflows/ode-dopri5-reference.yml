@@ -148,8 +148,12 @@ jobs:
           DECAY_GENERATION_OUTCOME: ${{ steps.decay_comparison.outcome }}
           DECAY_FIRST_STATUS: ${{ steps.decay_comparison.outputs.first_status }}
           DECAY_SECOND_STATUS: ${{ steps.decay_comparison.outputs.second_status }}
+          LOCK_CHANGED: ${{ steps.lock_refresh.outputs.lock_changed }}
+          LOCK_METADATA_STATUS: ${{ steps.lock_refresh.outputs.metadata_status }}
         run: |
           set -euo pipefail
+          test "$LOCK_METADATA_STATUS" = "0"
+          test "$LOCK_CHANGED" = "false"
           test "$GENERATION_OUTCOME" = "success"
           test "$FIRST_STATUS" = "0"
           test "$SECOND_STATUS" = "0"
