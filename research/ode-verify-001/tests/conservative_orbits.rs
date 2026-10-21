@@ -135,12 +135,30 @@ fn verlet_keeps_two_body_invariants_bounded_over_fifty_eccentric_orbits() {
 
 #[test]
 fn verlet_energy_error_improves_under_timestep_refinement() {
+    // Three levels let the test check the trend rather than relying on one pair.
+    let rough = audit_orbit(0.04);
     let coarse = audit_orbit(0.02);
     let fine = audit_orbit(0.01);
 
     assert!(
+        rough.max_relative_energy_drift < 8e-4,
+        "rough relative energy drift {:.3e} exceeded 8e-4",
+        rough.max_relative_energy_drift
+    );
+    assert!(
         coarse.max_relative_energy_drift < 2e-4,
         "coarse relative energy drift {:.3e} exceeded 2e-4",
+        coarse.max_relative_energy_drift
+    );
+    assert!(
+        fine.max_relative_energy_drift < 5e-5,
+        "fine relative energy drift {:.3e} exceeded 5e-5",
+        fine.max_relative_energy_drift
+    );
+    assert!(
+        coarse.max_relative_energy_drift < rough.max_relative_energy_drift * 0.4,
+        "halving dt should materially reduce energy error: rough={:.3e}, coarse={:.3e}",
+        rough.max_relative_energy_drift,
         coarse.max_relative_energy_drift
     );
     assert!(
