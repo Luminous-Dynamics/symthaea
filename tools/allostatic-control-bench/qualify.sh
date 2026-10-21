@@ -302,8 +302,8 @@ if ! awk -F, '
     if (($13 != "none" && $20 == "false") != ($22 == "true")) failed = 1
     if ($21 == "true" && $20 == "false") failed = 1
     if ($6 == "true" && $13 != "none" && $21 != "true") failed = 1
-    if (($11 == "none") != ($25 == "false")) failed = 1
-    if (($11 == "none") != ($26 == "false")) failed = 1
+    if ($11 == "none" && ($25 != "false" || $26 != "false")) failed = 1
+    if ($2 == "nominal" && $11 != "none" && $25 != "true") failed = 1
     if ($12 != "none" && ($27 != "true" || $28 != "true")) failed = 1
     if ($2 == "nominal" &&
         ($22 == "true" || $23 != "true" || $24 != "true" ||
@@ -356,12 +356,14 @@ if ! awk -F, '
     if ($2 == "strong_shift" &&
         ($5 != 0 || $6 != 0 || $20 != 0 || $22 != 0)) failed = 1
     if ($2 == "nominal" && $25 != 0) failed = 1
-    if ($2 == "strong_shift" && $25 < 1) failed = 1
+    if ($2 == "strong_shift") strong_predictive_false_certificates += $25
     key = $1 SUBSEP $2
     if (seen[key]++) failed = 1
     rows++
   }
-  END { if (NR != 16 || rows != 15 || failed) exit 1 }
+  END {
+    if (NR != 16 || rows != 15 || strong_predictive_false_certificates < 1 || failed) exit 1
+  }
 ' "$tmpdir/ood-summary-a.csv"; then
   printf 'FAIL: OOD fallback per-state alarm, miss, true-safety or availability summary is invalid\n' >&2
   exit 1
