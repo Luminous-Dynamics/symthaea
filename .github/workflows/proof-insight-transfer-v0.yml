@@ -1006,14 +1006,20 @@ jobs:
                           raise ValueError(f"{field} exceeds frozen run budget")
                       previous[field] = value
 
+                  seen_in_event = set()
                   for transition in event["obligation_transitions"]:
                       obligation_id = transition["obligation_id"]
                       obligation_sha = transition["obligation_sha256"]
                       kind = transition["transition"]
                       receipt = transition["checker_receipt_sha256"]
                       children = transition["children"]
+                      if obligation_id in seen_in_event:
+                          raise ValueError("one event cannot transition an obligation instance more than once")
+                      seen_in_event.add(obligation_id)
                       if obligation_id not in known or known[obligation_id] != obligation_sha:
                           raise ValueError("transition references an unknown obligation instance or digest")
+                      if obligation_id in expanded:
+                          raise ValueError("expanded parent obligation cannot transition again; use its child instance IDs")
                       child_ids = [child["obligation_id"] for child in children]
                       if len(set(child_ids)) != len(child_ids):
                           raise ValueError("child obligation IDs must be unique within a transition")
