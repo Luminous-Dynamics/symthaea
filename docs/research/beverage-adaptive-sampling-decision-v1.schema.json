@@ -24,7 +24,6 @@
     "requested_at_ms",
     "next_review_at_ms",
     "reason_code",
-    "estimated_cost_units",
     "decision_deadline_ms",
     "expected_result_available_at_ms",
     "expected_loss_without_sample_units",
@@ -141,10 +140,6 @@
       "type": "string",
       "minLength": 1,
       "maxLength": 256
-    },
-    "estimated_cost_units": {
-      "type": "number",
-      "minimum": 0
     },
     "decision_deadline_ms": {
       "type": "integer",
