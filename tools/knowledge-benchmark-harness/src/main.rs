@@ -7,7 +7,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-const TOOL_VERSION: &str = "knowledge-benchmark-harness-v0.1.0";
+const TOOL_VERSION: &str = "knowledge-benchmark-harness-v0.2.0";
 const DRAFT_2020_12: &str = "https://json-schema.org/draft/2020-12/schema";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -822,4 +822,63 @@ mod tests {
         });
         assert!(validate_graph_contract(&graph).is_empty());
     }
+    #[test]
+    fn context_swap_pair_rejects_unchanged_context() {
+        let pair = json!({
+            "dimension": "context_swap",
+            "expected_relation": "local_change",
+            "baseline": {"context_id":"same","evidence_pack":[]},
+            "mutated": {"context_id":"same","evidence_pack":[]},
+            "intervention": {
+                "field":"context_id",
+                "before_value":"same",
+                "after_value":"different"
+            },
+            "acceptance": {"must_change":["context-conditioned meaning"]}
+        });
+        let errors = validate_pair_contract(&pair);
+        assert!(errors.iter().any(|e| e.contains("must change context_id")));
+    }
+
+    #[test]
+    fn relation_mutation_pair_must_expect_rejection() {
+        let pair = json!({
+            "dimension": "relation_mutation",
+            "expected_relation": "local_change",
+            "baseline": {"context_id":"same","evidence_pack":[]},
+            "mutated": {"context_id":"same","evidence_pack":[]},
+            "intervention": {
+                "field":"relation",
+                "before_value":"resembles",
+                "after_value":"historically_influences"
+            },
+            "acceptance": {"must_change":["edge is rejected"]}
+        });
+        let errors = validate_pair_contract(&pair);
+        assert!(errors.iter().any(|e| e.contains("must reject an unsupported relation change")));
+    }
+
+    #[test]
+    fn rights_revocation_pair_requires_denial() {
+        let pair = json!({
+            "dimension": "rights_revocation",
+            "expected_relation": "deny_access",
+            "baseline": {
+                "rights_status":"synthetic_only",
+                "evidence_pack":[]
+            },
+            "mutated": {
+                "rights_status":"restricted",
+                "evidence_pack":[]
+            },
+            "intervention": {
+                "field":"rights_status",
+                "before_value":"synthetic_only",
+                "after_value":"restricted"
+            },
+            "acceptance": {"must_change":["access is denied"]}
+        });
+        assert!(validate_pair_contract(&pair).is_empty());
+    }
+
 }
