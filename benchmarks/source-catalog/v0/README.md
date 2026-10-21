@@ -28,4 +28,4 @@ The annotation workflow should record who reviewed the bibliographic identity, e
 - `split`: currently development for every record.
 - `annotation_status`: current human-review state, not a quality grade.
 
-Validate using `source.schema.json` and the focused Rust harness. Schema validity is not proof that source identification, scholarly interpretation, rights, or annotations are correct.
+Validate using `source.schema.json` and the focused Rust harness (`--kind source`). The validator rejects unknown-rights/full-text access combinations, source-family split leakage, unsupported `verified_open_content` claims, and limited-use approval while rights remain unknown or restricted. A separate integration test requires every case source ID and URI to resolve to the catalog and the case split to match the catalog split. Schema validity is not proof that source identification, scholarly interpretation, rights, or annotations are correct.
