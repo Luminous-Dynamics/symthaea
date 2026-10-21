@@ -28,7 +28,7 @@ From the repository root:
     cargo test -p symthaea-core pattern_interaction
     cargo run -p symthaea-core --example platonic_pattern_interaction
 
-Default dimensions are 16,384 coordinates, 64 candidate prototypes, 16 trials per condition, noise rates 5/10/20/30/35/40/45/50%, and bundle/association sizes 1/3/5/9/17/33/49. The output includes paired MAP-versus-HRR associative-capacity results. These are exploratory smoke settings, not publication-grade sample sizes.
+The smoke mode uses 16,384 coordinates, 64 candidate prototypes, 16 trials, noise rates 5/10/20/30/35/40/45/50%, and bundle/association sizes 1/3/5/9/17/33/49. The stress mode is invoked with --stress and uses 4,096 coordinates, 256 candidates, 8 trials, and capacities 1/7/31/63/127/255 to probe a much higher interference regime. Both emit paired MAP-versus-HRR capacity results, but these initial settings do not yet establish matched-byte K_95 or state-of-the-art performance.
 
 ## Interpretation and controls
 
