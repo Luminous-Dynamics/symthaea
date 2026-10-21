@@ -1605,6 +1605,48 @@ mod tests {
     }
 
     #[test]
+    fn connected_source_families_form_one_bootstrap_cluster() {
+        let mut first = pair("p1", "source_swap", "local_change", "major", true);
+        let mut second = pair("p2", "tradition_transfer", "local_change", "major", true);
+        first.source_family_ids = vec!["family-A".into(), "family-B".into()];
+        second.source_family_ids = vec!["family-B".into(), "family-C".into()];
+        let clusters = source_family_clusters(&[first, second]).unwrap();
+        assert_eq!(clusters.len(), 1);
+        assert_eq!(clusters[0], vec![0, 1]);
+    }
+
+    #[test]
+    fn paired_cluster_bootstrap_is_deterministic_and_reports_ci() {
+        let plan = fixture_plan();
+        let pairs = vec![
+            pair("p1", "context_swap", "local_change", "major", true),
+            pair("p2", "alias_equivalence", "invariant", "diagnostic", false),
+        ];
+        let results = vec![
+            observation("r1", "s1", "p1", "incorrect"),
+            observation("r2", "s1", "p2", "incorrect"),
+            observation("r3", "s2", "p1", "local_change"),
+            observation("r4", "s2", "p2", "invariant"),
+        ];
+        let clusters = source_family_clusters(&pairs).unwrap();
+        assert_eq!(clusters.len(), 2);
+        let first = compute_pairwise_comparisons(&plan, &pairs, &results, &clusters).unwrap();
+        let second = compute_pairwise_comparisons(&plan, &pairs, &results, &clusters).unwrap();
+        assert_eq!(
+            serde_json::to_value(&first).unwrap(),
+            serde_json::to_value(&second).unwrap()
+        );
+        assert_eq!(first.len(), 1);
+        assert_eq!(first[0].baseline_system_id, "s1");
+        assert_eq!(first[0].candidate_system_id, "s2");
+        assert_eq!(first[0].source_family_cluster_count, 2);
+        assert_eq!(first[0].bootstrap_replicates, plan.bootstrap.replicates);
+        assert_eq!(first[0].confidence_interval_low, 1.0);
+        assert_eq!(first[0].confidence_interval_high, 1.0);
+        assert!(first[0].candidate_improvement_supported);
+    }
+
+    #[test]
     fn declared_input_digest_mismatch_fails_closed() {
         let error = verify_sha256("source pack", b"observed bytes", &"0".repeat(64)).unwrap_err();
         assert!(error.contains("source pack digest mismatch"));
