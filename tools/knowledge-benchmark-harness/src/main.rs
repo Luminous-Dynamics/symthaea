@@ -1085,16 +1085,67 @@ fn validate_annotation_catalog_refs(annotation: &Value) -> Vec<String> {
 fn validate_source_pack_contract(record: &Value) -> Vec<String> {
     let mut errors = Vec::new();
     let pair_id = string_field(record, "pair_id").unwrap_or("<missing>");
-    if record.get("synthetic_only").and_then(Value::as_bool) != Some(true) {
+    let split = string_field(record, "split").unwrap_or("");
+    let synthetic_only = record
+        .get("synthetic_only")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    let access_decision = string_field(record, "access_decision").unwrap_or("");
+    let rights_status = string_field(record, "rights_status").unwrap_or("");
+    let evidence = record
+        .get("evidence_pack")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+
+    if synthetic_only != (split == "synthetic") {
         errors.push(format!(
-            "source-pack fixture {pair_id:?} must be explicitly synthetic_only"
+            "source-pack snapshot {pair_id:?} must be synthetic exactly when split=synthetic"
         ));
     }
     if !matches!(string_field(record, "state"), Some("baseline" | "mutated")) {
         errors.push(format!(
-            "source-pack fixture {pair_id:?} must identify baseline or mutated state"
+            "source-pack snapshot {pair_id:?} must identify baseline or mutated state"
         ));
     }
+    if !matches!(
+        access_decision,
+        "synthetic_only" | "allow" | "deny" | "require_permission" | "metadata_only"
+    ) {
+        errors.push(format!(
+            "source-pack snapshot {pair_id:?} has unsupported access_decision {access_decision:?}"
+        ));
+    }
+    if access_decision != "allow" && !evidence.is_empty() {
+        errors.push(format!(
+            "source-pack snapshot {pair_id:?} exposes evidence despite access_decision={access_decision:?}"
+        ));
+    }
+    if synthetic_only && rights_status != "synthetic_only" {
+        errors.push(format!(
+            "source-pack snapshot {pair_id:?} must use synthetic_only rights_status"
+        ));
+    }
+    if !synthetic_only && !evidence.is_empty() && matches!(rights_status, "unknown" | "restricted") {
+        errors.push(format!(
+            "source-pack snapshot {pair_id:?} uses content with inadmissible rights_status {rights_status:?}"
+        ));
+    }
+
+    for item in &evidence {
+        let kind = string_field(item, "kind").unwrap_or("");
+        if synthetic_only && kind != "synthetic_control" {
+            errors.push(format!(
+                "source-pack snapshot {pair_id:?} synthetic evidence kind must be synthetic_control"
+            ));
+        }
+        if !synthetic_only && matches!(kind, "synthetic_control" | "metadata_only") {
+            errors.push(format!(
+                "source-pack snapshot {pair_id:?} uses inadmissible real evidence kind {kind:?}"
+            ));
+        }
+    }
+
     collect_unique_object_ids(
         record,
         "evidence_pack",
@@ -2038,6 +2089,27 @@ mod tests {
                 .iter()
                 .any(|e| e.contains("duplicate claim annotation ID"))
         );
+    }
+
+    #[test]
+    fn source_pack_rejects_non_allow_access_with_evidence() {
+        let record = json!({
+            "schema_version":"knowledge-source-pack-v0",
+            "synthetic_only":false,
+            "split":"holdout",
+            "pair_id":"rights-test",
+            "state":"mutated",
+            "context_id":"context",
+            "tradition_scope":"example",
+            "source_id":"source-1",
+            "variant_id":"v1",
+            "prompt":"retrieve",
+            "rights_status":"open_license_verified",
+            "access_decision":"deny",
+            "evidence_pack":[{"evidence_id":"e1","source_id":"source-1","statement":"content","kind":"source_attestation"}]
+        });
+        let errors = validate_source_pack_contract(&record);
+        assert!(errors.iter().any(|error| error.contains("exposes evidence despite access_decision")));
     }
 
     #[test]
