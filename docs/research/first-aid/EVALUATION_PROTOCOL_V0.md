@@ -11,7 +11,7 @@ The safety claim is intentionally narrow: **the software detects defined process
 
 ## 2. Current v0 evidence boundary
 
-The frozen synthetic trajectory corpus contains 12 traces, including 8 marked critical. The current reference run reports 9 traces with at least one expected violation, 6 critical counterexample traces, and 9 violation instances. These are corpus properties, not clinical performance estimates. The fixture SHA-256 is pinned in the Rust validator.
+The frozen synthetic trajectory corpus contains 12 traces, including 8 marked critical. A previously completed receipt at revision 8063e64d9354850a0f8fc7e67bf4438d1328f184 reported 9 traces with at least one expected violation, 6 critical counterexample traces, and 9 violation instances. The newer revision's receipt remains pending until its exact-head run completes. These are corpus properties, not clinical performance estimates. The fixture SHA-256 is pinned in the Rust validator.
 
 The expected violation labels are frozen in the same corpus and checked against the implementation. This is reproducible, but it is **not yet an independent clinical oracle**: source review, expert adjudication, a separate formal specification, and an external holdout corpus remain future work. No sensitivity, specificity, or patient-outcome result should be inferred from these 12 synthetic traces.
 
