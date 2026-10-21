@@ -39,7 +39,7 @@ Never average away a critical invariant failure: publish per-invariant counts an
 
 1. **Revocation and identity:** render after revocation; verify the wrong bundle; replay a revoked bundle; change the active bundle between load and verification.
 2. **Freshness and authority:** present stale/unknown material as confirmed; omit required metadata; substitute a different digest; create unknown enum values or unknown JSON fields.
-3. **Interruption and recovery:** interruption clears verified state; resume does not restore verification implicitly; require a fresh verification before rendering again.
+3. **Session lifecycle and recovery:** rendering outside an active session is rejected; starting a new session cannot inherit the previous session's verified bundle; interruption clears verified state; resume does not restore verification implicitly; require a fresh verification before rendering again.
 4. **Uncertainty and handoff:** detect uncertainty then drop it at handoff; preserve it and hand off; preserve without a prior detection; introduce a second uncertainty event after an earlier preservation.
 5. **Privacy and consent:** sensitive payload with missing, false, or true consent scope; non-sensitive payload with missing scope; verify malformed or contradictory consent facts fail closed.
 6. **Connectivity:** offline and intermittent core-network dependencies are rejected; non-core optional network use is not automatically treated as a failure.
