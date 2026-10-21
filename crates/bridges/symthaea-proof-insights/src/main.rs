@@ -3865,52 +3865,63 @@ end Second
             "unique_stable_theorem_proof_transition"
         );
         assert_eq!(dataset_events[1]["identity_candidate_timeline_positions"][0], 0);
-        assert_eq!(
-            dataset_events[1]["path_join_status"],
-            "ambiguous_path_match"
-        );
+        assert_eq!(dataset_events[1]["path_join_status"], "ambiguous_path_match");
         assert_eq!(
             dataset_events[1]["statement_match_relation"],
             "not_checked_due_to_ambiguous_path"
         );
-        assert_eq!(dataset_events[2]["path_join_status"], "no_path_match");
+        assert_eq!(dataset_events[2]["path_join_status"], "ambiguous_path_match");
         assert_eq!(
             dataset_events[2]["identity_join_status"],
+            "unique_proof_transition_with_statement_or_visibility_mismatch"
+        );
+        assert_eq!(dataset_events[2]["identity_candidate_timeline_positions"][0], 1);
+        assert_eq!(dataset_events[2]["identity_statement_match_at_commit_before"], false);
+        assert_eq!(dataset_events[2]["identity_statement_match_at_completion"], false);
+        assert_eq!(dataset_events[2]["identity_proof_matches_completion"], true);
+        assert_eq!(dataset_events[2]["identity_proof_absent_at_commit_before"], true);
+        assert_eq!(
+            dataset_events[2]["statement_match_relation"],
+            "not_checked_due_to_ambiguous_path"
+        );
+        assert_eq!(dataset_events[3]["path_join_status"], "no_path_match");
+        assert_eq!(
+            dataset_events[3]["identity_join_status"],
             "not_checked_no_path_candidate"
         );
         assert_eq!(
-            dataset_events[2]["statement_match_relation"],
+            dataset_events[3]["statement_match_relation"],
             "not_checked_due_to_unmatched_path"
         );
-        assert_eq!(dataset_events[3]["path_join_status"], "unique_path_match");
+        assert_eq!(dataset_events[4]["path_join_status"], "unique_path_match");
         assert_eq!(
-            dataset_events[3]["identity_join_status"],
+            dataset_events[4]["identity_join_status"],
             "declared_name_unavailable"
         );
         assert_eq!(
-            dataset_events[3]["statement_match_relation"],
+            dataset_events[4]["statement_match_relation"],
             "empty_formal_statement"
         );
         assert_eq!(
-            dataset_events[3]["statement_match_at_commit_before"],
+            dataset_events[4]["statement_match_at_commit_before"],
             serde_json::Value::Null
         );
-        assert_eq!(dataset_events[4]["path_join_status"], "invalid_path");
-        assert_eq!(
-            dataset_events[4]["statement_match_relation"],
-            "not_checked_due_to_invalid_path"
-        );
-        assert_eq!(dataset_events[5]["commit_before_object_exists"], false);
+        assert_eq!(dataset_events[5]["path_join_status"], "invalid_path");
         assert_eq!(
             dataset_events[5]["statement_match_relation"],
+            "not_checked_due_to_invalid_path"
+        );
+        assert_eq!(dataset_events[6]["commit_before_object_exists"], false);
+        assert_eq!(
+            dataset_events[6]["statement_match_relation"],
             "completion_match_pre_state_unavailable"
         );
         assert_eq!(
-            dataset_events[6]["commit_before_object_exists"],
+            dataset_events[7]["commit_before_object_exists"],
             serde_json::Value::Null
         );
         assert_eq!(
-            dataset_events[6]["statement_match_relation"],
+            dataset_events[7]["statement_match_relation"],
             "completion_match_pre_state_unavailable"
         );
 
