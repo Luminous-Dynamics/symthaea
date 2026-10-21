@@ -1904,6 +1904,14 @@ mod tests {
     }
 
     #[test]
+    fn rejects_unknown_multiple_comparison_correction() {
+        let mut plan = fixture_plan();
+        plan.bootstrap.multiple_comparison_correction = "invented".into();
+        let error = validate_plan_eligibility(&plan).unwrap_err();
+        assert!(error.contains("multiple_comparison_correction must be none or bonferroni"));
+    }
+
+    #[test]
     fn held_out_comparisons_require_familywise_correction_for_multiple_baselines() {
         let mut plan = fixture_plan();
         plan.phase = "preregistered_held_out".into();
