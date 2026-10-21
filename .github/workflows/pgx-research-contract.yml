@@ -76,6 +76,9 @@ jobs:
           outline_sha="$(sha256sum papers/applications/pgx-health-equity/OUTLINE.md | awk '{print $1}')"
           boundary_sha="$(sha256sum docs/research/PGX_RESEARCH_ONLY_BOUNDARY_V0.md | awk '{print $1}')"
           manifest_sha="$(sha256sum Cargo.toml | awk '{print $1}')"
+          equity_example_sha="$(sha256sum crates/domains/symthaea-neuromodulators/examples/pgx_equity_analysis.rs | awk '{print $1}')"
+          sensitivity_example_sha="$(sha256sum crates/domains/symthaea-neuromodulators/examples/pgx_sensitivity_analysis.rs | awk '{print $1}')"
+          workflow_sha="$(sha256sum .github/workflows/pgx-research-contract.yml | awk '{print $1}')"
           receipt_status=PASS
           if [[ "$tested_head" != "$EXPECTED_HEAD" || "$FORMAT_OUTCOME" != "success" || "$TEST_OUTCOME" != "success" || "$EXAMPLES_OUTCOME" != "success" ]]; then
             receipt_status=FAIL
@@ -93,6 +96,9 @@ jobs:
             --arg outline_sha256 "$outline_sha" \
             --arg boundary_sha256 "$boundary_sha" \
             --arg manifest_sha256 "$manifest_sha" \
+            --arg equity_example_sha256 "$equity_example_sha" \
+            --arg sensitivity_example_sha256 "$sensitivity_example_sha" \
+            --arg workflow_sha256 "$workflow_sha" \
             '{
               schema_version: "pgx-research-contract-receipt-v0.1",
               status: $status,
@@ -108,7 +114,10 @@ jobs:
                 manuscript: $manuscript_sha256,
                 outline: $outline_sha256,
                 qualification_boundary: $boundary_sha256,
-                cargo_manifest: $manifest_sha256
+                cargo_manifest: $manifest_sha256,
+                pgx_equity_example: $equity_example_sha256,
+                pgx_sensitivity_example: $sensitivity_example_sha256,
+                contract_workflow: $workflow_sha256
               },
               claim_ceiling: "Exact-head software contract only; no pharmacogenomic phenotype accuracy, patient-level inference, clinical utility, or prescribing claim."
             }' > target/pgx-research/receipt.json
