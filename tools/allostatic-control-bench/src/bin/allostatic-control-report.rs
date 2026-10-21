@@ -213,12 +213,23 @@ fn parse_episodes(csv: &str) -> Result<BTreeMap<ConditionKey, EpisodesBySeed>, B
         if cumulative_load < 0.0 || violation_exposure < 0.0 || resource_cost < 0.0 {
             return Err(invalid_data(format!("negative accumulated metric on line {}", line_index + 2)).into());
         }
+        let mean_tolerance = 1e-5;
+        if (mean_load - cumulative_load / HORIZON as f64).abs() > mean_tolerance
+            || peak_load + mean_tolerance < mean_load
+            || peak_load + mean_tolerance < terminal_load
+            || minimum_reserve > terminal_reserve + mean_tolerance
+        {
+            return Err(invalid_data(format!("inconsistent trajectory summary on line {}", line_index + 2)).into());
+        }
         if unsafe_ticks > HORIZON
             || false_alarms > false_alarm_opportunities
             || false_alarm_opportunities > HORIZON
             || missed_limits > HORIZON
             || shield_vetoes > HORIZON
             || no_safe_action_ticks > HORIZON
+            || push_steps > HORIZON
+            || maintain_steps > HORIZON
+            || emergency_recover_steps > HORIZON
             || push_steps + maintain_steps + emergency_recover_steps != HORIZON
         {
             return Err(invalid_data(format!("episode counters violate horizon/denominator contract on line {}", line_index + 2)).into());
@@ -398,7 +409,7 @@ mod tests {
 
     const SAMPLE_HEADER: &str = EPISODE_CSV_HEADER;
 
-    const SAMPLE_ROW: &str = "calm,0,task_only,false,1.0,2.0,0.1,0.2,0.8,0.8,0.2,0,false,0.0,0.0,0,0,0,0,1,1,46,0,0.2,false,NA";
+    const SAMPLE_ROW: &str = "calm,0,task_only,false,1.0,4.8,0.1,0.2,0.8,0.8,0.2,0,false,0.0,0.0,0,0,0,0,1,1,47,0,0.2,false,NA";
 
     #[test]
     fn parser_requires_episode_violation_flag_to_match_tick_count() {
