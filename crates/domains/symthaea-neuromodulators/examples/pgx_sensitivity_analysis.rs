@@ -251,7 +251,7 @@ fn main() {
         }
         println!();
 
-        // Count stability: does the base set of underserved populations persist?
+        // Count stability: do the prototype's threshold-crossing labels persist?
         let base_set = &analyses[base_idx].1[pair_idx].3;
         for &(anc, _) in ANCESTRY_ORDER {
             let in_base = base_set.contains(&anc);
