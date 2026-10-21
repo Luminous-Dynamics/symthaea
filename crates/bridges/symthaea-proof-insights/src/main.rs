@@ -3556,7 +3556,6 @@ end Second
                 "file_path": "lean/Other.lean",
                 "commit_before": commit_one,
                 "formal_statement": "theorem other : True := by",
-
                 "proof": "exact True.intro"
             }),
             serde_json::json!({
@@ -3565,7 +3564,6 @@ end Second
                 "file_path": "lean/Example.lean",
                 "commit_before": commit_one,
                 "formal_statement": "theorem first : True := by",
-
                 "proof": "exact True.intro"
             }),
             serde_json::json!({
@@ -3574,7 +3572,6 @@ end Second
                 "file_path": "lean/Unlisted.lean",
                 "commit_before": commit_one,
                 "formal_statement": "theorem absent : True := by",
-
                 "proof": "rfl"
             }),
             serde_json::json!({
@@ -3583,7 +3580,6 @@ end Second
                 "file_path": "lean/Other.lean",
                 "commit_before": commit_one,
                 "formal_statement": "",
-
                 "proof": "exact True.intro"
             }),
             serde_json::json!({
@@ -3592,7 +3588,6 @@ end Second
                 "file_path": "../outside.lean",
                 "commit_before": commit_one,
                 "formal_statement": "theorem outside : True := by",
-
                 "proof": "rfl"
             }),
             serde_json::json!({
@@ -3601,7 +3596,6 @@ end Second
                 "file_path": "lean/Other.lean",
                 "commit_before": "f".repeat(40),
                 "formal_statement": "theorem other : True := by",
-
                 "proof": "exact True.intro"
             }),
             serde_json::json!({
@@ -3610,7 +3604,6 @@ end Second
                 "file_path": "lean/Other.lean",
                 "commit_before": "not-a-git-sha",
                 "formal_statement": "theorem other : True := by",
-
                 "proof": "exact True.intro"
             }),
         ];
