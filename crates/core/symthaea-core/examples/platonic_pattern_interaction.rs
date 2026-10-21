@@ -54,19 +54,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("associations,target_similarity,max_distractor,recall_at_1,cleanup_target_similarity,cleanup_max_distractor,cleanup_recall_at_1");
     for result in &report.associative_capacity_results {
         println!(
-            "{},{:.6},{},{:.6},{:.6},{},{:.6}",
+            "{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6}",
             result.association_count,
             result.mean_target_similarity,
-            result.mean_max_distractor_similarity.map_or_else(
-                || "n/a".to_string(),
-                |value| format!("{value:.6}")
-            ),
+            result.mean_max_distractor_similarity,
             result.recall_at_1,
             result.cleanup_mean_target_similarity,
-            result.cleanup_mean_max_distractor_similarity.map_or_else(
-                || "n/a".to_string(),
-                |value| format!("{value:.6}")
-            ),
+            result.cleanup_mean_max_distractor_similarity,
             result.cleanup_recall_at_1
         );
     }
