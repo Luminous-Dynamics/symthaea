@@ -48,11 +48,20 @@ jobs:
 
           # Positive control: the intentional, small 2-layer coupon should have
           # no enabled rule violations in the pinned native EDA CLI.
+          set +e
           kicad pcb drc --severity-all --format json \
             --output "$OUT/clean-drc.json" --exit-code-violations "$BOARD"
+          clean_exit=$?
+          set -e
           jq empty "$OUT_HOST/clean-drc.json"
+          if [ "$clean_exit" -ne 0 ]; then
+            echo "Positive-control board has DRC violations (exit=$clean_exit). Findings follow:"
+            jq -c '.violations[]? // empty | {severity: .severity, type: .type, description: .description, items: .items}' "$OUT_HOST/clean-drc.json" || cat "$OUT_HOST/clean-drc.json"
+          fi
           kicad pcb drc --severity-all --format json \
             --output "$OUT/clean-drc-repeat.json" --exit-code-violations "$BOARD"
+          repeat_clean_exit=$?
+          test "$repeat_clean_exit" -eq "$clean_exit"
           cmp "$OUT_HOST/clean-drc.json" "$OUT_HOST/clean-drc-repeat.json"
 
           # Negative control: move the GND track onto the VCC track. Assert the
@@ -114,6 +123,7 @@ jobs:
             --arg image "$IMAGE" \
             --arg image_digest "$image_digest" \
             --arg kicad_version "$kicad_version" \
+            --arg clean_drc_exit_code "$clean_exit" \
             --arg shorted_drc_exit_code "$shorted_exit" \
             --argjson gerber_count "$gerber_count" \
             --argjson drill_file_count "$drill_count" \
@@ -128,7 +138,7 @@ jobs:
                 version_output: $kicad_version
               },
               controls: {
-                clean_board_drc_exit_code: 0,
+                clean_board_drc_exit_code: ($clean_drc_exit_code | tonumber),
                 clean_board_report_parsed_as_json: true,
                 repeated_clean_drc_report_byte_identical: true,
                 repeated_gerber_and_drill_exports_byte_identical: true,
@@ -173,7 +183,8 @@ jobs:
           ' "$OUT_HOST/receipt.json"
 
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: atomfab-kicad-cli-smoke-receipt
           path: atomfab-kicad-smoke-out/
-          if-no-files-found: error
+          if-no-files-found: warn
