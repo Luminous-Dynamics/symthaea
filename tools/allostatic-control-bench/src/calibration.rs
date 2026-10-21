@@ -42,7 +42,9 @@ fn finite_conformal_radius(scores: &[f64], target_coverage: f64) -> Option<f64> 
     if scores.is_empty()
         || !target_coverage.is_finite()
         || !(0.0..1.0).contains(&target_coverage)
-        || scores.iter().any(|score| !score.is_finite() || *score < 0.0)
+        || scores
+            .iter()
+            .any(|score| !score.is_finite() || *score < 0.0)
     {
         return None;
     }
@@ -117,8 +119,7 @@ mod tests {
     }
 
     fn state() -> StateEnvelope {
-        StateEnvelope::new(interval(0.45, 0.50), interval(0.20, 0.40))
-            .expect("valid test state")
+        StateEnvelope::new(interval(0.45, 0.50), interval(0.20, 0.40)).expect("valid test state")
     }
 
     #[test]
@@ -154,12 +155,8 @@ mod tests {
 
     #[test]
     fn calibrated_radii_expand_the_predicted_state_envelope() {
-        let radii = calibrate_episode_radii(
-            &[0.10; 19],
-            &[0.25; 19],
-            0.90,
-        )
-        .expect("nineteen episodes support this finite rank");
+        let radii = calibrate_episode_radii(&[0.10; 19], &[0.25; 19], 0.90)
+            .expect("nineteen episodes support this finite rank");
         let envelope = enclose_predicted_state(state(), radii).expect("valid envelope");
 
         assert!((envelope.reserve().lower() - 0.35).abs() < 1e-12);
@@ -170,10 +167,10 @@ mod tests {
 
     #[test]
     fn larger_radii_never_shrink_the_conservative_state_envelope() {
-        let small = calibrate_episode_radii(&[0.05; 19], &[0.10; 19], 0.90)
-            .expect("finite calibration");
-        let large = calibrate_episode_radii(&[0.15; 19], &[0.20; 19], 0.90)
-            .expect("finite calibration");
+        let small =
+            calibrate_episode_radii(&[0.05; 19], &[0.10; 19], 0.90).expect("finite calibration");
+        let large =
+            calibrate_episode_radii(&[0.15; 19], &[0.20; 19], 0.90).expect("finite calibration");
         let small_envelope = enclose_predicted_state(state(), small).expect("small envelope");
         let large_envelope = enclose_predicted_state(state(), large).expect("large envelope");
 
