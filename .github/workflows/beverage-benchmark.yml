@@ -64,6 +64,7 @@ jobs:
           rustfmt --edition 2024 --check tools/beverage-benchmark-harness/src/bin/schema_contract_audit.rs
           rustfmt --edition 2024 --check tools/beverage-benchmark-harness/src/bin/split_leakage_audit.rs
           rustfmt --edition 2024 --check tools/beverage-benchmark-harness/src/bin/decision_value_audit.rs
+          rustfmt --edition 2024 --check tools/beverage-benchmark-harness/src/bin/adaptive_sampling_policy_audit.rs
 
       - name: Test synthetic receipt contract
         run: cargo test --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin beverage_benchmark_receipt
@@ -82,6 +83,9 @@ jobs:
 
       - name: Test decision-value auditor
         run: cargo test --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin decision_value_audit
+
+      - name: Test adaptive-sampling policy auditor
+        run: cargo test --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin adaptive_sampling_policy_audit
 
       - name: Independently validate synthetic corpus schema
         run: |
@@ -107,6 +111,21 @@ jobs:
             --out "$RUNNER_TEMP/beverage-decision-schema-receipt.json"
           cat "$RUNNER_TEMP/beverage-decision-schema-receipt.json"
 
+      - name: Independently validate adaptive-sampling decision schema and fixture
+        run: |
+          cargo run --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin schema_contract_audit -- \\
+            --schema docs/research/beverage-adaptive-sampling-decision-v1.schema.json \\
+            --instance docs/research/beverage-adaptive-sampling-decision-synthetic-v1.json \\
+            --out "$RUNNER_TEMP/beverage-adaptive-sampling-schema-receipt.json"
+          cat "$RUNNER_TEMP/beverage-adaptive-sampling-schema-receipt.json"
+
+      - name: Audit synthetic adaptive-sampling decision
+        run: |
+          cargo run --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin adaptive_sampling_policy_audit -- \\
+            --input docs/research/beverage-adaptive-sampling-decision-synthetic-v1.json \\
+            --out "$RUNNER_TEMP/beverage-adaptive-sampling-decision-receipt.json"
+          cat "$RUNNER_TEMP/beverage-adaptive-sampling-decision-receipt.json"
+
       - name: Audit synthetic decision-value contract
         run: |
           cargo run --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin decision_value_audit -- \
@@ -129,6 +148,7 @@ jobs:
           cargo clippy --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin schema_contract_audit -- -D warnings
           cargo clippy --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin split_leakage_audit -- -D warnings
           cargo clippy --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin decision_value_audit -- -D warnings
+          cargo clippy --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin adaptive_sampling_policy_audit -- -D warnings
 
       - name: Emit exact-head receipt
         env:
