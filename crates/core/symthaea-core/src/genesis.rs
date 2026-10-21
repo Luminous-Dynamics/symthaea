@@ -92,7 +92,7 @@ impl GenesisSeed {
     /// V1: this method must not change historical model initialization.
     pub fn domain_v2(&self, label: &str) -> ShakeRng {
         let mut hasher = Shake256::default();
-        hasher.update(b"LuminousDynamics::GenesisSeed::domain::v2\\0");
+        hasher.update(b"LuminousDynamics::GenesisSeed::domain::v2\0");
         hasher.update(&(self.seed_phrase.len() as u64).to_le_bytes());
         hasher.update(self.seed_phrase.as_bytes());
         hasher.update(&(label.len() as u64).to_le_bytes());
