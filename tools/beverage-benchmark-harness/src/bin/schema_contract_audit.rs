@@ -47,10 +47,10 @@ fn find_external_reference(value: &Value) -> Option<String> {
     match value {
         Value::Object(object) => {
             for keyword in ["$ref", "$dynamicRef", "$recursiveRef"] {
-                if let Some(Value::String(reference)) = object.get(keyword) {
-                    if !reference.starts_with('#') {
-                        return Some(format!("{keyword}:{reference}"));
-                    }
+                if let Some(Value::String(reference)) = object.get(keyword)
+                    && !reference.starts_with('#')
+                {
+                    return Some(format!("{keyword}:{reference}"));
                 }
             }
             object.values().find_map(find_external_reference)
