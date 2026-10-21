@@ -291,6 +291,13 @@ impl KnowledgeManager {
                     tracing::info!(count = facts.len(), "Knowledge: loaded facts from SQLite");
                 }
             }
+            // Restore typed evidence links only after their fact endpoints exist.
+            if let Ok(links) = p.load_evidence_links() {
+                graph.import_evidence_links(&links);
+                if !links.is_empty() {
+                    tracing::info!(count = links.len(), "Knowledge: loaded typed evidence links from SQLite");
+                }
+            }
             // Load existing causal edges
             if let Ok(edges) = p.load_causal_edges() {
                 let edge_count = edges.len();
@@ -744,6 +751,7 @@ impl KnowledgeManager {
     ///
     /// Saves all facts and causal edges. No-op if persistence is not configured.
     pub fn persist_snapshot(&mut self) {
+        let evidence_links = self.graph.evidence_links().to_vec();
         if let Some(ref mut p) = self.persistence {
             let facts = self.graph.export_fact_records();
             let edge_tuples = self.causal_bridge.export_edge_records();
@@ -760,6 +768,9 @@ impl KnowledgeManager {
             let ontology_records = self.ontology.export_ontology_records();
             if let Err(e) = p.save_facts(&facts) {
                 tracing::warn!(error = %e, "Knowledge persistence: failed to save facts");
+            }
+            if let Err(e) = p.save_evidence_links(&evidence_links) {
+                tracing::warn!(error = %e, "Knowledge persistence: failed to save evidence links");
             }
             if let Err(e) = p.save_causal_edges(&edges) {
                 tracing::warn!(error = %e, "Knowledge persistence: failed to save edges");
