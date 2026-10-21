@@ -254,6 +254,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 &near_unknown,
             );
             report_identity_collision_controls(seed, &prototypes, &cic_name, cic.rule)?;
+            report_risk_coverage_curve(seed, mode_name, mode, &test);
         }
     }
 
@@ -463,22 +464,22 @@ fn calibrate_rule(samples: &[ScoredQuery], mode: CalibrationMode) -> DecisionRul
 /// are nested. Threshold values do not depend on the observed calibration data.
 fn fixed_sequence_candidates(mode: CalibrationMode) -> Vec<DecisionRule> {
     match mode {
-        CalibrationMode::ScoreOnly => (0..=20)
+        CalibrationMode::ScoreOnly => (0..=100)
             .map(|step| DecisionRule {
-                min_similarity: 0.65 - 0.01 * step as f64,
+                min_similarity: 0.65 - 1.65 * step as f64 / 100.0,
                 min_margin: -1.0,
             })
             .collect(),
-        CalibrationMode::MarginOnly => (0..=16)
+        CalibrationMode::MarginOnly => (0..=100)
             .map(|step| DecisionRule {
                 min_similarity: -1.0,
-                min_margin: 0.10 - 0.005 * step as f64,
+                min_margin: 0.10 * (1.0 - step as f64 / 100.0),
             })
             .collect(),
-        CalibrationMode::ScoreAndMargin => (0..=20)
+        CalibrationMode::ScoreAndMargin => (0..=100)
             .map(|step| DecisionRule {
-                min_similarity: 0.65 - 0.01 * step as f64,
-                min_margin: 0.10 - 0.004 * step as f64,
+                min_similarity: 0.65 - 1.65 * step as f64 / 100.0,
+                min_margin: 0.10 * (1.0 - step as f64 / 100.0),
             })
             .collect(),
     }
@@ -720,6 +721,60 @@ fn report_row(
             evaluate(&subset, rule),
         );
     }
+}
+
+/// Emit held-out risk/coverage points for every predeclared threshold and
+/// report trapezoidal area under the risk–coverage curve (lower is better).
+/// These are descriptive test-set metrics only; test rows never certify or tune
+/// a threshold.
+fn report_risk_coverage_curve(
+    seed: u64,
+    mode_name: &str,
+    mode: CalibrationMode,
+    samples: &[ScoredQuery],
+) {
+    let strategy = format!("fixed_grid_{mode_name}");
+    let candidates = fixed_sequence_candidates(mode);
+    let not_applicable = ("not_applicable", "NA", "NA", "NA");
+    let mut points = Vec::with_capacity(candidates.len() + 1);
+    points.push((0.0, 0.0));
+
+    for (index, rule) in candidates.iter().copied().enumerate() {
+        let result = evaluate(samples, rule);
+        let risk = result.selective_risk().unwrap_or(0.0);
+        points.push((result.coverage(), risk));
+        write_evaluation_row(
+            "risk_coverage_curve",
+            seed,
+            &strategy,
+            &format!("candidate_{index}"),
+            None,
+            rule,
+            0,
+            0,
+            not_applicable.0,
+            not_applicable.1,
+            not_applicable.2,
+            not_applicable.3,
+            samples.len(),
+            result,
+        );
+    }
+
+    // Coverage is non-decreasing by construction, but sort defensively so the
+    // area calculation remains correct if the candidate generator changes.
+    points.sort_by(|left, right| left.0.total_cmp(&right.0));
+    let aurc = points
+        .windows(2)
+        .map(|pair| {
+            let width = pair[1].0 - pair[0].0;
+            width * (pair[0].1 + pair[1].1) / 2.0
+        })
+        .sum::<f64>();
+    println!(
+        "# risk_coverage_summary=seed:{seed},strategy:{strategy},aurc:{aurc:.6},curve_points:{}",
+        points.len()
+    );
 }
 
 fn report_identity_collision_controls(
@@ -1108,8 +1163,8 @@ mod tests {
         let candidates = fixed_sequence_candidates(CalibrationMode::ScoreOnly);
         let result = calibrate_fixed_sequence_rule(&samples, CalibrationMode::ScoreOnly);
         assert!(result.certified_prefix_len > 0);
-        assert_eq!(result.stopped_at_index, Some(5));
-        assert_eq!(result.selected_candidate_index, Some(4));
+        assert_eq!(result.stopped_at_index, Some(4));
+        assert_eq!(result.selected_candidate_index, Some(3));
         assert!(result.certificate.passed);
 
         let later_certificate = certify_rule(&samples, *candidates.last().expect("candidate grid"));
