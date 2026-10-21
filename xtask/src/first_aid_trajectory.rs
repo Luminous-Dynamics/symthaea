@@ -312,7 +312,11 @@ fn validate_event_fields(trace: &TrajectoryScenario, event: &TraceEvent) -> Resu
         );
     }
     if event.kind == EventKind::BundleVerified && event.digest_verified.is_none() {
-        bail!("{} event {} requires digest_verified", trace.trace_id, event.sequence);
+        bail!(
+            "{} event {} requires digest_verified",
+            trace.trace_id,
+            event.sequence
+        );
     }
     if event.kind == EventKind::ResourcePresented
         && (event.resource_state.is_none() || event.presented_as.is_none())
