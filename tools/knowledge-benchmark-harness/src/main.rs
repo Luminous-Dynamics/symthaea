@@ -351,6 +351,25 @@ fn validate_pair_contract(pair: &Value) -> Vec<String> {
         errors.push("pair intervention before_value and after_value must differ".into());
     }
 
+    let state_field = match field {
+        "context_id" | "source_id" | "variant_id" | "tradition_scope" | "rights_status" => {
+            Some(field)
+        }
+        _ => None,
+    };
+    if let Some(state_field) = state_field {
+        if string_field(baseline, state_field) != Some(before_value) {
+            errors.push(format!(
+                "intervention before_value does not match baseline {state_field}"
+            ));
+        }
+        if string_field(mutated, state_field) != Some(after_value) {
+            errors.push(format!(
+                "intervention after_value does not match mutated {state_field}"
+            ));
+        }
+    }
+
     if matches!(
         expected,
         "local_change" | "abstain_or_revise" | "reject_unsupported_relation" | "deny_access"
@@ -395,8 +414,15 @@ fn validate_pair_contract(pair: &Value) -> Vec<String> {
             }
         }
         "relation_mutation" => {
-            if field != "relation" || expected != "reject_unsupported_relation" {
-                errors.push("relation_mutation must reject an unsupported relation change".into());
+            if field != "relation"
+                || expected != "reject_unsupported_relation"
+                || before_value != "resembles"
+                || after_value != "historically_influences"
+            {
+                errors.push(
+                    "relation_mutation must reject unsupported promotion from resemblance to historical influence"
+                        .into(),
+                );
             }
         }
         "variant_isolation" => {
@@ -905,6 +931,24 @@ mod tests {
             "acceptance": {"must_change":["access is denied"]}
         });
         assert!(validate_pair_contract(&pair).is_empty());
+    }
+
+    #[test]
+    fn source_swap_pair_binds_intervention_to_actual_witnesses() {
+        let pair = json!({
+            "dimension": "source_swap",
+            "expected_relation": "local_change",
+            "baseline": {"source_id":"source-A","evidence_pack":[]},
+            "mutated": {"source_id":"source-B","evidence_pack":[]},
+            "intervention": {
+                "field":"source_id",
+                "before_value":"wrong-source",
+                "after_value":"source-B"
+            },
+            "acceptance": {"must_change":["citation target changes"]}
+        });
+        let errors = validate_pair_contract(&pair);
+        assert!(errors.iter().any(|e| e.contains("before_value does not match baseline source_id")));
     }
 
 }
