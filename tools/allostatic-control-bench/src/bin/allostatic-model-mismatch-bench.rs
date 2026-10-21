@@ -284,7 +284,10 @@ fn run_panel(
                     !action_specific_95 && true_safe,
                 ];
 
-                if is_in_envelope && robust_certified.iter().any(|certified| *certified && !true_safe)
+                if is_in_envelope
+                    && robust_certified
+                        .iter()
+                        .any(|certified| *certified && !true_safe)
                 {
                     return Err(IoError::new(
                         ErrorKind::InvalidData,
