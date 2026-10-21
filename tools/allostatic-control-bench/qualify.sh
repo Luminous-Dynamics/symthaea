@@ -6,6 +6,7 @@ cd "$repo_root"
 
 manifest="tools/allostatic-control-bench/Cargo.toml"
 source_files=(
+  ".github/workflows/allostatic-control-bench.yml"
   "tools/allostatic-control-bench/Cargo.toml"
   "tools/allostatic-control-bench/src/lib.rs"
   "tools/allostatic-control-bench/src/main.rs"
