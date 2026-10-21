@@ -410,6 +410,10 @@ where
 
 fn active_intent_name(channels: &[f32]) -> &'static str {
     let mut thought = ThoughtChannels::default();
+    // Clear the default Unknown one-hot before copying legacy or complete input.
+    for channel in thought.channels.iter_mut().take(8) {
+        *channel = 0.0;
+    }
     for (index, value) in channels.iter().take(8).enumerate() {
         thought.channels[index] = *value;
     }
