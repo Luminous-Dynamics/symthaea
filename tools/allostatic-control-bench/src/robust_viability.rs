@@ -146,6 +146,14 @@ impl ViabilityLimits {
             max_load,
         })
     }
+
+    pub const fn min_reserve(self) -> f64 {
+        self.min_reserve
+    }
+
+    pub const fn max_load(self) -> f64 {
+        self.max_load
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
