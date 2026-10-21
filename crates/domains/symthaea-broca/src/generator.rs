@@ -365,11 +365,8 @@ type CheckpointLoadResult = anyhow::Result<(
 impl BrocaGenerator {
     /// Create a new generator from genesis seed and config using the legacy token initializer.
     pub fn new(genesis: &GenesisSeed, config: BrocaConfig) -> Self {
-        Self::new_with_token_embedding_seed_scheme(
-            genesis,
-            config,
-            crate::controller::TokenEmbeddingSeedScheme::LegacyV1,
-        )
+        let seed_scheme = config.controller.token_embedding_seed_scheme;
+        Self::new_with_token_embedding_seed_scheme(genesis, config, seed_scheme)
     }
 
     /// Create a generator with an explicit token embedding seed scheme.
@@ -378,9 +375,10 @@ impl BrocaGenerator {
     /// the token-row initializer without changing network weights or configuration.
     pub fn new_with_token_embedding_seed_scheme(
         genesis: &GenesisSeed,
-        config: BrocaConfig,
+        mut config: BrocaConfig,
         seed_scheme: crate::controller::TokenEmbeddingSeedScheme,
     ) -> Self {
+        config.controller.token_embedding_seed_scheme = seed_scheme;
         let tokenizer = BpeTokenizer::default_minimal();
         Self::with_tokenizer_and_token_embedding_seed_scheme(genesis, config, tokenizer, seed_scheme)
     }
@@ -427,21 +425,23 @@ impl BrocaGenerator {
         config: BrocaConfig,
         tokenizer: BpeTokenizer,
     ) -> Self {
+        let seed_scheme = config.controller.token_embedding_seed_scheme;
         Self::with_tokenizer_and_token_embedding_seed_scheme(
             genesis,
             config,
             tokenizer,
-            crate::controller::TokenEmbeddingSeedScheme::LegacyV1,
+            seed_scheme,
         )
     }
 
     /// Create a generator with a custom tokenizer and an explicit token seed scheme.
     pub fn with_tokenizer_and_token_embedding_seed_scheme(
         genesis: &GenesisSeed,
-        config: BrocaConfig,
+        mut config: BrocaConfig,
         tokenizer: BpeTokenizer,
         seed_scheme: crate::controller::TokenEmbeddingSeedScheme,
     ) -> Self {
+        config.controller.token_embedding_seed_scheme = seed_scheme;
         let mut ctrl_config = config.controller.clone();
         ctrl_config.vocab_size = tokenizer.vocab_size();
 
