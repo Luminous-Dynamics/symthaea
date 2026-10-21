@@ -373,8 +373,8 @@ mod tests {
         assert_eq!(receipt.status, "complete");
         assert_eq!(receipt.required_role_count, 2);
         assert_eq!(receipt.observed_artifact_count, 2);
-        assert_eq!(receipt.artifacts[0].sha256.clone().unwrap(), sha256_hex(b"board bytes"));
-        assert_eq!(receipt.artifacts[1].sha256.clone().unwrap(), sha256_hex(b"gerber bytes"));
+        assert_eq!(receipt.artifacts[0].sha256.clone().unwrap(), sha256_hex(b"gerber bytes"));
+        assert_eq!(receipt.artifacts[1].sha256.clone().unwrap(), sha256_hex(b"board bytes"));
         assert!(receipt.problems.is_empty());
     }
 
