@@ -14,7 +14,8 @@
     "source_id",
     "variant_id",
     "rights_status",
-    "evidence_pack"
+    "evidence_pack",
+    "access_decision"
   ],
   "properties": {
     "schema_version": {
@@ -90,6 +91,15 @@
           }
         }
       }
+    },
+    "access_decision": {
+      "enum": [
+        "synthetic_only",
+        "allow",
+        "deny",
+        "require_permission",
+        "metadata_only"
+      ]
     }
   }
 }
