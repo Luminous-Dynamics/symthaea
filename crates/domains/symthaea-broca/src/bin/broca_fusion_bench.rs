@@ -18,11 +18,44 @@ use symthaea_broca::generator::{BrocaConfig, BrocaGenerator, SamplingStrategy};
 use symthaea_broca::tokenizer::BpeTokenizer;
 use symthaea_broca::training::{self, TrainingConfig, TrainingDataset, TrainingPair};
 
+use serde::Serialize;
+use sha2::{Digest, Sha256};
 use symthaea_core::genesis::GenesisSeed;
+
+const GENESIS_PHRASE: &str = "broca-fusion-bench-v3";
 
 struct BenchRun {
     name: String,
     setup: Box<dyn Fn(&mut BrocaConfig)>,
+}
+
+#[derive(Debug, Serialize)]
+struct BenchArmResult {
+    name: String,
+    evaluation: EvalResult,
+}
+
+#[derive(Debug, Serialize)]
+struct FusionBenchReport {
+    schema_version: u32,
+    benchmark_id: &'static str,
+    evidence_level: &'static str,
+    evaluation_mode: &'static str,
+    source_revision: Option<&'static str>,
+    genesis_phrase: &'static str,
+    tokenizer_vocab_size: usize,
+    training_pairs: usize,
+    held_out_pairs: usize,
+    training_dataset_sha256: String,
+    held_out_dataset_sha256: String,
+    epochs_per_arm: usize,
+    results: Vec<BenchArmResult>,
+}
+
+fn dataset_sha256(dataset: &TrainingDataset) -> String {
+    let canonical = serde_json::to_vec(dataset)
+        .expect("the in-memory benchmark dataset must serialize deterministically");
+    format!("{:x}", Sha256::digest(canonical))
 }
 
 fn base_config() -> BrocaConfig {
@@ -281,9 +314,16 @@ fn main() {
     let do_sweep = args.iter().any(|a| a == "--sweep");
     let do_fusion_train = args.iter().any(|a| a == "--fusion-train");
 
-    let genesis = GenesisSeed::from_phrase("broca-fusion-bench-v3");
+    let genesis = GenesisSeed::from_phrase(GENESIS_PHRASE);
     let tok = BpeTokenizer::default_minimal();
     let (training_dataset, evaluation_dataset) = make_datasets(&tok);
+    let json_out = args
+        .iter()
+        .position(|arg| arg == "--json-out")
+        .and_then(|i| args.get(i + 1))
+        .cloned();
+    let mut report_arms = Vec::new();
+
     if epochs == 0 {
         eprintln!(
             "Initialization-only smoke comparison: use --epochs N for paired trained evaluation."
@@ -310,6 +350,10 @@ fn main() {
             "ppl={:.1} eng={:.3} coh={:.4}",
             r.perplexity, r.english_word_ratio, r.avg_coherence
         );
+        report_arms.push(BenchArmResult {
+            name: run.name.clone(),
+            evaluation: r.clone(),
+        });
         results.push((&run.name, r));
     }
     print_table(&results);
@@ -332,6 +376,10 @@ fn main() {
                 "ppl={:.1} eng={:.3} coh={:.4}",
                 r.perplexity, r.english_word_ratio, r.avg_coherence
             );
+            report_arms.push(BenchArmResult {
+                name: run.name.clone(),
+                evaluation: r.clone(),
+            });
             sweep_results.push((&run.name, r));
         }
         print_table(&sweep_results);
@@ -389,5 +437,38 @@ fn main() {
             "  Fusion-trained eval: ppl={:.1} eng={:.3} coh={:.4}",
             r.perplexity, r.english_word_ratio, r.avg_coherence
         );
+        report_arms.push(BenchArmResult {
+            name: "fusion-trained".to_string(),
+            evaluation: r,
+        });
+    }
+
+    if let Some(path) = json_out {
+        let report = FusionBenchReport {
+            schema_version: 1,
+            benchmark_id: "broca-fusion-smoke-v1",
+            evidence_level: "smoke",
+            evaluation_mode: if epochs == 0 {
+                "initialization_only"
+            } else {
+                "paired_training_held_out"
+            },
+            source_revision: option_env!("GIT_COMMIT_SHA"),
+            genesis_phrase: GENESIS_PHRASE,
+            tokenizer_vocab_size: tok.vocab_size(),
+            training_pairs: training_dataset.pairs.len(),
+            held_out_pairs: evaluation_dataset.pairs.len(),
+            training_dataset_sha256: dataset_sha256(&training_dataset),
+            held_out_dataset_sha256: dataset_sha256(&evaluation_dataset),
+            epochs_per_arm: epochs,
+            results: report_arms,
+        };
+        let json = serde_json::to_string_pretty(&report)
+            .expect("the benchmark report must serialize");
+        if let Err(error) = std::fs::write(&path, json) {
+            eprintln!("failed to write benchmark receipt {path}: {error}");
+            std::process::exit(2);
+        }
+        eprintln!("Wrote smoke benchmark receipt: {path}");
     }
 }
