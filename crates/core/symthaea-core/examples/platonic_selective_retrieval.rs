@@ -15,19 +15,19 @@ use symthaea_core::hdc::pattern_interaction::PatternVector;
 
 const DIMENSION: usize = 4_096;
 const PROTOTYPE_COUNT: usize = 64;
-const SELECTION_QUERY_COUNT: usize = 352;
-const CERTIFICATION_QUERY_COUNT: usize = 352;
-const TEST_QUERY_COUNT: usize = 704;
+const SELECTION_QUERY_COUNT: usize = 2_048;
+const CERTIFICATION_QUERY_COUNT: usize = 2_048;
+const TEST_QUERY_COUNT: usize = 4_096;
 const KNOWN_QUERY_WEIGHT: usize = 7;
 const OOD_QUERY_WEIGHT: usize = 2;
 const MIXTURE_QUERY_WEIGHT: usize = 2;
 const MAX_VALIDATION_RISK: f64 = 0.05;
 const MIN_ACCEPTED_FOR_CALIBRATION: usize = 30;
-// Family-wise error control across 3 policy candidates × 3 reported seeds.
-const MIN_ACCEPTED_FOR_CERTIFICATION: usize = 102;
-const CERTIFICATION_ALPHA_PER_RULE: f64 = 0.05 / 9.0;
+// Family-wise error control across 3 policy candidates × 5 reported seeds.
+const MIN_ACCEPTED_FOR_CERTIFICATION: usize = 112;
+const CERTIFICATION_ALPHA_PER_RULE: f64 = 0.05 / 15.0;
 const NOISE_LEVELS: [f64; 7] = [0.0, 0.10, 0.20, 0.30, 0.40, 0.45, 0.50];
-const SEEDS: [u64; 3] = [17, 29, 41];
+const SEEDS: [u64; 5] = [17, 29, 41, 53, 67];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum QueryKind {
@@ -647,15 +647,15 @@ mod tests {
     #[test]
     fn bonferroni_exact_binomial_certificate_respects_sample_floor() {
         assert!(
-            clopper_pearson_upper_bound(0, 101, CERTIFICATION_ALPHA_PER_RULE)
+            clopper_pearson_upper_bound(0, 111, CERTIFICATION_ALPHA_PER_RULE)
                 > MAX_VALIDATION_RISK
         );
         assert!(
-            clopper_pearson_upper_bound(0, 102, CERTIFICATION_ALPHA_PER_RULE)
+            clopper_pearson_upper_bound(0, 112, CERTIFICATION_ALPHA_PER_RULE)
                 <= MAX_VALIDATION_RISK
         );
         assert!(
-            clopper_pearson_upper_bound(1, 102, CERTIFICATION_ALPHA_PER_RULE)
+            clopper_pearson_upper_bound(1, 112, CERTIFICATION_ALPHA_PER_RULE)
                 > MAX_VALIDATION_RISK
         );
     }
