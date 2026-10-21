@@ -117,10 +117,6 @@ struct ChangeImpactReceipt {
     candidate_requirement_count: usize,
     mapped_requirement_count: usize,
     change_record_count: usize,
-    oracle_sha256: String,
-    oracle_case_count: usize,
-    known_answer_case_count: usize,
-    fault_mutation_case_count: usize,
     claim_ceiling: &'static str,
 }
 
