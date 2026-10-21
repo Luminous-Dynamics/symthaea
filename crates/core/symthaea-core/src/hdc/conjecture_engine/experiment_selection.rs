@@ -289,4 +289,77 @@ mod tests {
             "should prefer the point where x vs x^2 diverge most"
         );
     }
+
+    #[test]
+    fn selector_skips_non_finite_and_under_supported_candidates() {
+        let hypotheses = [0_i32, 1_i32, 2_i32];
+        let predict = |hypothesis: &i32, experiment: &f64| {
+            if *experiment == 0.0 {
+                if *hypothesis == 0 {
+                    Some(1.0)
+                } else {
+                    Some(f64::NAN)
+                }
+            } else if *experiment == 1.0 {
+                match *hypothesis {
+                    0 => Some(0.0),
+                    1 => Some(10.0),
+                    _ => Some(f64::INFINITY),
+                }
+            } else {
+                None
+            }
+        };
+
+        assert_eq!(
+            assess_epistemic_value(&0.0, &hypotheses, predict),
+            EpistemicAssessment::InsufficientValidPredictions {
+                valid_predictions: 1
+            }
+        );
+
+        let candidates = [0.0, 1.0];
+        let (chosen, score) = select_most_informative_experiment(
+            &candidates,
+            &hypotheses,
+            predict,
+        )
+        .expect("the second candidate has two finite, disagreeing predictions");
+        assert_eq!(*chosen, 1.0);
+        assert!((score - 25.0).abs() < 1e-12);
+        assert!(score.is_finite());
+    }
+
+    #[test]
+    fn assessment_distinguishes_unrepresentable_variance() {
+        let extreme = [-1.0e308_f64, 1.0e308_f64];
+        assert_eq!(
+            assess_epistemic_value(&(), &extreme, |value, _| Some(*value)),
+            EpistemicAssessment::UnrepresentableScore {
+                valid_predictions: 2
+            }
+        );
+
+        // The scaled calculation still returns zero for equal large values,
+        // instead of overflowing while summing the mean.
+        let equal_large = [1.0e308_f64, 1.0e308_f64];
+        assert_eq!(
+            assess_epistemic_value(&(), &equal_large, |value, _| Some(*value)),
+            EpistemicAssessment::Score {
+                value: 0.0,
+                valid_predictions: 2
+            }
+        );
+    }
+
+    #[test]
+    fn selector_returns_none_when_no_candidate_has_positive_disagreement() {
+        let hypotheses = [1_i32, 2_i32, 3_i32];
+        let predict = |_: &i32, _: &f64| Some(4.0);
+        let candidates = [0.0, 1.0, 2.0];
+        assert!(
+            select_most_informative_experiment(&candidates, &hypotheses, predict).is_none()
+        );
+    }
+
 }
