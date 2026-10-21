@@ -29,6 +29,10 @@
     "commit_before_invalid_sha_count",
     "commit_before_ancestor_of_completion_count",
     "statement_match_relation_counts",
+    "unique_theorem_identity_join_count",
+    "ambiguous_theorem_identity_join_count",
+    "unmatched_theorem_identity_join_count",
+    "theorem_identity_status_counts",
     "events"
   ],
   "properties": {
@@ -60,6 +64,14 @@
     "commit_before_invalid_sha_count": {"type": "integer", "minimum": 0},
     "commit_before_ancestor_of_completion_count": {"type": "integer", "minimum": 0},
     "statement_match_relation_counts": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {"type": "integer", "minimum": 0}
+    },
+    "unique_theorem_identity_join_count": {"type": "integer", "minimum": 0},
+    "ambiguous_theorem_identity_join_count": {"type": "integer", "minimum": 0},
+    "unmatched_theorem_identity_join_count": {"type": "integer", "minimum": 0},
+    "theorem_identity_status_counts": {
       "type": "object",
       "minProperties": 1,
       "additionalProperties": {"type": "integer", "minimum": 0}
@@ -114,7 +126,16 @@
         "commit_before_is_ancestor_of_completion",
         "statement_match_at_commit_before",
         "statement_match_at_completion",
-        "statement_match_relation"
+        "statement_match_relation",
+        "declared_statement_name",
+        "declared_name_matches_dataset",
+        "dataset_proof_sha256",
+        "identity_candidate_timeline_positions",
+        "identity_join_status",
+        "identity_statement_match_at_commit_before",
+        "identity_statement_match_at_completion",
+        "identity_proof_matches_completion",
+        "identity_proof_absent_at_commit_before"
       ],
       "properties": {
         "dataset_position": {"type": "integer", "minimum": 0},
@@ -163,7 +184,37 @@
             "pre_state_nonmatch_completion_unavailable",
             "completion_nonmatch_pre_state_unavailable"
           ]
-        }
+        },
+        "declared_statement_name": {
+          "oneOf": [
+            {"type": "string", "minLength": 1},
+            {"type": "null"}
+          ]
+        },
+        "declared_name_matches_dataset": {"$ref": "#/$defs/nullableBoolean"},
+        "dataset_proof_sha256": {"$ref": "#/$defs/sha256"},
+        "identity_candidate_timeline_positions": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "integer", "minimum": 0}
+        },
+        "identity_join_status": {
+          "enum": [
+            "declared_name_unavailable",
+            "declared_name_mismatch",
+            "not_checked_invalid_path",
+            "not_checked_empty_dataset_proof",
+            "not_checked_no_path_candidate",
+            "no_exact_proof_transition",
+            "ambiguous_proof_transition",
+            "unique_proof_transition_with_statement_or_visibility_mismatch",
+            "unique_stable_theorem_proof_transition"
+          ]
+        },
+        "identity_statement_match_at_commit_before": {"$ref": "#/$defs/nullableBoolean"},
+        "identity_statement_match_at_completion": {"$ref": "#/$defs/nullableBoolean"},
+        "identity_proof_matches_completion": {"$ref": "#/$defs/nullableBoolean"},
+        "identity_proof_absent_at_commit_before": {"$ref": "#/$defs/nullableBoolean"}
       },
       "allOf": [
         {
