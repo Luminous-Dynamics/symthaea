@@ -50,6 +50,8 @@ Do not demand conservation from dissipative, driven, stochastic, or chaotic syst
 
 The recorded simulation time must advance by the **accepted** adaptive step, not the requested maximum step. Retain accepted-step count, rejected-step count if available, derivative/function evaluation count, achieved error estimate, min/median/max step sizes, and any tolerance shortfall. An adaptive run that reaches its minimum step while violating tolerance must not be silently described as meeting tolerance.
 
+**Fail-closed rule:** if RK45 reaches `dt_min` while its embedded error estimate still exceeds `tol`, the checked simulation returns `SimulationError::AdaptiveToleranceNotMet`. The checked path must never turn this into a successful-looking trajectory. The legacy tuple-returning RK45 API remains a panic-on-failure compatibility wrapper; new checked callers should use `try_simulate` / `try_adaptive_step`. A minimum-step failure is a model/solver resolution limit to report, not permission to relax tolerance after observing the result.
+
 ### E — Work–precision comparison
 
 Use public benchmark families represented in [SciMLBenchmarks](https://docs.sciml.ai/SciMLBenchmarksOutput/stable/): non-stiff problems (Enright–Pryce, FitzHugh–Nagumo, Lotka–Volterra, Pleiades, rigid-body and three-body dynamics), stiff problems (ROBER, HIRES, Van der Pol, and chemistry/battery examples), and suitable dynamical systems. Add PDE/engineering cases only after choosing the correct qualified model/solver interfaces.
