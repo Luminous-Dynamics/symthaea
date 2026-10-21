@@ -8,16 +8,16 @@
     "trajectory_corpus_sha256": "1ac414e6b920a6259d68a20c273a0a9465e98c7a596393f9777be9976d6e3fd3"
   },
   "count_summary": {
-    "case_count": 36,
+    "case_count": 38,
     "frozen_trace_count": 12,
-    "mutation_case_count": 24,
-    "implemented_or_frozen_count": 36,
+    "mutation_case_count": 26,
+    "implemented_or_frozen_count": 38,
     "planned_not_yet_executable_count": 0
   },
   "evidence_status_definitions": {
     "frozen_fixture": "Expected output resides in the frozen corpus and is checked by the trajectory validator.",
     "unit_test_existing": "Named Rust unit test exists; latest exact-head workflow still must pass.",
-    "unit_test_added": "Added in the current PR branch; latest exact-head workflow still must pass.",
+    "unit_test_added": "A named Rust unit test has been added; it counts as mapped coverage but not as a passing result until the exact-head workflow succeeds.",
     "frozen_control": "Covered by a named frozen benign/control trace.",
     "planned_not_yet_executable": "Coverage gap: descriptive target only, no executable test claimed.",
     "workflow_gate_existing": "A named fail-closed workflow check exists and its gate reference is verified against workflow source. This is not a unit-level mutation test of GitHub Actions itself."
@@ -552,6 +552,39 @@
       },
       "evidence_status": "frozen_control",
       "note": "Covered by FA-TRACE-009."
+    },
+    {
+      "case_id": "MUT-025",
+      "invariant_id": "UNCERTAINTY-004",
+      "mode": "mutation_or_control",
+      "source_trace_id": "FA-TRACE-012",
+      "mutation": "remove the uncertainty_preserved event, then insert session_started before handoff",
+      "expected": {
+        "outcome": "evaluate",
+        "violation_codes": [
+          "uncertainty_lost_at_session_boundary",
+          "uncertainty_lost_at_handoff"
+        ]
+      },
+      "evidence_status": "unit_test_added",
+      "test_name": "starting_new_session_cannot_silently_drop_unpreserved_uncertainty",
+      "note": "Implemented in the trajectory inspector, JSON reference interpreter and unit test. Exact-head validation pending."
+    },
+    {
+      "case_id": "MUT-026",
+      "invariant_id": "SESSION-003",
+      "mode": "mutation_or_control",
+      "source_trace_id": "FA-TRACE-001",
+      "mutation": "insert session_resumed after bundle verification without a preceding interruption",
+      "expected": {
+        "outcome": "evaluate",
+        "violation_codes": [
+          "render_without_verified_bundle"
+        ]
+      },
+      "evidence_status": "unit_test_added",
+      "test_name": "resuming_session_without_interrupt_clears_prior_bundle_verification",
+      "note": "Resume explicitly invalidates verified state even if a malformed trace lacks an interruption; exact-head validation pending."
     }
   ],
   "differential_oracle": {
@@ -560,6 +593,9 @@
     "coverage": "all 12 frozen traces plus 9 adversarial mutations: session lifecycle, wrong bundle identity, digest failure, expired bundle, uncertainty re-entry, revocation across session changes, stale-resource claims, intermittent connectivity, and non-sensitive egress control",
     "limits": "same maintainers and frozen fixture; implementation-diversity cross-check only, not external clinical adjudication or a formally verified specification",
     "test_name": "differential_json_reference_agrees_on_frozen_traces",
-    "mutation_suite_test_name": "differential_json_reference_agrees_on_adversarial_mutation_suite"
+    "mutation_suite_test_name": "differential_json_reference_agrees_on_adversarial_mutation_suite",
+    "state_model_path": "xtask/src/first_aid_model.rs",
+    "state_model_test_name": "exhaustive_reachable_state_graph_preserves_trust_invariants",
+    "state_model_scope": "finite abstract graph exploration for session state, bundle identity/validity/digest, revocation monotonicity and uncertainty handoff; separate from the trace parser but not formal verification of clinical correctness"
   }
 }
