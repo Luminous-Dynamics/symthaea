@@ -2564,7 +2564,9 @@ fn validate_temporal_manifest(manifest: &TemporalReplayManifest) -> Result<()> {
 // Remove Lean comments before looking for exact normalized copies of long
 // future proofs. Strings are preserved so comment markers inside string literals
 // are not treated as comments. This is a conservative leakage control, not a Lean
-// parser; very short/common proofs are handled by exact-content checks only.
+// parser. Very short/common proofs are excluded from substring matching to limit
+// false positives; exact-span checks still apply, but embedded short snippets may
+// remain undetected and require separate contamination review.
 fn normalize_lean_for_leakage(source: &str) -> String {
     let chars: Vec<char> = source.chars().collect();
     let mut output = String::with_capacity(source.len());
