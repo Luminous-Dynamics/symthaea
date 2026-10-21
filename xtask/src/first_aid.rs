@@ -623,7 +623,10 @@ mod tests {
 
         assert!(item.measure.contains("event traces"));
         assert!(item.target.contains("zero critical forbidden transitions"));
-        assert!(item.gate.contains("Any critical forbidden transition blocks"));
+        assert!(
+            item.gate
+                .contains("Any critical forbidden transition blocks")
+        );
         assert!(item.claim_ceiling.contains("Synthetic process-integrity"));
     }
 
