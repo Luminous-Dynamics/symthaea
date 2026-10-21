@@ -205,6 +205,9 @@ class FailClosedPyPhiValidationTests(unittest.TestCase):
             n_validated=3,
             n_failed=0,
         )
+        report.shared_model_verified = False
+        self.assertFalse(self.validator.is_qualified(report))
+        report.shared_model_verified = True
         self.assertTrue(self.validator.is_qualified(report))
 
         # A release candidate must never become publication-qualified.
