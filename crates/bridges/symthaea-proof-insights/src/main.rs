@@ -311,6 +311,15 @@ struct TemporalDatasetJoinAuditEvent {
     statement_match_at_commit_before: Option<bool>,
     statement_match_at_completion: Option<bool>,
     statement_match_relation: String,
+    declared_statement_name: Option<String>,
+    declared_name_matches_dataset: Option<bool>,
+    dataset_proof_sha256: String,
+    identity_candidate_timeline_positions: Vec<usize>,
+    identity_join_status: String,
+    identity_statement_match_at_commit_before: Option<bool>,
+    identity_statement_match_at_completion: Option<bool>,
+    identity_proof_matches_completion: Option<bool>,
+    identity_proof_absent_at_commit_before: Option<bool>,
 }
 
 #[derive(Debug, Serialize)]
