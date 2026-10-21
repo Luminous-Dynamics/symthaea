@@ -1374,6 +1374,72 @@ mod tests {
     }
 
     #[test]
+    fn graph_snapshot_round_trip_preserves_claim_context_and_candidate_links() {
+        let mut original = EnhancedKnowledgeGraph::new(100);
+        let context_a = make_claim_context(
+            "witness-a",
+            "family-a",
+            "evidence-a",
+            "renewal",
+            ClaimPolarity::Positive,
+            Some(-300),
+        );
+        let context_b = make_claim_context(
+            "witness-b",
+            "family-b",
+            "evidence-b",
+            "renewal",
+            ClaimPolarity::Positive,
+            Some(-300),
+        );
+        let (id_a, _) = original
+            .insert_grounded(
+                make_encoding("same grounded claim", 0.7),
+                1,
+                None,
+                false,
+                context_a,
+            )
+            .unwrap();
+        let (id_b, _) = original
+            .insert_grounded(
+                make_encoding("same grounded claim", 0.7),
+                2,
+                None,
+                false,
+                context_b,
+            )
+            .unwrap();
+        let records = original.export_graph_fact_records();
+        let links = original.evidence_links().to_vec();
+        assert_eq!(records.len(), 2);
+        assert_eq!(links.len(), 1);
+
+        let mut restored = EnhancedKnowledgeGraph::new(100);
+        for record in &records {
+            restored.import_graph_fact_record(record);
+        }
+        restored.import_evidence_links(&links);
+        assert_eq!(restored.get_fact(id_a).unwrap().confidence, 0.7);
+        assert_eq!(restored.get_fact(id_b).unwrap().confidence, 0.7);
+        let adjudicated = restored
+            .adjudicate_evidence_relation(
+                id_a,
+                id_b,
+                EvidenceRelation::Corroborates,
+                vec!["evidence-a".into(), "evidence-b".into()],
+                "Two independent witnesses support the same scoped proposition".into(),
+                None,
+                None,
+                3,
+            )
+            .unwrap();
+        assert_eq!(adjudicated.status, EvidenceLinkStatus::Adjudicated);
+        assert_eq!(restored.get_fact(id_a).unwrap().corroboration_count, 1);
+        assert_eq!(restored.get_fact(id_a).unwrap().confidence, 0.75);
+    }
+
+    #[test]
     fn contradiction_candidates_do_not_demote_facts_before_adjudication() {
         let mut graph = EnhancedKnowledgeGraph::new(100);
         let (id_a, _) = graph.insert(make_encoding("oil prices rose", 0.8), 1, None, false);
