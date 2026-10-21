@@ -752,6 +752,95 @@ mod tests {
         assert!(validate_review(&review).unwrap_err().iter().any(|error| error.contains("both referenced alternatives must exist")));
     }
 
+    fn paired_scenario_review_fixture() -> Value {
+        let mut review = fixture();
+        let baseline_id = string_value(review["alternatives"][0].get("alternative_id")).to_owned();
+        let alternative_id = string_value(review["alternatives"][1].get("alternative_id")).to_owned();
+        let baseline_design_sha = string_value(review["alternatives"][0].get("snapshot_sha256")).to_owned();
+        let alternative_design_sha = string_value(review["alternatives"][1].get("snapshot_sha256")).to_owned();
+        let registry_sha = string_value(review["inputs"].get("metric_registry_sha256")).to_owned();
+        let boundary_sha = "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
+        let evaluation_sha = "1111111111111111111111111111111111111111111111111111111111111111";
+
+        review["inputs"]["scenario_runs"] = json!([
+            {
+                "system": "symtropy",
+                "manifest_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+                "purpose": "synthetic-benchmark",
+                "evidence_class": "synthetic",
+                "status": "blocked",
+                "model_id": "landscape-model-v0",
+                "model_version": "0.1.0",
+                "pairing_context": {
+                    "alternative_id": baseline_id,
+                    "design_snapshot_sha256": baseline_design_sha,
+                    "boundary_conditions_sha256": boundary_sha,
+                    "evaluation_plan_sha256": evaluation_sha,
+                    "metric_registry_sha256": registry_sha,
+                    "seed": 7,
+                    "scope": "site-parcel"
+                }
+            },
+            {
+                "system": "symtropy",
+                "manifest_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+                "purpose": "synthetic-benchmark",
+                "evidence_class": "synthetic",
+                "status": "blocked",
+                "model_id": "landscape-model-v0",
+                "model_version": "0.1.0",
+                "pairing_context": {
+                    "alternative_id": alternative_id,
+                    "design_snapshot_sha256": alternative_design_sha,
+                    "boundary_conditions_sha256": boundary_sha,
+                    "evaluation_plan_sha256": evaluation_sha,
+                    "metric_registry_sha256": registry_sha,
+                    "seed": 7,
+                    "scope": "site-parcel"
+                }
+            }
+        ]);
+        review
+    }
+
+    #[test]
+    fn paired_scenario_runs_with_shared_context_are_accepted_as_unranked() {
+        let review = paired_scenario_review_fixture();
+        assert!(validate_review(&review).is_ok());
+    }
+
+    #[test]
+    fn paired_scenario_runs_reject_boundary_condition_mismatch() {
+        let mut review = paired_scenario_review_fixture();
+        review["inputs"]["scenario_runs"][1]["pairing_context"]["boundary_conditions_sha256"] =
+            json!("0000000000000000000000000000000000000000000000000000000000000000");
+        let errors = validate_review(&review).unwrap_err();
+        assert!(errors.iter().any(|error| {
+            error.contains("must match across paired alternatives")
+        }));
+    }
+
+    #[test]
+    fn paired_scenario_run_must_bind_exact_alternative_snapshot() {
+        let mut review = paired_scenario_review_fixture();
+        review["inputs"]["scenario_runs"][1]["pairing_context"]["design_snapshot_sha256"] =
+            json!("0000000000000000000000000000000000000000000000000000000000000000");
+        let errors = validate_review(&review).unwrap_err();
+        assert!(errors.iter().any(|error| {
+            error.contains("does not match the exact alternative snapshot")
+        }));
+    }
+
+    #[test]
+    fn qualified_comparison_cannot_use_blocked_scenario_runs() {
+        let mut review = paired_scenario_review_fixture();
+        review["comparison"]["ranking_status"] = json!("qualified-comparison");
+        let errors = validate_review(&review).unwrap_err();
+        assert!(errors.iter().any(|error| {
+            error.contains("qualified comparison cannot include blocked or conflicted runs")
+        }));
+    }
+
     #[test]
     fn invalid_input_digest_is_rejected() {
         let mut review = fixture();
