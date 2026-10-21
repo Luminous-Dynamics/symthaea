@@ -284,6 +284,8 @@ impl EnhancedKnowledgeGraph {
         if rationale.trim().is_empty() {
             return Err("adjudicated evidence relations require a rationale".into());
         }
+        let mut evidence_ids = evidence_ids;
+        evidence_ids.sort();
         let supplied: HashSet<&str> = evidence_ids.iter().map(String::as_str).collect();
         if evidence_ids.is_empty()
             || evidence_ids.iter().any(|id| id.trim().is_empty())
