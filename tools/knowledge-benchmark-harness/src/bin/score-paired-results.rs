@@ -88,7 +88,7 @@ struct PairEvidence {
     kind: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 struct SourcePackSnapshot {
     schema_version: String,
     synthetic_only: bool,
@@ -1182,7 +1182,7 @@ mod tests {
         };
         assert!(validate_source_pack_matches_pairs(
             std::slice::from_ref(&case),
-            &[snapshot, mutated_snapshot],
+            &[snapshot.clone(), mutated_snapshot.clone()],
             true
         ).is_ok());
 
