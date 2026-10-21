@@ -118,8 +118,9 @@ jobs:
             .violation_count == 9 and
             .corpus_sha256 == "1ac414e6b920a6259d68a20c273a0a9465e98c7a596393f9777be9976d6e3fd3" and
             .claim_ceiling == "synthetic process-integrity audit only; no clinical safety or patient-outcome claim" and
-            ([.corpus_sha256, .evaluation_protocol_sha256, .validator_source_sha256,
-              .entrypoint_source_sha256, .executable_sha256] | all(test("^[0-9a-f]{64}$")))
+            ([.corpus_sha256, .evaluation_protocol_sha256, .mutation_matrix_sha256,
+              .validator_source_sha256, .entrypoint_source_sha256,
+              .executable_sha256] | all(test("^[0-9a-f]{64}$")))
           ' target/first-aid-trajectory-receipt.json
           jq -e --arg expected "$EXPECTED_HEAD" '
             .status == "synthetic_change_impact_contract_passed" and
