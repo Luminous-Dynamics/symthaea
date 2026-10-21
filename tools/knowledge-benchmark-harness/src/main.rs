@@ -20,6 +20,7 @@ enum Kind {
     Annotation,
     Run,
     PairResult,
+    SourcePack,
 }
 
 impl Kind {
@@ -33,8 +34,9 @@ impl Kind {
             "annotation" => Ok(Self::Annotation),
             "run" => Ok(Self::Run),
             "pair-result" => Ok(Self::PairResult),
+            "source-pack" => Ok(Self::SourcePack),
             _ => Err(format!(
-                "unknown --kind {raw:?}; expected case, graph, claim, pair, source, annotation, run, or pair-result"
+                "unknown --kind {raw:?}; expected case, graph, claim, pair, source, annotation, run, pair-result, or source-pack"
             )),
         }
     }
@@ -49,6 +51,7 @@ impl Kind {
             Self::Annotation => "annotation",
             Self::Run => "run",
             Self::PairResult => "pair-result",
+            Self::SourcePack => "source-pack",
         }
     }
 }
@@ -91,7 +94,7 @@ struct Report {
 }
 
 fn usage() -> &'static str {
-    "Usage: knowledge-benchmark-harness --schema FILE --input JSONL --kind case|graph|claim|pair|source|annotation|run|pair-result [--out FILE] [--subject-revision SHA]\n\nValidates local data only. It never fetches source URLs or remote schemas."
+    "Usage: knowledge-benchmark-harness --schema FILE --input JSONL --kind case|graph|claim|pair|source|annotation|run|pair-result|source-pack [--out FILE] [--subject-revision SHA]\n\nValidates local data only. It never fetches source URLs or remote schemas."
 }
 
 fn parse_args() -> Result<Config, String> {
@@ -304,6 +307,13 @@ fn validate_graph_contract(graph: &Value) -> Vec<String> {
 }
 
 fn record_identity(kind: Kind, value: &Value, line: usize) -> String {
+    if kind == Kind::SourcePack {
+        let pair_id = string_field(value, "pair_id").unwrap_or("");
+        let state = string_field(value, "state").unwrap_or("");
+        if !pair_id.is_empty() && !state.is_empty() {
+            return format!("{pair_id}:{state}");
+        }
+    }
     let key = match kind {
         Kind::Graph => "graph_id",
         Kind::Case | Kind::Claim => "id",
@@ -312,6 +322,7 @@ fn record_identity(kind: Kind, value: &Value, line: usize) -> String {
         Kind::Annotation => "annotation_id",
         Kind::Run => "plan_id",
         Kind::PairResult => "result_id",
+        Kind::SourcePack => "pair_id",
     };
     string_field(value, key)
         .map(str::to_string)
@@ -1023,6 +1034,29 @@ fn validate_annotation_catalog_refs(annotation: &Value) -> Vec<String> {
     errors
 }
 
+fn validate_source_pack_contract(record: &Value) -> Vec<String> {
+    let mut errors = Vec::new();
+    let pair_id = string_field(record, "pair_id").unwrap_or("<missing>");
+    if record.get("synthetic_only").and_then(Value::as_bool) != Some(true) {
+        errors.push(format!(
+            "source-pack fixture {pair_id:?} must be explicitly synthetic_only"
+        ));
+    }
+    if !matches!(string_field(record, "state"), Some("baseline" | "mutated")) {
+        errors.push(format!(
+            "source-pack fixture {pair_id:?} must identify baseline or mutated state"
+        ));
+    }
+    collect_unique_object_ids(
+        record,
+        "evidence_pack",
+        "evidence_id",
+        "source-pack evidence",
+        &mut errors,
+    );
+    errors
+}
+
 fn validate_pair_result_contract(result: &Value) -> Vec<String> {
     let mut errors = Vec::new();
     let result_id = string_field(result, "result_id").unwrap_or("<missing>");
@@ -1124,6 +1158,7 @@ fn validate_domain_contract(
         },
         Kind::Run => errors.extend(validate_run_contract(value)),
         Kind::PairResult => errors.extend(validate_pair_result_contract(value)),
+        Kind::SourcePack => errors.extend(validate_source_pack_contract(value)),
     }
     errors
 }
@@ -1741,6 +1776,28 @@ mod tests {
                 .iter()
                 .any(|e| e.contains("duplicate claim annotation ID"))
         );
+    }
+
+    #[test]
+    fn bundled_synthetic_source_pack_has_unique_pair_states() {
+        let mut seen_ids = HashSet::new();
+        for (index, raw_line) in
+            include_str!("../../../benchmarks/benchmark-runs/v0/synthetic-source-pack.jsonl")
+                .lines()
+                .enumerate()
+        {
+            let record: Value = serde_json::from_str(raw_line).unwrap_or_else(|error| {
+                panic!("invalid source-pack JSONL at line {}: {error}", index + 1)
+            });
+            let errors = validate_domain_contract(Kind::SourcePack, &record, &mut seen_ids);
+            assert!(
+                errors.is_empty(),
+                "source-pack line {} failed: {}",
+                index + 1,
+                errors.join("; ")
+            );
+        }
+        assert_eq!(seen_ids.len(), 20);
     }
 
     #[test]
