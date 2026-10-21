@@ -184,6 +184,17 @@ pub enum SimulationError {
         index: usize,
     },
     InvalidIntegratorConfiguration,
+    /// RK45 derivative evaluation returned a vector with the wrong dimension.
+    DerivativeDimensionMismatch {
+        stage: u8,
+        expected: usize,
+        actual: usize,
+    },
+    /// RK45 derivative evaluation returned a non-finite component.
+    NonFiniteDerivative {
+        stage: u8,
+        index: usize,
+    },
     /// RK45 reached its minimum step while the embedded error still exceeded tolerance.
     AdaptiveToleranceNotMet,
     InvalidIntegratorStepSize {
@@ -482,6 +493,27 @@ impl Rk45Integrator {
         }
     }
 
+    fn checked_derivatives(
+        system: &dyn DynamicalSystem,
+        state: &[f64],
+        t: f64,
+        expected_dim: usize,
+        stage: u8,
+    ) -> Result<Vec<f64>, SimulationError> {
+        let derivatives = system.derivatives(state, t);
+        if derivatives.len() != expected_dim {
+            return Err(SimulationError::DerivativeDimensionMismatch {
+                stage,
+                expected: expected_dim,
+                actual: derivatives.len(),
+            });
+        }
+        if let Some(index) = derivatives.iter().position(|value| !value.is_finite()) {
+            return Err(SimulationError::NonFiniteDerivative { stage, index });
+        }
+        Ok(derivatives)
+    }
+
     /// Attempt one adaptive step, returning state, accepted step size and error estimate.
     ///
     /// A step is accepted only when the embedded error is within `tol`. If the
@@ -516,24 +548,24 @@ impl Rk45Integrator {
 
         loop {
             // Cash-Karp coefficients
-            let k1 = system.derivatives(state, t);
+            let k1 = Self::checked_derivatives(system, state, t, dim, 1)?;
 
             let x2: Vec<f64> = (0..dim)
                 .map(|i| state[i] + h * (1.0 / 5.0) * k1[i])
                 .collect();
-            let k2 = system.derivatives(&x2, t + h / 5.0);
+            let k2 = Self::checked_derivatives(system, &x2, t + h / 5.0, dim, 2)?;
 
             let x3: Vec<f64> = (0..dim)
                 .map(|i| state[i] + h * (3.0 / 40.0 * k1[i] + 9.0 / 40.0 * k2[i]))
                 .collect();
-            let k3 = system.derivatives(&x3, t + 3.0 * h / 10.0);
+            let k3 = Self::checked_derivatives(system, &x3, t + 3.0 * h / 10.0, dim, 3)?;
 
             let x4: Vec<f64> = (0..dim)
                 .map(|i| {
                     state[i] + h * (3.0 / 10.0 * k1[i] - 9.0 / 10.0 * k2[i] + 6.0 / 5.0 * k3[i])
                 })
                 .collect();
-            let k4 = system.derivatives(&x4, t + 3.0 * h / 5.0);
+            let k4 = Self::checked_derivatives(system, &x4, t + 3.0 * h / 5.0, dim, 4)?;
 
             let x5: Vec<f64> = (0..dim)
                 .map(|i| {
@@ -542,7 +574,7 @@ impl Rk45Integrator {
                             + 35.0 / 27.0 * k4[i])
                 })
                 .collect();
-            let k5 = system.derivatives(&x5, t + h);
+            let k5 = Self::checked_derivatives(system, &x5, t + h, dim, 5)?;
 
             let x6: Vec<f64> = (0..dim)
                 .map(|i| {
@@ -554,7 +586,7 @@ impl Rk45Integrator {
                             + 253.0 / 4096.0 * k5[i])
                 })
                 .collect();
-            let k6 = system.derivatives(&x6, t + 7.0 * h / 8.0);
+            let k6 = Self::checked_derivatives(system, &x6, t + 7.0 * h / 8.0, dim, 6)?;
 
             // 5th order solution
             let y5: Vec<f64> = (0..dim)
@@ -1988,6 +2020,60 @@ mod tests {
         };
         let result = try_simulate(&oscillator, &integrator, &[1.0, 0.0], 0.0, 0.1, 0.1);
         assert_eq!(result, Err(SimulationError::AdaptiveToleranceNotMet));
+    }
+
+    struct MalformedDerivativeSystem {
+        output: Vec<f64>,
+    }
+
+    impl DynamicalSystem for MalformedDerivativeSystem {
+        fn state_dim(&self) -> usize {
+            2
+        }
+
+        fn derivatives(&self, _state: &[f64], _t: f64) -> Vec<f64> {
+            self.output.clone()
+        }
+
+        fn name(&self) -> &str {
+            "MalformedDerivativeSystem"
+        }
+    }
+
+    #[test]
+    fn checked_rk45_rejects_wrong_dimension_derivatives() {
+        let system = MalformedDerivativeSystem { output: vec![0.0] };
+        let result = Rk45Integrator::new(1e-8).try_adaptive_step(
+            &system,
+            &[1.0, 0.0],
+            0.0,
+            0.1,
+        );
+        assert_eq!(
+            result,
+            Err(SimulationError::DerivativeDimensionMismatch {
+                stage: 1,
+                expected: 2,
+                actual: 1,
+            })
+        );
+    }
+
+    #[test]
+    fn checked_rk45_rejects_non_finite_derivatives() {
+        let system = MalformedDerivativeSystem {
+            output: vec![f64::NAN, 0.0],
+        };
+        let result = Rk45Integrator::new(1e-8).try_adaptive_step(
+            &system,
+            &[1.0, 0.0],
+            0.0,
+            0.1,
+        );
+        assert_eq!(
+            result,
+            Err(SimulationError::NonFiniteDerivative { stage: 1, index: 0 })
+        );
     }
 
     #[test]
