@@ -157,6 +157,19 @@ Reference: Campo-Manzanares et al., *Critical assessment of machine learning app
 All numeric targets above are proposals derived from a published comparator, not results achieved by this project.
 
 
+## Abnormal-process adaptation is a separate benchmark from nominal forecasting
+
+The source inventory now includes `ABNORMAL-FERMENTATION-ADAPTATION-2026`, a study-specific literature comparator for data-adaptive mechanistic estimation after abnormality detection. Kim et al. (2026, https://doi.org/10.1016/j.ceja.2026.101157) report 30 industrial contaminated fed-batch runs, with measurements of substrate, biomass and product concentrations at four-hour intervals. Their data-availability-dependent strategy reports lower early-prefix post-detection errors for Bayesian fitting than GA fitting (26% substrate and 44% product relative error reductions), but reports higher accuracy for GA in richer-data conditions (25% substrate and 19% product). The underlying industrial data are confidential; these reported numbers are not independently reproducible from the record in this project.
+
+Translate this into a pre-registered method comparison, not an imported winner:
+1. At each legal data cutoff after an abnormality alarm, fit the fixed mechanistic, Bayesian, evolutionary and adaptive-switch estimators on **the same prefix**.
+2. Lock detection times, prefix lengths, estimator versions, priors, optimization budgets, parameter bounds and switching rule before evaluating held-out batches.
+3. Score substrate and product forecasts separately; include interval coverage/width, identifiability diagnostics, false alarms, detection delay, p95 latency and hard-constraint outcomes.
+4. Include sensor bias, sensor dropout, process disturbance, genuine contamination and overlapping nominal/abnormal trajectories as separate challenge classes whenever trustworthy labels exist.
+5. Permit `INDETERMINATE`/abstention when evidence is insufficient. A large residual alone is not a validated contamination diagnosis.
+
+A proposed stretch target is ≥15% lower mean post-detection error than the strongest fixed estimator on a locked, independent early-prefix evaluation, with paired uncertainty supporting improvement, 85–95% empirical coverage for nominal 90% prediction intervals across sufficient independent runs, and no increase in hard-constraint violations. This target is intentionally **not** a reproduction of the paper's 26%/44% figures. A public dataset and matching endpoints/splits are required for a direct comparison; the cited confidential dataset is a motivation source only.
+
 ## Executable paired decision-value audit
 
 Forecast accuracy does not show that following a model improves production. The next benchmark layer therefore scores a preregistered intervention against a matched baseline, with the accounting boundary and non-compensatory quality gates explicit.
