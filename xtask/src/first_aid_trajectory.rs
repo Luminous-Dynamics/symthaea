@@ -122,6 +122,7 @@ struct TrajectoryReceipt {
     evaluation_protocol_sha256: String,
     mutation_matrix_sha256: String,
     state_model_sha256: String,
+    state_model_test_outcome: String,
     cargo_lock_sha256: String,
     rustc_version: String,
     cargo_version: String,
@@ -196,6 +197,8 @@ pub fn run(root: &Path, corpus_arg: &Path, out_arg: Option<&Path>) -> Result<()>
         evaluation_protocol_sha256: evaluation_protocol_digest,
         mutation_matrix_sha256: mutation_matrix_digest,
         state_model_sha256: state_model_digest,
+        state_model_test_outcome: std::env::var("STATE_MODEL_TEST_OUTCOME")
+            .unwrap_or_else(|_| "not-provided".to_string()),
         cargo_lock_sha256: cargo_lock_digest,
         rustc_version,
         cargo_version,
