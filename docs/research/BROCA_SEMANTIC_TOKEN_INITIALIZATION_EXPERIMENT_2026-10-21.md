@@ -23,6 +23,9 @@ This does **not** claim that Natural Semantic Metalanguage provides a complete o
 2. Ismayilzada et al., *Evaluating Morphological Compositional Generalization in Large Language Models*, NAACL 2025. In Turkish and Finnish experiments, models' generalization weakened on novel roots and as morphological complexity increased: https://aclanthology.org/2025.naacl-long.59/
 3. EleutherAI LM Evaluation Harness, a reusable framework with standard academic tasks and multiple model backends: https://github.com/EleutherAI/lm-evaluation-harness
 4. HELM's maintainers report that the original framework entered maintenance mode on 2026-06-01. Its published taxonomy and transparent artifact model remain useful references, but it should not be the sole living baseline: https://github.com/stanford-crfm/helm
+5. Ribeiro et al., *Beyond Accuracy: Behavioral Testing of NLP Models with CheckList*, ACL 2020. Its minimum-functionality, invariance, and directional-expectation tests are a useful pattern for testing semantic contracts rather than relying only on aggregate held-out scores: https://aclanthology.org/2020.acl-main.442/
+6. Jearanaiwongkul et al., *Metamorphic Testing for Assessing Behavioral Consistency of Open-Source Large Language Models*, first published September 16, 2026. This recent work directly motivates checking behavior across controlled input transformations: https://doi.org/10.3233/FAIA260738
+7. Zheng et al., *Bidirectional Empowerment of Metamorphic Testing and Large Language Models: A Systematic Survey*, May 2026. A broader review of metamorphic testing for generative systems and methods to automate relations and test generation: https://arxiv.org/abs/2605.13898
 
 These sources motivate test design. They provide no evidence that this experiment improves Symthaea.
 
