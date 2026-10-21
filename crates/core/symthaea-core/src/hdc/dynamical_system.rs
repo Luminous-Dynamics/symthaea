@@ -502,11 +502,14 @@ impl Default for Rk45Integrator {
 /// error scale is `absolute[i] + relative * max(abs(y_old[i]), abs(y_new[i]))`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Rk45Tolerances {
+    /// Shared relative tolerance applied to every state component.
     pub relative: f64,
+    /// Positive absolute tolerance for each state component, in that component's units.
     pub absolute: Vec<f64>,
 }
 
 impl Rk45Tolerances {
+    /// Construct a tolerance profile. Validation occurs when an integration is requested.
     pub fn new(relative: f64, absolute: Vec<f64>) -> Self {
         Self { relative, absolute }
     }
@@ -527,15 +530,21 @@ impl Rk45Tolerances {
 /// One accepted RK45 step and the next controller proposal.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Rk45StepReport {
+    /// Accepted state at `t + accepted_dt`.
     pub state: Vec<f64>,
+    /// Accepted timestep (which may be smaller than the requested maximum).
     pub accepted_dt: f64,
     /// Maximum absolute difference between the embedded formulas.
     pub max_absolute_error: f64,
     /// Dimensionless error score; accepted steps have `error_norm <= 1`.
     pub error_norm: f64,
+    /// Suggested timestep for the next controller call.
     pub proposed_next_dt: f64,
+    /// Total attempted Cash–Karp steps, including rejected attempts.
     pub attempted_steps: usize,
+    /// Number of rejected attempts before this accepted step.
     pub rejected_steps: usize,
+    /// Number of derivative callback invocations (six per Cash–Karp attempt).
     pub derivative_evaluations: usize,
 }
 
@@ -547,6 +556,7 @@ pub struct Rk45Controller {
 }
 
 impl Rk45Controller {
+    /// Create a controller seeded with its first proposed timestep.
     pub fn new(initial_step_size: f64) -> Result<Self, SimulationError> {
         if !initial_step_size.is_finite() || initial_step_size <= 0.0 {
             return Err(SimulationError::InvalidTimeStep);
@@ -556,10 +566,12 @@ impl Rk45Controller {
         })
     }
 
+    /// Return the currently persisted proposal, if a successful step has occurred.
     pub fn next_step_size(&self) -> Option<f64> {
         self.next_step_size
     }
 
+    /// Reset the controller to a new initial timestep.
     pub fn reset(&mut self, initial_step_size: f64) -> Result<(), SimulationError> {
         if !initial_step_size.is_finite() || initial_step_size <= 0.0 {
             return Err(SimulationError::InvalidTimeStep);
@@ -568,6 +580,10 @@ impl Rk45Controller {
         Ok(())
     }
 
+    /// Execute one accepted adaptive step and persist its next-step proposal.
+    ///
+    /// `maximum_dt` is a per-call upper bound, usually the remaining simulation
+    /// interval or the integrator's configured maximum timestep.
     pub fn try_step(
         &mut self,
         integrator: &Rk45Integrator,
@@ -577,7 +593,10 @@ impl Rk45Controller {
         maximum_dt: f64,
         tolerances: &Rk45Tolerances,
     ) -> Result<Rk45StepReport, SimulationError> {
-        if !maximum_dt.is_finite() || maximum_dt <= 0.0 || !t.is_finite() {
+        if !t.is_finite() {
+            return Err(SimulationError::NonFiniteTimeBounds);
+        }
+        if !maximum_dt.is_finite() || maximum_dt <= 0.0 {
             return Err(SimulationError::InvalidTimeStep);
         }
         let requested_dt = self
@@ -599,18 +618,26 @@ impl Rk45Controller {
 /// Aggregate diagnostics for a scale-aware adaptive simulation.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Rk45Diagnostics {
+    /// Number of accepted timesteps in the complete simulation.
     pub accepted_steps: usize,
+    /// Total rejected Cash–Karp attempts across the simulation.
     pub rejected_steps: usize,
+    /// Total derivative callback evaluations across accepted and rejected attempts.
     pub derivative_evaluations: usize,
+    /// Smallest accepted timestep, or `None` for a zero-duration simulation.
     pub min_accepted_dt: Option<f64>,
+    /// Largest accepted timestep, or `None` for a zero-duration simulation.
     pub max_accepted_dt: Option<f64>,
+    /// Largest normalized error norm among accepted steps.
     pub max_error_norm: f64,
 }
 
 /// Numerical trajectory plus adaptive-controller diagnostics.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Rk45SimulationReport {
+    /// Recorded numerical trajectory.
     pub simulation: SimulationResult,
+    /// Work/error diagnostics produced by the adaptive controller.
     pub diagnostics: Rk45Diagnostics,
 }
 
