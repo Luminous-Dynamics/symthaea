@@ -216,19 +216,19 @@ Table 4 reports classifications produced by the current model and its chosen heu
 
 **Table 4. Exploratory model flags across selected drug-gene pairs (not clinical risk estimates).**
 
-| Drug | Gene | Domain | Model score tier | Population labels flagged by model | Example model-derived contrast (unvalidated) |
-|------|------|--------|------------|------------------------|----------------------|
-| Tacrolimus | CYP3A5 | Transplant | High | African, East Asian, South Asian, Mixed | 82% African expressors vs 6% European |
-| Efavirenz | CYP2B6 | HIV | High | African, South Asian | 17.6% African PM vs 6.8% European |
-| Codeine | CYP2D6 | Pain | Moderate-High | African, East Asian, South Asian | UM + IM divergence across groups |
-| Clopidogrel | CYP2C19 | Cardiology | Moderate-High | East Asian, South Asian, Mixed | 8.4% East Asian PM vs 2.2% European |
-| Voriconazole | CYP2C19 | Infectious disease | Moderate-High | East Asian, South Asian, Mixed | Same CYP2C19 disparity |
-| Sertraline | CYP2C19 | Psychiatry | Moderate | East Asian, South Asian | PM accumulation risk |
-| Tamoxifen | CYP2D6 | Oncology | Moderate | East Asian, South Asian | IM-driven reduced efficacy |
-| Atomoxetine | CYP2D6 | Psychiatry | Moderate | East Asian, South Asian | PM accumulation risk |
-| Ondansetron | CYP2D6 | Supportive care | Moderate | African | UM-driven treatment failure |
-| Warfarin | CYP2C9 | Cardiology | Moderate | South Asian | 5.3% South Asian PM vs 4.9% European |
-| Phenytoin | CYP2C9 | Epilepsy | Moderate | South Asian | Same CYP2C9 disparity |
+| Drug | Gene | Domain | Model score tier | Population labels crossing prototype thresholds | Method/coverage warning |
+|------|------|--------|----------------|-----------------------------------------------|-------------------------|
+| Tacrolimus | CYP3A5 | Transplant | High | African, East Asian, South Asian, Mixed | Expressor interpretation and *3/*6 coverage require independent qualification |
+| Efavirenz | CYP2B6 | HIV | High | African, South Asian | Functional-bin PM fraction not independently validated |
+| Codeine | CYP2D6 | Pain | Moderate-High | African, East Asian, South Asian | CYP2D6 copy-number/structural variants and diplotype rules incomplete |
+| Clopidogrel | CYP2C19 | Cardiology | Moderate-High | East Asian, South Asian, Mixed | *3 and complete star-allele/activity-score interpretation not represented |
+| Voriconazole | CYP2C19 | Infectious disease | Moderate-High | East Asian, South Asian, Mixed | Same CYP2C19 coverage and phenotype-definition limits |
+| Sertraline | CYP2C19 | Psychiatry | Moderate | East Asian, South Asian | Heuristic weights not outcome-calibrated |
+| Tamoxifen | CYP2D6 | Oncology | Moderate | East Asian, South Asian | Model flag is not a treatment or dosing recommendation |
+| Atomoxetine | CYP2D6 | Psychiatry | Moderate | East Asian, South Asian | CYP2D6 structural and allele-translation gaps |
+| Ondansetron | CYP2D6 | Supportive care | Moderate | African | Prototype UM category does not establish treatment failure |
+| Warfarin | CYP2C9 | Cardiology | Moderate | South Asian | Model output omits full multigene dosing context |
+| Phenytoin | CYP2C9 | Epilepsy | Moderate | South Asian | Model output omits complete allele coverage and clinical context |
 
 These tiers and flags depend on the present allele list, broad functional bins, heuristic weights, thresholds, and population references. Several phenotype estimates are known to disagree substantially with published comparisons (Section 3.8). The labels therefore mean only that the current code crossed its own threshold; they do not establish that a population is clinically underserved, that a dose is wrong, or that one drug–gene pair causes more harm than another.
 ### 3.3 Modeled Population Scenario Estimates (Not Clinical Impact)
