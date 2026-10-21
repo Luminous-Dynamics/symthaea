@@ -180,8 +180,9 @@ jobs:
             .corpus_sha256 == "1ac414e6b920a6259d68a20c273a0a9465e98c7a596393f9777be9976d6e3fd3" and
             .claim_ceiling == "synthetic process-integrity audit only; no clinical safety or patient-outcome claim" and
             ([.corpus_sha256, .evaluation_protocol_sha256, .mutation_matrix_sha256,
-              .state_model_sha256, .cargo_lock_sha256, .validator_source_sha256,
-              .entrypoint_source_sha256, .executable_sha256] | all(test("^[0-9a-f]{64}$"))) and
+              .state_model_sha256, .state_model_spec_sha256, .cargo_lock_sha256,
+              .validator_source_sha256, .entrypoint_source_sha256,
+              .executable_sha256] | all(test("^[0-9a-f]{64}$"))) and
             .state_model_test_outcome == "success" and
             (.rustc_version | startswith("rustc 1.96.0 ")) and
             (.cargo_version | startswith("cargo 1.96.0 "))
