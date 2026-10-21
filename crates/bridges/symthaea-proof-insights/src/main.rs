@@ -1259,7 +1259,7 @@ fn audit_temporal_dataset(
     }
 
     let audit = TemporalDatasetJoinAudit {
-        schema_version: "pitb.temporal-dataset-join-audit.v0",
+        schema_version: "pitb.temporal-dataset-join-audit.v1",
         repository_url,
         repository_commit,
         timeline_path: timeline_relative,
