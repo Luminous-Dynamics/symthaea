@@ -43,13 +43,13 @@ The strongest smoke test compares two three-node networks:
 
 The same marginal entropy can therefore coexist with very different dynamics. This is a constructive counterexample to any universal claim that entropy alone is an adequate integration score. It does not show that this diagnostic equals IIT phi.
 
-Other fixtures exercise common-driver correlation, an XOR dependency, noise sweeps, transition normalization, and node-relabeling invariance.
+Other fixtures exercise common-driver dependence, feed-forward chains, XOR and AND nonlinearities, noise sweeps, transition normalization, and node-relabeling invariance.
 
 ## Next experimental program
 
 ### Phase A — qualify the kernel
 
-- Execute all eight Rust tests on the exact branch head.
+- Execute all ten Rust tests on the exact branch head.
 - Add property-based checks for stochastic-row normalization, nonnegativity, entropy bounds, deterministic/noise extremes, and permutation invariance.
 - Independently implement the tiny transition-model calculations or use a separately written analytical enumerator; cross-check every TPM row and metric, not just summary statistics.
 - Freeze emitted rows as a versioned deterministic CSV/JSON artifact with schema, input-model digest, source SHA, and run receipt. Do not hand-edit measurements into documentation.
@@ -66,13 +66,15 @@ Other fixtures exercise common-driver correlation, an XOR dependency, noise swee
 | Symthaea HDC entropy proxy | Fast approximation candidate | Must be validated against an independent target |
 | PyPhi, pinned to a named formalism | Reference for small systems under that formalism | Formalism/configuration-dependent |
 
-PyPhi's current documentation distinguishes IIT 3.0, IIT 4.0 (2023), and IIT 4.0 (2026). Record the exact preset/formalism and PyPhi version instead of relying on a library default. The target is a declared formalism, not an interchangeable notion of ground truth.
+PyPhi's current documentation distinguishes IIT 3.0, IIT 4.0 (2023), and IIT 4.0 (2026). PyPhi 2.0 has a breaking API transition from `Network`/`Subsystem` to `Substrate`/`System`; the revised reference call uses `Substrate` and an explicit `formalism="IIT_3_0"`. The validation dependency is pinned to the available `2.0.0rc4` pre-release plus the EMD extra, so its pre-release status must be visible in every receipt. The benchmark must rerun against a final stable version before use as publication evidence. [Migration guide](https://pyphi.readthedocs.io/en/latest/migration/migration-2.0.html). The target is a declared formalism, not an interchangeable notion of ground truth.
 
-The existing validation path **validation/pyphi_crossvalidation.py** must be audited before using its output as evidence: if the Rust invocation fails, its current code can return hard-coded topology-dependent estimates. Replace that behavior with a typed failure or missing result, exclude failed cases from aggregate scores, and report failure counts. **Never compute accuracy or correlation over substituted estimates.** The script also constructs a simplified TPM; document that model explicitly and compare like with like.
+The legacy path **validation/pyphi_crossvalidation.py** has now been changed to fail closed: no topology-name estimates are substituted, unavailable scores stay missing, and an unqualified run exits nonzero. Its PyPhi reference model is explicitly a noisy OR-neighbor TPM, with a digest reported per topology. This reference fixture is **not yet the same model as the Rust Boolean-network kernel**, and the Symthaea adapter intentionally raises a blocked status until a shared canonical-model interface exists. No paired accuracy or correlation result can be claimed yet.
 
 IIT is not simply H(whole) minus the sum of H(parts). Formal calculations depend on the selected IIT version, state, transition probability matrix, mechanism/purview repertoires, partition scheme, and distance/normalization choice. This kernel is intentionally a pre-reference diagnostic only.
 
 ### Phase C — synthetic suite and adversarial controls
+
+The starter kernel now emits a TSV header plus each case's canonical Boolean rule specification and noise level. Save the complete stdout artifact, then hash the exact bytes (for example with `sha256sum`) and record the exact Git head; this hashes the actual output rather than using a homemade pseudo-hash. A shared model schema and per-model SHA-256 receipts are still required before the PyPhi and Rust rows can be joined.
 
 Create a frozen small-system suite across node counts 2–8 where tractable, including:
 
