@@ -2703,6 +2703,38 @@ fn validate_normalized_future_proof_leakage(
     Ok(summary)
 }
 
+fn normalized_full_proof_body(block: &str) -> Result<String> {
+    let statement_prefix = statement_declaration_prefix(block)
+        .context("source declaration lacks a parseable ':= by' boundary")?;
+    let normalized_block = normalize_lean_for_leakage(block);
+    let normalized_prefix = normalize_lean_for_leakage(&statement_prefix);
+    let mut boundaries = normalized_block.match_indices(&normalized_prefix);
+    let (_, _) = boundaries
+        .next()
+        .context("source declaration prefix was not found after normalization")?;
+    if boundaries.next().is_some() {
+        bail!("source declaration prefix is ambiguous after normalization");
+    }
+    let proof_start = normalized_block
+        .find(&normalized_prefix)
+        .context("source declaration prefix was not found after normalization")?
+        + normalized_prefix.len();
+    let proof_region = normalized_block[proof_start..].split_whitespace().collect::<Vec<_>>();
+    let mut proof_tokens = proof_region;
+    loop {
+        if proof_tokens.last().copied() == Some("end") {
+            proof_tokens.pop();
+            continue;
+        }
+        if proof_tokens.len() >= 2 && proof_tokens[proof_tokens.len() - 2] == "end" {
+            proof_tokens.truncate(proof_tokens.len() - 2);
+            continue;
+        }
+        break;
+    }
+    Ok(proof_tokens.join(" "))
+}
+
 fn validate_artifact_declaration_identity(
     source: &[u8],
     artifact: &TemporalEvidenceArtifact,
@@ -2743,17 +2775,11 @@ fn validate_artifact_declaration_identity(
             }
         }
         "proof_body" => {
-            let statement_prefix = statement_declaration_prefix(block)
-                .context("source declaration lacks a parseable ':= by' boundary")?;
-            let normalized_block = normalize_whitespace(block);
-            let normalized_prefix = normalize_whitespace(&statement_prefix);
-            let proof_region = normalized_block
-                .strip_prefix(&normalized_prefix)
-                .context("source declaration prefix could not be separated from its proof")?;
-            let normalized_proof = normalize_whitespace(span_text);
-            if normalized_proof.is_empty() || !proof_region.contains(&normalized_proof) {
+            let normalized_proof = normalize_lean_for_leakage(span_text);
+            let normalized_full_proof = normalized_full_proof_body(block)?;
+            if normalized_proof.is_empty() || normalized_proof != normalized_full_proof {
                 bail!(
-                    "proof span is not contained in the proof region of declaration {theorem_id}"
+                    "proof artifact must cover the complete normalized proof body of declaration {theorem_id}"
                 );
             }
         }
@@ -3721,6 +3747,36 @@ mod tests {
         assert!(error.to_string().contains("normalized future-proof leakage"));
         assert!(error.to_string().contains("target-000"));
         assert!(error.to_string().contains("target-001"));
+    }
+
+    #[test]
+    fn temporal_proof_artifact_must_not_be_a_short_excerpt_of_a_longer_proof() {
+        let source = b"theorem first : True := by\n  have h := Nat.add_comm a b\n  exact h\n";
+        let partial_span = exact_line_span(source, 2, 2).expect("partial proof line");
+        let full_span = exact_line_span(source, 2, 3).expect("full proof body");
+        let mut artifact = TemporalEvidenceArtifact {
+            artifact_id: "proof-first".to_string(),
+            path: "lean/Example.lean".to_string(),
+            artifact_kind: "proof_body".to_string(),
+            content_sha256: format!("{:x}", Sha256::digest(partial_span)),
+            content_start_line: 2,
+            content_end_line: 2,
+            source_file_sha256: format!("{:x}", Sha256::digest(source)),
+            source_commit: "1".repeat(40),
+            available_at_position: None,
+            target_position: Some(0),
+            theorem_id: Some("first".to_string()),
+        };
+        assert!(
+            validate_artifact_declaration_identity(source, &artifact, partial_span).is_err(),
+            "a digest-correct tactic excerpt must not masquerade as the whole proof body"
+        );
+        artifact.content_sha256 = format!("{:x}", Sha256::digest(full_span));
+        artifact.content_end_line = 3;
+        assert!(
+            validate_artifact_declaration_identity(source, &artifact, full_span).is_ok(),
+            "a complete declaration-scoped proof body should pass"
+        );
     }
 
     #[test]
