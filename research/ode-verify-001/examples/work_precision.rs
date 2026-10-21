@@ -20,8 +20,7 @@ const GLOBAL_ERROR_MULTIPLIER: f64 = 10.0;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let source_sha = env::var("ODE_BENCH_SOURCE_SHA").unwrap_or_else(|_| "unknown".to_string());
-    let checkout_sha =
-        env::var("ODE_BENCH_CHECKOUT_SHA").unwrap_or_else(|_| "unknown".to_string());
+    let checkout_sha = env::var("ODE_BENCH_CHECKOUT_SHA").unwrap_or_else(|_| "unknown".to_string());
     let oscillator = HarmonicOscillator::simple(1.0);
     let integrator = Rk45Integrator::new(1.0e-8);
     let mut observations = Vec::new();
