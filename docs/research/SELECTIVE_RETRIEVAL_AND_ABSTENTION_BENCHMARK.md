@@ -31,7 +31,7 @@ The random OOD samples have no registered target. A bundled pair of stored proto
 3. **Margin-only:** accept when the best-versus-second-best similarity margin passes a calibration-selected threshold.
 4. **Score + margin:** accept only when both calibrated conditions pass.
 
-Thresholds are chosen only on the selection split by maximizing coverage subject to a preliminary one-sided 95% Wilson upper-risk bound of at most 5%, and at least 30 accepted selection queries. This is candidate selection, not a risk guarantee. The selected threshold for each candidate rule is then evaluated on a second, independent certification split. A rule is marked `certified=pass` only when it accepts at least 87 certification queries and its one-sided Wilson upper risk bound is at most 5% using the Bonferroni-adjusted critical value for the three candidate policies compared per seed. The certification split is never used to tune thresholds, and final evaluation is a third held-out split. If certification fails, the rule's held-out metrics are still reported for diagnosis, but it must not be described as risk-certified.
+Thresholds are chosen only on the selection split by maximizing coverage subject to a preliminary one-sided 95% Wilson upper-risk bound of at most 5%, and at least 30 accepted selection queries. This is candidate selection, not a risk guarantee. The selected threshold for each candidate rule is then evaluated on a second, independent certification split. A rule is marked `certified=pass` only when it accepts at least 80 certification queries and its one-sided Clopper–Pearson exact-binomial upper bound is at most 5%, using per-rule `alpha=0.05/3` (Bonferroni correction for the three candidate policies compared per seed). This gate uses an independent certification split, never the data used to tune thresholds; final evaluation is a third held-out split. The bound treats accepted-query errors as binomial draws from the predeclared synthetic query generator. It is therefore a scoped benchmark certificate—not a distribution-free guarantee for arbitrary inputs, class-mixture changes, or deployment distribution shift. If certification fails, the rule's held-out metrics are still reported for diagnosis, but it must not be described as risk-certified.
 
 ## Reported metrics
 
@@ -46,11 +46,11 @@ The first version reports risk/coverage points rather than claiming a complete a
 
 ## What would count as progress?
 
-A rule is not better merely because it abstains more. The primary comparisons are:
+A rule is not better merely because it abstains more. The exact-binomial gate is a practical baseline; later work should reproduce stronger published selective-risk methods rather than imply that this threshold search is itself SOTA. The primary comparisons are:
 
 - At a fixed evaluation coverage, lower selective risk than score-only and margin-only.
 - At a predeclared risk ceiling, higher coverage than each one-dimensional threshold baseline.
-- Certification and final evaluation remain independent of threshold selection. Comparisons among three candidate policies use the predeclared Bonferroni correction.
+- Certification and final evaluation remain independent of threshold selection. Comparisons among three candidate policies use the predeclared Bonferroni correction for the exact-binomial gate.
 - The direction of the difference persists across at least five independent seeds and multiple memory sizes.
 - Final evaluation risk/coverage is reported with intervals; certification on its own does not replace final evaluation.
 - Unknown-pattern and mixture rejection remains effective as stored memory grows and distractors become correlated or near-duplicates.
@@ -80,7 +80,10 @@ A useful capacity metric for the expanded suite is **K95**: the largest stored-m
 
 ## References
 
-- Vergés et al. (2025), “Classification using hyperdimensional computing: a review with comparative analysis,” *Artificial Intelligence Review*. The review highlights that methods often use different benchmarks and provides a shared comparison over established datasets. <https://doi.org/10.1007/s10462-025-11181-2>
+- Vergés et al. (2025), “Classification using hyperdimensional computing: a review with comparative analysis,” *Artificial Intelligence Review*. The review highlights inconsistent evaluation and reports both seven commonly used HD/VSA datasets and 121 UCI classification tasks. <https://doi.org/10.1007/s10462-025-11181-2>
+- Gangrade, Kag, and Saligrama (2021), “Selective Classification via One-Sided Prediction,” AISTATS/PMLR. A published high-accuracy/low-error selective-classification baseline to study and reproduce; it is not implemented in protocol v1. <https://proceedings.mlr.press/v130/gangrade21a.html>
+- Xu, Guo, and Wei (2025), “Selective Conformal Risk Control,” preprint. A relevant conformal/selective risk-control comparator. <https://arxiv.org/abs/2512.12844>
+- Yu and Liu (2026), “A Joint Finite-Sample Certificate for Adaptive Selective Conformal Risk Control,” preprint. It studies simultaneous certification of risk and acceptance probability under adaptive threshold selection; reported results are on specific image/panoptic settings and are not assumed to transfer to HDC. <https://arxiv.org/abs/2606.08517>
 - IEEE CIS Task Force on Hyperdimensional Computing and Vector Symbolic Architectures. <https://cis.taskforce.ieee.org/hdcvsa/>
 - Kleyko et al. (2023), “A Survey on Hyperdimensional Computing aka Vector Symbolic Architectures, Part II: Applications, Cognitive Models, and Challenges,” *ACM Computing Surveys*. <https://doi.org/10.1145/3558000>
 - Bhattacharjee and Martin (2025), “Accuracy and capacity of modern Hopfield networks with synaptic noise,” *Physical Review E* 112, 035313. This is a distinct associative-memory family and a later comparison target, not evidence for the current implementation. <https://doi.org/10.1103/nwbb-n1bc>
