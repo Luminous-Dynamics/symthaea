@@ -17,9 +17,11 @@ source_files=(
   "tools/allostatic-control-bench/src/main.rs"
   "tools/allostatic-control-bench/src/bin/allostatic-control-report.rs"
   "tools/allostatic-control-bench/src/bin/allostatic-model-mismatch-bench.rs"
+  "tools/allostatic-control-bench/src/bin/allostatic-multistep-viability-bench.rs"
   "tools/allostatic-control-bench/qualify.sh"
   "docs/research/ALLOSTATIC_CONTROL_BENCHMARK_V1.md"
   "docs/research/ROBUST_VIABILITY_ENVELOPE_V1.md"
+  "docs/research/MULTISTEP_VIABILITY_TUBES_V1.md"
 )
 expected_head="${1:-$(git rev-parse HEAD)}"
 actual_head="$(git rev-parse HEAD)"
@@ -43,6 +45,7 @@ summary_out="${out_base}-summary.csv"
 paired_out="${out_base}-paired-deltas.csv"
 mismatch_out="${out_base}-mismatch-frontier.csv"
 mismatch_summary_out="${out_base}-mismatch-frontier-summary.csv"
+horizon_out="${out_base}-multistep-horizon.csv"
 receipt="${out_csv}.receipt.txt"
 
 cargo fmt --manifest-path "$manifest" -- --check
@@ -160,6 +163,57 @@ if ! awk -F, '
   exit 1
 fi
 
+# Measure viable-action shrinkage and bounded search cost across five operating
+# states, 24 deterministic dynamics panels and horizons 1, 2, 3, 5, and 8.
+cargo run --locked --release --manifest-path "$manifest" --bin allostatic-multistep-viability-bench -- \
+  "$tmpdir/horizon-a.csv"
+cargo run --locked --release --manifest-path "$manifest" --bin allostatic-multistep-viability-bench -- \
+  "$tmpdir/horizon-b.csv"
+if ! cmp -s "$tmpdir/horizon-a.csv" "$tmpdir/horizon-b.csv"; then
+  printf 'FAIL: repeated multi-step frontier is not byte-identical\n' >&2
+  exit 1
+fi
+
+if ! awk -F, '
+  NR == 1 { if (NF != 11) failed = 1; next }
+  {
+    if (NF != 11) failed = 1
+    if ($1 != "critical_low_reserve_high_load" && $1 != "reserve_limited" &&
+        $1 != "load_limited" && $1 != "balanced" && $1 != "high_margin") failed = 1
+    if ($2 !~ /^[0-9]+$/ || $2 >= 24) failed = 1
+    if ($3 != 1 && $3 != 2 && $3 != 3 && $3 != 5 && $3 != 8) failed = 1
+    for (i = 4; i <= 6; i++) if ($i != "true" && $i != "false") failed = 1
+    if ($7 != (($4 == "true") + ($5 == "true") + ($6 == "true"))) failed = 1
+    if (($8 == "true") != ($7 == 0)) failed = 1
+    if ($9 !~ /^[0-9]+$/ || $9 > 10000) failed = 1
+    if ($10 !~ /^[0-9]+$/ || $10 > 10000) failed = 1
+    if ($11 !~ /^[0-9]+$/ || $11 > $3) failed = 1
+    key = $1 SUBSEP $2
+    if (!(key in previous_horizon)) {
+      if ($3 != 1) failed = 1
+    } else {
+      if (($3 == 2 && previous_horizon[key] != 1) ||
+          ($3 == 3 && previous_horizon[key] != 2) ||
+          ($3 == 5 && previous_horizon[key] != 3) ||
+          ($3 == 8 && previous_horizon[key] != 5)) failed = 1
+      if ($4 == "true" && previous_push[key] != "true") failed = 1
+      if ($5 == "true" && previous_maintain[key] != "true") failed = 1
+      if ($6 == "true" && previous_recovery[key] != "true") failed = 1
+    }
+    previous_horizon[key] = $3
+    previous_push[key] = $4
+    previous_maintain[key] = $5
+    previous_recovery[key] = $6
+    unique_key = $1 SUBSEP $2 SUBSEP $3
+    if (seen[unique_key]++) failed = 1
+    rows++
+  }
+  END { if (NR != 601 || rows != 600 || length(previous_horizon) != 120 || failed) exit 1 }
+' "$tmpdir/horizon-a.csv"; then
+  printf 'FAIL: multi-step horizon schema, monotonicity, or bounded-search contract is invalid\n' >&2
+  exit 1
+fi
+
 # Summary must contain 5 scenarios × 6 policies × 2 shield settings.
 if ! awk -F, 'NR == 1 { if (NF != 28) failed = 1; next }
   { if (NF != 28) failed = 1; rows++ }
@@ -182,6 +236,7 @@ cp "$tmpdir/summary-a.csv" "$summary_out"
 cp "$tmpdir/paired-a.csv" "$paired_out"
 cp "$tmpdir/mismatch-a.csv" "$mismatch_out"
 cp "$tmpdir/mismatch-summary-a.csv" "$mismatch_summary_out"
+cp "$tmpdir/horizon-a.csv" "$horizon_out"
 {
   printf 'status=pass\n'
   printf 'git_commit=%s\n' "$actual_head"
@@ -201,6 +256,8 @@ cp "$tmpdir/mismatch-summary-a.csv" "$mismatch_summary_out"
   printf 'mismatch_frontier_rows_excluding_header=%s\n' "$(( $(wc -l < "$mismatch_out") - 1 ))"
   printf 'mismatch_summary_sha256=%s\n' "$(sha256sum "$mismatch_summary_out" | awk '{print $1}')"
   printf 'mismatch_summary_rows_excluding_header=%s\n' "$(( $(wc -l < "$mismatch_summary_out") - 1 ))"
+  printf 'multistep_frontier_sha256=%s\n' "$(sha256sum "$horizon_out" | awk '{print $1}')"
+  printf 'multistep_frontier_rows_excluding_header=%s\n' "$(( $(wc -l < "$horizon_out") - 1 ))"
   printf '\nsource_sha256:\n'
   sha256sum "${source_files[@]}"
 } > "$receipt"
@@ -210,4 +267,5 @@ printf 'Distributional summary: %s\n' "$summary_out"
 printf 'Paired shield deltas: %s\n' "$paired_out"
 printf 'Model-mismatch safety frontier: %s\n' "$mismatch_out"
 printf 'Model-mismatch frontier summary: %s\n' "$mismatch_summary_out"
+printf 'Multi-step viability horizon frontier: %s\n' "$horizon_out"
 printf 'Provenance receipt: %s\n' "$receipt"
