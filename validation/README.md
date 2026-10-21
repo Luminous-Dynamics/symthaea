@@ -28,7 +28,7 @@ This currently produces unavailable/failed measurements by design, until the ada
 ## Required before qualification
 
 - A maintained Rust adapter that emits scores for the same causal transition model as PyPhi.
-- Model / TPM digest, source SHA, PyPhi version, explicit formalism, state, and configuration in each receipt.
+- Canonical model digest, separate state-prior digest, source SHA, PyPhi version, explicit formalism, state, and configuration in each receipt.
 - No topology-name fallbacks, default-zero substitutions, or hidden exception-to-score paths.
 - Enough finite, paired cases, held-out model families, uncertainty intervals, absolute-error metrics, rank metrics, and negative controls.
 - Exact-head evidence; queued or missing CI is not a pass.
