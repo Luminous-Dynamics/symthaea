@@ -96,6 +96,7 @@ jobs:
             and .qualification_status == "UNQUALIFIED_DIAGNOSTIC_ONLY"
             and (.status | IN("completed","attempt_budget_exceeded","tolerance_not_met","time_did_not_advance","solver_error","non_finite_state","invalid_step_report","invalid_target_interval","sample_target_overshoot","invalid_controller","rhs_counter_mismatch"))
             and (.output_target_count == 17)
+            and (.rhs_callback_count_exact == true)
             and (.output_sample_count >= 1)
             and (. as $root | ($root.output_samples | length) == $root.output_sample_count)
             and (.attempted_steps_reported >= .accepted_steps_reported)
@@ -147,5 +148,6 @@ jobs:
             .schema_version == "0.1.0"
             and .benchmark_id == "ODE-ROBERTSON-EXPLICIT-PROBE-001"
             and .qualification_status == "UNQUALIFIED_DIAGNOSTIC_ONLY"
+            and .rhs_callback_count_exact == true
             and (. as $root | ($root.output_samples | length) == $root.output_sample_count)
           ' /tmp/ode-robertson-probe-1.json
