@@ -746,7 +746,7 @@ mod tests {
     use super::*;
 
     fn run_named(name: &str) -> (Vec<InterventionResult>, Vec<ProfilePoint>) {
-        fixtures()
+        fixtures().unwrap()
             .into_iter()
             .find(|fixture| fixture.name == name)
             .expect("fixture exists")
