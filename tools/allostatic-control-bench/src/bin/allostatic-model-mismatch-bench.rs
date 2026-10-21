@@ -308,9 +308,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut raw = format!("{RAW_HEADER}\n");
     let mut summary = format!("{SUMMARY_HEADER}\n");
 
-    for (panel, first_seed, profile_count, mismatch_scale) in
-        [("within_envelope", 1_000, 300, 1.0), ("out_of_envelope", 5_000, 32, 2.0)]
-    {
+    for (panel, first_seed, profile_count, mismatch_scale) in [
+        ("within_envelope", 1_000, 300, 1.0),
+        ("out_of_envelope", 5_000, 32, 2.0),
+    ] {
         let mut aggregate = PanelCounters::default();
         for point in OPERATING_POINTS {
             let counters = run_panel(
