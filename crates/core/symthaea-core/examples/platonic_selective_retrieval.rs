@@ -626,20 +626,20 @@ fn fixed_sequence_candidates(mode: CalibrationMode) -> Vec<DecisionRule> {
     match mode {
         CalibrationMode::ScoreOnly => (0..=100)
             .map(|step| DecisionRule {
-                min_similarity: 0.65 - 1.65 * step as f64 / 100.0,
+                min_similarity: 1.0 - 2.0 * step as f64 / 100.0,
                 min_margin: -1.0,
             })
             .collect(),
         CalibrationMode::MarginOnly => (0..=100)
             .map(|step| DecisionRule {
                 min_similarity: -1.0,
-                min_margin: 0.10 * (1.0 - step as f64 / 100.0),
+                min_margin: 0.80 * (1.0 - step as f64 / 100.0),
             })
             .collect(),
         CalibrationMode::ScoreAndMargin => (0..=100)
             .map(|step| DecisionRule {
-                min_similarity: 0.65 - 1.65 * step as f64 / 100.0,
-                min_margin: 0.10 * (1.0 - step as f64 / 100.0),
+                min_similarity: 1.0 - 2.0 * step as f64 / 100.0,
+                min_margin: 0.80 * (1.0 - step as f64 / 100.0),
             })
             .collect(),
     }
@@ -1680,22 +1680,22 @@ mod tests {
 
     #[test]
     fn fixed_sequence_stops_before_a_later_safe_nonmonotone_threshold() {
-        // Strict candidates accept 400 correct examples. At threshold 0.60,
-        // 50 errors enter and the risk certificate fails. At the final 0.45
-        // candidate, 2,000 additional correct examples dilute the observed
-        // error rate enough to pass again. Fixed-sequence CIC must nevertheless
-        // stop at the first failure rather than selecting that later point.
+        // The initial strict candidates accept 400 correct examples at similarity
+        // 1.0. At threshold 0.58, 50 errors enter and the risk certificate fails.
+        // At the final -1.0 candidate, 2,000 additional correct examples dilute
+        // the observed error rate enough to pass again. Fixed-sequence CIC must
+        // nevertheless stop at the first failure rather than selecting that later point.
         let mut samples = Vec::with_capacity(2_450);
         samples.extend((0..400).map(|_| ScoredQuery {
-            best_similarity: 0.9,
-            top_two_margin: 0.2,
+            best_similarity: 1.0,
+            top_two_margin: 0.95,
             correct: true,
             target_similarity: Some(0.5),
             prototype_similarities: Arc::<[f64]>::from(Vec::<f64>::new()),
             kind: QueryKind::Known { noise_index: 0 },
         }));
         samples.extend((0..50).map(|_| ScoredQuery {
-            best_similarity: 0.6,
+            best_similarity: 0.59,
             top_two_margin: 0.1,
             correct: false,
             target_similarity: Some(0.5),
@@ -1714,8 +1714,8 @@ mod tests {
         let candidates = fixed_sequence_candidates(CalibrationMode::ScoreOnly);
         let result = calibrate_fixed_sequence_rule(&samples, CalibrationMode::ScoreOnly);
         assert!(result.certified_prefix_len > 0);
-        assert_eq!(result.stopped_at_index, Some(4));
-        assert_eq!(result.selected_candidate_index, Some(3));
+        assert_eq!(result.stopped_at_index, Some(21));
+        assert_eq!(result.selected_candidate_index, Some(20));
         assert!(result.certificate.passed);
 
         let later_certificate = certify_rule(&samples, *candidates.last().expect("candidate grid"));
