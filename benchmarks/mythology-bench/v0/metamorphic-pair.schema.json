@@ -7,6 +7,8 @@
   "required": [
     "schema_version",
     "pair_id",
+    "split",
+    "synthetic_only",
     "dimension",
     "baseline",
     "intervention",
@@ -128,6 +130,18 @@
     },
     "notes": {
       "type": "string"
+    },
+    "split": {
+      "enum": [
+        "synthetic",
+        "development",
+        "validation",
+        "test",
+        "holdout"
+      ]
+    },
+    "synthetic_only": {
+      "type": "boolean"
     }
   },
   "$defs": {
@@ -201,7 +215,20 @@
                 "minLength": 1
               },
               "kind": {
-                "const": "synthetic_control"
+                "enum": [
+                  "synthetic_control",
+                  "source_attestation",
+                  "scholarly_interpretation",
+                  "community_authorized_source",
+                  "archival_transcription",
+                  "metadata_only"
+                ]
+              },
+              "locator": {
+                "type": [
+                  "string",
+                  "null"
+                ]
               }
             }
           }
