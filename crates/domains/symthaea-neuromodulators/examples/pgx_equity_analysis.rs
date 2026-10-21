@@ -445,6 +445,6 @@ fn print_key_findings(engine: &PgxHealthEquityEngine) {
     println!(
         "\n[Analysis engine: PgxHealthEquityEngine with {} allele frequencies, {} CPIC guidelines]",
         engine.allele_frequencies.len(),
-        engine.cpic_guidelines.len()
+        engine.guideline_reference_count()
     );
 }
