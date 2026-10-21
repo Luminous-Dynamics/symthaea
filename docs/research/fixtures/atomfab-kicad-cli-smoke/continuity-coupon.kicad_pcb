@@ -49,7 +49,7 @@
     (add_net "VCC")
     (add_net "GND")
   )
-  (footprint "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical"
+  (footprint "AtomFab_Continuity_Connector_VCC"
     (layer "F.Cu")
     (uuid "10000000-0000-4000-8000-000000000001")
     (at 105 100)
@@ -87,7 +87,7 @@
       (uuid "10000000-0000-4000-8000-000000000005")
     )
   )
-  (footprint "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical"
+  (footprint "AtomFab_Continuity_Connector_GND"
     (layer "F.Cu")
     (uuid "20000000-0000-4000-8000-000000000001")
     (at 115 100)
