@@ -87,33 +87,36 @@ if ! cmp -s "$tmpdir/summary-a.csv" "$tmpdir/summary-b.csv" ||
   exit 1
 fi
 
-# Compare point, globally widened, and action-conditioned robust envelopes
-# across five paired operating points. Out-of-envelope profiles are negative controls.
+# Compare global and action-specific envelopes at matched 90% and 95% joint targets,
+# across five operating points. Out-of-envelope profiles are negative controls.
 cargo run --locked --release --manifest-path "$manifest" --bin allostatic-model-mismatch-bench -- \
   "$tmpdir/mismatch-a.csv" "$tmpdir/mismatch-summary-a.csv"
 cargo run --locked --release --manifest-path "$manifest" --bin allostatic-model-mismatch-bench -- \
   "$tmpdir/mismatch-b.csv" "$tmpdir/mismatch-summary-b.csv"
 if ! cmp -s "$tmpdir/mismatch-a.csv" "$tmpdir/mismatch-b.csv" ||
    ! cmp -s "$tmpdir/mismatch-summary-a.csv" "$tmpdir/mismatch-summary-b.csv"; then
-  printf 'FAIL: repeated mismatch frontier is not byte-identical\n' >&2
+  printf 'FAIL: repeated matched-coverage frontier is not byte-identical\n' >&2
   exit 1
 fi
 
-# Five operating points × five stress levels × three actions; each seed is paired
-# across operating points. 300 in-envelope and 32 shifted profiles per operating point.
+# Five operating points × five stress levels × three actions; profiles are paired
+# across all four envelope methods and all operating points.
 if ! awk -F, '
-  NR == 1 { if (NF != 16) failed = 1; next }
+  NR == 1 { if (NF != 22) failed = 1; next }
   {
-    if (NF != 16) failed = 1
+    if (NF != 22) failed = 1
     if ($1 != "within_envelope" && $1 != "out_of_envelope") failed = 1
     if ($2 != "critical_low_reserve_high_load" && $2 != "reserve_limited" &&
         $2 != "load_limited" && $2 != "balanced" && $2 != "high_margin") failed = 1
     if ($5 !~ /^[0-9]+$/) failed = 1
     if ($7 != "push" && $7 != "maintain" && $7 != "emergency_recover") failed = 1
-    for (i = 8; i <= 16; i++) if ($i != "true" && $i != "false") failed = 1
+    for (i = 8; i <= 22; i++) if ($i != "true" && $i != "false") failed = 1
+    if ($11 == "true" && $9 != "true") failed = 1
+    if ($12 == "true" && $10 != "true") failed = 1
     if ($1 == "within_envelope") {
       within_rows++
-      if (($9 == "true" || $10 == "true") && $11 == "false") failed = 1
+      if (($9 == "true" || $10 == "true" || $11 == "true" || $12 == "true") &&
+          $13 == "false") failed = 1
     }
     if ($1 == "out_of_envelope") out_rows++
     key = $1 SUBSEP $2 SUBSEP $5 SUBSEP $6 SUBSEP $7
@@ -121,33 +124,38 @@ if ! awk -F, '
   }
   END { if (NR != 24901 || within_rows != 22500 || out_rows != 2400 || failed) exit 1 }
 ' "$tmpdir/mismatch-a.csv"; then
-  printf 'FAIL: operating-state frontier schema, coverage, or in-envelope safety contract is invalid\n' >&2
+  printf 'FAIL: matched-coverage frontier schema, coverage, monotonicity, or safety contract is invalid\n' >&2
   exit 1
 fi
 
 if ! awk -F, '
-  NR == 1 { if (NF != 23) failed = 1; next }
+  NR == 1 { if (NF != 35) failed = 1; next }
   {
-    if (NF != 23) failed = 1
+    if (NF != 35) failed = 1
     if ($1 != "within_envelope" && $1 != "out_of_envelope") failed = 1
-    if ($8 > $7 || $9 > $7) failed = 1
+    if ($8 > $7 || $9 > $7 || $10 > $7 || $11 > $7) failed = 1
+    if ($10 > $8 || $11 > $9) failed = 1
     if ($2 == "all_states") {
       aggregate_rows++
       if ($1 == "within_envelope") {
-        if ($5 != 1500 || $6 != 22500 || $12 != 0 || $13 != 0) failed = 1
+        if ($5 != 1500 || $6 != 22500 ||
+            $14 != 0 || $15 != 0 || $16 != 0 || $17 != 0) failed = 1
       } else {
-        if ($5 != 160 || $6 != 2400 || $11 < 1 || $12 < 1 || $13 < 1) failed = 1
+        if ($5 != 160 || $6 != 2400 ||
+            ($14 + $15 + $16 + $17) < 1) failed = 1
       }
     } else {
       state_rows++
       if ($5 != ($1 == "within_envelope" ? 300 : 32) ||
           $6 != ($1 == "within_envelope" ? 4500 : 480)) failed = 1
-      if ($1 == "within_envelope" && ($12 != 0 || $13 != 0)) failed = 1
+      if ($10 > $8 || $11 > $9) failed = 1
+      if ($1 == "within_envelope" &&
+          ($14 != 0 || $15 != 0 || $16 != 0 || $17 != 0)) failed = 1
     }
   }
   END { if (NR != 13 || aggregate_rows != 2 || state_rows != 10 || failed) exit 1 }
 ' "$tmpdir/mismatch-summary-a.csv"; then
-  printf 'FAIL: operating-state summary missing per-condition safety/availability or shifted controls\n' >&2
+  printf 'FAIL: matched-coverage per-state safety/availability summary is invalid\n' >&2
   exit 1
 fi
 
