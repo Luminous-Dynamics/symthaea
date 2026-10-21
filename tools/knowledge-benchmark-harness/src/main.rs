@@ -978,7 +978,7 @@ mod tests {
         assert!(
             errors
                 .iter()
-                .any(|e| e.contains("must reject an unsupported relation change"))
+                .any(|e| e.contains("must bind the proposed relation and reject unsupported promotion"))
         );
     }
 
