@@ -7,6 +7,7 @@ Mythology deserves a first-class module in the shared knowledge fabric, but myth
 ## Contents
 
 - [`case.schema.json`](case.schema.json): versioned evaluation case contract.
+- [Shared source catalog](../../source-catalog/v0/README.md): source IDs, source-family grouping, split governance and rights-review status. Every case source reference must resolve to this metadata catalog.
 - [`cases.jsonl`](cases.jsonl): **26** development cases (Egypt-first + synthetic transfer/metamorphic controls).
 - [`narrative-graph.schema.json`](narrative-graph.schema.json): a source-grounded narrative-graph shape contract.
 - [`narrative-graph-fixtures.jsonl`](narrative-graph-fixtures.jsonl): four explicitly synthetic graph fixtures.
