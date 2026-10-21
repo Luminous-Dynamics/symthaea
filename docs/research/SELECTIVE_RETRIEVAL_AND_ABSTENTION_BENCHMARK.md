@@ -14,13 +14,13 @@ This deliberately tests a practical systems property rather than treating exact 
 
 The executable uses three deterministic seeds, 4,096-dimensional bipolar patterns, and 64 stored prototypes per seed.
 
-| Split | Known-pattern queries | Random out-of-distribution (OOD) queries | Two-prototype mixtures | Total |
+| Split | Expected known-pattern queries | Expected random OOD queries | Expected two-prototype mixtures | Total draws |
 |---|---:|---:|---:|---:|
-| Threshold selection | 224 | 64 | 64 | 352 |
-| Independent certification | 224 | 64 | 64 | 352 |
-| Final evaluation | 448 | 128 | 128 | 704 |
+| Threshold selection | ~224 | ~64 | ~64 | 352 |
+| Independent certification | ~224 | ~64 | ~64 | 352 |
+| Final evaluation | ~448 | ~128 | ~128 | 704 |
 
-Known queries span exact retrieval and bit-flip corruption levels of 0%, 10%, 20%, 30%, 40%, 45%, and 50%. Each split uses independent corruption and OOD-generation seeds. Threshold selection and certification never use final evaluation queries. All splits share the stored prototype memory, because this protocol tests threshold calibration for a fixed memory; a separate memory-held-out generalization test remains a required next phase.
+Every query is sampled from the declared 7:2:2 mixture of known/noisy patterns, random OOD patterns, and ambiguous two-prototype mixtures; the observed category counts are random, not forced to these expectations. For known queries, target prototype and one of seven corruption rates (0%, 10%, 20%, 30%, 40%, 45%, 50%) are sampled uniformly. The splits use independently derived seeds. Threshold selection and certification never use final evaluation queries. All splits share the stored prototype memory, because this protocol tests threshold calibration for a fixed memory; a separate memory-held-out generalization test remains a required next phase.
 
 The random OOD samples have no registered target. A bundled pair of stored prototypes is intentionally ambiguous, so a unique-label acceptance counts as an error. This avoids giving the system credit for confidently guessing one component of a genuinely multi-pattern query.
 
@@ -31,7 +31,7 @@ The random OOD samples have no registered target. A bundled pair of stored proto
 3. **Margin-only:** accept when the best-versus-second-best similarity margin passes a calibration-selected threshold.
 4. **Score + margin:** accept only when both calibrated conditions pass.
 
-Thresholds are chosen only on the selection split by maximizing coverage subject to a preliminary one-sided 95% Wilson upper-risk bound of at most 5%, and at least 30 accepted selection queries. This is candidate selection, not a risk guarantee. The selected threshold for each candidate rule is then evaluated on a second, independent certification split. A rule is marked `certified=pass` only when it accepts at least 80 certification queries and its one-sided Clopper–Pearson exact-binomial upper bound is at most 5%, using per-rule `alpha=0.05/3` (Bonferroni correction for the three candidate policies compared per seed). This gate uses an independent certification split, never the data used to tune thresholds; final evaluation is a third held-out split. The bound treats accepted-query errors as binomial draws from the predeclared synthetic query generator. It is therefore a scoped benchmark certificate—not a distribution-free guarantee for arbitrary inputs, class-mixture changes, or deployment distribution shift. If certification fails, the rule's held-out metrics are still reported for diagnosis, but it must not be described as risk-certified.
+Thresholds are chosen only on the selection split by maximizing coverage subject to a preliminary one-sided 95% Wilson upper-risk bound of at most 5%, and at least 30 accepted selection queries. This is candidate selection, not a risk guarantee. The selected threshold for each candidate rule is then evaluated on a second, independent certification split. A rule is marked `certified=pass` only when it accepts at least 80 certification queries and its one-sided Clopper–Pearson exact-binomial upper bound is at most 5%, using per-rule `alpha=0.05/3` (Bonferroni correction for the three candidate policies compared per seed). This gate uses an independent certification split, never the data used to tune thresholds; final evaluation is a third held-out split. The query generator samples each query independently from a fixed mixture, allowing the pooled accepted-query error count to be treated as binomial under the declared synthetic model. It is therefore a scoped benchmark certificate—not a distribution-free guarantee for arbitrary inputs, class-mixture changes, or deployment distribution shift. If certification fails, the rule's held-out metrics are still reported for diagnosis, but it must not be described as risk-certified.
 
 ## Reported metrics
 
