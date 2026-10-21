@@ -98,6 +98,8 @@ That chain is attractive but unjustified. Stress may increase during truthful di
 The public code search surfaced these existing areas on the inspected main head:
 
 - The partnership dyad test constructs a PhiDyadCalculator input with relationship integration, synchrony, turn-taking, mutual information, emotional safety, mutuality, and relationship stage. The visible tests are basic sanity/update checks, not validation that Φ measures love or relationship health.
+
+A regression test was added at `tests/sld_corpus_contract.rs` to validate the candidate corpus structure, required/declared fields, enum membership, unique IDs, contrast-pair completeness, and the critical cross-scale counterexamples. It is authored on the branch but has **not yet been compiled or executed**; its presence is not evidence of a passing test.
 - The unified thermodynamic state defines canonical entropy, entropy-production rate, an order parameter, dissipative health, free-energy fields, energy accounting, and metabolic stress. These fields describe multiple distinct computational/thermodynamic quantities.
 - The Symthaea Atelier creative critic describes a creative-scoring heuristic in which care-labelled neuromodulator values adjust harmony/coherence weights while stress/allostatic load adjust novelty/entropy weights. Treat this as a task-specific heuristic to test—not a general psychological law or a love model.
 - The neuromodulator research bridge contains a research pathway for stress/sleep/psychoneuroimmunology-inspired and pharmacogenomic modulation. A simulation of biological pathways is not a validated human physiology model by default.
@@ -117,6 +119,16 @@ The plausible failure is circularity: an internally generated consciousness-rela
 **Follow-up opened:** [Issue #8274 — audit Φ-dyad construct validity](https://github.com/Luminous-Dynamics/symthaea/issues/8274). It calls for provenance-aware types, separation of trust/reciprocity/synchrony/mutual information, negative controls, and tests showing that high synchrony or high Φ does not imply care-consistent behavior. Keep changes MeasurementOnly until qualified.
 
 These observations are code-inspection starting points, not a comprehensive audit of all call paths. The next step is to inspect implementations, units, normalization, update timing, missing-value behavior, calibration, and existing tests before proposing code changes.
+
+### Current IIT debate: treat theory and estimator as contestable
+
+This work must not treat IIT as either automatically true or automatically pseudoscientific. The 2025 *Nature Neuroscience* exchange includes both a defense of IIT's consciousness-first paradigm and a methodological challenge about what makes a theory of consciousness scientifically testable. A 2025 open-access critique also argues that IIT's relation between formal integration and phenomenal experience remains under-justified. Those sources support a comparative-theory posture: expose assumptions, preregister discriminating predictions, include failed predictions, and do not promote a code-level Φ estimator into a settled consciousness meter.
+
+- Haun et al., **“Consciousness or pseudo-consciousness? A clash of two paradigms”** (Nature Neuroscience, 2025): https://www.nature.com/articles/s41593-025-01880-y
+- **“What makes a theory of consciousness unscientific?”** (Nature Neuroscience, 2025): https://www.nature.com/articles/s41593-025-01881-x
+- Lopez & Montemayor, **“The Integrated Information Theory Needs Attention”** (published 2025; issue 2026): https://link.springer.com/article/10.1007/s10670-025-00949-1
+
+These are arguments in an active debate, not a settled verdict. The benchmark should test operational predictions and measurement validity without assuming the metaphysical conclusion.
 
 ## 5. Falsifiable research hypotheses
 
