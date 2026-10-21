@@ -45,7 +45,7 @@ jobs:
 
       - name: Check PGx source formatting
         id: format
-        run: cargo fmt --check -p symthaea-neuromodulators
+        run: cargo fmt --check --package symthaea-neuromodulators
 
       - name: Run PGx research module tests
         id: pgx-tests
