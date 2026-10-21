@@ -598,11 +598,8 @@ fn validate_pair_contract(pair: &Value) -> Vec<String> {
     for (state_name, state) in [("baseline", baseline), ("mutated", mutated)] {
         let mut evidence_ids = HashSet::new();
         let state_rights = string_field(state, "rights_status").unwrap_or("");
-        if synthetic_only && state_rights != "synthetic_only" {
-            errors.push(format!(
-                "{state_name} rights_status must be synthetic_only for a synthetic pair"
-            ));
-        }
+        // Top-level synthetic_only describes fixture provenance; state rights_status
+        // describes the tested access state and can change in a rights_revocation pair.
         if !synthetic_only
             && (state_rights == "synthetic_only"
                 || (matches!(split, "test" | "holdout")
