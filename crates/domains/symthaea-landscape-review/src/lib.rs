@@ -41,9 +41,10 @@ pub fn validate_review(review: &Value) -> Result<(), Vec<String>> {
 
     require_const(review, "schema", REVIEW_SCHEMA, "$", &mut errors);
     require_const(review, "schema_uri", REVIEW_SCHEMA_URI, "$", &mut errors);
-    for field in ["review_id", "created_at", "analysis_profile"] {
+    for field in ["review_id", "created_at"] {
         require_nonblank(review, field, "$", &mut errors);
     }
+    require_const(review, "analysis_profile", "LAND-REVIEW-001", "$", &mut errors);
 
     let authority = object_field(review, "authority", "$", &mut errors);
     if let Some(authority) = authority {
@@ -531,6 +532,27 @@ mod tests {
         review["recommendation"]["status"] = json!("candidate-next-action");
         let errors = validate_review(&review).unwrap_err();
         assert!(errors.iter().any(|error| error.contains("metadata-only source catalog cannot support computed metric")));
+    }
+
+    #[test]
+    fn local_drawing_frame_cannot_support_computed_metric_values() {
+        let mut review = fixture();
+        review["inputs"]["source_catalog_status"] = json!("qualified");
+        review["comparison"]["ranking_status"] = json!("qualified-comparison");
+        review["comparison"]["ranking_reasons"] = json!(["All declared comparison requirements were structurally qualified."]);
+        review["metric_assessments"][0] = json!({
+            "metric_id":"heat.shade_fraction_at_declared_time",
+            "family":"heat-and-comfort",
+            "status":"computed",
+            "value":23.0,
+            "unit":"percent_of_area",
+            "evidence_class":"modelled",
+            "method_ref":"shadow-model-v1",
+            "input_sha256":["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],
+            "uncertainty":{"kind":"qualitative","description":"Scenario range requires calibration."}
+        });
+        let errors = validate_review(&review).unwrap_err();
+        assert!(errors.iter().any(|error| error.contains("LOCAL_CARTESIAN_DRAWING_UNITS frame cannot support")));
     }
 
     #[test]
