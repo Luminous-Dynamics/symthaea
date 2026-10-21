@@ -6,7 +6,7 @@
 
 Measure the value of source-witness/context-aware reasoning over strong, simple retrieval baselines under comparable evidence and tool budgets. The primary question is not "does the answer sound plausible?" It is whether a system makes the right source-conditioned claim, changes when relevant evidence changes, stays stable under irrelevant changes, preserves valid alternatives, and respects access restrictions.
 
-The JSON Schema contract is `comparison-plan.schema.json`. `synthetic-plans.jsonl` is a sentinel fixture for the schema and validator only. Its digests and system definitions are intentionally fake and must never be treated as the setup for a real run.
+The JSON Schema contracts are `comparison-plan.schema.json` and `pair-result.schema.json`. `synthetic-plans.jsonl` and `synthetic-pair-results.jsonl` are intentionally fabricated qualification fixtures. Their digests, system labels, and observation labels are fake and must never be treated as real runs or model results. The `score-paired-results` Rust binary scores adjudicated paired results under a preregistered plan and writes a digest-bound report; it does not execute a model or verify human labels against source material.
 
 ## Baseline ladder
 
@@ -70,4 +70,6 @@ Set or revise thresholds using a pilot and power analysis **before opening the f
 
 A defensible claim needs all of the following: a source-family-held-out set with transparent inclusion/exclusion rules; rights review; independent subject-expert annotation; a published baseline ladder; equal budgets; frozen model/retriever/index/prompt/decoding revisions; preregistered primary endpoint; uncertainty intervals; ablations showing which component caused the gain; worst-group and critical-gate reporting; and third-party reproduction where feasible. If improvements disappear when source-family split or evidence budgets are enforced, the claimed advance does not survive.
 
-The synthetic control file in this directory is *not* an experiment result. Only after these conditions are met should a paper or product claim say that Symthaea outperforms a named baseline on a defined metric and test distribution.
+The paired scorer computes relation accuracy, preservation rate, required-change satisfaction, citation identity rate, forbidden-behavior rows, per-dimension paired fidelity, typed-relation macro-F1, worst-dimension score, and critical-gate violations. In `preregistered_held_out` phase, incomplete system/pair coverage fails closed and candidate critical-gate failures return a nonzero exit after preserving the report. This paired-result scorer currently supports `paired_intervention_fidelity`, `citation_identity_rate`, `typed_relation_macro_f1`, and `worst_dimension_score` as primary endpoints; other endpoint families need their own matching annotation/scoring contract.
+
+The synthetic control files in this directory are *not* experiment results. Only after these conditions are met should a paper or product claim say that Symthaea outperforms a named baseline on a defined metric and test distribution.
