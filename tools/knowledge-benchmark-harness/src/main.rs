@@ -617,12 +617,9 @@ fn validate_source_contract(value: &Value, seen_ids: &mut HashSet<String>) -> Ve
     }
 
     if rights_status == "unknown" && content_access != "metadata_only" {
-        errors.push(
-            "rights_status=unknown requires content_access=metadata_only".into(),
-        );
+        errors.push("rights_status=unknown requires content_access=metadata_only".into());
     }
-    if rights_review == "approved_limited_use"
-        && matches!(rights_status, "unknown" | "restricted")
+    if rights_review == "approved_limited_use" && matches!(rights_status, "unknown" | "restricted")
     {
         errors.push(
             "rights review cannot approve limited use while rights are unknown or restricted"
@@ -630,16 +627,17 @@ fn validate_source_contract(value: &Value, seen_ids: &mut HashSet<String>) -> Ve
         );
     }
     if content_access == "verified_open_content"
-        && !matches!(rights_status, "public_domain_verified" | "open_license_verified")
+        && !matches!(
+            rights_status,
+            "public_domain_verified" | "open_license_verified"
+        )
     {
         errors.push(
             "verified_open_content requires public-domain or open-license verification".into(),
         );
     }
     if content_access == "verified_open_content" && rights_review != "approved_limited_use" {
-        errors.push(
-            "verified_open_content requires rights_review=approved_limited_use".into(),
-        );
+        errors.push("verified_open_content requires rights_review=approved_limited_use".into());
     }
     if matches!(
         rights_status,
@@ -680,8 +678,10 @@ fn validate_annotation_contract(annotation: &Value) -> Vec<String> {
             .cloned()
             .unwrap_or_default();
 
-        if matches!(epistemic_lane, "source_attested" | "scholarly_interpretation")
-            && matches!(support_label, "supported" | "partially_supported")
+        if matches!(
+            epistemic_lane,
+            "source_attested" | "scholarly_interpretation"
+        ) && matches!(support_label, "supported" | "partially_supported")
             && evidence_refs.is_empty()
         {
             errors.push(format!(
@@ -690,16 +690,14 @@ fn validate_annotation_contract(annotation: &Value) -> Vec<String> {
             ));
         }
         if severity == "release_blocker"
-            && (failure_tags.is_empty()
-                || failure_tags.iter().any(|tag| tag == "none"))
+            && (failure_tags.is_empty() || failure_tags.iter().any(|tag| tag == "none"))
         {
             errors.push(format!(
                 "claim {:?}: release_blocker requires explicit non-none failure tags",
                 string_field(claim, "claim_id").unwrap_or("<missing>")
             ));
         }
-        if failure_tags.iter().any(|tag| tag == "rights_violation")
-            && severity != "release_blocker"
+        if failure_tags.iter().any(|tag| tag == "rights_violation") && severity != "release_blocker"
         {
             errors.push(format!(
                 "claim {:?}: rights_violation must be a release_blocker",
@@ -734,8 +732,10 @@ fn validate_annotation_contract(annotation: &Value) -> Vec<String> {
         }
     }
 
-    if matches!(annotation_role, "independent_reviewer" | "subject_expert" | "calibration_reviewer")
-        && review_status == "independent"
+    if matches!(
+        annotation_role,
+        "independent_reviewer" | "subject_expert" | "calibration_reviewer"
+    ) && review_status == "independent"
         && !string_array(annotation, "prior_annotation_ids").is_empty()
     {
         errors.push(
@@ -1300,7 +1300,10 @@ mod tests {
             .enumerate()
         {
             let source: Value = serde_json::from_str(line).unwrap_or_else(|error| {
-                panic!("invalid source catalog JSONL at line {}: {error}", index + 1)
+                panic!(
+                    "invalid source catalog JSONL at line {}: {error}",
+                    index + 1
+                )
             });
             let errors = validate_domain_contract(Kind::Source, &source, &mut seen_ids);
             assert!(
@@ -1342,7 +1345,8 @@ mod tests {
                             )
                         });
                         assert_eq!(
-                            uri, catalog_uri.as_str(),
+                            uri,
+                            catalog_uri.as_str(),
                             "case {} source URI differs from catalog for {source_id:?}",
                             string_field(&case, "id").unwrap_or("<unknown>")
                         );
@@ -1370,7 +1374,9 @@ mod tests {
         });
         let errors = validate_annotation_contract(&annotation);
         assert!(
-            errors.iter().any(|e| e.contains("must not expose claim content or alternatives"))
+            errors
+                .iter()
+                .any(|e| e.contains("must not expose claim content or alternatives"))
         );
     }
 
@@ -1386,7 +1392,11 @@ mod tests {
             ]
         });
         let errors = validate_annotation_contract(&annotation);
-        assert!(errors.iter().any(|e| e.contains("duplicate claim annotation ID")));
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.contains("duplicate claim annotation ID"))
+        );
     }
 
     #[test]
