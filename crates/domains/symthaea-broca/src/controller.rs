@@ -941,8 +941,13 @@ impl LanguageController {
                             &format!("broca::token_extension_residual::{name}"),
                             HDC_DIMENSION,
                         );
+                        // Weight directions, not raw norms: the context mean's
+                        // magnitude shrinks with context count, which would make a
+                        // nominally small residual dominate otherwise.
+                        let context_direction = context_bundle.normalize();
+                        let residual_direction = residual.normalize();
                         ContinuousHV::weighted_bundle(
-                            &[&context_bundle, &residual],
+                            &[&context_direction, &residual_direction],
                             &[1.0 - residual_weight, residual_weight],
                         )
                     }
