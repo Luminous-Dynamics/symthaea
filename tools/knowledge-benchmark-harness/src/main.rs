@@ -369,9 +369,7 @@ fn validate_pair_contract(pair: &Value) -> Vec<String> {
         errors.push("pair repeats source_family_id".into());
     }
     if synthetic_only != (split == "synthetic") {
-        errors.push(
-            "pair split must be synthetic exactly when synthetic_only=true".into(),
-        );
+        errors.push("pair split must be synthetic exactly when synthetic_only=true".into());
     }
     let baseline = pair.get("baseline").unwrap_or(&Value::Null);
     let mutated = pair.get("mutated").unwrap_or(&Value::Null);
@@ -837,7 +835,10 @@ fn validate_annotation_contract(annotation: &Value) -> Vec<String> {
 fn validate_run_contract(plan: &Value) -> Vec<String> {
     let mut errors = Vec::new();
     let phase = string_field(plan, "phase").unwrap_or("");
-    let synthetic_only = plan.get("synthetic_only").and_then(Value::as_bool).unwrap_or(false);
+    let synthetic_only = plan
+        .get("synthetic_only")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
     let benchmark = plan.get("benchmark").unwrap_or(&Value::Null);
     let split = string_field(benchmark, "split").unwrap_or("");
     let source_family_disjoint = benchmark
@@ -869,7 +870,12 @@ fn validate_run_contract(plan: &Value) -> Vec<String> {
         if !family.is_empty() {
             families.insert(family.to_string());
         }
-        for key in ["implementation", "revision", "prompt_sha256", "retriever_revision"] {
+        for key in [
+            "implementation",
+            "revision",
+            "prompt_sha256",
+            "retriever_revision",
+        ] {
             if string_field(system, key).is_none_or(str::is_empty) {
                 errors.push(format!(
                     "comparison system {system_id:?} requires non-empty {key}"
@@ -922,35 +928,41 @@ fn validate_run_contract(plan: &Value) -> Vec<String> {
                 errors.push("preregistered_held_out cannot be synthetic".into());
             }
             if !matches!(split, "test" | "holdout") {
-                errors.push(
-                    "preregistered_held_out requires benchmark split=test or holdout".into(),
-                );
+                errors
+                    .push("preregistered_held_out requires benchmark split=test or holdout".into());
             }
             if !source_family_disjoint {
                 errors.push("preregistered_held_out requires source-family-disjoint data".into());
             }
             if rights_review != "approved" {
-                errors.push(
-                    "preregistered_held_out requires rights_review_status=approved".into(),
-                );
+                errors.push("preregistered_held_out requires rights_review_status=approved".into());
             }
-            if !matches!(held_out_access, "sealed_until_freeze" | "independent_evaluator") {
+            if !matches!(
+                held_out_access,
+                "sealed_until_freeze" | "independent_evaluator"
+            ) {
                 errors.push(
-                    "preregistered_held_out requires sealed or independent-evaluator access"
-                        .into(),
+                    "preregistered_held_out requires sealed or independent-evaluator access".into(),
                 );
             }
         }
         _ => errors.push(format!("unknown comparison phase {phase:?}")),
     }
 
-    let benchmark_digests_ok = ["case_manifest_sha256", "source_catalog_sha256", "source_pack_sha256"]
-        .iter()
-        .all(|key| {
-            string_field(benchmark, key).is_some_and(|digest| {
-                digest.len() == 64 && digest.bytes().all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
-            })
-        });
+    let benchmark_digests_ok = [
+        "case_manifest_sha256",
+        "source_catalog_sha256",
+        "source_pack_sha256",
+    ]
+    .iter()
+    .all(|key| {
+        string_field(benchmark, key).is_some_and(|digest| {
+            digest.len() == 64
+                && digest
+                    .bytes()
+                    .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+        })
+    });
     if !benchmark_digests_ok {
         errors.push("comparison plan requires lowercase SHA-256 digests for case manifest, source catalog, and source pack".into());
     }
@@ -968,10 +980,9 @@ fn validate_annotation_catalog_refs(annotation: &Value) -> Vec<String> {
     let mut source_family_ids = HashSet::new();
     let mut source_rights: std::collections::HashMap<String, (String, String, String)> =
         std::collections::HashMap::new();
-    for (index, raw_line) in
-        include_str!("../../../benchmarks/source-catalog/v0/sources.jsonl")
-            .lines()
-            .enumerate()
+    for (index, raw_line) in include_str!("../../../benchmarks/source-catalog/v0/sources.jsonl")
+        .lines()
+        .enumerate()
     {
         match serde_json::from_str::<Value>(raw_line) {
             Ok(source) => {
@@ -985,9 +996,15 @@ fn validate_annotation_catalog_refs(annotation: &Value) -> Vec<String> {
                     source_rights.insert(
                         id.to_string(),
                         (
-                            string_field(&source, "rights_status").unwrap_or("").to_string(),
-                            string_field(&source, "content_access").unwrap_or("").to_string(),
-                            string_field(&source, "rights_review").unwrap_or("").to_string(),
+                            string_field(&source, "rights_status")
+                                .unwrap_or("")
+                                .to_string(),
+                            string_field(&source, "content_access")
+                                .unwrap_or("")
+                                .to_string(),
+                            string_field(&source, "rights_review")
+                                .unwrap_or("")
+                                .to_string(),
                         ),
                     );
                 }
@@ -1129,7 +1146,8 @@ fn validate_source_pack_contract(record: &Value) -> Vec<String> {
             "source-pack snapshot {pair_id:?} must use synthetic_only rights_status"
         ));
     }
-    if !synthetic_only && !evidence.is_empty() && matches!(rights_status, "unknown" | "restricted") {
+    if !synthetic_only && !evidence.is_empty() && matches!(rights_status, "unknown" | "restricted")
+    {
         errors.push(format!(
             "source-pack snapshot {pair_id:?} uses content with inadmissible rights_status {rights_status:?}"
         ));
@@ -1167,15 +1185,16 @@ fn validate_pair_catalog_refs(pair: &Value) -> Vec<String> {
     let mut errors = Vec::new();
     let pair_id = string_field(pair, "pair_id").unwrap_or("<unknown>");
     let split = string_field(pair, "split").unwrap_or("");
-    let declared_families: HashSet<String> =
-        string_array(pair, "source_family_ids").into_iter().map(str::to_string).collect();
+    let declared_families: HashSet<String> = string_array(pair, "source_family_ids")
+        .into_iter()
+        .map(str::to_string)
+        .collect();
     let mut observed_families = HashSet::<String>::new();
     let mut catalog = std::collections::HashMap::<String, Value>::new();
 
-    for (index, raw_line) in
-        include_str!("../../../benchmarks/source-catalog/v0/sources.jsonl")
-            .lines()
-            .enumerate()
+    for (index, raw_line) in include_str!("../../../benchmarks/source-catalog/v0/sources.jsonl")
+        .lines()
+        .enumerate()
     {
         match serde_json::from_str::<Value>(raw_line) {
             Ok(source) => {
@@ -1190,7 +1209,10 @@ fn validate_pair_catalog_refs(pair: &Value) -> Vec<String> {
         }
     }
 
-    for (state_name, state) in [("baseline", pair.get("baseline")), ("mutated", pair.get("mutated"))] {
+    for (state_name, state) in [
+        ("baseline", pair.get("baseline")),
+        ("mutated", pair.get("mutated")),
+    ] {
         let Some(state) = state else {
             errors.push(format!("pair {pair_id:?} has no {state_name} state"));
             continue;
@@ -1322,7 +1344,9 @@ fn validate_pair_result_contract(result: &Value) -> Vec<String> {
         ));
     }
     if string_field(result, "notes").is_none_or(str::is_empty) {
-        errors.push(format!("pair result {result_id:?} requires non-empty notes"));
+        errors.push(format!(
+            "pair result {result_id:?} requires non-empty notes"
+        ));
     }
     if !matches!(
         string_field(result, "adjudication_status"),
@@ -1384,12 +1408,12 @@ fn validate_domain_contract(
         Kind::Pair => {
             errors.extend(validate_pair_contract(value));
             errors.extend(validate_pair_catalog_refs(value));
-        },
+        }
         Kind::Source => errors.extend(validate_source_contract(value, seen_ids)),
         Kind::Annotation => {
             errors.extend(validate_annotation_contract(value));
             errors.extend(validate_annotation_catalog_refs(value));
-        },
+        }
         Kind::Run => errors.extend(validate_run_contract(value)),
         Kind::PairResult => errors.extend(validate_pair_result_contract(value)),
         Kind::SourcePack => errors.extend(validate_source_pack_contract(value)),
@@ -1736,7 +1760,11 @@ mod tests {
             "criticality":"major"
         });
         let errors = validate_pair_contract(&pair);
-        assert!(errors.iter().any(|e| e.contains("non-synthetic evidence kind")));
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.contains("non-synthetic evidence kind"))
+        );
     }
 
     #[test]
@@ -1763,8 +1791,16 @@ mod tests {
             "criticality":"release_blocker"
         });
         let errors = validate_pair_contract(&pair);
-        assert!(errors.iter().any(|e| e.contains("not admissible for split")));
-        assert!(errors.iter().any(|e| e.contains("inadmissible evidence kind")));
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.contains("not admissible for split"))
+        );
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.contains("inadmissible evidence kind"))
+        );
     }
 
     #[test]
@@ -2037,7 +2073,11 @@ mod tests {
         });
         let errors = validate_annotation_catalog_refs(&annotation);
         assert!(errors.iter().any(|e| e.contains("metadata-only")));
-        assert!(errors.iter().any(|e| e.contains("lacks approved rights review")));
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.contains("lacks approved rights review"))
+        );
     }
 
     #[test]
@@ -2112,7 +2152,11 @@ mod tests {
             "evidence_pack":[{"evidence_id":"e1","source_id":"source-1","statement":"content","kind":"source_attestation"}]
         });
         let errors = validate_source_pack_contract(&record);
-        assert!(errors.iter().any(|error| error.contains("exposes evidence despite access_decision")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("exposes evidence despite access_decision"))
+        );
     }
 
     #[test]
@@ -2150,7 +2194,11 @@ mod tests {
             "adjudication_status":"synthetic_only"
         });
         let errors = validate_pair_result_contract(&result);
-        assert!(errors.iter().any(|e| e.contains("repeats a forbidden_behavior tag")));
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.contains("repeats a forbidden_behavior tag"))
+        );
     }
 
     #[test]
@@ -2183,7 +2231,10 @@ mod tests {
                 .enumerate()
         {
             let plan: Value = serde_json::from_str(raw_line).unwrap_or_else(|error| {
-                panic!("invalid comparison plan JSONL at line {}: {error}", index + 1)
+                panic!(
+                    "invalid comparison plan JSONL at line {}: {error}",
+                    index + 1
+                )
             });
             let errors = validate_domain_contract(Kind::Run, &plan, &mut seen_ids);
             assert!(
@@ -2216,8 +2267,16 @@ mod tests {
         });
         let errors = validate_run_contract(&plan);
         assert!(errors.iter().any(|e| e.contains("source-family-disjoint")));
-        assert!(errors.iter().any(|e| e.contains("rights_review_status=approved")));
-        assert!(errors.iter().any(|e| e.contains("sealed or independent-evaluator")));
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.contains("rights_review_status=approved"))
+        );
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.contains("sealed or independent-evaluator"))
+        );
         plan["benchmark"]["source_family_disjoint"] = Value::Bool(true);
         plan["benchmark"]["rights_review_status"] = Value::String("approved".into());
         plan["preregistration"]["held_out_access"] = Value::String("sealed_until_freeze".into());
