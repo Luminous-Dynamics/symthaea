@@ -28,7 +28,7 @@ The existing `LanguageController::append_token` remains unchanged for compatibil
 
 Context-based initialization fails before mutating the vocabulary when context is missing, dimension-mismatched, non-finite, or degenerate; invalid residual weights are rejected. The append operation returns the inserted index, preserves old rows, and rebuilds the optional GPU cache consistently with the legacy path.
 
-The benchmark compares four arms: the seeded-random control, the legacy context-bundle behavior, the norm-matched context bundle, and context bundle plus a 0.15 residual. It operates on synthetic vector contexts from a fixed genesis phrase. Those contexts have **no linguistic labels**, so the benchmark is intentionally about geometry and output-distribution effects—not semantic correctness.
+The benchmark compares four arms: the seeded-random control, the legacy context-bundle behavior, the norm-matched context bundle, and context bundle plus a 0.15 residual. It operates on synthetic vector contexts from a fixed genesis phrase and deliberately duplicates one context set as a collapse negative control. Those contexts have **no linguistic labels**, so the benchmark is intentionally about geometry and output-distribution effects—not semantic correctness.
 
 Run from the repository root:
 
@@ -44,7 +44,7 @@ GIT_COMMIT_SHA=$(git rev-parse HEAD) cargo run -p symthaea-broca --bin broca-voc
 - median new-row norm relative to the median old-row norm;
 - mean similarity to supplied context rows;
 - mean and maximum absolute pairwise cosine among added rows;
-- probability mass assigned to all new tokens for one fixed query;
+- probability mass assigned to all new tokens for one fixed query, plus non-finite logit count;
 - KL divergence between the original old-vocabulary distribution and the extended distribution renormalized over old tokens;
 - finite/non-finite coordinate counts;
 - schema version, fixed fixture digest, source revision, and explicit claim boundary.
