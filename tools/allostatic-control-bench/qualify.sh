@@ -264,8 +264,8 @@ if ! awk -F, '
   exit 1
 fi
 
-# Calibrated OOD monitor: nominal, moderately shifted and strongly shifted
-# score populations × five operating points. Both outputs must be deterministic.
+# Calibrated OOD monitor and a separately widened reachability fallback.
+# Actual synthetic transition parameters change under moderate/strong drift.
 cargo run --locked --release --manifest-path "$manifest" --bin allostatic-ood-fallback-bench -- \
   "$tmpdir/ood-a.csv" "$tmpdir/ood-summary-a.csv"
 cargo run --locked --release --manifest-path "$manifest" --bin allostatic-ood-fallback-bench -- \
@@ -277,9 +277,9 @@ if ! cmp -s "$tmpdir/ood-a.csv" "$tmpdir/ood-b.csv" ||
 fi
 
 if ! awk -F, '
-  NR == 1 { if (NF != 17) failed = 1; next }
+  NR == 1 { if (NF != 22) failed = 1; next }
   {
-    if (NF != 17) failed = 1
+    if (NF != 22) failed = 1
     if ($1 != "critical_low_reserve_high_load" && $1 != "reserve_limited" &&
         $1 != "load_limited" && $1 != "balanced" && $1 != "high_margin") failed = 1
     if ($2 != "nominal" && $2 != "moderate_shift" && $2 != "strong_shift") failed = 1
@@ -289,29 +289,35 @@ if ! awk -F, '
     if (($6 == "true" && $7 != "reachability_fallback") ||
         ($6 == "false" && $7 != "predictive")) failed = 1
     if ($8 != "push") failed = 1
-    if ($9 !~ /^[0-3]$/ || $10 !~ /^[0-3]$/) failed = 1
-    if ($11 != "push" && $11 != "maintain" && $11 != "emergency_recover" && $11 != "none") failed = 1
-    if ($12 != "push" && $12 != "maintain" && $12 != "emergency_recover" && $12 != "none") failed = 1
-    if ($13 != "push" && $13 != "maintain" && $13 != "emergency_recover" && $13 != "none") failed = 1
+    for (i = 9; i <= 10; i++) if ($i !~ /^[0-3]$/) failed = 1
+    for (i = 11; i <= 13; i++)
+      if ($i != "push" && $i != "maintain" && $i != "emergency_recover" && $i != "none") failed = 1
     for (i = 14; i <= 17; i++) if ($i != "true" && $i != "false") failed = 1
+    if ($18 !~ /^[0-3]$/ || $19 !~ /^[0-3]$/) failed = 1
+    for (i = 20; i <= 22; i++) if ($i != "true" && $i != "false") failed = 1
     if (($4 > $5) != ($6 == "true")) failed = 1
     if (($6 == "false" && $13 != $11) || ($6 == "true" && $13 != $12)) failed = 1
     if (($13 == "none") != ($15 == "true")) failed = 1
     if ($15 == "true" && $14 == "true") failed = 1
+    if (($13 != "none" && $20 == "false") != ($22 == "true")) failed = 1
+    if ($21 == "true" && $20 == "false") failed = 1
+    if ($6 == "true" && $13 != "none" && $21 != "true") failed = 1
+    if ($2 == "nominal" && $22 == "true") failed = 1
+    if ($2 == "strong_shift" && ($6 != "true" || $22 == "true")) failed = 1
     key = $1 SUBSEP $2 SUBSEP $3
     if (seen[key]++) failed = 1
     rows++
   }
   END { if (NR != 4501 || rows != 4500 || failed) exit 1 }
 ' "$tmpdir/ood-a.csv"; then
-  printf 'FAIL: OOD fallback schema, threshold switch, action certificate or coverage is invalid\n' >&2
+  printf 'FAIL: OOD switch, active-filter certification, actual safety or raw coverage is invalid\n' >&2
   exit 1
 fi
 
 if ! awk -F, '
-  NR == 1 { if (NF != 14) failed = 1; next }
+  NR == 1 { if (NF != 21) failed = 1; next }
   {
-    if (NF != 14) failed = 1
+    if (NF != 21) failed = 1
     if ($1 != "critical_low_reserve_high_load" && $1 != "reserve_limited" &&
         $1 != "load_limited" && $1 != "balanced" && $1 != "high_margin") failed = 1
     if ($2 != "nominal" && $2 != "moderate_shift" && $2 != "strong_shift") failed = 1
@@ -319,17 +325,23 @@ if ! awk -F, '
     if ($5 > $4 || $6 > $3) failed = 1
     if ($9 != $4 || $10 > $9) failed = 1
     if ($11 < 0 || $11 > 300 || $12 < 0 || $12 > 300) failed = 1
-    if ($13 < 0 || $13 > 3 || $14 < 0 || $14 > 3) failed = 1
-    if ($2 == "nominal" && ($5 != $4 || $6 != 0 || $7 > 0.10)) failed = 1
+    if ($13 < 0 || $13 > 3 || $14 < 0 || $14 > 3 || $15 < 0 || $15 > 3 || $16 < 0 || $16 > 3) failed = 1
+    if ($17 < 0 || $17 > 300 || $18 < 0 || $18 > $17 ||
+        $19 < 0 || $19 > $18 || $20 < 0 || $20 > $17) failed = 1
+    if (($18 + $20) != $17) failed = 1
+    if ($21 > 1 || $21 < 0) failed = 1
+    if (($17 == 0 && $21 != 0) ||
+        ($17 > 0 && ($20 / $17 - $21 > 0.00001 || $21 - $20 / $17 > 0.00001))) failed = 1
+    if ($2 == "nominal" && ($5 != $4 || $6 != 0 || $7 > 0.10 || $20 != 0)) failed = 1
     if ($2 == "moderate_shift" && ($5 != 0 || $6 > 150)) failed = 1
-    if ($2 == "strong_shift" && ($5 != 0 || $6 != 0)) failed = 1
+    if ($2 == "strong_shift" && ($5 != 0 || $6 != 0 || $20 != 0)) failed = 1
     key = $1 SUBSEP $2
     if (seen[key]++) failed = 1
     rows++
   }
   END { if (NR != 16 || rows != 15 || failed) exit 1 }
 ' "$tmpdir/ood-summary-a.csv"; then
-  printf 'FAIL: OOD fallback per-state alarm/miss/availability summary is invalid\n' >&2
+  printf 'FAIL: OOD fallback per-state false-alarm, miss, actual-safety or availability summary is invalid\n' >&2
   exit 1
 fi
 
