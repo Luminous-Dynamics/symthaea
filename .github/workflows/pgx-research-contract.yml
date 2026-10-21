@@ -5,6 +5,8 @@ on:
     paths:
       - "crates/domains/symthaea-neuromodulators/src/pgx_health_equity.rs"
       - "crates/domains/symthaea-neuromodulators/src/pharmacogenomics.rs"
+      - "crates/domains/symthaea-neuromodulators/examples/pgx_equity_analysis.rs"
+      - "crates/domains/symthaea-neuromodulators/examples/pgx_sensitivity_analysis.rs"
       - "Cargo.toml"
       - "Cargo.lock"
       - "papers/applications/pgx-health-equity/**"
@@ -15,6 +17,8 @@ on:
     paths:
       - "crates/domains/symthaea-neuromodulators/src/pgx_health_equity.rs"
       - "crates/domains/symthaea-neuromodulators/src/pharmacogenomics.rs"
+      - "crates/domains/symthaea-neuromodulators/examples/pgx_equity_analysis.rs"
+      - "crates/domains/symthaea-neuromodulators/examples/pgx_sensitivity_analysis.rs"
       - "Cargo.toml"
       - "Cargo.lock"
       - "papers/applications/pgx-health-equity/**"
