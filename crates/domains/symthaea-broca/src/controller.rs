@@ -71,7 +71,16 @@ impl GpuEmbeddingCache {
 /// V1 remains the compatibility default. V2 changes token vectors and must be
 /// treated as a distinct initialization condition in checkpoint and benchmark
 /// comparisons; it is not applied retroactively to loaded checkpoints.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Default,
+    serde::Serialize,
+    serde::Deserialize,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum TokenEmbeddingSeedScheme {
     /// Historical concatenation of the seed phrase, delimiter, and label.
@@ -87,7 +96,9 @@ fn token_embedding_from_seed(
     scheme: TokenEmbeddingSeedScheme,
 ) -> ContinuousHV {
     match scheme {
-        TokenEmbeddingSeedScheme::LegacyV1 => ContinuousHV::from_genesis(genesis, label, HDC_DIMENSION),
+        TokenEmbeddingSeedScheme::LegacyV1 => {
+            ContinuousHV::from_genesis(genesis, label, HDC_DIMENSION)
+        }
         TokenEmbeddingSeedScheme::DomainSeparatedV2 => genesis.hv_v2(label, HDC_DIMENSION),
     }
 }
@@ -340,9 +351,9 @@ pub struct LanguageController {
 }
 
 impl LanguageController {
-    /// Create a controller with the historical token-embedding initializer.
+    /// Create a controller using the configured token-embedding seed scheme.
     ///
-    /// This remains the default to preserve existing model initialization.
+    /// The config defaults to V1 to preserve existing model initialization.
     pub fn new(genesis: &GenesisSeed, config: &LanguageControllerConfig) -> Self {
         Self::new_with_token_embedding_seed_scheme(
             genesis,
@@ -384,7 +395,13 @@ impl LanguageController {
         // Seed scheme is isolated to token rows; the recurrent network above
         // intentionally retains its existing initialization for controlled A/B.
         let token_embeddings: Vec<ContinuousHV> = (0..config.vocab_size)
-            .map(|i| token_embedding_from_seed(genesis, &format!("broca::token_emb::{i}"), seed_scheme))
+            .map(|i| {
+                token_embedding_from_seed(
+                    genesis,
+                    &format!("broca::token_emb::{i}"),
+                    seed_scheme,
+                )
+            })
             .collect();
 
         let position_base =
