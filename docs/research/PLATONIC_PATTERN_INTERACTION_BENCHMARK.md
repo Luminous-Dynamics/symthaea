@@ -28,7 +28,7 @@ From the repository root:
     cargo test -p symthaea-core pattern_interaction
     cargo run -p symthaea-core --example platonic_pattern_interaction
 
-The smoke mode uses 16,384 coordinates, 64 candidate prototypes, 16 trials, noise rates 5/10/20/30/35/40/45/50%, and bundle/association sizes 1/3/5/9/17/33/49. The stress mode is invoked with --stress and uses 4,096 coordinates, 256 candidates, 32 trials, and capacities 1/7/31/63/127/255 to probe a much higher interference regime. Both emit paired MAP-versus-HRR capacity results, but these initial settings do not yet establish matched-byte K_95 or state-of-the-art performance.
+The smoke mode uses 16,384 coordinates, 64 candidate prototypes, 16 trials, noise rates 5/10/20/30/35/40/45/50%, and bundle/association sizes 1/3/5/9/17/33/49. The stress mode is invoked with --stress and uses 4,096 coordinates, 256 candidates, 128 trials, and capacities 1/7/31/63/127/255 to probe a much higher interference regime. The larger stress trial count narrows single-run binomial intervals relative to the original 32-trial sweep, but is still one predeclared seed; multiple seeds remain mandatory for publication-grade comparisons. Both emit paired MAP-versus-HRR capacity results, but these initial settings do not yet establish matched-byte K_95 or state-of-the-art performance.
 
 ## Interpretation and controls
 
