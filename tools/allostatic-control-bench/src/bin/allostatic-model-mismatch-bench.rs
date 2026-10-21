@@ -256,7 +256,7 @@ fn run_panel(
                 counters.action_specific_false_vetoes += usize::from(action_specific_false_veto);
 
                 raw.push_str(&format!(
-                    "{panel},{},{:.2},{:.2},{},{stress:.2},{},{},{},{},{},{},{},{},{},{},{}\n",
+                    "{panel},{},{:.2},{:.2},{},{stress:.2},{},{},{},{},{},{},{},{},{},{}\n",
                     point.name,
                     point.reserve,
                     point.load,
