@@ -61,6 +61,7 @@ struct BootstrapPlan {
     replicates: usize,
     seed: u64,
     confidence_level: f64,
+    multiple_comparison_correction: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -185,6 +186,7 @@ struct PairwiseComparison {
     source_family_cluster_count: usize,
     bootstrap_replicates: usize,
     bootstrap_seed: u64,
+    multiple_comparison_correction: String,
     candidate_improvement_supported: bool,
 }
 
@@ -418,6 +420,21 @@ fn validate_plan_eligibility(plan: &Plan) -> Result<(), String> {
     }
     if !(plan.bootstrap.confidence_level > 0.5 && plan.bootstrap.confidence_level < 1.0) {
         return Err("bootstrap confidence_level must be in (0.5, 1.0)".into());
+    }
+    if !matches!(
+        plan.bootstrap.multiple_comparison_correction.as_str(),
+        "none" | "bonferroni"
+    ) {
+        return Err("multiple_comparison_correction must be none or bonferroni".into());
+    }
+    if plan.phase == "preregistered_held_out"
+        && plan.systems.len() > 2
+        && plan.bootstrap.multiple_comparison_correction == "none"
+    {
+        return Err(
+            "held-out comparisons against multiple baselines require familywise correction"
+                .into(),
+        );
     }
 
     if !matches!(
@@ -889,8 +906,14 @@ fn compute_pairwise_comparisons(
         }
         differences.sort_by(f64::total_cmp);
         let alpha = 1.0 - plan.bootstrap.confidence_level;
-        let confidence_interval_low = percentile(&differences, alpha / 2.0);
-        let confidence_interval_high = percentile(&differences, 1.0 - alpha / 2.0);
+        let comparison_count = (plan.systems.len() - 1).max(1) as f64;
+        let adjusted_alpha = if plan.bootstrap.multiple_comparison_correction == "bonferroni" {
+            alpha / comparison_count
+        } else {
+            alpha
+        };
+        let confidence_interval_low = percentile(&differences, adjusted_alpha / 2.0);
+        let confidence_interval_high = percentile(&differences, 1.0 - adjusted_alpha / 2.0);
         comparisons.push(PairwiseComparison {
             baseline_system_id: system.system_id.clone(),
             candidate_system_id: plan.candidate_system_id.clone(),
@@ -904,6 +927,7 @@ fn compute_pairwise_comparisons(
             source_family_cluster_count: clusters.len(),
             bootstrap_replicates: plan.bootstrap.replicates,
             bootstrap_seed: plan.bootstrap.seed,
+            multiple_comparison_correction: plan.bootstrap.multiple_comparison_correction.clone(),
             candidate_improvement_supported: confidence_interval_low > 0.0,
         });
     }
@@ -1436,7 +1460,7 @@ mod tests {
             "synthetic_only":true,
             "primary_endpoint":"paired_intervention_fidelity",
             "candidate_system_id":"s2",
-            "bootstrap":{"replicates":2000,"seed":7,"confidence_level":0.95},
+            "bootstrap":{"replicates":2000,"seed":7,"confidence_level":0.95,"multiple_comparison_correction":"bonferroni"},
             "benchmark":{
                 "split":"synthetic",
                 "source_family_disjoint":true,
