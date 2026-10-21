@@ -1,0 +1,148 @@
+{
+  "schema_version": "pitb.insight-record.v0",
+  "record_id": "candidate-openai-math-026-eventual-subset-density-transfer-v0",
+  "source": {
+    "repository_url": "https://github.com/openai/math",
+    "commit": "1581d4cbdd69a0faf34b2089614fe2a814316a6a",
+    "path": "lean/OAI/NumberTheory/PrimeGaps/RatioDensity.lean",
+    "sha256": "01e43807653f3c486a997f1db3a0ddb451e0a84056f56fa7e7b1bdf117e04343",
+    "family_id": "026",
+    "license_status": "needs_review",
+    "upstream_record_status": "formalized_supporting_result"
+  },
+  "theorem": {
+    "theorem_id": "OAI.Problem344.positive_lower_density_prime_ratio_increases_of_large_gaps",
+    "statement_text": "theorem positive_lower_density_prime_ratio_increases_of_large_gaps (hgap : ∀ C : ℝ, 0 < C → ∃ c : ℝ, 0 < c ∧ ∃ N0 : ℕ, ∀ N : ℕ, N0 ≤ N → c * (N : ℝ) ≤ (initialCount (largeGapIndices C) N : ℝ)) : 0 < lowerAsymptoticDensity ratioIncreaseIndices",
+    "statement_digest": "cdebebffa686caafd401a489d2804229413bb31c9ec1bd7a412c5f40d032aa13",
+    "domain": [
+      "analytic number theory",
+      "asymptotic density",
+      "prime gaps",
+      "eventual set inclusion",
+      "quantitative-to-qualitative proof transfer"
+    ],
+    "claim_status": "formalized_supporting_result",
+    "assumptions": [
+      "The declaration is interpreted under the imports and definitions of the pinned OpenAI math Lean project."
+    ]
+  },
+  "artifact": {
+    "kind": "lean_file",
+    "path": "lean/OAI/NumberTheory/PrimeGaps/RatioDensity.lean",
+    "sha256": "01e43807653f3c486a997f1db3a0ddb451e0a84056f56fa7e7b1bdf117e04343",
+    "lean_toolchain": "leanprover/lean4:v4.34.1",
+    "mathlib_revision": "d13f23b723b8a846827a245b89c10fc7d3f11612",
+    "verification_scope": "Static inspection of pinned source bytes and theorem signature only. No Lean compilation, independent axiom/dependency audit, or manuscript statement-correspondence review was performed for this annotation.",
+    "verification_command": "cd lean && lake env lean OAI/NumberTheory/PrimeGaps/RatioDensity.lean (not run in this authoring step)"
+  },
+  "insight": {
+    "move_id": "eventual-inclusion-preserves-positive-linear-count",
+    "obstacle": "A quantitative lower bound is known for a source set A, while the desired qualitative conclusion concerns a target set B. The proof only establishes A ⊆ B after a finite threshold, so pointwise inclusion cannot be used globally without accounting for the exceptional prefix.",
+    "strategy": "Reduce the target conclusion to positive linear growth of its initial counting function. Establish that for all n ≥ K, membership in A implies membership in B. The counting lemma gives count_A(N) ≤ count_B(N) + K, because at most K natural indices can lie in the exceptional prefix. If count_A(N) ≥ cN eventually for fixed c > 0, choose N large enough that K ≤ cN/2; then count_B(N) ≥ (c/2)N. A separate lemma converts this positive linear lower bound into positive lower asymptotic density. The prime-gap example composes an eventual analytic inequality that gives set inclusion with this finite-prefix density-transport argument.",
+    "preconditions": [
+      "The count function measures the relevant finite prefix consistently for both sets.",
+      "There is a finite natural threshold K after which A-membership implies B-membership.",
+      "The source set has an eventually valid lower bound count_A(N) ≥ c*N with a fixed real c > 0.",
+      "The exceptional prefix has cardinality at most K under the counting convention; index offsets must be checked if the domain/counting interval changes.",
+      "The target density notion is known to follow from a positive linear lower bound; a different density definition may require a different bridge lemma."
+    ],
+    "transformation": {
+      "before_state": "For source set A, count_A(N) ≥ c*N eventually; for target set B, A ⊆ B is known only for indices at least K. The target's positive lower density is not yet established.",
+      "after_state": "Finite-prefix accounting yields count_A(N) ≤ count_B(N)+K. For sufficiently large N the constant K is absorbed into half the linear term, so count_B(N) ≥ (c/2)*N; positive lower asymptotic density follows under the target density's declared bridge lemma.",
+      "expected_obligation_change": "Split one qualitative density goal into (1) eventual source-to-target inclusion, (2) a finite-exception counting inequality, (3) absorption of a fixed additive constant into a positive linear lower bound, and (4) the explicit linear-count-to-density bridge."
+    },
+    "evidence": [
+      {
+        "source_path": "lean/OAI/NumberTheory/PrimeGaps/RatioDensity.lean",
+        "locator": "theorem eventually_largeGapIndices_explicit_subset_ratioIncreaseIndices",
+        "evidence_kind": "lean_declaration",
+        "excerpt": "simpa only [primeAt] using PrimeGrowth.eventually_nth_prime_ratio_le_log",
+        "supports": "The target set inclusion is proved eventually by importing an asymptotic prime-growth inequality rather than assuming a pointwise bound for every index."
+      },
+      {
+        "source_path": "lean/OAI/NumberTheory/PrimeGaps/RatioDensity.lean",
+        "locator": "theorem positive_lower_density_prime_ratio_increases_of_explicit_large_gaps",
+        "evidence_kind": "proof_step",
+        "excerpt": "exact positive_linear_count_of_eventual_subset",
+        "supports": "The high-level proof uses the eventual-inclusion counting bridge, composing it with the positive-linear-count-to-density result."
+      },
+      {
+        "source_path": "lean/OAI/NumberTheory/PrimeGaps/DensityTransport.lean",
+        "locator": "theorem initialCount_le_add_of_subset_above",
+        "evidence_kind": "lean_declaration",
+        "excerpt": "initialCount A N ≤",
+        "supports": "The local counting contract explicitly bounds the cost of all exceptions by an additive constant K."
+      },
+      {
+        "source_path": "lean/OAI/NumberTheory/PrimeGaps/DensityTransport.lean",
+        "locator": "theorem eventual_half_linear_count_of_subset_above",
+        "evidence_kind": "proof_step",
+        "excerpt": "exact ⟨max NA NK, ?_⟩",
+        "supports": "The proof selects a threshold where both the source lower bound applies and the finite exceptional prefix is at most half the linear term."
+      }
+    ],
+    "failure_boundaries": [
+      "If inclusion only holds on a positive-density subset rather than after a finite threshold, the additive-K argument is not sufficient.",
+      "If the source lower-bound coefficient varies with N or tends to zero, the fixed c/2 conclusion does not follow without a uniform positive lower bound.",
+      "If infinitely many exceptions are possible, their count must be bounded separately; it cannot be replaced by a finite constant K.",
+      "If the counting function uses a different interval or counts zero differently, the exceptional-prefix bound and off-by-one details must be re-established.",
+      "A positive linear lower count is stronger than some notions of positive density and may not be the right bridge for arbitrary density variants.",
+      "This is a source-derived strategy annotation; Symthaea has not yet attempted a transfer to another theorem."
+    ],
+    "transfer_candidates": []
+  },
+  "verification": {
+    "status": "not_attempted",
+    "exact_statement_checked": false,
+    "checker": null,
+    "checker_version": null,
+    "exact_statement_digest": null,
+    "axiom_policy": "unknown",
+    "notes": [
+      "The source file SHA-256 and exact stored theorem-signature digest were computed from the pinned file content during annotation authoring.",
+      "No Lean build, full dependency/axiom check, proof replay, or external theorem-equivalence check was run in this authoring step."
+    ]
+  },
+  "semantic_validation": {
+    "status": "not_attempted",
+    "statement_correspondence": {
+      "status": "not_reviewed",
+      "independent_reviewer_count": 0,
+      "notes": [
+        "The theorem signature was copied from the pinned Lean source, but correspondence to the intended manuscript-level statement has not been independently reviewed."
+      ]
+    },
+    "successor_tests": [],
+    "mutation_controls": []
+  },
+  "constructive_transfer": {
+    "status": "not_applicable",
+    "unknowns": [],
+    "candidate_witness": {
+      "status": "absent",
+      "representation": null,
+      "notes": [
+        "This record annotates an existing proof strategy, not a hidden-witness generation task."
+      ]
+    },
+    "proof_obligations": [],
+    "answer_equivalence": {
+      "method": "none",
+      "status": "not_applicable",
+      "score": null,
+      "notes": [
+        "Constructive answer discovery is not the track represented by this annotation."
+      ]
+    }
+  },
+  "review": {
+    "status": "unreviewed",
+    "independent_review_count": 0,
+    "review_notes": [
+      "Training-family-only static strategy annotation; it is not included in scored results.",
+      "Family 026 is assigned to train in the frozen split manifest; no validation or test family was opened for target selection.",
+      "Redistribution/license status remains needs_review.",
+      "The annotated proof uses prime-growth bounds and an explicit finite-prefix transport lemma; portability to other counting measures is a hypothesis until separately validated."
+    ]
+  }
+}
