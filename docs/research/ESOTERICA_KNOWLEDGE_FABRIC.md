@@ -98,7 +98,7 @@ For the same frozen questions and evidence pack, compare at least:
 
 Where model APIs are used, record exact model/version/date, prompts, decoding settings, context budget, retrieval indices, embedding/reranker versions, tool calls, latency, tokens and cost. Freeze the evaluation split and run each stochastic condition with declared seeds/repeats. Compare only like-for-like budgets and inputs.
 
-Use existing general evaluation research as methodological inspiration, not as a direct score proxy: [RAGTruth](https://aclanthology.org/2024.acl-long.585/) provides annotated hallucination examples for RAG; [ALCE](https://aclanthology.org/2023.acl-long.307/) studies citation-supported long-form QA; and expert-focused research warns that one automatic overall score is inadequate for long-form answer quality ([Xu et al., ACL 2023](https://aclanthology.org/2023.acl-long.181/)). None of these benchmarks, by itself, measures esoteric/historical expertise.
+Use existing general evaluation research as methodological inspiration, not as a direct score proxy: [RAGTruth](https://aclanthology.org/2024.acl-long.585/) provides annotated hallucination examples for RAG; [ALCE](https://aclanthology.org/2023.emnlp-main.398/) studies citation-supported long-form QA; [FRAMES](https://aclanthology.org/2025.naacl-long.243/) jointly evaluates factuality, retrieval and reasoning; and [LongCite](https://aclanthology.org/2025.findings-acl.264/) studies fine-grained citations for long-context QA. Expert-focused research also warns that one automatic overall score is inadequate for long-form answer quality ([Xu et al., ACL 2023](https://aclanthology.org/2023.acl-long.181/)). None of these benchmarks, by itself, measures esoteric/historical expertise.
 
 ### Provisional gates (targets, not results)
 
@@ -153,7 +153,9 @@ For every result bind the dataset version/hash, source-pack manifest, code revis
 - [IIIF Presentation API 3.0](https://iiif.io/api/presentation/3.0/): interoperable presentation of complex digital objects and annotations.
 - [OpenAlex API reference](https://help.openalex.org/api/): scholarly metadata discovery.
 - [RAGTruth](https://aclanthology.org/2024.acl-long.585/): RAG hallucination annotation/evaluation.
-- [ALCE](https://aclanthology.org/2023.acl-long.307/): citation-supported long-form QA.
+- [ALCE](https://aclanthology.org/2023.emnlp-main.398/): citation-supported long-form QA.
+- [FRAMES](https://aclanthology.org/2025.naacl-long.243/): combined factuality, retrieval and reasoning evaluation.
+- [LongCite](https://aclanthology.org/2025.findings-acl.264/): fine-grained citation generation for long-context QA.
 - [CARE principles for Indigenous data governance](https://www.gida-global.org/care): collective benefit, authority to control, responsibility and ethics. Treat CARE as a governance starting point, not a license to ingest community knowledge.
 - [IIIF Authorization Flow API](https://iiif.io/api/auth/2.0/): access-control interoperability context.
 
