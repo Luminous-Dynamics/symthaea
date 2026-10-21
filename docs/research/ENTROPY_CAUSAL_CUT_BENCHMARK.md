@@ -15,6 +15,8 @@ This is a paradigm shift from optimizing a scalar called phi to building an **ev
 Run and test on a machine with the Rust toolchain:
 
 ~~~sh
+mkdir -p results
+git rev-parse HEAD
 cargo run --example entropy_causality_reference --release > results/entropy_causality_reference.tsv
 sha256sum results/entropy_causality_reference.tsv
 cargo test --example entropy_causality_reference
@@ -32,7 +34,7 @@ For a supplied distribution over current states X(t) and transition model P(X(t+
 - **I_prev_next_bits:** mutual information I(X(t); X(t+1)) = H(X(t+1)) - H(X(t+1) | X(t)), in bits, under that ensemble.
 - **min_cut_sensitivity_tv:** minimum across nontrivial bipartitions of the prior-weighted mean total-variation distance between original and diagnostic cut transition rows.
 
-Every TSV row now records both a canonical rule/noise specification and the full input-state distribution; no ensemble is implicit in the emitted artifact. The public helper `measure()` is a uniform-prior convenience wrapper around `measure_with_state_distribution()`, which rejects invalid weights instead of silently renormalizing them.
+Every TSV row now records both versioned canonical rule/noise and prior specifications; no ensemble is implicit in the emitted artifact. The public helper `measure()` is a uniform-prior convenience wrapper around `measure_with_state_distribution()`, which rejects invalid weights instead of silently renormalizing them.
 
 For the cut diagnostic, a target whose rule has an input dependency crossing the cut receives a fair-random unnoised output before the same bit-flip noise is applied. The diagnostic compares the full and cut conditional distributions. It is operationally defined, bounded by 1, and exhaustively computable; **it is not IIT's formal partition operation and must not be called phi**. Results depend on this explicit cut convention and the uniform distribution over current states.
 
