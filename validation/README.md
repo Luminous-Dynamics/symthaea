@@ -29,6 +29,16 @@ This currently produces unavailable/failed measurements by design, until the ada
 
 The task-conditioned counterfactual integration candidate has a small, exact Boolean-network evaluator and a separate standard-library Python oracle. The executable source of fixture rules, task targets, input-state weights, component partitions, intervention edges, and expected outcomes is `fixtures/tccip_toy_expectations.tsv` (schema v3). Both the Rust example and independent Python oracle parse this manifest.
 
+Run the additional independent, standard-library checker (separate parser/evaluator) as a third exact cross-check:
+
+~~~bash
+set -euo pipefail
+SYMTHAEA_SOURCE_SHA="$(git rev-parse HEAD)" \
+  python validation/tccip_independent_check.py
+~~~
+
+It checks all six manifest fixture summaries/partition ranges and all 16 joint-intervention rows. Its output includes SHA-256 digests of both input TSV files. It is a separate executable, not a Rust test or a result emitted by the primary Python oracle. This newly committed checker itself has not yet been run from the repository; the one-off exhaustive audit performed during development was a distinct local script against copies of the two manifest files.
+
 Run the independent reference oracle:
 
 ~~~bash
