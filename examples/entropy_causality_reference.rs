@@ -80,7 +80,7 @@ impl Network {
             })
             .collect::<Vec<_>>()
             .join(",");
-        format!("rules={rules};flip={:.6}", self.flip_probability)
+        format!("schema=boolean-network-v1;rules={rules};flip={:.6}", self.flip_probability)
     }
 
     fn node_count(&self) -> usize {
@@ -245,7 +245,7 @@ fn canonical_prior_specification(probabilities: &[f64]) -> String {
         .map(|(state, probability)| format!("{state}:{probability:.6}"))
         .collect::<Vec<_>>()
         .join(",");
-    format!("prior={entries}")
+    format!("schema=state-prior-v1;prior={entries}")
 }
 
 fn measure(network: &Network) -> Metrics {
@@ -459,7 +459,7 @@ mod tests {
     fn canonical_specification_includes_rule_order_and_noise() {
         assert_eq!(
             directed_ring(3, 0.1).canonical_specification(),
-            "rules=copy:1,copy:2,copy:0;flip=0.100000"
+            "schema=boolean-network-v1;rules=copy:1,copy:2,copy:0;flip=0.100000"
         );
     }
 
