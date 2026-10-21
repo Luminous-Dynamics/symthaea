@@ -1817,6 +1817,37 @@ mod tests {
     }
 
     #[test]
+    fn cosine_logits_are_invariant_to_positive_embedding_rescaling() {
+        let genesis = test_genesis();
+        let config = test_config();
+        let base = LanguageController::new(&genesis, &config);
+        let query = ContinuousHV::from_genesis(
+            &genesis,
+            "positive-rescale-invariance-query",
+            HDC_DIMENSION,
+        );
+        let baseline_logits = base.compute_logits(&query);
+
+        let mut scaled = base.clone();
+        let mut embeddings = scaled.token_embeddings().to_vec();
+        embeddings[0] = embeddings[0].clone().scale(7.0);
+        scaled.restore_token_embeddings(embeddings);
+        let scaled_logits = scaled.compute_logits(&query);
+
+        assert_eq!(baseline_logits.len(), scaled_logits.len());
+        for (token_id, (before, after)) in baseline_logits
+            .iter()
+            .zip(scaled_logits.iter())
+            .enumerate()
+        {
+            assert!(
+                (before - after).abs() <= 1e-5,
+                "positive rescaling changed cosine logit for token {token_id}: {before} vs {after}"
+            );
+        }
+    }
+
+    #[test]
     fn test_append_token() {
         let genesis = test_genesis();
         let config = test_config();
