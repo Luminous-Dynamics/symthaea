@@ -11,6 +11,7 @@ Mythology deserves a first-class module in the shared knowledge fabric, but myth
 - [`narrative-graph.schema.json`](narrative-graph.schema.json): a source-grounded narrative-graph shape contract.
 - [`narrative-graph-fixtures.jsonl`](narrative-graph-fixtures.jsonl): four explicitly synthetic graph fixtures.
 - [`TRANSFER_PROTOCOL.md`](TRANSFER_PROTOCOL.md): cross-source splits, transfer metrics, metamorphic tests, baselines and nonclaims.
+- [Validator harness](../../../tools/knowledge-benchmark-harness/): offline Rust JSON Schema validation, source-reference checks, and digest-bound reports.
 
 Schema validation checks data structure only. A separate domain validator must verify graph endpoint/source references, relation-specific evidence, interval consistency, permissions, and variant isolation.
 
@@ -42,4 +43,6 @@ MythologyBench should complement rather than duplicate them: its focus is source
 
 ## Acceptance boundary
 
-All cases are `development`; synthetic controls are not historical evidence. Source links are not an invitation for automated crawling. Rights remain `unknown` until reviewed. No score should be claimed until the runner, expert review, source-disjoint split manifests and exact-head evaluations exist. A queued, skipped or absent runner is not a pass.
+All cases are `development`; synthetic controls are not historical evidence. Source links are not an invitation for automated crawling. Rights remain `unknown` until reviewed. Use [`scripts/validate-knowledge-benchmarks.sh`](../../../scripts/validate-knowledge-benchmarks.sh) to run the focused harness over all four fixture groups. The harness requires a generated `Cargo.lock`, binds its SHA-256 into each report, refuses remote schema references, and never crawls the scholarly source URLs.
+
+No score should be claimed until this harness has been built and tested on the exact head, expert review and source-disjoint split manifests exist. Structural validation is not a model benchmark pass. A queued, skipped or absent runner is not a pass.
