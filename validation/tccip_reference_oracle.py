@@ -336,7 +336,10 @@ def expected_task(fixture: Fixture, inputs: Sequence[bool]) -> bool:
 
 
 def task_utility(fixture: Fixture, intervention: Intervention | None = None) -> float:
-    input_assignments = list(__import__("itertools").product((False, True), repeat=fixture.input_count))
+    input_assignments = [
+        tuple(bool((state >> index) & 1) for index in range(fixture.input_count))
+        for state in range(1 << fixture.input_count)
+    ]
     coin_assignments = (False, True) if intervention else (False,)
     total_input_weight = sum(fixture.input_state_weights)
     correct_weight = 0
