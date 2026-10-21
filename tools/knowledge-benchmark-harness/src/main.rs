@@ -1126,6 +1126,112 @@ mod tests {
         );
     }
     #[test]
+    fn source_family_split_leakage_is_rejected() {
+        let mut seen_ids = HashSet::new();
+        let source_a = json!({
+            "source_id":"witness-A",
+            "source_family_id":"work-family",
+            "split":"development",
+            "rights_status":"unknown",
+            "content_access":"metadata_only",
+            "rights_review":"pending"
+        });
+        let source_b = json!({
+            "source_id":"witness-B",
+            "source_family_id":"work-family",
+            "split":"test",
+            "rights_status":"unknown",
+            "content_access":"metadata_only",
+            "rights_review":"pending"
+        });
+        assert!(validate_domain_contract(Kind::Source, &source_a, &mut seen_ids).is_empty());
+        let errors = validate_domain_contract(Kind::Source, &source_b, &mut seen_ids);
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.contains("spans multiple evaluation splits"))
+        );
+    }
+
+    #[test]
+    fn unknown_rights_cannot_authorize_full_text_access() {
+        let source = json!({
+            "source_id":"source-unknown",
+            "source_family_id":"family-unknown",
+            "split":"development",
+            "rights_status":"unknown",
+            "content_access":"permissioned_full_text",
+            "rights_review":"pending"
+        });
+        let errors = validate_source_contract(&source, &mut HashSet::new());
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.contains("rights_status=unknown requires content_access=metadata_only"))
+        );
+    }
+
+    #[test]
+    fn bundled_sources_and_case_references_are_consistent() {
+        let mut catalog = std::collections::HashMap::new();
+        let mut seen_ids = HashSet::new();
+        for (index, line) in include_str!("../../../benchmarks/source-catalog/v0/sources.jsonl")
+            .lines()
+            .enumerate()
+        {
+            let source: Value = serde_json::from_str(line).unwrap_or_else(|error| {
+                panic!("invalid source catalog JSONL at line {}: {error}", index + 1)
+            });
+            let errors = validate_domain_contract(Kind::Source, &source, &mut seen_ids);
+            assert!(
+                errors.is_empty(),
+                "source catalog line {} failed: {}",
+                index + 1,
+                errors.join("; ")
+            );
+            let id = string_field(&source, "source_id").unwrap().to_string();
+            let uri = string_field(&source, "uri").unwrap().to_string();
+            assert!(
+                catalog.insert(id.clone(), uri).is_none(),
+                "duplicate source catalog ID {id:?}"
+            );
+        }
+
+        let case_sets = [
+            include_str!("../../../benchmarks/esoterica-bench/v0/cases.jsonl"),
+            include_str!("../../../benchmarks/mythology-bench/v0/cases.jsonl"),
+        ];
+        for (set_index, cases) in case_sets.iter().enumerate() {
+            for (line_index, line) in cases.lines().enumerate() {
+                let case: Value = serde_json::from_str(line).unwrap_or_else(|error| {
+                    panic!(
+                        "invalid case JSONL in set {} line {}: {error}",
+                        set_index + 1,
+                        line_index + 1
+                    )
+                });
+                if let Some(source_refs) = case.get("source_refs").and_then(Value::as_array) {
+                    for source_ref in source_refs {
+                        let source_id = string_field(source_ref, "source_id").unwrap_or("");
+                        let uri = string_field(source_ref, "uri").unwrap_or("");
+                        let catalog_uri = catalog.get(source_id).unwrap_or_else(|| {
+                            panic!(
+                                "case {} references source ID {source_id:?} absent from catalog",
+                                string_field(&case, "id").unwrap_or("<unknown>")
+                            )
+                        });
+                        assert_eq!(
+                            uri, catalog_uri,
+                            "case {} source URI differs from catalog for {source_id:?}",
+                            string_field(&case, "id").unwrap_or("<unknown>")
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
     fn bundled_metamorphic_pairs_satisfy_domain_contract() {
         let mut seen_ids = HashSet::new();
         for (index, raw_line) in
