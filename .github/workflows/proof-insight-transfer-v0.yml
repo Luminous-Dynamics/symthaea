@@ -363,6 +363,9 @@ jobs:
           missing_target_evidence = copy.deepcopy(verified_record)
           del missing_target_evidence["insight"]["transfer_candidates"][0]["transfer_verification"]
           mutants.append(missing_target_evidence)
+          single_target_reviewer = copy.deepcopy(verified_record)
+          single_target_reviewer["insight"]["transfer_candidates"][0]["transfer_verification"]["target_statement_correspondence"]["independent_reviewer_count"] = 1
+          mutants.append(single_target_reviewer)
 
           rejected_without_mismatch = copy.deepcopy(record)
           rejected_candidate = rejected_without_mismatch["insight"]["transfer_candidates"][0]
