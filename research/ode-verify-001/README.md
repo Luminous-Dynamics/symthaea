@@ -118,6 +118,22 @@ These are proposed project targets, not published standards or achieved results:
 
 Use the active [NASA-STD-7009B](https://standards.nasa.gov/standard/NASA/NASA-STD-7009) and its [February 2026 implementation handbook](https://standards.nasa.gov/standard/NASA/NASA-HDBK-7009) to structure intended use, model credibility evidence, and the life-cycle record. ASME's [VVUQ standards portfolio](https://www.asme.org/codes-standards/vvuq-standards) provides discipline-specific guidance for CFD/heat transfer, solid mechanics, and uncertainty quantification. These references guide the protocol; they do not certify this project.
 
+## Observed internal baseline — ODE-WP-ANALYTIC-OSCILLATOR-001
+
+A real GitHub Actions run of the isolated Rust harness completed at source head `e4b43c1a3ebb60e165aad27ad405973d692f16be`, run [39606168253](https://github.com/Luminous-Dynamics/symthaea/actions/runs/39606168253). The checked-out merge tree was `77e02512243ce80708bfe8e435e1e4fa1ea5bece`. The runner executed the deterministic report twice and passed byte equality, schema/source identity checks, all nine observations, and the numerical error gates. The ODE tests and strict Clippy were also green at that exact source head.
+
+The uploaded JSON receipt has SHA-256 `d91f7878e93efe4711fcac3f2cd8d6cc0a86fd66a656c1d92fc6aa96b55581e5`; the GitHub Actions artifact ZIP is [artifact 12348865716](https://github.com/Luminous-Dynamics/symthaea/actions/runs/39606168253/artifacts/12348865716), whose platform-reported digest is `sha256:4d31bc51029843ba11aceaa75c3813ee6ed4c2dbbdfb319e70451e5a80ac4403`.
+
+| Relative tolerance | Accepted steps | Rejected attempts | Derivative evaluations | Maximum scaled endpoint error | Maximum relative energy drift | Maximum accepted normalized error |
+|---:|---:|---:|---:|---:|---:|---:|
+| `1e-3` | 11 | 0 | 66 | (2.051\times10^{-3}) | (4.101\times10^{-3}) | (2.606\times10^{-1}) |
+| `1e-5` | 26 | 5 | 186 | (2.484\times10^{-5}) | (4.920\times10^{-5}) | (9.183\times10^{-1}) |
+| `1e-7` | 64 | 9 | 438 | (2.221\times10^{-7}) | (4.429\times10^{-7}) | (9.711\times10^{-1}) |
+
+Each tolerance row is the maximum across state scales (10^{-6}), (1), and (10^6). The three scales followed the same accepted/rejected work sequence: 11/0, 26/5, and 64/9, respectively. All nine cases completed with finite states, accepted-step normalized error at most one, and endpoint/energy errors within the predeclared (10\times rtol) envelope.
+
+**Interpretation:** this is observed evidence for the internal analytical oscillator contract and approximate scale-invariance of the controller work profile on this fixture. It is not a timing result, a comparison against another solver, a stiff-equation result, or physical validation. It establishes the named tests and report for the exact recorded source head only; subsequent commits need their own exact-head qualification. The independent Dopri5 comparison is a separate benchmark and must pass before any cross-solver work/error claims.
+
 ## Receipt requirements
 
 Every published comparison should retain: exact repository/source commit, lockfile digest, Rust/Cargo versions, target triple, command and configuration, reference dataset/license/digest, tolerances and norm definitions, raw outputs, machine-readable summary, run identity, negative controls, and an explicit status for missing evidence.
