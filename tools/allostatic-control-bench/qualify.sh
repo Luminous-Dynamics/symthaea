@@ -190,6 +190,7 @@ if ! awk -F, '
     if ($11 !~ /^[0-9]+$/ || $11 > $3) failed = 1
     key = $1 SUBSEP $2
     if (!(key in previous_horizon)) {
+      profile_keys++
       if ($3 != 1) failed = 1
     } else {
       if (($3 == 2 && previous_horizon[key] != 1) ||
@@ -208,7 +209,7 @@ if ! awk -F, '
     if (seen[unique_key]++) failed = 1
     rows++
   }
-  END { if (NR != 601 || rows != 600 || length(previous_horizon) != 120 || failed) exit 1 }
+  END { if (NR != 601 || rows != 600 || profile_keys != 120 || failed) exit 1 }
 ' "$tmpdir/horizon-a.csv"; then
   printf 'FAIL: multi-step horizon schema, monotonicity, or bounded-search contract is invalid\n' >&2
   exit 1
