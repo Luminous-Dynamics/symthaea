@@ -82,3 +82,8 @@ Exact-head run [#39549790807](https://github.com/Luminous-Dynamics/symthaea/acti
 Receipt artifact: [`atomfab-kicad-cli-smoke-receipt`](https://github.com/Luminous-Dynamics/symthaea/actions/runs/39549790807/artifacts/12322464083), uploaded ZIP digest `sha256:1ba5f03077abaa24823a33f937cd2587244ca70e81cf27db5e9b5d9c77ab881c`. The embedded receipt binds the manifest digest `0913ce50225fb1b238fdfc764193f60e8bbc2d547441febdabc2cfeee655f1b8` and the exact board/tool revision.
 
 Reviewing the downloaded bundle then revealed a handoff issue: `SHA256SUMS` recorded runner-absolute paths, so the manifest and CAM outputs were intact but the checksum file could not verify after extraction on another host. The workflow now writes artifact-root-relative checksums and runs `sha256sum -c SHA256SUMS` before upload. The next exact-head run must prove the exported ZIP is portable, not merely that its files were generated on the hosted runner.
+
+
+## Portable checksum verification
+
+The checksum list initially used absolute paths from the hosted runner. I fixed that follow-up in the parent workflow: it now changes into the artifact root, hashes every file except `SHA256SUMS` with sorted relative paths, and immediately executes `sha256sum -c SHA256SUMS`. This adds a portability check to the exact-head run rather than assuming an artifact can be verified only on its producer machine.
