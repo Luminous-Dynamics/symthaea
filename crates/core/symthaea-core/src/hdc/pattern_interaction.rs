@@ -19,6 +19,9 @@
 use std::error::Error;
 use std::fmt;
 
+const CLEANUP_BETA: f64 = 12.0;
+const CLEANUP_STEPS: usize = 3;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PatternSpaceError {
     EmptyVector,
@@ -321,9 +324,15 @@ impl Default for PatternInteractionConfig {
 #[derive(Debug, Clone, PartialEq)]
 pub struct NoiseRetrievalResult {
     pub noise_fraction: f64,
+    /// One-step nearest-prototype classifier accuracy.
     pub top1_accuracy: f64,
     /// Mean target similarity minus the best competing-prototype similarity.
     pub mean_similarity_margin: f64,
+    /// Accuracy after iterative softmax-weighted pattern cleanup with bipolar projection.
+    /// This is a Hopfield-inspired baseline, not an exact reproduction of a specific paper.
+    pub cleanup_top1_accuracy: f64,
+    /// Target-vs-best-distractor margin after projected associative cleanup.
+    pub cleanup_mean_similarity_margin: f64,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -401,6 +410,8 @@ pub fn run_pattern_interaction_suite(
     for (noise_index, &noise_fraction) in config.noise_fractions.iter().enumerate() {
         let mut correct = 0usize;
         let mut margin_sum = 0.0;
+        let mut cleanup_correct = 0usize;
+        let mut cleanup_margin_sum = 0.0;
         for trial in 0..config.trials {
             let patterns = make_prototypes(seed, trial, config)?;
             let target_index = trial % config.prototype_count;
@@ -421,11 +432,34 @@ pub fn run_pattern_interaction_suite(
                 .into_iter()
                 .fold(f64::NEG_INFINITY, f64::max);
             margin_sum += target_similarity - best_competitor;
+
+            let cleaned = projected_softmax_cleanup(
+                &query,
+                &patterns,
+                CLEANUP_BETA,
+                CLEANUP_STEPS,
+            )?;
+            let cleaned_ranked = space.rank(&cleaned)?;
+            if cleaned_ranked.first().is_some_and(|result| {
+                result.label == format!("p{target_index}")
+            }) {
+                cleanup_correct += 1;
+            }
+            let cleaned_target_similarity = cleaned.similarity(&patterns[target_index])?;
+            let cleaned_best_competitor = patterns.iter().enumerate()
+                .filter(|(index, _)| *index != target_index)
+                .map(|(_, pattern)| cleaned.similarity(pattern))
+                .collect::<Result<Vec<_>, _>>()?
+                .into_iter()
+                .fold(f64::NEG_INFINITY, f64::max);
+            cleanup_margin_sum += cleaned_target_similarity - cleaned_best_competitor;
         }
         noise_results.push(NoiseRetrievalResult {
             noise_fraction,
             top1_accuracy: correct as f64 / config.trials as f64,
             mean_similarity_margin: margin_sum / config.trials as f64,
+            cleanup_top1_accuracy: cleanup_correct as f64 / config.trials as f64,
+            cleanup_mean_similarity_margin: cleanup_margin_sum / config.trials as f64,
         });
     }
 
@@ -535,6 +569,58 @@ pub fn run_pattern_interaction_suite(
         bundle_results,
         associative_capacity_results,
     })
+}
+
+/// Projected softmax associative cleanup: score all stored patterns against
+/// the current query, take a beta-scaled softmax-weighted superposition, and
+/// project the result back onto the bipolar hypercube. This is a deliberately
+/// simple Hopfield-inspired iterative baseline, not claimed to be an exact
+/// implementation of any one modern Hopfield formulation.
+fn projected_softmax_cleanup(
+    query: &PatternVector,
+    patterns: &[PatternVector],
+    beta: f64,
+    steps: usize,
+) -> Result<PatternVector, PatternSpaceError> {
+    if patterns.is_empty() {
+        return Err(PatternSpaceError::EmptyBundle);
+    }
+    if !beta.is_finite() || beta <= 0.0 || steps == 0 {
+        return Err(PatternSpaceError::InvalidConfiguration(
+            "cleanup beta and iteration count must be positive",
+        ));
+    }
+
+    let mut current = query.clone();
+    for _ in 0..steps {
+        let scores = patterns.iter()
+            .map(|pattern| current.similarity(pattern).map(|similarity| beta * similarity))
+            .collect::<Result<Vec<_>, _>>()?;
+        let max_score = scores.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+        let weights: Vec<f64> = scores.iter().map(|score| (score - max_score).exp()).collect();
+        let weight_sum = weights.iter().sum::<f64>();
+        if !weight_sum.is_finite() || weight_sum <= 0.0 {
+            return Err(PatternSpaceError::InvalidConfiguration(
+                "cleanup produced invalid softmax normalization",
+            ));
+        }
+
+        let mut values = Vec::with_capacity(query.dimension());
+        for coordinate in 0..query.dimension() {
+            let weighted_vote = patterns.iter().zip(&weights)
+                .map(|(pattern, weight)| pattern.values[coordinate] as f64 * weight)
+                .sum::<f64>() / weight_sum;
+            values.push(if weighted_vote > 0.0 {
+                1
+            } else if weighted_vote < 0.0 {
+                -1
+            } else {
+                current.values[coordinate]
+            });
+        }
+        current = PatternVector { values };
+    }
+    Ok(current)
 }
 
 fn validate_config(config: &PatternInteractionConfig) -> Result<(), PatternSpaceError> {
