@@ -393,8 +393,10 @@ impl AdmixedPopulation {
 pub struct PgxHealthEquityEngine {
     /// Reference allele frequency data.
     pub allele_frequencies: Vec<PopulationAlleleFrequency>,
-    /// Loaded CPIC guideline recommendations.
-    pub cpic_guidelines: Vec<CpicGuideline>,
+    /// Loaded CPIC guideline recommendations stay internal and are excluded from serde.
+    /// External consumers receive only the non-actionable projection API.
+    #[serde(skip)]
+    cpic_guidelines: Vec<CpicGuideline>,
 }
 
 impl Default for PgxHealthEquityEngine {
@@ -413,6 +415,11 @@ impl PgxHealthEquityEngine {
         engine.load_reference_allele_frequencies();
         engine.build_reference_cpic_guidelines();
         engine
+    }
+
+    /// Number of in-memory reference entries without exposing action-bearing records.
+    pub fn guideline_reference_count(&self) -> usize {
+        self.cpic_guidelines.len()
     }
 
     /// Load built-in population allele frequencies from published literature.
@@ -2451,4 +2458,23 @@ mod tests {
         assert!(projection.reference_evidence_level.is_none());
         assert!(projection.population_model_gap_score.is_none());
     }
+    #[test]
+    fn test_engine_serialization_excludes_action_bearing_guideline_records() {
+        let e = engine();
+        assert!(e.guideline_reference_count() > 0);
+
+        let encoded = serde_json::to_value(&e).unwrap();
+        assert!(encoded.get("cpic_guidelines").is_none());
+
+        let decoded: PgxHealthEquityEngine = serde_json::from_value(encoded).unwrap();
+        assert_eq!(decoded.guideline_reference_count(), 0);
+        let projection = decoded.research_guideline_projection(
+            "codeine",
+            "CYP2D6",
+            AncestryGroup::European,
+            MetabolizerPhenotype::Normal,
+        );
+        assert_eq!(projection.status, ResearchProjectionStatus::Indeterminate);
+    }
+
 }
