@@ -773,9 +773,16 @@ mod tests {
             min_r: 0.8,
             max_r: 2.0,
         };
-        assert!(run_adaptive_coupling_experiment(
-            &template, &perturbation, 0, false, AdaptiveCouplingConfig::default(),
-        ).is_err());
+        assert!(
+            run_adaptive_coupling_experiment(
+                &template,
+                &perturbation,
+                0,
+                false,
+                AdaptiveCouplingConfig::default(),
+            )
+            .is_err()
+        );
     }
     #[test]
     fn perturbation_label_is_stable_and_distinct() {
