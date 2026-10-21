@@ -303,6 +303,9 @@ jobs:
             .schema == "atomfab-kicad-cli-smoke-receipt-v0.1"
             and (.git_head | test("^[0-9a-f]{40}$"))
             and (.board_sha256 | test("^[0-9a-f]{64}$"))
+            and .artifact_manifest.path == "artifact-manifest.json"
+            and (.artifact_manifest.sha256 | test("^[0-9a-f]{64}$"))
+            and .artifact_manifest.artifact_count == 20
             and .controls.clean_board_drc_exit_code == 0
             and .controls.repeated_clean_drc_semantically_equal_after_date_normalization
             and .controls.repeated_gerber_payloads_match_after_timestamp_normalization
