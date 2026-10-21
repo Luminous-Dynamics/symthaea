@@ -15,6 +15,7 @@ from shared_boolean_network import (
     f64_to_hex,
     load_model_manifest,
     model_digest,
+    prior_digest,
     transition_tpm,
 )
 
@@ -47,6 +48,7 @@ class SharedBooleanNetworkTests(unittest.TestCase):
         skewed = cases["recurrent_ring_skewed_prior"]
         self.assertEqual(uniform.canonical_model_specification(), skewed.canonical_model_specification())
         self.assertEqual(model_digest(uniform), model_digest(skewed))
+        self.assertNotEqual(prior_digest(uniform), prior_digest(skewed))
         self.assertNotEqual(uniform.canonical_prior_specification(), skewed.canonical_prior_specification())
 
     def test_tpm_rows_match_expected_noise_extremes(self) -> None:
