@@ -591,10 +591,26 @@ fn main() -> Result<(), Box<dyn Error>> {
                     csv_bool(false_safety_certificate).to_string(),
                     csv_bool(actual_inside_predictive).to_string(),
                     csv_bool(actual_inside_fallback).to_string(),
-                    csv_bool(predictive_action.is_some_and(|action| actual_one_step.contains(action))).to_string(),
-                    csv_bool(predictive_action.is_some_and(|action| actual_horizon.contains(action))).to_string(),
-                    csv_bool(fallback_action.is_some_and(|action| actual_one_step.contains(action))).to_string(),
-                    csv_bool(fallback_action.is_some_and(|action| actual_horizon.contains(action))).to_string(),
+                    csv_bool(
+                        predictive_action
+                            .is_some_and(|action| actual_one_step.contains(action)),
+                    )
+                    .to_string(),
+                    csv_bool(
+                        predictive_action
+                            .is_some_and(|action| actual_horizon.contains(action)),
+                    )
+                    .to_string(),
+                    csv_bool(
+                        fallback_action
+                            .is_some_and(|action| actual_one_step.contains(action)),
+                    )
+                    .to_string(),
+                    csv_bool(
+                        fallback_action
+                            .is_some_and(|action| actual_horizon.contains(action)),
+                    )
+                    .to_string(),
                 ];
                 csv_row(&mut raw, fields);
                 row_count += 1;
