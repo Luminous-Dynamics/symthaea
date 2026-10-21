@@ -1,6 +1,6 @@
 [package]
 name = "knowledge-benchmark-harness"
-version = "0.7.0"
+version = "0.8.0
 edition = "2024"
 publish = false
 license = "AGPL-3.0-or-later"
