@@ -40,3 +40,14 @@ The PR trigger is intentionally limited to changes in this benchmark document an
 
 
 On the first execution, KiCad found two violations on the purported clean coupon and returned its documented violation code. This is a fixture defect until the report proves otherwise; the workflow now preserves and prints full DRC diagnostics even when a gate fails, rather than stopping before the evidence is retained. The fixture is not called clean unless the pinned tool says exit code 0.
+
+
+## Failure-driven hardening and replay semantics
+
+Observed exact-head experiment on `f49ccec0bc8db0a4ed5a1ba23f9e2de6af13acc0`:
+
+- The board passed the clean DRC control with zero violations and zero unconnected items after removing the false standard-library identity from its self-contained smoke-only footprints.
+- The first invalid-board mutation returned DRC exit code 5 but was *not* a true short: the report contained zero `violations` and one `unconnected_items` entry. That is an invalid negative control, not success.
+- Gerber replay exposed creation-time metadata (`%TF.CreationDate` and a generated-by KiCad date comment), so raw Gerber bytes differed across valid runs even though geometry output was expected to match.
+
+The next run now changes the GND trace into a continuous crossover through the VCC trace, asserts a KiCad `shorting_items` violation and zero unconnected items, and compares the normalized DRC/export payload after excluding only documented time fields. Original reports/exports are still retained and raw-file SHA-256 checksums still include those timestamps. We do **not** claim raw output bytes are identical when KiCad intentionally writes wall-clock metadata; the repeatability target is identical design/export payload plus separately hashed provenance-bearing files.
