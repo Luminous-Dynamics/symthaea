@@ -3566,6 +3566,14 @@ end Second
                 "proof": "exact True.intro"
             }),
             serde_json::json!({
+                "id": "statement-drift",
+                "theorem_name": "second",
+                "file_path": "lean/Example.lean",
+                "commit_before": commit_one,
+                "formal_statement": "theorem second : False := by",
+                "proof": "trivial"
+            }),
+            serde_json::json!({
                 "id": "unmatched-path",
                 "theorem_name": "absent",
                 "file_path": "lean/Unlisted.lean",
@@ -3805,15 +3813,15 @@ end Second
         .expect("parse synthetic dataset join audit JSON");
         assert_eq!(dataset_audit["total_timeline_rows"], 4);
         assert_eq!(dataset_audit["unique_timeline_path_count"], 3);
-        assert_eq!(dataset_audit["total_dataset_records"], 7);
-        assert_eq!(dataset_audit["unique_dataset_id_count"], 7);
+        assert_eq!(dataset_audit["total_dataset_records"], 8);
+        assert_eq!(dataset_audit["unique_dataset_id_count"], 8);
         assert_eq!(dataset_audit["unique_path_join_count"], 4);
-        assert_eq!(dataset_audit["ambiguous_path_join_count"], 1);
+        assert_eq!(dataset_audit["ambiguous_path_join_count"], 2);
         assert_eq!(dataset_audit["unmatched_path_join_count"], 1);
         assert_eq!(dataset_audit["invalid_dataset_path_count"], 1);
         assert_eq!(dataset_audit["unique_theorem_identity_join_count"], 2);
         assert_eq!(dataset_audit["ambiguous_theorem_identity_join_count"], 0);
-        assert_eq!(dataset_audit["unmatched_theorem_identity_join_count"], 5);
+        assert_eq!(dataset_audit["unmatched_theorem_identity_join_count"], 6);
         assert_eq!(
             dataset_audit["theorem_identity_status_counts"]
                 .as_object()
@@ -3821,9 +3829,9 @@ end Second
                 .values()
                 .map(|count| count.as_u64().expect("status count is nonnegative") as usize)
                 .sum::<usize>(),
-            7
+            8
         );
-        assert_eq!(dataset_audit["commit_before_ancestor_of_head_count"], 5);
+        assert_eq!(dataset_audit["commit_before_ancestor_of_head_count"], 6);
         assert_eq!(
             dataset_audit["commit_before_missing_commit_object_count"],
             1
