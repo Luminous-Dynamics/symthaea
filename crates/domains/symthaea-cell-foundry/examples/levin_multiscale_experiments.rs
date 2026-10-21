@@ -107,8 +107,18 @@ fn main() -> Result<(), Box<dyn Error>> {
                             trajectory: condition.discrepancy_trajectory.clone(),
                         });
                         let permeability_milli = (permeability * 1000.0).round() as u16;
+                        let summary_perturbation = if label.starts_with("scramble_vmem(") {
+                            "scramble_vmem".to_string()
+                        } else {
+                            label.clone()
+                        };
                         grouped_final_errors
-                            .entry((family.to_string(), label, homing_enabled, permeability_milli))
+                            .entry((
+                                family.to_string(),
+                                summary_perturbation,
+                                homing_enabled,
+                                permeability_milli,
+                            ))
                             .or_default()
                             .push(condition.final_discrepancy);
                     }
