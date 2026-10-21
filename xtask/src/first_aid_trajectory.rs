@@ -153,7 +153,8 @@ pub fn run(root: &Path, corpus_arg: &Path, out_arg: Option<&Path>) -> Result<()>
         .context("read trajectory validator source for receipt identity")?;
     let entrypoint_source = fs::read(root.join("xtask/src/main.rs"))
         .context("read xtask entrypoint source for receipt identity")?;
-    let executable_path = std::env::current_exe().context("resolve trajectory validator executable")?;
+    let executable_path = std::env::current_exe()
+        .context("resolve trajectory validator executable")?;
     let executable_bytes = fs::read(&executable_path)
         .with_context(|| format!("read validator executable {}", executable_path.display()))?;
 
@@ -176,10 +177,13 @@ pub fn run(root: &Path, corpus_arg: &Path, out_arg: Option<&Path>) -> Result<()>
             .count(),
         critical_counterexample_count: corpus.scenarios.iter()
             .zip(&results)
-            .filter(|(trace, codes)| trace.criticality == Criticality::Critical && !codes.is_empty())
+            .filter(|(trace, codes)| {
+                trace.criticality == Criticality::Critical && !codes.is_empty()
+            })
             .count(),
         violation_count: results.iter().map(Vec::len).sum(),
-        claim_ceiling: "synthetic process-integrity audit only; no clinical safety or patient-outcome claim",
+        claim_ceiling:
+            "synthetic process-integrity audit only; no clinical safety or patient-outcome claim",
     };
     let encoded = serde_json::to_string_pretty(&receipt)?;
 
@@ -379,7 +383,10 @@ fn inspect_trace(trace: &TrajectoryScenario) -> Vec<String> {
                 uncertainty_preserved = false;
             }
             EventKind::ResourcePresented => {
-                if matches!(event.resource_state, Some(ResourceState::Stale | ResourceState::Unknown))
+                if matches!(
+                    event.resource_state,
+                    Some(ResourceState::Stale | ResourceState::Unknown)
+                )
                     && event.presented_as == Some(PresentedAs::Confirmed)
                 {
                     violations.push("stale_resource_claimed_confirmed".to_string());
