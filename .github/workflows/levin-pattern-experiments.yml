@@ -11,6 +11,8 @@ on:
       - "crates/core/symthaea-core/src/hdc/mod.rs"
       - "crates/core/symthaea-core/examples/platonic_pattern_interaction.rs"
       - "crates/core/symthaea-core/examples/platonic_selective_retrieval.rs"
+      - "crates/core/symthaea-core/examples/platonic_osp_thresholds.rs"
+      - "crates/core/symthaea-core/Cargo.toml"
       - "crates/core/symthaea-core/Cargo.toml"
       - "crates/domains/symthaea-cell-foundry/**"
       - "crates/core/symthaea-observation-attestation/**"
@@ -28,6 +30,8 @@ on:
       - "crates/core/symthaea-core/src/hdc/mod.rs"
       - "crates/core/symthaea-core/examples/platonic_pattern_interaction.rs"
       - "crates/core/symthaea-core/examples/platonic_selective_retrieval.rs"
+      - "crates/core/symthaea-core/examples/platonic_osp_thresholds.rs"
+      - "crates/core/symthaea-core/Cargo.toml"
       - "crates/core/symthaea-core/Cargo.toml"
       - "crates/domains/symthaea-cell-foundry/**"
       - "Cargo.toml"
@@ -120,6 +124,12 @@ jobs:
 
       - name: Run calibrated selective retrieval benchmark
         run: cargo run --locked --release -p symthaea-core --example platonic_selective_retrieval 2>&1 | tee research-results/platonic-selective-retrieval.log
+
+      - name: Test OSP-inspired classwise threshold optimizer
+        run: cargo test --locked --release -p symthaea-core --example platonic_osp_thresholds -- --nocapture
+
+      - name: Run OSP-inspired classwise threshold benchmark
+        run: cargo run --locked --release -p symthaea-core --example platonic_osp_thresholds 2>&1 | tee research-results/platonic-osp-thresholds.log
 
       - name: Verify Cell Foundry equifinality tests
         run: cargo test --locked --release -p symthaea-cell-foundry experiments::tests -- --nocapture
