@@ -6,7 +6,7 @@
 
 Measure the value of source-witness/context-aware reasoning over strong, simple retrieval baselines under comparable evidence and tool budgets. The primary question is not "does the answer sound plausible?" It is whether a system makes the right source-conditioned claim, changes when relevant evidence changes, stays stable under irrelevant changes, preserves valid alternatives, and respects access restrictions.
 
-The JSON Schema contracts are `comparison-plan.schema.json` and `pair-result.schema.json`. `synthetic-plans.jsonl` and `synthetic-pair-results.jsonl` are intentionally fabricated qualification fixtures. Their digests, system labels, and observation labels are fake and must never be treated as real runs or model results. The `score-paired-results` Rust binary scores adjudicated paired results under a preregistered plan and writes a digest-bound report; it does not execute a model or verify human labels against source material.
+The JSON Schema contracts are `comparison-plan.schema.json`, `pair-result.schema.json`, and `score-report.schema.json`. `synthetic-plans.jsonl` and `synthetic-pair-results.jsonl` are intentionally fabricated qualification fixtures. Their digests, system labels, and observation labels are fake and must never be treated as real runs or model results. The `score-paired-results` Rust binary scores adjudicated paired results under a preregistered plan, validates the generated report against `score-report.schema.json`, and writes a digest-bound report; it does not execute a model or verify human labels against source material.
 
 ## Baseline ladder
 
