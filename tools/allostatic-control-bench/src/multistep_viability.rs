@@ -283,11 +283,11 @@ mod tests {
 
     #[test]
     fn invalid_horizon_and_unsafe_initial_tube_fail_closed() {
-        let state = boundary_state();
+        let initial_state = boundary_state();
         let dynamics = deadline_dynamics();
-        assert!(evaluate_horizon_action_set(state, dynamics, limits(), true, 0).is_none());
+        assert!(evaluate_horizon_action_set(initial_state, dynamics, limits(), true, 0).is_none());
         assert!(evaluate_horizon_action_set(
-            state,
+            initial_state,
             dynamics,
             limits(),
             true,
