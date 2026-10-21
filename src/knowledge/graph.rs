@@ -771,8 +771,11 @@ impl EnhancedKnowledgeGraph {
             source_text: record.source_text.clone(),
             confidence: record.confidence,
         };
-        let id: FactId = self.next_id;
-        self.next_id += 1;
+        let id = record
+            .fact_id
+            .filter(|candidate| !self.facts.contains_key(candidate))
+            .unwrap_or(self.next_id);
+        self.next_id = self.next_id.max(id.saturating_add(1));
         let fact = TemporalFact {
             id,
             encoding,
@@ -800,6 +803,7 @@ impl EnhancedKnowledgeGraph {
         self.facts
             .values()
             .map(|f| super::persistence::FactRecord {
+                fact_id: Some(f.id),
                 vector_bytes: f.encoding.vector.0.to_vec(),
                 source_text: f.encoding.source_text.clone(),
                 confidence: f.confidence,
