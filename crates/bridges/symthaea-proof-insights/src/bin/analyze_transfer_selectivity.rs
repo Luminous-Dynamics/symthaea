@@ -681,6 +681,24 @@ fn validate_outcome_contract(value: &Value, context: &str) -> Result<()> {
             bail!("{run_ctx}.{key} must be a non-negative integer when present");
         }
     }
+    for (actual_key, budget_key) in [
+        ("actual_model_calls", "max_model_calls"),
+        ("actual_tokens", "max_tokens"),
+        ("actual_wall_ms", "max_wall_ms"),
+        ("actual_cost_microusd", "max_cost_microusd"),
+    ] {
+        if let Some(actual) = run.get(actual_key).and_then(Value::as_u64) {
+            let limit = budget
+                .get(budget_key)
+                .and_then(Value::as_u64)
+                .context("validated run budget unexpectedly disappeared")?;
+            if actual > limit {
+                bail!(
+                    "{run_ctx}.{actual_key}={actual} exceeds declared {budget_key}={limit}"
+                );
+            }
+        }
+    }
     Ok(())
 }
 
@@ -1359,6 +1377,10 @@ mod tests {
         let mut corrupt_digest = valid.clone();
         corrupt_digest["source"]["artifact_sha256"] = json!("not-a-digest");
         assert!(validate_outcome_contract(&corrupt_digest, "corrupt digest").is_err());
+
+        let mut over_budget = valid.clone();
+        over_budget["run"]["actual_tokens"] = json!(16001);
+        assert!(validate_outcome_contract(&over_budget, "over budget").is_err());
 
         let mut extra_field = valid;
         extra_field["unregistered_authority"] = json!(true);
