@@ -36,9 +36,10 @@ These intervals must be calibrated with independent episode-level data or justif
 
 ## Implementation
 
-Source: `tools/allostatic-control-bench/src/robust_viability.rs`
+Sources: `tools/allostatic-control-bench/src/robust_viability.rs` and `tools/allostatic-control-bench/src/calibration.rs`.
 
 - `Interval` rejects nonfinite and inverted ranges.
+- `calibrate_episode_radii` uses episode-level maximum residuals and Bonferroni-adjusts reserve/load coverage to target simultaneous envelope coverage. Too few calibration episodes returns `None`; it never invents a finite radius.
 - `StateEnvelope` constrains reserve/load intervals to [0, 1].
 - `ActionEffectBounds` constrains one-step reserve/load deltas to [-1, 1].
 - `ViabilityLimits` validates the reserve floor and load ceiling independently; they represent different axes and must not be compared to each other.
