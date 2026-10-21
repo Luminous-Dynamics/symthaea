@@ -113,16 +113,16 @@ jobs:
 
       - name: Independently validate adaptive-sampling decision schema and fixture
         run: |
-          cargo run --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin schema_contract_audit -- \\
-            --schema docs/research/beverage-adaptive-sampling-decision-v1.schema.json \\
-            --instance docs/research/beverage-adaptive-sampling-decision-synthetic-v1.json \\
+          cargo run --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin schema_contract_audit -- \
+            --schema docs/research/beverage-adaptive-sampling-decision-v1.schema.json \
+            --instance docs/research/beverage-adaptive-sampling-decision-synthetic-v1.json \
             --out "$RUNNER_TEMP/beverage-adaptive-sampling-schema-receipt.json"
           cat "$RUNNER_TEMP/beverage-adaptive-sampling-schema-receipt.json"
 
       - name: Audit synthetic adaptive-sampling decision
         run: |
-          cargo run --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin adaptive_sampling_policy_audit -- \\
-            --input docs/research/beverage-adaptive-sampling-decision-synthetic-v1.json \\
+          cargo run --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin adaptive_sampling_policy_audit -- \
+            --input docs/research/beverage-adaptive-sampling-decision-synthetic-v1.json \
             --out "$RUNNER_TEMP/beverage-adaptive-sampling-decision-receipt.json"
           cat "$RUNNER_TEMP/beverage-adaptive-sampling-decision-receipt.json"
 
