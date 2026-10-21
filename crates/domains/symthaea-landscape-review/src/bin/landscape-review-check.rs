@@ -44,6 +44,7 @@ fn main() -> ExitCode {
             Err(error) => errors.push(format!("invalid JSON: {error}")),
         }
     }
+    let valid = errors.is_empty();
     let report = json!({
         "report_schema": REPORT_SCHEMA,
         "schema_uri": REPORT_SCHEMA_URI,
@@ -62,5 +63,5 @@ fn main() -> ExitCode {
             return ExitCode::from(70);
         }
     }
-    if errors.is_empty() { ExitCode::SUCCESS } else { ExitCode::from(2) }
+    if valid { ExitCode::SUCCESS } else { ExitCode::from(2) }
 }
