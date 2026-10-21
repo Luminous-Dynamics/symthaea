@@ -29,11 +29,23 @@ fn main() -> Result<(), Box<dyn Error>> {
         config.trials,
         &config.bundle_sizes,
     )?;
+    let matched_bytes_hrr_dimension = (config.dimension / 8).max(1);
+    let matched_bytes_hrr_report = run_hrr_associative_capacity(
+        0x4d41_5443_4842_5954,
+        matched_bytes_hrr_dimension,
+        config.prototype_count,
+        config.trials,
+        &config.bundle_sizes,
+    )?;
     let elapsed_ms = started.elapsed().as_millis();
     let estimated_prototype_payload_bytes =
         report.dimension * report.prototype_count * size_of::<i8>();
     let estimated_hrr_candidate_payload_bytes =
         hrr_report.dimension * hrr_report.candidate_count * size_of::<f64>();
+    let estimated_matched_bytes_hrr_payload_bytes =
+        matched_bytes_hrr_report.dimension
+            * matched_bytes_hrr_report.candidate_count
+            * size_of::<f64>();
 
     println!("experiment,mode,seed,dimension,prototypes,trials,random_baseline");
     println!(
@@ -60,9 +72,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("pattern_storage_encoding,bipolar_i8");
     println!("estimated_map_candidate_payload_bytes,{estimated_prototype_payload_bytes}");
     println!("hrr_storage_encoding,f64");
-    println!("estimated_hrr_candidate_payload_bytes,{estimated_hrr_candidate_payload_bytes}");
+    println!("estimated_hrr_same_dimension_payload_bytes,{estimated_hrr_candidate_payload_bytes}");
+    println!("matched_bytes_hrr_dimension,{matched_bytes_hrr_dimension}");
+    println!("estimated_matched_bytes_hrr_payload_bytes,{estimated_matched_bytes_hrr_payload_bytes}");
     println!("storage_estimate_excludes,Vec metadata and transient working allocations");
-    println!("capacity_comparison,matched dimension but not matched payload bytes");
+    println!("capacity_comparisons,same_dimension_and_matched_payload_bytes");
 
     println!();
     println!(
@@ -101,15 +115,16 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     println!();
     println!(
-        "associations,map_raw_recall,map_ci_low,map_ci_high,map_cleanup_recall,map_cleanup_ci_low,map_cleanup_ci_high,hrr_raw_recall,hrr_ci_low,hrr_ci_high,hrr_target_similarity,hrr_max_distractor_similarity"
+        "associations,map_raw_recall,map_ci_low,map_ci_high,map_cleanup_recall,map_cleanup_ci_low,map_cleanup_ci_high,hrr_same_dim_recall,hrr_same_dim_ci_low,hrr_same_dim_ci_high,hrr_same_dim_target_sim,hrr_same_dim_distractor_sim,hrr_matched_bytes_recall,hrr_matched_bytes_ci_low,hrr_matched_bytes_ci_high,hrr_matched_bytes_target_sim,hrr_matched_bytes_distractor_sim"
     );
-    for (map_result, hrr_result) in report
+    for ((map_result, hrr_result), matched_bytes_hrr_result) in report
         .associative_capacity_results
         .iter()
         .zip(&hrr_report.results)
+        .zip(&matched_bytes_hrr_report.results)
     {
         println!(
-            "{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6}",
+            "{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6}",
             map_result.association_count,
             map_result.recall_at_1,
             map_result.recall_at_1_ci95.0,
@@ -121,7 +136,12 @@ fn main() -> Result<(), Box<dyn Error>> {
             hrr_result.raw_recall_ci95.0,
             hrr_result.raw_recall_ci95.1,
             hrr_result.mean_target_similarity,
-            hrr_result.mean_max_distractor_similarity
+            hrr_result.mean_max_distractor_similarity,
+            matched_bytes_hrr_result.raw_recall_at_1,
+            matched_bytes_hrr_result.raw_recall_ci95.0,
+            matched_bytes_hrr_result.raw_recall_ci95.1,
+            matched_bytes_hrr_result.mean_target_similarity,
+            matched_bytes_hrr_result.mean_max_distractor_similarity
         );
     }
     Ok(())
