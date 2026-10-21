@@ -9,7 +9,8 @@
 //!
 //! Usage:
 //!   cargo run -p symthaea-broca --bin broca-vocab-extension-bench
-//!   GIT_COMMIT_SHA=$(git rev-parse HEAD) cargo run -p symthaea-broca --bin broca-vocab-extension-bench -- --json-out extension.json
+//!   GIT_COMMIT_SHA=$(git rev-parse HEAD) cargo run -p symthaea-broca --bin broca-vocab-extension-bench -- \
+//!     --json-out extension.json
 
 use serde::Serialize;
 use sha2::{Digest, Sha256};
