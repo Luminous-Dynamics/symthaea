@@ -548,9 +548,11 @@ def main() -> int:
         result.hdc_phi is not None and result.pyphi_phi is not None
         for result in report.results
     )
-    print(f"Status: NOT QUALIFIED (paired measurements={paired_count}, failures={report.n_failed})")
+    qualified = validator.is_qualified(report)
+    status = "PASS" if qualified else "NOT QUALIFIED"
+    print(f"Status: {status} (paired measurements={paired_count}, failures={report.n_failed})")
     print(f"Report: {args.output}")
-    return 0 if validator.is_qualified(report) else 2
+    return 0 if qualified else 2
 
 
 if __name__ == "__main__":
