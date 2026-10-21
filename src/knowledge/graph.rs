@@ -12,8 +12,11 @@
 //! Science: Temporal knowledge graphs (Trivedi et al. 2017),
 //!          Belief revision (AGM theory, Alchourrón et al. 1985)
 
+use super::claim_provenance::{
+    ClaimContext, EvidenceLink, EvidenceLinkStatus, EvidenceRelation,
+};
 use super::encoding::FactEncoding;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use symthaea_core::hdc::unified_hv::BinaryHV;
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -44,6 +47,8 @@ pub struct TemporalFact {
     pub domain: Option<String>,
     /// Whether this fact has causal relations (eligible for DAG)
     pub has_causal_relations: bool,
+    /// Optional source-witness-grounded claim envelope.
+    pub claim_context: Option<ClaimContext>,
 }
 
 /// Alert raised when a new fact contradicts an existing one
@@ -59,6 +64,12 @@ pub struct ContradictionAlert {
     pub higher_confidence_id: FactId,
     /// Cycle when detected
     pub detected_at_cycle: u64,
+    /// Similarity/text detections remain candidates until explicitly adjudicated.
+    pub adjudicated: bool,
+    /// Evidence IDs supporting the adjudication.
+    pub evidence_ids: Vec<String>,
+    /// Human/verifier-readable rationale.
+    pub rationale: Option<String>,
 }
 
 /// Search result from the knowledge graph
@@ -91,8 +102,10 @@ pub struct EnhancedKnowledgeGraph {
     contradiction_threshold: f32,
     /// Domain index: domain_tag → Vec<FactId>
     domain_index: HashMap<String, Vec<FactId>>,
-    /// Pending contradiction alerts (drained by the knowledge manager each cycle)
+    /// Pending contradiction candidates (drained by the knowledge manager each cycle)
     pending_contradictions: Vec<ContradictionAlert>,
+    /// Explicit and candidate typed links between facts.
+    evidence_links: Vec<EvidenceLink>,
     /// Statistics
     total_insertions: u64,
     total_evictions: u64,
@@ -116,6 +129,7 @@ impl EnhancedKnowledgeGraph {
             contradiction_threshold: 0.7,
             domain_index: HashMap::new(),
             pending_contradictions: Vec::new(),
+            evidence_links: Vec::new(),
             total_insertions: 0,
             total_evictions: 0,
             total_contradictions: 0,
@@ -125,6 +139,10 @@ impl EnhancedKnowledgeGraph {
     /// Insert a new fact into the knowledge graph.
     ///
     /// Returns the fact ID and any contradiction alerts generated.
+    /// Insert a generic fact without inferring identity from HDC similarity.
+    ///
+    /// Similarity remains a retrieval/candidate-link signal; it cannot merge facts
+    /// or increment confidence without explicit, typed evidence.
     pub fn insert(
         &mut self,
         encoding: FactEncoding,
@@ -132,28 +150,53 @@ impl EnhancedKnowledgeGraph {
         domain: Option<String>,
         has_causal: bool,
     ) -> (FactId, Vec<ContradictionAlert>) {
-        // Check for contradictions before inserting
+        self.insert_with_context(encoding, current_cycle, domain, has_causal, None)
+    }
+
+    /// Insert a source-grounded fact with explicit claim identity.
+    pub fn insert_grounded(
+        &mut self,
+        encoding: FactEncoding,
+        current_cycle: u64,
+        domain: Option<String>,
+        has_causal: bool,
+        claim_context: ClaimContext,
+    ) -> Result<(FactId, Vec<ContradictionAlert>), String> {
+        claim_context.validate()?;
+        Ok(self.insert_with_context(
+            encoding,
+            current_cycle,
+            domain,
+            has_causal,
+            Some(claim_context),
+        ))
+    }
+
+    fn insert_with_context(
+        &mut self,
+        encoding: FactEncoding,
+        current_cycle: u64,
+        domain: Option<String>,
+        has_causal: bool,
+        claim_context: Option<ClaimContext>,
+    ) -> (FactId, Vec<ContradictionAlert>) {
+        // Similarity/text checks create candidates, never an adjudicated contradiction.
         let contradictions = self.detect_contradictions(&encoding, current_cycle);
+        let similar_existing: Vec<(FactId, f32)> = self
+            .facts
+            .values()
+            .filter_map(|fact| {
+                let similarity = encoding.vector.similarity(&fact.encoding.vector);
+                (similarity > 0.85).then_some((fact.id, similarity))
+            })
+            .collect();
 
-        // Check for corroboration (highly similar existing fact)
-        if let Some(existing_id) = self.find_corroboration(&encoding) {
-            if let Some(fact) = self.facts.get_mut(&existing_id) {
-                fact.corroboration_count += 1;
-                // Boost confidence on corroboration (capped at initial)
-                fact.confidence = (fact.confidence + 0.1).min(1.0);
-                fact.last_accessed_cycle = current_cycle;
-                return (existing_id, contradictions);
-            }
-        }
-
-        // Evict if at capacity
         if self.facts.len() >= self.capacity {
             self.evict_lowest_confidence();
         }
 
         let id = self.next_id;
         self.next_id += 1;
-
         let confidence = encoding.confidence;
         let fact = TemporalFact {
             id,
@@ -163,24 +206,220 @@ impl EnhancedKnowledgeGraph {
             confidence,
             initial_confidence: confidence,
             corroboration_count: 0,
-            contradiction_count: contradictions.len() as u32,
+            contradiction_count: 0,
             domain: domain.clone(),
             has_causal_relations: has_causal,
+            claim_context,
         };
-
         self.facts.insert(id, fact);
         self.total_insertions += 1;
 
-        // Update domain index
         if let Some(ref d) = domain {
             self.domain_index.entry(d.clone()).or_default().push(id);
         }
 
-        // Store contradiction alerts
-        self.pending_contradictions.extend(contradictions.clone());
-        self.total_contradictions += contradictions.len() as u64;
+        // Keep semantically close facts distinct. Record only a candidate link.
+        for (existing_id, similarity) in similar_existing {
+            if !self.facts.contains_key(&existing_id) {
+                continue;
+            }
+            let (relation, evidence_ids) = {
+                let new_context = self
+                    .facts
+                    .get(&id)
+                    .and_then(|fact| fact.claim_context.as_ref());
+                let old_context = self
+                    .facts
+                    .get(&existing_id)
+                    .and_then(|fact| fact.claim_context.as_ref());
+                candidate_relation(new_context, old_context)
+            };
+            self.evidence_links.push(EvidenceLink {
+                from_fact_id: existing_id,
+                to_fact_id: id,
+                relation,
+                status: EvidenceLinkStatus::Candidate,
+                evidence_ids,
+                rationale: Some(format!(
+                    "HDC similarity {similarity:.4} generated a candidate only; no inference or confidence update"
+                )),
+                causal_argument: None,
+                transmission_chain: None,
+                detected_at_cycle: current_cycle,
+            });
+        }
 
+        self.pending_contradictions.extend(contradictions.clone());
         (id, contradictions)
+    }
+
+    /// Typed semantic/evidence links. Candidate links never change confidence.
+    pub fn evidence_links(&self) -> &[EvidenceLink] {
+        &self.evidence_links
+    }
+
+    /// Import persisted links after facts have been restored; drop stale endpoints.
+    pub fn import_evidence_links(&mut self, links: &[EvidenceLink]) {
+        for link in links {
+            if self.facts.contains_key(&link.from_fact_id)
+                && self.facts.contains_key(&link.to_fact_id)
+            {
+                self.evidence_links.push(link.clone());
+            }
+        }
+    }
+
+    /// Adjudicate a typed relation using source evidence referenced by both claims.
+    #[allow(clippy::too_many_arguments)]
+    pub fn adjudicate_evidence_relation(
+        &mut self,
+        from_fact_id: FactId,
+        to_fact_id: FactId,
+        relation: EvidenceRelation,
+        evidence_ids: Vec<String>,
+        rationale: String,
+        causal_argument: Option<String>,
+        transmission_chain: Option<String>,
+        current_cycle: u64,
+    ) -> Result<EvidenceLink, String> {
+        if from_fact_id == to_fact_id {
+            return Err("an evidence relation requires two distinct facts".into());
+        }
+        if rationale.trim().is_empty() {
+            return Err("adjudicated evidence relations require a rationale".into());
+        }
+        let supplied: HashSet<&str> = evidence_ids.iter().map(String::as_str).collect();
+        if evidence_ids.is_empty()
+            || evidence_ids.iter().any(|id| id.trim().is_empty())
+            || supplied.len() != evidence_ids.len()
+        {
+            return Err("adjudication requires unique, non-empty evidence IDs".into());
+        }
+
+        let from_context = self
+            .facts
+            .get(&from_fact_id)
+            .and_then(|fact| fact.claim_context.as_ref())
+            .ok_or_else(|| format!("fact {from_fact_id} has no claim provenance"))?;
+        let to_context = self
+            .facts
+            .get(&to_fact_id)
+            .and_then(|fact| fact.claim_context.as_ref())
+            .ok_or_else(|| format!("fact {to_fact_id} has no claim provenance"))?;
+        let from_has_evidence = from_context
+            .evidence_ids
+            .iter()
+            .any(|id| supplied.contains(id.as_str()));
+        let to_has_evidence = to_context
+            .evidence_ids
+            .iter()
+            .any(|id| supplied.contains(id.as_str()));
+        if !from_has_evidence || !to_has_evidence {
+            return Err("adjudication evidence must reference both claim contexts".into());
+        }
+
+        match relation {
+            EvidenceRelation::SemanticNeighbor | EvidenceRelation::SameWitnessVariant => {
+                return Err("semantic proximity and witness variants are candidate-only relations".into());
+            }
+            EvidenceRelation::Corroborates => {
+                if !from_context.same_claim(to_context)
+                    || !from_context.admissibly_independent_from(to_context)
+                {
+                    return Err("corroboration requires the same scoped claim and independent source evidence".into());
+                }
+            }
+            EvidenceRelation::Contradicts => {
+                if !from_context.same_conflict_scope(to_context)
+                    || from_context.same_claim(to_context)
+                {
+                    return Err("contradiction requires incompatible claims in the same subject/relation/context/time scope".into());
+                }
+            }
+            EvidenceRelation::Resembles => {}
+            EvidenceRelation::Precedes => {
+                if !strictly_precedes(from_context, to_context) {
+                    return Err("precedes requires explicit event times with from earlier than to".into());
+                }
+            }
+            EvidenceRelation::Causes => {
+                if !strictly_precedes(from_context, to_context)
+                    || causal_argument.as_deref().is_none_or(str::is_empty)
+                {
+                    return Err("causes requires temporal precedence and a causal_argument".into());
+                }
+            }
+            EvidenceRelation::HistoricallyInfluences => {
+                if !strictly_precedes(from_context, to_context)
+                    || transmission_chain.as_deref().is_none_or(str::is_empty)
+                {
+                    return Err("historical influence requires temporal precedence and a transmission_chain".into());
+                }
+            }
+        }
+
+        let already_adjudicated = self.evidence_links.iter().any(|link| {
+            link.from_fact_id == from_fact_id
+                && link.to_fact_id == to_fact_id
+                && link.relation == relation
+                && link.status == EvidenceLinkStatus::Adjudicated
+                && link.evidence_ids == evidence_ids
+        });
+        let link = EvidenceLink {
+            from_fact_id,
+            to_fact_id,
+            relation,
+            status: EvidenceLinkStatus::Adjudicated,
+            evidence_ids: evidence_ids.clone(),
+            rationale: Some(rationale),
+            causal_argument,
+            transmission_chain,
+            detected_at_cycle: current_cycle,
+        };
+        if !already_adjudicated {
+            if relation == EvidenceRelation::Corroborates {
+                for fact_id in [from_fact_id, to_fact_id] {
+                    if let Some(fact) = self.facts.get_mut(&fact_id) {
+                        fact.corroboration_count = fact.corroboration_count.saturating_add(1);
+                        fact.confidence = (fact.confidence + 0.05).clamp(0.0, 1.0);
+                        fact.last_accessed_cycle = current_cycle;
+                    }
+                }
+            } else if relation == EvidenceRelation::Contradicts {
+                for fact_id in [from_fact_id, to_fact_id] {
+                    if let Some(fact) = self.facts.get_mut(&fact_id) {
+                        fact.contradiction_count = fact.contradiction_count.saturating_add(1);
+                    }
+                }
+                self.total_contradictions += 1;
+            }
+        }
+        self.evidence_links.push(link.clone());
+        Ok(link)
+    }
+
+    /// Turn a string/HDC contradiction candidate into an evidence-backed decision.
+    pub fn adjudicate_contradiction(
+        &mut self,
+        alert: &ContradictionAlert,
+        evidence_ids: Vec<String>,
+        rationale: String,
+    ) -> Result<ContradictionAlert, String> {
+        self.adjudicate_evidence_relation(
+            alert.existing_fact_id,
+            alert.new_fact_id,
+            EvidenceRelation::Contradicts,
+            evidence_ids.clone(),
+            rationale.clone(),
+            None,
+            None,
+            alert.detected_at_cycle,
+        )?;
+        let mut adjudicated = alert.clone();
+        adjudicated.adjudicated = true;
+        adjudicated.evidence_ids = evidence_ids;
+        adjudicated.rationale = Some(rationale);
+        Ok(adjudicated)
     }
 
     /// Search for facts similar to a query vector, returning top-k results
@@ -492,6 +731,12 @@ impl EnhancedKnowledgeGraph {
     pub fn resolve_contradictions(&mut self, alerts: &[ContradictionAlert]) -> usize {
         let mut resolved = 0;
         for alert in alerts {
+            if !alert.adjudicated
+                || alert.evidence_ids.is_empty()
+                || alert.rationale.as_deref().is_none_or(str::is_empty)
+            {
+                continue;
+            }
             let weaker_id = if alert.higher_confidence_id == alert.new_fact_id {
                 alert.existing_fact_id
             } else {
@@ -499,7 +744,6 @@ impl EnhancedKnowledgeGraph {
             };
             let should_remove = if let Some(fact) = self.facts.get_mut(&weaker_id) {
                 fact.confidence *= 0.5;
-                fact.contradiction_count += 1;
                 resolved += 1;
                 fact.confidence < 0.05
             } else {
@@ -540,6 +784,7 @@ impl EnhancedKnowledgeGraph {
             contradiction_count: 0,
             domain: record.domain.clone(),
             has_causal_relations: record.is_causal,
+            claim_context: record.claim_context.clone(),
         };
         if let Some(ref domain) = fact.domain {
             self.domain_index
@@ -561,6 +806,7 @@ impl EnhancedKnowledgeGraph {
                 domain: f.domain.clone(),
                 cycle: f.inserted_at_cycle,
                 is_causal: f.has_causal_relations,
+                claim_context: f.claim_context.clone(),
             })
             .collect()
     }
@@ -654,34 +900,26 @@ impl EnhancedKnowledgeGraph {
                 if new_negated != existing_negated {
                     // One is negated and the other isn't = contradiction
                     let higher_confidence_id = if new_encoding.confidence > existing.confidence {
-                        0 // Placeholder — will be set after insertion
+                        self.next_id
                     } else {
                         existing.id
                     };
 
                     alerts.push(ContradictionAlert {
-                        new_fact_id: self.next_id, // Will be assigned
+                        new_fact_id: self.next_id,
                         existing_fact_id: existing.id,
                         similarity: sim,
                         higher_confidence_id,
                         detected_at_cycle: current_cycle,
+                        adjudicated: false,
+                        evidence_ids: Vec::new(),
+                        rationale: None,
                     });
                 }
             }
         }
 
         alerts
-    }
-
-    fn find_corroboration(&self, encoding: &FactEncoding) -> Option<FactId> {
-        // A fact with >0.85 similarity is likely the same information
-        for existing in self.facts.values() {
-            let sim = encoding.vector.similarity(&existing.encoding.vector);
-            if sim > 0.85 {
-                return Some(existing.id);
-            }
-        }
-        None
     }
 
     fn evict_lowest_confidence(&mut self) {
@@ -697,6 +935,8 @@ impl EnhancedKnowledgeGraph {
 
     fn remove_fact(&mut self, id: FactId) {
         if let Some(fact) = self.facts.remove(&id) {
+            self.evidence_links
+                .retain(|link| link.from_fact_id != id && link.to_fact_id != id);
             // Clean domain index
             if let Some(ref domain) = fact.domain {
                 if let Some(ids) = self.domain_index.get_mut(domain) {
@@ -708,6 +948,42 @@ impl EnhancedKnowledgeGraph {
             }
         }
     }
+}
+
+fn candidate_relation(
+    new_context: Option<&ClaimContext>,
+    old_context: Option<&ClaimContext>,
+) -> (EvidenceRelation, Vec<String>) {
+    let mut evidence_ids = Vec::new();
+    if let Some(context) = old_context {
+        evidence_ids.extend(context.evidence_ids.iter().cloned());
+    }
+    if let Some(context) = new_context {
+        evidence_ids.extend(context.evidence_ids.iter().cloned());
+    }
+    evidence_ids.sort();
+    evidence_ids.dedup();
+
+    let relation = match (new_context, old_context) {
+        (Some(new_context), Some(old_context)) if old_context.same_claim(new_context) => {
+            if old_context.admissibly_independent_from(new_context) {
+                EvidenceRelation::Corroborates
+            } else {
+                EvidenceRelation::SameWitnessVariant
+            }
+        }
+        (Some(new_context), Some(old_context))
+            if old_context.same_conflict_scope(new_context) =>
+        {
+            EvidenceRelation::Contradicts
+        }
+        _ => EvidenceRelation::SemanticNeighbor,
+    };
+    (relation, evidence_ids)
+}
+
+fn strictly_precedes(from: &ClaimContext, to: &ClaimContext) -> bool {
+    matches!((from.event_time, to.event_time), (Some(from_time), Some(to_time)) if from_time < to_time)
 }
 
 fn contains_negation(text: &str) -> bool {
