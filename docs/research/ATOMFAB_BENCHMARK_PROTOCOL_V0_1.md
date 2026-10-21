@@ -85,3 +85,28 @@ References: [KiCad 9.0 CLI manual](https://docs.kicad.org/9.0/en/cli/cli.html); 
 - **Qualification / production release**: separate authorized engineering review against applicable product, manufacturing and safety standards, supported by physical test evidence. No preceding gate grants machinery authority.
 
 A successful benchmark may still conclude that outsourcing is preferable. The target is reliable productive closure and a defensible decision, not forcing every process to become local.
+
+
+## F. Copper-trace routing is a separate benchmark domain
+
+Do not conflate **manufacturing-process route selection** (local vs outsourced fabrication/assembly and cost per accepted assembly) with **PCB copper-trace routing** (connecting pads/nets while satisfying DRC). The former is covered by PCB-CELL-001 / PCB-COST-001; the latter has its own new Symtropy program: [PCB-ROUTE-BENCH-001 #2473](https://github.com/Luminous-Dynamics/symtropy/issues/2473).
+
+### State-of-the-art reference
+
+[PCBWorld](https://github.com/LGAI-Research/PCBWorld) and its [PCBWorld-Bench paper](https://arxiv.org/abs/2607.05915) (July 2026; KDD 2026 Workshop) provide an open, engine-grounded benchmark. The paper documents grid-based and gridless synthetic families plus **679 real open-source boards**, scored by the same native KiCad routing engine and DRC. Its comparison includes rule-based routing, reinforcement-learning policies and tool-using LLMs; it reports that large-board routing remains difficult and learned methods can trail strong rule-based routers on larger boards. A separate 2026 DreamerV3 + FreeRouting paper reports 96% completion in its own setup. These published numbers are **not directly comparable** until we reproduce the same dataset split, engine build, DRC counting policy, timeout and evaluation protocol.
+
+### Experiment contract
+
+Start with six known-answer synthetic controls, then a declared, stratified pilot of 30 board-licensed real examples, and expand only after the pipeline is reliable. Compare available pinned rule-based baselines and Symthaea-guided closed-loop decisions on the *same starting boards*. Keep native KiCad PNS/DRC as geometric authority; do not create a second grid abstraction or train against DRC-free rewards alone.
+
+An instance counts as valid only when every required net is connected and the routing-relevant DRC policy reports zero violations, including crossings/shorts, clearance errors, dangling segments/vias and net conflicts. Record upstream non-routing violations separately. Report invalid/timed-out boards, not just successful runs. For each result retain completion/reason, unrouted nets, violation types, wirelength, via count, elapsed/CPU time, memory, engine calls and input/output digests.
+
+Optimize lexicographically: (1) zero routing violations and all required nets connected; (2) lower runtime at equal validity; (3) Pareto improvement in copper wirelength and via count. Compare per-board outcomes, completion percentage, median/p90 runtime and paired 95% confidence intervals. Stratify by source board, routing family and board complexity; use held-out board-source families to limit duplicate leakage.
+
+**Proposed stretch target, not a result:** on a frozen held-out split, seek either a statistically supported absolute completion improvement of at least 5 percentage points or a Pareto improvement at equal completion. Among boards completed by both methods, seek at least a 10% lower median runtime without worsening validity; report wirelength/via changes and 95% paired intervals. Do not claim SOTA superiority unless the complete pinned comparison supports it.
+
+### Integration and licensing boundary
+
+Use PCBWorld and its engine as explicitly pinned external processes. The published environment repository is BSD-3-Clause while the separate engine/submodule is GPLv3; individual board fixtures retain their source licenses. Do not vendor/link engine internals into production Symthaea/Symtropy or build a combined image. A Rust-first orchestrator can launch declared external commands and verify outputs without making Python a production dependency. Every run receipt binds exact source commit, environment/engine/KiCad versions, dataset manifest digest, command/configuration and output hashes.
+
+A passing routing benchmark still does not certify impedance, crosstalk, SI/PI, thermal behavior, manufacturing yield or physical board quality. Those require separate design analyses and physical validation.
