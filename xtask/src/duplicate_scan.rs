@@ -76,10 +76,10 @@ fn core_module_names(workspace_root: &Path) -> Result<BTreeSet<String>> {
             } else {
                 None
             };
-            if let Some(n) = name {
-                if !IGNORED_MODULES.contains(&n.as_str()) {
-                    out.insert(n);
-                }
+            if let Some(n) = name
+                && !IGNORED_MODULES.contains(&n.as_str())
+            {
+                out.insert(n);
             }
         }
     }
@@ -141,7 +141,10 @@ pub fn scan(workspace_root: &Path, registry_path: &Path) -> Result<()> {
     );
     for (m, c) in &collisions {
         match reg.known_name_collisions.get(m) {
-            Some(k) => println!("  known    {m:<28} <-> {c}   [{}]", k.disposition),
+            Some(k) => println!(
+                "  known    {m:<28} <-> {c}   [{}] — evidence: {}",
+                k.disposition, k.note
+            ),
             None => {
                 println!("  NEW      {m:<28} <-> {c}");
                 unadjudicated.push((m.clone(), c.clone()));
