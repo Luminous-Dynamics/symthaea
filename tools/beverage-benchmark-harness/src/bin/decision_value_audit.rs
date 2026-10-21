@@ -288,20 +288,25 @@ fn audit_manifest_bytes(bytes: &[u8]) -> DecisionReceipt {
         || manifest.required_primary_reduction_pct <= 0.0
         || manifest.required_primary_reduction_pct >= 100.0
     {
-        validation_errors.push("required_primary_reduction_pct_must_be_between_0_and_100".to_owned());
+        validation_errors
+            .push("required_primary_reduction_pct_must_be_between_0_and_100".to_owned());
     }
     if !manifest.maximum_secondary_resource_increase_pct.is_finite()
         || manifest.maximum_secondary_resource_increase_pct < 0.0
         || manifest.maximum_secondary_resource_increase_pct >= 100.0
     {
-        validation_errors.push("secondary_resource_guardrail_must_be_between_0_inclusive_and_100_exclusive".to_owned());
+        validation_errors.push(
+            "secondary_resource_guardrail_must_be_between_0_inclusive_and_100_exclusive"
+                .to_owned(),
+        );
     }
     if manifest.minimum_independent_units < 2 {
         validation_errors.push("minimum_independent_units_must_be_at_least_2".to_owned());
     }
     let design_gate_passed = manifest.design != Design::UncontrolledPrePost;
     if !design_gate_passed {
-        validation_errors.push("uncontrolled_pre_post_design_cannot_pass_decision_value_gate".to_owned());
+        validation_errors
+            .push("uncontrolled_pre_post_design_cannot_pass_decision_value_gate".to_owned());
     }
 
     let mut checks = Checks {
@@ -321,11 +326,25 @@ fn audit_manifest_bytes(bytes: &[u8]) -> DecisionReceipt {
     let mut energy_intervention = Vec::new();
 
     for comparison in &manifest.comparisons {
-        if !clean(&comparison.comparison_id) || !checks.comparison_ids.insert(comparison.comparison_id.clone()) {
-            validation_errors.push(format!("empty_or_duplicate_comparison_id:{}", comparison.comparison_id));
+        if !clean(&comparison.comparison_id)
+            || !checks
+                .comparison_ids
+                .insert(comparison.comparison_id.clone())
+        {
+            validation_errors.push(format!(
+                "empty_or_duplicate_comparison_id:{}",
+                comparison.comparison_id
+            ));
         }
-        if !clean(&comparison.independent_unit_id) || !checks.independent_units.insert(comparison.independent_unit_id.clone()) {
-            validation_errors.push(format!("empty_or_duplicate_independent_unit_id:{}", comparison.independent_unit_id));
+        if !clean(&comparison.independent_unit_id)
+            || !checks
+                .independent_units
+                .insert(comparison.independent_unit_id.clone())
+        {
+            validation_errors.push(format!(
+                "empty_or_duplicate_independent_unit_id:{}",
+                comparison.independent_unit_id
+            ));
         }
 
         if !clean(&comparison.product_stratum)
@@ -333,7 +352,10 @@ fn audit_manifest_bytes(bytes: &[u8]) -> DecisionReceipt {
             || !clean(&comparison.intervention_period_id)
             || comparison.baseline_period_id == comparison.intervention_period_id
         {
-            validation_errors.push(format!("invalid_stratum_or_period_pair:{}", comparison.comparison_id));
+            validation_errors.push(format!(
+                "invalid_stratum_or_period_pair:{}",
+                comparison.comparison_id
+            ));
         }
 
         checks.meter_boundaries_match &= clean(&comparison.baseline_meter_boundary_ref)
@@ -398,22 +420,28 @@ fn audit_manifest_bytes(bytes: &[u8]) -> DecisionReceipt {
     let single_product_stratum = checks.product_strata.len() == 1;
 
     if !checks.meter_boundaries_match {
-        validation_errors.push("meter_boundary_refs_must_match_within_pairs_and_across_cohort".to_owned());
+        validation_errors
+            .push("meter_boundary_refs_must_match_within_pairs_and_across_cohort".to_owned());
     }
     if !checks.functional_units_match {
-        validation_errors.push("functional_units_must_match_within_pairs_and_across_cohort".to_owned());
+        validation_errors
+            .push("functional_units_must_match_within_pairs_and_across_cohort".to_owned());
     }
     if !checks.product_mix_matches {
-        validation_errors.push("product_mix_refs_must_match_within_pairs_and_across_cohort".to_owned());
+        validation_errors
+            .push("product_mix_refs_must_match_within_pairs_and_across_cohort".to_owned());
     }
     if !single_product_stratum {
         validation_errors.push("product_strata_must_not_be_pooled_in_v1".to_owned());
     }
     if !checks.saleable_output_basis_passed {
-        validation_errors.push("both_periods_must_use_saleable_quality_conforming_output".to_owned());
+        validation_errors
+            .push("both_periods_must_use_saleable_quality_conforming_output".to_owned());
     }
     if !checks.positive_finite_measurements {
-        validation_errors.push("all_resource_and_saleable_output_values_must_be_finite_and_positive".to_owned());
+        validation_errors.push(
+            "all_resource_and_saleable_output_values_must_be_finite_and_positive".to_owned(),
+        );
     }
     if !checks.quality_gates_passed {
         validation_errors.push("quality_gate_failure_is_non_compensatory".to_owned());
@@ -430,7 +458,8 @@ fn audit_manifest_bytes(bytes: &[u8]) -> DecisionReceipt {
         .all(|value| value.is_finite() && *value > 0.0);
     checks.positive_finite_measurements &= normalized_intensities_are_finite;
     if !normalized_intensities_are_finite {
-        validation_errors.push("normalized_resource_intensities_must_be_finite_and_positive".to_owned());
+        validation_errors
+            .push("normalized_resource_intensities_must_be_finite_and_positive".to_owned());
     }
 
     let independent_unit_count = checks.independent_units.len();
@@ -450,7 +479,8 @@ fn audit_manifest_bytes(bytes: &[u8]) -> DecisionReceipt {
     if water_baseline.len() != manifest.comparisons.len()
         || energy_baseline.len() != manifest.comparisons.len()
     {
-        validation_errors.push("invalid_measurement_rows_prevent_complete_effect_estimate".to_owned());
+        validation_errors
+            .push("invalid_measurement_rows_prevent_complete_effect_estimate".to_owned());
     }
 
     let effect_input_valid = validation_errors.is_empty()
@@ -481,32 +511,33 @@ fn audit_manifest_bytes(bytes: &[u8]) -> DecisionReceipt {
         ResourceMetric::Energy => (energy_effect, water_effect),
     };
     let primary_target_gate_passed = primary_effect
-        .map(|effect| effect.percentile_bootstrap_95pct_low >= manifest.required_primary_reduction_pct)
+        .map(|effect| {
+            effect.percentile_bootstrap_95pct_low >= manifest.required_primary_reduction_pct
+        })
         .unwrap_or(false);
     if !primary_target_gate_passed {
-        validation_errors.push("primary_resource_reduction_lower_95pct_bound_does_not_meet_preregistered_target".to_owned());
+        validation_errors.push(
+            "primary_resource_reduction_lower_95pct_bound_does_not_meet_preregistered_target"
+                .to_owned(),
+        );
     }
     let secondary_resource_guardrail_passed = secondary_effect
-        .map(|effect| effect.percentile_bootstrap_95pct_low >= -manifest.maximum_secondary_resource_increase_pct)
+        .map(|effect| {
+            effect.percentile_bootstrap_95pct_low
+                >= -manifest.maximum_secondary_resource_increase_pct
+        })
         .unwrap_or(false);
     if !secondary_resource_guardrail_passed {
-        validation_errors.push("secondary_resource_increase_exceeds_preregistered_guardrail_or_interval_not_estimable".to_owned());
+        validation_errors.push(
+            "secondary_resource_increase_exceeds_preregistered_guardrail_or_interval_not_estimable"
+                .to_owned(),
+        );
     }
 
-    let hard_gates_passed = design_gate_passed
-        && unique_comparison_ids
-        && unique_independent_units
-        && checks.meter_boundaries_match
-        && checks.functional_units_match
-        && checks.product_mix_matches
-        && single_product_stratum
-        && checks.saleable_output_basis_passed
-        && checks.positive_finite_measurements
-        && checks.quality_gates_passed
-        && checks.safety_gates_passed
-        && minimum_independent_units_met;
+    let hard_gates_passed = effect_input_valid;
 
-    let passed = effect_input_valid && primary_target_gate_passed && secondary_resource_guardrail_passed;
+    let passed =
+        effect_input_valid && primary_target_gate_passed && secondary_resource_guardrail_passed;
     let status = if !passed {
         "FAIL"
     } else {
@@ -619,7 +650,12 @@ mod tests {
     #[test]
     fn synthetic_paired_fixture_passes_without_claiming_empirical_success() {
         let receipt = audit_manifest_bytes(FIXTURE);
-        assert_eq!(receipt.status, "SYNTHETIC_CONTRACT_PASS_NOT_EMPIRICAL", "{:?}", receipt.validation_errors);
+        assert_eq!(
+            receipt.status,
+            "SYNTHETIC_CONTRACT_PASS_NOT_EMPIRICAL",
+            "{:?}",
+            receipt.validation_errors
+        );
         assert!(receipt.hard_gates_passed);
         assert!(receipt.primary_target_gate_passed);
         assert!(receipt.secondary_resource_guardrail_passed);
