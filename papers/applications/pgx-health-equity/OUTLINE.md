@@ -236,26 +236,26 @@ Pharmacogenomic guidelines are a powerful tool for precision medicine, but their
 - Columns: Drug, Gene, Evidence Level, Equity Gap Score, Underserved Populations, Guideline Applicability (per ancestry, 6 sub-columns)
 - 4 rows
 
-### Table 3: Population-level clinical impact estimates
-- Columns: Drug, Gene, Ancestry Group, Estimated Actionable Phenotype Prevalence, Estimated Annual Prescriptions, Estimated Patients at Risk, Risk Type (ADR vs Inefficacy)
-- ~12-16 rows (4 drugs x 3-4 most affected populations each)
-- Prominent footnote: "Estimates based on published prescription rates and HWE-derived phenotype frequencies. Not validated against clinical outcome data."
+### Table 3: Modelled population scenario arithmetic
+- Columns: Drug, Gene, broad group label, denominator, modelled phenotype fraction, arithmetic product
+- Clearly state that outputs are not observed clinical impact, patient risk, prescription counts, or treatment need
 
 ---
 
 ## Supplementary Material
 
-### S1: Sensitivity analysis of risk weights
-- Vary adverse/efficacy weights +/-20%, +/-50%; show equity gap score ranking stability
+### S1: Internal sensitivity checks
+- Vary included inputs/weights and report score/flag/ranking changes; state that bounded perturbations do not cover omitted variants or model misspecification and do not validate ranking
 
-### S2: Comparison of HWE-derived phenotype frequencies with directly measured values
-- Where available from All of Us, UK Biobank, published cohort studies
+### S2: HWE-derived estimates versus published phenotype references
+- Compare with independent published estimates only where definitions and populations are comparable
+- Report disagreement and reference incompatibilities; do not call comparison a validation pass or assume errors are always conservative
 
 ### S3: Full engine API documentation and code listing
 - Link to GitHub repository with tagged release
 
-### S4: Extended allele frequency table with confidence intervals
-- Where literature provides ranges rather than point estimates
+### S4: Selected allele-frequency source-consistency comparison
+- Pin versions and query methods; report relative differences without calling the comparison phenotype or clinical validation
 
 ---
 
