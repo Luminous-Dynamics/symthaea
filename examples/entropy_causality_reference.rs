@@ -80,7 +80,7 @@ impl Network {
             })
             .collect::<Vec<_>>()
             .join(",");
-        format!("schema=boolean-network-v1;rules={rules};flip={:.6}", self.flip_probability)
+        format!("schema=boolean-network-v1;rules={rules};flip={:.6};flip_bits={:016x}", self.flip_probability, self.flip_probability.to_bits())
     }
 
     fn node_count(&self) -> usize {
@@ -242,7 +242,7 @@ fn canonical_prior_specification(probabilities: &[f64]) -> String {
     let entries = probabilities
         .iter()
         .enumerate()
-        .map(|(state, probability)| format!("{state}:{probability:.6}"))
+        .map(|(state, probability)| format!("{state}:{probability:.6}:{:016x}", probability.to_bits()))
         .collect::<Vec<_>>()
         .join(",");
     format!("schema=state-prior-v1;prior={entries}")
@@ -459,7 +459,7 @@ mod tests {
     fn canonical_specification_includes_rule_order_and_noise() {
         assert_eq!(
             directed_ring(3, 0.1).canonical_specification(),
-            "schema=boolean-network-v1;rules=copy:1,copy:2,copy:0;flip=0.100000"
+            "schema=boolean-network-v1;rules=copy:1,copy:2,copy:0;flip=0.100000;flip_bits=3fb999999999999a"
         );
     }
 
