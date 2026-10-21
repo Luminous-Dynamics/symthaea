@@ -378,6 +378,26 @@ pub fn calibration_panel() -> Vec<MismatchProfile> {
     profiles
 }
 
+/// 159-profile synthetic design panel for eight-family 95% joint-coverage code
+/// tests. Includes zero error, both extrema on every coordinate, and 142 mixed
+/// perturbations. It is a deterministic bounds fixture, not exchangeable data.
+pub fn action_specific_calibration_panel() -> Vec<MismatchProfile> {
+    let mut profiles = vec![make_profile_from_coordinates([0.0; 8])];
+    for axis in 0..8 {
+        for sign in [-1.0, 1.0] {
+            let mut coordinates = [0.0; 8];
+            coordinates[axis] = sign;
+            profiles.push(make_profile_from_coordinates(coordinates));
+        }
+    }
+    for case in 0..142_u64 {
+        let coordinates =
+            std::array::from_fn(|dimension| deterministic_trit(case + 10_000, dimension));
+        profiles.push(make_profile_from_coordinates(coordinates));
+    }
+    profiles
+}
+
 /// Generate a deterministic held-out mismatch profile. Scale 1.0 stays within
 /// the declared coordinate bounds; scale 2.0 is an out-of-family negative control.
 pub fn synthetic_mismatch_profile(seed: u64, scale: f64) -> Option<MismatchProfile> {
@@ -442,11 +462,15 @@ pub fn point_and_robust_vs_true(
     let point_effect = nominal_action_effect(action, stress)?;
     let robust_effect = calibrated_action_effect(action, stress, radii)?;
     let true_effect = true_action_effect(action, stress, mismatch)?;
-    let nominal_reserve = (state.reserve().lower() + state.reserve().upper()) * 0.5;
-    let nominal_load = (state.load().lower() + state.load().upper()) * 0.5;
     let true_state = StateEnvelope::new(
-        Interval::point((nominal_reserve + mismatch.reserve_state_error).clamp(0.0, 1.0))?,
-        Interval::point((nominal_load + mismatch.load_state_error).clamp(0.0, 1.0))?,
+        Interval::new(
+            (state.reserve().lower() + mismatch.reserve_state_error).clamp(0.0, 1.0),
+            (state.reserve().upper() + mismatch.reserve_state_error).clamp(0.0, 1.0),
+        )?,
+        Interval::new(
+            (state.load().lower() + mismatch.load_state_error).clamp(0.0, 1.0),
+            (state.load().upper() + mismatch.load_state_error).clamp(0.0, 1.0),
+        )?,
     )?;
     let robust_state = enclose_predicted_state(state, radii)?;
     let point_certified = robustly_viable(state, point_effect, limits);
@@ -497,6 +521,89 @@ mod tests {
 
     fn limits() -> ViabilityLimits {
         ViabilityLimits::new(0.15, 0.88).expect("valid limits")
+    }
+
+    #[test]
+    fn action_specific_panel_reaches_each_of_eight_residual_families() {
+        let panel = action_specific_calibration_panel();
+        assert_eq!(panel.len(), 159);
+        let scores: Vec<ActionSpecificEpisodeResidualScores> = panel
+            .iter()
+            .map(|profile| {
+                action_specific_episode_residual_scores(*profile, &STRESS_GRID)
+                    .expect("valid action-specific profile scores")
+            })
+            .collect();
+        assert!((scores.iter().map(|s| s.reserve_state).fold(0.0, f64::max) - 0.01).abs() < 1e-12);
+        assert!((scores.iter().map(|s| s.load_state).fold(0.0, f64::max) - 0.02).abs() < 1e-12);
+        assert!((scores.iter().map(|s| s.push_reserve_effect).fold(0.0, f64::max) - 0.03).abs() < 1e-12);
+        assert!((scores.iter().map(|s| s.push_load_effect).fold(0.0, f64::max) - 0.06).abs() < 1e-12);
+        assert!((scores.iter().map(|s| s.maintain_reserve_effect).fold(0.0, f64::max) - 0.01).abs() < 1e-12);
+        assert!((scores.iter().map(|s| s.maintain_load_effect).fold(0.0, f64::max) - 0.025).abs() < 1e-12);
+        assert!((scores.iter().map(|s| s.recovery_reserve_effect).fold(0.0, f64::max) - 0.015).abs() < 1e-12);
+        assert!((scores.iter().map(|s| s.recovery_load_effect).fold(0.0, f64::max) - 0.04).abs() < 1e-12);
+    }
+
+    #[test]
+    fn action_specific_certificate_preserves_safe_maintain_action_lost_by_global_margin() {
+        let global_panel = calibration_panel();
+        let global = calibrate_mismatch_panel(&global_panel, &STRESS_GRID, 0.90)
+            .expect("global four-family calibration");
+        let specific_panel = action_specific_calibration_panel();
+        let specific = calibrate_action_specific_mismatch_panel(
+            &specific_panel,
+            &STRESS_GRID,
+            0.95,
+        )
+        .expect("159 episodes meet the eight-family 95% finite-rank gate");
+        let mismatch = profile(1.0);
+        let (point, global_robust, global_true_safe) =
+            point_and_robust_vs_true(state(), Action::Maintain, 0.5, mismatch, global, limits())
+                .expect("global comparison");
+        let (specific_point, specific_robust, specific_true_safe) =
+            point_and_action_specific_robust_vs_true(
+                state(),
+                Action::Maintain,
+                0.5,
+                mismatch,
+                specific,
+                limits(),
+            )
+            .expect("action-specific comparison");
+
+        assert_eq!(point, specific_point);
+        assert_eq!(global_true_safe, specific_true_safe);
+        assert!(point);
+        assert!(!global_robust);
+        assert!(specific_robust);
+        assert!(specific_true_safe);
+    }
+
+    #[test]
+    fn action_specific_certificates_are_sound_for_the_declared_coordinate_box() {
+        let panel = action_specific_calibration_panel();
+        let radii = calibrate_action_specific_mismatch_panel(&panel, &STRESS_GRID, 0.95)
+            .expect("action-specific calibration panel");
+        for mismatch in panel {
+            for stress in STRESS_GRID {
+                for action in [Action::Push, Action::Maintain, Action::EmergencyRecover] {
+                    let (_, robust_certified, true_safe) =
+                        point_and_action_specific_robust_vs_true(
+                            state(),
+                            action,
+                            stress,
+                            mismatch,
+                            radii,
+                            limits(),
+                        )
+                        .expect("valid action-specific certificate inputs");
+                    assert!(
+                        !robust_certified || true_safe,
+                        "action-specific false certification: stress={stress} action={action:?}"
+                    );
+                }
+            }
+        }
     }
 
     #[test]
