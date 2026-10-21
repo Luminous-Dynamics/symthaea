@@ -1750,16 +1750,18 @@ mod tests {
             "expected_relation": "deny_access",
             "baseline": {
                 "rights_status":"synthetic_only",
+                "access_decision":"allow",
                 "evidence_pack":[]
             },
             "mutated": {
-                "rights_status":"restricted",
+                "rights_status":"synthetic_only",
+                "access_decision":"deny",
                 "evidence_pack":[]
             },
             "intervention": {
-                "field":"rights_status",
-                "before_value":"synthetic_only",
-                "after_value":"restricted"
+                "field":"access_decision",
+                "before_value":"allow",
+                "after_value":"deny"
             },
             "acceptance": {"must_change":["access is denied"]}
         });
