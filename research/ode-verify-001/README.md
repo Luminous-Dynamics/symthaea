@@ -95,3 +95,17 @@ Queued, skipped, formatting-only, and synthetic-known-answer passes are never de
 The separate [GEOM-ODE-001 protocol](GEOMETRIC_STRUCTURE_PROTOCOL_V0_1.md) adds direct one-step checks for canonical phase-space area and signed-step reversibility. The frozen unit oscillator uses Velocity-Verlet as the structure-preserving candidate and RK4 as an intentional negative control. These are distinct from the long-horizon conservation checks in `tests/conservative_orbits.rs`; none of these synthetic numerical checks establishes physical validation or solver-SOTA superiority.
 
 The nonlinear follow-on is specified in [NONLINEAR_SYMPLECTICITY_PROTOCOL_V0_1.md](NONLINEAR_SYMPLECTICITY_PROTOCOL_V0_1.md) and implemented in tests/nonlinear_symplecticity.rs. It extends the fixed oscillator fixture to a nonlinear Hamiltonian and retains RK4 as a negative control. No Rust test pass is claimed until the focused workflow succeeds on the exact PR head.
+
+
+## Executable fixed-step work–precision baseline
+
+Run the deterministic analytical sweep in release mode:
+
+```bash
+cargo test --locked --manifest-path research/ode-verify-001/Cargo.toml --example oscillator_work_precision
+cargo run --locked --release --manifest-path research/ode-verify-001/Cargo.toml --example oscillator_work_precision
+```
+
+The example compares Euler, RK4, and Velocity-Verlet on the unit harmonic oscillator over four periods and five refinements. It emits CSV fields for actual steps, derivative-evaluation count, final and maximum sampled trajectory error, maximum relative energy drift, and median wall time over five repetitions.
+
+Timing covers the checked simulation driver and full trajectory recording; it is not an integrator-kernel-only result. The fixed-step report is a first local work–precision baseline, not an industry comparison or an SOTA claim. The focused workflow runs numerical regression tests and emits the CSV on the exact PR head; timing values from shared CI runners are not treated as stable performance comparisons.
