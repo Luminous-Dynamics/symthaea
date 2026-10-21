@@ -124,7 +124,7 @@ class TccipReferenceOracleTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "bad.tsv"
             path.write_text(
-                "# schema=tccip-toy-expectations-v2\n"
+                "# schema=tccip-toy-expectations-v3\n"
                 "only\ttwo\tfields\n",
                 encoding="utf-8",
             )
