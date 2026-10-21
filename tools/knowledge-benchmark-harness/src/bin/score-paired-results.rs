@@ -68,18 +68,34 @@ struct PairCase {
     acceptance: Acceptance,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 struct PairState {
+    context_id: String,
+    tradition_scope: String,
     source_id: String,
+    variant_id: String,
+    prompt: String,
     rights_status: String,
     access_decision: String,
     evidence_pack: Vec<PairEvidence>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 struct PairEvidence {
+    evidence_id: String,
     source_id: String,
+    statement: String,
     kind: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct SourcePackSnapshot {
+    schema_version: String,
+    synthetic_only: bool,
+    pair_id: String,
+    state: String,
+    #[serde(flatten)]
+    state_data: PairState,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -377,6 +393,77 @@ fn validate_plan_eligibility(plan: &Plan) -> Result<(), String> {
             "primary endpoint {:?} is not computed by this paired-results scorer",
             plan.primary_endpoint
         ));
+    }
+    Ok(())
+}
+
+fn validate_source_pack_matches_pairs(
+    pairs: &[PairCase],
+    source_pack: &[SourcePackSnapshot],
+    synthetic_only: bool,
+) -> Result<(), String> {
+    let expected_count = pairs.len() * 2;
+    if source_pack.len() != expected_count {
+        return Err(format!(
+            "source pack contains {} snapshots, expected exactly {expected_count}",
+            source_pack.len()
+        ));
+    }
+
+    let mut snapshots: HashMap<(String, String), &SourcePackSnapshot> = HashMap::new();
+    for snapshot in source_pack {
+        if snapshot.schema_version != "synthetic-source-pack-v0" {
+            return Err(format!(
+                "source-pack snapshot for pair {:?} has unsupported schema_version {:?}",
+                snapshot.pair_id, snapshot.schema_version
+            ));
+        }
+        if snapshot.synthetic_only != synthetic_only {
+            return Err(format!(
+                "source-pack snapshot for pair {:?} disagrees with plan synthetic_only={synthetic_only}",
+                snapshot.pair_id
+            ));
+        }
+        if !matches!(snapshot.state.as_str(), "baseline" | "mutated") {
+            return Err(format!(
+                "source-pack snapshot for pair {:?} has invalid state {:?}",
+                snapshot.pair_id, snapshot.state
+            ));
+        }
+        let key = (snapshot.pair_id.clone(), snapshot.state.clone());
+        if snapshots.insert(key, snapshot).is_some() {
+            return Err(format!(
+                "duplicate source-pack snapshot for pair {:?} state {:?}",
+                snapshot.pair_id, snapshot.state
+            ));
+        }
+    }
+
+    let mut expected_keys = HashSet::new();
+    for pair in pairs {
+        for (state_name, expected_state) in [
+            ("baseline", &pair.baseline),
+            ("mutated", &pair.mutated),
+        ] {
+            let key = (pair.pair_id.clone(), state_name.to_string());
+            expected_keys.insert(key.clone());
+            let snapshot = snapshots.get(&key).ok_or_else(|| {
+                format!(
+                    "source pack is missing pair {:?} state {state_name}",
+                    pair.pair_id
+                )
+            })?;
+            if snapshot.state_data != *expected_state {
+                return Err(format!(
+                    "source-pack snapshot does not match pair {:?} state {state_name}",
+                    pair.pair_id
+                ));
+            }
+        }
+    }
+
+    if snapshots.keys().any(|key| !expected_keys.contains(key)) {
+        return Err("source pack contains an unreferenced pair/state snapshot".into());
     }
     Ok(())
 }
@@ -829,6 +916,9 @@ fn run() -> Result<(), String> {
     let pair_count = pairs.len();
     let results = parse_jsonl::<Observation>(&result_bytes, "paired-intervention results")?;
     let source_records = parse_jsonl::<SourceRecord>(&source_catalog_bytes, "source catalog")?;
+    let source_pack_records =
+        parse_jsonl::<SourcePackSnapshot>(&source_pack_bytes, "source pack")?;
+    validate_source_pack_matches_pairs(&pairs, &source_pack_records, plan.synthetic_only)?;
     let system_metrics = score(&plan, pairs, results, &source_records)?;
 
     let manifest_lock_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("Cargo.lock");
@@ -959,11 +1049,17 @@ mod tests {
 
     fn synthetic_pair_state() -> PairState {
         PairState {
+            context_id: "synthetic-context".into(),
+            tradition_scope: "synthetic-tradition".into(),
             source_id: "synthetic-source".into(),
+            variant_id: "synthetic-variant".into(),
+            prompt: "Synthetic control prompt".into(),
             rights_status: "synthetic_only".into(),
             access_decision: "synthetic_only".into(),
             evidence_pack: vec![PairEvidence {
+                evidence_id: "synthetic-evidence".into(),
                 source_id: "synthetic-source".into(),
+                statement: "Synthetic control evidence".into(),
                 kind: "synthetic_control".into(),
             }],
         }
@@ -1053,6 +1149,40 @@ mod tests {
             validate_real_pair_state("pair-1", "holdout", "baseline", &state, &catalog)
                 .is_ok()
         );
+    }
+
+    #[test]
+    fn source_pack_snapshot_must_match_pair_state_exactly() {
+        let case = pair("p1", "context_swap", "local_change", "major", true);
+        let mut snapshot = SourcePackSnapshot {
+            schema_version: "synthetic-source-pack-v0".into(),
+            synthetic_only: true,
+            pair_id: "p1".into(),
+            state: "baseline".into(),
+            state_data: case.baseline.clone(),
+        };
+        let mut mutated_snapshot = SourcePackSnapshot {
+            schema_version: "synthetic-source-pack-v0".into(),
+            synthetic_only: true,
+            pair_id: "p1".into(),
+            state: "mutated".into(),
+            state_data: case.mutated.clone(),
+        };
+        assert!(validate_source_pack_matches_pairs(
+            std::slice::from_ref(&case),
+            &[snapshot, mutated_snapshot],
+            true
+        ).is_ok());
+
+        mutated_snapshot.state_data.prompt = "altered source-pack prompt".into();
+        snapshot.state_data.prompt = "baseline altered prompt".into();
+        let error = validate_source_pack_matches_pairs(
+            std::slice::from_ref(&case),
+            &[snapshot, mutated_snapshot],
+            true,
+        )
+        .unwrap_err();
+        assert!(error.contains("does not match pair"));
     }
 
     #[test]
