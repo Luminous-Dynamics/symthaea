@@ -47,53 +47,135 @@
 //! experiment is uninformative -- it's simply excluded from that
 //! experiment's variance computation.
 
-/// Population variance (not sample variance -- deliberate: this scores
-/// *disagreement across the hypothesis set itself*, not an estimate of a
-/// variance parameter from a sample of some larger population).
+/// A typed result for scoring a candidate experiment against live hypotheses.
+///
+/// Keeping unsupported and unrepresentable scores distinct prevents callers
+/// from mistaking an invalid experiment for a legitimate zero-disagreement one.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum EpistemicAssessment {
+    /// Finite, representable population variance over at least two predictions.
+    Score {
+        value: f64,
+        valid_predictions: usize,
+    },
+    /// Fewer than two hypotheses produced finite predictions for this experiment.
+    InsufficientValidPredictions {
+        valid_predictions: usize,
+    },
+    /// Predictions were finite, but the variance was not representable as f64.
+    UnrepresentableScore {
+        valid_predictions: usize,
+    },
+}
+
+/// Population variance (not sample variance). Scaling before reduction avoids
+/// overflowing the mean when several large finite predictions share a sign.
 fn variance(values: &[f64]) -> f64 {
     if values.len() < 2 {
         return 0.0;
     }
-    let mean = values.iter().sum::<f64>() / values.len() as f64;
-    values.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / values.len() as f64
+
+    let scale = values
+        .iter()
+        .fold(0.0_f64, |maximum, value| maximum.max(value.abs()));
+    if scale == 0.0 {
+        return 0.0;
+    }
+
+    let normalized: Vec<f64> = values.iter().map(|value| value / scale).collect();
+    let mean = normalized.iter().sum::<f64>() / normalized.len() as f64;
+    let normalized_variance = normalized
+        .iter()
+        .map(|value| (value - mean).powi(2))
+        .sum::<f64>()
+        / normalized.len() as f64;
+
+    // Multiplication order matters: normalized_variance * scale * scale can
+    // retain a representable result when scale*scale alone would overflow.
+    normalized_variance * scale * scale
 }
 
-/// How informative would running `experiment` be for discriminating among
-/// `hypotheses`? Scored as the variance of their predictions for that
-/// experiment -- high variance means the hypotheses disagree a lot, so
-/// whichever one turns out to match reality, this experiment clearly rules
-/// out the others; low variance (including the degenerate case where every
-/// hypothesis predicts the same thing) means this experiment teaches
-/// nothing about which hypothesis is right.
+/// Score a candidate experiment while preserving validity information.
 ///
-/// Returns `0.0` if fewer than 2 hypotheses produce a prediction for this
-/// experiment (nothing to disagree about).
+/// Non-finite predictions are excluded from the comparison. Fewer than two
+/// finite predictions return `InsufficientValidPredictions`; an overflowed
+/// variance returns `UnrepresentableScore` instead of silently becoming a
+/// high score or contaminating the candidate ranking.
+pub fn assess_epistemic_value<H, E>(
+    experiment: &E,
+    hypotheses: &[H],
+    predict: impl Fn(&H, &E) -> Option<f64>,
+) -> EpistemicAssessment {
+    let predictions: Vec<f64> = hypotheses
+        .iter()
+        .filter_map(|hypothesis| predict(hypothesis, experiment))
+        .filter(|prediction| prediction.is_finite())
+        .collect();
+
+    if predictions.len() < 2 {
+        return EpistemicAssessment::InsufficientValidPredictions {
+            valid_predictions: predictions.len(),
+        };
+    }
+
+    let valid_predictions = predictions.len();
+    let value = variance(&predictions);
+    if !value.is_finite() || value < 0.0 {
+        EpistemicAssessment::UnrepresentableScore { valid_predictions }
+    } else {
+        EpistemicAssessment::Score {
+            value,
+            valid_predictions,
+        }
+    }
+}
+
+/// Compatibility score for one candidate experiment.
+///
+/// High population variance means candidate hypotheses disagree; zero means
+/// either that the predictions agree, fewer than two finite predictions remain,
+/// or the score is unrepresentable. Callers that need to distinguish those cases
+/// should use [`assess_epistemic_value`] instead.
 pub fn epistemic_value<H, E>(
     experiment: &E,
     hypotheses: &[H],
     predict: impl Fn(&H, &E) -> Option<f64>,
 ) -> f64 {
-    let predictions: Vec<f64> = hypotheses
-        .iter()
-        .filter_map(|h| predict(h, experiment))
-        .collect();
-    variance(&predictions)
+    match assess_epistemic_value(experiment, hypotheses, predict) {
+        EpistemicAssessment::Score { value, .. } => value,
+        EpistemicAssessment::InsufficientValidPredictions { .. }
+        | EpistemicAssessment::UnrepresentableScore { .. } => 0.0,
+    }
 }
 
-/// Select, from a pool of candidate experiments, the one with maximum
-/// [`epistemic_value`] against `hypotheses` -- i.e. the single most
-/// discriminating experiment to run next. Returns `None` if `candidates` is
-/// empty. Ties broken by first occurrence (stable, deterministic given a
-/// fixed candidate ordering).
+/// Select the highest-scoring candidate with finite, representable disagreement
+/// across at least two hypotheses. Experiments with no valid comparison or zero
+/// disagreement are omitted; returns `None` if no informative candidate remains.
+/// Ties keep the first candidate, preserving deterministic input-order semantics.
 pub fn select_most_informative_experiment<'a, H, E>(
     candidates: &'a [E],
     hypotheses: &[H],
     predict: impl Fn(&H, &E) -> Option<f64> + Copy,
 ) -> Option<(&'a E, f64)> {
-    candidates
-        .iter()
-        .map(|e| (e, epistemic_value(e, hypotheses, predict)))
-        .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
+    let mut best: Option<(&'a E, f64)> = None;
+
+    for candidate in candidates {
+        let EpistemicAssessment::Score { value, .. } =
+            assess_epistemic_value(candidate, hypotheses, predict)
+        else {
+            continue;
+        };
+
+        if value <= 0.0 {
+            continue;
+        }
+
+        if best.map_or(true, |(_, best_value)| value > best_value) {
+            best = Some((candidate, value));
+        }
+    }
+
+    best
 }
 
 #[cfg(test)]
