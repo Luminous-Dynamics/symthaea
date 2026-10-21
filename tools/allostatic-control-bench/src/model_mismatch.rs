@@ -328,7 +328,14 @@ mod tests {
 
     #[test]
     fn malformed_profiles_or_stress_grids_fail_closed() {
-        assert!(MismatchProfile::new(f64::NAN, 0.0, error(0.0, 0.0), error(0.0, 0.0), error(0.0, 0.0)).is_none());
+        assert!(MismatchProfile::new(
+            f64::NAN,
+            0.0,
+            error(0.0, 0.0),
+            error(0.0, 0.0),
+            error(0.0, 0.0),
+        )
+        .is_none());
         let valid = profile(1.0);
         assert!(episode_residual_scores(valid, &[]).is_none());
         assert!(episode_residual_scores(valid, &[0.0, f64::NAN]).is_none());
@@ -338,7 +345,9 @@ mod tests {
     #[test]
     fn point_shield_false_positive_is_rejected_by_a_calibrated_envelope() {
         // Every calibration episode contains <= this held-out error magnitude.
-        let calibration: Vec<MismatchProfile> = (1..=39).map(|i| profile(i as f64 / 39.0)).collect();
+        let calibration: Vec<MismatchProfile> = (1..=39)
+            .map(|i| profile(i as f64 / 39.0))
+            .collect();
         let radii = calibrate_mismatch_panel(&calibration, &STRESS_GRID, 0.90)
             .expect("39 episodes meet the 90% four-family finite-rank gate");
         let held_out = profile(1.0);
@@ -384,8 +393,38 @@ mod tests {
     }
 
     #[test]
+    fn calibrated_certificate_matches_realized_safety_for_the_enclosed_model_panel() {
+        let calibration: Vec<MismatchProfile> = (1..=39)
+            .map(|i| profile(i as f64 / 39.0))
+            .collect();
+        let radii = calibrate_mismatch_panel(&calibration, &STRESS_GRID, 0.90)
+            .expect("calibration panel");
+        for mismatch in calibration {
+            for stress in STRESS_GRID {
+                for action in [Action::Push, Action::Maintain, Action::EmergencyRecover] {
+                    let (_, robust_certified, true_safe) = point_and_robust_vs_true(
+                        state(),
+                        action,
+                        stress,
+                        mismatch,
+                        radii,
+                        limits(),
+                    )
+                    .expect("valid enclosed model sample");
+                    assert!(
+                        !robust_certified || true_safe,
+                        "robust false certification: stress={stress} action={action:?}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
     fn model_error_outside_calibration_envelope_is_an_explicit_negative_control() {
-        let calibration: Vec<MismatchProfile> = (1..=39).map(|i| profile(0.2 * i as f64 / 39.0)).collect();
+        let calibration: Vec<MismatchProfile> = (1..=39)
+            .map(|i| profile(0.2 * i as f64 / 39.0))
+            .collect();
         let radii = calibrate_mismatch_panel(&calibration, &STRESS_GRID, 0.90)
             .expect("calibration panel");
         let out_of_family = profile(2.0);
