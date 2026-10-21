@@ -363,7 +363,7 @@ type CheckpointLoadResult = anyhow::Result<(
 )>;
 
 impl BrocaGenerator {
-    /// Create a new generator from genesis seed and config using the legacy token initializer.
+    /// Create a generator using the configured token initializer (V1 by default).
     pub fn new(genesis: &GenesisSeed, config: BrocaConfig) -> Self {
         let seed_scheme = config.controller.token_embedding_seed_scheme;
         Self::new_with_token_embedding_seed_scheme(genesis, config, seed_scheme)
@@ -380,7 +380,12 @@ impl BrocaGenerator {
     ) -> Self {
         config.controller.token_embedding_seed_scheme = seed_scheme;
         let tokenizer = BpeTokenizer::default_minimal();
-        Self::with_tokenizer_and_token_embedding_seed_scheme(genesis, config, tokenizer, seed_scheme)
+        Self::with_tokenizer_and_token_embedding_seed_scheme(
+            genesis,
+            config,
+            tokenizer,
+            seed_scheme,
+        )
     }
 
     /// Create a generator for a specific coding substrate.
