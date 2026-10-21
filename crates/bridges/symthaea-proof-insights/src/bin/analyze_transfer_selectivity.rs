@@ -1466,7 +1466,11 @@ mod tests {
         invalid_precondition["prediction"]["precondition_checks"][0]["outcome"] =
             json!("probably-satisfied");
         assert!(
-            validate_outcome_contract(&invalid_precondition, "invalid precondition outcome").is_err()
+            validate_outcome_contract(
+                &invalid_precondition,
+                "invalid precondition outcome"
+            )
+            .is_err()
         );
 
         let mut extra_field = valid;
