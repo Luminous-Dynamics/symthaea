@@ -21,6 +21,8 @@ Run as much of the following ladder as the research question needs, with pinned 
 7. **Ablations** — disable source identity, context, variant, typed relation, counterevidence, or rights gates one at a time.
 8. **Expert reference** — blinded subject-expert labels / adjudicated claim and alternative sets, not a model-like exact string.
 
+Before any output is inspected, freeze `candidate_system_id` alongside the full baseline list. The candidate cannot be changed after seeing scores. Synthetic systems in this repository are scorer controls only; their names do not imply that BM25 or Symthaea was actually executed.
+
 An LLM baseline should have a pinned model identifier/revision or dated API identity, not just a product label. Pin retriever, embedding model, index build, reranker, prompt, decoding, tool implementation and all evidence/source digests. Report proprietary models as API baselines if weights are unavailable; don't claim full reproducibility beyond what their API exposes.
 
 ## Equal-budget rule
