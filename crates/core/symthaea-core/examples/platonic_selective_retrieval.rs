@@ -20,11 +20,13 @@ const PROTOTYPE_COUNT: usize = 64;
 const SELECTION_QUERY_COUNT: usize = 2_048;
 const CERTIFICATION_QUERY_COUNT: usize = 2_048;
 const TEST_QUERY_COUNT: usize = 4_096;
+const CONFORMAL_CALIBRATION_QUERY_COUNT: usize = 2_048;
 const KNOWN_QUERY_WEIGHT: usize = 7;
 const OOD_QUERY_WEIGHT: usize = 2;
 const MIXTURE_QUERY_WEIGHT: usize = 2;
 const MAX_VALIDATION_RISK: f64 = 0.05;
 const CONFORMAL_ALPHA: f64 = 0.05;
+const DCO_GAP_PENALTY_CANDIDATES: [f64; 5] = [0.0, 0.25, 0.5, 1.0, 2.0];
 const MIN_ACCEPTED_FOR_CALIBRATION: usize = 30;
 // Family-wise error control across 3 policy candidates × 5 reported seeds.
 const MIN_ACCEPTED_FOR_CERTIFICATION: usize = 125;
@@ -62,6 +64,21 @@ struct ScoredQuery {
     /// Cached similarity to each prototype, also reused for set-valued retrieval.
     prototype_similarities: Arc<[f64]>,
     kind: QueryKind,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum ConformalScoreMode {
+    RawSimilarity,
+    GapAdjusted { penalty: f64 },
+}
+
+#[derive(Debug, Clone, Copy)]
+struct DcoScoreSelection {
+    mode: ConformalScoreMode,
+    provisional_quantile: f64,
+    tuning_coverage: f64,
+    mean_set_size: f64,
+    tuning_n: usize,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -145,8 +162,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         "# fixed_sequence_rule=predeclared_strict_to_permissive_candidates_stop_at_first_failed_certificate"
     );
     println!("# fixed_sequence_uses_one_calibration_split=true");
-    println!("# set_valued_baseline=split_conformal_prediction_sets");
+    println!("# set_valued_baseline=split_conformal_and_dco_tuned_prediction_sets");
     println!("# conformal_alpha=0.05; marginal_known_query_coverage_target=0.95");
+    println!("# dco_tuning_split=selection; fresh_conformal_calibration_split=true");
+    println!("# dco_tuning_objective=minimize_tuning_mean_set_size_subject_to_tuning_coverage_target");
+    println!("# dco_gap_penalty_candidates=0,0.25,0.5,1,2");
     println!(
         "# conformal_scope=exchangeable_known_queries_from_same_synthetic_generator; strata_are_descriptive"
     );
@@ -191,6 +211,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         let selection = score_queries(&selection_queries, &prototypes)?;
         let certification = score_queries(&certification_queries, &prototypes)?;
         let test = score_queries(&test_queries, &prototypes)?;
+        let conformal_calibration_queries = generate_queries(
+            &prototypes,
+            derive_seed(seed, 0x434f_4e46, 0),
+            CONFORMAL_CALIBRATION_QUERY_COUNT,
+        )?;
+        let conformal_calibration = score_queries(&conformal_calibration_queries, &prototypes)?;
         let near_unknown_queries = generate_near_unknown_challenges(
             &prototypes,
             derive_seed(seed, 0x4e45_4152, 0),
@@ -202,17 +228,30 @@ fn main() -> Result<(), Box<dyn Error>> {
         // split. Its finite-sample guarantee is marginal over this generator's
         // known-query distribution; per-noise rows are descriptive, not conditional
         // coverage guarantees.
-        let (conformal_q, conformal_calibration_n) =
-            split_conformal_quantile(&selection, CONFORMAL_ALPHA)?;
+        // Baseline split conformal uses the raw similarity score, calibrated on
+        // a fresh split that is disjoint from threshold/score tuning.
+        let (conformal_q, conformal_calibration_n) = split_conformal_quantile(
+            &conformal_calibration,
+            CONFORMAL_ALPHA,
+            ConformalScoreMode::RawSimilarity,
+        )?;
         let conformal_cutoff_similarity = 1.0 - conformal_q;
-        let conformal_test = score_conformal_sets(&test, conformal_q);
-        let conformal_near_unknown = score_conformal_sets(&near_unknown, conformal_q);
+        let conformal_test = score_conformal_sets(
+            &test,
+            conformal_q,
+            ConformalScoreMode::RawSimilarity,
+        );
+        let conformal_near_unknown = score_conformal_sets(
+            &near_unknown,
+            conformal_q,
+            ConformalScoreMode::RawSimilarity,
+        );
         println!(
-            "# conformal_calibration=seed:{seed},alpha:{CONFORMAL_ALPHA:.4},q:{conformal_q:.6},cutoff_similarity:{conformal_cutoff_similarity:.6},known_calibration_n:{conformal_calibration_n}"
+            "# conformal_calibration=seed:{seed},alpha:{CONFORMAL_ALPHA:.4},q:{conformal_q:.6},cutoff_similarity:{conformal_cutoff_similarity:.6},known_calibration_n:{conformal_calibration_n},split:fresh"
         );
         report_conformal_set_summaries(
             seed,
-            "evaluation",
+            "evaluation_raw_conformal",
             CONFORMAL_ALPHA,
             conformal_q,
             conformal_calibration_n,
@@ -220,11 +259,48 @@ fn main() -> Result<(), Box<dyn Error>> {
         );
         report_conformal_set_summaries(
             seed,
-            "near_unknown_challenge",
+            "near_unknown_raw_conformal",
             CONFORMAL_ALPHA,
             conformal_q,
             conformal_calibration_n,
             &conformal_near_unknown,
+        );
+
+        // DCO-style experiment: tune only the score structure on the selection
+        // split, then compute the final quantile on fresh, independent examples.
+        let dco = tune_dco_score(&selection, CONFORMAL_ALPHA)?;
+        let (dco_q, dco_calibration_n) =
+            split_conformal_quantile(&conformal_calibration, CONFORMAL_ALPHA, dco.mode)?;
+        let dco_test = score_conformal_sets(&test, dco_q, dco.mode);
+        let dco_near_unknown = score_conformal_sets(&near_unknown, dco_q, dco.mode);
+        let dco_mode_label = match dco.mode {
+            ConformalScoreMode::RawSimilarity => "raw_similarity".to_owned(),
+            ConformalScoreMode::GapAdjusted { penalty } => {
+                format!("gap_adjusted_{penalty:.2}")
+            }
+        };
+        println!(
+            "# dco_selection=seed:{seed},score:{dco_mode_label},provisional_q:{:.6},tuning_n:{},tuning_known_coverage:{:.6},tuning_mean_set_size:{:.6},fresh_calibration_n:{dco_calibration_n},fresh_q:{dco_q:.6}",
+            dco.provisional_quantile,
+            dco.tuning_n,
+            dco.tuning_coverage,
+            dco.mean_set_size
+        );
+        report_conformal_set_summaries(
+            seed,
+            "evaluation_dco_tuned",
+            CONFORMAL_ALPHA,
+            dco_q,
+            dco_calibration_n,
+            &dco_test,
+        );
+        report_conformal_set_summaries(
+            seed,
+            "near_unknown_dco_tuned",
+            CONFORMAL_ALPHA,
+            dco_q,
+            dco_calibration_n,
+            &dco_near_unknown,
         );
 
         let always_accept = DecisionRule {
@@ -888,6 +964,7 @@ fn report_risk_coverage_curve(
 fn split_conformal_quantile(
     calibration: &[ScoredQuery],
     alpha: f64,
+    mode: ConformalScoreMode,
 ) -> Result<(f64, usize), Box<dyn Error>> {
     if !alpha.is_finite() || !(0.0..1.0).contains(&alpha) {
         return Err("conformal alpha must be finite and strictly between zero and one".into());
@@ -895,7 +972,11 @@ fn split_conformal_quantile(
     let mut nonconformity: Vec<f64> = calibration
         .iter()
         .filter(|sample| matches!(sample.kind, QueryKind::Known { .. }))
-        .filter_map(|sample| sample.target_similarity.map(|similarity| 1.0 - similarity))
+        .filter_map(|sample| {
+            sample.target_similarity.map(|similarity| {
+                conformal_nonconformity(similarity, sample.best_similarity, mode)
+            })
+        })
         .collect();
     if nonconformity.is_empty() {
         return Err("split conformal needs at least one labeled known calibration query".into());
@@ -911,19 +992,38 @@ fn split_conformal_quantile(
     Ok((quantile, count))
 }
 
-fn score_conformal_sets(scored: &[ScoredQuery], conformal_q: f64) -> Vec<ConformalQueryResult> {
-    let cutoff_similarity = 1.0 - conformal_q;
+fn conformal_nonconformity(
+    candidate_similarity: f64,
+    best_similarity: f64,
+    mode: ConformalScoreMode,
+) -> f64 {
+    match mode {
+        ConformalScoreMode::RawSimilarity => 1.0 - candidate_similarity,
+        ConformalScoreMode::GapAdjusted { penalty } => {
+            (1.0 - candidate_similarity) + penalty * (best_similarity - candidate_similarity)
+        }
+    }
+}
+
+fn score_conformal_sets(
+    scored: &[ScoredQuery],
+    conformal_q: f64,
+    mode: ConformalScoreMode,
+) -> Vec<ConformalQueryResult> {
     scored
         .iter()
         .map(|score| {
             let set_size = score
                 .prototype_similarities
                 .iter()
-                .filter(|&&similarity| similarity >= cutoff_similarity)
+                .map(|&similarity| {
+                    conformal_nonconformity(similarity, score.best_similarity, mode)
+                })
+                .filter(|&nonconformity| nonconformity <= conformal_q)
                 .count();
-            let covered = score
-                .target_similarity
-                .is_some_and(|similarity| 1.0 - similarity <= conformal_q);
+            let covered = score.target_similarity.is_some_and(|similarity| {
+                conformal_nonconformity(similarity, score.best_similarity, mode) <= conformal_q
+            });
             ConformalQueryResult {
                 kind: score.kind,
                 labeled: score.target_similarity.is_some(),
@@ -932,6 +1032,56 @@ fn score_conformal_sets(scored: &[ScoredQuery], conformal_q: f64) -> Vec<Conform
             }
         })
         .collect()
+}
+
+fn tune_dco_score(
+    tuning: &[ScoredQuery],
+    alpha: f64,
+) -> Result<DcoScoreSelection, Box<dyn Error>> {
+    let mut candidates = vec![ConformalScoreMode::RawSimilarity];
+    candidates.extend(DCO_GAP_PENALTY_CANDIDATES.iter().copied().skip(1).map(|penalty| {
+        ConformalScoreMode::GapAdjusted { penalty }
+    }));
+
+    let mut best: Option<DcoScoreSelection> = None;
+    for mode in candidates {
+        let (quantile, tuning_n) = split_conformal_quantile(tuning, alpha, mode)?;
+        let predictions = score_conformal_sets(tuning, quantile, mode);
+        let known: Vec<_> = predictions
+            .iter()
+            .filter(|prediction| {
+                prediction.labeled && matches!(prediction.kind, QueryKind::Known { .. })
+            })
+            .collect();
+        if known.is_empty() {
+            continue;
+        }
+        let covered = known.iter().filter(|prediction| prediction.covered).count();
+        let coverage = covered as f64 / known.len() as f64;
+        if coverage + f64::EPSILON < 1.0 - alpha {
+            continue;
+        }
+        let mean_set_size = known.iter().map(|prediction| prediction.set_size).sum::<usize>()
+            as f64
+            / known.len() as f64;
+        let candidate = DcoScoreSelection {
+            mode,
+            provisional_quantile: quantile,
+            tuning_coverage: coverage,
+            mean_set_size,
+            tuning_n,
+        };
+        let should_replace = best.is_none_or(|current| {
+            candidate.mean_set_size < current.mean_set_size
+                || (candidate.mean_set_size == current.mean_set_size
+                    && candidate.tuning_coverage > current.tuning_coverage)
+        });
+        if should_replace {
+            best = Some(candidate);
+        }
+    }
+
+    best.ok_or_else(|| "DCO tuning found no conformal score with target tuning coverage".into())
 }
 
 fn report_conformal_set_summaries(
