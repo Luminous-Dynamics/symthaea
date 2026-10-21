@@ -19,6 +19,7 @@ enum Kind {
     Source,
     Annotation,
     Run,
+    PairResult,
 }
 
 impl Kind {
@@ -31,8 +32,9 @@ impl Kind {
             "source" => Ok(Self::Source),
             "annotation" => Ok(Self::Annotation),
             "run" => Ok(Self::Run),
+            "pair-result" => Ok(Self::PairResult),
             _ => Err(format!(
-                "unknown --kind {raw:?}; expected case, graph, claim, pair, source, annotation, or run"
+                "unknown --kind {raw:?}; expected case, graph, claim, pair, source, annotation, run, or pair-result"
             )),
         }
     }
@@ -46,6 +48,7 @@ impl Kind {
             Self::Source => "source",
             Self::Annotation => "annotation",
             Self::Run => "run",
+            Self::PairResult => "pair-result",
         }
     }
 }
@@ -88,7 +91,7 @@ struct Report {
 }
 
 fn usage() -> &'static str {
-    "Usage: knowledge-benchmark-harness --schema FILE --input JSONL --kind case|graph|claim|pair|source|annotation|run [--out FILE] [--subject-revision SHA]\n\nValidates local data only. It never fetches source URLs or remote schemas."
+    "Usage: knowledge-benchmark-harness --schema FILE --input JSONL --kind case|graph|claim|pair|source|annotation|run|pair-result [--out FILE] [--subject-revision SHA]\n\nValidates local data only. It never fetches source URLs or remote schemas."
 }
 
 fn parse_args() -> Result<Config, String> {
@@ -308,6 +311,7 @@ fn record_identity(kind: Kind, value: &Value, line: usize) -> String {
         Kind::Source => "source_id",
         Kind::Annotation => "annotation_id",
         Kind::Run => "plan_id",
+        Kind::PairResult => "result_id",
     };
     string_field(value, key)
         .map(str::to_string)
@@ -957,6 +961,53 @@ fn validate_annotation_catalog_refs(annotation: &Value) -> Vec<String> {
     errors
 }
 
+fn validate_pair_result_contract(result: &Value) -> Vec<String> {
+    let mut errors = Vec::new();
+    let result_id = string_field(result, "result_id").unwrap_or("<missing>");
+    if string_field(result, "plan_id").is_none_or(str::is_empty)
+        || string_field(result, "system_id").is_none_or(str::is_empty)
+        || string_field(result, "pair_id").is_none_or(str::is_empty)
+    {
+        errors.push(format!(
+            "pair result {result_id:?} requires non-empty plan_id, system_id, and pair_id"
+        ));
+    }
+    let allowed_relations = [
+        "invariant",
+        "local_change",
+        "abstain_or_revise",
+        "reject_unsupported_relation",
+        "deny_access",
+        "incorrect",
+        "ambiguous",
+    ];
+    if !string_field(result, "observed_relation")
+        .is_some_and(|relation| allowed_relations.contains(&relation))
+    {
+        errors.push(format!(
+            "pair result {result_id:?} has unsupported observed_relation"
+        ));
+    }
+    let forbidden = string_array(result, "forbidden_behaviors");
+    if forbidden.iter().collect::<HashSet<_>>().len() != forbidden.len() {
+        errors.push(format!(
+            "pair result {result_id:?} repeats a forbidden_behavior tag"
+        ));
+    }
+    if string_field(result, "notes").is_none_or(str::is_empty) {
+        errors.push(format!("pair result {result_id:?} requires non-empty notes"));
+    }
+    if !matches!(
+        string_field(result, "adjudication_status"),
+        Some("synthetic_only" | "independent_review" | "blind_human_adjudicated")
+    ) {
+        errors.push(format!(
+            "pair result {result_id:?} has unsupported adjudication_status"
+        ));
+    }
+    errors
+}
+
 fn validate_domain_contract(
     kind: Kind,
     value: &Value,
@@ -1010,6 +1061,7 @@ fn validate_domain_contract(
             errors.extend(validate_annotation_catalog_refs(value));
         },
         Kind::Run => errors.extend(validate_run_contract(value)),
+        Kind::PairResult => errors.extend(validate_pair_result_contract(value)),
     }
     errors
 }
@@ -1608,6 +1660,43 @@ mod tests {
                 .iter()
                 .any(|e| e.contains("duplicate claim annotation ID"))
         );
+    }
+
+    #[test]
+    fn pair_result_rejects_duplicate_forbidden_tags() {
+        let result = json!({
+            "result_id":"r1",
+            "plan_id":"p1",
+            "system_id":"s1",
+            "pair_id":"case1",
+            "observed_relation":"invariant",
+            "forbidden_behaviors":["rights_violation","rights_violation"],
+            "notes":"synthetic test row",
+            "adjudication_status":"synthetic_only"
+        });
+        let errors = validate_pair_result_contract(&result);
+        assert!(errors.iter().any(|e| e.contains("repeats a forbidden_behavior tag")));
+    }
+
+    #[test]
+    fn bundled_paired_results_satisfy_domain_contract() {
+        let mut seen_ids = HashSet::new();
+        for (index, raw_line) in
+            include_str!("../../../benchmarks/benchmark-runs/v0/synthetic-pair-results.jsonl")
+                .lines()
+                .enumerate()
+        {
+            let result: Value = serde_json::from_str(raw_line).unwrap_or_else(|error| {
+                panic!("invalid paired result JSONL at line {}: {error}", index + 1)
+            });
+            let errors = validate_domain_contract(Kind::PairResult, &result, &mut seen_ids);
+            assert!(
+                errors.is_empty(),
+                "paired result line {} failed: {}",
+                index + 1,
+                errors.join("; ")
+            );
+        }
     }
 
     #[test]
