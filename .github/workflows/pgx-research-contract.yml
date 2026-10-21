@@ -49,7 +49,7 @@ jobs:
 
       - name: Check PGx source formatting
         id: format
-        run: rustfmt --edition 2024 --check crates/domains/symthaea-neuromodulators/src/pgx_health_equity.rs
+        run: rustfmt --edition 2024 --check crates/domains/symthaea-neuromodulators/src/pgx_health_equity.rs crates/domains/symthaea-neuromodulators/examples/pgx_equity_analysis.rs crates/domains/symthaea-neuromodulators/examples/pgx_sensitivity_analysis.rs
 
       - name: Run PGx research module tests
         id: pgx-tests
