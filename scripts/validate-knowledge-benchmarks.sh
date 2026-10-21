@@ -42,6 +42,11 @@ run_validator case \
   benchmarks/mythology-bench/v0/cases.jsonl \
   "$reports_dir/mythology-cases.json"
 
+run_validator pair \
+  benchmarks/mythology-bench/v0/metamorphic-pair.schema.json \
+  benchmarks/mythology-bench/v0/metamorphic-pairs.jsonl \
+  "$reports_dir/metamorphic-pairs.json"
+
 run_validator graph \
   benchmarks/mythology-bench/v0/narrative-graph.schema.json \
   benchmarks/mythology-bench/v0/narrative-graph-fixtures.jsonl \
