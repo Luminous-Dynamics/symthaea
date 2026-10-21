@@ -19,6 +19,7 @@ on:
       - ".github/workflows/first-aid-contract.yml"
       - "docs/research/first-aid/**"
       - "xtask/src/first_aid.rs"
+      - "xtask/src/first_aid_trajectory.rs"
       - "xtask/src/guideline_change_impact.rs"
       - "xtask/src/main.rs"
       - "xtask/Cargo.toml"
@@ -88,7 +89,7 @@ jobs:
       - name: Check warnings in xtask
         run: cargo clippy -p xtask --all-targets -- -D warnings
 
-      - name: Confirm both receipts match the tested head and retain non-clinical claim ceilings
+      - name: Confirm all receipts match the tested head and retain non-clinical claim ceilings
         shell: bash
         env:
           EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
