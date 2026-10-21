@@ -1,7 +1,7 @@
 {
   "schema_version": "beverage-decision-value-v1",
   "evidence_class": "SYNTHETIC_CONTRACT_FIXTURE",
-  "design": "BLOCK_RANDOMIZED",
+  "design": "SYNTHETIC_FIXTURE",
   "dataset_id": "synthetic-paired-intervention-demo",
   "dataset_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
   "primary_resource_metric": "WATER",
