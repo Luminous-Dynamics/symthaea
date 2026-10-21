@@ -263,100 +263,50 @@ pub fn evaluate_safety_availability(
     Some(metrics)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+fn make_effect_error(reserve: f64, load: f64) -> ActionEffectError {
+    ActionEffectError {
+        reserve_delta_error: reserve,
+        load_delta_error: load,
+    }
+}
 
-    const STRESS_GRID: [f64; 5] = [0.0, 0.25, 0.5, 0.75, 1.0];
+fn make_profile_from_coordinates(coordinates: [f64; 8]) -> MismatchProfile {
+    MismatchProfile::new(
+        0.01 * coordinates[0],
+        0.02 * coordinates[1],
+        make_effect_error(0.03 * coordinates[2], 0.06 * coordinates[3]),
+        make_effect_error(0.01 * coordinates[4], 0.025 * coordinates[5]),
+        make_effect_error(0.015 * coordinates[6], 0.04 * coordinates[7]),
+    )
+    .expect("finite synthetic mismatch")
+}
 
-    fn error(reserve: f64, load: f64) -> ActionEffectError {
-        ActionEffectError {
-            reserve_delta_error: reserve,
-            load_delta_error: load,
+fn deterministic_trit(seed: u64, dimension: usize) -> f64 {
+    let mut value =
+        seed.wrapping_add((dimension as u64 + 1).wrapping_mul(0x9E37_79B9_7F4A_7C15));
+    value = (value ^ (value >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    value = (value ^ (value >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+    value ^= value >> 31;
+    [-1.0, 0.0, 1.0][(value % 3) as usize]
+}
+
+/// Deterministic calibration-design panel: zero error, both extrema on each of
+/// eight coordinates, plus mixed perturbations. It is not empirical data.
+pub fn calibration_panel() -> Vec<MismatchProfile> {
+    let mut profiles = vec![make_profile_from_coordinates([0.0; 8])];
+    for axis in 0..8 {
+        for sign in [-1.0, 1.0] {
+            let mut coordinates = [0.0; 8];
+            coordinates[axis] = sign;
+            profiles.push(make_profile_from_coordinates(coordinates));
         }
     }
-
-    fn profile(scale: f64) -> MismatchProfile {
-        MismatchProfile::new(
-            0.01 * scale,
-            -0.02 * scale,
-            error(-0.03 * scale, 0.06 * scale),
-            error(0.01 * scale, -0.025 * scale),
-            error(-0.015 * scale, 0.04 * scale),
-        )
-        .expect("finite synthetic mismatch")
+    for case in 0..22_u64 {
+        let coordinates =
+            std::array::from_fn(|dimension| deterministic_trit(case + 100, dimension));
+        profiles.push(make_profile_from_coordinates(coordinates));
     }
-
-    fn signed_cycle(index: usize) -> f64 {
-        [-1.0, 0.0, 1.0][index % 3]
-    }
-
-    fn profile_from_coordinates(coordinates: [f64; 8]) -> MismatchProfile {
-        MismatchProfile::new(
-            0.01 * coordinates[0],
-            0.02 * coordinates[1],
-            error(0.03 * coordinates[2], 0.06 * coordinates[3]),
-            error(0.01 * coordinates[4], 0.025 * coordinates[5]),
-            error(0.015 * coordinates[6], 0.04 * coordinates[7]),
-        )
-        .expect("finite synthetic mismatch")
-    }
-
-    fn deterministic_trit(seed: u64, dimension: usize) -> f64 {
-        let mut value = seed.wrapping_add(
-            (dimension as u64 + 1).wrapping_mul(0x9E37_79B9_7F4A_7C15),
-        );
-        value = (value ^ (value >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
-        value = (value ^ (value >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
-        value ^= value >> 31;
-        [-1.0, 0.0, 1.0][(value % 3) as usize]
-    }
-
-    /// A 39-episode synthetic panel: zero error, both extrema on each of eight
-    /// independent error coordinates, plus 22 deterministic mixed perturbations.
-    /// It exercises the finite 90% four-family order-statistic gate but is not
-    /// treated as evidence of real-world exchangeability or empirical coverage.
-    pub fn calibration_panel() -> Vec<MismatchProfile> {
-        let mut profiles = vec![profile_from_coordinates([0.0; 8])];
-        for axis in 0..8 {
-            for sign in [-1.0, 1.0] {
-                let mut coordinates = [0.0; 8];
-                coordinates[axis] = sign;
-                profiles.push(profile_from_coordinates(coordinates));
-            }
-        }
-        for case in 0..22_u64 {
-            let coordinates = std::array::from_fn(|dimension| {
-                deterministic_trit(case + 100, dimension)
-            });
-            profiles.push(profile_from_coordinates(coordinates));
-        }
-        profiles
-    }
-
-    fn state() -> StateEnvelope {
-        StateEnvelope::new(
-            Interval::point(0.22).expect("finite point"),
-            Interval::point(0.80).expect("finite point"),
-        )
-        .expect("valid state")
-    }
-
-    fn limits() -> ViabilityLimits {
-        ViabilityLimits::new(0.15, 0.88).expect("valid limits")
-    }
-
-/// Generate a deterministic synthetic mismatch profile for a held-out seed.
-/// Scale 1.0 stays within the declared calibration coordinate bounds; scale 2.0
-/// is an intentional out-of-family negative control.
-pub fn synthetic_mismatch_profile(seed: u64, scale: f64) -> Option<MismatchProfile> {
-    if !scale.is_finite() || !(0.0..=10.0).contains(&scale) {
-        return None;
-    }
-    let coordinates = std::array::from_fn(|dimension| {
-        deterministic_trit(seed, dimension) * scale
-    });
-    Some(profile_from_coordinates(coordinates))
+    profiles
 }
 
     #[test]
