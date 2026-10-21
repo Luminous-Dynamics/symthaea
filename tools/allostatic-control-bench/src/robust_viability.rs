@@ -90,6 +90,14 @@ impl ActionEffectBounds {
             None
         }
     }
+
+    pub const fn reserve_delta(self) -> Interval {
+        self.reserve_delta
+    }
+
+    pub const fn load_delta(self) -> Interval {
+        self.load_delta
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
