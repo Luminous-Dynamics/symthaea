@@ -774,6 +774,8 @@ mod tests {
             result.top1_accuracy >= report.random_chance_baseline
         }));
         assert!(report.noise_results[0].top1_accuracy >= 0.9);
+        assert!(report.noise_results[0].cleanup_top1_accuracy >= 0.9);
+        assert!(report.noise_results[0].cleanup_mean_similarity_margin > 0.0);
     }
 
     #[test]
@@ -790,7 +792,12 @@ mod tests {
         assert_eq!(report.bundle_results[0].member_recall_at_1, 1.0);
         assert_eq!(report.associative_capacity_results.len(), 5);
         assert_eq!(report.associative_capacity_results[0].recall_at_1, 1.0);
+        assert_eq!(report.associative_capacity_results[0].cleanup_recall_at_1, 1.0);
         assert_eq!(report.associative_capacity_results[0].mean_target_similarity, 1.0);
+        assert_eq!(
+            report.associative_capacity_results[0].cleanup_mean_target_similarity,
+            1.0
+        );
         assert!(report.bundle_results.iter().all(|result| {
             (0.0..=1.0).contains(&result.member_recall_at_1)
                 && result.mean_member_similarity > result.mean_max_distractor_similarity
