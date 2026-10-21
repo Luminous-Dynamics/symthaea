@@ -881,6 +881,82 @@ fn validate_run_contract(plan: &Value) -> Vec<String> {
     errors
 }
 
+fn validate_annotation_catalog_refs(annotation: &Value) -> Vec<String> {
+    if string_field(annotation, "annotation_role") == Some("synthetic_fixture") {
+        return Vec::new();
+    }
+
+    let mut errors = Vec::new();
+    let mut source_ids = HashSet::new();
+    let mut source_family_ids = HashSet::new();
+    for (index, raw_line) in
+        include_str!("../../../benchmarks/source-catalog/v0/sources.jsonl")
+            .lines()
+            .enumerate()
+    {
+        match serde_json::from_str::<Value>(raw_line) {
+            Ok(source) => {
+                if let Some(id) = string_field(&source, "source_id") {
+                    source_ids.insert(id.to_string());
+                }
+                if let Some(id) = string_field(&source, "source_family_id") {
+                    source_family_ids.insert(id.to_string());
+                }
+            }
+            Err(error) => errors.push(format!(
+                "bundled source catalog line {} is invalid JSON: {error}",
+                index + 1
+            )),
+        }
+    }
+
+    let annotation_id = string_field(annotation, "annotation_id").unwrap_or("<unknown>");
+    let claims = annotation
+        .get("claim_annotations")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    for claim in claims {
+        let claim_id = string_field(&claim, "claim_id").unwrap_or("<unknown>");
+        if let Some(refs) = claim.get("evidence_refs").and_then(Value::as_array) {
+            for evidence_ref in refs {
+                let source_id = string_field(evidence_ref, "source_id").unwrap_or("");
+                if !source_ids.contains(source_id) {
+                    errors.push(format!(
+                        "annotation {annotation_id:?} claim {claim_id:?} references source ID {source_id:?} absent from catalog"
+                    ));
+                }
+            }
+        }
+    }
+
+    let alternatives = annotation
+        .get("valid_alternatives")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    for alternative in alternatives {
+        let alternative_id = string_field(&alternative, "alternative_id").unwrap_or("<unknown>");
+        for source_id in string_array(&alternative, "source_ids") {
+            if !source_ids.contains(source_id) {
+                errors.push(format!(
+                    "annotation {annotation_id:?} alternative {alternative_id:?} references source ID {source_id:?} absent from catalog"
+                ));
+            }
+        }
+    }
+
+    for family_id in string_array(annotation, "source_family_ids") {
+        if !source_family_ids.contains(family_id) {
+            errors.push(format!(
+                "annotation {annotation_id:?} references source_family_id {family_id:?} absent from catalog"
+            ));
+        }
+    }
+
+    errors
+}
+
 fn validate_domain_contract(
     kind: Kind,
     value: &Value,
@@ -929,7 +1005,10 @@ fn validate_domain_contract(
         Kind::Graph => errors.extend(validate_graph_contract(value)),
         Kind::Pair => errors.extend(validate_pair_contract(value)),
         Kind::Source => errors.extend(validate_source_contract(value, seen_ids)),
-        Kind::Annotation => errors.extend(validate_annotation_contract(value)),
+        Kind::Annotation => {
+            errors.extend(validate_annotation_contract(value));
+            errors.extend(validate_annotation_catalog_refs(value));
+        },
         Kind::Run => errors.extend(validate_run_contract(value)),
     }
     errors
@@ -1475,6 +1554,23 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn real_annotation_rejects_unknown_source_ids() {
+        let annotation = json!({
+            "annotation_id":"ANN-REAL-PLACEHOLDER",
+            "annotation_role":"independent_reviewer",
+            "valid_alternatives":[
+                {"alternative_id":"ALT1","source_ids":["SYN-NOT-IN-CATALOG"]}
+            ],
+            "claim_annotations":[
+                {"claim_id":"C1","evidence_refs":[{"source_id":"SYN-NOT-IN-CATALOG","locator":null}]}
+            ],
+            "source_family_ids":["SYN-FAMILY-NOT-IN-CATALOG"]
+        });
+        let errors = validate_annotation_catalog_refs(&annotation);
+        assert!(errors.iter().any(|e| e.contains("absent from catalog")));
     }
 
     #[test]
