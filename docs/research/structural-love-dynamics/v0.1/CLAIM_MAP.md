@@ -26,6 +26,6 @@
 
 ## Candidate corpus accounting
 
-The companion **core-cases.json** currently contains 30 synthetic, unreviewed candidate scenarios in 15 A/B contrast groups. It is **DRAFT_CANDIDATE**, not frozen. The simple structural check verified JSON parsing, required-key presence, enum membership, unique case IDs, and two-member A/B grouping. It is not yet a full JSON Schema-validator run, behavioural evaluation, independent oracle adjudication, or exact-head executable qualification.
+The companion **core-cases.json** currently contains 44 synthetic, unreviewed candidate scenarios in 22 A/B contrast groups. It is **DRAFT_CANDIDATE**, not frozen. The custom structural validation verified JSON parsing, required-key presence, enum membership, unique case IDs, and two-member A/B grouping. A Rust regression test now encodes those checks plus critical cross-scale case assertions, but it has not yet been compiled or executed. It is not yet a full JSON Schema-validator run, behavioural evaluation, independent oracle adjudication, or exact-head executable qualification.
 
 Before marking it frozen, require: (a) independent review of each expected policy; (b) a full schema-validation command; (c) stable corpus/schema digests and a frozen manifest; (d) at least one negative/mutation test per invariant; and (e) an explicit change/version policy that cannot rewrite previous results.
