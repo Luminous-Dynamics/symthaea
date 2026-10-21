@@ -9,8 +9,10 @@ on:
       - "crates/core/symthaea-core/src/hdc/pattern_interaction.rs"
       - "crates/core/symthaea-core/src/hdc/hrr_baseline.rs"
       - "crates/core/symthaea-core/src/hdc/mod.rs"
+      - "crates/core/symthaea-core/src/hdc/identity_evidence.rs"
       - "crates/core/symthaea-core/examples/platonic_pattern_interaction.rs"
       - "crates/core/symthaea-core/examples/platonic_selective_retrieval.rs"
+      - "crates/core/symthaea-core/examples/identity_evidence_boundary.rs"
       - "crates/core/symthaea-core/Cargo.toml"
       - "crates/domains/symthaea-cell-foundry/**"
       - "crates/core/symthaea-observation-attestation/**"
@@ -20,14 +22,17 @@ on:
       - "docs/research/LEVIN_MULTISCALE_EXPERIMENT_PROTOCOL.md"
       - "docs/research/PLATONIC_PATTERN_INTERACTION_BENCHMARK.md"
       - "docs/research/SELECTIVE_RETRIEVAL_AND_ABSTENTION_BENCHMARK.md"
+      - "docs/research/IDENTITY_EVIDENCE_GATED_RETRIEVAL.md"
   push:
     branches: [main]
     paths:
       - ".github/workflows/levin-pattern-experiments.yml"
       - "crates/core/symthaea-core/src/hdc/pattern_interaction.rs"
       - "crates/core/symthaea-core/src/hdc/mod.rs"
+      - "crates/core/symthaea-core/src/hdc/identity_evidence.rs"
       - "crates/core/symthaea-core/examples/platonic_pattern_interaction.rs"
       - "crates/core/symthaea-core/examples/platonic_selective_retrieval.rs"
+      - "crates/core/symthaea-core/examples/identity_evidence_boundary.rs"
       - "crates/core/symthaea-core/Cargo.toml"
       - "crates/domains/symthaea-cell-foundry/**"
       - "Cargo.toml"
@@ -123,6 +128,18 @@ jobs:
 
       - name: Run calibrated selective retrieval benchmark
         run: cargo run --locked --release -p symthaea-core --example platonic_selective_retrieval 2>&1 | tee research-results/platonic-selective-retrieval.log
+
+      - name: Check identity-evidence API and example formatting
+        if: hashFiles('crates/core/symthaea-core/src/hdc/identity_evidence.rs') != ''
+        run: rustfmt --edition 2024 --check crates/core/symthaea-core/src/hdc/identity_evidence.rs crates/core/symthaea-core/examples/identity_evidence_boundary.rs
+
+      - name: Test fail-closed identity evidence resolution
+        if: hashFiles('crates/core/symthaea-core/src/hdc/identity_evidence.rs') != ''
+        run: cargo test --locked --release -p symthaea-core hdc::identity_evidence -- --nocapture
+
+      - name: Run identity evidence boundary experiment
+        if: hashFiles('crates/core/symthaea-core/src/hdc/identity_evidence.rs') != ''
+        run: cargo run --locked --release -p symthaea-core --example identity_evidence_boundary 2>&1 | tee research-results/identity-evidence-boundary.log
 
       - name: Verify Cell Foundry equifinality tests
         run: cargo test --locked --release -p symthaea-cell-foundry experiments::tests -- --nocapture
