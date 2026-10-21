@@ -3554,49 +3554,63 @@ end Second
                 "theorem_name": "other",
                 "file_path": "lean/Other.lean",
                 "commit_before": commit_one,
-                "formal_statement": "theorem other : True := by"
+                "formal_statement": "theorem other : True := by",
+
+                "proof": "exact True.intro"
             }),
             serde_json::json!({
                 "id": "ambiguous-example",
                 "theorem_name": "first",
                 "file_path": "lean/Example.lean",
                 "commit_before": commit_one,
-                "formal_statement": "theorem first : True := by"
+                "formal_statement": "theorem first : True := by",
+
+                "proof": "exact True.intro"
             }),
             serde_json::json!({
                 "id": "unmatched-path",
                 "theorem_name": "absent",
                 "file_path": "lean/Unlisted.lean",
                 "commit_before": commit_one,
-                "formal_statement": "theorem absent : True := by"
+                "formal_statement": "theorem absent : True := by",
+
+                "proof": "rfl"
             }),
             serde_json::json!({
                 "id": "empty-statement",
                 "theorem_name": "other",
                 "file_path": "lean/Other.lean",
                 "commit_before": commit_one,
-                "formal_statement": ""
+                "formal_statement": "",
+
+                "proof": "exact True.intro"
             }),
             serde_json::json!({
                 "id": "invalid-path",
                 "theorem_name": "outside",
                 "file_path": "../outside.lean",
                 "commit_before": commit_one,
-                "formal_statement": "theorem outside : True := by"
+                "formal_statement": "theorem outside : True := by",
+
+                "proof": "rfl"
             }),
             serde_json::json!({
                 "id": "missing-before-commit",
                 "theorem_name": "other",
                 "file_path": "lean/Other.lean",
                 "commit_before": "f".repeat(40),
-                "formal_statement": "theorem other : True := by"
+                "formal_statement": "theorem other : True := by",
+
+                "proof": "exact True.intro"
             }),
             serde_json::json!({
                 "id": "malformed-before-commit",
                 "theorem_name": "other",
                 "file_path": "lean/Other.lean",
                 "commit_before": "not-a-git-sha",
-                "formal_statement": "theorem other : True := by"
+                "formal_statement": "theorem other : True := by",
+
+                "proof": "exact True.intro"
             }),
         ];
         let dataset_text = dataset_rows
