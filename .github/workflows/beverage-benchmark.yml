@@ -1,0 +1,94 @@
+name: Beverage Benchmark Contract
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/domains/symthaea-culinary/**"
+      - "tools/beverage-benchmark-harness/**"
+      - "docs/research/BEVERAGE_ENGINEERING_BENCHMARK_V1.md"
+      - "docs/research/beverage-engineering-scenarios-v1.json"
+      - "docs/research/beverage-engineering-scenarios-v1.schema.json"
+      - "docs/research/beverage-data-sources-v1.json"
+      - ".github/workflows/beverage-benchmark.yml"
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/domains/symthaea-culinary/**"
+      - "tools/beverage-benchmark-harness/**"
+      - "docs/research/BEVERAGE_ENGINEERING_BENCHMARK_V1.md"
+      - "docs/research/beverage-engineering-scenarios-v1.json"
+      - "docs/research/beverage-engineering-scenarios-v1.schema.json"
+      - "docs/research/beverage-data-sources-v1.json"
+      - ".github/workflows/beverage-benchmark.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: beverage-benchmark-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  synthetic-contract:
+    name: Synthetic Corpus Contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Format focused runners
+        run: |
+          rustfmt --edition 2024 --check crates/domains/symthaea-culinary/src/bin/beverage_benchmark_receipt.rs
+          rustfmt --edition 2024 --check crates/domains/symthaea-culinary/src/bin/wine_quality_source_audit.rs
+          rustfmt --edition 2024 --check crates/domains/symthaea-culinary/src/bin/fermentation_time_series_audit.rs
+          rustfmt --edition 2024 --check tools/beverage-benchmark-harness/src/bin/schema_contract_audit.rs
+
+      - name: Test synthetic receipt contract
+        run: cargo test --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin beverage_benchmark_receipt
+
+      - name: Test wine source auditor
+        run: cargo test --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin wine_quality_source_audit
+
+      - name: Test fermentation time-series intake auditor
+        run: cargo test --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin fermentation_time_series_audit
+
+      - name: Test full Draft 2020-12 schema auditor
+        run: cargo test --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin schema_contract_audit
+
+      - name: Independently validate synthetic corpus schema
+        run: |
+          cargo run --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin schema_contract_audit -- \
+            --schema docs/research/beverage-engineering-scenarios-v1.schema.json \
+            --instance docs/research/beverage-engineering-scenarios-v1.json \
+            --out "$RUNNER_TEMP/beverage-schema-receipt.json"
+          cat "$RUNNER_TEMP/beverage-schema-receipt.json"
+
+      - name: Clippy focused runners
+        run: |
+          cargo clippy --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin beverage_benchmark_receipt -- -D warnings
+          cargo clippy --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin wine_quality_source_audit -- -D warnings
+          cargo clippy --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin fermentation_time_series_audit -- -D warnings
+          cargo clippy --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin schema_contract_audit -- -D warnings
+
+      - name: Emit exact-head receipt
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          cargo run --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin beverage_benchmark_receipt -- \
+            --corpus docs/research/beverage-engineering-scenarios-v1.json \
+            --schema docs/research/beverage-engineering-scenarios-v1.schema.json \
+            --expected-head "$EXPECTED_HEAD" \
+            --out "$RUNNER_TEMP/beverage-benchmark-receipt.json"
+          cat "$RUNNER_TEMP/beverage-benchmark-receipt.json"

@@ -1,0 +1,36 @@
+[package]
+name = "beverage-benchmark-harness"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Isolated compile/test harness for Symthaea beverage research executables"
+
+# This is a deliberately standalone workspace. The monorepo workspace currently
+# has an unrelated glob-matched directory missing Cargo.toml, so these focused
+# checks compile the real source files without excluding or weakening that gate.
+[workspace]
+resolver = "2"
+
+[dependencies]
+csv = "=1.4.0"
+serde = { version = "=1.0.228", features = ["derive"] }
+serde_json = "=1.0.150"
+sha2 = "=0.10.9"
+jsonschema = { version = "=0.59.0", default-features = false }
+
+[[bin]]
+name = "beverage_benchmark_receipt"
+path = "../../crates/domains/symthaea-culinary/src/bin/beverage_benchmark_receipt.rs"
+
+[[bin]]
+name = "wine_quality_source_audit"
+path = "../../crates/domains/symthaea-culinary/src/bin/wine_quality_source_audit.rs"
+
+[[bin]]
+name = "fermentation_time_series_audit"
+path = "../../crates/domains/symthaea-culinary/src/bin/fermentation_time_series_audit.rs"
+
+[[bin]]
+name = "schema_contract_audit"
+path = "src/bin/schema_contract_audit.rs"
