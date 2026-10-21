@@ -1,0 +1,779 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/benchmarks/proof-insight-transfer-v0/transfer-selectivity-analysis-report.schema.json",
+  "title": "Proof Insight Transfer Selectivity Analysis Report v0",
+  "description": "Auditable aggregate output from the Rust transfer-selectivity analyzer. This schema validates output shape, not mathematical truth, reviewer independence, or adequacy of the sample design.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "input_sha256",
+    "split",
+    "bootstrap_seed",
+    "bootstrap_replicates",
+    "counts",
+    "metrics",
+    "calibration",
+    "proposed_gates",
+    "limitations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.transfer-selectivity-analysis.v0"
+    },
+    "input_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "split": {
+      "enum": [
+        "test",
+        "external_challenge"
+      ]
+    },
+    "bootstrap_seed": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "bootstrap_replicates": {
+      "type": "integer",
+      "minimum": 1000
+    },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rows",
+        "adjudicated_compatible",
+        "adjudicated_incompatible",
+        "adjudicated_partial",
+        "unresolved_or_unknown",
+        "pending",
+        "accept_decisions",
+        "reject_decisions",
+        "abstain_decisions",
+        "binary_evaluable_pairs",
+        "compatible_components",
+        "incompatible_components",
+        "unique_source_families",
+        "unique_target_families",
+        "unique_pair_components"
+      ],
+      "properties": {
+        "rows": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "adjudicated_compatible": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "adjudicated_incompatible": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "adjudicated_partial": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unresolved_or_unknown": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "pending": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "accept_decisions": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "reject_decisions": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "abstain_decisions": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "binary_evaluable_pairs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "compatible_components": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "incompatible_components": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unique_source_families": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unique_target_families": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unique_pair_components": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "compatible_accept_recall",
+        "incompatible_false_accept_rate",
+        "compatible_false_reject_rate",
+        "compatible_abstention_rate",
+        "incompatible_abstention_rate",
+        "binary_coverage",
+        "selective_risk"
+      ],
+      "properties": {
+        "compatible_accept_recall": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "numerator",
+            "denominator",
+            "estimate",
+            "ci_95",
+            "bootstrap_defined_replicates",
+            "bootstrap_undefined_replicates"
+          ],
+          "properties": {
+            "numerator": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "denominator": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "estimate": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0,
+              "maximum": 1
+            },
+            "ci_95": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "lower",
+                    "upper"
+                  ],
+                  "properties": {
+                    "lower": {
+                      "type": "number"
+                    },
+                    "upper": {
+                      "type": "number"
+                    }
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "bootstrap_defined_replicates": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "bootstrap_undefined_replicates": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "incompatible_false_accept_rate": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "numerator",
+            "denominator",
+            "estimate",
+            "ci_95",
+            "bootstrap_defined_replicates",
+            "bootstrap_undefined_replicates"
+          ],
+          "properties": {
+            "numerator": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "denominator": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "estimate": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0,
+              "maximum": 1
+            },
+            "ci_95": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "lower",
+                    "upper"
+                  ],
+                  "properties": {
+                    "lower": {
+                      "type": "number"
+                    },
+                    "upper": {
+                      "type": "number"
+                    }
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "bootstrap_defined_replicates": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "bootstrap_undefined_replicates": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "compatible_false_reject_rate": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "numerator",
+            "denominator",
+            "estimate",
+            "ci_95",
+            "bootstrap_defined_replicates",
+            "bootstrap_undefined_replicates"
+          ],
+          "properties": {
+            "numerator": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "denominator": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "estimate": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0,
+              "maximum": 1
+            },
+            "ci_95": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "lower",
+                    "upper"
+                  ],
+                  "properties": {
+                    "lower": {
+                      "type": "number"
+                    },
+                    "upper": {
+                      "type": "number"
+                    }
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "bootstrap_defined_replicates": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "bootstrap_undefined_replicates": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "compatible_abstention_rate": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "numerator",
+            "denominator",
+            "estimate",
+            "ci_95",
+            "bootstrap_defined_replicates",
+            "bootstrap_undefined_replicates"
+          ],
+          "properties": {
+            "numerator": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "denominator": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "estimate": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0,
+              "maximum": 1
+            },
+            "ci_95": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "lower",
+                    "upper"
+                  ],
+                  "properties": {
+                    "lower": {
+                      "type": "number"
+                    },
+                    "upper": {
+                      "type": "number"
+                    }
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "bootstrap_defined_replicates": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "bootstrap_undefined_replicates": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "incompatible_abstention_rate": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "numerator",
+            "denominator",
+            "estimate",
+            "ci_95",
+            "bootstrap_defined_replicates",
+            "bootstrap_undefined_replicates"
+          ],
+          "properties": {
+            "numerator": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "denominator": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "estimate": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0,
+              "maximum": 1
+            },
+            "ci_95": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "lower",
+                    "upper"
+                  ],
+                  "properties": {
+                    "lower": {
+                      "type": "number"
+                    },
+                    "upper": {
+                      "type": "number"
+                    }
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "bootstrap_defined_replicates": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "bootstrap_undefined_replicates": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "binary_coverage": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "numerator",
+            "denominator",
+            "estimate",
+            "ci_95",
+            "bootstrap_defined_replicates",
+            "bootstrap_undefined_replicates"
+          ],
+          "properties": {
+            "numerator": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "denominator": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "estimate": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0,
+              "maximum": 1
+            },
+            "ci_95": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "lower",
+                    "upper"
+                  ],
+                  "properties": {
+                    "lower": {
+                      "type": "number"
+                    },
+                    "upper": {
+                      "type": "number"
+                    }
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "bootstrap_defined_replicates": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "bootstrap_undefined_replicates": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "selective_risk": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "numerator",
+            "denominator",
+            "estimate",
+            "ci_95",
+            "bootstrap_defined_replicates",
+            "bootstrap_undefined_replicates"
+          ],
+          "properties": {
+            "numerator": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "denominator": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "estimate": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0,
+              "maximum": 1
+            },
+            "ci_95": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "lower",
+                    "upper"
+                  ],
+                  "properties": {
+                    "lower": {
+                      "type": "number"
+                    },
+                    "upper": {
+                      "type": "number"
+                    }
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "bootstrap_defined_replicates": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "bootstrap_undefined_replicates": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        }
+      }
+    },
+    "calibration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "eligible_binary_pairs",
+        "probability_scored_pairs",
+        "probability_coverage",
+        "complete_binary_coverage",
+        "scored_components",
+        "brier_score",
+        "brier_score_ci_95",
+        "expected_calibration_error_10_bins",
+        "calibration_error_ci_95",
+        "reliability_bins"
+      ],
+      "properties": {
+        "eligible_binary_pairs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "probability_scored_pairs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "probability_coverage": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "complete_binary_coverage": {
+          "type": "boolean"
+        },
+        "scored_components": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "brier_score": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "brier_score_ci_95": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "lower",
+                "upper"
+              ],
+              "properties": {
+                "lower": {
+                  "type": "number"
+                },
+                "upper": {
+                  "type": "number"
+                }
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "expected_calibration_error_10_bins": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "calibration_error_ci_95": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "lower",
+                "upper"
+              ],
+              "properties": {
+                "lower": {
+                  "type": "number"
+                },
+                "upper": {
+                  "type": "number"
+                }
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reliability_bins": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "bin_index",
+              "lower_bound",
+              "upper_bound",
+              "count",
+              "mean_predicted_compatibility",
+              "observed_compatibility_rate"
+            ],
+            "properties": {
+              "bin_index": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9
+              },
+              "lower_bound": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 0.9
+              },
+              "upper_bound": {
+                "type": "number",
+                "minimum": 0.1,
+                "maximum": 1
+              },
+              "count": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "mean_predicted_compatibility": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "observed_compatibility_rate": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    "proposed_gates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "minimum_compatible_components",
+        "observed_compatible_components",
+        "compatible_component_floor_met",
+        "minimum_incompatible_components",
+        "observed_incompatible_components",
+        "incompatible_component_floor_met",
+        "minimum_compatible_recall",
+        "compatible_recall_target_met",
+        "pair_selectivity_gate",
+        "finite_mutation_suite_gate",
+        "overall_confirmatory_decision"
+      ],
+      "properties": {
+        "minimum_compatible_components": {
+          "const": 20
+        },
+        "observed_compatible_components": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "compatible_component_floor_met": {
+          "type": "boolean"
+        },
+        "minimum_incompatible_components": {
+          "const": 20
+        },
+        "observed_incompatible_components": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "incompatible_component_floor_met": {
+          "type": "boolean"
+        },
+        "minimum_compatible_recall": {
+          "const": 0.9
+        },
+        "compatible_recall_target_met": {
+          "type": "boolean"
+        },
+        "pair_selectivity_gate": {
+          "enum": [
+            "pair_track_thresholds_met",
+            "pair_track_thresholds_not_met"
+          ]
+        },
+        "finite_mutation_suite_gate": {
+          "const": "not_evaluated_by_this_analyzer"
+        },
+        "overall_confirmatory_decision": {
+          "const": "not_evaluated_requires_independent_mutation_receipt_and_protocol_audit"
+        }
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  }
+}
