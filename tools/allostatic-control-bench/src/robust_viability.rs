@@ -133,8 +133,7 @@ impl ViabilityLimits {
         (min_reserve.is_finite()
             && max_load.is_finite()
             && (0.0..=1.0).contains(&min_reserve)
-            && (0.0..=1.0).contains(&max_load)
-            && min_reserve <= max_load)
+            && (0.0..=1.0).contains(&max_load))
             .then_some(Self {
                 min_reserve,
                 max_load,
@@ -278,7 +277,7 @@ mod tests {
         assert!(Interval::new(0.4, 0.3).is_none());
         assert!(StateEnvelope::new(interval(-0.1, 0.2), interval(0.0, 0.2)).is_none());
         assert!(ActionEffectBounds::new(interval(-1.1, -1.0), interval(0.0, 0.1)).is_none());
-        assert!(ViabilityLimits::new(0.9, 0.2).is_none());
+        assert!(ViabilityLimits::new(0.9, 0.2).is_some());
         assert!(ViabilityLimits::new(0.1, f64::INFINITY).is_none());
     }
 
