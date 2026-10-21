@@ -98,6 +98,8 @@ Research-level informal proof quality is another separate track. Blindly score c
 This is a protocol template; the alpha level, power assumptions, eligibility denominator, model budget, and any deviation must be recorded in the final run manifest **before** inspecting confirmatory test results.
 
 ## Protocol amendment log
+- **2026-10-21, before any confirmatory outcomes were collected or inspected:** added a separate insight-component intervention track. It preregisters full insight versus a high-similarity incompatible decoy, precondition/failure-boundary/evidence ablations, and a no-insight control under matched task budgets. This is a secondary causal experiment and does not change the primary A-I retrieval contrast. Confirmatory component claims require same-token matching, paired target outcomes, family/component-clustered uncertainty, and content-addressed condition/input receipts. No ablation or transfer result is claimed; any run config must hash the current protocol bytes.
+
 
 - **2026-10-21, before any confirmatory outcomes were collected or inspected:** added a secondary transfer-selectivity track with blinded, dual-review compatibility labels, positive and hard-negative controls, source/target-family leakage prevention, pair-graph component-level uncertainty, and separate false-accept/recall/abstention/coverage reporting. This does not change the primary F-versus-validation-selected-baseline endpoint. It closes a reject-everything loophole in transfer-gate evaluation: the finite negative mutation suite is an integrity check, while positive-control recall and held-out false-accept rate test whether transfer judgments are useful. The track's sample-size and recall targets are proposed acceptance gates; they are not measured results. The updated protocol bytes must be hashed into any future frozen run config.
 
@@ -135,6 +137,31 @@ Prevent family leakage in this track separately from the theorem-solve split: a 
 For every pair, the system must emit one of `accept`, `reject`, or `abstain`, plus specific precondition checks and mismatch codes. Report (a) false-accept rate among adjudicated incompatible pairs, (b) recall among compatible pairs, (c) false-reject rate, (d) abstention and accepted coverage, and (e) selective risk as coverage varies. If the system emits calibrated probabilities, also report a proper scoring rule and a reliability plot; do not infer calibration from cosine similarity or uncalibrated model confidence.
 
 Proposed transfer-gate adoption targets are: reject every item in the frozen finite negative-control suite; at least 90% point recall on compatible held-out positive controls; and at least 20 independent pair-graph components in each of the compatible and incompatible classes before any confirmatory transfer-selectivity claim. Report component-clustered 95% intervals for rates. These are conservative project-specific targets, not achieved results or a substitute for power analysis. If the sample-size floor is unmet, report a pilot and extend the independently adjudicated pair set without tuning against the held-out labels.
+
+## Insight-component intervention track
+
+This is a separate, pre-registered secondary experiment. It does not add arms to or retroactively alter the primary A-I retrieval ablation. Its purpose is to test **which parts of a typed insight cause measurable utility**, rather than infer causal value from a correlation between record quality and success.
+
+### Conditions
+
+For each eligible target, preserve the target statement, checker, model, system prompt, retrieval corpus/candidates, tool permissions, retry policy and budget. Randomize condition order per target with a frozen seed, disable cross-condition conversation/cache carryover where possible, and retain the exact material shown to the solver.
+
+1. **Full insight:** strategy, preconditions, state transition, evidence locators, and failure boundaries.
+2. **Surface-matched decoy:** a high lexical/topical-similarity source insight adjudicated incompatible with the target. This is not a fabricated false theorem; the mismatch and source provenance are reviewed in advance.
+3. **Precondition ablation:** preserve the strategy and evidence, but mask explicit applicability preconditions.
+4. **Failure-boundary ablation:** preserve the strategy and preconditions, but mask known non-applicability conditions.
+5. **Evidence ablation:** preserve the paraphrased move and contracts, but remove source locators/evidence anchors.
+6. **No-insight control:** identical target context with no insight record.
+
+Generate every ablation mechanically from one immutable full record. Each condition must be bound to a condition-manifest digest and derived-input digest; do not hand-edit an individual test prompt after inspecting a result. Use a fixed model tokenizer to replace masked content with neutral placeholders of the same token count. If exact token matching cannot be achieved for the selected model, report actual input tokens and treat component contrasts as exploratory, not confirmatory. All conditions retain the same hard token/call/time/cost limits.
+
+### Outcomes and causal interpretation
+
+The primary secondary-track contrast is **full insight versus surface-matched decoy** on exact-target semantic-gate-verified success. Report the paired percentage-point effect and family-clustered 95% interval. Secondary contrasts compare full insight against each ablation and against no insight. Also report (a) exact checker success, (b) semantic-gate success, (c) transfer accept/reject/abstain quality on adjudicated pairs, (d) failure mode, and (e) cost/time/tokens per verified solve. Do not combine these outcomes into an opaque weighted score.
+
+Use the frozen target/family set in every condition and retain timeouts, tool-unavailable outcomes, abstentions, and exclusions. Resample independent family or pair-graph components, not individual correlated targets. A causal component claim requires the predeclared contrast, no budget/token drift, all receipts, and a 95% interval whose lower bound is above zero; a proposed practical-value target is +10 percentage points. A component result below that threshold, a null interval, or inability to match tokens is reported as inconclusive/exploratory, not repaired by changing prompts or thresholds after the run.
+
+This design operationalizes three falsifiable questions: does a semantically compatible strategy help beyond a topical near-miss; do explicit preconditions reduce false acceptance or improve verified success; and do failure boundaries and provenance add measurable value? It is still a design until the conditions, receipts and outcomes actually exist.
 
 ## 8. Go / no-go decisions
 
