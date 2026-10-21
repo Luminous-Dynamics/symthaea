@@ -6,6 +6,7 @@ on:
     paths:
       - "benchmarks/esoterica-bench/v0/**"
       - "benchmarks/mythology-bench/v0/**"
+      - "benchmarks/source-catalog/v0/**"
       - "docs/research/ESOTERICA_KNOWLEDGE_FABRIC.md"
       - "tools/knowledge-benchmark-harness/**"
       - "scripts/validate-knowledge-benchmarks.sh"
@@ -15,6 +16,7 @@ on:
     paths:
       - "benchmarks/esoterica-bench/v0/**"
       - "benchmarks/mythology-bench/v0/**"
+      - "benchmarks/source-catalog/v0/**"
       - "docs/research/ESOTERICA_KNOWLEDGE_FABRIC.md"
       - "tools/knowledge-benchmark-harness/**"
       - "scripts/validate-knowledge-benchmarks.sh"
