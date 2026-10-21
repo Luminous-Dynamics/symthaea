@@ -195,7 +195,7 @@ The output includes canonical fixture definitions and one row per intervention p
 
 ## First exact finite-state evaluator prototype (2026-10-21)
 
-Added `examples/task_conditioned_finite_state_eval.rs`. Unlike the earlier scorer, this evaluator computes intact and intervention utility by exhaustive enumeration of all two-bit exogenous inputs and both outcomes of the fair-coin replacement signal. The cut is applied to a declared edge in an acyclic Boolean rule graph; whether it crosses the declared two-component partition is derived from endpoint labels, not supplied by the score caller. Raw intervention outcomes and aggregate profile rows are emitted separately.
+Added `examples/task_conditioned_finite_state_eval.rs`. Unlike the earlier scorer, this evaluator computes intact and intervention utility by exhaustive enumeration of all two-bit exogenous inputs and both outcomes of the fair-coin replacement signal. The expected fixture parameters and oracle outputs are also recorded in `validation/fixtures/tccip_toy_expectations.tsv`, and a Rust test binds the manifest to the fixture rule strings, partition labels, utilities, and partition-sweep counts. The cut is applied to a declared edge in an acyclic Boolean rule graph; whether it crosses the declared two-component partition is derived from endpoint labels, not supplied by the score caller. Raw intervention outcomes and aggregate profile rows are emitted separately.
 
 The first fixtures test three deliberately different situations:
 
@@ -205,7 +205,7 @@ The first fixtures test three deliberately different situations:
 | Irrelevant cross-component branch | 1.0 | 1.0 | 1.0 | 0.0 |
 | Harmful constant-bias coupling | 0.0 | 0.5 | 0.0 | -0.5 |
 
-These exact expectations were independently checked with a separate, small enumerator. **That is not a Rust compilation or test pass.** Eight Rust test definitions now cover the three expected contrasts, edge/partition semantics, fail-closed missing strata, malformed edges/topology, repeatability/bounds, and invalid IDs/costs. Rust/cargo are unavailable in the current execution environment, so this example remains uncompiled and unexecuted.
+These exact expectations were independently checked with a separate, small enumerator. **That is not a Rust compilation or test pass.** The Rust example now has 13 test definitions covering exact toy contrasts, partition sensitivity/sign reversal, malformed interventions, fail-closed strata, determinism, bounds, and manifest parity. Rust/cargo are unavailable in the current execution environment, so this example remains uncompiled and unexecuted.
 
 These are conformance fixtures, not evidence of empirical usefulness. The controls are deliberately simple matched edge-signal replacements; they do not yet solve all practical matching problems involving degree, delay, bandwidth, component role, or network centrality. The harmful-coupling fixture also begins with zero task accuracy, so it demonstrates the required sign behavior, not a competitive architecture. A real evaluation must report intact capability and matched-control quality alongside the profile and use held-out systems.
 
@@ -223,7 +223,7 @@ A separate exhaustive Python enumerator (used as a cross-check, **not a Rust tes
 
 This is an important warning, not a result to hide: for the same fixed toy causal model and intervention outcome table, the contrast can reverse sign with the partition. The declared partitions recover the expected +0.5, 0.0 and -0.5 fixture scores, but these score ranges show that the contrast is **partition-relative**, not an intrinsic scalar property of the network. This is why the metric must expose the full partition profile and freeze partition selection before held-out evaluation. It also makes independent control selection and matched-stratum quality central requirements. The toy sweep still does not prove that TCCIP is useful or better than existing methods.
 
-Twelve Rust test definitions are now authored, including exact expected sign reversals and the invariant that the declared partition appears in the exhaustive sweep. The source remains uncompiled and unexecuted in this environment.
+The 13 authored test definitions include exact expected sign reversals, the invariant that the declared partition appears in the exhaustive sweep, and parity checks against `validation/fixtures/tccip_toy_expectations.tsv`. The TSV is an expectation oracle, not a run receipt. The source remains uncompiled and unexecuted in this environment.
 
 ## Literature-aware scope and a stronger next paradigm
 
