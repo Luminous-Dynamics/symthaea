@@ -25,13 +25,15 @@ class TccipReferenceOracleTests(unittest.TestCase):
         cls.by_name = {fixture.name: fixture for fixture in cls.fixtures}
 
     def test_manifest_is_versioned_and_covers_three_cases(self) -> None:
-        self.assertEqual(len(self.fixtures), 3)
+        self.assertEqual(len(self.fixtures), 5)
         self.assertEqual(
             set(self.by_name),
             {
                 "useful_xor_coordination",
                 "irrelevant_cross_component_connectivity",
                 "harmful_cross_component_coupling",
+                "task_relevant_high_x1_prior",
+                "task_relevant_high_x0_prior",
             },
         )
         for fixture in self.fixtures:
@@ -65,6 +67,8 @@ class TccipReferenceOracleTests(unittest.TestCase):
             "useful_xor_coordination": (127, 112, 15, -0.5, 0.5),
             "irrelevant_cross_component_connectivity": (15, 8, 7, 0.0, 0.0),
             "harmful_cross_component_coupling": (511, 448, 63, -0.5, 0.5),
+            "task_relevant_high_x1_prior": (15, 8, 7, -0.3, 0.3),
+            "task_relevant_high_x0_prior": (15, 8, 7, -0.3, 0.3),
         }
         for fixture in self.fixtures:
             _, partitions, summary = evaluate_fixture(fixture)
@@ -74,6 +78,21 @@ class TccipReferenceOracleTests(unittest.TestCase):
             self.assertEqual(summary["skipped"], skipped)
             self.assertEqual(min(point.tccip for point in partitions), lower)
             self.assertEqual(max(point.tccip for point in partitions), upper)
+
+    def test_same_graph_reverses_tccip_sign_when_input_prior_is_reversed(self) -> None:
+        high_x1 = self.by_name["task_relevant_high_x1_prior"]
+        high_x0 = self.by_name["task_relevant_high_x0_prior"]
+        self.assertEqual(high_x1.rules, high_x0.rules)
+        self.assertEqual(high_x1.components, high_x0.components)
+        self.assertEqual(high_x1.interventions, high_x0.interventions)
+        _, _, high_summary = evaluate_fixture(high_x1)
+        _, _, low_summary = evaluate_fixture(high_x0)
+        self.assertAlmostEqual(high_summary["cross_loss"], 0.4, places=12)
+        self.assertAlmostEqual(high_summary["control_loss"], 0.1, places=12)
+        self.assertAlmostEqual(high_summary["tccip"], 0.3, places=12)
+        self.assertAlmostEqual(low_summary["cross_loss"], 0.1, places=12)
+        self.assertAlmostEqual(low_summary["control_loss"], 0.4, places=12)
+        self.assertAlmostEqual(low_summary["tccip"], -0.3, places=12)
 
     def test_nonexistent_intervention_edge_is_rejected(self) -> None:
         fixture = self.by_name["useful_xor_coordination"]
@@ -109,7 +128,7 @@ class TccipReferenceOracleTests(unittest.TestCase):
                 "only\ttwo\tfields\n",
                 encoding="utf-8",
             )
-            with self.assertRaisesRegex(ValueError, "expected 18 fields"):
+            with self.assertRaisesRegex(ValueError, "expected 19 fields"):
                 parse_manifest(path)
 
 
