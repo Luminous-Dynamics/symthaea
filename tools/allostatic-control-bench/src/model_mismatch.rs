@@ -316,7 +316,7 @@ mod tests {
     /// independent error coordinates, plus 22 deterministic mixed perturbations.
     /// It exercises the finite 90% four-family order-statistic gate but is not
     /// treated as evidence of real-world exchangeability or empirical coverage.
-    fn mismatch_calibration_panel() -> Vec<MismatchProfile> {
+    pub fn calibration_panel() -> Vec<MismatchProfile> {
         let mut profiles = vec![profile_from_coordinates([0.0; 8])];
         for axis in 0..8 {
             for sign in [-1.0, 1.0] {
@@ -346,9 +346,22 @@ mod tests {
         ViabilityLimits::new(0.15, 0.88).expect("valid limits")
     }
 
+/// Generate a deterministic synthetic mismatch profile for a held-out seed.
+/// Scale 1.0 stays within the declared calibration coordinate bounds; scale 2.0
+/// is an intentional out-of-family negative control.
+pub fn synthetic_mismatch_profile(seed: u64, scale: f64) -> Option<MismatchProfile> {
+    if !scale.is_finite() || !(0.0..=10.0).contains(&scale) {
+        return None;
+    }
+    let coordinates = std::array::from_fn(|dimension| {
+        deterministic_trit(seed, dimension) * scale
+    });
+    Some(profile_from_coordinates(coordinates))
+}
+
     #[test]
     fn mismatch_calibration_panel_reaches_each_independent_error_bound() {
-        let panel = mismatch_calibration_panel();
+        let panel = calibration_panel();
         assert_eq!(panel.len(), 39);
         let scores: Vec<EpisodeResidualScores> = panel
             .iter()
@@ -417,7 +430,7 @@ mod tests {
     #[test]
     fn point_shield_false_positive_is_rejected_by_a_calibrated_envelope() {
         // Every calibration episode contains <= this held-out error magnitude.
-        let calibration = mismatch_calibration_panel();
+        let calibration = calibration_panel();
         let radii = calibrate_mismatch_panel(&calibration, &STRESS_GRID, 0.90)
             .expect("39 episodes meet the 90% four-family finite-rank gate");
         let held_out = profile(1.0);
@@ -444,7 +457,7 @@ mod tests {
 
     #[test]
     fn robustness_is_scored_with_false_certifications_and_false_vetoes_separate() {
-        let calibration = mismatch_calibration_panel();
+        let calibration = calibration_panel();
         let radii =
             calibrate_mismatch_panel(&calibration, &STRESS_GRID, 0.90).expect("calibration panel");
         let metrics =
@@ -460,7 +473,7 @@ mod tests {
 
     #[test]
     fn calibrated_certificate_matches_realized_safety_for_the_enclosed_model_panel() {
-        let calibration = mismatch_calibration_panel();
+        let calibration = calibration_panel();
         let radii =
             calibrate_mismatch_panel(&calibration, &STRESS_GRID, 0.90).expect("calibration panel");
         for mismatch in calibration {
