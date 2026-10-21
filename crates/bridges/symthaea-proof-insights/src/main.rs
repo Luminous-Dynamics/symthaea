@@ -3981,6 +3981,32 @@ end Second
                 .expect_err("source-file mutation must be rejected against historical Git bytes");
         assert!(format!("{source_digest_error:#}").contains("source-file digest mismatch"));
 
+        // A digest-correct line from another theorem must not be relabelled as
+        // the target's proof body. The historical file hash still matches; only
+        // declaration-scoped proof identity can catch this provenance attack.
+        let mut wrong_declaration_manifest = manifest.clone();
+        let unrelated_span = exact_line_span(&source_two, 4, 4)
+            .expect("line four belongs to the unrelated second theorem");
+        wrong_declaration_manifest["artifacts"][1]["content_start_line"] =
+            serde_json::json!(4);
+        wrong_declaration_manifest["artifacts"][1]["content_end_line"] =
+            serde_json::json!(4);
+        wrong_declaration_manifest["artifacts"][1]["content_sha256"] =
+            serde_json::Value::String(sha(unrelated_span));
+        let wrong_declaration_path = base.join("wrong-declaration-proof.json");
+        fs::write(
+            &wrong_declaration_path,
+            serde_json::to_vec_pretty(&wrong_declaration_manifest)
+                .expect("serialize declaration-identity mutant"),
+        )
+        .expect("write declaration-identity mutant");
+        let identity_error = verify_temporal_manifest_file(&root, &wrong_declaration_path)
+            .expect_err("a proof span from another declaration must be rejected");
+        assert!(
+            format!("{identity_error:#}").contains("does not match its declared Lean theorem identity"),
+            "the rejection must be due to theorem identity, not a stale digest"
+        );
+
         verify_temporal_manifest_file(&root, &manifest_path)
             .expect("pinned chronological history and exact artifact bytes should verify");
         let timeline_audit_path = base.join("timeline-audit.json");
