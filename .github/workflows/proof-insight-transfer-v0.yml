@@ -778,6 +778,15 @@ jobs:
               raise SystemExit("dataset JSONL digest differs from the pinned checkout bytes")
           if sum(audit["statement_match_relation_counts"].values()) != audit["total_dataset_records"]:
               raise SystemExit("statement-match relation accounting does not cover all dataset records")
+          identity_total = (
+              audit["unique_theorem_identity_join_count"]
+              + audit["ambiguous_theorem_identity_join_count"]
+              + audit["unmatched_theorem_identity_join_count"]
+          )
+          if identity_total != audit["total_dataset_records"]:
+              raise SystemExit("theorem-identity join accounting does not cover all dataset records")
+          if sum(audit["theorem_identity_status_counts"].values()) != audit["total_dataset_records"]:
+              raise SystemExit("theorem-identity status counts do not cover all dataset records")
           by_status = {event["path_join_status"]: 0 for event in audit["events"]}
           for event in audit["events"]:
               by_status[event["path_join_status"]] += 1
