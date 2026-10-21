@@ -844,6 +844,10 @@ fn audit_temporal_dataset(
     let mut commit_before_invalid_sha_count = 0_usize;
     let mut commit_before_ancestor_of_completion_count = 0_usize;
     let mut statement_match_relation_counts = BTreeMap::new();
+    let mut unique_theorem_identity_join_count = 0_usize;
+    let mut ambiguous_theorem_identity_join_count = 0_usize;
+    let mut unmatched_theorem_identity_join_count = 0_usize;
+    let mut theorem_identity_status_counts = BTreeMap::new();
     let mut head_ancestry_cache: BTreeMap<String, bool> = BTreeMap::new();
     let mut commit_existence_cache: BTreeMap<String, bool> = BTreeMap::new();
 
@@ -1205,6 +1209,15 @@ fn audit_temporal_dataset(
             statement_match_at_commit_before,
             statement_match_at_completion,
             statement_match_relation,
+            declared_statement_name,
+            declared_name_matches_dataset,
+            dataset_proof_sha256,
+            identity_candidate_timeline_positions,
+            identity_join_status,
+            identity_statement_match_at_commit_before,
+            identity_statement_match_at_completion,
+            identity_proof_matches_completion,
+            identity_proof_absent_at_commit_before,
         });
     }
 
@@ -1247,6 +1260,10 @@ fn audit_temporal_dataset(
         commit_before_invalid_sha_count,
         commit_before_ancestor_of_completion_count,
         statement_match_relation_counts,
+        unique_theorem_identity_join_count,
+        ambiguous_theorem_identity_join_count,
+        unmatched_theorem_identity_join_count,
+        theorem_identity_status_counts,
         events,
     };
 
