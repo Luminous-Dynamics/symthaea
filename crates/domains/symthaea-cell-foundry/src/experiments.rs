@@ -739,6 +739,28 @@ mod tests {
     }
 
     #[test]
+    fn counterfactual_coupling_is_deterministic_and_bounded() {
+        let template = build_linear_axis_template(79, 48, 4);
+        let perturbation = Perturbation::AmputateAxis {
+            min_x: 0.35,
+            max_x: 2.0,
+        };
+        let config = AdaptiveCouplingConfig::default();
+        let first = run_counterfactual_coupling_experiment(
+            &template, &perturbation, 12, true, config,
+        ).expect("valid counterfactual policy");
+        let second = run_counterfactual_coupling_experiment(
+            &template, &perturbation, 12, true, config,
+        ).expect("valid counterfactual policy");
+        assert_eq!(first, second);
+        assert_eq!(first.permeability_trajectory.len(), 12);
+        assert_eq!(first.discrepancy_trajectory.len(), 12);
+        assert!(first.permeability_trajectory.iter().all(|(_, value)| {
+            (config.min_permeability..=config.max_permeability).contains(value)
+        }));
+        assert!(first.integrated_discrepancy.is_finite());
+    }
+    #[test]
     fn adaptive_coupling_rejects_invalid_configuration() {
         let mut config = AdaptiveCouplingConfig::default();
         config.initial_permeability = 1.5;
