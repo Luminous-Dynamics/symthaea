@@ -871,8 +871,16 @@ fn audit_temporal_dataset(
         let raw_file_path = required_text("file_path")?;
         let commit_before = required_text("commit_before")?.to_ascii_lowercase();
         let formal_statement = required_text("formal_statement")?;
+        let dataset_proof = required_text("proof")?;
         let formal_statement_is_empty = formal_statement.trim().is_empty();
         let statement_sha256 = format!("{:x}", Sha256::digest(formal_statement.as_bytes()));
+        let dataset_proof_sha256 = format!("{:x}", Sha256::digest(dataset_proof.as_bytes()));
+        let declared_statement_name = declared_name_from_statement(&formal_statement);
+        let statement_prefix = statement_declaration_prefix(&formal_statement);
+        let theorem_short_name = theorem_name.rsplit('.').next().unwrap_or(&theorem_name);
+        let declared_name_matches_dataset = declared_statement_name.as_ref().map(|name| {
+            name.rsplit('.').next().unwrap_or(name) == theorem_short_name
+        });
         dataset_ids.insert(dataset_id.clone());
 
         let commit_before_object_exists = if validate_git_sha(&commit_before).is_ok() {
