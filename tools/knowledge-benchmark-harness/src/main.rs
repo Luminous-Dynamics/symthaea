@@ -1746,6 +1746,8 @@ mod tests {
     #[test]
     fn rights_revocation_pair_requires_denial() {
         let pair = json!({
+            "split":"synthetic",
+            "synthetic_only":true,
             "dimension": "rights_revocation",
             "expected_relation": "deny_access",
             "baseline": {
