@@ -12,7 +12,7 @@ fn main() {
                         .recovery_steps
                         .map_or_else(|| "NA".to_string(), |steps| steps.to_string());
                     println!(
-                        "{},{},{},{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{},{},{:.6},{:.6},{},{},{},{},{},{},{},{},{:.6},{},{}",
+                        "{},{},{},{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{},{:.6},{:.6},{},{},{:.6},{:.6},{},{},{},{},{},{},{},{:.6},{},{}",
                         scenario.name(),
                         seed,
                         policy.name(),
@@ -22,6 +22,8 @@ fn main() {
                         m.mean_load,
                         m.peak_load,
                         m.minimum_reserve,
+                        m.mean_safe_action_options,
+                        m.minimum_safe_action_options,
                         m.terminal_reserve,
                         m.terminal_load,
                         m.unsafe_ticks,
