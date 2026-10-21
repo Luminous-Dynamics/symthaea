@@ -1,0 +1,37 @@
+{
+  "schema_version": "beverage-adaptive-sampling-decision-v1",
+  "evidence_class": "SYNTHETIC_CONTRACT_FIXTURE",
+  "decision_id": "sense-decision-synthetic-001",
+  "batch_id": "synthetic-batch-001",
+  "policy_version": "risk-aware-voi-contract-v1",
+  "policy_config_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "input_prefix_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "decision_time_ms": 1000,
+  "available_channels": [
+    "temperature",
+    "off_gas"
+  ],
+  "observations": [
+    {
+      "observation_id": "obs-001",
+      "channel": "temperature",
+      "observed_at_ms": 800,
+      "available_at_ms": 900,
+      "content_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    }
+  ],
+  "required_tests_due": [
+    "required-sugar-assay"
+  ],
+  "required_tests_scheduled": [
+    "required-sugar-assay",
+    "discretionary-off-gas"
+  ],
+  "calibration_state": "CALIBRATED",
+  "action": "SAMPLE",
+  "requested_channel": "off_gas",
+  "requested_at_ms": 1000,
+  "next_review_at_ms": null,
+  "reason_code": "synthetic_decision_value_exceeds_cost",
+  "estimated_cost_units": 2.0
+}
