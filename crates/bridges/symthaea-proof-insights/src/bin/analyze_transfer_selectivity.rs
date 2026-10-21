@@ -797,7 +797,15 @@ fn deserialize_required_nullable_f64<'de, D>(deserializer: D) -> std::result::Re
 where
     D: serde::Deserializer<'de>,
 {
-    Option::<f64>::deserialize(deserializer)
+    let value = Option::<f64>::deserialize(deserializer)?;
+    if value.is_some_and(|probability| {
+        !probability.is_finite() || !(0.0..=1.0).contains(&probability)
+    }) {
+        return Err(<D::Error as serde::de::Error>::custom(
+            "compatibility_probability must be null or a finite value in [0, 1]",
+        ));
+    }
+    Ok(value)
 }
 
 fn sha256_hex(bytes: &[u8]) -> String {
@@ -923,6 +931,13 @@ mod tests {
             "compatibility_probability": null
         }));
         assert!(explicit_null.is_ok());
+
+        let out_of_range = serde_json::from_value::<Prediction>(json!({
+            "decision": "accept",
+            "predicted_label": "compatible",
+            "compatibility_probability": 1.01
+        }));
+        assert!(out_of_range.is_err());
     }
 
     #[test]
