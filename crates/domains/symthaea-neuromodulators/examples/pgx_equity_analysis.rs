@@ -205,7 +205,10 @@ fn print_table3_population_scenarios(engine: &PgxHealthEquityEngine) {
             drug,
             gene,
             total_millions,
-            format!("{:?} ({:.1} M)", estimate.largest_modelled_product_group, largest_millions),
+            format!(
+                "{:?} ({:.1} M)",
+                estimate.largest_modelled_product_group, largest_millions
+            ),
             estimate.scenario_note
         );
     }
