@@ -94,10 +94,11 @@ fn crate_dir_names(workspace_root: &Path) -> Result<BTreeSet<String>> {
         };
         for e in entries.flatten() {
             let p = e.path();
-            if p.is_dir() && p.join("Cargo.toml").exists() {
-                if let Some(n) = p.file_name().and_then(|s| s.to_str()) {
-                    out.insert(n.to_string());
-                }
+            if p.is_dir()
+                && p.join("Cargo.toml").exists()
+                && let Some(n) = p.file_name().and_then(|s| s.to_str())
+            {
+                out.insert(n.to_string());
             }
         }
     }
