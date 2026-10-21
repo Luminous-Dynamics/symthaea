@@ -614,6 +614,9 @@ fn fixtures() -> Result<Vec<Fixture>, String> {
         if fixture.network.rules.len() != parse_usize(fields[1], "node count")? {
             return Err(format!("node count disagrees with rules in fixture {}", fixture.name));
         }
+        if fixture.input_state_weights.iter().map(u64::to_string).collect::<Vec<_>>().join(",") != fields[5] {
+            return Err(format!("noncanonical input-state weights in fixture {}", fixture.name));
+        }
         if fixture.network.canonical_rules() != fields[6] {
             return Err(format!("noncanonical rule list in fixture {}", fixture.name));
         }
@@ -690,9 +693,9 @@ fn fixtures() -> Result<Vec<Fixture>, String> {
             .fold(f64::INFINITY, f64::min);
         let max_tccip = partition_profiles.iter().map(|point| point.tccip)
             .fold(f64::NEG_INFINITY, f64::max);
-        let expected_min = fields[16].parse::<f64>()
+        let expected_min = fields[17].parse::<f64>()
             .map_err(|error| format!("invalid minimum partition TCCIP: {error}"))?;
-        let expected_max = fields[17].parse::<f64>()
+        let expected_max = fields[18].parse::<f64>()
             .map_err(|error| format!("invalid maximum partition TCCIP: {error}"))?;
         if (min_tccip - expected_min).abs() > 1e-12 || (max_tccip - expected_max).abs() > 1e-12 {
             return Err(format!(
@@ -1019,7 +1022,7 @@ mod tests {
                 0usize,
                 |acc, (index, component)| acc | ((*component as usize) << index),
             );
-            assert_eq!(mask, fields[8].parse::<usize>().unwrap());
+            assert_eq!(mask, fields[9].parse::<usize>().unwrap());
 
             let (results, declared) = fixture.run().unwrap();
             let point = &declared[0];
@@ -1041,9 +1044,9 @@ mod tests {
 
             let (sweep, total, skipped) =
                 all_partition_profiles(&fixture.name, fixture.network.rules.len(), &results);
-            assert_eq!(total, fields[16].parse::<usize>().unwrap());
-            assert_eq!(sweep.len(), fields[14].parse::<usize>().unwrap());
-            assert_eq!(skipped, fields[15].parse::<usize>().unwrap());
+            assert_eq!(total, fields[14].parse::<usize>().unwrap());
+            assert_eq!(sweep.len(), fields[15].parse::<usize>().unwrap());
+            assert_eq!(skipped, fields[16].parse::<usize>().unwrap());
             close(
                 sweep.iter().map(|point| point.tccip).fold(f64::INFINITY, f64::min),
                 17,
