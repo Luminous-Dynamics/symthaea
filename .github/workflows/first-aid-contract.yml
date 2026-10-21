@@ -78,10 +78,10 @@ jobs:
             .schema_version == "first-aid-mutation-matrix-v0" and
             .status == "research_coverage_inventory" and
             .clinical_use_authorized == false and
-            .count_summary.case_count == 38 and
-            .count_summary.implemented_or_frozen_count == 38 and
+            .count_summary.case_count == 39 and
+            .count_summary.implemented_or_frozen_count == 39 and
             .count_summary.frozen_trace_count == 12 and
-            .count_summary.mutation_case_count == 26 and
+            .count_summary.mutation_case_count == 27 and
             .count_summary.planned_not_yet_executable_count == 0 and
             .differential_oracle.status == "unit_test_added" and
             ([.differential_oracle.implementation, .differential_oracle.coverage,
