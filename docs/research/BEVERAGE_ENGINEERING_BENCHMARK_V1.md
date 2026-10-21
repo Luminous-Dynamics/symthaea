@@ -181,6 +181,8 @@ The isolated Rust runner is `tools/beverage-benchmark-harness/src/bin/decision_v
 
 For each independent matched unit, the manifest declares baseline and intervention periods, meter-boundary references, functional units, product-mix references, saleable quality-conforming output, absolute water and energy readings, and quality/safety gate results. The auditor normalizes water to litres per 1,000 litres of saleable output and energy to kWh per 1,000 litres of saleable output. The v1 contract refuses to pool product strata or mismatched meter boundaries, functional units, or product mixes.
 
+The synthetic fixture uses `design: SYNTHETIC_FIXTURE`; it does not call its generated values randomized or matched experimental observations. The auditor accepts that design only when `evidence_class` is `SYNTHETIC_CONTRACT_FIXTURE`. A claimed `MEASURED_PROSPECTIVE` record must use a declared block-randomized or matched-control design. Uncontrolled pre/post comparisons and mismatches between evidence class and design fail closed.
+
 It computes each independent unit's percentage reduction, then a deterministic 5,000-resample percentile bootstrap interval over those paired unit-level reductions. A contract passes only if:
 - the design declares block randomization or a matched control (uncontrolled before/after comparison is rejected);
 - every pair uses the same declared meter boundary, functional unit and product-mix reference;
