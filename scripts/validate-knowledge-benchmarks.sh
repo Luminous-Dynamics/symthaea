@@ -52,6 +52,11 @@ run_validator source \
   benchmarks/source-catalog/v0/sources.jsonl \
   "$reports_dir/source-catalog.json"
 
+run_validator annotation \
+  benchmarks/knowledge-annotation/v0/annotation.schema.json \
+  benchmarks/knowledge-annotation/v0/synthetic-fixtures.jsonl \
+  "$reports_dir/annotation-fixtures.json"
+
 run_validator graph \
   benchmarks/mythology-bench/v0/narrative-graph.schema.json \
   benchmarks/mythology-bench/v0/narrative-graph-fixtures.jsonl \
