@@ -161,21 +161,21 @@ We provide: (1) a formalized equity gap scoring methodology, (2) an open-source 
 - RELIVAF (Latin American guidelines): Regional effort; our engine is ancestry-agnostic and extensible
 
 ### 4.3 Limitations (be thorough and honest)
-1. **Hardy-Weinberg assumptions**: HWE assumes random mating within groups. Continental-scale groupings violate this. Admixed populations (increasingly common) cannot be accurately modeled with 6 discrete bins. The "Mixed" category is a placeholder, not a solution.
-2. **Allele coverage**: We include 10 star alleles across 4 genes. CYP2D6 alone has >100 known alleles. Rare alleles with population-specific distributions (e.g., CYP2C9*8 in African populations, CYP2D6*29 in African populations) are not yet represented. This systematically underestimates equity gaps for African populations.
-3. **Risk weight heuristics**: The 0.8/0.3/0.9/0.7/0.2 risk weights are pharmacologically motivated but not empirically calibrated. Sensitivity analysis (supplementary) shows equity gap rankings are robust to +/-20% weight perturbation, but absolute scores shift.
-4. **No clinical outcome validation**: We compute expected risk from phenotype distributions, not observed adverse event rates. Prospective clinical validation is needed.
-5. **Prescription rate uncertainty**: Clinical impact estimates depend on drug prescription rates that vary by country, insurance coverage, and indication prevalence.
-6. **Gene-gene interactions**: We model each gene independently. CYP2D6-CYP2C19 co-metabolism (e.g., for some SSRIs) is not captured.
-7. **Ancestry self-identification**: In clinical practice, patient ancestry is often self-reported and may not correspond to genetic ancestry (as the 2025 NIH All of Us study demonstrated).
-8. **Sample size for reference data**: Some allele frequencies (especially Native American, Mixed) are derived from small samples with wide confidence intervals.
+1. **Simplified phenotype method:** HWE is applied after broad functional-bin aggregation, losing allele pairing and CPIC activity-score semantics; the model's own comparisons show material discrepancies.
+2. **Allele/structural coverage:** clinically relevant alleles, copy-number and structural variants, phase uncertainty, and gene-specific star-allele interpretation are incomplete.
+3. **Population assumptions:** broad group labels mask within-group variation and must not serve as proxies for an individual's genotype. Linear admixture is a first-order scenario, not individual-level ancestry inference.
+4. **Heuristic scores:** weights and thresholds are not clinically calibrated. Stability under numeric perturbation does not establish accuracy or ranking validity.
+5. **No outcome validation:** there is no validation against observed adverse events, therapeutic failure, or treatment benefit.
+6. **Source checks are not phenotype validation:** selected allele-frequency comparisons to gnomAD/literature do not validate completeness or clinical interpretation.
+7. **No clinical impact count:** population denominator × modelled fraction is arithmetic only without validated phenotype methods, prescription/indication data, and a defined context.
+8. **Reference uncertainty:** some values depend on small cohorts, broad labels, and population mappings; source edition, denominator, interval, and missingness must be explicit.
 
-### 4.4 Policy recommendations
-- CPIC guideline development should include systematic equity impact assessment for each new or updated guideline
-- Any future clinical display of aggregate equity analysis would require independent qualification and must remain separate from individual genotype-to-phenotype interpretation
-- Pharmacovigilance databases should stratify adverse event reporting by genetic ancestry (not self-reported race)
-- Biobanks (All of Us, UK Biobank, H3Africa) should prioritize population-specific allele frequency refinement for pharmacogenes
-- Open-source tools for equity quantification lower the barrier for global adoption, particularly in LMICs where no PGx tools have been developed locally
+### 4.4 Research questions for qualified stakeholders
+- After independent validation, could guideline-development groups report population coverage, uncertainty, and limitations of allele/diplotype evidence?
+- Can clinical and pharmacovigilance datasets support ethically governed, privacy-preserving evaluation of subgroup performance and adverse outcomes?
+- Which reference datasets and underrepresented variants should be prioritized to improve coverage?
+- What evidence would be required before an aggregate evidence-gap metric could be considered for policy use?
+These are research questions, not recommendations established by this prototype.
 
 ### 4.5 Future work
 - Expand to all 28 active CPIC guidelines (164 drugs, 34 genes)
@@ -212,17 +212,15 @@ Pharmacogenomic guidelines are a powerful tool for precision medicine, but their
 - **Annotation**: Star (*) on cells where population is flagged as underserved
 - **Marginal**: Right margin shows aggregate equity gap score per drug
 
-### Figure 3: Clinical impact estimates
+### Figure 3: Exploratory population scenario arithmetic
 - **Type**: Horizontal bar chart
-- **Bars**: Estimated patients at risk, per drug-gene pair, stacked by ancestry group
-- **Error bars**: Range from prescription rate uncertainty
-- **Note**: Prominently labeled "MODELED ESTIMATES -- not epidemiological measurements"
+- **Bars**: Rounded population denominator multiplied by modelled phenotype fraction
+- **Note**: Outputs are arithmetic scenarios only, not patient-risk or clinical-impact estimates
 
-### Figure 4: Ancestry-adjusted vs standard dosing comparison
-- **Type**: Paired decision flowchart (2-3 clinical scenarios)
-- **Left path**: Standard CPIC recommendation
-- **Right path**: Ancestry-adjusted recommendation from engine
-- **Highlight**: Where paths diverge (additional TDM recommendation, equity gap flag)
+### Figure 4: Non-actionable guideline-reference projection
+- Show exact tuple lookup and reference-found/indeterminate states
+- Assert that serialized outputs contain no dose, medication choice, contraindication, monitoring, or treatment-instruction fields
+- State that a reference match does not validate an individual's genotype or authorize a clinical action
 
 ---
 
