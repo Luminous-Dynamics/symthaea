@@ -198,12 +198,6 @@ fn audit_record(record: &DecisionRecord) -> Vec<String> {
         violations.push("expected_loss_without_sample_invalid".to_string());
     }
 
-    let mut validate_optional_nonnegative = |field: &str, value: Option<f64>| {
-        if value.is_some_and(|value| !value.is_finite() || value < 0.0) {
-            violations.push(format!("{field}_invalid"));
-        }
-    };
-
     match record.action {
         PolicyAction::Sample => {
             match record.requested_channel.as_deref() {
@@ -245,8 +239,16 @@ fn audit_record(record: &DecisionRecord) -> Vec<String> {
                     None
                 }
             };
-            validate_optional_nonnegative("estimated_sampling_cost_units", record.estimated_sampling_cost_units);
-            validate_optional_nonnegative("estimated_delay_cost_units", record.estimated_delay_cost_units);
+            if record.estimated_sampling_cost_units
+                .is_some_and(|value| !value.is_finite() || value < 0.0)
+            {
+                violations.push("estimated_sampling_cost_units_invalid".to_string());
+            }
+            if record.estimated_delay_cost_units
+                .is_some_and(|value| !value.is_finite() || value < 0.0)
+            {
+                violations.push("estimated_delay_cost_units_invalid".to_string());
+            }
 
             match (loss_with_sample, record.estimated_sampling_cost_units, record.estimated_delay_cost_units) {
                 (Some(loss_after), Some(sample_cost), Some(delay_cost))
@@ -584,10 +586,7 @@ mod tests {
     #[test]
     fn allows_discretionary_deferral_when_required_test_remains_scheduled() {
         let mut record = valid_record();
-        record.action = PolicyAction::Defer;
-        record.requested_channel = None;
-        record.requested_at_ms = None;
-        record.next_review_at_ms = Some(2_000);
+        make_defer(&mut record, 1_200);
         assert!(audit_record(&record).is_empty());
     }
 
