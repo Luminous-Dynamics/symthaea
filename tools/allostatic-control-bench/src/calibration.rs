@@ -507,4 +507,103 @@ mod tests {
         assert!(large_effects.load_delta().lower() <= small_effects.load_delta().lower());
         assert!(large_effects.load_delta().upper() >= small_effects.load_delta().upper());
     }
+    #[test]
+    fn action_specific_calibration_uses_eight_family_joint_coverage_gate() {
+        let seven_eight = repeated(0.01, 78);
+        assert!(calibrate_action_specific_episode_radii(
+            &seven_eight, &seven_eight, &seven_eight, &seven_eight,
+            &seven_eight, &seven_eight, &seven_eight, &seven_eight, 0.90,
+        ).is_none());
+
+        let seventy_nine = repeated(0.01, 79);
+        assert!(calibrate_action_specific_episode_radii(
+            &seventy_nine, &seventy_nine, &seventy_nine, &seventy_nine,
+            &seventy_nine, &seventy_nine, &seventy_nine, &seventy_nine, 0.90,
+        ).is_some());
+
+        let one_fifty_eight = repeated(0.01, 158);
+        assert!(calibrate_action_specific_episode_radii(
+            &one_fifty_eight, &one_fifty_eight, &one_fifty_eight, &one_fifty_eight,
+            &one_fifty_eight, &one_fifty_eight, &one_fifty_eight, &one_fifty_eight, 0.95,
+        ).is_none());
+
+        let one_fifty_nine = repeated(0.01, 159);
+        assert!(calibrate_action_specific_episode_radii(
+            &one_fifty_nine, &one_fifty_nine, &one_fifty_nine, &one_fifty_nine,
+            &one_fifty_nine, &one_fifty_nine, &one_fifty_nine, &one_fifty_nine, 0.95,
+        ).is_some());
+    }
+
+    #[test]
+    fn action_specific_effect_bounds_do_not_inherit_another_actions_worst_error() {
+        let n = 79;
+        let reserve_state = repeated(0.01, n);
+        let load_state = repeated(0.02, n);
+        let push_reserve = repeated(0.03, n);
+        let push_load = repeated(0.06, n);
+        let maintain_reserve = repeated(0.01, n);
+        let maintain_load = repeated(0.025, n);
+        let recovery_reserve = repeated(0.015, n);
+        let recovery_load = repeated(0.04, n);
+        let specific = calibrate_action_specific_episode_radii(
+            &reserve_state,
+            &load_state,
+            &push_reserve,
+            &push_load,
+            &maintain_reserve,
+            &maintain_load,
+            &recovery_reserve,
+            &recovery_load,
+            0.90,
+        )
+        .expect("79 episodes meet the eight-family 90% finite-rank gate");
+
+        let global = calibrate_episode_radii(
+            &reserve_state,
+            &load_state,
+            &push_reserve,
+            &push_load,
+            0.90,
+        )
+        .expect("global four-family calibration");
+
+        let specific_maintain = enclose_action_specific_predicted_effects(
+            nominal_effects(),
+            Action::Maintain,
+            specific,
+        )
+        .expect("maintain-specific bounds");
+        let global_maintain = enclose_predicted_action_effects(nominal_effects(), global)
+            .expect("global worst-case bounds");
+        assert!(specific_maintain.reserve_delta().lower() > global_maintain.reserve_delta().lower());
+        assert!(specific_maintain.reserve_delta().upper() < global_maintain.reserve_delta().upper());
+        assert!(specific_maintain.load_delta().lower() > global_maintain.load_delta().lower());
+        assert!(specific_maintain.load_delta().upper() < global_maintain.load_delta().upper());
+        assert_eq!(specific.effect_radii(Action::Push), (0.03, 0.06));
+        assert_eq!(specific.effect_radii(Action::Maintain), (0.01, 0.025));
+        assert_eq!(specific.effect_radii(Action::EmergencyRecover), (0.015, 0.04));
+    }
+
+    #[test]
+    fn action_specific_calibration_rejects_invalid_families_and_bounds() {
+        let n = 79;
+        let scores = repeated(0.01, n);
+        assert!(calibrate_action_specific_episode_radii(
+            &scores, &scores[..78], &scores, &scores, &scores, &scores, &scores, &scores, 0.90,
+        ).is_none());
+        let mut invalid = scores.clone();
+        invalid[0] = f64::NAN;
+        assert!(calibrate_action_specific_episode_radii(
+            &scores, &scores, &scores, &scores, &scores, &scores, &invalid, &scores, 0.90,
+        ).is_none());
+        let radii = calibrate_action_specific_episode_radii(
+            &scores, &scores, &scores, &scores, &scores, &scores, &scores, &scores, 0.90,
+        ).expect("valid radii");
+        assert!(enclose_action_specific_predicted_effects(
+            nominal_effects(),
+            Action::Maintain,
+            radii,
+        ).is_some());
+    }
+
 }
