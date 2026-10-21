@@ -602,7 +602,9 @@ fn validate_outcome_contract(value: &Value, context: &str) -> Result<()> {
                 bail!("{prediction_ctx}.compatibility_probability must be null or lie in [0, 1]");
             }
         }
-        None => bail!("{prediction_ctx}.compatibility_probability is required; use null when unscored"),
+        None => bail!(
+            "{prediction_ctx}.compatibility_probability is required; use null when unscored"
+        ),
     }
     validate_digest_field(prediction, "receipt_sha256", 64, &prediction_ctx)?;
     let mismatch_codes = prediction
