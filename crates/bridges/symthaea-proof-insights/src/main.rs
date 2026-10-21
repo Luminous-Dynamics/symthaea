@@ -1828,6 +1828,7 @@ fn verify_temporal_manifest_file(repository_root: &Path, manifest_path: &Path) -
     }
 
     let mut file_cache: BTreeMap<(String, String), Vec<u8>> = BTreeMap::new();
+    let mut normalized_artifact_content: BTreeMap<String, String> = BTreeMap::new();
     for artifact in &manifest.artifacts {
         if !git_is_ancestor(&root, &artifact.source_commit, &manifest.repository_commit)? {
             bail!(
@@ -1879,7 +1880,14 @@ fn verify_temporal_manifest_file(repository_root: &Path, manifest_path: &Path) -
                 artifact.artifact_id
             )
         })?;
+        let span_text = std::str::from_utf8(span)
+            .with_context(|| format!("artifact {} is not UTF-8", artifact.artifact_id))?;
+        normalized_artifact_content.insert(
+            artifact.artifact_id.clone(),
+            normalize_lean_for_leakage(span_text),
+        );
     }
+    validate_normalized_future_proof_leakage(&manifest, &normalized_artifact_content)?;
 
     println!(
         "PITB_TEMPORAL_MANIFEST_PASS: events={} artifacts={} repository_commit={}",
@@ -2550,6 +2558,122 @@ fn validate_temporal_manifest(manifest: &TemporalReplayManifest) -> Result<()> {
         }
     }
 
+    Ok(())
+}
+
+// Remove Lean comments before looking for exact normalized copies of long
+// future proofs. Strings are preserved so comment markers inside string literals
+// are not treated as comments. This is a conservative leakage control, not a Lean
+// parser; very short/common proofs are handled by exact-content checks only.
+fn normalize_lean_for_leakage(source: &str) -> String {
+    let chars: Vec<char> = source.chars().collect();
+    let mut output = String::with_capacity(source.len());
+    let mut index = 0;
+    while index < chars.len() {
+        if chars[index] == '-' && chars.get(index + 1) == Some(&'-') {
+            index += 2;
+            while index < chars.len() && chars[index] != '\n' {
+                index += 1;
+            }
+            output.push(' ');
+            continue;
+        }
+        if chars[index] == '/' && chars.get(index + 1) == Some(&'-') {
+            index += 2;
+            let mut depth = 1_usize;
+            while index < chars.len() && depth > 0 {
+                if chars[index] == '/' && chars.get(index + 1) == Some(&'-') {
+                    depth += 1;
+                    index += 2;
+                } else if chars[index] == '-' && chars.get(index + 1) == Some(&'/') {
+                    depth -= 1;
+                    index += 2;
+                } else {
+                    index += 1;
+                }
+            }
+            output.push(' ');
+            continue;
+        }
+        if chars[index] == '"' {
+            output.push(chars[index]);
+            index += 1;
+            let mut escaped = false;
+            while index < chars.len() {
+                let character = chars[index];
+                output.push(character);
+                index += 1;
+                if escaped {
+                    escaped = false;
+                } else if character == '\\' {
+                    escaped = true;
+                } else if character == '"' {
+                    break;
+                }
+            }
+            continue;
+        }
+        output.push(chars[index]);
+        index += 1;
+    }
+    normalize_whitespace(&output)
+}
+
+fn validate_normalized_future_proof_leakage(
+    manifest: &TemporalReplayManifest,
+    normalized_artifact_content: &BTreeMap<String, String>,
+) -> Result<()> {
+    const MIN_NORMALIZED_PROOF_TOKENS: usize = 12;
+    let artifacts_by_id: BTreeMap<&str, &TemporalEvidenceArtifact> = manifest
+        .artifacts
+        .iter()
+        .map(|artifact| (artifact.artifact_id.as_str(), artifact))
+        .collect();
+
+    for event in &manifest.events {
+        for future_event in manifest
+            .events
+            .iter()
+            .filter(|candidate| candidate.position >= event.position)
+        {
+            let proof = artifacts_by_id
+                .get(future_event.proof_artifact_id.as_str())
+                .with_context(|| {
+                    format!(
+                        "hidden proof artifact is missing for target {}",
+                        future_event.target_id
+                    )
+                })?;
+            let normalized_proof = normalized_artifact_content
+                .get(&proof.artifact_id)
+                .with_context(|| {
+                    format!(
+                        "normalized hidden proof is missing for target {}",
+                        future_event.target_id
+                    )
+                })?;
+            if normalized_proof.split_whitespace().count() < MIN_NORMALIZED_PROOF_TOKENS {
+                continue;
+            }
+            let needle = format!(" {normalized_proof} ");
+            for visible_id in &event.visible_artifact_ids {
+                let visible = normalized_artifact_content
+                    .get(visible_id)
+                    .with_context(|| {
+                        format!("normalized visible artifact {visible_id} is missing")
+                    })?;
+                let haystack = format!(" {visible} ");
+                if haystack.contains(&needle) {
+                    bail!(
+                        "normalized future-proof leakage: target {} sees visible artifact {} containing the normalized proof body of hidden/future target {}",
+                        event.target_id,
+                        visible_id,
+                        future_event.target_id
+                    );
+                }
+            }
+        }
+    }
     Ok(())
 }
 
