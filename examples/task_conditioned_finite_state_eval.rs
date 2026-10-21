@@ -628,12 +628,55 @@ fn fixtures() -> Result<Vec<Fixture>, String> {
                 return Err(format!("out-of-range {field_name} in fixture {}", fixture.name));
             }
         }
-        for (column, field_name) in [
-            (13, "partition count"),
-            (14, "usable partition count"),
-            (15, "skipped partition count"),
-        ] {
-            parse_usize(fields[column], field_name)?;
+        let expected_counts = [
+            parse_usize(fields[13], "partition count")?,
+            parse_usize(fields[14], "usable partition count")?,
+            parse_usize(fields[15], "skipped partition count")?,
+        ];
+        let expected_values = [
+            fields[9].parse::<f64>().map_err(|error| format!("invalid intact utility: {error}"))?,
+            fields[10].parse::<f64>().map_err(|error| format!("invalid cross-cut mean loss: {error}"))?,
+            fields[11].parse::<f64>().map_err(|error| format!("invalid control mean loss: {error}"))?,
+            fields[12].parse::<f64>().map_err(|error| format!("invalid TCCIP: {error}"))?,
+        ];
+        let (results, profile) = fixture.run()?;
+        let point = profile.first().ok_or_else(|| format!("no profile point for {}", fixture.name))?;
+        let actual_values = [
+            point.intact_utility,
+            point.cross_cut_mean_loss,
+            point.matched_control_mean_loss,
+            point.tccip,
+        ];
+        for (index, (actual, expected)) in actual_values.iter().zip(expected_values.iter()).enumerate() {
+            if !actual.is_finite() || (actual - expected).abs() > 1e-12 {
+                return Err(format!(
+                    "fixture {} oracle mismatch at metric {}: computed {}, expected {}",
+                    fixture.name, index, actual, expected
+                ));
+            }
+        }
+        let (partition_profiles, total, skipped) =
+            all_partition_profiles(&fixture.name, fixture.network.rules.len(), &results);
+        let actual_counts = [total, partition_profiles.len(), skipped];
+        if actual_counts != expected_counts {
+            return Err(format!(
+                "fixture {} partition-count oracle mismatch: computed {:?}, expected {:?}",
+                fixture.name, actual_counts, expected_counts
+            ));
+        }
+        let min_tccip = partition_profiles.iter().map(|point| point.tccip)
+            .fold(f64::INFINITY, f64::min);
+        let max_tccip = partition_profiles.iter().map(|point| point.tccip)
+            .fold(f64::NEG_INFINITY, f64::max);
+        let expected_min = fields[16].parse::<f64>()
+            .map_err(|error| format!("invalid minimum partition TCCIP: {error}"))?;
+        let expected_max = fields[17].parse::<f64>()
+            .map_err(|error| format!("invalid maximum partition TCCIP: {error}"))?;
+        if (min_tccip - expected_min).abs() > 1e-12 || (max_tccip - expected_max).abs() > 1e-12 {
+            return Err(format!(
+                "fixture {} partition-range oracle mismatch: computed [{}, {}], expected [{}, {}]",
+                fixture.name, min_tccip, max_tccip, expected_min, expected_max
+            ));
         }
         parsed.push(fixture);
     }
