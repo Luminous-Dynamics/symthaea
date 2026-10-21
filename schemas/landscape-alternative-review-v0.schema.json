@@ -975,6 +975,49 @@
           }
         }
       }
+    },
+    {
+      "if": {
+        "properties": {
+          "inputs": {
+            "properties": {
+              "baseline_design": {
+                "properties": {
+                  "coordinate_frame_kind": {
+                    "const": "LOCAL_CARTESIAN_DRAWING_UNITS"
+                  }
+                },
+                "required": [
+                  "coordinate_frame_kind"
+                ]
+              }
+            },
+            "required": [
+              "baseline_design"
+            ]
+          }
+        },
+        "required": [
+          "inputs"
+        ]
+      },
+      "then": {
+        "properties": {
+          "metric_assessments": {
+            "items": {
+              "properties": {
+                "status": {
+                  "enum": [
+                    "blocked",
+                    "conflicted",
+                    "not-applicable"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
     }
   ]
 }
