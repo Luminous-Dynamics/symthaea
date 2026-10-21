@@ -102,3 +102,22 @@ mod tests {
         assert!(report["errors"][0].as_str().unwrap().contains("exceeds maximum"));
     }
 }
+
+
+#[cfg(test)]
+mod schema_tests {
+    use super::*;
+
+    #[test]
+    fn report_schema_uri_matches_schema() {
+        let schema: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../../../schemas/landscape-review-validation-report-v0.schema.json"
+        ))
+        .expect("report JSON Schema must be valid JSON");
+        assert_eq!(schema["$id"], REPORT_SCHEMA_URI);
+        assert_eq!(
+            schema["properties"]["report_schema"]["const"],
+            REPORT_SCHEMA
+        );
+    }
+}
