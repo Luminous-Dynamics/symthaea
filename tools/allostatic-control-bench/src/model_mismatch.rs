@@ -243,8 +243,7 @@ fn make_profile_from_coordinates(coordinates: [f64; 8]) -> MismatchProfile {
 }
 
 fn deterministic_trit(seed: u64, dimension: usize) -> f64 {
-    let mut value =
-        seed.wrapping_add((dimension as u64 + 1).wrapping_mul(0x9E37_79B9_7F4A_7C15));
+    let mut value = seed.wrapping_add((dimension as u64 + 1).wrapping_mul(0x9E37_79B9_7F4A_7C15));
     value = (value ^ (value >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
     value = (value ^ (value >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
     value ^= value >> 31;
@@ -276,8 +275,7 @@ pub fn synthetic_mismatch_profile(seed: u64, scale: f64) -> Option<MismatchProfi
     if !scale.is_finite() || !(0.0..=10.0).contains(&scale) {
         return None;
     }
-    let coordinates =
-        std::array::from_fn(|dimension| deterministic_trit(seed, dimension) * scale);
+    let coordinates = std::array::from_fn(|dimension| deterministic_trit(seed, dimension) * scale);
     Some(make_profile_from_coordinates(coordinates))
 }
 
@@ -361,18 +359,10 @@ mod tests {
             .iter()
             .map(|mismatch| episode_residual_scores(*mismatch, &STRESS_GRID).expect("scores"))
             .collect();
-        assert!(
-            (scores.iter().map(|s| s.reserve_state).fold(0.0, f64::max) - 0.01).abs() < 1e-12
-        );
-        assert!(
-            (scores.iter().map(|s| s.load_state).fold(0.0, f64::max) - 0.02).abs() < 1e-12
-        );
-        assert!(
-            (scores.iter().map(|s| s.reserve_effect).fold(0.0, f64::max) - 0.03).abs() < 1e-12
-        );
-        assert!(
-            (scores.iter().map(|s| s.load_effect).fold(0.0, f64::max) - 0.06).abs() < 1e-12
-        );
+        assert!((scores.iter().map(|s| s.reserve_state).fold(0.0, f64::max) - 0.01).abs() < 1e-12);
+        assert!((scores.iter().map(|s| s.load_state).fold(0.0, f64::max) - 0.02).abs() < 1e-12);
+        assert!((scores.iter().map(|s| s.reserve_effect).fold(0.0, f64::max) - 0.03).abs() < 1e-12);
+        assert!((scores.iter().map(|s| s.load_effect).fold(0.0, f64::max) - 0.06).abs() < 1e-12);
     }
 
     #[test]
