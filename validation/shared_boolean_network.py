@@ -203,3 +203,10 @@ def model_digest(case: BooleanNetworkCase) -> str:
     digest = hashlib.sha256()
     digest.update(case.canonical_model_specification().encode("ascii"))
     return digest.hexdigest()
+
+
+def prior_digest(case: BooleanNetworkCase) -> str:
+    """Hash the prior/state ensemble separately from the causal model identity."""
+    digest = hashlib.sha256()
+    digest.update(case.canonical_prior_specification().encode("ascii"))
+    return digest.hexdigest()
