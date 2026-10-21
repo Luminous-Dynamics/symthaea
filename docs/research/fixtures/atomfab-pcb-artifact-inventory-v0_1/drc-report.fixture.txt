@@ -1,0 +1,2 @@
+SYNTHETIC ARTIFACT-INVENTORY FIXTURE ONLY.
+Not a KiCad DRC result; it records no design-rule status.
