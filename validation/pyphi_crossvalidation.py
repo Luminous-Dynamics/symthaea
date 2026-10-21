@@ -413,6 +413,12 @@ class PyPhiValidator:
         topologies = [t for t in topologies if t.n_nodes <= max_nodes]
 
         report = ValidationReport()
+        if PYPHI_AVAILABLE:
+            try:
+                from importlib.metadata import version as package_version
+                report.pyphi_version = package_version("pyphi")
+            except Exception as error:
+                logger.warning("Could not record PyPhi package version: %s", error)
 
         for topology in topologies:
             result = self.validate_topology(topology)
@@ -444,11 +450,30 @@ class PyPhiValidator:
 
         hdc_values = np.array([pair[0] for pair in paired], dtype=float)
         pyphi_values = np.array([pair[1] for pair in paired], dtype=float)
-        correlation = float(np.corrcoef(hdc_values, pyphi_values)[0, 1])
-        if np.isfinite(correlation):
-            report.correlation = correlation
+        pearson = float(np.corrcoef(hdc_values, pyphi_values)[0, 1])
+        if np.isfinite(pearson):
+            report.correlation = pearson
+
+        def average_ranks(values: np.ndarray) -> np.ndarray:
+            order = np.argsort(values, kind="mergesort")
+            ranks = np.empty(len(values), dtype=float)
+            start = 0
+            while start < len(values):
+                end = start + 1
+                while end < len(values) and values[order[end]] == values[order[start]]:
+                    end += 1
+                # Average of the 1-based rank interval [start + 1, end].
+                ranks[order[start:end]] = (start + 1 + end) / 2.0
+                start = end
+            return ranks
+
+        spearman = float(np.corrcoef(average_ranks(hdc_values), average_ranks(pyphi_values))[0, 1])
+        if np.isfinite(spearman):
+            report.spearman_correlation = spearman
+
         errors = np.abs(hdc_values - pyphi_values)
         report.mean_absolute_error = float(np.mean(errors))
+        report.root_mean_square_error = float(np.sqrt(np.mean(np.square(errors))))
         report.max_absolute_error = float(np.max(errors))
         relative_errors = errors / np.maximum(np.abs(pyphi_values), 0.001)
         report.agreement_within_10_percent = float(np.mean(relative_errors < 0.10) * 100.0)
