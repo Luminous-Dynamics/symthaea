@@ -1873,6 +1873,12 @@ fn verify_temporal_manifest_file(repository_root: &Path, manifest_path: &Path) -
                 artifact.content_end_line
             );
         }
+        validate_artifact_declaration_identity(source, artifact, span).with_context(|| {
+            format!(
+                "artifact {} does not match its declared Lean theorem identity",
+                artifact.artifact_id
+            )
+        })?;
     }
 
     println!(
@@ -2544,6 +2550,65 @@ fn validate_temporal_manifest(manifest: &TemporalReplayManifest) -> Result<()> {
         }
     }
 
+    Ok(())
+}
+
+fn validate_artifact_declaration_identity(
+    source: &[u8],
+    artifact: &TemporalEvidenceArtifact,
+    span: &[u8],
+) -> Result<()> {
+    if ![
+        "theorem_statement",
+        "completion_statement",
+        "proof_body",
+    ]
+    .contains(&artifact.artifact_kind.as_str())
+    {
+        return Ok(());
+    }
+    let theorem_id = artifact
+        .theorem_id
+        .as_deref()
+        .filter(|name| !name.trim().is_empty())
+        .context("theorem evidence artifact lacks a theorem identity")?;
+    let source_text = std::str::from_utf8(source).context("Lean source is not UTF-8")?;
+    let span_text = std::str::from_utf8(span).context("Lean artifact span is not UTF-8")?;
+    let blocks = named_declaration_blocks(source_text, theorem_id)?;
+    if blocks.len() != 1 {
+        bail!(
+            "expected exactly one declaration matching {theorem_id}, found {}",
+            blocks.len()
+        );
+    }
+    let block = &blocks[0];
+    match artifact.artifact_kind.as_str() {
+        "theorem_statement" | "completion_statement" => {
+            let expected_prefix = statement_declaration_prefix(span_text)
+                .context("statement artifact lacks a parseable ':= by' declaration boundary")?;
+            if !normalized_contains(block, &expected_prefix) {
+                bail!(
+                    "statement span does not match the proposition of declaration {theorem_id}"
+                );
+            }
+        }
+        "proof_body" => {
+            let statement_prefix = statement_declaration_prefix(block)
+                .context("source declaration lacks a parseable ':= by' boundary")?;
+            let normalized_block = normalize_whitespace(block);
+            let normalized_prefix = normalize_whitespace(&statement_prefix);
+            let proof_region = normalized_block
+                .strip_prefix(&normalized_prefix)
+                .context("source declaration prefix could not be separated from its proof")?;
+            let normalized_proof = normalize_whitespace(span_text);
+            if normalized_proof.is_empty() || !proof_region.contains(&normalized_proof) {
+                bail!(
+                    "proof span is not contained in the proof region of declaration {theorem_id}"
+                );
+            }
+        }
+        _ => unreachable!("artifact kind was filtered above"),
+    }
     Ok(())
 }
 
@@ -3437,6 +3502,59 @@ mod tests {
                 },
             ],
         }
+    }
+
+    #[test]
+    fn temporal_artifact_identity_checks_the_proposition_and_proof_region() {
+        let source = b"theorem first : True := by\n  exact True.intro\n\ntheorem second : True := by\n  trivial\n";
+        let first_statement = b"theorem first : True := by\n";
+        let first_proof = b"  exact True.intro\n";
+        let second_proof = b"  trivial\n";
+        let statement_artifact = TemporalEvidenceArtifact {
+            artifact_id: "statement-first".to_string(),
+            path: "lean/Example.lean".to_string(),
+            artifact_kind: "theorem_statement".to_string(),
+            content_sha256: format!("{:x}", Sha256::digest(first_statement)),
+            content_start_line: 1,
+            content_end_line: 1,
+            source_file_sha256: format!("{:x}", Sha256::digest(source)),
+            source_commit: "1".repeat(40),
+            available_at_position: Some(0),
+            target_position: None,
+            theorem_id: Some("first".to_string()),
+        };
+        assert!(
+            validate_artifact_declaration_identity(source, &statement_artifact, first_statement)
+                .is_ok()
+        );
+
+        let proof_artifact = TemporalEvidenceArtifact {
+            artifact_id: "proof-first".to_string(),
+            path: "lean/Example.lean".to_string(),
+            artifact_kind: "proof_body".to_string(),
+            content_sha256: format!("{:x}", Sha256::digest(first_proof)),
+            content_start_line: 2,
+            content_end_line: 2,
+            source_file_sha256: format!("{:x}", Sha256::digest(source)),
+            source_commit: "2".repeat(40),
+            available_at_position: None,
+            target_position: Some(0),
+            theorem_id: Some("first".to_string()),
+        };
+        assert!(
+            validate_artifact_declaration_identity(source, &proof_artifact, first_proof).is_ok()
+        );
+        assert!(
+            validate_artifact_declaration_identity(source, &proof_artifact, second_proof).is_err(),
+            "a proof-shaped span from a different declaration must not satisfy the target proof identity"
+        );
+
+        let wrong_statement = b"theorem first : False := by\n";
+        assert!(
+            validate_artifact_declaration_identity(source, &statement_artifact, wrong_statement)
+                .is_err(),
+            "same theorem name with a changed proposition must be rejected"
+        );
     }
 
     #[test]
