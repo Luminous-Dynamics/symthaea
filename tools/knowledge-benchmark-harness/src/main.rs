@@ -61,6 +61,7 @@ struct Report {
     subject_revision: Option<String>,
     schema_sha256: String,
     input_sha256: String,
+    dependency_lock_sha256: String,
     declared_schema_dialect: Option<String>,
     schema_meta_valid: bool,
     schema_compiled: bool,
@@ -306,6 +307,14 @@ fn run(config: Config) -> Result<(Report, bool), String> {
         .map_err(|e| format!("cannot read input {}: {e}", config.input.display()))?;
     let schema_hash = sha256_hex(&schema_bytes);
     let input_hash = sha256_hex(&input_bytes);
+    let lock_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("Cargo.lock");
+    let lock_bytes = fs::read(&lock_path).map_err(|e| {
+        format!(
+            "cannot read dependency lockfile {}: {e}; generate and review Cargo.lock before qualifying this harness",
+            lock_path.display()
+        )
+    })?;
+    let lock_hash = sha256_hex(&lock_bytes);
 
     let schema: Value = serde_json::from_slice(&schema_bytes)
         .map_err(|e| format!("schema is not valid JSON: {e}"))?;
@@ -403,6 +412,7 @@ fn run(config: Config) -> Result<(Report, bool), String> {
         subject_revision: config.subject_revision,
         schema_sha256: schema_hash,
         input_sha256: input_hash,
+        dependency_lock_sha256: lock_hash,
         declared_schema_dialect: dialect,
         schema_meta_valid: meta_valid,
         schema_compiled: true,
