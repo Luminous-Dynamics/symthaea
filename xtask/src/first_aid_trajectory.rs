@@ -305,17 +305,9 @@ fn validate_corpus(corpus: &TrajectoryCorpus) -> Result<()> {
             previous_sequence = Some(event.sequence);
             validate_event_fields(trace, event)?;
         }
-        let mut expected_codes = HashSet::new();
         for code in &trace.expected_violation_codes {
             if !is_known_violation_code(code) {
                 bail!("{}: unknown violation code {}", trace.trace_id, code);
-            }
-            if !expected_codes.insert(code.as_str()) {
-                bail!(
-                    "{}: duplicate expected violation code {}",
-                    trace.trace_id,
-                    code
-                );
             }
         }
         let actual = inspect_trace(trace);
@@ -1322,6 +1314,35 @@ mod tests {
         assert_eq!(inspect_trace(&trace), expected);
         let value = serde_json::to_value(&trace).expect("mutated trace serializes");
         assert_eq!(inspect_trace(&trace), reference_codes_from_json(&value));
+    }
+
+    #[test]
+    fn repeated_violation_codes_count_each_event_occurrence() {
+        let mut trace = scenario("FA-TRACE-002");
+        let mut repeated_render = trace
+            .events
+            .iter()
+            .find(|event| event.kind == EventKind::ProtocolRendered)
+            .expect("render event exists")
+            .clone();
+        repeated_render.sequence = trace.events.last().expect("events exist").sequence + 1;
+        trace.events.push(repeated_render);
+        trace.expected_violation_codes = vec![
+            "render_without_verified_bundle".to_owned(),
+            "render_without_verified_bundle".to_owned(),
+        ];
+        let corpus = TrajectoryCorpus {
+            schema_version: CORPUS_VERSION.to_owned(),
+            status: "synthetic_process_contract_tests_only".to_owned(),
+            clinical_use_authorized: false,
+            claim_ceiling: REQUIRED_CLAIM_CEILING.to_owned(),
+            notes: None,
+            scenarios: vec![trace.clone()],
+        };
+        validate_corpus(&corpus).expect("repeated event-level codes are valid expected outcomes");
+        let value = serde_json::to_value(&trace).expect("mutated trace serializes");
+        assert_eq!(inspect_trace(&trace), reference_codes_from_json(&value));
+        assert_eq!(inspect_trace(&trace).len(), 2);
     }
 
 }
