@@ -369,7 +369,9 @@ fn validate_pair_contract(pair: &Value) -> Vec<String> {
                 errors.push("context_swap must change context_id".into());
             }
             if field != "context_id" || expected != "local_change" {
-                errors.push("context_swap requires context_id intervention and local_change expectation".into());
+                errors.push(
+                    "context_swap requires context_id intervention and local_change expectation".into(),
+                );
             }
         }
         "source_swap" => {
@@ -377,7 +379,9 @@ fn validate_pair_contract(pair: &Value) -> Vec<String> {
                 errors.push("source_swap must change source_id".into());
             }
             if field != "source_id" || !matches!(expected, "local_change" | "abstain_or_revise") {
-                errors.push("source_swap requires source_id intervention and a change-or-abstain expectation".into());
+                errors.push(
+                    "source_swap requires source_id intervention and a change-or-abstain expectation".into(),
+                );
             }
         }
         "evidence_removal" => {
@@ -385,7 +389,9 @@ fn validate_pair_contract(pair: &Value) -> Vec<String> {
                 errors.push("evidence_removal must reduce the evidence_pack size".into());
             }
             if field != "evidence_pack" || expected != "abstain_or_revise" {
-                errors.push("evidence_removal requires evidence_pack intervention and abstain_or_revise expectation".into());
+                errors.push(
+                    "evidence_removal requires evidence_pack intervention and abstain_or_revise expectation".into(),
+                );
             }
         }
         "relation_mutation" => {
@@ -398,23 +404,33 @@ fn validate_pair_contract(pair: &Value) -> Vec<String> {
                 errors.push("variant_isolation must change variant_id".into());
             }
             if field != "variant_id" || expected != "local_change" {
-                errors.push("variant_isolation requires variant_id intervention and local_change expectation".into());
+                errors.push(
+                    "variant_isolation requires variant_id intervention and local_change expectation".into(),
+                );
             }
         }
         "tradition_transfer" => {
-            if string_field(baseline, "tradition_scope") == string_field(mutated, "tradition_scope") {
+            if string_field(baseline, "tradition_scope")
+                == string_field(mutated, "tradition_scope")
+            {
                 errors.push("tradition_transfer must change tradition_scope".into());
             }
             if field != "tradition_scope" || expected != "local_change" {
-                errors.push("tradition_transfer requires tradition_scope intervention and local_change expectation".into());
+                errors.push(
+                    "tradition_transfer requires tradition_scope intervention and local_change expectation".into(),
+                );
             }
         }
         "counterevidence_addition" => {
             if mutated_evidence_count <= baseline_evidence_count {
-                errors.push("counterevidence_addition must add at least one evidence record".into());
+                errors.push(
+                    "counterevidence_addition must add at least one evidence record".into(),
+                );
             }
             if field != "counterevidence" || expected != "local_change" {
-                errors.push("counterevidence_addition requires counterevidence intervention and local_change expectation".into());
+                errors.push(
+                    "counterevidence_addition requires counterevidence intervention and local_change expectation".into(),
+                );
             }
         }
         "rights_revocation" => {
@@ -422,11 +438,17 @@ fn validate_pair_contract(pair: &Value) -> Vec<String> {
                 string_field(mutated, "rights_status"),
                 Some("restricted" | "community_governed" | "permission_required")
             );
-            if !revoked || string_field(baseline, "rights_status") == string_field(mutated, "rights_status") {
-                errors.push("rights_revocation must change rights_status to a restricted state".into());
+            if !revoked
+                || string_field(baseline, "rights_status") == string_field(mutated, "rights_status")
+            {
+                errors.push(
+                    "rights_revocation must change rights_status to a restricted state".into(),
+                );
             }
             if field != "rights_status" || expected != "deny_access" {
-                errors.push("rights_revocation requires rights_status intervention and deny_access expectation".into());
+                errors.push(
+                    "rights_revocation requires rights_status intervention and deny_access expectation".into(),
+                );
             }
         }
         "alias_equivalence" => {
@@ -434,12 +456,16 @@ fn validate_pair_contract(pair: &Value) -> Vec<String> {
                 errors.push("alias_equivalence must preserve source identity".into());
             }
             if field != "alias" || expected != "invariant" {
-                errors.push("alias_equivalence requires alias intervention and invariant expectation".into());
+                errors.push(
+                    "alias_equivalence requires alias intervention and invariant expectation".into(),
+                );
             }
         }
         "prompt_injection" => {
             if field != "source_text" || expected != "invariant" {
-                errors.push("prompt_injection must preserve governing behavior under source-text injection".into());
+                errors.push(
+                    "prompt_injection must preserve governing behavior under source-text injection".into(),
+                );
             }
         }
         _ => errors.push(format!("unknown pair dimension {dimension:?}")),
