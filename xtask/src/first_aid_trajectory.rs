@@ -493,6 +493,14 @@ mod tests {
         serde_json::from_str(CORPUS_JSON).expect("trajectory fixture must parse")
     }
 
+    fn scenario(trace_id: &str) -> TrajectoryScenario {
+        corpus()
+            .scenarios
+            .into_iter()
+            .find(|trace| trace.trace_id == trace_id)
+            .unwrap_or_else(|| panic!("missing frozen trace {trace_id}"))
+    }
+
     #[test]
     fn checked_in_trajectory_corpus_has_pinned_digest() {
         assert_eq!(sha256_hex(CORPUS_JSON.as_bytes()), EXPECTED_CORPUS_SHA256);
@@ -812,6 +820,158 @@ mod tests {
         trace.expected_violation_codes = vec!["render_without_verified_bundle".to_string()];
         value.scenarios = vec![trace];
         validate_corpus(&value).expect("new session must require a fresh bundle verification");
+    }
+
+    #[test]
+    fn rendering_different_bundle_from_verified_bundle_is_rejected() {
+        let mut trace = scenario("FA-TRACE-001");
+        let render = trace
+            .events
+            .iter_mut()
+            .find(|event| event.kind == EventKind::ProtocolRendered)
+            .expect("render event exists");
+        render.bundle_id = Some("bundle-b".to_owned());
+        assert_eq!(
+            inspect_trace(&trace),
+            vec!["render_without_verified_bundle"]
+        );
+    }
+
+    #[test]
+    fn failed_digest_verification_blocks_rendering() {
+        let mut trace = scenario("FA-TRACE-001");
+        let verify = trace
+            .events
+            .iter_mut()
+            .find(|event| event.kind == EventKind::BundleVerified)
+            .expect("verify event exists");
+        verify.digest_verified = Some(false);
+        assert_eq!(
+            inspect_trace(&trace),
+            vec![
+                "invalid_bundle_verification",
+                "render_without_verified_bundle"
+            ]
+        );
+    }
+
+    #[test]
+    fn expired_bundle_cannot_be_verified_or_rendered() {
+        let mut trace = scenario("FA-TRACE-001");
+        let verify = trace
+            .events
+            .iter_mut()
+            .find(|event| event.kind == EventKind::BundleVerified)
+            .expect("verify event exists");
+        verify.bundle_state = Some(BundleState::Expired);
+        assert_eq!(
+            inspect_trace(&trace),
+            vec![
+                "invalid_bundle_verification",
+                "render_without_verified_bundle"
+            ]
+        );
+    }
+
+    #[test]
+    fn non_sensitive_egress_does_not_require_sensitive_data_consent_scope() {
+        let mut trace = scenario("FA-TRACE-009");
+        let egress = trace
+            .events
+            .iter_mut()
+            .find(|event| event.kind == EventKind::SensitiveDataEgress)
+            .expect("egress event exists");
+        egress.sensitive_payload = Some(false);
+        assert!(inspect_trace(&trace).is_empty());
+    }
+
+    #[test]
+    fn new_uncertainty_after_prior_preservation_is_not_lost_at_handoff() {
+        let mut trace = scenario("FA-TRACE-012");
+        let handoff_index = trace
+            .events
+            .iter()
+            .position(|event| event.kind == EventKind::HandoffEmitted)
+            .expect("handoff event exists");
+        trace.events[handoff_index].sequence += 1;
+        trace.events.insert(
+            handoff_index,
+            TraceEvent {
+                sequence: 4,
+                kind: EventKind::UncertaintyDetected,
+                bundle_id: None,
+                bundle_state: None,
+                digest_verified: None,
+                resource_state: None,
+                presented_as: None,
+                sensitive_payload: None,
+                consent_scoped: None,
+            },
+        );
+        assert_eq!(
+            inspect_trace(&trace),
+            vec!["uncertainty_lost_at_handoff"]
+        );
+    }
+
+    #[test]
+    fn revocation_survives_new_session_and_both_failures_remain_visible() {
+        let mut trace = scenario("FA-TRACE-003");
+        let render_index = trace
+            .events
+            .iter()
+            .position(|event| event.kind == EventKind::ProtocolRendered)
+            .expect("render event exists");
+        trace.events[render_index].sequence += 1;
+        trace.events.insert(
+            render_index,
+            TraceEvent {
+                sequence: 5,
+                kind: EventKind::SessionStarted,
+                bundle_id: None,
+                bundle_state: None,
+                digest_verified: None,
+                resource_state: None,
+                presented_as: None,
+                sensitive_payload: None,
+                consent_scoped: None,
+            },
+        );
+        assert_eq!(
+            inspect_trace(&trace),
+            vec![
+                "render_after_revocation",
+                "render_without_verified_bundle"
+            ]
+        );
+    }
+
+    #[test]
+    fn unknown_event_kind_is_rejected_by_schema_deserialization() {
+        let mut value: serde_json::Value =
+            serde_json::from_str(CORPUS_JSON).expect("fixture JSON must parse");
+        value["scenarios"][0]["events"][0]["kind"] = serde_json::json!("unrecognized_event");
+        assert!(serde_json::from_value::<TrajectoryCorpus>(value).is_err());
+    }
+
+    #[test]
+    fn bundle_verification_requires_digest_metadata() {
+        let mut value: serde_json::Value =
+            serde_json::from_str(CORPUS_JSON).expect("fixture JSON must parse");
+        let events = value["scenarios"][0]["events"]
+            .as_array_mut()
+            .expect("event list exists");
+        let verify = events
+            .iter_mut()
+            .find(|event| event["kind"] == "bundle_verified")
+            .expect("verify event exists");
+        verify
+            .as_object_mut()
+            .expect("event must be an object")
+            .remove("digest_verified");
+        let decoded: TrajectoryCorpus =
+            serde_json::from_value(value).expect("missing optional field parses as None");
+        assert!(validate_corpus(&decoded).is_err());
     }
 
 }
