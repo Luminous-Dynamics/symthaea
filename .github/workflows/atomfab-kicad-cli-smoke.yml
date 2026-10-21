@@ -5,7 +5,6 @@ on:
     paths:
       - "docs/research/ATOMFAB_KICAD_CLI_SMOKE_V0_1.md"
       - "docs/research/fixtures/atomfab-kicad-cli-smoke/**"
-      - ".github/workflows/atomfab-kicad-cli-smoke.yml"
   workflow_dispatch:
 
 permissions:
