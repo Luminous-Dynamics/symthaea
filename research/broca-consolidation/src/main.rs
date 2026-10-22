@@ -567,14 +567,9 @@ fn validate_self_checks(candidates: &[Candidate], rows: &[Decision]) -> Result<(
         return Err("promote-everything mutation control was not detected".into());
     }
 
-    let typed = summaries.get("typed_lifecycle")
-        .ok_or_else(|| "missing typed lifecycle candidate".to_owned())?;
-    if typed.covered_load_bearing * 4 < typed.load_bearing_candidates * 3 {
-        return Err("typed lifecycle coverage fell below the 75% anti-degeneracy floor".into());
-    }
-    if typed.total_regret >= promote.total_regret {
-        return Err("typed lifecycle did not improve on the promote-everything mutation control".into());
-    }
+    // Policy quality is an experimental outcome, not receipt validity. A
+    // poorly performing candidate policy must still produce a valid report;
+    // only evaluator/oracle and mutation-control failures invalidate the run.
     Ok(())
 }
 
@@ -825,6 +820,30 @@ mod tests {
             "--candidates".to_owned(), "11".to_owned(),
         ];
         assert!(parse_args(&too_small).is_err());
+    }
+
+    #[test]
+    fn poor_candidate_quality_does_not_invalidate_measurement_receipt() {
+        let candidates = build_fixture(350, 24);
+        let mut rows = evaluate_all(&candidates);
+        let typed_spec = POLICIES
+            .iter()
+            .find(|spec| spec.name == "typed_lifecycle")
+            .unwrap();
+        for row in rows.iter_mut().filter(|row| row.policy == "typed_lifecycle") {
+            let candidate = candidates
+                .iter()
+                .find(|candidate| candidate.id == row.candidate_id)
+                .unwrap();
+            *row = Decision::from_candidate(candidate, typed_spec, Action::Retire);
+        }
+        // The anti-controls remain intact. Poor candidate performance should
+        // be measured, not relabeled as an invalid benchmark run.
+        assert!(validate_self_checks(&candidates, &rows).is_ok());
+        assert_eq!(
+            summarize(&rows).get("typed_lifecycle").unwrap().covered_load_bearing,
+            0
+        );
     }
 
     #[test]
