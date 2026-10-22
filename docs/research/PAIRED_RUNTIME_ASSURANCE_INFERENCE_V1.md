@@ -34,7 +34,7 @@ Each report row is a distinct `scenario × shielded` condition. The utility neve
 ## Reported estimands
 
 1. **Paired mean delta** and **median paired delta**, always defined as candidate minus baseline. Positive is not automatically better; interpretation depends on the metric. For example, positive reward delta may be desirable while positive exposure delta may be harmful.
-2. **95% percentile paired-bootstrap interval** for the mean per-seed delta. Resampling units are complete paired episodes, not control ticks. The PRNG seed and replicate count are fixed and recorded by the invocation, making identical input and arguments produce byte-identical output. The interval is an uncertainty estimate under the seed-level sampling design, not a distribution-free safety guarantee.
+2. **95% percentile paired-bootstrap interval** for the mean per-seed delta. Resampling units are complete paired episodes, not control ticks. The PRNG seed is deterministic per scenario/shield setting and is emitted as `bootstrap_seed`; the replicate count is also emitted. Identical input and arguments produce byte-identical output. The interval is an uncertainty estimate under the seed-level sampling design, not a distribution-free safety guarantee.
 3. **Observed violation rates** and separate one-sided 95% **exact Clopper–Pearson upper confidence limits** for the baseline and candidate rates. Zero observed violations must not be reported as zero underlying risk.
 4. **Exact two-sided McNemar test** for the paired binary episode-violation outcome, using only discordant baseline/candidate episodes. This is a secondary inferential statistic, not a substitute for violation counts, the confidence limits, or practical effect size.
 
