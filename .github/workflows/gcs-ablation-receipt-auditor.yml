@@ -7,6 +7,10 @@ on:
       - "src/bin/coding_gcs_ablation_verify.rs"
       - "examples/coding_gcs_ablation_benchmark.rs"
       - "src/language/intelligent_dispatcher.rs"
+      - "src/coding_agent/mod.rs"
+      - "src/coding_agent/experience.rs"
+      - "src/coding_agent/generation.rs"
+      - "src/coding_agent/tests.rs"
       - "docs/research/GCS_ABLATION_RECEIPT_AUDITOR_2026-10-22.md"
       - "docs/research/GCS_RUNTIME_ABLATION_BENCHMARK_2026-10-22.md"
       - ".github/workflows/gcs-ablation-receipt-auditor.yml"
@@ -38,10 +42,17 @@ jobs:
         run: |
           rustfmt --edition 2024 --check src/bin/coding_gcs_ablation_verify.rs
           rustfmt --edition 2024 --check examples/coding_gcs_ablation_benchmark.rs
+          rustfmt --edition 2024 --check src/language/intelligent_dispatcher.rs
+          rustfmt --edition 2024 --check src/coding_agent/mod.rs
+          rustfmt --edition 2024 --check src/coding_agent/experience.rs
+          rustfmt --edition 2024 --check src/coding_agent/generation.rs
+          rustfmt --edition 2024 --check src/coding_agent/tests.rs
       - name: Run independent receipt and mutation tests
         run: cargo test --locked --bin coding_gcs_ablation_verify
       - name: Run producer provenance and backend-identity tests
         run: cargo test --locked --example coding_gcs_ablation_benchmark --features "code_generation geodesic_synthesis"
+      - name: Test selected-tier versus actual backend attempt reporting
+        run: cargo test --locked --lib --features "code_generation geodesic_synthesis" backend_attempts
       - name: Compile the paired benchmark producer
         run: cargo check --locked --example coding_gcs_ablation_benchmark --features "code_generation geodesic_synthesis"
       - name: Run strict Clippy on the auditor
