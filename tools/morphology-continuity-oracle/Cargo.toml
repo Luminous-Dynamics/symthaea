@@ -5,6 +5,9 @@ edition = "2024"
 license = "AGPL-3.0-or-later"
 description = "Dependency-free oracle for target identity versus current morphology under damage"
 
+# Keep this research executable isolated from the large Symthaea workspace.
+[workspace]
+
 [lib]
 path = "src/lib.rs"
 
