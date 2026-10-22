@@ -163,8 +163,7 @@ pub(super) fn run(
     let working_tree_clean = tree_status.is_empty();
     if !dry_run && !working_tree_clean {
         bail!(
-            "refusing to execute calibration from a dirty/unverifiable working tree "
-                .to_owned() + "(status digest " + &sha256_hex(tree_status.as_bytes()) + "); commit or clean the tree first",
+            "refusing to execute calibration from a dirty/unverifiable working tree (status digest {}); commit or clean the tree first",
             sha256_hex(tree_status.as_bytes())
         );
     }
@@ -274,8 +273,7 @@ fn validate_suite(suite: &Suite) -> Result<()> {
         }
         if !task.quarantined || task.production_use_allowed || task.novel_discovery {
             bail!(
-                "task {} violates calibration safety flags; expected quarantined=true, "
-                    .to_owned() + "production_use_allowed=false, novel_discovery=false",
+                "task {} violates calibration safety flags; expected quarantined=true, production_use_allowed=false, novel_discovery=false",
                 task.task_id
             );
         }
@@ -431,7 +429,11 @@ fn task_result_from_output(
 }
 
 fn resolve_in_root(root: &Path, path: &Path) -> Result<PathBuf> {
-    let resolved = if path.is_absolute() { path.to_path_buf() } else { root.join(path) };
+    let resolved = if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        root.join(path)
+    };
     let canonical_root = root
         .canonicalize()
         .with_context(|| format!("canonicalize {}", root.display()))?;
@@ -445,8 +447,14 @@ fn resolve_in_root(root: &Path, path: &Path) -> Result<PathBuf> {
 }
 
 fn resolve_output_path(root: &Path, path: &Path) -> Result<PathBuf> {
-    let path = if path.is_absolute() { path.to_path_buf() } else { root.join(path) };
-    let canonical_root = root.canonicalize().with_context(|| format!("canonicalize {}", root.display()))?;
+    let path = if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        root.join(path)
+    };
+    let canonical_root = root
+        .canonicalize()
+        .with_context(|| format!("canonicalize {}", root.display()))?;
     // Output directories may not exist yet. Canonicalize the closest existing parent,
     // then append the remaining normal components to ensure the final path stays in-root.
     let mut ancestor = path.as_path();
