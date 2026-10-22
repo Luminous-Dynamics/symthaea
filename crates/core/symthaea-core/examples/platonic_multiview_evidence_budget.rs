@@ -113,6 +113,7 @@ fn main() -> BenchResult<()> {
                             let (known_rank, known_scan_us) = rank(&bank, &known_query)?;
                             let known = Score {
                                 correct_top1: Some(known_rank.0.as_str() == identity),
+                                views_used: view_count,
                                 best_similarity: known_rank.1,
                                 top_two_margin: known_rank.2,
                                 fusion_us: known_fusion_us,
@@ -134,6 +135,7 @@ fn main() -> BenchResult<()> {
                             scores.entry((seed, noise_index, view_count, view_mode.as_str(), "near_unknown"))
                                 .or_default().push(Score {
                                     correct_top1: None,
+                                    views_used: view_count,
                                     best_similarity: unknown_rank.1,
                                     top_two_margin: unknown_rank.2,
                                     fusion_us: unknown_fusion_us,
