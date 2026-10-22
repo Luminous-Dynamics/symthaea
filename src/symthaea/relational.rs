@@ -5,8 +5,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::hdc::relational_consciousness::{RelationMode, RelationalAssessment};
-use crate::partnership::{HumanPartnerModel, InteractionEvent, RelationshipTrajectory};
+use crate::partnership::{HumanPartnerModel, RelationshipTrajectory};
 
 pub use crate::hdc::relational_consciousness::RelationshipStage;
 
@@ -38,13 +37,23 @@ impl RelationalCore {
     }
 
     pub(super) fn from_persisted(
-        partner: HumanPartnerModel,
-        trajectory: RelationshipTrajectory,
+        mut partner: HumanPartnerModel,
+        _legacy_trajectory: RelationshipTrajectory,
         recent_user_input_states: Vec<symthaea_core::hdc::unified_hv::ContinuousHV>,
     ) -> Self {
+        // Pre-gate facade snapshots stored heuristic relationship fields and
+        // ungrounded dyadic-Phi trajectory points without source provenance.
+        // Do not promote those legacy values into observed relationship evidence.
+        partner.mode = crate::hdc::relational_consciousness::RelationMode::IIt;
+        partner.stage = RelationshipStage::NoRelation;
+        partner.trust = 0.0;
+        partner.vulnerability = 0.0;
+        partner.reciprocity = 0.0;
+        partner.phi_relational = 0.0;
+
         Self {
             partner,
-            trajectory,
+            trajectory: RelationshipTrajectory::default(),
             recent_user_input_states,
         }
     }
@@ -69,44 +78,16 @@ impl RelationalCore {
         None
     }
 
-    /// Update partnership state from interaction consciousness level.
-    pub(super) fn update_partnership(&mut self, consciousness: f32) {
+    /// Record that a user turn occurred without inferring their trust,
+    /// emotional safety, vulnerability, reciprocity, or relationship stage from
+    /// the system's own consciousness-related scalar.
+    pub(super) fn record_interaction(&mut self) {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
             .as_secs_f64();
-
-        let depth = (consciousness * 0.5).clamp(0.0, 1.0);
-        let safety = (consciousness * 0.7 + 0.2).clamp(0.0, 1.0);
-        let mutuality = (consciousness * 0.4 + 0.1).clamp(0.0, 1.0);
-
-        let event = InteractionEvent {
-            timestamp: now,
-            depth,
-            emotional_safety: safety,
-            mutuality,
-        };
-        self.partner.update_on_interaction(&event);
-
-        let assessment = RelationalAssessment {
-            agent_a: "symthaea".to_string(),
-            agent_b: self.partner.partner_id.clone(),
-            phi_relation: self.partner.phi_relational,
-            stage: self.partner.stage,
-            synchrony: consciousness as f64 * 0.8,
-            turn_taking_quality: 0.7,
-            mutual_information: mutuality as f64,
-            mode: if self.partner.trust > 0.3 {
-                RelationMode::IThou
-            } else {
-                RelationMode::IIt
-            },
-            num_interactions: self.partner.interactions_count as usize,
-            relationship_age: now,
-            explanation: String::new(),
-        };
-        self.partner.update_from_assessment(&assessment);
-        self.partner.advance_stage_if_ready();
+        self.partner.interactions_count = self.partner.interactions_count.saturating_add(1);
+        self.partner.last_interaction_ts = Some(now);
 
         if let Some(phi_dyad) = self.compute_phi_dyad() {
             self.trajectory.record(now, self.partner.stage, phi_dyad);
@@ -122,6 +103,7 @@ impl RelationalCore {
             None => (0.0, PhiDyadStatus::UnavailableNoIndependentPartnerObservations),
         };
         PartnershipState {
+            partner_state_status: PartnerStateEvidenceStatus::UnavailableNoIndependentPartnerObservations,
             stage: self.partner.stage,
             trust: self.partner.trust,
             vulnerability: self.partner.vulnerability,
@@ -145,9 +127,20 @@ pub enum PhiDyadStatus {
     AvailableFromIndependentPartnerObservations,
 }
 
+/// Evidence status for the relationship-state fields exposed by the facade.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PartnerStateEvidenceStatus {
+    /// No independently sourced partner observations are currently wired in.
+    UnavailableNoIndependentPartnerObservations,
+    /// Reserved for a future independently sourced observation path.
+    AvailableFromIndependentPartnerObservations,
+}
+
 /// Summary of partnership state for external consumers.
 #[derive(Debug, Clone)]
 pub struct PartnershipState {
+    /// Evidence status governing interpretation of partner-state fields.
+    pub partner_state_status: PartnerStateEvidenceStatus,
     /// Current relationship stage.
     pub stage: RelationshipStage,
     /// Trust level (0.0-1.0).
@@ -207,10 +200,17 @@ mod provenance_tests {
 
         assert_eq!(relational.compute_phi_dyad(), None);
 
-        relational.update_partnership(0.9);
+        relational.record_interaction();
+        assert_eq!(relational.partner.trust, 0.0);
+        assert_eq!(relational.partner.reciprocity, 0.0);
+        assert_eq!(relational.partner.stage, RelationshipStage::NoRelation);
         assert_eq!(
             relational.partnership_state().phi_dyad_status,
             PhiDyadStatus::UnavailableNoIndependentPartnerObservations
+        );
+        assert_eq!(
+            relational.partnership_state().partner_state_status,
+            PartnerStateEvidenceStatus::UnavailableNoIndependentPartnerObservations
         );
         assert!(
             relational.trajectory.points().is_empty(),
@@ -227,5 +227,36 @@ mod provenance_tests {
             state.phi_dyad_status,
             PhiDyadStatus::UnavailableNoIndependentPartnerObservations
         );
+        assert_eq!(
+            state.partner_state_status,
+            PartnerStateEvidenceStatus::UnavailableNoIndependentPartnerObservations
+        );
+    }
+
+    #[test]
+    fn legacy_proxy_state_and_trajectory_are_not_promoted_to_observed_data() {
+        let mut legacy_partner = HumanPartnerModel::new("legacy");
+        legacy_partner.trust = 0.95;
+        legacy_partner.vulnerability = 0.8;
+        legacy_partner.reciprocity = 0.9;
+        legacy_partner.phi_relational = 0.99;
+        legacy_partner.stage = RelationshipStage::Attunement;
+
+        let mut legacy_trajectory = RelationshipTrajectory::default();
+        legacy_trajectory.record(1.0, RelationshipStage::Attunement, 0.8);
+        let restored = RelationalCore::from_persisted(
+            legacy_partner,
+            legacy_trajectory,
+            Vec::new(),
+        );
+        let state = restored.partnership_state();
+
+        assert_eq!(state.trust, 0.0);
+        assert_eq!(state.vulnerability, 0.0);
+        assert_eq!(state.reciprocity, 0.0);
+        assert_eq!(state.stage, RelationshipStage::NoRelation);
+        assert_eq!(state.phi_dyad, 0.0);
+        assert_eq!(state.phi_dyad_status, PhiDyadStatus::UnavailableNoIndependentPartnerObservations);
+        assert_eq!(state.trajectory_points, 0);
     }
 }
