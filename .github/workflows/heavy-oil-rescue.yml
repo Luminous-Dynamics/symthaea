@@ -1,0 +1,55 @@
+name: Heavy Oil Rescue V0
+
+on:
+  pull_request:
+    paths:
+      - "research/heavy-oil-rescue/**"
+      - ".github/workflows/heavy-oil-rescue.yml"
+  push:
+    branches: [main]
+    paths:
+      - "research/heavy-oil-rescue/**"
+      - ".github/workflows/heavy-oil-rescue.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: heavy-oil-rescue-v0-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+
+jobs:
+  offline-rust:
+    name: Offline Rust tests and deterministic fixtures
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact source revision
+        uses: actions/checkout@v4
+
+      - name: Install repository-pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Check standalone crate formatting
+        run: cargo fmt --manifest-path research/heavy-oil-rescue/Cargo.toml -- --check
+
+      - name: Run tests without network access
+        run: cargo test --manifest-path research/heavy-oil-rescue/Cargo.toml --offline
+
+      - name: Run frozen synthetic corpus offline
+        shell: bash
+        run: |
+          set -euo pipefail
+          output="$RUNNER_TEMP/heavy-oil-rescue-v0.csv"
+          cargo run --quiet --manifest-path research/heavy-oil-rescue/Cargo.toml --offline > "$output"
+          test "$(wc -l < "$output")" -eq 6
+          grep -q 'SyntheticOnly' "$output"
+          grep -q 'NotEconomicallyViableWithinBounds' "$output"
+          grep -q 'PossibleWithUncertainty' "$output"
+          grep -q 'ExactUnbalanced' "$output"
+          grep -q 'Indeterminate' "$output"
+          echo "Synthetic fixture corpus SHA-256 (run-local artifact, not physical evidence):"
+          sha256sum "$output"
