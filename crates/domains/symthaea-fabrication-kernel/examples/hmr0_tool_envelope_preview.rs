@@ -39,8 +39,8 @@ fn sealed_tote_gripper_envelope() -> CSGNode {
 
     // Pad envelopes are placeholders: no elastomer, texture, compliance or
     // friction model is implied by these rigid cuboids.
-    let left_pad = cuboid([5.0, 70.0, 70.0], [-132.5, 0.0, -2.0]);
-    let right_pad = cuboid([5.0, 70.0, 70.0], [132.5, 0.0, -2.0]);
+    let left_pad = cuboid([5.0, 60.0, 70.0], [-132.5, 0.0, -2.0]);
+    let right_pad = cuboid([5.0, 60.0, 70.0], [132.5, 0.0, -2.0]);
 
     rail.union(left_jaw)
         .union(right_jaw)
