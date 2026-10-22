@@ -232,18 +232,24 @@ fn run_single_unroll(
     let elapsed_ms = start.elapsed().as_secs_f64() * 1_000.0;
 
     let mut gradients = vec![vec![0.0f32; backend.d_model()]; context.len()];
+    let mut seen = vec![false; context.len()];
     for (position, gradient) in report.context_gradients {
         ensure!(position < gradients.len(), "single-unroll gradient position out of range");
         ensure!(
-            gradients[position].iter().all(|value| *value == 0.0),
+            !seen[position],
             "single-unroll backend returned duplicate context gradient position {position}"
         );
         ensure!(
             gradient.len() == backend.d_model() && gradient.iter().all(|value| value.is_finite()),
             "invalid single-unroll gradient at context position {position}"
         );
+        seen[position] = true;
         gradients[position] = gradient;
     }
+    ensure!(
+        seen.iter().all(|value| *value),
+        "single-unroll backend omitted one or more requested context positions"
+    );
 
     Ok(RunResult {
         elapsed_ms,
@@ -288,9 +294,15 @@ fn main() -> Result<()> {
 
     let mut repeated = Vec::with_capacity(options.repeats);
     let mut single = Vec::with_capacity(options.repeats);
-    for _ in 0..options.repeats {
-        repeated.push(run_repeated_prefix(&base, &context, &targets)?);
-        single.push(run_single_unroll(&base, &context, &targets)?);
+    for repeat_index in 0..options.repeats {
+        // Alternate method order to reduce systematic first/second timing bias.
+        if repeat_index % 2 == 0 {
+            single.push(run_single_unroll(&base, &context, &targets)?);
+            repeated.push(run_repeated_prefix(&base, &context, &targets)?);
+        } else {
+            repeated.push(run_repeated_prefix(&base, &context, &targets)?);
+            single.push(run_single_unroll(&base, &context, &targets)?);
+        }
     }
 
     let reference = repeated.last().expect("repeats is positive");
