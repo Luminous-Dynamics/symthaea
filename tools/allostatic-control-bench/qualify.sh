@@ -25,6 +25,7 @@ source_files=(
   "tools/allostatic-control-bench/src/bin/allostatic-task-scope-bench.rs"
   "tools/allostatic-control-bench/src/bin/allostatic-sequential-scope-bench.rs"
   "tools/allostatic-control-bench/src/bin/allostatic-risk-eprocess-bench.rs"
+  "tools/allostatic-control-bench/src/bin/allostatic-alpha-spending-bench.rs"
   "tools/allostatic-control-bench/qualify.sh"
   "docs/research/ALLOSTATIC_CONTROL_BENCHMARK_V1.md"
   "docs/research/ROBUST_VIABILITY_ENVELOPE_V1.md"
@@ -33,6 +34,7 @@ source_files=(
   "docs/research/TASK_RELEVANT_SCOPE_MONITOR_V1.md"
   "docs/research/SEQUENTIAL_SCOPE_CUSUM_V1.md"
   "docs/research/BOUNDED_RISK_EPROCESS_V1.md"
+  "docs/research/EPROCESS_LIFETIME_ALPHA_SPENDING_V1.md"
 )
 expected_head="${1:-$(git rev-parse HEAD)}"
 actual_head="$(git rev-parse HEAD)"
@@ -66,6 +68,8 @@ sequential_out="${out_base}-sequential-scope.csv"
 sequential_summary_out="${out_base}-sequential-scope-summary.csv"
 eprocess_out="${out_base}-risk-eprocess.csv"
 eprocess_summary_out="${out_base}-risk-eprocess-summary.csv"
+alpha_spending_out="${out_base}-alpha-spending.csv"
+alpha_spending_summary_out="${out_base}-alpha-spending-summary.csv"
 receipt="${out_csv}.receipt.txt"
 
 cargo fmt --manifest-path "$manifest" -- --check
@@ -866,6 +870,228 @@ if ! awk -F, '
   exit 1
 fi
 
+# Compare a countably summable alpha-spending schedule with the same e-process
+# reset per episode at a fixed threshold. Inputs are the exact same CUSUM traces.
+cargo run --locked --release --manifest-path "$manifest" --bin allostatic-alpha-spending-bench -- \
+  "$tmpdir/sequential-a.csv" "$tmpdir/alpha-spending-a.csv" "$tmpdir/alpha-spending-summary-a.csv"
+cargo run --locked --release --manifest-path "$manifest" --bin allostatic-alpha-spending-bench -- \
+  "$tmpdir/sequential-a.csv" "$tmpdir/alpha-spending-b.csv" "$tmpdir/alpha-spending-summary-b.csv"
+if ! cmp -s "$tmpdir/alpha-spending-a.csv" "$tmpdir/alpha-spending-b.csv" ||
+   ! cmp -s "$tmpdir/alpha-spending-summary-a.csv" "$tmpdir/alpha-spending-summary-b.csv"; then
+  printf 'FAIL: repeated alpha-spending outputs are not byte-identical\n' >&2
+  exit 1
+fi
+if ! cmp -s "$tmpdir/sequential-a.csv" <(cut -d, -f1-14 "$tmpdir/alpha-spending-a.csv"); then
+  printf 'FAIL: alpha-spending output is not paired to the exact CUSUM source trace\n' >&2
+  exit 1
+fi
+
+if ! awk -F, '
+  NR == 1 { if (NF != 31) failed = 1; next }
+  {
+    if (NF != 31) failed = 1
+    if ($1 != "critical_low_reserve_high_load" && $1 != "reserve_limited" &&
+        $1 != "load_limited" && $1 != "balanced" && $1 != "high_margin") failed = 1
+    if ($2 != "nominal" && $2 != "gradual_shift" &&
+        $2 != "abrupt_shift" && $2 != "stealth_shift") failed = 1
+    if ($3 !~ /^[0-9]+$/ || $3 < 50000 || $3 >= 50300) failed = 1
+    if ($4 !~ /^[0-7]$/) failed = 1
+    if ($5 !~ /^[0-9]*[.]?[0-9]+$/ || $5 < 0 || $5 > 1) failed = 1
+    if ($6 !~ /^[0-9]*[.]?[0-9]+$/ || $6 < 0) failed = 1
+    for (i = 7; i <= 7; i++) if ($i != "true" && $i != "false") failed = 1
+    if ($8 !~ /^[0-8]$/ || $9 !~ /^[0-9]*[.]?[0-9]+$/ ||
+        $10 !~ /^[0-9]*[.]?[0-9]+$/) failed = 1
+    if ($11 != "true" && $11 != "false") failed = 1
+    if ($12 !~ /^[0-8]$/) failed = 1
+    if ($13 != "true" && $13 != "false") failed = 1
+    if ($14 != "true" && $14 != "false") failed = 1
+    expected_loss = $5 / 0.05
+    if (expected_loss > 1) expected_loss = 1
+    if (($15 - expected_loss > 0.000001) || (expected_loss - $15 > 0.000001)) failed = 1
+    expected_budget_index = $3 - 49999
+    if ($16 != expected_budget_index || $16 < 1 || $16 > 300) failed = 1
+    expected_spend = 0.05 / (5 * $16 * ($16 + 1))
+    if (($17 - expected_spend > 0.0000000001) ||
+        (expected_spend - $17 > 0.0000000001)) failed = 1
+    expected_alpha_threshold = log(5 * $16 * ($16 + 1) / 0.05)
+    if (($19 - expected_alpha_threshold > 0.000001) ||
+        (expected_alpha_threshold - $19 > 0.000001)) failed = 1
+    if (($23 - log(100) > 0.000001) || (log(100) - $23 > 0.000001)) failed = 1
+    if ($18 !~ /^-?[0-9]*[.]?[0-9]+$/ ||
+        $22 !~ /^-?[0-9]*[.]?[0-9]+$/) failed = 1
+    if ($20 != "true" && $20 != "false") failed = 1
+    if ($21 !~ /^[0-8]$/) failed = 1
+    if ($24 != "true" && $24 != "false") failed = 1
+    if ($25 !~ /^[0-8]$/) failed = 1
+    for (i = 26; i <= 31; i++) if ($i !~ /^-?[0-9]*[.]?[0-9]+$/) failed = 1
+    if ($19 < log(5 / 0.05)) failed = 1
+
+    key = $1 SUBSEP $2 SUBSEP $3
+    if ($4 == 0) {
+      next_step[key] = 0
+      previous_spend_1[key] = 0
+      previous_spend_2[key] = 0
+      previous_spend_3[key] = 0
+      previous_reset_1[key] = 0
+      previous_reset_2[key] = 0
+      previous_reset_3[key] = 0
+      first_spend[key] = 8
+      first_reset[key] = 8
+      recorded_first_spend[key] = $21
+      recorded_first_reset[key] = $25
+      latched_spend[key] = "false"
+      latched_reset[key] = "false"
+      recorded_below[key] = $14
+      episode_all_below[key] = "true"
+      previous_budget[key] = $16
+      episode_max_score[key] = 0
+    } else if ($4 != next_step[key]) failed = 1
+    if ($16 != previous_budget[key]) failed = 1
+    if ($21 != recorded_first_spend[key] || $25 != recorded_first_reset[key]) failed = 1
+
+    for (i = 1; i <= 3; i++) {
+      fraction = i == 1 ? 0.25 : (i == 2 ? 0.50 : 0.75)
+      factor = 1 + (fraction / 0.15) * ($15 - 0.15)
+      if (factor <= 0) failed = 1
+      expected_spend_component = previous_spend_ i[key] + log(factor)
+    }
+    factor_1 = 1 + (0.25 / 0.15) * ($15 - 0.15)
+    factor_2 = 1 + (0.50 / 0.15) * ($15 - 0.15)
+    factor_3 = 1 + (0.75 / 0.15) * ($15 - 0.15)
+    spend_1 = previous_spend_1[key] + log(factor_1)
+    spend_2 = previous_spend_2[key] + log(factor_2)
+    spend_3 = previous_spend_3[key] + log(factor_3)
+    reset_1 = previous_reset_1[key] + log(factor_1)
+    reset_2 = previous_reset_2[key] + log(factor_2)
+    reset_3 = previous_reset_3[key] + log(factor_3)
+    if (($26 - spend_1 > 0.000001) || (spend_1 - $26 > 0.000001) ||
+        ($27 - spend_2 > 0.000001) || (spend_2 - $27 > 0.000001) ||
+        ($28 - spend_3 > 0.000001) || (spend_3 - $28 > 0.000001)) failed = 1
+    if (($29 - reset_1 > 0.000001) || (reset_1 - $29 > 0.000001) ||
+        ($30 - reset_2 > 0.000001) || (reset_2 - $30 > 0.000001) ||
+        ($31 - reset_3 > 0.000001) || (reset_3 - $31 > 0.000001)) failed = 1
+    previous_spend_1[key] = $26
+    previous_spend_2[key] = $27
+    previous_spend_3[key] = $28
+    previous_reset_1[key] = $29
+    previous_reset_2[key] = $30
+    previous_reset_3[key] = $31
+
+    max_spend_component = $26
+    if ($27 > max_spend_component) max_spend_component = $27
+    if ($28 > max_spend_component) max_spend_component = $28
+    expected_spend_mix = max_spend_component + log((
+      exp($26 - max_spend_component) +
+      exp($27 - max_spend_component) +
+      exp($28 - max_spend_component)) / 3)
+    if (($18 - expected_spend_mix > 0.000002) ||
+        (expected_spend_mix - $18 > 0.000002)) failed = 1
+
+    max_reset_component = $29
+    if ($30 > max_reset_component) max_reset_component = $30
+    if ($31 > max_reset_component) max_reset_component = $31
+    expected_reset_mix = max_reset_component + log((
+      exp($29 - max_reset_component) +
+      exp($30 - max_reset_component) +
+      exp($31 - max_reset_component)) / 3)
+    if (($22 - expected_reset_mix > 0.000002) ||
+        (expected_reset_mix - $22 > 0.000002)) failed = 1
+
+    expected_spend_alarm = (latched_spend[key] == "true" || $18 >= $19) ? "true" : "false"
+    expected_reset_alarm = (latched_reset[key] == "true" || $22 >= $23) ? "true" : "false"
+    if ($20 != expected_spend_alarm || $24 != expected_reset_alarm) failed = 1
+    if ($20 == "true" && first_spend[key] == 8) first_spend[key] = $4
+    if ($24 == "true" && first_reset[key] == 8) first_reset[key] = $4
+    latched_spend[key] = expected_spend_alarm
+    latched_reset[key] = expected_reset_alarm
+    if ($5 > episode_max_score[key]) episode_max_score[key] = $5
+    if ($5 > $6) episode_all_below[key] = "false"
+    if ($14 != recorded_below[key]) failed = 1
+    if ($4 == 7 && (($14 == "true") != (episode_all_below[key] == "true"))) failed = 1
+
+    pair_key = $1 SUBSEP $3 SUBSEP $4
+    if ($2 == "nominal") {
+      nominal_score[pair_key] = $5
+      nominal_loss[pair_key] = $15
+      nominal_budget[pair_key] = $16
+      nominal_spend_log[pair_key] = $18
+      nominal_spend_alarm[pair_key] = $20
+      nominal_spend_first[pair_key] = $21
+      nominal_reset_log[pair_key] = $22
+      nominal_reset_alarm[pair_key] = $24
+      nominal_reset_first[pair_key] = $25
+    }
+    if ($2 == "stealth_shift" &&
+        (nominal_score[pair_key] != $5 ||
+         nominal_loss[pair_key] != $15 ||
+         nominal_budget[pair_key] != $16 ||
+         nominal_spend_log[pair_key] != $18 ||
+         nominal_spend_alarm[pair_key] != $20 ||
+         nominal_spend_first[pair_key] != $21 ||
+         nominal_reset_log[pair_key] != $22 ||
+         nominal_reset_alarm[pair_key] != $24 ||
+         nominal_reset_first[pair_key] != $25)) failed = 1
+
+    row_key = key SUBSEP $4
+    if (seen[row_key]++) failed = 1
+    next_step[key] = $4 + 1
+    rows++
+  }
+  END {
+    if (NR != 48001 || rows != 48000 || failed) exit 1
+    for (key in next_step) {
+      if (next_step[key] != 8 ||
+          first_spend[key] != recorded_first_spend[key] ||
+          first_reset[key] != recorded_first_reset[key]) exit 1
+    }
+  }
+' "$tmpdir/alpha-spending-a.csv"; then
+  printf 'FAIL: alpha-spending raw schema, component recurrence, threshold or paired-controls contract is invalid\n' >&2
+  exit 1
+fi
+
+if ! awk -F, '
+  NR == 1 { if (NF != 19) failed = 1; next }
+  {
+    if (NF != 19) failed = 1
+    if ($1 != "critical_low_reserve_high_load" && $1 != "reserve_limited" &&
+        $1 != "load_limited" && $1 != "balanced" && $1 != "high_margin") failed = 1
+    if ($2 != "nominal" && $2 != "gradual_shift" &&
+        $2 != "abrupt_shift" && $2 != "stealth_shift") failed = 1
+    if ($3 != 300) failed = 1
+    for (i = 4; i <= 9; i++) if ($i !~ /^[0-9]+$/ || $i > 300) failed = 1
+    if ($4 + $6 != 300 || $7 + $9 != 300 || $5 > $4 || $8 > $7) failed = 1
+    if ($10 != "NA" && $10 !~ /^[0-9]*[.]?[0-9]+$/) failed = 1
+    if ($11 != "NA" && $11 !~ /^[0-9]*[.]?[0-9]+$/) failed = 1
+    if ($12 < 0 || $12 > 300 || $13 < 0 || $13 > $12 ||
+        $14 < 0 || $14 > $12) failed = 1
+    if ($15 !~ /^[0-9]*[.]?[0-9]+$/ ||
+        $16 != 300 ||
+        $17 !~ /^-?[0-9]*[.]?[0-9]+$/ ||
+        $18 !~ /^-?[0-9]*[.]?[0-9]+$/ ||
+        $19 !~ /^-?[0-9]*[.]?[0-9]+$/) failed = 1
+    expected_spend_sum = 0.05 / 5 * (1 - 1 / 301)
+    if (($15 - expected_spend_sum > 0.0000001) ||
+        (expected_spend_sum - $15 > 0.0000001)) failed = 1
+    if ($2 == "nominal" && ($5 != $4 || $8 != $7 || $4 > 30 || $7 > 30)) failed = 1
+    if ($2 != "nominal" && ($5 != 0 || $8 != 0)) failed = 1
+    if ($2 == "gradual_shift" && $6 != 300) failed = 1
+    key = $1 SUBSEP $2
+    if (seen[key]++) failed = 1
+    if ($2 == "nominal") {
+      nominal_spending[$1] = $4
+      nominal_reset[$1] = $7
+    }
+    if ($2 == "stealth_shift" &&
+        ($4 != nominal_spending[$1] || $7 != nominal_reset[$1])) failed = 1
+    rows++
+  }
+  END { if (NR != 21 || rows != 20 || failed) exit 1 }
+' "$tmpdir/alpha-spending-summary-a.csv"; then
+  printf 'FAIL: alpha-spending summary schema, budget arithmetic or paired shift controls are invalid\n' >&2
+  exit 1
+fi
+
 # Summary must contain 5 scenarios × 6 policies × 2 shield settings.
 if ! awk -F, 'NR == 1 { if (NF != 28) failed = 1; next }
   { if (NF != 28) failed = 1; rows++ }
@@ -898,6 +1124,8 @@ cp "$tmpdir/sequential-a.csv" "$sequential_out"
 cp "$tmpdir/sequential-summary-a.csv" "$sequential_summary_out"
 cp "$tmpdir/eprocess-a.csv" "$eprocess_out"
 cp "$tmpdir/eprocess-summary-a.csv" "$eprocess_summary_out"
+cp "$tmpdir/alpha-spending-a.csv" "$alpha_spending_out"
+cp "$tmpdir/alpha-spending-summary-a.csv" "$alpha_spending_summary_out"
 {
   printf 'status=pass\n'
   printf 'git_commit=%s\n' "$actual_head"
@@ -937,6 +1165,10 @@ cp "$tmpdir/eprocess-summary-a.csv" "$eprocess_summary_out"
   printf 'risk_eprocess_rows_excluding_header=%s\n' "$(( $(wc -l < "$eprocess_out") - 1 ))"
   printf 'risk_eprocess_summary_sha256=%s\n' "$(sha256sum "$eprocess_summary_out" | awk '{print $1}')"
   printf 'risk_eprocess_summary_rows_excluding_header=%s\n' "$(( $(wc -l < "$eprocess_summary_out") - 1 ))"
+  printf 'alpha_spending_sha256=%s\n' "$(sha256sum "$alpha_spending_out" | awk '{print $1}')"
+  printf 'alpha_spending_rows_excluding_header=%s\n' "$(( $(wc -l < "$alpha_spending_out") - 1 ))"
+  printf 'alpha_spending_summary_sha256=%s\n' "$(sha256sum "$alpha_spending_summary_out" | awk '{print $1}')"
+  printf 'alpha_spending_summary_rows_excluding_header=%s\n' "$(( $(wc -l < "$alpha_spending_summary_out") - 1 ))"
   printf '\nsource_sha256:\n'
   sha256sum "${source_files[@]}"
 } > "$receipt"
@@ -956,4 +1188,6 @@ printf 'Sequential CUSUM scope frontier: %s\n' "$sequential_out"
 printf 'Sequential CUSUM scope summary: %s\n' "$sequential_summary_out"
 printf 'Bounded-risk e-process frontier: %s\n' "$eprocess_out"
 printf 'Bounded-risk e-process summary: %s\n' "$eprocess_summary_out"
+printf 'Lifetime alpha-spending frontier: %s\n' "$alpha_spending_out"
+printf 'Lifetime alpha-spending summary: %s\n' "$alpha_spending_summary_out"
 printf 'Provenance receipt: %s\n' "$receipt"
