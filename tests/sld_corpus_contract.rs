@@ -501,8 +501,17 @@ fn longitudinal_trajectory_contract_checks_horizon_and_event_order() {
     let errors = validate_trajectory_corpus(&corpus);
     assert!(errors.is_empty(), "trajectory corpus invalid: {errors:#?}");
     let cases = corpus["cases"].as_array().expect("trajectory cases");
-    assert_eq!(cases.len(), 6);
+    assert_eq!(cases.len(), 8);
     assert!(cases.iter().any(|case| case["horizon_turns"] == 100));
+    let allowed_families = schema["$defs"]["case"]["properties"]["family"]["enum"]
+        .as_array().expect("trajectory family enum");
+    for case in cases {
+        let family = case["family"].as_str().expect("trajectory family");
+        assert!(
+            allowed_families.iter().any(|value| value.as_str() == Some(family)),
+            "trajectory family {family} must be declared in schema"
+        );
+    }
 
     let mut corrupt = corpus.clone();
     corrupt["cases"][0]["events"][1]["turn"] = Value::from(101);
