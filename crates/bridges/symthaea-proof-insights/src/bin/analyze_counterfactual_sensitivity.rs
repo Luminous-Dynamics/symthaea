@@ -605,6 +605,20 @@ fn validate_adjudication_link(suite_adj: &Value, outcome: &Value, context: &str)
         .with_context(|| format!("{context}: suite reviewer_decisions must be an array"))?;
     let outcome_reviewers = outcome_adj.get("reviewer_decisions").and_then(Value::as_array)
         .with_context(|| format!("{context}: outcome reviewer_decisions must be an array"))?;
+    let status = required_string(suite_adj, "status", context)?;
+    let gold_label = required_string(suite_adj, "label", context)?;
+    if status == "adjudicated" {
+        if suite_reviewers.len() < 2
+            || gold_label == "unknown"
+            || suite_reviewers.iter().any(|reviewer| {
+                reviewer.get("label").and_then(Value::as_str) != Some(gold_label)
+            })
+        {
+            bail!("{context}: adjudicated label requires two agreeing independent reviewers");
+        }
+    } else if gold_label != "unknown" {
+        bail!("{context}: unresolved/pending adjudication must preserve unknown label");
+    }
     if suite_reviewers.len() != outcome_reviewers.len() {
         bail!("{context}: suite/outcome reviewer counts differ");
     }
