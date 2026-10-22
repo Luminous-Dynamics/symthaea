@@ -1,6 +1,6 @@
 # First-Aid Workflow Integrity: Industry Comparison Note
 
-**Snapshot date:** 2026-10-21  
+**Snapshot date:** 2026-10-22  
 **Status:** research note; not clinical validation, certification, or deployment authorization.
 
 ## Executive finding
@@ -21,20 +21,10 @@ Source: https://hai.stanford.edu/news/measuring-what-medical-ai-can-actually-do 
 
 AgentClinic is a multimodal simulated clinical-agent benchmark covering nine specialties and seven languages, explicitly designed around sequential patient interaction, incomplete information, and tool use: https://www.nature.com/articles/s41746-026-02674-7 (published 2026-04-27).
 
-A separate 2026 study compared general-purpose agent systems across AgentClinic, MedAgentsBench, and Humanity's Last Exam. It found modest gains over baseline models in several clinical evaluations alongside substantial resource costs (>10× token usage and >2× latency) and remaining hallucinations: https://www.nature.com/articles/s41746-026-02443-6 (published 2026-02-18).
+In its reported AgentClinic-MedQA setup, Claude 3.5 Sonnet reached 62.1% diagnostic accuracy with a GPT-4 patient agent, while results differ materially with patient-agent configuration, interaction budget and tool choice. The benchmark also reported average relevant-information coverage of 67% in sequential conversations; coverage was 72% on correctly diagnosed cases versus 63% on incorrect diagnoses. The authors caution that patient-agent configuration affects results and that benchmark tool actions are simpler than real clinical workflows. This is important context: accurate state tracking is necessary, but it is not a clinical success metric.
 
+A separate 2026 study compared general-purpose agent systems across AgentClinic, MedAgentsBench, and Humanity's Last Exam. It reported up to 60.3% accuracy on AgentClinic MedQA and 28.0% on the MIMIC-based setting for the evaluated systems, with higher resource costs (>10× token usage and >2× latency) and residual hallucinations despite in-agent safeguards. These are study-specific findings, not a universal ranking of all current models: https://www.nature.com/articles/s41746-026-02443-6 (published 2026-02-18).
 
-### Stanford HAI: task execution rather than answer scoring
-
-Stanford HAI's October 19, 2026 synthesis, *Measuring What Medical AI Can Actually Do*, reports results from several task-oriented benchmarks:
-
-- **MedHELM:** a taxonomy developed with 29 clinicians spanning 5 categories, 22 subcategories and 121 tasks, evaluated with 37 benchmark datasets. The reported model win-rate range for administration/workflow was 0.53–0.63, lower than the ranges reported for note generation and patient communication.
-- **PhysicianBench:** 100 long-horizon clinical tasks across 21 specialties, with 670 checks for retrieval, reasoning, action execution and documentation. The article reports the best tested model completed 46% of tasks on a single attempt; only 28% of tasks were properly completed in all three runs.
-- **HealthAdminBench:** 135 administrative tasks across simulated EHR, payer and fax systems. The best tested agent completed 36.3% end-to-end. GPT-5.4 reportedly passed 82.8% of subtasks but completed only 26.7% of whole tasks.
-
-These percentages are **not interchangeable scores**. Stanford explicitly cautions that PhysicianBench and HealthAdminBench differ in environments, model sets, interfaces and grading. The useful conclusion is directional: high performance on individual steps does not guarantee end-to-end success or repeatability.
-
-Source: https://hai.stanford.edu/news/measuring-what-medical-ai-can-actually-do (published 2026-10-19; accessed 2026-10-21).
 
 ### Clinical AI evaluation literature
 
