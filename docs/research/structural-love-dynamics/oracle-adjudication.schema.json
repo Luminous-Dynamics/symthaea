@@ -189,6 +189,7 @@
       "additionalProperties": false,
       "required": [
         "case_id",
+        "risk_level",
         "initial_labels_blinded",
         "randomized_order_token",
         "initial_judgments",
@@ -277,6 +278,15 @@
               }
             }
           }
+        },
+        "risk_level": {
+          "enum": [
+            "critical",
+            "high",
+            "medium",
+            "low",
+            "other"
+          ]
         }
       }
     },
