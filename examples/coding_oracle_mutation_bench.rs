@@ -440,7 +440,7 @@ fn main() {
         },
         "summary": {
             "task_count": CASES.len(),
-            "expected_assertion_tests": total_tests,
+            "expected_test_functions": total_tests,
             "reference_controls_passed": reference_passes,
             "mutants_killed": mutants_killed,
             "mutation_kill_rate": mutants_killed as f64 / CASES.len() as f64,
