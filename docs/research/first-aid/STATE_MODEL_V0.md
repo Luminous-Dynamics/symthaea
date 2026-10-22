@@ -55,14 +55,14 @@ The exact lifecycle graph is pinned at 84 reachable abstract states and 1,344 st
 
 The test suite now stores a breadth-first shortest event-history witness for each reachable abstract state. For every state it appends every one of the 16 actions, feeds each resulting history through the production JSON trace checker, and compares the ordered violation codes to those returned by replaying the abstract model. This gives 84 × 16 = 1,344 model-to-production edge comparisons, in addition to state invariants and the 18 orthogonal policy truth tables. It is a same-repository differential check: a matching result catches implementation divergence, but shared requirements and abstractions mean it is not an independent clinical oracle. The newest exact-head workflow must pass before these comparisons count as verified evidence.
 
-A second exhaustive test covers 18 **orthogonal policy combinations** that are deliberately kept outside the lifecycle product graph to prevent a Cartesian state-space explosion:
+A second exhaustive truth-table test covers 18 **orthogonal policy combinations** that are deliberately kept outside the lifecycle product graph to prevent a Cartesian state-space explosion. A further differential test feeds each of those 18 combinations to the production JSON trace checker and compares its result with the abstract policy helper:
 
 - Six connectivity/requirement combinations: online, offline, or intermittent connectivity when the core workflow either does or does not require the network.
 - Six resource freshness/presentation combinations: fresh, stale, or unknown resource state, each presented as confirmed or unconfirmed.
 - Four data sensitivity/consent combinations: sensitive or non-sensitive payload, with or without consent scope.
 - Two unknown-normalization cases: no normalization event vs. an explicit unknown-normalization event.
 
-These are finite truth-table probes, not temporal models of network recovery, resource invalidation, consent changes, or their interactions with lifecycle state. Those combined paths still need generated sequence tests. The dedicated workflow binds the model source digest, model-specification digest, and test outcome into the trace-contract receipt.
+These are finite truth-table probes checked both against the abstract policy helpers and the production JSON trace checker, not temporal models of network recovery, resource invalidation, consent changes, or their interactions with lifecycle state. Those combined paths still need generated sequence tests. The dedicated workflow binds the model source digest, model-specification digest, and test outcome into the trace-contract receipt.
 
 ## What it does not establish
 
