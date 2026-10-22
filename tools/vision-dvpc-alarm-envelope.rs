@@ -174,6 +174,10 @@ struct RunResult {
     alarm_true_positive: usize,
     alarm_false_positive: usize,
     alarm_false_negative: usize,
+    shift_episodes: usize,
+    detected_shift_episodes: usize,
+    undetected_shift_episodes: usize,
+    mean_detection_delay_trials: Option<f64>,
     empirical_sensitivity: Option<f64>,
     empirical_false_positive_rate: Option<f64>,
     false_alarm_blocks: usize,
@@ -371,6 +375,7 @@ fn run_policy(
     let mut detector_budget_exhausted = false;
     let mut stop_after_accounting_failure = false;
     let mut alarm_history: Vec<ObservedAlarm> = Vec::new();
+    let mut gate_trigger_timeline = Vec::with_capacity(trials.len());
     let mut incremental_losses = Vec::with_capacity(trials.len());
 
     for trial in trials {
@@ -420,6 +425,20 @@ fn run_policy(
         }
 
         let observed_values: Vec<bool> = alarm_history.iter().map(|entry| entry.value).collect();
+        let gate_triggered = match policy {
+            Policy::LcbOnly => false,
+            Policy::InstantGuard => current_alarm == Some(true) && trial.is_shifted,
+            Policy::TwoOfThreeGuard => {
+                let recent = alarm_history.iter().rev().take(3);
+                current_alarm.is_some()
+                    && observed_values.len() >= 3
+                    && observed_values.iter().rev().take(3).filter(|alarm| **alarm).count() >= 2
+                    && recent.filter(|entry| {
+                        entry.value && entry.is_shifted_for_evaluator_only
+                    }).count() >= 2
+            }
+        };
+        gate_trigger_timeline.push(gate_triggered);
         let candidate = if stop_after_accounting_failure
             || (policy.pays_for_detector() && current_alarm.is_none())
         {
@@ -519,6 +538,28 @@ fn run_policy(
 
     let total_benefit = -incremental_losses.iter().sum::<f64>();
     let task_loss = BASE_TASK_LOSS * trials.len() as f64 - total_benefit;
+    let mut shift_episodes = 0;
+    let mut detected_shift_episodes = 0;
+    let mut undetected_shift_episodes = 0;
+    let mut detection_delays = Vec::new();
+    let mut episode_start: Option<usize> = None;
+    for index in 0..=trials.len() {
+        let in_shift = index < trials.len() && trials[index].is_shifted;
+        if in_shift {
+            if episode_start.is_none() {
+                episode_start = Some(index);
+            }
+        } else if let Some(start) = episode_start.take() {
+            shift_episodes += 1;
+            if let Some(detected_at) = (start..index).find(|&at| gate_trigger_timeline[at]) {
+                detected_shift_episodes += 1;
+                detection_delays.push((detected_at - start) as f64);
+            } else {
+                undetected_shift_episodes += 1;
+            }
+        }
+    }
+    let mean_detection_delay_trials = mean(&detection_delays);
     let shifted_alarm_denominator = alarm_true_positive + alarm_false_negative;
     let unshifted_alarm_denominator =
         alarm_observations.saturating_sub(shifted_alarm_denominator);
@@ -541,6 +582,10 @@ fn run_policy(
         alarm_true_positive,
         alarm_false_positive,
         alarm_false_negative,
+        shift_episodes,
+        detected_shift_episodes,
+        undetected_shift_episodes,
+        mean_detection_delay_trials,
         empirical_sensitivity: ratio(alarm_true_positive, shifted_alarm_denominator),
         empirical_false_positive_rate: ratio(alarm_false_positive, unshifted_alarm_denominator),
         false_alarm_blocks,
@@ -591,7 +636,7 @@ fn render_report() -> String {
     report.push_str("META\tshift_episode_persistence\t0.75\n");
     report.push_str("META\tbudget_percentages\t20;40;60\n");
     report.push_str("META\tevaluator_boundary\thidden_shift_true_dvpc_actual_cost_post_commit_only\n");
-    report.push_str("RUN_HEADER\tscenario\tpolicy\tbudget_percent\tseed\ttrial_count\tlcb_candidates\tescalations\tbeneficial_escalations\tharmful_escalations\tmissed_beneficial\tshifted_trials\tshifted_escalations\tshifted_harmful\talarm_observations\talarm_true_positive\talarm_false_positive\talarm_false_negative\tempirical_sensitivity\tempirical_false_positive_rate\tfalse_alarm_blocks\tfalse_alarm_beneficial_blocks\ttotal_benefit\ttask_loss\tcvar95_incremental_loss\tcharged_units\tbudget_units\tdetector_cost_units\treservation_overruns\trun_budget_overruns\n");
+    report.push_str("RUN_HEADER\tscenario\tpolicy\tbudget_percent\tseed\ttrial_count\tlcb_candidates\tescalations\tbeneficial_escalations\tharmful_escalations\tmissed_beneficial\tshifted_trials\tshifted_escalations\tshifted_harmful\talarm_observations\talarm_true_positive\talarm_false_positive\talarm_false_negative\tshift_episodes\tdetected_shift_episodes\tundetected_shift_episodes\tmean_detection_delay_trials\tempirical_sensitivity\tempirical_false_positive_rate\tfalse_alarm_blocks\tfalse_alarm_beneficial_blocks\ttotal_benefit\ttask_loss\tcvar95_incremental_loss\tcharged_units\tbudget_units\tdetector_cost_units\treservation_overruns\trun_budget_overruns\n");
 
     for row in &results {
         report.push_str(&format!(
@@ -613,6 +658,10 @@ fn render_report() -> String {
             row.alarm_true_positive,
             row.alarm_false_positive,
             row.alarm_false_negative,
+            row.shift_episodes,
+            row.detected_shift_episodes,
+            row.undetected_shift_episodes,
+            fmt_opt(row.mean_detection_delay_trials),
             fmt_opt(row.empirical_sensitivity),
             fmt_opt(row.empirical_false_positive_rate),
             row.false_alarm_blocks,
@@ -628,7 +677,7 @@ fn render_report() -> String {
         ));
     }
 
-    report.push_str("SUMMARY_HEADER\tscenario\tpolicy\tbudget_percent\tseed_count\tmean_escalations\tmean_harmful_escalations\tmean_missed_beneficial\tmean_shifted_harmful\tmean_sensitivity\tmean_false_positive_rate\tmean_false_alarm_beneficial_blocks\tmean_total_benefit\tmean_task_loss\tmean_cvar95_incremental_loss\tmean_charged_units\tmean_detector_cost_units\tbudget_violation_runs\n");
+    report.push_str("SUMMARY_HEADER\tscenario\tpolicy\tbudget_percent\tseed_count\tmean_escalations\tmean_harmful_escalations\tmean_missed_beneficial\tmean_shifted_harmful\tmean_detected_shift_episodes\tmean_undetected_shift_episodes\tmean_detection_delay_trials\tmean_sensitivity\tmean_false_positive_rate\tmean_false_alarm_beneficial_blocks\tmean_total_benefit\tmean_task_loss\tmean_cvar95_incremental_loss\tmean_charged_units\tmean_detector_cost_units\tbudget_violation_runs\n");
     for scenario in &scenario_rows {
         for budget_percent in BUDGET_PERCENTAGES {
             for policy in Policy::ALL {
@@ -651,13 +700,17 @@ fn render_report() -> String {
                     .iter()
                     .filter_map(|row| row.empirical_false_positive_rate)
                     .collect();
+                let detection_delays: Vec<f64> = rows
+                    .iter()
+                    .filter_map(|row| row.mean_detection_delay_trials)
+                    .collect();
                 let violations = rows
                     .iter()
                     .filter(|row| row.reservation_overruns > 0 || row.run_budget_overruns > 0)
                     .count();
 
                 report.push_str(&format!(
-                    "SUMMARY\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+                    "SUMMARY\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
                     scenario.name,
                     policy.label(),
                     budget_percent,
@@ -666,6 +719,9 @@ fn render_report() -> String {
                     fmt_opt(mean(&collect(|row| row.harmful_escalations as f64))),
                     fmt_opt(mean(&collect(|row| row.missed_beneficial as f64))),
                     fmt_opt(mean(&collect(|row| row.shifted_harmful as f64))),
+                    fmt_opt(mean(&collect(|row| row.detected_shift_episodes as f64))),
+                    fmt_opt(mean(&collect(|row| row.undetected_shift_episodes as f64))),
+                    fmt_opt(mean(&detection_delays)),
                     fmt_opt(mean(&sensitivities)),
                     fmt_opt(mean(&false_positive_rates)),
                     fmt_opt(mean(&collect(|row| row.false_alarm_beneficial_blocks as f64))),
