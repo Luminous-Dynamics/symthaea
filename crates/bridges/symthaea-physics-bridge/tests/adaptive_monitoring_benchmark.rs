@@ -80,7 +80,7 @@ fn collect_alarm_delay(
     actions: &[f64],
     use_context: bool,
 ) -> Option<usize> {
-    let context_channels = usize::from(use_context);
+    let context_channels = if use_context { 1 } else { 0 };
     let mut monitor = PrequentialPitMartingale::new(ALPHA, context_channels)
         .expect("benchmark alpha and context count are valid");
 
