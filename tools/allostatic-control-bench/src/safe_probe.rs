@@ -135,6 +135,76 @@ fn hull_effect(hypotheses: &[DynamicsBounds], action: Action) -> Option<ActionEf
     ActionEffectBounds::new(reserve, load)
 }
 
+/// One noisy observation of the reserve/load transition effects for a chosen action.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ObservedEffect {
+    reserve_delta: f64,
+    load_delta: f64,
+    measurement_radius: f64,
+}
+
+impl ObservedEffect {
+    pub fn new(reserve_delta: f64, load_delta: f64, measurement_radius: f64) -> Option<Self> {
+        (reserve_delta.is_finite()
+            && load_delta.is_finite()
+            && measurement_radius.is_finite()
+            && measurement_radius >= 0.0)
+        .then_some(Self {
+            reserve_delta,
+            load_delta,
+            measurement_radius,
+        })
+    }
+
+    pub const fn reserve_delta(self) -> f64 {
+        self.reserve_delta
+    }
+
+    pub const fn load_delta(self) -> f64 {
+        self.load_delta
+    }
+
+    pub const fn measurement_radius(self) -> f64 {
+        self.measurement_radius
+    }
+}
+
+fn interval_intersects_observation(interval: Interval, observed: f64, radius: f64) -> bool {
+    interval.upper() >= observed - radius && interval.lower() <= observed + radius
+}
+
+/// Retain only hypotheses whose predicted effect box intersects the measured
+/// transition box. Some(empty) is meaningful: the observation falsified every
+/// candidate model. Callers must then invalidate the prior certificate and fail
+/// closed; they must not silently restore the original model family.
+pub fn filter_compatible_hypotheses(
+    hypotheses: &[DynamicsBounds],
+    action: Action,
+    observation: ObservedEffect,
+) -> Option<Vec<DynamicsBounds>> {
+    if hypotheses.is_empty() {
+        return None;
+    }
+
+    let retained = hypotheses
+        .iter()
+        .copied()
+        .filter(|model| {
+            let effect = model.effect_for_action(action);
+            interval_intersects_observation(
+                effect.reserve_delta(),
+                observation.reserve_delta,
+                observation.measurement_radius,
+            ) && interval_intersects_observation(
+                effect.load_delta(),
+                observation.load_delta,
+                observation.measurement_radius,
+            )
+        })
+        .collect();
+    Some(retained)
+}
+
 /// Build a rectangular transition hull containing every supplied candidate model.
 /// Rectangularization can add combinations not present in any candidate model,
 /// making this safe-set computation conservative but straightforward to audit.
@@ -380,6 +450,97 @@ mod tests {
                 assert!(combined.load_delta().upper() >= effect.load_delta().upper());
             }
         }
+    }
+
+    #[test]
+    fn observed_safe_probe_can_eliminate_a_model_and_expand_viability() {
+        let models = [
+            model(
+                effects((-0.02, -0.02), (0.02, 0.02)),
+                effects((0.02, 0.02), (-0.02, -0.02)),
+                effects((0.08, 0.10), (-0.10, -0.08)),
+            ),
+            model(
+                effects((-0.08, -0.08), (0.10, 0.10)),
+                effects((0.04, 0.04), (-0.06, -0.06)),
+                effects((0.08, 0.10), (-0.10, -0.08)),
+            ),
+        ];
+        let current = state((0.30, 0.30), (0.80, 0.80));
+        let hull = dynamics_hull(&models).expect("valid model hull");
+        let before = evaluate_horizon_action_set(current, hull, limits(), true, 3)
+            .expect("valid pre-probe certificate");
+        assert!(!before.push());
+
+        let recommendation = recommend_safe_probe(
+            current,
+            &models,
+            limits(),
+            true,
+            3,
+            Action::Maintain,
+            0.01,
+        )
+        .expect("valid probe request");
+        assert_eq!(recommendation.selected_action(), Some(Action::Maintain));
+        assert!(recommendation.selected_action_is_certified());
+
+        let observation =
+            ObservedEffect::new(0.02, -0.02, 0.001).expect("valid measured transition");
+        let posterior = filter_compatible_hypotheses(
+            &models,
+            Action::Maintain,
+            observation,
+        )
+        .expect("nonempty prior");
+        assert_eq!(posterior.len(), 1);
+        assert_eq!(posterior[0], models[0]);
+
+        let posterior_hull = dynamics_hull(&posterior).expect("posterior still nonempty");
+        let after = evaluate_horizon_action_set(current, posterior_hull, limits(), true, 3)
+            .expect("valid post-probe certificate");
+        assert!(after.push());
+        assert!(after.count() > before.count());
+    }
+
+    #[test]
+    fn observation_that_falsifies_every_candidate_does_not_restore_the_prior() {
+        let models = informative_models();
+        let observation =
+            ObservedEffect::new(0.99, 0.99, 0.001).expect("finite but out-of-family observation");
+        let retained = filter_compatible_hypotheses(
+            &models,
+            Action::Maintain,
+            observation,
+        )
+        .expect("valid nonempty prior");
+        assert!(retained.is_empty());
+        assert!(dynamics_hull(&retained).is_none());
+    }
+
+    #[test]
+    fn ambiguous_observation_keeps_both_overlapping_hypotheses() {
+        let models = [
+            model(
+                effects((-0.02, -0.02), (0.02, 0.02)),
+                effects((0.02, 0.02), (-0.02, -0.02)),
+                effects((0.08, 0.10), (-0.10, -0.08)),
+            ),
+            model(
+                effects((-0.08, -0.08), (0.10, 0.10)),
+                effects((0.04, 0.04), (-0.06, -0.06)),
+                effects((0.08, 0.10), (-0.10, -0.08)),
+            ),
+        ];
+        let observation =
+            ObservedEffect::new(0.03, -0.04, 0.021).expect("valid ambiguous observation");
+        let retained = filter_compatible_hypotheses(
+            &models,
+            Action::Maintain,
+            observation,
+        )
+        .expect("valid nonempty prior");
+        assert_eq!(retained.len(), 2);
     }
 
     #[test]
