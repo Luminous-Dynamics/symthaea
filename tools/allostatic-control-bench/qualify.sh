@@ -222,6 +222,8 @@ stratified_fixture="$tmpdir/stratified-fixture.csv"
 printf 'task,seed,baseline_score,candidate_score\n' > "$stratified_fixture"
 for seed in $(seq 1 30); do
   printf 'cartpole,%s,0.4,0.6\n' "$seed" >> "$stratified_fixture"
+done
+for seed in $(seq 1 10); do
   printf 'quadrotor,%s,0.7,0.6\n' "$seed" >> "$stratified_fixture"
 done
 cargo run --locked --release --manifest-path "$manifest" --bin allostatic-stratified-eval-bench -- "$stratified_fixture" "$tmpdir/stratified-a.csv" 10000 17
@@ -236,7 +238,7 @@ if ! awk -F, 'NR == 1 { if (NF != 23) failed = 1; next }
     if ($1 == "task") task_rows++
     else if ($1 == "aggregate") {
       aggregate_rows++
-      if ($2 != "ALL" || $3 != 60 || $11 < 0.049999 || $11 > 0.050001 ||
+      if ($2 != "ALL" || $3 != 40 || $11 < 0.049999 || $11 > 0.050001 ||
           $14 < 0.049999 || $14 > 0.050001 || $17 < 0.499999 || $17 > 0.500001 ||
           $20 < 0.499999 || $20 > 0.500001 || $21 != 2 || $22 != 10000 || $23 != 17) failed = 1
     } else failed = 1
