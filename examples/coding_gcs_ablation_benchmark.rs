@@ -399,6 +399,15 @@ fn mode_summary(results: &[EvalResult], enabled: bool) -> serde_json::Value {
     let total = mode.len();
     let passed = mode.iter().filter(|r| r.behavioral_success).count();
     let compiled = mode.iter().filter(|r| r.compiled && !r.simulated).count();
+    let compile_rejections = mode
+        .iter()
+        .filter(|run| {
+            !run.compiled
+                && !run.simulated
+                && run.runtime_error.is_none()
+                && run.compile_errors.iter().any(|error| error.trim_start().starts_with("error"))
+        })
+        .count();
     let complete = mode.iter().filter(|r| r.oracle_complete).count();
     let agent_ms: u128 = mode.iter().map(|r| r.agent_elapsed_ms).sum();
     let agent_elapsed_values: Vec<u128> = mode.iter().map(|r| r.agent_elapsed_ms).collect();
@@ -506,6 +515,7 @@ fn mode_summary(results: &[EvalResult], enabled: bool) -> serde_json::Value {
         "behavioral_successes": passed,
         "pass_rate": if total == 0 { 0.0 } else { passed as f64 / total as f64 },
         "real_compiles": compiled,
+        "compile_rejections": compile_rejections,
         "complete_oracles": complete,
         "complete_oracle_rate": if total == 0 { 0.0 } else { complete as f64 / total as f64 },
         "agent_elapsed_ms_total": agent_ms,
