@@ -614,7 +614,7 @@ fn json_string(value: &str) -> String {
 
 fn emit_candidate(row: &Decision, source_sha: &str, seed: u64, candidates: usize) {
     println!(
-        "{{\"type\":\"decision\",\"protocol\":\"GMCv1\",\"source_sha\":{},\"seed\":{},\"candidate_count\":{},\"candidate_id\":{},\"kind\":{},\"policy\":{},\"role\":{},\"action\":{},\"oracle_action\":{},\"net_utility\":{},\"oracle_utility\":{},\"decision_regret\":{},\"storage_units\":{},\"load_bearing\":{},\"covered\":{},\"false_promotion\":{},\"destructive_forgetting\":{}}}",
+        "{{\"type\":\"decision\",\"protocol\":\"GMCv2\",\"source_sha\":{},\"seed\":{},\"candidate_count\":{},\"candidate_id\":{},\"kind\":{},\"policy\":{},\"role\":{},\"action\":{},\"oracle_action\":{},\"net_utility\":{},\"oracle_utility\":{},\"decision_regret\":{},\"storage_units\":{},\"load_bearing\":{},\"covered\":{},\"false_promotion\":{},\"destructive_forgetting\":{}}}",
         json_string(source_sha), seed, candidates, row.candidate_id,
         json_string(row.kind.name()), json_string(row.policy), json_string(row.role),
         json_string(row.action.name()), json_string(row.oracle_action.name()),
@@ -625,7 +625,7 @@ fn emit_candidate(row: &Decision, source_sha: &str, seed: u64, candidates: usize
 
 fn emit_summary(policy: &str, summary: &PolicySummary, source_sha: &str, seed: u64) {
     println!(
-        "{{\"type\":\"summary\",\"protocol\":\"GMCv1\",\"source_sha\":{},\"seed\":{},\"policy\":{},\"candidates\":{},\"total_utility\":{},\"mean_regret\":{:.6},\"total_regret\":{},\"total_storage_units\":{},\"load_bearing_candidates\":{},\"covered_load_bearing\":{},\"load_bearing_coverage\":{:.6},\"false_promotions\":{},\"destructive_forgetting\":{}}}",
+        "{{\"type\":\"summary\",\"protocol\":\"GMCv2\",\"source_sha\":{},\"seed\":{},\"policy\":{},\"candidates\":{},\"total_utility\":{},\"mean_regret\":{:.6},\"total_regret\":{},\"total_storage_units\":{},\"load_bearing_candidates\":{},\"covered_load_bearing\":{},\"load_bearing_coverage\":{:.6},\"false_promotions\":{},\"destructive_forgetting\":{}}}",
         json_string(source_sha), seed, json_string(policy), summary.candidates,
         summary.total_utility, summary.mean_regret(), summary.total_regret,
         summary.total_storage_units, summary.load_bearing_candidates,
@@ -648,7 +648,7 @@ fn run(config: Config) -> Result<(), String> {
     validate_self_checks(&candidates, &rows)?;
     let fingerprint = fixture_fingerprint(&candidates);
     println!(
-        "{{\"type\":\"run\",\"protocol\":\"GMCv1\",\"generator\":\"broca-consolidation-v1\",\"status\":\"COMPLETED\",\"self_checks_passed\":true,\"source_sha\":{},\"seed\":{},\"candidate_count\":{},\"policy_count\":{},\"fixture_fnv1a64\":{},\"fingerprint_is_cryptographic\":false,\"oracle_scope\":\"synthetic-generator-only\"}}",
+        "{{\"type\":\"run\",\"protocol\":\"GMCv2\",\"generator\":\"broca-consolidation-v2\",\"status\":\"COMPLETED\",\"self_checks_passed\":true,\"source_sha\":{},\"seed\":{},\"candidate_count\":{},\"policy_count\":{},\"fixture_fnv1a64\":{},\"fingerprint_is_cryptographic\":false,\"oracle_scope\":\"synthetic-generator-only\"}}",
         json_string(&config.source_sha), config.seed, config.candidates,
         POLICIES.len(), json_string(&fingerprint)
     );
