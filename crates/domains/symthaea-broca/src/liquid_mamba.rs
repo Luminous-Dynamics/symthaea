@@ -1271,7 +1271,9 @@ impl LiquidMambaGenerator {
         // Topological regularization is also applied once after the sequence
         // update, so it cannot mutate the projection between token losses.
         let live_coherence = f32::from_bits(self.topological_coherence.load(Ordering::Relaxed));
-        if live_coherence < 0.6 {
+        // This regularizer is defined for the spatial HDC→bottleneck projection.
+        // Do not mutate that dormant projection during temporal-projection training.
+        if !uses_temporal_projection && live_coherence < 0.6 {
             let reg_strength = 0.05 * (1.0 - live_coherence);
             self.projection.apply_manifold_regularization(reg_strength);
         }
