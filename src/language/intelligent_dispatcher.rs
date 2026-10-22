@@ -8,7 +8,7 @@
 //! | Epistemic Status | Prediction Error | Backend |
 //! |-----------------|-----------------|---------|
 //! | Certain | Low | Native (CodeGenerator via HDC+CfC, 0 latency) |
-//! | Probable | Medium | Local LLM (qwen2.5-coder:7b via Ollama) |
+//! | Probable | Medium | Local LLM via Ollama (default model gemma4:e2b; override with SYMTHAEA_LLM_MODEL) |
 //! | Uncertain/Unknown | High | Cloud LLM (Claude API) |
 //!
 //! Tracks per-backend success rates and respects metabolic budget constraints.
@@ -30,7 +30,7 @@ pub enum BackendTier {
     Native,
     /// Specialized Hardware Driver Emitter (I2C/MMIO).
     Hardware,
-    /// Local LLM (e.g., qwen2.5-coder:7b via Ollama).
+    /// Local LLM via Ollama (model defaults to gemma4:e2b and is configurable with SYMTHAEA_LLM_MODEL).
     LocalLlm,
     /// Cloud LLM (e.g., Claude via Anthropic API).
     CloudLlm,
@@ -190,7 +190,7 @@ impl CodeTaskCategory {
 /// Phase 6 additions: per-category success tracking, MAGI-style prediction
 /// confidence, and honest "I don't know" refusal path.
 pub struct IntelligentDispatcher {
-    /// Local LLM backend (Ollama with qwen2.5-coder:7b).
+    /// Local LLM backend (Ollama; defaults to gemma4:e2b unless SYMTHAEA_LLM_MODEL overrides it).
     local_llm: Arc<dyn LLMBackend>,
     /// Cloud LLM backend (Anthropic Claude, if available).
     cloud_llm: Option<Arc<dyn LLMBackend>>,
@@ -237,7 +237,7 @@ impl IntelligentDispatcher {
         Self::new(Arc::new(SimulatedBackend), None)
     }
 
-    /// Create a dispatcher with Ollama (qwen2.5-coder:7b) as the local LLM backend.
+    /// Create a dispatcher with Ollama as the local LLM backend (defaults to gemma4:e2b unless SYMTHAEA_LLM_MODEL overrides it).
     ///
     /// Attempts to connect to Ollama at `localhost:11434`. If Ollama is not available,
     /// the dispatcher still works — generation will fail gracefully and fall back to
