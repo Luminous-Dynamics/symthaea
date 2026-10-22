@@ -52,8 +52,8 @@ jobs:
           sudo apt-get install -y clang
       - name: Install cargo-fuzz
         run: cargo install cargo-fuzz --locked
-      - name: Fuzz keypair import boundary
-        run: cargo +nightly fuzz run fuzz_keypair_import -- -max_len=8192 -max_total_time=${FUZZ_SECONDS}
+      - name: Fuzz authenticated-signature boundary
+        run: cargo +nightly fuzz run fuzz_authenticated_signature -- -max_len=8192 -max_total_time=${FUZZ_SECONDS}
         working-directory: stubs/mycelix-zkp-core/fuzz
       - name: Fuzz signature verification boundary
         run: cargo +nightly fuzz run fuzz_signature_verification -- -max_len=8192 -max_total_time=${FUZZ_SECONDS}
