@@ -29,16 +29,23 @@ const EXPECTED_DATASETS: [&str; 7] = [
     "ucihar",
 ];
 
-const REQUIRED_METHODS: [&str; 9] = [
+const REQUIRED_METHODS: [&str; 16] = [
     "centroid_prototype",
     "map_bipolar_prototype",
     "bsc_binary_prototype",
     "hrr_real_prototype",
+    "onlinehd",
+    "adapthd",
+    "disthd",
+    "sparsehd",
     "svm_raw",
     "lda_raw",
     "ridge_raw",
+    "rvfl_raw",
     "svm_encoded",
+    "lda_encoded",
     "ridge_encoded",
+    "rvfl_encoded",
 ];
 
 fn member<'a>(value: &'a Value, key: &str, path: &str) -> CheckResult<&'a Value> {
