@@ -47,8 +47,8 @@
 //!
 //! ## Feature Gate
 //!
-//! Requires `pqc-handshake` feature (implies `identity` + `mesh-key-exchange`
-//! + `mycelix-crypto` with `native` feature).
+//! Requires `pqc-handshake` feature (implies `swarm` transport, `identity`,
+//! `mesh-key-exchange`, and the current compile-only `mycelix-crypto` stub).
 //!
 //! ## References
 //!
