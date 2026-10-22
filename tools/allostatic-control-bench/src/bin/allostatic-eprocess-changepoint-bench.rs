@@ -452,8 +452,11 @@ fn raw_fields(
     let cp_delay = scenario.change_start
         .filter(|start| alarm.is_some_and(|value| value.detected_at() as usize >= *start))
         .map(|start| cp_at - start);
-    let cp_start_error = scenario.change_start
-        .and_then(|start| alarm.map(|value| (value.start_index() as usize).abs_diff(start)));
+    let cp_start_error = scenario.change_start.and_then(|start| {
+        alarm
+            .filter(|value| value.detected_at() as usize >= start)
+            .map(|value| (value.start_index() as usize).abs_diff(start))
+    });
     let cp_within_8 = cp_start_error.map(|error| error <= 8);
 
     let fields = [
@@ -500,7 +503,8 @@ fn validate_design() -> Result<(), Box<dyn Error>> {
         || SCENARIOS.iter().any(|scenario| {
             !(0.0..=1.0).contains(&scenario.baseline_probability)
                 || !(0.0..=1.0).contains(&scenario.post_shift_probability)
-                || scenario.risk_violating && scenario.post_shift_probability <= RISK_BOUND
+                || scenario.risk_violating
+                    && scenario.max_expected_loss() <= RISK_BOUND
         })
     {
         return Err(IoError::new(ErrorKind::InvalidInput, "change-point benchmark design is inconsistent").into());
