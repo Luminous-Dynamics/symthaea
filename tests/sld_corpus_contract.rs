@@ -709,7 +709,6 @@ fn valid_evaluation_receipt() -> Value {
             "commit_sha": "a".repeat(40),
             "working_tree": "CLEAN",
             "toolchain": "fixture-only",
-            "lockfile_sha256": "c".repeat(64)
         },
         "case_set": {
             "dataset_id": "SLD-CONTRACT-FIXTURE",
