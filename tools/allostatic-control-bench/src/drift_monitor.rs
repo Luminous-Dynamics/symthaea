@@ -260,8 +260,8 @@ mod tests {
 
     #[test]
     fn nominal_mode_preserves_a_one_step_safe_proposal() {
-        let threshold = calibrate_drift_threshold(&nominal_scores(19), 0.05)
-            .expect("valid threshold");
+        let threshold =
+            calibrate_drift_threshold(&nominal_scores(19), 0.05).expect("valid threshold");
         let (predictive, fallback) = test_sets();
         assert!(predictive.contains(Action::Push));
         assert!(!fallback.contains(Action::Push));
