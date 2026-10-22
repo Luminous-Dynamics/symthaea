@@ -57,10 +57,10 @@ fn audit_current_fep() -> AuditReport {
         let result = efe.compute(action, &agent.belief, &agent.model);
         rows.push(ActionRow {
             action,
-            epistemic_value: result.epistemic_value(),
-            pragmatic_value: result.pragmatic_value(),
-            novelty: result.novelty_value(),
-            total: result.total_value(),
+            epistemic_value: result.epistemic,
+            pragmatic_value: result.pragmatic,
+            novelty: result.novelty,
+            total: result.total,
             predicted_entropy: result.predicted_state.entropy(),
         });
     }
