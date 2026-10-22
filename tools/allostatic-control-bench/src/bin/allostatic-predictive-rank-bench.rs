@@ -137,9 +137,8 @@ fn run_episode(
     episode_max_threshold: f64,
 ) -> Result<EpisodeRecord, Box<dyn Error>> {
     let seed = 200_000 + episode;
-    let mut portfolio =
-        RankMartingalePortfolio::new(reference, TARGET_FALSE_ALARM_RATE)
-            .ok_or("failed to initialize predictive-rank portfolio")?;
+    let mut portfolio = RankMartingalePortfolio::new(reference, TARGET_FALSE_ALARM_RATE)
+        .ok_or("failed to initialize predictive-rank portfolio")?;
 
     let mut pointwise_alarm_step = 0;
     let mut episode_max_alarm_step = 0;
