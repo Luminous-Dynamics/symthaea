@@ -370,6 +370,9 @@ fn audit(
             push_check(
                 &mut errors,
                 bool_field(control, "reference_passes") == Some(true)
+                    && bool_field(control, "compiled") == Some(true)
+                    && bool_field(control, "simulated") == Some(false)
+                    && control.get("runtime_error").is_some_and(Value::is_null)
                     && bool_field(control, "oracle_complete") == Some(true)
                     && u64_field(control, "tests_expected") == Some(expected)
                     && u64_field(control, "tests_passed") == Some(expected)
@@ -402,10 +405,20 @@ fn audit(
                 seen.insert(id.to_string(), ()).is_none(),
                 format!("duplicate empty-patch control task {id}"),
             );
+            let compile_errors = control.get("compile_errors").and_then(Value::as_array);
+            let has_real_rustc_diagnostic = compile_errors.is_some_and(|errors| {
+                errors.iter().any(|error| {
+                    error.as_str().is_some_and(|message| message.trim_start().starts_with("error"))
+                })
+            });
             push_check(
                 &mut errors,
-                bool_field(control, "empty_patch_fails") == Some(true),
-                format!("empty patch did not fail for task {id}"),
+                bool_field(control, "empty_patch_fails") == Some(true)
+                    && bool_field(control, "compiled") == Some(false)
+                    && bool_field(control, "simulated") == Some(false)
+                    && control.get("runtime_error").is_some_and(Value::is_null)
+                    && has_real_rustc_diagnostic,
+                format!("empty patch was not rejected by a real, non-simulated rustc compile for task {id}"),
             );
             push_check(
                 &mut errors,
@@ -456,7 +469,7 @@ fn audit(
             let source_hash = str_field(control, "mutation_source_blake3").unwrap_or("");
             push_check(
                 &mut errors,
-                expected_hash.is_some_and(|digest| digest == source_hash) && is_hex(source_hash, 64),
+                expected_hash.is_some_and(|digest| digest.as_str() == source_hash) && is_hex(source_hash, 64),
                 format!("mutation control source digest mismatch for task {id}"),
             );
             let passed = u64_field(control, "tests_passed").unwrap_or(0);
