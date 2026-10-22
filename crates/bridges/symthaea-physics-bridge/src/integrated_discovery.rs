@@ -777,14 +777,14 @@ mod tests {
                 SYSTEMATIC_DISCREPANCY,
             );
 
-            clean_nominal_successes += usize::from(clean_nominal.success);
-            clean_robust_successes += usize::from(clean_robust.success);
+            clean_nominal_successes += if clean_nominal.success { 1 } else { 0 };
+            clean_robust_successes += if clean_robust.success { 1 } else { 0 };
             misspec_nominal_false_singletons +=
-                usize::from(misspec_nominal.overconfident_under_misspecification);
+                if misspec_nominal.overconfident_under_misspecification { 1 } else { 0 };
             misspec_robust_false_singletons +=
-                usize::from(misspec_robust.overconfident_under_misspecification);
-            misspec_nominal_detected += usize::from(misspec_nominal.model_discrepancy_detected);
-            misspec_robust_detected += usize::from(misspec_robust.model_discrepancy_detected);
+                if misspec_robust.overconfident_under_misspecification { 1 } else { 0 };
+            misspec_nominal_detected += if misspec_nominal.model_discrepancy_detected { 1 } else { 0 };
+            misspec_robust_detected += if misspec_robust.model_discrepancy_detected { 1 } else { 0 };
             misspec_nominal_unresolved += usize::from(misspec_nominal.final_live > 1);
             misspec_robust_unresolved += usize::from(misspec_robust.final_live > 1);
             paired.push(RobustEIGPair {
@@ -803,22 +803,23 @@ mod tests {
 
         let (clean_delta, clean_ci_low, clean_ci_high) = paired_bootstrap_mean_ci(
             &paired,
-            |pair| f64::from(pair.clean_robust_success) - f64::from(pair.clean_nominal_success),
+            |pair| (if pair.clean_robust_success { 1.0 } else { 0.0 })
+                - (if pair.clean_nominal_success { 1.0 } else { 0.0 }),
             0x524f_4255_5354_434c,
         );
         let (false_delta, false_ci_low, false_ci_high) = paired_bootstrap_mean_ci(
             &paired,
             |pair| {
-                f64::from(pair.misspec_robust_false_singleton)
-                    - f64::from(pair.misspec_nominal_false_singleton)
+                (if pair.misspec_robust_false_singleton { 1.0 } else { 0.0 })
+                    - (if pair.misspec_nominal_false_singleton { 1.0 } else { 0.0 })
             },
             0x524f_4255_5354_4643,
         );
         let (detect_delta, detect_ci_low, detect_ci_high) = paired_bootstrap_mean_ci(
             &paired,
             |pair| {
-                f64::from(pair.misspec_robust_detected)
-                    - f64::from(pair.misspec_nominal_detected)
+                (if pair.misspec_robust_detected { 1.0 } else { 0.0 })
+                    - (if pair.misspec_nominal_detected { 1.0 } else { 0.0 })
             },
             0x524f_4255_5354_4445,
         );
