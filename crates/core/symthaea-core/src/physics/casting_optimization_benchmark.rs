@@ -177,6 +177,26 @@ struct TrialRecord {
     cumulative_cost_units: u64,
 }
 
+/// Restricted view that optimization policies are allowed to inspect.
+/// This deliberately excludes evaluator-only ground truth and hidden known optima.
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct ProposalObservation {
+    point: Point,
+    status: TrialStatus,
+    observed_objective: Option<f64>,
+}
+
+fn proposal_history(records: &[TrialRecord]) -> Vec<ProposalObservation> {
+    records
+        .iter()
+        .map(|record| ProposalObservation {
+            point: record.point,
+            status: record.status,
+            observed_objective: record.observed_objective,
+        })
+        .collect()
+}
+
 #[derive(Debug, Clone, PartialEq)]
 struct BenchmarkRun {
     case: SyntheticCase,
@@ -346,11 +366,11 @@ fn evaluate_trial(
 /// a nearest-observation surrogate plus a fixed distance-based exploration bonus over
 /// a finite candidate lattice. It does not fit a Gaussian process or calibrated
 /// posterior. Evaluation-only objective truth is not read by this selection function.
-fn choose_adaptive_point(records: &[TrialRecord]) -> Option<Point> {
+fn choose_adaptive_point(history: &[ProposalObservation]) -> Option<Point> {
     const SIDE: usize = 16;
     const EXPLORATION_WEIGHT: f64 = 0.20;
 
-    let measured: Vec<&TrialRecord> = records
+    let measured: Vec<&ProposalObservation> = history
         .iter()
         .filter(|record| record.status == TrialStatus::Feasible)
         .filter(|record| record.observed_objective.is_some())
@@ -363,7 +383,7 @@ fn choose_adaptive_point(records: &[TrialRecord]) -> Option<Point> {
                 x: (ix as f64 + 0.5) / SIDE as f64,
                 y: (iy as f64 + 0.5) / SIDE as f64,
             };
-            if records.iter().any(|record| {
+            if history.iter().any(|record| {
                 let dx = record.point.x - candidate.x;
                 let dy = record.point.y - candidate.y;
                 dx * dx + dy * dy < 1e-20
@@ -372,7 +392,7 @@ fn choose_adaptive_point(records: &[TrialRecord]) -> Option<Point> {
             }
 
             let mut nearest_any_distance_sq = f64::INFINITY;
-            for record in records {
+            for record in history {
                 let dx = record.point.x - candidate.x;
                 let dy = record.point.y - candidate.y;
                 nearest_any_distance_sq =
@@ -442,7 +462,7 @@ fn run_benchmark(
             if query_index < adaptive_warm_start.len() {
                 adaptive_warm_start[query_index]
             } else {
-                choose_adaptive_point(&records)
+                choose_adaptive_point(&proposal_history(&records))
                     .ok_or(BenchmarkError::AdaptiveCandidatePoolExhausted)?
             }
         } else {
@@ -701,13 +721,13 @@ mod tests {
             4,
         )
         .unwrap();
-        let next_a = choose_adaptive_point(&seed.transcript).unwrap();
+        let next_a = choose_adaptive_point(&proposal_history(&seed.transcript)).unwrap();
 
         let mut changed_evaluation_truth = seed.transcript.clone();
         for record in &mut changed_evaluation_truth {
             record.true_objective_for_evaluation_only += 1000.0;
         }
-        let next_b = choose_adaptive_point(&changed_evaluation_truth).unwrap();
+        let next_b = choose_adaptive_point(&proposal_history(&changed_evaluation_truth)).unwrap();
         assert_eq!(next_a, next_b);
         assert!(!seed.transcript.iter().any(|record| record.point == next_a));
 
@@ -750,7 +770,7 @@ mod tests {
                 });
             }
         }
-        assert_eq!(choose_adaptive_point(&records), None);
+        assert_eq!(choose_adaptive_point(&proposal_history(&records)), None);
     }
 
     #[test]
@@ -770,7 +790,7 @@ mod tests {
             })
             .collect();
 
-        let next = choose_adaptive_point(&records).unwrap();
+        let next = choose_adaptive_point(&proposal_history(&records)).unwrap();
         assert!(!records.iter().any(|record| record.point == next));
     }
 
