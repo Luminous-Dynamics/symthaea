@@ -37,6 +37,7 @@ pub struct ProofAttestation {
     /// Cryptographic hash of the compiled binary artifact (supply-chain integrity).
     pub binary_hash: Option<[u8; 32]>,
     pub verdict: String,
+    /// Detached signature over the canonical transcript for the selected format version.
     pub signature: Vec<u8>,
     pub public_key: Vec<u8>,
     /// Signature transcript format. Historical JSON without this field loads as v1.
@@ -134,7 +135,8 @@ impl SovereignAttestor {
         binary_data: Option<&[u8]>,
     ) -> Result<ProofAttestation, String> {
         let smt_hash: [u8; 32] = Sha256::digest(smtlib2.as_bytes()).into();
-        let binary_hash = binary_data.map(|data| Sha256::digest(data).into());
+        let binary_hash: Option<[u8; 32]> =
+            binary_data.map(|data| Sha256::digest(data).into());
 
         let mut attestation = ProofAttestation {
             label: label.to_string(),
