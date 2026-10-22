@@ -911,7 +911,9 @@ mod tests {
         assert_eq!(result.backend_attempts.len(), 1);
         assert_eq!(result.backend_attempts[0].tier, BackendTier::Simulated);
         assert_eq!(result.backend_attempts[0].backend_name, "Simulated");
-        assert!(result.backend_attempts[0].success);
+        assert!(result.backend_attempts[0].success, "the simulator did return non-empty placeholder text");
+        assert!(!result.success, "placeholder text must not count as usable code generation");
+        assert_eq!(result.energy_cost, 0.0);
     }
 
     #[tokio::test]
@@ -932,7 +934,8 @@ mod tests {
         assert!(!result.backend_attempts[0].success);
         assert_eq!(result.backend_attempts[1].backend_name, "Simulated");
         assert_eq!(result.backend_attempts[1].tier, BackendTier::Simulated);
-        assert!(result.backend_attempts[1].success);
+        assert!(result.backend_attempts[1].success, "simulator returned placeholder text");
+        assert!(!result.success, "simulated fallback must not count as usable generation");
         assert_eq!(result.backend_attempts[0].estimated_energy_cost, COST_CLOUD_LLM);
         assert_eq!(result.backend_attempts[1].estimated_energy_cost, 0.0);
         // The cloud attempt is charged; simulated fallback adds no real-backend cost.
@@ -1075,8 +1078,9 @@ mod tests {
             .await;
 
         assert_eq!(result.tier, BackendTier::LocalLlm);
-        assert!(result.success);
+        assert!(!result.success, "non-empty simulated output is not usable generation");
         assert_eq!(result.backend_attempts[0].tier, BackendTier::Simulated);
+        assert_eq!(result.backend_attempts[0].success, true, "attempt success means non-empty output");
         assert_eq!(result.energy_cost, 0.0, "simulated output must not be charged as an Ollama invocation");
     }
 
