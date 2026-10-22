@@ -658,7 +658,12 @@ mod tests {
         let mut paired_outcomes: Vec<SelectorPair> = Vec::with_capacity(SEEDS as usize);
 
         for seed in 1..=SEEDS {
-            let raw = run_trial_with_selector(seed, config, ROUND_BUDGET, ActiveSelector::RawVariance);
+            let raw = run_trial_with_selector(
+                seed,
+                config,
+                ROUND_BUDGET,
+                ActiveSelector::RawVariance,
+            );
             let eig = run_trial_with_selector(
                 seed,
                 config,
