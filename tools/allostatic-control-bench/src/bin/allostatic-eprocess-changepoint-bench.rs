@@ -199,7 +199,12 @@ impl DetectorStats {
         self.final_log_values.push(final_log_e);
     }
 
-    fn observe_changepoint(&mut self, scenario: Scenario, alarm: Option<ChangePointAlarm>, peak_candidates: usize) {
+    fn observe_changepoint(
+        &mut self,
+        scenario: Scenario,
+        alarm: Option<ChangePointAlarm>,
+        peak_candidates: usize,
+    ) {
         self.peak_active_candidates = self.peak_active_candidates.max(peak_candidates);
         let detected = alarm.is_some();
         let detected_at = alarm.map_or(NO_ALARM_STEP, |value| value.detected_at() as usize);
@@ -349,7 +354,8 @@ fn mean_f64(values: &[f64]) -> Option<f64> {
 }
 
 fn mean_usize(values: &[usize]) -> Option<f64> {
-    (!values.is_empty()).then(|| values.iter().map(|value| *value as f64).sum::<f64>() / values.len() as f64)
+    (!values.is_empty())
+        .then(|| values.iter().map(|value| *value as f64).sum::<f64>() / values.len() as f64)
 }
 
 fn percentile(values: &[usize], percentile: usize) -> Option<usize> {
@@ -442,12 +448,20 @@ fn raw_fields(
             optional_float(Some(value.log_threshold())),
             optional_float(Some(value.evidence_excess())),
         ),
-        None => (NO_ALARM_STEP, "NA".to_string(), "NA".to_string(), "NA".to_string(), "NA".to_string()),
+        None => (
+            NO_ALARM_STEP,
+            "NA".to_string(),
+            "NA".to_string(),
+            "NA".to_string(),
+            "NA".to_string(),
+        ),
     };
 
     let global_delay = scenario
         .change_start
-        .filter(|start| outcome.global_first_alarm_step < HORIZON && outcome.global_first_alarm_step >= *start)
+        .filter(|start| {
+            outcome.global_first_alarm_step < HORIZON && outcome.global_first_alarm_step >= *start
+        })
         .map(|start| outcome.global_first_alarm_step - start);
     let cp_delay = scenario.change_start
         .filter(|start| alarm.is_some_and(|value| value.detected_at() as usize >= *start))
@@ -507,11 +521,17 @@ fn validate_design() -> Result<(), Box<dyn Error>> {
                     && scenario.max_expected_loss() <= RISK_BOUND
         })
     {
-        return Err(IoError::new(ErrorKind::InvalidInput, "change-point benchmark design is inconsistent").into());
+        return Err(
+            IoError::new(ErrorKind::InvalidInput, "change-point benchmark design is inconsistent")
+                .into(),
+        );
     }
     for step in 0..HORIZON {
         if SCENARIOS[0].expected_loss(step) != SCENARIOS[6].expected_loss(step) {
-            return Err(IoError::new(ErrorKind::InvalidInput, "stealth profile is not paired to null low").into());
+            return Err(
+                IoError::new(ErrorKind::InvalidInput, "stealth profile is not paired to null low")
+                    .into(),
+            );
         }
     }
     Ok(())
@@ -583,10 +603,22 @@ mod tests {
     #[test]
     fn design_pairs_stealth_and_covers_late_changes() {
         validate_design().expect("valid design");
-        let stealth = SCENARIOS.iter().find(|scenario| scenario.name == "stealth_paired").unwrap();
-        let null = SCENARIOS.iter().find(|scenario| scenario.name == "null_low").unwrap();
+        let stealth = SCENARIOS
+            .iter()
+            .find(|scenario| scenario.name == "stealth_paired")
+            .unwrap();
+        let null = SCENARIOS
+            .iter()
+            .find(|scenario| scenario.name == "null_low")
+            .unwrap();
         assert!((0..HORIZON).all(|step| stealth.expected_loss(step) == null.expected_loss(step)));
-        assert_eq!(SCENARIOS.iter().filter(|scenario| scenario.change_start == Some(192)).count(), 2);
+        assert_eq!(
+            SCENARIOS
+                .iter()
+                .filter(|scenario| scenario.change_start == Some(192))
+                .count(),
+            2
+        );
     }
 
     #[test]
