@@ -9,7 +9,7 @@
 //!
 //! Standard qualification mode requires at least 30 paired observations per scenario.
 //! Exploratory mode permits smaller samples for pipeline debugging, but can never
-//! report a qualified pass. Synthetic data is always diagnostic, never qualification
+//! report a declared gate pass. Synthetic data is always diagnostic, never qualification
 //! evidence. Energy gates are only evaluable for physical-device runs using calibrated
 //! instrumentation and a non-empty calibration identity.
 
@@ -746,7 +746,7 @@ mod tests {
         assert!(report.gates.energy_gate_evaluable);
         assert!(report.gates.energy_gate_pass);
         assert!(!report.gates.privacy_gate_pass);
-        assert!(!report.gates.qualified_pass);
+        assert!(!report.gates.declared_gates_pass);
     }
 
     #[test]
@@ -781,6 +781,6 @@ mod tests {
         assert!(report.gates.physical_measurement_eligible);
         assert!(!report.gates.energy_gate_evaluable);
         assert!(!report.gates.energy_gate_pass);
-        assert!(!report.gates.qualified_pass);
+        assert!(!report.gates.declared_gates_pass);
     }
 }
