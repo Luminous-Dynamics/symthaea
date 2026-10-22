@@ -1,0 +1,243 @@
+{
+  "schema_version": "pitb.success-cost-frontier-plan.v0",
+  "plan_id": "synthetic-success-cost-frontier-plan-v0",
+  "dataset_kind": "synthetic_fixture",
+  "split": "validation",
+  "target_manifest_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "targets": [
+    {
+      "target_id": "frontier-target-a",
+      "component_id": "frontier-component-a",
+      "family_id": "frontier-family-a",
+      "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "artifact_path": "synthetic/FrontierA.lean",
+      "artifact_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "statement_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+    },
+    {
+      "target_id": "frontier-target-b",
+      "component_id": "frontier-component-b",
+      "family_id": "frontier-family-b",
+      "source_commit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "artifact_path": "synthetic/FrontierB.lean",
+      "artifact_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "statement_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+    }
+  ],
+  "arms": [
+    {
+      "arm_id": "A",
+      "method_class": "minimal_shell_agent",
+      "model_id": "synthetic-model",
+      "model_version": "fixture-only",
+      "checker_id": "synthetic-lean-checker",
+      "checker_version": "fixture-only",
+      "prompt_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "config_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "retry_policy": "one attempt per run; fixture only",
+      "cache_policy": "disabled across arms and targets"
+    },
+    {
+      "arm_id": "F",
+      "method_class": "typed_insight_local_recovery",
+      "model_id": "synthetic-model",
+      "model_version": "fixture-only",
+      "checker_id": "synthetic-lean-checker",
+      "checker_version": "fixture-only",
+      "prompt_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+      "config_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+      "retry_policy": "one attempt per run; fixture only",
+      "cache_policy": "disabled across arms and targets"
+    },
+    {
+      "arm_id": "E",
+      "method_class": "cost_aware_coordinator",
+      "model_id": "synthetic-model",
+      "model_version": "fixture-only",
+      "checker_id": "synthetic-lean-checker",
+      "checker_version": "fixture-only",
+      "prompt_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+      "config_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "retry_policy": "one attempt per run; fixture only",
+      "cache_policy": "disabled across arms and targets"
+    }
+  ],
+  "budget_levels": [
+    {
+      "budget_id": "small",
+      "max_model_calls": 2,
+      "max_tokens": 1000,
+      "max_wall_ms": 10000,
+      "max_cost_microusd": 5000
+    },
+    {
+      "budget_id": "medium",
+      "max_model_calls": 4,
+      "max_tokens": 4000,
+      "max_wall_ms": 30000,
+      "max_cost_microusd": 20000
+    },
+    {
+      "budget_id": "large",
+      "max_model_calls": 8,
+      "max_tokens": 16000,
+      "max_wall_ms": 120000,
+      "max_cost_microusd": 80000
+    }
+  ],
+  "assignments": [
+    {
+      "run_id": "synthetic-run-01",
+      "target_id": "frontier-target-a",
+      "component_id": "frontier-component-a",
+      "arm_id": "A",
+      "budget_id": "small",
+      "input_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+    },
+    {
+      "run_id": "synthetic-run-02",
+      "target_id": "frontier-target-a",
+      "component_id": "frontier-component-a",
+      "arm_id": "A",
+      "budget_id": "medium",
+      "input_sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+    },
+    {
+      "run_id": "synthetic-run-03",
+      "target_id": "frontier-target-a",
+      "component_id": "frontier-component-a",
+      "arm_id": "A",
+      "budget_id": "large",
+      "input_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+    },
+    {
+      "run_id": "synthetic-run-04",
+      "target_id": "frontier-target-a",
+      "component_id": "frontier-component-a",
+      "arm_id": "F",
+      "budget_id": "small",
+      "input_sha256": "5555555555555555555555555555555555555555555555555555555555555555"
+    },
+    {
+      "run_id": "synthetic-run-05",
+      "target_id": "frontier-target-a",
+      "component_id": "frontier-component-a",
+      "arm_id": "F",
+      "budget_id": "medium",
+      "input_sha256": "6666666666666666666666666666666666666666666666666666666666666666"
+    },
+    {
+      "run_id": "synthetic-run-06",
+      "target_id": "frontier-target-a",
+      "component_id": "frontier-component-a",
+      "arm_id": "F",
+      "budget_id": "large",
+      "input_sha256": "7777777777777777777777777777777777777777777777777777777777777777"
+    },
+    {
+      "run_id": "synthetic-run-07",
+      "target_id": "frontier-target-a",
+      "component_id": "frontier-component-a",
+      "arm_id": "E",
+      "budget_id": "small",
+      "input_sha256": "8888888888888888888888888888888888888888888888888888888888888888"
+    },
+    {
+      "run_id": "synthetic-run-08",
+      "target_id": "frontier-target-a",
+      "component_id": "frontier-component-a",
+      "arm_id": "E",
+      "budget_id": "medium",
+      "input_sha256": "9999999999999999999999999999999999999999999999999999999999999999"
+    },
+    {
+      "run_id": "synthetic-run-09",
+      "target_id": "frontier-target-a",
+      "component_id": "frontier-component-a",
+      "arm_id": "E",
+      "budget_id": "large",
+      "input_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "run_id": "synthetic-run-10",
+      "target_id": "frontier-target-b",
+      "component_id": "frontier-component-b",
+      "arm_id": "A",
+      "budget_id": "small",
+      "input_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    {
+      "run_id": "synthetic-run-11",
+      "target_id": "frontier-target-b",
+      "component_id": "frontier-component-b",
+      "arm_id": "A",
+      "budget_id": "medium",
+      "input_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    },
+    {
+      "run_id": "synthetic-run-12",
+      "target_id": "frontier-target-b",
+      "component_id": "frontier-component-b",
+      "arm_id": "A",
+      "budget_id": "large",
+      "input_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    },
+    {
+      "run_id": "synthetic-run-13",
+      "target_id": "frontier-target-b",
+      "component_id": "frontier-component-b",
+      "arm_id": "F",
+      "budget_id": "small",
+      "input_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    },
+    {
+      "run_id": "synthetic-run-14",
+      "target_id": "frontier-target-b",
+      "component_id": "frontier-component-b",
+      "arm_id": "F",
+      "budget_id": "medium",
+      "input_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    },
+    {
+      "run_id": "synthetic-run-15",
+      "target_id": "frontier-target-b",
+      "component_id": "frontier-component-b",
+      "arm_id": "F",
+      "budget_id": "large",
+      "input_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+    },
+    {
+      "run_id": "synthetic-run-16",
+      "target_id": "frontier-target-b",
+      "component_id": "frontier-component-b",
+      "arm_id": "E",
+      "budget_id": "small",
+      "input_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+    },
+    {
+      "run_id": "synthetic-run-17",
+      "target_id": "frontier-target-b",
+      "component_id": "frontier-component-b",
+      "arm_id": "E",
+      "budget_id": "medium",
+      "input_sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+    },
+    {
+      "run_id": "synthetic-run-18",
+      "target_id": "frontier-target-b",
+      "component_id": "frontier-component-b",
+      "arm_id": "E",
+      "budget_id": "large",
+      "input_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+    }
+  ],
+  "analysis_policy": {
+    "primary_endpoint": "exact_target_semantic_gate_success",
+    "success_gate": "target_kernel_and_semantic_gate_and_applicable_successor_receipts",
+    "resampling_unit": "target_component_id",
+    "minimum_budget_levels": 3,
+    "require_complete_cartesian_coverage": true,
+    "confirmatory_decision": "not_evaluated_until_real_outcomes_and_receipts_are_validated"
+  },
+  "plan_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+}
