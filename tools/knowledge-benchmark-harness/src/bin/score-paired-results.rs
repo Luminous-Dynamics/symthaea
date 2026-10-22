@@ -898,6 +898,15 @@ fn compute_pairwise_comparisons(
 
     let all_indices: Vec<usize> = (0..pairs.len()).collect();
     let candidate_id = plan.candidate_system_id.as_str();
+    let candidate_critical_gates_pass = pairs
+        .iter()
+        .filter(|pair| pair.criticality == "release_blocker")
+        .all(|pair| {
+            observations_by_system
+                .get(candidate_id)
+                .and_then(|rows| rows.get(pair.pair_id.as_str()))
+                .is_some_and(|observation| fidelity_for(pair, observation))
+        });
     let candidate_value = metric_for_sample(
         &plan.primary_endpoint,
         &all_indices,
@@ -982,7 +991,11 @@ fn compute_pairwise_comparisons(
             bootstrap_replicates: plan.bootstrap.replicates,
             bootstrap_seed: plan.bootstrap.seed,
             multiple_comparison_correction: plan.bootstrap.multiple_comparison_correction.clone(),
-            candidate_improvement_supported: confidence_interval_low > 0.0,
+            candidate_improvement_supported: !plan.synthetic_only
+                && plan.phase == "preregistered_held_out"
+                && clusters.len() >= plan.bootstrap.minimum_independent_clusters
+                && candidate_critical_gates_pass
+                && confidence_interval_low > 0.0,
         });
     }
     Ok(comparisons)
@@ -1790,7 +1803,10 @@ mod tests {
         assert_eq!(first[0].bootstrap_replicates, plan.bootstrap.replicates);
         assert_eq!(first[0].confidence_interval_low, 1.0);
         assert_eq!(first[0].confidence_interval_high, 1.0);
-        assert!(first[0].candidate_improvement_supported);
+        assert!(
+            !first[0].candidate_improvement_supported,
+            "positive synthetic-control intervals must not support an improvement claim"
+        );
     }
 
     #[test]
