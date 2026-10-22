@@ -187,6 +187,32 @@ PITB now has a draft `proof-progress-trace.schema.json`, a synthetic trace, and 
 
 This creates a potential research contribution beyond another retrieval index: a common, content-addressed record of strategy use, proof-state lineage, verified intermediate progress and terminal semantic outcome. It can enable causal analysis and better credit assignment while refusing to use intermediate activity as a substitute for correctness.
 
+
+## 22 October 2026 update: audited counterfactuals and current prover frontier
+
+### Why strategy applicability should be tested counterfactually
+
+Pythagoras-Prover introduced Augmented Lean Formalisation (ALF), generating statement variants and a contamination-sensitive MiniF2F-ALF benchmark; the paper reports accuracy drops for all evaluated models on that set ([paper](https://arxiv.org/abs/2606.12594)). This is evidence that benchmark variation matters, but generated variants are not by themselves proof that a particular strategy's applicability changed correctly. PITB's next step is narrower and more auditable: pair an independently reviewed compatible base target with a single declared counterfactual edit, and require adjudicators to verify whether that specific edit preserves or breaks the insight's prerequisites.
+
+The new `counterfactual-precondition-suite.schema.json` formalizes base/variant statement digests, mutation-fragment hashes, mutation receipts, source insight digests, dual adjudications, and stable join IDs for both eventual system outcome rows. Its seven-pair fixture covers a semantics-preserving control plus changed precondition, inequality direction, object type, quantifier scope, premise, and predicate. The fixture is clearly synthetic; it is not a mathematical dataset or evidence about an actual model. The current workflow validates 13 negative controls covering duplicate IDs, statement-digest collisions, faulty mutation descriptions, reviewer failures, family-component/split leaks, and unknown-label misuse.
+
+For a real study, measure **paired contract adherence**: the system must handle the compatible base correctly *and* reject or abstain on the individually verified incompatible counterfactual. Alongside that, report positive recall, false acceptance by mutation type, false rejection, and stability on semantics-preserving variants. Do not assume that reversing an inequality or removing an assumption makes every theorem incompatible; reviewers must establish that each actual mutation crosses the selected insight's applicability boundary. Run matched model/checker/budget conditions, preserve raw output rows and receipts, and keep unresolved judgments unknown.
+
+### Industry frontier: compare the right task
+
+OProver is an important open-weight whole-proof reference. Its paper/released repository reports OProver-32B Pass@32 of 93.3 on MiniF2F, 58.2 on ProverBench, and 11.3 on PutnamBench; it uses verified-proof retrieval, iterative compiler-feedback repair, and a train-time loop incorporating verified proof and repair trajectories ([paper](https://arxiv.org/abs/2605.17283); [official implementation](https://github.com/multimodal-art-projection/OProver)). Those numbers are whole-proof Pass@32 scores; they are **not** transfer-selectivity or counterfactual sensitivity results.
+
+Pythagoras-Prover reports 93.0% MiniF2F-Test at 32B, and also studies generated statement variants with MiniF2F-ALF ([paper](https://arxiv.org/abs/2606.12594)). OptProver targets Olympiad-to-undergraduate optimization transfer and penalizes valid but non-progressing steps ([ICML 2026 paper](https://proceedings.mlr.press/v306/li26ek.html)). Process-Verified RL explicitly uses Lean elaboration for tactic-level verified feedback during training ([ICLR 2026 paper](https://proceedings.iclr.cc/paper_files/paper/2026/hash/554a5982e26d0129f4038ad7a68fb3aa-Abstract-Conference.html)). ProofOptimizer optimizes a different objective: it reports proof-length reductions of 87% on MiniF2F, 57% on PutnamBench and 50% on Seed-Prover's IMO 2025 proofs ([ICLR 2026 paper](https://proceedings.iclr.cc/paper_files/paper/2026/hash/60917970c4257e50aff60d1d7bde2edf-Abstract-Conference.html)).
+
+These are distinct strengths, not one leaderboard. PITB should not claim that an insight-transfer metric beats OProver's Pass@32. A credible comparison plan is:
+
+- Keep matched-task exact-target verified success as PITB's primary endpoint; reproduce relevant whole-proof baselines on the same eligible targets if a suitable adapter and checker are available.
+- Compare retrieval/strategy intervention arms at equal target, context, tokens, retries and cost; select the strongest baseline on validation data only.
+- Evaluate the counterfactual suite independently for positive recall, false-accept by critical mutation, no-op stability and paired contract adherence.
+- Only then test whether the intervention helps under missing formal infrastructure, dependency-rich repositories, or hard-mode witness discovery—each on its own denominator.
+
+The potential contribution is not another claimed best percentage. It is a **falsifiable strategy applicability test** that connects preconditions to controlled statement changes and kernel-checked target outcomes. This could complement large whole-proof systems and proof-state feedback methods if an actual, replicated experiment demonstrates incremental value. No such value is measured yet.
+
 ## Research references
 
 - Kim, Han & Hwang, [Benchmarking Testing in Automated Theorem Proving](https://aclanthology.org/2026.acl-industry.150/), ACL 2026 Industry Track.
