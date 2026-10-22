@@ -25,6 +25,7 @@ source_files=(
   "tools/allostatic-control-bench/src/bin/allostatic-task-scope-bench.rs"
   "tools/allostatic-control-bench/src/bin/allostatic-sequential-scope-bench.rs"
   "tools/allostatic-control-bench/src/bin/allostatic-risk-eprocess-bench.rs"
+  "tools/allostatic-control-bench/src/bin/allostatic-eprocess-shift-power-surface.rs"
   "tools/allostatic-control-bench/qualify.sh"
   "docs/research/ALLOSTATIC_CONTROL_BENCHMARK_V1.md"
   "docs/research/ROBUST_VIABILITY_ENVELOPE_V1.md"
@@ -33,6 +34,7 @@ source_files=(
   "docs/research/TASK_RELEVANT_SCOPE_MONITOR_V1.md"
   "docs/research/SEQUENTIAL_SCOPE_CUSUM_V1.md"
   "docs/research/BOUNDED_RISK_EPROCESS_V1.md"
+  "docs/research/EPROCESS_SHIFT_POWER_SURFACE_V1.md"
 )
 expected_head="${1:-$(git rev-parse HEAD)}"
 actual_head="$(git rev-parse HEAD)"
@@ -66,6 +68,8 @@ sequential_out="${out_base}-sequential-scope.csv"
 sequential_summary_out="${out_base}-sequential-scope-summary.csv"
 eprocess_out="${out_base}-risk-eprocess.csv"
 eprocess_summary_out="${out_base}-risk-eprocess-summary.csv"
+power_surface_out="${out_base}-eprocess-shift-power.csv"
+power_surface_summary_out="${out_base}-eprocess-shift-power-summary.csv"
 receipt="${out_csv}.receipt.txt"
 
 cargo fmt --manifest-path "$manifest" -- --check
@@ -866,6 +870,208 @@ if ! awk -F, '
   exit 1
 fi
 
+# Sweep predeclared e-process betting rates over shift magnitudes and temporal
+# profiles. This contrasts per-episode risk testing with change detection; it
+# does not re-use the held-out episodes to select a betting rate.
+cargo run --locked --release --manifest-path "$manifest" --bin allostatic-eprocess-shift-power-surface -- \
+  "$tmpdir/power-a.csv" "$tmpdir/power-summary-a.csv"
+cargo run --locked --release --manifest-path "$manifest" --bin allostatic-eprocess-shift-power-surface -- \
+  "$tmpdir/power-b.csv" "$tmpdir/power-summary-b.csv"
+if ! cmp -s "$tmpdir/power-a.csv" "$tmpdir/power-b.csv" ||
+   ! cmp -s "$tmpdir/power-summary-a.csv" "$tmpdir/power-summary-b.csv"; then
+  printf 'FAIL: repeated e-process shift-surface outputs are not byte-identical\n' >&2
+  exit 1
+fi
+
+if ! awk -F, '
+  NR == 1 { if (NF != 44) failed = 1; next }
+  {
+    if (NF != 44) failed = 1
+    if ($1 != "null_low" && $1 != "null_boundary" &&
+        $1 != "persistent_0175" && $1 != "persistent_020" &&
+        $1 != "persistent_025" && $1 != "persistent_035" &&
+        $1 != "ramp_to_020" && $1 != "ramp_to_030" &&
+        $1 != "ramp_to_045" && $1 != "burst_008" &&
+        $1 != "burst_024" && $1 != "recurrent_bursts" &&
+        $1 != "stealth_paired") failed = 1
+    if ($2 != "true" && $2 != "false") failed = 1
+    if ($3 != "true" && $3 != "false") failed = 1
+    if ($4 != "true" && $4 != "false") failed = 1
+    if ($5 !~ /^[0-9]+$/ || $5 < 0 || $5 >= 5000) failed = 1
+    if ($6 !~ /^[0-9]+$/ || $7 != 256) failed = 1
+    for (i = 8; i <= 10; i++) {
+      if ($i !~ /^[0-9]*[.]?[0-9]+$/ || $i < 0 || $i > 1) failed = 1
+    }
+    if ($9 < $8 || $11 !~ /^[0-9]+$/ || $11 > 256) failed = 1
+    for (i = 12; i <= 12; i++) if ($i !~ /^[0-9]+$/ || $i < 0 || $i > 256) failed = 1
+    if ($13 != "true" && $13 != "false") failed = 1
+    for (i = 14; i <= 18; i++) if ($i !~ /^-?[0-9]*[.]?[0-9]+$/) failed = 1
+    if ($19 !~ /^[0-9]+$/ || $19 < 0 || $19 > 256) failed = 1
+    if ($20 != "true" && $20 != "false") failed = 1
+    for (i = 21; i <= 25; i++) if ($i !~ /^-?[0-9]*[.]?[0-9]+$/) failed = 1
+    for (i = 26; i <= 40; i++) {
+      if ((i - 26) % 3 == 0) {
+        if ($i !~ /^[0-9]+$/ || $i < 0 || $i > 256) failed = 1
+      } else if ((i - 26) % 3 == 1) {
+        if ($i != "true" && $i != "false") failed = 1
+      } else if ($i !~ /^-?[0-9]*[.]?[0-9]+$/) failed = 1
+    }
+    if (($12 < 256) != ($13 == "true")) failed = 1
+    if (($19 < 256) != ($20 == "true")) failed = 1
+    if (($26 < 256) != ($27 == "true")) failed = 1
+    if (($29 < 256) != ($30 == "true")) failed = 1
+    if (($32 < 256) != ($33 == "true")) failed = 1
+    if (($35 < 256) != ($36 == "true")) failed = 1
+    if (($38 < 256) != ($39 == "true")) failed = 1
+    if (($41 - log(100) > 0.000001) || (log(100) - $41 > 0.000001)) failed = 1
+    if (($42 - 0.15 > 0.000001) || (0.15 - $42 > 0.000001)) failed = 1
+    if (($43 - 0.05 > 0.000001) || (0.05 - $43 > 0.000001)) failed = 1
+    if ($44 != 5) failed = 1
+
+    max_low = $16
+    if ($17 > max_low) max_low = $17
+    if ($18 > max_low) max_low = $18
+    low_mix = max_low + log((exp($16 - max_low) + exp($17 - max_low) +
+      exp($18 - max_low)) / 3)
+    if (($14 - low_mix > 0.000001) || (low_mix - $14 > 0.000001)) failed = 1
+    max_high = $23
+    if ($24 > max_high) max_high = $24
+    if ($25 > max_high) max_high = $25
+    high_mix = max_high + log((exp($23 - max_high) + exp($24 - max_high) +
+      exp($25 - max_high)) / 3)
+    if (($21 - high_mix > 0.000001) || (high_mix - $21 > 0.000001)) failed = 1
+
+    if ($1 == "null_low" &&
+        ($2 != "false" || $3 != "false" || $4 != "true" ||
+         $8 != 0.1 || $9 != 0.1)) failed = 1
+    if ($1 == "null_boundary" &&
+        ($2 != "false" || $3 != "false" || $4 != "true" ||
+         $8 != 0.15 || $9 != 0.15)) failed = 1
+    if ($1 == "stealth_paired" &&
+        ($2 != "true" || $3 != "false" || $4 != "false" ||
+         $8 != 0.1 || $9 != 0.1)) failed = 1
+    if ($1 != "null_low" && $1 != "null_boundary" && $1 != "stealth_paired" &&
+        ($2 != "true" || $3 != "true" || $4 != "false")) failed = 1
+
+    key = $1 SUBSEP $5
+    if (seen[key]++) failed = 1
+    if ($1 == "null_low") {
+      for (i = 5; i <= 44; i++) paired_null[$5 SUBSEP i] = $i
+    }
+    if ($1 == "stealth_paired") {
+      for (i = 5; i <= 44; i++) {
+        if ($i != paired_null[$5 SUBSEP i]) failed = 1
+      }
+    }
+    scenario_rows[$1]++
+    rows++
+  }
+  END {
+    if (NR != 65001 || rows != 65000 || failed) exit 1
+    for (name in scenario_rows) if (scenario_rows[name] != 5000) exit 1
+    if (scenario_rows["null_low"] != 5000 ||
+        scenario_rows["null_boundary"] != 5000 ||
+        scenario_rows["persistent_0175"] != 5000 ||
+        scenario_rows["persistent_020"] != 5000 ||
+        scenario_rows["persistent_025"] != 5000 ||
+        scenario_rows["persistent_035"] != 5000 ||
+        scenario_rows["ramp_to_020"] != 5000 ||
+        scenario_rows["ramp_to_030"] != 5000 ||
+        scenario_rows["ramp_to_045"] != 5000 ||
+        scenario_rows["burst_008"] != 5000 ||
+        scenario_rows["burst_024"] != 5000 ||
+        scenario_rows["recurrent_bursts"] != 5000 ||
+        scenario_rows["stealth_paired"] != 5000) exit 1
+  }
+' "$tmpdir/power-a.csv"; then
+  printf 'FAIL: e-process power-surface raw schema, threshold, mixture arithmetic or stealth pairing is invalid\n' >&2
+  exit 1
+fi
+
+if ! awk -F, '
+  NR == 1 { if (NF != 87) failed = 1; next }
+  {
+    if (NF != 87) failed = 1
+    if ($1 != "null_low" && $1 != "null_boundary" &&
+        $1 != "persistent_0175" && $1 != "persistent_020" &&
+        $1 != "persistent_025" && $1 != "persistent_035" &&
+        $1 != "ramp_to_020" && $1 != "ramp_to_030" &&
+        $1 != "ramp_to_045" && $1 != "burst_008" &&
+        $1 != "burst_024" && $1 != "recurrent_bursts" &&
+        $1 != "stealth_paired") failed = 1
+    if ($2 != "true" && $2 != "false") failed = 1
+    if ($3 != "true" && $3 != "false") failed = 1
+    if ($4 != "true" && $4 != "false") failed = 1
+    if ($5 != 5000) failed = 1
+    if ($6 !~ /^[0-9]*[.]?[0-9]+$/ || $7 !~ /^[0-9]*[.]?[0-9]+$/ ||
+        $8 !~ /^[0-9]*[.]?[0-9]+$/ || $8 < $6) failed = 1
+    if (($1 == "null_low" || $1 == "null_boundary") &&
+        ($2 != "false" || $3 != "false" || $4 != "true")) failed = 1
+    if ($1 == "stealth_paired" &&
+        ($2 != "true" || $3 != "false" || $4 != "false")) failed = 1
+    if ($1 != "null_low" && $1 != "null_boundary" && $1 != "stealth_paired" &&
+        ($2 != "true" || $3 != "true" || $4 != "false")) failed = 1
+
+    for (start = 11; start <= 77; start += 11) {
+      alarms = $(start)
+      rate = $(start + 1)
+      lower = $(start + 2)
+      upper = $(start + 3)
+      false_alarms = $(start + 4)
+      risk_misses = $(start + 5)
+      latent_misses = $(start + 6)
+      delay = $(start + 7)
+      p95 = $(start + 8)
+      median = $(start + 9)
+      mean_log = $(start + 10)
+      if (alarms !~ /^[0-9]+$/ || alarms > 5000 ||
+          false_alarms !~ /^[0-9]+$/ || false_alarms > 5000 ||
+          risk_misses !~ /^[0-9]+$/ || risk_misses > 5000 ||
+          latent_misses !~ /^[0-9]+$/ || latent_misses > 5000) failed = 1
+      if (rate !~ /^[0-9]*[.]?[0-9]+$/ || lower !~ /^[0-9]*[.]?[0-9]+$/ ||
+          upper !~ /^[0-9]*[.]?[0-9]+$/ || lower > rate || rate > upper ||
+          (rate - alarms/5000 > 0.000001) || (alarms/5000 - rate > 0.000001)) failed = 1
+      if ($3 == "true") {
+        if (false_alarms != 0 || risk_misses != 5000 - alarms ||
+            latent_misses != 5000 - alarms) failed = 1
+      } else {
+        if (false_alarms != alarms || risk_misses != 0) failed = 1
+        if ($2 == "true" && latent_misses != 5000 - alarms) failed = 1
+        if ($2 == "false" && latent_misses != 0) failed = 1
+      }
+      if ($4 == "true" && false_alarms > 75) failed = 1
+      if (alarms == 0 && (delay != "NA" || p95 != "NA" || median != "NA")) failed = 1
+      if (alarms > 0 &&
+          (delay !~ /^[0-9]*[.]?[0-9]+$/ || p95 !~ /^[0-9]+$/ ||
+           median !~ /^[0-9]+$/ || delay < 0 || delay > 255 ||
+           p95 < 0 || p95 > 255 || median < 0 || median > 255)) failed = 1
+      if (mean_log !~ /^-?[0-9]*[.]?[0-9]+$/) failed = 1
+    }
+
+    # Power gates are deliberately limited to predeclared strong cells.
+    # Moderate alternatives and bursts are measured rather than forced to pass.
+    if ($1 == "persistent_025" && ($11 < 3750 || $44 < 4000)) failed = 1
+    if ($1 == "persistent_035" &&
+        ($11 < 4500 || $22 < 4500 || $44 < 4500 || $55 < 4500)) failed = 1
+    key = $1
+    if (seen[key]++) failed = 1
+    if ($1 == "null_low") {
+      for (i = 11; i <= 87; i++) null_low_summary[i] = $i
+    }
+    if ($1 == "stealth_paired") {
+      for (i = 11; i <= 87; i++) {
+        # Latent-shift misses should differ: the paired null has no latent shift.
+        if ((i - 11) % 11 != 6 && $i != null_low_summary[i]) failed = 1
+      }
+    }
+    rows++
+  }
+  END { if (NR != 14 || rows != 13 || failed) exit 1 }
+' "$tmpdir/power-summary-a.csv"; then
+  printf 'FAIL: e-process power-surface summary schema, confidence intervals, null rate or power gates are invalid\n' >&2
+  exit 1
+fi
+
 # Summary must contain 5 scenarios × 6 policies × 2 shield settings.
 if ! awk -F, 'NR == 1 { if (NF != 28) failed = 1; next }
   { if (NF != 28) failed = 1; rows++ }
@@ -898,6 +1104,8 @@ cp "$tmpdir/sequential-a.csv" "$sequential_out"
 cp "$tmpdir/sequential-summary-a.csv" "$sequential_summary_out"
 cp "$tmpdir/eprocess-a.csv" "$eprocess_out"
 cp "$tmpdir/eprocess-summary-a.csv" "$eprocess_summary_out"
+cp "$tmpdir/power-a.csv" "$power_surface_out"
+cp "$tmpdir/power-summary-a.csv" "$power_surface_summary_out"
 {
   printf 'status=pass\n'
   printf 'git_commit=%s\n' "$actual_head"
@@ -937,6 +1145,10 @@ cp "$tmpdir/eprocess-summary-a.csv" "$eprocess_summary_out"
   printf 'risk_eprocess_rows_excluding_header=%s\n' "$(( $(wc -l < "$eprocess_out") - 1 ))"
   printf 'risk_eprocess_summary_sha256=%s\n' "$(sha256sum "$eprocess_summary_out" | awk '{print $1}')"
   printf 'risk_eprocess_summary_rows_excluding_header=%s\n' "$(( $(wc -l < "$eprocess_summary_out") - 1 ))"
+  printf 'eprocess_power_surface_sha256=%s\n' "$(sha256sum "$power_surface_out" | awk '{print $1}')"
+  printf 'eprocess_power_surface_rows_excluding_header=%s\n' "$(( $(wc -l < "$power_surface_out") - 1 ))"
+  printf 'eprocess_power_surface_summary_sha256=%s\n' "$(sha256sum "$power_surface_summary_out" | awk '{print $1}')"
+  printf 'eprocess_power_surface_summary_rows_excluding_header=%s\n' "$(( $(wc -l < "$power_surface_summary_out") - 1 ))"
   printf '\nsource_sha256:\n'
   sha256sum "${source_files[@]}"
 } > "$receipt"
@@ -956,4 +1168,6 @@ printf 'Sequential CUSUM scope frontier: %s\n' "$sequential_out"
 printf 'Sequential CUSUM scope summary: %s\n' "$sequential_summary_out"
 printf 'Bounded-risk e-process frontier: %s\n' "$eprocess_out"
 printf 'Bounded-risk e-process summary: %s\n' "$eprocess_summary_out"
+printf 'E-process shift power surface: %s\n' "$power_surface_out"
+printf 'E-process shift power summary: %s\n' "$power_surface_summary_out"
 printf 'Provenance receipt: %s\n' "$receipt"
