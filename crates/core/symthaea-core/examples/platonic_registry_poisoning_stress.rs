@@ -1,11 +1,11 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Measure open-set retrieval failure under hostile prototype enrollment.
+//! Measure retrieval failure under hostile prototype enrollment.
 //!
-//! This synthetic insertion-attack benchmark adds attacker-labelled copies of
-//! genuine prototypes at a fixed vector dimension. It reports attack success,
-//! clean accuracy, selective coverage/risk, memory payload and exact-scan cost.
+//! The benchmark compares attacker-labelled insertion with fixed-budget
+//! replacement of genuine prototype entries. It reports targeted attack
+//! success, classwise utility, selective coverage/risk, and resource cost.
 //! Similarity thresholds are frozen diagnostics, not a risk certificate.
 
 use std::error::Error;
@@ -72,7 +72,7 @@ fn main() -> BenchResult<()> {
     println!("# attack_modes=insertion (extra entries) and replacement (fixed entry count, genuine target class removed)");
     println!("# acceptance=similarity>={MIN_SIMILARITY},top_two_margin>={MIN_TOP_TWO_MARGIN}; fixed diagnostic, not calibrated");
     println!("# payload=entry_count*dimension*sizeof(i8); excludes labels, allocator, runtime, and indexes");
-    println!("seed,attack_mode,dimension,genuine_classes,entry_count,poison_count,poison_noise,query_noise,query_count,attacked_classes,targeted_query_count,targeted_top1_correct,targeted_top1_accuracy,targeted_accepted_count,targeted_coverage,targeted_false_rejections,targeted_false_rejection_rate,target_attack_success_count,target_attack_success_rate,accepted_target_attack_success_count,accepted_target_attack_success_rate,retained_query_count,retained_top1_correct,retained_top1_accuracy,retained_accepted_count,retained_coverage,retained_false_rejections,retained_false_rejection_rate,top1_correct,top1_accuracy,accepted_count,coverage,accepted_errors,selective_risk,attacker_prediction_count,attacker_prediction_rate,p50_latency_us,p95_latency_us,scan_wall_ms,scan_qps,vector_payload_bytes");
+    println!("seed,attack_mode,dimension,genuine_classes,entry_count,poison_count,poison_noise,query_noise,query_count,attacked_class_count,targeted_query_count,targeted_top1_correct,targeted_top1_accuracy,targeted_accepted_count,targeted_coverage,targeted_false_rejections,targeted_false_rejection_rate,target_attack_success_count,target_attack_success_rate,accepted_target_attack_success_count,accepted_target_attack_success_rate,retained_query_count,retained_top1_correct,retained_top1_accuracy,retained_accepted_count,retained_coverage,retained_false_rejections,retained_false_rejection_rate,top1_correct,top1_accuracy,accepted_count,coverage,accepted_errors,selective_risk,attacker_prediction_count,attacker_prediction_rate,p50_latency_us,p95_latency_us,scan_wall_ms,scan_qps,vector_payload_bytes");
 
     for seed in SEEDS {
         let prototypes = build_prototypes(seed)?;
@@ -457,7 +457,7 @@ mod tests {
                 .all(|entry| entry.label != format!("id-{target:02}"))
         );
         assert_eq!(poisoned_ranked.label, format!("attacker-{target:02}-00"));
-        assert!(poisoned_ranked.similarity > clean_ranked.similarity - f64::EPSILON);
+        assert_eq!(poisoned_ranked.similarity, 1.0);
         assert!(poisoned_ranked.margin >= MIN_TOP_TWO_MARGIN);
         assert!(accepts(poisoned_ranked.similarity, poisoned_ranked.margin));
     }
@@ -477,6 +477,14 @@ mod tests {
             .expect("replacement bank");
             assert_eq!(bank.len(), CLASS_COUNT);
             assert_eq!(attacked_classes.len(), poison_count);
+            for class in 0..CLASS_COUNT {
+                let has_genuine_label = bank.iter().any(|entry| entry.label == format!("id-{class:02}"));
+                assert_eq!(
+                    has_genuine_label,
+                    !attacked_classes.contains(&class),
+                    "class {class} must be removed only when selected for replacement"
+                );
+            }
             for left in 0..attacked_classes.len() {
                 for right in (left + 1)..attacked_classes.len() {
                     assert_ne!(attacked_classes[left], attacked_classes[right]);
