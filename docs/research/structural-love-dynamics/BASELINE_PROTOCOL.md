@@ -269,6 +269,8 @@ A run is not eligible for comparison merely because a model generated output or 
 
 The Rust cross-field validator and synthetic unit-test fixture in `tests/sld_corpus_contract.rs` enforce these additional invariants:
 
+The key distinction is that `run_status=COMPLETE` means a census was recorded, not that it is eligible for leaderboard aggregation. `comparison_eligibility=COMPARABLE` is allowed only when all expected cases occur exactly once and no result is missing, duplicated, skipped, errored, or indeterminate. A measured behavioral `FAIL` remains valid comparable evidence; the release gate will still block promotion when a critical invariant fails.
+
 - every expected case is accounted for exactly once before a run can be marked `COMPLETE`;
 - duplicate IDs, missing cases, unexpected IDs in public sets, invalid statuses, and inconsistent counts are errors;
 - `PASS`, `FAIL`, `INDETERMINATE`, `ERROR`, and `SKIPPED` are separate terminal outcomes;
