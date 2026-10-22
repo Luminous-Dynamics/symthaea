@@ -119,6 +119,8 @@ pub enum ConsentEvidenceBasis {
     Interrogative,
     /// A structured CONSENT field supplied the state; truth/provenance remain unverified.
     StructuredField,
+    /// Incompatible grant/non-grant cues appeared without reliable temporal resolution.
+    ConflictingSignals,
 }
 
 /// Auditable text-level consent assessment.
@@ -135,6 +137,8 @@ pub struct ConsentTextAssessment {
     pub basis: ConsentEvidenceBasis,
     /// Recognized cue, when one was selected.
     pub matched_phrase: Option<String>,
+    /// Competing grant/non-grant phrases that prevented a determinate label.
+    pub conflicting_phrases: Vec<String>,
     /// Whether an unquoted question mark forced the result to Unknown.
     pub question_suppressed: bool,
     /// Whether text inside supported quote delimiters was masked from matching.
@@ -147,6 +151,7 @@ impl Default for ConsentTextAssessment {
             state: ConsentState::Unknown,
             basis: ConsentEvidenceBasis::NoAssertedEvidence,
             matched_phrase: None,
+            conflicting_phrases: Vec::new(),
             question_suppressed: false,
             quoted_text_suppressed: false,
         }
@@ -171,6 +176,7 @@ impl ConsentTextAssessment {
             ConsentEvidenceBasis::ExplicitAssumptionCue => "Consent is described as assumed, not affirmatively granted",
             ConsentEvidenceBasis::Interrogative => "Question does not assert a consent state",
             ConsentEvidenceBasis::StructuredField => "Structured consent field extracted; truth, identity and provenance unverified",
+            ConsentEvidenceBasis::ConflictingSignals => "Grant and non-grant cues conflict; chronology and speaker attribution are unresolved",
         }
     }
 }
@@ -1153,6 +1159,7 @@ impl MoralParser {
                 state: ConsentState::Unknown,
                 basis: ConsentEvidenceBasis::Interrogative,
                 matched_phrase: None,
+                conflicting_phrases: Vec::new(),
                 question_suppressed: true,
                 quoted_text_suppressed,
             };
@@ -1173,22 +1180,60 @@ impl MoralParser {
             (&self.consent_given_words, ConsentState::Given, ConsentEvidenceBasis::ExplicitAffirmativeCue),
         ];
 
-        for (cues, state, basis) in categories {
-            if let Some(matched_phrase) = longest_matching_cue(cues, &evidence_text) {
-                return ConsentTextAssessment {
-                    state,
-                    basis,
-                    matched_phrase: Some(matched_phrase),
-                    question_suppressed: false,
-                    quoted_text_suppressed,
-                };
+        let matches: Vec<(ConsentState, ConsentEvidenceBasis, String)> = categories
+            .iter()
+            .filter_map(|(cues, state, basis)| {
+                longest_matching_cue(cues, &evidence_text)
+                    .map(|phrase| (*state, *basis, phrase))
+            })
+            .collect();
+
+        let has_given = matches.iter().any(|(state, _, _)| *state == ConsentState::Given);
+        let conflicting_phrases: Vec<String> = matches
+            .iter()
+            .filter(|(state, _, _)| *state != ConsentState::Given)
+            .map(|(state, _, phrase)| format!("{state:?}: {phrase}"))
+            .collect();
+
+        // Do not guess at chronology when the same unquoted text contains both
+        // affirmative and non-affirmative signals. Example: "she refused, then
+        // agreed" needs temporal/speaker resolution, not a keyword priority.
+        if has_given && !conflicting_phrases.is_empty() {
+            let mut all_phrases = conflicting_phrases;
+            if let Some((_, _, affirmative)) = matches
+                .iter()
+                .find(|(state, _, _)| *state == ConsentState::Given)
+            {
+                all_phrases.push(format!("Given: {affirmative}"));
             }
+            all_phrases.sort();
+            all_phrases.dedup();
+            return ConsentTextAssessment {
+                state: ConsentState::Unknown,
+                basis: ConsentEvidenceBasis::ConflictingSignals,
+                matched_phrase: None,
+                conflicting_phrases: all_phrases,
+                question_suppressed: false,
+                quoted_text_suppressed,
+            };
+        }
+
+        if let Some((state, basis, phrase)) = matches.into_iter().next() {
+            return ConsentTextAssessment {
+                state,
+                basis,
+                matched_phrase: Some(phrase),
+                conflicting_phrases: Vec::new(),
+                question_suppressed: false,
+                quoted_text_suppressed,
+            };
         }
 
         ConsentTextAssessment {
             state: ConsentState::Unknown,
             basis: ConsentEvidenceBasis::NoAssertedEvidence,
             matched_phrase: None,
+            conflicting_phrases: Vec::new(),
             question_suppressed: false,
             quoted_text_suppressed,
         }
@@ -1581,6 +1626,7 @@ impl MoralParser {
                     state: scenario.consent,
                     basis: ConsentEvidenceBasis::StructuredField,
                     matched_phrase: Some(format!("consent: {consent}")),
+                    conflicting_phrases: Vec::new(),
                     question_suppressed: false,
                     quoted_text_suppressed: false,
                 };
@@ -2018,6 +2064,16 @@ mod tests {
         assert_eq!(question.basis, ConsentEvidenceBasis::Interrogative);
         assert!(question.question_suppressed);
         assert!(!question.has_affirmative_cue());
+
+        let conflict = parser.assess_consent_evidence(
+            "She refused consent, but later said yes; the timeline is unclear.",
+        );
+        assert_eq!(conflict.state, ConsentState::Unknown);
+        assert_eq!(conflict.basis, ConsentEvidenceBasis::ConflictingSignals);
+        assert!(conflict.matched_phrase.is_none());
+        assert!(conflict.conflicting_phrases.len() >= 2);
+        assert!(conflict.conflicting_phrases.iter().any(|s| s.starts_with("Given:")));
+        assert!(conflict.conflicting_phrases.iter().any(|s| s.starts_with("Denied:")));
 
         let quoted = parser.assess_consent_evidence("The report says \"she gave consent\" but the source is unknown.");
         assert_eq!(quoted.state, ConsentState::Unknown);
