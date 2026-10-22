@@ -7,6 +7,7 @@ on:
       - "crates/core/symthaea-core/src/hdc/conjecture_engine.rs"
       - "crates/core/symthaea-core/src/hdc/conjecture_engine/experiment_selection.rs"
       - "crates/bridges/symthaea-physics-bridge/src/integrated_discovery.rs"
+      - "docs/research/EXPECTED_INFORMATION_GAIN_SELECTOR_V0_1.md"
       - ".github/workflows/expected-information-gain-selector.yml"
   workflow_dispatch:
 
