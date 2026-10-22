@@ -26,10 +26,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
     let config = MisShotBudgetConfig::new(8, 8, 512, 0.05)?;
     let scenarios = vec![
-        MisSamplingScenario::new("wide-gap", vec![0.80, 0.20])?,
-        MisSamplingScenario::new("moderate-gap", vec![0.60, 0.40])?,
-        MisSamplingScenario::new("narrow-gap", vec![0.55, 0.45])?,
-        MisSamplingScenario::new("exact-tie", vec![0.50, 0.50])?,
+        MisSamplingScenario::new("wide-four", vec![0.80, 0.45, 0.20, 0.10])?,
+        MisSamplingScenario::new("moderate-four", vec![0.60, 0.55, 0.40, 0.35])?,
+        MisSamplingScenario::new("narrow-four", vec![0.55, 0.53, 0.51, 0.45])?,
+        MisSamplingScenario::new("exact-tie-four", vec![0.50, 0.50, 0.50, 0.50])?,
     ];
 
     println!("record_type,scenario,trial_index,trial_seed,probabilities,true_best_vertex,adaptive_selected,adaptive_correct,adaptive_observations,uniform_selected,uniform_correct,uniform_observations,successive_rejects_selected,successive_rejects_correct,successive_rejects_observations,cr_c_selected,cr_c_correct,cr_c_observations,cr_c_eliminated,cr_a_selected,cr_a_correct,cr_a_observations,cr_a_eliminated");
@@ -60,8 +60,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             )?;
             let cc = scenario.inclusion_probabilities[conservative.selected_vertex] == best_mean;
             let ac = scenario.inclusion_probabilities[aggressive.selected_vertex] == best_mean;
-            cr_c_correct += u64::from(cc);
-            cr_a_correct += u64::from(ac);
+            cr_c_correct += if cc { 1 } else { 0 };
+            cr_a_correct += if ac { 1 } else { 0 };
             cr_c_total += u128::from(conservative.total_observations);
             cr_a_total += u128::from(aggressive.total_observations);
             cr_c_eliminated += conservative.eliminated_vertices_order.len() as u64;
