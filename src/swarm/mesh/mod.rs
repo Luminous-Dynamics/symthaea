@@ -1493,21 +1493,30 @@ impl RotatingKeyPair {
 // X25519 PER-PEER KEY AGREEMENT
 // ============================================================================
 
-/// Per-peer key store: X25519 Diffie-Hellman → BLAKE3 KDF → ChaCha20 key.
+/// Per-peer key store: static X25519 Diffie-Hellman → HKDF-SHA-256 → keys.
 ///
-/// Each peer pair derives a unique symmetric key from their DH shared secret.
-/// This provides forward secrecy (compromising one peer's key doesn't reveal
-/// other pairs' traffic) and eliminates the single shared secret.
+/// This derives pairwise keys from long-term static X25519 secrets. It can
+/// isolate peers when the supplied public keys are correctly authenticated and
+/// each peer pair uses the expected identity mapping. It does **not** provide
+/// forward secrecy: a later compromise of a long-term private key and access to
+/// the peer's recorded static public key reproduces the same DH result and
+/// derived keys. The caller must authenticate and bind public keys to peer
+/// identities; this type accepts a public key but does not verify its owner.
+///
+/// The derived keys are deterministic for a given static key pair and fixed
+/// KDF context. Use an analyzed authenticated key-exchange protocol with fresh
+/// ephemeral contributions when forward secrecy and transcript binding are
+/// required.
 ///
 /// ```text
-/// Node A (secret_a)                    Node B (secret_b)
-///   │                                    │
-///   ├─ public_a = X25519(secret_a) ─────►│
-///   │◄──── public_b = X25519(secret_b) ──┤
-///   │                                    │
-///   ├─ shared = DH(secret_a, public_b)   ├─ shared = DH(secret_b, public_a)
-///   ├─ key = BLAKE3(shared ‖ ctx)        ├─ key = BLAKE3(shared ‖ ctx)
-///   └─ (same key on both sides)          └─ (same key on both sides)
+/// Node A (static_secret_a)               Node B (static_secret_b)
+///   │                                      │
+///   ├─ static_public_a = X25519(a) ───────►│
+///   │◄──── static_public_b = X25519(b) ────┤
+///   │                                      │
+///   ├─ shared = DH(a, public_b)            ├─ shared = DH(b, public_a)
+///   ├─ keys = HKDF(shared, fixed info)     ├─ keys = HKDF(shared, fixed info)
+///   └─ same pairwise keys each session unless inputs change
 /// ```
 #[cfg(feature = "mesh-key-exchange")]
 pub struct PeerKeyStore {
@@ -1523,7 +1532,10 @@ pub struct PeerKeyStore {
 
 #[cfg(feature = "mesh-key-exchange")]
 impl PeerKeyStore {
-    /// Create a new key store with a random X25519 keypair.
+    /// Create a key store from supplied long-term X25519 secret bytes.
+    ///
+    /// The caller is responsible for secure secret generation, storage, rotation,
+    /// and authenticating the public key with the peer identity.
     pub fn new(secret_bytes: [u8; 32]) -> Self {
         let secret = x25519_dalek::StaticSecret::from(secret_bytes);
         let public = x25519_dalek::PublicKey::from(&secret);
@@ -1540,16 +1552,31 @@ impl PeerKeyStore {
         self.public.to_bytes()
     }
 
-    /// Perform DH key agreement with a peer's public key.
+    /// Derive pairwise traffic keys from the supplied peer public key.
     ///
-    /// Derives two symmetric keys via HKDF-SHA256:
+    /// Uses static X25519 plus HKDF-SHA256 with fixed domain-separation labels:
     /// - Encryption key (info: `symthaea-mesh-chacha20-v1`)
     /// - Authentication key (info: `symthaea-mesh-auth-v1`)
     ///
-    /// Returns the encryption key.
-    pub fn agree(&mut self, peer_source_id: [u8; 8], peer_public: &[u8; 32]) -> [u8; 32] {
+    /// This operation does not authenticate the peer public key, bind it to a
+    /// transcript/identity, or provide forward secrecy. With unchanged static
+    /// key material, it derives the same key values again.
+    ///
+    /// Returns an error for a non-contributory X25519 result before deriving or
+    /// storing traffic keys. Callers must still authenticate the peer public key
+    /// and bind it to the intended identity and handshake transcript.
+    pub fn agree(
+        &mut self,
+        peer_source_id: [u8; 8],
+        peer_public: &[u8; 32],
+    ) -> Result<[u8; 32], crate::swarm::SwarmError> {
         let peer_pk = x25519_dalek::PublicKey::from(*peer_public);
         let shared_secret = self.secret.diffie_hellman(&peer_pk);
+        if !shared_secret.was_contributory() {
+            return Err(crate::swarm::SwarmError::TrustVerificationError {
+                reason: "X25519 produced a non-contributory shared secret".to_string(),
+            });
+        }
 
         // KDF: HKDF-SHA256 with domain-separated info strings
         let hk = hkdf::Hkdf::<sha2::Sha256>::new(None, shared_secret.as_bytes());
@@ -1564,7 +1591,7 @@ impl PeerKeyStore {
 
         self.peer_keys.insert(peer_source_id, chacha_key);
         self.peer_auth_keys.insert(peer_source_id, auth_key);
-        chacha_key
+        Ok(chacha_key)
     }
 
     /// Get the derived symmetric key for a peer (if agreement has been done).

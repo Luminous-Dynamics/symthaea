@@ -1,44 +1,64 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! # Post-Quantum Hybrid Handshake — Ed25519 + ML-KEM-768
+//! # PQC-Assisted KEM Handshake — Claim-Integrity Review
 //!
-//! Combines classical Ed25519 identity verification with ML-KEM-768
-//! key encapsulation for quantum-resistant session key derivation.
+//! This module contains experimental KEM-exchange scaffolding, **not a
+//! reviewed hybrid key-exchange protocol**.
 //!
-//! ## Protocol
+//! Critical backend limitation: the main workspace currently resolves
+//! `mycelix-crypto` to `stubs/mycelix-crypto`, whose ML-KEM methods return
+//! deterministic all-zero keys, ciphertexts, and shared secrets. That is a
+//! compile-only stub, not cryptography. The API checks
+//! `CRYPTO_BACKEND_IS_STUB` and refuses KEM operations while it is linked. A
+//! reviewed real ML-KEM backend and transcript-bound handshake are prerequisites
+//! for enabling post-quantum session establishment.
+//!
+//! ## Current data flow
 //!
 //! ```text
-//! Phase 1 (Classical): Mutual Ed25519 handshake (from handshake.rs)
-//!   → Both sides prove identity via challenge-response
-//!
-//! Phase 2 (PQC): ML-KEM-768 key encapsulation
-//!   → Initiator encapsulates shared secret to responder's KEM public key
-//!   → Responder decapsulates to recover the same shared secret
-//!
-//! Phase 3 (Derivation): HKDF(Ed25519_nonce || ML-KEM_shared) → session key
-//!   → Combined session key is quantum-resistant even if Ed25519 is broken
-//!   → Both classical AND PQC must succeed (AND logic)
+//! Ed25519 challenge-response (separate API)
+//!   → challenge nonce is public protocol input, not a shared secret
+//! ML-KEM-768 encapsulation
+//!   → shared secret comes from the KEM
+//! Session derivation
+//!   → BLAKE3 derive_key(context, public_challenge || kem_shared_secret)
 //! ```
 //!
-//! ## Security
+//! ## Security claim boundaries
 //!
-//! The hybrid approach follows NIST recommendations for PQC transition:
-//! - If quantum computers break Ed25519, ML-KEM-768 still protects the session key
-//! - If ML-KEM-768 has an undiscovered vulnerability, Ed25519 still authenticates
-//! - The HKDF combination ensures the derived key is at least as strong as
-//!   the strongest component (Bindel et al. 2019)
+//! - Mixing a public challenge nonce with the KEM secret does not add an
+//!   independent classical secret contribution to confidentiality.
+//! - This API does not itself enforce that the Ed25519 exchange completed, nor
+//!   bind both peer identities, the KEM public key and KEM ciphertext to one
+//!   authenticated transcript. Callers must not infer authentication simply
+//!   because they invoked the session-key API.
+//! - The manager holds one ML-KEM keypair across sessions. Recorded KEM
+//!   ciphertexts can be decapsulated if that private key is later compromised;
+//!   the current design therefore does not provide KEM-based forward secrecy.
+//! - Do not claim the session remains secure if either the classical or KEM
+//!   component fails without a specified combiner proof, authenticated key
+//!   binding, and independent protocol review.
+//!
+//! A production protocol needs an authenticated, transcript-bound handshake,
+//! explicit downgrade rules, per-session key lifecycle/erasure, and independent
+//! tests against active attacks. See
+//! `docs/security/MESH_KEY_AGREEMENT_CLAIM_REVIEW.md`.
 //!
 //! ## Feature Gate
 //!
-//! Requires `pqc-handshake` feature (implies `identity` + `mesh-key-exchange`
-//! + `mycelix-crypto` with `native` feature).
+//! Requires `pqc-handshake` feature (implies `swarm` transport, `identity`,
+//! `mesh-key-exchange`, and the current compile-only `mycelix-crypto` stub).
 //!
-//! ## References
+//! ## Design references
 //!
-//! - NIST FIPS 203 (2024) — ML-KEM (Module-Lattice Key Encapsulation Mechanism)
-//! - Bindel et al. (2019) — Hybrid key exchange in TLS 1.3
-//! - Schwabe et al. (2020) — CRYSTALS-Kyber algorithm specification
+//! - NIST FIPS 203 — final ML-KEM standard
+//! - RFC 10024 — standardized TLS 1.3 `X25519MLKEM768` hybrid group
+//! - RFC 9954 — TLS 1.3 hybrid key-exchange framework
+//!
+//! These standards are references for future integration, not evidence that this
+//! module implements them. The current workspace backend is a compile-only stub,
+//! and this module does not establish a session.
 
 use crate::swarm::{SwarmConfig, SwarmError, SwarmResult};
 use mycelix_crypto::pqc::ml_kem::MlKem768KeyPair;
@@ -46,37 +66,43 @@ use mycelix_crypto::traits::KeyEncapsulator;
 use mycelix_crypto::{AlgorithmId, TaggedPublicKey};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use zeroize::Zeroize;
+
+// ML-KEM-768 encodings from FIPS 203. Validate lengths before storing or decapsulating.
+const ML_KEM_768_PUBLIC_KEY_BYTES: usize = 1_184;
+const ML_KEM_768_CIPHERTEXT_BYTES: usize = 1_088;
+/// Bound caller-controlled pending exchange state (public keys plus candidate keys).
+const MAX_PENDING_KEM_EXCHANGES: usize = 256;
+/// Bound peer labels before copying them into pending-state maps.
+const MAX_KEM_PEER_ID_BYTES: usize = 256;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // PQC SESSION KEY
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/// A PQC-derived session key combining classical and quantum-resistant components.
-#[derive(Clone)]
-pub struct PqcSessionKey {
-    /// Combined session key: HKDF(classical_nonce || kem_shared_secret).
-    /// 32 bytes — suitable for ChaCha20-Poly1305.
-    session_key: [u8; 32],
-    /// When the session was established (for expiration tracking).
-    established_at: std::time::SystemTime,
+/// Unconfirmed key material derived from KEM output and public context.
+///
+/// This is not an established session key. It remains in the pending map until
+/// a reviewed protocol implements transcript binding and explicit key confirmation.
+struct PqcCandidateKey {
+    candidate_key: [u8; 32],
+    created_at: std::time::SystemTime,
 }
 
-impl PqcSessionKey {
-    /// Get the 32-byte session key.
-    pub fn key(&self) -> &[u8; 32] {
-        &self.session_key
+impl PqcCandidateKey {
+    fn key(&self) -> &[u8; 32] {
+        &self.candidate_key
     }
 
-    /// When the session was established.
-    pub fn established_at(&self) -> std::time::SystemTime {
-        self.established_at
+    fn created_at(&self) -> std::time::SystemTime {
+        self.created_at
     }
 }
 
-impl Drop for PqcSessionKey {
+impl Drop for PqcCandidateKey {
     fn drop(&mut self) {
-        // Zeroize session key on drop
-        self.session_key = [0u8; 32];
+        use zeroize::Zeroize;
+        self.candidate_key.zeroize();
     }
 }
 
@@ -84,7 +110,10 @@ impl Drop for PqcSessionKey {
 // KEM PUBLIC KEY EXCHANGE
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/// Data sent during PQC handshake phase 2: KEM public key + encapsulation.
+/// Experimental wire-payload shape only; not an active protocol message.
+///
+/// Do not transmit this type as a security claim: the current KEM backend is a
+/// compile stub and the service deliberately does not complete a handshake.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KemExchange {
     /// ML-KEM-768 public key bytes (1184 bytes).
@@ -99,17 +128,20 @@ pub struct KemExchange {
 // PQC HANDSHAKE MANAGER
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/// Manages hybrid Ed25519 + ML-KEM-768 handshakes.
+/// Manages experimental KEM API plumbing; it does not establish sessions.
 ///
-/// Wraps the classical `HybridHandshake` with a KEM layer that provides
-/// post-quantum key agreement.
+/// The workspace-local backend is a deterministic all-zero compile stub and is
+/// explicitly refused by the public KEM operations. Even after a real backend
+/// is selected, KEM results must remain candidates until a reviewed, transcript-
+/// bound protocol and explicit key confirmation exist.
 pub struct PqcHandshakeManager {
     /// Classical handshake manager (Ed25519 or BLAKE3 fallback).
     classical: crate::swarm::handshake::HybridHandshake,
-    /// This node's ML-KEM-768 keypair.
+    /// Backend keypair placeholder. The bundled stub is never accepted
+    /// for KEM operations; see `ensure_real_kem_backend`.
     kem_keypair: MlKem768KeyPair,
-    /// Per-peer PQC session keys (derived after successful handshake).
-    session_keys: HashMap<String, PqcSessionKey>,
+    /// Candidate keys derived from KEM but not yet transcript-confirmed.
+    pending_session_keys: HashMap<String, PqcCandidateKey>,
     /// Pending KEM exchanges (peer_id → their KEM public key).
     pending_kem: HashMap<String, Vec<u8>>,
 }
@@ -120,15 +152,28 @@ impl PqcHandshakeManager {
         Self {
             classical: crate::swarm::handshake::HybridHandshake::new(config),
             kem_keypair: MlKem768KeyPair::generate(),
-            session_keys: HashMap::new(),
+            pending_session_keys: HashMap::new(),
             pending_kem: HashMap::new(),
         }
     }
 
-    /// Get this node's KEM public key bytes (for transmission to peers).
-    pub fn kem_public_key_bytes(&self) -> Vec<u8> {
+    /// Export this node's KEM public key only when a real cryptographic backend is linked.
+    ///
+    /// The workspace-local `mycelix-crypto` dependency is a compilation stub
+    /// with deterministic all-zero outputs. It is explicitly refused here.
+    pub fn kem_public_key_bytes(&self) -> SwarmResult<Vec<u8>> {
+        Self::ensure_real_kem_backend()?;
         let tagged = self.kem_keypair.public_key();
-        tagged.key_bytes.clone()
+        Ok(tagged.key_bytes.clone())
+    }
+
+    fn ensure_real_kem_backend() -> SwarmResult<()> {
+        if mycelix_crypto::CRYPTO_BACKEND_IS_STUB {
+            return Err(SwarmError::FeatureNotEnabled {
+                feature: "real ML-KEM-768 backend (workspace crypto stub is active)".to_string(),
+            });
+        }
+        Ok(())
     }
 
     /// Get the classical handshake manager (for Ed25519 operations).
@@ -141,19 +186,29 @@ impl PqcHandshakeManager {
         &mut self.classical
     }
 
-    /// Get a session key for a peer (if PQC handshake completed).
-    pub fn session_key(&self, peer_id: &str) -> Option<&[u8; 32]> {
-        self.session_keys.get(peer_id).map(|sk| sk.key())
+    /// Get an established session key for a peer.
+    ///
+    /// KEM output alone is not an established session. Until authenticated
+    /// transcript binding and explicit key confirmation are implemented, this
+    /// returns `None` for candidate keys.
+    pub fn session_key(&self, _peer_id: &str) -> Option<&[u8; 32]> {
+        // No session-activation API exists yet. Candidate material is never an active key.
+        None
     }
 
-    /// Number of active PQC sessions.
+    /// Number of established sessions.
     pub fn session_count(&self) -> usize {
-        self.session_keys.len()
+        0
     }
 
-    /// Remove a peer's session key (on disconnect).
+    /// Number of derived candidate keys awaiting transcript/key confirmation.
+    pub fn pending_session_count(&self) -> usize {
+        self.pending_session_keys.len()
+    }
+
+    /// Remove a peer's active and pending key material (e.g., on disconnect).
     pub fn remove_session(&mut self, peer_id: &str) {
-        self.session_keys.remove(peer_id);
+        self.pending_session_keys.remove(peer_id);
         self.pending_kem.remove(peer_id);
     }
 
@@ -161,34 +216,80 @@ impl PqcHandshakeManager {
     // INITIATOR SIDE
     // ════════════════════════════════════════════════════════════════════
 
-    /// Phase 2a (Initiator): Store the responder's KEM public key.
+    /// Store a candidate responder KEM public key after the caller has
+    /// authenticated its identity/transcript.
     ///
-    /// Called when the initiator receives the responder's `KemExchange`
-    /// (which contains their KEM public key but no ciphertext yet).
-    pub fn receive_kem_public_key(&mut self, peer_id: &str, kem_public_key: &[u8]) {
+    /// This method validates the ML-KEM-768 encoding size and bounds peer labels
+    /// and pending entries. It does not authenticate the supplied public key.
+    pub fn receive_kem_public_key(
+        &mut self,
+        peer_id: &str,
+        kem_public_key: &[u8],
+    ) -> SwarmResult<()> {
+        if peer_id.is_empty() || peer_id.len() > MAX_KEM_PEER_ID_BYTES {
+            return Err(SwarmError::TrustVerificationError {
+                reason: "PQC peer identifier is empty or exceeds the 256-byte limit".to_string(),
+            });
+        }
+        if kem_public_key.len() != ML_KEM_768_PUBLIC_KEY_BYTES {
+            return Err(SwarmError::TrustVerificationError {
+                reason: format!(
+                    "Invalid ML-KEM-768 public key length: expected {ML_KEM_768_PUBLIC_KEY_BYTES}, got {}",
+                    kem_public_key.len()
+                ),
+            });
+        }
+        if !self.pending_kem.contains_key(peer_id)
+            && self.pending_kem.len() >= MAX_PENDING_KEM_EXCHANGES
+        {
+            return Err(SwarmError::TrustVerificationError {
+                reason: "Maximum pending PQC key exchanges reached".to_string(),
+            });
+        }
+        Self::ensure_real_kem_backend()?;
         self.pending_kem
             .insert(peer_id.to_string(), kem_public_key.to_vec());
+        Ok(())
     }
 
-    /// Phase 2b (Initiator): Encapsulate a shared secret to the responder's KEM public key.
+    /// Encapsulate a shared secret to the responder's supplied KEM public key.
     ///
-    /// Returns `(ciphertext, classical_nonce)` — the ciphertext is sent to the
-    /// responder, and the classical_nonce (from the handshake challenge) is used
-    /// in HKDF derivation.
+    /// The `classical_nonce` is public challenge/context input; it is not a
+    /// classical shared secret. This method does not verify that the classical
+    /// handshake succeeded or that this KEM public key is authenticated for
+    /// `peer_id`; the caller must enforce those conditions before use.
     ///
-    /// After this call, the initiator can derive the session key via
-    /// `derive_session_key()`.
+    /// Returns the KEM ciphertext and stores only a pending candidate key.
+    /// The candidate is not returned by `session_key` until a future reviewed
+    /// protocol supplies authenticated transcript binding and key confirmation.
+    /// The current KEM private key is reused across sessions, so this API does
+    /// not provide forward secrecy against later compromise of that key.
     pub fn encapsulate_for_peer(
         &mut self,
         peer_id: &str,
         classical_nonce: &[u8],
     ) -> SwarmResult<Vec<u8>> {
-        let kem_pk_bytes =
-            self.pending_kem
-                .remove(peer_id)
-                .ok_or_else(|| SwarmError::TrustVerificationError {
-                    reason: format!("No KEM public key stored for peer '{peer_id}'"),
-                })?;
+        if peer_id.is_empty() || peer_id.len() > MAX_KEM_PEER_ID_BYTES {
+            return Err(SwarmError::TrustVerificationError {
+                reason: "PQC peer identifier is empty or exceeds the 256-byte limit".to_string(),
+            });
+        }
+        if !self.pending_session_keys.contains_key(peer_id)
+            && self.pending_session_keys.len() >= MAX_PENDING_KEM_EXCHANGES
+        {
+            return Err(SwarmError::TrustVerificationError {
+                reason: "Maximum pending PQC candidate keys reached".to_string(),
+            });
+        }
+        let kem_pk_bytes = self
+            .pending_kem
+            .get(peer_id)
+            .cloned()
+            .ok_or_else(|| SwarmError::TrustVerificationError {
+                reason: format!("No KEM public key stored for peer '{peer_id}'"),
+            })?;
+        Self::ensure_real_kem_backend()?;
+        self.pending_kem.remove(peer_id);
 
         // Build TaggedPublicKey for the responder
         let tagged_pk = TaggedPublicKey::new(AlgorithmId::MlKem768, kem_pk_bytes).map_err(|e| {
@@ -198,23 +299,26 @@ impl PqcHandshakeManager {
         })?;
 
         // Encapsulate shared secret
-        let (ciphertext, kem_shared_secret) =
+        let (ciphertext, mut kem_shared_secret) =
             self.kem_keypair.encapsulate(&tagged_pk).map_err(|e| {
                 SwarmError::TrustVerificationError {
                     reason: format!("ML-KEM-768 encapsulation failed: {e}"),
                 }
             })?;
 
-        // Derive session key: HKDF(classical_nonce || kem_shared_secret)
-        let session_key = Self::hkdf_derive(classical_nonce, &kem_shared_secret);
+        // Derive using BLAKE3 context-based derivation; the nonce is public context.
+        let mut session_key = Self::blake3_derive_session_key(classical_nonce, &kem_shared_secret);
+        kem_shared_secret.zeroize();
 
-        self.session_keys.insert(
+        self.pending_session_keys.insert(
             peer_id.to_string(),
-            PqcSessionKey {
-                session_key,
-                established_at: std::time::SystemTime::now(),
+            PqcCandidateKey {
+                candidate_key: session_key,
+                created_at: std::time::SystemTime::now(),
             },
         );
+        // Arrays are Copy; clear the temporary stack copy after insertion.
+        session_key.zeroize();
 
         Ok(ciphertext)
     }
@@ -223,61 +327,84 @@ impl PqcHandshakeManager {
     // RESPONDER SIDE
     // ════════════════════════════════════════════════════════════════════
 
-    /// Phase 2 (Responder): Decapsulate the initiator's KEM ciphertext
-    /// and derive the session key.
+    /// Decapsulate a KEM ciphertext and derive a pending candidate key.
     ///
-    /// The responder receives the ciphertext from `encapsulate_for_peer()`,
-    /// decapsulates with their own KEM private key, and derives the same
-    /// session key via HKDF.
+    /// The candidate is not exposed as an established session and this method
+    /// returns no key bytes. A future reviewed protocol must bind the ciphertext,
+    /// KEM key identity, peer identities, protocol version and classical
+    /// transcript, then complete explicit key confirmation before activation.
     pub fn decapsulate_and_derive(
         &mut self,
         peer_id: &str,
         kem_ciphertext: &[u8],
         classical_nonce: &[u8],
-    ) -> SwarmResult<[u8; 32]> {
+    ) -> SwarmResult<()> {
+        if peer_id.is_empty() || peer_id.len() > MAX_KEM_PEER_ID_BYTES {
+            return Err(SwarmError::TrustVerificationError {
+                reason: "PQC peer identifier is empty or exceeds the 256-byte limit".to_string(),
+            });
+        }
+        if kem_ciphertext.len() != ML_KEM_768_CIPHERTEXT_BYTES {
+            return Err(SwarmError::TrustVerificationError {
+                reason: format!(
+                    "Invalid ML-KEM-768 ciphertext length: expected {ML_KEM_768_CIPHERTEXT_BYTES}, got {}",
+                    kem_ciphertext.len()
+                ),
+            });
+        }
+        if !self.pending_session_keys.contains_key(peer_id)
+            && self.pending_session_keys.len() >= MAX_PENDING_KEM_EXCHANGES
+        {
+            return Err(SwarmError::TrustVerificationError {
+                reason: "Maximum pending PQC candidate keys reached".to_string(),
+            });
+        }
+        Self::ensure_real_kem_backend()?;
+
         // Decapsulate shared secret
-        let kem_shared_secret = self.kem_keypair.decapsulate(kem_ciphertext).map_err(|e| {
+        let mut kem_shared_secret = self.kem_keypair.decapsulate(kem_ciphertext).map_err(|e| {
             SwarmError::TrustVerificationError {
                 reason: format!("ML-KEM-768 decapsulation failed: {e}"),
             }
         })?;
 
-        // Derive session key: HKDF(classical_nonce || kem_shared_secret)
-        let session_key = Self::hkdf_derive(classical_nonce, &kem_shared_secret);
+        // Derive using BLAKE3 context-based derivation; the nonce is public context.
+        let mut session_key = Self::blake3_derive_session_key(classical_nonce, &kem_shared_secret);
+        kem_shared_secret.zeroize();
 
-        self.session_keys.insert(
+        self.pending_session_keys.insert(
             peer_id.to_string(),
-            PqcSessionKey {
-                session_key,
-                established_at: std::time::SystemTime::now(),
+            PqcCandidateKey {
+                candidate_key: session_key,
+                created_at: std::time::SystemTime::now(),
             },
         );
+        // Arrays are Copy; clear the temporary stack copy after insertion.
+        session_key.zeroize();
 
-        Ok(session_key)
+        Ok(())
     }
 
     // ════════════════════════════════════════════════════════════════════
     // KEY DERIVATION
     // ════════════════════════════════════════════════════════════════════
 
-    /// Derive a 32-byte session key from classical nonce + KEM shared secret.
+    /// Derive a 32-byte key using BLAKE3's context-based derive-key API.
     ///
-    /// Uses HKDF-SHA256 with domain separation:
-    /// - Salt: classical handshake nonce (binds to the Ed25519 session)
-    /// - IKM: ML-KEM-768 shared secret (32 bytes, quantum-resistant)
-    /// - Info: domain separator "symthaea-pqc-session-v1"
-    ///
-    /// The derived key is at least as strong as the strongest input
-    /// (Bindel et al. 2019 — hybrid KDF security proof).
-    fn hkdf_derive(classical_nonce: &[u8], kem_shared_secret: &[u8]) -> [u8; 32] {
-        // Concatenate inputs for IKM
-        let mut ikm = Vec::with_capacity(classical_nonce.len() + kem_shared_secret.len());
+    /// The public challenge bytes are concatenated with the secret ML-KEM
+    /// output as input material. The challenge contributes context binding only;
+    /// it is not secret entropy and this function does not implement HKDF or a
+    /// proven hybrid KDF combiner.
+    fn blake3_derive_session_key(
+        classical_nonce: &[u8],
+        kem_shared_secret: &[u8],
+    ) -> [u8; 32] {
+        let mut ikm = zeroize::Zeroizing::new(
+            Vec::with_capacity(classical_nonce.len() + kem_shared_secret.len()),
+        );
         ikm.extend_from_slice(classical_nonce);
         ikm.extend_from_slice(kem_shared_secret);
-
-        // BLAKE3 keyed derivation (lighter than HKDF-SHA256, same security)
-        let derived = blake3::derive_key("symthaea-pqc-session-v1", &ikm);
-        derived
+        blake3::derive_key("symthaea-pqc-session-v1", ikm.as_slice())
     }
 }
 
@@ -294,165 +421,242 @@ mod tests {
     }
 
     #[test]
-    fn test_kem_keypair_generation() {
+    fn test_workspace_crypto_stub_is_never_accepted_as_ml_kem() {
+        assert!(
+            mycelix_crypto::CRYPTO_BACKEND_IS_STUB,
+            "this workspace dependency must identify itself as a test/compile-only stub"
+        );
         let manager = PqcHandshakeManager::new(test_config());
-        let pk_bytes = manager.kem_public_key_bytes();
-        // ML-KEM-768 public key is 1184 bytes
-        assert_eq!(pk_bytes.len(), 1184, "KEM public key should be 1184 bytes");
+        assert!(manager.kem_public_key_bytes().is_err());
+        assert_eq!(manager.session_count(), 0);
+        assert_eq!(manager.pending_session_count(), 0);
+        assert!(manager.session_key("any-peer").is_none());
     }
 
     #[test]
-    fn test_pqc_session_key_derivation() {
-        let mut initiator = PqcHandshakeManager::new(test_config());
-        let mut responder = PqcHandshakeManager::new(test_config());
-
-        let nonce = vec![0x42u8; 32]; // simulated classical handshake nonce
-
-        // Initiator receives responder's KEM public key
-        let responder_pk = responder.kem_public_key_bytes();
-        initiator.receive_kem_public_key("peer-B", &responder_pk);
-
-        // Initiator encapsulates
-        let ciphertext = initiator.encapsulate_for_peer("peer-B", &nonce).unwrap();
-        assert!(!ciphertext.is_empty());
-
-        // Responder decapsulates
-        let responder_key = responder
-            .decapsulate_and_derive("peer-A", &ciphertext, &nonce)
-            .unwrap();
-
-        // Both should derive the same session key
-        let initiator_key = initiator.session_key("peer-B").unwrap();
-        assert_eq!(
-            initiator_key, &responder_key,
-            "Initiator and responder must derive the same session key"
-        );
-    }
-
-    #[test]
-    fn test_pqc_session_key_different_per_peer() {
+    fn test_kem_public_key_length_and_peer_id_are_validated_before_storage() {
         let mut manager = PqcHandshakeManager::new(test_config());
-        let responder_a = PqcHandshakeManager::new(test_config());
-        let responder_b = PqcHandshakeManager::new(test_config());
+        let valid_length = vec![0u8; ML_KEM_768_PUBLIC_KEY_BYTES];
 
-        let nonce = vec![0x42u8; 32];
-
-        // Establish session with peer A
-        manager.receive_kem_public_key("peer-A", &responder_a.kem_public_key_bytes());
-        let _ = manager.encapsulate_for_peer("peer-A", &nonce).unwrap();
-
-        // Establish session with peer B
-        manager.receive_kem_public_key("peer-B", &responder_b.kem_public_key_bytes());
-        let _ = manager.encapsulate_for_peer("peer-B", &nonce).unwrap();
-
-        let key_a = manager.session_key("peer-A").unwrap();
-        let key_b = manager.session_key("peer-B").unwrap();
-        assert_ne!(
-            key_a, key_b,
-            "Different peers must have different session keys"
+        assert!(manager.receive_kem_public_key("", &valid_length).is_err());
+        assert!(
+            manager
+                .receive_kem_public_key(&"p".repeat(MAX_KEM_PEER_ID_BYTES + 1), &valid_length)
+                .is_err()
         );
+        assert!(manager.pending_kem.is_empty());
+
+        for length in [0, ML_KEM_768_PUBLIC_KEY_BYTES - 1, ML_KEM_768_PUBLIC_KEY_BYTES + 1] {
+            let malformed = vec![0u8; length];
+            assert!(
+                manager.receive_kem_public_key("peer-invalid", &malformed).is_err(),
+                "malformed public-key length {length} must be rejected"
+            );
+            assert!(manager.pending_kem.is_empty());
+        }
+
+        // Correct length is not sufficient: the current backend is an explicit
+        // all-zero stub, so it must fail closed without storing the key.
+        assert!(manager.receive_kem_public_key("peer-stub", &valid_length).is_err());
+        assert!(manager.pending_kem.is_empty());
     }
 
     #[test]
-    fn test_classical_nonce_affects_session_key() {
-        let mut initiator1 = PqcHandshakeManager::new(test_config());
-        let mut initiator2 = PqcHandshakeManager::new(test_config());
-        let responder = PqcHandshakeManager::new(test_config());
-
-        let rpk = responder.kem_public_key_bytes();
-
-        // Same responder PK, different nonces
-        let nonce1 = vec![0x01u8; 32];
-        let nonce2 = vec![0x02u8; 32];
-
-        initiator1.receive_kem_public_key("peer-R", &rpk);
-        let _ = initiator1.encapsulate_for_peer("peer-R", &nonce1).unwrap();
-
-        initiator2.receive_kem_public_key("peer-R", &rpk);
-        let _ = initiator2.encapsulate_for_peer("peer-R", &nonce2).unwrap();
-
-        let key1 = initiator1.session_key("peer-R").unwrap();
-        let key2 = initiator2.session_key("peer-R").unwrap();
-        assert_ne!(
-            key1, key2,
-            "Different classical nonces must produce different session keys"
-        );
-    }
-
-    #[test]
-    fn test_wrong_ciphertext_fails() {
-        let mut responder = PqcHandshakeManager::new(test_config());
-        let nonce = vec![0x42u8; 32];
-
-        // Random garbage ciphertext
-        let bad_ct = vec![0xFFu8; 1088];
-        let result = responder.decapsulate_and_derive("peer-X", &bad_ct, &nonce);
-        // ML-KEM-768 is IND-CCA2 secure — wrong ciphertext produces a random
-        // shared secret (implicit rejection). It doesn't error, but the keys won't match.
-        // This is by design in Kyber/ML-KEM.
-        assert!(result.is_ok(), "ML-KEM implicit rejection should not error");
-    }
-
-    #[test]
-    fn test_remove_session() {
+    fn test_pending_kem_exchange_count_is_bounded() {
         let mut manager = PqcHandshakeManager::new(test_config());
-        let responder = PqcHandshakeManager::new(test_config());
-        let nonce = vec![0x42u8; 32];
+        let encoded_pk = vec![0u8; ML_KEM_768_PUBLIC_KEY_BYTES];
 
-        manager.receive_kem_public_key("peer-A", &responder.kem_public_key_bytes());
-        let _ = manager.encapsulate_for_peer("peer-A", &nonce).unwrap();
-        assert_eq!(manager.session_count(), 1);
+        // Seed private test state directly to exercise the capacity guard
+        // independently of the stub-backend guard.
+        for index in 0..MAX_PENDING_KEM_EXCHANGES {
+            manager.pending_kem.insert(format!("peer-{index}"), encoded_pk.clone());
+        }
+        assert_eq!(manager.pending_kem.len(), MAX_PENDING_KEM_EXCHANGES);
 
+        assert!(
+            manager.receive_kem_public_key("peer-over-limit", &encoded_pk).is_err(),
+            "a new peer beyond the fixed pending limit must be rejected"
+        );
+        assert_eq!(manager.pending_kem.len(), MAX_PENDING_KEM_EXCHANGES);
+        assert!(!manager.pending_kem.contains_key("peer-over-limit"));
+    }
+
+    #[test]
+    fn test_pending_candidate_count_is_bounded_before_kem_work() {
+        let mut manager = PqcHandshakeManager::new(test_config());
+        let now = std::time::SystemTime::now();
+
+        for index in 0..MAX_PENDING_KEM_EXCHANGES {
+            manager.pending_session_keys.insert(
+                format!("candidate-{index}"),
+                PqcCandidateKey {
+                    candidate_key: [index as u8; 32],
+                    created_at: now,
+                },
+            );
+        }
+        manager.pending_kem.insert(
+            "peer-over-limit".to_string(),
+            vec![0u8; ML_KEM_768_PUBLIC_KEY_BYTES],
+        );
+
+        // Capacity checks must happen before KEM calls and before pending
+        // public-key state is consumed.
+        assert!(
+            manager
+                .encapsulate_for_peer("peer-over-limit", &[0x42u8; 32])
+                .is_err()
+        );
+        assert!(
+            manager
+                .decapsulate_and_derive(
+                    "peer-over-limit",
+                    &vec![0u8; ML_KEM_768_CIPHERTEXT_BYTES],
+                    &[0x42u8; 32],
+                )
+                .is_err()
+        );
+        assert_eq!(manager.pending_session_count(), MAX_PENDING_KEM_EXCHANGES);
+        assert_eq!(manager.pending_kem.len(), 1);
+        assert!(manager.pending_kem.contains_key("peer-over-limit"));
+        assert_eq!(manager.session_count(), 0);
+    }
+
+    #[test]
+    fn test_invalid_kem_ciphertext_lengths_do_not_create_candidates() {
+        let mut manager = PqcHandshakeManager::new(test_config());
+        let public_context = [0x5Au8; 32];
+
+        for length in [0, ML_KEM_768_CIPHERTEXT_BYTES - 1, ML_KEM_768_CIPHERTEXT_BYTES + 1] {
+            let ciphertext = vec![0u8; length];
+            assert!(
+                manager
+                    .decapsulate_and_derive("peer-invalid", &ciphertext, &public_context)
+                    .is_err(),
+                "malformed ciphertext length {length} must be rejected"
+            );
+            assert_eq!(manager.pending_session_count(), 0);
+        }
+
+        // Correct ciphertext length still cannot use the compile-only stub.
+        assert!(
+            manager
+                .decapsulate_and_derive(
+                    "peer-stub",
+                    &vec![0xFFu8; ML_KEM_768_CIPHERTEXT_BYTES],
+                    &public_context,
+                )
+                .is_err()
+        );
+        assert_eq!(manager.pending_session_count(), 0);
+        assert_eq!(manager.session_count(), 0);
+    }
+
+    #[test]
+    fn test_stub_backend_cannot_create_candidate_or_active_session() {
+        let mut manager = PqcHandshakeManager::new(test_config());
+        let public_key = vec![0u8; ML_KEM_768_PUBLIC_KEY_BYTES];
+        let ciphertext = vec![0u8; ML_KEM_768_CIPHERTEXT_BYTES];
+
+        assert!(matches!(
+            manager.kem_public_key_bytes(),
+            Err(SwarmError::FeatureNotEnabled { .. })
+        ));
+        assert!(matches!(
+            manager.receive_kem_public_key("peer-B", &public_key),
+            Err(SwarmError::FeatureNotEnabled { .. })
+        ));
+        assert!(manager.pending_kem.is_empty());
+
+        // Exercise encapsulation with an already-populated pending slot so the
+        // backend guard, not a missing-key check, is the reason it fails.
+        manager.pending_kem.insert("peer-B".to_string(), public_key);
+        assert!(matches!(
+            manager.encapsulate_for_peer("peer-B", &[0x42u8; 32]),
+            Err(SwarmError::FeatureNotEnabled { .. })
+        ));
+        assert!(
+            manager.pending_kem.contains_key("peer-B"),
+            "backend refusal must not consume pending caller state"
+        );
+
+        assert!(matches!(
+            manager.decapsulate_and_derive("peer-B", &ciphertext, &[0x42u8; 32]),
+            Err(SwarmError::FeatureNotEnabled { .. })
+        ));
+
+        assert_eq!(manager.pending_session_count(), 0);
+        assert_eq!(manager.session_count(), 0);
+        assert!(manager.session_key("peer-B").is_none());
+    }
+
+    #[test]
+    fn test_remove_session_clears_pending_candidate_and_public_key() {
+        let mut manager = PqcHandshakeManager::new(test_config());
+        manager.pending_kem.insert(
+            "peer-A".to_string(),
+            vec![0u8; ML_KEM_768_PUBLIC_KEY_BYTES],
+        );
+        manager.pending_session_keys.insert(
+            "peer-A".to_string(),
+            PqcCandidateKey {
+                candidate_key: [0x42; 32],
+                created_at: std::time::SystemTime::now(),
+            },
+        );
+
+        assert_eq!(manager.pending_session_count(), 1);
+        assert!(manager.pending_kem.contains_key("peer-A"));
         manager.remove_session("peer-A");
         assert_eq!(manager.session_count(), 0);
+        assert_eq!(manager.pending_session_count(), 0);
+        assert!(!manager.pending_kem.contains_key("peer-A"));
         assert!(manager.session_key("peer-A").is_none());
     }
 
     #[test]
     fn test_missing_kem_public_key_fails() {
         let mut manager = PqcHandshakeManager::new(test_config());
-        let nonce = vec![0x42u8; 32];
-
-        // No KEM public key stored for this peer
-        let result = manager.encapsulate_for_peer("peer-X", &nonce);
-        assert!(result.is_err());
+        assert!(manager.encapsulate_for_peer("peer-X", &[0x42u8; 32]).is_err());
     }
 
     #[test]
-    fn test_session_key_is_32_bytes() {
-        let mut initiator = PqcHandshakeManager::new(test_config());
-        let responder = PqcHandshakeManager::new(test_config());
-        let nonce = vec![0x42u8; 32];
-
-        initiator.receive_kem_public_key("peer-B", &responder.kem_public_key_bytes());
-        let _ = initiator.encapsulate_for_peer("peer-B", &nonce).unwrap();
-
-        let key = initiator.session_key("peer-B").unwrap();
-        assert_eq!(
-            key.len(),
-            32,
-            "Session key must be 32 bytes for ChaCha20-Poly1305"
+    fn test_candidate_key_is_not_exposed_as_established_session() {
+        let mut manager = PqcHandshakeManager::new(test_config());
+        manager.pending_session_keys.insert(
+            "peer-B".to_string(),
+            PqcCandidateKey {
+                candidate_key: [0xAB; 32],
+                created_at: std::time::SystemTime::now(),
+            },
         );
+
+        let candidate = manager.pending_session_keys.get("peer-B").unwrap();
+        assert_eq!(candidate.key().len(), 32);
+        assert!(candidate.created_at() <= std::time::SystemTime::now());
+        assert_eq!(manager.pending_session_count(), 1);
+        assert_eq!(manager.session_count(), 0);
+        assert!(manager.session_key("peer-B").is_none());
     }
 
     #[test]
-    fn test_hkdf_derive_deterministic() {
-        let nonce = vec![0x42u8; 32];
-        let kem_secret = vec![0xABu8; 32];
+    fn test_blake3_derive_session_key_deterministic() {
+        let public_context = vec![0x42u8; 32];
+        let test_secret = vec![0xABu8; 32];
 
-        let key1 = PqcHandshakeManager::hkdf_derive(&nonce, &kem_secret);
-        let key2 = PqcHandshakeManager::hkdf_derive(&nonce, &kem_secret);
-        assert_eq!(key1, key2, "HKDF derivation must be deterministic");
+        let key1 = PqcHandshakeManager::blake3_derive_session_key(&public_context, &test_secret);
+        let key2 = PqcHandshakeManager::blake3_derive_session_key(&public_context, &test_secret);
+        assert_eq!(key1, key2, "BLAKE3 derive-key derivation must be deterministic");
     }
 
     #[test]
-    fn test_hkdf_derive_different_inputs() {
-        let nonce1 = vec![0x01u8; 32];
-        let nonce2 = vec![0x02u8; 32];
-        let kem_secret = vec![0xABu8; 32];
+    fn test_blake3_derive_session_key_different_inputs() {
+        let context_a = vec![0x01u8; 32];
+        let context_b = vec![0x02u8; 32];
+        let test_secret = vec![0xABu8; 32];
 
-        let key1 = PqcHandshakeManager::hkdf_derive(&nonce1, &kem_secret);
-        let key2 = PqcHandshakeManager::hkdf_derive(&nonce2, &kem_secret);
+        let key1 = PqcHandshakeManager::blake3_derive_session_key(&context_a, &test_secret);
+        let key2 = PqcHandshakeManager::blake3_derive_session_key(&context_b, &test_secret);
         assert_ne!(key1, key2, "Different inputs must produce different keys");
     }
 }
