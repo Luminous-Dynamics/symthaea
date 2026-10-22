@@ -1562,10 +1562,21 @@ impl PeerKeyStore {
     /// transcript/identity, or provide forward secrecy. With unchanged static
     /// key material, it derives the same key values again.
     ///
-    /// Returns the encryption key.
-    pub fn agree(&mut self, peer_source_id: [u8; 8], peer_public: &[u8; 32]) -> [u8; 32] {
+    /// Returns an error for a non-contributory X25519 result before deriving or
+    /// storing traffic keys. Callers must still authenticate the peer public key
+    /// and bind it to the intended identity and handshake transcript.
+    pub fn agree(
+        &mut self,
+        peer_source_id: [u8; 8],
+        peer_public: &[u8; 32],
+    ) -> Result<[u8; 32], crate::swarm::SwarmError> {
         let peer_pk = x25519_dalek::PublicKey::from(*peer_public);
         let shared_secret = self.secret.diffie_hellman(&peer_pk);
+        if !shared_secret.was_contributory() {
+            return Err(crate::swarm::SwarmError::TrustVerificationError {
+                reason: "X25519 produced a non-contributory shared secret".to_string(),
+            });
+        }
 
         // KDF: HKDF-SHA256 with domain-separated info strings
         let hk = hkdf::Hkdf::<sha2::Sha256>::new(None, shared_secret.as_bytes());
@@ -1580,7 +1591,7 @@ impl PeerKeyStore {
 
         self.peer_keys.insert(peer_source_id, chacha_key);
         self.peer_auth_keys.insert(peer_source_id, auth_key);
-        chacha_key
+        Ok(chacha_key)
     }
 
     /// Get the derived symmetric key for a peer (if agreement has been done).
