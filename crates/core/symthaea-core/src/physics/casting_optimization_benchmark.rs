@@ -124,10 +124,16 @@ enum SamplingDesign {
     Random = 0,
     UniformGrid = 1,
     LatinHypercube = 2,
+    AdaptiveNearestNeighbor = 3,
 }
 
 impl SamplingDesign {
-    const ALL: [Self; 3] = [Self::Random, Self::UniformGrid, Self::LatinHypercube];
+    const ALL: [Self; 4] = [
+        Self::Random,
+        Self::UniformGrid,
+        Self::LatinHypercube,
+        Self::AdaptiveNearestNeighbor,
+    ];
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -171,6 +177,26 @@ struct TrialRecord {
     cumulative_cost_units: u64,
 }
 
+/// Restricted view that optimization policies are allowed to inspect.
+/// This deliberately excludes evaluator-only ground truth and hidden known optima.
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct ProposalObservation {
+    point: Point,
+    status: TrialStatus,
+    observed_objective: Option<f64>,
+}
+
+fn proposal_history(records: &[TrialRecord]) -> Vec<ProposalObservation> {
+    records
+        .iter()
+        .map(|record| ProposalObservation {
+            point: record.point,
+            status: record.status,
+            observed_objective: record.observed_objective,
+        })
+        .collect()
+}
+
 #[derive(Debug, Clone, PartialEq)]
 struct BenchmarkRun {
     case: SyntheticCase,
@@ -194,6 +220,8 @@ struct BenchmarkRun {
 enum BenchmarkError {
     ZeroBudget,
     EmptySeedSet,
+    AdaptiveRequiresHistory,
+    AdaptiveCandidatePoolExhausted,
     CostOverflow,
 }
 
@@ -202,6 +230,12 @@ impl fmt::Display for BenchmarkError {
         match self {
             Self::ZeroBudget => f.write_str("benchmark budget must be greater than zero"),
             Self::EmptySeedSet => f.write_str("paired benchmark requires at least one seed"),
+            Self::AdaptiveRequiresHistory => {
+                f.write_str("adaptive sampling requires a sequential observation history")
+            }
+            Self::AdaptiveCandidatePoolExhausted => {
+                f.write_str("adaptive candidate lattice has no unqueried candidate left")
+            }
             Self::CostOverflow => f.write_str("benchmark cumulative cost overflowed"),
         }
     }
@@ -283,6 +317,9 @@ fn sample_points(
                 })
                 .collect()
         }
+        SamplingDesign::AdaptiveNearestNeighbor => {
+            return Err(BenchmarkError::AdaptiveRequiresHistory);
+        }
     };
 
     debug_assert_eq!(points.len(), budget);
@@ -323,6 +360,73 @@ fn evaluate_trial(
     }
 }
 
+/// Select the next point using only the previously observed values.
+///
+/// This intentionally simple adaptive baseline is not Bayesian optimization: it uses
+/// a nearest-observation surrogate plus a fixed distance-based exploration bonus over
+/// a finite candidate lattice. It does not fit a Gaussian process or calibrated
+/// posterior. Evaluation-only objective truth is not read by this selection function.
+fn choose_adaptive_point(history: &[ProposalObservation]) -> Option<Point> {
+    const SIDE: usize = 16;
+    const EXPLORATION_WEIGHT: f64 = 0.20;
+
+    let measured: Vec<&ProposalObservation> = history
+        .iter()
+        .filter(|record| record.status == TrialStatus::Feasible)
+        .filter(|record| record.observed_objective.is_some())
+        .collect();
+
+    let mut best: Option<(f64, Point)> = None;
+    for ix in 0..SIDE {
+        for iy in 0..SIDE {
+            let candidate = Point {
+                x: (ix as f64 + 0.5) / SIDE as f64,
+                y: (iy as f64 + 0.5) / SIDE as f64,
+            };
+            if history.iter().any(|record| {
+                let dx = record.point.x - candidate.x;
+                let dy = record.point.y - candidate.y;
+                dx * dx + dy * dy < 1e-20
+            }) {
+                continue;
+            }
+
+            let mut nearest_any_distance_sq = f64::INFINITY;
+            for record in history {
+                let dx = record.point.x - candidate.x;
+                let dy = record.point.y - candidate.y;
+                nearest_any_distance_sq =
+                    nearest_any_distance_sq.min(dx * dx + dy * dy);
+            }
+
+            let mut nearest_measured_distance_sq = f64::INFINITY;
+            let mut nearest_observed: Option<f64> = None;
+            for record in &measured {
+                let dx = record.point.x - candidate.x;
+                let dy = record.point.y - candidate.y;
+                let distance_sq = dx * dx + dy * dy;
+                if distance_sq < nearest_measured_distance_sq {
+                    nearest_measured_distance_sq = distance_sq;
+                    nearest_observed = record.observed_objective;
+                }
+            }
+
+            let novelty = nearest_any_distance_sq.sqrt();
+            // If every initial trial failed or was infeasible, continue space-filling
+            // exploration rather than aborting. Otherwise balance local value and novelty.
+            let acquisition = match nearest_observed {
+                Some(predicted) => predicted - EXPLORATION_WEIGHT * novelty,
+                None => -novelty,
+            };
+            if best.map_or(true, |(best_score, _)| acquisition < best_score) {
+                best = Some((acquisition, candidate));
+            }
+        }
+    }
+
+    best.map(|(_, point)| point)
+}
+
 fn run_benchmark(
     case: SyntheticCase,
     design: SamplingDesign,
@@ -330,7 +434,19 @@ fn run_benchmark(
     seed: u64,
     budget: usize,
 ) -> Result<BenchmarkRun, BenchmarkError> {
-    let points = sample_points(design, budget, seed)?;
+    if budget == 0 {
+        return Err(BenchmarkError::ZeroBudget);
+    }
+    let fixed_points = if design == SamplingDesign::AdaptiveNearestNeighbor {
+        Vec::new()
+    } else {
+        sample_points(design, budget, seed)?
+    };
+    let adaptive_warm_start = if design == SamplingDesign::AdaptiveNearestNeighbor {
+        adaptive_points(seed, budget)?
+    } else {
+        Vec::new()
+    };
     let mut records = Vec::with_capacity(budget);
     let mut total_cost_units = 0_u64;
     let mut feasible_count = 0_usize;
@@ -341,7 +457,18 @@ fn run_benchmark(
     let mut best_observed_objective: Option<f64> = None;
     let mut best_true_objective_at_selected_point: Option<f64> = None;
 
-    for point in points {
+    for query_index in 0..budget {
+        let point = if design == SamplingDesign::AdaptiveNearestNeighbor {
+            if query_index < adaptive_warm_start.len() {
+                adaptive_warm_start[query_index]
+            } else {
+                choose_adaptive_point(&proposal_history(&records))
+                    .ok_or(BenchmarkError::AdaptiveCandidatePoolExhausted)?
+            }
+        } else {
+            fixed_points[query_index]
+        };
+
         total_cost_units = total_cost_units
             .checked_add(fidelity.cost_units())
             .ok_or(BenchmarkError::CostOverflow)?;
@@ -356,7 +483,11 @@ fn run_benchmark(
                 let observed = record
                     .observed_objective
                     .expect("feasible trial has an observation");
-                if cost_to_target.is_none() && observed <= SYNTHETIC_TARGET_OBJECTIVE {
+                // The synthetic evaluator confirms target achievement against
+                // noise-free truth only after this query; the strategy sees observations.
+                if cost_to_target.is_none()
+                    && record.true_objective_for_evaluation_only <= SYNTHETIC_TARGET_OBJECTIVE
+                {
                     cost_to_target = Some(record.cumulative_cost_units);
                 }
                 if best_observed_objective.map_or(true, |best| observed < best) {
@@ -578,6 +709,122 @@ mod tests {
         )
         .unwrap();
         assert_ne!(left.transcript_digest_blake3, right.transcript_digest_blake3);
+    }
+
+    #[test]
+    fn adaptive_selector_uses_observed_values_and_never_repeats_candidates() {
+        let seed = run_benchmark(
+            SyntheticCase::SmoothBowl,
+            SamplingDesign::LatinHypercube,
+            Fidelity::High,
+            0xDEAD_BEEF,
+            4,
+        )
+        .unwrap();
+        let next_a = choose_adaptive_point(&proposal_history(&seed.transcript)).unwrap();
+
+        let mut changed_evaluation_truth = seed.transcript.clone();
+        for record in &mut changed_evaluation_truth {
+            record.true_objective_for_evaluation_only += 1000.0;
+        }
+        let next_b = choose_adaptive_point(&proposal_history(&changed_evaluation_truth)).unwrap();
+        assert_eq!(next_a, next_b);
+        assert!(!seed.transcript.iter().any(|record| record.point == next_a));
+
+        let adaptive = run_benchmark(
+            SyntheticCase::SmoothBowl,
+            SamplingDesign::AdaptiveNearestNeighbor,
+            Fidelity::High,
+            0xDEAD_BEEF,
+            BUDGET,
+        )
+        .unwrap();
+        assert_eq!(adaptive.transcript.len(), BUDGET);
+        let distinct_points = adaptive
+            .transcript
+            .iter()
+            .map(|record| (record.point.x.to_bits(), record.point.y.to_bits()))
+            .collect::<std::collections::HashSet<_>>();
+        assert_eq!(distinct_points.len(), BUDGET);
+    }
+
+    #[test]
+    fn adaptive_candidate_lattice_exhaustion_is_explicit() {
+        let mut records = Vec::new();
+        let mut cost = 0_u64;
+        for ix in 0..16 {
+            for iy in 0..16 {
+                cost += HIGH_FIDELITY_COST_UNITS;
+                let point = Point {
+                    x: (ix as f64 + 0.5) / 16.0,
+                    y: (iy as f64 + 0.5) / 16.0,
+                };
+                records.push(TrialRecord {
+                    point,
+                    status: TrialStatus::Feasible,
+                    fidelity: Fidelity::High,
+                    true_objective_for_evaluation_only: 1.0,
+                    observed_objective: Some(1.0),
+                    cost_units: HIGH_FIDELITY_COST_UNITS,
+                    cumulative_cost_units: cost,
+                });
+            }
+        }
+        assert_eq!(choose_adaptive_point(&proposal_history(&records)), None);
+    }
+
+    #[test]
+    fn adaptive_strategy_keeps_exploring_when_warm_start_has_no_usable_observation() {
+        let points = sample_points(SamplingDesign::LatinHypercube, 4, 99).unwrap();
+        let records: Vec<TrialRecord> = points
+            .iter()
+            .enumerate()
+            .map(|(index, point)| TrialRecord {
+                point: *point,
+                status: TrialStatus::Infeasible,
+                fidelity: Fidelity::High,
+                true_objective_for_evaluation_only: 1.0,
+                observed_objective: None,
+                cost_units: HIGH_FIDELITY_COST_UNITS,
+                cumulative_cost_units: (index as u64 + 1) * HIGH_FIDELITY_COST_UNITS,
+            })
+            .collect();
+
+        let next = choose_adaptive_point(&proposal_history(&records)).unwrap();
+        assert!(!records.iter().any(|record| record.point == next));
+    }
+
+    #[test]
+    fn adaptive_strategy_replays_and_is_included_in_paired_comparison() {
+        let left = run_benchmark(
+            SyntheticCase::CoupledFactors,
+            SamplingDesign::AdaptiveNearestNeighbor,
+            Fidelity::High,
+            0xBEEF,
+            BUDGET,
+        )
+        .unwrap();
+        let right = run_benchmark(
+            SyntheticCase::CoupledFactors,
+            SamplingDesign::AdaptiveNearestNeighbor,
+            Fidelity::High,
+            0xBEEF,
+            BUDGET,
+        )
+        .unwrap();
+        assert_eq!(left, right);
+
+        let summary = compare_designs(
+            SyntheticCase::CoupledFactors,
+            Fidelity::High,
+            BUDGET,
+            &[1, 2, 3, 4],
+        )
+        .unwrap();
+        assert_eq!(summary.len(), SamplingDesign::ALL.len());
+        assert!(summary
+            .iter()
+            .any(|row| row.design == SamplingDesign::AdaptiveNearestNeighbor));
     }
 
     #[test]
