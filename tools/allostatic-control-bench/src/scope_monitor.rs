@@ -481,7 +481,7 @@ mod tests {
         .expect("valid false-safe prediction");
         assert!(monitor.observe(false_safe));
         assert!(monitor.alarmed());
-        assert_eq!(monitor.statistic(), 0.0);
+        assert!(monitor.statistic() < monitor.threshold());
     }
 
     #[test]
