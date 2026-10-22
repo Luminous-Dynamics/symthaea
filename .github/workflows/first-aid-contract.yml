@@ -124,6 +124,8 @@ jobs:
           grep -Fq "fn ${state_model_test}(" xtask/src/first_aid_model.rs
           edge_differential_test="$(jq -r '.differential_oracle.edge_differential_test_name' "$matrix")"
           grep -Fq "fn ${edge_differential_test}(" xtask/src/first_aid_model.rs
+          two_action_sequence_test="$(jq -r '.differential_oracle.two_action_sequence_differential_test_name' "$matrix")"
+          grep -Fq "fn ${two_action_sequence_test}(" xtask/src/first_aid_model.rs
           policy_truth_table_test="$(jq -r '.differential_oracle.policy_truth_table_test_name' "$matrix")"
           grep -Fq "fn ${policy_truth_table_test}(" xtask/src/first_aid_model.rs
           policy_truth_table_differential_test="$(jq -r '.differential_oracle.policy_truth_table_differential_test_name' "$matrix")"
@@ -132,6 +134,8 @@ jobs:
             (.differential_oracle.policy_truth_table_scope | type == "string" and length > 0) and
             .differential_oracle.edge_differential_status == "implemented_in_source" and
             (.differential_oracle.edge_differential_scope | type == "string" and length > 0) and
+            .differential_oracle.two_action_sequence_differential_status == "implemented_in_source" and
+            (.differential_oracle.two_action_sequence_differential_scope | type == "string" and length > 0) and
             .differential_oracle.policy_truth_table_differential_status == "implemented_in_source" and
             (.differential_oracle.policy_truth_table_differential_scope | type == "string" and length > 0) and
             .differential_oracle.policy_truth_table_test_name == "exhaustive_orthogonal_policy_truth_tables_cover_non_lifecycle_invariants"
