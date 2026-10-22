@@ -227,8 +227,37 @@ impl ChvorinovModel {
     /// tooling states, measurement definitions, or thermal boundary conditions merely
     /// to increase sample count. Fit quality is reported for audit, not treated as
     /// qualification.
+    /// Fit both the mold constant and exponent from measured observations.
+    ///
+    /// Use observations from one compatible alloy/mold/tooling/measurement population.
+    /// The fitted exponent is empirical; a strong in-sample fit is not evidence of
+    /// generalization or process qualification.
     pub fn calibrate(
         observations: &[ChvorinovObservation],
+    ) -> Result<Self, CastingModelError> {
+        Self::calibrate_impl(observations, None)
+    }
+
+    /// Fit the mold constant while fixing the exponent to a declared positive value.
+    ///
+    /// This is useful for honest baseline comparisons, including a fixed exponent of
+    /// 2.0 as a classic Chvorinov-style reference. It is not universally correct for
+    /// all alloys, mold materials, or thermal conditions. The exponent must be selected
+    /// before evaluating a frozen holdout; selecting it from holdout performance leaks
+    /// validation information.
+    pub fn calibrate_with_fixed_exponent(
+        observations: &[ChvorinovObservation],
+        fixed_exponent: f64,
+    ) -> Result<Self, CastingModelError> {
+        if !fixed_exponent.is_finite() || fixed_exponent <= 0.0 {
+            return Err(CastingModelError::NonPositiveExponent);
+        }
+        Self::calibrate_impl(observations, Some(fixed_exponent))
+    }
+
+    fn calibrate_impl(
+        observations: &[ChvorinovObservation],
+        fixed_exponent: Option<f64>,
     ) -> Result<Self, CastingModelError> {
         if observations.len() < MIN_CALIBRATION_OBSERVATIONS {
             return Err(CastingModelError::NotEnoughObservations {
@@ -273,15 +302,20 @@ impl ChvorinovModel {
             return Err(CastingModelError::DegenerateCalibrationDomain);
         }
 
-        let covariance_xy = xs
-            .iter()
-            .zip(ys.iter())
-            .map(|(x, y)| (x - mean_x) * (y - mean_y))
-            .sum::<f64>();
-        let exponent = covariance_xy / ss_x;
-        if !exponent.is_finite() || exponent <= 0.0 {
-            return Err(CastingModelError::NonPositiveExponent);
-        }
+        let exponent = if let Some(fixed) = fixed_exponent {
+            fixed
+        } else {
+            let covariance_xy = xs
+                .iter()
+                .zip(ys.iter())
+                .map(|(x, y)| (x - mean_x) * (y - mean_y))
+                .sum::<f64>();
+            let fitted = covariance_xy / ss_x;
+            if !fitted.is_finite() || fitted <= 0.0 {
+                return Err(CastingModelError::NonPositiveExponent);
+            }
+            fitted
+        };
 
         let log_constant = mean_y - exponent * mean_x;
         let mold_constant_s_per_m_pow_n = log_constant.exp();
@@ -530,6 +564,50 @@ mod tests {
         assert!((model.mold_constant_s_per_m_pow_n() - 1.2e6).abs() < 1e-6);
         assert!(model.fit_r_squared() > 0.999_999_999);
         assert_eq!(model.sample_count(), 5);
+    }
+
+    #[test]
+    fn fixed_exponent_baseline_recovers_synthetic_quadratic_relation() {
+        let model = ChvorinovModel::calibrate_with_fixed_exponent(&synthetic_observations(), 2.0)
+            .unwrap();
+        assert!((model.exponent() - 2.0).abs() < 1e-12);
+        assert!((model.mold_constant_s_per_m_pow_n() - 1.2e6).abs() < 1e-6);
+        assert!(model.fit_r_squared() > 0.999_999_999);
+    }
+
+    #[test]
+    fn fixed_exponent_baseline_can_be_scored_against_learned_exponent() {
+        // Synthetic t = B * m^1.5: arithmetic-only test, not physical foundry data.
+        let training: Vec<ChvorinovObservation> = [0.001_f64, 0.002, 0.004, 0.008, 0.010]
+            .into_iter()
+            .map(|modulus| ChvorinovObservation::new(modulus, 90_000.0 * modulus.powf(1.5)))
+            .collect();
+        let holdout: Vec<ChvorinovObservation> = [0.003_f64, 0.005, 0.007]
+            .into_iter()
+            .map(|modulus| ChvorinovObservation::new(modulus, 90_000.0 * modulus.powf(1.5)))
+            .collect();
+
+        let learned = ChvorinovModel::calibrate(&training).unwrap();
+        let fixed = ChvorinovModel::calibrate_with_fixed_exponent(&training, 2.0).unwrap();
+        let learned_report = learned.evaluate_holdout(&holdout).unwrap();
+        let fixed_report = fixed.evaluate_holdout(&holdout).unwrap();
+
+        assert!((learned.exponent() - 1.5).abs() < 1e-10);
+        assert_eq!(learned_report.coverage_fraction, 1.0);
+        assert_eq!(fixed_report.coverage_fraction, 1.0);
+        assert!(learned_report.mae_s.unwrap() < fixed_report.mae_s.unwrap());
+    }
+
+    #[test]
+    fn fixed_exponent_baseline_rejects_invalid_exponent() {
+        assert!(matches!(
+            ChvorinovModel::calibrate_with_fixed_exponent(&synthetic_observations(), 0.0),
+            Err(CastingModelError::NonPositiveExponent)
+        ));
+        assert!(matches!(
+            ChvorinovModel::calibrate_with_fixed_exponent(&synthetic_observations(), f64::NAN),
+            Err(CastingModelError::NonPositiveExponent)
+        ));
     }
 
     #[test]
