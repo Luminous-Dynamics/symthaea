@@ -181,12 +181,21 @@ jobs:
           edge_count="$(grep -Eo 'model_production_edge_comparisons=[0-9]+' target/first-aid/state-model-test.log | tail -n 1 | cut -d= -f2)"
           policy_count="$(grep -Eo 'production_policy_truth_table_cases_compared=[0-9]+' target/first-aid/state-model-test.log | tail -n 1 | cut -d= -f2)"
           two_action_count="$(grep -Eo 'model_production_two_action_sequence_comparisons=[0-9]+' target/first-aid/state-model-test.log | tail -n 1 | cut -d= -f2)"
+          seeded_count="$(grep -Eo 'model_production_seeded_long_horizon_comparisons=[0-9]+' target/first-aid/state-model-test.log | tail -n 1 | cut -d= -f2)"
+          seeded_seed="$(grep -Eo 'seed=0x[0-9a-f]+' target/first-aid/state-model-test.log | tail -n 1 | cut -d= -f2)"
+          seeded_max_actions="$(grep -Eo 'max_actions=[0-9]+' target/first-aid/state-model-test.log | tail -n 1 | cut -d= -f2)"
           test "$edge_count" = "5040"
           test "$policy_count" = "18"
           test "$two_action_count" = "100800"
+          test "$seeded_count" = "4096"
+          test "$seeded_seed" = "0x4c554d494e4f5553"
+          test "$seeded_max_actions" = "64"
           echo "edge_comparison_count=$edge_count" >> "$GITHUB_OUTPUT"
           echo "policy_truth_table_comparison_count=$policy_count" >> "$GITHUB_OUTPUT"
           echo "two_action_sequence_comparison_count=$two_action_count" >> "$GITHUB_OUTPUT"
+          echo "seeded_long_horizon_comparison_count=$seeded_count" >> "$GITHUB_OUTPUT"
+          echo "seeded_long_horizon_seed=$seeded_seed" >> "$GITHUB_OUTPUT"
+          echo "seeded_long_horizon_max_actions=$seeded_max_actions" >> "$GITHUB_OUTPUT"
 
       - name: Verify guideline change-impact validator unit tests
         run: cargo test -p xtask guideline_change_impact::tests -- --nocapture
@@ -206,6 +215,9 @@ jobs:
           MODEL_PRODUCTION_EDGE_COMPARISON_COUNT: ${{ steps.state-model-tests.outputs.edge_comparison_count }}
           POLICY_TRUTH_TABLE_CASE_COMPARISON_COUNT: ${{ steps.state-model-tests.outputs.policy_truth_table_comparison_count }}
           MODEL_PRODUCTION_TWO_ACTION_SEQUENCE_COMPARISON_COUNT: ${{ steps.state-model-tests.outputs.two_action_sequence_comparison_count }}
+          MODEL_PRODUCTION_SEEDED_LONG_HORIZON_COMPARISON_COUNT: ${{ steps.state-model-tests.outputs.seeded_long_horizon_comparison_count }}
+          MODEL_PRODUCTION_SEEDED_LONG_HORIZON_SEED: ${{ steps.state-model-tests.outputs.seeded_long_horizon_seed }}
+          MODEL_PRODUCTION_SEEDED_LONG_HORIZON_MAX_ACTIONS: ${{ steps.state-model-tests.outputs.seeded_long_horizon_max_actions }}
         run: cargo run -p xtask -- first-aid-trajectory-validate --out target/first-aid-trajectory-receipt.json
 
       - name: Run the synthetic guideline change-impact validator
@@ -236,7 +248,7 @@ jobs:
               .executable_sha256] | all(test("^[0-9a-f]{64}$")))
           ' target/first-aid-contract-receipt.json
           jq -e --arg expected "$EXPECTED_HEAD" '
-            .receipt_version == "first-aid-trajectory-receipt-v1" and
+            .receipt_version == "first-aid-trajectory-receipt-v1.1" and
             .status == "synthetic_trajectory_contract_passed" and
             .source_revision_sha == $expected and
             .trace_count == 12 and
@@ -271,6 +283,9 @@ jobs:
             .model_production_edge_comparison_count == 5040 and
             .policy_truth_table_comparison_count == 18 and
             .model_production_two_action_sequence_comparison_count == 100800 and
+            .model_production_seeded_long_horizon_comparison_count == 4096 and
+            .model_production_seeded_long_horizon_seed == "0x4c554d494e4f5553" and
+            .model_production_seeded_long_horizon_max_actions == 64 and
             (.rustc_version | startswith("rustc 1.96.0 ")) and
             (.cargo_version | startswith("cargo 1.96.0 "))
           ' target/first-aid-trajectory-receipt.json
