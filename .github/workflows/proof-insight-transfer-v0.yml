@@ -1408,6 +1408,14 @@ jobs:
           reviewer_extra_field[0]["adjudication"]["reviewer_decisions"][0]["unregistered"] = True
           cases.append(("unknown reviewer field", reviewer_extra_field))
 
+          bad_source_artifact = copy.deepcopy(source_rows)
+          bad_source_artifact[0]["source"]["artifact_sha256"] = "0" * 64
+          cases.append(("source artifact digest mismatch", bad_source_artifact))
+
+          bad_variant_artifact = copy.deepcopy(source_rows)
+          bad_variant_artifact[1]["target"]["artifact_sha256"] = "0" * 64
+          cases.append(("counterfactual artifact digest mismatch", bad_variant_artifact))
+
           for name, rows in cases:
               bad_path = Path(f"{report_path.parent}/bad-counterfactual-{name.replace(' ', '-')}.jsonl")
               bad_path.write_text("".join(json.dumps(row) + "\n" for row in rows))
@@ -1436,7 +1444,19 @@ jobs:
           if result.returncode == 0:
               raise SystemExit("counterfactual analyzer unexpectedly ignored cross-split family leakage")
 
-          print("PITB_COUNTERFACTUAL_ANALYZER_PASS: paired metrics, component bootstrap, calibration, report schema, eight malformed-outcome controls, one whole-suite leakage control")
+          same_artifact_suite = copy.deepcopy(suite)
+          same_artifact_suite["pairs"][1]["target"]["counterfactual_artifact_sha256"] = same_artifact_suite["pairs"][1]["target"]["base_artifact_sha256"]
+          same_artifact_suite_path = report_path.parent / "bad-counterfactual-identical-artifacts.json"
+          same_artifact_suite_path.write_text(json.dumps(same_artifact_suite))
+          result = subprocess.run(
+              [str(binary), str(same_artifact_suite_path), str(outcomes_path), "test",
+               str(report_path.parent / "bad-counterfactual-identical-artifacts.report.json"), "1000", "17"],
+              capture_output=True, text=True
+          )
+          if result.returncode == 0:
+              raise SystemExit("counterfactual analyzer unexpectedly accepted identical artifact digests for distinct variants")
+
+          print("PITB_COUNTERFACTUAL_ANALYZER_PASS: paired metrics, component bootstrap, calibration, report schema, ten malformed-outcome controls, one whole-suite leakage control, one identical-artifact control")
           PY
       - name: Audit pinned Dalek Lean Bench timeline
         shell: bash
