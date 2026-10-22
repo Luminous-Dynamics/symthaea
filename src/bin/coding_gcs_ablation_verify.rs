@@ -1639,6 +1639,7 @@ mod tests {
             "tier": "ImaginaryLLM",
             "backend_name": "SomeBackend",
             "success": true,
+            "verification_passed": null,
             "elapsed_ms": 5,
             "estimated_energy_cost": 10.0
         }]);
@@ -1653,6 +1654,7 @@ mod tests {
             "tier": "CloudLLM",
             "backend_name": "Ollama",
             "success": true,
+            "verification_passed": null,
             "elapsed_ms": 5,
             "estimated_energy_cost": 50.0
         }]);
@@ -1675,6 +1677,7 @@ mod tests {
             "tier": "CloudLLM",
             "backend_name": "Anthropic",
             "success": true,
+            "verification_passed": null,
             "elapsed_ms": 5,
             "estimated_energy_cost": 50.0
         }]);
@@ -1707,8 +1710,8 @@ mod tests {
 
         report["runs"][0]["selected_generation_tiers"] = serde_json::json!(["LocalLLM", "LocalLLM"]);
         report["runs"][0]["backend_attempts"] = serde_json::json!([
-            {"tier": "Simulated", "backend_name": "Simulated", "success": true, "elapsed_ms": 7, "estimated_energy_cost": 0.0},
-            {"tier": "LocalLLM", "backend_name": "Ollama", "success": true, "elapsed_ms": 11, "estimated_energy_cost": 10.0}
+            {"tier": "Simulated", "backend_name": "Simulated", "success": true, "verification_passed": null, "elapsed_ms": 7, "estimated_energy_cost": 0.0},
+            {"tier": "LocalLLM", "backend_name": "Ollama", "success": true, "verification_passed": null, "elapsed_ms": 11, "estimated_energy_cost": 10.0}
         ]);
         report["summary"]["gcs_off"]["selected_tier_decisions"] = serde_json::json!({
             "Native": 0, "Hardware": 0, "LocalLLM": 2, "CloudLLM": 0, "Simulated": 0
