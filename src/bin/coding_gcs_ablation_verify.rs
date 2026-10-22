@@ -140,12 +140,66 @@ fn verify_mode_summary(
         .map(|run| read_f64(run, "energy").unwrap_or(0.0))
         .sum();
     let count = selected_runs.len() as u64;
+    let tier_attempt_count = |target: &str| -> u64 {
+        selected_runs
+            .iter()
+            .map(|run| {
+                run.get("generation_tiers")
+                    .and_then(Value::as_array)
+                    .map(|tiers| tiers.iter().filter(|tier| tier.as_str() == Some(target)).count() as u64)
+                    .unwrap_or(0)
+            })
+            .fold(0_u64, u64::saturating_add)
+    };
+    let runs_with_external_llm_tier = selected_runs
+        .iter()
+        .filter(|run| {
+            run.get("generation_tiers")
+                .and_then(Value::as_array)
+                .is_some_and(|tiers| {
+                    tiers.iter().any(|tier| {
+                        matches!(tier.as_str(), Some("LocalLLM" | "CloudLLM"))
+                    })
+                })
+        })
+        .count() as u64;
+    let runs_with_simulated_tier = selected_runs
+        .iter()
+        .filter(|run| {
+            run.get("generation_tiers")
+                .and_then(Value::as_array)
+                .is_some_and(|tiers| tiers.iter().any(|tier| tier.as_str() == Some("Simulated")))
+        })
+        .count() as u64;
+    let runs_with_no_generation_attempts = selected_runs
+        .iter()
+        .filter(|run| {
+            run.get("generation_tiers")
+                .and_then(Value::as_array)
+                .is_some_and(|tiers| tiers.is_empty())
+        })
+        .count() as u64;
+    let expected_tier_attempts = serde_json::json!({
+        "Native": tier_attempt_count("Native"),
+        "Hardware": tier_attempt_count("Hardware"),
+        "LocalLLM": tier_attempt_count("LocalLLM"),
+        "CloudLLM": tier_attempt_count("CloudLLM"),
+        "Simulated": tier_attempt_count("Simulated")
+    });
+    push_check(
+        errors,
+        summary.get("generation_tier_attempts") == Some(&expected_tier_attempts),
+        format!("summary.{label}.generation_tier_attempts is inconsistent with individual runs"),
+    );
     let checks = [
         ("runs", count),
         ("behavioral_successes", passed),
         ("real_compiles", compiles),
         ("complete_oracles", complete),
         ("agent_elapsed_ms_total", time_total),
+        ("runs_with_external_llm_tier", runs_with_external_llm_tier),
+        ("runs_with_simulated_tier", runs_with_simulated_tier),
+        ("runs_with_no_generation_attempts", runs_with_no_generation_attempts),
     ];
     for (key, expected) in checks {
         push_check(
@@ -1173,6 +1227,10 @@ mod tests {
             "summary": {
                 "gcs_off": {
                     "gcs_advisories_enabled": false,
+                    "generation_tier_attempts": {"Native": 1, "Hardware": 0, "LocalLLM": 0, "CloudLLM": 0, "Simulated": 0},
+                    "runs_with_external_llm_tier": 0,
+                    "runs_with_simulated_tier": 0,
+                    "runs_with_no_generation_attempts": 0,
                     "runs": 1,
                     "behavioral_successes": 1,
                     "pass_rate": 1.0,
@@ -1186,6 +1244,10 @@ mod tests {
                 },
                 "gcs_on": {
                     "gcs_advisories_enabled": true,
+                    "generation_tier_attempts": {"Native": 1, "Hardware": 0, "LocalLLM": 0, "CloudLLM": 0, "Simulated": 0},
+                    "runs_with_external_llm_tier": 0,
+                    "runs_with_simulated_tier": 0,
+                    "runs_with_no_generation_attempts": 0,
                     "runs": 1,
                     "behavioral_successes": 0,
                     "pass_rate": 0.0,
@@ -1377,6 +1439,28 @@ mod tests {
         report["runs"][0]["generation_tiers"] = serde_json::json!(["ImaginaryLLM"]);
         let errors = audit(&report, None, None);
         assert!(errors.iter().any(|error| error.contains("generation_tiers")));
+    }
+
+    #[test]
+    fn tampered_generation_tier_summary_is_rejected() {
+        let mut report = valid_fixture();
+        report["summary"]["gcs_off"]["generation_tier_attempts"]["CloudLLM"] = Value::from(9);
+        let errors = audit(&report, None, None);
+        assert!(errors.iter().any(|error| error.contains("generation_tier_attempts")));
+    }
+
+    #[test]
+    fn generation_tier_summary_distinguishes_simulated_and_external_routes() {
+        let mut report = valid_fixture();
+        report["runs"][0]["generation_tiers"] = serde_json::json!(["Simulated", "LocalLLM"]);
+        report["summary"]["gcs_off"]["generation_tier_attempts"] = serde_json::json!({
+            "Native": 0, "Hardware": 0, "LocalLLM": 1, "CloudLLM": 0, "Simulated": 1
+        });
+        report["summary"]["gcs_off"]["runs_with_external_llm_tier"] = Value::from(1);
+        report["summary"]["gcs_off"]["runs_with_simulated_tier"] = Value::from(1);
+        let errors = audit(&report, None, None);
+        assert!(errors.iter().all(|error| !error.contains("generation_tier_attempts")));
+        assert!(errors.iter().any(|error| error.contains("wins") || error.contains("summary")));
     }
 
     #[test]
