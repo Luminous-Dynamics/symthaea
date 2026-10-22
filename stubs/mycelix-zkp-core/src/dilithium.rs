@@ -165,6 +165,15 @@ pub fn verify_authenticated_signature(
     proof: &AuthenticatedProof,
     client_public_key: &[u8],
 ) -> ZkpResult<bool> {
+    // Reject oversized/malformed keys before hashing attacker-controlled input.
+    if client_public_key.len() != PUBLIC_KEY_SIZE {
+        return Err(ZkpError::InvalidKeyMaterial(format!(
+            "public key: expected {} bytes, got {}",
+            PUBLIC_KEY_SIZE,
+            client_public_key.len()
+        )));
+    }
+
     let expected_id = Sha256::digest(client_public_key);
     if proof.metadata.client_id != expected_id.as_slice() {
         return Err(ZkpError::ClientIdMismatch);
@@ -292,5 +301,26 @@ mod tests {
         let loaded_b =
             DilithiumKeypair::from_bytes(kp.public_key().to_vec(), kp.secret_key.clone()).unwrap();
         assert_eq!(loaded_a.client_id(), loaded_b.client_id());
+    } 
+    #[test]
+    fn test_authenticated_verification_rejects_wrong_key_length_before_identity_hash() {
+        let proof = AuthenticatedProof {
+            proof: vec![1, 2, 3],
+            signature: vec![],
+            metadata: crate::types::ProofMetadata {
+                domain_tag: crate::domain::DomainTag::new("Test", "Input", 1),
+                protocol_version: 1,
+                client_id: [0u8; 32],
+                timestamp: 0,
+                nonce: [0u8; 32],
+                backend: crate::types::BackendId::Risc0,
+            },
+            public_inputs_hash: [0u8; 32],
+            joules_consumed: 0.0,
+        };
+        let wrong_length_key = vec![0u8; PUBLIC_KEY_SIZE + 1024];
+        let result = verify_authenticated_signature(&proof, &wrong_length_key);
+        assert!(matches!(result, Err(ZkpError::InvalidKeyMaterial(_))));
     }
+
 }
