@@ -401,6 +401,8 @@ fn validate_monte_carlo_gates(
         || fwer(1, "mix7") > 0.08
         || fwer(2, "mix7") < fwer(2, "mix3") + 0.15
         || fwer(3, "mix7") < fwer(3, "mix3") + 0.20
+        || fwer(2, "adaptive") < fwer(2, "mix3") + 0.10
+        || fwer(3, "adaptive") < fwer(3, "mix3") + 0.40
         || fwer(4, "fixed") < 0.95
         || fwer(4, "mix3") < 0.95
         || fwer(4, "adaptive") < 0.95
