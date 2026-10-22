@@ -89,7 +89,7 @@ The consent violation detection mechanism may fail to identify scenarios where c
 | Implement `judge_consent_action()` with explicit ConsentState parameter | Done | `moral_algebra.rs` — bypasses HDC inference entirely |
 | Wire direct ConsentState check into EthicsEngine pipeline | Done | `EncodedMoralScenario::is_consent_violation()` checks `Absent | Denied` |
 | Regression tests for consent detection | Done | 5 tests in adversarial suite specifically for consent |
-| Monotonic ordering test (Denied > Absent > Implied > Given) | Done | `consistency_consent_violation_sim_monotonic` |
+| Consent severity proxy ordering (Denied > Absent > Unknown > Implied > Given) | Draft / unqualified | `consistency_consent_violation_sim_monotonic`; Unknown is not itself a violation verdict |
 
 ### Residual Risk
 **Medium–High pending qualification.** Explicit Denied/Absent states have a direct evaluation path, but text extraction remains heuristic. A missing consent mention is not evidence of implied consent, and the legacy verdict enum cannot distinguish neutral from underdetermined. The parser change does not decide which actions require consent and does not issue authority.
