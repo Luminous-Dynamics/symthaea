@@ -63,6 +63,21 @@
       "claim_use_status": "source_metadata_only_not_adjudicated",
       "text_reproduced": false,
       "notes": "Scope is deliberately constrained; no recommendation is encoded by this registry entry."
+    },
+    {
+      "source_id": "RCSA-ECC-AED-2026",
+      "publisher": "Resuscitation Council of Southern Africa",
+      "title": "2025 ECC Guidelines: Effect on AEDs",
+      "edition": "2025 ECC guideline implementation notice",
+      "publication_or_update_date": "2026-04-10",
+      "url": "https://resus.co.za/back-office/uploads/pdf/pdf_20260413_102704.pdf",
+      "scope": "South African/Southern African resuscitation-council notice concerning AED use under the 2025 CPR and emergency cardiovascular care guidelines",
+      "source_role": "southern_african_resuscitation_council_notice",
+      "jurisdiction_relevance": "southern_africa",
+      "localization_status": "local_adaptation_required",
+      "claim_use_status": "source_metadata_only_not_adjudicated",
+      "text_reproduced": false,
+      "notes": "Official RCSA notice says the 2025 ECC guidelines were adopted into training programmes and materials; the notice is AED-topic-specific, not a comprehensive first-aid protocol and does not adjudicate any clinical claim."
     }
   ],
   "claims": []
