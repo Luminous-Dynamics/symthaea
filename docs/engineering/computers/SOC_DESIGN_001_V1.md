@@ -43,11 +43,10 @@ The diagram is a proposed workflow, not a claim that all these integrations curr
 
 The current phone frontier is already extremely difficult. Apple reports its 2 nm A20 Pro has a 6-core CPU, 7-core GPU, 50% more memory bandwidth than A19 Pro, and up to 40% higher GPU performance than its predecessor; these are manufacturer comparisons and not directly reproduced Symthaea results. The thermal package and cooling system matter alongside the logic architecture.
 
-Current public sources:
-- Apple A20 Pro product announcement: https://www.apple.com/newsroom/2026/09/apple-debuts-iphone-18-pro-and-iphone-18-pro-max/
-- Independent A20 Pro review and cross-device test caveats: https://www.notebookcheck.net/Apple-iPhone-18-Pro-review-Compact-powerhouse-with-an-unresolved-weakness.1420103.0.html
-- MLPerf Client for supported client-side LLM and agentic workload comparisons: https://mlcommons.org/benchmarks/client/
-- MLPerf Mobile for supported mobile inference paths: https://mlcommons.org/2026/06/mlperf-mobile-v6/
+Current public sources (check each release and exact supported device/runtime before comparing):
+- Apple A20 Pro SoC specifications and early benchmark context: https://www.notebookcheck.net/Apple-A20-Pro-Processor-Benchmarks-and-Specs.1396010.0.html and https://www.tomshardware.com/pc-components/cpus/apples-a20-pro-shatters-geekbench-7-single-core-record-2nm-chip-beats-desktop-intel-core-i9-and-amd-ryzen-9-by-up-to-32-percent
+- MLPerf Client v2.0 (personal computer LLM, image-generation and agentic workloads): https://mlcommons.org/benchmarks/client/
+- MLPerf Mobile v6.0 (mobile Llama 3.2 1B/3B and Llama 3.1 8B tests with quality gates): https://mlcommons.org/2026/06/mlperf-mobile-v6/
 
 Do not treat AnTuTu, Geekbench, NPU TOPS, GPU theoretical FLOPS, FPGA LUT count or a simulated PPA estimate as interchangeable. Phone and laptop operating systems, cooling, process nodes, memory configurations and benchmark paths differ. Use those tests as external context, then compare frozen end-to-end workloads separately.
 
@@ -104,16 +103,18 @@ The near-term CPU objective is to identify which workload stalls on scalar/branc
 
 ## 4. GPU architecture: reuse an open research GPU, don't promise a replacement yet
 
-Use the open-source [Vortex GPU](https://github.com/vortexgpgpu/vortex) as a research baseline. It has a RISC-V-based configurable GPU architecture, simulator, RTL, software stack and FPGA backends. This is valuable because it spans software to hardware rather than stopping at a diagram.
+Use [Vortex v3.0](https://github.com/vortexgpgpu/vortex/releases) as the first open GPU research baseline, not an older generic GPU template. The v3.0 release dated 2026-10-07 lists a fixed-function graphics stack, 2:4 structured-sparsity tensor cores, warpgroup matrix multiplication, global-to-local transfer acceleration, a hardware kernel scheduler/command processor, an asynchronous runtime API, hardware atomics, an SV32 MMU, Vulkan through Mesa/lavapipe, HIP through chipStar, SimX v3, and Synopsys/Yosys ASIC flows. This is unusually valuable because it exposes architecture, compiler/runtime and more of the design/qualification chain in one open project.
+
+The exact Vortex version and configuration must be pinned. Feature presence in its release notes does not prove every backend is production-ready for our target OS/GPU board, nor does it establish phone thermals, performance/Watt or driver readiness.
 
 Initial GPU work:
-1. Run a small frozen kernel corpus in the simulator and where supported the RTL/FPGA flow.
-2. Include graphics-independent compute workloads—HDC similarity, sparse graph work, image/filter kernels, matrix/vector operations—alongside at least one negative control that should favor the CPU.
-3. Count occupancy, local/global memory traffic, transfers, divergence, latency, throughput and resources.
-4. Compare the accelerator against the best available CPU SIMD/GPU implementation using the same input, quality gate, work boundary and batching.
-5. Only later address production Vulkan/graphics driver integration, power/thermal behavior, display pipeline and silicon physical design.
+1. Freeze a Vortex v3.0 source/config/toolchain identity and get one supported SimX/OpenCL workload running before altering architecture. Keep the upstream result separate from any Symthaea modification.
+2. Include HDC similarity, sparse graph work, image/filter kernels and matrix/vector operations, plus at least one negative control expected to favor CPU SIMD.
+3. Count occupancy, local/global memory traffic, transfer and launch overhead, divergence, latency, throughput, area/resource reports and actual power only when measurable.
+4. Compare each candidate with the best available optimized CPU SIMD/GPU path using identical input, correctness/quality gate, measurement boundary and batching.
+5. Only after benchmark parity, test accelerator-side HDC specialization and architecture deltas; keep graphics, Vulkan/HIP integration, display pipeline and mobile power/thermal qualification as separate gates.
 
-Vortex is a research baseline, not evidence that a custom mobile GPU can match a commercial Adreno, Apple GPU or laptop discrete GPU. For a shipping product, retain qualified graphics IP or partner with an existing provider unless the results justify a much larger program.
+Vortex v3.0's fixed-function graphics and tensor-core features change the best open baseline: we should first reproduce and benchmark what already exists, then compete with specific kernels or workload classes. It remains a research baseline—not evidence that a custom GPU matches commercial Adreno, Apple GPU or laptop discrete GPU performance, power, compatibility or reliability. For a shipping product, retain qualified graphics IP or partner with an existing provider unless measured results justify a much larger program.
 
 ## 5. Phone candidate architecture
 
@@ -209,7 +210,7 @@ The existing [COMPUTE-MFG-001E #5800](https://github.com/Luminous-Dynamics/symth
 
 ## 11. Immediate deliverables
 
-- [ ] Freeze CPU/GPU/HDC workload matrix and software baselines, reusing #5805, #6530, #7905, #8413 and #8446.
+- [ ] Freeze CPU/GPU/HDC workload matrix and software baselines, reusing #5805, #6530, #7905, #8413 and #8446; include Vortex v3.0 and MLPerf Client v2.0 / Mobile v6.0 only where exact paths qualify.
 - [ ] Version the candidate matrix in `soc_design_candidate_matrix_v1.json`.
 - [x] Audit the current `symthaea-silicon` generator; found the RTL/PPA stub gap tracked in #8462. Complete the HDC RTL status audit before writing parallel RTL.
 - [ ] Establish a Nix-pinned tool manifest and capability probes for simulator, formal tool, synthesis, FPGA target, KiCad and ASIC flow; missing tools produce a clear unqualified result.
