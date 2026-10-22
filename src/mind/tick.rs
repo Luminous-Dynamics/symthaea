@@ -834,12 +834,6 @@ impl ContinuousMind {
                 }
             }
 
-            // Per-peer rate limit check
-            if self.mesh_peers.is_rate_limited(&packet.source_id) {
-                self.mesh_stats.packets_rate_limited += 1;
-                continue;
-            }
-
             // MAC verification (Item 1): reject if key is set and MAC doesn't match (Hybrid policy)
             let is_critical = packet.urgency == crate::swarm::mesh::MeshUrgency::Critical
                 || packet.payload_type == crate::swarm::mesh::PayloadType::MoralTopology;
@@ -904,6 +898,15 @@ impl ContinuousMind {
                     payload = ?packet.payload_type,
                     "No authentication key available for telemetry packet. Fail-open: passing as unauthenticated."
                 );
+            }
+
+            // Source IDs are packet-controlled until the MAC is verified.
+            // Count toward a tracked peer's rate limit only after both authentication
+            // and replay checks; otherwise a spoofed source ID can exhaust the
+            // legitimate peer's quota before its packet is authenticated.
+            if auth_verified && self.mesh_peers.is_rate_limited(&packet.source_id) {
+                self.mesh_stats.packets_rate_limited += 1;
+                continue;
             }
 
             // TTL forwarding (Item 4): rebroadcast with decremented TTL
