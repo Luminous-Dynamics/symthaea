@@ -487,7 +487,7 @@ impl PairingManager {
     /// `initiator_pubkey`. Returns `None` if `initiator_pubkey` is not a
     /// well-formed 32-byte public key.
     #[cfg(not(feature = "pairing"))]
-    fn sign_nonce(
+    fn authenticate_transcript(
         &self,
         transcript: &[u8],
         _seed: &[u8; 32],
@@ -526,7 +526,7 @@ impl PairingManager {
     /// recomputing the expected MAC -- the shared secret itself is never
     /// transmitted, so this cannot be forged from `pubkey`/`signature` alone.
     #[cfg(not(feature = "pairing"))]
-    fn verify_signature(&self, transcript: &[u8], signature: &[u8], pubkey: &[u8]) -> bool {
+    fn verify_transcript(&self, transcript: &[u8], signature: &[u8], pubkey: &[u8]) -> bool {
         if signature.len() != 32 || pubkey.len() != 32 {
             return false;
         }
