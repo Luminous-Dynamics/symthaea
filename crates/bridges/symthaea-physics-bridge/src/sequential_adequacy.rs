@@ -297,7 +297,7 @@ mod tests {
         *state ^= *state >> 12;
         *state ^= *state << 25;
         *state ^= *state >> 27;
-        let value = state.wrapping_mul(0x2545_F491_4F6C_DD1D);
+        let value = (*state).wrapping_mul(0x2545_F491_4F6C_DD1D);
         (value >> 11) as f64 / ((1_u64 << 53) as f64)
     }
 
