@@ -47,6 +47,7 @@ struct PairObservation {
 
 #[derive(Debug, Clone, Copy, Default)]
 struct Counts {
+    paired_rows: usize,
     base_positive: usize,
     base_accept: usize,
     variant_positive: usize,
@@ -83,6 +84,7 @@ struct Counts {
 
 impl Counts {
     fn add(&mut self, observation: &PairObservation) {
+        self.paired_rows += 1;
         self.base_model_calls_sum = self.base_model_calls_sum.saturating_add(observation.base_model_calls);
         self.variant_model_calls_sum = self.variant_model_calls_sum.saturating_add(observation.variant_model_calls);
         self.base_tokens_sum = self.base_tokens_sum.saturating_add(observation.base_tokens);
@@ -158,6 +160,7 @@ impl Counts {
     }
 
     fn add_assign(&mut self, other: Counts) {
+        self.paired_rows += other.paired_rows;
         self.base_positive += other.base_positive;
         self.base_accept += other.base_accept;
         self.variant_positive += other.variant_positive;
@@ -1941,7 +1944,7 @@ fn percentile(sorted: &[f64], p: f64) -> f64 {
 }
 
 fn observations_count(counts: &Counts) -> usize {
-    counts.base_positive + counts.variant_negative + counts.variant_positive.saturating_sub(counts.variant_positive)
+    counts.paired_rows
 }
 
 fn counts_component_count(observations: &[PairObservation]) -> usize {
