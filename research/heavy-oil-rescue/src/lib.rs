@@ -187,6 +187,7 @@ pub enum EvalErrorCode {
     EmptyOutputs,
     EmptyCosts,
     InvalidInterval,
+    InvalidName,
     NegativeMass,
     InvalidFeedBasis,
     MissingFeedstockFlow,
@@ -393,7 +394,7 @@ fn validate_tolerance(tolerance: BalanceTolerance) -> Result<(), EvalError> {
 fn validate_name(name: &str, field: &str) -> Result<(), EvalError> {
     if name.trim().is_empty() {
         return Err(EvalError::new(
-            EvalErrorCode::InvalidInterval,
+            EvalErrorCode::InvalidName,
             format!("{field}: empty name"),
         ));
     }
@@ -509,8 +510,8 @@ fn sum_revenue(
     for output in ordered {
         if let Some(price) = output.price_usd_per_tonne {
             // kg output / kg feed is numerically equal to tonnes output / tonne feed.
-            lower += (output.mass_kg.lower / feed_basis_kg) * price.lower;
-            upper += (output.mass_kg.upper / feed_basis_kg) * price.upper;
+            lower += (output.mass_kg.lower * price.lower) / feed_basis_kg;
+            upper += (output.mass_kg.upper * price.upper) / feed_basis_kg;
         }
     }
     checked_interval(lower, upper, "revenue_usd_per_feed_tonne")
@@ -866,7 +867,7 @@ mod tests {
 
     #[test]
     fn summation_is_invariant_to_input_output_and_cost_order() {
-        let mut forward = fixtures::synthetic_positive_case();
+        let forward = fixtures::synthetic_positive_case();
         let mut reversed = fixtures::synthetic_positive_case();
         reversed.inputs.reverse();
         reversed.outputs.reverse();
@@ -880,10 +881,6 @@ mod tests {
         assert_eq!(a.cost_usd_per_feed_tonne, b.cost_usd_per_feed_tonne);
         assert_eq!(a.netback_usd_per_feed_tonne, b.netback_usd_per_feed_tonne);
 
-        // Keep this binding mutable in neither API nor output: the test also guards
-        // against an accidental API that would mutate the caller's route definition.
-        forward.inputs.reverse();
-        assert_eq!(forward.inputs.len(), reversed.inputs.len());
     }
 
     #[test]
@@ -928,10 +925,9 @@ mod tests {
     #[test]
     fn deterministic_receipt_is_repeatable() {
         let result = assess(&fixtures::synthetic_positive_case());
-        assert_eq!(
-            deterministic_receipt(&result),
-            deterministic_receipt(&result)
-        );
-        assert!(deterministic_receipt(&result).contains("fnv1a64-non-cryptographic"));
+        let first = deterministic_receipt(&result);
+        let second = deterministic_receipt(&assess(&fixtures::synthetic_positive_case()));
+        assert_eq!(first, second);
+        assert!(first.contains("fnv1a64-non-cryptographic"));
     }
 }
