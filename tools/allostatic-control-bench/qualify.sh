@@ -12,6 +12,7 @@ source_files=(
   "tools/allostatic-control-bench/src/lib.rs"
   "tools/allostatic-control-bench/src/calibration.rs"
   "tools/allostatic-control-bench/src/drift_monitor.rs"
+  "tools/allostatic-control-bench/src/bounded_risk_eprocess.rs"
   "tools/allostatic-control-bench/src/scope_monitor.rs"
   "tools/allostatic-control-bench/src/model_mismatch.rs"
   "tools/allostatic-control-bench/src/multistep_viability.rs"
@@ -23,6 +24,7 @@ source_files=(
   "tools/allostatic-control-bench/src/bin/allostatic-ood-fallback-bench.rs"
   "tools/allostatic-control-bench/src/bin/allostatic-task-scope-bench.rs"
   "tools/allostatic-control-bench/src/bin/allostatic-sequential-scope-bench.rs"
+  "tools/allostatic-control-bench/src/bin/allostatic-risk-eprocess-bench.rs"
   "tools/allostatic-control-bench/qualify.sh"
   "docs/research/ALLOSTATIC_CONTROL_BENCHMARK_V1.md"
   "docs/research/ROBUST_VIABILITY_ENVELOPE_V1.md"
@@ -30,6 +32,7 @@ source_files=(
   "docs/research/OOD_REACHABILITY_FALLBACK_V1.md"
   "docs/research/TASK_RELEVANT_SCOPE_MONITOR_V1.md"
   "docs/research/SEQUENTIAL_SCOPE_CUSUM_V1.md"
+  "docs/research/BOUNDED_RISK_EPROCESS_V1.md"
 )
 expected_head="${1:-$(git rev-parse HEAD)}"
 actual_head="$(git rev-parse HEAD)"
@@ -61,6 +64,8 @@ scope_out="${out_base}-task-scope.csv"
 scope_summary_out="${out_base}-task-scope-summary.csv"
 sequential_out="${out_base}-sequential-scope.csv"
 sequential_summary_out="${out_base}-sequential-scope-summary.csv"
+eprocess_out="${out_base}-risk-eprocess.csv"
+eprocess_summary_out="${out_base}-risk-eprocess-summary.csv"
 receipt="${out_csv}.receipt.txt"
 
 cargo fmt --manifest-path "$manifest" -- --check
@@ -619,6 +624,165 @@ if ! awk -F, '
   exit 1
 fi
 
+# Apply a bounded-risk e-process to the exact same sequential residual rows.
+# This is a fixed predictable bet with a risk bound; it is not a pointwise
+# conformal threshold and is valid only if the conditional-mean risk null holds.
+cargo run --locked --release --manifest-path "$manifest" --bin allostatic-risk-eprocess-bench -- \
+  "$tmpdir/sequential-a.csv" "$tmpdir/eprocess-a.csv" "$tmpdir/eprocess-summary-a.csv"
+cargo run --locked --release --manifest-path "$manifest" --bin allostatic-risk-eprocess-bench -- \
+  "$tmpdir/sequential-a.csv" "$tmpdir/eprocess-b.csv" "$tmpdir/eprocess-summary-b.csv"
+if ! cmp -s "$tmpdir/eprocess-a.csv" "$tmpdir/eprocess-b.csv" ||
+   ! cmp -s "$tmpdir/eprocess-summary-a.csv" "$tmpdir/eprocess-summary-b.csv"; then
+  printf 'FAIL: repeated bounded-risk e-process outputs are not byte-identical\n' >&2
+  exit 1
+fi
+if ! cmp -s "$tmpdir/sequential-a.csv" <(cut -d, -f1-14 "$tmpdir/eprocess-a.csv"); then
+  printf 'FAIL: e-process output is not paired to the exact CUSUM raw trace\n' >&2
+  exit 1
+fi
+
+if ! awk -F, '
+  NR == 1 { if (NF != 21) failed = 1; next }
+  NR == 2 {
+    log_threshold = $19
+    risk_bound = $20
+    bet = $21
+  }
+  {
+    if (NF != 21) failed = 1
+    if ($1 != "critical_low_reserve_high_load" && $1 != "reserve_limited" &&
+        $1 != "load_limited" && $1 != "balanced" && $1 != "high_margin") failed = 1
+    if ($2 != "nominal" && $2 != "gradual_shift" &&
+        $2 != "abrupt_shift" && $2 != "stealth_shift") failed = 1
+    if ($3 !~ /^[0-9]+$/ || $3 < 50000 || $3 >= 50300) failed = 1
+    if ($4 !~ /^[0-7]$/) failed = 1
+    if ($5 !~ /^[0-9]*[.]?[0-9]+$/ || $5 < 0 || $5 > 1) failed = 1
+    if ($6 !~ /^[0-9]*[.]?[0-9]+$/ || $6 < 0) failed = 1
+    if ($7 != "true" && $7 != "false") failed = 1
+    if ($8 !~ /^[0-8]$/) failed = 1
+    if ($9 !~ /^[0-9]*[.]?[0-9]+$/ || $10 !~ /^[0-9]*[.]?[0-9]+$/) failed = 1
+    if ($11 != "true" && $11 != "false") failed = 1
+    if ($12 !~ /^[0-8]$/) failed = 1
+    if ($13 != "true" && $13 != "false") failed = 1
+    if ($14 != "true" && $14 != "false") failed = 1
+    expected_loss = $5 / 0.05
+    if (expected_loss > 1) expected_loss = 1
+    if (($15 - expected_loss > 0.000001) || (expected_loss - $15 > 0.000001)) failed = 1
+    if ($16 !~ /^-?[0-9]*[.]?[0-9]+$/) failed = 1
+    if ($17 != "true" && $17 != "false") failed = 1
+    if ($18 !~ /^[0-8]$/) failed = 1
+    if (($19 - log(100) > 0.000001) || (log(100) - $19 > 0.000001)) failed = 1
+    if (($19 - log_threshold > 0.000001) || (log_threshold - $19 > 0.000001)) failed = 1
+    if (($20 - 0.15 > 0.000001) || (0.15 - $20 > 0.000001)) failed = 1
+    if (($21 - (0.5 / 0.15) > 0.000001) || ((0.5 / 0.15) - $21 > 0.000001)) failed = 1
+    if (($20 - risk_bound > 0.000001) || (risk_bound - $20 > 0.000001)) failed = 1
+    if (($21 - bet > 0.000001) || (bet - $21 > 0.000001)) failed = 1
+    if (1 + $21 * ($15 - $20) <= 0) failed = 1
+
+    key = $1 SUBSEP $2 SUBSEP $3
+    if ($4 == 0) {
+      next_step[key] = 0
+      previous_log_e[key] = 0
+      first_alarm[key] = 8
+      recorded_first_alarm[key] = $18
+      recorded_below[key] = $14
+      latched[key] = "false"
+      episode_max_score[key] = 0
+      episode_all_below[key] = "true"
+    } else if ($4 != next_step[key]) failed = 1
+
+    factor = 1 + $21 * ($15 - $20)
+    expected_log_e = previous_log_e[key] + log(factor)
+    if (($16 - expected_log_e > 0.000001) || (expected_log_e - $16 > 0.000001)) failed = 1
+    previous_log_e[key] = $16
+    expected_alarm = (latched[key] == "true" || $16 >= log_threshold) ? "true" : "false"
+    if ($17 != expected_alarm) failed = 1
+    if ($17 == "true" && first_alarm[key] == 8) first_alarm[key] = $4
+    latched[key] = expected_alarm
+    if ($18 != recorded_first_alarm[key]) failed = 1
+    if ($14 != recorded_below[key]) failed = 1
+    if ($5 > episode_max_score[key]) episode_max_score[key] = $5
+    if ($5 > $6) episode_all_below[key] = "false"
+
+    pair_key = $1 SUBSEP $3 SUBSEP $4
+    if ($2 == "nominal") {
+      nominal_score[pair_key] = $5
+      nominal_loss[pair_key] = $15
+      nominal_log_e[pair_key] = $16
+      nominal_alarm[pair_key] = $17
+      nominal_first_alarm[pair_key] = $18
+    }
+    if ($2 == "stealth_shift" &&
+        (nominal_score[pair_key] != $5 ||
+         nominal_loss[pair_key] != $15 ||
+         nominal_log_e[pair_key] != $16 ||
+         nominal_alarm[pair_key] != $17 ||
+         nominal_first_alarm[pair_key] != $18)) failed = 1
+
+    if ($4 == 7 && ($14 == "true") != (episode_max_score[key] <= $6)) failed = 1
+    if ($4 == 7 && (episode_all_below[key] == "true") != ($14 == "true")) failed = 1
+    row_key = key SUBSEP $4
+    if (seen[row_key]++) failed = 1
+    next_step[key] = $4 + 1
+    rows++
+  }
+  END {
+    if (NR != 48001 || rows != 48000 || failed) exit 1
+    for (key in next_step) {
+      if (next_step[key] != 8 ||
+          first_alarm[key] != recorded_first_alarm[key]) exit 1
+    }
+  }
+' "$tmpdir/eprocess-a.csv"; then
+  printf 'FAIL: bounded-risk e-process schema, log-e recurrence, threshold or stealth pairing is invalid\n' >&2
+  exit 1
+fi
+
+if ! awk -F, '
+  NR == 1 { if (NF != 17) failed = 1; next }
+  {
+    if (NF != 17) failed = 1
+    if ($1 != "critical_low_reserve_high_load" && $1 != "reserve_limited" &&
+        $1 != "load_limited" && $1 != "balanced" && $1 != "high_margin") failed = 1
+    if ($2 != "nominal" && $2 != "gradual_shift" &&
+        $2 != "abrupt_shift" && $2 != "stealth_shift") failed = 1
+    if ($3 != 300) failed = 1
+    for (i = 4; i <= 6; i++) if ($i !~ /^[0-9]+$/ || $i > 300) failed = 1
+    if ($4 + $6 != 300 || $5 > $4) failed = 1
+    if ($2 == "nominal" && ($4 > 30 || $5 != $4 || $6 != 0)) failed = 1
+    if ($2 != "nominal" && $5 != 0) failed = 1
+    if ($7 != "NA" && $7 !~ /^[0-9]*[.]?[0-9]+$/) failed = 1
+    if ($8 != "NA" && $8 !~ /^[0-9]+$/) failed = 1
+    if ($9 != "NA" && $9 !~ /^[0-9]+$/) failed = 1
+    if ($4 == 0 && ($7 != "NA" || $8 != "NA" || $9 != "NA")) failed = 1
+    if ($4 > 0 && ($7 == "NA" || $8 == "NA" || $9 == "NA")) failed = 1
+    if ($10 < 0 || $10 > 300 || $11 < 0 || $11 > $10) failed = 1
+    if ($12 !~ /^-?[0-9]*[.]?[0-9]+$/ || $13 !~ /^-?[0-9]*[.]?[0-9]+$/) failed = 1
+    if (($14 - log(100) > 0.000001) || (log(100) - $14 > 0.000001)) failed = 1
+    if (($15 - 0.15 > 0.000001) || (0.15 - $15 > 0.000001)) failed = 1
+    if (($16 - (0.5 / 0.15) > 0.000001) || ((0.5 / 0.15) - $16 > 0.000001)) failed = 1
+    if (($17 - 0.05 > 0.000001) || (0.05 - $17 > 0.000001)) failed = 1
+
+    if ($2 == "gradual_shift" &&
+        ($4 < 240 || $6 > 60 || $10 != 300 || $11 < 240)) failed = 1
+    if ($2 == "abrupt_shift" && ($4 < 270 || $6 > 30)) failed = 1
+    if ($2 == "stealth_shift" && ($4 > 30 || $6 < 270)) failed = 1
+    key = $1 SUBSEP $2
+    if (seen[key]++) failed = 1
+    if ($2 == "nominal") {
+      nominal_alarms[$1] = $4
+      nominal_misses[$1] = $6
+    }
+    if ($2 == "stealth_shift" &&
+        ($4 != nominal_alarms[$1] || $6 != nominal_misses[$1])) failed = 1
+    rows++
+  }
+  END { if (NR != 21 || rows != 20 || failed) exit 1 }
+' "$tmpdir/eprocess-summary-a.csv"; then
+  printf 'FAIL: bounded-risk e-process summary schema, detection behavior or matched stealth-control gates are invalid\n' >&2
+  exit 1
+fi
+
 # Summary must contain 5 scenarios × 6 policies × 2 shield settings.
 if ! awk -F, 'NR == 1 { if (NF != 28) failed = 1; next }
   { if (NF != 28) failed = 1; rows++ }
@@ -649,6 +813,8 @@ cp "$tmpdir/scope-a.csv" "$scope_out"
 cp "$tmpdir/scope-summary-a.csv" "$scope_summary_out"
 cp "$tmpdir/sequential-a.csv" "$sequential_out"
 cp "$tmpdir/sequential-summary-a.csv" "$sequential_summary_out"
+cp "$tmpdir/eprocess-a.csv" "$eprocess_out"
+cp "$tmpdir/eprocess-summary-a.csv" "$eprocess_summary_out"
 {
   printf 'status=pass\n'
   printf 'git_commit=%s\n' "$actual_head"
@@ -684,6 +850,10 @@ cp "$tmpdir/sequential-summary-a.csv" "$sequential_summary_out"
   printf 'sequential_scope_rows_excluding_header=%s\n' "$(( $(wc -l < "$sequential_out") - 1 ))"
   printf 'sequential_scope_summary_sha256=%s\n' "$(sha256sum "$sequential_summary_out" | awk '{print $1}')"
   printf 'sequential_scope_summary_rows_excluding_header=%s\n' "$(( $(wc -l < "$sequential_summary_out") - 1 ))"
+  printf 'risk_eprocess_sha256=%s\n' "$(sha256sum "$eprocess_out" | awk '{print $1}')"
+  printf 'risk_eprocess_rows_excluding_header=%s\n' "$(( $(wc -l < "$eprocess_out") - 1 ))"
+  printf 'risk_eprocess_summary_sha256=%s\n' "$(sha256sum "$eprocess_summary_out" | awk '{print $1}')"
+  printf 'risk_eprocess_summary_rows_excluding_header=%s\n' "$(( $(wc -l < "$eprocess_summary_out") - 1 ))"
   printf '\nsource_sha256:\n'
   sha256sum "${source_files[@]}"
 } > "$receipt"
@@ -701,4 +871,6 @@ printf 'Task-relevant scope frontier: %s\n' "$scope_out"
 printf 'Task-relevant scope summary: %s\n' "$scope_summary_out"
 printf 'Sequential CUSUM scope frontier: %s\n' "$sequential_out"
 printf 'Sequential CUSUM scope summary: %s\n' "$sequential_summary_out"
+printf 'Bounded-risk e-process frontier: %s\n' "$eprocess_out"
+printf 'Bounded-risk e-process summary: %s\n' "$eprocess_summary_out"
 printf 'Provenance receipt: %s\n' "$receipt"
