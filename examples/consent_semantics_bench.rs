@@ -200,21 +200,30 @@ fn main() {
     println!("consent_semantics_bench_v1");
     println!("fixture_count={}", FIXTURES.len());
     for fixture in FIXTURES {
-        let actual = parser.parse(fixture.text).consent;
+        let assessment = parser.assess_consent_evidence(fixture.text);
+        let actual = assessment.state;
         let baseline_actual = strict_lexical_baseline(fixture.text);
         candidate.observe(fixture.expected, actual);
         baseline.observe(fixture.expected, baseline_actual);
         if fixture.expected != ConsentState::Given && actual == ConsentState::Given {
-            println!("CANDIDATE_FALSE_GIVEN {} expected={} text={:?}",
-                fixture.id, label(fixture.expected), fixture.text);
+            println!("CANDIDATE_FALSE_GIVEN {} expected={} basis={:?} cue={:?} text={:?}",
+                fixture.id, label(fixture.expected), assessment.basis,
+                assessment.matched_phrase, fixture.text);
         }
         if fixture.expected != ConsentState::Given && baseline_actual == ConsentState::Given {
             println!("BASELINE_FALSE_GIVEN {} expected={} text={:?}",
                 fixture.id, label(fixture.expected), fixture.text);
         }
         if fixture.expected == ConsentState::Given && actual != ConsentState::Given {
-            println!("CANDIDATE_MISSED_GIVEN {} actual={} text={:?}",
-                fixture.id, label(actual), fixture.text);
+            println!("CANDIDATE_MISSED_GIVEN {} actual={} basis={:?} cue={:?} text={:?}",
+                fixture.id, label(actual), assessment.basis,
+                assessment.matched_phrase, fixture.text);
+        }
+        if actual != fixture.expected {
+            println!("MISMATCH {} expected={} actual={} basis={:?} cue={:?} question_suppressed={} quoted_text_suppressed={} explanation={:?}",
+                fixture.id, label(fixture.expected), label(actual), assessment.basis,
+                assessment.matched_phrase, assessment.question_suppressed,
+                assessment.quoted_text_suppressed, assessment.explanation());
         }
     }
 
