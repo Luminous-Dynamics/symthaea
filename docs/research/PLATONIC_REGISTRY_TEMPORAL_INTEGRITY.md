@@ -40,7 +40,11 @@ The runner includes deterministic positive and negative event traces covering:
 
 Embedded tests validate every expected outcome in the trace table and directly check state invariants, including the revoked tombstone after a failed rollback, retained state after unauthorized replacement, at-most-once event IDs, deterministic digests, delimiter-safe canonical encoding and generation-overflow rejection.
 
-The harness emits one row per event and an end receipt containing case/step totals plus BLAKE3 digests of the frozen fixtures and observed execution. If any expected decision differs, the executable exits nonzero. This is a useful regression oracle, but it is not an independent implementation: the expected outcomes and model are authored in the same codebase. A later phase should cross-check the implementation against an independently written reference oracle or a bounded TLA+/state-space model.
+The harness emits one row per event and an end receipt containing case/step totals plus BLAKE3 digests of the frozen fixtures and observed execution. If any expected decision differs, the executable exits nonzero.
+
+Beyond the 13 frozen traces, a bounded adversarial test constructs 48 event/authority templates and exhaustively checks all ordered two-event combinations: **2,304 two-event traces and 4,608 event applications**. Its test-side contract asserts that rejected operations do not mutate identity records, accepted operations obey authority/generation rules, revocation cannot be reversed by rollback, and an operation cannot mutate an unrelated identity. This bounded exploration is still not complete verification for arbitrary or unbounded histories.
+
+The expected outcome table, state model, and test-side invariant checker are all in the same codebase. A later phase should cross-check the implementation against an independently written reference oracle or a bounded TLA+/state-space model.
 
 ## Security properties and negative controls
 
