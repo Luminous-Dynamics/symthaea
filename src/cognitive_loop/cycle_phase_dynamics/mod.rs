@@ -374,6 +374,7 @@ impl CognitiveLoopService {
         module_timings: &mut super::ModuleTimings,
     ) -> DynamicsPhaseResult {
         let prediction_error = perception.urgency.prediction_error;
+        let prediction_error_valid = perception.urgency.prediction_error_valid;
         let urgency = perception.urgency.urgency;
         let phi_attention_weight = perception.encoding.phi_attention_weight;
         let surprise_triggered = perception.exploration.surprise_triggered;
@@ -2133,13 +2134,16 @@ impl CognitiveLoopService {
             );
         }
 
-        // 10d. Update prediction confidence
-        self.update_prediction_confidence(pattern, prediction_error, pattern_confidence);
+        // 10d. Update prediction confidence only from an actual prediction comparison.
+        if prediction_error_valid {
+            self.update_prediction_confidence(pattern, prediction_error, pattern_confidence);
+        }
 
         // ═══════════════════════════════════════════════════════════════════════
         // 10d.5 Active Inference Bridge
         // ═══════════════════════════════════════════════════════════════════════
-        let prediction_success = prediction_error < self.config.learning_threshold;
+        let prediction_success =
+            prediction_error_valid && prediction_error < self.config.learning_threshold;
         self.fep
             .active_inference_bridge
             .observe_resolution(self.prediction_confidence, prediction_success);
