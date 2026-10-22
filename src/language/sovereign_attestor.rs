@@ -234,7 +234,7 @@ mod tests {
     #[test]
     fn v2_attestation_without_binary_verifies_without_binary() {
         let attestor = SovereignAttestor::new();
-        let attestation = attestor.attest("unit-test", TEST_SMT, "Proven", None);
+        let attestation = attestor.attest("unit-test", TEST_SMT, "Proven", None).unwrap();
         assert_eq!(attestation.transcript_version, TRANSCRIPT_VERSION_V2);
         assert!(SovereignAttestor::verify(&attestation, None));
     }
@@ -243,7 +243,7 @@ mod tests {
     fn v2_attestation_with_binary_requires_the_matching_binary() {
         let attestor = SovereignAttestor::new();
         let binary = b"compiled artifact";
-        let attestation = attestor.attest("unit-test", TEST_SMT, "Proven", Some(binary));
+        let attestation = attestor.attest("unit-test", TEST_SMT, "Proven", Some(binary)).unwrap();
 
         assert!(SovereignAttestor::verify(&attestation, Some(binary)));
         assert!(!SovereignAttestor::verify(&attestation, Some(b"tampered artifact")));
@@ -256,7 +256,7 @@ mod tests {
     #[test]
     fn v2_attestation_rejects_binary_presence_substitution() {
         let attestor = SovereignAttestor::new();
-        let attestation = attestor.attest("unit-test", TEST_SMT, "Proven", Some(b"artifact"));
+        let attestation = attestor.attest("unit-test", TEST_SMT, "Proven", Some(b"artifact")).unwrap();
 
         let mut changed = attestation.clone();
         changed.binary_hash = None;
@@ -265,7 +265,7 @@ mod tests {
             "removing the optional hash must invalidate the signature transcript"
         );
 
-        let mut changed = attestor.attest("unit-test", TEST_SMT, "Proven", None);
+        let mut changed = attestor.attest("unit-test", TEST_SMT, "Proven", None).unwrap();
         assert!(
             !SovereignAttestor::verify(&changed, Some(b"artifact")),
             "a supplied artifact must not be treated as verified if the attestation did not commit to it"
@@ -277,7 +277,7 @@ mod tests {
     #[test]
     fn v2_transcript_binds_label_and_verdict() {
         let attestor = SovereignAttestor::new();
-        let attestation = attestor.attest("unit-test", TEST_SMT, "Proven", None);
+        let attestation = attestor.attest("unit-test", TEST_SMT, "Proven", None).unwrap();
 
         let mut changed_label = attestation.clone();
         changed_label.label.push_str("-other");
@@ -291,7 +291,7 @@ mod tests {
     #[test]
     fn legacy_v1_attestation_is_rejected() {
         let attestor = SovereignAttestor::new();
-        let mut attestation = attestor.attest("unit-test", TEST_SMT, "Proven", None);
+        let mut attestation = attestor.attest("unit-test", TEST_SMT, "Proven", None).unwrap();
         attestation.transcript_version = 1;
         assert!(!SovereignAttestor::verify(&attestation, None));
     }
@@ -362,7 +362,7 @@ mod tests {
     #[test]
     fn v2_transcript_binds_version_and_option_tag() {
         let attestor = SovereignAttestor::new();
-        let attestation = attestor.attest("unit-test", TEST_SMT, "Proven", Some(b"artifact"));
+        let attestation = attestor.attest("unit-test", TEST_SMT, "Proven", Some(b"artifact")).unwrap();
 
         let original = signing_message_v2(&attestation);
         let mut changed = attestation.clone();
