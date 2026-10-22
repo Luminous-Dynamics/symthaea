@@ -501,17 +501,21 @@ impl ContinuousMind {
 
     /// Perform X25519 key agreement with a peer.
     ///
-    /// Derives a per-peer ChaCha20 symmetric key from the DH shared secret.
-    /// Returns the derived key (also stored internally for lookup by source_id).
+    /// Derive a per-peer ChaCha20 key from a contributory X25519 exchange.
+    ///
+    /// Returns `Ok(None)` when the peer key store is not initialized and
+    /// returns an error for non-contributory public inputs. The peer public key
+    /// must still be authenticated and bound to the intended identity/transcript.
     #[cfg(feature = "mesh-key-exchange")]
     pub fn agree_with_peer(
         &mut self,
         peer_source_id: [u8; 8],
         peer_public: &[u8; 32],
-    ) -> Option<[u8; 32]> {
-        self.mesh_peer_keys
-            .as_mut()
-            .map(|store| store.agree(peer_source_id, peer_public))
+    ) -> Result<Option<[u8; 32]>, crate::swarm::SwarmError> {
+        match self.mesh_peer_keys.as_mut() {
+            Some(store) => store.agree(peer_source_id, peer_public).map(Some),
+            None => Ok(None),
+        }
     }
 
     /// Look up the derived symmetric key for a peer.
