@@ -15,10 +15,12 @@ use symthaea::coding_agent::{CodingAgent, CodingAgentConfig};
 use symthaea::language::code_executor::CodeExecutor;
 
 const BENCHMARK_ID: &str = "symthaea_gcs_runtime_ablation";
-const SCHEMA_VERSION: u32 = 1;
+const SCHEMA_VERSION: u32 = 2;
 
 struct TaskCase {
     id: &'static str,
+    // Declared metadata is part of the frozen task contract; do not infer it by scanning Rust text.
+    expected_test_functions: usize,
     description: &'static str,
     expected_symbol: &'static str,
     reference_source: &'static str,
@@ -66,6 +68,7 @@ fn task_suite() -> Vec<TaskCase> {
     vec![
         TaskCase {
             id: "add_numbers",
+            expected_test_functions: 3,
             description: "Implement `pub fn add_numbers(a: i32, b: i32) -> i32` that adds two integers.",
             expected_symbol: "add_numbers",
             reference_source: "pub fn add_numbers(a: i32, b: i32) -> i32 { a + b }",
@@ -81,6 +84,7 @@ fn task_suite() -> Vec<TaskCase> {
         },
         TaskCase {
             id: "factorial",
+            expected_test_functions: 3,
             description: "Implement `pub fn factorial(n: u64) -> u64` with factorial(0) equal to 1.",
             expected_symbol: "factorial",
             reference_source: "pub fn factorial(n: u64) -> u64 { (1..=n).product() }",
@@ -96,6 +100,7 @@ fn task_suite() -> Vec<TaskCase> {
         },
         TaskCase {
             id: "gcd",
+            expected_test_functions: 4,
             description: "Implement `pub fn gcd(a: u64, b: u64) -> u64` using the Euclidean algorithm.",
             expected_symbol: "gcd",
             reference_source: "pub fn gcd(mut a: u64, mut b: u64) -> u64 { while b != 0 { let r = a % b; a = b; b = r; } a }",
@@ -111,6 +116,7 @@ fn task_suite() -> Vec<TaskCase> {
         },
         TaskCase {
             id: "is_even",
+            expected_test_functions: 4,
             description: "Implement `pub fn is_even(n: i64) -> bool` for positive, zero, and negative integers.",
             expected_symbol: "is_even",
             reference_source: "pub fn is_even(n: i64) -> bool { n % 2 == 0 }",
@@ -126,6 +132,7 @@ fn task_suite() -> Vec<TaskCase> {
         },
         TaskCase {
             id: "reverse_string",
+            expected_test_functions: 3,
             description: "Implement `pub fn reverse_string(s: &str) -> String` by reversing Unicode scalar values.",
             expected_symbol: "reverse_string",
             reference_source: "pub fn reverse_string(s: &str) -> String { s.chars().rev().collect() }",
@@ -140,6 +147,7 @@ fn task_suite() -> Vec<TaskCase> {
         },
         TaskCase {
             id: "sum_slice",
+            expected_test_functions: 3,
             description: "Implement `pub fn sum_slice(values: &[i32]) -> i32` that sums all elements.",
             expected_symbol: "sum_slice",
             reference_source: "pub fn sum_slice(values: &[i32]) -> i32 { values.iter().copied().sum() }",
@@ -154,6 +162,7 @@ fn task_suite() -> Vec<TaskCase> {
         },
         TaskCase {
             id: "binary_search",
+            expected_test_functions: 4,
             description: "Implement `pub fn binary_search(values: &[i32], needle: i32) -> Option<usize>` on sorted slices.",
             expected_symbol: "binary_search",
             reference_source: "pub fn binary_search(values: &[i32], needle: i32) -> Option<usize> { values.binary_search(&needle).ok() }",
@@ -169,6 +178,7 @@ fn task_suite() -> Vec<TaskCase> {
         },
         TaskCase {
             id: "is_palindrome",
+            expected_test_functions: 5,
             description: "Implement `pub fn is_palindrome(s: &str) -> bool` with exact, case-sensitive character comparison.",
             expected_symbol: "is_palindrome",
             reference_source: "pub fn is_palindrome(s: &str) -> bool { s.chars().eq(s.chars().rev()) }",
@@ -186,8 +196,8 @@ fn task_suite() -> Vec<TaskCase> {
     ]
 }
 
-fn expected_test_functions(test_source: &str) -> usize {
-    test_source.matches("#[test]").count()
+fn expected_test_functions(task: &TaskCase) -> usize {
+    task.expected_test_functions
 }
 
 fn source_digest(source: &str) -> String {
@@ -208,6 +218,7 @@ fn task_digest(task: &TaskCase) -> String {
         hasher.update(&(field.len() as u64).to_be_bytes());
         hasher.update(field.as_bytes());
     }
+    hasher.update(&(task.expected_test_functions as u64).to_be_bytes());
     hasher.update(&(task.mutant_sources.len() as u64).to_be_bytes());
     for mutant in task.mutant_sources {
         hasher.update(&(mutant.len() as u64).to_be_bytes());
@@ -287,7 +298,7 @@ fn run_candidate(
     let source = std::fs::read_to_string(&output_path).unwrap_or_default();
     let code_written = !source.trim().is_empty();
     let expected_symbol_found = source.contains(task.expected_symbol);
-    let expected = expected_test_functions(task.test_source);
+    let expected = expected_test_functions(task);
     let oracle = evaluate_source(&source, task.test_source);
     let verification_elapsed_ms = oracle.elapsed_ms;
     // CodeExecutor stores a nonzero test-process exit in runtime_error even when
@@ -472,7 +483,7 @@ fn parse_cli(args: &[String]) -> Result<Option<CliOptions>, String> {
             use_llm: false,
             use_cloud: false,
             repeats: 3,
-            output_path: std::env::temp_dir().join("symthaea_gcs_ablation_v1.json"),
+            output_path: std::env::temp_dir().join("symthaea_gcs_ablation_v2.json"),
             print_manifest: true,
         }));
     }
@@ -490,7 +501,7 @@ fn parse_cli(args: &[String]) -> Result<Option<CliOptions>, String> {
     let mut use_cloud = false;
     let mut repeats = 3_usize;
     let mut repeats_seen = false;
-    let mut output_path = std::env::temp_dir().join("symthaea_gcs_ablation_v1.json");
+    let mut output_path = std::env::temp_dir().join("symthaea_gcs_ablation_v2.json");
     let mut output_seen = false;
     let mut index = 0;
 
@@ -564,7 +575,7 @@ fn main() {
     let source_revision = require_source_revision();
     let CliOptions { use_llm, use_cloud, repeats, output_path, print_manifest } = options;
     let tasks = task_suite();
-    if tasks.iter().any(|task| expected_test_functions(task.test_source) == 0 || task.mutant_sources.is_empty()) {
+    if tasks.iter().any(|task| expected_test_functions(task) == 0 || task.mutant_sources.is_empty()) {
         eprintln!("Invalid task suite: every task must have declared tests and at least one semantic mutant");
         std::process::exit(2);
     }
@@ -582,7 +593,7 @@ fn main() {
     let mut empty_patch_controls = Vec::new();
     let mut mutation_controls = Vec::new();
     for task in &tasks {
-        let expected = expected_test_functions(task.test_source);
+        let expected = expected_test_functions(task);
         let reference = evaluate_source(task.reference_source, task.test_source);
         let reference_passes = is_behaviorally_successful(&reference, expected);
         let reference_oracle_complete = is_oracle_complete(&reference, expected);
@@ -709,7 +720,7 @@ fn main() {
             "test_source": task.test_source,
             "mutant_sources": task.mutant_sources,
             "task_digest_blake3": task_digest(task),
-            "expected_test_functions": expected_test_functions(task.test_source),
+            "expected_test_functions": expected_test_functions(task),
             "reference_source_blake3": source_digest(task.reference_source),
             "test_source_blake3": source_digest(task.test_source)
         })).collect::<Vec<_>>(),
@@ -766,7 +777,7 @@ mod provenance_tests {
         assert!(!parsed.use_llm);
         assert!(!parsed.use_cloud);
         assert_eq!(parsed.repeats, 3);
-        assert!(parsed.output_path.ends_with("symthaea_gcs_ablation_v1.json"));
+        assert!(parsed.output_path.ends_with("symthaea_gcs_ablation_v2.json"));
     }
 
     #[test]
@@ -824,6 +835,14 @@ mod provenance_tests {
         };
         assert!(!is_oracle_complete(&run, 3));
         assert!(!is_behaviorally_successful(&run, 3));
+    }
+
+    #[test]
+    fn declared_oracle_count_is_bound_into_task_digest() {
+        let mut task = task_suite().remove(0);
+        let original = task_digest(&task);
+        task.expected_test_functions += 1;
+        assert_ne!(original, task_digest(&task));
     }
 
     #[test]

@@ -65,6 +65,7 @@ fn task_digest_from_manifest(task: &Value) -> Option<String> {
     let expected_symbol = str_field(task, "expected_symbol")?;
     let reference_source = str_field(task, "reference_source")?;
     let test_source = str_field(task, "test_source")?;
+    let expected_test_functions = u64_field(task, "expected_test_functions")?;
     let mutants = task.get("mutant_sources")?.as_array()?;
 
     // Mirror the producer's length-prefixed content encoding. This avoids
@@ -74,6 +75,7 @@ fn task_digest_from_manifest(task: &Value) -> Option<String> {
         hasher.update(&(field.len() as u64).to_be_bytes());
         hasher.update(field.as_bytes());
     }
+    hasher.update(&expected_test_functions.to_be_bytes());
     hasher.update(&(mutants.len() as u64).to_be_bytes());
     for mutant in mutants {
         let source = mutant.as_str()?;
@@ -81,10 +83,6 @@ fn task_digest_from_manifest(task: &Value) -> Option<String> {
         hasher.update(source.as_bytes());
     }
     Some(hasher.finalize().to_hex().to_string())
-}
-
-fn declared_test_function_count(test_source: &str) -> u64 {
-    test_source.matches("#[test]").count() as u64
 }
 
 fn score_success(run: &Value, expected: u64) -> bool {
@@ -181,8 +179,8 @@ fn audit(
 
     push_check(
         &mut errors,
-        u64_field(report, "schema_version") == Some(1),
-        "schema_version must be 1",
+        u64_field(report, "schema_version") == Some(2),
+        "schema_version must be 2",
     );
     push_check(
         &mut errors,
@@ -271,11 +269,6 @@ fn audit(
             is_hex(test_digest, 64)
                 && test_digest == blake3::hash(test_source.as_bytes()).to_hex().as_str(),
             format!("task_manifest[{index}] test-source digest does not match the included fixture"),
-        );
-        push_check(
-            &mut errors,
-            expected > 0 && expected == declared_test_function_count(test_source),
-            format!("task_manifest[{index}] expected test count does not match the included fixture"),
         );
         push_check(
             &mut errors,
@@ -1060,6 +1053,7 @@ mod tests {
             task_hasher.update(&(field.len() as u64).to_be_bytes());
             task_hasher.update(field.as_bytes());
         }
+        task_hasher.update(&1_u64.to_be_bytes());
         task_hasher.update(&(mutant_sources.len() as u64).to_be_bytes());
         for mutant in &mutant_sources {
             task_hasher.update(&(mutant.len() as u64).to_be_bytes());
@@ -1083,7 +1077,7 @@ mod tests {
         })];
         let manifest_sha = manifest_digest(&manifest).unwrap();
         serde_json::json!({
-            "schema_version": 1,
+            "schema_version": 2,
             "benchmark": "symthaea_gcs_runtime_ablation",
             "source_revision": "1".repeat(40),
             "model_mode": "native",
@@ -1384,6 +1378,15 @@ mod tests {
         let errors = audit(&report, None, None);
         assert!(errors.iter().any(|error| error.contains("test-source digest")));
         assert!(errors.iter().any(|error| error.contains("task digest")));
+    }
+
+    #[test]
+    fn declared_oracle_count_is_digest_bound_and_must_match_observed_runs() {
+        let mut report = valid_fixture();
+        report["task_manifest"][0]["expected_test_functions"] = Value::from(2);
+        let errors = audit(&report, None, None);
+        assert!(errors.iter().any(|error| error.contains("task digest")));
+        assert!(errors.iter().any(|error| error.contains("expected test count")));
     }
 
     #[test]
