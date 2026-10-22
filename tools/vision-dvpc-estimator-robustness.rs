@@ -594,8 +594,7 @@ fn render_report() -> String {
             row.mean_regret.map(fmt_stats).unwrap_or_else(|| "UNKNOWN\tUNKNOWN\tUNKNOWN".to_owned()),
             fmt_stats(row.mean_harmful_escalations), fmt_stats(row.mean_missed_beneficial),
             fmt_stats(row.mean_charged_units), row.budget_violation_runs,
-            row.paired_loss_delta_vs_random.map(fmt_stats).unwrap_or_else(|| "UNKNOWN\tUNKNOWN\tUNKNOWN".to_owned())
-            row.budget_violation_runs, fmt_stats(row.paired_loss_delta_vs_random)
+            row.paired_loss_delta_vs_random.map(fmt_stats).unwrap_or_else(|| "UNKNOWN\tUNKNOWN\tUNKNOWN".to_owned()),
         ));
     }
     report
