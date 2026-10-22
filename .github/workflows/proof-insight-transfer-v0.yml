@@ -1427,6 +1427,15 @@ jobs:
           assert report["metrics"]["paired_contract_adherence"]["estimate"] == 1.0
           assert report["metrics"]["semantics_preserving_decision_stability"]["estimate"] == 1.0
           assert abs(report["metrics"]["compatibility_probability_brier_score"]["estimate"] - 0.01) < 1e-9
+          assert report["metrics"]["mean_counterfactual_to_base_cost_ratio"]["statistic"] == "mean"
+          assert report["metrics"]["mean_counterfactual_to_base_cost_ratio"]["estimate"] == 1.0
+          assert report["metrics"]["mean_counterfactual_cost_delta_microusd"]["statistic"] == "paired_difference"
+          assert report["metrics"]["mean_counterfactual_cost_delta_microusd"]["estimate"] == 0.0
+          assert report["resource_usage"]["paired_outcome_rows"] == 7
+          assert report["resource_usage"]["base_totals"]["cost_microusd"] == 700
+          assert report["resource_usage"]["counterfactual_totals"]["cost_microusd"] == 700
+          assert report["resource_usage"]["base_mean_per_pair"]["tokens"] == 100
+          assert report["resource_usage"]["counterfactual_mean_per_pair"]["tokens"] == 100
           assert report["proposed_gates"]["overall_confirmatory_decision"].startswith("not_evaluated_")
 
           source_rows = [json.loads(line) for line in outcomes_path.read_text().splitlines() if line.strip()]
