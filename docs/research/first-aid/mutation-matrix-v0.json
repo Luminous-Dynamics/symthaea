@@ -800,6 +800,12 @@
     "policy_truth_table_differential_scope": "18 connectivity, freshness/presentation, sensitivity/consent, and unknown-normalization combinations are each compared against the production trace checker; no claim that these truth tables model temporal coupling between those domains.",
     "two_action_sequence_differential_status": "implemented_in_source",
     "two_action_sequence_differential_test_name": "every_reachable_state_two_action_suffix_matches_production_trace_checker",
-    "two_action_sequence_differential_scope": "For each of 252 reachable abstract states, take its breadth-first shortest witness, append every ordered pair from the 20-action alphabet, and compare the full ordered violation list from model replay to the production JSON trace checker: 252 × 20 × 20 = 100,800 sequences. This is bounded suffix coverage, not all possible event histories or clinical ground truth."
+    "two_action_sequence_differential_scope": "For each of 252 reachable abstract states, take its breadth-first shortest witness, append every ordered pair from the 20-action alphabet, and compare the full ordered violation list from model replay to the production JSON trace checker: 252 × 20 × 20 = 100,800 sequences. This is bounded suffix coverage, not all possible event histories or clinical ground truth.",
+    "seeded_long_horizon_status": "unit_test_added_pending_exact_head_validation",
+    "seeded_long_horizon_test_name": "seeded_long_horizon_histories_match_production_trace_checker",
+    "seeded_long_horizon_seed": "0x4c554d494e4f5553",
+    "seeded_long_horizon_trial_count": 4096,
+    "seeded_long_horizon_max_actions": 64,
+    "seeded_long_horizon_scope": "Run 4,096 deterministic action histories of lengths 1 through 64 using the pinned xorshift64* seed; every history is compared against the typed production trace checker and the abstract model. The seed and count are required in receipt v1.1. This is bounded, same-repository differential testing, not formal verification or clinical ground truth."
   }
 }
