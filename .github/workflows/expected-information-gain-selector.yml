@@ -16,7 +16,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: expected-information-gain-selector-${{ github.ref }}-${{ github.event_name }}
+  group: expected-information-gain-selector-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
