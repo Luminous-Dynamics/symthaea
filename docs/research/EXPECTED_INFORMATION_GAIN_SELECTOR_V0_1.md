@@ -39,6 +39,19 @@ The focused workflow also runs `expected_information_gain_vs_variance_on_paired_
 
 The simulator's actual noise scale depends on the hidden truth's output magnitude. The EIG selector must not inspect that truth, so this pilot estimates one shared standard deviation from the median absolute predictions across the live hypotheses and remaining candidate points. That is a visible homoscedastic approximation; an improvement or regression may reflect this mismatch as well as the selection rule. The benchmark must therefore report selection failures and noise regimes before any general conclusion.
 
+## Scheduled audit policy for model mismatch
+
+A latest literature-driven extension adds an explicitly separate policy arm, `InformationGainWithAudits`: it uses the information-gain selector on ordinary rounds and selects one seeded-uniform admissible experiment every second round. This is not claimed to be optimal. It is a controlled way to test whether periodic measurements outside the greedy acquisition score reduce false confidence when the candidate class does not contain the observation-generating process.
+
+The integrated simulator now accepts a hidden additive discrepancy term proportional to the base law magnitude and a combination of sinusoidal input terms. Selectors receive only their live candidate predictions and never the discrepancy amplitude or hidden transformed truth. The paired diagnostic compares plain EIG and EIG-with-audits on the same seeds and candidate-pool generation in two regimes:
+
+- **Matched regime:** discrepancy amplitude is zero; track recovery to ensure audit sampling does not catastrophically harm ordinary discovery.
+- **Misspecified regime:** discrepancy amplitude is 0.12; track how often all candidate hypotheses are eliminated (a detectable model-coverage failure) versus how often the procedure ends with exactly one candidate (false certainty under known misspecification).
+
+The pilot reports paired 2,000-resample percentile intervals for the difference in false-singleton rate, discrepancy detection, and matched-world recovery. The bootstrap pairs the two policies by seed but is not a world-clustered external benchmark. A lower false-singleton rate and higher discrepancy-detection rate are desired; the test does not assert that the audit policy wins.
+
+This is inspired by recent research on misspecified experimental design: classical information-maximizing experiments can amplify inferential bias, while representativeness and error de-amplification are separate acquisition concerns. It does **not** implement the published R-IDeA criterion or the maximin/Sibson-MI robust-design method and must not be presented as a reimplementation of either.
+
 ## Falsifiable benchmark plan
 
 ### Baselines
@@ -93,5 +106,8 @@ After this synthetic gate, attempt only permitted, version-pinned external tasks
 
 - [SciLaws-Bench paper and official results](https://arxiv.org/abs/2609.01552) — motivates separate fit, validity and structure metrics and explicit analysis of candidate selection.
 - [SciLaws-Bench official project page](https://yiyihum.github.io/SciLaws-Bench/) — provides current results and task-specific license notes.
-- [NewtonBench publication record](https://researchportal.hkust.edu.hk/en/publications/newtonbench-benchmarking-generalizable-scientific-law-discovery-i/) — motivates noise and complexity stress tests for interactive discovery.
+- [NewtonBench official repository](https://github.com/HKUST-KnowComp/NewtonBench) — 324 interactive tasks across 12 physics domains; results show sensitivity to system complexity and noise.
+- [AISTATS 2026: On the Misinformation in a Statistical Experiment](https://proceedings.mlr.press/v300/callahan26a.html) — information-maximizing designs may amplify inferential/model misspecification.
+- [AISTATS 2026: R-IDeA active learning](https://proceedings.mlr.press/v300/tang26d.html) — motivates treating representativeness, informativeness, and error de-amplification as distinct concerns.
+- [ICML 2026: Maximin Robust Bayesian Experimental Design](https://arxiv.org/abs/2603.14094) — adversarial distributional-robust formulation with Sibson mutual information; noted as a future research reference, not reimplemented here.
 - [SciMLBenchmarks](https://docs.sciml.ai/SciMLBenchmarksOutput/dev/) — a relevant future reference for numerical solver work-precision, but not a direct leaderboard for this hypothesis-selection method.
