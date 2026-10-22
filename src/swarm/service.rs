@@ -665,7 +665,16 @@ impl NetworkService {
     ) -> SwarmResult<TrustLevel> {
         use std::time::Duration;
 
-        // Skip handshake for local-only configs
+        // A PQC-required build must not bypass key agreement via LocalTrust.
+        #[cfg(feature = "pqc-handshake")]
+        if !self.config.require_handshake {
+            return Err(SwarmError::TrustVerificationError {
+                reason: "PQC feature enabled while require_handshake=false; refusing LocalTrust downgrade".to_string(),
+            });
+        }
+
+        // Skip handshake only when the build does not require the PQC phase.
+        #[cfg(not(feature = "pqc-handshake"))]
         if !self.config.require_handshake {
             return Ok(TrustLevel::LocalTrust);
         }
@@ -752,11 +761,17 @@ impl NetworkService {
         #[cfg(feature = "pqc-handshake")]
         {
             // The feature must never silently skip PQC when manager setup is absent.
-            let pqc = self.pqc_manager.as_ref().ok_or_else(|| {
-                SwarmError::TrustVerificationError {
-                    reason: "PQC feature enabled but no KEM manager is configured".to_string(),
+            let pqc = match self.pqc_manager.as_ref() {
+                Some(pqc) => pqc,
+                None => {
+                    // Classical verification already inserted this peer into the
+                    // trust map. Roll it back before returning the setup error.
+                    self.handshake.write().remove_peer(peer_id);
+                    return Err(SwarmError::TrustVerificationError {
+                        reason: "PQC feature enabled but no KEM manager is configured".to_string(),
+                    });
                 }
-            })?;
+            };
             match self
                 .run_pqc_exchange(peer_id, channel, &challenge_bytes, pqc)
                 .await
