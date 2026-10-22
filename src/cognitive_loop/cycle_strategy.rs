@@ -277,7 +277,7 @@ impl CognitiveLoopService {
     /// - Codebook diversity → memoization threshold adaptation
     /// - Input similarity memoization (Tulving & Schacter 1990)
     /// - Unified Ethics Engine evaluation
-    /// - Adaptive learning threshold + urgency computation
+    /// - Adaptive learning threshold calculation; stateful urgency is computed downstream
     pub(super) fn run_encoding_and_preprocessing(
         &mut self,
         input: &str,
