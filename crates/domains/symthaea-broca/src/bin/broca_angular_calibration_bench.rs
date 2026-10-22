@@ -48,7 +48,7 @@ struct EvalCounts {
     protected_safety_margin_sum: f64,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 struct Evaluation {
     positive_contexts: usize,
     intended_token_beats_old_vocab_fraction: f64,
