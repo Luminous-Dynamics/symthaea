@@ -26,9 +26,6 @@ pub(super) struct RelationalCore {
     /// Recent user utterance embeddings (ring buffer, max 8). These are not
     /// AI-generated states or observations of the user's internal mental state.
     pub(super) recent_user_input_states: Vec<symthaea_core::hdc::unified_hv::ContinuousHV>,
-    /// Last validated dyadic estimate. Stays zero while independent partner
-    /// observations are unavailable; the facade also hard-gates feedback to zero.
-    pub(super) last_phi_dyad: f64,
 }
 
 impl RelationalCore {
@@ -37,7 +34,6 @@ impl RelationalCore {
             partner: HumanPartnerModel::new("human"),
             trajectory: RelationshipTrajectory::default(),
             recent_user_input_states: Vec::new(),
-            last_phi_dyad: 0.0,
         }
     }
 
@@ -115,11 +111,9 @@ impl RelationalCore {
 
         if let Some(phi_dyad) = self.compute_phi_dyad() {
             self.trajectory.record(now, self.partner.stage, phi_dyad);
-            self.last_phi_dyad = phi_dyad;
-        } else {
-            // Do not record unavailable data as a zero-valued observation.
-            self.last_phi_dyad = 0.0;
         }
+        // When no independently sourced partner stream is available, do not
+        // persist an unavailable estimate as a zero-valued trajectory point.
     }
 
     /// Get current partnership state summary.
@@ -215,7 +209,6 @@ mod provenance_tests {
         assert_eq!(relational.compute_phi_dyad(), None);
 
         relational.update_partnership(0.9);
-        assert_eq!(relational.last_phi_dyad, 0.0);
         assert_eq!(
             relational.partnership_state().phi_dyad_status,
             PhiDyadStatus::UnavailableNoIndependentPartnerObservations
