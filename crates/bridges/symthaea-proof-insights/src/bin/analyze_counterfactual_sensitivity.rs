@@ -657,8 +657,16 @@ fn join_pairs(
         let component_id = required_string(pair, "component_id", &context)?.to_owned();
         let source = pair.get("source_insight").context("source_insight missing")?;
         let target = pair.get("target").context("target missing")?;
-        let source_record = required_string(source, "record_id", &format!("{context}.source_insight"))?;
-        let source_family = required_string(source, "family_id", &format!("{context}.source_insight"))?;
+        let source_record = required_string(
+            source,
+            "record_id",
+            &format!("{context}.source_insight"),
+        )?;
+        let source_family = required_string(
+            source,
+            "family_id",
+            &format!("{context}.source_insight"),
+        )?;
         let target_family = required_string(target, "family_id", &format!("{context}.target"))?;
         for link_field in ["base_outcome_pair_id", "counterfactual_outcome_pair_id"] {
             let link = required_string(pair, link_field, &context)?.to_owned();
@@ -680,7 +688,9 @@ fn join_pairs(
                 }
             }
         }
-        if let Some(previous) = suite_insight_split.insert(source_record.to_owned(), split.to_owned()) {
+        if let Some(previous) =
+            suite_insight_split.insert(source_record.to_owned(), split.to_owned())
+        {
             if previous != split {
                 bail!("source insight {source_record} crosses suite splits");
             }
