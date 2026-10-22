@@ -1,6 +1,6 @@
 import unittest
 from family_heldout_scm_benchmark import (
-    MECHANISMS, TOPOLOGIES, SCM, build_suite, graph_scores, make_scm, split_label, validate_scm,
+    MECHANISMS, TOPOLOGIES, SCM, build_suite, graph_scores, layered_graph_scores, make_scm, split_label, validate_scm,
 )
 
 class FamilyHeldoutTests(unittest.TestCase):
@@ -45,6 +45,29 @@ class FamilyHeldoutTests(unittest.TestCase):
         score = graph_scores([(0, 1), (1, 2)], [], 3)
         self.assertEqual(score["shd"], 2)
         self.assertEqual(score["directed_recall"], 0.0)
+
+    def test_layered_scores_separate_skeleton_direction_and_intervention_budget(self):
+        score = layered_graph_scores(
+            true_dag_edges=[(0, 1), (1, 2)],
+            true_cpdag_directed_edges=[(0, 1)],
+            predicted_directed_edges=[(0, 1)],
+            predicted_undirected_edges=[(1, 2)],
+            node_count=3, minimum_intervention_count=2, interventions_used=2,
+        )
+        self.assertEqual(score["skeleton_f1"], 1.0)
+        self.assertEqual(score["compelled_f1"], 1.0)
+        self.assertLess(score["directed_f1"], 1.0)
+        self.assertEqual(score["unresolved_true_adjacencies"], 1)
+        self.assertEqual(score["dag_shd"], 1)
+        self.assertEqual(score["intervention_count_to_minimum_ratio"], 1.0)
+
+    def test_layered_scoring_rejects_conflicting_or_noncanonical_edges(self):
+        with self.assertRaises(ValueError):
+            layered_graph_scores([(0, 1)], [], [(0, 1)], [(0, 1)], 2, 1, 0)
+        with self.assertRaises(ValueError):
+            layered_graph_scores([(0, 1)], [], [], [(1, 0)], 2, 1, 0)
+        with self.assertRaises(ValueError):
+            layered_graph_scores([(0, 1)], [], [(0, 1), (0, 1)], [], 2, 1, 0)
 
     def test_invalid_and_duplicate_predictions_fail_closed(self):
         with self.assertRaises(ValueError): graph_scores([(0, 1)], [(0, 0)], 3)
