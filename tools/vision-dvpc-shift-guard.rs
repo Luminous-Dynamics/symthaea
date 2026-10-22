@@ -321,7 +321,15 @@ fn run_policy(
         }
 
         let candidate = choose(policy, &trial.producer, seed ^ 0xA11C_A710);
+        let reservation = trial.producer.declared_cost_units;
+        let can_reserve = match reservation {
+            Some(cost) if cost > 0 && !stop_after_accounting_failure => {
+                charged_units.checked_add(cost).is_some_and(|next| next <= budget_units)
+            }
+            _ => false,
+        };
         if policy == Policy::ShiftGuardedLcb
+            && can_reserve
             && trial.producer.observable_shift_alarm
             && !trial.is_shifted
             && choose(Policy::ConservativeLcb, &trial.producer, seed) == Choice::Escalate
@@ -332,13 +340,6 @@ fn run_policy(
             }
         }
 
-        let reservation = trial.producer.declared_cost_units;
-        let can_reserve = match reservation {
-            Some(cost) if cost > 0 && !stop_after_accounting_failure => {
-                charged_units.checked_add(cost).is_some_and(|next| next <= budget_units)
-            }
-            _ => false,
-        };
         let choice = if candidate == Choice::Escalate && can_reserve {
             Choice::Escalate
         } else {
