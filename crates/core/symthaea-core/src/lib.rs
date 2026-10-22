@@ -70,6 +70,8 @@ pub mod core;
 /// Shared embodiment types: MotorSafetyLevel, EmbodimentBridge trait, telemetry.
 #[allow(missing_docs)]
 pub mod embodiment;
+/// Typed v2 embodiment observations, action lineage, and conformance contracts.
+pub mod embodiment_v2;
 /// System bootstrap and initialization.
 #[allow(missing_docs)]
 pub mod genesis;

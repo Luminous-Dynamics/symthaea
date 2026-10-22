@@ -13,7 +13,7 @@ categories = ["science", "simulation"]
 
 [dependencies]
 symthaea-core = { path = "../../core/symthaea-core" }
-symthaea-humanoid = { path = "../../domains/symthaea-humanoid" }
+symthaea-humanoid = { path = "../../domains/symthaea-humanoid", optional = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
@@ -34,5 +34,6 @@ builtin_interfaces = { path = "ros_msgs/builtin_interfaces", optional = true }
 symthaea-control = { path = "../symthaea-control", optional = true }
 
 [features]
-default = []
+default = ["humanoid-adapter"]
+humanoid-adapter = ["dep:symthaea-humanoid"]
 ros2 = ["dep:rclrs", "dep:sensor_msgs", "dep:trajectory_msgs", "dep:std_msgs", "dep:builtin_interfaces", "dep:symthaea-control"]

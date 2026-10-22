@@ -9,7 +9,7 @@ use symthaea_core::hdc::ContinuousHV;
 use crate::controller::FlightController;
 use crate::encoder::QuadrotorHdcEncoder;
 use crate::simulator::{PhysicsSimulator, SimplePhysicsSimulator};
-use crate::types::FlightConfig;
+use crate::types::{FlightConfig, QuadrotorCommand};
 
 pub use symthaea_core::embodiment::{
     EmbodimentResult, EmbodimentTelemetry, GROUNDING_SENSORIMOTOR, MoralGateInput,
@@ -35,10 +35,16 @@ pub enum FlightFallbackStage {
 /// Quadrotor embodiment bridge.
 pub struct FlightEmbodiment {
     controller: FlightController,
+    /// Deterministic identity for this seeded simulator instance; not hardware identity.
+    instance_id: String,
     simulator: SimplePhysicsSimulator,
+    /// Last command accepted by the in-process simulator. This is not hardware evidence.
+    last_applied_command: Option<QuadrotorCommand>,
     encoder: QuadrotorHdcEncoder,
     last_perception: Option<ContinuousHV>,
     total_steps: usize,
+    /// Simulation-clock epoch increments on reset so timestamps never rewind within one clock domain.
+    simulation_epoch: u64,
     current_safety: MotorSafetyLevel,
     safety_override: Option<MotorSafetyLevel>,
     moral_safety: Option<MotorSafetyLevel>,
@@ -49,6 +55,15 @@ pub struct FlightEmbodiment {
 }
 
 impl FlightEmbodiment {
+    /// Deterministic identity of this simulator instance (seed-derived; not a device certificate).
+    pub fn instance_id(&self) -> &str {
+        &self.instance_id
+    }
+
+    fn sim_clock_domain_id(&self) -> String {
+        format!("symthaea.multirotor.sim-time.epoch-{}", self.simulation_epoch)
+    }
+
     /// Emergency descent thrust as a fraction of hover thrust.
     /// Produces a controlled descent instead of freefall.
     const EMERGENCY_DESCENT_FRACTION: f32 = 0.3;
@@ -74,10 +89,13 @@ impl FlightEmbodiment {
     pub fn with_controller(genesis: &GenesisSeed, controller: FlightController) -> Self {
         Self {
             controller,
+            instance_id: format!("symthaea.multirotor:{}", genesis.timeline_id()),
             simulator: SimplePhysicsSimulator::new(),
+            last_applied_command: None,
             encoder: QuadrotorHdcEncoder::new(genesis, 32),
             last_perception: None,
             total_steps: 0,
+            simulation_epoch: 0,
             current_safety: MotorSafetyLevel::Green,
             safety_override: None,
             moral_safety: None,
@@ -86,6 +104,38 @@ impl FlightEmbodiment {
             fallback_stage: FlightFallbackStage::StabilizeHover,
             fallback_cycles_in_stage: 0,
         }
+    }
+
+    /// Construct with a caller-provided logical instance ID.
+    ///
+    /// Use this when the adapter is part of a multi-instance simulation/runtime. The
+    /// default constructor's seed-derived ID is deterministic but is not globally unique.
+    pub fn with_instance_id(
+        genesis: &GenesisSeed,
+        instance_id: impl Into<String>,
+    ) -> Result<Self, String> {
+        let instance_id = instance_id.into();
+        if instance_id.trim().is_empty() {
+            return Err("multirotor instance ID must not be empty".into());
+        }
+        let mut embodiment = Self::new(genesis);
+        embodiment.instance_id = instance_id;
+        Ok(embodiment)
+    }
+
+    /// Construct an already-trained controller with a caller-provided logical instance ID.
+    pub fn with_controller_and_instance_id(
+        genesis: &GenesisSeed,
+        controller: FlightController,
+        instance_id: impl Into<String>,
+    ) -> Result<Self, String> {
+        let instance_id = instance_id.into();
+        if instance_id.trim().is_empty() {
+            return Err("multirotor instance ID must not be empty".into());
+        }
+        let mut embodiment = Self::with_controller(genesis, controller);
+        embodiment.instance_id = instance_id;
+        Ok(embodiment)
     }
 
     /// Apply moral gate from ethics engine.
@@ -213,6 +263,7 @@ impl FlightEmbodiment {
             / 4.0;
         self.last_control_effort = effort;
 
+        self.last_applied_command = Some(cmd);
         self.simulator.step(&cmd, dt as f64);
 
         let perception = self.encoder.encode(self.simulator.state());
@@ -246,7 +297,9 @@ impl FlightEmbodiment {
     }
 
     pub fn reset(&mut self) {
+        self.simulation_epoch = self.simulation_epoch.saturating_add(1);
         self.simulator.reset(0.1);
+        self.last_applied_command = None;
         self.controller.reset();
         self.encoder.reset();
         self.last_perception = None;
@@ -285,6 +338,143 @@ impl FlightEmbodiment {
             observation_confidence: grounding_from_prediction_error(self.last_prediction_error),
             platform_specific: Vec::new(),
         }
+    }
+}
+
+
+/// V2 semantic adapter. Applied actions refer only to the named in-process simulator.
+impl symthaea_core::embodiment_v2::EmbodimentV2Adapter for FlightEmbodiment {
+    fn descriptor_v2(&self, instance_id: &str) -> symthaea_core::embodiment_v2::EmbodimentDescriptorV2 {
+        use symthaea_core::embodiment_v2::EmbodimentDescriptorV2;
+        EmbodimentDescriptorV2 {
+            contract_version: symthaea_core::embodiment_v2::EMBODIMENT_CONTRACT_VERSION_V2,
+            profile_id: "symthaea.multirotor.simple-physics-quadrotor.v1".into(),
+            platform_family_id: "aerial.multirotor".into(),
+            instance_id: self.instance_id.clone(),
+            morphology_id: "quadrotor.simple-physics-27g.v1".into(),
+            observation_schema_id: "symthaea.observation.scalar-quantity.v2".into(),
+            action_schema_id: "symthaea.action.scalar-quantity.v2".into(),
+            frame_graph_id: Some("world/body".into()),
+            clock_domain_id: self.sim_clock_domain_id(),
+            actuator_capability_ids: vec![
+                "actuator/thrust".into(),
+                "actuator/roll_moment".into(),
+                "actuator/pitch_moment".into(),
+                "actuator/yaw_moment".into(),
+            ],
+            sensor_capability_ids: vec![
+                "position".into(),
+                "orientation".into(),
+                "linear_velocity".into(),
+                "angular_velocity".into(),
+            ],
+            safe_fallback_profile_id: "symthaea.multirotor.multi-stage-landing.v1".into(),
+            calibration_profile_id: None,
+            backend_provenance_id: "symthaea-multirotor.simple-physics-simulator".into(),
+            descriptor_digest: None,
+        }
+    }
+
+    fn observation_frame_v2(
+        &self,
+        instance_id: &str,
+    ) -> Result<symthaea_core::embodiment_v2::ObservationFrameV2, String> {
+        if instance_id != self.instance_id {
+            return Err(format!("requested instance {instance_id:?} does not match bound instance {:?}", self.instance_id));
+        }
+        use symthaea_core::embodiment_v2::{
+            ClockStampV2, EMBODIMENT_CONTRACT_VERSION_V2, ObservationFrameV2, ObservationValueV2,
+        };
+        let state = self.simulator.state();
+        if !state.timestamp.is_finite()
+            || state.timestamp < 0.0
+            || state.timestamp > (u64::MAX as f64 / 1_000_000_000.0)
+        {
+            return Err("simulator timestamp cannot be represented as nanoseconds".into());
+        }
+        let timestamp_ns = (state.timestamp * 1_000_000_000.0).round() as u64;
+        let mut observations = Vec::with_capacity(13);
+        let mut add = |address: &str, quantity: &str, unit: &str, value: f64| {
+            observations.push(ObservationValueV2 {
+                address: address.into(),
+                quantity: quantity.into(),
+                unit: unit.into(),
+                value: Some(value),
+                missing_reason: None,
+                uncertainty: None,
+            });
+        };
+        add("position/x", "position", "m", state.position[0]);
+        add("position/y", "position", "m", state.position[1]);
+        add("position/z", "position", "m", state.position[2]);
+        add("orientation/w", "orientation_component", "1", state.quaternion[0]);
+        add("orientation/x", "orientation_component", "1", state.quaternion[1]);
+        add("orientation/y", "orientation_component", "1", state.quaternion[2]);
+        add("orientation/z", "orientation_component", "1", state.quaternion[3]);
+        add("linear_velocity/x", "velocity", "m/s", state.linear_velocity[0]);
+        add("linear_velocity/y", "velocity", "m/s", state.linear_velocity[1]);
+        add("linear_velocity/z", "velocity", "m/s", state.linear_velocity[2]);
+        add("angular_velocity/x", "angular_velocity", "rad/s", state.angular_velocity[0]);
+        add("angular_velocity/y", "angular_velocity", "rad/s", state.angular_velocity[1]);
+        add("angular_velocity/z", "angular_velocity", "rad/s", state.angular_velocity[2]);
+        let frame = ObservationFrameV2 {
+            contract_version: EMBODIMENT_CONTRACT_VERSION_V2,
+            profile_id: "symthaea.multirotor.simple-physics-quadrotor.v1".into(),
+            instance_id: self.instance_id.clone(),
+            clock: ClockStampV2 {
+                clock_domain_id: self.sim_clock_domain_id(),
+                sequence: Some(self.total_steps as u64),
+                timestamp_ns: Some(timestamp_ns),
+            },
+            frame_graph_id: Some("world/body".into()),
+            source_id: "SimplePhysicsSimulator::state".into(),
+            observations,
+        };
+        frame.validate()?;
+        Ok(frame)
+    }
+
+    fn last_action_frame_v2(
+        &self,
+        instance_id: &str,
+    ) -> Result<Option<symthaea_core::embodiment_v2::ActionFrameV2>, String> {
+        if instance_id != self.instance_id {
+            return Err(format!("requested instance {instance_id:?} does not match bound instance {:?}", self.instance_id));
+        }
+        use symthaea_core::embodiment_v2::{
+            ActionFrameV2, ActionStageV2, ActionValueV2, ClockStampV2, EMBODIMENT_CONTRACT_VERSION_V2,
+        };
+        let Some(command) = self.last_applied_command else {
+            return Ok(None);
+        };
+        let timestamp = self.simulator.state().timestamp;
+        if !timestamp.is_finite()
+            || timestamp < 0.0
+            || timestamp > (u64::MAX as f64 / 1_000_000_000.0)
+        {
+            return Err("simulator timestamp cannot be represented as nanoseconds".into());
+        }
+        let frame = ActionFrameV2 {
+            contract_version: EMBODIMENT_CONTRACT_VERSION_V2,
+            profile_id: "symthaea.multirotor.simple-physics-quadrotor.v1".into(),
+            instance_id: instance_id.into(),
+            clock: ClockStampV2 {
+                clock_domain_id: self.sim_clock_domain_id(),
+                sequence: Some(self.total_steps as u64),
+                timestamp_ns: Some((timestamp * 1_000_000_000.0).round() as u64),
+            },
+            frame_graph_id: Some("world/body".into()),
+            source_id: "symthaea-multirotor.simple-physics-simulator".into(),
+            stage: ActionStageV2::Applied,
+            actions: vec![
+                ActionValueV2 { address: "actuator/thrust".into(), quantity: "force".into(), unit: "N".into(), value: command.thrust as f64 },
+                ActionValueV2 { address: "actuator/roll_moment".into(), quantity: "moment".into(), unit: "N*m".into(), value: command.roll_moment as f64 },
+                ActionValueV2 { address: "actuator/pitch_moment".into(), quantity: "moment".into(), unit: "N*m".into(), value: command.pitch_moment as f64 },
+                ActionValueV2 { address: "actuator/yaw_moment".into(), quantity: "moment".into(), unit: "N*m".into(), value: command.yaw_moment as f64 },
+            ],
+        };
+        frame.validate()?;
+        Ok(Some(frame))
     }
 }
 
@@ -410,6 +600,69 @@ mod tests {
             alt_at_red_onset,
             state.position[2]
         );
+    }
+
+    #[test]
+    fn uec_v2_multirotor_adapter_passes_shared_conformance_after_simulated_step() {
+        use symthaea_core::embodiment_v2::{
+            validate_adapter_v2_conformance, ActionStageV2, EmbodimentV2Adapter,
+        };
+        let mut bridge = FlightEmbodiment::new(&GenesisSeed::from_phrase("uec-v2-test"));
+        let instance = bridge.instance_id().to_string();
+        let before = bridge.observation_frame_v2(instance).unwrap();
+        assert_eq!(before.observations.len(), 13);
+        assert!(bridge.last_action_frame_v2(instance).unwrap().is_none());
+        validate_adapter_v2_conformance(&bridge, instance).unwrap();
+
+        let hv = ContinuousHV::random(16384, 42);
+        let legacy_result = bridge.step(&hv, 0.002, 0.7);
+        assert!(legacy_result.success);
+        // Compatibility: the v1 EmbodimentBridge behavior remains directly callable.
+        let after = bridge.observation_frame_v2(instance).unwrap();
+        assert_eq!(after.clock.sequence, Some(1));
+        let action = bridge.last_action_frame_v2(instance).unwrap().unwrap();
+        assert_eq!(action.stage, ActionStageV2::Applied);
+        assert_eq!(action.actions.len(), 4);
+        validate_adapter_v2_conformance(&bridge, instance).unwrap();
+    }
+
+    #[test]
+    fn uec_v2_explicit_instance_ids_separate_same_seeded_simulators() {
+        let genesis = GenesisSeed::from_phrase("same-seed");
+        let first = FlightEmbodiment::with_instance_id(&genesis, "sim-a").unwrap();
+        let second = FlightEmbodiment::with_instance_id(&genesis, "sim-b").unwrap();
+        assert_ne!(first.instance_id(), second.instance_id());
+
+        use symthaea_core::embodiment_v2::EmbodimentV2Adapter;
+        assert_eq!(first.descriptor_v2("sim-a").instance_id, "sim-a");
+        assert_eq!(second.descriptor_v2("sim-b").instance_id, "sim-b");
+        assert!(FlightEmbodiment::with_instance_id(&genesis, "  ").is_err());
+    }
+
+    #[test]
+    fn uec_v2_reset_starts_a_new_clock_domain_epoch() {
+        use symthaea_core::embodiment_v2::{validate_adapter_v2_conformance, EmbodimentV2Adapter};
+        let mut bridge = FlightEmbodiment::new(&GenesisSeed::from_phrase("uec-v2-epoch-test"));
+        let instance = bridge.instance_id().to_string();
+        let hv = ContinuousHV::random(16384, 42);
+        bridge.step(&hv, 0.002, 0.7);
+        let before = bridge.observation_frame_v2(&instance).unwrap();
+
+        bridge.reset();
+        let after = bridge.observation_frame_v2(&instance).unwrap();
+        assert_ne!(before.clock.clock_domain_id, after.clock.clock_domain_id);
+        assert_eq!(after.clock.sequence, Some(0));
+        assert_eq!(after.clock.timestamp_ns, Some(0));
+        validate_adapter_v2_conformance(&bridge, &instance).unwrap();
+    }
+
+    #[test]
+    fn uec_v2_multirotor_rejects_wrong_instance() {
+        use symthaea_core::embodiment_v2::validate_adapter_v2_conformance;
+        let bridge = FlightEmbodiment::new(&GenesisSeed::from_phrase("uec-v2-test"));
+        let failures = validate_adapter_v2_conformance(&bridge, "requested-instance");
+        assert!(failures.is_err());
+        assert!(bridge.observation_frame_v2("requested-instance").is_err());
     }
 
     #[test]

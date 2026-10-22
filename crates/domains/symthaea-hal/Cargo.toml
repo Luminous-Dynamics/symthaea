@@ -16,7 +16,7 @@ no-panic.workspace = true
 fixed.workspace = true
 statig.workspace = true
 symthaea-core = { path = "../../core/symthaea-core" }
-symthaea-humanoid = { path = "../symthaea-humanoid" }
+symthaea-humanoid = { path = "../symthaea-humanoid", optional = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
@@ -37,9 +37,10 @@ features = ["i2c"]
 proptest = "1.4"
 
 [features]
-default = []
+default = ["humanoid"]
+humanoid = ["dep:symthaea-humanoid"]
 linux = ["dep:linux-embedded-hal"]
-calibrate = ["dep:clap"]
+calibrate = ["dep:clap", "humanoid"]
 signal = ["dep:ctrlc"]
 
 [[bin]]
