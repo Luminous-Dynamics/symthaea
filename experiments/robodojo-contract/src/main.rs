@@ -642,6 +642,12 @@ mod cli_tests {
             .join("synthetic_forecasts.tsv")
     }
 
+    fn sensing_fixture_path() -> std::path::PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("examples")
+            .join("synthetic_sensing_trials.tsv")
+    }
+
     #[test]
     fn synthetic_forecasts_produce_calibration_and_risk_coverage_metrics() {
         let probabilities = read_forecast_probabilities(forecast_fixture_path())
@@ -670,6 +676,33 @@ mod cli_tests {
         assert!(join_forecasts(missing, &trials).is_err());
         let duplicated = vec![probabilities[0].clone(), probabilities[0].clone()];
         assert!(join_forecasts(duplicated, &trials).is_err());
+    }
+
+    #[test]
+    fn synthetic_sensing_ledger_parses_pairs_and_preserves_missing_costs() {
+        let records = read_sensing_trials(sensing_fixture_path())
+            .expect("synthetic sensing ledger must parse");
+        assert_eq!(records.len(), 30);
+        let audit = audit_sensing_trials(&records, 1_000, 42)
+            .expect("fixture arms must be completely paired");
+        assert!(audit.passed);
+        assert_eq!(audit.scenario_count, 6);
+        assert_eq!(audit.scenario_family_count, 6);
+        assert_eq!(audit.arm_summaries.len(), 5);
+        assert_eq!(audit.comparisons_to_fixed_rate.len(), 4);
+
+        let voi = audit.arm_summaries.iter()
+            .find(|row| row.arm == SensingArm::ValueOfInformation)
+            .expect("value-of-information arm summary exists");
+        assert_eq!(voi.sensing_energy_measured_count, 5);
+        assert_eq!(voi.sensing_energy_missing_count, 1);
+        assert!(voi.mean_sensing_energy_j.is_some());
+
+        let compare = audit.comparisons_to_fixed_rate.iter()
+            .find(|row| row.arm == SensingArm::ValueOfInformation)
+            .expect("value-of-information comparison exists");
+        assert_eq!(compare.sensing_energy_pair_count, 5);
+        assert_eq!(compare.inference_status, "candidate_better_on_family_bootstrap");
     }
 
     #[test]
