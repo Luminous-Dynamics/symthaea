@@ -208,7 +208,7 @@ if ! cmp -s "$tmpdir/paired-eval-a.csv" "$tmpdir/paired-eval-b.csv"; then
   printf 'FAIL: repeated paired-inference report is not byte-identical\n' >&2
   exit 1
 fi
-if ! awk -F, 'NR == 1 { if (NF != 23) failed = 1; next }
+if ! awk -F, 'NR == 1 { if (NF != 32) failed = 1; next }
   { if (NF != 23 || $6 != 30) failed = 1; rows++ }
   END { if (NR != 5 || rows != 4 || failed) exit 1 }
 ' "$tmpdir/paired-eval-a.csv"; then
@@ -232,15 +232,22 @@ if ! cmp -s "$tmpdir/stratified-a.csv" "$tmpdir/stratified-b.csv"; then
   printf 'FAIL: repeated stratified aggregate is not byte-identical\n' >&2
   exit 1
 fi
-if ! awk -F, 'NR == 1 { if (NF != 23) failed = 1; next }
+if ! awk -F, 'NR == 1 { if (NF != 32) failed = 1; next }
   {
-    if (NF != 23) failed = 1
+    if (NF != 32) failed = 1
     if ($1 == "task") task_rows++
     else if ($1 == "aggregate") {
       aggregate_rows++
-      if ($2 != "ALL" || $3 != 40 || $11 < 0.049999 || $11 > 0.050001 ||
-          $14 < 0.049999 || $14 > 0.050001 || $17 < 0.499999 || $17 > 0.500001 ||
-          $20 < 0.499999 || $20 > 0.500001 || $21 != 2 || $22 != 10000 || $23 != 17) failed = 1
+      if ($2 != "ALL" || $3 != 40 ||
+          $12 < 0.049999 || $12 > 0.050001 ||
+          $15 < 0.049999 || $15 > 0.050001 ||
+          $18 < 0.499999 || $18 > 0.500001 ||
+          $21 < 0.499999 || $21 > 0.500001 ||
+          $24 < 0.549999 || $24 > 0.550001 ||
+          $25 < 0.599999 || $25 > 0.600001 ||
+          $26 < 0.049999 || $26 > 0.050001 ||
+          $29 < 0.499999 || $29 > 0.500001 ||
+          $30 != 2 || $31 != 10000 || $32 != 17) failed = 1
     } else failed = 1
   }
   END { if (NR != 4 || task_rows != 2 || aggregate_rows != 1 || failed) exit 1 }
