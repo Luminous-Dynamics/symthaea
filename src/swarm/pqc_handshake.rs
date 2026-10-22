@@ -1,33 +1,42 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! # Post-Quantum Hybrid Handshake — Ed25519 + ML-KEM-768
+//! # PQC-Assisted KEM Handshake — Claim-Integrity Review
 //!
-//! Combines classical Ed25519 identity verification with ML-KEM-768
-//! key encapsulation for quantum-resistant session key derivation.
+//! This module combines an Ed25519 challenge-response API with ML-KEM-768
+//! encapsulation. The current code is a research integration, **not a reviewed
+//! hybrid key-exchange protocol**.
 //!
-//! ## Protocol
+//! ## Current data flow
 //!
 //! ```text
-//! Phase 1 (Classical): Mutual Ed25519 handshake (from handshake.rs)
-//!   → Both sides prove identity via challenge-response
-//!
-//! Phase 2 (PQC): ML-KEM-768 key encapsulation
-//!   → Initiator encapsulates shared secret to responder's KEM public key
-//!   → Responder decapsulates to recover the same shared secret
-//!
-//! Phase 3 (Derivation): HKDF(Ed25519_nonce || ML-KEM_shared) → session key
-//!   → Combined session key is quantum-resistant even if Ed25519 is broken
-//!   → Both classical AND PQC must succeed (AND logic)
+//! Ed25519 challenge-response (separate API)
+//!   → challenge nonce is public protocol input, not a shared secret
+//! ML-KEM-768 encapsulation
+//!   → shared secret comes from the KEM
+//! Session derivation
+//!   → BLAKE3 derive_key(context, public_challenge || kem_shared_secret)
 //! ```
 //!
-//! ## Security
+//! ## Security claim boundaries
 //!
-//! The hybrid approach follows NIST recommendations for PQC transition:
-//! - If quantum computers break Ed25519, ML-KEM-768 still protects the session key
-//! - If ML-KEM-768 has an undiscovered vulnerability, Ed25519 still authenticates
-//! - The HKDF combination ensures the derived key is at least as strong as
-//!   the strongest component (Bindel et al. 2019)
+//! - Mixing a public challenge nonce with the KEM secret does not add an
+//!   independent classical secret contribution to confidentiality.
+//! - This API does not itself enforce that the Ed25519 exchange completed, nor
+//!   bind both peer identities, the KEM public key and KEM ciphertext to one
+//!   authenticated transcript. Callers must not infer authentication simply
+//!   because they invoked the session-key API.
+//! - The manager holds one ML-KEM keypair across sessions. Recorded KEM
+//!   ciphertexts can be decapsulated if that private key is later compromised;
+//!   the current design therefore does not provide KEM-based forward secrecy.
+//! - Do not claim the session remains secure if either the classical or KEM
+//!   component fails without a specified combiner proof, authenticated key
+//!   binding, and independent protocol review.
+//!
+//! A production protocol needs an authenticated, transcript-bound handshake,
+//! explicit downgrade rules, per-session key lifecycle/erasure, and independent
+//! tests against active attacks. See
+//! `docs/security/MESH_KEY_AGREEMENT_CLAIM_REVIEW.md`.
 //!
 //! ## Feature Gate
 //!
@@ -51,7 +60,10 @@ use std::collections::HashMap;
 // PQC SESSION KEY
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/// A PQC-derived session key combining classical and quantum-resistant components.
+/// A session key derived from ML-KEM shared secret plus public challenge bytes.
+///
+/// This is not, by itself, proof of a hybrid classical/PQC combiner or an
+/// authenticated forward-secret session. See the module-level claim boundary.
 #[derive(Clone)]
 pub struct PqcSessionKey {
     /// Combined session key: HKDF(classical_nonce || kem_shared_secret).
@@ -170,14 +182,16 @@ impl PqcHandshakeManager {
             .insert(peer_id.to_string(), kem_public_key.to_vec());
     }
 
-    /// Phase 2b (Initiator): Encapsulate a shared secret to the responder's KEM public key.
+    /// Encapsulate a shared secret to the responder's supplied KEM public key.
     ///
-    /// Returns `(ciphertext, classical_nonce)` — the ciphertext is sent to the
-    /// responder, and the classical_nonce (from the handshake challenge) is used
-    /// in HKDF derivation.
+    /// The `classical_nonce` is public challenge/context input; it is not a
+    /// classical shared secret. This method does not verify that the classical
+    /// handshake succeeded or that this KEM public key is authenticated for
+    /// `peer_id`; the caller must enforce those conditions before use.
     ///
-    /// After this call, the initiator can derive the session key via
-    /// `derive_session_key()`.
+    /// Returns the KEM ciphertext and stores the locally derived session key.
+    /// The current KEM private key is reused across sessions, so this API does
+    /// not provide forward secrecy against later compromise of that key.
     pub fn encapsulate_for_peer(
         &mut self,
         peer_id: &str,
@@ -206,7 +220,7 @@ impl PqcHandshakeManager {
             })?;
 
         // Derive session key: HKDF(classical_nonce || kem_shared_secret)
-        let session_key = Self::hkdf_derive(classical_nonce, &kem_shared_secret);
+        let session_key = Self::blake3_derive_session_key(classical_nonce, &kem_shared_secret);
 
         self.session_keys.insert(
             peer_id.to_string(),
@@ -223,12 +237,12 @@ impl PqcHandshakeManager {
     // RESPONDER SIDE
     // ════════════════════════════════════════════════════════════════════
 
-    /// Phase 2 (Responder): Decapsulate the initiator's KEM ciphertext
-    /// and derive the session key.
+    /// Decapsulate a KEM ciphertext and derive the session key.
     ///
-    /// The responder receives the ciphertext from `encapsulate_for_peer()`,
-    /// decapsulates with their own KEM private key, and derives the same
-    /// session key via HKDF.
+    /// The caller must bind the ciphertext, KEM key identity, peer identities,
+    /// protocol version and classical handshake transcript in an authenticated
+    /// protocol. This helper accepts a caller-supplied `peer_id` and public
+    /// challenge bytes; it does not enforce that binding or handshake state.
     pub fn decapsulate_and_derive(
         &mut self,
         peer_id: &str,
@@ -243,7 +257,7 @@ impl PqcHandshakeManager {
         })?;
 
         // Derive session key: HKDF(classical_nonce || kem_shared_secret)
-        let session_key = Self::hkdf_derive(classical_nonce, &kem_shared_secret);
+        let session_key = Self::blake3_derive_session_key(classical_nonce, &kem_shared_secret);
 
         self.session_keys.insert(
             peer_id.to_string(),
@@ -260,24 +274,20 @@ impl PqcHandshakeManager {
     // KEY DERIVATION
     // ════════════════════════════════════════════════════════════════════
 
-    /// Derive a 32-byte session key from classical nonce + KEM shared secret.
+    /// Derive a 32-byte key using BLAKE3's context-based derive-key API.
     ///
-    /// Uses HKDF-SHA256 with domain separation:
-    /// - Salt: classical handshake nonce (binds to the Ed25519 session)
-    /// - IKM: ML-KEM-768 shared secret (32 bytes, quantum-resistant)
-    /// - Info: domain separator "symthaea-pqc-session-v1"
-    ///
-    /// The derived key is at least as strong as the strongest input
-    /// (Bindel et al. 2019 — hybrid KDF security proof).
-    fn hkdf_derive(classical_nonce: &[u8], kem_shared_secret: &[u8]) -> [u8; 32] {
-        // Concatenate inputs for IKM
+    /// The public challenge bytes are concatenated with the secret ML-KEM
+    /// output as input material. The challenge contributes context binding only;
+    /// it is not secret entropy and this function does not implement HKDF or a
+    /// proven hybrid KDF combiner.
+    fn blake3_derive_session_key(
+        classical_nonce: &[u8],
+        kem_shared_secret: &[u8],
+    ) -> [u8; 32] {
         let mut ikm = Vec::with_capacity(classical_nonce.len() + kem_shared_secret.len());
         ikm.extend_from_slice(classical_nonce);
         ikm.extend_from_slice(kem_shared_secret);
-
-        // BLAKE3 keyed derivation (lighter than HKDF-SHA256, same security)
-        let derived = blake3::derive_key("symthaea-pqc-session-v1", &ikm);
-        derived
+        blake3::derive_key("symthaea-pqc-session-v1", &ikm)
     }
 }
 
