@@ -1,0 +1,93 @@
+name: HLB Factorial Benchmark Contract
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - ".github/workflows/hlb-factorial-benchmark-contract.yml"
+      - "crates/core/symthaea-core/examples/hlb_factorial_benchmark_contract.rs"
+      - "crates/core/symthaea-core/Cargo.toml"
+      - "docs/research/HLB_INTEGRATED_FACTORIAL_BENCHMARK.md"
+      - "docs/research/hlb-factorial-benchmark-v1.json"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/hlb-factorial-benchmark-contract.yml"
+      - "crates/core/symthaea-core/examples/hlb_factorial_benchmark_contract.rs"
+      - "crates/core/symthaea-core/Cargo.toml"
+      - "docs/research/HLB_INTEGRATED_FACTORIAL_BENCHMARK.md"
+      - "docs/research/hlb-factorial-benchmark-v1.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hlb-factorial-benchmark-contract-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  protocol-contract:
+    name: Validate factorial design and receipt
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CARGO_TERM_COLOR: always
+      RUST_BACKTRACE: 1
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Check manifest structure and fail-closed labels
+        run: |
+          set -euo pipefail
+          jq -e '
+            .schema_version == "hlb-factorial-benchmark-v1" and
+            .status == "protocol_only" and
+            (.profiles | length == 8) and
+            ([.profiles[].id] | unique | length == 8) and
+            ([.profiles[].execution_status] | all(. == "planned_not_executed")) and
+            (.seeds.development | length == 10) and
+            (.seeds.held_out | length == 20) and
+            (([.seeds.development[], .seeds.held_out[]] | unique | length) == 30)
+          ' docs/research/hlb-factorial-benchmark-v1.json >/dev/null
+
+      - name: Check validator formatting
+        run: rustfmt --edition 2024 --check crates/core/symthaea-core/examples/hlb_factorial_benchmark_contract.rs
+
+      - name: Test factorial, split, and negative-control invariants
+        run: cargo test --locked --release -p symthaea-core --example hlb_factorial_benchmark_contract -- --nocapture
+
+      - name: Generate protocol-only receipt
+        env:
+          SYMTHAEA_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p research-results
+          cargo run --locked --release -p symthaea-core --example hlb_factorial_benchmark_contract 2>&1 | tee research-results/hlb-factorial-contract.log
+          sha256sum \
+            docs/research/hlb-factorial-benchmark-v1.json \
+            docs/research/HLB_INTEGRATED_FACTORIAL_BENCHMARK.md \
+            crates/core/symthaea-core/examples/hlb_factorial_benchmark_contract.rs \
+            research-results/hlb-factorial-contract.log > research-results/SHA256SUMS
+          cat research-results/SHA256SUMS
+
+      - name: Upload contract-validation receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hlb-factorial-contract-${{ github.event.pull_request.head.sha || github.sha }}
+          path: research-results/
+          if-no-files-found: warn
+          retention-days: 30
