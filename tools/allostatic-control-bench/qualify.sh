@@ -718,14 +718,14 @@ if ! awk -F, -v raw="$tmpdir/bet-grid-a.csv" -v summary="$tmpdir/bet-grid-summar
     rate_names[4] = "0.100"; rate_values[4] = 0.10
     rate_names[5] = "0.200"; rate_values[5] = 0.20
     rate_names[6] = "0.400"; rate_values[6] = 0.40
-    method_names[1] = "fixed"; method_names[2] = "mix3"; method_names[3] = "mix7"
+    method_names[1] = "fixed"; method_names[2] = "mix3"; method_names[3] = "mix7"; method_names[4] = "adaptive"
     threshold = log(100)
     z = 1.959963984540054
   }
 
   FILENAME == raw {
-    if (FNR == 1) { if (NF != 12) failed = 1; next }
-    if (NF != 12) failed = 1
+    if (FNR == 1) { if (NF != 14) failed = 1; next }
+    if (NF != 14) failed = 1
     ri = 0
     for (i = 1; i <= 6; i++) if ($1 == rate_names[i]) ri = i
     if (ri == 0) failed = 1
@@ -737,6 +737,7 @@ if ! awk -F, -v raw="$tmpdir/bet-grid-a.csv" -v summary="$tmpdir/bet-grid-summar
     if ($6 != "NA" && ($6 !~ /^[0-9]+$/ || $6 >= 300)) failed = 1
     for (i = 7; i <= 9; i++) if ($i !~ /^[0-9]+$/ || $i > 300) failed = 1
     for (i = 10; i <= 12; i++) if ($i !~ /^-?[0-9]*[.]?[0-9]+$/) failed = 1
+    if ($13 !~ /^[0-9]+$/ || $13 > 300 || $14 !~ /^-?[0-9]*[.]?[0-9]+$/) failed = 1
     key = ri SUBSEP $2 SUBSEP $3
     if (seen[key]++) failed = 1
 
@@ -748,6 +749,11 @@ if ! awk -F, -v raw="$tmpdir/bet-grid-a.csv" -v summary="$tmpdir/bet-grid-summar
     c7[1] = c7[2] = c7[3] = c7[4] = c7[5] = c7[6] = c7[7] = 0
     first3 = first7 = 300
     l3 = l7 = 0
+    adaptive_log = 0
+    first_adaptive = 300
+    adaptive_count = 0
+    prior_loss_sum = 0
+    prior_squared_loss_sum = 0
     for (step = 0; step < 300; step++) {
       loss = (substr(trace, step + 1, 1) == "1") ? 1 : 0
       if (loss == 1) {
@@ -774,26 +780,48 @@ if ! awk -F, -v raw="$tmpdir/bet-grid-a.csv" -v summary="$tmpdir/bet-grid-summar
       for (j = 1; j <= 7; j++) sum7 += exp(c7[j] - max7)
       l7 = max7 + log(sum7 / 7)
       if (l7 >= threshold && first7 == 300) first7 = step
+
+      adaptive_bet = 0
+      if (adaptive_count >= 20) {
+        adaptive_mean = prior_loss_sum / adaptive_count
+        adaptive_variance = prior_squared_loss_sum / adaptive_count - adaptive_mean * adaptive_mean
+        if (adaptive_variance < 1.0e-10) adaptive_variance = 1.0e-10
+        adaptive_excess = adaptive_mean - 0.05
+        if (adaptive_excess > 0) {
+          adaptive_bet = adaptive_excess / (adaptive_variance + adaptive_excess * adaptive_excess)
+          if (adaptive_bet > 10) adaptive_bet = 10
+        }
+      }
+      adaptive_factor = 1 + adaptive_bet * (loss - 0.05)
+      if (adaptive_factor <= 0) failed = 1
+      adaptive_log += log(adaptive_factor)
+      if (adaptive_log >= threshold && first_adaptive == 300) first_adaptive = step
+      adaptive_count++
+      prior_loss_sum += loss
+      prior_squared_loss_sum += loss * loss
     }
 
     if (count != $4) failed = 1
     if ((first_event == 300 && $6 != "NA") ||
         (first_event < 300 && $6 != first_event)) failed = 1
-    if ($7 != first_fixed || $8 != first3 || $9 != first7) failed = 1
+    if ($7 != first_fixed || $8 != first3 || $9 != first7 || $13 != first_adaptive) failed = 1
     if (($10 - fixed_log > 0.000003) || (fixed_log - $10 > 0.000003) ||
         ($11 - l3 > 0.000003) || (l3 - $11 > 0.000003) ||
-        ($12 - l7 > 0.000003) || (l7 - $12 > 0.000003)) failed = 1
+        ($12 - l7 > 0.000003) || (l7 - $12 > 0.000003) ||
+        ($14 - adaptive_log > 0.000003) || (adaptive_log - $14 > 0.000003)) failed = 1
 
-    raw_key = ri SUBSEP $2 SUBSEP $3
-    if (seen[raw_key]++) failed = 1
     streams[ri SUBSEP $2] = 1
     event_sum[ri] += count
-    for (j = 1; j <= 3; j++) {
+    method_first[1] = first_fixed
+    method_first[2] = first3
+    method_first[3] = first7
+    method_first[4] = first_adaptive
+    for (j = 1; j <= 4; j++) {
       method = method_names[j]
-      if ((j == 1 ? first_fixed : (j == 2 ? first3 : first7)) < 300) {
+      if (method_first[j] < 300) {
         monitor_alarms[ri SUBSEP method]++
-        monitor_step_sum[ri SUBSEP method] += (j == 1 ? first_fixed : (j == 2 ? first3 : first7))
-        alarm_steps[ri SUBSEP method SUBSEP monitor_alarms[ri SUBSEP method]] = (j == 1 ? first_fixed : (j == 2 ? first3 : first7))
+        monitor_step_sum[ri SUBSEP method] += method_first[j]
+        alarm_steps[ri SUBSEP method SUBSEP monitor_alarms[ri SUBSEP method]] = method_first[j]
         cohort_alarm[ri SUBSEP $2 SUBSEP method] = 1
       }
     }
@@ -808,7 +836,7 @@ if ! awk -F, -v raw="$tmpdir/bet-grid-a.csv" -v summary="$tmpdir/bet-grid-summar
     for (i = 1; i <= 6; i++) if ($1 == rate_names[i]) ri = i
     if (ri == 0) failed = 1
     method = $2
-    if (method != "fixed" && method != "mix3" && method != "mix7") failed = 1
+    if (method != "fixed" && method != "mix3" && method != "mix7" && method != "adaptive") failed = 1
     if ($3 != 1000 || $4 != 5 || $5 != 300) failed = 1
     if ($6 !~ /^[0-9]+$/ || $6 > 1000) failed = 1
     if ($7 !~ /^[0-9]*[.]?[0-9]+$/ || $8 !~ /^[0-9]*[.]?[0-9]+$/ ||
@@ -822,7 +850,8 @@ if ! awk -F, -v raw="$tmpdir/bet-grid-a.csv" -v summary="$tmpdir/bet-grid-summar
         $17 != 0.05 || $18 != 0.05 || $20 == "") failed = 1
     if ((method == "fixed" && $20 != "0.500") ||
         (method == "mix3" && $20 != "0.250;0.500;0.750") ||
-        (method == "mix7" && $20 != "0.025;0.050;0.100;0.250;0.500;0.750;0.950")) failed = 1
+        (method == "mix7" && $20 != "0.025;0.050;0.100;0.250;0.500;0.750;0.950") ||
+        (method == "adaptive" && $20 != "predictable_mean_variance;max_fraction=0.500;min_history=20")) failed = 1
     if (($19 - log(100) > 0.000001) || (log(100) - $19 > 0.000001)) failed = 1
 
     calculated_fwer = 0
@@ -865,7 +894,7 @@ if ! awk -F, -v raw="$tmpdir/bet-grid-a.csv" -v summary="$tmpdir/bet-grid-summar
   }
 
   END {
-    if (raw_rows != 30000 || summary_rows != 18 || failed) exit 1
+    if (raw_rows != 30000 || summary_rows != 24 || failed) exit 1
     for (i = 1; i <= 6; i++) for (cohort = 0; cohort < 1000; cohort++)
       for (monitor = 0; monitor < 5; monitor++)
         if (!streams[i SUBSEP cohort] || !seen[i SUBSEP cohort SUBSEP monitor]) exit 1
@@ -873,17 +902,21 @@ if ! awk -F, -v raw="$tmpdir/bet-grid-a.csv" -v summary="$tmpdir/bet-grid-summar
     if (fwer_rate[1 SUBSEP "fixed"] > 0.02 ||
         fwer_rate[1 SUBSEP "mix3"] > 0.02 ||
         fwer_rate[1 SUBSEP "mix7"] > 0.02 ||
+        fwer_rate[1 SUBSEP "adaptive"] > 0.02 ||
         fwer_upper[2 SUBSEP "fixed"] > 0.08 ||
         fwer_upper[2 SUBSEP "mix3"] > 0.08 ||
-        fwer_upper[2 SUBSEP "mix7"] > 0.08) exit 1
+        fwer_upper[2 SUBSEP "mix7"] > 0.08 ||
+        fwer_upper[2 SUBSEP "adaptive"] > 0.08) exit 1
     if (fwer_rate[3 SUBSEP "mix7"] < fwer_rate[3 SUBSEP "mix3"] + 0.15 ||
         fwer_rate[4 SUBSEP "mix7"] < fwer_rate[4 SUBSEP "mix3"] + 0.20) exit 1
     if (fwer_rate[5 SUBSEP "fixed"] < 0.95 ||
         fwer_rate[5 SUBSEP "mix3"] < 0.95 ||
         fwer_rate[5 SUBSEP "mix7"] < 0.95 ||
+        fwer_rate[5 SUBSEP "adaptive"] < 0.95 ||
         fwer_rate[6 SUBSEP "fixed"] < 0.99 ||
         fwer_rate[6 SUBSEP "mix3"] < 0.99 ||
-        fwer_rate[6 SUBSEP "mix7"] < 0.99) exit 1
+        fwer_rate[6 SUBSEP "mix7"] < 0.99 ||
+        fwer_rate[6 SUBSEP "adaptive"] < 0.99) exit 1
   }
 ' "$tmpdir/bet-grid-a.csv" "$tmpdir/bet-grid-summary-a.csv"; then
   printf 'FAIL: risk-null Monte Carlo schema, component recurrence, confidence intervals, calibration or power gates are invalid\n' >&2
