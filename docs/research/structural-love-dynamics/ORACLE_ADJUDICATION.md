@@ -63,3 +63,43 @@ A critical-invariant failure is not compensated by warmth, helpfulness, or avera
 ## Explicit non-claims
 
 This protocol does not define all human love, certify any model as loving or conscious, establish clinical efficacy, or authorize runtime behavior. It is a procedure for making benchmark labels contestable and auditable.
+
+## Executable evidence contract (added 2026-10-22)
+
+The review protocol is no longer represented only by a free-text status field. The machine-readable contract is 'oracle-adjudication.schema.json'; the audit entry point is 'xtask/src/bin/sld-oracle-audit.rs'; the receipt pins its output in 'oracle_adjudication'.
+
+### Frozen case-ID inventory
+
+'oracle-case-inventory.json' lists **61 unique IDs**: 52 core candidate cases plus nine longitudinal trajectories. Its order is sorted, and the audit tool computes the digest over the compact UTF-8 JSON serialization of the sorted ID array (not the pretty-printed file bytes). 'case_id_inventory_sha256' must match the digest in the ledger and the evaluation receipt's 'case_set.inventory_sha256'. The ledger's 'ledger_sha256', by contrast, is SHA-256 over the exact byte sequence of the immutable ledger file.
+
+The inventory is a frozen review census, not an assertion that the expected labels are correct. If the corpus changes, regenerate the inventory, assign a new corpus version, and re-review changed or affected cases; never silently update the digest after reading model results.
+
+### Minimum ledger fields enforced by the Rust auditor
+
+- Every scored case appears exactly once in the frozen inventory and has at least two distinct initial reviewer IDs.
+- Initial labels are recorded as blinded; order tokens are present and unique; a reviewer who authored a case cannot supply its initial judgment or adjudicate it.
+- Reviewer registry entries have distinct pseudonymous IDs, expertise categories, independence attestations, and disclosed/managed conflicts. Personal identities should remain separate and access-controlled.
+- Disagreements require a third-party adjudicator who was not one of the initial reviewers. A 'REVISED' disposition also requires an independent adjudicator. A completed ledger cannot retain rejected, indeterminate, or unadjudicated cases in its scored census.
+- Declared case, adjudicated, critical-case, reviewer, and unresolved-disagreement counts must match the records. A complete ledger digest is computed from exact bytes and emitted as a receipt-compatible JSON summary.
+- The auditor fails closed and emits no success receipt on missing IDs, duplicate reviewer judgments, authorship conflicts, unresolved disagreements, mismatched counts, or a changed case-ID inventory.
+
+Example command, after the Rust toolchain is installed:
+
+\`\`\`sh
+cargo run -p xtask --bin sld-oracle-audit -- \\
+  --ledger reports/sld/oracle-ledger.json \\
+  --case-ids docs/research/structural-love-dynamics/oracle-case-inventory.json \\
+  --out reports/sld/oracle-evidence-summary.json
+\`\`\`
+
+The summary is designed to populate the evaluation receipt's 'oracle_adjudication' object. A model-behavior receipt cannot be marked comparison-eligible without a complete audit summary, the exact case-ID inventory digest, and a completed evaluator adjudication status. Two receipts must pin the same oracle evidence object.
+
+### Judge reliability is a separate axis
+
+NOPE Evals reports that changing one judge moved some model scores by 0.8–3.6 percentage points, exceeding its reported median adjacent leaderboard gap; it explicitly cautions against interpreting small score gaps as findings. The ICLR 2026 paper 'Noisy but Valid' formalizes how judge sensitivity/specificity uncertainty must be accounted for when using machine labels to certify a safety threshold. These are methodological inputs, not direct SLD results:
+
+- NOPE Evals, [How we publish results](https://evals.nope.net/how-we-publish).
+- Feng et al., ICLR 2026, [Noisy but Valid: Robust Statistical Evaluation of LLMs with Imperfect Judges](https://proceedings.iclr.org/paper_files/paper/2026/hash/08a67eb74bfb9ded9e949dd52973e997-Abstract-Conference.html).
+- Qian et al., ICML 2026, [Who can we trust? LLM-as-a-jury for Comparative Assessment](https://proceedings.mlr.press/v306/qian26i.html).
+
+SLD should report oracle validity, judge accuracy/calibration, judgment stability under reruns and order swaps, inter-rater agreement, and model outcome as separate measures. Agreement alone is not correctness: two judges may repeat the same mistake, and a stable verdict can still be biased. When a judge-based score informs a safety gate, publish the human-labelled calibration sample and uncertainty in the judge-error estimates; do not treat a single judge or majority vote as ground truth.
