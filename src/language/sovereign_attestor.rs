@@ -320,11 +320,11 @@ mod tests {
 
         let mut changed_label = attestation.clone();
         changed_label.label.push_str("-other");
-        assert!(!SovereignAttestor::verify(&changed_label, None));
+        assert!(!SovereignAttestor::verify(&changed_label, None, &trusted_public_key));
 
         let mut changed_verdict = attestation;
         changed_verdict.verdict = "Unknown".to_string();
-        assert!(!SovereignAttestor::verify(&changed_verdict, None));
+        assert!(!SovereignAttestor::verify(&changed_verdict, None, &trusted_public_key));
     }
 
     #[test]
@@ -421,7 +421,6 @@ mod tests {
     #[test]
     fn v2_transcript_binds_version_and_option_tag() {
         let attestor = SovereignAttestor::new();
-        let trusted_public_key = attestor.public_key().to_vec();
         let attestation = attestor.attest("unit-test", TEST_SMT, "Proven", Some(b"artifact")).unwrap();
 
         let original = signing_message_v2(&attestation);
