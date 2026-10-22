@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "experiment": "symthaea-silicon HDC XOR first simulation",
+  "experiment": "symthaea-silicon HDC XOR datapath-width simulation sweep",
   "required_tools": [
     {
       "name": "verilator",
@@ -28,11 +28,11 @@
     }
   ],
   "commands": {
-    "lint": "verilator --lint-only --timing -Wall --top-module tb_hdc_bind_xor <rtl> <testbench>",
-    "simulation": "verilator --binary --timing --assert -Wall --top-module tb_hdc_bind_xor --Mdir <output>/obj_dir <rtl> <testbench>"
+    "lint": "verilator --lint-only --timing -Wall --top-module tb_hdc_bind_xor -GDATA_W=<64|128|256|512> <rtl> <testbench>",
+    "simulation": "verilator --binary --timing --assert -Wall --top-module tb_hdc_bind_xor -GDATA_W=<64|128|256|512> --Mdir <output>/width-<bits>/obj_dir <rtl> <testbench>"
   },
-  "output": "target/hdl-qualification/hdc-bind-xor/<UTC timestamp>/receipt.json plus immutable-per-run logs",
-  "pass_semantics": "simulation_smoke_pass means lint+build+simulation exit zero and the exact expected PASS marker is present.",
+  "output": "target/hdl-qualification/hdc-bind-xor/<UTC timestamp>/receipt.json plus per-width logs and log hashes",
+  "pass_semantics": "simulation_smoke_pass means every declared width passed lint, build, simulation exit-code checks and the exact PASS marker is present for each run.",
   "fail_closed_semantics": [
     "missing tool => unqualified_tool_missing",
     "lint/build/test failure => failed",
@@ -40,5 +40,12 @@
     "a receipt never implies formal proof, synthesis, PPA, FPGA observation, physical energy or SOTA"
   ],
   "tool_versions": "Provided by root flake.lock through devShells.hdl, subject to platform and lock file",
-  "status": "specification for the first tool execution only; not yet run on this authoring host"
+  "status": "specification for the first tool execution only; not yet run on this authoring host",
+  "widths_bits": [
+    64,
+    128,
+    256,
+    512
+  ],
+  "claim_ceiling": "This is a word-level simulation smoke sweep, not throughput benchmarking, synthesis/PPA, FPGA observation, measured energy or SOTA qualification."
 }
