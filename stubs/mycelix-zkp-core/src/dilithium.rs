@@ -246,7 +246,10 @@ mod tests {
     fn test_detached_signature_rejects_mutated_message() {
         let kp = DilithiumKeypair::generate();
         let signature = kp.sign_detached(b"original statement").unwrap();
-        assert!(!verify_detached_signature(b"changed statement", &signature, kp.public_key()).unwrap());
+        assert!(
+            !verify_detached_signature(b"changed statement", &signature, kp.public_key())
+                .unwrap()
+        );
     }
 
     #[test]
@@ -259,7 +262,10 @@ mod tests {
             let mut mutated = signature.clone();
             mutated[index] ^= 0x01;
             assert!(
-                !matches!(verify_detached_signature(message, &mutated, kp.public_key()), Ok(true)),
+                !matches!(
+                    verify_detached_signature(message, &mutated, kp.public_key()),
+                    Ok(true)
+                ),
                 "mutated detached signature at byte {index} was accepted"
             );
         }
@@ -273,7 +279,11 @@ mod tests {
         let signature = signer.sign_detached(message).unwrap();
 
         assert!(matches!(
-            verify_detached_signature(message, &signature[..signature.len() - 1], signer.public_key()),
+            verify_detached_signature(
+                message,
+                &signature[..signature.len() - 1],
+                signer.public_key()
+            ),
             Err(ZkpError::SignatureInvalid)
         ));
         assert!(!verify_detached_signature(message, &signature, other.public_key()).unwrap());
@@ -282,7 +292,11 @@ mod tests {
     #[test]
     fn test_detached_signature_rejects_wrong_public_key_length() {
         assert!(matches!(
-            verify_detached_signature(b"message", &[0; SIGNATURE_SIZE], &[0; PUBLIC_KEY_SIZE - 1]),
+            verify_detached_signature(
+                b"message",
+                &[0; SIGNATURE_SIZE],
+                &[0; PUBLIC_KEY_SIZE - 1]
+            ),
             Err(ZkpError::InvalidKeyMaterial(_))
         ));
     }
@@ -297,12 +311,17 @@ mod tests {
 
     #[test]
     fn test_client_id_deterministic() {
-        let kp1 =
-            DilithiumKeypair::from_bytes(vec![0u8; PUBLIC_KEY_SIZE], vec![0u8; SECRET_KEY_SIZE])
-                .unwrap();
-        let kp2 =
-            DilithiumKeypair::from_bytes(vec![0u8; PUBLIC_KEY_SIZE], vec![0u8; SECRET_KEY_SIZE])
-                .unwrap();
+        let generated = DilithiumKeypair::generate();
+        let kp1 = DilithiumKeypair::from_bytes(
+            generated.public_key().to_vec(),
+            generated.secret_key.clone(),
+        )
+        .unwrap();
+        let kp2 = DilithiumKeypair::from_bytes(
+            generated.public_key().to_vec(),
+            generated.secret_key.clone(),
+        )
+        .unwrap();
         assert_eq!(kp1.client_id(), kp2.client_id());
     }
 }
