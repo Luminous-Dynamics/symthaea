@@ -273,7 +273,7 @@ impl<const N: usize> MixtureBoundedRiskEProcess<N> {
     }
 
     pub fn reset(&mut self) {
-        self.component_log_e_values = [0.0; 3];
+        self.component_log_e_values = [0.0; N];
         self.log_e_value = 0.0;
         self.alarmed = false;
     }
