@@ -357,29 +357,36 @@ pub fn select_experiment_by_information_gain_per_cost<'a, H, E>(
 /// Compute conservative expected information gain over a finite set of plausible
 /// observation-noise standard deviations.
 ///
-/// The returned value is the minimum information gain across every supplied
-/// noise scenario. This is a finite-scenario robustness criterion, not a bound
-/// over unlisted noise scales and not protection against a misspecified
-/// hypothesis class. An empty scenario set, invalid noise scale, incomplete
-/// prediction set, or non-finite prediction fails closed with `None`.
+/// Compute conservative expected information gain over a finite set of plausible
+/// observation-noise standard deviations.
+///
+/// Under the shared additive Gaussian-noise model, increasing noise is a
+/// post-processing channel, so exact mutual information cannot increase with
+/// noise. Thus the worst case is the largest supplied standard deviation; this
+/// computes that score once instead of repeating the quadrature for every
+/// scenario. The finite set is still validated in full, and this is not a bound
+/// over unlisted noise scales or protection against a misspecified hypothesis
+/// class. An empty/invalid scenario set, incomplete predictions, or non-finite
+/// prediction fails closed with `None`.
 pub fn expected_information_gain_worst_case_nats<H, E>(
     experiment: &E,
     hypotheses: &[H],
     observation_std_devs: &[f64],
     predict: impl Fn(&H, &E) -> Option<f64> + Copy,
 ) -> Option<f64> {
-    if observation_std_devs.is_empty() {
+    if observation_std_devs.is_empty()
+        || observation_std_devs
+            .iter()
+            .any(|sigma| !sigma.is_finite() || *sigma <= 0.0)
+    {
         return None;
     }
 
-    let mut worst_case = f64::INFINITY;
-    for &observation_std_dev in observation_std_devs {
-        let information_gain =
-            expected_information_gain_nats(experiment, hypotheses, observation_std_dev, predict)?;
-        worst_case = worst_case.min(information_gain);
-    }
-
-    (worst_case.is_finite() && worst_case >= 0.0).then_some(worst_case)
+    let worst_case_std_dev = observation_std_devs
+        .iter()
+        .copied()
+        .fold(0.0_f64, f64::max);
+    expected_information_gain_nats(experiment, hypotheses, worst_case_std_dev, predict)
 }
 
 /// Select the experiment maximizing worst-case expected information gain per cost.
