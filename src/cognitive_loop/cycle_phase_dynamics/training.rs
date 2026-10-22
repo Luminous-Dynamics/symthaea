@@ -215,8 +215,15 @@ impl CognitiveLoopService {
             }
         }
 
-        // 12. Update statistics
-        self.update_stats(prediction_error, cycle_start.elapsed());
+        // 12. Update statistics. Always retain timing/structural telemetry, but
+        // update prediction statistics only when this cycle had a real comparison.
+        self.update_stats(
+            perception
+                .urgency
+                .prediction_error_valid
+                .then_some(prediction_error),
+            cycle_start.elapsed(),
+        );
 
         self.stats.ltc_consciousness = self.temporal_network.state_diversity();
 
@@ -385,12 +392,19 @@ impl CognitiveLoopService {
         };
         let pp_learning_threshold = self.config.learning_threshold;
 
-        let cycle_reward = self.compute_reward_signal(prediction_error, pp_learning_threshold);
+        // Missing PE evidence is neither reward-worthy success nor a failure.
+        let cycle_reward = if perception.urgency.prediction_error_valid {
+            self.compute_reward_signal(prediction_error, pp_learning_threshold)
+        } else {
+            0.0
+        };
 
         let cycle_learning_result = CycleLearningResult {
             reward: cycle_reward,
             strategy_used: selected_strategy,
-            successful: prediction_error < pp_learning_threshold && pp_in_flow,
+            successful: perception.urgency.prediction_error_valid
+                && prediction_error < pp_learning_threshold
+                && pp_in_flow,
             prediction_error,
             coherence,
         };
