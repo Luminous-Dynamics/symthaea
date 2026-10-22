@@ -3000,7 +3000,7 @@ mod language_model_gradient_tests {
             .compute_e2e_gradients_with_scale(&thought, &gradients, scale)
             .expect("valid temporal gradients should accumulate");
 
-        let epsilon = 1e-3f32;
+        let epsilon = 1e-2f32;
         let original_up = projection.group_w_up[0][0];
         projection.group_w_up[0][0] = original_up + epsilon;
         let plus_up = objective(&projection, &thought, &gradients, scale);
@@ -3064,24 +3064,6 @@ mod temporal_full_path_gradient_tests {
             * scale
     }
 
-    fn finite_difference(
-        projection: &mut TemporalProjection,
-        thought: &ContinuousHV,
-        gradient: &[f32],
-        chunk_index: usize,
-        scale: f32,
-        parameter: &mut f32,
-    ) -> f32 {
-        let epsilon = 1e-3f32;
-        let original = *parameter;
-        *parameter = original + epsilon;
-        let plus = objective(projection, thought, gradient, chunk_index, scale);
-        *parameter = original - epsilon;
-        let minus = objective(projection, thought, gradient, chunk_index, scale);
-        *parameter = original;
-        (plus - minus) / (2.0 * epsilon)
-    }
-
     #[test]
     fn temporal_adapter_position_and_layernorm_gradients_match_finite_differences() {
         let genesis = GenesisSeed::from_phrase("temporal-full-path-gradient-fd");
@@ -3089,6 +3071,14 @@ mod temporal_full_path_gradient_tests {
             TemporalProjection::new_with_options(&genesis, 8, 4, 3, true);
         projection.enable_adapter(&genesis);
         projection.set_learned_attention(true);
+        // Strengthen selected adapter weights so the numerical check meaningfully
+        // exercises adapter backprop instead of passing on near-zero initialization.
+        {
+            let adapter = projection.adapter.as_mut().expect("adapter enabled");
+            adapter.w1[0] = 0.8;
+            adapter.b1[0] = 0.4;
+            adapter.w2[0] = 0.7;
+        }
 
         let thought =
             ContinuousHV::from_vec(vec![0.2, -0.7, 0.4, 1.1, -0.3, 0.8, -1.2, 0.5]);
@@ -3103,7 +3093,7 @@ mod temporal_full_path_gradient_tests {
             .expect("full-path gradients should accumulate");
 
         let check = |name: &str, analytic: f32, numeric: f32| {
-            let tolerance = 2e-2 + numeric.abs() * 0.12;
+            let tolerance = 2e-3 + numeric.abs() * 0.06;
             assert!(
                 analytic.is_finite()
                     && numeric.is_finite()
