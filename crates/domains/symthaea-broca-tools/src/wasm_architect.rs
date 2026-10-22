@@ -290,7 +290,7 @@ impl WasmArchitect {
     fn compute_hash(code: &str, plugin_name: &str) -> String {
         use sha2::{Digest, Sha256};
 
-        const DOMAIN: &[u8] = b"SYMTHAEA-WASM-CACHE-KEY/v2\\0";
+        const DOMAIN: &[u8] = b"SYMTHAEA-WASM-CACHE-KEY/v2\0";
         const TARGET: &[u8] = b"wasm32-unknown-unknown";
         const PROFILE: &[u8] = b"release";
 
