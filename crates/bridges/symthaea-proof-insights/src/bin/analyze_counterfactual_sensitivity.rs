@@ -233,6 +233,7 @@ fn main() -> Result<()> {
 
     let suite: Value = serde_json::from_slice(&suite_bytes)
         .context("parse counterfactual suite JSON")?;
+    validate_counterfactual_suite(&suite)?;
     let suite_id = required_string(&suite, "suite_id", "suite")?.to_owned();
     if required_string(&suite, "schema_version", "suite")? != SUITE_VERSION {
         bail!("unsupported suite schema_version");
@@ -629,6 +630,360 @@ fn parse_outcomes(text: &str, requested_split: &str) -> Result<BTreeMap<String, 
         bail!("outcomes JSONL contains no rows");
     }
     Ok(outcomes)
+}
+
+
+fn validate_counterfactual_suite(suite: &Value) -> Result<()> {
+    let context = "suite";
+    require_exact_keys(
+        suite,
+        &[
+            "schema_version",
+            "suite_id",
+            "dataset_kind",
+            "pairs",
+            "suite_receipt_sha256",
+        ],
+        &[],
+        context,
+    )?;
+    if required_string(suite, "schema_version", context)? != SUITE_VERSION {
+        bail!("suite has unsupported schema_version");
+    }
+    required_string(suite, "suite_id", context)?;
+    let dataset_kind = required_string(suite, "dataset_kind", context)?;
+    if !matches!(dataset_kind, "synthetic_fixture" | "reviewed_benchmark") {
+        bail!("suite has invalid dataset_kind {dataset_kind:?}");
+    }
+    validate_digest(
+        required_string(suite, "suite_receipt_sha256", context)?,
+        64,
+        "suite.suite_receipt_sha256",
+    )?;
+    let pairs = suite
+        .get("pairs")
+        .and_then(Value::as_array)
+        .context("suite.pairs must be an array")?;
+    if pairs.is_empty() {
+        bail!("suite contains no pairs");
+    }
+
+    let mut pair_ids = BTreeSet::new();
+    let mut outcome_ids = BTreeSet::new();
+    for (index, pair) in pairs.iter().enumerate() {
+        let pair_context = format!("suite.pairs[{index}]");
+        require_exact_keys(
+            pair,
+            &[
+                "pair_id",
+                "component_id",
+                "split",
+                "base_outcome_pair_id",
+                "counterfactual_outcome_pair_id",
+                "source_insight",
+                "target",
+                "mutation",
+                "base_adjudication",
+                "counterfactual_adjudication",
+            ],
+            &[],
+            &pair_context,
+        )?;
+        let pair_id = required_string(pair, "pair_id", &pair_context)?;
+        if !pair_ids.insert(pair_id.to_owned()) {
+            bail!("{pair_context} has duplicate pair_id");
+        }
+        required_string(pair, "component_id", &pair_context)?;
+        if !matches!(
+            required_string(pair, "split", &pair_context)?,
+            "train" | "validation" | "test" | "external_challenge"
+        ) {
+            bail!("{pair_context} has unsupported split");
+        }
+        for key in ["base_outcome_pair_id", "counterfactual_outcome_pair_id"] {
+            let outcome_id = required_string(pair, key, &pair_context)?;
+            if !outcome_ids.insert(outcome_id.to_owned()) {
+                bail!("{pair_context} has a duplicate outcome-row link");
+            }
+        }
+
+        let source = pair
+            .get("source_insight")
+            .context("source_insight missing")?;
+        let source_context = format!("{pair_context}.source_insight");
+        require_exact_keys(
+            source,
+            &[
+                "record_id",
+                "family_id",
+                "source_commit",
+                "source_artifact_sha256",
+                "insight_sha256",
+            ],
+            &[],
+            &source_context,
+        )?;
+        required_string(source, "record_id", &source_context)?;
+        required_string(source, "family_id", &source_context)?;
+        validate_digest(
+            required_string(source, "source_commit", &source_context)?,
+            40,
+            &format!("{source_context}.source_commit"),
+        )?;
+        for key in ["source_artifact_sha256", "insight_sha256"] {
+            validate_digest(
+                required_string(source, key, &source_context)?,
+                64,
+                &format!("{source_context}.{key}"),
+            )?;
+        }
+
+        let target = pair.get("target").context("target missing")?;
+        let target_context = format!("{pair_context}.target");
+        require_exact_keys(
+            target,
+            &[
+                "target_id",
+                "family_id",
+                "source_commit",
+                "artifact_path",
+                "counterfactual_artifact_path",
+                "base_artifact_sha256",
+                "counterfactual_artifact_sha256",
+                "base_statement_sha256",
+                "counterfactual_statement_sha256",
+            ],
+            &[],
+            &target_context,
+        )?;
+        required_string(target, "target_id", &target_context)?;
+        required_string(target, "family_id", &target_context)?;
+        validate_digest(
+            required_string(target, "source_commit", &target_context)?,
+            40,
+            &format!("{target_context}.source_commit"),
+        )?;
+        let base_path = required_string(target, "artifact_path", &target_context)?;
+        let counterfactual_path =
+            required_string(target, "counterfactual_artifact_path", &target_context)?;
+        for (field, path) in [
+            ("artifact_path", base_path),
+            ("counterfactual_artifact_path", counterfactual_path),
+        ] {
+            if path.starts_with('/')
+                || path.split('/').any(|part| part.is_empty() || part == "..")
+            {
+                bail!("{target_context}.{field} must be a safe repository-relative path");
+            }
+        }
+        if base_path == counterfactual_path {
+            bail!("{target_context} base and counterfactual artifact paths must differ");
+        }
+        for key in [
+            "base_artifact_sha256",
+            "counterfactual_artifact_sha256",
+            "base_statement_sha256",
+            "counterfactual_statement_sha256",
+        ] {
+            validate_digest(
+                required_string(target, key, &target_context)?,
+                64,
+                &format!("{target_context}.{key}"),
+            )?;
+        }
+        if required_string(target, "base_artifact_sha256", &target_context)?
+            == required_string(target, "counterfactual_artifact_sha256", &target_context)?
+        {
+            bail!("{target_context} base and counterfactual artifact digests must differ");
+        }
+        if required_string(target, "base_statement_sha256", &target_context)?
+            == required_string(target, "counterfactual_statement_sha256", &target_context)?
+        {
+            bail!("{target_context} base and counterfactual statement digests must differ");
+        }
+
+        let mutation = pair.get("mutation").context("mutation missing")?;
+        let mutation_context = format!("{pair_context}.mutation");
+        require_exact_keys(
+            mutation,
+            &[
+                "kind",
+                "semantic_change",
+                "changed_field",
+                "before_fragment_sha256",
+                "after_fragment_sha256",
+                "mutation_receipt_sha256",
+                "description",
+            ],
+            &[],
+            &mutation_context,
+        )?;
+        let kind = required_string(mutation, "kind", &mutation_context)?;
+        if !matches!(
+            kind,
+            "no_semantic_change"
+                | "precondition_removed"
+                | "precondition_strengthened"
+                | "inequality_direction_reversed"
+                | "object_type_changed"
+                | "quantifier_scope_changed"
+                | "premise_removed"
+                | "predicate_changed"
+                | "conclusion_weakened"
+        ) {
+            bail!("{mutation_context} has unsupported mutation kind {kind:?}");
+        }
+        let semantic_change = required_string(mutation, "semantic_change", &mutation_context)?;
+        if !matches!(semantic_change, "none" | "changed") {
+            bail!("{mutation_context} has invalid semantic_change");
+        }
+        required_string(mutation, "changed_field", &mutation_context)?;
+        required_string(mutation, "description", &mutation_context)?;
+        let before = required_string(
+            mutation,
+            "before_fragment_sha256",
+            &mutation_context,
+        )?;
+        let after = required_string(
+            mutation,
+            "after_fragment_sha256",
+            &mutation_context,
+        )?;
+        validate_digest(before, 64, &format!("{mutation_context}.before_fragment_sha256"))?;
+        validate_digest(after, 64, &format!("{mutation_context}.after_fragment_sha256"))?;
+        validate_digest(
+            required_string(mutation, "mutation_receipt_sha256", &mutation_context)?,
+            64,
+            &format!("{mutation_context}.mutation_receipt_sha256"),
+        )?;
+        if kind == "no_semantic_change" {
+            if semantic_change != "none" || before != after {
+                bail!("{mutation_context} no-op must preserve its declared fragment and semantics");
+            }
+        } else if semantic_change != "changed" || before == after {
+            bail!("{mutation_context} changed mutation needs distinct before/after fragments");
+        }
+
+        let base = pair
+            .get("base_adjudication")
+            .context("base_adjudication missing")?;
+        let variant = pair
+            .get("counterfactual_adjudication")
+            .context("counterfactual_adjudication missing")?;
+        let (base_status, base_label, base_reviewers) =
+            validate_suite_adjudication(base, &format!("{pair_context}.base_adjudication"))?;
+        let (variant_status, variant_label, variant_reviewers) = validate_suite_adjudication(
+            variant,
+            &format!("{pair_context}.counterfactual_adjudication"),
+        )?;
+        if base_status == "adjudicated" && variant_status == "adjudicated"
+            && base_reviewers != variant_reviewers
+        {
+            bail!("{pair_context} base/counterfactual reviewer identities differ");
+        }
+        if dataset_kind == "synthetic_fixture" {
+            if base_label != "compatible" {
+                bail!("{pair_context} synthetic base must be the compatible control");
+            }
+            let expected = if kind == "no_semantic_change" {
+                "compatible"
+            } else {
+                "incompatible"
+            };
+            if variant_label != expected {
+                bail!("{pair_context} synthetic counterfactual label must be {expected:?}");
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_suite_adjudication(
+    adjudication: &Value,
+    context: &str,
+) -> Result<(String, String, BTreeSet<String>)> {
+    require_exact_keys(
+        adjudication,
+        &[
+            "status",
+            "label",
+            "rubric_version",
+            "reviewer_decisions",
+            "receipt_sha256",
+        ],
+        &["note"],
+        context,
+    )?;
+    let status = required_string(adjudication, "status", context)?.to_owned();
+    if !matches!(status.as_str(), "adjudicated" | "unresolved" | "pending") {
+        bail!("{context} has invalid status");
+    }
+    let label = required_string(adjudication, "label", context)?.to_owned();
+    if !matches!(label.as_str(), "compatible" | "incompatible" | "unknown") {
+        bail!("{context} has invalid label");
+    }
+    required_string(adjudication, "rubric_version", context)?;
+    validate_digest(
+        required_string(adjudication, "receipt_sha256", context)?,
+        64,
+        &format!("{context}.receipt_sha256"),
+    )?;
+    let reviewers = adjudication
+        .get("reviewer_decisions")
+        .and_then(Value::as_array)
+        .with_context(|| format!("{context}.reviewer_decisions must be an array"))?;
+    let mut reviewer_ids = BTreeSet::new();
+    for (index, reviewer) in reviewers.iter().enumerate() {
+        let reviewer_context = format!("{context}.reviewer_decisions[{index}]");
+        require_exact_keys(
+            reviewer,
+            &["reviewer_id", "label", "reason_code", "evidence_sha256"],
+            &[],
+            &reviewer_context,
+        )?;
+        let id = required_string(reviewer, "reviewer_id", &reviewer_context)?.to_owned();
+        if !reviewer_ids.insert(id) {
+            bail!("{reviewer_context} has duplicate reviewer ID");
+        }
+        let reviewer_label = required_string(reviewer, "label", &reviewer_context)?;
+        if !matches!(reviewer_label, "compatible" | "incompatible" | "unknown") {
+            bail!("{reviewer_context} has invalid label");
+        }
+        let reason = required_string(reviewer, "reason_code", &reviewer_context)?;
+        if !matches!(
+            reason,
+            "preconditions_satisfied"
+                | "missing_precondition"
+                | "precondition_strengthened"
+                | "inequality_direction"
+                | "object_type"
+                | "quantifier_scope"
+                | "premise_unavailable"
+                | "predicate_mismatch"
+                | "conclusion_mismatch"
+                | "no_semantic_change"
+                | "other"
+                | "unknown"
+        ) {
+            bail!("{reviewer_context} has invalid reason_code");
+        }
+        validate_digest(
+            required_string(reviewer, "evidence_sha256", &reviewer_context)?,
+            64,
+            &format!("{reviewer_context}.evidence_sha256"),
+        )?;
+        if status == "adjudicated" && reviewer_label != label {
+            bail!("{reviewer_context} label disagrees with adjudication");
+        }
+    }
+    if status == "adjudicated" {
+        if reviewers.len() < 2 || label == "unknown" {
+            bail!("{context} adjudicated label requires at least two agreeing reviewers");
+        }
+    } else if label != "unknown" {
+        bail!("{context} unresolved/pending status must preserve unknown label");
+    }
+    Ok((status, label, reviewer_ids))
 }
 
 fn join_pairs(
