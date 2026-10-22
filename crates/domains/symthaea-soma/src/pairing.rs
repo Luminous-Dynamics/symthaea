@@ -347,10 +347,45 @@ impl PairingManager {
             return false;
         }
 
-        // Convert pubkey to [u8; 32]
-        let mut pk = [0u8; 32];
-        let len = pubkey.len().min(32);
-        pk[..len].copy_from_slice(&pubkey[..len]);
+        // The cryptographic check establishes possession of the key named in
+        // this response, not that it is the key previously paired to this
+        // transport peer. Pin identity continuity after first pairing.
+        let response_pubkey: [u8; 32] = match pubkey.try_into() {
+            Ok(pk) => pk,
+            Err(_) => {
+                self.enqueue(PairingOutbound::Reject {
+                    peer_id,
+                    reason: "invalid responder public key".into(),
+                });
+                return false;
+            }
+        };
+        let existing_pubkey = self
+            .paired_devices
+            .iter()
+            .find(|device| device.peer_id == peer_id)
+            .map(|device| device.pubkey);
+        if let Some(existing_pubkey) = existing_pubkey {
+            if existing_pubkey != response_pubkey {
+                self.enqueue(PairingOutbound::Reject {
+                    peer_id,
+                    reason: "paired identity changed; explicit forget required".into(),
+                });
+                return false;
+            }
+
+            if let Some(device) = self
+                .paired_devices
+                .iter_mut()
+                .find(|device| device.peer_id == peer_id)
+            {
+                device.last_seen = self.cycle;
+            }
+            self.enqueue(PairingOutbound::Ack { peer_id });
+            return true;
+        }
+
+        let pk = response_pubkey;
 
         // Add to paired devices (evict oldest if at cap)
         if self.paired_devices.len() >= MAX_PAIRED_DEVICES {
@@ -380,6 +415,19 @@ impl PairingManager {
     /// Check if a peer is currently paired.
     pub fn is_paired(&self, peer_id: u64) -> bool {
         self.paired_devices.iter().any(|d| d.peer_id == peer_id)
+    }
+
+    /// Explicitly forget a peer's stored identity and cancel its pending
+    /// challenge. The caller should expose this only as a deliberate trust-reset
+    /// action: the next successful pairing can establish a different key.
+    ///
+    /// Returns whether an established identity was removed.
+    pub fn forget_peer(&mut self, peer_id: u64) -> bool {
+        let before = self.paired_devices.len();
+        self.paired_devices.retain(|device| device.peer_id != peer_id);
+        self.pending_challenges
+            .retain(|(pending_peer_id, _)| *pending_peer_id != peer_id);
+        before != self.paired_devices.len()
     }
 
     /// Get current pairing mode.
@@ -672,6 +720,83 @@ mod tests {
             "a response to a rewritten initiator key must not verify"
         );
         assert!(!alice.is_paired(2));
+    }
+
+    #[test]
+    fn test_paired_identity_change_requires_explicit_forget() {
+        let mut alice = PairingManager::new(PairingMode::Discoverable);
+        let mut bob = PairingManager::new(PairingMode::Discoverable);
+        let mut mallory = PairingManager::new(PairingMode::Discoverable);
+        alice.generate_keypair();
+        bob.generate_keypair();
+        mallory.generate_keypair();
+        alice.tick(100);
+        bob.tick(100);
+        mallory.tick(100);
+
+        // First pairing pins Bob's public key to this peer ID.
+        assert!(alice.initiate_pairing(2));
+        let first_challenge = alice.drain_outbound();
+        let (nonce, initiator_pubkey) = match &first_challenge[0] {
+            PairingOutbound::Challenge { nonce, initiator_pubkey, .. } => {
+                (nonce.clone(), initiator_pubkey.clone())
+            }
+            other => panic!("Expected Challenge, got {:?}", other),
+        };
+        assert!(bob.receive_challenge(1, &nonce, &initiator_pubkey));
+        let first_response = bob.drain_outbound();
+        let (signature, bob_pubkey) = match &first_response[0] {
+            PairingOutbound::Response { signature, pubkey, .. } => {
+                (signature.clone(), pubkey.clone())
+            }
+            other => panic!("Expected Response, got {:?}", other),
+        };
+        assert!(alice.verify_response(2, &signature, &bob_pubkey));
+        let trusted_key = alice.paired_devices()[0].pubkey;
+
+        // A different key can produce a cryptographically valid response, but
+        // it must not replace the identity already pinned to peer ID 2.
+        assert!(alice.initiate_pairing(2));
+        let second_challenge = alice.drain_outbound();
+        let (nonce, initiator_pubkey) = match &second_challenge[0] {
+            PairingOutbound::Challenge { nonce, initiator_pubkey, .. } => {
+                (nonce.clone(), initiator_pubkey.clone())
+            }
+            other => panic!("Expected Challenge, got {:?}", other),
+        };
+        assert!(mallory.receive_challenge(1, &nonce, &initiator_pubkey));
+        let forged_response = mallory.drain_outbound();
+        let (signature, mallory_pubkey) = match &forged_response[0] {
+            PairingOutbound::Response { signature, pubkey, .. } => {
+                (signature.clone(), pubkey.clone())
+            }
+            other => panic!("Expected Response, got {:?}", other),
+        };
+        assert!(!alice.verify_response(2, &signature, &mallory_pubkey));
+        assert_eq!(alice.paired_count(), 1);
+        assert_eq!(alice.paired_devices()[0].pubkey, trusted_key);
+
+        // Changing identity is possible only after explicit local trust reset.
+        assert!(alice.forget_peer(2));
+        assert!(!alice.is_paired(2));
+        assert!(alice.initiate_pairing(2));
+        let third_challenge = alice.drain_outbound();
+        let (nonce, initiator_pubkey) = match &third_challenge[0] {
+            PairingOutbound::Challenge { nonce, initiator_pubkey, .. } => {
+                (nonce.clone(), initiator_pubkey.clone())
+            }
+            other => panic!("Expected Challenge, got {:?}", other),
+        };
+        assert!(mallory.receive_challenge(1, &nonce, &initiator_pubkey));
+        let replacement_response = mallory.drain_outbound();
+        let (signature, mallory_pubkey) = match &replacement_response[0] {
+            PairingOutbound::Response { signature, pubkey, .. } => {
+                (signature.clone(), pubkey.clone())
+            }
+            other => panic!("Expected Response, got {:?}", other),
+        };
+        assert!(alice.verify_response(2, &signature, &mallory_pubkey));
+        assert_eq!(alice.paired_devices()[0].pubkey, mallory_pubkey[..32].try_into().unwrap());
     }
 
     #[test]
