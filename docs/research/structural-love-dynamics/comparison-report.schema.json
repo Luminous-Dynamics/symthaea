@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/structural-love-dynamics/comparison-report.schema.json",
+  "title": "SLD paired-comparison report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "comparison_status", "run_a", "run_b", "metrics", "families", "clusters", "case_results", "critical_invariant_gate", "uncertainty_note", "limitations"],
+  "properties": {
+    "schema_version": { "const": "sld-paired-comparison-0.1" },
+    "comparison_status": { "const": "COMPARABLE" },
+    "run_a": { "$ref": "#/$defs/run" },
+    "run_b": { "$ref": "#/$defs/run" },
+    "metrics": { "$ref": "#/$defs/metrics" },
+    "families": { "type": "array", "items": { "$ref": "#/$defs/family" } },
+    "clusters": { "type": "array", "minItems": 2, "items": { "$ref": "#/$defs/cluster" } },
+    "case_results": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/case" } },
+    "critical_invariant_gate": { "$ref": "#/$defs/criticalGate" },
+    "uncertainty_note": { "type": "string", "minLength": 1 },
+    "limitations": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } }
+  },
+  "$defs": {
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["receipt_id", "subject_label", "source_commit_sha"],
+      "properties": {
+        "receipt_id": { "type": "string", "minLength": 1 },
+        "subject_label": { "type": "string", "minLength": 1 },
+        "source_commit_sha": { "type": "string", "pattern": "^[0-9a-f]{40}$" }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["case_count", "cluster_count", "bootstrap_replicates", "bootstrap_seed", "cluster_weighted_pass_rate_a", "cluster_weighted_pass_rate_b", "cluster_weighted_delta_b_minus_a", "cluster_bootstrap_ci95_low", "cluster_bootstrap_ci95_high", "case_weighted_pass_rate_a", "case_weighted_pass_rate_b", "case_weighted_delta_b_minus_a", "case_b_wins", "case_a_wins", "case_ties", "cluster_b_wins", "cluster_a_wins", "cluster_ties"],
+      "properties": {
+        "case_count": { "type": "integer", "minimum": 1 },
+        "cluster_count": { "type": "integer", "minimum": 2 },
+        "bootstrap_replicates": { "type": "integer", "minimum": 1000 },
+        "bootstrap_seed": { "type": "integer", "minimum": 0 },
+        "cluster_weighted_pass_rate_a": { "type": "number", "minimum": 0, "maximum": 1 },
+        "cluster_weighted_pass_rate_b": { "type": "number", "minimum": 0, "maximum": 1 },
+        "cluster_weighted_delta_b_minus_a": { "type": "number", "minimum": -1, "maximum": 1 },
+        "cluster_bootstrap_ci95_low": { "type": "number", "minimum": -1, "maximum": 1 },
+        "cluster_bootstrap_ci95_high": { "type": "number", "minimum": -1, "maximum": 1 },
+        "case_weighted_pass_rate_a": { "type": "number", "minimum": 0, "maximum": 1 },
+        "case_weighted_pass_rate_b": { "type": "number", "minimum": 0, "maximum": 1 },
+        "case_weighted_delta_b_minus_a": { "type": "number", "minimum": -1, "maximum": 1 },
+        "case_b_wins": { "type": "integer", "minimum": 0 },
+        "case_a_wins": { "type": "integer", "minimum": 0 },
+        "case_ties": { "type": "integer", "minimum": 0 },
+        "cluster_b_wins": { "type": "integer", "minimum": 0 },
+        "cluster_a_wins": { "type": "integer", "minimum": 0 },
+        "cluster_ties": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "family": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["family", "cluster_count", "case_count", "cluster_weighted_pass_rate_a", "cluster_weighted_pass_rate_b", "cluster_weighted_delta_b_minus_a", "critical_failures_a", "critical_failures_b"],
+      "properties": {
+        "family": { "type": "string", "minLength": 1 },
+        "cluster_count": { "type": "integer", "minimum": 1 },
+        "case_count": { "type": "integer", "minimum": 1 },
+        "cluster_weighted_pass_rate_a": { "type": "number", "minimum": 0, "maximum": 1 },
+        "cluster_weighted_pass_rate_b": { "type": "number", "minimum": 0, "maximum": 1 },
+        "cluster_weighted_delta_b_minus_a": { "type": "number", "minimum": -1, "maximum": 1 },
+        "critical_failures_a": { "type": "integer", "minimum": 0 },
+        "critical_failures_b": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "cluster": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cluster_id", "family", "case_count", "pass_rate_a", "pass_rate_b", "delta_b_minus_a", "critical_failures_a", "critical_failures_b"],
+      "properties": {
+        "cluster_id": { "type": "string", "minLength": 1 },
+        "family": { "type": "string", "minLength": 1 },
+        "case_count": { "type": "integer", "minimum": 1 },
+        "pass_rate_a": { "type": "number", "minimum": 0, "maximum": 1 },
+        "pass_rate_b": { "type": "number", "minimum": 0, "maximum": 1 },
+        "delta_b_minus_a": { "type": "number", "minimum": -1, "maximum": 1 },
+        "critical_failures_a": { "type": "integer", "minimum": 0 },
+        "critical_failures_b": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["case_id", "cluster_id", "family", "status_a", "status_b", "delta_b_minus_a", "critical_invariant_failure_a", "critical_invariant_failure_b"],
+      "properties": {
+        "case_id": { "type": "string", "minLength": 1 },
+        "cluster_id": { "type": "string", "minLength": 1 },
+        "family": { "type": "string", "minLength": 1 },
+        "status_a": { "enum": ["PASS", "FAIL"] },
+        "status_b": { "enum": ["PASS", "FAIL"] },
+        "delta_b_minus_a": { "type": "integer", "minimum": -1, "maximum": 1 },
+        "critical_invariant_failure_a": { "type": "boolean" },
+        "critical_invariant_failure_b": { "type": "boolean" }
+      }
+    },
+    "criticalGate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["failures_a", "failures_b", "status", "release_promotion_eligible"],
+      "properties": {
+        "failures_a": { "type": "integer", "minimum": 0 },
+        "failures_b": { "type": "integer", "minimum": 0 },
+        "status": { "enum": ["BLOCKED_CRITICAL_FAILURE_OBSERVED", "NO_CRITICAL_FAILURE_OBSERVED"] },
+        "release_promotion_eligible": { "const": false }
+      }
+    }
+  }
+}
