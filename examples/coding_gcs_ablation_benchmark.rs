@@ -550,18 +550,37 @@ fn main() {
         let expected = expected_test_functions(task.test_source);
         let reference = evaluate_source(task.reference_source, task.test_source);
         let reference_passes = is_behaviorally_successful(&reference, expected);
+        let reference_oracle_complete = expected > 0
+            && reference.compiled
+            && !reference.simulated
+            && reference.runtime_error.is_none()
+            && reference.tests_passed + reference.tests_failed == expected;
         let empty = evaluate_source("", task.test_source);
-        let empty_patch_fails = !is_behaviorally_successful(&empty, expected);
+        // This benchmark's empty patch should fail specifically as a real
+        // rustc compilation rejection, not as a sandbox/runner failure.
+        let empty_patch_fails = !empty.simulated
+            && !empty.compiled
+            && empty.runtime_error.is_none()
+            && empty.compile_errors.iter().any(|error| error.trim_start().starts_with("error"));
         reference_controls.push(serde_json::json!({
-            "task_id": task.id, "reference_blake3": source_digest(task.reference_source),
-            "reference_passes": reference_passes, "tests_expected": expected,
-            "tests_passed": reference.tests_passed, "tests_failed": reference.tests_failed,
-            "oracle_complete": reference.tests_passed + reference.tests_failed == expected
-                && reference.runtime_error.is_none() && !reference.simulated
+            "task_id": task.id,
+            "reference_blake3": source_digest(task.reference_source),
+            "reference_passes": reference_passes,
+            "compiled": reference.compiled,
+            "simulated": reference.simulated,
+            "runtime_error": reference.runtime_error,
+            "tests_expected": expected,
+            "tests_passed": reference.tests_passed,
+            "tests_failed": reference.tests_failed,
+            "oracle_complete": reference_oracle_complete
         }));
         empty_patch_controls.push(serde_json::json!({
-            "task_id": task.id, "empty_patch_blake3": source_digest(""),
-            "empty_patch_fails": empty_patch_fails, "compiled": empty.compiled,
+            "task_id": task.id,
+            "empty_patch_blake3": source_digest(""),
+            "empty_patch_fails": empty_patch_fails,
+            "compiled": empty.compiled,
+            "simulated": empty.simulated,
+            "runtime_error": empty.runtime_error,
             "compile_errors": empty.compile_errors.iter().take(2).collect::<Vec<_>>()
         }));
         if !reference_passes || !empty_patch_fails {
