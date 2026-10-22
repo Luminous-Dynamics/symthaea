@@ -224,13 +224,13 @@ mod gated_run {
             slack_ns: 0.5,
         };
 
-        let artifact = silicon.synthesize_rtl("Conscious Accelerator v1", chip_target);
-        println!("✅ Silicon RTL Synthesized: {}", artifact.label);
+        let artifact = silicon.emit_rtl_stub("Conscious Accelerator v1", chip_target);
+        println!("⚠️  Silicon RTL design-intent stub emitted (no EDA run): {}", artifact.label);
 
         let silicon_concept = silicon.to_engineering_concept(&artifact);
-        let silicon_invariants = silicon.derive_timing_invariants(&artifact);
+        let silicon_invariants = silicon.emit_timing_requirement_assertions(&artifact);
         println!(
-            "✅ Electrical Safety Case generated with {} timing invariants.",
+            "ℹ️  {} target requirement assertions emitted; no timing report was analyzed.",
             silicon_invariants.len()
         );
 

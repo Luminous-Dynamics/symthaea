@@ -17,7 +17,8 @@ pub struct SiliconPPA {
     pub slack_ns: f32,
 }
 
-/// A Silicon Design artifact: Verilog RTL + PPA metrics.
+/// A design-intent artifact containing placeholder Verilog text and target PPA requirements.
+/// This is not a synthesis result; `actual_ppa` remains absent until real tools produce evidence.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SiliconArtifact {
     pub id: String,
@@ -30,14 +31,18 @@ pub struct SiliconArtifact {
 pub struct SiliconArchitect;
 
 impl SiliconArchitect {
-    /// Autonomously synthesize Verilog RTL from a functional goal.
-    pub fn synthesize_rtl(&self, goal: &str, ppa_target: SiliconPPA) -> SiliconArtifact {
-        tracing::info!("🔌 Synthesizing Silicon RTL for goal: {}", goal);
+    /// Emit a design-intent RTL stub from a functional goal.
+    ///
+    /// This method does not synthesize RTL or invoke any EDA tool. The returned
+    /// source contains placeholder logic and must not be treated as elaborated,
+    /// verified, synthesized, timed, or physically qualified RTL.
+    pub fn emit_rtl_stub(&self, goal: &str, ppa_target: SiliconPPA) -> SiliconArtifact {
+        tracing::warn!("Emitting RTL design-intent stub for goal (EDA not run): {}", goal);
 
         // In a real implementation, Broca would generate the Verilog.
         // This is a stub showing the structural transformation.
         let verilog = format!(
-            "module {} (\n  input clk,\n  input rst,\n  // Goal: {}\n);\n  // Logic here...\nendmodule",
+            "// DESIGN-INTENT STUB ONLY: no implementation logic; EDA has not run.\nmodule {} (\n  input clk,\n  input rst,\n  // Goal: {}\n);\n  // Placeholder only; replace with reviewed, testable RTL.\nendmodule",
             goal.replace(" ", "_").to_lowercase(),
             goal
         );
@@ -51,8 +56,11 @@ impl SiliconArchitect {
         }
     }
 
-    /// Autonomously derive electrical SMT safety gates from a timing report.
-    pub fn derive_timing_invariants(&self, artifact: &SiliconArtifact) -> Vec<String> {
+    /// Emit assertions expressing requested timing/area requirements.
+    ///
+    /// This consumes `ppa_target`, not a parsed timing/physical-design report.
+    /// The returned strings are requirements only and are not proof of closure.
+    pub fn emit_timing_requirement_assertions(&self, artifact: &SiliconArtifact) -> Vec<String> {
         let mut invariants = Vec::new();
 
         // Setup/Hold Time Invariant: slack must be non-negative
@@ -166,5 +174,40 @@ impl PowerDistributionLogic {
 
         self.renewable_ratio = (available_mw / (demand_mw + 0.1)).min(1.0);
         surprise
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn target() -> SiliconPPA {
+        SiliconPPA {
+            power_mw: 50.0,
+            freq_mhz: 200.0,
+            area_um2: 1500.0,
+            slack_ns: 0.5,
+        }
+    }
+
+    #[test]
+    fn rtl_generation_is_explicitly_a_stub_not_synthesis() {
+        let silicon = SiliconArchitect;
+        let artifact = silicon.emit_rtl_stub("HDC XOR", target());
+        assert!(artifact.verilog_source.contains("DESIGN-INTENT STUB ONLY"));
+        assert!(artifact.verilog_source.contains("Placeholder only"));
+        assert!(artifact.actual_ppa.is_none());
+        assert_eq!(artifact.ppa_target.freq_mhz, 200.0);
+    }
+
+    #[test]
+    fn target_assertions_do_not_create_actual_ppa_evidence() {
+        let silicon = SiliconArchitect;
+        let artifact = silicon.emit_rtl_stub("HDC XOR", target());
+        let requirements =
+            silicon.emit_timing_requirement_assertions(&artifact);
+        assert!(requirements.iter().any(|value| value.contains("slack_ns")));
+        assert!(requirements.iter().any(|value| value.contains("total_area_um2")));
+        assert!(artifact.actual_ppa.is_none());
     }
 }
