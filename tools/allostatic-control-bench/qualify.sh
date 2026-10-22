@@ -1345,7 +1345,16 @@ if ! awk -F, '
     for (i = 11; i <= 11; i++) if ($i != "true" && $i != "false") failed = 1
     for (i = 14; i <= 14; i++) if ($i != "true" && $i != "false") failed = 1
     if ($16 != "true" && $16 != "false") failed = 1
-    for (i = 10; i <= 17; i += (i == 10 ? 2 : (i == 12 ? 1 : 2))) {
+    for (i = 10; i <= 10; i++) {
+      if ($i != "NA" && ($i !~ /^[0-9]+$/ || $i >= 400)) failed = 1
+    }
+    for (i = 12; i <= 12; i++) {
+      if ($i != "NA" && ($i !~ /^[0-9]+$/ || $i >= 400)) failed = 1
+    }
+    for (i = 15; i <= 15; i++) {
+      if ($i != "NA" && ($i !~ /^[0-9]+$/ || $i >= 400)) failed = 1
+    }
+    for (i = 17; i <= 17; i++) {
       if ($i != "NA" && ($i !~ /^[0-9]+$/ || $i >= 400)) failed = 1
     }
     if ((($9 == "true") != ($10 != "NA")) ||
@@ -1495,9 +1504,13 @@ if ! awk -F, -v raw="$tmpdir/dependent-risk-a.csv" '
         ($(22) < 0.90 || $(7) < 0.75 || $(14) < 0.50)) failed = 1
     if (!close_enough($36, 0.05, 0.000001) ||
         !close_enough($37, 0.15, 0.000001) || $38 != 133) failed = 1
+    if (seen_condition[condition]++) failed = 1
     summary_rows++
   }
-  END { if (summary_rows != 2 || failed) exit 1 }
+  END {
+    if (summary_rows != 2 || !seen_condition["conditional_risk_null"] ||
+        !seen_condition["shifted_risk"] || failed) exit 1
+  }
 ' "$tmpdir/dependent-risk-summary-a.csv"; then
   printf 'FAIL: dependent-risk summary does not independently match trial records or acceptance gates\n' >&2
   exit 1
