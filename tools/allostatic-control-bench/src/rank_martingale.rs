@@ -223,8 +223,7 @@ impl RankMartingale {
         self.observed_feature_sum += feature_value;
         self.observations_seen += 1;
 
-        let next_denominator =
-            reference_size as f64 + self.observations_seen as f64 + 1.0;
+        let next_denominator = reference_size as f64 + self.observations_seen as f64 + 1.0;
         let next_predictive_mean =
             (self.base_feature_sum + self.observed_feature_sum) / next_denominator;
         let next_bound = (self.feature_min - next_predictive_mean)
@@ -232,8 +231,7 @@ impl RankMartingale {
             .max((self.feature_max - next_predictive_mean).abs())
             .min(1.0);
         let next_radius = 1.0 - next_bound / 4.0;
-        let next_lambda = self.lambda
-            + 4.5 * gradient / self.accumulated_squared_gradients;
+        let next_lambda = self.lambda + 4.5 * gradient / self.accumulated_squared_gradients;
         self.lambda = next_lambda.clamp(-next_radius, next_radius);
 
         Some(RankObservation {
@@ -410,10 +408,14 @@ mod tests {
     fn rejected_observation_does_not_advance_rank_history() {
         let mut monitor =
             RankMartingale::new(&reference(), RankFeature::Order, 0.05).expect("monitor");
-        assert!(monitor.observe(ScoreToken {
-            score: f64::NAN,
-            tie_breaker: 0.2,
-        }).is_none());
+        assert!(
+            monitor
+                .observe(ScoreToken {
+                    score: f64::NAN,
+                    tie_breaker: 0.2,
+                })
+                .is_none()
+        );
         assert_eq!(monitor.observations_seen(), 0);
     }
 }
