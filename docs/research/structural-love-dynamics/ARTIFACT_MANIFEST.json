@@ -3,7 +3,7 @@
   "status": "DRAFT_CANDIDATE",
   "hash_algorithm": "SHA-256",
   "encoding": "UTF-8 bytes of exact repository file content",
-  "source_commit_before_manifest": "5d37fec969a0c3c24f26625e59127989b9e4b19b",
+  "source_commit_before_manifest": "6c79723f16b46ae86474779b297b7959f77999b5",
   "generated_date": "2026-10-22",
   "self_digest_excluded": true,
   "notes": [
@@ -56,9 +56,9 @@
     },
     {
       "path": "docs/research/structural-love-dynamics/PAIRED_COMPARISON_PROTOCOL.md",
-      "sha256": "654272b3289faa5a8c89ed3d7c44b8f598c403d9f34f809e4c09e08768e3f670",
-      "utf8_bytes": 8489,
-      "git_blob_sha1": "a7c2384da2dc1303d07c8e1a24c07d84969760ab"
+      "sha256": "7a40f22d00518919f1fd74b0cc4402190b9bf7e1bf06886dd5971e6c768d5d3b",
+      "utf8_bytes": 8653,
+      "git_blob_sha1": "5740882b16dc85814abef7852b007969fdc10657"
     },
     {
       "path": "docs/research/structural-love-dynamics/trajectory-cases.json",
@@ -98,9 +98,9 @@
     },
     {
       "path": "xtask/src/bin/sld-compare.rs",
-      "sha256": "f39b796be6eb77381fc7dc2aff9596a485026af2fbffc92763e2611501fc75e1",
-      "utf8_bytes": 31959,
-      "git_blob_sha1": "8562f25eb5653e058121a2719d00d382b0ec3401"
+      "sha256": "8f7378b3a57a9d590459c401a06cd2dc48ba89ac46fc1c7a97125a3ad5b8c17b",
+      "utf8_bytes": 32850,
+      "git_blob_sha1": "a343afe11a6517734d99a0c8995fce1e912ccc6c"
     },
     {
       "path": "xtask/src/main.rs",
