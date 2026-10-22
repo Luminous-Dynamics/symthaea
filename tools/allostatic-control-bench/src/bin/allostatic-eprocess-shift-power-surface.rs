@@ -534,7 +534,7 @@ fn validate_design() -> Result<(), Box<dyn Error>> {
         || SCENARIOS.iter().any(|scenario| {
             !(0.0..=1.0).contains(&scenario.mean_expected_loss())
                 || !(0.0..=1.0).contains(&scenario.max_expected_loss())
-                || scenario.max_expected_loss() < RISK_BOUND && scenario.risk_violating
+                || scenario.max_expected_loss() <= RISK_BOUND && scenario.risk_violating
         })
     {
         return Err(IoError::new(ErrorKind::InvalidInput, "shift-surface design is inconsistent").into());
