@@ -127,6 +127,7 @@ This track follows two complementary findings: *Discover and Prove* separates an
 This is a protocol template; the alpha level, power assumptions, eligibility denominator, model budget, and any deviation must be recorded in the final run manifest **before** inspecting confirmatory test results.
 
 ## Protocol amendment log
+- **2026-10-22, before confirmatory outcomes were collected or inspected:** added a counterfactual precondition-sensitivity track with paired base/variant target digests, mutation-receipt and reviewer contracts, stable outcome-row join keys, split/component isolation, and explicit stability/sensitivity/false-accept/false-reject metrics. The seven-pair checked-in fixture is synthetic and no system output has been scored. Future run configs must hash this protocol revision.
 - **2026-10-22, before confirmatory outcomes were collected or inspected:** added an optional proof-progress trace contract. It records obligation-instance lineage and receipt-backed discharges but explicitly excludes goal splits from progress, retains the terminal semantic-gate endpoint as primary, and adds synthetic relational invariants / anti-gaming controls. No trace collector or target-level progress result is claimed. Future run configs must hash this protocol revision.
 - **2026-10-21, before confirmatory outcomes were collected or inspected:** elevated benchmark-row validity from a broad semantic-gate principle to an explicit audit track. Confirmatory targets require two independent statement-correspondence reviews, full dependency/axiom receipts, pinned static defect screens, nearby statement mutations, and raw/eligible/excluded/unknown/defect accounting. This follows the June 2026 published audit of five Lean benchmarks that found 4,833 findings across 10,318 problems, including 398 mechanically certified issues. These requirements do not claim that finite static checks prove universal benchmark validity. All future frozen run configs must hash this protocol revision.
 
@@ -190,6 +191,42 @@ Prevent family leakage in this track separately from the theorem-solve split: a 
 For every pair, the system must emit one of `accept`, `reject`, or `abstain`, plus specific precondition checks and mismatch codes. Report (a) false-accept rate among adjudicated incompatible pairs, (b) recall among compatible pairs, (c) false-reject rate, (d) abstention and accepted coverage, and (e) selective risk as coverage varies. Every pair outcome distinguishes action confidence from `prediction.compatibility_probability`, which estimates the probability the transfer is compatible regardless of whether the system accepts, rejects, or abstains. When that probability is available, report its coverage, Brier score, and ten-bin reliability data; never impute a missing probability or infer calibration from cosine similarity. The v0 Rust analyzer currently reports Brier/ECE/reliability descriptively, while component-clustered 95% intervals apply to the primary selectivity rates; a confirmatory calibration claim requires a separately reviewed uncertainty analysis and adequate probability coverage.
 
 Proposed transfer-gate adoption targets are: reject every item in the frozen finite negative-control suite; at least 90% point recall on compatible held-out positive controls; and at least 20 independent pair-graph components in each of the compatible and incompatible classes before any confirmatory transfer-selectivity claim. Report component-clustered 95% intervals for rates. These are conservative project-specific targets, not achieved results or a substitute for power analysis. If the sample-size floor is unmet, report a pilot and extend the independently adjudicated pair set without tuning against the held-out labels.
+
+
+## Counterfactual precondition-sensitivity track
+
+This separate track tests whether a typed insight is applied because its mathematical preconditions hold, rather than because the target looks similar. It does **not** change the primary F-versus-validation-selected exact-target endpoint or the existing transfer-selectivity metrics.
+
+### Pair construction
+
+Each contrast links two target-outcome IDs for the same source insight:
+
+- **Base control:** an independently reviewed target on which the source insight is applicable.
+- **Counterfactual:** a controlled statement variant or altered premise that tests one declared applicability boundary.
+- **Semantics-preserving control:** a byte-level variant whose formatting/normalization changes, but whose intended mathematical statement remains equivalent.
+
+For each pair, preserve base and counterfactual statement digests, source commit and insight digest, exact target artifact and mutation receipt, mutation class, separate adjudication receipts, and stable `base_outcome_pair_id` / `counterfactual_outcome_pair_id` join keys. A change type such as reversed inequality is not automatically a gold label for every problem: expert review must verify that the particular mutation actually breaks the strategy's required contract. Use two independent reviewers, with the same reviewer set assessing both sides of a contrast; preserve unresolved decisions as unknown.
+
+The draft schema covers: semantic-preserving variants, removed/strengthened preconditions, inequality-direction reversal, changed object type, changed quantifier scope, removed premises, changed predicates, and weakened conclusions. The checked-in seven-pair suite is explicitly synthetic. Its placeholder adjudications demonstrate structure and CI guardrails only; it is **not** a mathematically adjudicated dataset.
+
+### Metrics and adoption gates
+
+Report each dimension separately; do not collapse them into one score:
+
+1. **Paired contract adherence:** the system accepts the compatible base and rejects or abstains on the independently verified incompatible variant.
+2. **Mutation sensitivity:** among reviewed mutations that invalidate the required contract, the fraction rejected or abstained on, conditional on the base control being handled correctly.
+3. **Semantics-preserving stability:** the decision remains stable on equivalent rewrites; also report absolute change in the predicted compatibility probability rather than treating threshold stability as perfect calibration.
+4. **False rejection:** compatible bases and semantics-preserving variants incorrectly rejected.
+5. **False acceptance:** incompatible variants accepted despite the changed requirement; break this down by mutation class.
+6. **Outcome linkage and cost:** join each side to its actual transfer-selectivity outcome row and report time, tokens and verified proof utility for both versions.
+
+Proposed gates for a future confirmatory version are at least 90% mutation sensitivity alongside at least 90% compatible-positive recall, at least 95% decision stability on adjudicated semantics-preserving variants, rejection of 100% of a frozen finite integrity suite, and at least 20 independent pair-graph components in each primary class plus simulation-based power planning. These are targets, not observed results. A reject-everything strategy fails positive recall; a strategy that accepts every near-match fails the mutation controls.
+
+### CI contract currently implemented
+
+`counterfactual-precondition-suite.schema.json` and `fixtures/counterfactual-precondition-suite.synthetic.json` validate typed mutation records, distinct base/counterfactual statement digests, unique outcome-row join keys, paired reviewer identities and labels, and component/split isolation. CI applies 13 intentionally malformed synthetic variants. This checks the dataset contract, not mathematical correctness and not a model's behavior. Real evaluations additionally need independently reviewed Lean statements, executed mutation receipts, outcome rows and target-kernel evidence.
+
+This design is motivated by three separate ideas in the literature: T² tests formal statements through dependent successor theorems; FormalRewardBench uses expert-curated proof error injections; effect-grounded tactic representations study the structural edit a tactic induces rather than only its surface text ([T²](https://aclanthology.org/2026.acl-industry.150/), [FormalRewardBench](https://arxiv.org/abs/2605.10141), [effect-grounded tactic representations](https://aclanthology.org/2025.mathnlp-main.12/)). These works motivate the test design, not a claim that the counterfactual track already improves PITB.
 
 ## Insight-component intervention track
 
