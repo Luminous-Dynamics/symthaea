@@ -301,9 +301,10 @@ pub fn expected_information_gain_nats<H, E>(
 
 /// Select the candidate maximizing expected information gain per unit cost.
 ///
-/// Candidates with non-positive/non-finite costs or incomplete predictions are
-/// skipped. The returned score is nats per cost unit. Strict comparison preserves
-/// the first candidate when scores tie, making selection deterministic.
+/// Candidates with non-positive/non-finite costs, incomplete predictions, or zero
+/// information gain are skipped. The returned score is nats per cost unit. Strict
+/// comparison preserves the first informative candidate when scores tie, making
+/// selection deterministic. Returns `None` if no candidate is informative.
 pub fn select_experiment_by_information_gain_per_cost<'a, H, E>(
     candidates: &'a [E],
     hypotheses: &[H],
@@ -323,7 +324,10 @@ pub fn select_experiment_by_information_gain_per_cost<'a, H, E>(
             continue;
         };
         let score = information_gain / experiment_cost;
-        if score.is_finite() && best.is_none_or(|(_, best_score)| score > best_score) {
+        if score.is_finite()
+            && score > 0.0
+            && best.is_none_or(|(_, best_score)| score > best_score)
+        {
             best = Some((experiment, score));
         }
     }
@@ -522,6 +526,22 @@ mod tests {
         .expect("at least one valid candidate");
         assert_eq!(*chosen, 1);
         assert!(score.is_finite() && score > 0.0);
+    }
+
+    #[test]
+    fn information_gain_selector_returns_none_when_every_candidate_is_uninformative() {
+        let hypotheses = [0_i32, 1, 2];
+        let candidates = [0.0_f64, 1.0, 2.0];
+        assert!(
+            select_experiment_by_information_gain_per_cost(
+                &candidates,
+                &hypotheses,
+                1.0,
+                |_, _| Some(7.0),
+                |_| 1.0,
+            )
+            .is_none()
+        );
     }
 
     #[test]
