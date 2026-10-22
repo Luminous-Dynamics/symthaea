@@ -885,7 +885,8 @@ mod tests {
                 presented_as: None,
                 sensitive_payload: None,
                 consent_scoped: None,
-                connectivity: None,            },
+                connectivity: None,
+            },
         );
         cases.push(("revocation across session", revoked_new_session));
 
@@ -936,7 +937,8 @@ mod tests {
                 presented_as: None,
                 sensitive_payload: None,
                 consent_scoped: None,
-                connectivity: None,            },
+                connectivity: None,
+            },
         );
         cases.push((
             "unresolved uncertainty across new session",
@@ -962,7 +964,8 @@ mod tests {
                 presented_as: None,
                 sensitive_payload: None,
                 consent_scoped: None,
-                connectivity: None,            },
+                connectivity: None,
+            },
         );
         cases.push(("resume without interruption", resume_without_interrupt));
 
@@ -991,7 +994,8 @@ mod tests {
                 presented_as: None,
                 sensitive_payload: None,
                 consent_scoped: None,
-                connectivity: None,            },
+                connectivity: None,
+            },
         );
         cases.push((
             "verification outside active session",
@@ -1037,7 +1041,8 @@ mod tests {
             presented_as: None,
             sensitive_payload: None,
             consent_scoped: None,
-            connectivity: None,        });
+            connectivity: None,
+        });
         trace.events.push(TraceEvent {
             sequence: 6,
             kind: EventKind::ProtocolRendered,
@@ -1048,7 +1053,8 @@ mod tests {
             presented_as: None,
             sensitive_payload: None,
             consent_scoped: None,
-            connectivity: None,        });
+            connectivity: None,
+        });
         assert_eq!(inspect_trace(&trace), vec!["render_after_revocation"]);
     }
 
@@ -1065,7 +1071,8 @@ mod tests {
             presented_as: None,
             sensitive_payload: None,
             consent_scoped: None,
-            connectivity: None,        });
+            connectivity: None,
+        });
         trace.events.push(TraceEvent {
             sequence: 6,
             kind: EventKind::SessionResumed,
@@ -1076,7 +1083,8 @@ mod tests {
             presented_as: None,
             sensitive_payload: None,
             consent_scoped: None,
-            connectivity: None,        });
+            connectivity: None,
+        });
         trace.events.push(TraceEvent {
             sequence: 7,
             kind: EventKind::ProtocolRendered,
@@ -1087,7 +1095,8 @@ mod tests {
             presented_as: None,
             sensitive_payload: None,
             consent_scoped: None,
-            connectivity: None,        });
+            connectivity: None,
+        });
         assert_eq!(
             inspect_trace(&trace),
             vec!["render_without_verified_bundle"]
@@ -1193,7 +1202,8 @@ mod tests {
                 presented_as: None,
                 sensitive_payload: None,
                 consent_scoped: None,
-                connectivity: None,            },
+                connectivity: None,
+            },
         );
         assert_eq!(
             inspect_trace(&trace),
@@ -1225,7 +1235,8 @@ mod tests {
                 presented_as: None,
                 sensitive_payload: None,
                 consent_scoped: None,
-                connectivity: None,            },
+                connectivity: None,
+            },
         );
         trace.expected_violation_codes = vec!["render_without_verified_bundle".to_string()];
         value.scenarios = vec![trace];
@@ -1316,7 +1327,8 @@ mod tests {
                 presented_as: None,
                 sensitive_payload: None,
                 consent_scoped: None,
-                connectivity: None,            },
+                connectivity: None,
+            },
         );
         assert_eq!(inspect_trace(&trace), vec!["uncertainty_lost_at_handoff"]);
     }
@@ -1342,7 +1354,8 @@ mod tests {
                 presented_as: None,
                 sensitive_payload: None,
                 consent_scoped: None,
-                connectivity: None,            },
+                connectivity: None,
+            },
         );
         assert_eq!(inspect_trace(&trace), vec!["render_after_revocation"]);
     }
@@ -1402,7 +1415,8 @@ mod tests {
                 presented_as: None,
                 sensitive_payload: None,
                 consent_scoped: None,
-                connectivity: None,            },
+                connectivity: None,
+            },
         );
         assert_eq!(
             inspect_trace(&trace),
@@ -1442,7 +1456,8 @@ mod tests {
                 presented_as: None,
                 sensitive_payload: None,
                 consent_scoped: None,
-                connectivity: None,            },
+                connectivity: None,
+            },
         );
         let expected = vec![
             "invalid_bundle_verification",
@@ -1535,7 +1550,8 @@ mod tests {
             presented_as: None,
             sensitive_payload: None,
             consent_scoped: None,
-            connectivity: None,        }
+            connectivity: None,
+        }
     }
 
     fn resequence(trace: &mut TrajectoryScenario) {
