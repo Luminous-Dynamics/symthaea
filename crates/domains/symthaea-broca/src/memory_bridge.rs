@@ -60,26 +60,27 @@ impl MemoryBridge {
             return Ok(0);
         }
 
-        // 4. Bundle past experiences into a single "memory vector"
-        // IMPROVEMENT: Use permutation-based bundling to preserve temporal order.
-        // The first (most similar) memory is not shifted, subsequent ones are
-        // permuted increasingly to represent their relative 'distance' in search space
-        // or implicitly their chronological order if they were stored sequentially.
+        // 4. Bundle past experiences into a single "memory vector".
+        // scan_similar returns neighbors ordered by similarity (then ID), so
+        // the permutation index below represents retrieval rank, not chronology.
+        // This is rank-aware bundling only. HdcStore entries have caller-provided
+        // IDs but no timestamp contract; chronological encoding requires explicit
+        // time/version metadata and ordering before this loop.
         let mut bundled_values = vec![0.0f32; current_thought.dim()];
         let n = retrieved_hvs.len() as f32;
 
-        for (i, hv) in retrieved_hvs.iter().enumerate() {
-            // Permute to avoid collapsing into a simple average (Sequence-Aware Bundling)
-            let shifted = hv.permute(i);
+        for (rank, hv) in retrieved_hvs.iter().enumerate() {
+            // Distinct permutations encode retrieval rank; they do not establish
+            // temporal order or prove that the retrieved memories are sequential.
+            let shifted = hv.permute(rank);
             for (b, &s) in bundled_values.iter_mut().zip(shifted.as_slice().iter()) {
                 *b += s / n;
             }
         }
         let memory_hv = ContinuousHV::from_vec(bundled_values);
 
-        // 5. IMPROVEMENT: Holographic Resonance Blending
-        // Instead of fixed lerp, we compute the "Resonance" (inner product alignment).
-        // High resonance (familiarity) triggers deeper integration of past experiences.
+        // 5. Holographic resonance blending
+        // High resonance (familiarity) increases the memory blend under this heuristic.
         let resonance = current_thought.similarity(&memory_hv).max(0.1);
         let dynamic_alpha = (self.blend_alpha * (1.0 + resonance)).clamp(0.05, 0.95);
 
