@@ -5,6 +5,10 @@ edition = "2021"
 publish = false
 description = "Synthetic-first, offline Rust benchmark for evidence-bounded feedstock economics"
 
+# Isolate this research crate from the repository-wide workspace on purpose.
+[workspace]
+resolver = "2"
+
 [lib]
 path = "src/lib.rs"
 
