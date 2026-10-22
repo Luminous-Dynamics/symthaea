@@ -113,10 +113,12 @@ impl LessonOutcome {
     pub fn is_success(&self) -> bool {
         !self.simulated_execution
             && self.compiled
-            && self.tests_expected > 0
-            && self.test_run_complete
-            && self.tests_passed == self.tests_expected
-            && self.tests_failed == 0
+            && has_complete_passing_oracle(
+                self.tests_expected,
+                self.test_run_complete,
+                self.tests_passed,
+                self.tests_failed,
+            )
     }
 
     /// Mastery signal: full pass credit only for a complete oracle; incomplete runs are discounted.
@@ -135,6 +137,19 @@ impl LessonOutcome {
             pass_rate * 0.5
         }
     }
+}
+
+/// Whether a nonempty declared oracle ran to completion and all expected tests passed.
+fn has_complete_passing_oracle(
+    tests_expected: usize,
+    test_run_complete: bool,
+    tests_passed: usize,
+    tests_failed: usize,
+) -> bool {
+    tests_expected > 0
+        && test_run_complete
+        && tests_passed == tests_expected
+        && tests_failed == 0
 }
 
 /// Counts simple Rust #[test] declarations in an external lesson oracle.
@@ -1282,9 +1297,12 @@ impl CodeLearningEngine {
 
         let distillation_eligible = !simulated_execution
             && exec_result.compiled
-            && test_run_complete
-            && exec_result.tests_passed == tests_expected
-            && exec_result.tests_failed == 0
+            && has_complete_passing_oracle(
+                tests_expected,
+                test_run_complete,
+                exec_result.tests_passed,
+                exec_result.tests_failed,
+            )
             && generated.plan_coverage >= MIN_PLAN_COVERAGE;
 
         // Do not give an unrun or incomplete behavioral oracle a perfect quality score.
@@ -1981,6 +1999,15 @@ mod tests {
             actual_quality: 1.0,
             was_hallucination: false,
         }
+    }
+
+    #[test]
+    fn test_complete_passing_oracle_predicate_fails_closed() {
+        assert!(!has_complete_passing_oracle(0, false, 0, 0));
+        assert!(!has_complete_passing_oracle(2, false, 1, 0));
+        assert!(!has_complete_passing_oracle(2, true, 1, 1));
+        assert!(!has_complete_passing_oracle(2, true, 1, 0));
+        assert!(has_complete_passing_oracle(2, true, 2, 0));
     }
 
     #[test]
