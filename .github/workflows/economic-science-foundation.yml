@@ -1,0 +1,109 @@
+name: Economic Science Foundation
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-economics/**"
+      - ".github/workflows/economic-science-foundation.yml"
+  push:
+    branches: [main]
+    paths:
+      - "crates/domains/symthaea-economics/**"
+      - ".github/workflows/economic-science-foundation.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: economic-science-foundation-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install qualification toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Freeze scientific and authority boundaries
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          root = Path("crates/domains/symthaea-economics")
+          constitution = (root / "docs/ECONOMIC_SCIENCE_CONSTITUTION_V1.md").read_text()
+          required = [
+              "constraint truth != empirical claim != normative proposition",
+              "simulation != observation",
+              "historical fit != prospective prediction",
+              "fit != causality",
+              "evidence channel != truth tier",
+              "prediction != recommendation != decision != execution",
+              "scientific result != governance authority",
+              "Mycelix participation != research consent",
+              "Mycelix data availability != Symthaea training permission",
+          ]
+          missing = [item for item in required if item not in constitution]
+          if missing:
+              raise SystemExit(f"economic science constitution drift: {missing}")
+
+          cargo = (root / "Cargo.toml").read_text()
+          marker = "[dependencies]"
+          if marker not in cargo or cargo.split(marker, 1)[1].strip():
+              raise SystemExit("economic foundation must remain zero-dependency")
+          lib = (root / "src/lib.rs").read_text()
+          if "#![forbid(unsafe_code)]" not in lib:
+              raise SystemExit("economic foundation must forbid unsafe code")
+
+          science = (root / "src/science.rs").read_text()
+          if "EvidenceChannel" not in science:
+              raise SystemExit("economic evidence must remain multidimensional")
+          if "EvidenceMaturity" in science:
+              raise SystemExit("economic evidence must not collapse into a maturity ladder")
+
+          theory = (root / "src/theory.rs").read_text()
+          for symbol in ["ConstraintClaim", "EmpiricalClaim", "NormativeProposition"]:
+              if symbol not in theory:
+                  raise SystemExit(f"missing scientific statement boundary: {symbol}")
+          if any(token in theory for token in ["maturity:", "EvidenceMaturity", "EvidenceChannel"]):
+              raise SystemExit("empirical claims may not self-certify evidence state")
+          if "prediction lacks a falsification criterion" not in theory:
+              raise SystemExit("every empirical prediction must retain a falsifier")
+
+          accounting = (root / "src/accounting.rs").read_text()
+          for symbol in ["DoubleEntryLedger", "JournalEntry", "checked_add", "is_balanced"]:
+              if symbol not in accounting:
+                  raise SystemExit(f"missing accounting invariant: {symbol}")
+          if "self.balances.entry(account)" not in accounting or "Entry::Vacant" not in accounting:
+              raise SystemExit("duplicate account registration must fail through entry semantics")
+
+          etir = (root / "src/etir.rs").read_text()
+          for symbol in ["TheoryIr", "ModelAdapterDeclaration", "ModelParadigm", "validate_adapter"]:
+              if symbol not in etir:
+                  raise SystemExit(f"missing ETIR boundary: {symbol}")
+          if "model adapter cannot implement normative proposition" not in etir:
+              raise SystemExit("model adapters must not absorb normative propositions")
+          if "model adapter omits empirical claim outcome" not in etir:
+              raise SystemExit("model adapters must expose claimed empirical outcomes")
+          if "mechanistic claim outcome not produced by claimed mechanism" not in etir:
+              raise SystemExit("mechanistic claims must terminate in their predicted outcomes")
+          if "mechanistic claim contains disconnected mechanism" not in etir:
+              raise SystemExit("mechanistic claims may not carry decorative disconnected mechanisms")
+          PY
+
+      - name: Verify locked workspace metadata
+        run: cargo metadata --locked --no-deps --format-version 1 >/dev/null
+
+      - name: Rustfmt
+        run: cargo fmt --check -p symthaea-economics
+
+      - name: Unit tests
+        run: cargo test --locked -p symthaea-economics --lib
+
+      - name: Strict Clippy
+        run: cargo clippy --locked -p symthaea-economics --lib -- -D warnings

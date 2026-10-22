@@ -8,10 +8,30 @@ values.
 ## Design boundaries
 
 - deterministic mathematical primitives live here;
-- cognition, institutions, and agent simulation remain in higher layers;
-- public inputs reject `NaN` and infinities;
+- theory-neutral scientific contracts may live here when they remain pure data/invariants;
+- cognition, institutions, agent simulation, empirical ingestion, and governance remain in higher layers;
+- public floating-point inputs reject `NaN` and infinities;
 - economic non-solutions are distinct from invalid models;
 - no `unsafe` code and no dependency on `symthaea-core`.
+
+## Economic Science foundation
+
+The additive Economic Science v1 foundation separates three kinds of statement:
+
+- hard constraints and accounting identities;
+- falsifiable empirical claims;
+- explicit normative propositions.
+
+It adds exact integer-atom double-entry accounting, a small theory-neutral state
+ontology, decomposed economic claims with predeclared falsifiers, and **ETIR v1**
+(Economic Theory Intermediate Representation). ETIR permits multiple model
+paradigms to implement the same scientific claim without making any model family
+or economic school the owner of that claim.
+
+The constitutional boundary is documented in
+[`docs/ECONOMIC_SCIENCE_CONSTITUTION_V1.md`](docs/ECONOMIC_SCIENCE_CONSTITUTION_V1.md).
+The foundation does **not** add a policy recommender, welfare optimizer, Mycelix
+data access, or execution/governance authority.
 
 ## Example
 
