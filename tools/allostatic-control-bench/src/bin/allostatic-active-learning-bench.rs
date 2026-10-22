@@ -10,7 +10,7 @@ use allostatic_control_bench::robust_viability::{
     ActionEffectBounds, DynamicsBounds, Interval, StateEnvelope, ViabilityLimits,
 };
 use allostatic_control_bench::safe_probe::{
-    dynamics_hull, filter_compatible_hypotheses, recommend_safe_probe, ObservedEffect,
+    dynamics_hull, filter_compatible_hypotheses, recommend_safe_probe_with_noise, ObservedEffect,
 };
 use allostatic_control_bench::Action;
 use std::error::Error;
@@ -139,7 +139,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     summary.push('\n');
 
     for case in cases() {
-        let recommendation = recommend_safe_probe(
+        let recommendation = recommend_safe_probe_with_noise(
             state,
             &models,
             limits,
@@ -147,6 +147,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             3,
             Action::Maintain,
             0.01,
+            0.001,
         )
         .expect("valid common-hull probe contract");
         let selected = recommendation.selected_action();
