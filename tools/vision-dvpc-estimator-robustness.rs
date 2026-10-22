@@ -578,7 +578,7 @@ fn render_report() -> String {
     report.push_str("SUMMARY_HEADER\tregime\tpolicy\tbudget_percent\tseed_count\tmean_task_loss\ttask_loss_ci95_low\ttask_loss_ci95_high\tmean_total_benefit\tbenefit_ci95_low\tbenefit_ci95_high\tmean_regret\tregret_ci95_low\tregret_ci95_high\tmean_harmful_escalations\tharmful_ci95_low\tharmful_ci95_high\tmean_missed_beneficial\tmissed_ci95_low\tmissed_ci95_high\tmean_charged_units\tcharged_ci95_low\tcharged_ci95_high\tbudget_violation_runs\tpaired_loss_delta_vs_random\tdelta_ci95_low\tdelta_ci95_high\n");
     for row in summarize(&results) {
         report.push_str(&format!(
-            "SUMMARY\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+            "SUMMARY\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
             row.regime.label(), row.policy.label(), row.budget_percent, row.seeds,
             fmt_stats(row.mean_task_loss), fmt_stats(row.mean_total_benefit),
             fmt_stats(row.mean_regret), fmt_stats(row.mean_harmful_escalations),
