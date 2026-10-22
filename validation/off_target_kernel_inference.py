@@ -54,7 +54,6 @@ def worlds(n):
     return tuple(itertools.product((0, 1), repeat=n))
 
 def mechanism_probability(model, assignment, node, noise):
-    expected = 0
     parent_assignment = 0
     for bit, parent in enumerate(model.parents[node]):
         parent_assignment |= (assignment[parent] & 1) << bit
