@@ -34,6 +34,51 @@ pub struct MisInformerSignal {
     inclusion_counts: Vec<u64>,
 }
 
+/// A recommendation whose empirical frequency was separated from its nearest rival.
+#[derive(Debug, Clone, PartialEq)]
+pub struct MisConfidenceRecommendation {
+    /// Selected vertex and raw observed frequency.
+    pub recommendation: MisVertexRecommendation,
+    /// Empirical inclusion rate for the selected vertex.
+    pub empirical_rate: f64,
+    /// Lower simultaneous confidence bound for the selected vertex rate.
+    pub lower_bound: f64,
+    /// Upper simultaneous confidence bound for the selected vertex rate.
+    pub upper_bound: f64,
+    /// Upper bound for the best rival when preferring inclusion, or lower bound
+    /// for the best rival when preferring exclusion.
+    pub competitor_bound: f64,
+    /// Family-wise error probability supplied by the caller.
+    pub familywise_error_probability: f64,
+}
+
+/// Why the confidence-aware informer declined to make a frequency-based choice.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MisConfidenceAbstention {
+    /// The most extreme empirical frequency is tied across multiple candidates.
+    EmpiricalTie,
+    /// Simultaneous bounds overlap, so the score ordering is not resolved.
+    ConfidenceIntervalsOverlap,
+    /// A single eligible vertex leaves no competing signal score to compare.
+    OnlyOneCandidate,
+}
+
+/// Confidence-aware informer result. Abstention is a valid outcome, not an error.
+#[derive(Debug, Clone, PartialEq)]
+pub enum MisConfidenceDecision {
+    /// The selected score is separated from the strongest competing candidate.
+    Selected(MisConfidenceRecommendation),
+    /// The informer declines to use its frequency score for this decision.
+    Abstain {
+        /// Reason the empirical signal did not resolve the decision.
+        reason: MisConfidenceAbstention,
+        /// Number of eligible vertices considered.
+        eligible_vertex_count: usize,
+        /// Number of source samples summarized by the signal.
+        sample_count: u64,
+    },
+}
+
 /// Errors returned when constructing or using an MIS informer signal.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MisSignalError {
@@ -61,6 +106,22 @@ pub enum MisSignalError {
     InstanceIdMismatch,
     /// The signal's source graph digest differs from the expected graph artifact.
     GraphDigestMismatch,
+    /// The requested family-wise error probability must be finite and strictly in (0, 1).
+    InvalidConfidenceLevel,
+    /// Confidence-aware selection requires a non-empty candidate set.
+    EmptyEligibleSet,
+    /// A candidate vertex appears more than once in the eligible set.
+    DuplicateEligibleVertex {
+        /// Repeated vertex index.
+        vertex: usize,
+    },
+    /// A candidate vertex is not part of the graph.
+    EligibleVertexOutOfRange {
+        /// Out-of-range candidate index.
+        vertex: usize,
+        /// Number of vertices in the graph.
+        vertex_count: usize,
+    },
     /// The signal's graph size differs from the reducer's graph.
     GraphSizeMismatch {
         /// Vertex count declared by the signal.
@@ -113,6 +174,17 @@ impl fmt::Display for MisSignalError {
             Self::GraphDigestMismatch => {
                 write!(f, "informer signal graph digest does not match the expected graph")
             }
+            Self::InvalidConfidenceLevel => {
+                write!(f, "family-wise error probability must be finite and strictly between 0 and 1")
+            }
+            Self::EmptyEligibleSet => write!(f, "confidence-aware selection requires at least one eligible vertex"),
+            Self::DuplicateEligibleVertex { vertex } => {
+                write!(f, "eligible vertex {vertex} appears more than once")
+            }
+            Self::EligibleVertexOutOfRange { vertex, vertex_count } => write!(
+                f,
+                "eligible vertex {vertex} is outside graph with {vertex_count} vertices"
+            ),
             Self::GraphSizeMismatch {
                 signal_vertices,
                 expected_vertices,
@@ -204,6 +276,168 @@ impl MisInformerSignal {
             graph.vertex_count(),
             mode,
         )
+    }
+
+    /// Make a confidence-aware choice only when one candidate's observed rate is separated.
+    ///
+    /// Uses a Hoeffding/union-bound interval radius
+    /// sqrt(ln(2*m/alpha)/(2*n)), where m is the number of eligible vertices,
+    /// n is the sample count, and alpha is the requested family-wise error
+    /// probability. For the stated bound to be meaningful, the sample population
+    /// must be compatible with independent, identically distributed Bernoulli
+    /// observations for each vertex. This routine cannot verify that assumption;
+    /// the caller must document the sampling design in the run manifest.
+    ///
+    /// This is uncertainty about empirical inclusion-rate ordering, not a guarantee
+    /// that a selected vertex belongs to an optimal independent set. Tied or
+    /// overlapping scores produce an explicit abstention so callers can take more
+    /// samples or use a classical fallback.
+    pub fn recommend_confidently_for_graph(
+        &self,
+        expected_instance_id: &str,
+        graph: &MisGraphIdentity,
+        eligible_vertices: &[usize],
+        mode: MisSelectionMode,
+        familywise_error_probability: f64,
+    ) -> Result<MisConfidenceDecision, MisSignalError> {
+        self.validate_graph_binding(
+            expected_instance_id,
+            graph.sha256(),
+            graph.vertex_count(),
+        )?;
+
+        if !familywise_error_probability.is_finite()
+            || familywise_error_probability <= 0.0
+            || familywise_error_probability >= 1.0
+        {
+            return Err(MisSignalError::InvalidConfidenceLevel);
+        }
+        if eligible_vertices.is_empty() {
+            return Err(MisSignalError::EmptyEligibleSet);
+        }
+
+        let mut seen = vec![false; self.vertex_count];
+        for &vertex in eligible_vertices {
+            if vertex >= self.vertex_count {
+                return Err(MisSignalError::EligibleVertexOutOfRange {
+                    vertex,
+                    vertex_count: self.vertex_count,
+                });
+            }
+            if seen[vertex] {
+                return Err(MisSignalError::DuplicateEligibleVertex { vertex });
+            }
+            seen[vertex] = true;
+        }
+
+        let abstain = |reason| {
+            Ok(MisConfidenceDecision::Abstain {
+                reason,
+                eligible_vertex_count: eligible_vertices.len(),
+                sample_count: self.sample_count,
+            })
+        };
+        if eligible_vertices.len() == 1 {
+            return abstain(MisConfidenceAbstention::OnlyOneCandidate);
+        }
+
+        let selected_vertex = eligible_vertices.iter().copied().reduce(|best, candidate| {
+            let best_count = self.inclusion_counts[best];
+            let candidate_count = self.inclusion_counts[candidate];
+            match mode {
+                MisSelectionMode::PreferInSet
+                    if candidate_count > best_count
+                        || (candidate_count == best_count && candidate < best) =>
+                {
+                    candidate
+                }
+                MisSelectionMode::PreferOutSet
+                    if candidate_count < best_count
+                        || (candidate_count == best_count && candidate < best) =>
+                {
+                    candidate
+                }
+                _ => best,
+            }
+        }).expect("eligible vertices checked non-empty");
+
+        let selected_count = self.inclusion_counts[selected_vertex];
+        let tie_count = eligible_vertices
+            .iter()
+            .filter(|&&vertex| self.inclusion_counts[vertex] == selected_count)
+            .count();
+        if tie_count > 1 {
+            return abstain(MisConfidenceAbstention::EmpiricalTie);
+        }
+
+        let competitor_vertex = eligible_vertices.iter().copied()
+            .filter(|&vertex| vertex != selected_vertex)
+            .reduce(|best, candidate| {
+                let best_count = self.inclusion_counts[best];
+                let candidate_count = self.inclusion_counts[candidate];
+                match mode {
+                    MisSelectionMode::PreferInSet if candidate_count > best_count => candidate,
+                    MisSelectionMode::PreferOutSet if candidate_count < best_count => candidate,
+                    _ => best,
+                }
+            }).expect("at least two eligible vertices checked above");
+
+        let eligible_count = eligible_vertices.len() as f64;
+        let samples = self.sample_count as f64;
+        let radius =
+            ((2.0 * eligible_count / familywise_error_probability).ln() / (2.0 * samples)).sqrt();
+        let selected_rate = selected_count as f64 / samples;
+        let competitor_rate = self.inclusion_counts[competitor_vertex] as f64 / samples;
+        let lower_bound = (selected_rate - radius).max(0.0);
+        let upper_bound = (selected_rate + radius).min(1.0);
+        let competitor_lower = (competitor_rate - radius).max(0.0);
+        let competitor_upper = (competitor_rate + radius).min(1.0);
+        let separated = match mode {
+            MisSelectionMode::PreferInSet => lower_bound > competitor_upper,
+            MisSelectionMode::PreferOutSet => upper_bound < competitor_lower,
+        };
+        if !separated {
+            return abstain(MisConfidenceAbstention::ConfidenceIntervalsOverlap);
+        }
+
+        Ok(MisConfidenceDecision::Selected(MisConfidenceRecommendation {
+            recommendation: MisVertexRecommendation {
+                vertex: selected_vertex,
+                inclusion_count: selected_count,
+                sample_count: self.sample_count,
+                tie_count,
+                mode,
+            },
+            empirical_rate: selected_rate,
+            lower_bound,
+            upper_bound,
+            competitor_bound: match mode {
+                MisSelectionMode::PreferInSet => competitor_upper,
+                MisSelectionMode::PreferOutSet => competitor_lower,
+            },
+            familywise_error_probability,
+        }))
+    }
+
+    fn validate_graph_binding(
+        &self,
+        expected_instance_id: &str,
+        expected_graph_sha256: [u8; 32],
+        expected_vertex_count: usize,
+    ) -> Result<(), MisSignalError> {
+        if self.instance_id != expected_instance_id {
+            return Err(MisSignalError::InstanceIdMismatch);
+        }
+        if self.graph_sha256 != expected_graph_sha256 {
+            return Err(MisSignalError::GraphDigestMismatch);
+        }
+        if self.vertex_count != expected_vertex_count {
+            return Err(MisSignalError::GraphSizeMismatch {
+                signal_vertices: self.vertex_count,
+                expected_vertices: expected_vertex_count,
+            });
+        }
+        Ok(())
     }
 
     /// Frozen benchmark-instance identifier attached to this signal.
@@ -413,6 +647,84 @@ mod tests {
         assert_eq!(result.sample_count, 100);
         assert_eq!(result.inclusion_count, 0);
         assert_eq!(result.tie_count, 2);
+    }
+
+    #[test]
+    fn confidence_aware_selector_abstains_on_overlapping_intervals() {
+        let graph = MisGraphIdentity::from_edges(2, &[(0, 1)]).expect("valid graph");
+        let signal = MisInformerSignal::from_graph("case", &graph, 10, vec![6, 5])
+            .expect("valid signal");
+        assert_eq!(
+            signal.recommend_confidently_for_graph(
+                "case",
+                &graph,
+                &[0, 1],
+                MisSelectionMode::PreferInSet,
+                0.05,
+            ).expect("valid confidence request"),
+            MisConfidenceDecision::Abstain {
+                reason: MisConfidenceAbstention::ConfidenceIntervalsOverlap,
+                eligible_vertex_count: 2,
+                sample_count: 10,
+            }
+        );
+    }
+
+    #[test]
+    fn confidence_aware_selector_abstains_on_empirical_tie() {
+        let graph = MisGraphIdentity::from_edges(2, &[(0, 1)]).expect("valid graph");
+        let signal = MisInformerSignal::from_graph("case", &graph, 1000, vec![500, 500])
+            .expect("valid signal");
+        assert!(matches!(
+            signal.recommend_confidently_for_graph(
+                "case", &graph, &[0, 1], MisSelectionMode::PreferOutSet, 0.05
+            ).expect("valid confidence request"),
+            MisConfidenceDecision::Abstain {
+                reason: MisConfidenceAbstention::EmpiricalTie,
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn confidence_aware_selector_selects_only_after_separation() {
+        let graph = MisGraphIdentity::from_edges(2, &[(0, 1)]).expect("valid graph");
+        let signal = MisInformerSignal::from_graph("case", &graph, 1000, vec![950, 20])
+            .expect("valid signal");
+        let decision = signal.recommend_confidently_for_graph(
+            "case", &graph, &[0, 1], MisSelectionMode::PreferInSet, 0.05
+        ).expect("valid confidence request");
+        match decision {
+            MisConfidenceDecision::Selected(result) => {
+                assert_eq!(result.recommendation.vertex, 0);
+                assert!(result.lower_bound > result.competitor_bound);
+                assert!(result.lower_bound <= result.empirical_rate);
+                assert!(result.empirical_rate <= result.upper_bound);
+            }
+            MisConfidenceDecision::Abstain { reason, .. } => panic!("expected separated scores, got {reason:?}"),
+        }
+    }
+
+    #[test]
+    fn confidence_aware_selector_validates_alpha_and_candidate_set() {
+        let graph = MisGraphIdentity::from_edges(2, &[(0, 1)]).expect("valid graph");
+        let signal = MisInformerSignal::from_graph("case", &graph, 100, vec![90, 10])
+            .expect("valid signal");
+        assert_eq!(
+            signal.recommend_confidently_for_graph("case", &graph, &[0, 1], MisSelectionMode::PreferInSet, 1.0)
+                .expect_err("alpha must be less than one"),
+            MisSignalError::InvalidConfidenceLevel
+        );
+        assert_eq!(
+            signal.recommend_confidently_for_graph("case", &graph, &[], MisSelectionMode::PreferInSet, 0.05)
+                .expect_err("candidate set must not be empty"),
+            MisSignalError::EmptyEligibleSet
+        );
+        assert_eq!(
+            signal.recommend_confidently_for_graph("case", &graph, &[0, 0], MisSelectionMode::PreferInSet, 0.05)
+                .expect_err("duplicate candidate is invalid"),
+            MisSignalError::DuplicateEligibleVertex { vertex: 0 }
+        );
     }
 
     #[test]
