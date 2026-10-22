@@ -1,0 +1,68 @@
+# Cryptographic boundary regression and fuzz smoke testing.
+# The focused test suite runs on relevant PRs; longer campaigns run weekly.
+name: Crypto Boundary Fuzz
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "stubs/mycelix-zkp-core/**"
+      - ".github/workflows/crypto-boundary-fuzz.yml"
+  push:
+    branches: [main]
+    paths:
+      - "stubs/mycelix-zkp-core/**"
+      - ".github/workflows/crypto-boundary-fuzz.yml"
+  workflow_dispatch:
+  schedule:
+    - cron: "23 3 * * 3"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  wrapper-tests:
+    name: Wrapper regression tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+      - name: Test Dilithium wrapper and regression controls
+        run: cargo test --manifest-path stubs/mycelix-zkp-core/Cargo.toml --features dilithium
+
+  fuzz-smoke:
+    name: ${{ github.event_name == 'schedule' && 'Scheduled fuzz campaign' || 'Fuzz target smoke campaign' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      FUZZ_SECONDS: ${{ github.event_name == 'schedule' && '120' || '15' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install nightly with fuzzing support
+        uses: dtolnay/rust-toolchain@nightly
+      - name: Install C/C++ compiler for libFuzzer
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang
+      - name: Install cargo-fuzz
+        run: cargo install cargo-fuzz --locked
+      - name: Fuzz authenticated-signature boundary
+        run: cargo +nightly fuzz run fuzz_authenticated_signature -- -max_len=8192 -max_total_time=${FUZZ_SECONDS}
+        working-directory: stubs/mycelix-zkp-core/fuzz
+      - name: Fuzz signature verification boundary
+        run: cargo +nightly fuzz run fuzz_signature_verification -- -max_len=8192 -max_total_time=${FUZZ_SECONDS}
+        working-directory: stubs/mycelix-zkp-core/fuzz
+      - name: Preserve crash artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: crypto-fuzz-artifacts-${{ github.sha }}
+          path: stubs/mycelix-zkp-core/fuzz/artifacts/
+          if-no-files-found: ignore
+          retention-days: 30

@@ -1,0 +1,30 @@
+[package]
+name = "mycelix-zkp-core-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+sha2 = "0.10"
+mycelix-zkp-core = { path = "..", features = ["dilithium"] }
+
+[[bin]]
+name = "fuzz_authenticated_signature"
+path = "fuzz_targets/fuzz_authenticated_signature.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_signature_verification"
+path = "fuzz_targets/fuzz_signature_verification.rs"
+test = false
+doc = false
+bench = false
+
+[workspace]
+members = ["."]
