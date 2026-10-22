@@ -287,6 +287,11 @@ mod tests {
 
         assert!(states.len() >= 100, "state exploration unexpectedly shallow");
         assert!(transition_count >= 1_600, "transition exploration unexpectedly shallow");
+        println!(
+            "abstract_states_explored={} state_action_transitions_checked={}",
+            states.len(),
+            transition_count
+        );
     }
 
     #[test]
