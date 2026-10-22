@@ -66,8 +66,8 @@ use std::collections::HashMap;
 /// authenticated forward-secret session. See the module-level claim boundary.
 #[derive(Clone)]
 pub struct PqcSessionKey {
-    /// Combined session key: HKDF(classical_nonce || kem_shared_secret).
-    /// 32 bytes — suitable for ChaCha20-Poly1305.
+    /// 32-byte session key derived from ML-KEM secret plus public challenge context.
+    /// Suitable for ChaCha20-Poly1305; this field alone does not imply hybrid security.
     session_key: [u8; 32],
     /// When the session was established (for expiration tracking).
     established_at: std::time::SystemTime,
@@ -219,7 +219,7 @@ impl PqcHandshakeManager {
                 }
             })?;
 
-        // Derive session key: HKDF(classical_nonce || kem_shared_secret)
+        // Derive using BLAKE3 context-based derivation; the nonce is public context.
         let session_key = Self::blake3_derive_session_key(classical_nonce, &kem_shared_secret);
 
         self.session_keys.insert(
@@ -256,7 +256,7 @@ impl PqcHandshakeManager {
             }
         })?;
 
-        // Derive session key: HKDF(classical_nonce || kem_shared_secret)
+        // Derive using BLAKE3 context-based derivation; the nonce is public context.
         let session_key = Self::blake3_derive_session_key(classical_nonce, &kem_shared_secret);
 
         self.session_keys.insert(
@@ -482,7 +482,7 @@ mod tests {
 
         let key1 = PqcHandshakeManager::blake3_derive_session_key(&nonce, &kem_secret);
         let key2 = PqcHandshakeManager::blake3_derive_session_key(&nonce, &kem_secret);
-        assert_eq!(key1, key2, "HKDF derivation must be deterministic");
+        assert_eq!(key1, key2, "BLAKE3 derive-key derivation must be deterministic");
     }
 
     #[test]
