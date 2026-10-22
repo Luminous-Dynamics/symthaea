@@ -13,6 +13,7 @@
 //!          Belief revision (AGM theory, Alchourrón et al. 1985)
 
 use super::encoding::FactEncoding;
+use super::extraction::SemanticRole;
 use std::collections::HashMap;
 use symthaea_core::hdc::unified_hv::BinaryHV;
 
@@ -514,30 +515,51 @@ impl EnhancedKnowledgeGraph {
 
     // ── Persistence Support ─────────────────────────────────────────────
 
-    /// Import a fact from a persistence record.
+    /// Import a fact from a persistence record without weakening its epistemic state.
     pub fn import_fact_record(&mut self, record: &super::persistence::FactRecord) {
-        if record.vector_bytes.len() != 2048 {
+        if record.id == 0 || record.vector_bytes.len() != 2048 {
             return;
         }
+
         let mut arr = [0u8; 2048];
         arr.copy_from_slice(&record.vector_bytes);
+
+        let role_vectors: HashMap<SemanticRole, BinaryHV> = record
+            .role_vectors
+            .iter()
+            .filter_map(|(role_tag, vector_bytes)| {
+                if vector_bytes.len() != 2048 {
+                    return None;
+                }
+                let role = semantic_role_from_tag(*role_tag)?;
+                let mut role_arr = [0u8; 2048];
+                role_arr.copy_from_slice(vector_bytes);
+                Some((
+                    role,
+                    symthaea_core::hdc::binary_hv::BinaryHV(role_arr),
+                ))
+            })
+            .collect();
+
         let encoding = super::encoding::FactEncoding {
             vector: symthaea_core::hdc::binary_hv::BinaryHV(arr),
-            role_vectors: std::collections::HashMap::new(),
+            role_vectors,
             source_text: record.source_text.clone(),
-            confidence: record.confidence,
+            confidence: record.encoding_confidence,
         };
-        let id: FactId = self.next_id;
-        self.next_id += 1;
+
+        let id: FactId = record.id;
+        self.next_id = self.next_id.max(id.saturating_add(1));
+
         let fact = TemporalFact {
             id,
             encoding,
             inserted_at_cycle: record.cycle,
-            last_accessed_cycle: record.cycle,
+            last_accessed_cycle: record.last_accessed_cycle,
             confidence: record.confidence,
-            initial_confidence: record.confidence,
-            corroboration_count: 0,
-            contradiction_count: 0,
+            initial_confidence: record.initial_confidence,
+            corroboration_count: record.corroboration_count,
+            contradiction_count: record.contradiction_count,
             domain: record.domain.clone(),
             has_causal_relations: record.is_causal,
         };
@@ -555,11 +577,23 @@ impl EnhancedKnowledgeGraph {
         self.facts
             .values()
             .map(|f| super::persistence::FactRecord {
+                id: f.id,
                 vector_bytes: f.encoding.vector.0.to_vec(),
+                role_vectors: f
+                    .encoding
+                    .role_vectors
+                    .iter()
+                    .map(|(role, vector)| (semantic_role_tag(*role), vector.0.to_vec()))
+                    .collect(),
                 source_text: f.encoding.source_text.clone(),
+                encoding_confidence: f.encoding.confidence,
                 confidence: f.confidence,
+                initial_confidence: f.initial_confidence,
                 domain: f.domain.clone(),
                 cycle: f.inserted_at_cycle,
+                last_accessed_cycle: f.last_accessed_cycle,
+                corroboration_count: f.corroboration_count,
+                contradiction_count: f.contradiction_count,
                 is_causal: f.has_causal_relations,
             })
             .collect()
@@ -710,6 +744,65 @@ impl EnhancedKnowledgeGraph {
     }
 }
 
+/// Stable persistence tag for semantic roles.
+///
+/// These numeric values are storage ABI and must not be reordered when new enum
+/// variants are added. New roles receive new tags.
+fn semantic_role_tag(role: SemanticRole) -> u8 {
+    match role {
+        SemanticRole::Agent => 0,
+        SemanticRole::Patient => 1,
+        SemanticRole::Instrument => 2,
+        SemanticRole::Context => 3,
+        SemanticRole::Goal => 4,
+        SemanticRole::Source => 5,
+        SemanticRole::Destination => 6,
+        SemanticRole::Temporal => 7,
+        SemanticRole::Location => 8,
+        SemanticRole::Cause => 9,
+        SemanticRole::Result => 10,
+        SemanticRole::Calls => 11,
+        SemanticRole::Implements => 12,
+        SemanticRole::DependsOn => 13,
+        SemanticRole::ReturnsType => 14,
+        SemanticRole::FixedBy => 15,
+        #[cfg(feature = "therapeutic")]
+        SemanticRole::TherapeuticTarget => 16,
+        #[cfg(feature = "therapeutic")]
+        SemanticRole::ProtectiveFactor => 17,
+        #[cfg(feature = "therapeutic")]
+        SemanticRole::RiskFactor => 18,
+    }
+}
+
+fn semantic_role_from_tag(tag: u8) -> Option<SemanticRole> {
+    match tag {
+        0 => Some(SemanticRole::Agent),
+        1 => Some(SemanticRole::Patient),
+        2 => Some(SemanticRole::Instrument),
+        3 => Some(SemanticRole::Context),
+        4 => Some(SemanticRole::Goal),
+        5 => Some(SemanticRole::Source),
+        6 => Some(SemanticRole::Destination),
+        7 => Some(SemanticRole::Temporal),
+        8 => Some(SemanticRole::Location),
+        9 => Some(SemanticRole::Cause),
+        10 => Some(SemanticRole::Result),
+        11 => Some(SemanticRole::Calls),
+        12 => Some(SemanticRole::Implements),
+        13 => Some(SemanticRole::DependsOn),
+        14 => Some(SemanticRole::ReturnsType),
+        15 => Some(SemanticRole::FixedBy),
+        #[cfg(feature = "therapeutic")]
+        16 => Some(SemanticRole::TherapeuticTarget),
+        #[cfg(feature = "therapeutic")]
+        17 => Some(SemanticRole::ProtectiveFactor),
+        #[cfg(feature = "therapeutic")]
+        18 => Some(SemanticRole::RiskFactor),
+        _ => None,
+    }
+}
+
 fn contains_negation(text: &str) -> bool {
     let markers = [
         "not ",
@@ -793,6 +886,57 @@ mod tests {
         assert_eq!(graph.len(), 1); // Still one fact
         let fact = graph.get_fact(id1).unwrap();
         assert_eq!(fact.corroboration_count, 1);
+    }
+
+    #[test]
+    fn test_fact_record_round_trip_preserves_graph_semantics() {
+        let mut graph = EnhancedKnowledgeGraph::new(100);
+        let role_vector = BinaryHV::random(777);
+        let mut encoding = make_encoding("sanctions caused scarcity", 0.93);
+        encoding
+            .role_vectors
+            .insert(SemanticRole::Cause, role_vector.clone());
+
+        let (id, _) = graph.insert(encoding, 4, Some("economics".into()), true);
+        let query = graph.get_fact(id).unwrap().encoding.vector.clone();
+        let _ = graph.search(&query, 1, 12); // updates last_accessed_cycle
+        let duplicate = make_encoding("sanctions caused scarcity", 0.93);
+        let _ = graph.insert(duplicate, 13, Some("economics".into()), true);
+        {
+            let fact = graph.facts.get_mut(&id).unwrap();
+            fact.confidence = 0.61;
+            fact.contradiction_count = 2;
+        }
+
+        let record = graph
+            .export_fact_records()
+            .into_iter()
+            .find(|record| record.id == id)
+            .unwrap();
+
+        let mut restored = EnhancedKnowledgeGraph::new(100);
+        restored.import_fact_record(&record);
+        let fact = restored.get_fact(id).unwrap();
+
+        assert_eq!(fact.id, id);
+        assert_eq!(fact.encoding.source_text, "sanctions caused scarcity");
+        assert_eq!(fact.domain.as_deref(), Some("economics"));
+        assert!(fact.has_causal_relations);
+        assert_eq!(fact.last_accessed_cycle, 13);
+        assert_eq!(fact.corroboration_count, 1);
+        assert_eq!(fact.contradiction_count, 2);
+        assert!((fact.confidence - 0.61).abs() < 0.001);
+        assert!((fact.initial_confidence - 0.93).abs() < 0.001);
+        assert!((fact.encoding.confidence - 0.93).abs() < 0.001);
+        let restored_role = fact
+            .encoding
+            .role_vectors
+            .get(&SemanticRole::Cause)
+            .expect("cause role vector should survive persistence round-trip");
+        assert_eq!(restored_role.similarity(&role_vector), 1.0);
+
+        let (next_id, _) = restored.insert(make_encoding("new fact", 0.5), 14, None, false);
+        assert!(next_id > id, "restored next_id must advance beyond stable IDs");
     }
 
     #[test]
