@@ -56,6 +56,75 @@ mod tests {
         RenderWithoutVerifiedBundle,
         UncertaintyLostAtHandoff,
         UncertaintyLostAtSessionBoundary,
+        UnknownNormalized,
+        StaleResourceClaimedConfirmed,
+        OfflineCoreNetworkDependency,
+        IntermittentCoreNetworkDependency,
+        SensitiveDataEgressWithoutConsent,
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    enum Connectivity {
+        Online,
+        Offline,
+        Intermittent,
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    enum ResourceFreshness {
+        Fresh,
+        Stale,
+        Unknown,
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    enum ResourcePresentation {
+        Confirmed,
+        Unconfirmed,
+    }
+
+    fn network_policy_violation(
+        connectivity: Connectivity,
+        core_network_required: bool,
+    ) -> Option<Violation> {
+        if !core_network_required {
+            return None;
+        }
+        match connectivity {
+            Connectivity::Online => None,
+            Connectivity::Offline => Some(Violation::OfflineCoreNetworkDependency),
+            Connectivity::Intermittent => {
+                Some(Violation::IntermittentCoreNetworkDependency)
+            }
+        }
+    }
+
+    fn resource_policy_violation(
+        freshness: ResourceFreshness,
+        presentation: ResourcePresentation,
+    ) -> Option<Violation> {
+        match (freshness, presentation) {
+            (
+                ResourceFreshness::Stale | ResourceFreshness::Unknown,
+                ResourcePresentation::Confirmed,
+            ) => Some(Violation::StaleResourceClaimedConfirmed),
+            _ => None,
+        }
+    }
+
+    fn egress_policy_violation(
+        sensitive_payload: bool,
+        consent_scoped: bool,
+    ) -> Option<Violation> {
+        if sensitive_payload && !consent_scoped {
+            Some(Violation::SensitiveDataEgressWithoutConsent)
+        } else {
+            None
+        }
+    }
+
+    fn unknown_normalization_violation(normalized_unknown: bool) -> Option<Violation> {
+        normalized_unknown.then_some(Violation::UnknownNormalized)
     }
 
     #[derive(Debug, Clone, Copy)]
@@ -366,5 +435,86 @@ mod tests {
                 .contains(&Violation::InvalidBundleVerification)
         );
     }
+
+    #[test]
+    fn exhaustive_orthogonal_policy_truth_tables_cover_non_lifecycle_invariants() {
+        let mut network_cases = 0;
+        for connectivity in [
+            Connectivity::Online,
+            Connectivity::Offline,
+            Connectivity::Intermittent,
+        ] {
+            for core_network_required in [false, true] {
+                network_cases += 1;
+                let expected = match (connectivity, core_network_required) {
+                    (Connectivity::Offline, true) => {
+                        Some(Violation::OfflineCoreNetworkDependency)
+                    }
+                    (Connectivity::Intermittent, true) => {
+                        Some(Violation::IntermittentCoreNetworkDependency)
+                    }
+                    _ => None,
+                };
+                assert_eq!(
+                    network_policy_violation(connectivity, core_network_required),
+                    expected,
+                    "network policy mismatch: {connectivity:?}, required={core_network_required}"
+                );
+            }
+        }
+        assert_eq!(network_cases, 6);
+
+        let mut resource_cases = 0;
+        for freshness in [
+            ResourceFreshness::Fresh,
+            ResourceFreshness::Stale,
+            ResourceFreshness::Unknown,
+        ] {
+            for presentation in [
+                ResourcePresentation::Confirmed,
+                ResourcePresentation::Unconfirmed,
+            ] {
+                resource_cases += 1;
+                let expected = match (freshness, presentation) {
+                    (
+                        ResourceFreshness::Stale | ResourceFreshness::Unknown,
+                        ResourcePresentation::Confirmed,
+                    ) => Some(Violation::StaleResourceClaimedConfirmed),
+                    _ => None,
+                };
+                assert_eq!(
+                    resource_policy_violation(freshness, presentation),
+                    expected,
+                    "resource policy mismatch: {freshness:?}, {presentation:?}"
+                );
+            }
+        }
+        assert_eq!(resource_cases, 6);
+
+        let mut egress_cases = 0;
+        for sensitive_payload in [false, true] {
+            for consent_scoped in [false, true] {
+                egress_cases += 1;
+                let expected = if sensitive_payload && !consent_scoped {
+                    Some(Violation::SensitiveDataEgressWithoutConsent)
+                } else {
+                    None
+                };
+                assert_eq!(
+                    egress_policy_violation(sensitive_payload, consent_scoped),
+                    expected,
+                    "egress policy mismatch: sensitive={sensitive_payload}, consent={consent_scoped}"
+                );
+            }
+        }
+        assert_eq!(egress_cases, 4);
+
+        assert_eq!(unknown_normalization_violation(false), None);
+        assert_eq!(
+            unknown_normalization_violation(true),
+            Some(Violation::UnknownNormalized)
+        );
+    }
+
 
 }
