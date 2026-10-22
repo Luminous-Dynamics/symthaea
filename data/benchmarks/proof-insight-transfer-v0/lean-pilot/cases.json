@@ -1,0 +1,54 @@
+{
+  "schema_version": "pitb.lean-pilot-cases.v0",
+  "suite_id": "pitb-lean-counterfactual-calibration-v0",
+  "purpose": "formal_harness_calibration_not_model_evaluation",
+  "toolchain": "leanprover/lean4:v4.34.1",
+  "source_path": "data/benchmarks/proof-insight-transfer-v0/lean-pilot/PITBCounterfactualPilot.lean",
+  "cases": [
+    {
+      "case_id": "alpha-renaming-defeq",
+      "mutation_kind": "alpha_rename",
+      "base_statement": "∀ n : Nat, n = n",
+      "variant_statement": "∀ x : Nat, x = x",
+      "expected_relation": "same_elaborated_type",
+      "evidence_declarations": [
+        "alpha_renaming_same_type"
+      ],
+      "contract_precondition": null,
+      "model_outcomes": "not_run",
+      "note": "The proof by reflexivity demonstrates definitional equality of proposition terms."
+    },
+    {
+      "case_id": "identity-proposition-equivalence",
+      "mutation_kind": "equivalent_reformulation",
+      "base_statement": "∀ n : Nat, n = n",
+      "variant_statement": "∀ n : Nat, True",
+      "expected_relation": "propositionally_equivalent",
+      "evidence_declarations": [
+        "identity_statement_iff_true_function"
+      ],
+      "contract_precondition": null,
+      "model_outcomes": "not_run",
+      "note": "Both directions of the stated equivalence are proved explicitly; do not infer definitional equality from this result."
+    },
+    {
+      "case_id": "remove-order-premise",
+      "mutation_kind": "precondition_removed",
+      "base_statement": "∀ a b : Nat, a ≤ b → Nat.succ a ≤ Nat.succ b",
+      "variant_statement": "∀ a b : Nat, Nat.succ a ≤ Nat.succ b",
+      "expected_relation": "variant_refuted",
+      "evidence_declarations": [
+        "successor_monotonicity_with_premise",
+        "premise_removed_variant_is_false"
+      ],
+      "contract_precondition": "a ≤ b",
+      "model_outcomes": "not_run",
+      "note": "The base uses the premise to lift order through Nat.succ; the counterfactual universal statement is refuted by the checked instance a=1, b=0."
+    }
+  ],
+  "exclusions": [
+    "This fixture does not include a model, retrieval system, or transfer outcome.",
+    "The theorem examples do not establish that arbitrary premise removal breaks arbitrary proof strategies.",
+    "CI compilation and independent type-checking must pass before these formal examples are referenced as verified evidence."
+  ]
+}
