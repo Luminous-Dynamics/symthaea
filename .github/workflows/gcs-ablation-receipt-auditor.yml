@@ -57,6 +57,8 @@ jobs:
         run: cargo test --locked --lib --features "code_generation geodesic_synthesis" cloud_failure
       - name: Verify hardware dispatch cannot emit placeholder code
         run: cargo test --locked --lib --features "code_generation geodesic_synthesis" hardware_tier_does_not_claim_driver_emitter_ran
+      - name: Verify unobserved routing does not assume backend success
+        run: cargo test --locked --lib --features "code_generation geodesic_synthesis" unobserved_hardware_and_simulated_routes_are_not_assumed_perfect
       - name: Compile the paired benchmark producer
         run: cargo check --locked --example coding_gcs_ablation_benchmark --features "code_generation geodesic_synthesis"
       - name: Run strict Clippy on the auditor
