@@ -268,6 +268,30 @@ mod tests {
         Transition { next, violations }
     }
 
+    fn assert_state_invariants(state: State) {
+        assert_eq!(
+            state.revoked_mask & !0b11,
+            0,
+            "revocation mask may contain only declared bundle identities: {state:?}"
+        );
+        assert!(
+            !state.uncertainty_preserved || state.uncertainty_pending,
+            "preserved uncertainty must remain pending until handoff: {state:?}"
+        );
+        if let Some(verified) = state.verified {
+            assert!(state.session_active, "verified bundle outside active session: {state:?}");
+            assert_eq!(
+                state.loaded,
+                Some(verified),
+                "verified identity must equal the currently loaded identity: {state:?}"
+            );
+            assert!(
+                !state.is_revoked(verified),
+                "revoked bundle cannot remain verified: {state:?}"
+            );
+        }
+    }
+
     fn reachable_states() -> HashSet<State> {
         let mut seen = HashSet::from([State::INITIAL]);
         let mut queue = VecDeque::from([State::INITIAL]);
@@ -288,9 +312,11 @@ mod tests {
         let mut transition_count = 0usize;
 
         for state in &states {
+            assert_state_invariants(*state);
             for action in ACTIONS {
                 transition_count += 1;
                 let outcome = transition(*state, action);
+                assert_state_invariants(outcome.next);
                 assert_eq!(
                     outcome.next.revoked_mask & state.revoked_mask,
                     state.revoked_mask,
@@ -326,23 +352,68 @@ mod tests {
                             state.uncertainty_pending && !state.uncertainty_preserved
                         );
                     }
-                    Action::RenderA | Action::RenderB if outcome.violations.is_empty() => {
+                    Action::RenderA | Action::RenderB => {
                         let rendered = if matches!(action, Action::RenderA) {
                             Bundle::A
                         } else {
                             Bundle::B
                         };
-                        assert!(state.session_active);
-                        assert_eq!(state.verified, Some(rendered));
-                        assert!(!state.is_revoked(rendered));
+                        let mut expected = Vec::new();
+                        if !state.session_active {
+                            expected.push(Violation::RenderWithoutActiveSession);
+                        }
+                        if state.is_revoked(rendered) {
+                            expected.push(Violation::RenderAfterRevocation);
+                        } else if state.verified != Some(rendered) {
+                            expected.push(Violation::RenderWithoutVerifiedBundle);
+                        }
+                        assert_eq!(
+                            outcome.violations, expected,
+                            "render authorization mismatch for {state:?} via {action:?}"
+                        );
                     }
-                    Action::VerifyAValid | Action::VerifyBValid
-                        if outcome.next.verified.is_some() =>
-                    {
-                        let verified = outcome.next.verified.expect("checked above");
-                        assert!(state.session_active);
-                        assert_eq!(state.loaded, Some(verified));
-                        assert!(!state.is_revoked(verified));
+                    Action::VerifyAValid
+                    | Action::VerifyABadDigest
+                    | Action::VerifyAExpired
+                    | Action::VerifyBValid => {
+                        let (bundle, valid_state, digest_verified) = match action {
+                            Action::VerifyAValid => (Bundle::A, true, true),
+                            Action::VerifyABadDigest => (Bundle::A, true, false),
+                            Action::VerifyAExpired => (Bundle::A, false, true),
+                            Action::VerifyBValid => (Bundle::B, true, true),
+                            _ => unreachable!(),
+                        };
+                        let allowed = state.session_active
+                            && state.loaded == Some(bundle)
+                            && valid_state
+                            && digest_verified
+                            && !state.is_revoked(bundle);
+                        assert_eq!(
+                            outcome.next.verified,
+                            allowed.then_some(bundle),
+                            "verification result mismatch for {state:?} via {action:?}"
+                        );
+                        assert_eq!(
+                            outcome.violations.contains(&Violation::InvalidBundleVerification),
+                            !allowed,
+                            "verification violation mismatch for {state:?} via {action:?}"
+                        );
+                    }
+                    Action::LoadA | Action::LoadB => {
+                        assert_eq!(outcome.next.verified, None);
+                    }
+                    Action::RevokeA | Action::RevokeB => {
+                        let revoked = if matches!(action, Action::RevokeA) {
+                            Bundle::A
+                        } else {
+                            Bundle::B
+                        };
+                        assert!(outcome.next.is_revoked(revoked));
+                        assert_ne!(
+                            outcome.next.verified,
+                            Some(revoked),
+                            "revocation must invalidate matching verification"
+                        );
                     }
                     _ => {}
                 }
