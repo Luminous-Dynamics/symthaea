@@ -79,7 +79,7 @@ jobs:
               raise SystemExit("case manifest and Lean toolchain file disagree")
 
           def declaration_exists(name):
-              pattern = rf"\\b(?:theorem|lemma|def|abbrev)\\s+{re.escape(name)}\\b"
+              pattern = rf"\b(?:theorem|lemma|def|abbrev)\s+{re.escape(name)}\b"
               return re.search(pattern, source.read_text()) is not None
 
           case_bindings = []
