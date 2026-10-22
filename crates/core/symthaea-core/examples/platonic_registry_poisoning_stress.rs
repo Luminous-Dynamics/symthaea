@@ -353,7 +353,9 @@ mod tests {
 
         assert_eq!(ranked.similarity, 1.0);
         assert_eq!(ranked.attacker_target, Some(target));
+        assert_eq!(ranked.margin, 0.0);
         assert!(ranked.label.starts_with("attacker-"));
+        assert!(!accepts(ranked.similarity, ranked.margin));
     }
 
     #[test]
