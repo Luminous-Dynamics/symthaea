@@ -32,7 +32,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     ];
 
     println!(
-        "record_type,scenario,trial_index,trial_seed,master_seed,probabilities,true_best_vertex,adaptive_selected_vertex,adaptive_correct,adaptive_abstention_reason,adaptive_total_shots,adaptive_shots_by_vertex,adaptive_successes_by_vertex,uniform_selected_vertex,uniform_correct,uniform_total_shots,uniform_shots_by_vertex,uniform_successes_by_vertex"
+        "record_type,scenario,trial_index,trial_seed,master_seed,probabilities,true_best_vertex,adaptive_selected_vertex,adaptive_correct,adaptive_abstention_reason,adaptive_total_shots,adaptive_shots_by_vertex,adaptive_successes_by_vertex,uniform_selected_vertex,uniform_correct,uniform_total_shots,uniform_shots_by_vertex,uniform_successes_by_vertex,successive_rejects_selected_vertex,successive_rejects_correct,successive_rejects_total_shots,successive_rejects_shots_by_vertex,successive_rejects_successes_by_vertex"
     );
 
     eprintln!(
@@ -74,6 +74,11 @@ fn print_trial(row: &MisSamplingTrial, master_seed: u64, probabilities: &[f64]) 
         row.uniform_total_shots.to_string(),
         join_u64(&row.uniform_shots_by_vertex),
         join_u64(&row.uniform_successes_by_vertex),
+        row.successive_rejects_selected_vertex.to_string(),
+        row.successive_rejects_correct.to_string(),
+        row.successive_rejects_total_shots.to_string(),
+        join_u64(&row.successive_rejects_shots_by_vertex),
+        join_u64(&row.successive_rejects_successes_by_vertex),
     ];
     println!("{}", values.iter().map(|value| csv_cell(value)).collect::<Vec<_>>().join(","));
 }
@@ -85,8 +90,10 @@ fn print_summary(scenario: &str, summary: &MisSamplingAggregate) {
         wilson_interval(summary.adaptive_incorrect, summary.adaptive_selected);
     let (uniform_low, uniform_high) =
         wilson_interval(summary.uniform_correct, summary.trial_count);
+    let (successive_rejects_low, successive_rejects_high) =
+        wilson_interval(summary.successive_rejects_correct, summary.trial_count);
     eprintln!(
-        "summary,scenario={},trials={},adaptive_selected={},adaptive_abstained={},adaptive_correct={},adaptive_incorrect={},adaptive_coverage={:.6},adaptive_coverage_wilson95=[{};{}],adaptive_selective_error={:.6},adaptive_selective_error_wilson95=[{};{}],adaptive_mean_shots={:.3},adaptive_mean_shots_fraction_of_fixed={:.6},uniform_correct={},uniform_accuracy={:.6},uniform_accuracy_wilson95=[{};{}],uniform_mean_shots={:.3}",
+        "summary,scenario={},trials={},adaptive_selected={},adaptive_abstained={},adaptive_correct={},adaptive_incorrect={},adaptive_coverage={:.6},adaptive_coverage_wilson95=[{};{}],adaptive_selective_error={:.6},adaptive_selective_error_wilson95=[{};{}],adaptive_mean_shots={:.3},adaptive_mean_shots_fraction_of_fixed={:.6},uniform_correct={},uniform_accuracy={:.6},uniform_accuracy_wilson95=[{};{}],uniform_mean_shots={:.3},successive_rejects_correct={},successive_rejects_incorrect={},successive_rejects_accuracy={:.6},successive_rejects_wilson95=[{};{}],successive_rejects_mean_shots={:.3}",
         csv_cell(scenario),
         summary.trial_count,
         summary.adaptive_selected,
@@ -106,6 +113,12 @@ fn print_summary(scenario: &str, summary: &MisSamplingAggregate) {
         fmt_optional(uniform_low),
         fmt_optional(uniform_high),
         summary.uniform_mean_shots(),
+        summary.successive_rejects_correct,
+        summary.successive_rejects_incorrect,
+        summary.successive_rejects_accuracy(),
+        fmt_optional(successive_rejects_low),
+        fmt_optional(successive_rejects_high),
+        summary.successive_rejects_mean_shots(),
     );
 }
 
