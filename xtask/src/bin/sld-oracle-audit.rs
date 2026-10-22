@@ -66,7 +66,6 @@ struct CaseReview {
     case_id: String,
     risk_level: String,
     initial_labels_blinded: bool,
-    randomized_order_token: String,
     initial_judgments: Vec<Judgment>,
     adjudication: Adjudication,
     dissent: Vec<Dissent>,
@@ -94,6 +93,8 @@ struct Ledger {
     case_id_inventory_sha256: String,
     rubric_sha256: String,
     protocol_sha256: String,
+    assignment_seed: u64,
+    randomized_case_order: Vec<String>,
     reviewers: Vec<Reviewer>,
     cases: Vec<CaseReview>,
     summary: DeclaredSummary,
@@ -120,6 +121,34 @@ struct OracleEvidenceSummary {
     case_authors_excluded_from_adjudication: bool,
     conflicts_disclosed: bool,
     completed_at: Option<String>,
+}
+
+struct SplitMix64 {
+    state: u64,
+}
+
+impl SplitMix64 {
+    fn new(seed: u64) -> Self { Self { state: seed } }
+    fn next_u64(&mut self) -> u64 {
+        self.state = self.state.wrapping_add(0x9E3779B97F4A7C15);
+        let mut z = self.state;
+        z = (z ^ (z >> 30)).wrapping_mul(0xBF58476D1CE4E5B9);
+        z = (z ^ (z >> 27)).wrapping_mul(0x94D049BB133111EB);
+        z ^ (z >> 31)
+    }
+    fn index(&mut self, upper: usize) -> usize {
+        (((self.next_u64() as u128) * (upper as u128)) >> 64) as usize
+    }
+}
+
+fn seeded_shuffle(mut items: Vec<String>, seed: u64) -> Vec<String> {
+    items.sort();
+    let mut rng = SplitMix64::new(seed);
+    for index in (1..items.len()).rev() {
+        let selected = rng.index(index + 1);
+        items.swap(index, selected);
+    }
+    items
 }
 
 fn sha256_hex(bytes: &[u8]) -> String {
@@ -213,8 +242,12 @@ fn audit(ledger: &Ledger, expected_ids: &[String], ledger_bytes: &[u8]) -> Resul
     );
 
     let expected_set: BTreeSet<&str> = expected.iter().map(String::as_str).collect();
+    let expected_order = seeded_shuffle(expected.clone(), ledger.assignment_seed);
+    ensure!(
+        ledger.randomized_case_order == expected_order,
+        "randomized_case_order does not match the frozen seeded shuffle"
+    );
     let mut case_map = BTreeMap::new();
-    let mut order_tokens = BTreeSet::new();
     let mut reviewed_count = 0usize;
     let mut adjudicated_count = 0usize;
     let mut indeterminate_count = 0usize;
@@ -234,16 +267,6 @@ fn audit(ledger: &Ledger, expected_ids: &[String], ledger_bytes: &[u8]) -> Resul
         ensure!(
             case_map.insert(case.case_id.clone(), case).is_none(),
             "ledger contains duplicate case {}",
-            case.case_id
-        );
-        ensure!(
-            order_tokens.insert(case.randomized_order_token.clone()),
-            "randomized order token reused for case {}",
-            case.case_id
-        );
-        ensure!(
-            !case.randomized_order_token.trim().is_empty(),
-            "case {} lacks randomized-order evidence",
             case.case_id
         );
         ensure!(
@@ -408,8 +431,10 @@ fn audit(ledger: &Ledger, expected_ids: &[String], ledger_bytes: &[u8]) -> Resul
         "summary claims blinded review but case records contradict it"
     );
     ensure!(
-        ledger.summary.case_assignment_randomized && order_tokens.len() == expected.len(),
-        "summary claims randomized assignment but tokens are incomplete/duplicated"
+        ledger.summary.case_assignment_randomized
+            && ledger.randomized_case_order.len() == expected.len()
+            && ledger.randomized_case_order.iter().collect::<BTreeSet<_>>().len() == expected.len(),
+        "summary claims randomized assignment but order is incomplete/duplicated"
     );
     ensure!(
         ledger.summary.case_authors_excluded_from_adjudication && all_authors_excluded,
@@ -518,7 +543,6 @@ mod tests {
             case_id: id.to_string(),
             risk_level: risk_level.to_string(),
             initial_labels_blinded: true,
-            randomized_order_token: format!("order-{id}"),
             initial_judgments: vec![
                 Judgment {
                     reviewer_id: "REV-A".to_string(),
@@ -557,6 +581,8 @@ mod tests {
             case_id_inventory_sha256: corpus_digest,
             rubric_sha256: "a".repeat(64),
             protocol_sha256: "b".repeat(64),
+            assignment_seed: 7,
+            randomized_case_order: seeded_shuffle(ids.clone(), 7),
             reviewers,
             cases,
             summary: DeclaredSummary {
