@@ -10,6 +10,7 @@ on:
       - "docs/research/OOD_REACHABILITY_FALLBACK_V1.md"
       - "docs/research/TASK_RELEVANT_SCOPE_MONITOR_V1.md"
       - "docs/research/SEQUENTIAL_SCOPE_CUSUM_V1.md"
+      - "docs/research/BOUNDED_RISK_EPROCESS_V1.md"
       - ".github/workflows/allostatic-control-bench.yml"
   workflow_dispatch:
 
@@ -63,3 +64,5 @@ jobs:
             allostatic-control-v1-task-scope-summary.csv
             allostatic-control-v1-sequential-scope.csv
             allostatic-control-v1-sequential-scope-summary.csv
+            allostatic-control-v1-risk-eprocess.csv
+            allostatic-control-v1-risk-eprocess-summary.csv

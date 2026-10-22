@@ -12,6 +12,7 @@ source_files=(
   "tools/allostatic-control-bench/src/lib.rs"
   "tools/allostatic-control-bench/src/calibration.rs"
   "tools/allostatic-control-bench/src/drift_monitor.rs"
+  "tools/allostatic-control-bench/src/bounded_risk_eprocess.rs"
   "tools/allostatic-control-bench/src/scope_monitor.rs"
   "tools/allostatic-control-bench/src/model_mismatch.rs"
   "tools/allostatic-control-bench/src/multistep_viability.rs"
@@ -23,6 +24,7 @@ source_files=(
   "tools/allostatic-control-bench/src/bin/allostatic-ood-fallback-bench.rs"
   "tools/allostatic-control-bench/src/bin/allostatic-task-scope-bench.rs"
   "tools/allostatic-control-bench/src/bin/allostatic-sequential-scope-bench.rs"
+  "tools/allostatic-control-bench/src/bin/allostatic-risk-eprocess-bench.rs"
   "tools/allostatic-control-bench/qualify.sh"
   "docs/research/ALLOSTATIC_CONTROL_BENCHMARK_V1.md"
   "docs/research/ROBUST_VIABILITY_ENVELOPE_V1.md"
@@ -30,6 +32,7 @@ source_files=(
   "docs/research/OOD_REACHABILITY_FALLBACK_V1.md"
   "docs/research/TASK_RELEVANT_SCOPE_MONITOR_V1.md"
   "docs/research/SEQUENTIAL_SCOPE_CUSUM_V1.md"
+  "docs/research/BOUNDED_RISK_EPROCESS_V1.md"
 )
 expected_head="${1:-$(git rev-parse HEAD)}"
 actual_head="$(git rev-parse HEAD)"
@@ -61,6 +64,8 @@ scope_out="${out_base}-task-scope.csv"
 scope_summary_out="${out_base}-task-scope-summary.csv"
 sequential_out="${out_base}-sequential-scope.csv"
 sequential_summary_out="${out_base}-sequential-scope-summary.csv"
+eprocess_out="${out_base}-risk-eprocess.csv"
+eprocess_summary_out="${out_base}-risk-eprocess-summary.csv"
 receipt="${out_csv}.receipt.txt"
 
 cargo fmt --manifest-path "$manifest" -- --check
@@ -619,6 +624,248 @@ if ! awk -F, '
   exit 1
 fi
 
+# Apply a predeclared mixture of bounded-risk e-processes to the exact same
+# sequential residual rows. The three bet fractions are fixed before evaluation.
+cargo run --locked --release --manifest-path "$manifest" --bin allostatic-risk-eprocess-bench -- \
+  "$tmpdir/sequential-a.csv" "$tmpdir/eprocess-a.csv" "$tmpdir/eprocess-summary-a.csv"
+cargo run --locked --release --manifest-path "$manifest" --bin allostatic-risk-eprocess-bench -- \
+  "$tmpdir/sequential-a.csv" "$tmpdir/eprocess-b.csv" "$tmpdir/eprocess-summary-b.csv"
+if ! cmp -s "$tmpdir/eprocess-a.csv" "$tmpdir/eprocess-b.csv" ||
+   ! cmp -s "$tmpdir/eprocess-summary-a.csv" "$tmpdir/eprocess-summary-b.csv"; then
+  printf 'FAIL: repeated bounded-risk mixture e-process outputs are not byte-identical\n' >&2
+  exit 1
+fi
+if ! cmp -s "$tmpdir/sequential-a.csv" <(cut -d, -f1-14 "$tmpdir/eprocess-a.csv"); then
+  printf 'FAIL: e-process output is not paired to the exact CUSUM raw trace\n' >&2
+  exit 1
+fi
+
+if ! awk -F, '
+  NR == 1 { if (NF != 30) failed = 1; next }
+  NR == 2 {
+    log_threshold = $19
+    risk_bound = $20
+    fraction_1 = $21
+    fraction_2 = $22
+    fraction_3 = $23
+  }
+  {
+    if (NF != 30) failed = 1
+    if ($1 != "critical_low_reserve_high_load" && $1 != "reserve_limited" &&
+        $1 != "load_limited" && $1 != "balanced" && $1 != "high_margin") failed = 1
+    if ($2 != "nominal" && $2 != "gradual_shift" &&
+        $2 != "abrupt_shift" && $2 != "stealth_shift") failed = 1
+    if ($3 !~ /^[0-9]+$/ || $3 < 50000 || $3 >= 50300) failed = 1
+    if ($4 !~ /^[0-7]$/) failed = 1
+    if ($5 !~ /^[0-9]*[.]?[0-9]+$/ || $5 < 0 || $5 > 1) failed = 1
+    if ($6 !~ /^[0-9]*[.]?[0-9]+$/ || $6 < 0) failed = 1
+    if ($7 != "true" && $7 != "false") failed = 1
+    if ($8 !~ /^[0-8]$/) failed = 1
+    if ($9 !~ /^[0-9]*[.]?[0-9]+$/ || $10 !~ /^[0-9]*[.]?[0-9]+$/) failed = 1
+    if ($11 != "true" && $11 != "false") failed = 1
+    if ($12 !~ /^[0-8]$/) failed = 1
+    if ($13 != "true" && $13 != "false") failed = 1
+    if ($14 != "true" && $14 != "false") failed = 1
+    expected_loss = $5 / 0.05
+    if (expected_loss > 1) expected_loss = 1
+    if (($15 - expected_loss > 0.000001) || (expected_loss - $15 > 0.000001)) failed = 1
+    if ($16 !~ /^-?[0-9]*[.]?[0-9]+$/) failed = 1
+    if ($17 != "true" && $17 != "false") failed = 1
+    if ($18 !~ /^[0-8]$/) failed = 1
+    if (($19 - log(100) > 0.000001) || (log(100) - $19 > 0.000001)) failed = 1
+    if (($19 - log_threshold > 0.000001) || (log_threshold - $19 > 0.000001)) failed = 1
+    if (($20 - 0.15 > 0.000001) || (0.15 - $20 > 0.000001)) failed = 1
+    if (($21 - 0.25 > 0.000001) || (0.25 - $21 > 0.000001)) failed = 1
+    if (($22 - 0.50 > 0.000001) || (0.50 - $22 > 0.000001)) failed = 1
+    if (($23 - 0.75 > 0.000001) || (0.75 - $23 > 0.000001)) failed = 1
+    if (($20 - risk_bound > 0.000001) || (risk_bound - $20 > 0.000001)) failed = 1
+    if (($21 - fraction_1 > 0.000001) || (fraction_1 - $21 > 0.000001) ||
+        ($22 - fraction_2 > 0.000001) || (fraction_2 - $22 > 0.000001) ||
+        ($23 - fraction_3 > 0.000001) || (fraction_3 - $23 > 0.000001)) failed = 1
+    for (i = 24; i <= 27; i++) if ($i !~ /^-?[0-9]*[.]?[0-9]+$/) failed = 1
+    if ($28 != "true" && $28 != "false") failed = 1
+    if ($29 !~ /^[0-8]$/) failed = 1
+    if (($30 - 0.5 > 0.000001) || (0.5 - $30 > 0.000001)) failed = 1
+
+    key = $1 SUBSEP $2 SUBSEP $3
+    if ($4 == 0) {
+      next_step[key] = 0
+      previous_1[key] = 0
+      previous_2[key] = 0
+      previous_3[key] = 0
+      previous_fixed[key] = 0
+      first_alarm[key] = 8
+      first_fixed_alarm[key] = 8
+      recorded_first_alarm[key] = $18
+      recorded_fixed_first_alarm[key] = $29
+      fixed_latched[key] = "false"
+      recorded_below[key] = $14
+      latched[key] = "false"
+      episode_max_score[key] = 0
+      episode_all_below[key] = "true"
+      threshold_by_episode[key] = $6
+    } else if ($4 != next_step[key]) failed = 1
+    if (($6 - threshold_by_episode[key] > 0.000001) ||
+        (threshold_by_episode[key] - $6 > 0.000001)) failed = 1
+
+    factor_1 = 1 + (fraction_1 / risk_bound) * ($15 - risk_bound)
+    factor_2 = 1 + (fraction_2 / risk_bound) * ($15 - risk_bound)
+    factor_3 = 1 + (fraction_3 / risk_bound) * ($15 - risk_bound)
+    if (factor_1 <= 0 || factor_2 <= 0 || factor_3 <= 0) failed = 1
+    expected_1 = previous_1[key] + log(factor_1)
+    expected_2 = previous_2[key] + log(factor_2)
+    expected_3 = previous_3[key] + log(factor_3)
+    if (($24 - expected_1 > 0.000001) || (expected_1 - $24 > 0.000001)) failed = 1
+    if (($25 - expected_2 > 0.000001) || (expected_2 - $25 > 0.000001)) failed = 1
+    if (($26 - expected_3 > 0.000001) || (expected_3 - $26 > 0.000001)) failed = 1
+    previous_1[key] = $24
+    previous_2[key] = $25
+    previous_3[key] = $26
+
+    max_component = $24
+    if ($25 > max_component) max_component = $25
+    if ($26 > max_component) max_component = $26
+    expected_mix = max_component + log((
+      exp($24 - max_component) +
+      exp($25 - max_component) +
+      exp($26 - max_component)) / 3)
+    if (($16 - expected_mix > 0.000002) || (expected_mix - $16 > 0.000002)) failed = 1
+
+    expected_alarm = (latched[key] == "true" || $16 >= log_threshold) ? "true" : "false"
+    if ($17 != expected_alarm) failed = 1
+    if ($17 == "true" && first_alarm[key] == 8) first_alarm[key] = $4
+    latched[key] = expected_alarm
+    if ($18 != recorded_first_alarm[key]) failed = 1
+
+    factor_fixed = 1 + (0.5 / risk_bound) * ($15 - risk_bound)
+    if (factor_fixed <= 0) failed = 1
+    expected_fixed = previous_fixed[key] + log(factor_fixed)
+    if (($27 - expected_fixed > 0.000001) || (expected_fixed - $27 > 0.000001)) failed = 1
+    previous_fixed[key] = $27
+    expected_fixed_alarm = (fixed_latched[key] == "true" || $27 >= log_threshold) ? "true" : "false"
+    if ($28 != expected_fixed_alarm) failed = 1
+    if ($28 == "true" && first_fixed_alarm[key] == 8) first_fixed_alarm[key] = $4
+    fixed_latched[key] = expected_fixed_alarm
+    if ($29 != recorded_fixed_first_alarm[key]) failed = 1
+    if ($14 != recorded_below[key]) failed = 1
+    if ($5 > episode_max_score[key]) episode_max_score[key] = $5
+    if ($5 > $6) episode_all_below[key] = "false"
+
+    pair_key = $1 SUBSEP $3 SUBSEP $4
+    if ($2 == "nominal") {
+      nominal_score[pair_key] = $5
+      nominal_loss[pair_key] = $15
+      nominal_mix[pair_key] = $16
+      nominal_alarm[pair_key] = $17
+      nominal_first_alarm[pair_key] = $18
+      nominal_1[pair_key] = $24
+      nominal_2[pair_key] = $25
+      nominal_3[pair_key] = $26
+      nominal_fixed_log[pair_key] = $27
+      nominal_fixed_alarm[pair_key] = $28
+      nominal_fixed_first[pair_key] = $29
+    }
+    if ($2 == "stealth_shift" &&
+        (nominal_score[pair_key] != $5 ||
+         nominal_loss[pair_key] != $15 ||
+         nominal_mix[pair_key] != $16 ||
+         nominal_alarm[pair_key] != $17 ||
+         nominal_first_alarm[pair_key] != $18 ||
+         nominal_1[pair_key] != $24 ||
+         nominal_2[pair_key] != $25 ||
+         nominal_3[pair_key] != $26 ||
+         nominal_fixed_log[pair_key] != $27 ||
+         nominal_fixed_alarm[pair_key] != $28 ||
+         nominal_fixed_first[pair_key] != $29)) failed = 1
+
+    if ($4 == 7 && ($14 == "true") != (episode_max_score[key] <= threshold_by_episode[key])) failed = 1
+    if ($4 == 7 && (episode_all_below[key] == "true") != ($14 == "true")) failed = 1
+    row_key = key SUBSEP $4
+    if (seen[row_key]++) failed = 1
+    next_step[key] = $4 + 1
+    rows++
+  }
+  END {
+    if (NR != 48001 || rows != 48000 || failed) exit 1
+    for (key in next_step) {
+      if (next_step[key] != 8 ||
+          first_alarm[key] != recorded_first_alarm[key] ||
+          first_fixed_alarm[key] != recorded_fixed_first_alarm[key]) exit 1
+    }
+  }
+' "$tmpdir/eprocess-a.csv"; then
+  printf 'FAIL: bounded-risk mixture e-process schema, component recurrence, log-mixture, threshold or stealth pairing is invalid\n' >&2
+  exit 1
+fi
+
+if ! awk -F, '
+  NR == 1 { if (NF != 29) failed = 1; next }
+  {
+    if (NF != 29) failed = 1
+    if ($1 != "critical_low_reserve_high_load" && $1 != "reserve_limited" &&
+        $1 != "load_limited" && $1 != "balanced" && $1 != "high_margin") failed = 1
+    if ($2 != "nominal" && $2 != "gradual_shift" &&
+        $2 != "abrupt_shift" && $2 != "stealth_shift") failed = 1
+    if ($3 != 300) failed = 1
+    for (i = 4; i <= 6; i++) if ($i !~ /^[0-9]+$/ || $i > 300) failed = 1
+    if ($2 == "nominal") {
+      if ($5 != $4 || $6 != 0 || $4 > 30) failed = 1
+      if ($21 != $20 || $22 != 0 || $20 > 30) failed = 1
+    } else {
+      if ($4 + $6 != 300 || $5 != 0) failed = 1
+      if ($20 + $22 != 300 || $21 != 0) failed = 1
+    }
+    if ($7 != "NA" && $7 !~ /^[0-9]*[.]?[0-9]+$/) failed = 1
+    if ($8 != "NA" && $8 !~ /^[0-9]+$/) failed = 1
+    if ($9 != "NA" && $9 !~ /^[0-9]+$/) failed = 1
+    if ($4 == 0 && ($7 != "NA" || $8 != "NA" || $9 != "NA")) failed = 1
+    if ($4 > 0 && ($7 == "NA" || $8 == "NA" || $9 == "NA")) failed = 1
+    if ($10 < 0 || $10 > 300 || $11 < 0 || $11 > $10) failed = 1
+    if ($12 !~ /^-?[0-9]*[.]?[0-9]+$/ || $13 !~ /^-?[0-9]*[.]?[0-9]+$/) failed = 1
+    if (($14 - log(100) > 0.000001) || (log(100) - $14 > 0.000001)) failed = 1
+    if (($15 - 0.15 > 0.000001) || (0.15 - $15 > 0.000001)) failed = 1
+    if (($16 - 0.25 > 0.000001) || (0.25 - $16 > 0.000001) ||
+        ($17 - 0.50 > 0.000001) || (0.50 - $17 > 0.000001) ||
+        ($18 - 0.75 > 0.000001) || (0.75 - $18 > 0.000001)) failed = 1
+    if (($19 - 0.05 > 0.000001) || (0.05 - $19 > 0.000001)) failed = 1
+    if ($23 != "NA" && $23 !~ /^[0-9]*[.]?[0-9]+$/) failed = 1
+    if ($24 != "NA" && $24 !~ /^[0-9]+$/) failed = 1
+    if ($25 != "NA" && $25 !~ /^[0-9]+$/) failed = 1
+    if ($20 == 0 && ($23 != "NA" || $24 != "NA" || $25 != "NA")) failed = 1
+    if ($20 > 0 && ($23 == "NA" || $24 == "NA" || $25 == "NA")) failed = 1
+    if ($26 < 0 || $26 > 300 || $26 > $10) failed = 1
+    if ($27 !~ /^-?[0-9]*[.]?[0-9]+$/ || $28 !~ /^-?[0-9]*[.]?[0-9]+$/) failed = 1
+    if (($29 - 0.5 > 0.000001) || (0.5 - $29 > 0.000001)) failed = 1
+
+    if ($2 == "nominal" && ($4 > 30 || $5 != $4 || $6 != 0)) failed = 1
+    if ($2 == "gradual_shift" &&
+        ($4 < 240 || $6 > 60 || $10 != 300 || $11 < 240 ||
+         $20 < 120 || $20 > 240 || $22 > 180 || $26 != $20 ||
+         $4 < $20 + 60)) failed = 1
+    if ($2 == "abrupt_shift" &&
+        ($4 < 270 || $6 > 30 || $20 < 270 || $22 > 30)) failed = 1
+    if ($2 == "stealth_shift" &&
+        ($4 > 30 || $6 < 270 || $20 > 30 || $22 < 270)) failed = 1
+    key = $1 SUBSEP $2
+    if (seen[key]++) failed = 1
+    if ($2 == "nominal") {
+      nominal_alarms[$1] = $4
+      nominal_misses[$1] = $6
+      nominal_fixed_alarms[$1] = $20
+      nominal_fixed_misses[$1] = $22
+    }
+    if ($2 == "stealth_shift" &&
+        ($4 != nominal_alarms[$1] || $6 != nominal_misses[$1] ||
+         $20 != nominal_fixed_alarms[$1] ||
+         $22 != nominal_fixed_misses[$1])) failed = 1
+    rows++
+  }
+  END { if (NR != 21 || rows != 20 || failed) exit 1 }
+' "$tmpdir/eprocess-summary-a.csv"; then
+  printf 'FAIL: mixture e-process summary schema, detection behavior or matched stealth-control gates are invalid\n' >&2
+  exit 1
+fi
+
 # Summary must contain 5 scenarios × 6 policies × 2 shield settings.
 if ! awk -F, 'NR == 1 { if (NF != 28) failed = 1; next }
   { if (NF != 28) failed = 1; rows++ }
@@ -649,6 +896,8 @@ cp "$tmpdir/scope-a.csv" "$scope_out"
 cp "$tmpdir/scope-summary-a.csv" "$scope_summary_out"
 cp "$tmpdir/sequential-a.csv" "$sequential_out"
 cp "$tmpdir/sequential-summary-a.csv" "$sequential_summary_out"
+cp "$tmpdir/eprocess-a.csv" "$eprocess_out"
+cp "$tmpdir/eprocess-summary-a.csv" "$eprocess_summary_out"
 {
   printf 'status=pass\n'
   printf 'git_commit=%s\n' "$actual_head"
@@ -684,6 +933,10 @@ cp "$tmpdir/sequential-summary-a.csv" "$sequential_summary_out"
   printf 'sequential_scope_rows_excluding_header=%s\n' "$(( $(wc -l < "$sequential_out") - 1 ))"
   printf 'sequential_scope_summary_sha256=%s\n' "$(sha256sum "$sequential_summary_out" | awk '{print $1}')"
   printf 'sequential_scope_summary_rows_excluding_header=%s\n' "$(( $(wc -l < "$sequential_summary_out") - 1 ))"
+  printf 'risk_eprocess_sha256=%s\n' "$(sha256sum "$eprocess_out" | awk '{print $1}')"
+  printf 'risk_eprocess_rows_excluding_header=%s\n' "$(( $(wc -l < "$eprocess_out") - 1 ))"
+  printf 'risk_eprocess_summary_sha256=%s\n' "$(sha256sum "$eprocess_summary_out" | awk '{print $1}')"
+  printf 'risk_eprocess_summary_rows_excluding_header=%s\n' "$(( $(wc -l < "$eprocess_summary_out") - 1 ))"
   printf '\nsource_sha256:\n'
   sha256sum "${source_files[@]}"
 } > "$receipt"
@@ -701,4 +954,6 @@ printf 'Task-relevant scope frontier: %s\n' "$scope_out"
 printf 'Task-relevant scope summary: %s\n' "$scope_summary_out"
 printf 'Sequential CUSUM scope frontier: %s\n' "$sequential_out"
 printf 'Sequential CUSUM scope summary: %s\n' "$sequential_summary_out"
+printf 'Bounded-risk e-process frontier: %s\n' "$eprocess_out"
+printf 'Bounded-risk e-process summary: %s\n' "$eprocess_summary_out"
 printf 'Provenance receipt: %s\n' "$receipt"
