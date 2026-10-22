@@ -99,6 +99,7 @@ struct Receipt {
     selected_train_false_activation_upper_95: f64,
     calibration_constraint_met: bool,
     heldout_false_activation_confidence: &'static str,
+    false_activation_bound_assumption: &'static str,
     lambda_trials: Vec<LambdaTrial>,
     results: Vec<StrategyResult>,
     fixture_spec_digest_sha256: String,
@@ -569,6 +570,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         calibration_constraint_met: selected_train_metrics.protected_false_activation_rate
             <= MAX_TRAIN_FALSE_ACTIVATION_RATE,
         heldout_false_activation_confidence: "one-sided exact Clopper-Pearson 95% upper bound",
+        false_activation_bound_assumption: concat!(
+            "IID Bernoulli queries; concepts may be heterogeneous, so this is diagnostic, ",
+            "not a distribution-free guarantee"
+        ),
         lambda_trials: trials,
         results,
         fixture_spec_digest_sha256: digest_fixture(),
@@ -582,4 +587,33 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
     println!("{json}");
     Ok(())
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn zero_false_activations_with_512_queries_has_sub_one_percent_iid_bound() {
+        let upper = clopper_pearson_upper(0, 512, 0.05);
+        assert!(upper > 0.005 && upper < 0.006);
+        assert!(upper < 0.01);
+    }
+
+    #[test]
+    fn one_false_activation_with_512_queries_still_has_sub_one_percent_iid_bound() {
+        assert!(clopper_pearson_upper(1, 512, 0.05) < 0.01);
+    }
+
+    #[test]
+    fn two_false_activations_with_512_queries_exceed_one_percent_iid_bound() {
+        assert!(clopper_pearson_upper(2, 512, 0.05) > 0.01);
+    }
+
+    #[test]
+    fn empty_or_all_false_activation_samples_fail_closed() {
+        assert_eq!(clopper_pearson_upper(0, 0, 0.05), 1.0);
+        assert_eq!(clopper_pearson_upper(10, 10, 0.05), 1.0);
+    }
 }
