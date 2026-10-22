@@ -798,10 +798,14 @@ fn clustered_bootstrap_summary(report: &Value) -> Option<Value> {
     let mut comparable_pairs = 0_u64;
     let mut unresolved_pairs = 0_u64;
     let mut tasks_without_comparable_pairs = 0_u64;
-    for (task_id, expected) in &expected_counts {
+    // Iterate the receipt manifest, not HashMap iteration order, so the same
+    // frozen receipt yields byte-for-byte stable bootstrap samples across runs.
+    for task in manifest {
+        let task_id = str_field(task, "task_id")?;
+        let expected = u64_field(task, "expected_test_functions")?;
         let mut paired_deltas = Vec::new();
         for repeat in 1..=repeats {
-            let Some(pair) = slots.get(&(task_id.clone(), repeat)) else {
+            let Some(pair) = slots.get(&(task_id.to_string(), repeat)) else {
                 unresolved_pairs += 1;
                 continue;
             };
@@ -809,12 +813,12 @@ fn clustered_bootstrap_summary(report: &Value) -> Option<Value> {
                 unresolved_pairs += 1;
                 continue;
             };
-            if !oracle_complete(off, *expected) || !oracle_complete(on, *expected) {
+            if !oracle_complete(off, expected) || !oracle_complete(on, expected) {
                 unresolved_pairs += 1;
                 continue;
             }
-            let off_success = score_success(off, *expected) as u8 as f64;
-            let on_success = score_success(on, *expected) as u8 as f64;
+            let off_success = score_success(off, expected) as u8 as f64;
+            let on_success = score_success(on, expected) as u8 as f64;
             paired_deltas.push(on_success - off_success);
             comparable_pairs += 1;
         }
