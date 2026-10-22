@@ -58,7 +58,9 @@ pub(crate) struct EncodingPhaseResult {
     pub(crate) input_similarity: f32,
     pub(crate) input_memoized: bool,
     pub(crate) effective_threshold: f32,
-    /// PE for control calculations; zero when the encoder comparison is degenerate.
+    /// Effective PE estimate for control calculations. If this cycle has no valid
+    /// comparison, carries forward the running mean or uses the configured neutral
+    /// threshold prior. Consumers must check prediction_error_valid before learning.
     pub(crate) prediction_error: f32,
     /// Whether the PE came from a genuine prediction comparison.
     pub(crate) prediction_error_valid: bool,
@@ -285,14 +287,18 @@ impl CognitiveLoopService {
         let _t_core = Instant::now();
         let mut encoding_result = self.encoder.encode(input);
         // Degenerate 1.0 values remain on EncodingResult as explicit legacy
-        // sentinels, but they are not observations of surprise. Use zero control
-        // evidence until a genuine prediction comparison is available.
+        // sentinels, but they are not observations of surprise. For scalar-only
+        // downstream controllers, use the last measured running mean; before any
+        // valid comparison exists, use the configured threshold as a neutral prior.
+        // The validity bit prevents this fallback estimate from entering learning.
         let prediction_error_valid =
             self.encoder.last_prediction_degeneracy() == PredictionDegeneracy::Genuine;
         let prediction_error = if prediction_error_valid {
             encoding_result.prediction_error
+        } else if !self.error_history.is_empty() {
+            self.stats.avg_prediction_error.clamp(0.0, 1.0)
         } else {
-            0.0
+            self.config.learning_threshold.clamp(0.0, 1.0)
         };
         module_timings.core_hdc_encode = _t_core.elapsed().as_micros() as u64;
 
@@ -500,7 +506,7 @@ impl CognitiveLoopService {
             // amplify dimensions that differ most from last prediction.
             // Feldman & Friston (2010): precision-weighted prediction errors
             // gate information flow at the dimension level.
-            if prediction_error > SURPRISE_PE_THRESHOLD {
+            if prediction_error_valid && prediction_error > SURPRISE_PE_THRESHOLD {
                 if let Some(ref last_pred) = self.last_prediction {
                     if last_pred.len() == raw.len() {
                         let pred_slice = last_pred.as_slice();
@@ -942,10 +948,10 @@ mod tests {
             svc.encoder.last_prediction_degeneracy(),
             PredictionDegeneracy::NoPrediction
         );
-        assert_eq!(result.prediction_error, 0.0);
+        assert_eq!(result.prediction_error, svc.config.learning_threshold);
         assert!(!result.prediction_error_valid);
-        // The raw result retains its diagnostic sentinel, but stateful urgency
-        // and learning consumers receive no prediction-error evidence.
+        // The raw result retains its diagnostic sentinel; control paths use a
+        // neutral prior, and learning consumers receive no PE evidence.
     }
 
     #[test]
