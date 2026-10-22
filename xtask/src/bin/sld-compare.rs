@@ -440,6 +440,11 @@ fn validate_receipt<'r>(
             fail += 1;
         }
         if result.critical_invariant_failure {
+            ensure!(
+                result.status == "FAIL",
+                "{label}: critical invariant failure for case {} cannot be reported as PASS",
+                result.case_id
+            );
             critical += 1;
         }
         ensure!(
@@ -1000,7 +1005,10 @@ mod tests {
     fn critical_failure_blocks_promotion_even_when_aggregate_is_computable() {
         let mut a = fixture_receipt();
         let b = fixture_receipt();
+        a.case_results[0].status = "FAIL".to_string();
         a.case_results[0].critical_invariant_failure = true;
+        a.summary.pass = 0;
+        a.summary.fail = 2;
         a.summary.critical_invariant_failures = 1;
         let results_a = validate_receipt(&a, "A").expect("valid receipt A");
         let results_b = validate_receipt(&b, "B").expect("valid receipt B");
