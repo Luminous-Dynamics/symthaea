@@ -10,7 +10,7 @@ This is intentionally a narrow step beyond the nominal expected-information-gain
 
 ## API
 
-- `expected_information_gain_worst_case_nats` evaluates the same experiment under every supplied observation-noise standard deviation and returns the minimum information gain.
+- `expected_information_gain_worst_case_nats` returns the conservative information gain for the largest supplied noise scale; Gaussian-channel monotonicity makes that the theoretical minimum over the finite envelope.
 - `select_experiment_by_worst_case_information_gain_per_cost` ranks candidate experiments by that minimum divided by positive finite cost.
 
 The noise envelope is a finite caller-supplied list, not an interval guarantee. Every scale must be positive and finite or the request fails closed. Under the shared additive Gaussian-noise model, increasing noise is a post-processing channel, so exact mutual information is non-increasing in noise; the implementation validates the full list and evaluates its maximum scale once, avoiding one quadrature per scenario. Incomplete or non-finite predictions remain ineligible. The functions preserve deterministic input-order tie-breaking and do not alter the existing variance or nominal EIG selectors. Consequently, v0.1 is best understood as explicit conservative high-noise EIG, not a novel general-purpose robust objective.
