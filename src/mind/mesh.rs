@@ -9,6 +9,151 @@ use super::ContinuousMind;
 #[cfg(feature = "mesh")]
 pub(super) const MESH_DEDUP_RING_SIZE: usize = 512;
 
+/// Maximum age of a packet before freshness checks stop accepting it.
+#[cfg(feature = "mesh")]
+pub(super) const MESH_MAX_PACKET_AGE_S: u32 = 60;
+
+/// Maximum tolerated positive clock skew for authenticated packets.
+#[cfg(feature = "mesh")]
+pub(super) const MESH_MAX_FUTURE_SKEW_S: u32 = 5;
+
+/// Width of the authenticated per-stream sequence replay window.
+#[cfg(feature = "mesh")]
+pub(super) const MESH_SEQUENCE_WINDOW_WIDTH: u32 = 64;
+
+/// Bound authenticated replay tracking to 512 source/type streams.
+#[cfg(feature = "mesh")]
+pub(super) const MESH_REPLAY_STREAM_CAPACITY: usize = 4_608;
+
+/// A sequence window for one authenticated (source_id, payload_type) stream.
+///
+/// Bit zero represents the highest accepted sequence; bit N represents the
+/// sequence N places behind it. Serial-number arithmetic permits u32 wrap while
+/// rejecting duplicates and packets older than the fixed window.
+#[cfg(feature = "mesh")]
+#[derive(Debug, Default)]
+pub(super) struct AuthenticatedSequenceWindow {
+    highest_sequence: Option<u32>,
+    seen_bitmap: u64,
+    last_accepted_at: Option<std::time::Instant>,
+}
+
+#[cfg(feature = "mesh")]
+impl AuthenticatedSequenceWindow {
+    /// Accept a fresh sequence exactly once. Returns false for duplicates and
+    /// sequences outside the 64-packet reordering window.
+    pub(super) fn check_and_mark(
+        &mut self,
+        sequence: u32,
+        now: std::time::Instant,
+    ) -> bool {
+        let accepted = match self.highest_sequence {
+            None => {
+                self.highest_sequence = Some(sequence);
+                self.seen_bitmap = 1;
+                true
+            }
+            Some(highest) => {
+                let forward = sequence.wrapping_sub(highest);
+                if forward == 0 {
+                    false
+                } else if forward < (1u32 << 31) {
+                    // The serial number is newer. A large jump moves the
+                    // bitmap entirely; smaller jumps preserve reorder history.
+                    self.seen_bitmap = if forward >= MESH_SEQUENCE_WINDOW_WIDTH {
+                        1
+                    } else {
+                        (self.seen_bitmap << forward) | 1
+                    };
+                    self.highest_sequence = Some(sequence);
+                    true
+                } else {
+                    // The serial number is older (including the ambiguous
+                    // half-range case); only an unseen bit inside the window
+                    // may be accepted as out-of-order delivery.
+                    let behind = highest.wrapping_sub(sequence);
+                    if behind >= MESH_SEQUENCE_WINDOW_WIDTH {
+                        false
+                    } else {
+                        let bit = 1u64 << behind;
+                        if self.seen_bitmap & bit != 0 {
+                            false
+                        } else {
+                            self.seen_bitmap |= bit;
+                            true
+                        }
+                    }
+                }
+            }
+        };
+
+        if accepted {
+            self.last_accepted_at = Some(now);
+        }
+        accepted
+    }
+
+    /// Expire an idle stream only after its packets must fail the independent
+    /// timestamp freshness gate, including the allowed future clock skew.
+    pub(super) fn is_expired(&self, now: std::time::Instant) -> bool {
+        let retention = std::time::Duration::from_secs(
+            (MESH_MAX_PACKET_AGE_S + MESH_MAX_FUTURE_SKEW_S) as u64,
+        );
+        self.last_accepted_at
+            .is_some_and(|last| now.saturating_duration_since(last) > retention)
+    }
+}
+
+#[cfg(feature = "mesh")]
+#[cfg(test)]
+mod authenticated_sequence_window_tests {
+    use super::*;
+
+    #[test]
+    fn accepts_each_sequence_once_and_allows_bounded_reordering() {
+        let now = std::time::Instant::now();
+        let mut window = AuthenticatedSequenceWindow::default();
+
+        assert!(window.check_and_mark(100, now));
+        assert!(window.check_and_mark(98, now));
+        assert!(window.check_and_mark(99, now));
+        assert!(!window.check_and_mark(99, now));
+        assert!(!window.check_and_mark(100, now));
+    }
+
+    #[test]
+    fn rejects_sequences_older_than_the_window() {
+        let now = std::time::Instant::now();
+        let mut window = AuthenticatedSequenceWindow::default();
+
+        assert!(window.check_and_mark(100, now));
+        assert!(window.check_and_mark(36, now));
+        assert!(!window.check_and_mark(35, now));
+    }
+
+    #[test]
+    fn handles_u32_sequence_wraparound() {
+        let now = std::time::Instant::now();
+        let mut window = AuthenticatedSequenceWindow::default();
+
+        assert!(window.check_and_mark(u32::MAX - 1, now));
+        assert!(window.check_and_mark(u32::MAX, now));
+        assert!(window.check_and_mark(0, now));
+        assert!(window.check_and_mark(1, now));
+        assert!(!window.check_and_mark(u32::MAX, now));
+        assert!(!window.check_and_mark(0, now));
+    }
+
+    #[test]
+    fn rejects_the_ambiguous_half_range_jump() {
+        let now = std::time::Instant::now();
+        let mut window = AuthenticatedSequenceWindow::default();
+
+        assert!(window.check_and_mark(7, now));
+        assert!(!window.check_and_mark(7u32.wrapping_add(1u32 << 31), now));
+    }
+}
+
 /// Maximum age of a mesh packet (seconds) before it's rejected as stale.
 #[cfg(feature = "mesh")]
 pub(super) const MESH_MAX_PACKET_AGE_S: u32 = 60;
