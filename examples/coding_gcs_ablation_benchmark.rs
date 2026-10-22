@@ -348,6 +348,15 @@ fn eval_json(result: &EvalResult) -> serde_json::Value {
     })
 }
 
+fn nearest_rank_percentile(values: &mut [u128], quantile: f64) -> Option<u128> {
+    if values.is_empty() || !quantile.is_finite() || !(0.0..=1.0).contains(&quantile) {
+        return None;
+    }
+    values.sort_unstable();
+    let rank = ((quantile * values.len() as f64).ceil() as usize).clamp(1, values.len());
+    values.get(rank - 1).copied()
+}
+
 fn mode_summary(results: &[EvalResult], enabled: bool) -> serde_json::Value {
     let mode: Vec<&EvalResult> = results.iter().filter(|r| r.gcs_advisories_enabled == enabled).collect();
     let total = mode.len();
@@ -355,6 +364,12 @@ fn mode_summary(results: &[EvalResult], enabled: bool) -> serde_json::Value {
     let compiled = mode.iter().filter(|r| r.compiled && !r.simulated).count();
     let complete = mode.iter().filter(|r| r.oracle_complete).count();
     let agent_ms: u128 = mode.iter().map(|r| r.agent_elapsed_ms).sum();
+    let mut agent_elapsed_values: Vec<u128> = mode.iter().map(|r| r.agent_elapsed_ms).collect();
+    let mut verification_elapsed_values: Vec<u128> = mode.iter().map(|r| r.verification_elapsed_ms).collect();
+    let agent_elapsed_ms_p50 = nearest_rank_percentile(&mut agent_elapsed_values.clone(), 0.50).unwrap_or(0);
+    let agent_elapsed_ms_p95 = nearest_rank_percentile(&mut agent_elapsed_values.clone(), 0.95).unwrap_or(0);
+    let verification_elapsed_ms_p50 = nearest_rank_percentile(&mut verification_elapsed_values.clone(), 0.50).unwrap_or(0);
+    let verification_elapsed_ms_p95 = nearest_rank_percentile(&mut verification_elapsed_values.clone(), 0.95).unwrap_or(0);
     let energy: f64 = mode.iter().map(|r| r.energy).sum();
     let tier_attempt_count = |target: &str| -> usize {
         mode.iter()
@@ -397,6 +412,10 @@ fn mode_summary(results: &[EvalResult], enabled: bool) -> serde_json::Value {
         "complete_oracle_rate": if total == 0 { 0.0 } else { complete as f64 / total as f64 },
         "agent_elapsed_ms_total": agent_ms,
         "agent_elapsed_ms_mean": if total == 0 { 0.0 } else { agent_ms as f64 / total as f64 },
+        "agent_elapsed_ms_p50": agent_elapsed_ms_p50,
+        "agent_elapsed_ms_p95": agent_elapsed_ms_p95,
+        "verification_elapsed_ms_p50": verification_elapsed_ms_p50,
+        "verification_elapsed_ms_p95": verification_elapsed_ms_p95,
         "energy_total": energy,
         "energy_mean": if total == 0 { 0.0 } else { energy / total as f64 }
     })
@@ -885,6 +904,17 @@ mod provenance_tests {
         assert!(parse_cli(&args(&["--unknown"])).is_err());
         assert!(parse_cli(&args(&["--help", "--cloud"])).is_err());
         assert!(parse_cli(&args(&["--help"])).unwrap().is_none());
+    }
+
+    #[test]
+    fn latency_percentiles_use_nearest_rank_and_reject_invalid_input() {
+        let mut values = vec![120_u128, 10, 100, 20];
+        assert_eq!(nearest_rank_percentile(&mut values.clone(), 0.50), Some(20));
+        assert_eq!(nearest_rank_percentile(&mut values.clone(), 0.95), Some(120));
+        assert_eq!(nearest_rank_percentile(&mut values.clone(), 1.0), Some(120));
+        assert_eq!(nearest_rank_percentile(&mut [], 0.50), None);
+        assert_eq!(nearest_rank_percentile(&mut values.clone(), f64::NAN), None);
+        assert_eq!(nearest_rank_percentile(&mut values.clone(), 1.5), None);
     }
 
     #[test]
