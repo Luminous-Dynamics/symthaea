@@ -201,7 +201,7 @@
       "case_id": "MUT-001",
       "invariant_id": "SESSION-001",
       "mode": "mutation_or_control",
-      "source_trace_id": null,
+      "source_trace_id": "FA-TRACE-001",
       "mutation": "remove the only session_started event",
       "expected": {
         "outcome": "evaluate",
@@ -211,13 +211,15 @@
       },
       "evidence_status": "unit_test_added",
       "note": "Implemented in rendering_outside_active_session_is_rejected.",
-      "test_name": "rendering_outside_active_session_is_rejected"
+      "test_name": "rendering_outside_active_session_is_rejected",
+      "operator_id": "remove_session_start",
+      "execution_target": "rust_matrix_runner"
     },
     {
       "case_id": "MUT-002",
       "invariant_id": "SESSION-002",
       "mode": "mutation_or_control",
-      "source_trace_id": null,
+      "source_trace_id": "FA-TRACE-001",
       "mutation": "insert session_started after bundle verification and before render",
       "expected": {
         "outcome": "evaluate",
@@ -227,13 +229,15 @@
       },
       "evidence_status": "unit_test_added",
       "note": "Implemented in starting_new_session_invalidates_prior_bundle_verification.",
-      "test_name": "starting_new_session_invalidates_prior_bundle_verification"
+      "test_name": "starting_new_session_invalidates_prior_bundle_verification",
+      "operator_id": "new_session_before_render",
+      "execution_target": "rust_matrix_runner"
     },
     {
       "case_id": "MUT-003",
       "invariant_id": "CONNECTIVITY-002",
       "mode": "mutation_or_control",
-      "source_trace_id": null,
+      "source_trace_id": "FA-TRACE-007",
       "mutation": "replace connectivity offline with intermittent on core network dependency",
       "expected": {
         "outcome": "evaluate",
@@ -243,7 +247,9 @@
       },
       "evidence_status": "unit_test_added",
       "note": "Implemented in intermittent_connectivity_cannot_be_a_core_network_dependency.",
-      "test_name": "intermittent_connectivity_cannot_be_a_core_network_dependency"
+      "test_name": "intermittent_connectivity_cannot_be_a_core_network_dependency",
+      "operator_id": "intermittent_network",
+      "execution_target": "rust_matrix_runner"
     },
     {
       "case_id": "MUT-004",
@@ -257,7 +263,9 @@
       },
       "evidence_status": "unit_test_added",
       "note": "Implemented in claim_ceiling_cannot_be_weakened_to_clinical_validation.",
-      "test_name": "claim_ceiling_cannot_be_weakened_to_clinical_validation"
+      "test_name": "claim_ceiling_cannot_be_weakened_to_clinical_validation",
+      "operator_id": "weaken_claim_ceiling",
+      "execution_target": "rust_matrix_runner"
     },
     {
       "case_id": "MUT-005",
@@ -271,13 +279,15 @@
       },
       "evidence_status": "unit_test_added",
       "note": "Implemented in clinical_use_authorization_remains_forbidden.",
-      "test_name": "clinical_use_authorization_remains_forbidden"
+      "test_name": "clinical_use_authorization_remains_forbidden",
+      "operator_id": "enable_clinical_use",
+      "execution_target": "rust_matrix_runner"
     },
     {
       "case_id": "MUT-006",
       "invariant_id": "SCHEMA-001",
       "mode": "mutation_or_control",
-      "source_trace_id": null,
+      "source_trace_id": "FA-TRACE-001",
       "mutation": "make adjacent event sequence values equal",
       "expected": {
         "outcome": "reject",
@@ -285,7 +295,9 @@
       },
       "evidence_status": "unit_test_existing",
       "note": "Implemented in duplicate_or_decreasing_sequences_are_rejected.",
-      "test_name": "duplicate_or_decreasing_sequences_are_rejected"
+      "test_name": "duplicate_or_decreasing_sequences_are_rejected",
+      "operator_id": "duplicate_event_sequence",
+      "execution_target": "rust_matrix_runner"
     },
     {
       "case_id": "MUT-007",
@@ -299,13 +311,15 @@
       },
       "evidence_status": "unit_test_existing",
       "note": "Implemented in unknown_fields_are_rejected.",
-      "test_name": "unknown_fields_are_rejected"
+      "test_name": "unknown_fields_are_rejected",
+      "operator_id": "unknown_corpus_field",
+      "execution_target": "rust_matrix_runner"
     },
     {
       "case_id": "MUT-008",
       "invariant_id": "BUNDLE-002",
       "mode": "mutation_or_control",
-      "source_trace_id": null,
+      "source_trace_id": "FA-TRACE-001",
       "mutation": "append revocation followed by another render of the revoked bundle",
       "expected": {
         "outcome": "evaluate",
@@ -315,13 +329,15 @@
       },
       "evidence_status": "unit_test_existing",
       "note": "Implemented in revocation_mutation_detects_post_revoke_render.",
-      "test_name": "revocation_mutation_detects_post_revoke_render"
+      "test_name": "revocation_mutation_detects_post_revoke_render",
+      "operator_id": "render_after_revocation",
+      "execution_target": "rust_matrix_runner"
     },
     {
       "case_id": "MUT-009",
       "invariant_id": "SESSION-002",
       "mode": "mutation_or_control",
-      "source_trace_id": null,
+      "source_trace_id": "FA-TRACE-001",
       "mutation": "append interruption and resume before rendering without re-verification",
       "expected": {
         "outcome": "evaluate",
@@ -331,7 +347,9 @@
       },
       "evidence_status": "unit_test_existing",
       "note": "Implemented in interruption_clears_verified_state.",
-      "test_name": "interruption_clears_verified_state"
+      "test_name": "interruption_clears_verified_state",
+      "operator_id": "resume_after_interruption",
+      "execution_target": "rust_matrix_runner"
     },
     {
       "case_id": "MUT-010",
@@ -344,7 +362,9 @@
         "violation_codes": []
       },
       "evidence_status": "frozen_control",
-      "note": "Covered by FA-TRACE-011 and stale_resource_is_not_a_violation_when_marked_unconfirmed."
+      "note": "Covered by FA-TRACE-011 and stale_resource_is_not_a_violation_when_marked_unconfirmed.",
+      "operator_id": "stale_unconfirmed_control",
+      "execution_target": "rust_matrix_runner"
     },
     {
       "case_id": "MUT-011",
@@ -357,13 +377,15 @@
         "violation_codes": []
       },
       "evidence_status": "frozen_control",
-      "note": "Covered by FA-TRACE-012."
+      "note": "Covered by FA-TRACE-012.",
+      "operator_id": "preserved_uncertainty_control",
+      "execution_target": "rust_matrix_runner"
     },
     {
       "case_id": "MUT-012",
       "invariant_id": "PRIVACY-002",
       "mode": "mutation_or_control",
-      "source_trace_id": null,
+      "source_trace_id": "FA-TRACE-009",
       "mutation": "set sensitive_payload false and consent_scoped false",
       "expected": {
         "outcome": "evaluate",
@@ -371,13 +393,15 @@
       },
       "evidence_status": "unit_test_added",
       "note": "Implemented in non_sensitive_egress_does_not_require_sensitive_data_consent_scope. Exact-head workflow validation is pending.",
-      "test_name": "non_sensitive_egress_does_not_require_sensitive_data_consent_scope"
+      "test_name": "non_sensitive_egress_does_not_require_sensitive_data_consent_scope",
+      "operator_id": "non_sensitive_egress",
+      "execution_target": "rust_matrix_runner"
     },
     {
       "case_id": "MUT-013",
       "invariant_id": "BUNDLE-001",
       "mode": "mutation_or_control",
-      "source_trace_id": null,
+      "source_trace_id": "FA-TRACE-001",
       "mutation": "change rendered bundle_id after successful verification",
       "expected": {
         "outcome": "evaluate",
@@ -387,13 +411,15 @@
       },
       "evidence_status": "unit_test_added",
       "note": "Implemented in rendering_different_bundle_from_verified_bundle_is_rejected. Exact-head workflow validation is pending.",
-      "test_name": "rendering_different_bundle_from_verified_bundle_is_rejected"
+      "test_name": "rendering_different_bundle_from_verified_bundle_is_rejected",
+      "operator_id": "wrong_bundle_identity",
+      "execution_target": "rust_matrix_runner"
     },
     {
       "case_id": "MUT-014",
       "invariant_id": "BUNDLE-003",
       "mode": "mutation_or_control",
-      "source_trace_id": null,
+      "source_trace_id": "FA-TRACE-001",
       "mutation": "set digest_verified false on otherwise valid bundle verification",
       "expected": {
         "outcome": "evaluate",
@@ -404,13 +430,15 @@
       },
       "evidence_status": "unit_test_added",
       "note": "A failed verification is recorded, and the subsequent render is separately recorded as missing a verified bundle. Exact-head run pending.",
-      "test_name": "failed_digest_verification_blocks_rendering"
+      "test_name": "failed_digest_verification_blocks_rendering",
+      "operator_id": "false_digest",
+      "execution_target": "rust_matrix_runner"
     },
     {
       "case_id": "MUT-015",
       "invariant_id": "BUNDLE-003",
       "mode": "mutation_or_control",
-      "source_trace_id": null,
+      "source_trace_id": "FA-TRACE-001",
       "mutation": "verify an expired bundle with a matching digest",
       "expected": {
         "outcome": "evaluate",
@@ -421,13 +449,15 @@
       },
       "evidence_status": "unit_test_added",
       "note": "A failed verification is recorded, and the subsequent render is separately recorded as missing a verified bundle. Exact-head run pending.",
-      "test_name": "expired_bundle_cannot_be_verified_or_rendered"
+      "test_name": "expired_bundle_cannot_be_verified_or_rendered",
+      "operator_id": "expired_bundle",
+      "execution_target": "rust_matrix_runner"
     },
     {
       "case_id": "MUT-016",
       "invariant_id": "UNCERTAINTY-002",
       "mode": "mutation_or_control",
-      "source_trace_id": null,
+      "source_trace_id": "FA-TRACE-012",
       "mutation": "handoff after uncertainty detected and preserved, then detect a new uncertainty without preserving it",
       "expected": {
         "outcome": "evaluate",
@@ -437,13 +467,15 @@
       },
       "evidence_status": "unit_test_added",
       "note": "Implemented in new_uncertainty_after_prior_preservation_is_not_lost_at_handoff. Exact-head workflow validation is pending.",
-      "test_name": "new_uncertainty_after_prior_preservation_is_not_lost_at_handoff"
+      "test_name": "new_uncertainty_after_prior_preservation_is_not_lost_at_handoff",
+      "operator_id": "uncertainty_reentered",
+      "execution_target": "rust_matrix_runner"
     },
     {
       "case_id": "MUT-017",
       "invariant_id": "SESSION-001",
       "mode": "mutation_or_control",
-      "source_trace_id": null,
+      "source_trace_id": "FA-TRACE-003",
       "mutation": "render a revoked bundle after a new session starts",
       "expected": {
         "outcome": "evaluate",
@@ -453,7 +485,9 @@
       },
       "evidence_status": "unit_test_added",
       "note": "Implemented in revocation_survives_new_session_and_remains_a_violation. Revocation is the primary reported violation; generic missing-verification is suppressed for a revoked render. Exact-head validation is pending.",
-      "test_name": "revocation_survives_new_session_and_remains_a_violation"
+      "test_name": "revocation_survives_new_session_and_remains_a_violation",
+      "operator_id": "revocation_new_session",
+      "execution_target": "rust_matrix_runner"
     },
     {
       "case_id": "MUT-018",
@@ -467,7 +501,9 @@
       },
       "evidence_status": "unit_test_added",
       "note": "Implemented in one_byte_corpus_mutation_is_rejected_by_digest_gate; the CLI now calls the same checked_corpus_digest helper. Exact-head validation is pending.",
-      "test_name": "one_byte_corpus_mutation_is_rejected_by_digest_gate"
+      "test_name": "one_byte_corpus_mutation_is_rejected_by_digest_gate",
+      "operator_id": "tampered_corpus_digest",
+      "execution_target": "rust_matrix_runner"
     },
     {
       "case_id": "MUT-019",
@@ -481,7 +517,8 @@
       },
       "evidence_status": "workflow_gate_existing",
       "note": "Enforced by the workflow's Record and verify tested revision step, which compares actual checkout HEAD to expected PR SHA. CI source-gate presence is checked by the matrix validator.",
-      "gate_ref": "test \"$actual\" = \"$expected\""
+      "gate_ref": "test \"$actual\" = \"$expected\"",
+      "execution_target": "workflow_gate"
     },
     {
       "case_id": "MUT-020",
@@ -495,7 +532,8 @@
       },
       "evidence_status": "workflow_gate_existing",
       "note": "The receipt predicate requires the protocol digest and validates its SHA-256 format along with corpus, matrix, lockfile and executable digests. CI source-gate presence is checked by the matrix validator.",
-      "gate_ref": ".evaluation_protocol_sha256"
+      "gate_ref": ".evaluation_protocol_sha256",
+      "execution_target": "workflow_gate"
     },
     {
       "case_id": "MUT-021",
@@ -509,7 +547,9 @@
       },
       "evidence_status": "unit_test_added",
       "note": "Implemented in unknown_event_kind_is_rejected_by_schema_deserialization. Exact-head workflow validation is pending.",
-      "test_name": "unknown_event_kind_is_rejected_by_schema_deserialization"
+      "test_name": "unknown_event_kind_is_rejected_by_schema_deserialization",
+      "operator_id": "unknown_event_kind",
+      "execution_target": "rust_matrix_runner"
     },
     {
       "case_id": "MUT-022",
@@ -523,7 +563,9 @@
       },
       "evidence_status": "unit_test_added",
       "note": "Implemented in bundle_verification_requires_digest_metadata. Exact-head workflow validation is pending.",
-      "test_name": "bundle_verification_requires_digest_metadata"
+      "test_name": "bundle_verification_requires_digest_metadata",
+      "operator_id": "missing_digest_metadata",
+      "execution_target": "rust_matrix_runner"
     },
     {
       "case_id": "MUT-023",
@@ -538,7 +580,9 @@
         ]
       },
       "evidence_status": "frozen_control",
-      "note": "Covered by FA-TRACE-007."
+      "note": "Covered by FA-TRACE-007.",
+      "operator_id": "offline_network_control",
+      "execution_target": "rust_matrix_runner"
     },
     {
       "case_id": "MUT-024",
@@ -553,7 +597,9 @@
         ]
       },
       "evidence_status": "frozen_control",
-      "note": "Covered by FA-TRACE-009."
+      "note": "Covered by FA-TRACE-009.",
+      "operator_id": "sensitive_egress_control",
+      "execution_target": "rust_matrix_runner"
     },
     {
       "case_id": "MUT-025",
@@ -570,7 +616,9 @@
       },
       "evidence_status": "unit_test_added",
       "test_name": "starting_new_session_cannot_silently_drop_unpreserved_uncertainty",
-      "note": "Implemented in the trajectory inspector, JSON reference interpreter and unit test. Exact-head validation pending."
+      "note": "Implemented in the trajectory inspector, JSON reference interpreter and unit test. Exact-head validation pending.",
+      "operator_id": "uncertainty_session_boundary",
+      "execution_target": "rust_matrix_runner"
     },
     {
       "case_id": "MUT-026",
@@ -586,7 +634,9 @@
       },
       "evidence_status": "unit_test_added",
       "test_name": "resuming_session_without_interrupt_clears_prior_bundle_verification",
-      "note": "Resume explicitly invalidates verified state even if a malformed trace lacks an interruption; exact-head validation pending."
+      "note": "Resume explicitly invalidates verified state even if a malformed trace lacks an interruption; exact-head validation pending.",
+      "operator_id": "resume_without_interrupt",
+      "execution_target": "rust_matrix_runner"
     },
     {
       "case_id": "MUT-027",
@@ -604,7 +654,9 @@
       },
       "evidence_status": "unit_test_added",
       "test_name": "verification_outside_active_session_is_rejected",
-      "note": "Implemented in the production inspector, JSON reference interpreter and separate finite-state model precondition; exact-head validation pending."
+      "note": "Implemented in the production inspector, JSON reference interpreter and separate finite-state model precondition; exact-head validation pending.",
+      "operator_id": "verify_outside_session",
+      "execution_target": "rust_matrix_runner"
     },
     {
       "case_id": "MUT-028",
@@ -621,7 +673,9 @@
       },
       "evidence_status": "unit_test_added",
       "test_name": "repeated_violation_codes_count_each_event_occurrence",
-      "note": "Expected violations are an ordered event-level list and may repeat; receipt counts event occurrences separately from unique invariant classes. Exact-head validation pending."
+      "note": "Expected violations are an ordered event-level list and may repeat; receipt counts event occurrences separately from unique invariant classes. Exact-head validation pending.",
+      "operator_id": "repeat_unverified_render",
+      "execution_target": "rust_matrix_runner"
     }
   ],
   "differential_oracle": {
