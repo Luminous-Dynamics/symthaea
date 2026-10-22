@@ -1,0 +1,15 @@
+[package]
+name = "symthaea-aircraft-loading"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Fail-closed aircraft loading arithmetic research prototype"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+# Independent research kernel: do not inherit broken/large root workspace resolution.
+[workspace]
+resolver = "2"

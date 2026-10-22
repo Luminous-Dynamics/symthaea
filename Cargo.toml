@@ -31,6 +31,10 @@ exclude = [
     # live modules. Excluded so the workspace stops compiling a dead island;
     # the adopt path (foveation RealVentralPipeline) still works via path dep.
     "crates/domains/symthaea-perception",
+    # LOADMASTER-001 remains independently buildable while the main workspace
+    # has an unrelated missing core manifest; its own Cargo.toml defines a nested
+    # workspace and CI tests it via the explicit manifest path.
+    "crates/domains/symthaea-aircraft-loading",
 ]
 default-members = [
     "xtask",
