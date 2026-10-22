@@ -278,6 +278,63 @@ mod tests {
         assert!(validate_mesh(&resolve_to_mesh(&model)).is_valid());
     }
 
+    fn set_nominal(catalog: &mut Value, tool_id: &str, name: &str, value: f64) {
+        let concept = catalog["concepts"]
+            .as_array_mut()
+            .expect("concept list")
+            .iter_mut()
+            .find(|concept| concept["tool_id"] == tool_id)
+            .expect("concept exists");
+        let parameters = concept["geometry"]["parameters"]
+            .as_array_mut()
+            .expect("parameter list");
+        let parameter = parameters
+            .iter_mut()
+            .find(|parameter| parameter["name"] == name)
+            .expect("parameter exists");
+        parameter["nominal_candidate"] = serde_json::json!(value);
+    }
+
+    #[test]
+    fn gripper_geometry_remains_valid_across_opening_and_pad_width_sweep() {
+        for opening in [220.0, 260.0, 320.0] {
+            for pad_width in [45.0, 60.0, 75.0] {
+                let mut source = catalog();
+                set_nominal(&mut source, "SEALED_TOTE_GRIPPER", "jaw_opening_max", opening);
+                set_nominal(&mut source, "SEALED_TOTE_GRIPPER", "pad_width", pad_width);
+                let model = sealed_tote_gripper_envelope(&source)
+                    .expect("all sweep values remain inside catalog ranges");
+                let mesh = resolve_to_mesh(&model);
+                let report = validate_mesh(&mesh);
+                assert!(
+                    report.is_valid(),
+                    "gripper opening={opening} pad_width={pad_width}: {:?}",
+                    report
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn tray_dock_geometry_remains_valid_across_width_and_depth_sweep() {
+        for tray_width in [250.0, 360.0, 500.0] {
+            for tray_depth in [180.0, 260.0, 360.0] {
+                let mut source = catalog();
+                set_nominal(&mut source, "PASSIVE_TRAY_DOCK", "tray_width", tray_width);
+                set_nominal(&mut source, "PASSIVE_TRAY_DOCK", "tray_depth", tray_depth);
+                let model = passive_tray_dock_envelope(&source)
+                    .expect("all sweep values remain inside catalog ranges");
+                let mesh = resolve_to_mesh(&model);
+                let report = validate_mesh(&mesh);
+                assert!(
+                    report.is_valid(),
+                    "tray width={tray_width} depth={tray_depth}: {:?}",
+                    report
+                );
+            }
+        }
+    }
+
     #[test]
     fn out_of_range_nominal_parameter_fails_closed_before_geometry_generation() {
         let mut source = catalog();
