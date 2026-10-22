@@ -90,7 +90,8 @@ impl StratifiedSummary {
         }
 
         let mut task_summaries = Vec::with_capacity(tasks.len());
-        let mut samples_by_task: Vec<(Vec<f64>, Vec<f64>, Vec<f64>)> = Vec::with_capacity(tasks.len());
+        let mut samples_by_task: Vec<(Vec<f64>, Vec<f64>, Vec<f64>)> =
+            Vec::with_capacity(tasks.len());
         let mut total_pairs = 0_usize;
 
         for (task, episodes) in tasks {
@@ -516,7 +517,9 @@ mod tests {
         assert!((summary.task_balanced_baseline_iqm - 0.55).abs() < 1e-12);
         assert!((summary.task_balanced_candidate_iqm - 0.6).abs() < 1e-12);
         assert!((summary.task_balanced_iqm_delta - 0.05).abs() < 1e-12);
-        assert!(summary.task_balanced_iqm_delta_ci95_low < summary.task_balanced_iqm_delta_ci95_high);
+        assert!(
+            summary.task_balanced_iqm_delta_ci95_low < summary.task_balanced_iqm_delta_ci95_high
+        );
         assert_eq!(summary.task_count, 2);
         assert_eq!(summary.total_pairs, 40);
         assert!(summary.macro_mean_delta_ci95_low < summary.macro_mean_delta_ci95_high);
@@ -529,7 +532,10 @@ mod tests {
         let candidate = [2.0, 0.0, 1.0];
         let paired = [2.0, -1.0, -1.0];
         assert!((super::paired_win_rate(&paired) - 1.0 / 3.0).abs() < 1e-12);
-        assert!((super::marginal_probability_of_superiority(&baseline, &candidate) - 0.5).abs() < 1e-12);
+        assert!(
+            (super::marginal_probability_of_superiority(&baseline, &candidate) - 0.5).abs()
+                < 1e-12
+        );
     }
 
     #[test]
