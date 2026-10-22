@@ -110,10 +110,7 @@ mod tests {
         }
     }
 
-    fn egress_policy_violation(
-        sensitive_payload: bool,
-        consent_scoped: bool,
-    ) -> Option<Violation> {
+    fn egress_policy_violation(sensitive_payload: bool, consent_scoped: bool) -> Option<Violation> {
         if sensitive_payload && !consent_scoped {
             Some(Violation::SensitiveDataEgressWithoutConsent)
         } else {
@@ -407,13 +404,17 @@ mod tests {
                 .contains(&Violation::UncertaintyLostAtSessionBoundary)
         );
         let revoked_render = transition(started.next, Action::RenderA);
-        assert!(revoked_render
-            .violations
-            .contains(&Violation::RenderAfterRevocation));
+        assert!(
+            revoked_render
+                .violations
+                .contains(&Violation::RenderAfterRevocation)
+        );
         let handoff = transition(state, Action::Handoff);
-        assert!(handoff
-            .violations
-            .contains(&Violation::UncertaintyLostAtHandoff));
+        assert!(
+            handoff
+                .violations
+                .contains(&Violation::UncertaintyLostAtHandoff)
+        );
     }
     #[test]
     fn verification_without_active_session_is_rejected() {
@@ -446,7 +447,9 @@ mod tests {
                 network_cases += 1;
                 let expected = match (connectivity, core_network_required) {
                     (Connectivity::Offline, true) => Some(Violation::OfflineCoreNetworkDependency),
-                    (Connectivity::Intermittent, true) => Some(Violation::IntermittentCoreNetworkDependency),
+                    (Connectivity::Intermittent, true) => {
+                        Some(Violation::IntermittentCoreNetworkDependency)
+                    }
                     _ => None,
                 };
                 assert_eq!(
