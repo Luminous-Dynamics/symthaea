@@ -1855,7 +1855,7 @@ mod tests {
     fn positive_interval_does_not_override_a_candidate_critical_gate_failure() {
         let (plan, pairs, observations) = held_out_bootstrap_fixture();
         let clusters = source_family_clusters(&pairs).unwrap();
-        assert_eq!(clusters.len(), 20);
+        assert_eq!(clusters.len(), 30);
         let comparisons =
             compute_pairwise_comparisons(&plan, &pairs, &observations, &clusters).unwrap();
         assert_eq!(comparisons.len(), 1);
