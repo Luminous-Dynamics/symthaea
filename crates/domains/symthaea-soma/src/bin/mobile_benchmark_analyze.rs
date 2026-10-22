@@ -715,7 +715,7 @@ mod tests {
             let selected_set: BTreeSet<usize> = indices.iter().copied().collect();
             let resampled_count = resampled
                 .iter()
-                .filter(|index| selected_set.contains(index))
+                .filter(|index| selected_set.contains(*index))
                 .count();
             assert_eq!(resampled_count, indices.len());
         }
@@ -736,6 +736,7 @@ mod tests {
         assert!(!report.gates.physical_measurement_eligible);
         assert!(!report.gates.energy_gate_evaluable);
         assert!(!report.gates.declared_gates_pass);
+        assert!(!report.gates.evidence_receipt_verified);
     }
 
     #[test]
@@ -745,6 +746,7 @@ mod tests {
         let report = analyze(&experiment, 500, 5, false).unwrap();
         assert!(report.gates.energy_gate_evaluable);
         assert!(report.gates.energy_gate_pass);
+        assert!(!report.gates.evidence_receipt_verified);
         assert!(!report.gates.privacy_gate_pass);
         assert!(!report.gates.declared_gates_pass);
     }
