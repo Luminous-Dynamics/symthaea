@@ -63,7 +63,9 @@ A tool proposal is not an image or a plausible CAD mesh. It is an auditable pack
 - failure modes, tool-detach detection and safe stop/release behavior;
 - verification cases, test artifacts, open risks and design owner/reviewer evidence.
 
-### First two tool concepts to model
+The initial parameterized concept definitions are stored in `docs/engineering/hmr0-tool-cad-concepts-v0.1.json`. This is a design-input contract with parameter ranges and test proposals, not generated geometry or manufacturing data. The separate Symtropy manifest gate is in [PR #2699](https://github.com/Luminous-Dynamics/symtropy/pull/2699).
+
+### First tool concepts to model
 - **SealedTote Gripper:** compliant, geometry-adaptable parallel grasp surfaces for sealed mock supply bins; no cutting, piercing, powered heat or patient contact; load/center-of-mass and slip detection are mandatory model parameters.
 - **PassiveTray Dock:** alignment funnels and mechanical retention for a passive exchange tray; tool cannot autonomously dispense medication or hand objects directly to a patient.
 
