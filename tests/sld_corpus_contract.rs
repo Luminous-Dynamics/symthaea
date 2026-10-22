@@ -404,3 +404,119 @@ fn measurement_integrity_attacks_distinguish_source_replay_and_feedback() {
     }
     assert_eq!(cases.len(), 52);
 }
+
+
+const TRAJECTORY_SCHEMA_PATH: &str = "docs/research/structural-love-dynamics/trajectory-cases.schema.json";
+const TRAJECTORY_CORPUS_PATH: &str = "docs/research/structural-love-dynamics/trajectory-cases.json";
+
+/// Validate the trajectory fixture contract used by this test module.
+/// This is intentionally narrower than a general JSON Schema validator.
+fn validate_trajectory_corpus(corpus: &Value) -> Vec<String> {
+    let mut errors = Vec::new();
+    if corpus["corpus_id"].as_str() != Some("SLD-TRAJECTORIES-0.1") {
+        errors.push("unexpected trajectory corpus_id".to_owned());
+    }
+    if corpus["schema_version"].as_str() != Some("sld-trajectory-0.1") {
+        errors.push("unexpected trajectory schema_version".to_owned());
+    }
+    if corpus["status"].as_str() != Some("DRAFT_CANDIDATE") {
+        errors.push("trajectory corpus must remain a draft candidate".to_owned());
+    }
+    if corpus["evaluation_mode"].as_str() != Some("MEASUREMENT_ONLY") {
+        errors.push("trajectory corpus must be measurement-only".to_owned());
+    }
+    if !corpus["provenance"].as_str().is_some_and(|s| !s.trim().is_empty()) {
+        errors.push("trajectory provenance must be non-empty".to_owned());
+    }
+    let Some(cases) = corpus["cases"].as_array() else {
+        return vec!["trajectory cases must be an array".to_owned()];
+    };
+    if cases.is_empty() {
+        errors.push("trajectory cases must not be empty".to_owned());
+        return errors;
+    }
+
+    let mut ids = BTreeSet::new();
+    for case in cases {
+        let id = case["case_id"].as_str().unwrap_or("<missing-id>");
+        if !ids.insert(id.to_owned()) {
+            errors.push(format!("duplicate trajectory case_id {id}"));
+        }
+        if !id.starts_with("SLD-TRAJ-") {
+            errors.push(format!("{id}: invalid trajectory ID prefix"));
+        }
+        if case["review_state"].as_str() != Some("UNREVIEWED_CANDIDATE") {
+            errors.push(format!("{id}: case must remain UNREVIEWED_CANDIDATE"));
+        }
+        let horizon = case["horizon_turns"].as_u64().unwrap_or(0);
+        if !(5..=100).contains(&horizon) {
+            errors.push(format!("{id}: horizon must be between 5 and 100 turns"));
+        }
+        for field in ["terminal_checks", "claim_boundary"] {
+            if !case[field].as_array().is_some_and(|items| {
+                !items.is_empty() && items.iter().all(|item| item.as_str().is_some_and(|s| !s.trim().is_empty()))
+            }) {
+                errors.push(format!("{id}: {field} must be a non-empty string array"));
+            }
+        }
+        let Some(events) = case["events"].as_array() else {
+            errors.push(format!("{id}: events must be an array"));
+            continue;
+        };
+        if events.len() < 2 {
+            errors.push(format!("{id}: at least two events are required"));
+        }
+        let mut previous_turn = 0_u64;
+        for event in events {
+            let turn = event["turn"].as_u64().unwrap_or(0);
+            if turn == 0 || turn <= previous_turn {
+                errors.push(format!("{id}: event turns must be positive and strictly increasing"));
+            }
+            if turn > horizon {
+                errors.push(format!("{id}: event turn {turn} exceeds horizon {horizon}"));
+            }
+            previous_turn = turn;
+            if !event["stimulus"].as_str().is_some_and(|s| !s.trim().is_empty()) {
+                errors.push(format!("{id}: event stimulus must be non-empty"));
+            }
+            for field in ["expected_behavior", "must_not"] {
+                if !event[field].as_array().is_some_and(|items| {
+                    !items.is_empty() && items.iter().all(|item| item.as_str().is_some_and(|s| !s.trim().is_empty()))
+                }) {
+                    errors.push(format!("{id}: event {field} must be a non-empty string array"));
+                }
+            }
+        }
+    }
+    errors
+}
+
+#[test]
+fn longitudinal_trajectory_contract_checks_horizon_and_event_order() {
+    let schema = read_json(TRAJECTORY_SCHEMA_PATH);
+    let corpus = read_json(TRAJECTORY_CORPUS_PATH);
+    assert_eq!(schema["$schema"].as_str(), Some("https://json-schema.org/draft/2020-12/schema"));
+    assert_eq!(corpus["corpus_id"].as_str(), schema["properties"]["corpus_id"]["const"].as_str());
+
+    let errors = validate_trajectory_corpus(&corpus);
+    assert!(errors.is_empty(), "trajectory corpus invalid: {errors:#?}");
+    let cases = corpus["cases"].as_array().expect("trajectory cases");
+    assert_eq!(cases.len(), 6);
+    assert!(cases.iter().any(|case| case["horizon_turns"] == 100));
+
+    let mut corrupt = corpus.clone();
+    corrupt["cases"][0]["events"][1]["turn"] = Value::from(101);
+    let errors = validate_trajectory_corpus(&corrupt);
+    assert!(errors.iter().any(|error| error.contains("exceeds horizon")));
+}
+
+#[test]
+fn trajectory_negative_control_rejects_reordered_events() {
+    let corpus = read_json(TRAJECTORY_CORPUS_PATH);
+    let mut corrupt = corpus.clone();
+    let first_turn = corrupt["cases"][0]["events"][0]["turn"].clone();
+    corrupt["cases"][0]["events"][0]["turn"] = corrupt["cases"][0]["events"][1]["turn"].clone();
+    corrupt["cases"][0]["events"][1]["turn"] = first_turn;
+    let errors = validate_trajectory_corpus(&corrupt);
+    assert!(errors.iter().any(|error| error.contains("strictly increasing")));
+}
