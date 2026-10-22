@@ -43,20 +43,22 @@ fn run_topological_bench(generator: &mut LiquidMambaGenerator) -> Result<()> {
     let mut beta1_samples = 0usize;
     let mut beta1_spikes = 0usize;
 
-    // Count only history entries emitted by each run. Previously, each
-    // iteration re-counted the entire accumulated history, inflating spikes.
+    // Generate several independent monologues, then count one snapshot of the
+    // bounded rolling history exactly once. The history is a 64-entry VecDeque;
+    // "new items since previous len" is invalid after the ring buffer fills.
     for i in 0..5 {
-        let previous_history_len = generator.betti_history.lock().len();
         let channels = ThoughtChannels::with_intent(i);
         let monologue = generator.generate_semantic_monologue(&channels, 3)?;
         total_chunks += monologue.chunks.len();
+    }
 
-        let history = generator.betti_history.lock();
-        for &(_, beta1) in history.iter().skip(previous_history_len) {
-            beta1_samples += 1;
-            if beta1 > 0 {
-                beta1_spikes += 1;
-            }
+    // The Hodge worker is asynchronous, so this is the retained rolling-window
+    // snapshot available at read time, not a per-monologue causal attribution.
+    let history = generator.betti_history.lock();
+    for &(_, beta1) in history.iter() {
+        beta1_samples += 1;
+        if beta1 > 0 {
+            beta1_spikes += 1;
         }
     }
 
