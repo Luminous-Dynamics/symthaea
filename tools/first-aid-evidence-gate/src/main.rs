@@ -103,8 +103,8 @@ fn validate_registry(root: &Value) -> Result<AuditSummary, Vec<String>> {
         errors.push("claim_admission_policy.approved_claim_status is unsupported".to_owned());
     }
 
-    let sources = match root.get("sources").and_then(Value::as_array) {
-        Some(sources) if !sources.is_empty() => sources,
+    let sources: &[Value] = match root.get("sources").and_then(Value::as_array) {
+        Some(sources) if !sources.is_empty() => sources.as_slice(),
         _ => {
             errors.push("sources must be a non-empty array".to_owned());
             &[]
@@ -152,8 +152,8 @@ fn validate_registry(root: &Value) -> Result<AuditSummary, Vec<String>> {
         check_bool(source, "text_reproduced", false, &context, &mut errors);
     }
 
-    let claims = match root.get("claims").and_then(Value::as_array) {
-        Some(claims) => claims,
+    let claims: &[Value] = match root.get("claims").and_then(Value::as_array) {
+        Some(claims) => claims.as_slice(),
         None => {
             errors.push("claims must be an array (use [] when none are admitted)".to_owned());
             &[]
@@ -217,8 +217,8 @@ fn validate_registry(root: &Value) -> Result<AuditSummary, Vec<String>> {
             require_text(claim, "review_date", &context, &mut errors);
             require_text(claim, "source_update_trigger", &context, &mut errors);
 
-            let reviewers = match claim.get("reviewers").and_then(Value::as_array) {
-                Some(reviewers) if reviewers.len() >= 2 => reviewers,
+            let reviewers: &[Value] = match claim.get("reviewers").and_then(Value::as_array) {
+                Some(reviewers) if reviewers.len() >= 2 => reviewers.as_slice(),
                 _ => {
                     errors.push(format!(
                         "{context}: approval requires at least two independent reviewers"
