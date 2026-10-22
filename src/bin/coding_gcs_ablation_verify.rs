@@ -70,7 +70,7 @@ fn oracle_complete(run: &Value, expected: u64) -> bool {
         && bool_field(run, "simulated") == Some(false)
         && run.get("runtime_error").is_some_and(Value::is_null)
         && u64_field(run, "tests_passed").unwrap_or(0)
-            + u64_field(run, "tests_failed").unwrap_or(0)
+            .saturating_add(u64_field(run, "tests_failed").unwrap_or(0))
             == expected
 }
 
