@@ -180,13 +180,9 @@ fn manifest_digest(tasks: &[TaskCase]) -> String {
 }
 
 fn evaluate_source(source: &str, test_source: &str) -> OracleRun {
-    if source.trim().is_empty() {
-        return OracleRun {
-            compiled: false, simulated: false, tests_passed: 0, tests_failed: 0,
-            runtime_error: Some("No source generated; oracle was not executed".to_string()),
-            compile_errors: vec!["No generated source".to_string()], elapsed_ms: 0,
-        };
-    }
+    // Even an empty patch is sent to the real compiler with the same external oracle.
+    // This is essential to the reference-pass / empty-patch-fail control; do not treat
+    // an empty source string as a synthetic failure without exercising the test harness.
     let start = Instant::now();
     let mut executor = CodeExecutor::with_real_execution();
     let result = executor.execute_rust(source, Some(test_source));
