@@ -14,6 +14,9 @@ source_files=(
   "tools/allostatic-control-bench/src/calibration.rs"
   "tools/allostatic-control-bench/src/model_mismatch.rs"
   "tools/allostatic-control-bench/src/robust_viability.rs"
+  "tools/allostatic-control-bench/src/paired_statistics.rs"
+  "tools/allostatic-control-bench/src/bin/allostatic-paired-eval-bench.rs"
+  "docs/research/PAIRED_RUNTIME_ASSURANCE_INFERENCE_V1.md"
   "tools/allostatic-control-bench/src/main.rs"
   "tools/allostatic-control-bench/src/bin/allostatic-control-report.rs"
   "tools/allostatic-control-bench/src/bin/allostatic-model-mismatch-bench.rs"
@@ -43,6 +46,7 @@ summary_out="${out_base}-summary.csv"
 paired_out="${out_base}-paired-deltas.csv"
 mismatch_out="${out_base}-mismatch-frontier.csv"
 mismatch_summary_out="${out_base}-mismatch-frontier-summary.csv"
+paired_eval_summary_out="${out_base}-paired-eval-selftest-summary.csv"
 receipt="${out_csv}.receipt.txt"
 
 cargo fmt --manifest-path "$manifest" -- --check
@@ -177,6 +181,38 @@ if ! awk -F, 'NR == 1 { if (NF != 18) failed = 1; next }
   exit 1
 fi
 
+# Exercise paired inference on a deterministic synthetic fixture. This tests the analysis tool only.
+fixture="$tmpdir/paired-eval-fixture.csv"
+printf 'scenario,seed,policy,shielded,task_reward,unsafe_episode\n' > "$fixture"
+for scenario in nominal shifted; do
+  for shielded in false true; do
+    for seed in $(seq 0 29); do
+      baseline_reward="$(awk -v s="$seed" 'BEGIN { printf "%.6f", 1 + s / 100 }')"
+      candidate_reward="$(awk -v s="$seed" -v c="$scenario" 'BEGIN { d = (c == "nominal" ? 0.10 : 0.05); printf "%.6f", 1 + s / 100 + d }')"
+      baseline_violation=false
+      candidate_violation=false
+      if [[ "$scenario" == "shifted" ]] && (( seed % 5 == 0 )); then baseline_violation=true; fi
+      if [[ "$scenario" == "shifted" ]] && (( seed % 10 == 0 )); then candidate_violation=true; fi
+      printf '%s,%s,global_margin,%s,%s,%s\n' "$scenario" "$seed" "$shielded" "$baseline_reward" "$baseline_violation" >> "$fixture"
+      printf '%s,%s,conditioned_policy,%s,%s,%s\n' "$scenario" "$seed" "$shielded" "$candidate_reward" "$candidate_violation" >> "$fixture"
+    done
+  done
+done
+cargo run --locked --release --manifest-path "$manifest" --bin allostatic-paired-eval-bench -- "$fixture" "$tmpdir/paired-eval-a.csv" task_reward unsafe_episode global_margin conditioned_policy 10000
+cargo run --locked --release --manifest-path "$manifest" --bin allostatic-paired-eval-bench -- "$fixture" "$tmpdir/paired-eval-b.csv" task_reward unsafe_episode global_margin conditioned_policy 10000
+if ! cmp -s "$tmpdir/paired-eval-a.csv" "$tmpdir/paired-eval-b.csv"; then
+  printf 'FAIL: repeated paired-inference report is not byte-identical\n' >&2
+  exit 1
+fi
+if ! awk -F, 'NR == 1 { if (NF != 22) failed = 1; next }
+  { if (NF != 22 || $6 != 30) failed = 1; rows++ }
+  END { if (NR != 5 || rows != 4 || failed) exit 1 }
+' "$tmpdir/paired-eval-a.csv"; then
+  printf 'FAIL: paired-inference schema or condition coverage is invalid\n' >&2
+  exit 1
+fi
+
+cp "$tmpdir/paired-eval-a.csv" "$paired_eval_summary_out"
 cp "$tmpdir/run-a.csv" "$out_csv"
 cp "$tmpdir/summary-a.csv" "$summary_out"
 cp "$tmpdir/paired-a.csv" "$paired_out"
@@ -201,6 +237,8 @@ cp "$tmpdir/mismatch-summary-a.csv" "$mismatch_summary_out"
   printf 'mismatch_frontier_rows_excluding_header=%s\n' "$(( $(wc -l < "$mismatch_out") - 1 ))"
   printf 'mismatch_summary_sha256=%s\n' "$(sha256sum "$mismatch_summary_out" | awk '{print $1}')"
   printf 'mismatch_summary_rows_excluding_header=%s\n' "$(( $(wc -l < "$mismatch_summary_out") - 1 ))"
+  printf 'paired_eval_selftest_sha256=%s\n' "$(sha256sum "$paired_eval_summary_out" | awk '{print $1}')"
+  printf 'paired_eval_selftest_rows_excluding_header=%s\n' "$(( $(wc -l < "$paired_eval_summary_out") - 1 ))"
   printf '\nsource_sha256:\n'
   sha256sum "${source_files[@]}"
 } > "$receipt"
@@ -211,3 +249,4 @@ printf 'Paired shield deltas: %s\n' "$paired_out"
 printf 'Model-mismatch safety frontier: %s\n' "$mismatch_out"
 printf 'Model-mismatch frontier summary: %s\n' "$mismatch_summary_out"
 printf 'Provenance receipt: %s\n' "$receipt"
+printf 'Paired-inference self-test summary (synthetic only): %s\n' "$paired_eval_summary_out"
