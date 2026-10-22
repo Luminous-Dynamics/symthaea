@@ -218,6 +218,7 @@ fn run() -> Result<(), String> {
         let _ = fs::remove_file(&temporary);
         return Err(error);
     }
+    Ok(())
 }
 
 fn canonical_output_path(path: &Path) -> Result<std::path::PathBuf, String> {
