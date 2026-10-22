@@ -233,7 +233,8 @@ mod tests {
             .expect("valid effects")
     }
 
-    fn context(
+    #[allow(clippy::too_many_arguments)]
+fn context(
         step: u64,
         state_revision: u64,
         dynamics_revision: u64,
