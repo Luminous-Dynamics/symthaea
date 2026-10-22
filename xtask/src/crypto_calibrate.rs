@@ -319,7 +319,7 @@ fn parse_command_for_test(command: &str, expected_test: &str) -> Result<ParsedCo
             test_filter: filter.to_owned(),
             cargo_args,
         })
-
+}
 
 fn execute_regression(root: &Path, task: &Task, regression: &Regression, parsed: ParsedCommand) -> TaskResult {
     let started = Instant::now();
