@@ -92,7 +92,9 @@ pub struct ProofMetadata {
 pub struct AuthenticatedProof {
     /// The ZK proof bytes (RISC0 receipt or Winterfell STARK).
     pub proof: ProofBytes,
-    /// CRYSTALS-Dilithium5 signature over (domain_tag || metadata || proof_hash || joules).
+    /// Signature over the versioned v2 transcript from construct_signed_message.
+    /// The transcript binds domain/protocol metadata, signer identity, backend,
+    /// public inputs, proof hash, and the joules value.
     /// Empty if Dilithium is not enabled.
     pub signature: Vec<u8>,
     /// Proof metadata (domain, timestamp, nonce, client_id, backend).
@@ -104,20 +106,41 @@ pub struct AuthenticatedProof {
 }
 
 impl AuthenticatedProof {
-    /// Construct the message that was signed (for verification).
+    /// Construct the versioned, domain-separated message that is signed.
     ///
-    /// Message = SHA-256(domain_tag || protocol_version || client_id ||
-    ///                    timestamp || nonce || public_inputs_hash || proof_hash)
+    /// Transcript v2 binds every security-relevant envelope field, including
+    /// the proof backend and joules value. This intentionally differs from the
+    /// legacy transcript; legacy signatures must not be silently reinterpreted
+    /// as v2 signatures.
     pub fn construct_signed_message(&self) -> Vec<u8> {
+        const TRANSCRIPT_DOMAIN: &[u8] = b"MYCELIX-AUTHENTICATED-PROOF/v2";
+
         let mut hasher = Sha256::new();
-        hasher.update(self.metadata.domain_tag.as_bytes());
+        hasher.update(TRANSCRIPT_DOMAIN);
+
+        // Length-prefix the variable-size domain tag so the transcript has a
+        // canonical, unambiguous field boundary.
+        let domain_tag = self.metadata.domain_tag.as_bytes();
+        hasher.update((domain_tag.len() as u64).to_le_bytes());
+        hasher.update(domain_tag);
+
         hasher.update(self.metadata.protocol_version.to_le_bytes());
         hasher.update(self.metadata.client_id);
         hasher.update(self.metadata.timestamp.to_le_bytes());
         hasher.update(self.metadata.nonce);
+
+        // These numeric IDs are explicit wire values; do not use enum layout.
+        let backend_id = match self.metadata.backend {
+            BackendId::Risc0 => 1u8,
+            BackendId::Winterfell => 2u8,
+            BackendId::Binius => 3u8,
+        };
+        hasher.update([backend_id]);
+
         hasher.update(self.public_inputs_hash);
         let proof_hash = Sha256::digest(&self.proof);
         hasher.update(proof_hash);
+        hasher.update(self.joules_consumed.to_bits().to_le_bytes());
         hasher.finalize().to_vec()
     }
 
@@ -173,5 +196,40 @@ mod tests {
         let msg2 = proof.construct_signed_message();
         assert_eq!(msg1, msg2);
         assert_eq!(msg1.len(), 32);
+    }
+
+    #[test]
+    fn test_authenticated_proof_transcript_binds_backend_and_joules() {
+        let proof = AuthenticatedProof {
+            proof: vec![1, 2, 3, 4],
+            signature: vec![],
+            metadata: ProofMetadata {
+                domain_tag: DomainTag::new("Test", "Unit", 1),
+                protocol_version: 1,
+                client_id: [0xAA; 32],
+                timestamp: 1700000000,
+                nonce: [0xBB; 32],
+                backend: BackendId::Winterfell,
+            },
+            public_inputs_hash: [0xCC; 32],
+            joules_consumed: 1.25,
+        };
+        let original = proof.construct_signed_message();
+
+        let mut changed_energy = proof.clone();
+        changed_energy.joules_consumed = 9.5;
+        assert_ne!(
+            original,
+            changed_energy.construct_signed_message(),
+            "changing joules must change the signed transcript"
+        );
+
+        let mut changed_backend = proof.clone();
+        changed_backend.metadata.backend = BackendId::Binius;
+        assert_ne!(
+            original,
+            changed_backend.construct_signed_message(),
+            "changing the proof backend must change the signed transcript"
+        );
     }
 }
