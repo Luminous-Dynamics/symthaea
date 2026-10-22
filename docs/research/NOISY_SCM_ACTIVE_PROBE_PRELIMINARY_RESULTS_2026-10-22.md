@@ -76,3 +76,10 @@ Before qualification:
 Relevant prior art: [ACDB (2026)](https://arxiv.org/abs/2609.31675), [CausalArena (2026)](https://arxiv.org/abs/2609.11897), [TCD-Arena (ICLR 2026)](https://tcd-arena.github.io/), [active learning for intervention design (Nature Machine Intelligence, 2023)](https://www.nature.com/articles/s42256-023-00719-0).
 
 No novelty, SOTA, general causal discovery, or real-world safety claim is made.
+
+
+## Receipt update — local rerun
+
+A fresh local run completed on 2026-10-22 after rerunning the embedded self-test and all ten unit tests. The test source matches branch blob `c69e398b53170d355fcbb9f834cd79b4e175f09f`. The executed local source mirror blob was `ae0678017d1b42b266d207b2869108ae92080284` (SHA-256 `18a672c4267e297e5ec7ff10c094aa52ee3d244f3f5a965c3a9fcd87dcc9295c`). The output JSON was 87,416 bytes, SHA-256 `8cd371d931f7d01c96fd8c8658bd9428d3f4067bf7e5bdb9bd9d8da9f3db1e48`; its `source_sha` field binds to that local mirror blob.
+
+**Still not exact-current-branch evidence:** the source blob currently on the research branch is `7b92460b60c6722681389981d8cbfbaa80122cf5`, which differs from the executed mirror. The metric values are reproduced, but the committed-source byte mismatch remains a qualification blocker. Do not call this a test pass for the current GitHub source or combine this receipt with skipped CI runs.
