@@ -12,16 +12,17 @@ The trace checker validates JSON event histories. This model expresses a smaller
 
 Each state is the tuple:
 
-`S = (session_active, loaded, verified, revoked_mask, uncertainty_pending, uncertainty_preserved)`
+`S = (session_active, connectivity, loaded, verified, revoked_mask, uncertainty_pending, uncertainty_preserved)`
 
 - `session_active`: whether the active workflow session is live.
+- `connectivity`: current modeled network state (`online`, `offline`, or `intermittent`), updated by explicit events and read when a network-dependent action occurs.
 - `loaded`: optional bundle identity, abstracted to A or B.
 - `verified`: optional identity whose verification currently authorizes rendering.
 - `revoked_mask`: monotonic bit set for bundle A and B.
 - `uncertainty_pending`: an uncertainty was observed and remains unresolved for handoff.
 - `uncertainty_preserved`: the pending uncertainty has been explicitly preserved for a handoff.
 
-The two bundle identities are a finite abstraction for identity mismatch, not a model of actual CPIC or first-aid content. Verification actions vary validity state and digest verification. Session start, load, verify, revoke, interrupt, resume, uncertainty detection/preservation, handoff, and render actions comprise the action alphabet.
+The two bundle identities are a finite abstraction for identity mismatch, not a model of actual CPIC or first-aid content. Verification actions vary validity state and digest verification. Session start, load, verify, revoke, interrupt, resume, uncertainty detection/preservation, handoff, render, connectivity changes, and a core-network-dependent action comprise the 20-action alphabet.
 
 ## Required invariants
 
@@ -35,7 +36,7 @@ The two bundle identities are a finite abstraction for identity mismatch, not a 
 
 ## Explicit state invariants checked on every edge
 
-For every reachable state and every one of the 16 actions, the test checks both the state before the action and the successor state:
+For every reachable state and every one of the 20 actions, the test checks both the state before the action and the successor state:
 
 - The revocation mask contains only the two modeled identity bits and is monotonic across every transition.
 - A verified identity can exist only in an active session, must equal the currently loaded identity, and must not be revoked.
@@ -45,15 +46,15 @@ For every reachable state and every one of the 16 actions, the test checks both 
 - Every render action is checked against exact violation precedence: inactive-session violation can co-occur with the render's identity/trust violation; a revoked render reports revocation rather than also emitting the generic missing-verification violation.
 - Load clears prior verification, and revocation immediately invalidates verification for the same bundle.
 
-These assertions strengthen the transition checker beyond a reachable-state count. The fixed count (84 states / 1,344 edges) is still used as a review trigger—not as a substitute for the invariant checks.
+These assertions strengthen the transition checker beyond a reachable-state count. The fixed count (252 states / 5,040 edges) is still used as a review trigger—not as a substitute for the invariant checks.
 
 ## Exploration method
 
-The checker performs breadth-first exploration from the initial state. For each distinct reachable state it applies each of the 16 declared abstract actions, checks the next state and violations against the invariants, and enqueues newly discovered states until reaching a fixed point. A finite fixed-point traversal avoids relying on sampled traces for this abstract model.
+The checker performs breadth-first exploration from the initial state. For each distinct reachable state it applies each of the 20 declared abstract actions, checks the next state and violations against the invariants, and enqueues newly discovered states until reaching a fixed point. A finite fixed-point traversal avoids relying on sampled traces for this abstract model.
 
-The exact lifecycle graph is pinned at 84 reachable abstract states and 1,344 state/action transitions; the Rust test prints both counts and fails if either changes. A changed count requires reviewing the state/action space rather than silently accepting a smaller graph.
+The exact lifecycle/connectivity graph is pinned at 252 reachable abstract states and 5,040 state/action transitions; the Rust test prints both counts and fails if either changes. A changed count requires reviewing the state/action space rather than silently accepting a smaller graph.
 
-The test suite now stores a breadth-first shortest event-history witness for each reachable abstract state. For every state it appends every one of the 16 actions, feeds each resulting history through the production JSON trace checker, and compares the ordered violation codes to those returned by replaying the abstract model. This gives 84 × 16 = 1,344 model-to-production edge comparisons, in addition to state invariants and the 18 orthogonal policy truth tables. A further bounded-sequence test appends every ordered pair of actions to each state's shortest witness, compares the full ordered violation list against the production checker, and covers 84 × 16 × 16 = 21,504 two-action suffix sequences. The CI test step extracts the actual comparison counts from test output, asserts 1,344 edges, 21,504 two-action suffixes, and 18 policy cases, and passes those values into trajectory receipt schema v1. The receipt gate rejects missing or wrong counts and requires `first-aid-trajectory-receipt-v1`. This instrumented evidence is still pending successful exact-head execution. It is a same-repository differential check: a matching result catches implementation divergence, but shared requirements and abstractions mean it is not an independent clinical oracle. The newest exact-head workflow must pass before these comparisons count as verified evidence.
+The test suite now stores a breadth-first shortest event-history witness for each reachable abstract state. For every state it appends every one of the 20 actions, feeds each resulting history through the production JSON trace checker, and compares the ordered violation codes to those returned by replaying the abstract model. This gives 252 × 20 = 5,040 model-to-production edge comparisons, in addition to state invariants and the 18 orthogonal policy truth tables. A further bounded-sequence test appends every ordered pair of actions to each state's shortest witness, compares the full ordered violation list against the production checker, and covers 252 × 20 × 20 = 100,800 two-action suffix sequences. The CI test step extracts the actual comparison counts from test output, asserts 5,040 edges, 100,800 two-action suffixes, and 18 policy cases, and passes those values into trajectory receipt schema v1. The receipt gate rejects missing or wrong counts and requires `first-aid-trajectory-receipt-v1`. This instrumented evidence is still pending successful exact-head execution. It is a same-repository differential check: a matching result catches implementation divergence, but shared requirements and abstractions mean it is not an independent clinical oracle. The newest exact-head workflow must pass before these comparisons count as verified evidence.
 
 A second exhaustive truth-table test covers 18 **orthogonal policy combinations** that are deliberately kept outside the lifecycle product graph to prevent a Cartesian state-space explosion. A further differential test feeds each of those 18 combinations to the production JSON trace checker and compares its result with the abstract policy helper:
 
@@ -62,7 +63,7 @@ A second exhaustive truth-table test covers 18 **orthogonal policy combinations*
 - Four data sensitivity/consent combinations: sensitive or non-sensitive payload, with or without consent scope.
 - Two unknown-normalization cases: no normalization event vs. an explicit unknown-normalization event.
 
-These are finite truth-table probes checked both against the abstract policy helpers and the production JSON trace checker, not temporal models of network recovery, resource invalidation, consent changes, or their interactions with lifecycle state. Those combined paths still need generated sequence tests. The dedicated workflow binds the model source digest, model-specification digest, and test outcome into the trace-contract receipt.
+Connectivity state is also included in the reachable lifecycle graph: the model can switch online/offline/intermittent before a core-network-dependent action, and the production JSON checker is compared against that ordered history. The 18 orthogonal truth-table probes remain useful local checks for connectivity/requirement, freshness/presentation, consent, and unknown normalization, but they do not model real packet loss, retries, timeouts, clock-based freshness, consent-change semantics, or all cross-domain temporal interactions. The dedicated workflow binds the model source digest, model-specification digest, and test outcome into the trace-contract receipt.
 
 ## What it does not establish
 
