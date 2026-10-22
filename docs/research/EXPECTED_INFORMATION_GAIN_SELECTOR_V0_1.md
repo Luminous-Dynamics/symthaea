@@ -33,6 +33,12 @@ This is an approximate, equal-prior, homoscedastic-Gaussian design criterion, no
 
 This code does not prove improved scientific discovery or SOTA performance. Unit tests demonstrate selected mathematical/numerical properties only.
 
+## Integrated law-discovery pilot
+
+The focused workflow also runs `expected_information_gain_vs_variance_on_paired_seeds` inside the existing `symthaea-physics-bridge` multi-round discovery simulator. It compares the raw-variance selector with expected-information-gain-per-cost (equal unit cost in this first ablation), using the same 40 deterministic seeds, typed-generation setting, four-round budget and candidate-pool generation per seed. The report prints paired selector-only wins, both success rates, mean rounds, and EIG selection failures. This is a small pilot diagnostic, not a confirmatory performance claim.
+
+The simulator's actual noise scale depends on the hidden truth's output magnitude. The EIG selector must not inspect that truth, so this pilot estimates one shared standard deviation from the median absolute predictions across the live hypotheses and remaining candidate points. That is a visible homoscedastic approximation; an improvement or regression may reflect this mismatch as well as the selection rule. The benchmark must therefore report selection failures and noise regimes before any general conclusion.
+
 ## Falsifiable benchmark plan
 
 ### Baselines
