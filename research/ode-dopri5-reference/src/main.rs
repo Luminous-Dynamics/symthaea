@@ -1,8 +1,8 @@
 //! Matched analytical work–precision comparison against ode_solvers 0.6.2.
 //!
 //! The reference method is Dormand–Prince 5(4) (Dopri5), not a claim of universal
-//! solver superiority. This benchmark compares endpoint error and evaluation work
-//! for the same scaled harmonic oscillator at the same declared rtol / atol.
+//! solver superiority. Both solvers are evaluated on one frozen 101-point output grid
+//! and compared against the exact oscillator, including pointwise solver disagreement.
 //! It intentionally excludes wall-clock timing from the deterministic receipt.
 
 use std::env;
@@ -214,7 +214,11 @@ fn main() -> Result<(), Box<dyn Error>> {
             let custom_fields = match custom {
                 Ok(report) => {
                     custom_samples = Some(report.samples.clone());
-                    let endpoint = report.samples.last().map(|sample| sample.1).unwrap_or([f64::NAN; 2]);
+                    let endpoint = report
+                        .samples
+                        .last()
+                        .map(|sample| sample.1)
+                        .unwrap_or([f64::NAN; 2]);
                     let endpoint_error = scaled_state_error(endpoint, scale, T_END);
                     let trajectory_error = max_sampled_scaled_trajectory_error(
                         report.samples.iter().copied(),
@@ -224,7 +228,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                         report.samples.iter().map(|sample| sample.1),
                         scale,
                     );
-                    let common_grid_complete = report.samples.len() == COMMON_OUTPUT_INTERVALS + 1;
+                    let common_grid_complete =
+                        report.samples.len() == COMMON_OUTPUT_INTERVALS + 1;
                     let pass = report.completed
                         && common_grid_complete
                         && report.finite
@@ -251,7 +256,10 @@ fn main() -> Result<(), Box<dyn Error>> {
                 }
                 Err(error) => {
                     all_passed = false;
-                    format!("\"custom_common_grid_complete\":false,\"custom_pass\":false,\"custom_error\":\"{:?}\"", error)
+                    format!(
+                        "\"custom_common_grid_complete\":false,\"custom_pass\":false,\"custom_error\":\"{:?}\"",
+                        error
+                    )
                 }
             };
 
