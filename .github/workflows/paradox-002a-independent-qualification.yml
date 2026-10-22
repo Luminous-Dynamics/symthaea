@@ -1,0 +1,129 @@
+name: PARADOX-002A-I Independent Qualification
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/paradox-002a-independent-qualification.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: paradox-002a-independent-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  RUNNER_SHA: ${{ github.event.pull_request.head.sha }}
+  RUNNER_BASE_SHA: 4bad8af72ff775e7c869b6df83faba718a339a36
+  SUBJECT_SHA: 09d83a1d1fddbbbd30e4eba7cc95946c8eab871f
+  QUALIFIED_002A_SHA: eb73527d05a913e79d1f05135ad6b06c1da8e2ee
+  QUALIFIED_CENSUS_BYTES: '1830977'
+  QUALIFIED_CENSUS_SHA256: 49ff56a49ac730d960d7625b65ddb0139171fa3862d145a6deb3d68245c7e711
+
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout exact runner plane
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.RUNNER_SHA }}
+          fetch-depth: 2
+
+      - name: Bind runner plane
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${RUNNER_SHA}"
+          test "$(git rev-parse HEAD^)" = "${RUNNER_BASE_SHA}"
+          test "$(git rev-list --count "${RUNNER_BASE_SHA}..${RUNNER_SHA}")" = 1
+          test -z "$(git status --porcelain --untracked-files=all)"
+          changed="$(git diff --name-only "${RUNNER_BASE_SHA}" "${RUNNER_SHA}")"
+          test "${changed}" = '.github/workflows/paradox-002a-independent-qualification.yml'
+          printf 'runner-plane subject=%s base=%s\n' "${RUNNER_SHA}" "${RUNNER_BASE_SHA}"
+
+      - name: Install pinned Rust
+        uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de
+        with:
+          toolchain: 1.96.0
+
+      - name: Checkout exact G2b verifier subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.SUBJECT_SHA }}
+          fetch-depth: 64
+
+      - name: Bind exact verifier subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${SUBJECT_SHA}"
+          test "$(git rev-parse HEAD^)" = "${QUALIFIED_002A_SHA}"
+          test "$(git rev-list --count "${QUALIFIED_002A_SHA}..${SUBJECT_SHA}")" = 1
+          test -z "$(git status --porcelain --untracked-files=all)"
+          unexpected="$(git diff --name-only "${QUALIFIED_002A_SHA}" "${SUBJECT_SHA}" | grep -Ev '^tools/paradox_002a_independent/' || true)"
+          if [[ -n "${unexpected}" ]]; then
+            printf 'unexpected G2b verifier diff surface:\n%s\n' "${unexpected}" >&2
+            exit 1
+          fi
+          test "$(git rev-parse HEAD:tools/paradox_002a_independent/qualify.sh)" = "b59b078b205ca5aaaefbe3c28f4720b72e0fc9e7"
+
+      - name: Execute frozen independent qualifier
+        shell: bash
+        run: |
+          set -euo pipefail
+          log="${RUNNER_TEMP}/paradox-002a-independent-qualification.log"
+          bash tools/paradox_002a_independent/qualify.sh | tee "${log}"
+          grep -Fq "qualified corpus reproduced bytes=${QUALIFIED_CENSUS_BYTES} sha256=${QUALIFIED_CENSUS_SHA256}" "${log}"
+          python3 - "${log}" <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          import sys
+
+          path = Path(sys.argv[1])
+          receipt = None
+          for raw in path.read_text(encoding="utf-8").splitlines():
+              if raw.startswith('{'):
+                  try:
+                      candidate = json.loads(raw)
+                  except json.JSONDecodeError:
+                      continue
+                  if candidate.get("schema") == "SYMT-PARADOX-002A-I-RECEIPT-V1":
+                      receipt = candidate
+          if receipt is None:
+              raise SystemExit("independent verifier receipt missing")
+
+          expected = {
+              "schema": "SYMT-PARADOX-002A-I-RECEIPT-V1",
+              "qualified_002a_sha": os.environ["QUALIFIED_002A_SHA"],
+              "census_sha256": os.environ["QUALIFIED_CENSUS_SHA256"],
+              "census_bytes": int(os.environ["QUALIFIED_CENSUS_BYTES"]),
+              "verifier_sha": os.environ["SUBJECT_SHA"],
+              "format_protocol": "confirmatory-census-v1",
+              "fixtures_checked": 7168,
+              "reports_checked": 7168,
+              "mutation_controls": 12,
+          }
+          for key, value in expected.items():
+              if receipt.get(key) != value:
+                  raise SystemExit(
+                      f"receipt mismatch {key}: expected={value!r} got={receipt.get(key)!r}"
+                  )
+          summary = receipt.get("semantic_summary_sha256")
+          if not isinstance(summary, str) or len(summary) != 64:
+              raise SystemExit("semantic summary SHA-256 missing/malformed")
+          int(summary, 16)
+          canonical = json.dumps(receipt, sort_keys=True, separators=(",", ":")).encode("ascii") + b"\n"
+          print(f"independent-receipt-sha256={hashlib.sha256(canonical).hexdigest()}")
+          PY
+          printf 'qualification-log-sha256=%s\n' "$(sha256sum "${log}" | awk '{print $1}')"
+
+      - name: Postflight verifier immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${SUBJECT_SHA}"
+          test "$(git rev-parse HEAD^)" = "${QUALIFIED_002A_SHA}"
+          test -z "$(git status --porcelain --untracked-files=all)"
