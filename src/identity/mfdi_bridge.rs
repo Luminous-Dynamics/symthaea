@@ -249,7 +249,7 @@ impl SignedOutput {
         timestamp: SystemTime,
         cycle_id: u64,
     ) -> Vec<u8> {
-        const DOMAIN: &[u8] = b"SYMTHAEA-MFDI-SIGNED-OUTPUT/v2\\0";
+        const DOMAIN: &[u8] = b"SYMTHAEA-MFDI-SIGNED-OUTPUT/v2\0";
         let timestamp_nanos = timestamp
             .duration_since(UNIX_EPOCH)
             .map(|duration| duration.as_nanos())
@@ -269,13 +269,10 @@ impl SignedOutput {
     }
 
     /// Create a new signed output, binding its identity, timestamp, and cycle.
-    pub fn new(
-        output: Vec<f32>,
-        signing_key: &SigningKey,
-        agent_id: impl Into<String>,
-        cycle_id: u64,
-    ) -> Self {
-        let agent_id = agent_id.into();
+    pub fn new(output: Vec<f32>, signing_key: &SigningKey, cycle_id: u64) -> Self {
+        // Derive attribution from the key doing the signing; a caller-supplied
+        // DID could otherwise mislabel the producer.
+        let agent_id = MfdiIdentity::derive_did(&signing_key.verifying_key());
         let timestamp = SystemTime::now();
         let output_digest = Self::signing_digest(&output, &agent_id, timestamp, cycle_id);
         let signature = signing_key.sign(&output_digest);
@@ -472,13 +469,14 @@ impl MfdiBridge {
     /// Sign an output
     pub fn sign_output(&mut self, output: &[f32]) -> Result<SignedOutput, MfdiError> {
         let signing_key = self.signing_key.as_ref().ok_or(MfdiError::NoSigningKey)?;
-        let agent_id = self.agent_id().ok_or(MfdiError::NoIdentity)?.to_string();
+        // Preserve the explicit identity gate, while deriving output attribution
+        // from the actual signing key rather than a possibly different current identity.
+        self.current_identity.as_ref().ok_or(MfdiError::NoIdentity)?;
 
         self.cycle_counter += 1;
         Ok(SignedOutput::new(
             output.to_vec(),
             signing_key,
-            agent_id,
             self.cycle_counter,
         ))
     }
@@ -671,7 +669,7 @@ mod tests {
         let signing_key = MfdiBridge::generate_key();
         let output = vec![0.1, 0.2, 0.3, 0.4];
         let agent_id = MfdiIdentity::derive_did(&signing_key.verifying_key());
-        let signed = SignedOutput::new(output.clone(), &signing_key, agent_id.clone(), 1);
+        let signed = SignedOutput::new(output.clone(), &signing_key, 1);
 
         assert!(signed.verify(&signing_key.verifying_key()));
         assert_eq!(signed.output, output);
@@ -683,8 +681,7 @@ mod tests {
         let signing_key = MfdiBridge::generate_key();
         let public_key = signing_key.verifying_key();
         let output = vec![0.1, 0.2, 0.3, 0.4];
-        let agent_id = MfdiIdentity::derive_did(&public_key);
-        let signed = SignedOutput::new(output, &signing_key, agent_id, 7);
+        let signed = SignedOutput::new(output, &signing_key, 7);
         assert!(signed.verify(&public_key));
 
         let mut changed_agent = signed.clone();
