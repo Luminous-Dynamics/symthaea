@@ -1,0 +1,140 @@
+{
+  "authority": "representation_only_no_physical_execution_authority",
+  "cases": [
+    {
+      "expected_disposition": "QualitativeOnly",
+      "id": "sharp_image_without_scale_reference",
+      "image_quality_ref": "quality:sharp",
+      "raw_observation_ref": "obs:synthetic-image-001",
+      "scale_reference_ref": null
+    },
+    {
+      "calibration_currentness": "current",
+      "coverage_profile_ref": "coverage:synthetic-local-center",
+      "derived_measurement_ref": "derived:synthetic-measurement-001",
+      "expected_disposition": "CandidateMeasurement",
+      "id": "current_scale_reference_candidate_measurement",
+      "raw_observation_ref": "obs:synthetic-image-002",
+      "scale_reference_ref": "ref:synthetic-scale-v1"
+    },
+    {
+      "commanded_position_ref": "position:commanded-a",
+      "expected_disposition": "DiscrepancyObserved",
+      "id": "commanded_vs_observed_position_discrepancy",
+      "observed_position_ref": "position:observed-b"
+    },
+    {
+      "absolute_reference_ref": null,
+      "expected_disposition": "RepeatabilityOnly",
+      "id": "repeatable_without_absolute_reference",
+      "repeatability_relation": "consistent_under_profile",
+      "revisit_observation_refs": [
+        "obs:revisit-1",
+        "obs:revisit-2",
+        "obs:revisit-3"
+      ]
+    },
+    {
+      "calibration_currentness": "stale",
+      "derived_measurement_ref": "derived:synthetic-measurement-002",
+      "expected_disposition": "CalibrationStaleOrMissing",
+      "id": "stale_scale_calibration",
+      "raw_observation_ref": "obs:synthetic-image-003",
+      "scale_reference_ref": "ref:synthetic-scale-v1"
+    },
+    {
+      "calibration_currentness": "current",
+      "coverage_profile_ref": "coverage:center-only",
+      "edge_characterization_ref": null,
+      "expected_disposition": "CoverageLimited",
+      "id": "center_field_only_edge_uncharacterized",
+      "raw_observation_ref": "obs:synthetic-image-004",
+      "scale_reference_ref": "ref:synthetic-scale-v1"
+    },
+    {
+      "expected_identity_relation": "distinct",
+      "id": "remount_changes_transform_identity",
+      "post_remount_transform_ref": "transform:synthetic-b",
+      "pre_remount_transform_ref": "transform:synthetic-a"
+    },
+    {
+      "derived_image_ref": "derived:image-enhanced-005",
+      "expected_lineage_relation": "derived_from_raw_no_new_physical_observation",
+      "id": "software_enhancement_preserves_raw_physical_source",
+      "physical_source_ref": "obs:synthetic-image-005",
+      "raw_observation_ref": "obs:synthetic-image-005"
+    },
+    {
+      "coverage_profile_ref": "coverage:local-region",
+      "expected_disposition": "CoverageLimited",
+      "id": "local_clean_region_not_whole_sample",
+      "local_region_disposition": "clean_under_local_profile",
+      "raw_observation_ref": "obs:synthetic-image-006",
+      "whole_sample_claim_requested": true
+    },
+    {
+      "derived_measurement_ref": "derived:orphan-measurement-001",
+      "expected_error": "LineageInvalid",
+      "id": "derived_measurement_without_raw_observation",
+      "raw_observation_ref": null
+    },
+    {
+      "declared_order_semantics": "set",
+      "evidence_refs_a": [
+        "evidence:alpha",
+        "evidence:beta"
+      ],
+      "evidence_refs_b": [
+        "evidence:beta",
+        "evidence:alpha"
+      ],
+      "expected_identity_relation": "same",
+      "id": "unordered_evidence_refs_canonicalize"
+    },
+    {
+      "evidence_refs": [
+        "evidence:alpha",
+        "evidence:alpha"
+      ],
+      "expected_error": "DuplicateReference",
+      "id": "duplicate_evidence_ref_rejected"
+    },
+    {
+      "expected_history": "both_preserved",
+      "historical_calibration_events": [
+        {
+          "calibration_ref": "cal:old",
+          "currentness_at_use": "stale"
+        },
+        {
+          "calibration_ref": "cal:new",
+          "currentness_at_use": "current"
+        }
+      ],
+      "id": "recalibration_preserves_stale_history"
+    },
+    {
+      "expected_closure_relation": "operational_but_import_dependent",
+      "id": "imported_subsystems_do_not_imply_productive_closure",
+      "imported_subsystem_refs": [
+        "subsystem:camera-imported",
+        "subsystem:stage-imported"
+      ],
+      "instrument_status": "operational_under_profile"
+    },
+    {
+      "commissioning_ref": "commissioning:synthetic-bench-v1",
+      "expected_error": "ProcessCapabilityNotEstablished",
+      "id": "commissioned_bench_not_process_capability",
+      "requested_process_capability": "semiconductor-processing"
+    },
+    {
+      "benchmark_result_ref": "benchmark:synthetic-pass",
+      "execution_authority": false,
+      "expected_authority": "none",
+      "id": "benchmark_cannot_mint_execution_authority"
+    }
+  ],
+  "purpose": "Synthetic known-answer cases for inspection/positioning/calibration evidence semantics. Contains no hardware construction or semiconductor process parameters.",
+  "schema": "semi-eqp-met-001a-synthetic-corpus-v1"
+}
