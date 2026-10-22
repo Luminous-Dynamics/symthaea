@@ -3,7 +3,7 @@
   "status": "DRAFT_CANDIDATE",
   "hash_algorithm": "SHA-256",
   "encoding": "UTF-8 bytes of exact repository file content",
-  "source_commit_before_manifest": "fc630539a899f87e4760be802790153d2257fc26",
+  "source_commit_before_manifest": "2a23739dbd1040b95e5e1b58aa3d91d730ef1a60",
   "generated_date": "2026-10-22",
   "self_digest_excluded": true,
   "notes": [
@@ -116,9 +116,9 @@
     },
     {
       "path": "xtask/src/bin/sld-oracle-audit.rs",
-      "sha256": "a06fc30450f3f7093f5a5867158c301d9ac79432e58054e067c1bdb7a62e77bc",
-      "utf8_bytes": 26862,
-      "git_blob_sha1": "bcafe13df082cfb8057394b6b7b9fa5584cdc1e6"
+      "sha256": "3eac8f21de816b8f81ff72207b9ccd596774ea4a327e4284bd1af3e3ceaf3e88",
+      "utf8_bytes": 27082,
+      "git_blob_sha1": "21b49aa0c55b18ee5ac5e4c9fe8787e188e77cc7"
     },
     {
       "path": "xtask/src/main.rs",
