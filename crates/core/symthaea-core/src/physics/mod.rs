@@ -9,6 +9,7 @@
 mod advanced_materials;
 pub mod chemistry;
 pub mod casting;
+pub mod casting_evidence;
 mod consciousness_bridge;
 pub mod constants;
 mod coupled_physics;
@@ -138,6 +139,7 @@ pub use standard_model::*;
 pub use advanced_materials::*;
 pub use consciousness_bridge::*;
 pub use casting::*;
+pub use casting_evidence::*;
 pub use coupled_physics::*;
 pub use design_integration::*;
 pub use design_space::*;
