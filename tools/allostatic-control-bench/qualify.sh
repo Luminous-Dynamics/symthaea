@@ -25,6 +25,7 @@ source_files=(
   "tools/allostatic-control-bench/src/bin/allostatic-task-scope-bench.rs"
   "tools/allostatic-control-bench/src/bin/allostatic-sequential-scope-bench.rs"
   "tools/allostatic-control-bench/src/bin/allostatic-risk-eprocess-bench.rs"
+  "tools/allostatic-control-bench/src/bin/allostatic-task-risk-stream-bench.rs"
   "tools/allostatic-control-bench/qualify.sh"
   "docs/research/ALLOSTATIC_CONTROL_BENCHMARK_V1.md"
   "docs/research/ROBUST_VIABILITY_ENVELOPE_V1.md"
@@ -33,6 +34,7 @@ source_files=(
   "docs/research/TASK_RELEVANT_SCOPE_MONITOR_V1.md"
   "docs/research/SEQUENTIAL_SCOPE_CUSUM_V1.md"
   "docs/research/BOUNDED_RISK_EPROCESS_V1.md"
+  "docs/research/TASK_RISK_EVENT_STREAM_V1.md"
 )
 expected_head="${1:-$(git rev-parse HEAD)}"
 actual_head="$(git rev-parse HEAD)"
@@ -66,6 +68,8 @@ sequential_out="${out_base}-sequential-scope.csv"
 sequential_summary_out="${out_base}-sequential-scope-summary.csv"
 eprocess_out="${out_base}-risk-eprocess.csv"
 eprocess_summary_out="${out_base}-risk-eprocess-summary.csv"
+task_risk_out="${out_base}-task-risk-event-stream.csv"
+task_risk_summary_out="${out_base}-task-risk-event-stream-summary.csv"
 receipt="${out_csv}.receipt.txt"
 
 cargo fmt --manifest-path "$manifest" -- --check
