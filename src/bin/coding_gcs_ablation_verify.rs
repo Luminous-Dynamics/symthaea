@@ -187,6 +187,10 @@ fn verify_mode_summary(
         .fold(0_u64, u64::saturating_add);
     let backend_attempt_elapsed_ms_p50 = nearest_rank_percentile(&mut backend_attempt_elapsed_values.clone(), 0.50).unwrap_or(0);
     let backend_attempt_elapsed_ms_p95 = nearest_rank_percentile(&mut backend_attempt_elapsed_values.clone(), 0.95).unwrap_or(0);
+    let backend_attempt_estimated_energy_total: f64 = backend_attempts
+        .iter()
+        .map(|attempt| read_f64(attempt, "estimated_energy_cost").unwrap_or(0.0))
+        .sum();
     let backend_attempt_count = |target: &str| -> u64 {
         backend_attempts
             .iter()
@@ -296,6 +300,7 @@ fn verify_mode_summary(
         ("agent_elapsed_ms_mean", if count == 0 { 0.0 } else { time_total as f64 / count as f64 }),
         ("energy_total", energy_total),
         ("energy_mean", if count == 0 { 0.0 } else { energy_total / count as f64 }),
+        ("backend_attempt_estimated_energy_total", backend_attempt_estimated_energy_total),
     ] {
         push_check(
             errors,
@@ -722,13 +727,14 @@ fn audit(
                 let backend_name_valid = !backend_name.trim().is_empty();
                 let success_valid = success.is_some();
                 let elapsed_valid = u64_field(attempt, "elapsed_ms").is_some();
+                let energy_valid = read_f64(attempt, "estimated_energy_cost").is_some_and(|cost| cost >= 0.0);
                 let identity_consistent = match backend_name.to_ascii_lowercase().as_str() {
                     "simulated" => tier == Some("Simulated"),
                     "ollama" => tier == Some("LocalLLM"),
                     "anthropic" => tier == Some("CloudLLM"),
                     _ => true,
                 };
-                tier_valid && backend_name_valid && success_valid && elapsed_valid && identity_consistent
+                tier_valid && backend_name_valid && success_valid && elapsed_valid && energy_valid && identity_consistent
             })
         });
         push_check(
@@ -1366,6 +1372,7 @@ mod tests {
                     "backend_attempt_elapsed_ms_total": 0,
                     "backend_attempt_elapsed_ms_p50": 0,
                     "backend_attempt_elapsed_ms_p95": 0,
+                    "backend_attempt_estimated_energy_total": 0.0,
                     "runs_with_external_backend_attempts": 0,
                     "runs_with_simulated_backend_attempts": 0,
                     "runs_with_no_backend_attempts": 1,
@@ -1609,7 +1616,8 @@ mod tests {
             "tier": "ImaginaryLLM",
             "backend_name": "SomeBackend",
             "success": true,
-            "elapsed_ms": 5
+            "elapsed_ms": 5,
+            "estimated_energy_cost": 10.0
         }]);
         let errors = audit(&report, None, None);
         assert!(errors.iter().any(|error| error.contains("backend_attempts")));
@@ -1622,7 +1630,8 @@ mod tests {
             "tier": "CloudLLM",
             "backend_name": "Ollama",
             "success": true,
-            "elapsed_ms": 5
+            "elapsed_ms": 5,
+            "estimated_energy_cost": 50.0
         }]);
         let errors = audit(&report, None, None);
         assert!(errors.iter().any(|error| error.contains("backend_attempts")));
@@ -1643,7 +1652,8 @@ mod tests {
             "tier": "CloudLLM",
             "backend_name": "Anthropic",
             "success": true,
-            "elapsed_ms": 5
+            "elapsed_ms": 5,
+            "estimated_energy_cost": 50.0
         }]);
         report["summary"]["gcs_off"]["backend_attempts_by_tier"] = serde_json::json!({
             "Native": 0, "Hardware": 0, "LocalLLM": 0, "CloudLLM": 1, "Simulated": 0
@@ -1654,6 +1664,7 @@ mod tests {
         report["summary"]["gcs_off"]["backend_attempt_elapsed_ms_total"] = Value::from(5);
         report["summary"]["gcs_off"]["backend_attempt_elapsed_ms_p50"] = Value::from(5);
         report["summary"]["gcs_off"]["backend_attempt_elapsed_ms_p95"] = Value::from(5);
+        report["summary"]["gcs_off"]["backend_attempt_estimated_energy_total"] = Value::from(50.0);
         report["summary"]["gcs_off"]["runs_with_external_backend_attempts"] = Value::from(1);
         report["summary"]["gcs_off"]["runs_with_simulated_backend_attempts"] = Value::from(0);
         report["summary"]["gcs_off"]["runs_with_no_backend_attempts"] = Value::from(0);
@@ -1673,8 +1684,8 @@ mod tests {
 
         report["runs"][0]["selected_generation_tiers"] = serde_json::json!(["LocalLLM", "LocalLLM"]);
         report["runs"][0]["backend_attempts"] = serde_json::json!([
-            {"tier": "Simulated", "backend_name": "Simulated", "success": true, "elapsed_ms": 7},
-            {"tier": "LocalLLM", "backend_name": "Ollama", "success": true, "elapsed_ms": 11}
+            {"tier": "Simulated", "backend_name": "Simulated", "success": true, "elapsed_ms": 7, "estimated_energy_cost": 10.0},
+            {"tier": "LocalLLM", "backend_name": "Ollama", "success": true, "elapsed_ms": 11, "estimated_energy_cost": 10.0}
         ]);
         report["summary"]["gcs_off"]["selected_tier_decisions"] = serde_json::json!({
             "Native": 0, "Hardware": 0, "LocalLLM": 2, "CloudLLM": 0, "Simulated": 0
@@ -1690,6 +1701,7 @@ mod tests {
         report["summary"]["gcs_off"]["backend_attempt_elapsed_ms_total"] = Value::from(18);
         report["summary"]["gcs_off"]["backend_attempt_elapsed_ms_p50"] = Value::from(7);
         report["summary"]["gcs_off"]["backend_attempt_elapsed_ms_p95"] = Value::from(11);
+        report["summary"]["gcs_off"]["backend_attempt_estimated_energy_total"] = Value::from(20.0);
         report["summary"]["gcs_off"]["runs_with_external_backend_attempts"] = Value::from(1);
         report["summary"]["gcs_off"]["runs_with_simulated_backend_attempts"] = Value::from(1);
         report["summary"]["gcs_off"]["runs_with_no_backend_attempts"] = Value::from(0);
