@@ -7,7 +7,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-const TOOL_VERSION: &str = "knowledge-benchmark-harness-v0.11.0";
+const TOOL_VERSION: &str = "knowledge-benchmark-harness-v0.12.0";
 const DRAFT_2020_12: &str = "https://json-schema.org/draft/2020-12/schema";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
