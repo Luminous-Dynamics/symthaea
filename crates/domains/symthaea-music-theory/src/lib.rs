@@ -79,6 +79,7 @@ pub mod sonata;
 pub mod spec;
 pub mod spelling;
 pub mod style;
+pub mod temporal_map;
 pub mod voicing;
 
 pub use accompaniment::Accompaniment;
@@ -139,4 +140,7 @@ pub use sonata::{
 pub use spec::{Attitude, CompositionSpec, DrumPolicy, FormKind, ProgressionSpec, TextureSpec};
 pub use spelling::{Accidental, AlteredDegree, LetterName, SpelledPitchClass};
 pub use style::Style;
+pub use temporal_map::{
+    TEMPORAL_MAP_VERSION, TempoV1, TemporalMapErrorV1, TemporalMapV1, TemporalPointV1,
+};
 pub use voicing::{lead_bass, lead_upper};
