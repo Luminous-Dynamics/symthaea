@@ -25,11 +25,11 @@ class FamilyHeldoutMdlBaselineTests(unittest.TestCase):
         self.assertEqual(a, b)
         self.assertTrue(all(row[0] == 1 for row in a["rows"]))
 
-    def test_bic_returns_a_valid_dag_and_deterministic_result(self):
+    def test_mdl_returns_a_valid_dag_and_deterministic_result(self):
         scm = make_scm(4, "chain", "and", 1)
         obs, mixed = sample_arms(scm, 32, 16, 2, 0.1)
-        first = select_dag_bic(obs, 4, 0.1)
-        second = select_dag_bic(obs, 4, 0.1)
+        first = select_dag_mdl(obs, 4, 0.1)
+        second = select_dag_mdl(obs, 4, 0.1)
         self.assertEqual(first, second)
         score = graph_scores(scm.edges(), first["edges"], 4)
         self.assertIn("directed_f1", score)
