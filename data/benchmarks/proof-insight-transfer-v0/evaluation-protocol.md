@@ -230,6 +230,10 @@ For every pair, the system must emit one of `accept`, `reject`, or `abstain`, pl
 Proposed transfer-gate adoption targets are: reject every item in the frozen finite negative-control suite; at least 90% point recall on compatible held-out positive controls; and at least 20 independent pair-graph components in each of the compatible and incompatible classes before any confirmatory transfer-selectivity claim. Report component-clustered 95% intervals for rates. These are conservative project-specific targets, not achieved results or a substitute for power analysis. If the sample-size floor is unmet, report a pilot and extend the independently adjudicated pair set without tuning against the held-out labels.
 
 
+## Mutation-qualification prerequisite
+
+Before counterfactual pairs enter a confirmatory denominator, apply [the mutation adequacy protocol](counterfactual-mutation-adequacy.md) and validate a versioned [mutation-qualification record](counterfactual-mutation-qualification.schema.json). This record separates elaboration validity, formal statement relation, strategy-contract applicability, theorem truth evidence, and actual checked strategy outcome. In particular, a parser/elaborator failure is an invalid mutant—not evidence that the system correctly rejected an inapplicable mathematical strategy. The checked-in qualification fixture and CI controls are synthetic only. Freeze the schema, rubric, receipts, and current protocol digests in every run manifest; no confirmatory claim is permitted until a real pinned Lean pilot supplies the corresponding evidence.
+
 ## Counterfactual precondition-sensitivity track
 
 This separate track tests whether a typed insight is applied because its mathematical preconditions hold, rather than because the target looks similar. It does **not** change the primary F-versus-validation-selected exact-target endpoint or the existing transfer-selectivity metrics.
