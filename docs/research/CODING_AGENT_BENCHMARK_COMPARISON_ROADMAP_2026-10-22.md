@@ -23,7 +23,7 @@ Terminal-Bench itself describes version 4 as a protocol change that calibrates t
 
 A reference implementation passing and an empty patch failing are necessary, not sufficient. The current pilot now requires every curated mutant to compile and fail at least one assertion under a complete, non-simulated test run. CodeExecutor may record a nonzero test-binary exit in `runtime_error` when an ordinary assertion fails; exact full test counts therefore indicate a completed behavioral failure, while missing counts/simulated runs remain unresolved. For a larger task bank, record the mutation catalogue and report killed, surviving, invalid/compile-failing and unresolved mutants separately. A mutant that cannot compile is not evidence that tests discriminate behavior.
 
-The fixed eight-task pilot now declares expected test counts explicitly and binds them into each task digest (receipt schema v2), removing the producer/auditor's `#[test]` text scan. The real preflight and each run must account for exactly the declared count, so a zero-test run is incomplete rather than a pass. Before ingesting arbitrary repositories, generalize this into a machine-readable harness contract with independent test-discovery evidence; do not return to counting source-text tokens.
+The fixed eight-task pilot declares expected test counts explicitly and binds them into each task digest (schema v2), removing producer/auditor text scanning. Schema v3 additionally records requested backend/model identity and observed per-run generation tiers, corrects the local model label to the actual `gemma4:e2b` constructor default, and fails closed on cloud mode without a non-empty API key. These tiers are app-reported telemetry, not cryptographic provider attestation. The real preflight and each run must account for exactly the declared count. Before ingesting arbitrary repositories, generalize this into a machine-readable harness contract with independent test-discovery evidence.
 
 ### 2. Unknown is not failure—and not a tie
 
@@ -31,11 +31,11 @@ Report assessed behavioral failures separately from incomplete compiler/test exe
 
 ### 3. Test intervention effects, not just the final agent
 
-Use the same model revision, prompt budget, tools, compiler, sandbox, task, hidden tests and stopping budget in each arm; change only GCS advisories. Alternate/randomize treatment order and repeat tasks to estimate run variance. Include a no-GCS baseline and, later, ablations for advisory type, confidence threshold and repair feedback. Report the agent+model+harness as the unit of comparison.
+Use the same model revision, prompt budget, tools, compiler, sandbox, task, hidden tests and stopping budget in each arm; change only GCS advisories. Record both requested model identity and per-run observed generation tiers. Alternate/randomize treatment order and repeat tasks to estimate run variance. Include a no-GCS baseline and, later, ablations for advisory type, confidence threshold and repair feedback. Report the agent+model+harness as the unit of comparison.
 
 ### 4. Make the held-out tasks harder than memorized function synthesis
 
-Move from toy functions to repository-level fixes: multi-file changes, regression-preserving refactors, dependency/compiler errors, concurrency, security-sensitive parsing, performance regressions and changes where tests alone do not reveal the intended behavior. Freeze a public development set, maintain a private/held-out evaluation set, and grade patches in pristine checkouts with hidden fail-to-pass plus pass-to-pass tests. Keep task source, model prompts and reference patches out of the agent's accessible runtime.
+Move from toy functions to repository-level fixes: multi-file changes, regression-preserving refactors, dependency/compiler errors, concurrency, security-sensitive parsing, performance regressions and changes where tests alone do not reveal the intended behavior. Freeze a public development set, maintain a private/held-out evaluation set, and grade patches in pristine checkouts with hidden fail-to-pass plus pass-to-pass tests. Keep task source, model prompts and reference patches out of the agent's accessible runtime. A practical Rust-native starting point is [SWE-bench-Live MultiLang](https://github.com/microsoft/SWE-bench-Live), which supports Rust and reported 1,077 task instances across 431 repositories and eight languages in its August 2026 snapshot. Pin an exact dataset revision and report the Rust slice, not the aggregate leaderboard result.
 
 ### 5. Measure the engineering frontier, not one score
 
