@@ -112,6 +112,21 @@ pub trait MambaBackend: Send + Sync {
     /// The sequence is typically 64 chunks of 768D from temporal projection.
     fn inject_context_sequence(&mut self, sequence: &[Vec<f32>]) -> Result<()>;
 
+    /// Compute an E2E gradient on a cloned backend so the live teacher-forcing
+    /// recurrent state is not reset or overwritten by the gradient replay.
+    ///
+    /// Model parameters are cloned according to the backend's clone semantics;
+    /// the mutable recurrence state must be isolated by that implementation.
+    fn compute_e2e_token_loss_at_isolated(
+        &mut self,
+        sequence: &[Vec<f32>],
+        tokens: &[u32],
+        pos: usize,
+    ) -> Result<Vec<f32>> {
+        let mut gradient_backend = self.clone_box();
+        gradient_backend.compute_e2e_token_loss_at(sequence, tokens, pos)
+    }
+
     /// Compute E2E token loss at a specific position in the SSM sequence (Improvement B).
     ///
     /// Injects [0..pos) as context (no grad), injects [pos] as Var, detaches state,
@@ -1099,7 +1114,10 @@ pub mod mock {
             _tokens: &[u32],
             _pos: usize,
         ) -> Result<Vec<f32>> {
-            // Mock: return small deterministic gradient
+            // Model the production E2E implementation's state-reset side effect.
+            // Callers must isolate this replay from their live generation/training state.
+            self.reset();
+            self.forward_count += 1;
             let d = self.d_model();
             Ok(vec![0.001f32; d])
         }
@@ -1188,6 +1206,25 @@ pub(crate) mod tests {
 
     /// Integration test requiring network access to download mamba-130m.
     /// Ignored in CI — run manually with `cargo test --features mamba -- --ignored`.
+    #[test]
+    fn isolated_e2e_gradient_preserves_live_backend_state() {
+        use super::MambaBackend;
+
+        let mut backend = MockMamba::new();
+        backend.forward_with_state(17).expect("mock forward should succeed");
+        let forwards_before = backend.forward_count;
+        let resets_before = backend.reset_count;
+        let sequence = vec![vec![0.25f32; 768]];
+        let gradient = backend
+            .compute_e2e_token_loss_at_isolated(&sequence, &[17, 29], 0)
+            .expect("isolated mock gradient should succeed");
+
+        assert_eq!(backend.forward_count, forwards_before);
+        assert_eq!(backend.reset_count, resets_before);
+        assert_eq!(gradient.len(), backend.d_model());
+        assert!(gradient.iter().all(|value| value.is_finite()));
+    }
+
     #[test]
     #[ignore = "Requires network access to download mamba-130m (~260MB)"]
     fn test_mamba_load_and_forward() {
