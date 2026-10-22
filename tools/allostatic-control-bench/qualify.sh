@@ -969,7 +969,19 @@ if ! awk -F, '
   END {
     if (NR != 65001 || rows != 65000 || failed) exit 1
     for (name in scenario_rows) if (scenario_rows[name] != 5000) exit 1
-    if (length(scenario_rows) != 13) exit 1
+    if (scenario_rows["null_low"] != 5000 ||
+        scenario_rows["null_boundary"] != 5000 ||
+        scenario_rows["persistent_0175"] != 5000 ||
+        scenario_rows["persistent_020"] != 5000 ||
+        scenario_rows["persistent_025"] != 5000 ||
+        scenario_rows["persistent_035"] != 5000 ||
+        scenario_rows["ramp_to_020"] != 5000 ||
+        scenario_rows["ramp_to_030"] != 5000 ||
+        scenario_rows["ramp_to_045"] != 5000 ||
+        scenario_rows["burst_008"] != 5000 ||
+        scenario_rows["burst_024"] != 5000 ||
+        scenario_rows["recurrent_bursts"] != 5000 ||
+        scenario_rows["stealth_paired"] != 5000) exit 1
   }
 ' "$tmpdir/power-a.csv"; then
   printf 'FAIL: e-process power-surface raw schema, threshold, mixture arithmetic or stealth pairing is invalid\n' >&2
@@ -1047,7 +1059,10 @@ if ! awk -F, '
       for (i = 11; i <= 87; i++) null_low_summary[i] = $i
     }
     if ($1 == "stealth_paired") {
-      for (i = 11; i <= 87; i++) if ($i != null_low_summary[i]) failed = 1
+      for (i = 11; i <= 87; i++) {
+        # Latent-shift misses should differ: the paired null has no latent shift.
+        if ((i - 11) % 11 != 6 && $i != null_low_summary[i]) failed = 1
+      }
     }
     rows++
   }
