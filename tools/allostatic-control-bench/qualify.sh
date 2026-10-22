@@ -15,16 +15,21 @@ source_files=(
   "tools/allostatic-control-bench/src/model_mismatch.rs"
   "tools/allostatic-control-bench/src/multistep_viability.rs"
   "tools/allostatic-control-bench/src/robust_viability.rs"
+  "tools/allostatic-control-bench/src/safe_probe.rs"
   "tools/allostatic-control-bench/src/main.rs"
   "tools/allostatic-control-bench/src/bin/allostatic-control-report.rs"
   "tools/allostatic-control-bench/src/bin/allostatic-model-mismatch-bench.rs"
   "tools/allostatic-control-bench/src/bin/allostatic-multistep-viability-bench.rs"
   "tools/allostatic-control-bench/src/bin/allostatic-ood-fallback-bench.rs"
+  "tools/allostatic-control-bench/src/bin/allostatic-safe-probe-bench.rs"
+  "tools/allostatic-control-bench/src/bin/allostatic-guaranteed-learning-bench.rs"
+  "tools/allostatic-control-bench/src/bin/allostatic-active-learning-bench.rs"
   "tools/allostatic-control-bench/qualify.sh"
   "docs/research/ALLOSTATIC_CONTROL_BENCHMARK_V1.md"
   "docs/research/ROBUST_VIABILITY_ENVELOPE_V1.md"
   "docs/research/MULTISTEP_VIABILITY_TUBES_V1.md"
   "docs/research/OOD_REACHABILITY_FALLBACK_V1.md"
+  "docs/research/SAFETY_CONSTRAINED_ACTIVE_FALSIFICATION_V1.md"
 )
 expected_head="${1:-$(git rev-parse HEAD)}"
 actual_head="$(git rev-parse HEAD)"
@@ -52,6 +57,12 @@ horizon_out="${out_base}-multistep-horizon.csv"
 horizon_summary_out="${out_base}-multistep-horizon-summary.csv"
 ood_out="${out_base}-ood-fallback.csv"
 ood_summary_out="${out_base}-ood-fallback-summary.csv"
+probe_out="${out_base}-safe-probe.csv"
+probe_summary_out="${out_base}-safe-probe-summary.csv"
+guaranteed_learning_out="${out_base}-guaranteed-learning.csv"
+guaranteed_learning_summary_out="${out_base}-guaranteed-learning-summary.csv"
+active_learning_out="${out_base}-active-learning.csv"
+active_learning_summary_out="${out_base}-active-learning-summary.csv"
 receipt="${out_csv}.receipt.txt"
 
 cargo fmt --manifest-path "$manifest" -- --check
@@ -387,6 +398,202 @@ if ! awk -F, '
   exit 1
 fi
 
+# Safety-constrained active model discrimination. A probe is only selected
+# when every candidate effect is inside a common model hull and one safe
+# multi-step continuation is certified under that hull.
+cargo run --locked --release --manifest-path "$manifest" --bin allostatic-safe-probe-bench -- \
+  "$tmpdir/probe-a.csv" "$tmpdir/probe-summary-a.csv"
+cargo run --locked --release --manifest-path "$manifest" --bin allostatic-safe-probe-bench -- \
+  "$tmpdir/probe-b.csv" "$tmpdir/probe-summary-b.csv"
+if ! cmp -s "$tmpdir/probe-a.csv" "$tmpdir/probe-b.csv" ||
+   ! cmp -s "$tmpdir/probe-summary-a.csv" "$tmpdir/probe-summary-b.csv"; then
+  printf 'FAIL: repeated active-probe raw and summary outputs are not byte-identical\n' >&2
+  exit 1
+fi
+
+if ! awk -F, '
+  NR == 1 { if (NF != 21) failed = 1; next }
+  {
+    if (NF != 21) failed = 1
+    if ($1 != "informative_safe_action" && $1 != "informative_action_unsafe" &&
+        $1 != "indistinguishable_models" && $1 != "one_step_safe_dead_end" &&
+        $1 != "recovery_authority_required" && $1 != "invalid_horizon_rejected") failed = 1
+    if ($2 !~ /^[0-9]*[.]?[0-9]+$/ || $3 !~ /^[0-9]*[.]?[0-9]+$/ ||
+        $4 !~ /^[0-9]*[.]?[0-9]+$/ || $5 !~ /^[0-9]*[.]?[0-9]+$/) failed = 1
+    if ($6 !~ /^[0-9]+$/ || $7 != "true" && $7 != "false" || $8 != 2) failed = 1
+    if ($9 !~ /^[0-9]*[.]?[0-9]+$/) failed = 1
+    for (i = 10; i <= 13; i++) if ($i != "true" && $i != "false") failed = 1
+    if ($14 !~ /^[0-3]$/) failed = 1
+    for (i = 15; i <= 17; i++) if ($i !~ /^[0-9]*[.]?[0-9]+$/) failed = 1
+    if ($18 != "push" && $18 != "maintain" && $18 != "emergency_recover" && $18 != "none") failed = 1
+    if ($19 !~ /^[0-9]*[.]?[0-9]+$/) failed = 1
+    if ($20 != "true" && $20 != "false") failed = 1
+    if ($21 != "probe_selected_push" && $21 != "no_probe_unsafe_discriminator" &&
+        $21 != "no_probe_without_information" &&
+        $21 != "no_probe_without_safe_continuation" &&
+        $21 != "no_probe_without_recovery_authority" &&
+        $21 != "invalid_request_rejected") failed = 1
+    if ($20 == "true" && $18 == "none") failed = 1
+    if ($18 != "none" && $20 != "true") failed = 1
+    if ($1 == "informative_safe_action" &&
+        ($18 != "push" || $20 != "true" || $11 != "true" || $14 < 1)) failed = 1
+    if ($1 == "informative_action_unsafe" &&
+        ($11 != "false" || $18 == "push" || $20 == "true")) failed = 1
+    if ($1 == "indistinguishable_models" &&
+        ($18 != "none" || $14 < 1 || $15 != 0 || $16 != 0 || $17 != 0)) failed = 1
+    if ($1 == "one_step_safe_dead_end" &&
+        ($10 != "true" || $11 != "false" || $18 == "push")) failed = 1
+    if ($1 == "recovery_authority_required" &&
+        ($7 != "false" || $13 != "false" || $18 == "emergency_recover")) failed = 1
+    if ($1 == "invalid_horizon_rejected" &&
+        ($6 != 99 || $18 != "none" || $20 != "false")) failed = 1
+    seen[$1]++
+    rows++
+  }
+  END {
+    if (NR != 7 || rows != 6 || failed) exit 1
+    for (key in seen) if (seen[key] != 1) exit 1
+  }
+' "$tmpdir/probe-a.csv"; then
+  printf 'FAIL: active-probe schema, common-hull safety, information threshold or negative controls are invalid\n' >&2
+  exit 1
+fi
+
+if ! awk -F, '
+  NR == 1 { if (NF != 8) failed = 1; next }
+  {
+    if (NF != 8) failed = 1
+    if ($1 != "informative_safe_action" && $1 != "informative_action_unsafe" &&
+        $1 != "indistinguishable_models" && $1 != "one_step_safe_dead_end" &&
+        $1 != "recovery_authority_required" && $1 != "invalid_horizon_rejected") failed = 1
+    if ($2 != "true" && $2 != "false") failed = 1
+    if ($3 != "push" && $3 != "maintain" && $3 != "emergency_recover" && $3 != "none") failed = 1
+    if ($4 !~ /^[0-9]*[.]?[0-9]+$/ || $5 !~ /^[0-3]$/) failed = 1
+    if ($6 != "true" && $6 != "false" || $7 != "true" && $7 != "false") failed = 1
+    if (($2 == "true") != ($3 != "none")) failed = 1
+    rows++
+  }
+  END { if (NR != 7 || rows != 6 || failed) exit 1 }
+' "$tmpdir/probe-summary-a.csv"; then
+  printf 'FAIL: active-probe summary coverage or selection accounting is invalid\n' >&2
+  exit 1
+fi
+
+# Close the loop: select a certified probe, consume a measured transition,
+# filter the candidate family, and recompute future viability. Unknown/unmodeled
+# outcomes must not be silently replaced by the prior candidate model set.
+cargo run --locked --release --manifest-path "$manifest" --bin allostatic-active-learning-bench -- \
+  "$tmpdir/active-learning-a.csv" "$tmpdir/active-learning-summary-a.csv"
+cargo run --locked --release --manifest-path "$manifest" --bin allostatic-active-learning-bench -- \
+  "$tmpdir/active-learning-b.csv" "$tmpdir/active-learning-summary-b.csv"
+if ! cmp -s "$tmpdir/active-learning-a.csv" "$tmpdir/active-learning-b.csv" ||
+   ! cmp -s "$tmpdir/active-learning-summary-a.csv" "$tmpdir/active-learning-summary-b.csv"; then
+  printf 'FAIL: repeated active-learning raw and summary outputs are not byte-identical\n' >&2
+  exit 1
+fi
+
+if ! awk -F, '
+  NR == 1 { if (NF != 13) failed = 1; next }
+  {
+    if (NF != 13) failed = 1
+    if ($1 != "observation_identifies_model_0" &&
+        $1 != "observation_identifies_model_1" &&
+        $1 != "ambiguous_measurement_outside_family" &&
+        $1 != "observation_falsifies_model_family") failed = 1
+    if ($2 != "model_0" && $2 != "model_1" &&
+        $2 != "intermediate_unmodeled_plant" && $2 != "outside_family") failed = 1
+    if ($3 != "true" && $3 != "false") failed = 1
+    if ($4 != "maintain" || $5 != "true") failed = 1
+    if ($6 != "true" && $6 != "false") failed = 1
+    if ($7 != 2 || $8 !~ /^[0-2]$/ || $9 !~ /^[0-3]$/ || $10 !~ /^[0-3]$/) failed = 1
+    if ($11 !~ /^-?[0-3]$/ || ($10 - $9) != $11) failed = 1
+    if ($12 != "true" && $12 != "false") failed = 1
+    if ($13 != "model_family_narrowed" &&
+        $13 != "ambiguity_retained_no_claim" &&
+        $13 != "candidate_family_falsified_fail_closed") failed = 1
+    if ($9 != 2) failed = 1
+    if ($1 == "observation_identifies_model_0" &&
+        ($2 != "model_0" || $3 != "true" || $6 != "true" || $8 != 1 ||
+         $10 != 3 || $11 != 1 || $12 != "true" || $13 != "model_family_narrowed")) failed = 1
+    if ($1 == "observation_identifies_model_1" &&
+        ($2 != "model_1" || $3 != "true" || $6 != "true" || $8 != 1 ||
+         $10 != 2 || $11 != 0 || $12 != "true" || $13 != "model_family_narrowed")) failed = 1
+    if ($1 == "ambiguous_measurement_outside_family" &&
+        ($3 != "false" || $6 != "true" || $8 != 2 || $10 != 2 || $11 != 0 ||
+         $12 != "false" || $13 != "ambiguity_retained_no_claim")) failed = 1
+    if ($1 == "observation_falsifies_model_family" &&
+        ($3 != "false" || $6 != "false" || $8 != 0 || $10 != 0 || $11 != -2 ||
+         $12 != "false" || $13 != "candidate_family_falsified_fail_closed")) failed = 1
+    seen[$1]++
+    rows++
+  }
+  END { if (NR != 5 || rows != 4 || failed) exit 1; for (key in seen) if (seen[key] != 1) exit 1 }
+' "$tmpdir/active-learning-a.csv"; then
+  printf 'FAIL: active-learning hypothesis update, safety, or viability-gain contract is invalid\n' >&2
+  exit 1
+fi
+
+if ! awk -F, '
+  NR == 1 { if (NF != 8) failed = 1; next }
+  {
+    if (NF != 8) failed = 1
+    if ($1 != "observation_identifies_model_0" &&
+        $1 != "observation_identifies_model_1" &&
+        $1 != "ambiguous_measurement_outside_family" &&
+        $1 != "observation_falsifies_model_family") failed = 1
+    if ($2 != "maintain" || $3 != "true") failed = 1
+    if ($4 !~ /^[0-2]$/ || $5 != 2 || $6 !~ /^[0-3]$/ ||
+        $7 !~ /^-?[0-3]$/ || ($6 - $5) != $7) failed = 1
+    if ($8 != "model_family_narrowed" &&
+        $8 != "ambiguity_retained_no_claim" &&
+        $8 != "candidate_family_falsified_fail_closed") failed = 1
+    rows++
+  }
+  END { if (NR != 5 || rows != 4 || failed) exit 1 }
+' "$tmpdir/active-learning-summary-a.csv"; then
+  printf 'FAIL: active-learning summary coverage or accounting is invalid\n' >&2
+  exit 1
+fi
+
+# Distinguish full one-step identification from guaranteed partial learning.
+cargo run --locked --release --manifest-path "$manifest" --bin allostatic-guaranteed-learning-bench -- \
+  "$tmpdir/guaranteed-learning-a.csv" "$tmpdir/guaranteed-learning-summary-a.csv"
+cargo run --locked --release --manifest-path "$manifest" --bin allostatic-guaranteed-learning-bench -- \
+  "$tmpdir/guaranteed-learning-b.csv" "$tmpdir/guaranteed-learning-summary-b.csv"
+if ! cmp -s "$tmpdir/guaranteed-learning-a.csv" "$tmpdir/guaranteed-learning-b.csv" ||
+   ! cmp -s "$tmpdir/guaranteed-learning-summary-a.csv" "$tmpdir/guaranteed-learning-summary-b.csv"; then
+  printf 'FAIL: repeated guaranteed-learning outputs are not byte-identical\n' >&2
+  exit 1
+fi
+
+if ! awk -F, '
+  NR == 1 { if (NF != 17) failed = 1; next }
+  {
+    if (NF != 17) failed = 1
+    if ($1 != "three_candidate_partial_reduction" || $2 != 3 || $3 != 3 || $4 != 0.005) failed = 1
+    if ($5 != "none" || $6 != 0) failed = 1
+    if ($7 != "push" || $8 != 0) failed = 1
+    if ($9 != "true" || $10 != "false") failed = 1
+    if ($11 != 2 || $12 != 1 || $13 != 3 || $14 != 0 || $15 != 3 || $16 != 0) failed = 1
+    if ($17 != "partial_learning_without_full_identification") failed = 1
+    rows++
+  }
+  END { if (NR != 2 || rows != 1 || failed) exit 1 }
+' "$tmpdir/guaranteed-learning-a.csv"; then
+  printf 'FAIL: guaranteed partial-learning raw metrics or selection contract is invalid\n' >&2
+  exit 1
+fi
+
+if ! awk -F, '
+  NR == 1 { if (NF != 5) failed = 1; next }
+  { if (NF != 5 || $1 != "three_candidate_partial_reduction" || $2 != "none" ||
+        $3 != "push" || $4 != 1 || $5 != "partial_learning_without_full_identification") failed = 1; rows++ }
+  END { if (NR != 2 || rows != 1 || failed) exit 1 }
+' "$tmpdir/guaranteed-learning-summary-a.csv"; then
+  printf 'FAIL: guaranteed partial-learning summary does not match the contract\n' >&2
+  exit 1
+fi
+
 # Summary must contain 5 scenarios × 6 policies × 2 shield settings.
 if ! awk -F, 'NR == 1 { if (NF != 28) failed = 1; next }
   { if (NF != 28) failed = 1; rows++ }
@@ -413,6 +620,12 @@ cp "$tmpdir/horizon-a.csv" "$horizon_out"
 cp "$tmpdir/horizon-summary-a.csv" "$horizon_summary_out"
 cp "$tmpdir/ood-a.csv" "$ood_out"
 cp "$tmpdir/ood-summary-a.csv" "$ood_summary_out"
+cp "$tmpdir/probe-a.csv" "$probe_out"
+cp "$tmpdir/probe-summary-a.csv" "$probe_summary_out"
+cp "$tmpdir/guaranteed-learning-a.csv" "$guaranteed_learning_out"
+cp "$tmpdir/guaranteed-learning-summary-a.csv" "$guaranteed_learning_summary_out"
+cp "$tmpdir/active-learning-a.csv" "$active_learning_out"
+cp "$tmpdir/active-learning-summary-a.csv" "$active_learning_summary_out"
 {
   printf 'status=pass\n'
   printf 'git_commit=%s\n' "$actual_head"
@@ -440,6 +653,18 @@ cp "$tmpdir/ood-summary-a.csv" "$ood_summary_out"
   printf 'ood_frontier_rows_excluding_header=%s\n' "$(( $(wc -l < "$ood_out") - 1 ))"
   printf 'ood_summary_sha256=%s\n' "$(sha256sum "$ood_summary_out" | awk '{print $1}')"
   printf 'ood_summary_rows_excluding_header=%s\n' "$(( $(wc -l < "$ood_summary_out") - 1 ))"
+  printf 'safe_probe_sha256=%s\n' "$(sha256sum "$probe_out" | awk '{print $1}')"
+  printf 'safe_probe_rows_excluding_header=%s\n' "$(( $(wc -l < "$probe_out") - 1 ))"
+  printf 'safe_probe_summary_sha256=%s\n' "$(sha256sum "$probe_summary_out" | awk '{print $1}')"
+  printf 'safe_probe_summary_rows_excluding_header=%s\n' "$(( $(wc -l < "$probe_summary_out") - 1 ))"
+  printf 'guaranteed_learning_sha256=%s\n' "$(sha256sum "$guaranteed_learning_out" | awk '{print $1}')"
+  printf 'guaranteed_learning_rows_excluding_header=%s\n' "$(( $(wc -l < "$guaranteed_learning_out") - 1 ))"
+  printf 'guaranteed_learning_summary_sha256=%s\n' "$(sha256sum "$guaranteed_learning_summary_out" | awk '{print $1}')"
+  printf 'guaranteed_learning_summary_rows_excluding_header=%s\n' "$(( $(wc -l < "$guaranteed_learning_summary_out") - 1 ))"
+  printf 'active_learning_sha256=%s\n' "$(sha256sum "$active_learning_out" | awk '{print $1}')"
+  printf 'active_learning_rows_excluding_header=%s\n' "$(( $(wc -l < "$active_learning_out") - 1 ))"
+  printf 'active_learning_summary_sha256=%s\n' "$(sha256sum "$active_learning_summary_out" | awk '{print $1}')"
+  printf 'active_learning_summary_rows_excluding_header=%s\n' "$(( $(wc -l < "$active_learning_summary_out") - 1 ))"
   printf '\nsource_sha256:\n'
   sha256sum "${source_files[@]}"
 } > "$receipt"
@@ -453,4 +678,10 @@ printf 'Multi-step viability horizon frontier: %s\n' "$horizon_out"
 printf 'Multi-step viability horizon summary: %s\n' "$horizon_summary_out"
 printf 'OOD fallback frontier: %s\n' "$ood_out"
 printf 'OOD fallback summary: %s\n' "$ood_summary_out"
+printf 'Safety-constrained active-probe frontier: %s\n' "$probe_out"
+printf 'Safety-constrained active-probe summary: %s\n' "$probe_summary_out"
+printf 'Guaranteed partial-learning frontier: %s\n' "$guaranteed_learning_out"
+printf 'Guaranteed partial-learning summary: %s\n' "$guaranteed_learning_summary_out"
+printf 'Active-learning update frontier: %s\n' "$active_learning_out"
+printf 'Active-learning update summary: %s\n' "$active_learning_summary_out"
 printf 'Provenance receipt: %s\n' "$receipt"

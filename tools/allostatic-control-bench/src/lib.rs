@@ -12,6 +12,7 @@ pub mod drift_monitor;
 pub mod model_mismatch;
 pub mod multistep_viability;
 pub mod robust_viability;
+pub mod safe_probe;
 
 pub const HORIZON: usize = 48;
 pub const EPISODE_CSV_HEADER: &str = "scenario,seed,policy,shielded,task_reward,cumulative_exposure,mean_load,peak_load,minimum_reserve,mean_safe_action_options,minimum_safe_action_options,terminal_reserve,terminal_load,unsafe_ticks,unsafe_episode,violation_exposure,max_violation_severity,missed_limits,shield_vetoes,no_safe_action_ticks,false_alarms,false_alarm_opportunities,push_steps,maintain_steps,emergency_recover_steps,resource_cost,failed,had_disturbance,recovery_steps";
