@@ -299,7 +299,6 @@ struct TrialOutcome {
     selection_failed: bool,
     audit_queries: usize,
     model_discrepancy_detected: bool,
-    singleton_decision: bool,
     overconfident_under_misspecification: bool,
 }
 
@@ -577,7 +576,6 @@ fn run_trial_with_discrepancy(
         selection_failed,
         audit_queries,
         model_discrepancy_detected: systematic_discrepancy != 0.0 && live.is_empty(),
-        singleton_decision: live.len() == 1,
         overconfident_under_misspecification: systematic_discrepancy != 0.0 && live.len() == 1,
     }
 }
@@ -650,7 +648,9 @@ mod tests {
     use super::*;
 
     type SelectorPair = (bool, bool, usize, usize, bool);
-    type MisspecSelectorPair = (bool, bool, bool, bool, usize, usize, bool, bool, usize, bool, bool);
+    type MisspecSelectorPair = (
+        bool, bool, bool, bool, usize, usize, bool, bool, usize, bool, bool,
+    );
 
     /// Paired percentile bootstrap over seed/world outcomes. Every resample carries the raw
     /// and EIG result together, preserving pairing. This small pilot interval is diagnostic;
@@ -822,7 +822,8 @@ mod tests {
                 if misspec_eig.overconfident_under_misspecification { 1 } else { 0 };
             misspecified_audit_false_singletons +=
                 if misspec_audit.overconfident_under_misspecification { 1 } else { 0 };
-            misspecified_eig_detections += if misspec_eig.model_discrepancy_detected { 1 } else { 0 };
+            misspecified_eig_detections +=
+                if misspec_eig.model_discrepancy_detected { 1 } else { 0 };
             misspecified_audit_detections +=
                 if misspec_audit.model_discrepancy_detected { 1 } else { 0 };
             audit_query_total += misspec_audit.audit_queries;
