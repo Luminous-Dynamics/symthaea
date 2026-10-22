@@ -779,6 +779,7 @@ fn valid_evaluation_receipt() -> Value {
         },
         "oracle_adjudication": {
             "status": "NOT_PERFORMED",
+            "case_id_inventory_sha256": "f".repeat(64),
             "ledger_sha256": null,
             "protocol_sha256": "8".repeat(64),
             "rubric_sha256": "5".repeat(64),
@@ -850,6 +851,7 @@ fn evaluation_receipt_requires_auditable_oracle_review_before_comparison() {
     let digest = "9".repeat(64);
     receipt["oracle_adjudication"] = json!({
         "status": "COMPLETE",
+        "case_id_inventory_sha256": "f".repeat(64),
         "ledger_sha256": digest,
         "protocol_sha256": "8".repeat(64),
         "rubric_sha256": "5".repeat(64),
