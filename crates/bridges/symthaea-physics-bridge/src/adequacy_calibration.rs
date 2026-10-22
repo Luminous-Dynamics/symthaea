@@ -239,29 +239,51 @@ pub fn standardized_rms_residual(
     rms.is_finite().then_some(rms)
 }
 
-/// Composite batch-level nonconformity score for several predeclared residual failure modes.
+/// Predeclared component diagnostics for one standardized-residual batch.
 ///
-/// The function takes the maximum of four complementary standardized diagnostics:
-/// - RMS standardized residual (broad predictive misfit);
-/// - maximum absolute standardized residual divided by sqrt(2 ln(n + 1)) (localized outlier);
-/// - sqrt(n) times the absolute mean standardized residual (systematic bias);
-/// - sqrt(n - 1) times the absolute lag-one residual correlation (serial structure).
+/// Every field is a non-negative score; larger is more anomalous. The normalizers are fixed
+/// sensitivity heuristics, not analytic p-values. Use the *same* batch size, ordering convention,
+/// fields, and implementation for independent clean calibration batches and audit batches.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ResidualDiagnosticScores {
+    /// Root-mean-square standardized residual across the batch.
+    pub rms_standardized_residual: f64,
+    /// Maximum absolute standardized residual divided by sqrt(2 ln(n + 1)).
+    pub normalized_peak_residual: f64,
+    /// sqrt(n) times absolute mean standardized residual.
+    pub normalized_mean_bias: f64,
+    /// sqrt(n - 1) times absolute lag-one residual correlation (zero for n < 2 or undefined variance).
+    pub normalized_lag_one_dependence: f64,
+}
+
+impl ResidualDiagnosticScores {
+    /// Return the component scores in the stable order used by score-fusion calibration.
+    pub fn as_array(self) -> [f64; 4] {
+        [
+            self.rms_standardized_residual,
+            self.normalized_peak_residual,
+            self.normalized_mean_bias,
+            self.normalized_lag_one_dependence,
+        ]
+    }
+
+    /// Maximum of the predeclared components.
+    pub fn maximum(self) -> f64 {
+        self.as_array().into_iter().fold(0.0_f64, f64::max)
+    }
+}
+
+/// Compute complementary residual diagnostics for one fixed-size audit batch.
 ///
-/// These normalizers are sensitivity heuristics, not Gaussian p-values. Finite-sample false-alarm
-/// control comes from conformal calibration of this *single aggregate score* on independent clean
-/// batches, using exactly the same function, batch length, ordering convention, and predeclared
-/// diagnostic family for calibration and audit data. Do not calibrate each component separately
-/// and then treat this score as if it were calibrated. Changing batch size or the diagnostic family
-/// defines a different score contract and requires fresh calibration.
-///
-/// Returns None for empty/mismatched arrays, invalid scales, non-finite values, or arithmetic
-/// overflow. For an all-zero residual batch the score is zero. The caller must preserve the
-/// intended target-distribution/exchangeability protocol.
-pub fn multi_view_standardized_residual_score(
+/// The returned components target broad misfit, localized outliers, systematic residual bias,
+/// and lag-one dependence. The normalizers do not rely on a Gaussian analytic null: finite-sample
+/// validity, if required, comes from calibrating a frozen scalar aggregation on independent clean
+/// batches. Do not threshold these components analytically or interpret them as p-values.
+pub fn standardized_residual_diagnostics(
     observed: &[f64],
     predicted: &[f64],
     predictive_scales: &[f64],
-) -> Option<f64> {
+) -> Option<ResidualDiagnosticScores> {
     if observed.is_empty()
         || observed.len() != predicted.len()
         || observed.len() != predictive_scales.len()
@@ -300,7 +322,12 @@ pub fn multi_view_standardized_residual_score(
         .map(|score| score.abs())
         .fold(0.0_f64, f64::max);
     if max_abs == 0.0 {
-        return Some(0.0);
+        return Some(ResidualDiagnosticScores {
+            rms_standardized_residual: 0.0,
+            normalized_peak_residual: 0.0,
+            normalized_mean_bias: 0.0,
+            normalized_lag_one_dependence: 0.0,
+        });
     }
 
     // Normalize before summing to avoid premature overflow in the moments.
@@ -316,7 +343,7 @@ pub fn multi_view_standardized_residual_score(
         / n as f64;
     let rms = max_abs * mean_scaled_squares.sqrt();
 
-    // These are fixed scale factors for the predeclared statistic, not analytic p-values.
+    // Fixed scale factors make the raw components more comparable; they are not null p-values.
     let peak_normalizer = (2.0 * ((n as f64) + 1.0).ln()).sqrt();
     let peak = max_abs / peak_normalizer;
     let bias = max_abs * mean_normalized.abs() * (n as f64).sqrt();
@@ -348,8 +375,70 @@ pub fn multi_view_standardized_residual_score(
         }
     };
 
-    let composite = rms.max(peak).max(bias).max(serial);
-    composite.is_finite().then_some(composite)
+    let scores = ResidualDiagnosticScores {
+        rms_standardized_residual: rms,
+        normalized_peak_residual: peak,
+        normalized_mean_bias: bias,
+        normalized_lag_one_dependence: serial,
+    };
+    scores
+        .as_array()
+        .iter()
+        .all(|score| score.is_finite() && *score >= 0.0)
+        .then_some(scores)
+}
+
+/// Maximum-statistic score for the four predeclared residual diagnostics.
+///
+/// Calibrate this *single returned score* on independent clean batches using
+/// `ConformalAdequacyCalibrator` before thresholding it. The maximum retains a single scalar
+/// calibration contract but can be less powerful than RMS for some alternatives; compare it with
+/// each constituent score at matched false-alarm and measurement budgets.
+pub fn multi_view_standardized_residual_score(
+    observed: &[f64],
+    predicted: &[f64],
+    predictive_scales: &[f64],
+) -> Option<f64> {
+    standardized_residual_diagnostics(observed, predicted, predictive_scales)
+        .map(ResidualDiagnosticScores::maximum)
+}
+
+/// Combine already-calibrated component scores into one score for a *second* conformal calibration.
+///
+/// The component calibrators must be fitted on an independent normalization split. This function
+/// computes `-ln(min component p-value)`; larger values mean at least one component is unusual.
+/// To retain finite-sample marginal validity without assuming independence between components,
+/// compute this aggregate for a separate, untouched set of clean aggregate-calibration batches and
+/// fit a new `ConformalAdequacyCalibrator` to those aggregate scores. Use that second calibrator
+/// for the final audit. The two split roles must not overlap, and the component family/order must
+/// be frozen before looking at audit scores.
+///
+/// This two-stage score-fusion primitive is intentionally explicit about the extra calibration
+/// cost. It is not itself a final calibrated p-value and does not implement anytime-valid monitoring.
+pub fn minimum_component_p_fusion_score(
+    component_calibrators: &[ConformalAdequacyCalibrator],
+    component_scores: &[f64],
+    independent_audit: bool,
+) -> Result<f64, CalibrationError> {
+    if !independent_audit {
+        return Err(CalibrationError::AuditNotIndependent);
+    }
+    if component_calibrators.is_empty() || component_calibrators.len() != component_scores.len() {
+        return Err(CalibrationError::InvalidAuditScore);
+    }
+
+    let mut minimum_p = 1.0_f64;
+    for (calibrator, score) in component_calibrators
+        .iter()
+        .zip(component_scores.iter().copied())
+    {
+        minimum_p = minimum_p.min(calibrator.audit_p_value(score, true)?);
+    }
+    let aggregate = -minimum_p.ln();
+    if !aggregate.is_finite() || aggregate < 0.0 {
+        return Err(CalibrationError::InvalidAuditScore);
+    }
+    Ok(aggregate)
 }
 
 #[cfg(test)]
@@ -381,7 +470,7 @@ mod tests {
     }
 
     #[test]
-    fn multi_view_score_detects_a_localized_outlier_better_than_rms() {
+    fn multi_view_score_increases_raw_statistic_for_localized_outlier() {
         let mut observed = vec![0.0; 100];
         observed[50] = 1.0;
         let predicted = vec![0.0; 100];
@@ -396,7 +485,7 @@ mod tests {
     }
 
     #[test]
-    fn multi_view_score_detects_systematic_bias_beyond_rms() {
+    fn multi_view_score_increases_raw_statistic_for_systematic_bias() {
         let observed = vec![0.25; 64];
         let predicted = vec![0.0; 64];
         let scales = vec![1.0; 64];
@@ -410,7 +499,7 @@ mod tests {
     }
 
     #[test]
-    fn multi_view_score_detects_alternating_residual_structure() {
+    fn multi_view_score_increases_raw_statistic_for_alternating_residual_structure() {
         let observed = (0..32)
             .map(|index| if index % 2 == 0 { 1.0 } else { -1.0 })
             .collect::<Vec<_>>();
@@ -465,6 +554,51 @@ mod tests {
             multi_view_standardized_residual_score(&[100.0, 0.0, 0.0], &[0.0; 3], &[1.0; 3])
                 .unwrap();
         let result = calibrator.assess_audit_score(audit_score, true).unwrap();
+        assert!((result.p_value - 0.05).abs() < 1e-12);
+        assert!(matches!(result.assessment, AdequacyAssessment::Alarm { .. }));
+    }
+
+    fn component_calibrators() -> Vec<ConformalAdequacyCalibrator> {
+        let scores = (1..=19).map(|value| value as f64).collect::<Vec<_>>();
+        let calibrator = ConformalAdequacyCalibrator::new(&scores, 0.5).unwrap();
+        vec![
+            calibrator.clone(),
+            calibrator.clone(),
+            calibrator.clone(),
+            calibrator,
+        ]
+    }
+
+    #[test]
+    fn component_p_fusion_is_monotone_and_checks_contract() {
+        let components = component_calibrators();
+        let usual = minimum_component_p_fusion_score(&components, &[10.0; 4], true).unwrap();
+        let unusual = minimum_component_p_fusion_score(&components, &[100.0, 10.0, 10.0, 10.0], true).unwrap();
+        assert!(unusual > usual);
+        assert_eq!(
+            minimum_component_p_fusion_score(&components, &[1.0], true),
+            Err(CalibrationError::InvalidAuditScore)
+        );
+        assert_eq!(
+            minimum_component_p_fusion_score(&components, &[1.0; 4], false),
+            Err(CalibrationError::AuditNotIndependent)
+        );
+    }
+
+    #[test]
+    fn component_p_fusion_uses_a_separate_outer_conformal_calibrator() {
+        let components = component_calibrators();
+        let aggregate_reference = (1..=19)
+            .map(|value| {
+                minimum_component_p_fusion_score(&components, &[value as f64; 4], true).unwrap()
+            })
+            .collect::<Vec<_>>();
+        let final_calibrator =
+            ConformalAdequacyCalibrator::new(&aggregate_reference, 0.05).unwrap();
+        let audit_aggregate =
+            minimum_component_p_fusion_score(&components, &[100.0, 10.0, 10.0, 10.0], true)
+                .unwrap();
+        let result = final_calibrator.assess_audit_score(audit_aggregate, true).unwrap();
         assert!((result.p_value - 0.05).abs() < 1e-12);
         assert!(matches!(result.assessment, AdequacyAssessment::Alarm { .. }));
     }
