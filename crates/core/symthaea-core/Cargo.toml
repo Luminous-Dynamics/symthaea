@@ -125,6 +125,11 @@ name = "platonic_registry_poisoning_stress"
 path = "examples/platonic_registry_poisoning_stress.rs"
 test = true
 
+[[example]]
+name = "platonic_registry_event_integrity"
+path = "examples/platonic_registry_event_integrity.rs"
+test = true
+
 # scaling_study_demo: module not yet wired into physics/mod.rs; exclude from default build
 [[example]]
 name = "scaling_study_demo"
