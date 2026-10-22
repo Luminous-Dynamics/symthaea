@@ -28,7 +28,7 @@ This contract represents evaluator judgments at the **claim and interpretation l
 
 ## Synthetic qualification fixtures
 
-The schema and these controls are also run through the focused Rust harness as `--kind annotation`. Contract checks reject positive source-grounded labels without evidence references, duplicate claim/alternative IDs, rights violations below release-blocker severity, invalid independent-review trails, and content leakage in rights-prohibited abstentions.
+The schema and these controls are also run through the focused Rust harness as `--kind annotation`. Contract checks reject positive source-grounded labels without evidence references, duplicate claim/alternative IDs, rights violations below release-blocker severity, invalid independent-review trails, and content leakage in rights-prohibited abstentions. The separate `score-annotation-agreement` binary computes raw exact agreement and nominal Krippendorff alpha for answerability, abstention, support label, epistemic lane, and severity. Single-rater units are excluded and counted; alpha is left undefined where category variation is absent. The CI fixture must remain marked `qualification_only` and its reliability numbers are not expert-reliability results.
 
 `synthetic-fixtures.jsonl` contains five controls covering multi-answer interpretation, two intentionally disagreeing independent labels, appropriate abstention when the evidence pack is insufficient, and rights-based abstention. The source IDs used by those fixtures are synthetic placeholders, not catalog entries.
 
