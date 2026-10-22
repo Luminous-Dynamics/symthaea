@@ -209,8 +209,8 @@ mod tests {
         );
         let limits = ViabilityLimits::new(0.15, 0.88).expect("valid limits");
         let predictive = evaluate_action_set(state, dynamics, limits, true);
-        let fallback = evaluate_horizon_action_set(state, dynamics, limits, false, 2)
-            .expect("valid horizon");
+        let fallback =
+            evaluate_horizon_action_set(state, dynamics, limits, false, 2).expect("valid horizon");
         (predictive, fallback)
     }
 
@@ -260,8 +260,8 @@ mod tests {
 
     #[test]
     fn nominal_mode_preserves_a_one_step_safe_proposal() {
-        let threshold = calibrate_drift_threshold(&nominal_scores(19), 0.05)
-            .expect("valid threshold");
+        let threshold =
+            calibrate_drift_threshold(&nominal_scores(19), 0.05).expect("valid threshold");
         let (predictive, fallback) = test_sets();
         assert!(predictive.contains(Action::Push));
         assert!(!fallback.contains(Action::Push));
@@ -282,8 +282,8 @@ mod tests {
 
     #[test]
     fn detected_shift_selects_only_a_multistep_certified_fallback_action() {
-        let threshold = calibrate_drift_threshold(&nominal_scores(19), 0.05)
-            .expect("valid threshold");
+        let threshold =
+            calibrate_drift_threshold(&nominal_scores(19), 0.05).expect("valid threshold");
         let (predictive, fallback) = test_sets();
         let shifted_score = threshold.score_threshold() + 0.1;
         let decision =
@@ -301,8 +301,8 @@ mod tests {
 
     #[test]
     fn no_reachability_action_means_no_action_not_predictive_fallback() {
-        let threshold = calibrate_drift_threshold(&nominal_scores(19), 0.05)
-            .expect("valid threshold");
+        let threshold =
+            calibrate_drift_threshold(&nominal_scores(19), 0.05).expect("valid threshold");
         let (predictive, _) = test_sets();
         let unsafe_state = StateEnvelope::new(interval(0.14, 0.16), interval(0.89, 0.95))
             .expect("valid but unsafe initial state");

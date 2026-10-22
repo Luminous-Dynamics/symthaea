@@ -25,6 +25,8 @@ source_files=(
   "tools/allostatic-control-bench/src/bin/allostatic-task-scope-bench.rs"
   "tools/allostatic-control-bench/src/bin/allostatic-sequential-scope-bench.rs"
   "tools/allostatic-control-bench/src/bin/allostatic-risk-eprocess-bench.rs"
+  "tools/allostatic-control-bench/src/bin/allostatic-task-risk-stream-bench.rs"
+  "tools/allostatic-control-bench/src/bin/allostatic-risk-eprocess-null-monte-carlo.rs"
   "tools/allostatic-control-bench/qualify.sh"
   "docs/research/ALLOSTATIC_CONTROL_BENCHMARK_V1.md"
   "docs/research/ROBUST_VIABILITY_ENVELOPE_V1.md"
@@ -33,6 +35,8 @@ source_files=(
   "docs/research/TASK_RELEVANT_SCOPE_MONITOR_V1.md"
   "docs/research/SEQUENTIAL_SCOPE_CUSUM_V1.md"
   "docs/research/BOUNDED_RISK_EPROCESS_V1.md"
+  "docs/research/TASK_RISK_EVENT_STREAM_V1.md"
+  "docs/research/EPROCESS_BET_GRID_MONTE_CARLO_V1.md"
 )
 expected_head="${1:-$(git rev-parse HEAD)}"
 actual_head="$(git rev-parse HEAD)"
@@ -66,6 +70,10 @@ sequential_out="${out_base}-sequential-scope.csv"
 sequential_summary_out="${out_base}-sequential-scope-summary.csv"
 eprocess_out="${out_base}-risk-eprocess.csv"
 eprocess_summary_out="${out_base}-risk-eprocess-summary.csv"
+task_risk_out="${out_base}-task-risk-event-stream.csv"
+task_risk_summary_out="${out_base}-task-risk-event-stream-summary.csv"
+bet_grid_out="${out_base}-eprocess-bet-grid-monte-carlo.csv"
+bet_grid_summary_out="${out_base}-eprocess-bet-grid-monte-carlo-summary.csv"
 receipt="${out_csv}.receipt.txt"
 
 cargo fmt --manifest-path "$manifest" -- --check
@@ -468,6 +476,452 @@ if ! awk -F, '
   END { if (NR != 21 || rows != 20 || failed) exit 1 }
 ' "$tmpdir/scope-summary-a.csv"; then
   printf 'FAIL: task-scope per-state false-alarm, missed-shift or safety-event summary is invalid\n' >&2
+  exit 1
+fi
+
+# Persistent task-outcome risk stream. Unlike the residual monitors, this
+# carries evidence across 300 episodes and consumes only observed false-safe
+# outcomes. Its risk-null is conditional expected event loss <= 5%, not OOD.
+cargo run --locked --release --manifest-path "$manifest" --bin allostatic-task-risk-stream-bench -- \
+  "$tmpdir/scope-a.csv" "$tmpdir/task-risk-a.csv" "$tmpdir/task-risk-summary-a.csv"
+cargo run --locked --release --manifest-path "$manifest" --bin allostatic-task-risk-stream-bench -- \
+  "$tmpdir/scope-a.csv" "$tmpdir/task-risk-b.csv" "$tmpdir/task-risk-summary-b.csv"
+if ! cmp -s "$tmpdir/task-risk-a.csv" "$tmpdir/task-risk-b.csv" ||
+   ! cmp -s "$tmpdir/task-risk-summary-a.csv" "$tmpdir/task-risk-summary-b.csv"; then
+  printf 'FAIL: repeated task-risk event stream outputs are not byte-identical\n' >&2
+  exit 1
+fi
+if ! cmp -s "$tmpdir/scope-a.csv" <(cut -d, -f1-19 "$tmpdir/task-risk-a.csv"); then
+  printf 'FAIL: task-risk output does not preserve the exact task-scope episode rows\n' >&2
+  exit 1
+fi
+
+if ! awk -F, -v raw="$tmpdir/task-risk-a.csv" -v summary="$tmpdir/task-risk-summary-a.csv" '
+  FILENAME == raw {
+    if (FNR == 1) {
+      if (NF != 34) failed = 1
+      next
+    }
+    if (NF != 34) failed = 1
+    if ($1 != "critical_low_reserve_high_load" && $1 != "reserve_limited" &&
+        $1 != "load_limited" && $1 != "balanced" && $1 != "high_margin") failed = 1
+    if ($2 != "nominal" && $2 != "moderate_shift" &&
+        $2 != "strong_shift" && $2 != "stealth_shift") failed = 1
+    if ($3 !~ /^[0-9]+$/ || $3 < 0 || $3 >= 300) failed = 1
+    if ($15 !~ /^[0-8]$/) failed = 1
+    if ($19 != "true" && $19 != "false") failed = 1
+    if ($20 != "true" && $20 != "false") failed = 1
+    if (($15 < 8) != ($20 == "true")) failed = 1
+    if ($19 != $20) failed = 1
+    if (($11 == "false") != ($2 == "nominal")) failed = 1
+    if ($21 !~ /^-?[0-9]*[.]?[0-9]+$/) failed = 1
+    for (i = 22; i <= 24; i++) if ($i !~ /^-?[0-9]*[.]?[0-9]+$/) failed = 1
+    if ($25 != "true" && $25 != "false") failed = 1
+    if ($26 != "NA" && ($26 !~ /^[0-9]+$/ || $26 >= 300)) failed = 1
+    if ($27 !~ /^-?[0-9]*[.]?[0-9]+$/) failed = 1
+    if ($28 != "true" && $28 != "false") failed = 1
+    if ($29 != "NA" && ($29 !~ /^[0-9]+$/ || $29 >= 300)) failed = 1
+    if ($30 !~ /^[0-9]*[.]?[0-9]+$/ || $31 !~ /^[0-9]*[.]?[0-9]+$/) failed = 1
+    if (($30 - log(100) > 0.000001) || (log(100) - $30 > 0.000001)) failed = 1
+    if (($31 - 0.05 > 0.000001) || (0.05 - $31 > 0.000001)) failed = 1
+    if (($32 - 0.25 > 0.000001) || (0.25 - $32 > 0.000001) ||
+        ($33 - 0.50 > 0.000001) || (0.50 - $33 > 0.000001) ||
+        ($34 - 0.75 > 0.000001) || (0.75 - $34 > 0.000001)) failed = 1
+
+    key = $1 SUBSEP $2
+    if ($3 == 0) {
+      streams[key] = 1
+      next_episode[key] = 0
+      event_count[key] = 0
+      first_event[key] = 300
+      first_mix[key] = 300
+      first_fixed[key] = 300
+      events_at_mix[key] = 0
+      events_at_fixed[key] = 0
+      previous_1[key] = 0
+      previous_2[key] = 0
+      previous_3[key] = 0
+      previous_fixed[key] = 0
+      latched_mix[key] = "false"
+      latched_fixed[key] = "false"
+      event_at_zero[key] = ($20 == "true" ? 1 : 0)
+      report_first_mix[key] = $26
+      report_first_fixed[key] = $29
+    } else if (!streams[key] || $3 != next_episode[key]) failed = 1
+    if ($26 != report_first_mix[key] || $29 != report_first_fixed[key]) failed = 1
+
+    loss = ($20 == "true") ? 1 : 0
+    if (loss == 1) {
+      event_count[key]++
+      if (first_event[key] == 300) first_event[key] = $3
+    }
+    factor_1 = 1 + ($32 / $31) * (loss - $31)
+    factor_2 = 1 + ($33 / $31) * (loss - $31)
+    factor_3 = 1 + ($34 / $31) * (loss - $31)
+    if (factor_1 <= 0 || factor_2 <= 0 || factor_3 <= 0) failed = 1
+    expected_1 = previous_1[key] + log(factor_1)
+    expected_2 = previous_2[key] + log(factor_2)
+    expected_3 = previous_3[key] + log(factor_3)
+    if (($22 - expected_1 > 0.000002) || (expected_1 - $22 > 0.000002) ||
+        ($23 - expected_2 > 0.000002) || (expected_2 - $23 > 0.000002) ||
+        ($24 - expected_3 > 0.000002) || (expected_3 - $24 > 0.000002)) failed = 1
+    previous_1[key] = $22
+    previous_2[key] = $23
+    previous_3[key] = $24
+    max_component = $22
+    if ($23 > max_component) max_component = $23
+    if ($24 > max_component) max_component = $24
+    expected_mix = max_component + log((exp($22 - max_component) +
+      exp($23 - max_component) + exp($24 - max_component)) / 3)
+    if (($21 - expected_mix > 0.000002) || (expected_mix - $21 > 0.000002)) failed = 1
+    expected_mix_alarm = (latched_mix[key] == "true" || $21 >= $30) ? "true" : "false"
+    if ($25 != expected_mix_alarm) failed = 1
+    if ($25 == "true" && first_mix[key] == 300) {
+      first_mix[key] = $3
+      events_at_mix[key] = event_count[key]
+    }
+    latched_mix[key] = expected_mix_alarm
+
+    factor_fixed = 1 + (0.50 / $31) * (loss - $31)
+    if (factor_fixed <= 0) failed = 1
+    expected_fixed = previous_fixed[key] + log(factor_fixed)
+    if (($27 - expected_fixed > 0.000002) || (expected_fixed - $27 > 0.000002)) failed = 1
+    previous_fixed[key] = $27
+    expected_fixed_alarm = (latched_fixed[key] == "true" || $27 >= $30) ? "true" : "false"
+    if ($28 != expected_fixed_alarm) failed = 1
+    if ($28 == "true" && first_fixed[key] == 300) {
+      first_fixed[key] = $3
+      events_at_fixed[key] = event_count[key]
+    }
+    latched_fixed[key] = expected_fixed_alarm
+    if ($3 == 1 && loss == 1 && event_at_zero[key] == 1 &&
+        (first_mix[key] != 1 || first_fixed[key] != 1 ||
+         events_at_mix[key] != 2 || events_at_fixed[key] != 2)) failed = 1
+
+    if ($2 == "nominal" && loss != 0) failed = 1
+    pair_key = $1 SUBSEP $3
+    if ($2 == "strong_shift") {
+      strong_event[pair_key] = $20
+      strong_first_event[pair_key] = $15
+      for (i = 20; i <= 34; i++) strong_output[pair_key SUBSEP i] = $i
+    }
+    if ($2 == "stealth_shift") {
+      if (strong_event[pair_key] != $20 || strong_first_event[pair_key] != $15) failed = 1
+      for (i = 20; i <= 34; i++)
+        if (strong_output[pair_key SUBSEP i] != $i) failed = 1
+    }
+
+    row_key = key SUBSEP $3
+    if (seen[row_key]++) failed = 1
+    next_episode[key] = $3 + 1
+    if ($3 == 299) {
+      if (first_mix[key] == 300 && report_first_mix[key] != "NA") failed = 1
+      if (first_mix[key] < 300 && report_first_mix[key] != first_mix[key]) failed = 1
+      if (first_fixed[key] == 300 && report_first_fixed[key] != "NA") failed = 1
+      if (first_fixed[key] < 300 && report_first_fixed[key] != first_fixed[key]) failed = 1
+      raw_events[key] = event_count[key]
+      raw_first_event[key] = first_event[key]
+      raw_first_mix[key] = first_mix[key]
+      raw_first_fixed[key] = first_fixed[key]
+      raw_events_at_mix[key] = (first_mix[key] < 300 ? events_at_mix[key] : "NA")
+      raw_events_at_fixed[key] = (first_fixed[key] < 300 ? events_at_fixed[key] : "NA")
+      raw_final_mix[key] = $21
+      raw_final_fixed[key] = $27
+      raw_mix_alarm[key] = (first_mix[key] < 300 ? "true" : "false")
+      raw_fixed_alarm[key] = (first_fixed[key] < 300 ? "true" : "false")
+    }
+    raw_rows++
+    next
+  }
+
+  FILENAME == summary {
+    if (FNR == 1) {
+      if (NF != 20) failed = 1
+      next
+    }
+    if (NF != 20) failed = 1
+    if ($1 != "critical_low_reserve_high_load" && $1 != "reserve_limited" &&
+        $1 != "load_limited" && $1 != "balanced" && $1 != "high_margin") failed = 1
+    if ($2 != "nominal" && $2 != "moderate_shift" &&
+        $2 != "strong_shift" && $2 != "stealth_shift") failed = 1
+    key = $1 SUBSEP $2
+    if (summary_seen[key]++) failed = 1
+    if ($3 != 300 || $4 !~ /^[0-9]+$/ || $4 > 300) failed = 1
+    if ($5 !~ /^[0-9]*[.]?[0-9]+$/ ||
+        ($5 - ($4 / 300) > 0.000001) || (($4 / 300) - $5 > 0.000001)) failed = 1
+    if ($6 != "true" && $6 != "false") failed = 1
+    if ($8 != "true" && $8 != "false") failed = 1
+    if ($7 != "NA" && ($7 !~ /^[0-9]+$/ || $7 >= 300)) failed = 1
+    if ($9 != "NA" && ($9 !~ /^[0-9]+$/ || $9 >= 300)) failed = 1
+    if ($10 != "NA" && ($10 !~ /^[0-9]+$/ || $10 >= 300)) failed = 1
+    if ($11 != "NA" && ($11 !~ /^[0-9]+$/ || $11 >= 300)) failed = 1
+    if ($12 != "NA" && ($12 !~ /^[0-9]+$/ || $12 >= 300)) failed = 1
+    if ($13 != "NA" && ($13 !~ /^[0-9]+$/ || $13 > $4)) failed = 1
+    if ($14 != "NA" && ($14 !~ /^[0-9]+$/ || $14 > $4)) failed = 1
+    if ($15 !~ /^-?[0-9]*[.]?[0-9]+$/ || $16 !~ /^-?[0-9]*[.]?[0-9]+$/) failed = 1
+    if (($17 - log(100) > 0.000001) || (log(100) - $17 > 0.000001)) failed = 1
+    if (($18 - 0.05 > 0.000001) || (0.05 - $18 > 0.000001)) failed = 1
+    if (($19 - 0.05 > 0.000001) || (0.05 - $19 > 0.000001)) failed = 1
+    if ($20 != 5) failed = 1
+    if ($6 != raw_mix_alarm[key] || $8 != raw_fixed_alarm[key]) failed = 1
+    if (($7 == "NA" ? 300 : $7) != raw_first_mix[key]) failed = 1
+    if (($9 == "NA" ? 300 : $9) != raw_first_fixed[key]) failed = 1
+    if (($10 == "NA" ? 300 : $10) != raw_first_event[key]) failed = 1
+    if (($11 == "NA" ? 300 : $11) !=
+        ((raw_first_mix[key] < 300 && raw_first_event[key] < 300)
+          ? raw_first_mix[key] - raw_first_event[key] : 300)) failed = 1
+    if (($12 == "NA" ? 300 : $12) !=
+        ((raw_first_fixed[key] < 300 && raw_first_event[key] < 300)
+          ? raw_first_fixed[key] - raw_first_event[key] : 300)) failed = 1
+    if ($13 != raw_events_at_mix[key] || $14 != raw_events_at_fixed[key]) failed = 1
+    if (($15 - raw_final_mix[key] > 0.000002) || (raw_final_mix[key] - $15 > 0.000002) ||
+        ($16 - raw_final_fixed[key] > 0.000002) || (raw_final_fixed[key] - $16 > 0.000002)) failed = 1
+    if ($2 == "nominal" && ($4 != 0 || $6 != "false" || $8 != "false")) failed = 1
+    rows_summary++
+    next
+  }
+
+  END {
+    if (raw_rows != 6000 || rows_summary != 20 || failed) exit 1
+    for (key in streams) {
+      if (next_episode[key] != 300) exit 1
+      if (event_count[key] == 0 &&
+          (first_mix[key] < 300 || first_fixed[key] < 300)) exit 1
+      if (event_count[key] == 300 &&
+          (first_mix[key] != 1 || first_fixed[key] != 1 ||
+           events_at_mix[key] != 2 || events_at_fixed[key] != 2)) exit 1
+    }
+    for (key in summary_seen) if (!streams[key]) exit 1
+  }
+' "$tmpdir/task-risk-a.csv" "$tmpdir/task-risk-summary-a.csv"; then
+  printf 'FAIL: persistent task-risk stream schema, event accounting, mixture recurrence or stealth pairing is invalid\n' >&2
+  exit 1
+fi
+
+# Monte Carlo validation of risk-null calibration and wide bet-grid power.
+# Every method consumes the same deterministic Bernoulli trace per cohort/monitor.
+cargo run --locked --release --manifest-path "$manifest" --bin allostatic-risk-eprocess-null-monte-carlo -- \
+  "$tmpdir/bet-grid-a.csv" "$tmpdir/bet-grid-summary-a.csv"
+cargo run --locked --release --manifest-path "$manifest" --bin allostatic-risk-eprocess-null-monte-carlo -- \
+  "$tmpdir/bet-grid-b.csv" "$tmpdir/bet-grid-summary-b.csv"
+if ! cmp -s "$tmpdir/bet-grid-a.csv" "$tmpdir/bet-grid-b.csv" ||
+   ! cmp -s "$tmpdir/bet-grid-summary-a.csv" "$tmpdir/bet-grid-summary-b.csv"; then
+  printf 'FAIL: repeated bet-grid Monte Carlo outputs are not byte-identical\n' >&2
+  exit 1
+fi
+
+if ! awk -F, -v raw="$tmpdir/bet-grid-a.csv" -v summary="$tmpdir/bet-grid-summary-a.csv" '
+  BEGIN {
+    rate_names[1] = "0.010"; rate_values[1] = 0.01
+    rate_names[2] = "0.050"; rate_values[2] = 0.05
+    rate_names[3] = "0.075"; rate_values[3] = 0.075
+    rate_names[4] = "0.100"; rate_values[4] = 0.10
+    rate_names[5] = "0.200"; rate_values[5] = 0.20
+    rate_names[6] = "0.400"; rate_values[6] = 0.40
+    method_names[1] = "fixed"; method_names[2] = "mix3"; method_names[3] = "mix7"; method_names[4] = "adaptive"
+    threshold = log(100)
+    z = 1.959963984540054
+  }
+
+  FILENAME == raw {
+    if (FNR == 1) { if (NF != 14) failed = 1; next }
+    if (NF != 14) failed = 1
+    ri = 0
+    for (i = 1; i <= 6; i++) if ($1 == rate_names[i]) ri = i
+    if (ri == 0) failed = 1
+    if ($2 !~ /^[0-9]+$/ || $2 < 0 || $2 >= 1000) failed = 1
+    if ($3 !~ /^[0-9]+$/ || $3 < 0 || $3 >= 5) failed = 1
+    if ($4 !~ /^[0-9]+$/ || $4 > 300) failed = 1
+    trace = $5
+    if (length(trace) != 300 || trace ~ /[^01]/) failed = 1
+    if ($6 != "NA" && ($6 !~ /^[0-9]+$/ || $6 >= 300)) failed = 1
+    for (i = 7; i <= 9; i++) if ($i !~ /^[0-9]+$/ || $i > 300) failed = 1
+    for (i = 10; i <= 12; i++) if ($i !~ /^-?[0-9]*[.]?[0-9]+$/) failed = 1
+    if ($13 !~ /^[0-9]+$/ || $13 > 300 || $14 !~ /^-?[0-9]*[.]?[0-9]+$/) failed = 1
+    key = ri SUBSEP $2 SUBSEP $3
+    if (seen[key]++) failed = 1
+
+    count = 0
+    first_event = 300
+    fixed_log = 0
+    first_fixed = 300
+    c3[1] = c3[2] = c3[3] = 0
+    c7[1] = c7[2] = c7[3] = c7[4] = c7[5] = c7[6] = c7[7] = 0
+    first3 = first7 = 300
+    l3 = l7 = 0
+    adaptive_log = 0
+    first_adaptive = 300
+    adaptive_count = 0
+    prior_loss_sum = 0
+    prior_squared_loss_sum = 0
+    for (step = 0; step < 300; step++) {
+      loss = (substr(trace, step + 1, 1) == "1") ? 1 : 0
+      if (loss == 1) {
+        count++
+        if (first_event == 300) first_event = step
+      }
+      factor_fixed = 1 + 10 * (loss - 0.05)
+      fixed_log += log(factor_fixed)
+      if (fixed_log >= threshold && first_fixed == 300) first_fixed = step
+
+      lambda3[1] = 5; lambda3[2] = 10; lambda3[3] = 15
+      for (j = 1; j <= 3; j++) c3[j] += log(1 + lambda3[j] * (loss - 0.05))
+      max3 = c3[1]
+      for (j = 2; j <= 3; j++) if (c3[j] > max3) max3 = c3[j]
+      l3 = max3 + log((exp(c3[1] - max3) + exp(c3[2] - max3) + exp(c3[3] - max3)) / 3)
+      if (l3 >= threshold && first3 == 300) first3 = step
+
+      lambda7[1] = 0.5; lambda7[2] = 1; lambda7[3] = 2; lambda7[4] = 5
+      lambda7[5] = 10; lambda7[6] = 15; lambda7[7] = 19
+      for (j = 1; j <= 7; j++) c7[j] += log(1 + lambda7[j] * (loss - 0.05))
+      max7 = c7[1]
+      for (j = 2; j <= 7; j++) if (c7[j] > max7) max7 = c7[j]
+      sum7 = 0
+      for (j = 1; j <= 7; j++) sum7 += exp(c7[j] - max7)
+      l7 = max7 + log(sum7 / 7)
+      if (l7 >= threshold && first7 == 300) first7 = step
+
+      adaptive_bet = 0
+      if (adaptive_count >= 20) {
+        adaptive_mean = prior_loss_sum / adaptive_count
+        adaptive_variance = prior_squared_loss_sum / adaptive_count - adaptive_mean * adaptive_mean
+        if (adaptive_variance < 1.0e-10) adaptive_variance = 1.0e-10
+        adaptive_excess = adaptive_mean - 0.05
+        if (adaptive_excess > 0) {
+          adaptive_bet = adaptive_excess / (adaptive_variance + adaptive_excess * adaptive_excess)
+          if (adaptive_bet > 10) adaptive_bet = 10
+        }
+      }
+      adaptive_factor = 1 + adaptive_bet * (loss - 0.05)
+      if (adaptive_factor <= 0) failed = 1
+      adaptive_log += log(adaptive_factor)
+      if (adaptive_log >= threshold && first_adaptive == 300) first_adaptive = step
+      adaptive_count++
+      prior_loss_sum += loss
+      prior_squared_loss_sum += loss * loss
+    }
+
+    if (count != $4) failed = 1
+    if ((first_event == 300 && $6 != "NA") ||
+        (first_event < 300 && $6 != first_event)) failed = 1
+    if ($7 != first_fixed || $8 != first3 || $9 != first7 || $13 != first_adaptive) failed = 1
+    if (($10 - fixed_log > 0.000003) || (fixed_log - $10 > 0.000003) ||
+        ($11 - l3 > 0.000003) || (l3 - $11 > 0.000003) ||
+        ($12 - l7 > 0.000003) || (l7 - $12 > 0.000003) ||
+        ($14 - adaptive_log > 0.000003) || (adaptive_log - $14 > 0.000003)) failed = 1
+
+    streams[ri SUBSEP $2] = 1
+    event_sum[ri] += count
+    method_first[1] = first_fixed
+    method_first[2] = first3
+    method_first[3] = first7
+    method_first[4] = first_adaptive
+    for (j = 1; j <= 4; j++) {
+      method = method_names[j]
+      if (method_first[j] < 300) {
+        monitor_alarms[ri SUBSEP method]++
+        monitor_step_sum[ri SUBSEP method] += method_first[j]
+        alarm_steps[ri SUBSEP method SUBSEP monitor_alarms[ri SUBSEP method]] = method_first[j]
+        cohort_alarm[ri SUBSEP $2 SUBSEP method] = 1
+      }
+    }
+    raw_rows++
+    next
+  }
+
+  FILENAME == summary {
+    if (FNR == 1) { if (NF != 20) failed = 1; next }
+    if (NF != 20) failed = 1
+    ri = 0
+    for (i = 1; i <= 6; i++) if ($1 == rate_names[i]) ri = i
+    if (ri == 0) failed = 1
+    method = $2
+    if (method != "fixed" && method != "mix3" && method != "mix7" && method != "adaptive") failed = 1
+    if ($3 != 1000 || $4 != 5 || $5 != 300) failed = 1
+    if ($6 !~ /^[0-9]+$/ || $6 > 1000) failed = 1
+    if ($7 !~ /^[0-9]*[.]?[0-9]+$/ || $8 !~ /^[0-9]*[.]?[0-9]+$/ ||
+        $9 !~ /^[0-9]*[.]?[0-9]+$/ || $10 !~ /^[0-9]+$/ || $10 > 5000 ||
+        $11 !~ /^[0-9]*[.]?[0-9]+$/) failed = 1
+    if ($12 != "NA" && ($12 !~ /^[0-9]*[.]?[0-9]+$/ || $12 < 0 || $12 >= 300)) failed = 1
+    if ($13 != "NA" && ($13 !~ /^[0-9]+$/ || $13 < 0 || $13 >= 300)) failed = 1
+    if ($14 != "NA" && ($14 !~ /^[0-9]+$/ || $14 < 0 || $14 >= 300)) failed = 1
+    if ($13 != "NA" && $14 != "NA" && $13 < $14) failed = 1
+    if ($15 !~ /^[0-9]*[.]?[0-9]+$/ || $16 !~ /^[0-9]*[.]?[0-9]+$/ ||
+        $17 != 0.05 || $18 != 0.05 || $20 == "") failed = 1
+    if ((method == "fixed" && $20 != "0.500") ||
+        (method == "mix3" && $20 != "0.250;0.500;0.750") ||
+        (method == "mix7" && $20 != "0.025;0.050;0.100;0.250;0.500;0.750;0.950") ||
+        (method == "adaptive" && $20 != "predictable_mean_variance;max_fraction=0.500;min_history=20")) failed = 1
+    if (($19 - log(100) > 0.000001) || (log(100) - $19 > 0.000001)) failed = 1
+
+    calculated_fwer = 0
+    for (cohort = 0; cohort < 1000; cohort++)
+      if (cohort_alarm[ri SUBSEP cohort SUBSEP method]) calculated_fwer++
+    if ($6 != calculated_fwer) failed = 1
+    if (($7 - calculated_fwer / 1000 > 0.000001) ||
+        (calculated_fwer / 1000 - $7 > 0.000001)) failed = 1
+    phat = calculated_fwer / 1000
+    denominator = 1 + z*z/1000
+    center = (phat + z*z/(2*1000)) / denominator
+    half = z * sqrt(phat*(1-phat)/1000 + z*z/(4*1000*1000)) / denominator
+    lower = (center-half > 0 ? center-half : 0)
+    upper = (center+half < 1 ? center+half : 1)
+    if (($8 - lower > 0.000002) || (lower - $8 > 0.000002) ||
+        ($9 - upper > 0.000002) || (upper - $9 > 0.000002)) failed = 1
+
+    counted_alarms = monitor_alarms[ri SUBSEP method] + 0
+    if ($10 != counted_alarms) failed = 1
+    if (($11 - counted_alarms/5000 > 0.000002) ||
+        (counted_alarms/5000 - $11 > 0.000002)) failed = 1
+    if (counted_alarms == 0 && ($12 != "NA" || $13 != "NA" || $14 != "NA")) failed = 1
+    if (counted_alarms > 0) {
+      computed_mean = monitor_step_sum[ri SUBSEP method] / counted_alarms
+      if ($12 == "NA" || ($12 - computed_mean > 0.000002) ||
+          (computed_mean - $12 > 0.000002)) failed = 1
+    }
+    if (($15 - event_sum[ri]/5000 > 0.000002) ||
+        (event_sum[ri]/5000 - $15 > 0.000002)) failed = 1
+    expected_count = rate_values[ri] * 300
+    if (($16 - expected_count > 0.000002) ||
+        (expected_count - $16 > 0.000002)) failed = 1
+    if ($15 - $16 > 0.25 || $16 - $15 > 0.25) failed = 1
+    grid_key = ri SUBSEP method
+    if (summary_seen[grid_key]++) failed = 1
+    fwer_rate[grid_key] = $7
+    fwer_upper[grid_key] = $9
+    summary_rows++
+    next
+  }
+
+  END {
+    if (raw_rows != 30000 || summary_rows != 24 || failed) exit 1
+    for (i = 1; i <= 6; i++) for (cohort = 0; cohort < 1000; cohort++)
+      for (monitor = 0; monitor < 5; monitor++)
+        if (!streams[i SUBSEP cohort] || !seen[i SUBSEP cohort SUBSEP monitor]) exit 1
+
+    if (fwer_rate[1 SUBSEP "fixed"] > 0.02 ||
+        fwer_rate[1 SUBSEP "mix3"] > 0.02 ||
+        fwer_rate[1 SUBSEP "mix7"] > 0.02 ||
+        fwer_rate[1 SUBSEP "adaptive"] > 0.02 ||
+        fwer_upper[2 SUBSEP "fixed"] > 0.08 ||
+        fwer_upper[2 SUBSEP "mix3"] > 0.08 ||
+        fwer_upper[2 SUBSEP "mix7"] > 0.08 ||
+        fwer_upper[2 SUBSEP "adaptive"] > 0.08) exit 1
+    if (fwer_rate[3 SUBSEP "mix7"] < fwer_rate[3 SUBSEP "mix3"] + 0.15 ||
+        fwer_rate[4 SUBSEP "mix7"] < fwer_rate[4 SUBSEP "mix3"] + 0.20 ||
+        fwer_rate[3 SUBSEP "adaptive"] < fwer_rate[3 SUBSEP "mix3"] + 0.10 ||
+        fwer_rate[4 SUBSEP "adaptive"] < fwer_rate[4 SUBSEP "mix3"] + 0.40) exit 1
+    if (fwer_rate[5 SUBSEP "fixed"] < 0.95 ||
+        fwer_rate[5 SUBSEP "mix3"] < 0.95 ||
+        fwer_rate[5 SUBSEP "mix7"] < 0.95 ||
+        fwer_rate[5 SUBSEP "adaptive"] < 0.95 ||
+        fwer_rate[6 SUBSEP "fixed"] < 0.99 ||
+        fwer_rate[6 SUBSEP "mix3"] < 0.99 ||
+        fwer_rate[6 SUBSEP "mix7"] < 0.99 ||
+        fwer_rate[6 SUBSEP "adaptive"] < 0.99) exit 1
+  }
+' "$tmpdir/bet-grid-a.csv" "$tmpdir/bet-grid-summary-a.csv"; then
+  printf 'FAIL: risk-null Monte Carlo schema, component recurrence, confidence intervals, calibration or power gates are invalid\n' >&2
   exit 1
 fi
 
@@ -898,6 +1352,10 @@ cp "$tmpdir/sequential-a.csv" "$sequential_out"
 cp "$tmpdir/sequential-summary-a.csv" "$sequential_summary_out"
 cp "$tmpdir/eprocess-a.csv" "$eprocess_out"
 cp "$tmpdir/eprocess-summary-a.csv" "$eprocess_summary_out"
+cp "$tmpdir/task-risk-a.csv" "$task_risk_out"
+cp "$tmpdir/task-risk-summary-a.csv" "$task_risk_summary_out"
+cp "$tmpdir/bet-grid-a.csv" "$bet_grid_out"
+cp "$tmpdir/bet-grid-summary-a.csv" "$bet_grid_summary_out"
 {
   printf 'status=pass\n'
   printf 'git_commit=%s\n' "$actual_head"
@@ -937,6 +1395,14 @@ cp "$tmpdir/eprocess-summary-a.csv" "$eprocess_summary_out"
   printf 'risk_eprocess_rows_excluding_header=%s\n' "$(( $(wc -l < "$eprocess_out") - 1 ))"
   printf 'risk_eprocess_summary_sha256=%s\n' "$(sha256sum "$eprocess_summary_out" | awk '{print $1}')"
   printf 'risk_eprocess_summary_rows_excluding_header=%s\n' "$(( $(wc -l < "$eprocess_summary_out") - 1 ))"
+  printf 'task_risk_event_stream_sha256=%s\n' "$(sha256sum "$task_risk_out" | awk '{print $1}')"
+  printf 'task_risk_event_stream_rows_excluding_header=%s\n' "$(( $(wc -l < "$task_risk_out") - 1 ))"
+  printf 'task_risk_event_stream_summary_sha256=%s\n' "$(sha256sum "$task_risk_summary_out" | awk '{print $1}')"
+  printf 'task_risk_event_stream_summary_rows_excluding_header=%s\n' "$(( $(wc -l < "$task_risk_summary_out") - 1 ))"
+  printf 'eprocess_bet_grid_sha256=%s\n' "$(sha256sum "$bet_grid_out" | awk '{print $1}')"
+  printf 'eprocess_bet_grid_rows_excluding_header=%s\n' "$(( $(wc -l < "$bet_grid_out") - 1 ))"
+  printf 'eprocess_bet_grid_summary_sha256=%s\n' "$(sha256sum "$bet_grid_summary_out" | awk '{print $1}')"
+  printf 'eprocess_bet_grid_summary_rows_excluding_header=%s\n' "$(( $(wc -l < "$bet_grid_summary_out") - 1 ))"
   printf '\nsource_sha256:\n'
   sha256sum "${source_files[@]}"
 } > "$receipt"
@@ -956,4 +1422,8 @@ printf 'Sequential CUSUM scope frontier: %s\n' "$sequential_out"
 printf 'Sequential CUSUM scope summary: %s\n' "$sequential_summary_out"
 printf 'Bounded-risk e-process frontier: %s\n' "$eprocess_out"
 printf 'Bounded-risk e-process summary: %s\n' "$eprocess_summary_out"
+printf 'Persistent task-risk event stream: %s\n' "$task_risk_out"
+printf 'Persistent task-risk event summary: %s\n' "$task_risk_summary_out"
+printf 'E-process bet-grid Monte Carlo frontier: %s\n' "$bet_grid_out"
+printf 'E-process bet-grid Monte Carlo summary: %s\n' "$bet_grid_summary_out"
 printf 'Provenance receipt: %s\n' "$receipt"
