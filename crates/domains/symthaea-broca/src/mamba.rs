@@ -1666,6 +1666,24 @@ pub(crate) mod tests {
             .compute_e2e_sequence_loss_and_gradients(&context, &targets, &[0, 1])
             .expect("sequence loss and gradients should be computable");
         assert!(report.mean_loss.is_finite() && report.mean_loss > 0.0);
+
+        // The reported scalar from the autograd graph must equal an independent
+        // teacher-forced loss pass over the same projected context and target ids.
+        let mut reference_wrapper = wrapper.clone();
+        let reference_loss = mean_teacher_forced_loss(
+            &mut reference_wrapper,
+            &context,
+            &targets,
+        )
+        .expect("reference teacher-forced loss should compute");
+        let loss_tolerance = 1e-4 + reference_loss.abs() * 1e-4;
+        assert!(
+            (report.mean_loss - reference_loss).abs() <= loss_tolerance,
+            "single-unroll loss mismatch: graph={}, reference={}, tolerance={loss_tolerance}",
+            report.mean_loss,
+            reference_loss
+        );
+
         let gradient = &report
             .context_gradients
             .iter()
