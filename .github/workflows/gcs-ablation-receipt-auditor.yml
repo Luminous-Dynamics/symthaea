@@ -53,6 +53,8 @@ jobs:
         run: cargo test --locked --example coding_gcs_ablation_benchmark --features "code_generation geodesic_synthesis"
       - name: Test selected-tier versus actual backend attempt reporting
         run: cargo test --locked --lib --features "code_generation geodesic_synthesis" backend_attempts
+      - name: Test fallback cost and effective-backend energy accounting
+        run: cargo test --locked --lib --features "code_generation geodesic_synthesis" cloud_failure_records_cloud_then_actual_fallback_backend
       - name: Compile the paired benchmark producer
         run: cargo check --locked --example coding_gcs_ablation_benchmark --features "code_generation geodesic_synthesis"
       - name: Run strict Clippy on the auditor
