@@ -412,7 +412,7 @@ impl IntelligentDispatcher {
         };
 
         let mut backend_attempts = Vec::new();
-        let (output, success, cost) = match tier {
+        let (output, success, nominal_cost) = match tier {
             BackendTier::Native => {
                 // Native generation is handled externally by CodeGenerator.
                 // The selected tier is tracked separately from LLM backend attempts.
@@ -566,6 +566,18 @@ impl IntelligentDispatcher {
                 );
                 ("// simulated code output".to_string(), true, 0.0)
             }
+        };
+
+        // Charge actual invoked backends (including failed attempts and fallback).
+        // Native/Hardware execution happens in the caller, so retain the nominal
+        // tier estimate when this dispatcher did not invoke an LLM backend.
+        let cost = if backend_attempts.is_empty() {
+            nominal_cost
+        } else {
+            backend_attempts
+                .iter()
+                .map(|attempt| attempt.estimated_energy_cost)
+                .sum()
         };
 
         self.total_energy += cost;
