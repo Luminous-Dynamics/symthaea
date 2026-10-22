@@ -8,11 +8,11 @@
     "trajectory_corpus_sha256": "1ac414e6b920a6259d68a20c273a0a9465e98c7a596393f9777be9976d6e3fd3"
   },
   "count_summary": {
-    "case_count": 43,
+    "case_count": 44,
     "frozen_trace_count": 12,
-    "mutation_case_count": 31,
+    "mutation_case_count": 32,
     "planned_not_yet_executable_count": 0,
-    "mapped_case_count": 43
+    "mapped_case_count": 44
   },
   "evidence_status_definitions": {
     "frozen_fixture": "Expected output resides in the frozen corpus and is checked by the trajectory validator.",
@@ -759,12 +759,29 @@
       "operator_id": "connectivity_recovery_control",
       "execution_target": "rust_matrix_runner",
       "execution_test_name": "executable_mutation_matrix_matches_each_declared_outcome"
+    },
+    {
+      "case_id": "MUT-032",
+      "invariant_id": "SCHEMA-006",
+      "mode": "mutation_or_control",
+      "source_trace_id": "FA-TRACE-001",
+      "mutation": "attach sensitive_payload metadata to session_started, where the field has no semantic meaning",
+      "expected": {
+        "outcome": "reject",
+        "violation_codes": []
+      },
+      "evidence_status": "unit_test_added",
+      "test_name": "event_fields_are_scoped_to_their_event_kind",
+      "note": "Implemented in validate_event_fields and the Rust matrix runner's unexpected_event_metadata operator. Rejection prevents unused known fields from being silently ignored. Exact-head validation pending.",
+      "operator_id": "unexpected_event_metadata",
+      "execution_target": "rust_matrix_runner",
+      "execution_test_name": "executable_mutation_matrix_matches_each_declared_outcome"
     }
   ],
   "differential_oracle": {
     "status": "unit_test_added",
     "implementation": "JSON-value-based reference interpreter compared against the production typed-state interpreter",
-    "coverage": "Typed trace checker + JSON-value differential interpreter over all 12 frozen traces and 13 adversarial mutations; independent test-only finite lifecycle/connectivity graph (252 states, 5,040 state/action transitions); 18 orthogonal policy truth-table combinations. Event-level connectivity degradation, recovery, and metadata scoping are executed by the mutation matrix.",
+    "coverage": "Typed trace checker + JSON-value differential interpreter over all 12 frozen traces and 13 adversarial mutations plus event-metadata-scoping rejection in the executable matrix runner; independent test-only finite lifecycle/connectivity graph (252 states, 5,040 state/action transitions); 18 orthogonal policy truth-table combinations. Event-level connectivity degradation, recovery, and metadata scoping are executed by the mutation matrix.",
     "limits": "Same repository and shared invariants/fixtures; implementation-diversity and finite abstraction checks only, not external clinical adjudication, formally verified specification, stateful connectivity/freshness/consent interactions, or clinical validation.",
     "test_name": "differential_json_reference_agrees_on_frozen_traces",
     "mutation_suite_test_name": "differential_json_reference_agrees_on_adversarial_mutation_suite",
@@ -774,7 +791,7 @@
     "state_model_spec_path": "docs/research/first-aid/STATE_MODEL_V0.md",
     "matrix_runner_test_name": "executable_mutation_matrix_matches_each_declared_outcome",
     "policy_truth_table_test_name": "exhaustive_orthogonal_policy_truth_tables_cover_non_lifecycle_invariants",
-    "policy_truth_table_scope": "18 explicit combinations over connectivity/requirement (6), freshness/presentation (6), sensitivity/consent (4), and unknown normalization (2), separate from the 84-state lifecycle graph.",
+    "policy_truth_table_scope": "18 explicit combinations over connectivity/requirement (6), freshness/presentation (6), sensitivity/consent (4), and unknown normalization (2), separate from the 252-state lifecycle graph.",
     "edge_differential_status": "implemented_in_source",
     "edge_differential_test_name": "every_reachable_state_action_edge_matches_production_trace_checker",
     "edge_differential_scope": "For each of 252 reachable abstract states, replay its breadth-first shortest event-history witness, append each of the 20 actions, and compare ordered violations from the production JSON trace checker with the abstract transition model; expected 252 states and 5,040 edges. Same repo, shared design intent, and finite abstraction; not independent clinical ground truth.",
