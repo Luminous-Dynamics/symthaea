@@ -1,0 +1,92 @@
+{
+  "protocol_id": "symthaea-rust-repair",
+  "protocol_version": "0.1.0",
+  "status": "draft",
+  "created_utc": "2026-10-22T20:00:00+02:00",
+  "dataset": {
+    "provider": "Microsoft SWE-bench-Live MultiLang",
+    "repository_url": "https://github.com/microsoft/SWE-bench-Live",
+    "code_revision_sha": "62d02936a0726fbf4597b05bd07b09fb99eddae6",
+    "data_revision": "3638632e8153a10ca422c1022bed79023084b5c9",
+    "split": "rust",
+    "language_slice": "Official Rust split at the pinned Hugging Face snapshot; 171 candidate rows reported upstream. Final denominator must be computed after three gold-patch validation runs and an independent task-quality audit.",
+    "task_count": null,
+    "task_ids_sha256": null,
+    "manifest_sha256": null,
+    "candidate_row_count": 171,
+    "data_file_path": "data/rust-00000-of-00001.parquet",
+    "data_file_sha256": "02ac78e2c51a84eb174ac393bb07b77478f1f96cf260af18835a711dd8074ebc"
+  },
+  "agent": {
+    "agent_name": "Symthaea coding agent",
+    "agent_harness_commit": null,
+    "model_provider": "UNSET",
+    "model_id": null,
+    "model_revision": null,
+    "model_identity_evidence": "application_reported_only"
+  },
+  "treatments": {
+    "baseline": "GCS advisories disabled",
+    "candidate": "GCS advisories enabled",
+    "changed_factor": "CodingAgentConfig.enable_gcs_advisories only; all other agent/model/tool/build/evaluation settings held fixed",
+    "order_policy": "randomized_paired",
+    "randomization_seed": null,
+    "repeats_per_task": 3
+  },
+  "environment": {
+    "os_architecture": "Record exact runner OS and architecture before locking",
+    "rust_toolchain": "Record exact `rustc --version` and Cargo version before locking",
+    "container_image_digest": null,
+    "lockfile_sha256": null,
+    "network_policy": "No access to hidden tests, gold patches, or evaluator metadata; record any required network access",
+    "cpu_gpu_description": "Record runner hardware and whether GPU is used"
+  },
+  "budget": {
+    "max_wall_clock_minutes_per_run": 60,
+    "max_agent_tokens_per_run": 100000,
+    "max_cost_usd_per_run": 5,
+    "max_retries": 0
+  },
+  "endpoints": {
+    "primary": "paired_pass_at_1_absolute_difference",
+    "task_weighting": "task_weighted",
+    "success_definition": "Patch applies; real build/test execution completes; every hidden fail-to-pass and required pass-to-pass test passes; no evaluator error or missing test evidence.",
+    "secondary": [
+      "pass-to-pass regression rate",
+      "compile success",
+      "oracle completeness",
+      "unresolved rate",
+      "paired wins/losses/ties",
+      "cost per verified fix",
+      "p50/p95 latency",
+      "tokens and retries"
+    ]
+  },
+  "analysis": {
+    "alpha": 0.05,
+    "target_effect_percentage_points": 5,
+    "non_inferiority_margin_percentage_points": 1.5,
+    "cluster_keys": [
+      "repository",
+      "task_family"
+    ],
+    "bootstrap_resamples": 10000,
+    "bootstrap_seed": null,
+    "power_analysis": null,
+    "analysis_code_commit": null
+  },
+  "exclusions": {
+    "predeclared_rules": [
+      "Exclude a task only before candidate scoring when base/reference/oracle controls fail reproducibly; preserve reason and evidence.",
+      "Do not remove agent failures, timeouts, refusals, missing patches, or unresolved executions silently."
+    ],
+    "unresolved_policy": "Report separately and publish arm-adverse sensitivity bounds; unresolved is neither a behavioral fail nor a tie.",
+    "publish_exclusion_ledger": true
+  },
+  "artifacts": {
+    "raw_receipt_location": null,
+    "auditor_revision": null,
+    "independent_audit_required": true,
+    "signature_policy": "Preserve raw run artifacts; independently audit from a separate environment; sign or immutably publish the final audit manifest with a separately controlled key where available."
+  }
+}
