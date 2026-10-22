@@ -500,6 +500,17 @@ mod tests {
             .expect("both candidates have positive worst-case information");
         assert_eq!(*robust, 0);
         assert!(nominal_score > 0.0 && robust_score > 0.0);
+
+        let (cost_aware, cost_score) = select_experiment_by_worst_case_information_gain_per_cost(
+            &candidates,
+            &hypotheses,
+            &[0.1, 5.0],
+            predict,
+            |candidate| if *candidate == 0 { 100.0 } else { 1.0 },
+        )
+        .expect("at least one candidate has positive information per cost");
+        assert_eq!(*cost_aware, 1);
+        assert!(cost_score.is_finite() && cost_score > 0.0);
     }
 
     #[test]
