@@ -355,10 +355,186 @@ pub fn select_experiment_by_information_gain_per_cost<'a, H, E>(
 }
 
 
+
+/// Compute conservative expected information gain over a finite set of plausible
+/// observation-noise standard deviations.
+///
+/// The returned value is the minimum information gain across every supplied
+/// noise scenario. This is a finite-scenario robustness criterion, not a bound
+/// over unlisted noise scales and not protection against a misspecified
+/// hypothesis class. An empty scenario set, invalid noise scale, incomplete
+/// prediction set, or non-finite prediction fails closed with `None`.
+pub fn expected_information_gain_worst_case_nats<H, E>(
+    experiment: &E,
+    hypotheses: &[H],
+    observation_std_devs: &[f64],
+    predict: impl Fn(&H, &E) -> Option<f64> + Copy,
+) -> Option<f64> {
+    if observation_std_devs.is_empty() {
+        return None;
+    }
+
+    let mut worst_case = f64::INFINITY;
+    for &observation_std_dev in observation_std_devs {
+        let information_gain =
+            expected_information_gain_nats(experiment, hypotheses, observation_std_dev, predict)?;
+        worst_case = worst_case.min(information_gain);
+    }
+
+    (worst_case.is_finite() && worst_case >= 0.0).then_some(worst_case)
+}
+
+/// Select the experiment maximizing worst-case expected information gain per cost.
+///
+/// Each candidate is evaluated at every supplied observation-noise scale; its
+/// score is the minimum of those gains divided by positive finite cost. This is
+/// conservative only with respect to the caller-provided finite scenario set.
+/// It does not replace discrepancy audits, posterior calibration, safety
+/// constraints, or out-of-model hypothesis checks. Invalid scenario sets are
+/// rejected before ranking; candidates with invalid predictions or costs are
+/// skipped. Deterministic input-order tie-breaking is preserved.
+pub fn select_experiment_by_worst_case_information_gain_per_cost<'a, H, E>(
+    candidates: &'a [E],
+    hypotheses: &[H],
+    observation_std_devs: &[f64],
+    predict: impl Fn(&H, &E) -> Option<f64> + Copy,
+    cost: impl Fn(&E) -> f64 + Copy,
+) -> Option<(&'a E, f64)> {
+    if observation_std_devs.is_empty()
+        || observation_std_devs
+            .iter()
+            .any(|sigma| !sigma.is_finite() || *sigma <= 0.0)
+    {
+        return None;
+    }
+
+    let mut best: Option<(&'a E, f64)> = None;
+    for experiment in candidates {
+        let experiment_cost = cost(experiment);
+        if !experiment_cost.is_finite() || experiment_cost <= 0.0 {
+            continue;
+        }
+        let Some(worst_case_gain) = expected_information_gain_worst_case_nats(
+            experiment,
+            hypotheses,
+            observation_std_devs,
+            predict,
+        ) else {
+            continue;
+        };
+        let score = worst_case_gain / experiment_cost;
+        if score.is_finite()
+            && score > 0.0
+            && best.is_none_or(|(_, best_score)| score > best_score)
+        {
+            best = Some((experiment, score));
+        }
+    }
+    best
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::hdc::conjecture_engine::Expr;
+
+
+    #[test]
+    fn worst_case_information_gain_is_bounded_by_every_scenario() {
+        let hypotheses = [0_i32, 1, 2, 3];
+        let predictions = [0.0_f64, 0.0, 0.0, 3.0];
+        let scenarios = [0.1_f64, 1.0, 5.0];
+        let robust = expected_information_gain_worst_case_nats(
+            &(),
+            &hypotheses,
+            &scenarios,
+            |hypothesis, _| Some(predictions[*hypothesis as usize]),
+        )
+        .expect("valid finite scenarios");
+        for sigma in scenarios {
+            let scenario_score = expected_information_gain_nats(
+                &(),
+                &hypotheses,
+                sigma,
+                |hypothesis, _| Some(predictions[*hypothesis as usize]),
+            )
+            .unwrap();
+            assert!(
+                robust <= scenario_score + 1.0e-12,
+                "worst-case score {robust} exceeded scenario score {scenario_score} at sigma={sigma}"
+            );
+        }
+    }
+
+    #[test]
+    fn robust_selector_can_trade_nominal_information_for_noise_envelope() {
+        // Candidate 1 separates every hypothesis at low noise. Candidate 0 has
+        // lower low-noise entropy, but higher signal variance and therefore better
+        // worst-case information under the much noisier scenario.
+        let hypotheses = [0_usize, 1, 2, 3];
+        let candidates = [0_u8, 1_u8];
+        let predict = |hypothesis: &usize, candidate: &u8| {
+            let values = match candidate {
+                0 => [0.0_f64, 0.0, 0.0, 3.0],
+                1 => [0.0_f64, 1.0, 2.0, 3.0],
+                _ => return None,
+            };
+            Some(values[*hypothesis])
+        };
+        let (nominal, nominal_score) =
+            select_experiment_by_information_gain_per_cost(
+                &candidates,
+                &hypotheses,
+                0.1,
+                predict,
+                |_| 1.0,
+            )
+            .expect("a low-noise candidate is informative");
+        assert_eq!(*nominal, 1);
+
+        let (robust, robust_score) =
+            select_experiment_by_worst_case_information_gain_per_cost(
+                &candidates,
+                &hypotheses,
+                &[0.1, 5.0],
+                predict,
+                |_| 1.0,
+            )
+            .expect("both candidates have positive worst-case information");
+        assert_eq!(*robust, 0);
+        assert!(nominal_score > 0.0 && robust_score > 0.0);
+    }
+
+    #[test]
+    fn robust_selector_fails_closed_on_invalid_noise_envelope() {
+        let hypotheses = [0_i32, 1];
+        let candidates = [0.0_f64, 1.0];
+        let predict = |hypothesis: &i32, experiment: &f64| {
+            Some(*hypothesis as f64 * *experiment)
+        };
+        assert!(expected_information_gain_worst_case_nats(
+            &0.0,
+            &hypotheses,
+            &[],
+            predict
+        )
+        .is_none());
+        assert!(expected_information_gain_worst_case_nats(
+            &0.0,
+            &hypotheses,
+            &[1.0, f64::NAN],
+            predict
+        )
+        .is_none());
+        assert!(select_experiment_by_worst_case_information_gain_per_cost(
+            &candidates,
+            &hypotheses,
+            &[1.0, 0.0],
+            predict,
+            |_| 1.0
+        )
+        .is_none());
+    }
 
     #[test]
     fn variance_of_identical_values_is_zero() {
