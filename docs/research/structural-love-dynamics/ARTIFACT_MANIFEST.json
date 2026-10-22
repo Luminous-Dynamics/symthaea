@@ -3,7 +3,7 @@
   "status": "DRAFT_CANDIDATE",
   "hash_algorithm": "SHA-256",
   "encoding": "UTF-8 bytes of exact repository file content",
-  "source_commit_before_manifest": "6c79723f16b46ae86474779b297b7959f77999b5",
+  "source_commit_before_manifest": "71bc752f19f51d6e914c718389276d76eb55300b",
   "generated_date": "2026-10-22",
   "self_digest_excluded": true,
   "notes": [
@@ -98,9 +98,9 @@
     },
     {
       "path": "xtask/src/bin/sld-compare.rs",
-      "sha256": "8f7378b3a57a9d590459c401a06cd2dc48ba89ac46fc1c7a97125a3ad5b8c17b",
-      "utf8_bytes": 32850,
-      "git_blob_sha1": "a343afe11a6517734d99a0c8995fce1e912ccc6c"
+      "sha256": "1a1a3a749a3ec00ee5a441537a40d4877af96d4de0aec8edbdd0fddc47273560",
+      "utf8_bytes": 34291,
+      "git_blob_sha1": "a5e17c3b380828ae11f6a7b2de85414af4c59f76"
     },
     {
       "path": "xtask/src/main.rs",
