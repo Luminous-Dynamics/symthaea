@@ -432,15 +432,15 @@ mod tests {
     #[test]
     fn requests_more_samples_when_score_intervals_overlap() {
         let estimates = [
-            MisCandidateEstimate::new(0, 10, 6).expect("valid estimate"),
-            MisCandidateEstimate::new(1, 10, 5).expect("valid estimate"),
-            MisCandidateEstimate::new(2, 10, 1).expect("valid estimate"),
+            MisCandidateEstimate::new(0, 1000, 600).expect("valid estimate"),
+            MisCandidateEstimate::new(1, 1000, 590).expect("valid estimate"),
+            MisCandidateEstimate::new(2, 1000, 100).expect("valid estimate"),
         ];
-        match plan_mis_shots(&estimates, MisSelectionMode::PreferInSet, config(100))
+        match plan_mis_shots(&estimates, MisSelectionMode::PreferInSet, config(10_000))
             .expect("valid plan")
         {
             MisShotBudgetDecision::RequestMoreShots { allocations, total_shots, .. } => {
-                assert_eq!(total_shots, 30);
+                assert_eq!(total_shots, 3000);
                 assert!(allocations.iter().any(|allocation| allocation.vertex == 0));
                 assert!(allocations.iter().any(|allocation| allocation.vertex == 1));
                 assert!(!allocations.iter().any(|allocation| allocation.vertex == 2));
