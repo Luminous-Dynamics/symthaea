@@ -8,7 +8,7 @@ use allostatic_control_bench::certificate_lease::{
     CertificateContext, CertificateLease, CertificateRejection,
 };
 use allostatic_control_bench::independent_verifier::{
-    verify_leased_witness, verify_sequence, LeasedVerificationFailure, VerificationFailure,
+    verify_leased_witness, verify_sequence, LeasedVerificationFailure,
 };
 use allostatic_control_bench::multistep_viability::evaluate_horizon_action_set;
 use allostatic_control_bench::robust_viability::{
