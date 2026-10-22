@@ -229,7 +229,7 @@ fn summary_row(
     let mut fwer_count = 0_usize;
     for cohort in 0..COHORTS {
         let any_alarm = records.iter().any(|record| {
-            record.cohort == cohort && method_fields(*record, method).0 < HORIZON
+            record.cohort == cohort && method_fields(record, method).0 < HORIZON
         });
         fwer_count += usize::from(any_alarm);
     }
