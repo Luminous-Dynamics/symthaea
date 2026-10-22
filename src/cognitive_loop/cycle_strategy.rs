@@ -6,7 +6,8 @@
 //! Contains:
 //! - `run_strategy_selection`: Closed Learning Loop strategy selection + agency override
 //! - `run_encoding_and_preprocessing`: HDC encoding, soul alignment, phi attention gating,
-//!   surprise exploration, codebook diversity, input memoization, ethics engine, urgency
+//!   codebook diversity, input memoization, and ethics evaluation. Stateful exploration and
+//!   urgency updates are owned by the perception phase so they occur exactly once per cycle.
 
 use std::time::Instant;
 use symthaea_core::hdc::binary_hv::BinaryHV;
