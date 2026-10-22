@@ -31,6 +31,8 @@ jobs:
           use-mathlib-cache: false
           nanoda: true
           nanoda-allow-sorry: false
+          axiom-audit: true
+          axiom-audit-root: PITBCounterfactualPilot
 
       - name: Produce content-addressed Lean pilot receipt
         shell: bash
@@ -137,6 +139,9 @@ jobs:
                   "lean_kernel_checked_examples": "passed",
                   "nanoda_independent_type_check": "passed",
                   "sorry_disallowed_by_nanoda": True,
+                  "axiom_audit": "passed",
+                  "unlisted_axioms_disallowed": True,
+                  "axiom_allowlist": ["propext", "Classical.choice", "Quot.sound"],
               },
               "case_manifest_bindings": case_bindings,
               "limitations": [
