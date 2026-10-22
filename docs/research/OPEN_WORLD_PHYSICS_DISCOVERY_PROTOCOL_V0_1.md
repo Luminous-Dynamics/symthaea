@@ -252,7 +252,7 @@ Pre-register the comparison. Freeze exact source commits, corpora, data access, 
 
 Require an independent reproduction before making a broad superiority claim. If one lane improves and another regresses, publish the Pareto trade-off rather than averaging away the regression. Report costs and failures, not just accuracy.
 
-## External benchmark update — SCILAWS-BENCH (2026-10-21)
+## External benchmark update — SCILAWS-BENCH (2026-10-22)
 
 A newer state-of-the-art comparison target has appeared since this protocol's first draft: **SCILAWS-BENCH**, submitted on 1 September 2026. Its paper describes 118 problems drawn from 381 publications, 291 candidate laws, and roughly 8 million real data points, with two complementary settings:
 
@@ -260,6 +260,10 @@ A newer state-of-the-art comparison target has appeared since this protocol's fi
 - **SCILAWS-PARALLEL:** actively query residual-calibrated synthetic worlds to recover a newly hidden law derived from published physical relationships.
 
 The authors report that predictive fit can diverge from scientific validity, that memorization influences whether models reproduce or move beyond known formulas, and that best-of-N candidate selection remains a bottleneck. Those are directly relevant to Symthaea's goal of connecting cold hypothesis generation, experimental discrimination, independent verification, and evidence admission. Source: https://arxiv.org/abs/2609.01552
+
+The live project page has since expanded its evaluation to fourteen models; it reports **GPT-6 leads the aggregate on numeric fit, scientific validity, and hidden-structure recovery**, while its paired task-bootstrap analysis supports the GPT-6 vs GPT-5.5 improvement in structure recovery but not fit or validity. In the same report, fit and validity agree on only 53.6% of unequal-fit model pairs, and for GPT-6 the cross-task correlation between fit and structure recovery is only 0.06. These are benchmark-specific findings, not universal laws; they reinforce the protocol's requirement to keep metrics separate. Source: https://yiyihum.github.io/SciLaws-Bench/
+
+The updated results sharpen the candidate-selection target: on the paper's 118-task best-of-N analysis for GPT-5.4-mini, increasing the pool from five to twenty candidates improves the oracle's mean scores by 4.5 points in numeric fit and 5.3 in scientific validity, while the agent's own selection improves by less than two points on either metric. The report also finds 60% of selected winners in five-candidate groups are Pareto-dominated by another proposal. GPT-6 and Claude Opus 5.5 have a smaller reported best-candidate-to-submission numeric-fit gap (0.03–0.04) than GPT-5.4-mini (0.14). The implication is not merely to generate more candidates, but to improve selection under independent validity constraints and disclose the oracle-selection gap. Source: https://yiyihum.github.io/SciLaws-Bench/
 
 ### What changes for Symthaea
 
