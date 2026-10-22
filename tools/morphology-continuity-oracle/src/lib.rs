@@ -180,8 +180,8 @@ pub fn evaluate_episode(
 ) -> EpisodeReport {
     let current_exact_matches = classify_exact(observed, templates);
     let compatible = compatible_histories(observed, templates, max_missing_cells);
-    let observed_vs_target =
-        template(templates, ground_truth_target_id).map(|target| overlap_metrics(&target.cells, observed));
+    let observed_vs_target = template(templates, ground_truth_target_id)
+        .map(|target| overlap_metrics(&target.cells, observed));
 
     let (disposition, evidence_matches_ground_truth, target_conditioned_oracle) = match evidence {
         TargetEvidence::Missing | TargetEvidence::Corrupted | TargetEvidence::Conflicting => {
@@ -235,7 +235,10 @@ mod tests {
 
     #[test]
     fn canonical_request_digest_is_pinned() {
-        assert_eq!(REQUEST_SHA256, "9348ff465116c23bacf9dfa5f1ed6ce98bb14bfa042b228800d6406ef542681f");
+        assert_eq!(
+            REQUEST_SHA256,
+            "9348ff465116c23bacf9dfa5f1ed6ce98bb14bfa042b228800d6406ef542681f"
+        );
     }
 
     #[test]
@@ -258,7 +261,8 @@ mod tests {
     fn no_memory_abstains_when_two_histories_are_compatible() {
         let templates = canonical_templates();
         let observation = chair_without_backrest(&templates);
-        let report = evaluate_episode("chair", &observation, &templates, 4, TargetEvidence::Missing);
+        let report =
+            evaluate_episode("chair", &observation, &templates, 4, TargetEvidence::Missing);
         assert_eq!(report.compatible_histories, vec!["chair", "table"]);
         assert_eq!(report.disposition, Disposition::AbstainAmbiguousHistory);
         assert_eq!(report.evidence_matches_ground_truth, None);
@@ -268,7 +272,13 @@ mod tests {
     fn correct_target_claim_gets_separate_oracle_upper_bound() {
         let templates = canonical_templates();
         let observation = chair_without_backrest(&templates);
-        let report = evaluate_episode("chair", &observation, &templates, 4, TargetEvidence::Claimed("chair"));
+        let report = evaluate_episode(
+            "chair",
+            &observation,
+            &templates,
+            4,
+            TargetEvidence::Claimed("chair"),
+        );
         assert_eq!(report.disposition, Disposition::TargetAvailable);
         assert_eq!(report.evidence_matches_ground_truth, Some(true));
         assert_eq!(report.target_conditioned_oracle.expect("oracle").iou_ppm, 1_000_000);
@@ -279,7 +289,13 @@ mod tests {
     fn false_compatible_target_claim_is_not_hidden_by_perfect_shape_score() {
         let templates = canonical_templates();
         let observation = chair_without_backrest(&templates);
-        let report = evaluate_episode("chair", &observation, &templates, 4, TargetEvidence::Claimed("table"));
+        let report = evaluate_episode(
+            "chair",
+            &observation,
+            &templates,
+            4,
+            TargetEvidence::Claimed("table"),
+        );
         assert_eq!(report.disposition, Disposition::TargetAvailable);
         assert_eq!(report.evidence_matches_ground_truth, Some(false));
         assert_eq!(report.target_conditioned_oracle.expect("table oracle").iou_ppm, 1_000_000);
@@ -290,10 +306,22 @@ mod tests {
     fn invalid_or_incompatible_target_claim_fails_closed() {
         let templates = canonical_templates();
         let observation = chair_without_backrest(&templates);
-        let invalid = evaluate_episode("chair", &observation, &templates, 4, TargetEvidence::Claimed("spaceship"));
+        let invalid = evaluate_episode(
+            "chair",
+            &observation,
+            &templates,
+            4,
+            TargetEvidence::Claimed("spaceship"),
+        );
         assert_eq!(invalid.disposition, Disposition::AbstainInvalidTargetEvidence);
         assert_eq!(invalid.evidence_matches_ground_truth, Some(false));
-        let small_budget = evaluate_episode("chair", &observation, &templates, 2, TargetEvidence::Claimed("chair"));
+        let small_budget = evaluate_episode(
+            "chair",
+            &observation,
+            &templates,
+            2,
+            TargetEvidence::Claimed("chair"),
+        );
         assert_eq!(small_budget.disposition, Disposition::AbstainTargetNotCompatible);
     }
 
@@ -301,8 +329,16 @@ mod tests {
     fn corrupted_or_conflicting_target_memory_does_not_authorize_recovery() {
         let templates = canonical_templates();
         let observation = chair_without_backrest(&templates);
-        assert_eq!(evaluate_episode("chair", &observation, &templates, 4, TargetEvidence::Corrupted).disposition, Disposition::AbstainAmbiguousHistory);
-        assert_eq!(evaluate_episode("chair", &observation, &templates, 4, TargetEvidence::Conflicting).disposition, Disposition::AbstainAmbiguousHistory);
+        assert_eq!(
+            evaluate_episode("chair", &observation, &templates, 4, TargetEvidence::Corrupted)
+                .disposition,
+            Disposition::AbstainAmbiguousHistory
+        );
+        assert_eq!(
+            evaluate_episode("chair", &observation, &templates, 4, TargetEvidence::Conflicting)
+                .disposition,
+            Disposition::AbstainAmbiguousHistory
+        );
     }
 
     #[test]
