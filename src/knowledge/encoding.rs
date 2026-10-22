@@ -61,6 +61,8 @@ impl KnowledgeEncoder {
 
     pub fn with_seed(seed: u64) -> Self {
         let mut role_bases = HashMap::new();
+        // Keep this list in parity with `SemanticRole`. Missing a role here silently
+        // drops that role-binding from `encode_fact`, so schema coverage is tested below.
         let roles = [
             SemanticRole::Agent,
             SemanticRole::Patient,
@@ -73,6 +75,11 @@ impl KnowledgeEncoder {
             SemanticRole::Location,
             SemanticRole::Cause,
             SemanticRole::Result,
+            SemanticRole::Calls,
+            SemanticRole::Implements,
+            SemanticRole::DependsOn,
+            SemanticRole::ReturnsType,
+            SemanticRole::FixedBy,
             #[cfg(feature = "therapeutic")]
             SemanticRole::TherapeuticTarget,
             #[cfg(feature = "therapeutic")]
@@ -86,6 +93,8 @@ impl KnowledgeEncoder {
         }
 
         let mut type_bases = HashMap::new();
+        // Keep this list in parity with `EntityType`. Falling through to the old
+        // generic seed collapses distinct extractor types into the same basis.
         let types = [
             EntityType::Person,
             EntityType::Organization,
@@ -97,6 +106,11 @@ impl KnowledgeEncoder {
             EntityType::Artifact,
             EntityType::Process,
             EntityType::Property,
+            EntityType::Function,
+            EntityType::Type,
+            EntityType::Module,
+            EntityType::ErrorPattern,
+            EntityType::CodeSnippet,
             #[cfg(feature = "therapeutic")]
             EntityType::ClinicalConcept,
             #[cfg(feature = "therapeutic")]
@@ -299,6 +313,83 @@ mod tests {
         assert!(encoding.confidence > 0.0);
         assert!(!encoding.role_vectors.is_empty());
         assert!(encoding.confidence > 0.0);
+    }
+
+    #[test]
+    fn test_encoder_covers_non_feature_extractor_schema() {
+        let encoder = KnowledgeEncoder::with_seed(42);
+
+        let roles = [
+            SemanticRole::Agent,
+            SemanticRole::Patient,
+            SemanticRole::Instrument,
+            SemanticRole::Context,
+            SemanticRole::Goal,
+            SemanticRole::Source,
+            SemanticRole::Destination,
+            SemanticRole::Temporal,
+            SemanticRole::Location,
+            SemanticRole::Cause,
+            SemanticRole::Result,
+            SemanticRole::Calls,
+            SemanticRole::Implements,
+            SemanticRole::DependsOn,
+            SemanticRole::ReturnsType,
+            SemanticRole::FixedBy,
+        ];
+        for role in roles {
+            assert!(
+                encoder.role_bases.contains_key(&role),
+                "missing HDC basis for semantic role {role:?}"
+            );
+        }
+
+        let entity_types = [
+            EntityType::Person,
+            EntityType::Organization,
+            EntityType::Place,
+            EntityType::Event,
+            EntityType::Concept,
+            EntityType::Quantity,
+            EntityType::Temporal,
+            EntityType::Artifact,
+            EntityType::Process,
+            EntityType::Property,
+            EntityType::Function,
+            EntityType::Type,
+            EntityType::Module,
+            EntityType::ErrorPattern,
+            EntityType::CodeSnippet,
+        ];
+        for entity_type in entity_types {
+            assert!(
+                encoder.type_bases.contains_key(&entity_type),
+                "missing HDC basis for entity type {entity_type:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_code_semantics_are_role_bound() {
+        let mut encoder = KnowledgeEncoder::with_seed(42);
+        let mut role_map = HashMap::new();
+        role_map.insert("compile_module".to_string(), SemanticRole::DependsOn);
+
+        let fact = ExtractedFact {
+            entities: vec![ExtractedEntity {
+                text: "compile_module".to_string(),
+                entity_type: EntityType::Module,
+                confidence: 0.95,
+                offset: 0,
+            }],
+            relations: vec![],
+            role_map,
+            source_text: "compile_module depends on parser".to_string(),
+            confidence: 0.95,
+        };
+
+        let encoding = encoder.encode_fact(&fact);
+        assert!(encoding.role_vectors.contains_key(&SemanticRole::DependsOn));
     }
 
     #[test]
