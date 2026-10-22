@@ -6,28 +6,28 @@
 use serde::{Deserialize, Serialize};
 
 use crate::hdc::relational_consciousness::{RelationMode, RelationalAssessment};
-use crate::partnership::{
-    DyadInput, DyadWeights, HumanPartnerModel, InteractionEvent, PhiDyadCalculator,
-    RelationshipTrajectory,
-};
+use crate::partnership::{HumanPartnerModel, InteractionEvent, RelationshipTrajectory};
 
 pub use crate::hdc::relational_consciousness::RelationshipStage;
 
 /// Relational consciousness subsystem — partnership, trajectory, and dyadic Phi.
 ///
-/// Groups all relational state into a cohesive unit: partner model tracking,
-/// relationship trajectory, Phi-dyad computation, and recent AI states for
-/// dyadic assessment.
+/// Groups relational state for the facade.
+///
+/// Important: this facade currently receives user-input embeddings, but no
+/// independently sourced partner-observation stream. It therefore does not
+/// compute or feed back a dyadic Φ estimate. The standalone PhiDyadCalculator
+/// remains available to callers that supply separately sourced streams.
 pub(super) struct RelationalCore {
     /// Human partner model for relational consciousness.
     pub(super) partner: HumanPartnerModel,
     /// Relationship trajectory tracking.
     pub(super) trajectory: RelationshipTrajectory,
-    /// Phi-dyad calculator for relational Phi.
-    dyad_calculator: PhiDyadCalculator,
-    /// Recent AI states for dyad computation (ring buffer, max 8).
-    pub(super) recent_ai_states: Vec<symthaea_core::hdc::unified_hv::ContinuousHV>,
-    /// Last computed Phi_dyad — fed back into mind as relational Psi on next cycle.
+    /// Recent user utterance embeddings (ring buffer, max 8). These are not
+    /// AI-generated states or observations of the user's internal mental state.
+    pub(super) recent_user_input_states: Vec<symthaea_core::hdc::unified_hv::ContinuousHV>,
+    /// Last validated dyadic estimate. Stays zero while independent partner
+    /// observations are unavailable; the facade also hard-gates feedback to zero.
     pub(super) last_phi_dyad: f64,
 }
 
@@ -36,8 +36,7 @@ impl RelationalCore {
         Self {
             partner: HumanPartnerModel::new("human"),
             trajectory: RelationshipTrajectory::default(),
-            dyad_calculator: PhiDyadCalculator::new(),
-            recent_ai_states: Vec::new(),
+            recent_user_input_states: Vec::new(),
             last_phi_dyad: 0.0,
         }
     }
@@ -45,67 +44,34 @@ impl RelationalCore {
     pub(super) fn from_persisted(
         partner: HumanPartnerModel,
         trajectory: RelationshipTrajectory,
-        recent_ai_states: Vec<symthaea_core::hdc::unified_hv::ContinuousHV>,
+        recent_user_input_states: Vec<symthaea_core::hdc::unified_hv::ContinuousHV>,
     ) -> Self {
         Self {
             partner,
             trajectory,
-            dyad_calculator: PhiDyadCalculator::new(),
-            recent_ai_states,
+            recent_user_input_states,
             last_phi_dyad: 0.0,
         }
     }
 
-    /// Push an AI state into the ring buffer (max 8).
-    pub(super) fn push_ai_state(&mut self, hv: symthaea_core::hdc::unified_hv::ContinuousHV) {
-        self.recent_ai_states.push(hv);
-        if self.recent_ai_states.len() > 8 {
-            self.recent_ai_states.remove(0);
+    /// Record a user utterance embedding. This is communication input, not
+    /// an observation of the user's private mental state or an AI-generated state.
+    pub(super) fn push_user_input_state(
+        &mut self,
+        hv: symthaea_core::hdc::unified_hv::ContinuousHV,
+    ) {
+        self.recent_user_input_states.push(hv);
+        if self.recent_user_input_states.len() > 8 {
+            self.recent_user_input_states.remove(0);
         }
     }
 
-    /// Compute Phi-dyad from recent AI states and partner model.
-    fn compute_phi_dyad(&self) -> f64 {
-        if self.recent_ai_states.is_empty() {
-            return 0.0;
-        }
-
-        let human_states: Vec<symthaea_core::hdc::unified_hv::ContinuousHV> = self
-            .recent_ai_states
-            .iter()
-            .map(|s| {
-                let mut vals = s.values.clone();
-                for v in vals.iter_mut() {
-                    *v *= 0.9;
-                    *v += 0.1;
-                }
-                symthaea_core::hdc::unified_hv::ContinuousHV::from_values(vals).normalize()
-            })
-            .collect();
-
-        let assessment = RelationalAssessment {
-            agent_a: "symthaea".to_string(),
-            agent_b: self.partner.partner_id.clone(),
-            phi_relation: self.partner.phi_relational,
-            stage: self.partner.stage,
-            synchrony: self.partner.trust as f64,
-            turn_taking_quality: 0.7,
-            mutual_information: self.partner.reciprocity as f64,
-            mode: self.partner.mode,
-            num_interactions: self.partner.interactions_count as usize,
-            relationship_age: 0.0,
-            explanation: String::new(),
-        };
-
-        let input = DyadInput {
-            ai_states: &self.recent_ai_states,
-            human_states: &human_states,
-            relational: &assessment,
-            human_model: &self.partner,
-            weights: DyadWeights::default(),
-        };
-
-        self.dyad_calculator.compute(&input).phi_dyad
+    /// Return a dyadic estimate only when the facade has independent partner
+    /// observations. No such stream is currently wired into this subsystem, so
+    /// the correct result is unavailable, not a synthetic state or numeric zero.
+    fn compute_phi_dyad(&self) -> Option<f64> {
+        let _has_user_input_history = !self.recent_user_input_states.is_empty();
+        None
     }
 
     /// Update partnership state from interaction consciousness level.
@@ -147,24 +113,43 @@ impl RelationalCore {
         self.partner.update_from_assessment(&assessment);
         self.partner.advance_stage_if_ready();
 
-        let phi_dyad = self.compute_phi_dyad();
-        self.trajectory.record(now, self.partner.stage, phi_dyad);
-        self.last_phi_dyad = phi_dyad;
+        if let Some(phi_dyad) = self.compute_phi_dyad() {
+            self.trajectory.record(now, self.partner.stage, phi_dyad);
+            self.last_phi_dyad = phi_dyad;
+        } else {
+            // Do not record unavailable data as a zero-valued observation.
+            self.last_phi_dyad = 0.0;
+        }
     }
 
     /// Get current partnership state summary.
     pub(super) fn partnership_state(&self) -> PartnershipState {
-        let phi_dyad = self.compute_phi_dyad();
+        let (phi_dyad, phi_dyad_status) = match self.compute_phi_dyad() {
+            Some(value) => (value, PhiDyadStatus::AvailableFromIndependentPartnerObservations),
+            None => (0.0, PhiDyadStatus::UnavailableNoIndependentPartnerObservations),
+        };
         PartnershipState {
             stage: self.partner.stage,
             trust: self.partner.trust,
             vulnerability: self.partner.vulnerability,
             reciprocity: self.partner.reciprocity,
             phi_dyad,
+            phi_dyad_status,
             interactions: self.partner.interactions_count,
             trajectory_points: self.trajectory.points().len(),
         }
     }
+}
+
+/// Whether the facade has sufficient independently sourced partner data
+/// to report a dyadic Φ estimate. This is a data-availability/provenance status,
+/// not a judgement about a relationship or a claim about consciousness.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PhiDyadStatus {
+    /// The current facade does not receive independent partner observations.
+    UnavailableNoIndependentPartnerObservations,
+    /// Reserved for a future provenance-validated observation path.
+    AvailableFromIndependentPartnerObservations,
 }
 
 /// Summary of partnership state for external consumers.
@@ -178,8 +163,12 @@ pub struct PartnershipState {
     pub vulnerability: f32,
     /// Reciprocity level (0.0-1.0).
     pub reciprocity: f32,
-    /// Current Phi-dyad value.
+    /// Current Phi-dyad value. Zero is a compatibility placeholder when the
+    /// status says the estimate is unavailable; do not interpret it as an
+    /// observed zero-valued Φ measurement.
     pub phi_dyad: f64,
+    /// Explicitly distinguishes unavailable input from a measured value.
+    pub phi_dyad_status: PhiDyadStatus,
     /// Total interactions.
     pub interactions: u64,
     /// Number of trajectory points recorded.
@@ -198,7 +187,10 @@ pub(super) struct PersistedState {
     pub(super) interactions: u64,
     pub(super) partner: HumanPartnerModel,
     pub(super) trajectory: RelationshipTrajectory,
-    pub(super) recent_ai_states: Vec<symthaea_core::hdc::unified_hv::ContinuousHV>,
+    /// Legacy serialized key "recent_ai_states" held user-input embeddings in the facade.
+    /// Alias preserves old snapshots while the in-memory name reflects their source.
+    #[serde(default, alias = "recent_ai_states")]
+    pub(super) recent_user_input_states: Vec<symthaea_core::hdc::unified_hv::ContinuousHV>,
     /// Path to the consciousness database (if configured).
     #[serde(default)]
     pub(super) database_path: Option<String>,
@@ -207,4 +199,41 @@ pub(super) struct PersistedState {
     /// state files written before this field existed.
     #[serde(default)]
     pub(super) user_state: Option<crate::user_state_inference::UserState>,
+}
+
+
+#[cfg(test)]
+mod provenance_tests {
+    use super::*;
+
+    #[test]
+    fn facade_phi_is_unavailable_without_independent_partner_observations() {
+        let mut relational = RelationalCore::new();
+        let user_input = symthaea_core::hdc::unified_hv::ContinuousHV::from_values(vec![0.25; 16]);
+        relational.push_user_input_state(user_input);
+
+        assert_eq!(relational.compute_phi_dyad(), None);
+
+        relational.update_partnership(0.9);
+        assert_eq!(relational.last_phi_dyad, 0.0);
+        assert_eq!(
+            relational.partnership_state().phi_dyad_status,
+            PhiDyadStatus::UnavailableNoIndependentPartnerObservations
+        );
+        assert!(
+            relational.trajectory.points().is_empty(),
+            "unavailable Phi must not be persisted as a zero-valued observation"
+        );
+    }
+
+    #[test]
+    fn empty_facade_has_explicitly_unavailable_phi() {
+        let relational = RelationalCore::new();
+        let state = relational.partnership_state();
+        assert_eq!(state.phi_dyad, 0.0);
+        assert_eq!(
+            state.phi_dyad_status,
+            PhiDyadStatus::UnavailableNoIndependentPartnerObservations
+        );
+    }
 }
