@@ -134,3 +134,14 @@ A reusable checker has now been committed at `validation/tccip_independent_check
 ## Evidence status
 
 This document is a research plan. PEID, CausalVerse, ACDB and TCD-Arena are prior art/benchmark references; no external benchmark adapter or direct external-baseline reproduction has been implemented. The TCCIP toy manifests and pairwise oracle are authored, and a separate one-off exhaustive audit matched their expectations, but the committed TCCIP Rust/Python suites and reusable TCCIP oracle have not been executed/compiled. In contrast, the new active-probe Python source and its eight-test suite were copied from the exact committed blobs and run locally; see the linked receipt. No SOTA or novelty claim is made.
+
+
+## Track 0.75 — noisy multi-node SCM active-probe pilot
+
+Implementation: `validation/noisy_scm_probe_benchmark.py`; tests: `validation/test_noisy_scm_probe_benchmark.py`; results: `docs/research/NOISY_SCM_ACTIVE_PROBE_PRELIMINARY_RESULTS_2026-10-22.md`.
+
+The pilot uses 3-node Boolean SCMs, eight candidate hypotheses, a known 0.1 mechanism-noise probability, six hard-do actions, exact outcome enumeration, and a two-unit synthetic budget. It aggregates posterior mass across models that share a graph and optimizes graph entropy separately from mechanism entropy.
+
+The exploratory 40-instance run reports mean graph entropy 1.2138 bits for an exact graph-entropy oracle, 1.2534 for greedy EIG per (cost + 0.25 × synthetic disturbance), 1.3371 for greedy EIG, 1.3419 for cost-first, 1.4617 for random, and 1.4701 for fixed order. Synthetic cost/disturbance are not empirical values; this is not a direct ACDB result.
+
+**Qualification blocker:** ten local tests passed, and the test file matches its branch blob, but the executed source mirror differs from the current branch source blob. The result is explicitly source-unbound and must not be described as exact-source evidence. Resolve the byte mismatch and rerun before external claims. Next add assumption violations, graph precision/recall + SHD, calibration/coverage, held-out topology/mechanism families, and contract-matched ACDB comparisons.
