@@ -81,7 +81,7 @@ Tristan Stoltz
 ### Risk Description
 The consent violation detection mechanism may fail to identify scenarios where consent is absent or denied, leading to ethical violations.
 
-### Treatment Strategy: Mitigate (Fixed)
+### Treatment Strategy: Mitigate (In progress; not fully fixed)
 
 | Action | Status | Evidence |
 |--------|--------|----------|
@@ -89,10 +89,12 @@ The consent violation detection mechanism may fail to identify scenarios where c
 | Implement `judge_consent_action()` with explicit ConsentState parameter | Done | `moral_algebra.rs` — bypasses HDC inference entirely |
 | Wire direct ConsentState check into EthicsEngine pipeline | Done | `EncodedMoralScenario::is_consent_violation()` checks `Absent | Denied` |
 | Regression tests for consent detection | Done | 5 tests in adversarial suite specifically for consent |
-| Consent severity proxy ordering (Denied > Absent > Unknown > Implied > Given) | Draft / unqualified | `consistency_consent_violation_sim_monotonic`; Unknown is not itself a violation verdict |
+| Consent severity proxy ordering (Denied > Absent > Unknown > Implied > Given) | Draft / unqualified | `consistency_consent_violation_sim_monotonic`; score ordering is not a calibrated probability or violation verdict |
+| Scope-bound consent precondition | Added; unverified | `evaluate_consent_gate` checks state, exact subject/action/purpose, record/identity/authority flags, validity, expiry and revocation; helper is not yet wired to sensitive action dispatch and does not cryptographically verify records |
+| Question/quoted-claim adversarial fixtures and confusion-matrix diagnostic | Added; unverified | Parser tests and `cargo run --example consent_semantics_bench`; no compile/test results are claimed |
 
 ### Residual Risk
-**Medium–High pending qualification.** Explicit Denied/Absent states have a direct evaluation path, but text extraction remains heuristic. A missing consent mention is not evidence of implied consent, and the legacy verdict enum cannot distinguish neutral from underdetermined. The parser change does not decide which actions require consent and does not issue authority.
+**High pending exact-head validation and integration.** Explicit Denied/Absent states have a direct evaluation path, and a pure consent-specific precondition now exists. However, the parser remains heuristic; the legacy verdict enum cannot distinguish Neutral from underdetermined; the helper does not authenticate records or choose which actions require consent; and no sensitive action dispatcher has been shown to enforce it. Do not treat parser output or this helper alone as permission.
 
 ### Acceptance Criteria
 - `judge_consent_action(_, ConsentState::Denied)` always returns `ConsentViolation` verdict
@@ -100,7 +102,9 @@ The consent violation detection mechanism may fail to identify scenarios where c
 - `ConsentState::Unknown` remains distinct from Given, Denied, Absent and Implied in encoded state
 - Unknown or Implied consent cannot produce a positive consent-sensitive verdict; Neutral is not an authorization permit
 - Parser silence or an unanswered request is not classified as explicit consent
-- Any action-specific policy that requires consent must fail closed for Unknown until independently verified, scope-bound consent is supplied
+- The pure consent gate blocks Unknown, Implied, Absent, Denied, missing/unverified/out-of-scope/expired/revoked evidence in focused unit tests; those tests still need exact-head execution
+- A trusted adapter and a reviewed action-specific integration are mandatory before any sensitive action depends on this helper
+- The diagnostic benchmark reports its confusion matrix and false-Given cases but is not a blinded safety certification
 - Exact-head formatting, compilation, focused tests and downstream compatibility pass; no CI result is inferred from authored tests
 
 ### Risk Owner
