@@ -1750,7 +1750,7 @@ mod tests {
         for record in &records {
             restored.import_graph_fact_record(record);
         }
-        restored.import_evidence_links(&links);
+        restored.import_evidence_links(&links).unwrap();
         assert_eq!(restored.get_fact(id_a).unwrap().confidence, 0.7);
         assert_eq!(restored.get_fact(id_b).unwrap().confidence, 0.7);
         let adjudicated = restored
