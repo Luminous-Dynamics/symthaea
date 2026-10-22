@@ -59,7 +59,8 @@ struct TaskResult {
     compile_errors: Vec<String>,
     auto_fix_attempted: bool,
     auto_fix_succeeded: bool,
-    // Level 3: correctness
+    // Level 3: correctness / oracle integrity
+    tests_expected: usize,
     tests_passed: usize,
     tests_failed: usize,
     // Agent metrics
@@ -73,15 +74,37 @@ struct TaskResult {
 }
 
 impl TaskResult {
-    /// Success = compiled AND all tests passed (or no tests but compiled)
-    fn is_correct(&self) -> bool {
-        self.compiled
-            && self.tests_failed == 0
-            && (self.tests_passed > 0 || self.test_source_empty())
+    fn tests_executed(&self) -> usize {
+        self.tests_passed + self.tests_failed
     }
-    fn test_source_empty(&self) -> bool {
-        // Tasks with no test assertions count as "correct" if they compile
-        self.tests_passed == 0 && self.tests_failed == 0
+
+    /// The complete authored oracle must have actually executed.
+    ///
+    /// A compile pass with zero tests, a missing oracle, or a partial test run
+    /// is unverified—not a correctness success.
+    fn oracle_complete(&self) -> bool {
+        self.tests_expected > 0 && self.tests_executed() == self.tests_expected
+    }
+
+    fn oracle_status(&self) -> &'static str {
+        if self.tests_expected == 0 {
+            "missing_oracle"
+        } else if !self.compiled {
+            "not_run_compile_failure"
+        } else if self.tests_executed() == 0 {
+            "no_tests_executed"
+        } else if self.tests_executed() != self.tests_expected {
+            "test_count_mismatch"
+        } else if self.tests_failed > 0 {
+            "failed"
+        } else {
+            "passed"
+        }
+    }
+
+    /// Correctness requires compilation and a complete, passing test oracle.
+    fn is_correct(&self) -> bool {
+        self.compiled && self.oracle_complete() && self.tests_failed == 0
     }
 }
 
@@ -914,6 +937,7 @@ fn run_task(task: &BenchTask, task_idx: usize, use_llm: bool, use_cloud: bool) -
     let contains_expected = content.contains(task.expected_fn);
     let contains_todo =
         content.contains("TODO") || content.contains("todo!") || content.contains("unimplemented!");
+    let tests_expected = task.test_source.matches("#[test]").count();
 
     // Level 2+3: Real compilation and test execution
     let (compiled, compile_errors, tests_passed, tests_failed, fix_attempted, fix_succeeded) =
@@ -941,8 +965,12 @@ fn run_task(task: &BenchTask, task_idx: usize, use_llm: bool, use_cloud: bool) -
         .map(|t| t.to_string())
         .collect();
 
-    // Status symbols: ✓ = correct (compiles + tests pass), ◐ = compiles but tests fail, ✗ = doesn't compile
-    let status = if compiled && tests_failed == 0 {
+    // A compile-only or incomplete test run is never shown as correctness success.
+    let status = if compiled
+        && tests_expected > 0
+        && tests_passed + tests_failed == tests_expected
+        && tests_failed == 0
+    {
         "✓"
     } else if compiled {
         "◐"
@@ -959,9 +987,11 @@ fn run_task(task: &BenchTask, task_idx: usize, use_llm: bool, use_cloud: bool) -
     );
     if compiled {
         eprint!(
-            "[compiled, {}/{} tests]",
+            "[compiled; {} tests executed / {} expected; {} passed, {} failed]",
+            tests_passed + tests_failed,
+            tests_expected,
             tests_passed,
-            tests_passed + tests_failed
+            tests_failed
         );
     } else if !compile_errors.is_empty() {
         let first_err: String = compile_errors[0].chars().take(50).collect();
@@ -980,6 +1010,7 @@ fn run_task(task: &BenchTask, task_idx: usize, use_llm: bool, use_cloud: bool) -
         compile_errors,
         auto_fix_attempted: fix_attempted,
         auto_fix_succeeded: fix_succeeded,
+        tests_expected,
         tests_passed,
         tests_failed,
         iterations: result.iterations_used,
@@ -1082,8 +1113,20 @@ fn print_report(results: &[TaskResult], stats: &BenchStats) {
         100.0 * stats.correct as f64 / stats.total as f64
     );
     println!(
-        "  Tests: {} passed, {} failed",
-        stats.total_tests_passed, stats.total_tests_failed
+        "  Tests: {} passed, {} failed, {} expected",
+        stats.total_tests_passed,
+        stats.total_tests_failed,
+        results.iter().map(|r| r.tests_expected).sum::<usize>()
+    );
+    let oracle_complete = results.iter().filter(|r| r.oracle_complete()).count();
+    let unverified = results.iter().filter(|r| {
+        !matches!(r.oracle_status(), "passed" | "failed")
+    }).count();
+    println!(
+        "  Oracle coverage: {}/{} tasks fully executed; {} unverified",
+        oracle_complete,
+        results.len(),
+        unverified
     );
     println!();
 
@@ -1231,8 +1274,11 @@ fn main() {
                 "code_written": r.code_written,
                 "name_match": r.contains_expected_fn,
                 "compiled": r.compiled,
+                "tests_expected": r.tests_expected,
+                "tests_executed": r.tests_executed(),
                 "tests_passed": r.tests_passed,
                 "tests_failed": r.tests_failed,
+                "oracle_status": r.oracle_status(),
                 "correct": r.is_correct(),
                 "auto_fix_attempted": r.auto_fix_attempted,
                 "auto_fix_succeeded": r.auto_fix_succeeded,
@@ -1256,6 +1302,11 @@ fn main() {
             "correctness_rate": stats.correct as f64 / stats.total as f64,
             "tests_passed": stats.total_tests_passed,
             "tests_failed": stats.total_tests_failed,
+            "tests_expected": results.iter().map(|r| r.tests_expected).sum::<usize>(),
+            "oracle_complete_tasks": results.iter().filter(|r| r.oracle_complete()).count(),
+            "unverified_tasks": results.iter().filter(|r| {
+                !matches!(r.oracle_status(), "passed" | "failed")
+            }).count(),
             "auto_fix_attempts": stats.auto_fix_attempts,
             "auto_fix_successes": stats.auto_fix_successes,
             "by_difficulty": {
@@ -1273,5 +1324,74 @@ fn main() {
         serde_json::to_string_pretty(&json_report).unwrap(),
     ) {
         eprintln!("\nJSON report: {}", report_path.display());
+    }
+}
+
+#[cfg(test)]
+mod oracle_integrity_tests {
+    use super::*;
+
+    fn result(
+        tests_expected: usize,
+        tests_passed: usize,
+        tests_failed: usize,
+        compiled: bool,
+    ) -> TaskResult {
+        TaskResult {
+            description: "oracle integrity fixture".to_string(),
+            difficulty: Difficulty::Native,
+            code_written: true,
+            contains_expected_fn: true,
+            contains_todo: false,
+            compiled,
+            compile_errors: Vec::new(),
+            auto_fix_attempted: false,
+            auto_fix_succeeded: false,
+            tests_expected,
+            tests_passed,
+            tests_failed,
+            iterations: 1,
+            tiers_used: Vec::new(),
+            energy: 0.0,
+            phi_mean: 0.0,
+            quality_gate_rejections: 0,
+            elapsed_ms: 0,
+            final_phase: "Done".to_string(),
+        }
+    }
+
+    #[test]
+    fn compile_without_test_execution_is_not_correct() {
+        let r = result(1, 0, 0, true);
+        assert!(!r.is_correct());
+        assert_eq!(r.oracle_status(), "no_tests_executed");
+    }
+
+    #[test]
+    fn missing_oracle_is_not_correct() {
+        let r = result(0, 0, 0, true);
+        assert!(!r.is_correct());
+        assert_eq!(r.oracle_status(), "missing_oracle");
+    }
+
+    #[test]
+    fn partial_test_execution_is_not_correct() {
+        let r = result(3, 2, 0, true);
+        assert!(!r.is_correct());
+        assert_eq!(r.oracle_status(), "test_count_mismatch");
+    }
+
+    #[test]
+    fn complete_passing_oracle_is_correct() {
+        let r = result(3, 3, 0, true);
+        assert!(r.is_correct());
+        assert_eq!(r.oracle_status(), "passed");
+    }
+
+    #[test]
+    fn complete_failing_oracle_is_not_correct() {
+        let r = result(3, 2, 1, true);
+        assert!(!r.is_correct());
+        assert_eq!(r.oracle_status(), "failed");
     }
 }
