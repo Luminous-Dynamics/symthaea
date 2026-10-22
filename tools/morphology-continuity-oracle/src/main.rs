@@ -29,7 +29,20 @@ fn main() {
 
     // All emitted labels are fixed fixture strings or validated hexadecimal identifiers.
     println!(
-        "{{\"schema\":\"morphology-continuity-oracle/v0.1\",\"source_commit\":\"{}\",\"source_tree_sha\":\"{}\",\"request_sha256\":\"{}\",\"fixture\":\"chair-backrest-removed\",\"current_exact_matches\":[\"{}\"],\"compatible_histories\":[\"{}\",\"{}\"],\"ground_truth_target\":\"chair\",\"target_evidence\":\"missing\",\"disposition\":\"{:?}\",\"observed_target_iou_ppm\":{},\"restoration_oracle\":false}}",
+        concat!(
+            "{{\"schema\":\"morphology-continuity-oracle/v0.1\",",
+            "\"source_commit\":\"{}\",",
+            "\"source_tree_sha\":\"{}\",",
+            "\"request_sha256\":\"{}\",",
+            "\"fixture\":\"chair-backrest-removed\",",
+            "\"current_exact_matches\":[\"{}\"],",
+            "\"compatible_histories\":[\"{}\",\"{}\"],",
+            "\"ground_truth_target\":\"chair\",",
+            "\"target_evidence\":\"missing\",",
+            "\"disposition\":\"{:?}\",",
+            "\"observed_target_iou_ppm\":{},",
+            "\"restoration_oracle\":false}}"
+        ),
         source_commit,
         source_tree_sha,
         REQUEST_SHA256,
