@@ -101,3 +101,18 @@ Latest exact local validation:
 - Source blob: \`48f7a9e1e6b25ec9be7e8f90f10f1bfa3418b94f\`
 - Test blob: \`5cd2c2d7adc3caa78f6bc87b9903f35b2525c7c3\`
 - Embedded self-test passed; **11/11 tests passed**.
+
+
+## Deterministic sample simulator — follow-up
+
+Added \`mechanism_output\`, a deterministic topological-order routine, and \`sample_scm\`. The sampler supports observational rows and a single hard intervention \(do(X_i=v)\), with optional independent mechanism-output flips. The intervention replaces the target equation and bypasses its mechanism-noise flip; descendants use the intervened value. Inputs are validated, sampling is deterministic under the fixed seed, and a canonical JSON SHA-256 binds each row set to the SCM ID, seed, sample count, noise setting, and intervention contract.
+
+Smoke experiment: one 5-node AND-chain, 32 observational samples at noise probability 0.1, 32 samples for \(do(X_0=0)\), and 32 for \(do(X_0=1)\). Results are in the local sample artifact. The deterministic noiseless hard-do regression confirms all chain nodes become 0 under \(do(X_0=0)\) and all become 1 under \(do(X_0=1)\); this follows the deliberately constructed AND chain and is not evidence of discovery performance.
+
+Exact local validation on matching committed blobs:
+- Source blob: \`a67b65fe34fe40533bd3425f818b94b152c21acc\`
+- Test blob: \`9879240cd7bc4e64f19d76350f263c0af8642160\`
+- Embedded self-test passed; **14/14 unit tests passed**.
+- Sample smoke artifact: 2,316 bytes, SHA-256 \`b3647893810cac0fa74e557885ea953c7e26ad8787341c9552058b33fd171cd5\`.
+
+This enables a first reproducible sample-level evaluation protocol, but the code still does not infer a graph from samples, compute confidence intervals, handle latent variables/unknown interventions, or reproduce ACDB's exact scoring/efficiency contract. The benchmark is infrastructure only until discovery algorithms are evaluated.
