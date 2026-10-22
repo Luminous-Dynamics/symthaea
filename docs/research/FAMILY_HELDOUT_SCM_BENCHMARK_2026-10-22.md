@@ -116,3 +116,10 @@ Exact local validation on matching committed blobs:
 - Sample smoke artifact: 2,316 bytes, SHA-256 \`b3647893810cac0fa74e557885ea953c7e26ad8787341c9552058b33fd171cd5\`.
 
 This enables a first reproducible sample-level evaluation protocol, but the code still does not infer a graph from samples, compute confidence intervals, handle latent variables/unknown interventions, or reproduce ACDB's exact scoring/efficiency contract. The benchmark is infrastructure only until discovery algorithms are evaluated.
+
+
+## First sample-to-graph baseline now available
+
+The next report, \`docs/research/FAMILY_HELDOUT_MDL_BASELINE_2026-10-22.md\`, adds a paired comparison of observational-only versus mixed observational + hard-interventional samples using an exhaustive four-node enumerative-MDL graph selector. It evaluates 120 worlds and keeps topology-OOD, mechanism-OOD and combined-OOD results separate. The result is mixed: observational F1 is 0.9486 overall versus 0.9448 for the mixed intervention arm, while mean SHD improves from 0.0667 to 0.0500. The F1 advantage is not established; 110/120 worlds tie and the family-specific deltas vary. This is baseline plumbing and a diagnostic result, not a superiority claim.
+
+Source: \`validation/family_heldout_mdl_baseline.py\` (Git blob \`3698ecce55bbd02210c9221a8e31eb2c81ac7c05\`); tests: \`validation/test_family_heldout_mdl_baseline.py\` (Git blob \`1540b1d32f82c757b22cb4df66ac029e8fa2f585\`), 6/6 passed locally. The full output has SHA-256 \`7db7c8ceeb2438039636479c919ab5ea5cf7d618608d044320e3c9d0aca49707\`. The baseline now uses an explicit discrete-model MDL code instead of a misleading continuous-parameter BIC penalty.
