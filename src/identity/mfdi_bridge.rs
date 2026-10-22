@@ -9,8 +9,8 @@
 use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::collections::HashMap;
-use std::time::{Duration, SystemTime};
+use std::collections::{HashMap, HashSet};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 /// Assurance levels aligned with Epistemic Charter v2.0
 #[derive(
@@ -186,33 +186,54 @@ pub struct SignedRequest {
 }
 
 impl SignedRequest {
-    /// Create a new signed request
-    pub fn new(payload: impl Into<String>, signing_key: &SigningKey) -> Self {
-        let payload = payload.into();
-        let nonce = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_nanos() as u64;
+    /// Construct the canonical, versioned request transcript.
+    ///
+    /// The timestamp and nonce are authenticated alongside a length-prefixed
+    /// payload. The public key is not included in the transcript because Ed25519
+    /// verification already takes it as the verification key; request acceptance
+    /// separately requires that key to be in the bridge's trusted-key set.
+    fn signing_message(payload: &str, timestamp: SystemTime, nonce: u64) -> Vec<u8> {
+        const DOMAIN: &[u8] = b"SYMTHAEA-MFDI-SIGNED-REQUEST/v2\\0";
+        let timestamp_nanos = timestamp
+            .duration_since(UNIX_EPOCH)
+            .map(|duration| duration.as_nanos())
+            .unwrap_or_default();
 
-        // Create signing message: payload + nonce
-        let mut message = payload.as_bytes().to_vec();
+        let mut message = Vec::with_capacity(DOMAIN.len() + 8 + payload.len() + 16 + 8);
+        message.extend_from_slice(DOMAIN);
+        message.extend_from_slice(&(payload.len() as u64).to_le_bytes());
+        message.extend_from_slice(payload.as_bytes());
+        message.extend_from_slice(&timestamp_nanos.to_le_bytes());
         message.extend_from_slice(&nonce.to_le_bytes());
+        message
+    }
 
+    /// Create a new signed request with a cryptographically random 64-bit nonce.
+    pub fn new(payload: impl Into<String>, signing_key: &SigningKey) -> Self {
+        use rand::RngCore;
+
+        let payload = payload.into();
+        let timestamp = SystemTime::now();
+        let nonce = rand::thread_rng().next_u64();
+        let message = Self::signing_message(&payload, timestamp, nonce);
         let signature = signing_key.sign(&message);
 
         Self {
             payload,
             signature,
             public_key: signing_key.verifying_key(),
-            timestamp: SystemTime::now(),
+            timestamp,
             nonce,
         }
     }
 
-    /// Verify the request signature
+    /// Verify signature integrity only, not signer authorization.
+    ///
+    /// This checks that the payload, timestamp, and nonce match the signature.
+    /// A valid self-signature does not make the embedded public key trusted;
+    /// `MfdiBridge::verify_request` additionally applies its trusted-key policy.
     pub fn verify(&self) -> bool {
-        let mut message = self.payload.as_bytes().to_vec();
-        message.extend_from_slice(&self.nonce.to_le_bytes());
+        let message = Self::signing_message(&self.payload, self.timestamp, self.nonce);
         self.public_key.verify(&message, &self.signature).is_ok()
     }
 
@@ -314,8 +335,10 @@ pub struct MfdiBridge {
     signing_key: Option<SigningKey>,
     /// Current identity (if authenticated)
     current_identity: Option<MfdiIdentity>,
-    /// Seen nonces for replay protection
-    seen_nonces: HashMap<u64, SystemTime>,
+    /// Public keys explicitly authorized to submit signed requests.
+    trusted_request_keys: HashSet<[u8; 32]>,
+    /// Seen (signer public key, nonce) pairs for replay protection.
+    seen_nonces: HashMap<([u8; 32], u64), SystemTime>,
     /// Cycle counter for output signing
     cycle_counter: u64,
 }
@@ -327,6 +350,7 @@ impl MfdiBridge {
             config,
             signing_key: None,
             current_identity: None,
+            trusted_request_keys: HashSet::new(),
             seen_nonces: HashMap::new(),
             cycle_counter: 0,
         }
@@ -340,10 +364,14 @@ impl MfdiBridge {
         // Create default identity for local agent
         let identity = MfdiIdentity::new(agent_id, public_key, 0.5, 1.0);
 
+        let mut trusted_request_keys = HashSet::new();
+        trusted_request_keys.insert(public_key.to_bytes());
+
         Self {
             config,
             signing_key: Some(signing_key),
             current_identity: Some(identity),
+            trusted_request_keys,
             seen_nonces: HashMap::new(),
             cycle_counter: 0,
         }
@@ -365,6 +393,25 @@ impl MfdiBridge {
     /// Get agent ID
     pub fn agent_id(&self) -> Option<&str> {
         self.current_identity.as_ref().map(|i| i.agent_id.as_str())
+    }
+
+    /// Authorize a public key to submit signed requests to this bridge.
+    ///
+    /// Provision this trust anchor out of band (for example, through the
+    /// authenticated identity onboarding flow). A request's self-supplied key
+    /// alone is never enough to authorize it.
+    pub fn trust_request_signer(&mut self, public_key: &VerifyingKey) {
+        self.trusted_request_keys.insert(public_key.to_bytes());
+    }
+
+    /// Revoke authorization for a request signer.
+    pub fn untrust_request_signer(&mut self, public_key: &VerifyingKey) {
+        self.trusted_request_keys.remove(&public_key.to_bytes());
+    }
+
+    /// Number of public keys authorized to submit signed requests.
+    pub fn trusted_request_signer_count(&self) -> usize {
+        self.trusted_request_keys.len()
     }
 
     /// Get current assurance level
@@ -410,34 +457,40 @@ impl MfdiBridge {
 
     /// Verify a signed request
     pub fn verify_request(&mut self, request: &SignedRequest) -> Result<(), MfdiError> {
-        // Check signature
+        // Authorization is separate from self-signature validity: only the
+        // caller-provisioned trust set can authorize the claimed signer.
+        let signer_key = request.public_key.to_bytes();
+        if !self.trusted_request_keys.contains(&signer_key) {
+            return Err(MfdiError::UntrustedSigner);
+        }
+
         if !request.verify() {
             return Err(MfdiError::InvalidSignature);
         }
 
-        // Check replay protection
         let now = SystemTime::now();
         let window = Duration::from_secs(self.config.nonce_window_secs);
 
-        // Clean old nonces
-        self.seen_nonces
-            .retain(|_, t| t.elapsed().unwrap_or(window) < window);
+        // Reject timestamps before the epoch, timestamps in the future, and
+        // stale requests. The timestamp is also covered by the signature.
+        let age = now
+            .duration_since(request.timestamp)
+            .map_err(|_| MfdiError::RequestExpired)?;
+        if request.timestamp.duration_since(UNIX_EPOCH).is_err() || age > window {
+            return Err(MfdiError::RequestExpired);
+        }
 
-        // Check if nonce was seen
-        if self.seen_nonces.contains_key(&request.nonce) {
+        // Replay state is scoped by signer as well as nonce so one peer cannot
+        // poison another peer's nonce namespace.
+        self.seen_nonces
+            .retain(|_, seen_at| now.duration_since(*seen_at).is_ok_and(|age| age < window));
+
+        let replay_key = (signer_key, request.nonce);
+        if self.seen_nonces.contains_key(&replay_key) {
             return Err(MfdiError::ReplayDetected);
         }
 
-        // Check timestamp freshness
-        if let Ok(age) = request.timestamp.elapsed() {
-            if age > window {
-                return Err(MfdiError::RequestExpired);
-            }
-        }
-
-        // Store nonce
-        self.seen_nonces.insert(request.nonce, now);
-
+        self.seen_nonces.insert(replay_key, now);
         Ok(())
     }
 
@@ -529,6 +582,8 @@ pub struct MfdiBridgeSummary {
 pub enum MfdiError {
     /// Signature verification failed
     InvalidSignature,
+    /// Signer key is not authorized by this bridge's trust policy
+    UntrustedSigner,
     /// Replay attack detected
     ReplayDetected,
     /// Request too old
@@ -551,6 +606,7 @@ impl std::fmt::Display for MfdiError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             MfdiError::InvalidSignature => write!(f, "Invalid signature"),
+            MfdiError::UntrustedSigner => write!(f, "Request signer is not trusted"),
             MfdiError::ReplayDetected => write!(f, "Replay attack detected"),
             MfdiError::RequestExpired => write!(f, "Request expired"),
             MfdiError::NoSigningKey => write!(f, "No signing key available"),
@@ -636,6 +692,46 @@ mod tests {
 
         assert!(request.verify());
         assert!(request.agent_did().starts_with("did:mycelix:"));
+    }
+
+    #[test]
+    fn test_signed_request_binds_timestamp_and_nonce() {
+        let signing_key = MfdiBridge::generate_key();
+        let mut request = SignedRequest::new("test payload", &signing_key);
+        assert!(request.verify());
+
+        request.timestamp = request.timestamp + Duration::from_secs(1);
+        assert!(
+            !request.verify(),
+            "changing an unsigned freshness field must not preserve signature validity"
+        );
+    }
+
+    #[test]
+    fn test_bridge_rejects_self_signed_untrusted_request() {
+        let trusted_key = MfdiBridge::generate_key();
+        let attacker_key = MfdiBridge::generate_key();
+        let mut bridge =
+            MfdiBridge::with_signing_key(MfdiBridgeConfig::default(), trusted_key);
+        let attacker_request = SignedRequest::new("privileged action", &attacker_key);
+
+        assert!(attacker_request.verify(), "attacker's self-signature is internally valid");
+        assert!(matches!(
+            bridge.verify_request(&attacker_request),
+            Err(MfdiError::UntrustedSigner)
+        ));
+    }
+
+    #[test]
+    fn test_bridge_accepts_explicitly_trusted_remote_request_signer() {
+        let remote_key = MfdiBridge::generate_key();
+        let remote_public = remote_key.verifying_key();
+        let mut bridge = MfdiBridge::new(MfdiBridgeConfig::default());
+        bridge.trust_request_signer(&remote_public);
+
+        let request = SignedRequest::new("authorized action", &remote_key);
+        assert!(bridge.verify_request(&request).is_ok());
+        assert_eq!(bridge.trusted_request_signer_count(), 1);
     }
 
     #[test]
