@@ -119,7 +119,7 @@ A claim of outperforming SOTA requires equal task access and budget, held-out ev
 
 The Rust-first runner is available through the workspace `xtask` binary. It reads the machine-readable suite, checks that every referenced source file still contains the named regression function, validates a strict allowlist of Cargo command shapes, and preflights all selected commands **before** executing any of them. It invokes Cargo with an argument vector—never a shell.
 
-The suite contains eight known-broken tasks, 15 attack-regression commands, and 16 explicit functional positive-control commands. The two outcome classes remain separate: a passed attack regression is recorded as `reproduced_known_break`; a passed control is `positive_control_passed`. Neither is counted as novel discovery.
+The suite contains eight known-broken tasks, 15 attack-regression commands, and 16 explicit functional positive-control commands. The two outcome classes remain separate: a passed attack regression is recorded as `reproduced_known_break`; a passed control is `positive_control_passed`. Neither is counted as novel discovery. The summary counts a witness as **accepted** only when every positive control for that same task and package also passes; raw witness observations are reported separately from accepted witnesses.
 
 From a clean checkout:
 
