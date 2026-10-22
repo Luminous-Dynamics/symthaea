@@ -7,6 +7,8 @@ mod first_aid;
 #[cfg(test)]
 mod first_aid_model;
 mod first_aid_trajectory;
+#[cfg(test)]
+mod first_aid_reference;
 mod guideline_change_impact;
 mod manifest;
 mod rhn_sweep;
