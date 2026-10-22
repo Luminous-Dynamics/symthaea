@@ -739,6 +739,14 @@ impl ContinuousMind {
             }
         }
 
+        // Expire a replay stream only after any packet from it must also fail
+        // the independent packet-timestamp freshness gate. Authenticated packets
+        // with missing timestamps are rejected below, so expiry cannot re-enable
+        // replay of timestamp-free authenticated packets.
+        let replay_cleanup_now = std::time::Instant::now();
+        self.mesh_replay_windows
+            .retain(|_, window| !window.is_expired(replay_cleanup_now));
+
         // Priority-aware inbox backpressure: drop lowest-priority packets first
         if self.mesh_inbox.len() > super::MAX_OUTBOX_SIZE {
             let excess = self.mesh_inbox.len() - super::MAX_OUTBOX_SIZE;
@@ -811,25 +819,20 @@ impl ContinuousMind {
         let mut moral_topology_count = 0u64;
 
         for packet in &inbox {
-            // Dedup check: skip if we've already seen this (source_id, sequence) pair
-            let key = (packet.source_id, packet.sequence, packet.payload_type as u8);
-            if self.mesh_seen_packets.contains(&key) {
-                self.mesh_stats.packets_deduplicated += 1;
-                continue;
-            }
-            if self.mesh_seen_packets.len() >= super::mesh::MESH_DEDUP_RING_SIZE {
-                self.mesh_seen_packets.pop_front();
-            }
-            self.mesh_seen_packets.push_back(key);
-
-            // Timestamp validation: reject packets older than MESH_MAX_PACKET_AGE_S
+            // Timestamp freshness is independent of sequence replay protection.
             let now_s = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
-                .map(|d| d.as_secs() as u32)
+                .map(|d| d.as_secs().min(u32::MAX as u64) as u32)
                 .unwrap_or(0);
             if now_s > 0 && packet.timestamp_s > 0 {
                 if now_s.saturating_sub(packet.timestamp_s) > super::mesh::MESH_MAX_PACKET_AGE_S {
-                    self.mesh_stats.packets_deduplicated += 1;
+                    self.mesh_stats.packets_replay_rejected += 1;
+                    continue;
+                }
+                if packet.timestamp_s
+                    > now_s.saturating_add(super::mesh::MESH_MAX_FUTURE_SKEW_S)
+                {
+                    self.mesh_stats.packets_replay_rejected += 1;
                     continue;
                 }
             }
@@ -904,6 +907,59 @@ impl ContinuousMind {
                     payload = ?packet.payload_type,
                     "No authentication key available for telemetry packet. Fail-open: passing as unauthenticated."
                 );
+            }
+
+            // A verified MAC makes source_id + payload_type + sequence an
+            // authenticated stream identity. Apply anti-replay state only after
+            // verification, so unauthenticated traffic cannot poison a trusted
+            // stream's replay window.
+            if auth_verified {
+                if now_s == 0 || packet.timestamp_s == 0 {
+                    // Authenticated packets must carry a usable timestamp;
+                    // without it, replay-window expiry could not be safe.
+                    self.mesh_stats.packets_replay_rejected += 1;
+                    continue;
+                }
+
+                let replay_key = (packet.source_id, packet.payload_type as u8);
+                if !self.mesh_replay_windows.contains_key(&replay_key)
+                    && self.mesh_replay_windows.len()
+                        >= super::mesh::MESH_REPLAY_STREAM_CAPACITY
+                {
+                    // Never evict active authenticated sequence state just to
+                    // admit a new stream: fail closed when the bounded table is full.
+                    self.mesh_stats.packets_replay_rejected += 1;
+                    tracing::warn!(
+                        target: "symthaea::mind::mesh",
+                        source = ?packet.source_id,
+                        payload = ?packet.payload_type,
+                        "Authenticated replay-window capacity reached; dropping new stream"
+                    );
+                    continue;
+                }
+
+                let replay_now = std::time::Instant::now();
+                let accepted = self
+                    .mesh_replay_windows
+                    .entry(replay_key)
+                    .or_default()
+                    .check_and_mark(packet.sequence, replay_now);
+                if !accepted {
+                    self.mesh_stats.packets_replay_rejected += 1;
+                    continue;
+                }
+            } else {
+                // Unauthenticated telemetry retains a bounded best-effort
+                // duplicate filter, isolated from authenticated replay state.
+                let key = (packet.source_id, packet.sequence, packet.payload_type as u8);
+                if self.mesh_seen_packets.contains(&key) {
+                    self.mesh_stats.packets_deduplicated += 1;
+                    continue;
+                }
+                if self.mesh_seen_packets.len() >= super::mesh::MESH_DEDUP_RING_SIZE {
+                    self.mesh_seen_packets.pop_front();
+                }
+                self.mesh_seen_packets.push_back(key);
             }
 
             // TTL forwarding (Item 4): rebroadcast with decremented TTL
