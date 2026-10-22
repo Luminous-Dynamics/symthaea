@@ -1285,7 +1285,10 @@ mod tests {
             )
         );
 
-        assert_eq!(protocol_failures, 0, "PIT monitor must fail closed only on real protocol defects");
+        assert_eq!(
+            protocol_failures, 0,
+            "PIT monitor must fail closed only on real protocol defects"
+        );
         assert!(
             pit_audit_queries > 0,
             "the integrated policy never reached a singleton audit"
