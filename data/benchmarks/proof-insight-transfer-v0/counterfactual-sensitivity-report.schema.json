@@ -17,7 +17,8 @@
     "by_mutation_kind",
     "bootstrap",
     "proposed_gates",
-    "limitations"
+    "limitations",
+    "resource_usage"
   ],
   "properties": {
     "schema_version": {
@@ -203,6 +204,60 @@
         "type": "string",
         "minLength": 1
       }
+    },
+    "resource_usage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "paired_outcome_rows",
+        "units",
+        "base_totals",
+        "counterfactual_totals",
+        "base_mean_per_pair",
+        "counterfactual_mean_per_pair"
+      ],
+      "properties": {
+        "paired_outcome_rows": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "units": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "cost",
+            "wall_time",
+            "tokens",
+            "model_calls"
+          ],
+          "properties": {
+            "cost": {
+              "const": "micro-USD"
+            },
+            "wall_time": {
+              "const": "milliseconds"
+            },
+            "tokens": {
+              "const": "tokens"
+            },
+            "model_calls": {
+              "const": "calls"
+            }
+          }
+        },
+        "base_totals": {
+          "$ref": "#/$defs/resourceTotals"
+        },
+        "counterfactual_totals": {
+          "$ref": "#/$defs/resourceTotals"
+        },
+        "base_mean_per_pair": {
+          "$ref": "#/$defs/resourceMeans"
+        },
+        "counterfactual_mean_per_pair": {
+          "$ref": "#/$defs/resourceMeans"
+        }
+      }
     }
   },
   "$defs": {
@@ -235,8 +290,7 @@
             "number",
             "null"
           ],
-          "minimum": 0,
-          "maximum": 1
+          "minimum": 0
         },
         "ci_95": {
           "oneOf": [
@@ -249,8 +303,7 @@
               "maxItems": 2,
               "items": {
                 "type": "number",
-                "minimum": 0,
-                "maximum": 1
+                "minimum": 0
               }
             }
           ]
@@ -262,8 +315,147 @@
         "statistic": {
           "enum": [
             "ratio",
-            "mean"
+            "mean",
+            "paired_difference"
           ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "statistic": {
+                "const": "ratio"
+              }
+            },
+            "required": [
+              "statistic"
+            ]
+          },
+          "then": {
+            "properties": {
+              "estimate": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 1
+              },
+              "ci_95": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "type": "array",
+                    "minItems": 2,
+                    "maxItems": 2,
+                    "items": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "statistic": {
+                "const": "mean"
+              }
+            },
+            "required": [
+              "statistic"
+            ]
+          },
+          "then": {
+            "properties": {
+              "estimate": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "ci_95": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "type": "array",
+                    "minItems": 2,
+                    "maxItems": 2,
+                    "items": {
+                      "type": "number",
+                      "minimum": 0
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    "resourceTotals": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "model_calls",
+        "tokens",
+        "wall_ms",
+        "cost_microusd"
+      ],
+      "properties": {
+        "model_calls": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "wall_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cost_microusd": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "resourceMeans": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "model_calls",
+        "tokens",
+        "wall_ms",
+        "cost_microusd"
+      ],
+      "properties": {
+        "model_calls": {
+          "type": "number",
+          "minimum": 0
+        },
+        "tokens": {
+          "type": "number",
+          "minimum": 0
+        },
+        "wall_ms": {
+          "type": "number",
+          "minimum": 0
+        },
+        "cost_microusd": {
+          "type": "number",
+          "minimum": 0
         }
       }
     }
