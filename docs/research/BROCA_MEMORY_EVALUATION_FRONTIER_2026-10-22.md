@@ -38,7 +38,7 @@ These are complementary datasets, not exchangeable measures. **LongMemEval V1 an
 
 ### Minimal first portfolio
 
-Start with **MIRE + LongMemEval + MemoryAgentBench**. Add **Mem2ActBench** before claiming the system improves tool-using agents. Add BEAM/AMA-Bench when the first adapter is stable. This order gives us a cheap integrity gate, a known conversational baseline, incremental-memory competencies, and then execution-level memory utility.
+Start with **MIRE + LongMemEval V1 + MemoryAgentBench**; run **LongMemEval-V2** as a separately reported accuracy–latency track as soon as its adapter is stable. Add **Mem2ActBench** before claiming the system improves tool-using agents. Add BEAM/AMA-Bench when the first adapter is stable. This order gives us a cheap integrity gate, a known conversational baseline, incremental-memory competencies, and then execution-level memory utility.
 
 ## 3. Fair baseline matrix
 
@@ -152,7 +152,7 @@ Never combine V1 task accuracy, V2 frontier metrics, Recall@20, LLM-judge scores
 
 1. **Integrity first:** run MIRE reference tests and mutation controls on an exact source revision; do not interpret skipped CI as a pass.
 2. **Substrate-only pilot:** use small, fixed data and one frozen answer model to compare no-memory, BM25, dense retrieval, versioned KV, current HDC/MemoryBridge and selective intervention. Keep the experiment cheap enough to run locally.
-3. **External suite adapter:** first LongMemEval and MemoryAgentBench, preserving official scorers and dataset versions. Do not copy benchmark data into the training path.
+3. **External suite adapter:** first LongMemEval V1 and MemoryAgentBench, preserving official scorers and dataset versions; run LongMemEval-V2 as a separate frontier experiment, never merging its score with V1. Do not copy benchmark data into the training path.
 4. **Task-grounded follow-up:** add Mem2ActBench or an equivalent frozen tool sandbox. Verify actual selected tool and exact arguments, not merely whether memory was retrieved.
 5. **Frontier sweep:** cross several memory budgets with fixed workloads, multiple seeds, paired confidence intervals and full metadata accounting.
 6. **Scale and robustness:** extend to long context / agent trajectories, crash/restart/replay tests and concurrent or out-of-order writers only when the baseline adapter is stable.
