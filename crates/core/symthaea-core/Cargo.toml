@@ -212,3 +212,7 @@ gpu = ["dep:wgpu"]                            # WGPU-accelerated HDC compute pri
 [[example]]
 name = "hlb_factorial_benchmark_contract"
 path = "examples/hlb_factorial_benchmark_contract.rs"
+
+[[example]]
+name = "hlb_information_choice_fixture"
+path = "examples/hlb_information_choice_fixture.rs"
