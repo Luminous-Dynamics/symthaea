@@ -5,6 +5,7 @@
 // This is a streaming datapath slice, not a complete 16,384-bit vector controller,
 // SoC, CPU, GPU, or qualified accelerator.
 
+`timescale 1ns/1ps
 `default_nettype none
 
 module hdc_bind_xor #(
