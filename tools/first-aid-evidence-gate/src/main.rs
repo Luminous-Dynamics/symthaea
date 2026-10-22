@@ -182,16 +182,35 @@ fn validate_registry(root: &Value) -> Result<AuditSummary, Vec<String>> {
                 errors.push(format!("{context}: duplicate claim_id '{id}'"));
             }
         }
-        let claim_source_ids = match claim.get("source_ids").and_then(Value::as_array) {
-            Some(ids) if !ids.is_empty() => ids,
-            _ => {
-                errors.push(format!("{context}: source_ids must be a non-empty array"));
-                &[]
-            }
-        };
+        let claim_source_ids: &[Value] =
+            match claim.get("source_ids").and_then(Value::as_array) {
+                Some(ids) if ids.len() == 1 => ids.as_slice(),
+                Some(_) => {
+                    errors.push(format!(
+                        "{context}: v0 requires one primary source per atomic claim"
+                    ));
+                    &[]
+                }
+                None => {
+                    errors.push(format!("{context}: source_ids must be a one-item array"));
+                    &[]
+                }
+            };
         for source_id in claim_source_ids.iter().filter_map(Value::as_str) {
             if !source_ids.contains(source_id) {
                 errors.push(format!("{context}: unknown source_id '{source_id}'"));
+            } else {
+                let registered = sources
+                    .iter()
+                    .find(|source| field_str(source, "source_id") == Some(source_id));
+                if registered
+                    .and_then(|source| field_str(source, "edition"))
+                    != field_str(claim, "source_edition")
+                {
+                    errors.push(format!(
+                        "{context}: source_edition must match the registry edition for '{source_id}'"
+                    ));
+                }
             }
         }
 
