@@ -13,7 +13,7 @@ This is intentionally a narrow step beyond the nominal expected-information-gain
 - `expected_information_gain_worst_case_nats` evaluates the same experiment under every supplied observation-noise standard deviation and returns the minimum information gain.
 - `select_experiment_by_worst_case_information_gain_per_cost` ranks candidate experiments by that minimum divided by positive finite cost.
 
-The noise envelope is a finite caller-supplied list, not an interval guarantee. Invalid/empty noise scenarios fail closed. Incomplete or non-finite predictions remain ineligible. The functions preserve deterministic input-order tie-breaking and do not alter the existing variance or nominal EIG selectors.
+The noise envelope is a finite caller-supplied list, not an interval guarantee. Every scale must be positive and finite or the request fails closed. Under the shared additive Gaussian-noise model, increasing noise is a post-processing channel, so exact mutual information is non-increasing in noise; the implementation validates the full list and evaluates its maximum scale once, avoiding one quadrature per scenario. Incomplete or non-finite predictions remain ineligible. The functions preserve deterministic input-order tie-breaking and do not alter the existing variance or nominal EIG selectors. Consequently, v0.1 is best understood as explicit conservative high-noise EIG, not a novel general-purpose robust objective.
 
 ## Preconditions and non-claims
 
@@ -27,7 +27,7 @@ The focused Rust tests cover:
 
 1. The robust score is no larger than any included scenario score.
 2. A rank-reversal example where low-noise nominal EIG favors a four-way split, but the worst-case envelope favors a higher-signal-variance experiment when the noise scenario rises sharply.
-3. Empty and invalid noise envelopes fail closed.
+3. Empty and invalid noise envelopes fail closed; the worst-case computation evaluates the maximum valid noise scale only.
 4. A paired-seed discovery pilot compares nominal EIG with a factor-of-two noise envelope on matched clean and hidden-discrepancy worlds, reporting recovery, false confident-singleton, discrepancy detection, unresolved outcomes, and paired bootstrap intervals. The pilot intentionally reports results without asserting that the robust policy wins.
 
 A separate numeric translation of the rank-reversal case predicts these scenario scores (nats): at standard deviation 0.1, candidate A ≈ 0.562 and B ≈ 1.386; at standard deviation 5.0, A ≈ 0.0326 and B ≈ 0.0244. This calculation verifies the intended test geometry only; it is not a Rust build or CI result.
