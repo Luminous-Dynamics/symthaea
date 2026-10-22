@@ -1401,6 +1401,7 @@ mod tests {
                     "backend_attempt_elapsed_ms_total": 0,
                     "backend_attempt_elapsed_ms_p50": 0,
                     "backend_attempt_elapsed_ms_p95": 0,
+                    "backend_attempt_estimated_energy_total": 0.0,
                     "runs_with_external_backend_attempts": 0,
                     "runs_with_simulated_backend_attempts": 0,
                     "runs_with_no_backend_attempts": 1,
@@ -1717,6 +1718,38 @@ mod tests {
         assert_eq!(nearest_rank_percentile(&mut [], 0.50), None);
         assert_eq!(nearest_rank_percentile(&mut values.clone(), f64::NAN), None);
         assert_eq!(nearest_rank_percentile(&mut values.clone(), 1.5), None);
+    }
+
+    #[test]
+    fn tampered_backend_attempt_latency_summary_is_rejected() {
+        let mut report = valid_fixture();
+        report["summary"]["gcs_off"]["backend_attempt_elapsed_ms_p95"] = Value::from(999);
+        let errors = audit(&report, None, None);
+        assert!(errors.iter().any(|error| error.contains("backend_attempt_elapsed_ms_p95")));
+    }
+
+    #[test]
+    fn tampered_backend_attempt_energy_summary_is_rejected() {
+        let mut report = valid_fixture();
+        report["runs"][0]["backend_attempts"] = serde_json::json!([{
+            "tier": "Native",
+            "backend_name": "NativeCodeTemplate",
+            "success": true,
+            "elapsed_ms": 7,
+            "estimated_energy_cost": 1.0
+        }]);
+        report["summary"]["gcs_off"]["backend_attempts_by_tier"]["Native"] = Value::from(1);
+        report["summary"]["gcs_off"]["backend_attempts_by_name"] =
+            serde_json::json!({"NativeCodeTemplate": 1});
+        report["summary"]["gcs_off"]["backend_attempts_succeeded"] = Value::from(1);
+        report["summary"]["gcs_off"]["backend_attempts_failed"] = Value::from(0);
+        report["summary"]["gcs_off"]["backend_attempt_elapsed_ms_total"] = Value::from(7);
+        report["summary"]["gcs_off"]["backend_attempt_elapsed_ms_p50"] = Value::from(7);
+        report["summary"]["gcs_off"]["backend_attempt_elapsed_ms_p95"] = Value::from(7);
+        report["summary"]["gcs_off"]["backend_attempt_estimated_energy_total"] = Value::from(99.0);
+        report["summary"]["gcs_off"]["runs_with_no_backend_attempts"] = Value::from(0);
+        let errors = audit(&report, None, None);
+        assert!(errors.iter().any(|error| error.contains("backend_attempt_estimated_energy_total")));
     }
 
     #[test]
