@@ -427,7 +427,9 @@ mod tests {
     #[test]
     fn v2_transcript_binds_version_and_option_tag() {
         let attestor = SovereignAttestor::new();
-        let attestation = attestor.attest("unit-test", TEST_SMT, "Proven", Some(b"artifact")).unwrap();
+        let attestation = attestor
+            .attest("unit-test", TEST_SMT, "Proven", Some(b"artifact"))
+            .unwrap();
 
         let original = signing_message_v2(&attestation);
         let mut changed = attestation.clone();
