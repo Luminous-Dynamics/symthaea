@@ -163,9 +163,7 @@ fn run() -> Result<(), String> {
             });
         }
 
-        let random_seed = 0xA110_57A7_u64
-            .wrapping_add(scenario.bytes().map(u64::from).sum::<u64>())
-            .wrapping_add(if shielded { 1 } else { 0 });
+        let random_seed = stable_scenario_seed(&scenario, shielded);
         let summary = PairedSummary::from_samples(&paired, bootstrap_replicates, random_seed)
             .map_err(|error| format!("{scenario}/{shielded}: {error}"))?;
         summaries.push((scenario, shielded, random_seed, summary));
@@ -282,6 +280,20 @@ fn parse_bool(value: &str) -> Result<bool, ()> {
     }
 }
 
+fn stable_scenario_seed(scenario: &str, shielded: bool) -> u64 {
+    // FNV-1a is used only to produce a stable bootstrap seed, not for security.
+    let mut hash = 0xcbf2_9ce4_8422_2325_u64;
+    for byte in scenario.bytes().chain([u8::from(shielded)]) {
+        hash ^= u64::from(byte);
+        hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+    }
+    if hash == 0 {
+        0x9E37_79B9_7F4A_7C15
+    } else {
+        hash
+    }
+}
+
 fn is_slug(value: &str) -> bool {
     !value.is_empty()
         && value
@@ -328,7 +340,7 @@ fn write_summary_row(
 
 #[cfg(test)]
 mod tests {
-    use super::{csv_fields, ensure_distinct_paths, is_slug, parse_bool};
+    use super::{csv_fields, ensure_distinct_paths, is_slug, parse_bool, stable_scenario_seed};
     use std::fs;
     use std::path::Path;
 
@@ -348,6 +360,13 @@ mod tests {
         let result = ensure_distinct_paths(&source, &alias);
         fs::remove_file(&source).expect("remove temporary source fixture");
         assert!(result.expect_err("same path must be rejected").contains("same file"));
+    }
+
+    #[test]
+    fn bootstrap_seed_is_stable_and_order_sensitive() {
+        assert_eq!(stable_scenario_seed("cartpole", false), stable_scenario_seed("cartpole", false));
+        assert_ne!(stable_scenario_seed("ab", false), stable_scenario_seed("ba", false));
+        assert_ne!(stable_scenario_seed("cartpole", false), stable_scenario_seed("cartpole", true));
     }
 
     #[test]
