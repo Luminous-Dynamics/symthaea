@@ -672,11 +672,11 @@ impl MambaWrapper {
     /// because `State.hs` contains autograd-tracked tensors.
     ///
     /// Steps:
-    /// 1. Inject `[0..first_var_pos)` as context (no autograd)
-    /// 2. Detach state (cut gradient flow from warmup)
-    /// 3. Inject `[first_var_pos..N)`: Var at requested positions, Tensor elsewhere
-    /// 4. Teacher-force 1 token, compute cross-entropy loss
-    /// 5. Backward → extract gradients from all K Vars
+    /// 1. Warm-start convolution history and inject the projected context sequence
+    /// 2. Detach prefix warmup before the earliest differentiable context anchor
+    /// 3. Preserve graph connections through requested anchors and remaining context
+    /// 4. Replay every token in the teacher prefix and score the final token as target
+    /// 5. Backward → extract finite gradients for all requested anchors
     pub fn compute_e2e_token_loss_multi(
         &mut self,
         sequence: &[Vec<f32>],
