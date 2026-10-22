@@ -334,11 +334,15 @@ impl ContinuousHV {
         }
 
         let dim = hvs[0].values.len();
+        assert!(
+            hvs.iter().all(|hv| hv.values.len() == dim),
+            "ContinuousHV::bundle requires all vectors to have the same dimension"
+        );
 
         #[cfg(feature = "simd")]
         {
-            // SIMD path requires uniform dimensions; fall through to scalar if mismatched
-            let uniform = hvs.iter().all(|hv| hv.values.len() == dim);
+            // The shape contract is checked before either implementation path.
+            let uniform = true;
             if uniform {
                 let slices: Vec<&[f32]> = hvs.iter().map(|hv| hv.values.as_slice()).collect();
                 let weights = vec![1.0f32; hvs.len()];
@@ -391,11 +395,20 @@ impl ContinuousHV {
             return Self::zero(HDC_DIMENSION);
         }
 
+        assert_eq!(
+            hvs.len(),
+            weights.len(),
+            "ContinuousHV::weighted_bundle requires one weight per vector"
+        );
         let dim = hvs[0].values.len();
+        assert!(
+            hvs.iter().all(|hv| hv.values.len() == dim),
+            "ContinuousHV::weighted_bundle requires all vectors to have the same dimension"
+        );
 
         #[cfg(feature = "simd")]
         {
-            let uniform = hvs.iter().all(|hv| hv.values.len() == dim);
+            let uniform = true;
             if uniform {
                 let slices: Vec<&[f32]> = hvs.iter().map(|hv| hv.values.as_slice()).collect();
                 let values = crate::hdc::simd_continuous::bundle_simd(&slices, weights);
@@ -403,7 +416,7 @@ impl ContinuousHV {
             }
         }
 
-        // Scalar fallback (also used when dimensions are non-uniform)
+        // Scalar fallback; shape validity was established above.
         let weight_sum: f32 = weights.iter().sum();
 
         let values: Vec<f32> = (0..dim)
@@ -1164,6 +1177,30 @@ mod tests {
         // Bound should be dissimilar to both inputs
         assert!(a.similarity(&bound).abs() < 0.2);
         assert!(b.similarity(&bound).abs() < 0.2);
+    }
+
+    #[test]
+    #[should_panic(expected = "ContinuousHV::bundle requires all vectors to have the same dimension")]
+    fn test_continuous_bundle_rejects_mixed_dimensions() {
+        let a = ContinuousHV::zero(128);
+        let b = ContinuousHV::zero(64);
+        let _ = ContinuousHV::bundle(&[&a, &b]);
+    }
+
+    #[test]
+    #[should_panic(expected = "ContinuousHV::weighted_bundle requires all vectors to have the same dimension")]
+    fn test_continuous_weighted_bundle_rejects_mixed_dimensions() {
+        let a = ContinuousHV::zero(128);
+        let b = ContinuousHV::zero(64);
+        let _ = ContinuousHV::weighted_bundle(&[&a, &b], &[1.0, 1.0]);
+    }
+
+    #[test]
+    #[should_panic(expected = "ContinuousHV::weighted_bundle requires one weight per vector")]
+    fn test_continuous_weighted_bundle_rejects_weight_count_mismatch() {
+        let a = ContinuousHV::zero(128);
+        let b = ContinuousHV::zero(128);
+        let _ = ContinuousHV::weighted_bundle(&[&a, &b], &[1.0]);
     }
 
     #[test]
