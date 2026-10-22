@@ -51,3 +51,6 @@ jobs:
 
       - name: Exercise shift-stratified robustness CLI
         run: cargo run --locked --manifest-path experiments/robodojo-contract/Cargo.toml -- --shift-audit experiments/robodojo-contract/examples/synthetic_trials.tsv experiments/robodojo-contract/examples/synthetic_shift_plan.tsv baseline symthaea_sidecar
+
+      - name: Exercise paired active-sensing benchmark audit
+        run: cargo run --locked --manifest-path experiments/robodojo-contract/Cargo.toml -- --sensing-audit experiments/robodojo-contract/examples/synthetic_sensing_trials.tsv
