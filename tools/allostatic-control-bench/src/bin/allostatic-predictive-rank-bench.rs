@@ -6,9 +6,7 @@
 //! conditional on the algorithm's sampling/exchangeability assumptions.
 
 use allostatic_control_bench::drift_monitor::calibrate_drift_threshold;
-use allostatic_control_bench::rank_martingale::{
-    RankMartingalePortfolio, ScoreToken,
-};
+use allostatic_control_bench::rank_martingale::{RankMartingalePortfolio, ScoreToken};
 use std::error::Error;
 use std::fs;
 
