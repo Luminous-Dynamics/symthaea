@@ -142,7 +142,7 @@ cargo run -p xtask -- crypto-calibrate --all \
   --out target/crypto-discovery/run.json
 ```
 
-The runner refuses execution from a dirty or unverifiable working tree; this protects exact-commit provenance. It records the git revision, clean-tree status, suite SHA-256, Rust/Cargo versions, command arguments, duration, exit code, output SHA-256 digests, and bounded output excerpts. A nonzero test command is recorded as `command_failed`, not automatically called an attack failure: compilation/environment errors must be triaged separately. The runner prints and optionally writes a JSON receipt; use a path under `target/` to avoid leaving tracked working-tree changes.
+The runner refuses execution from a dirty or unverifiable working tree; this protects exact-commit provenance. It records the git revision, clean-tree status, suite SHA-256, workspace manifest and Cargo.lock SHA-256 digests, Rust/Cargo versions (including rustc host details), OS/architecture, command arguments, duration, exit code, output SHA-256 digests, and bounded output excerpts. A nonzero test command is recorded as `command_failed`, not automatically called an attack failure: compilation/environment errors must be triaged separately. The runner prints and optionally writes a JSON receipt; use a path under `target/` to avoid leaving tracked working-tree changes.
 
 This is a **calibration executor**, not yet a general agent orchestration system. It does not run blind frontier tasks, prove a new construction secure, or establish independent novelty. The current source additions have not been executed locally; CI must compile the xtask and run its unit tests before this runner is treated as validated.
 
