@@ -40,7 +40,7 @@ The LCB multiplier and threshold are fixed in source before the synthetic outcom
 
 The generated alarm has 80% sensitivity to the synthetic shifted stratum and a 10% false-positive rate. This is a *test parameter*, not measured detector performance. The evaluator-only shift flag is used only after choices are committed to score false positives, false negatives and stratum outcomes.
 
-Each regime uses 8 fixed seeds, 256 trials per seed, budget ceilings at 20%, 40% and 60% of a predeclared reference full-fidelity cost of four units per trial, and all five policies. Expected output: 360 per-seed run rows and 45 across-seed summary rows. Abstract integer cost units are not latency, FLOPs, joules or money.
+Each regime uses 8 fixed seeds, 256 trials per seed, budget ceilings at 20%, 40% and 60% of a predeclared reference full-fidelity cost of four units per trial, and all five policies. Expected output: 360 per-seed run rows and 45 across-seed summary rows. Each run reports CVaR95 of per-trial incremental decision loss: sort trial losses descending (a harmful escalation contributes positive loss, a beneficial escalation negative loss, and a cheap-path decision zero) and average the worst ceil(5% of trials). Abstract integer cost units are not latency, FLOPs, joules or money.
 
 ## Information and authority boundaries
 
@@ -60,14 +60,14 @@ It cannot receive the hidden shift stratum, true DVPC, actual cost, future obser
 - Preserve reservation overruns and run-budget overruns as explicit invalidating outcomes.
 - Mark regret as `INVALID_BUDGET` after any reservation overrun or total-budget overrun; do not clip spend, exclude only inconvenient rows silently, or present invalid runs as successful budget-relative comparisons.
 - Score the exact knapsack reference only after all policy decisions are committed.
-- Keep task loss, total decision benefit, harmful escalations, missed beneficial escalations, shifted-stratum harm, alarm frequency, false alarms, beneficial decisions blocked by false alarms, cost, and valid regret visible separately. There is deliberately no single weighted score that can hide the safety/utility tradeoff.
+- Keep task loss, total decision benefit, CVaR95 incremental decision loss, harmful escalations, missed beneficial escalations, shifted-stratum harm, alarm frequency, false alarms, beneficial decisions blocked by false alarms, cost, and valid regret visible separately. CVaR95 is computed over all trials in each regime/seed run, not only the hidden shifted subset. There is deliberately no single weighted score that can hide the safety/utility tradeoff.
 - Deterministic replay is a qualification invariant, not evidence of external validity.
 
 ## Predeclared interpretation gates
 
 These are candidate gates for this synthetic mechanism, not claims about current results:
 
-1. In the sign-reversal condition, the shift-guarded policy should reduce shifted-stratum harmful escalations by at least 25% relative to conservative LCB in at least two of the three fixed budget levels, averaged across the seeded runs. If the comparator's denominator is zero, report the reduction as undefined, not infinite.
+1. In the sign-reversal condition, the shift-guarded policy should reduce shifted-stratum harmful escalations by at least 25% relative to conservative LCB in at least two of the three fixed budget levels, averaged across the seeded runs. If the comparator's denominator is zero, report the reduction as undefined, not infinite. A tail-risk improvement claim also requires CVaR95 of incremental decision loss to improve; counts and CVaR95 must both be shown.
 2. In the stable-calibrated condition, total decision benefit should retain at least 90% of conservative LCB's benefit when that benefit is positive; otherwise report absolute paired differences. Report the exact count of beneficial opportunities blocked by false alarms.
 3. The guard must not gain apparent utility by violating reservation or total budgets. Every invalidated run stays visible and cannot support a positive regret claim.
 4. The overconfident-errors control is mandatory. A shift gate that only helps sign reversal must not be described as a general estimator-robustness solution.
