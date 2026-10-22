@@ -200,7 +200,11 @@
     "false_model_elimination_rate_under_observation_noise",
     "model_family_falsification_rate",
     "unidentifiable_model_pair_rate",
-    "actual_plant_membership_separate_from_observation_compatibility"
+    "actual_plant_membership_separate_from_observation_compatibility",
+    "stale_certificate_reuse_attempts",
+    "stale_certificate_rejections_by_reason",
+    "false_acceptance_rate_for_stale_certificates",
+    "certificate_validation_p50_p95_p99_latency"
   ],
   "mandatory_gates": [
     "invalid_input_or_missing_calibration_is_uncertified",
@@ -215,7 +219,11 @@
     "no_information_claim_from_probe_selection_without_observed_uncertainty_reduction",
     "empty_post_observation_model_set_invalidates_certificates_and_never_restores_prior_silently",
     "noise_compatibility_is_not_reported_as_true_plant_membership",
-    "active_learning_comparisons_use_fixed_exploration_budget_and_matched_violation_budget"
+    "active_learning_comparisons_use_fixed_exploration_budget_and_matched_violation_budget",
+    "certificate_lease_binds_state_model_limits_calibration_authority_monitor_and_evidence_revisions",
+    "stale_certificate_rejected_after_any_bound_context_change",
+    "certificate_validation_and_action_application_are_atomic_or_toctou_tested",
+    "certificate_horizon_and_expiry_are_checked_at_use"
   ],
   "proposed_targets_not_results": {
     "in_envelope_false_certificates": 0,
@@ -248,5 +256,33 @@
       "safe_capability_frontier_after_fixed_interaction_budget"
     ],
     "terminology_constraint": "Maximin interval separation is a geometric distinguishability proxy, not mutual information."
+  },
+  "certificate_lifecycle": {
+    "status": "required_external_adapter_gate",
+    "bound_fields": [
+      "state_revision",
+      "dynamics_revision",
+      "limits_revision",
+      "calibration_revision",
+      "authority_revision",
+      "monitor_epoch",
+      "evidence_digest",
+      "issued_step",
+      "expiry_step",
+      "certified_horizon"
+    ],
+    "reject_when": [
+      "state_revision_changed",
+      "dynamics_revision_changed",
+      "limits_revision_changed",
+      "calibration_revision_changed",
+      "authority_revision_changed",
+      "monitor_epoch_changed",
+      "evidence_digest_changed",
+      "lease_expired",
+      "clock_regressed",
+      "requested_horizon_exceeds_certified_horizon"
+    ],
+    "rule": "A rejected lease requires recertification; never downgrade an invalidation to a warning and continue using the cached permission."
   }
 }
