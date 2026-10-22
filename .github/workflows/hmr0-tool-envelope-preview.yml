@@ -45,16 +45,81 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cargo run --locked --release -p symthaea-fabrication-kernel --example hmr0_tool_envelope_preview -- target/hmr0-tool-envelope-previews
-          test -s target/hmr0-tool-envelope-previews/sealed_tote_gripper_envelope.stl
-          test -s target/hmr0-tool-envelope-previews/passive_tray_dock_envelope.stl
+          output_dir="target/hmr0-tool-envelope-previews"
+          cargo run --locked --release -p symthaea-fabrication-kernel --example hmr0_tool_envelope_preview -- "$output_dir"
+          gripper="$output_dir/sealed_tote_gripper_envelope.stl"
+          dock="$output_dir/passive_tray_dock_envelope.stl"
+          test -s "$gripper"
+          test -s "$dock"
+
+          gripper_sha="$(sha256sum "$gripper" | cut -d' ' -f1)"
+          gripper_bytes="$(wc -c < "$gripper" | tr -d ' ')"
+          dock_sha="$(sha256sum "$dock" | cut -d' ' -f1)"
+          dock_bytes="$(wc -c < "$dock" | tr -d ' ')"
+          cat > "$output_dir/sealed_tote_gripper.manifest.json" <<EOF
+          {
+            "schema_version": "hmr0-artifact-manifest-v0.1",
+            "tool_id": "SEALED_TOTE_GRIPPER",
+            "tool_revision": "0.1.0",
+            "evidence_class": "concept_preview_only",
+            "physical_actuation_authorized": false,
+            "patient_contact_authorized": false,
+            "clinical_function_authorized": false,
+            "artifacts": [{
+              "artifact_id": "sealed-tote-gripper-envelope",
+              "relative_path": "sealed_tote_gripper_envelope.stl",
+              "media_type": "model/stl",
+              "byte_length": $gripper_bytes,
+              "sha256": "$gripper_sha",
+              "role": "geometry_preview"
+            }],
+            "claim_ceiling": "Concept-only collision-envelope preview. Byte identity does not establish geometry quality, manufacturability, physical safety or clinical suitability."
+          }
+          EOF
+
+          cat > "$output_dir/passive_tray_dock.manifest.json" <<EOF
+          {
+            "schema_version": "hmr0-artifact-manifest-v0.1",
+            "tool_id": "PASSIVE_TRAY_DOCK",
+            "tool_revision": "0.1.0",
+            "evidence_class": "concept_preview_only",
+            "physical_actuation_authorized": false,
+            "patient_contact_authorized": false,
+            "clinical_function_authorized": false,
+            "artifacts": [{
+              "artifact_id": "passive-tray-dock-envelope",
+              "relative_path": "passive_tray_dock_envelope.stl",
+              "media_type": "model/stl",
+              "byte_length": $dock_bytes,
+              "sha256": "$dock_sha",
+              "role": "geometry_preview"
+            }],
+            "claim_ceiling": "Concept-only collision-envelope preview. Byte identity does not establish geometry quality, manufacturability, physical safety or clinical suitability."
+          }
+          EOF
+
+          test "$(jq -r '.artifacts[0].sha256' "$output_dir/sealed_tote_gripper.manifest.json")" = "$gripper_sha"
+          test "$(jq -r '.artifacts[0].byte_length' "$output_dir/sealed_tote_gripper.manifest.json")" = "$gripper_bytes"
+          test "$(jq -r '.artifacts[0].sha256' "$output_dir/passive_tray_dock.manifest.json")" = "$dock_sha"
+          test "$(jq -r '.artifacts[0].byte_length' "$output_dir/passive_tray_dock.manifest.json")" = "$dock_bytes"
+
           {
             echo "Exact tested revision: ${{ github.event.pull_request.head.sha || github.sha }}"
             echo "Rust: $(rustc --version)"
             echo "Tool catalog SHA-256: $(sha256sum docs/engineering/hmr0-tool-cad-concepts-v0.1.json | cut -d' ' -f1)"
             echo "Preview source SHA-256: $(sha256sum crates/domains/symthaea-fabrication-kernel/examples/hmr0_tool_envelope_preview.rs | cut -d' ' -f1)"
-            echo "Gripper preview SHA-256: $(sha256sum target/hmr0-tool-envelope-previews/sealed_tote_gripper_envelope.stl | cut -d' ' -f1)"
-            echo "Tray dock preview SHA-256: $(sha256sum target/hmr0-tool-envelope-previews/passive_tray_dock_envelope.stl | cut -d' ' -f1)"
+            echo "Gripper preview SHA-256: $gripper_sha ($gripper_bytes bytes)"
+            echo "Gripper manifest SHA-256: $(sha256sum "$output_dir/sealed_tote_gripper.manifest.json" | cut -d' ' -f1)"
+            echo "Tray dock preview SHA-256: $dock_sha ($dock_bytes bytes)"
+            echo "Tray dock manifest SHA-256: $(sha256sum "$output_dir/passive_tray_dock.manifest.json" | cut -d' ' -f1)"
             echo ""
             echo "Evidence class: concept-only block-out geometry. Not manufacturing-ready, physically tested, or authorized for robot use."
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Preserve generated concept previews and manifests
+        uses: actions/upload-artifact@v4
+        with:
+          name: hmr0-concept-only-tool-previews-${{ github.event.pull_request.head.sha || github.sha }}
+          path: target/hmr0-tool-envelope-previews/*
+          if-no-files-found: error
+          retention-days: 14
