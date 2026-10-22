@@ -961,13 +961,26 @@ impl CodingAgent {
     /// Map an orchestrator backend name to the existing `BackendTier` telemetry enum.
     #[cfg(feature = "code_generation")]
     pub(super) fn orchestrator_backend_tier(backend_name: &str) -> BackendTier {
-        if backend_name.starts_with("LLM:") {
+        let normalized = backend_name.to_ascii_lowercase();
+        if let Some(provider) = normalized.strip_prefix("llm:") {
+            match provider {
+                // Explicitly local model runtimes.
+                "ollama" | "candle" | "ssm" | "broca" | "mamba" => BackendTier::LocalLlm,
+                // Named cloud endpoints, and unknown LLM providers conservatively
+                // classified as external rather than silently counted as local.
+                _ => BackendTier::CloudLlm,
+            }
+        } else if normalized == "simulated" {
+            BackendTier::Simulated
+        } else if normalized == "ollama" {
             BackendTier::LocalLlm
-        } else if backend_name == "HardwareDriverEmitter" || backend_name == "HdlEmitter" {
+        } else if normalized == "anthropic" || normalized == "openai" || normalized == "deepswe" {
+            BackendTier::CloudLlm
+        } else if normalized == "hardwaredriveremitter" || normalized == "hdlemitter" {
             BackendTier::Hardware
         } else {
-            // CodeGenerator, CodeAlgebra::analogy, GeodesicSkeleton — all native,
-            // compiler-verified, zero-external-call tiers.
+            // CodeGenerator, CodeAlgebra::analogy, GeodesicSkeleton and native
+            // templates are in-process synthesis paths with no external LLM call.
             BackendTier::Native
         }
     }
