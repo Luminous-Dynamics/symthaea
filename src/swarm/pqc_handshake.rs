@@ -60,12 +60,13 @@ use std::collections::HashMap;
 // PQC SESSION KEY
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/// A session key derived from ML-KEM shared secret plus public challenge bytes.
+/// Candidate key material derived from an ML-KEM secret and public context.
 ///
-/// This is not, by itself, proof of a hybrid classical/PQC combiner or an
-/// authenticated forward-secret session. See the module-level claim boundary.
+/// This type is deliberately called a candidate: it is not an established
+/// session key until a reviewed protocol completes transcript binding and
+/// explicit key confirmation. See the module-level claim boundary.
 #[derive(Clone)]
-pub struct PqcSessionKey {
+pub struct PqcCandidateKey {
     /// 32-byte session key derived from ML-KEM secret plus public challenge context.
     /// Suitable for ChaCha20-Poly1305; this field alone does not imply hybrid security.
     session_key: [u8; 32],
@@ -73,7 +74,7 @@ pub struct PqcSessionKey {
     created_at: std::time::SystemTime,
 }
 
-impl PqcSessionKey {
+impl PqcCandidateKey {
     /// Get the 32-byte session key.
     pub fn key(&self) -> &[u8; 32] {
         &self.session_key
@@ -85,7 +86,7 @@ impl PqcSessionKey {
     }
 }
 
-impl Drop for PqcSessionKey {
+impl Drop for PqcCandidateKey {
     fn drop(&mut self) {
         // Zeroize session key on drop
         self.session_key = [0u8; 32];
@@ -111,19 +112,20 @@ pub struct KemExchange {
 // PQC HANDSHAKE MANAGER
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/// Manages hybrid Ed25519 + ML-KEM-768 handshakes.
+/// Manages research-stage ML-KEM exchange state.
 ///
-/// Wraps the classical `HybridHandshake` with a KEM layer that provides
-/// post-quantum key agreement.
+/// This type does not currently establish a completed hybrid session: KEM
+/// results remain pending until a reviewed, transcript-bound key-confirmation
+/// protocol exists. Do not treat candidate derivation as session establishment.
 pub struct PqcHandshakeManager {
     /// Classical handshake manager (Ed25519 or BLAKE3 fallback).
     classical: crate::swarm::handshake::HybridHandshake,
     /// This node's ML-KEM-768 keypair.
     kem_keypair: MlKem768KeyPair,
     /// Session keys usable by callers only after a future key-confirmation protocol.
-    session_keys: HashMap<String, PqcSessionKey>,
+    session_keys: HashMap<String, PqcCandidateKey>,
     /// Candidate keys derived from KEM but not yet transcript-confirmed.
-    pending_session_keys: HashMap<String, PqcSessionKey>,
+    pending_session_keys: HashMap<String, PqcCandidateKey>,
     /// Pending KEM exchanges (peer_id → their KEM public key).
     pending_kem: HashMap<String, Vec<u8>>,
 }
@@ -239,7 +241,7 @@ impl PqcHandshakeManager {
 
         self.pending_session_keys.insert(
             peer_id.to_string(),
-            PqcSessionKey {
+            PqcCandidateKey {
                 session_key,
                 created_at: std::time::SystemTime::now(),
             },
@@ -276,7 +278,7 @@ impl PqcHandshakeManager {
 
         self.pending_session_keys.insert(
             peer_id.to_string(),
-            PqcSessionKey {
+            PqcCandidateKey {
                 session_key,
                 created_at: std::time::SystemTime::now(),
             },
