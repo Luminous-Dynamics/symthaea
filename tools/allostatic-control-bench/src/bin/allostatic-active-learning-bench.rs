@@ -70,6 +70,7 @@ struct Case {
     actual_in_family: bool,
     observed: ObservedEffect,
     actual_model_index: Option<usize>,
+    actual_effect: (f64, f64),
     expected_status: &'static str,
 }
 
@@ -81,6 +82,7 @@ fn cases() -> Vec<Case> {
             actual_in_family: true,
             observed: ObservedEffect::new(0.02, -0.02, 0.001).expect("valid observation"),
             actual_model_index: Some(0),
+            actual_effect: (0.02, -0.02),
             expected_status: "model_family_narrowed",
         },
         Case {
@@ -89,6 +91,7 @@ fn cases() -> Vec<Case> {
             actual_in_family: true,
             observed: ObservedEffect::new(0.04, -0.06, 0.001).expect("valid observation"),
             actual_model_index: Some(1),
+            actual_effect: (0.04, -0.06),
             expected_status: "model_family_narrowed",
         },
         Case {
@@ -97,14 +100,16 @@ fn cases() -> Vec<Case> {
             actual_in_family: false,
             observed: ObservedEffect::new(0.03, -0.04, 0.021).expect("valid wide observation"),
             actual_model_index: None,
+            actual_effect: (0.03, -0.04),
             expected_status: "ambiguity_retained_no_claim",
         },
         Case {
             name: "observation_falsifies_model_family",
             actual_plant: "outside_family",
             actual_in_family: false,
-            observed: ObservedEffect::new(0.99, 0.99, 0.001).expect("valid out-of-family observation"),
+            observed: ObservedEffect::new(0.20, 0.20, 0.001).expect("valid out-of-family observation"),
             actual_model_index: None,
+            actual_effect: (0.20, 0.20),
             expected_status: "candidate_family_falsified_fail_closed",
         },
     ]
@@ -176,21 +181,10 @@ fn main() -> Result<(), Box<dyn Error>> {
             };
         }
 
-        let actual_probe_safe = match case.actual_model_index {
-            Some(index) => {
-                let actual_effect = models[index].effect_for_action(selected.unwrap_or(Action::Maintain));
-                let reserve = interval(
-                    state.reserve().lower() + actual_effect.reserve_delta().lower(),
-                    state.reserve().upper() + actual_effect.reserve_delta().upper(),
-                );
-                let load = interval(
-                    state.load().lower() + actual_effect.load_delta().lower(),
-                    state.load().upper() + actual_effect.load_delta().upper(),
-                );
-                reserve.lower() >= limits.min_reserve() && load.upper() <= limits.max_load()
-            }
-            None => false,
-        };
+        let actual_next_reserve = state.reserve().lower() + case.actual_effect.0;
+        let actual_next_load = state.load().upper() + case.actual_effect.1;
+        let actual_probe_safe =
+            actual_next_reserve >= limits.min_reserve() && actual_next_load <= limits.max_load();
 
         let gain = post_viable_count as isize - before.action_set.count() as isize;
         raw.push_str(&format!(
