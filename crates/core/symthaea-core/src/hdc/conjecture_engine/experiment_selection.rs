@@ -63,9 +63,7 @@ pub enum EpistemicAssessment {
         valid_predictions: usize,
     },
     /// Fewer than two hypotheses produced finite predictions for this experiment.
-    InsufficientValidPredictions {
-        valid_predictions: usize,
-    },
+    InsufficientValidPredictions { valid_predictions: usize },
     /// Predictions were finite, but the variance was not representable as f64.
     UnrepresentableScore {
         valid_predictions: usize,
@@ -323,11 +321,8 @@ mod tests {
         );
 
         let candidates = [0.0, 1.0];
-        let (chosen, score) = select_most_informative_experiment(
-            &candidates,
-            &hypotheses,
-            predict,
-        )
+        let (chosen, score) =
+            select_most_informative_experiment(&candidates, &hypotheses, predict)
         .expect("the second candidate has two finite, disagreeing predictions");
         assert_eq!(*chosen, 1.0);
         assert!((score - 25.0).abs() < 1e-12);
@@ -361,9 +356,7 @@ mod tests {
         let hypotheses = [1_i32, 2_i32, 3_i32];
         let predict = |_: &i32, _: &f64| Some(4.0);
         let candidates = [0.0, 1.0, 2.0];
-        assert!(
-            select_most_informative_experiment(&candidates, &hypotheses, predict).is_none()
-        );
+        assert!(select_most_informative_experiment(&candidates, &hypotheses, predict).is_none());
     }
 
 }
