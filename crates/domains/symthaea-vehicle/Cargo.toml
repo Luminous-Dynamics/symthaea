@@ -26,4 +26,4 @@ approx = "0.5"
 proptest = "1"
 
 [features]
-default = []
+default = []symthaea-regenerative-health = { path = "../symthaea-regenerative-health" }
