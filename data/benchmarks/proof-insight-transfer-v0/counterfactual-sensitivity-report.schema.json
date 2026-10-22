@@ -57,7 +57,8 @@
         "paired_contract_eligible_pairs",
         "semantics_preserving_pairs",
         "probability_scored_rows",
-        "components"
+        "components",
+        "unresolved_or_pending_pairs"
       ],
       "properties": {
         "suite_pairs_in_requested_split": {
@@ -95,6 +96,10 @@
         "components": {
           "type": "integer",
           "minimum": 1
+        },
+        "unresolved_or_pending_pairs": {
+          "type": "integer",
+          "minimum": 0
         }
       }
     },
