@@ -66,7 +66,9 @@
             "REPAIR",
             "AGENCY",
             "UNCERTAINTY",
-            "CONSENT"
+            "CONSENT",
+            "AMBIGUITY",
+            "PRIVACY"
           ]
         },
         "risk_level": {
