@@ -1129,7 +1129,7 @@ if ! awk -F, '
 
     if ($18 == 256) {
       if ($20 != "NA" || $21 != "NA" || $22 != "NA" || $23 != "NA" ||
-          $27 != "NA") failed = 1
+          $25 != "NA" || $26 != "NA" || $27 != "NA") failed = 1
     } else {
       if ($20 == "NA" || $21 == "NA" || $22 == "NA" || $23 == "NA") failed = 1
       if ($20 >= $18) failed = 1
@@ -1137,11 +1137,9 @@ if ! awk -F, '
       if (($21 + 0.000001) < $22) failed = 1
       if (($27 == "true") != ($26 != "NA" && $26 <= 8)) failed = 1
     }
-    if ($24 == "NA" && $8 != "NA") failed = 1
-    if ($25 != "NA" && $8 == "NA") failed = 1
-    if ($26 != "NA" && $8 == "NA") failed = 1
-    if ($8 != "NA" && $14 < $8 && $24 != "NA") failed = 1
-    if ($8 != "NA" && $18 < $8 && $25 != "NA") failed = 1
+    if ($24 != "NA" && ($8 == "NA" || $14 < $8)) failed = 1
+    if ($25 != "NA" && ($8 == "NA" || $18 < $8)) failed = 1
+    if ($26 != "NA" && ($8 == "NA" || $18 < $8)) failed = 1
 
     if (($1 == "null_low" || $1 == "null_boundary" || $1 == "stealth_paired") &&
         ($2 == "true" || $3 == "true")) failed = 1
@@ -1240,8 +1238,8 @@ if ! awk -F, '
 
     if (($1 == "null_low" || $1 == "null_boundary" || $1 == "stealth_paired") &&
         ($12 > 0.03 || $25 > 0.03)) failed = 1
-    if ($1 == "early_shift_050" && ($11 < 400 || $24 < 400)) failed = 1
-    if ($1 == "late_shift_065" && ($11 > 300 || $24 < 350 || $24 < $11 + 100)) failed = 1
+    if ($1 == "early_shift_050" && ($16 > 50 || $29 > 50)) failed = 1
+    if ($1 == "late_shift_065" && ($16 < 200 || $29 > 150 || $16 <= $29 + 100)) failed = 1
 
     key = $1
     if (seen[key]++) failed = 1
