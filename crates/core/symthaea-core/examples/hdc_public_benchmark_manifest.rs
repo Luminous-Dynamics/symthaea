@@ -342,7 +342,8 @@ mod tests {
     #[test]
     fn duplicate_dataset_ids_fail_closed() {
         let (mut manifest, schema) = fixture();
-        manifest["datasets"][1]["id"] = manifest["datasets"][0]["id"].clone();
+        let first_id = manifest["datasets"][0]["id"].clone();
+        manifest["datasets"][1]["id"] = first_id;
         assert!(validate_document(&manifest, &schema).is_err());
     }
 
