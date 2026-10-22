@@ -1599,6 +1599,127 @@ jobs:
 
           print("PITB_COUNTERFACTUAL_ANALYZER_PASS: paired metrics, explicit pending denominator, component bootstrap, report schema, 11 malformed-outcome controls and 7 suite-integrity controls")
           PY
+      - name: Validate preregistered success-cost frontier plan
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/jsonschema-venv/bin/python" - <<'PY'
+          import copy
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator, FormatChecker, ValidationError
+
+          base = Path("data/benchmarks/proof-insight-transfer-v0")
+          schema = json.loads((base / "success-cost-frontier-plan.schema.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          validator = Draft202012Validator(schema, format_checker=FormatChecker())
+          plan = json.loads((base / "fixtures/success-cost-frontier-plan.synthetic.json").read_text())
+
+          def validate_plan(candidate):
+              validator.validate(candidate)
+              targets = candidate["targets"]
+              arms = candidate["arms"]
+              budgets = candidate["budget_levels"]
+              assignments = candidate["assignments"]
+              target_ids = [x["target_id"] for x in targets]
+              arm_ids = [x["arm_id"] for x in arms]
+              budget_ids = [x["budget_id"] for x in budgets]
+              run_ids = [x["run_id"] for x in assignments]
+              if len(set(target_ids)) != len(target_ids):
+                  raise ValueError("target IDs must be unique")
+              if len(set(arm_ids)) != len(arm_ids):
+                  raise ValueError("arm IDs must be unique")
+              if len(set(budget_ids)) != len(budget_ids):
+                  raise ValueError("budget IDs must be unique")
+              if len(set(run_ids)) != len(run_ids):
+                  raise ValueError("run IDs must be unique")
+              if len({x["method_class"] for x in arms}) < 3:
+                  raise ValueError("frontier plan needs at least three distinct method classes")
+              if candidate["analysis_policy"]["minimum_budget_levels"] > len(budgets):
+                  raise ValueError("minimum budget level requirement exceeds the frozen schedule")
+              budget_fields = ("max_model_calls", "max_tokens", "max_wall_ms", "max_cost_microusd")
+              for previous, current in zip(budgets, budgets[1:]):
+                  if any(current[field] <= previous[field] for field in budget_fields):
+                      raise ValueError("each ordered budget level must strictly increase every resource cap")
+              target_by_id = {x["target_id"]: x for x in targets}
+              arm_by_id = {x["arm_id"]: x for x in arms}
+              budget_by_id = {x["budget_id"]: x for x in budgets}
+              seen = set()
+              for assignment in assignments:
+                  triple = (assignment["target_id"], assignment["arm_id"], assignment["budget_id"])
+                  if triple in seen:
+                      raise ValueError(f"duplicate target/arm/budget cell {triple}")
+                  seen.add(triple)
+                  target = target_by_id.get(assignment["target_id"])
+                  arm = arm_by_id.get(assignment["arm_id"])
+                  budget = budget_by_id.get(assignment["budget_id"])
+                  if target is None or arm is None or budget is None:
+                      raise ValueError("assignment references undeclared target/arm/budget")
+                  if assignment["component_id"] != target["component_id"]:
+                      raise ValueError("assignment component does not match its frozen target")
+              expected = {
+                  (target["target_id"], arm["arm_id"], budget["budget_id"])
+                  for target in targets for arm in arms for budget in budgets
+              }
+              if seen != expected:
+                  missing = len(expected - seen)
+                  extra = len(seen - expected)
+                  raise ValueError(f"incomplete Cartesian coverage: {missing} missing, {extra} extra cells")
+              if len(assignments) != len(targets) * len(arms) * len(budgets):
+                  raise ValueError("assignment count does not equal target x arm x budget")
+              if candidate["dataset_kind"] == "synthetic_fixture" and candidate["split"] not in ("validation",):
+                  raise ValueError("synthetic frontier fixture cannot claim test/external challenge split")
+              return len(seen)
+
+          cells = validate_plan(plan)
+          if cells != 18:
+              raise SystemExit(f"expected 18 synthetic target/arm/budget cells; found {cells}")
+
+          mutants = []
+          missing_cell = copy.deepcopy(plan)
+          missing_cell["assignments"].pop()
+          mutants.append(("missing Cartesian cell", missing_cell))
+
+          duplicate_cell = copy.deepcopy(plan)
+          duplicate_cell["assignments"][1]["target_id"] = duplicate_cell["assignments"][0]["target_id"]
+          duplicate_cell["assignments"][1]["arm_id"] = duplicate_cell["assignments"][0]["arm_id"]
+          duplicate_cell["assignments"][1]["budget_id"] = duplicate_cell["assignments"][0]["budget_id"]
+          mutants.append(("duplicate Cartesian cell", duplicate_cell))
+
+          unknown_arm = copy.deepcopy(plan)
+          unknown_arm["assignments"][0]["arm_id"] = "undeclared-arm"
+          mutants.append(("unknown arm", unknown_arm))
+
+          component_drift = copy.deepcopy(plan)
+          component_drift["assignments"][0]["component_id"] = "wrong-component"
+          mutants.append(("component drift", component_drift))
+
+          nonmonotonic_budget = copy.deepcopy(plan)
+          nonmonotonic_budget["budget_levels"][1]["max_tokens"] = nonmonotonic_budget["budget_levels"][0]["max_tokens"]
+          mutants.append(("nonmonotonic budget schedule", nonmonotonic_budget))
+
+          duplicate_run = copy.deepcopy(plan)
+          duplicate_run["assignments"][1]["run_id"] = duplicate_run["assignments"][0]["run_id"]
+          mutants.append(("duplicate run ID", duplicate_run))
+
+          arm_method_duplicate = copy.deepcopy(plan)
+          arm_method_duplicate["arms"][1]["method_class"] = arm_method_duplicate["arms"][0]["method_class"]
+          arm_method_duplicate["arms"][2]["method_class"] = arm_method_duplicate["arms"][0]["method_class"]
+          mutants.append(("insufficient distinct methods", arm_method_duplicate))
+
+          unsafe_path = copy.deepcopy(plan)
+          unsafe_path["targets"][0]["artifact_path"] = "../escaped/Target.lean"
+          mutants.append(("unsafe target path", unsafe_path))
+
+          for index, (name, mutant) in enumerate(mutants, start=1):
+              try:
+                  validate_plan(mutant)
+              except (ValidationError, ValueError):
+                  continue
+              raise SystemExit(f"success-cost frontier negative control {index} unexpectedly passed: {name}")
+
+          print("PITB_SUCCESS_COST_FRONTIER_PLAN_PASS: 18 complete target/arm/budget cells, 3 monotonic caps, 8 negative controls rejected; fixture remains validation-only")
+          PY
       - name: Audit pinned Dalek Lean Bench timeline
         shell: bash
         run: |
