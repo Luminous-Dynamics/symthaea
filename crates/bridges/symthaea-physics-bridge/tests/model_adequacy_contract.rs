@@ -127,10 +127,16 @@ fn action_gate_is_safe_for_every_enumerated_state_combination() {
                     } = assessment
                     {
                         if !(calibrated && independent_audit) {
+                            let expected = if termination == TerminationStatus::Active {
+                                DiscoveryAction::RunIndependentAdequacyAudit
+                            } else if live_candidate_count == 0 {
+                                DiscoveryAction::ReportEmptySetWithoutAdequacyEvidence
+                            } else {
+                                DiscoveryAction::ReportUnresolved
+                            };
                             assert_eq!(
-                                action,
-                                DiscoveryAction::RunIndependentAdequacyAudit,
-                                "an untrusted alarm cannot be promoted to a diagnosis: {snapshot:?}"
+                                action, expected,
+                                "an untrusted alarm must request an audit only when budget remains: {snapshot:?}"
                             );
                         }
                     }
