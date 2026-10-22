@@ -8,12 +8,12 @@ This is a pilot instrument, not an SOTA claim. It starts with eight small determ
 
 ## Current methodology
 
-- **Paired intervention:** each task/repeat runs once with GCS advisories off and once on.
+- **Paired intervention:** each task/repeat runs once with GCS advisories off and once on. A pair enters the win/loss/tie treatment comparison only when both arms have complete oracles; unresolved pairs are counted separately, not treated as ties.
 - **Order control:** treatment order alternates by task index plus repeat (`off_then_on` / `on_then_off`) to reduce simple order effects.
 - **Oracle preflight:** every task must have at least one declared `#[test]` function; a hand-written reference must pass all expected tests, and an empty patch must fail before agent trials begin. A failed control aborts the run.
 - **Fail-closed scoring:** success requires real execution, successful compilation, no runtime/test-runner error, exactly the expected number of observed test functions, all expected tests passing, and zero failures. Missing code or an incomplete oracle execution is not success.
 - **Source-bound execution:** before oracle controls or agent trials, the producer requires `GIT_COMMIT_SHA` to be a full 40-character SHA matching `git rev-parse HEAD`, and requires a clean working tree. It refuses to create an unauditable receipt from a dirty or ambiguous checkout.
-- **Reproducible receipt:** the JSON includes the resolved source revision, model mode, BLAKE3 task-manifest digest, per-task reference/test digests, generated-source digests, repeat/order, expected/observed test counts, completion status, pass result, runtime, iterations, and energy.
+- **Reproducible receipt:** the JSON includes the resolved source revision, model mode, ordered task-manifest digest and task content (description, expected symbol, reference source, test fixture), per-task source/test digests, generated-source digests, repeat/order, expected/observed test counts, completion status, pass result, runtime, iterations, and energy. Treat these pilot fixtures as public; this receipt design is not a substitute for hidden tests.
 - **Separate outcomes:** compilation rate, complete-oracle rate, behavioral success rate, per-task paired wins/losses, and time/energy are reported independently.
 
 ## Run
