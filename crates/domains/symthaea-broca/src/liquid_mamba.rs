@@ -1133,6 +1133,9 @@ impl LiquidMambaGenerator {
         if target_ids.is_empty() {
             return Ok(0.0);
         }
+        if self.config.rotate_grad && self.config.e2e_grad_chunks == 0 {
+            anyhow::bail!("e2e_grad_chunks must be positive when gradient rotation is enabled");
+        }
 
         let uses_temporal_projection =
             self.config.temporal_projection && self.temporal_proj.is_some();
@@ -1170,7 +1173,21 @@ impl LiquidMambaGenerator {
         // recurrence between teacher tokens.
         for (target_index, &target_id) in target_ids.iter().enumerate() {
             let (logits, _hidden) = self.mamba.forward_with_state(prev_token)?;
-            total_loss += crate::evaluation::cross_entropy_loss(&logits, target_id as usize);
+            anyhow::ensure!(
+                (target_id as usize) < logits.len(),
+                "teacher target token {target_id} is outside logits vocabulary of size {}",
+                logits.len()
+            );
+            anyhow::ensure!(
+                logits.iter().all(|value| value.is_finite()),
+                "teacher-forced logits contain a non-finite value at target position {target_index}"
+            );
+            let token_loss = crate::evaluation::cross_entropy_loss(&logits, target_id as usize);
+            anyhow::ensure!(
+                token_loss.is_finite(),
+                "teacher-forced cross-entropy is non-finite at target position {target_index}"
+            );
+            total_loss += token_loss;
 
             let should_compute_grad = if self.config.rotate_grad {
                 (self.generation_count + target_index + 1) % self.config.e2e_grad_chunks == 0
