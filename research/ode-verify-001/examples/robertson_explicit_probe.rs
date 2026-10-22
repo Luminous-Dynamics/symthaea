@@ -7,7 +7,8 @@ use std::env;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use ode_verify_001_harness::dynamical_system::{
-    DynamicalSystem, Rk45Controller, Rk45Integrator, Rk45Tolerances, SimulationError,
+    DynamicalSystem, Rk45Controller, Rk45Integrator, Rk45StepOutcome, Rk45Tolerances,
+    SimulationError,
 };
 
 const OUTPUT_TIMES: [f64; 17] = [
@@ -178,25 +179,32 @@ fn main() {
         if !remaining.is_finite() || remaining <= 0.0 {
             status = "invalid_target_interval";
             status_detail = format!("time={time:.17e}; target={target:.17e}");
-            failed_step_work_complete = false;
             break;
         }
 
         let rhs_before = system.derivative_evaluations.load(Ordering::Relaxed);
-        let step_result =
-            controller.try_step(&integrator, &system, &state, time, remaining, &tolerances);
+        let remaining_attempts = MAX_ATTEMPTS.saturating_sub(attempted_steps);
+        let step_outcome = controller.try_step_with_receipt(
+            &integrator,
+            &system,
+            &state,
+            time,
+            remaining,
+            &tolerances,
+            remaining_attempts,
+        );
         let rhs_after = system.derivative_evaluations.load(Ordering::Relaxed);
         let rhs_delta = rhs_after.saturating_sub(rhs_before);
         derivative_evaluations = rhs_after;
 
-        match step_result {
-            Ok(step) => {
+        match step_outcome {
+            Rk45StepOutcome::Accepted(step) => {
                 attempted_steps = attempted_steps.saturating_add(step.attempted_steps);
                 rejected_steps = rejected_steps.saturating_add(step.rejected_steps);
                 if rhs_delta != step.derivative_evaluations {
                     status = "rhs_counter_mismatch";
                     status_detail = format!(
-                        "independent RHS callback count {rhs_delta} differs from step report {}",
+                        "independent RHS callback count {rhs_delta} differs from success receipt {}",
                         step.derivative_evaluations
                     );
                     failed_step_work_complete = false;
@@ -209,7 +217,6 @@ fn main() {
                     status = "invalid_step_report";
                     status_detail =
                         "accepted step report had an invalid dt or state dimension".to_owned();
-                    failed_step_work_complete = false;
                     break;
                 }
 
@@ -221,7 +228,6 @@ fn main() {
                         "previous_time={previous_time:.17e}; accepted_dt={:.17e}",
                         step.accepted_dt
                     );
-                    failed_step_work_complete = false;
                     break;
                 }
 
@@ -242,7 +248,6 @@ fn main() {
                 } else if time > target + target_slack {
                     status = "sample_target_overshoot";
                     status_detail = format!("time={time:.17e}; target={target:.17e}");
-                    failed_step_work_complete = false;
                     break;
                 }
 
@@ -252,16 +257,34 @@ fn main() {
                     break;
                 }
             }
-            Err(error) => {
-                status = match &error {
-                    SimulationError::AdaptiveToleranceNotMet => "tolerance_not_met",
-                    SimulationError::TimeDidNotAdvance { .. } => "time_did_not_advance",
-                    _ => "solver_error",
-                };
-                status_detail = format!("{error:?}");
-                // The current API returns no partial step report on errors, so
-                // work attempted within this failed step cannot be counted here.
-                failed_step_work_complete = false;
+            Rk45StepOutcome::Failed(receipt) => {
+                attempted_steps = attempted_steps.saturating_add(receipt.attempted_steps);
+                rejected_steps = rejected_steps.saturating_add(receipt.rejected_steps);
+                if rhs_delta != receipt.derivative_evaluations {
+                    status = "rhs_counter_mismatch";
+                    status_detail = format!(
+                        "independent RHS callback count {rhs_delta} differs from failure receipt {}",
+                        receipt.derivative_evaluations
+                    );
+                    failed_step_work_complete = false;
+                } else {
+                    failed_step_work_complete = true;
+                    status = match &receipt.error {
+                        SimulationError::AdaptiveToleranceNotMet => "tolerance_not_met",
+                        SimulationError::TimeDidNotAdvance { .. } => "time_did_not_advance",
+                        SimulationError::Rk45AttemptBudgetExceeded { .. } => "attempt_budget_exceeded",
+                        _ => "solver_error",
+                    };
+                    status_detail = format!(
+                        "error={:?}; attempts={}; rejects={}; rhs={}; min_dt={:?}; last_dt={:?}",
+                        receipt.error,
+                        receipt.attempted_steps,
+                        receipt.rejected_steps,
+                        receipt.derivative_evaluations,
+                        receipt.min_attempted_dt,
+                        receipt.last_attempted_dt
+                    );
+                }
                 break;
             }
         }
