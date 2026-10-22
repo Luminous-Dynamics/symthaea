@@ -187,6 +187,7 @@ impl CodingAgent {
                     tier: BackendTier::Native,
                     backend_name: "NativeCodeTemplate".to_string(),
                     success: native_candidate.as_ref().is_some_and(|code| !code.trim().is_empty()),
+                    verification_passed: None,
                     elapsed_ms: native_elapsed_ms,
                     estimated_energy_cost: BackendTier::Native.estimated_energy_cost(),
                 });
@@ -880,22 +881,47 @@ impl CodingAgent {
         });
 
         let orchestration_started = std::time::Instant::now();
-        let response = self
-            .orchestrator
-            .as_ref()
-            .expect("checked is_none above")
-            .synthesize(&request);
+        let orchestrator = self.orchestrator.as_ref().expect("checked is_none above");
+        let attempt_history_start = orchestrator.attempt_history().len();
+        let response = orchestrator.synthesize(&request);
         let orchestration_elapsed_ms = orchestration_started.elapsed().as_millis();
-        let tier = Self::orchestrator_backend_tier(&response.backend_name);
-        self.generation_tiers.push(tier);
-        // Record every orchestrator invocation, including candidates rejected by verification.
-        self.actual_backend_attempts.push(BackendAttempt {
-            tier,
-            backend_name: response.backend_name.clone(),
-            success: !response.source.trim().is_empty(),
-            elapsed_ms: orchestration_elapsed_ms,
-            estimated_energy_cost: tier.estimated_energy_cost(),
-        });
+        let attempt_history = orchestrator.attempt_history();
+        let new_attempts = attempt_history
+            .get(attempt_history_start..)
+            .unwrap_or(&[]);
+
+        if new_attempts.is_empty() {
+            // Specialized paths such as the HDL emitter may return a response without
+            // a SynthesisAttempt entry; preserve the observed response as a fallback record.
+            let tier = Self::orchestrator_backend_tier(&response.backend_name);
+            self.generation_tiers.push(tier);
+            self.actual_backend_attempts.push(BackendAttempt {
+                tier,
+                backend_name: response.backend_name.clone(),
+                success: !response.source.trim().is_empty(),
+                verification_passed: Some(response.accepted),
+                elapsed_ms: orchestration_elapsed_ms,
+                estimated_energy_cost: response.energy_cost as f64,
+            });
+        } else {
+            // Capture the orchestrator's true per-backend audit trail, including
+            // rejected candidates before the eventual accepted/fallback attempt.
+            for attempt in new_attempts {
+                let tier = Self::orchestrator_backend_tier(&attempt.backend);
+                self.generation_tiers.push(tier);
+                self.actual_backend_attempts.push(BackendAttempt {
+                    tier,
+                    backend_name: attempt.backend.clone(),
+                    success: attempt
+                        .source_preview
+                        .as_deref()
+                        .is_some_and(|source| !source.trim().is_empty()),
+                    verification_passed: Some(attempt.verified),
+                    elapsed_ms: attempt.elapsed_ms,
+                    estimated_energy_cost: attempt.energy_cost as f64,
+                });
+            }
+        }
 
         if let Some(id) = prediction_id {
             if let Some(ref mut bridge) = self.magi_bridge {
