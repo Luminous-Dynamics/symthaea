@@ -37,7 +37,7 @@ The two bundle identities are a finite abstraction for identity mismatch, not a 
 
 The checker performs breadth-first exploration from the initial state. For each distinct reachable state it applies each of the 16 declared abstract actions, checks the next state and violations against the invariants, and enqueues newly discovered states until reaching a fixed point. A finite fixed-point traversal avoids relying on sampled traces for this abstract model.
 
-The exact count of reachable states and state/action transitions is printed by the Rust test run. The current source also asserts lower bounds on those counts to catch accidental removal of action coverage. The dedicated workflow binds the model source digest and its test outcome into the trace-contract receipt.
+The exact explored graph is pinned at 84 reachable abstract states and 1,344 state/action transitions; the Rust test prints both counts and fails if either changes. A changed count requires reviewing the state/action space rather than silently accepting a smaller graph. The dedicated workflow binds the model source digest, model-specification digest, and test outcome into the trace-contract receipt.
 
 ## What it does not establish
 
