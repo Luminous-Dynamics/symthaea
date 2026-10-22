@@ -20,15 +20,15 @@ That assumption is distinct from exchangeability-based conformal calibration. A 
 
 ## Implementation
 
-- tools/allostatic-control-bench/src/bounded_risk_eprocess.rs implements a bounded-loss e-process with fixed predictable bet, validation of all parameters and inputs, latched crossing, reset and a Bonferroni allocation over parallel monitors.
+- tools/allostatic-control-bench/src/bounded_risk_eprocess.rs implements a fixed-bet bounded-loss e-process and a predeclared three-bet mixture, with input validation, log-space component accumulation, latched crossing, reset and Bonferroni allocation over parallel monitors.
 - Evidence accumulates in log space, avoiding silent floating-point underflow/overflow when a stream is long. Alarm threshold in log space is \(\log(K/\delta)\), where \(K\) is the number of parallel operating-point monitors and \(\delta\) is the total familywise budget.
 - tools/allostatic-control-bench/src/bin/allostatic-risk-eprocess-bench.rs reads the exact raw 48,000-step input CSV from the CUSUM benchmark. It preserves the first 14 input columns byte-for-byte and appends normalized bounded loss, log e-value, latched alarm and the fixed risk parameters. It rejects a different schema, incomplete episode or mismatched full-episode flags.
-- The qualifier runs the e-process benchmark twice, compares output bytes, checks the recurrence independently, verifies the original source trace is unchanged, and compares nominal/stealth alarms for paired seeds.
+- The qualifier runs the e-process benchmark twice, compares output bytes, recomputes each component factor and the mixture log-sum-exp independently, verifies the original source trace is unchanged, and compares nominal/stealth alarms for paired seeds.
 
 ## Fixed synthetic design
 
 - The input is the same 5 operating-point × 4 condition × 300 episode × 8 step panel as the CUSUM benchmark.
-- The bounded loss is \(L_t=\min(r_t/0.05,1)\), where \(r_t\) is the task-residual score. The declared null risk bound is \(\epsilon=0.15\); the fixed predeclared bet fractions are \(\rho\in\{0.25,0.5,0.75\}\), corresponding to component bets \(\lambda_j=\rho_j/\epsilon\). The global false-alarm budget is \(\delta=0.05\), and five operating-point monitors use threshold \(K/\delta=100\) (or \(\log 100\) in log space). For component log-e-values \(z_1,z_2,z_3\), the mixture log-e-value is \(\log((e^{z_1}+e^{z_2}+e^{z_3})/3)\), computed with log-sum-exp.
+- The bounded loss is \(L_t=\min(r_t/0.05,1)\), where \(r_t\) is the task-residual score. The declared null risk bound is \(\epsilon=0.15\); the fixed predeclared bet fractions are \(\rho\in\{0.25,0.5,0.75\}\), corresponding to component bets \(\lambda_j=\rho_j/\epsilon\). The per-cohort false-alarm budget is \(\delta=0.05\), and \(K=5\) parallel operating-point monitor instances use threshold \(K/\delta=100\) (or \(\log 100\) in log space). For component log-e-values \(z_1,z_2,z_3\), the mixture log-e-value is \(\log((e^{z_1}+e^{z_2}+e^{z_3})/3)\), computed with log-sum-exp. The benchmark restarts each monitor for each independent 8-step evaluation episode; therefore this threshold is **not** a familywise 5% guarantee over all 300 repeated evaluation episodes. A real continuous deployment must preserve the evidence process across the monitored lifetime, or explicitly allocate a new error budget before resetting it.
 - These values are frozen for this fixture, not tuned on test episodes. The bounded-risk interpretation requires that nominal expected bounded loss be no greater than \(\epsilon\) conditional on past observations. The synthetic run checks basic behavior but cannot prove that assumption for a real system.
 - The stealth control reuses exactly the nominal residual scores, while the scenario label records an unobserved dynamics shift. Neither the pointwise, CUSUM nor e-process monitor should appear to detect information that is absent from the monitored signal.
 
@@ -37,7 +37,7 @@ That assumption is distinct from exchangeability-based conformal calibration. A 
 - Byte-identical repeated raw and summary outputs, exact 48,000 raw rows and 20 summary cells.
 - Raw e-process output must retain the exact first 14 columns of the CUSUM input.
 - Each bounded loss must equal the frozen score normalization; all three component log-e-values must match their factor recurrence, and the mixture log-e-value must match an independently recomputed log-sum-exp.
-- The global threshold must equal \(\log(5/0.05)\), and the recorded risk bound, bet and familywise delta must equal their frozen configuration.
+- The threshold must equal \(\log(5/0.05)\), and the recorded risk bound, all three bet fractions and delta must equal their frozen configuration. The report must not interpret Monte Carlo repeats as one globally controlled deployment lifetime.
 - Nominal false alarms no greater than 10% per operating-point cell; gradual-shift detection at least 80% even when all residuals remain below the pointwise threshold; abrupt-shift detection at least 90%.
 - Stealth shift must produce the same e-process alarm counts as the paired nominal streams, with most latent shifts missed. That is a negative control, not a failure to exploit evidence that does not exist.
 - Source and artifact SHA-256 hashes and row counts must be written to the provenance receipt.
