@@ -263,3 +263,30 @@ The manifest deliberately excludes its own bytes to avoid a self-referential dig
 
 Verify the current working tree from the repository root with `cargo run -p xtask -- verify-sld-manifest --root .`. The verifier checks manifest format, commit-ID syntax, unique and safe relative paths, symlink containment, UTF-8 validity, byte counts, and SHA-256 content digests. It fails on missing or modified artifacts. The command has been authored but has not yet been compiled or executed in this environment.
 
+## 16. Evaluation receipt contract and score integrity
+
+A run is not eligible for comparison merely because a model generated output or a dashboard displayed a score. The new schema `evaluation-receipt.schema.json` defines the required run-level record: exact source/model/generation configuration, corpus and inventory digests, judge panel and rubric digest, environment, per-case status and output digests, summary counts, and limitations.
+
+The Rust cross-field validator and synthetic unit-test fixture in `tests/sld_corpus_contract.rs` enforce these additional invariants:
+
+- every expected case is accounted for exactly once before a run can be marked `COMPLETE`;
+- duplicate IDs, missing cases, unexpected IDs in public sets, invalid statuses, and inconsistent counts are errors;
+- `PASS`, `FAIL`, `INDETERMINATE`, `ERROR`, and `SKIPPED` are separate terminal outcomes;
+- a skipped result is explicitly counted as skipped and never included in the pass count;
+- a critical-invariant failure cannot be reported as a passing result;
+- hidden-set receipts bind an inventory digest and count without requiring public exposure of hidden case IDs; a trusted evaluator must check IDs against its protected inventory.
+
+The test fixture is synthetic and does not contain a model output. These tests are authored but have not been compiled or executed in this environment.
+
+## 17. New external slices: rupture/repair and long-context decay
+
+The current [NOPE Evals leaderboard](https://evals.nope.net/) reports that its latest contributing **Companion interaction harms: coercion, rupture, and repair** run covered 64 models and 45 prompts (7 September 2026). This is a direct overlap with our repair trajectory, so we should reuse comparable public cases rather than claiming rupture/repair as novel. The additional challenge is to extend it with explicit source-provenance attacks and to measure whether a correction actually addresses downstream effects. See the [leaderboard and evaluation details](https://evals.nope.net/) and [methodology contract](https://evals.nope.net/how-we-publish).
+
+NOPE also publishes **Long-form alignment decay: sensitive disclosure vs conversation length (v2, repeats + self-rapport)**, which compares disclosures at different prior-turn depths and separates scripted from self-generated conversational histories. Its listed run covers 22 models and 14 prompts (30 June 2026). This demonstrates why a nominal "25-turn" fixture is not enough by itself: we must compare matched short/long contexts, record whether preceding turns were scripted or model-generated, and measure the first failure turn and persistence after failure. Reuse its eligible public cases, add counterfactual source/consent mutations, and avoid presenting sparse event probes as a fully run multi-turn conversation.
+
+### Required short-vs-long comparison
+
+For each eligible high-stakes or critical relational slice, compare the same final disclosure under at least three context depths—cold start, 8 prior turns, and 16 prior turns—while holding the disclosure and rubric constant. Use both scripted-both-sides and self-generated-assistant histories, and at least two generation seeds where stochastic decoding is used. Score the final response and trajectory separately. Publish uncertainty and all missing/error/skipped outcomes.
+
+The primary target is non-inferiority on critical invariants at greater context depth: no extra critical boundary, honesty, or consent failure is accepted just because the conversation is longer or warmer. Secondary targets are stable calibration, agency, and repair quality. An improvement claim requires matched reruns and independent adjudication.
+
