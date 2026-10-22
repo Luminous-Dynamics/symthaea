@@ -16,7 +16,7 @@ use symthaea::coding_agent::{CodingAgent, CodingAgentConfig};
 use symthaea::language::code_executor::CodeExecutor;
 
 const BENCHMARK_ID: &str = "symthaea_gcs_runtime_ablation";
-const SCHEMA_VERSION: u32 = 4;
+const SCHEMA_VERSION: u32 = 5;
 
 struct TaskCase {
     id: &'static str,
@@ -274,11 +274,20 @@ fn evaluate_source(source: &str, test_source: &str) -> OracleRun {
     }
 }
 
+fn has_real_compile_rejection(run: &OracleRun) -> bool {
+    !run.compiled
+        && !run.simulated
+        && run.runtime_error.is_none()
+        && run.compile_errors
+            .iter()
+            .any(|error| error.trim_start().starts_with("error"))
+}
+
 fn is_oracle_complete(run: &OracleRun, expected: usize) -> bool {
     expected > 0
         && !run.simulated
-        && run.compiled
-        && run.tests_passed + run.tests_failed == expected
+        && ((run.compiled && run.tests_passed + run.tests_failed == expected)
+            || has_real_compile_rejection(run))
 }
 
 fn is_behaviorally_successful(run: &OracleRun, expected: usize) -> bool {
@@ -663,7 +672,7 @@ fn parse_cli(args: &[String]) -> Result<Option<CliOptions>, String> {
             use_llm: false,
             use_cloud: false,
             repeats: 3,
-            output_path: std::env::temp_dir().join("symthaea_gcs_ablation_v4.json"),
+            output_path: std::env::temp_dir().join("symthaea_gcs_ablation_v5.json"),
             print_manifest: true,
         }));
     }
@@ -681,7 +690,7 @@ fn parse_cli(args: &[String]) -> Result<Option<CliOptions>, String> {
     let mut use_cloud = false;
     let mut repeats = 3_usize;
     let mut repeats_seen = false;
-    let mut output_path = std::env::temp_dir().join("symthaea_gcs_ablation_v4.json");
+    let mut output_path = std::env::temp_dir().join("symthaea_gcs_ablation_v5.json");
     let mut output_seen = false;
     let mut index = 0;
 
@@ -968,7 +977,7 @@ mod provenance_tests {
         assert!(!parsed.use_llm);
         assert!(!parsed.use_cloud);
         assert_eq!(parsed.repeats, 3);
-        assert!(parsed.output_path.ends_with("symthaea_gcs_ablation_v4.json"));
+        assert!(parsed.output_path.ends_with("symthaea_gcs_ablation_v5.json"));
     }
 
     #[test]
@@ -1120,6 +1129,49 @@ mod provenance_tests {
         };
         assert!(is_oracle_complete(&run, 3));
         assert!(!is_behaviorally_successful(&run, 3));
+    }
+
+    #[test]
+    fn real_rustc_compile_rejection_is_complete_but_not_success() {
+        let run = OracleRun {
+            compiled: false,
+            simulated: false,
+            tests_passed: 0,
+            tests_failed: 0,
+            runtime_error: None,
+            compile_errors: vec!["error[E0425]: cannot find value missing in this scope".to_string()],
+            elapsed_ms: 10,
+        };
+        assert!(has_real_compile_rejection(&run));
+        assert!(is_oracle_complete(&run, 3));
+        assert!(!is_behaviorally_successful(&run, 3));
+    }
+
+    #[test]
+    fn compiler_launcher_or_simulated_rejection_remains_unresolved() {
+        let launcher = OracleRun {
+            compiled: false,
+            simulated: false,
+            tests_passed: 0,
+            tests_failed: 0,
+            runtime_error: None,
+            compile_errors: vec!["Sandbox error: rustc could not be launched".to_string()],
+            elapsed_ms: 10,
+        };
+        assert!(!has_real_compile_rejection(&launcher));
+        assert!(!is_oracle_complete(&launcher, 3));
+
+        let simulated = OracleRun {
+            compiled: false,
+            simulated: true,
+            tests_passed: 0,
+            tests_failed: 0,
+            runtime_error: None,
+            compile_errors: vec!["error[E0425]: missing symbol".to_string()],
+            elapsed_ms: 10,
+        };
+        assert!(!has_real_compile_rejection(&simulated));
+        assert!(!is_oracle_complete(&simulated, 3));
     }
 
     #[test]
