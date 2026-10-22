@@ -515,7 +515,8 @@ fn trajectory_negative_control_rejects_reordered_events() {
     let corpus = read_json(TRAJECTORY_CORPUS_PATH);
     let mut corrupt = corpus.clone();
     let first_turn = corrupt["cases"][0]["events"][0]["turn"].clone();
-    corrupt["cases"][0]["events"][0]["turn"] = corrupt["cases"][0]["events"][1]["turn"].clone();
+    let second_turn = corrupt["cases"][0]["events"][1]["turn"].clone();
+    corrupt["cases"][0]["events"][0]["turn"] = second_turn;
     corrupt["cases"][0]["events"][1]["turn"] = first_turn;
     let errors = validate_trajectory_corpus(&corrupt);
     assert!(errors.iter().any(|error| error.contains("strictly increasing")));
