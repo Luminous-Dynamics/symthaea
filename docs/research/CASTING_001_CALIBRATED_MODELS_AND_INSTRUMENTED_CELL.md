@@ -179,7 +179,7 @@ Start with baselines that are easy to reproduce: fixed-parameter Chvorinov estim
 - [Essam et al. (2026), computational modeling, AI, and digital twins in metal casting](https://link.springer.com/article/10.1007/s43939-026-00685-5) — discusses physics/data/model integration and the limitations of industrial-scale validation and generalization.
 - [American Foundry Society: Casting Defect Analysis](https://www.afsinc.org/courses/casting-defect-analysis) — emphasizes systematic root-cause evaluation and collecting process data instead of assuming a classifier alone determines corrective action.
 - [American Foundry Society: Aluminum Casting Performance Initiative](https://www.afsinc.org/news/2025/05/15/afs-begins-work-aluminum-casting-performance-initiative-acpi-projects) — examples of current industry work on defect recognition and process-related quality.
-- [Nii(y)ama, A Modification of Chvorinov's Rule on Solidification Time of Sand Castings](https://www.jstage.jst.go.jp/article/imono/44/12/44_1047/_article) — source for the classic volume/surface-area solidification relation and its limitations.
+- [Niiyama, A Modification of Chvorinov's Rule on Solidification Time of Sand Castings](https://www.jstage.jst.go.jp/article/imono/44/12/44_1047/_article) — source for the classic volume/surface-area solidification relation and its limitations.
 - [NIST: Real-Time Monitoring and Control of Additive Manufacturing Processes](https://www.nist.gov/programs-projects/real-time-monitoring-and-control-additive-manufacturing-processes) — useful methodological precedent for calibrated sensing, validated physics-based models, and carefully qualified feedback-control research. It is not direct evidence that the same controller works for casting.
 
 ## Nonclaims
