@@ -22,8 +22,7 @@ concurrency:
 
 jobs:
   actionlint:
-    name: actionlint + GitHub shell syntax
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    name: actionlint + workflow admission safety
     runs-on: ubuntu-slim
     timeout-minutes: 5
     steps:
@@ -134,6 +133,12 @@ jobs:
           set -euo pipefail
           python3 .github/scripts/check-workflow-draft-safety.py
 
+      - name: Enforce formal-evidence workflow safety
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/check-formal-workflow-safety.py
+
       - name: Parse-check changed GitHub shell helpers
         if: steps.changed.outputs.shells == 'true'
         shell: bash
@@ -171,7 +176,10 @@ jobs:
             echo "actionlint_version=1.7.12"
             echo "actionlint_archive_sha256=8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8"
             echo "changed_workflows_only_on_pr=true"
+            echo "workflow_admission_runs_on_drafts=true"
+            echo "workflow_syntax_is_only_draft_runner_exception=true"
             echo "repository_wide_draft_runner_ratchet=true"
+            echo "formal_workflow_safety_ratchet=true"
             echo "changed_github_shell_scripts_bash_n=true"
             echo "showroom_hygiene_self_test_when_changed=true"
             echo "shellcheck_integration=false"
