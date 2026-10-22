@@ -903,4 +903,38 @@ mod tests {
         assert!(validate_compatibility(&a, &b).is_err());
     }
 
+
+    #[test]
+    fn critical_failure_blocks_promotion_even_when_aggregate_is_computable() {
+        let mut a = fixture_receipt();
+        let b = fixture_receipt();
+        a.case_results[0].critical_invariant_failure = true;
+        a.summary.critical_invariant_failures = 1;
+        let results_a = validate_receipt(&a, "A").expect("valid receipt A");
+        let results_b = validate_receipt(&b, "B").expect("valid receipt B");
+        validate_compatibility(&a, &b).expect("compatible receipts");
+        let cluster_map = ClusterMap {
+            schema_version: CLUSTER_SCHEMA_VERSION.to_string(),
+            cases: vec![
+                ClusterAssignment {
+                    case_id: "CASE-1".to_string(),
+                    cluster_id: "CLUSTER-1".to_string(),
+                    family: "FIXTURE".to_string(),
+                },
+                ClusterAssignment {
+                    case_id: "CASE-2".to_string(),
+                    cluster_id: "CLUSTER-2".to_string(),
+                    family: "FIXTURE".to_string(),
+                },
+            ],
+        };
+        let report = build_report(&a, &b, &results_a, &results_b, &cluster_map, 1_000, 7)
+            .expect("comparable synthetic fixture");
+        assert_eq!(
+            report.critical_invariant_gate.status,
+            "BLOCKED_CRITICAL_FAILURE_OBSERVED"
+        );
+        assert!(!report.critical_invariant_gate.release_promotion_eligible);
+    }
+
 }
