@@ -1,0 +1,36 @@
+name: Expected Information Gain Selector
+
+on:
+  push:
+    branches:
+      - research/expected-information-gain-selector-v0-1
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "crates/core/symthaea-core/src/hdc/conjecture_engine.rs"
+      - "crates/core/symthaea-core/src/hdc/conjecture_engine/experiment_selection.rs"
+      - ".github/workflows/expected-information-gain-selector.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: expected-information-gain-selector-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+
+jobs:
+  focused:
+    name: Focused selector tests and strict Clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - name: Format focused selector module
+        run: rustfmt --edition 2024 --check crates/core/symthaea-core/src/hdc/conjecture_engine/experiment_selection.rs
+      - name: Test information-gain selector
+        run: cargo test -p symthaea-core hdc::conjecture_engine::experiment_selection --lib
+      - name: Strict Clippy for the core library
+        run: cargo clippy -p symthaea-core --lib -- -D warnings
