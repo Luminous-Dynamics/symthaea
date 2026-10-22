@@ -176,7 +176,28 @@ jobs:
               reject(value["schema_version"] != "pitb.counterfactual-mutation-qualification.v0", "unsupported qualification schema version")
               cases = value["cases"]
               ids = [item["qualification_id"] for item in cases]
+              pair_ids = [item["target_pair"]["pair_id"] for item in cases]
+              outcome_ids = [
+                  outcome_id
+                  for item in cases
+                  for outcome_id in (
+                      item["target_pair"]["base_outcome_pair_id"],
+                      item["target_pair"]["variant_outcome_pair_id"],
+                  )
+              ]
               reject(len(ids) != len(set(ids)), "duplicate qualification IDs")
+              reject(len(pair_ids) != len(set(pair_ids)), "duplicate counterfactual pair IDs")
+              reject(len(outcome_ids) != len(set(outcome_ids)), "duplicate outcome join IDs")
+              family_splits = {}
+              component_splits = {}
+              for item in cases:
+                  split = item["target_pair"]["split"]
+                  target = item["target_pair"]
+                  for family_id in (item["source"]["family_id"], target["target_family_id"]):
+                      previous_split = family_splits.setdefault(family_id, split)
+                      reject(previous_split != split, f"family leakage across splits: {family_id}")
+                  previous_split = component_splits.setdefault(target["component_id"], split)
+                  reject(previous_split != split, f"component leakage across splits: {target['component_id']}")
               for item in cases:
                   pair = item["target_pair"]
                   reject(pair["base_artifact_path"] == pair["variant_artifact_path"], "base and variant artifact paths must be distinct")
