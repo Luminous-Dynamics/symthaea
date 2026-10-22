@@ -386,22 +386,97 @@ fn require_source_revision() -> String {
     actual_head
 }
 
+struct CliOptions {
+    use_llm: bool,
+    use_cloud: bool,
+    repeats: usize,
+    output_path: PathBuf,
+}
+
+fn parse_cli(args: &[String]) -> Result<Option<CliOptions>, String> {
+    if args.iter().any(|arg| arg == "--help" || arg == "-h") {
+        if args.len() == 1 {
+            return Ok(None);
+        }
+        return Err("--help/-h must be used by itself".to_string());
+    }
+
+    let mut use_llm = false;
+    let mut use_cloud = false;
+    let mut repeats = 3_usize;
+    let mut repeats_seen = false;
+    let mut output_path = std::env::temp_dir().join("symthaea_gcs_ablation_v1.json");
+    let mut output_seen = false;
+    let mut index = 0;
+
+    while index < args.len() {
+        match args[index].as_str() {
+            "--llm" if !use_llm => use_llm = true,
+            "--llm" => return Err("--llm may only be specified once".to_string()),
+            "--cloud" if !use_cloud => use_cloud = true,
+            "--cloud" => return Err("--cloud may only be specified once".to_string()),
+            "--repeats" => {
+                if repeats_seen {
+                    return Err("--repeats may only be specified once".to_string());
+                }
+                let value = args.get(index + 1).ok_or("--repeats requires an integer")?;
+                repeats = value.parse::<usize>()
+                    .map_err(|_| format!("invalid --repeats value: {value:?}"))?;
+                if !(1..=20).contains(&repeats) {
+                    return Err("--repeats must be in 1..=20".to_string());
+                }
+                repeats_seen = true;
+                index += 1;
+            }
+            "--json-out" => {
+                if output_seen {
+                    return Err("--json-out may only be specified once".to_string());
+                }
+                let value = args.get(index + 1).ok_or("--json-out requires a path")?;
+                if value.trim().is_empty() || value.starts_with("--") {
+                    return Err("--json-out requires a non-empty path".to_string());
+                }
+                output_path = PathBuf::from(value);
+                output_seen = true;
+                index += 1;
+            }
+            option => return Err(format!("unknown or duplicate option: {option}")),
+        }
+        index += 1;
+    }
+
+    if use_llm && use_cloud {
+        return Err("choose at most one backend: --llm or --cloud".to_string());
+    }
+
+    Ok(Some(CliOptions { use_llm, use_cloud, repeats, output_path }))
+}
+
+fn print_usage() {
+    eprintln!(
+        "Usage: coding_gcs_ablation_benchmark [--llm | --cloud] [--repeats 1..20] [--json-out PATH]\n\
+         The working tree must be clean and GIT_COMMIT_SHA must match git rev-parse HEAD."
+    );
+}
+
 fn main() {
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    let options = match parse_cli(&args) {
+        Ok(Some(options)) => options,
+        Ok(None) => {
+            print_usage();
+            return;
+        }
+        Err(error) => {
+            eprintln!("{error}");
+            print_usage();
+            std::process::exit(2);
+        }
+    };
     // Refuse to produce a benchmark receipt that cannot be tied to an exact,
     // clean source checkout. Do this before controls or any agent trials.
     let source_revision = require_source_revision();
-    let args: Vec<String> = std::env::args().skip(1).collect();
-    let use_llm = args.iter().any(|arg| arg == "--llm");
-    let use_cloud = args.iter().any(|arg| arg == "--cloud");
-    let repeats = args.windows(2).find(|pair| pair[0] == "--repeats")
-        .and_then(|pair| pair[1].parse::<usize>().ok()).unwrap_or(3);
-    if repeats == 0 || repeats > 20 {
-        eprintln!("--repeats must be in 1..=20");
-        std::process::exit(2);
-    }
-    let output_path = args.windows(2).find(|pair| pair[0] == "--json-out")
-        .map(|pair| PathBuf::from(&pair[1]))
-        .unwrap_or_else(|| std::env::temp_dir().join("symthaea_gcs_ablation_v1.json"));
+    let CliOptions { use_llm, use_cloud, repeats, output_path } = options;
     let tasks = task_suite();
     if tasks.iter().any(|task| expected_test_functions(task.test_source) == 0) {
         eprintln!("Invalid task suite: every task must have at least one declared test function");
@@ -521,6 +596,46 @@ fn main() {
 #[cfg(test)]
 mod provenance_tests {
     use super::*;
+
+    fn args(values: &[&str]) -> Vec<String> {
+        values.iter().map(|value| (*value).to_string()).collect()
+    }
+
+    #[test]
+    fn cli_defaults_are_explicit_and_reproducible() {
+        let parsed = parse_cli(&args(&[])).unwrap().unwrap();
+        assert!(!parsed.use_llm);
+        assert!(!parsed.use_cloud);
+        assert_eq!(parsed.repeats, 3);
+        assert!(parsed.output_path.ends_with("symthaea_gcs_ablation_v1.json"));
+    }
+
+    #[test]
+    fn cli_accepts_each_single_backend() {
+        let local = parse_cli(&args(&["--llm"])).unwrap().unwrap();
+        assert!(local.use_llm && !local.use_cloud);
+        let cloud = parse_cli(&args(&["--cloud"])).unwrap().unwrap();
+        assert!(cloud.use_cloud && !cloud.use_llm);
+    }
+
+    #[test]
+    fn cli_rejects_conflicting_backends_and_bad_repeats() {
+        assert!(parse_cli(&args(&["--llm", "--cloud"])).is_err());
+        assert!(parse_cli(&args(&["--repeats", "nonsense"])).is_err());
+        assert!(parse_cli(&args(&["--repeats", "0"])).is_err());
+        assert!(parse_cli(&args(&["--repeats", "21"])).is_err());
+        assert!(parse_cli(&args(&["--repeats"])).is_err());
+    }
+
+    #[test]
+    fn cli_rejects_missing_or_duplicate_output_options() {
+        assert!(parse_cli(&args(&["--json-out"])).is_err());
+        assert!(parse_cli(&args(&["--json-out", "--cloud"])).is_err());
+        assert!(parse_cli(&args(&["--json-out", "a.json", "--json-out", "b.json"])).is_err());
+        assert!(parse_cli(&args(&["--unknown"])).is_err());
+        assert!(parse_cli(&args(&["--help", "--cloud"])).is_err());
+        assert!(parse_cli(&args(&["--help"])).unwrap().is_none());
+    }
 
     #[test]
     fn accepts_exact_clean_revision_metadata() {
