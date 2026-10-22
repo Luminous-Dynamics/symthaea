@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::process;
 
@@ -370,6 +370,7 @@ struct Decision {
     policy: &'static str,
     role: &'static str,
     kind: CandidateKind,
+    features: ObservedFeatures,
     action: Action,
     oracle_action: Action,
     net_utility: i32,
@@ -397,6 +398,7 @@ impl Decision {
             policy: spec.name,
             role: spec.role,
             kind,
+            features: candidate.features,
             action,
             oracle_action,
             net_utility: utility,
@@ -541,6 +543,12 @@ fn validate_self_checks(candidates: &[Candidate], rows: &[Decision]) -> Result<(
         }
     }
 
+    let expected_ids: BTreeSet<u64> =
+        candidates.iter().map(|candidate| candidate.id).collect();
+    if expected_ids.len() != candidates.len() {
+        return Err("fixture contains duplicate candidate IDs".into());
+    }
+
     let summaries = summarize(rows);
     for spec in &POLICIES {
         let summary = summaries
@@ -550,6 +558,17 @@ fn validate_self_checks(candidates: &[Candidate], rows: &[Decision]) -> Result<(
             return Err(format!(
                 "policy {} produced {} decisions for {} candidates",
                 spec.name, summary.candidates, candidates.len()
+            ));
+        }
+        let policy_ids: BTreeSet<u64> = rows
+            .iter()
+            .filter(|row| row.policy == spec.name)
+            .map(|row| row.candidate_id)
+            .collect();
+        if policy_ids != expected_ids {
+            return Err(format!(
+                "policy {} has missing or duplicate candidate decisions",
+                spec.name
             ));
         }
     }
@@ -609,8 +628,12 @@ fn json_string(value: &str) -> String {
 
 fn emit_candidate(row: &Decision, source_sha: &str, seed: u64, candidates: usize) {
     println!(
-        "{{\"type\":\"decision\",\"protocol\":\"GMCv2\",\"source_sha\":{},\"seed\":{},\"candidate_count\":{},\"candidate_id\":{},\"kind\":{},\"policy\":{},\"role\":{},\"action\":{},\"oracle_action\":{},\"net_utility\":{},\"oracle_utility\":{},\"decision_regret\":{},\"storage_units\":{},\"load_bearing\":{},\"covered\":{},\"false_promotion\":{},\"destructive_forgetting\":{}}}",
+        "{{\"type\":\"decision\",\"protocol\":\"GMCv2\",\"source_sha\":{},\"seed\":{},\"candidate_count\":{},\"candidate_id\":{},\"observed_features\":{{\"repeat_count\":{},\"distinct_episodes\":{},\"contradiction_count\":{},\"recency\":{},\"correction_seen\":{},\"independent_successes\":{},\"provenance_diversity\":{}}},\"kind\":{},\"policy\":{},\"role\":{},\"action\":{},\"oracle_action\":{},\"net_utility\":{},\"oracle_utility\":{},\"decision_regret\":{},\"storage_units\":{},\"load_bearing\":{},\"covered\":{},\"false_promotion\":{},\"destructive_forgetting\":{}}}",
         json_string(source_sha), seed, candidates, row.candidate_id,
+        row.features.repeat_count, row.features.distinct_episodes,
+        row.features.contradiction_count, row.features.recency,
+        row.features.correction_seen, row.features.independent_successes,
+        row.features.provenance_diversity,
         json_string(row.kind.name()), json_string(row.policy), json_string(row.role),
         json_string(row.action.name()), json_string(row.oracle_action.name()),
         row.net_utility, row.oracle_utility, row.regret, row.storage_units,
@@ -643,7 +666,7 @@ fn run(config: Config) -> Result<(), String> {
     validate_self_checks(&candidates, &rows)?;
     let fingerprint = fixture_fingerprint(&candidates);
     println!(
-        "{{\"type\":\"run\",\"protocol\":\"GMCv2\",\"generator\":\"broca-consolidation-v2\",\"status\":\"COMPLETED\",\"self_checks_passed\":true,\"source_sha\":{},\"seed\":{},\"candidate_count\":{},\"policy_count\":{},\"fixture_fnv1a64\":{},\"fingerprint_is_cryptographic\":false,\"oracle_scope\":\"synthetic-generator-only\"}}",
+        "{{\"type\":\"run\",\"protocol\":\"GMCv2\",\"generator\":\"broca-consolidation-v2\",\"status\":\"COMPLETED\",\"self_checks_passed\":true,\"source_sha\":{},\"seed\":{},\"candidate_count\":{},\"policy_count\":{},\"fixture_fnv1a64\":{},\"fingerprint_is_cryptographic\":false,\"feature_noise\":\"bounded_jitter_v1\",\"oracle_scope\":\"synthetic-generator-only\"}}",
         json_string(&config.source_sha), config.seed, config.candidates,
         POLICIES.len(), json_string(&fingerprint)
     );
