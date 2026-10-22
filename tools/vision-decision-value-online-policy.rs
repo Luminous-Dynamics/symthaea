@@ -522,14 +522,14 @@ fn run_reference_scenario() -> Result<String, AllocationError> {
         input(2, 2, Some(-0.20), Some(5), true),
         input(3, 3, None, Some(2), true),
         input(4, 4, Some(0.70), Some(13), false),
-        input(5, 5, Some(0.60), Some(12), true),
+        input(5, 5, Some(0.60), Some(11), true),
         input(6, 6, Some(0.90), Some(1), false),
     ];
 
     for case in cases {
         let commit = allocator.decide(case)?;
         let actual_cost = if let Some(reservation_id) = commit.reservation_id {
-            let actual = if commit.trial_id == 1 { 4 } else { 13 };
+            let actual = if commit.trial_id == 1 { 4 } else { 12 };
             allocator.budget.settle(reservation_id, Some(actual))?;
             Some(actual)
         } else {
