@@ -13,6 +13,7 @@ source_files=(
   "tools/allostatic-control-bench/src/calibration.rs"
   "tools/allostatic-control-bench/src/drift_monitor.rs"
   "tools/allostatic-control-bench/src/bounded_risk_eprocess.rs"
+  "tools/allostatic-control-bench/src/alpha_spent_changepoint.rs"
   "tools/allostatic-control-bench/src/scope_monitor.rs"
   "tools/allostatic-control-bench/src/model_mismatch.rs"
   "tools/allostatic-control-bench/src/multistep_viability.rs"
@@ -26,6 +27,7 @@ source_files=(
   "tools/allostatic-control-bench/src/bin/allostatic-sequential-scope-bench.rs"
   "tools/allostatic-control-bench/src/bin/allostatic-risk-eprocess-bench.rs"
   "tools/allostatic-control-bench/src/bin/allostatic-eprocess-shift-power-surface.rs"
+  "tools/allostatic-control-bench/src/bin/allostatic-eprocess-changepoint-bench.rs"
   "tools/allostatic-control-bench/qualify.sh"
   "docs/research/ALLOSTATIC_CONTROL_BENCHMARK_V1.md"
   "docs/research/ROBUST_VIABILITY_ENVELOPE_V1.md"
@@ -35,6 +37,7 @@ source_files=(
   "docs/research/SEQUENTIAL_SCOPE_CUSUM_V1.md"
   "docs/research/BOUNDED_RISK_EPROCESS_V1.md"
   "docs/research/EPROCESS_SHIFT_POWER_SURFACE_V1.md"
+  "docs/research/EPROCESS_ALPHA_SPENT_CHANGEPOINT_V1.md"
 )
 expected_head="${1:-$(git rev-parse HEAD)}"
 actual_head="$(git rev-parse HEAD)"
@@ -70,6 +73,8 @@ eprocess_out="${out_base}-risk-eprocess.csv"
 eprocess_summary_out="${out_base}-risk-eprocess-summary.csv"
 power_surface_out="${out_base}-eprocess-shift-power.csv"
 power_surface_summary_out="${out_base}-eprocess-shift-power-summary.csv"
+changepoint_out="${out_base}-eprocess-changepoint.csv"
+changepoint_summary_out="${out_base}-eprocess-changepoint-summary.csv"
 receipt="${out_csv}.receipt.txt"
 
 cargo fmt --manifest-path "$manifest" -- --check
@@ -1072,6 +1077,193 @@ if ! awk -F, '
   exit 1
 fi
 
+# Compare the global risk e-process with a bounded-memory multi-start
+# alpha-spent detector on identical loss streams, including late-onset shifts.
+cargo run --locked --release --manifest-path "$manifest" --bin allostatic-eprocess-changepoint-bench -- \
+  "$tmpdir/changepoint-a.csv" "$tmpdir/changepoint-summary-a.csv"
+cargo run --locked --release --manifest-path "$manifest" --bin allostatic-eprocess-changepoint-bench -- \
+  "$tmpdir/changepoint-b.csv" "$tmpdir/changepoint-summary-b.csv"
+if ! cmp -s "$tmpdir/changepoint-a.csv" "$tmpdir/changepoint-b.csv" ||
+   ! cmp -s "$tmpdir/changepoint-summary-a.csv" "$tmpdir/changepoint-summary-b.csv"; then
+  printf 'FAIL: repeated change-point outputs are not byte-identical\n' >&2
+  exit 1
+fi
+
+if ! awk -F, '
+  NR == 1 { if (NF != 32) failed = 1; next }
+  {
+    if (NF != 32) failed = 1
+    if ($1 != "null_low" && $1 != "null_boundary" &&
+        $1 != "early_shift_050" && $1 != "late_shift_050" &&
+        $1 != "late_shift_065" && $1 != "very_late_shift_065" &&
+        $1 != "stealth_paired") failed = 1
+    for (i = 2; i <= 4; i++) if ($i != "true" && $i != "false") failed = 1
+    if ($5 !~ /^[0-9]+$/ || $5 < 0 || $5 >= 500) failed = 1
+    if ($6 !~ /^[0-9]+$/ || $7 != 256) failed = 1
+    if ($8 != "NA" && ($8 !~ /^[0-9]+$/ || $8 < 0 || $8 >= 256)) failed = 1
+    for (i = 9; i <= 12; i++) {
+      if ($i !~ /^[0-9]*[.]?[0-9]+$/ || $i < 0 || $i > 1) failed = 1
+    }
+    if ($13 !~ /^[0-9]+$/ || $13 > 256) failed = 1
+    if ($14 !~ /^[0-9]+$/ || $14 > 256) failed = 1
+    if (($14 < 256) != ($15 == "true")) failed = 1
+    if ($15 != "true" && $15 != "false") failed = 1
+    if ($16 !~ /^-?[0-9]*[.]?[0-9]+$/ || $17 !~ /^-?[0-9]*[.]?[0-9]+$/ ||
+        $17 < $16) failed = 1
+    if ($18 !~ /^[0-9]+$/ || $18 > 256) failed = 1
+    if ($19 != "true" && $19 != "false") failed = 1
+    if (($18 < 256) != ($19 == "true")) failed = 1
+    if ($20 != "NA" && ($20 !~ /^[0-9]+$/ || $20 >= 256)) failed = 1
+    for (i = 21; i <= 23; i++) {
+      if ($i != "NA" && $i !~ /^-?[0-9]*[.]?[0-9]+$/) failed = 1
+    }
+    for (i = 24; i <= 26; i++) {
+      if ($i != "NA" && ($i !~ /^[0-9]+$/ || $i > 256)) failed = 1
+    }
+    if ($27 != "true" && $27 != "false" && $27 != "NA") failed = 1
+    if ($28 !~ /^[0-9]+$/ || $28 < 1 || $28 > 64) failed = 1
+    if ($29 !~ /^[0-9]*[.]?[0-9]+$/ ||
+        ($29 - log(100) > 0.000001) || (log(100) - $29 > 0.000001)) failed = 1
+    if (($30 - 0.05 > 0.000001) || (0.05 - $30 > 0.000001) ||
+        $31 != 5 || $32 != 64) failed = 1
+
+    if ($18 == 256) {
+      if ($20 != "NA" || $21 != "NA" || $22 != "NA" || $23 != "NA" ||
+          $25 != "NA" || $26 != "NA" || $27 != "NA") failed = 1
+    } else {
+      if ($20 == "NA" || $21 == "NA" || $22 == "NA" || $23 == "NA") failed = 1
+      if ($20 >= $18 || ($18 - $20) >= 64) failed = 1
+      expected_start_threshold = log(100) + log(3.141592653589793^2 / 6) +
+        2 * log($20 + 1)
+      if (($22 - expected_start_threshold > 0.000001) ||
+          (expected_start_threshold - $22 > 0.000001)) failed = 1
+      if (($21 - $22 - $23 > 0.000001) || ($22 + $23 - $21 > 0.000001)) failed = 1
+      if (($21 + 0.000001) < $22) failed = 1
+      if ($27 != "NA" && (($27 == "true") != ($26 != "NA" && $26 <= 8))) failed = 1
+    }
+    if ($24 != "NA" && ($8 == "NA" || $14 < $8)) failed = 1
+    if ($25 != "NA" && ($8 == "NA" || $18 < $8)) failed = 1
+    if ($26 != "NA" && ($8 == "NA" || $18 < $8)) failed = 1
+
+    if (($1 == "null_low" || $1 == "null_boundary" || $1 == "stealth_paired") &&
+        ($2 == "true" || $3 == "true")) failed = 1
+    if (($1 == "early_shift_050" || $1 == "late_shift_050" ||
+         $1 == "late_shift_065" || $1 == "very_late_shift_065") &&
+        ($2 != "true" || $3 != "true" || $4 != "false")) failed = 1
+    if ($1 == "null_low" && ($8 != "NA" || $9 != 0.1 || $10 != 0.1)) failed = 1
+    if ($1 == "null_boundary" && ($8 != "NA" || $9 != 0.15 || $10 != 0.15)) failed = 1
+    if ($1 == "early_shift_050" && ($8 != 16 || $9 != 0.02 || $10 != 0.5)) failed = 1
+    if ($1 == "late_shift_050" && ($8 != 192 || $9 != 0.02 || $10 != 0.5)) failed = 1
+    if ($1 == "late_shift_065" && ($8 != 192 || $9 != 0.02 || $10 != 0.65)) failed = 1
+    if ($1 == "very_late_shift_065" && ($8 != 224 || $9 != 0.02 || $10 != 0.65)) failed = 1
+    if ($1 == "stealth_paired" && ($8 != "NA" || $9 != 0.1 || $10 != 0.1 || $2 != "true" || $3 != "false")) failed = 1
+
+    key = $1 SUBSEP $5
+    if (seen[key]++) failed = 1
+    if ($1 == "null_low") {
+      for (i = 5; i <= 32; i++) null_row[$5 SUBSEP i] = $i
+    }
+    if ($1 == "stealth_paired") {
+      for (i = 5; i <= 32; i++) if ($i != null_row[$5 SUBSEP i]) failed = 1
+    }
+    scenarios[$1]++
+    rows++
+  }
+  END {
+    if (NR != 3501 || rows != 3500) exit 1
+    if (scenarios["null_low"] != 500 || scenarios["null_boundary"] != 500 ||
+        scenarios["early_shift_050"] != 500 || scenarios["late_shift_050"] != 500 ||
+        scenarios["late_shift_065"] != 500 || scenarios["very_late_shift_065"] != 500 ||
+        scenarios["stealth_paired"] != 500) exit 1
+  }
+' "$tmpdir/changepoint-a.csv"; then
+  printf 'FAIL: change-point raw schema, thresholds, alpha-spending evidence, or paired-control gates are invalid\n' >&2
+  exit 1
+fi
+
+if ! awk -F, '
+  NR == 1 { if (NF != 40) failed = 1; next }
+  {
+    if (NF != 40) failed = 1
+    if ($1 != "null_low" && $1 != "null_boundary" &&
+        $1 != "early_shift_050" && $1 != "late_shift_050" &&
+        $1 != "late_shift_065" && $1 != "very_late_shift_065" &&
+        $1 != "stealth_paired") failed = 1
+    if ($2 != "true" && $2 != "false") failed = 1
+    if ($3 != "true" && $3 != "false") failed = 1
+    if ($4 != "true" && $4 != "false") failed = 1
+    if ($5 != 500) failed = 1
+    if ($6 != "NA" && ($6 !~ /^[0-9]+$/ || $6 >= 256)) failed = 1
+    if ($7 !~ /^[0-9]*[.]?[0-9]+$/ || $8 !~ /^[0-9]*[.]?[0-9]+$/) failed = 1
+    if ($9 !~ /^[0-9]*[.]?[0-9]+$/ || $10 !~ /^[0-9]*[.]?[0-9]+$/) failed = 1
+
+    for (start in split_cols) delete split_cols[start]
+    split_cols[11]=1; split_cols[24]=1
+    for (det = 0; det < 2; det++) {
+      base = det == 0 ? 11 : 24
+      alarm_count = $base
+      rate = $(base+1)
+      lower = $(base+2)
+      upper = $(base+3)
+      false_alarms = $(base+4)
+      risk_misses = $(base+5)
+      latent_misses = $(base+6)
+      pre_change = $(base+7)
+      if (alarm_count !~ /^[0-9]+$/ || alarm_count > 500 ||
+          false_alarms !~ /^[0-9]+$/ || false_alarms > 500 ||
+          risk_misses !~ /^[0-9]+$/ || risk_misses > 500 ||
+          latent_misses !~ /^[0-9]+$/ || latent_misses > 500 ||
+          pre_change !~ /^[0-9]+$/ || pre_change > 500) failed = 1
+      if (rate !~ /^[0-9]*[.]?[0-9]+$/ || lower !~ /^[0-9]*[.]?[0-9]+$/ ||
+          upper !~ /^[0-9]*[.]?[0-9]+$/ || lower > rate || rate > upper ||
+          (rate - alarm_count/500 > 0.000001) ||
+          (alarm_count/500 - rate > 0.000001)) failed = 1
+      if ($3 == "true" && risk_misses != 500 - (alarm_count - pre_change)) failed = 1
+      if ($3 == "false" && risk_misses != 0) failed = 1
+      if ($4 == "true" && false_alarms > 15) failed = 1
+      if (($1 == "null_low" || $1 == "null_boundary" || $1 == "stealth_paired") &&
+          (alarm_count > 15 || false_alarms > 15 || pre_change != 0)) failed = 1
+    }
+
+    for (i = 19; i <= 21; i++) if ($(i) != "NA" && $(i) !~ /^[0-9]*[.]?[0-9]+$/) failed = 1
+    if ($20 != "NA" && ($20 < 0 || $20 > 255)) failed = 1
+    if ($21 != "NA" && ($21 < 0 || $21 > 255)) failed = 1
+    if ($22 != "NA" && $22 !~ /^[0-9]*[.]?[0-9]+$/) failed = 1
+    if ($23 !~ /^-?[0-9]*[.]?[0-9]+$/) failed = 1
+    for (i = 32; i <= 34; i++) if ($(i) != "NA" && $(i) !~ /^[0-9]*[.]?[0-9]+$/) failed = 1
+    if ($33 != "NA" && ($33 < 0 || $33 > 255)) failed = 1
+    if ($34 != "NA" && ($34 < 0 || $34 > 255)) failed = 1
+    if ($35 != "NA" && $35 !~ /^[0-9]*[.]?[0-9]+$/) failed = 1
+    if ($36 != "NA" && $36 !~ /^[0-9]*[.]?[0-9]+$/) failed = 1
+    if ($37 !~ /^[0-9]+$/ || $37 > 500) failed = 1
+    if ($38 != "NA" && $38 !~ /^-?[0-9]*[.]?[0-9]+$/) failed = 1
+    if ($39 != "NA" && $39 !~ /^[0-9]*[.]?[0-9]+$/) failed = 1
+    if ($40 < 1 || $40 > 64) failed = 1
+
+    if (($1 == "null_low" || $1 == "null_boundary" || $1 == "stealth_paired") &&
+        ($12 > 0.03 || $25 > 0.03)) failed = 1
+    if ($1 == "early_shift_050" && ($16 > 50 || $29 > 50)) failed = 1
+    if ($1 == "late_shift_065" &&
+        ($16 < 200 || $29 > 150 || $16 <= $29 + 100 || $37 < 300)) failed = 1
+
+    key = $1
+    if (seen[key]++) failed = 1
+    if ($1 == "null_low") {
+      for (i = 6; i <= 40; i++) null_summary[i] = $i
+    }
+    if ($1 == "stealth_paired") {
+      for (i = 6; i <= 40; i++) {
+        if (i != 17 && i != 30 && $i != null_summary[i]) failed = 1
+      }
+    }
+    rows++
+  }
+  END { if (NR != 8 || rows != 7 || failed) exit 1 }
+' "$tmpdir/changepoint-summary-a.csv"; then
+  printf 'FAIL: change-point summary arithmetic, alpha budget, false-alarm, or late-shift power gates are invalid\n' >&2
+  exit 1
+fi
+
 # Summary must contain 5 scenarios × 6 policies × 2 shield settings.
 if ! awk -F, 'NR == 1 { if (NF != 28) failed = 1; next }
   { if (NF != 28) failed = 1; rows++ }
@@ -1106,6 +1298,8 @@ cp "$tmpdir/eprocess-a.csv" "$eprocess_out"
 cp "$tmpdir/eprocess-summary-a.csv" "$eprocess_summary_out"
 cp "$tmpdir/power-a.csv" "$power_surface_out"
 cp "$tmpdir/power-summary-a.csv" "$power_surface_summary_out"
+cp "$tmpdir/changepoint-a.csv" "$changepoint_out"
+cp "$tmpdir/changepoint-summary-a.csv" "$changepoint_summary_out"
 {
   printf 'status=pass\n'
   printf 'git_commit=%s\n' "$actual_head"
@@ -1149,6 +1343,10 @@ cp "$tmpdir/power-summary-a.csv" "$power_surface_summary_out"
   printf 'eprocess_power_surface_rows_excluding_header=%s\n' "$(( $(wc -l < "$power_surface_out") - 1 ))"
   printf 'eprocess_power_surface_summary_sha256=%s\n' "$(sha256sum "$power_surface_summary_out" | awk '{print $1}')"
   printf 'eprocess_power_surface_summary_rows_excluding_header=%s\n' "$(( $(wc -l < "$power_surface_summary_out") - 1 ))"
+  printf 'eprocess_changepoint_sha256=%s\n' "$(sha256sum "$changepoint_out" | awk '{print $1}')"
+  printf 'eprocess_changepoint_rows_excluding_header=%s\n' "$(( $(wc -l < "$changepoint_out") - 1 ))"
+  printf 'eprocess_changepoint_summary_sha256=%s\n' "$(sha256sum "$changepoint_summary_out" | awk '{print $1}')"
+  printf 'eprocess_changepoint_summary_rows_excluding_header=%s\n' "$(( $(wc -l < "$changepoint_summary_out") - 1 ))"
   printf '\nsource_sha256:\n'
   sha256sum "${source_files[@]}"
 } > "$receipt"
@@ -1170,4 +1368,6 @@ printf 'Bounded-risk e-process frontier: %s\n' "$eprocess_out"
 printf 'Bounded-risk e-process summary: %s\n' "$eprocess_summary_out"
 printf 'E-process shift power surface: %s\n' "$power_surface_out"
 printf 'E-process shift power summary: %s\n' "$power_surface_summary_out"
+printf 'Alpha-spent change-point frontier: %s\n' "$changepoint_out"
+printf 'Alpha-spent change-point summary: %s\n' "$changepoint_summary_out"
 printf 'Provenance receipt: %s\n' "$receipt"

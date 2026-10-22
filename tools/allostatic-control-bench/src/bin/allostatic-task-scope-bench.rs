@@ -402,7 +402,8 @@ fn run_episode(
         if first_scope_alarm_step == HORIZON && assessment.alarm() {
             first_scope_alarm_step = step;
         }
-        if first_false_safe_step == HORIZON && assessment.prediction_error().false_safe_prediction() {
+        if first_false_safe_step == HORIZON && assessment.prediction_error().false_safe_prediction()
+        {
             first_false_safe_step = step;
         }
         scope_false_safe_override |= assessment.false_safe_override();
