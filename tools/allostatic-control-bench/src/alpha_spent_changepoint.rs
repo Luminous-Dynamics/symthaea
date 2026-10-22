@@ -322,7 +322,10 @@ mod tests {
     #[test]
     fn rejects_invalid_configuration_and_observation_without_mutation() {
         assert!(AlphaSpentChangePointMonitor::new(0.0, BETS, DELTA, STREAMS, 64).is_none());
-        assert!(AlphaSpentChangePointMonitor::new(EPSILON, [0.0, 0.1, 0.2], DELTA, STREAMS, 64).is_none());
+        assert!(
+            AlphaSpentChangePointMonitor::new(EPSILON, [0.0, 0.1, 0.2], DELTA, STREAMS, 64)
+                .is_none()
+        );
         assert!(AlphaSpentChangePointMonitor::new(EPSILON, BETS, DELTA, 0, 64).is_none());
         assert!(AlphaSpentChangePointMonitor::new(EPSILON, BETS, DELTA, STREAMS, 0).is_none());
         assert!(AlphaSpentChangePointMonitor::new(
