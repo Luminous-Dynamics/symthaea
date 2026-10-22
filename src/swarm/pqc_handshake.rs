@@ -56,6 +56,14 @@ use mycelix_crypto::{AlgorithmId, TaggedPublicKey};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+// ML-KEM-768 encodings from FIPS 203. Validate lengths before storing or decapsulating.
+const ML_KEM_768_PUBLIC_KEY_BYTES: usize = 1_184;
+const ML_KEM_768_CIPHERTEXT_BYTES: usize = 1_088;
+/// Bound caller-controlled pending exchange state (public keys plus candidate keys).
+const MAX_PENDING_KEM_EXCHANGES: usize = 256;
+/// Bound peer labels before copying them into pending-state maps.
+const MAX_KEM_PEER_ID_BYTES: usize = 256;
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // PQC SESSION KEY
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -210,13 +218,39 @@ impl PqcHandshakeManager {
     // INITIATOR SIDE
     // ════════════════════════════════════════════════════════════════════
 
-    /// Phase 2a (Initiator): Store the responder's KEM public key.
+    /// Store a candidate responder KEM public key after the caller has
+    /// authenticated its identity/transcript.
     ///
-    /// Called when the initiator receives the responder's `KemExchange`
-    /// (which contains their KEM public key but no ciphertext yet).
-    pub fn receive_kem_public_key(&mut self, peer_id: &str, kem_public_key: &[u8]) {
+    /// This method validates the ML-KEM-768 encoding size and bounds peer labels
+    /// and pending entries. It does not authenticate the supplied public key.
+    pub fn receive_kem_public_key(
+        &mut self,
+        peer_id: &str,
+        kem_public_key: &[u8],
+    ) -> SwarmResult<()> {
+        if peer_id.is_empty() || peer_id.len() > MAX_KEM_PEER_ID_BYTES {
+            return Err(SwarmError::TrustVerificationError {
+                reason: "PQC peer identifier is empty or exceeds the 256-byte limit".to_string(),
+            });
+        }
+        if kem_public_key.len() != ML_KEM_768_PUBLIC_KEY_BYTES {
+            return Err(SwarmError::TrustVerificationError {
+                reason: format!(
+                    "Invalid ML-KEM-768 public key length: expected {ML_KEM_768_PUBLIC_KEY_BYTES}, got {}",
+                    kem_public_key.len()
+                ),
+            });
+        }
+        if !self.pending_kem.contains_key(peer_id)
+            && self.pending_kem.len() >= MAX_PENDING_KEM_EXCHANGES
+        {
+            return Err(SwarmError::TrustVerificationError {
+                reason: "Maximum pending PQC key exchanges reached".to_string(),
+            });
+        }
         self.pending_kem
             .insert(peer_id.to_string(), kem_public_key.to_vec());
+        Ok(())
     }
 
     /// Encapsulate a shared secret to the responder's supplied KEM public key.
@@ -236,6 +270,18 @@ impl PqcHandshakeManager {
         peer_id: &str,
         classical_nonce: &[u8],
     ) -> SwarmResult<Vec<u8>> {
+        if peer_id.is_empty() || peer_id.len() > MAX_KEM_PEER_ID_BYTES {
+            return Err(SwarmError::TrustVerificationError {
+                reason: "PQC peer identifier is empty or exceeds the 256-byte limit".to_string(),
+            });
+        }
+        if !self.pending_session_keys.contains_key(peer_id)
+            && self.pending_session_keys.len() >= MAX_PENDING_KEM_EXCHANGES
+        {
+            return Err(SwarmError::TrustVerificationError {
+                reason: "Maximum pending PQC candidate keys reached".to_string(),
+            });
+        }
         let kem_pk_bytes =
             self.pending_kem
                 .remove(peer_id)
@@ -288,6 +334,27 @@ impl PqcHandshakeManager {
         kem_ciphertext: &[u8],
         classical_nonce: &[u8],
     ) -> SwarmResult<()> {
+        if peer_id.is_empty() || peer_id.len() > MAX_KEM_PEER_ID_BYTES {
+            return Err(SwarmError::TrustVerificationError {
+                reason: "PQC peer identifier is empty or exceeds the 256-byte limit".to_string(),
+            });
+        }
+        if kem_ciphertext.len() != ML_KEM_768_CIPHERTEXT_BYTES {
+            return Err(SwarmError::TrustVerificationError {
+                reason: format!(
+                    "Invalid ML-KEM-768 ciphertext length: expected {ML_KEM_768_CIPHERTEXT_BYTES}, got {}",
+                    kem_ciphertext.len()
+                ),
+            });
+        }
+        if !self.pending_session_keys.contains_key(peer_id)
+            && self.pending_session_keys.len() >= MAX_PENDING_KEM_EXCHANGES
+        {
+            return Err(SwarmError::TrustVerificationError {
+                reason: "Maximum pending PQC candidate keys reached".to_string(),
+            });
+        }
+
         // Decapsulate shared secret
         let kem_shared_secret = self.kem_keypair.decapsulate(kem_ciphertext).map_err(|e| {
             SwarmError::TrustVerificationError {
