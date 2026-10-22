@@ -954,6 +954,7 @@ mod tests {
         assert_eq!(result.backend_attempts[0].tier, BackendTier::Simulated);
         assert_eq!(result.backend_attempts[0].backend_name, "Simulated");
         assert!(result.backend_attempts[0].success, "the simulator did return non-empty placeholder text");
+        assert!(!result.backend_attempts[0].usable_generation, "placeholder text is not usable generation");
         assert!(!result.success, "placeholder text must not count as usable code generation");
         assert_eq!(result.energy_cost, 0.0);
     }
@@ -977,6 +978,7 @@ mod tests {
         assert_eq!(result.backend_attempts[1].backend_name, "Simulated");
         assert_eq!(result.backend_attempts[1].tier, BackendTier::Simulated);
         assert!(result.backend_attempts[1].success, "simulator returned placeholder text");
+        assert!(!result.backend_attempts[1].usable_generation, "simulated fallback is not usable generation");
         assert!(!result.success, "simulated fallback must not count as usable generation");
         assert_eq!(result.backend_attempts[0].estimated_energy_cost, COST_CLOUD_LLM);
         assert_eq!(result.backend_attempts[1].estimated_energy_cost, 0.0);
@@ -1007,6 +1009,7 @@ mod tests {
         assert_eq!(result.backend_attempts[1].tier, BackendTier::LocalLlm);
         assert_eq!(result.backend_attempts[1].estimated_energy_cost, COST_LOCAL_LLM);
         assert!(result.backend_attempts[1].success);
+        assert!(result.backend_attempts[1].usable_generation);
         assert_eq!(result.energy_cost, COST_CLOUD_LLM + COST_LOCAL_LLM);
         assert_eq!(dispatcher.total_energy(), COST_CLOUD_LLM + COST_LOCAL_LLM);
     }
