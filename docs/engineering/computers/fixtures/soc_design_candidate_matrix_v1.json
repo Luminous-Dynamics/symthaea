@@ -84,30 +84,34 @@
       "profile": "laptop",
       "role": "open_research_reference",
       "cpu": "BOOM out-of-order RISC-V via Chipyard; exact generator/config hash required",
-      "gpu": "Vortex RISC-V GPGPU research stack",
+      "gpu": "Vortex v3.0 configurable RISC-V GPGPU research stack; pin exact tag/commit and backend",
       "accelerator": "Symthaea HDC tile 256-bit streaming datapath",
       "memory": "explicit cache/SRAM/host transfer model; capacities not preselected",
       "source_urls": [
         "https://chipyard.readthedocs.io/en/stable/generators/boom/",
-        "https://github.com/vortexgpgpu/vortex"
+        "https://github.com/vortexgpgpu/vortex",
+        "https://github.com/vortexgpgpu/vortex/releases/tag/v3.0"
       ],
       "execution_stage": "simulator_then_rtl_then_supported_fpga",
       "our_device_tested": false,
       "metrics": null,
-      "notes": "Research stack to test architecture/tooling; not expected to match a shipping laptop CPU/discrete GPU without evidence."
+      "notes": "Research stack to test architecture/tooling; v3.0 documents fixed-function graphics, tensor-core structured sparsity, async transfer and Vulkan/HIP backends, but exact build/backend/target qualification remains required. Not assumed equivalent to a shipping laptop CPU/discrete GPU."
     },
     {
       "id": "LAPTOP-RISCV-BOOM-VORTEX-HDC-512",
       "profile": "laptop",
       "role": "accelerator_width_variant",
       "cpu": "Same exact BOOM config as paired 256-bit candidate",
-      "gpu": "Same exact Vortex config as paired 256-bit candidate",
+      "gpu": "Vortex v3.0 configurable RISC-V GPGPU research stack; pin exact tag/commit and backend",
       "accelerator": "Symthaea HDC tile 512-bit streaming datapath",
       "memory": "same local SRAM and command batching as paired candidate",
       "execution_stage": "simulator_then_rtl_then_supported_fpga",
       "our_device_tested": false,
       "metrics": null,
-      "notes": "Paired width study; more bits per cycle may cost area, clock or energy, so no monotonic win is assumed."
+      "notes": "Research stack to test architecture/tooling; v3.0 documents fixed-function graphics, tensor-core structured sparsity, async transfer and Vulkan/HIP backends, but exact build/backend/target qualification remains required. Not assumed equivalent to a shipping laptop CPU/discrete GPU.",
+      "source_urls": [
+        "https://github.com/vortexgpgpu/vortex/releases/tag/v3.0"
+      ]
     },
     {
       "id": "LAPTOP-COMMERCIAL-BASELINE",
@@ -182,5 +186,11 @@
       "expected": "abstain_not_qualified"
     }
   ],
-  "claim_ceiling": "Candidate definitions only. No CPU/GPU/accelerator performance, energy, area, tapeout, fabricated silicon or product superiority has been measured."
+  "claim_ceiling": "Candidate definitions only. No CPU/GPU/accelerator performance, energy, area, tapeout, fabricated silicon or product superiority has been measured.",
+  "current_benchmark_refs": {
+    "laptop": "https://mlcommons.org/benchmarks/client/",
+    "phone": "https://mlcommons.org/2026/06/mlperf-mobile-v6/",
+    "gpu_release": "https://github.com/vortexgpgpu/vortex/releases/tag/v3.0",
+    "status": "public reference points only; no candidate measured in this fixture"
+  }
 }
