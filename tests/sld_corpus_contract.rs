@@ -796,6 +796,8 @@ fn valid_evaluation_receipt() -> Value {
             "case_assignment_randomized": false,
             "case_authors_excluded_from_adjudication": false,
             "conflicts_disclosed": false,
+            "initial_label_pairwise_agreement_rate": null,
+            "initial_label_unanimous_case_rate": null,
             "completed_at": null
         },
         "environment": {
@@ -868,6 +870,8 @@ fn evaluation_receipt_requires_auditable_oracle_review_before_comparison() {
         "case_assignment_randomized": true,
         "case_authors_excluded_from_adjudication": true,
         "conflicts_disclosed": true,
+        "initial_label_pairwise_agreement_rate": 1.0,
+        "initial_label_unanimous_case_rate": 1.0,
         "completed_at": "2026-10-22T11:00:00Z"
     });
     receipt["evaluator"]["human_review_status"] = Value::String("COMPLETE".to_owned());
