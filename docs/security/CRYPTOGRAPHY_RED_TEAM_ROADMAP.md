@@ -111,6 +111,31 @@ Do not collapse these states into a generic “secure” badge.
 
 Establish a measured baseline before imposing throughput budgets. Never optimize away checks or weaken negative tests to improve the numbers.
 
+## Executable red-team corpus: first protocol-boundary benchmark
+
+Convert each confirmed bug class into a deterministic fixture and require a paired positive control. The corpus should be a security regression benchmark, not a count of hypothetical attacks. The table below is a prioritized initial suite assembled from source review; proposed fixes and unexecuted tests must remain labelled unverified until they run on the exact commit.
+
+| Boundary | Adversarial mutation | Oracle / positive control |
+|---|---|---|
+| Key import | Combine valid-length public and secret keys from different keypairs; malformed encodings | Matching generated pair imports and signs/verifies; mixed pair fails import |
+| Authenticated proof | Change proof backend or energy after signing; truncate the signature | Original envelope verifies; any bound-field mutation fails |
+| Sovereign attestation | Move variable-field boundaries while preserving legacy concatenated bytes; substitute self-supplied key; omit a required artifact | Legacy version rejected; untrusted key rejected; exact binary verifies while missing/wrong binary fails |
+| WASM AOT loader | Supply a self-signed artifact; mutate precompiled bytes or compatibility fingerprint; use a different trusted key | Only the locally trusted key's v2 artifact loads; bytes and compatibility changes invalidate the signature |
+| Disabled runtime | Call execution when Wasmtime feature is absent | Returns explicit unavailable error; must not return success or claim verification |
+| WASM cache/path | Use traversal/TOML-syntax plugin names; collide or reuse a name/source cache identity; supply a non-digest extension path | Invalid names/IDs are rejected before filesystem use; identical inputs yield the same SHA-256 key, differing name/source changes it |
+| MFDI signed request | Change timestamp while keeping the signature; submit a valid self-signed untrusted key; reuse a nonce | Tampered freshness field fails; untrusted key is rejected; a trusted fresh request succeeds once |
+| MFDI signed output | Change the agent DID, timestamp, cycle ID, or output values | Original output verifies against the matching key; each mutation fails, and the DID must be derived from that key |
+| Swarm attestation diagnostic | Use a non-ASCII untrusted signer key whose byte 16 splits a UTF-8 character | Verification returns a trust error without panicking |
+| Pairing challenge | Reuse key material while resetting the cycle counter; replay an old response | Challenge nonce comes from OS randomness; replay fixture is rejected or no longer repeats the challenge nonce |
+
+### Benchmark scoring rules
+
+- Count **true positives** only when a test demonstrates that the unpatched implementation violated a stated invariant and the patched implementation rejects the same reproducer.
+- Pair each attack fixture with a valid control so an implementation that rejects all inputs cannot score well.
+- Report detection recall, false-positive rate, minimized reproduction rate, and regressions introduced. Use exact fixture IDs and hashes; do not count a generated hypothesis as a vulnerability.
+- Split scores by assurance class: parsing robustness, signature correctness, signer authorization, protocol integrity, replay/freshness, artifact provenance, and execution isolation. A strong score in one class must not mask a missing class.
+- Report the number of tests and mutation operators covered, not only a percentage. The 95% curated-fault target is meaningful only once the corpus, fault families, and exclusions are pinned and published.
+
 ## Symthaea-assisted red-team loop
 
 1. Build an inventory of cryptographic entry points and the invariant each is supposed to enforce.
