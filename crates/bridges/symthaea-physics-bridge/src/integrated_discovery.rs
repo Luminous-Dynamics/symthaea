@@ -766,7 +766,7 @@ mod tests {
     /// It reports clean recovery and three disjoint outcomes under hidden structural
     /// discrepancy; it intentionally does not assert that the robust policy wins.
     #[test]
-    fn robust_noise_envelope_vs_nominal_eig_pilot() {
+    fn scenario_robust_eig_vs_nominal_eig_pilot() {
         const SEEDS: u64 = 20;
         const ROUND_BUDGET: usize = 4;
         const SYSTEMATIC_DISCREPANCY: f64 = 0.12;
@@ -865,7 +865,7 @@ mod tests {
         );
 
         println!(
-            "robust_eig_pilot,seeds={SEEDS},round_budget={ROUND_BUDGET},noise_factors=[0.5,1,2],discrepancy={SYSTEMATIC_DISCREPANCY},clean_nominal_recovery={:.3},clean_robust_recovery={:.3},clean_delta_robust_minus_nominal={clean_delta:.3},clean_ci95=[{clean_ci_low:.3},{clean_ci_high:.3}],misspec_nominal_false_singleton={:.3},misspec_robust_false_singleton={:.3},false_singleton_delta_robust_minus_nominal={false_delta:.3},false_singleton_ci95=[{false_ci_low:.3},{false_ci_high:.3}],misspec_nominal_detected={:.3},misspec_robust_detected={:.3},detection_delta_robust_minus_nominal={detect_delta:.3},detection_ci95=[{detect_ci_low:.3},{detect_ci_high:.3}],misspec_nominal_unresolved={:.3},misspec_robust_unresolved={:.3}",
+            "scenario_robust_eig_pilot,seeds={SEEDS},round_budget={ROUND_BUDGET},noise_factors=[0.5,1,2],discrepancy={SYSTEMATIC_DISCREPANCY},clean_nominal_recovery={:.3},clean_robust_recovery={:.3},clean_delta_robust_minus_nominal={clean_delta:.3},clean_ci95=[{clean_ci_low:.3},{clean_ci_high:.3}],misspec_nominal_false_singleton={:.3},misspec_robust_false_singleton={:.3},false_singleton_delta_robust_minus_nominal={false_delta:.3},false_singleton_ci95=[{false_ci_low:.3},{false_ci_high:.3}],misspec_nominal_detected={:.3},misspec_robust_detected={:.3},detection_delta_robust_minus_nominal={detect_delta:.3},detection_ci95=[{detect_ci_low:.3},{detect_ci_high:.3}],misspec_nominal_unresolved={:.3},misspec_robust_unresolved={:.3}",
             clean_nominal_successes as f64 / SEEDS as f64,
             clean_robust_successes as f64 / SEEDS as f64,
             misspec_nominal_false_singletons as f64 / SEEDS as f64,
