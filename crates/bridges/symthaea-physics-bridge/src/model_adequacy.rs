@@ -190,7 +190,13 @@ pub fn next_discovery_action(snapshot: DiscoverySnapshot) -> DiscoveryAction {
     }
 
     if matches!(snapshot.adequacy, AdequacyAssessment::Alarm { .. }) {
-        return DiscoveryAction::RunIndependentAdequacyAudit;
+        return if snapshot.termination.can_continue() {
+            DiscoveryAction::RunIndependentAdequacyAudit
+        } else if snapshot.live_candidate_count == 0 {
+            DiscoveryAction::ReportEmptySetWithoutAdequacyEvidence
+        } else {
+            DiscoveryAction::ReportUnresolved
+        };
     }
 
     if snapshot.live_candidate_count == 0 {
@@ -342,6 +348,33 @@ mod tests {
                 TerminationStatus::Active,
             )),
             DiscoveryAction::RunIndependentAdequacyAudit
+        );
+    }
+
+    #[test]
+    fn exhausted_budget_never_requests_an_unavailable_adequacy_audit() {
+        let untrusted_alarm = AdequacyAssessment::Alarm {
+            diagnostic: AdequacyDiagnostic::CalibrationFailure,
+            calibrated: false,
+            independent_audit: false,
+        };
+        assert_eq!(
+            next_discovery_action(snapshot(
+                1,
+                untrusted_alarm,
+                ValidationStatus::InProgress,
+                TerminationStatus::BudgetExhausted,
+            )),
+            DiscoveryAction::ReportUnresolved
+        );
+        assert_eq!(
+            next_discovery_action(snapshot(
+                0,
+                untrusted_alarm,
+                ValidationStatus::NotStarted,
+                TerminationStatus::CandidatePoolExhausted,
+            )),
+            DiscoveryAction::ReportEmptySetWithoutAdequacyEvidence
         );
     }
 
