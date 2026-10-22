@@ -446,9 +446,7 @@ mod tests {
                 network_cases += 1;
                 let expected = match (connectivity, core_network_required) {
                     (Connectivity::Offline, true) => Some(Violation::OfflineCoreNetworkDependency),
-                    (Connectivity::Intermittent, true) => {
-                        Some(Violation::IntermittentCoreNetworkDependency)
-                    }
+                    (Connectivity::Intermittent, true) => Some(Violation::IntermittentCoreNetworkDependency),
                     _ => None,
                 };
                 assert_eq!(
