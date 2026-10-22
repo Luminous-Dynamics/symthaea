@@ -312,11 +312,12 @@ mod tests {
     }
 
     #[test]
-    fn test_pqc_session_key_derivation() {
+    fn legacy_pqc_derivation_succeeds_without_verified_classical_handshake_state() {
         let mut initiator = PqcHandshakeManager::new(test_config());
         let mut responder = PqcHandshakeManager::new(test_config());
 
-        let nonce = vec![0x42u8; 32]; // simulated classical handshake nonce
+        // Public context bytes: this test does not run or verify a classical handshake.
+        let nonce = vec![0x42u8; 32];
 
         // Initiator receives responder's KEM public key
         let responder_pk = responder.kem_public_key_bytes();
@@ -364,7 +365,7 @@ mod tests {
     }
 
     #[test]
-    fn test_classical_nonce_affects_session_key() {
+    fn test_public_challenge_context_affects_derived_session_key() {
         let mut initiator1 = PqcHandshakeManager::new(test_config());
         let mut initiator2 = PqcHandshakeManager::new(test_config());
         let responder = PqcHandshakeManager::new(test_config());
@@ -385,8 +386,37 @@ mod tests {
         let key2 = initiator2.session_key("peer-R").unwrap();
         assert_ne!(
             key1, key2,
-            "Different classical nonces must produce different session keys"
+            "Different public context inputs change the derived key; they do not add secret entropy"
         );
+    }
+
+    /// Known limitation witness: the same KEM ciphertext and public challenge
+    /// can be stored under two caller-provided peer IDs and yields the same key.
+    /// The caller must authenticate and transcript-bind the identity separately.
+    #[test]
+    fn legacy_pqc_session_derivation_does_not_bind_peer_id() {
+        let mut initiator = PqcHandshakeManager::new(test_config());
+        let mut responder = PqcHandshakeManager::new(test_config());
+        let public_challenge = vec![0x6Bu8; 32];
+
+        let responder_pk = responder.kem_public_key_bytes();
+        initiator.receive_kem_public_key("peer-A", &responder_pk);
+        let ciphertext = initiator
+            .encapsulate_for_peer("peer-A", &public_challenge)
+            .unwrap();
+        let expected = *initiator.session_key("peer-A").unwrap();
+
+        let key_as_peer_a = responder
+            .decapsulate_and_derive("peer-A", &ciphertext, &public_challenge)
+            .unwrap();
+        let key_as_peer_b = responder
+            .decapsulate_and_derive("peer-B", &ciphertext, &public_challenge)
+            .unwrap();
+
+        assert_eq!(expected, key_as_peer_a);
+        assert_eq!(key_as_peer_a, key_as_peer_b);
+        assert_eq!(responder.session_key("peer-A"), Some(&key_as_peer_a));
+        assert_eq!(responder.session_key("peer-B"), Some(&key_as_peer_b));
     }
 
     #[test]
@@ -446,23 +476,23 @@ mod tests {
     }
 
     #[test]
-    fn test_hkdf_derive_deterministic() {
+    fn test_blake3_derive_session_key_deterministic() {
         let nonce = vec![0x42u8; 32];
         let kem_secret = vec![0xABu8; 32];
 
-        let key1 = PqcHandshakeManager::hkdf_derive(&nonce, &kem_secret);
-        let key2 = PqcHandshakeManager::hkdf_derive(&nonce, &kem_secret);
+        let key1 = PqcHandshakeManager::blake3_derive_session_key(&nonce, &kem_secret);
+        let key2 = PqcHandshakeManager::blake3_derive_session_key(&nonce, &kem_secret);
         assert_eq!(key1, key2, "HKDF derivation must be deterministic");
     }
 
     #[test]
-    fn test_hkdf_derive_different_inputs() {
+    fn test_blake3_derive_session_key_different_inputs() {
         let nonce1 = vec![0x01u8; 32];
         let nonce2 = vec![0x02u8; 32];
         let kem_secret = vec![0xABu8; 32];
 
-        let key1 = PqcHandshakeManager::hkdf_derive(&nonce1, &kem_secret);
-        let key2 = PqcHandshakeManager::hkdf_derive(&nonce2, &kem_secret);
+        let key1 = PqcHandshakeManager::blake3_derive_session_key(&nonce1, &kem_secret);
+        let key2 = PqcHandshakeManager::blake3_derive_session_key(&nonce2, &kem_secret);
         assert_ne!(key1, key2, "Different inputs must produce different keys");
     }
 }
