@@ -856,8 +856,15 @@ mod tests {
 
         let mut repeated_training = training.clone();
         repeated_training[2] = repeated_training[0].clone();
+        let (model, calibrator) = fit_model_and_calibrator(&training, &calibration, 0.5);
         assert!(matches!(
-            create_manifest(&repeated_training, &calibration, &holdout, 0.5),
+            CastingSplitManifest::create(
+                &model,
+                &calibrator,
+                &repeated_training,
+                &calibration,
+                &holdout
+            ),
             Err(CastingEvidenceError::DuplicateObservationId { .. })
         ));
     }
