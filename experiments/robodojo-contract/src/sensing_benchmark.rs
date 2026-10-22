@@ -244,10 +244,10 @@ fn rate(numerator: usize, denominator: usize) -> f64 {
     if denominator == 0 { 0.0 } else { numerator as f64 / denominator as f64 }
 }
 
-fn find_arm<'a>(
-    cell: &'a BTreeMap<SensingArm, &'a SensingTrial>,
+fn find_arm<'a, 'b>(
+    cell: &'a BTreeMap<SensingArm, &'b SensingTrial>,
     arm: SensingArm,
-) -> Option<&'a SensingTrial> {
+) -> Option<&'b SensingTrial> {
     cell.get(&arm).copied()
 }
 
