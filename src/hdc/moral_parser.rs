@@ -371,7 +371,6 @@ impl MoralParser {
             consent_given_words: [
                 "gave consent",
                 "given consent",
-                "explicit consent",
                 "consented",
                 "said yes",
                 "gave permission",
@@ -414,6 +413,10 @@ impl MoralParser {
                 "didn't consent",
                 "does not consent",
                 "doesn't consent",
+                "did not agree",
+                "didn't agree",
+                "never agreed",
+                "never consented",
             ]
             .iter()
             .map(|s| s.to_string())
@@ -443,6 +446,23 @@ impl MoralParser {
                 "without permission",
                 "without consent",
                 "without explicit consent",
+                "without her permission",
+                "without their permission",
+                "without his permission",
+                "without their consent",
+                "did not give consent",
+                "didn't give consent",
+                "did not give explicit consent",
+                "didn't give explicit consent",
+                "not given consent",
+                "not explicitly authorized",
+                "not explicitly consented",
+                "not consented",
+                "never given consent",
+                "did not say yes",
+                "didn't say yes",
+                "not approved the request",
+                "did not approve the request",
                 "didn't ask",
                 "did not ask",
                 "never asked",
@@ -1772,6 +1792,10 @@ mod tests {
         // Explicit refusal is distinct from missing consent.
         let result = parser.parse("She refused consent, but I shared her health information");
         assert_eq!(result.consent, ConsentState::Denied);
+
+        // Negated mentions of consent must not turn into affirmative consent.
+        let result = parser.parse("I did not give explicit consent, so I should not proceed");
+        assert_eq!(result.consent, ConsentState::Absent);
 
         // Assumed consent is only inferred when assumption is actually stated.
         let result = parser.parse("I assumed my friend was okay with it");
