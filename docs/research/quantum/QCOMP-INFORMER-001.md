@@ -174,6 +174,12 @@ It emits per-trial records plus coverage, selective-error and baseline-accuracy 
 
 Follow the current [QOBLIB submission guide](https://github.com/ZIB-AOPT/QOBLIB/blob/main/CONTRIBUTING.md) exactly when submitting standardized results: it requires solver/source details and separates total, time-to-solution, CPU, GPU, and QPU runtime; the guide excludes hardware queue and compilation time from its runtime fields. To avoid underestimating practical value, produce an additional operational ledger alongside—not instead of—the QOBLIB-conforming numbers. In that ledger show preprocessing, compilation, calibration, data transfer, circuit execution, retries, postprocessing, cache invalidation, and independent verification. Report queue time separately; amortize reusable compilation/calibration only under a stated repeated-workload model. Never compare one method's standardized runtime against another's all-in elapsed wall time.
 
+### Physical measurement batches are not candidate observations
+
+[QCOMP-SHARED-OBSERVATION-001 / issue #8385](https://github.com/Luminous-Dynamics/symthaea/issues/8385) and [PR #8387](https://github.com/Luminous-Dynamics/symthaea/pull/8387) introduce a batch-level observation contract. One physical shot may update multiple candidate observables, so the experimental plan must keep physical execution shots, candidate observations, and end-to-end cost as separate axes. The first data model retains all outcomes from a shot together, counts a physical shot once, tracks pairwise co-inclusion counts, and charges batch setup only once. It does not decide which observables are jointly measurable or attest physical-device provenance; the caller must provide a correct basis/circuit context, execution profile, evidence class, and named cost model.
+
+This matters statistically as well as economically. The independent-Bernoulli arm simulator is a controlled policy test, not a model of the joint bitstring distribution from a QAOA circuit. Evaluate both independent-arm fixtures and joint-observation fixtures. Preserve dependence in raw sample vectors; do not reconstruct supposedly independent streams from a shared QPU bitstring. Compare sampling algorithms on both a declared candidate-observation budget and a declared physical-batch/total-cost budget. Hardware claims require raw result/receipt links and calibration/layout/compiler metadata.
+
 ### Reproducible policy harness and exact topology reuse
 
 The Rust implementation work is tracked in:
