@@ -68,7 +68,8 @@
             "UNCERTAINTY",
             "CONSENT",
             "AMBIGUITY",
-            "PRIVACY"
+            "PRIVACY",
+            "LONG_CONTEXT"
           ]
         },
         "risk_level": {
