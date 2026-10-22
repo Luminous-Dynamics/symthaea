@@ -774,7 +774,6 @@ mod tests {
     #[test]
     fn alarm_guard_blocks_only_after_alarm_or_confirmation() {
         let input = ProducerInput {
-            trial_id: 1,
             estimated_net_benefit: 2.0,
             reported_uncertainty: 0.1,
             declared_action_cost_units: Some(250),
