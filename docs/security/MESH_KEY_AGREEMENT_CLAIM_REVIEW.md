@@ -173,7 +173,7 @@ Before this branch's update, `pqc-handshake` did not imply the `swarm` transport
 - The non-swarm outbound and inbound stubs now have separate cfg branches: without PQC they retain the previous `LocalTrust` behavior; if PQC is ever configured without transport by future feature-graph changes, they return `FeatureNotEnabled` instead.
 - The feature guide documents both the transport dependency and that the linked KEM backend remains a compile-only stub.
 
-Acceptance requires a feature-matrix build for no features, `swarm`, `pqc-handshake`, and the full default-plus-PQC combination, plus a test that confirms no PQC-enabled configuration can select the `LocalTrust` stubs. These checks have not been run here.
+Acceptance requires a feature-matrix build for no features, `swarm`, `pqc-handshake`, and the full default-plus-PQC combination, plus `test_pqc_handshake_feature_requires_swarm_transport`, which asserts that any build with the PQC feature also has the swarm transport cfg. These checks have not been run here.
 
 ## Immediate disposition
 
