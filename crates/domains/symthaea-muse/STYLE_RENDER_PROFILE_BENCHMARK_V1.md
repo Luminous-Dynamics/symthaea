@@ -212,6 +212,36 @@ Targets for the first pilot (proposed, not existing results):
   positive/negative gesture tests, non-silence checks, and blinded human review.
   Do not count unavailable or untested notes as successful proficiency.
 
+## Blind-listening pack generation
+
+The companion example `blind_render_listening_pack` converts a complete renderer evidence manifest into an anonymous pilot pack. It does not modify audio: no gain normalization, decoding/re-encoding, loudness matching or mastering occurs during packaging. A separate controlled playback layer must handle presentation level and record any applied gain.
+
+Run from the workspace root after producing a complete `renderer_ab_fair` cohort:
+
+```sh
+export SYMTHAEA_BLIND_PACK_SEED="$(od -An -N32 -tx1 /dev/urandom | tr -d ' \n')"
+cargo run --release -p symthaea-muse --features theory --example blind_render_listening_pack -- \
+  audio_output/renderer-ab-fair-synth/renderer-ab-fair-manifest.json \
+  "$PWD" \
+  audio_output/listening-packs/pilot-001
+```
+
+The seed must be a 32-byte high-entropy secret encoded as 64 hexadecimal characters. The tool verifies the exact renderer schema and complete eight-style cohort, all four same-MIDI FluidSynth factorial arms per style/seed, each source WAV's RIFF/WAVE chunks, declared byte count and SHA-256, and shared sample rate within each block. It then copies WAV bytes unchanged and randomizes block / within-block order deterministically from the seed.
+
+Output separation is intentional:
+
+- `participant-pack/` contains anonymous WAV filenames, `ratings.csv`, listener instructions and a participant manifest. The form asks for target-style fit, overall quality and audible artifacts as distinct ratings. It does not expose treatment labels, original WAV paths, or source WAV digests.
+- `operator-only/answer-key.json` maps anonymous clips back to style, seed, treatment arm, original path and source hash. On Unix, the tool requests mode 0700 for this directory and 0600 for the key file. This is filesystem permission hardening, not encryption or a guarantee against privileged access. **Distribute only `participant-pack/`; never send the output root or operator-only key to participants.**
+
+Failure to verify any cell, WAV hash, byte count, sample rate, MIDI digest format, style coverage or factorial arm aborts pack creation instead of silently dropping the cell. The output status `ready_for_operator_review` only means a technically complete blind pack was assembled. The seed digest and output filenames do not validate listener randomization implementation independently; keep and audit the operator key.
+
+This tool supports—not replaces—a preregistered listening study. ITU-R BS.1116-3 is the current in-force reference for small audio impairments and BS.1534-3 (MUSHRA) for intermediate audio quality; this pilot pack generator does not claim compliance with either method:
+- https://www.itu.int/rec/R-REC-BS.1116
+- https://www.itu.int/rec/R-REC-BS.1534/en
+- EBU R 128 v5.0 recommends programme loudness and includes loudness range / maximum true-peak descriptors: https://tech.ebu.ch/publications/r128
+
+Before confirmatory collection, freeze playback equipment/level, break policy, prompt wording, eligibility/exclusion rules, primary endpoint, non-inferiority margin, randomization procedure and power/sample-size plan. Cluster uncertainty by listener for repeated ratings. Keep objective signal metrics, technical pass/fail, listener preference, style-fit and any claim of cultural authenticity separately reported.
+
 ## Next paradigm: compositional-control contract tests
 
 A style preset should become a **testable set of counterfactual promises**, not a
