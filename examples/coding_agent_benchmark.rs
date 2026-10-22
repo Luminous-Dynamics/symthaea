@@ -102,6 +102,23 @@ impl TaskResult {
         }
     }
 
+    /// Whether this task has an oracle and can be scored fairly.
+    ///
+    /// A compile failure is a legitimate task failure when an oracle was
+    /// specified. If compilation succeeds but the test runner does not execute
+    /// the full oracle, the attempt is unverified and excluded from the
+    /// correctness denominator.
+    fn is_assessed(&self) -> bool {
+        self.tests_expected > 0 && (!self.compiled || self.oracle_complete())
+    }
+
+    fn is_unverified(&self) -> bool {
+        matches!(
+            self.oracle_status(),
+            "missing_oracle" | "no_tests_executed" | "test_count_mismatch"
+        )
+    }
+
     /// Correctness requires compilation and a complete, passing test oracle.
     fn is_correct(&self) -> bool {
         self.compiled && self.oracle_complete() && self.tests_failed == 0
@@ -118,19 +135,23 @@ struct BenchStats {
     compiled: usize,
     auto_fix_attempts: usize,
     auto_fix_successes: usize,
-    // Level 3
+    // Level 3. Missing or incomplete oracles do not enter the assessed denominator.
     correct: usize,
+    assessed: usize,
     total_tests_passed: usize,
     total_tests_failed: usize,
     // By difficulty
     native_total: usize,
     native_correct: usize,
+    native_assessed: usize,
     native_compiled: usize,
     medium_total: usize,
     medium_correct: usize,
+    medium_assessed: usize,
     medium_compiled: usize,
     hard_total: usize,
     hard_correct: usize,
+    hard_assessed: usize,
     hard_compiled: usize,
     // Agent
     total_energy: f64,
@@ -1041,6 +1062,9 @@ fn compute_stats(results: &[TaskResult]) -> BenchStats {
         if r.compiled {
             stats.compiled += 1;
         }
+        if r.is_assessed() {
+            stats.assessed += 1;
+        }
         if r.is_correct() {
             stats.correct += 1;
         }
@@ -1066,6 +1090,9 @@ fn compute_stats(results: &[TaskResult]) -> BenchStats {
                 if r.compiled {
                     stats.native_compiled += 1;
                 }
+                if r.is_assessed() {
+                    stats.native_assessed += 1;
+                }
                 if r.is_correct() {
                     stats.native_correct += 1;
                 }
@@ -1075,6 +1102,9 @@ fn compute_stats(results: &[TaskResult]) -> BenchStats {
                 if r.compiled {
                     stats.medium_compiled += 1;
                 }
+                if r.is_assessed() {
+                    stats.medium_assessed += 1;
+                }
                 if r.is_correct() {
                     stats.medium_correct += 1;
                 }
@@ -1083,6 +1113,9 @@ fn compute_stats(results: &[TaskResult]) -> BenchStats {
                 stats.hard_total += 1;
                 if r.compiled {
                     stats.hard_compiled += 1;
+                }
+                if r.is_assessed() {
+                    stats.hard_assessed += 1;
                 }
                 if r.is_correct() {
                     stats.hard_correct += 1;
@@ -1111,11 +1144,17 @@ fn print_report(results: &[TaskResult], stats: &BenchStats) {
         stats.total,
         100.0 * stats.compiled as f64 / stats.total as f64
     );
+    let correctness_rate = if stats.assessed == 0 {
+        0.0
+    } else {
+        100.0 * stats.correct as f64 / stats.assessed as f64
+    };
     println!(
-        "  L3 Correct:      {}/{} ({:.0}%)",
+        "  L3 Correct:      {}/{} assessed ({:.1}%; {} tasks in suite)",
         stats.correct,
-        stats.total,
-        100.0 * stats.correct as f64 / stats.total as f64
+        stats.assessed,
+        correctness_rate,
+        stats.total
     );
     println!(
         "  Tests: {} passed, {} failed, {} expected",
@@ -1124,29 +1163,32 @@ fn print_report(results: &[TaskResult], stats: &BenchStats) {
         results.iter().map(|r| r.tests_expected).sum::<usize>()
     );
     let oracle_complete = results.iter().filter(|r| r.oracle_complete()).count();
-    let unverified = results.iter().filter(|r| {
-        !matches!(r.oracle_status(), "passed" | "failed")
-    }).count();
+    let unverified = results.iter().filter(|r| r.is_unverified()).count();
+    let missing_oracle = results
+        .iter()
+        .filter(|r| r.oracle_status() == "missing_oracle")
+        .count();
     println!(
-        "  Oracle coverage: {}/{} tasks fully executed; {} unverified",
+        "  Oracle coverage: {}/{} tasks fully executed; {} unverified; {} missing oracle",
         oracle_complete,
         results.len(),
-        unverified
+        unverified,
+        missing_oracle
     );
     println!();
 
     println!("── By Difficulty (L2 Compiled / L3 Correct) ─────────────");
     println!(
-        "  Native: {}/{} compiled, {}/{} correct",
-        stats.native_compiled, stats.native_total, stats.native_correct, stats.native_total
+        "  Native: {}/{} compiled, {}/{} assessed correct ({} task fixtures)",
+        stats.native_compiled, stats.native_total, stats.native_correct, stats.native_assessed, stats.native_total
     );
     println!(
-        "  Medium: {}/{} compiled, {}/{} correct",
-        stats.medium_compiled, stats.medium_total, stats.medium_correct, stats.medium_total
+        "  Medium: {}/{} compiled, {}/{} assessed correct ({} task fixtures)",
+        stats.medium_compiled, stats.medium_total, stats.medium_correct, stats.medium_assessed, stats.medium_total
     );
     println!(
-        "  Hard:   {}/{} compiled, {}/{} correct",
-        stats.hard_compiled, stats.hard_total, stats.hard_correct, stats.hard_total
+        "  Hard:   {}/{} compiled, {}/{} assessed correct ({} task fixtures)",
+        stats.hard_compiled, stats.hard_total, stats.hard_correct, stats.hard_assessed, stats.hard_total
     );
     println!();
 
@@ -1303,21 +1345,23 @@ fn main() {
             "name_match": stats.name_match,
             "compiled": stats.compiled,
             "correct": stats.correct,
-            "compilation_rate": stats.compiled as f64 / stats.total as f64,
-            "correctness_rate": stats.correct as f64 / stats.total as f64,
+            "compilation_rate": if stats.total == 0 { 0.0 } else { stats.compiled as f64 / stats.total as f64 },
+            "correctness_rate": if stats.assessed == 0 { 0.0 } else { stats.correct as f64 / stats.assessed as f64 },
+            "correctness_denominator": stats.assessed,
+            "assessed_tasks": stats.assessed,
+            "task_suite_size": stats.total,
             "tests_passed": stats.total_tests_passed,
             "tests_failed": stats.total_tests_failed,
             "tests_expected": results.iter().map(|r| r.tests_expected).sum::<usize>(),
             "oracle_complete_tasks": results.iter().filter(|r| r.oracle_complete()).count(),
-            "unverified_tasks": results.iter().filter(|r| {
-                !matches!(r.oracle_status(), "passed" | "failed")
-            }).count(),
+            "unverified_tasks": results.iter().filter(|r| r.is_unverified()).count(),
+            "missing_oracle_tasks": results.iter().filter(|r| r.oracle_status() == "missing_oracle").count(),
             "auto_fix_attempts": stats.auto_fix_attempts,
             "auto_fix_successes": stats.auto_fix_successes,
             "by_difficulty": {
-                "native": { "compiled": stats.native_compiled, "correct": stats.native_correct, "total": stats.native_total },
-                "medium": { "compiled": stats.medium_compiled, "correct": stats.medium_correct, "total": stats.medium_total },
-                "hard":   { "compiled": stats.hard_compiled,   "correct": stats.hard_correct,   "total": stats.hard_total },
+                "native": { "compiled": stats.native_compiled, "correct": stats.native_correct, "assessed": stats.native_assessed, "total": stats.native_total },
+                "medium": { "compiled": stats.medium_compiled, "correct": stats.medium_correct, "assessed": stats.medium_assessed, "total": stats.medium_total },
+                "hard":   { "compiled": stats.hard_compiled,   "correct": stats.hard_correct,   "assessed": stats.hard_assessed,   "total": stats.hard_total },
             }
         },
         "tasks": json_results,
@@ -1396,7 +1440,30 @@ mod oracle_integrity_tests {
     #[test]
     fn complete_failing_oracle_is_not_correct() {
         let r = result(3, 2, 1, true);
+        assert!(r.is_assessed());
         assert!(!r.is_correct());
         assert_eq!(r.oracle_status(), "failed");
+    }
+
+    #[test]
+    fn compile_failure_with_oracle_is_assessed_as_failure() {
+        let r = result(3, 0, 0, false);
+        assert!(r.is_assessed());
+        assert!(!r.is_correct());
+        assert_eq!(r.oracle_status(), "not_run_compile_failure");
+    }
+
+    #[test]
+    fn incomplete_oracle_run_is_unverified_not_scored() {
+        let r = result(3, 2, 0, true);
+        assert!(!r.is_assessed());
+        assert!(r.is_unverified());
+    }
+
+    #[test]
+    fn missing_oracle_is_unverified_not_scored() {
+        let r = result(0, 0, 0, true);
+        assert!(!r.is_assessed());
+        assert!(r.is_unverified());
     }
 }
