@@ -282,6 +282,144 @@ jobs:
 
           print("PITB_MUTATION_QUALIFICATION_NEGATIVE_CONTROLS_PASS: 6 malformed qualification controls rejected")
           PY
+      - name: Validate fixed-theorem proof-state intervention suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/jsonschema-venv/bin/python" - <<'PY'
+          import copy
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator, FormatChecker, ValidationError
+
+          root = Path("data/benchmarks/proof-insight-transfer-v0")
+          schema = json.loads((root / "proof-state-intervention-suite.schema.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          validator = Draft202012Validator(schema, format_checker=FormatChecker())
+          fixture = json.loads((root / "fixtures/proof-state-intervention-suite.synthetic.json").read_text())
+
+          def reject(condition, message):
+              if condition:
+                  raise ValueError(message)
+
+          expected_operations = {
+              "required_hypothesis_cleared": ("clear_local_decl", "required_precondition", False),
+              "hypothesis_alpha_renamed": ("rename_local_decl", "required_precondition", True),
+              "irrelevant_declaration_removed": ("remove_irrelevant_decl", "irrelevant", False),
+              "independent_declarations_reordered": ("reorder_independent_decls", "irrelevant", True),
+          }
+
+          def validate_suite(value):
+              validator.validate(value)
+              reject(value["schema_version"] != "pitb.proof-state-intervention-suite.v0", "unsupported proof-state intervention version")
+              cases = value["cases"]
+              case_ids = [c["case_id"] for c in cases]
+              pair_ids = [c["pair_id"] for c in cases]
+              outcome_ids = [
+                  x for c in cases for x in (
+                      c["outcome_links"]["base_outcome_id"],
+                      c["outcome_links"]["variant_outcome_id"],
+                  )
+              ]
+              reject(len(case_ids) != len(set(case_ids)), "duplicate intervention case IDs")
+              reject(len(pair_ids) != len(set(pair_ids)), "duplicate intervention pair IDs")
+              reject(len(outcome_ids) != len(set(outcome_ids)), "duplicate outcome joins")
+
+              family_splits, component_splits = {}, {}
+              for case in cases:
+                  split = case["split"]
+                  target = case["target"]
+                  source = case["source_insight"]
+                  for family in (source["family_id"], target["family_id"]):
+                      previous = family_splits.setdefault(family, split)
+                      reject(previous != split, f"family leakage across split: {family}")
+                  previous = component_splits.setdefault(case["component_id"], split)
+                  reject(previous != split, f"component leakage across split: {case['component_id']}")
+
+                  base, variant = case["base_state"], case["variant_state"]
+                  for field in ("source_commit", "statement_sha256", "goal_type_sha256", "environment_sha256", "lean_toolchain"):
+                      reject(base[field] != variant[field], f"paired states drift on {field}")
+                      reject(target[field] != base[field], f"target/base binding drift on {field}")
+                  reject(base["snapshot_id"] == variant["snapshot_id"], "base and variant snapshot IDs must differ")
+                  reject(base["snapshot_sha256"] == variant["snapshot_sha256"], "an intervention must yield distinct snapshots")
+                  reject(base["replay_receipt_sha256"] == variant["replay_receipt_sha256"], "state replay receipts must bind separately")
+                  reject(base["local_context_sha256"] == variant["local_context_sha256"], "intervention did not change the local context digest")
+                  reject(base["goal_count"] != variant["goal_count"], "proof-state intervention changed the number of goals")
+
+                  intervention = case["intervention"]
+                  kind, operation, role, must_remain = (
+                      intervention["kind"],
+                      intervention["operation"],
+                      expected_operations[intervention["kind"]][1],
+                      expected_operations[intervention["kind"]][2],
+                  ) if intervention["kind"] in expected_operations else (None, None, None, None)
+                  reject(kind is None, "unregistered intervention kind")
+                  reject(intervention["operation"] != expected_operations[kind][0], "operation does not match intervention kind")
+                  reject(intervention["single_factor"] is not True, "intervention is not single-factor")
+                  before, after = intervention["before_declaration"], intervention["after_declaration"]
+                  reject(before["stable_key"] != after["stable_key"], "changed declaration identity across paired state")
+                  reject(before["role"] != role or after["role"] != role, "declaration role conflicts with intervention kind")
+                  reject(before["present"] is not True, "intervention's original declaration was absent")
+                  if kind in {"required_hypothesis_cleared", "irrelevant_declaration_removed"}:
+                      reject(after["present"] is not False or after["type_sha256"] is not None or after["user_name"] is not None or after["position"] is not None, "removed declaration remains present in variant")
+                      reject(before["type_sha256"] is None or before["user_name"] is None or before["position"] is None, "original declaration lacks type/name/position evidence")
+                  elif kind == "hypothesis_alpha_renamed":
+                      reject(after["present"] is not True or after["type_sha256"] != before["type_sha256"], "alpha-renaming must preserve declaration type and presence")
+                      reject(after["user_name"] == before["user_name"] or after["user_name"] is None, "alpha-renaming must change the displayed name")
+                      reject(after["position"] != before["position"], "alpha-renaming must preserve position")
+                  elif kind == "independent_declarations_reordered":
+                      reject(after["present"] is not True or after["type_sha256"] != before["type_sha256"] or after["user_name"] != before["user_name"], "reordering must preserve declaration identity/type")
+                      reject(after["position"] == before["position"], "reordering must change the declaration position")
+
+                  contract = case["contract"]
+                  policy = contract["expected_action_policy"]
+                  if kind == "required_hypothesis_cleared":
+                      reject(contract["base_precondition_status"] != "available" or contract["variant_precondition_status"] != "absent", "cleared prerequisite status is inconsistent")
+                      reject(policy != "move_forbidden_or_replan", "missing prerequisite must withdraw this move or trigger replanning")
+                  else:
+                      reject(contract["base_precondition_status"] != "available" or contract["variant_precondition_status"] != "available", "surface-only or irrelevant context change must preserve the prerequisite")
+                      reject(policy != "preserve_eligibility", "surface-only or irrelevant context change must preserve eligibility")
+
+                  adjudication = case["adjudication"]
+                  reviewers = adjudication["reviewers"]
+                  reviewer_ids = [r["reviewer_id"] for r in reviewers]
+                  reject(len(reviewer_ids) != len(set(reviewer_ids)), "duplicate reviewer identity")
+                  reject(adjudication["status"] == "adjudicated" and len(reviewers) < 2, "adjudicated state pair requires two reviewers")
+                  if adjudication["status"] == "adjudicated":
+                      for reviewer in reviewers:
+                          reject(reviewer["base_precondition_status"] != contract["base_precondition_status"], "reviewer/base precondition disagreement")
+                          reject(reviewer["variant_precondition_status"] != contract["variant_precondition_status"], "reviewer/variant precondition disagreement")
+                          reject(reviewer["expected_action_policy"] != policy, "reviewer/action-policy disagreement")
+                  links = case["outcome_links"]
+                  reject(links["base_outcome_id"] == links["variant_outcome_id"], "base and variant outcome IDs must be unique")
+                  if value["dataset_kind"] == "synthetic_fixture":
+                      reject(links["status"] != "not_run", "synthetic fixture cannot claim linked executed outcomes")
+
+          validate_suite(fixture)
+          if len(fixture["cases"]) < 4:
+              raise SystemExit("fixture must cover required-removal, alpha-renaming, irrelevant-removal and reordering")
+
+          def expect_reject(mutant, label):
+              try:
+                  validate_suite(mutant)
+              except (ValidationError, ValueError):
+                  return
+              raise SystemExit(f"proof-state negative control unexpectedly accepted: {label}")
+
+          mutants = []
+          m = copy.deepcopy(fixture); m["cases"][0]["variant_state"]["statement_sha256"] = "f" * 64; mutants.append((m, "theorem statement drift"))
+          m = copy.deepcopy(fixture); m["cases"][0]["variant_state"]["goal_type_sha256"] = "f" * 64; mutants.append((m, "goal type drift"))
+          m = copy.deepcopy(fixture); m["cases"][0]["variant_state"]["environment_sha256"] = "f" * 64; mutants.append((m, "environment drift"))
+          m = copy.deepcopy(fixture); m["cases"][0]["intervention"]["operation"] = "rename_local_decl"; mutants.append((m, "wrong state operation"))
+          m = copy.deepcopy(fixture); m["cases"][0]["contract"]["variant_precondition_status"] = "available"; mutants.append((m, "cleared precondition still available"))
+          m = copy.deepcopy(fixture); m["cases"][1]["variant_state"]["local_context_sha256"] = m["cases"][1]["base_state"]["local_context_sha256"]; mutants.append((m, "no context change receipt"))
+          m = copy.deepcopy(fixture); m["cases"][2]["contract"]["expected_action_policy"] = "move_forbidden_or_replan"; mutants.append((m, "overreacting to irrelevant fact removal"))
+          m = copy.deepcopy(fixture); m["cases"][0]["outcome_links"]["variant_outcome_id"] = m["cases"][0]["outcome_links"]["base_outcome_id"]; mutants.append((m, "duplicate outcome join"))
+          m = copy.deepcopy(fixture); m["cases"][3]["adjudication"]["reviewers"][1]["reviewer_id"] = m["cases"][3]["adjudication"]["reviewers"][0]["reviewer_id"]; mutants.append((m, "duplicate reviewer"))
+          for mutant, label in mutants:
+              expect_reject(mutant, label)
+          print(f"PITB_PROOF_STATE_INTERVENTION_SCHEMA_PASS: {len(fixture['cases'])} synthetic pairs; {len(mutants)}/{len(mutants)} negative controls rejected")
+          PY
       - name: Validate insight schema and synthetic positive/negative controls
         shell: bash
         run: |
