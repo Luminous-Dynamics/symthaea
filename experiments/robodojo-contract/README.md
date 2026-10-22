@@ -74,6 +74,9 @@ Compare a pinned baseline and candidate within each pre-registered perturbation 
 cargo run --locked --manifest-path experiments/robodojo-contract/Cargo.toml -- --shift-audit \
   experiments/robodojo-contract/examples/synthetic_trials.tsv \
   experiments/robodojo-contract/examples/synthetic_shift_plan.tsv baseline symthaea_sidecar
+
+cargo run --locked --manifest-path experiments/robodojo-contract/Cargo.toml -- --sensing-audit \
+  experiments/robodojo-contract/examples/synthetic_sensing_trials.tsv
 ~~~
 
 The exact shift-plan header is:
@@ -87,3 +90,23 @@ Fields are tab-separated. Each task/trial pair has one manifest assignment share
 The audit rejects duplicate manifest keys, malformed digests, unmatched or missing rows, unpaired trials, and unexpected variants. Results are kept separate by family, severity, and exact spec digest. They include paired progress deltas/intervals where sample size permits, completion and valid-run deltas, runtime/cost, safety events, and operational failure-class deltas. Sparse strata emit NA intervals rather than implying precision.
 
 The shift-plan fixture is synthetic test data, not an RC benchmark result. Physical evaluation must preserve the canonical configuration payload beside its digest, measure realized perturbations where possible, retain unsuccessful attempts, and pre-register conditions and stopping rules.
+
+## Active-sensing benchmark ledger
+
+Run `--sensing-audit experiments/robodojo-contract/examples/synthetic_sensing_trials.tsv [BOOTSTRAPS] [SEED]` to compare these preregistered arms using matched scenario/seed/evidence cells:
+
+- `no_extra_sensing`
+- `fixed_rate`
+- `uncertainty_triggered`
+- `value_of_information`
+- `placebo_cost`
+
+The exact tab-separated header is:
+
+~~~text
+scenario_id scenario_family task_id trial_id seed split evidence_class arm progress valid_run completed safety_violation safety_event_count sensor_requests sensor_acquisitions sensing_energy_j sensing_latency_ms total_energy_j elapsed_ms predicted_success_probability
+~~~
+
+The fields are tab-separated, in the exact order above. Numeric measurements may use `NA` only when unmeasured; the audit leaves them missing rather than treating them as zero. Every scenario/seed/split/evidence group must contain exactly one row for all five arms. Progress and completion must agree; acquisitions cannot exceed requests; probabilities and measurements are validated for finite ranges. Any declared safety violation produces a failed qualification result but remains in the printed ledger.
+
+The audit prints per-arm valid-run/completion/progress/calibration/resource metrics and paired candidate-minus-fixed-rate comparisons. Progress uncertainty is bootstrapped by scenario family, not individual rows. Fewer than five families or fewer than 100 replicates suppresses the interval; this is a screening limitation, not evidence of equivalence. The included 30-row example is synthetic arithmetic smoke data only. It demonstrates parsing, pairing, missing-cost handling and report formatting; it is not a RoboDojo score.
