@@ -1148,6 +1148,153 @@ jobs:
 
           print("PITB_PROOF_PROGRESS_TRACE_PASS: schema valid; obligation lineage; monotonic budgeted trace; terminal evidence gate; 2 receipt-backed closures; 11 negative controls rejected")
           PY
+      - name: Validate counterfactual precondition suite and paired-review controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/jsonschema-venv/bin/python" - <<'PY'
+          import copy
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator, FormatChecker, ValidationError
+
+          base = Path("data/benchmarks/proof-insight-transfer-v0")
+          schema = json.loads((base / "counterfactual-precondition-suite.schema.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          validator = Draft202012Validator(schema, format_checker=FormatChecker())
+          fixture = json.loads((base / "fixtures/counterfactual-precondition-suite.synthetic.json").read_text())
+
+          def validate_suite(suite):
+              validator.validate(suite)
+              pairs = suite["pairs"]
+              if len({pair["pair_id"] for pair in pairs}) != len(pairs):
+                  raise ValueError("pair IDs must be unique")
+              insight_splits = {}
+              family_components = {}
+              family_splits = {}
+              for pair in pairs:
+                  pair_id = pair["pair_id"]
+                  src = pair["source_insight"]
+                  tgt = pair["target"]
+                  mutation = pair["mutation"]
+                  base_sha = tgt["base_statement_sha256"]
+                  variant_sha = tgt["counterfactual_statement_sha256"]
+                  if base_sha == variant_sha:
+                      raise ValueError(f"{pair_id}: target statement digests must identify distinct byte-level variants")
+                  if mutation["semantic_change"] == "none":
+                      if mutation["before_fragment_sha256"] != mutation["after_fragment_sha256"]:
+                          raise ValueError(f"{pair_id}: semantics-preserving control changed its declared fragment")
+                      if mutation["kind"] != "no_semantic_change":
+                          raise ValueError(f"{pair_id}: mutation kind/semantic-change mismatch")
+                  else:
+                      if mutation["before_fragment_sha256"] == mutation["after_fragment_sha256"]:
+                          raise ValueError(f"{pair_id}: changed mutation must identify distinct before/after fragments")
+                      if mutation["kind"] == "no_semantic_change":
+                          raise ValueError(f"{pair_id}: no-op mutation cannot claim semantic change")
+                  if src["insight_sha256"] == "0" * 64:
+                      raise ValueError(f"{pair_id}: synthetic/real source digest cannot be the all-zero placeholder")
+                  for adjudication_name in ("base_adjudication", "counterfactual_adjudication"):
+                      adjudication = pair[adjudication_name]
+                      reviewers = adjudication["reviewer_decisions"]
+                      ids = [reviewer["reviewer_id"] for reviewer in reviewers]
+                      if len(ids) != len(set(ids)):
+                          raise ValueError(f"{pair_id}: duplicate reviewer IDs")
+                      if adjudication["status"] == "adjudicated":
+                          if adjudication["label"] == "unknown" or len(ids) < 2:
+                              raise ValueError(f"{pair_id}: adjudicated labels require at least two reviewers and known label")
+                          if any(reviewer["label"] != adjudication["label"] for reviewer in reviewers):
+                              raise ValueError(f"{pair_id}: reviewer labels disagree with adjudication")
+                      elif adjudication["label"] != "unknown":
+                          raise ValueError(f"{pair_id}: pending/unresolved label must remain unknown")
+                  base_reviewers = {x["reviewer_id"] for x in pair["base_adjudication"]["reviewer_decisions"]}
+                  variant_reviewers = {x["reviewer_id"] for x in pair["counterfactual_adjudication"]["reviewer_decisions"]}
+                  if pair["base_adjudication"]["status"] == "adjudicated" and pair["counterfactual_adjudication"]["status"] == "adjudicated" and base_reviewers != variant_reviewers:
+                      raise ValueError(f"{pair_id}: both sides of a paired contrast must share the same independent reviewers")
+                  for family in (src["family_id"], tgt["family_id"]):
+                      prev_component = family_components.setdefault(family, pair["component_id"])
+                      if prev_component != pair["component_id"]:
+                          raise ValueError(f"family {family} appears in multiple pair-graph components")
+                      prev_split = family_splits.setdefault(family, pair["split"])
+                      if prev_split != pair["split"]:
+                          raise ValueError(f"family {family} crosses dataset splits")
+                  prev_insight_split = insight_splits.setdefault(src["record_id"], pair["split"])
+                  if prev_insight_split != pair["split"]:
+                      raise ValueError(f"source insight {src['record_id']} crosses dataset splits")
+              if suite["dataset_kind"] == "synthetic_fixture":
+                  for pair in pairs:
+                      if pair["base_adjudication"]["label"] != "compatible":
+                          raise ValueError("synthetic counterfactual base must be the compatible control")
+                      expected = "compatible" if pair["mutation"]["kind"] == "no_semantic_change" else "incompatible"
+                      if pair["counterfactual_adjudication"]["label"] != expected:
+                          raise ValueError(f"{pair['pair_id']}: synthetic expected counterfactual label {expected}")
+              return len(pairs)
+
+          count = validate_suite(fixture)
+          if count != 7:
+              raise SystemExit(f"expected 7 synthetic counterfactual pairs; found {count}")
+
+          mutants = []
+          duplicate_pair = copy.deepcopy(fixture)
+          duplicate_pair["pairs"][1]["pair_id"] = duplicate_pair["pairs"][0]["pair_id"]
+          mutants.append(duplicate_pair)
+
+          identical_statement = copy.deepcopy(fixture)
+          identical_statement["pairs"][1]["target"]["counterfactual_statement_sha256"] = identical_statement["pairs"][1]["target"]["base_statement_sha256"]
+          mutants.append(identical_statement)
+
+          changed_noop = copy.deepcopy(fixture)
+          changed_noop["pairs"][0]["mutation"]["after_fragment_sha256"] = "f" * 64
+          mutants.append(changed_noop)
+
+          unchanged_change = copy.deepcopy(fixture)
+          unchanged_change["pairs"][1]["mutation"]["after_fragment_sha256"] = unchanged_change["pairs"][1]["mutation"]["before_fragment_sha256"]
+          mutants.append(unchanged_change)
+
+          single_reviewer = copy.deepcopy(fixture)
+          single_reviewer["pairs"][1]["counterfactual_adjudication"]["reviewer_decisions"].pop()
+          mutants.append(single_reviewer)
+
+          duplicate_reviewer = copy.deepcopy(fixture)
+          duplicate_reviewer["pairs"][1]["base_adjudication"]["reviewer_decisions"][1]["reviewer_id"] = "reviewer-a"
+          mutants.append(duplicate_reviewer)
+
+          reviewer_disagreement = copy.deepcopy(fixture)
+          reviewer_disagreement["pairs"][1]["counterfactual_adjudication"]["reviewer_decisions"][1]["label"] = "compatible"
+          mutants.append(reviewer_disagreement)
+
+          invalid_base = copy.deepcopy(fixture)
+          invalid_base["pairs"][1]["base_adjudication"]["label"] = "incompatible"
+          mutants.append(invalid_base)
+
+          wrong_noop_label = copy.deepcopy(fixture)
+          wrong_noop_label["pairs"][0]["counterfactual_adjudication"]["label"] = "incompatible"
+          wrong_noop_label["pairs"][0]["counterfactual_adjudication"]["reviewer_decisions"] = [
+              dict(r, label="incompatible") for r in wrong_noop_label["pairs"][0]["counterfactual_adjudication"]["reviewer_decisions"]
+          ]
+          mutants.append(wrong_noop_label)
+
+          cross_split_family = copy.deepcopy(fixture)
+          cross_split_family["pairs"][1]["source_insight"]["family_id"] = cross_split_family["pairs"][0]["source_insight"]["family_id"]
+          cross_split_family["pairs"][1]["split"] = "test"
+          mutants.append(cross_split_family)
+
+          cross_component_family = copy.deepcopy(fixture)
+          cross_component_family["pairs"][1]["source_insight"]["family_id"] = cross_component_family["pairs"][0]["source_insight"]["family_id"]
+          mutants.append(cross_component_family)
+
+          pending_with_label = copy.deepcopy(fixture)
+          pending_with_label["pairs"][1]["counterfactual_adjudication"]["status"] = "pending"
+          mutants.append(pending_with_label)
+
+          for index, mutant in enumerate(mutants, start=1):
+              try:
+                  validate_suite(mutant)
+              except (ValidationError, ValueError):
+                  continue
+              raise SystemExit(f"counterfactual suite negative control {index} unexpectedly passed")
+
+          print("PITB_COUNTERFACTUAL_SUITE_PASS: 7 synthetic pairs validated; paired reviewers and split/component integrity enforced; 12 negative controls rejected")
+          PY
       - name: Audit pinned Dalek Lean Bench timeline
         shell: bash
         run: |
