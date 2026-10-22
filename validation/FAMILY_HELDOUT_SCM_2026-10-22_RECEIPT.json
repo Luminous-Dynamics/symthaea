@@ -6,13 +6,13 @@
   "branch": "research/entropy-causal-cut-benchmark-v1",
   "source": {
     "path": "validation/family_heldout_scm_benchmark.py",
-    "git_blob": "36b6c75a0f00a3056ddaf282a2f0b2008eb97621"
+    "git_blob": "48f7a9e1e6b25ec9be7e8f90f10f1bfa3418b94f"
   },
   "tests": {
     "path": "validation/test_family_heldout_scm_benchmark.py",
-    "git_blob": "f9e8fb471f446d718477244b44ea05610fe4952b",
-    "count": 9,
-    "result": "9/9_PASS_LOCAL"
+    "git_blob": "5cd2c2d7adc3caa78f6bc87b9903f35b2525c7c3",
+    "count": 11,
+    "result": "11/11_PASS_LOCAL"
   },
   "run": {
     "command": "python3 validation/family_heldout_scm_benchmark.py --nodes 6 --cases-per-cell 4 --output family_heldout_scm_suite.json",
@@ -29,25 +29,32 @@
     },
     "embedded_self_test": "PASS_LOCAL",
     "artifact_bytes": 31607,
-    "artifact_sha256": "aeb54c62299144e28013be786d9311f0b8e6d92c2d95bf749f514419dd0f9117"
+    "artifact_sha256": "aeb54c62299144e28013be786d9311f0b8e6d92c2d95bf749f514419dd0f9117",
+    "layered_score_covered": true
   },
   "scoring": {
     "metrics": [
       "skeleton precision/recall/F1",
+      "compelled-direction precision/recall/F1",
       "directed-edge precision/recall/F1",
-      "SHD",
-      "orientation reversals",
-      "edge-count delta"
+      "DAG SHD",
+      "orientation reversals/unresolved adjacencies",
+      "intervention counts and count-to-minimum ratio"
     ],
-    "shd_convention": "missing/extra adjacency = 1; reversed common adjacency = 1",
-    "scope": "fully directed graph predictions; not yet ACDB's full scoring/API contract"
+    "shd_convention": "missing/extra adjacency = 1; reversed common adjacency = 1; unresolved true adjacency = 1",
+    "scope": "ACDB-inspired layered mixed-graph scorer; not yet exact ACDB parity",
+    "caveats": [
+      "Caller supplies true CPDAG compelled arrows and minimum intervention count",
+      "Official ACDB efficiency scalar and SHD parity not verified"
+    ]
   },
   "limitations": [
     "Ground-truth generator only; no causal discovery method evaluated",
     "Boolean SCMs and finite fixed graph/mechanism family catalog",
     "No sample simulator, latent confounding, intervention failure, or statistical intervals",
     "No direct ACDB/CausalArena/CauScale comparison",
-    "Local test receipt is not a GitHub Actions result; skipped is not pass"
+    "Local test receipt is not a GitHub Actions result; skipped is not pass",
+    "Layered scoring requires externally provided CPDAG compelled arrows and minimum intervention set; exact ACDB parity remains unverified."
   ],
   "next_gate": "Build observation/intervention simulator and contract-matched ACDB scoring adapter; then evaluate family-held-out baselines."
 }
