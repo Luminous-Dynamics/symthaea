@@ -1,7 +1,7 @@
 import math
 import unittest
 from causal_probe_pareto_benchmark import (
-    fixtures, js_divergence, action_components, enumerate_policy_paths,
+    fixtures, js_divergence, distribution_mixture, action_components, enumerate_policy_paths,
     score_policy, run, self_test,
 )
 from intervention_reliability_audit import outcome_distribution
@@ -27,6 +27,18 @@ class CausalProbeParetoTests(unittest.TestCase):
         eig, jsd = action_components(self.models, (0.5, 0.5), self.refs, self.actions[0], 0.1, 1.0)
         self.assertGreaterEqual(eig, 0.0)
         self.assertTrue(0.0 <= jsd <= 1.0)
+
+    def test_reference_bank_weights_cover_every_model(self):
+        expanded = (*self.refs, *self.models)
+        action = self.actions[1]
+        narrow = distribution_mixture(self.refs, [1.0] * len(self.refs), action, 0.1, 1.0)
+        broad = distribution_mixture(expanded, [1.0] * len(expanded), action, 0.1, 1.0)
+        self.assertAlmostEqual(sum(narrow.values()), 1.0, places=12)
+        self.assertAlmostEqual(sum(broad.values()), 1.0, places=12)
+        self.assertTrue(any(abs(narrow.get(y, 0.0) - broad.get(y, 0.0)) > 1e-8
+                            for y in set(narrow) | set(broad)))
+        with self.assertRaises(ValueError):
+            distribution_mixture(expanded, [1.0] * 2, action, 0.1, 1.0)
 
     def test_policy_path_mass_normalizes(self):
         terms = enumerate_policy_paths(self.models, self.ood_test, self.refs, self.actions,
