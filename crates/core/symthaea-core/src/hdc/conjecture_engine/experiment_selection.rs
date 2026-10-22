@@ -391,13 +391,14 @@ pub fn expected_information_gain_worst_case_nats<H, E>(
 
 /// Select the experiment maximizing worst-case expected information gain per cost.
 ///
-/// Each candidate is evaluated at every supplied observation-noise scale; its
-/// score is the minimum of those gains divided by positive finite cost. This is
-/// conservative only with respect to the caller-provided finite scenario set.
-/// It does not replace discrepancy audits, posterior calibration, safety
-/// constraints, or out-of-model hypothesis checks. Invalid scenario sets are
-/// rejected before ranking; candidates with invalid predictions or costs are
-/// skipped. Deterministic input-order tie-breaking is preserved.
+/// Each candidate is scored at the largest supplied observation-noise scale;
+/// under the shared additive Gaussian-noise model, this realizes the exact
+/// information-gain minimum across the finite set by data-processing monotonicity.
+/// The score is divided by positive finite cost. This is conservative only with
+/// respect to the caller-provided noise scales. It does not replace discrepancy
+/// audits, posterior calibration, safety constraints, or out-of-model hypothesis
+/// checks. Invalid scenario sets are rejected before ranking; candidates with
+/// invalid predictions or costs are skipped. Input-order tie-breaking is stable.
 pub fn select_experiment_by_worst_case_information_gain_per_cost<'a, H, E>(
     candidates: &'a [E],
     hypotheses: &[H],
