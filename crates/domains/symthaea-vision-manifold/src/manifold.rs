@@ -2061,6 +2061,35 @@ impl VisionManifold {
         coherent
     }
 
+    /// Measure mean local transition coherence across a latent trajectory.
+    ///
+    /// This uses the same geometric proxy as `enforce_sheaf_coherence` so the
+    /// reported metric describes what the path validator actually checks.
+    /// It measures latent-state continuity, not semantic correctness,
+    /// predictive accuracy, or subjective experience. A score is unavailable
+    /// for paths with fewer than two states or any non-finite transition score.
+    pub fn measure_path_coherence(&self, path: &[ContinuousHV]) -> Option<f32> {
+        if path.len() < 2 {
+            return None;
+        }
+
+        let mut total = 0.0f32;
+        for pair in path.windows(2) {
+            // Similarity requires dimension equality; reject malformed paths
+            // rather than letting a public measurement API panic.
+            if pair[0].dim() != pair[1].dim() {
+                return None;
+            }
+            let score = self.compute_local_coherence(&pair[0], &pair[1]);
+            if !score.is_finite() {
+                return None;
+            }
+            total += score;
+        }
+
+        Some((total / (path.len() - 1) as f32).clamp(0.0, 1.0))
+    }
+
     fn compute_local_coherence(&self, a: &ContinuousHV, b: &ContinuousHV) -> f32 {
         // Use semantic similarity + binding strength as a proxy for sheaf consistency.
         let sim = a.similarity(b);
@@ -11003,4 +11032,56 @@ mod tests {
         invalid.modality_contexts[0].next_track_id = 0;
         assert!(restored.validate_checkpoint_state(&invalid).is_err());
     }
+
+    #[test]
+    fn path_coherence_is_unavailable_without_a_transition() {
+        let manifold = test_manifold();
+        let state = ContinuousHV::random(manifold.hdc_dim(), 0xC0DE_0001);
+
+        assert_eq!(manifold.measure_path_coherence(&[]), None);
+        assert_eq!(manifold.measure_path_coherence(std::slice::from_ref(&state)), None);
+    }
+
+    #[test]
+    fn path_coherence_fails_closed_on_mismatched_dimensions() {
+        let manifold = test_manifold();
+        let a = ContinuousHV::random(8, 0xC0DE_0010);
+        let b = ContinuousHV::random(9, 0xC0DE_0011);
+
+        assert_eq!(manifold.measure_path_coherence(&[a, b]), None);
+    }
+
+    #[test]
+    fn path_coherence_fails_closed_on_non_finite_transition_scores() {
+        let manifold = test_manifold();
+        let a = ContinuousHV::random(8, 0xC0DE_0012);
+        let mut b = ContinuousHV::random(8, 0xC0DE_0013);
+        b.values[0] = f32::NAN;
+
+        assert_eq!(manifold.measure_path_coherence(&[a, b]), None);
+    }
+
+    #[test]
+    fn path_coherence_is_the_mean_of_local_transition_scores() {
+        let manifold = test_manifold();
+        let a = ContinuousHV::random(manifold.hdc_dim(), 0xC0DE_0002);
+        let b = ContinuousHV::random(manifold.hdc_dim(), 0xC0DE_0003);
+        let c = ContinuousHV::random(manifold.hdc_dim(), 0xC0DE_0004);
+        let path = [a.clone(), b.clone(), c.clone()];
+
+        let expected = (manifold.compute_local_coherence(&a, &b)
+            + manifold.compute_local_coherence(&b, &c))
+            / 2.0;
+        let actual = manifold
+            .measure_path_coherence(&path)
+            .expect("a two-transition path must be measurable");
+
+        assert!(actual.is_finite());
+        assert!((0.0..=1.0).contains(&actual));
+        assert!(
+            (actual - expected).abs() <= f32::EPSILON,
+            "reported score {actual} must equal the mean local score {expected}"
+        );
+    }
+
 }
