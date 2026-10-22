@@ -288,9 +288,12 @@ impl CfcMoralClassifier {
             MoralIntent::Bad => -1.0,
             MoralIntent::Neutral | MoralIntent::Unknown => 0.0,
         });
+        // Missing consent evidence is neutral, not a half-positive implication.
+        // This feature is a classifier input, not an authorization decision.
         features.push(match parsed.consent {
             ConsentState::Given => 1.0f32,
             ConsentState::Implied => 0.5,
+            ConsentState::Unknown => 0.0,
             ConsentState::Absent => -0.5,
             ConsentState::Denied => -1.0,
         });
