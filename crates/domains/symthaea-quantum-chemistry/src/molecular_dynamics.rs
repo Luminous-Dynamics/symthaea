@@ -7,19 +7,19 @@
 //! using Velocity-Verlet integration. Forces are computed from finite-difference
 //! gradients of the quantum chemical energy.
 //!
-//! ## Status (Phase Q0, 2026-07-16): initial conditions are not real thermal sampling
+//! ## Initialization and current qualification limits
 //!
-//! Initial velocities are drawn from a **uniform**, not Gaussian, distribution
-//! via a hand-rolled deterministic hash (not a real RNG) -- see `run_md`'s
-//! velocity-initialization comment for detail. Real Maxwell-Boltzmann sampling
-//! needs each velocity component drawn from a normal distribution with
-//! variance `kT/m`; this crate does neither the Gaussian sampling nor a
-//! subsequent center-of-mass momentum removal (there is currently no COM
-//! subtraction step anywhere in this module) or exact-temperature rescale.
-//! Forces are central finite-difference only, not analytic. The energy-drift
-//! regression test (`test_md_energy_conservation_approximate` below) allows
-//! drift up to 0.1 Hartree (~63 kcal/mol) over a short trajectory -- a
-//! deliberately loose bound, not a validated conservation guarantee.
+//! Initial velocities use seeded pseudo-random Maxwell-Boltzmann Gaussian
+//! sampling (Box-Muller), center-of-mass translation removal, and rescaling to
+//! the requested initial kinetic temperature. `run_md` retains a deterministic
+//! default seed; `run_md_with_seed` permits reproducible independent starts.
+//!
+//! This corrects the initial-condition sampler only. Forces remain central
+//! finite differences rather than analytic gradients. The energy-drift
+//! regression test (`test_md_energy_conservation_approximate`) allows drift up
+//! to 0.1 Hartree (~63 kcal/mol) over a short trajectory -- a deliberately
+//! loose bound, not a validated conservation guarantee. This molecular,
+//! non-periodic HF/STO-3G implementation is not a qualified nanocrystal solver.
 //!
 //! References:
 //! - Car & Parrinello (1985). Phys. Rev. Lett. 55, 2471.
@@ -114,6 +114,93 @@ fn compute_forces(mol: &Molecule, fd_step: f64) -> Vec<[f64; 3]> {
     forces
 }
 
+/// Fixed default seed retained for backwards-reproducible run_md calls.
+const DEFAULT_MD_SEED: u64 = 42;
+
+/// Small deterministic SplitMix64 generator for dependency-free thermal sampling.
+#[derive(Debug, Clone)]
+struct NormalRng {
+    state: u64,
+    spare_normal: Option<f64>,
+}
+
+impl NormalRng {
+    fn new(seed: u64) -> Self {
+        Self { state: seed, spare_normal: None }
+    }
+
+    fn next_u64(&mut self) -> u64 {
+        self.state = self.state.wrapping_add(0x9E37_79B9_7F4A_7C15);
+        let mut value = self.state;
+        value = (value ^ (value >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+        value = (value ^ (value >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+        value ^ (value >> 31)
+    }
+
+    /// Uniform variate strictly inside (0, 1), avoiding ln(0) in Box-Muller.
+    fn uniform_open(&mut self) -> f64 {
+        let mantissa = self.next_u64() >> 11;
+        (mantissa as f64 + 0.5) / ((1u64 << 53) as f64)
+    }
+
+    fn standard_normal(&mut self) -> f64 {
+        if let Some(spare) = self.spare_normal.take() {
+            return spare;
+        }
+        let radius = (-2.0 * self.uniform_open().ln()).sqrt();
+        let angle = std::f64::consts::TAU * self.uniform_open();
+        let (sin_angle, cos_angle) = angle.sin_cos();
+        self.spare_normal = Some(radius * sin_angle);
+        radius * cos_angle
+    }
+}
+
+/// Construct a thermal initial velocity set in atomic units.
+fn initialize_velocities(masses: &[f64], temperature: f64, seed: u64) -> Vec<[f64; 3]> {
+    let mut velocities = vec![[0.0; 3]; masses.len()];
+    if !temperature.is_finite() || temperature <= 0.0 || masses.len() <= 1 {
+        return velocities;
+    }
+
+    let mut rng = NormalRng::new(seed);
+    for (velocity, &mass) in velocities.iter_mut().zip(masses) {
+        let sigma = (crate::stat_mech::K_BOLTZMANN_HARTREE * temperature / mass).sqrt();
+        for component in velocity {
+            *component = sigma * rng.standard_normal();
+        }
+    }
+
+    // Remove net linear momentum so the thermal ensemble has no spurious
+    // center-of-mass translation.
+    let total_mass: f64 = masses.iter().sum();
+    let mut total_momentum = [0.0; 3];
+    for (velocity, &mass) in velocities.iter().zip(masses) {
+        for axis in 0..3 {
+            total_momentum[axis] += mass * velocity[axis];
+        }
+    }
+    let center_velocity = total_momentum.map(|momentum| momentum / total_mass);
+    for velocity in &mut velocities {
+        for axis in 0..3 {
+            velocity[axis] -= center_velocity[axis];
+        }
+    }
+
+    // Match the requested initial kinetic temperature after COM removal, using
+    // the same 3N-3 degrees of freedom as kinetic_energy_and_temperature.
+    let (_, sampled_temperature) = kinetic_energy_and_temperature(&velocities, masses);
+    if sampled_temperature.is_finite() && sampled_temperature > 0.0 {
+        let scale = (temperature / sampled_temperature).sqrt();
+        for velocity in &mut velocities {
+            for component in velocity {
+                *component *= scale;
+            }
+        }
+    }
+
+    velocities
+}
+
 /// Compute kinetic energy and instantaneous temperature.
 fn kinetic_energy_and_temperature(velocities: &[[f64; 3]], masses: &[f64]) -> (f64, f64) {
     let mut ke = 0.0;
@@ -130,7 +217,19 @@ fn kinetic_energy_and_temperature(velocities: &[[f64; 3]], masses: &[f64]) -> (f
 }
 
 /// Run Born-Oppenheimer molecular dynamics using Velocity-Verlet.
+///
+/// Uses a fixed default seed to preserve deterministic behavior for existing callers.
 pub fn run_md(molecule: &Molecule, config: &MdConfig) -> MdResult {
+    run_md_with_seed(molecule, config, DEFAULT_MD_SEED)
+}
+
+/// Run molecular dynamics with an explicit seed for thermal initial velocities.
+///
+/// Each component is drawn with variance k_B T / m_i, net center-of-mass
+/// translation is removed, and the initial kinetic temperature is rescaled
+/// to config.temperature. This makes replicas reproducible; it does not
+/// qualify the underlying electronic-structure model or trajectory physics.
+pub fn run_md_with_seed(molecule: &Molecule, config: &MdConfig, seed: u64) -> MdResult {
     let n_atoms = molecule.n_atoms();
     let masses: Vec<f64> = molecule
         .atoms
@@ -139,29 +238,7 @@ pub fn run_md(molecule: &Molecule, config: &MdConfig) -> MdResult {
         .collect();
 
     let mut positions: Vec<[f64; 3]> = molecule.atoms.iter().map(|a| a.position).collect();
-    let mut velocities = vec![[0.0; 3]; n_atoms];
-
-    // NOT real Maxwell-Boltzmann sampling (Phase Q0, 2026-07-16): draws each
-    // velocity component from a UNIFORM distribution on [-v_scale, v_scale]
-    // via a hand-rolled deterministic hash, not a Gaussian/normal
-    // distribution and not a real RNG. No center-of-mass momentum removal
-    // or temperature rescale follows. See the module doc's status note.
-    if config.temperature > 0.0 {
-        let seed = 42u64;
-        for i in 0..n_atoms {
-            for c in 0..3 {
-                // Simple deterministic pseudo-random
-                let hash = ((seed
-                    .wrapping_mul(6364136223846793005)
-                    .wrapping_add(1442695040888963407))
-                .wrapping_mul((i * 3 + c + 1) as u64)) as f64
-                    / u64::MAX as f64;
-                let v_scale =
-                    (crate::stat_mech::K_BOLTZMANN_HARTREE * config.temperature / masses[i]).sqrt();
-                velocities[i][c] = (hash - 0.5) * 2.0 * v_scale;
-            }
-        }
-    }
+    let mut velocities = initialize_velocities(&masses, config.temperature, seed);
 
     // Initial forces
     let mut mol = molecule.clone();
@@ -282,5 +359,75 @@ mod tests {
                 assert!(c.is_finite(), "Force should be finite");
             }
         }
+    }
+
+    fn h2_masses() -> Vec<f64> {
+        Molecule::h2()
+            .atoms
+            .iter()
+            .map(|atom| atomic_mass_au(atom.atomic_number))
+            .collect()
+    }
+
+    #[test]
+    fn thermal_initialization_is_repeatable_for_same_seed_and_varies_by_seed() {
+        let masses = h2_masses();
+        let a = initialize_velocities(&masses, 300.0, 7);
+        let b = initialize_velocities(&masses, 300.0, 7);
+        let c = initialize_velocities(&masses, 300.0, 8);
+        assert_eq!(a, b, "same seed must reproduce the same initial velocities");
+        assert_ne!(a, c, "different seeds should produce different replicas");
+    }
+
+    #[test]
+    fn thermal_initialization_removes_center_of_mass_momentum_and_hits_temperature() {
+        let masses = h2_masses();
+        let velocities = initialize_velocities(&masses, 300.0, 1234);
+        let mut momentum = [0.0; 3];
+        for (velocity, &mass) in velocities.iter().zip(&masses) {
+            for axis in 0..3 {
+                momentum[axis] += mass * velocity[axis];
+            }
+        }
+        for component in momentum {
+            assert!(
+                component.abs() < 1e-9,
+                "center-of-mass momentum was not removed: {component:e}"
+            );
+        }
+        let (_, temperature) = kinetic_energy_and_temperature(&velocities, &masses);
+        assert!(
+            (temperature - 300.0).abs() < 1e-8,
+            "initial temperature was {temperature}, expected 300 K"
+        );
+    }
+
+    #[test]
+    fn zero_temperature_initialization_is_exactly_stationary() {
+        let velocities = initialize_velocities(&h2_masses(), 0.0, 19);
+        assert!(velocities.iter().flatten().all(|velocity| *velocity == 0.0));
+    }
+
+    #[test]
+    fn non_finite_temperature_does_not_create_non_finite_velocities() {
+        let velocities = initialize_velocities(&h2_masses(), f64::NAN, 19);
+        assert!(velocities.iter().flatten().all(|velocity| *velocity == 0.0));
+    }
+
+    #[test]
+    fn box_muller_samples_have_approximately_zero_mean_and_unit_variance() {
+        let mut rng = NormalRng::new(0xC0FF_EE);
+        let count = 20_000;
+        let mut sum = 0.0;
+        let mut sum_squares = 0.0;
+        for _ in 0..count {
+            let sample = rng.standard_normal();
+            sum += sample;
+            sum_squares += sample * sample;
+        }
+        let mean = sum / count as f64;
+        let variance = sum_squares / count as f64 - mean * mean;
+        assert!(mean.abs() < 0.03, "sample mean was {mean}");
+        assert!((variance - 1.0).abs() < 0.05, "sample variance was {variance}");
     }
 }
