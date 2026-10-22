@@ -213,6 +213,7 @@ def self_test() -> None:
                     tuple(Probe(i, i, 1, 0) for i in range(4)), 2)
     assert all(expected_information_gain(all_zero, (0, 1, 2, 3), probe) == 0.0 for probe in all_zero.probes)
     assert evaluate_policy(all_zero, "exact_oracle").expected_cost == 0.0
+    assert evaluate_policy(all_zero, "exact_oracle").expected_cost == 0.0
 
 
 def main() -> int:
