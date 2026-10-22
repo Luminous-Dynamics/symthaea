@@ -175,6 +175,24 @@ Before this branch's update, `pqc-handshake` did not imply the `swarm` transport
 
 Acceptance requires a feature-matrix build for no features, `swarm`, `pqc-handshake`, and the full default-plus-PQC combination, plus `test_pqc_handshake_feature_requires_swarm_transport`, which asserts that any build with the PQC feature also has the swarm transport cfg. These checks have not been run here.
 
+## K-12 — A published wrapper crate is not automatically a conformant backend
+
+A crates.io/docs.rs release of `mycelix-crypto 0.1.0` exists, but its published `src/pqc/ml_kem.rs` source imports `pqcrypto_kyber::{kyber768, kyber1024}` and wraps those APIs under ML-KEM-oriented names. Separately, the pqcrypto ecosystem has an unmaintained advisory because PQClean is being archived. Package availability and an `MlKem768KeyPair` type name are therefore insufficient evidence that the replacement implements final FIPS 203 correctly or will receive security maintenance.
+
+References:
+- Published wrapper and dependency metadata: https://docs.rs/crate/mycelix-crypto/0.1.0
+- Published KEM source: https://docs.rs/crate/mycelix-crypto/0.1.0/source/src/pqc/ml_kem.rs
+- pqcrypto ecosystem maintenance advisory: https://rustsec.org/advisories/RUSTSEC-2026-0164.html
+- NIST FIPS 203: https://csrc.nist.gov/pubs/fips/203/final
+- RustCrypto `ml-kem` 0.3.3 documents final FIPS 203 KAT coverage but explicitly says it has **not** been independently audited: https://docs.rs/crate/ml-kem/latest
+
+This is not sufficient by itself to prove the wrapper returns wrong outputs; it is a provenance/conformance concern. The project must not replace the stub blindly with that crate and flip a marker. Before accepting any backend, require:
+1. A pinned, maintained implementation whose target algorithm is explicitly final FIPS 203 ML-KEM, not a pre-standard Kyber round.
+2. Official NIST ACVP known-answer tests for key generation, encapsulation, decapsulation and malformed inputs, plus differential vectors against an independent implementation.
+3. Correct public-key/ciphertext validation and ML-KEM implicit-rejection semantics.
+4. An implementation/security review covering side channels, secret zeroization, RNG quality, build provenance and maintenance status.
+5. An integration test showing the exact backend actually linked into the released binary. If no backend satisfies the gate, keep the feature fail-closed.
+
 ## Immediate disposition
 
 - The X25519 store now rejects non-contributory shared secrets before deriving or storing keys; exact-head tests and review are still required.
@@ -226,4 +244,4 @@ A model discovery counts only when the issue is independently reproducible again
 
 ## Validation status
 
-Source review and regression-test authoring only. Tests were not compiled or run in this environment. The X25519 tests include `legacy_static_x25519_agreement_repeats_key_after_long_term_secret_reuse`, `legacy_static_x25519_derivation_does_not_bind_peer_source_id`, and `x25519_low_order_peer_keys_are_rejected_without_storing_keys`. PQC tests now verify the bundled backend marker and fail-closed operations (`test_workspace_crypto_stub_is_never_accepted_as_ml_kem`, `test_stub_backend_cannot_create_candidate_or_active_session`), along with input length/identifier validation, pending-state bounds, cleanup and synthetic BLAKE3 determinism. They no longer count all-zero stub outputs as successful KEM operations. CI must provide exact-head build evidence, and independent cryptographic review remains required. No claim is made that the current handshake is deployed or has been exploited.
+Source review and regression-test authoring only. Tests were not compiled or run in this environment. The X25519 tests include `legacy_static_x25519_agreement_repeats_key_after_long_term_secret_reuse`, `legacy_static_x25519_derivation_does_not_bind_peer_source_id`, and `x25519_low_order_peer_keys_are_rejected_without_storing_keys`. PQC tests now verify the bundled backend marker and fail-closed operations (`test_workspace_crypto_stub_is_never_accepted_as_ml_kem`, `test_stub_backend_cannot_create_candidate_or_active_session`), along with input length/identifier validation, pending-state bounds, cleanup and synthetic BLAKE3 determinism. They no longer count all-zero stub outputs as successful KEM operations. The real-backend acceptance bar now also calls for final FIPS 203 KATs, independent differential vectors, side-channel/zeroization review, maintenance provenance and proof of the linked backend. CI must provide exact-head build evidence, and independent cryptographic review remains required. No claim is made that the current handshake is deployed or has been exploited.
