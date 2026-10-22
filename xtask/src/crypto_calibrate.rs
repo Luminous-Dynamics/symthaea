@@ -354,38 +354,38 @@ fn validate_regression(root: &Path, regression: &Regression) -> Result<ParsedCom
 }
 
 fn parse_command_for_test(command: &str, expected_test: &str) -> Result<ParsedCommand> {
-        let tokens: Vec<&str> = command.split_ascii_whitespace().collect();
-        if tokens.len() < 5 || tokens[0] != "cargo" || tokens[1] != "test" || tokens[2] != "-p" {
-            bail!("only 'cargo test -p <approved-package> [--lib] <test-filter>' is allowed");
-        }
-        let package = tokens[3];
-        if !ALLOWED_PACKAGES.contains(&package) {
-            bail!("unapproved calibration package: {package}");
-        }
-    
-        let (flags, filter) = if tokens.len() == 5 {
-            (Vec::<String>::new(), tokens[4])
-        } else if tokens.len() == 6 && tokens[4] == "--lib" {
-            (vec!["--lib".to_owned()], tokens[5])
-        } else {
-            bail!("unapproved cargo test arguments for {}", expected_test);
-        };
-        if filter != expected_test {
-            bail!(
-                "command filter '{}' does not match manifest test '{}'",
-                filter,
-                expected_test
-            );
-        }
-    
-        let mut cargo_args = vec!["test".to_owned(), "-p".to_owned(), package.to_owned()];
-        cargo_args.extend(flags);
-        cargo_args.push(filter.to_owned());
-        Ok(ParsedCommand {
-            package: package.to_owned(),
-            test_filter: filter.to_owned(),
-            cargo_args,
-        })
+    let tokens: Vec<&str> = command.split_ascii_whitespace().collect();
+    if tokens.len() < 5 || tokens[0] != "cargo" || tokens[1] != "test" || tokens[2] != "-p" {
+        bail!("only 'cargo test -p <approved-package> [--lib] <test-filter>' is allowed");
+    }
+    let package = tokens[3];
+    if !ALLOWED_PACKAGES.contains(&package) {
+        bail!("unapproved calibration package: {package}");
+    }
+
+    let (flags, filter) = if tokens.len() == 5 {
+        (Vec::<String>::new(), tokens[4])
+    } else if tokens.len() == 6 && tokens[4] == "--lib" {
+        (vec!["--lib".to_owned()], tokens[5])
+    } else {
+        bail!("unapproved cargo test arguments for {}", expected_test);
+    };
+    if filter != expected_test {
+        bail!(
+            "command filter '{}' does not match manifest test '{}'",
+            filter,
+            expected_test
+        );
+    }
+
+    let mut cargo_args = vec!["test".to_owned(), "-p".to_owned(), package.to_owned()];
+    cargo_args.extend(flags);
+    cargo_args.push(filter.to_owned());
+    Ok(ParsedCommand {
+        package: package.to_owned(),
+        test_filter: filter.to_owned(),
+        cargo_args,
+    })
 }
 
 fn execute_regression(
@@ -452,7 +452,7 @@ fn task_result_from_output(
         security_notion: task.security_notion.clone(),
         source_path: regression.path.clone(),
         regression_test: parsed.test_filter.clone(),
-        command_argv: parsed.cargo_args,
+        command_argv: parsed.cargo_args.clone(),
         outcome,
         exit_code,
         duration_ms: elapsed_ms,
