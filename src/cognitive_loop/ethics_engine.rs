@@ -766,6 +766,16 @@ impl EthicsEngine {
         }
     }
 
+    /// Assess consent evidence synchronously for the supplied current input.
+    ///
+    /// This is a text-evidence API, not a scoped permission check. It is safe to
+    /// call on every proposed action because it does not use the seven-cycle
+    /// moral-score cache. Callers must still apply the independent, scope-bound
+    /// policy gate before any consent-sensitive side effect.
+    pub fn assess_consent_evidence(&self, input: &str) -> ConsentTextAssessment {
+        self.moral_parser.assess_consent_evidence(input)
+    }
+
     /// Evaluate ethics for the current cycle.
     ///
     /// Pipeline: moral parse → value gate → harmonies → unified verdict
@@ -800,7 +810,6 @@ impl EthicsEngine {
             moral_score,
             moral_verdict,
             deontological_verdict,
-            _stage1_consent_violation,
             moral_confidence,
             violations,
             satisfactions,
@@ -902,7 +911,6 @@ impl EthicsEngine {
                 score,
                 verdict_str,
                 deont_verdict_str,
-                cv,
                 confidence,
                 viols,
                 sats,
@@ -914,7 +922,6 @@ impl EthicsEngine {
                 self.cache.last_moral_score,
                 String::new(),
                 String::new(),
-                false,
                 0.0,
                 Vec::new(),
                 Vec::new(),
