@@ -836,18 +836,28 @@ mod tests {
         let expected_symbol = "task_a";
         let reference_source = "pub fn task_a() -> bool { true }";
         let test_source = "#[test] fn task_a_is_true() { assert!(task_a()); }";
-        let canonical = format!(
-            "{task_id}\n{description}\n{expected_symbol}\n{reference_source}\n{test_source}"
-        );
-        let task_digest = blake3::hash(canonical.as_bytes()).to_hex().to_string();
+        let mutant_sources = vec!["pub fn task_a() -> bool { false }"];
+        let mut task_hasher = blake3::Hasher::new();
+        for field in [task_id, description, expected_symbol, reference_source, test_source] {
+            task_hasher.update(&(field.len() as u64).to_be_bytes());
+            task_hasher.update(field.as_bytes());
+        }
+        task_hasher.update(&(mutant_sources.len() as u64).to_be_bytes());
+        for mutant in &mutant_sources {
+            task_hasher.update(&(mutant.len() as u64).to_be_bytes());
+            task_hasher.update(mutant.as_bytes());
+        }
+        let task_digest = task_hasher.finalize().to_hex().to_string();
         let reference_digest = blake3::hash(reference_source.as_bytes()).to_hex().to_string();
         let test_digest = blake3::hash(test_source.as_bytes()).to_hex().to_string();
+        let mutant_digest = blake3::hash(mutant_sources[0].as_bytes()).to_hex().to_string();
         let manifest = vec![serde_json::json!({
             "task_id": task_id,
             "description": description,
             "expected_symbol": expected_symbol,
             "reference_source": reference_source,
             "test_source": test_source,
+            "mutant_sources": mutant_sources,
             "task_digest_blake3": task_digest,
             "expected_test_functions": 1,
             "reference_source_blake3": reference_digest,
@@ -887,8 +897,23 @@ mod tests {
                     "compiled": false,
                     "compile_errors": ["expected missing function"]
                 }],
+                "mutation_controls": [{
+                    "task_id": "task_a",
+                    "mutation_index": 0,
+                    "mutation_source_blake3": mutant_digest,
+                    "compiled": true,
+                    "simulated": false,
+                    "tests_expected": 1,
+                    "tests_passed": 0,
+                    "tests_failed": 1,
+                    "runtime_error": null,
+                    "oracle_complete": true,
+                    "mutant_killed": true,
+                    "compile_errors": []
+                }],
                 "all_references_pass": true,
-                "all_empty_patches_fail": true
+                "all_empty_patches_fail": true,
+                "all_mutants_killed": true
             },
             "summary": {
                 "gcs_off": {
@@ -1025,6 +1050,16 @@ mod tests {
         let errors = audit(&report, None, None);
         assert!(errors.iter().any(|error| error.contains("expected 2")));
         assert!(errors.iter().any(|error| error.contains("pair incomplete")));
+    }
+
+    #[test]
+    fn surviving_mutant_is_rejected() {
+        let mut report = valid_fixture();
+        report["oracle_controls"]["mutation_controls"][0]["tests_failed"] = Value::from(0);
+        report["oracle_controls"]["mutation_controls"][0]["tests_passed"] = Value::from(1);
+        report["oracle_controls"]["mutation_controls"][0]["mutant_killed"] = Value::Bool(false);
+        let errors = audit(&report, None, None);
+        assert!(errors.iter().any(|error| error.contains("not behaviorally killed")));
     }
 
     #[test]
