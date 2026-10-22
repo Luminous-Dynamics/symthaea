@@ -252,6 +252,31 @@ fn main() -> Result<()> {
     if observations.is_empty() {
         bail!("no adjudicated base/counterfactual pairs are eligible for analysis");
     }
+    let selected_pairs: Vec<&Value> = pairs
+        .iter()
+        .filter(|pair| pair.get("split").and_then(Value::as_str) == Some(requested_split))
+        .collect();
+    let unresolved_or_pending_pairs = selected_pairs
+        .iter()
+        .filter(|pair| {
+            ["base_adjudication", "counterfactual_adjudication"]
+                .iter()
+                .any(|key| {
+                    pair.get(*key)
+                        .and_then(|adjudication| adjudication.get("status"))
+                        .and_then(Value::as_str)
+                        != Some("adjudicated")
+                })
+        })
+        .count();
+    if selected_pairs.len() != observations.len() + unresolved_or_pending_pairs {
+        bail!(
+            "requested-split pair accounting mismatch: {} suite pairs, {} analyzed pairs, {} pending/unresolved pairs",
+            selected_pairs.len(),
+            observations.len(),
+            unresolved_or_pending_pairs
+        );
+    }
 
     let metrics = calculate_metrics(&observations, bootstrap_replicates, seed);
     let counts = aggregate(&observations);
@@ -296,11 +321,9 @@ fn main() -> Result<()> {
         "suite_sha256": suite_sha256,
         "outcomes_sha256": outcomes_sha256,
         "counts": {
-            "suite_pairs_in_requested_split": pairs
-                .iter()
-                .filter(|p| p.get("split").and_then(Value::as_str) == Some(requested_split))
-                .count(),
+            "suite_pairs_in_requested_split": selected_pairs.len(),
             "adjudicated_pairs_analyzed": observations.len(),
+            "unresolved_or_pending_pairs": unresolved_or_pending_pairs,
             "base_compatible_pairs": counts.base_positive,
             "counterfactual_compatible_pairs": counts.variant_positive,
             "counterfactual_incompatible_pairs": counts.variant_negative,
@@ -934,13 +957,17 @@ fn validate_counterfactual_suite(suite: &Value) -> Result<()> {
             if base_label != "compatible" {
                 bail!("{pair_context} synthetic base must be the compatible control");
             }
-            let expected = if kind == "no_semantic_change" {
-                "compatible"
-            } else {
-                "incompatible"
-            };
-            if variant_label != expected {
-                bail!("{pair_context} synthetic counterfactual label must be {expected:?}");
+            if variant_status == "adjudicated" {
+                let expected = if kind == "no_semantic_change" {
+                    "compatible"
+                } else {
+                    "incompatible"
+                };
+                if variant_label != expected {
+                    bail!("{pair_context} synthetic counterfactual label must be {expected:?}");
+                }
+            } else if variant_label != "unknown" {
+                bail!("{pair_context} synthetic unresolved/pending label must remain unknown");
             }
         }
     }
