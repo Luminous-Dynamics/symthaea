@@ -460,6 +460,39 @@ fn main() -> Result<()> {
                 .collect::<BTreeSet<_>>()
                 .len()
         },
+        "resource_usage": {
+            "paired_outcome_rows": counts.paired_rows,
+            "units": {
+                "cost": "micro-USD",
+                "wall_time": "milliseconds",
+                "tokens": "tokens",
+                "model_calls": "calls"
+            },
+            "base_totals": {
+                "model_calls": counts.base_model_calls_sum,
+                "tokens": counts.base_tokens_sum,
+                "wall_ms": counts.base_wall_ms_sum,
+                "cost_microusd": counts.base_cost_microusd_sum
+            },
+            "counterfactual_totals": {
+                "model_calls": counts.variant_model_calls_sum,
+                "tokens": counts.variant_tokens_sum,
+                "wall_ms": counts.variant_wall_ms_sum,
+                "cost_microusd": counts.variant_cost_microusd_sum
+            },
+            "base_mean_per_pair": {
+                "model_calls": counts.base_model_calls_sum as f64 / counts.paired_rows.max(1) as f64,
+                "tokens": counts.base_tokens_sum as f64 / counts.paired_rows.max(1) as f64,
+                "wall_ms": counts.base_wall_ms_sum as f64 / counts.paired_rows.max(1) as f64,
+                "cost_microusd": counts.base_cost_microusd_sum as f64 / counts.paired_rows.max(1) as f64
+            },
+            "counterfactual_mean_per_pair": {
+                "model_calls": counts.variant_model_calls_sum as f64 / counts.paired_rows.max(1) as f64,
+                "tokens": counts.variant_tokens_sum as f64 / counts.paired_rows.max(1) as f64,
+                "wall_ms": counts.variant_wall_ms_sum as f64 / counts.paired_rows.max(1) as f64,
+                "cost_microusd": counts.variant_cost_microusd_sum as f64 / counts.paired_rows.max(1) as f64
+            }
+        },
         "metrics": metrics,
         "by_mutation_kind": per_mutation,
         "bootstrap": {
