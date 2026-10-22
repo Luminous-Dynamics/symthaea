@@ -160,6 +160,21 @@ impl fmt::Display for CastingModelError {
 
 impl Error for CastingModelError {}
 
+/// Digest an ordered stream of observations without normalizing their float bit patterns.
+fn observation_stream_digest(
+    domain: &[u8],
+    observations: &[ChvorinovObservation],
+) -> [u8; 32] {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(domain);
+    hasher.update(&(observations.len() as u64).to_le_bytes());
+    for observation in observations {
+        hasher.update(&observation.thermal_modulus_m.to_bits().to_le_bytes());
+        hasher.update(&observation.solidification_time_s.to_bits().to_le_bytes());
+    }
+    *hasher.finalize().as_bytes()
+}
+
 /// A Chvorinov-style model calibrated to measured solidification observations.
 ///
 /// Parameters are kept private so a model can only be constructed through the
@@ -177,6 +192,7 @@ pub struct ChvorinovModel {
     thermal_modulus_max_m: f64,
     fit_r_squared: f64,
     sample_count: usize,
+    training_data_digest_blake3: [u8; 32],
 }
 
 /// A multiplicative prediction interval calibrated from independent log-residuals.
@@ -211,6 +227,7 @@ pub struct ChvorinovConformalCalibrator {
     log_residual_quantile: f64,
     calibration_sample_count: usize,
     fitted_model_digest: [u8; 32],
+    calibration_data_digest_blake3: [u8; 32],
 }
 
 impl ChvorinovConformalCalibrator {
@@ -263,6 +280,10 @@ impl ChvorinovConformalCalibrator {
             log_residual_quantile,
             calibration_sample_count: count,
             fitted_model_digest: model.identity_digest(),
+            calibration_data_digest_blake3: observation_stream_digest(
+                b"symthaea-casting-conformal-observations-v1",
+                calibration_observations,
+            ),
         })
     }
 
@@ -316,6 +337,16 @@ impl ChvorinovConformalCalibrator {
     /// Return the number of independent calibration observations supplied by the caller.
     pub fn calibration_sample_count(&self) -> usize {
         self.calibration_sample_count
+    }
+
+    /// Return a BLAKE3 digest of the ordered conformal calibration observations.
+    pub fn calibration_data_digest_blake3(&self) -> [u8; 32] {
+        self.calibration_data_digest_blake3
+    }
+
+    /// Return a BLAKE3 digest binding this calibrator to its fitted model.
+    pub fn fitted_model_digest_blake3(&self) -> [u8; 32] {
+        self.fitted_model_digest
     }
 }
 
@@ -512,12 +543,16 @@ impl ChvorinovModel {
             thermal_modulus_max_m: max_m,
             fit_r_squared,
             sample_count: observations.len(),
+            training_data_digest_blake3: observation_stream_digest(
+                b"symthaea-casting-training-observations-v1",
+                observations,
+            ),
         })
     }
 
     fn identity_digest(&self) -> [u8; 32] {
         let mut hasher = blake3::Hasher::new();
-        hasher.update(b"symthaea-chvorinov-model-v1\\0");
+        hasher.update(b"symthaea-chvorinov-model-v1");
         for value in [
             self.mold_constant_s_per_m_pow_n,
             self.exponent,
@@ -528,6 +563,7 @@ impl ChvorinovModel {
             hasher.update(&value.to_bits().to_le_bytes());
         }
         hasher.update(&(self.sample_count as u64).to_le_bytes());
+        hasher.update(&self.training_data_digest_blake3);
         *hasher.finalize().as_bytes()
     }
 
@@ -701,6 +737,12 @@ impl ChvorinovModel {
     pub fn sample_count(&self) -> usize {
         self.sample_count
     }
+
+    /// Return a BLAKE3 digest of the ordered training observations, including exact
+    /// IEEE-754 bit patterns. Reordering observations changes the digest by design.
+    pub fn training_data_digest_blake3(&self) -> [u8; 32] {
+        self.training_data_digest_blake3
+    }
 }
 
 /// Calculate the thermal modulus using SI units.
@@ -746,6 +788,40 @@ mod tests {
         assert!((model.mold_constant_s_per_m_pow_n() - 1.2e6).abs() < 1e-6);
         assert!(model.fit_r_squared() > 0.999_999_999);
         assert_eq!(model.sample_count(), 5);
+    }
+
+    #[test]
+    fn model_and_calibration_digests_are_reproducible_and_input_bound() {
+        let training = conformal_training_observations();
+        let model_a = ChvorinovModel::calibrate(&training).unwrap();
+        let model_b = ChvorinovModel::calibrate(&training).unwrap();
+        let mut reversed = training.clone();
+        reversed.reverse();
+        let model_reordered = ChvorinovModel::calibrate(&reversed).unwrap();
+
+        assert_eq!(
+            model_a.training_data_digest_blake3(),
+            model_b.training_data_digest_blake3()
+        );
+        assert_ne!(
+            model_a.training_data_digest_blake3(),
+            model_reordered.training_data_digest_blake3()
+        );
+        assert_ne!(model_a.identity_digest(), model_reordered.identity_digest());
+
+        let calibration = conformal_calibration_observations();
+        let conformal_a =
+            ChvorinovConformalCalibrator::calibrate(&model_a, &calibration, 0.4).unwrap();
+        let conformal_b =
+            ChvorinovConformalCalibrator::calibrate(&model_a, &calibration, 0.4).unwrap();
+        assert_eq!(
+            conformal_a.calibration_data_digest_blake3(),
+            conformal_b.calibration_data_digest_blake3()
+        );
+        assert_eq!(
+            conformal_a.fitted_model_digest_blake3(),
+            conformal_b.fitted_model_digest_blake3()
+        );
     }
 
     #[test]
