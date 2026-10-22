@@ -685,7 +685,6 @@ mod tests {
         clean_audit_success: bool,
     }
 
-
     struct RobustEIGPair {
         clean_nominal_success: bool,
         clean_robust_success: bool,
@@ -722,7 +721,6 @@ mod tests {
         let high_index = (last * 975 + 999) / 1_000;
         (observed, means[low_index], means[high_index])
     }
-
 
     /// Small paired-seed pilot for the robust-noise-envelope selector versus nominal EIG.
     /// It reports clean recovery and three disjoint outcomes under hidden structural
