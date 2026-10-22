@@ -146,9 +146,20 @@ mod tests {
         ConnectivityOffline,
         ConnectivityIntermittent,
         RequireCoreNetwork,
+        PresentFreshConfirmed,
+        PresentFreshUnconfirmed,
+        PresentStaleConfirmed,
+        PresentStaleUnconfirmed,
+        PresentUnknownConfirmed,
+        PresentUnknownUnconfirmed,
+        EgressNonSensitiveWithoutConsent,
+        EgressNonSensitiveWithConsent,
+        EgressSensitiveWithoutConsent,
+        EgressSensitiveWithConsent,
+        NormalizeUnknown,
     }
 
-    const ACTIONS: [Action; 20] = [
+    const ACTIONS: [Action; 31] = [
         Action::StartSession,
         Action::LoadA,
         Action::LoadB,
@@ -169,6 +180,17 @@ mod tests {
         Action::ConnectivityOffline,
         Action::ConnectivityIntermittent,
         Action::RequireCoreNetwork,
+        Action::PresentFreshConfirmed,
+        Action::PresentFreshUnconfirmed,
+        Action::PresentStaleConfirmed,
+        Action::PresentStaleUnconfirmed,
+        Action::PresentUnknownConfirmed,
+        Action::PresentUnknownUnconfirmed,
+        Action::EgressNonSensitiveWithoutConsent,
+        Action::EgressNonSensitiveWithConsent,
+        Action::EgressSensitiveWithoutConsent,
+        Action::EgressSensitiveWithConsent,
+        Action::NormalizeUnknown,
     ];
 
     #[derive(Debug)]
@@ -281,6 +303,59 @@ mod tests {
                     violations.push(Violation::RenderWithoutVerifiedBundle);
                 }
             }
+            Action::PresentFreshConfirmed
+            | Action::PresentFreshUnconfirmed
+            | Action::PresentStaleConfirmed
+            | Action::PresentStaleUnconfirmed
+            | Action::PresentUnknownConfirmed
+            | Action::PresentUnknownUnconfirmed => {
+                let (freshness, presentation) = match action {
+                    Action::PresentFreshConfirmed => {
+                        (ResourceFreshness::Fresh, ResourcePresentation::Confirmed)
+                    }
+                    Action::PresentFreshUnconfirmed => {
+                        (ResourceFreshness::Fresh, ResourcePresentation::Unconfirmed)
+                    }
+                    Action::PresentStaleConfirmed => {
+                        (ResourceFreshness::Stale, ResourcePresentation::Confirmed)
+                    }
+                    Action::PresentStaleUnconfirmed => {
+                        (ResourceFreshness::Stale, ResourcePresentation::Unconfirmed)
+                    }
+                    Action::PresentUnknownConfirmed => {
+                        (ResourceFreshness::Unknown, ResourcePresentation::Confirmed)
+                    }
+                    Action::PresentUnknownUnconfirmed => {
+                        (ResourceFreshness::Unknown, ResourcePresentation::Unconfirmed)
+                    }
+                    _ => unreachable!(),
+                };
+                if let Some(violation) = resource_policy_violation(freshness, presentation) {
+                    violations.push(violation);
+                }
+            }
+            Action::EgressNonSensitiveWithoutConsent
+            | Action::EgressNonSensitiveWithConsent
+            | Action::EgressSensitiveWithoutConsent
+            | Action::EgressSensitiveWithConsent => {
+                let (sensitive_payload, consent_scoped) = match action {
+                    Action::EgressNonSensitiveWithoutConsent => (false, false),
+                    Action::EgressNonSensitiveWithConsent => (false, true),
+                    Action::EgressSensitiveWithoutConsent => (true, false),
+                    Action::EgressSensitiveWithConsent => (true, true),
+                    _ => unreachable!(),
+                };
+                if let Some(violation) =
+                    egress_policy_violation(sensitive_payload, consent_scoped)
+                {
+                    violations.push(violation);
+                }
+            }
+            Action::NormalizeUnknown => {
+                if let Some(violation) = unknown_normalization_violation(true) {
+                    violations.push(violation);
+                }
+            }
         }
 
         Transition { next, violations }
@@ -389,6 +464,49 @@ mod tests {
             }),
             Action::RequireCoreNetwork => json!({
                 "sequence": sequence, "kind": "network_required_for_core"
+            }),
+            Action::PresentFreshConfirmed => json!({
+                "sequence": sequence, "kind": "resource_presented",
+                "resource_state": "fresh", "presented_as": "confirmed"
+            }),
+            Action::PresentFreshUnconfirmed => json!({
+                "sequence": sequence, "kind": "resource_presented",
+                "resource_state": "fresh", "presented_as": "unconfirmed"
+            }),
+            Action::PresentStaleConfirmed => json!({
+                "sequence": sequence, "kind": "resource_presented",
+                "resource_state": "stale", "presented_as": "confirmed"
+            }),
+            Action::PresentStaleUnconfirmed => json!({
+                "sequence": sequence, "kind": "resource_presented",
+                "resource_state": "stale", "presented_as": "unconfirmed"
+            }),
+            Action::PresentUnknownConfirmed => json!({
+                "sequence": sequence, "kind": "resource_presented",
+                "resource_state": "unknown", "presented_as": "confirmed"
+            }),
+            Action::PresentUnknownUnconfirmed => json!({
+                "sequence": sequence, "kind": "resource_presented",
+                "resource_state": "unknown", "presented_as": "unconfirmed"
+            }),
+            Action::EgressNonSensitiveWithoutConsent => json!({
+                "sequence": sequence, "kind": "sensitive_data_egress",
+                "sensitive_payload": false, "consent_scoped": false
+            }),
+            Action::EgressNonSensitiveWithConsent => json!({
+                "sequence": sequence, "kind": "sensitive_data_egress",
+                "sensitive_payload": false, "consent_scoped": true
+            }),
+            Action::EgressSensitiveWithoutConsent => json!({
+                "sequence": sequence, "kind": "sensitive_data_egress",
+                "sensitive_payload": true, "consent_scoped": false
+            }),
+            Action::EgressSensitiveWithConsent => json!({
+                "sequence": sequence, "kind": "sensitive_data_egress",
+                "sensitive_payload": true, "consent_scoped": true
+            }),
+            Action::NormalizeUnknown => json!({
+                "sequence": sequence, "kind": "unknown_normalized"
             }),
         }
     }
@@ -615,7 +733,7 @@ mod tests {
             "reachable abstract-state count changed; review and update the model baseline"
         );
         assert_eq!(
-            transition_count, 5_040,
+            transition_count, 7_812,
             "state/action transition count changed; review and update the model baseline"
         );
         println!(
@@ -661,7 +779,7 @@ mod tests {
         }
 
         assert_eq!(
-            compared_edges, 5_040,
+            compared_edges, 7_812,
             "every reachable state/action edge must be differentially checked"
         );
         println!("model_production_edge_comparisons={compared_edges}");
@@ -696,7 +814,7 @@ mod tests {
         }
 
         assert_eq!(
-            compared_sequences, 100_800,
+            compared_sequences, 242_172,
             "all 252 states × 20 × 20 two-action suffixes must be compared"
         );
         println!("model_production_two_action_sequence_comparisons={compared_sequences}");
