@@ -74,7 +74,7 @@ impl StratifiedSummary {
         }
 
         let mut task_summaries = Vec::with_capacity(tasks.len());
-        let mut deltas_by_task = Vec::with_capacity(tasks.len());
+        let mut deltas_by_task: Vec<Vec<f64>> = Vec::with_capacity(tasks.len());
         let mut total_pairs = 0_usize;
 
         for (task, episodes) in tasks {
@@ -114,7 +114,7 @@ impl StratifiedSummary {
                 .checked_add(episodes.len())
                 .ok_or("total paired episode count overflow")?;
             task_summaries.push(summary);
-            deltas_by_task.push((baseline, candidate, deltas));
+            deltas_by_task.push(deltas);
         }
 
         let task_count = task_summaries.len();
@@ -166,7 +166,7 @@ impl StratifiedSummary {
 
         for _ in 0..bootstrap_replicates {
             let mut task_draws = Vec::with_capacity(task_count);
-            for (baseline, candidate, deltas) in &deltas_by_task {
+            for deltas in &deltas_by_task {
                 let mut sampled_deltas = Vec::with_capacity(deltas.len());
 
                 for _ in 0..deltas.len() {
