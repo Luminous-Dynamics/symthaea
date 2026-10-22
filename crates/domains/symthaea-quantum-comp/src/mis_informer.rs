@@ -26,6 +26,8 @@ pub enum MisSelectionMode {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MisInformerSignal {
     instance_id: String,
+    /// SHA-256 of the canonical graph artifact/manifest used to produce the signal.
+    graph_sha256: [u8; 32],
     vertex_count: usize,
     sample_count: u64,
     inclusion_counts: Vec<u64>,
@@ -56,6 +58,8 @@ pub enum MisSignalError {
     },
     /// The signal belongs to a different benchmark instance.
     InstanceIdMismatch,
+    /// The signal's source graph digest differs from the expected graph artifact.
+    GraphDigestMismatch,
     /// The signal's graph size differs from the reducer's graph.
     GraphSizeMismatch {
         /// Vertex count declared by the signal.
@@ -105,6 +109,9 @@ impl fmt::Display for MisSignalError {
             Self::InstanceIdMismatch => {
                 write!(f, "informer signal belongs to a different graph instance")
             }
+            Self::GraphDigestMismatch => {
+                write!(f, "informer signal graph digest does not match the expected graph")
+            }
             Self::GraphSizeMismatch {
                 signal_vertices,
                 expected_vertices,
@@ -126,6 +133,7 @@ impl MisInformerSignal {
     /// is missing evidence, not evidence that every vertex has probability zero.
     pub fn new(
         instance_id: impl Into<String>,
+        graph_sha256: [u8; 32],
         vertex_count: usize,
         sample_count: u64,
         inclusion_counts: Vec<u64>,
@@ -155,6 +163,7 @@ impl MisInformerSignal {
 
         Ok(Self {
             instance_id,
+            graph_sha256,
             vertex_count,
             sample_count,
             inclusion_counts,
@@ -183,18 +192,22 @@ impl MisInformerSignal {
 
     /// Select an extreme-frequency vertex after checking the graph binding.
     ///
-    /// The instance identifier and vertex count are supplied by the caller's
-    /// validated graph manifest. Ties are resolved by the lowest vertex index,
+    /// The instance identifier, graph digest, and vertex count are supplied by
+    /// the caller's validated graph manifest. Ties are resolved by the lowest index,
     /// making this recommendation deterministic. The caller remains responsible
     /// for recording signal provenance and verifying the final solution.
     pub fn recommend_vertex(
         &self,
         expected_instance_id: &str,
+        expected_graph_sha256: [u8; 32],
         expected_vertex_count: usize,
         mode: MisSelectionMode,
     ) -> Result<MisVertexRecommendation, MisSignalError> {
         if self.instance_id != expected_instance_id {
             return Err(MisSignalError::InstanceIdMismatch);
+        }
+        if self.graph_sha256 != expected_graph_sha256 {
+            return Err(MisSignalError::GraphDigestMismatch);
         }
         if self.vertex_count != expected_vertex_count {
             return Err(MisSignalError::GraphSizeMismatch {
@@ -245,11 +258,11 @@ mod tests {
     #[test]
     fn rejects_empty_or_control_character_instance_ids() {
         assert_eq!(
-            MisInformerSignal::new("  ", 2, 1, vec![0, 0]).expect_err("blank id is invalid"),
+            MisInformerSignal::new("  ", [0; 32], 2, 1, vec![0, 0]).expect_err("blank id is invalid"),
             MisSignalError::InvalidInstanceId
         );
         assert_eq!(
-            MisInformerSignal::new("graph\nwrong", 2, 1, vec![0, 0])
+            MisInformerSignal::new("graph\nwrong", [0; 32], 2, 1, vec![0, 0])
                 .expect_err("control character is invalid"),
             MisSignalError::InvalidInstanceId
         );
@@ -258,7 +271,7 @@ mod tests {
     #[test]
     fn rejects_missing_samples_instead_of_inventing_zero_frequency() {
         assert_eq!(
-            MisInformerSignal::new("mis-case-a", 2, 0, vec![0, 0])
+            MisInformerSignal::new("mis-case-a", [1; 32], 2, 0, vec![0, 0])
                 .expect_err("no samples are not negative evidence"),
             MisSignalError::NoSamples
         );
@@ -267,7 +280,7 @@ mod tests {
     #[test]
     fn rejects_vector_length_mismatch() {
         assert_eq!(
-            MisInformerSignal::new("mis-case-a", 3, 4, vec![0, 1])
+            MisInformerSignal::new("mis-case-a", [1; 32], 3, 4, vec![0, 1])
                 .expect_err("one vertex is missing"),
             MisSignalError::VertexCountMismatch {
                 expected: 3,
@@ -279,7 +292,7 @@ mod tests {
     #[test]
     fn rejects_inclusion_count_greater_than_sample_count() {
         assert_eq!(
-            MisInformerSignal::new("mis-case-a", 2, 4, vec![2, 5])
+            MisInformerSignal::new("mis-case-a", [1; 32], 2, 4, vec![2, 5])
                 .expect_err("count cannot exceed sample total"),
             MisSignalError::InclusionCountExceedsSamples {
                 vertex: 1,
@@ -292,9 +305,9 @@ mod tests {
     #[test]
     fn recommend_in_set_picks_highest_frequency_and_breaks_ties_by_index() {
         let signal =
-            MisInformerSignal::new("mis-case-a", 4, 10, vec![2, 8, 8, 4]).expect("valid signal");
+            MisInformerSignal::new("mis-case-a", [1; 32], 4, 10, vec![2, 8, 8, 4]).expect("valid signal");
         let result = signal
-            .recommend_vertex("mis-case-a", 4, MisSelectionMode::PreferInSet)
+            .recommend_vertex("mis-case-a", [1; 32], 4, MisSelectionMode::PreferInSet)
             .expect("matching graph identity");
         assert_eq!(result.vertex, 1);
         assert_eq!(result.inclusion_count, 8);
@@ -305,9 +318,9 @@ mod tests {
     #[test]
     fn recommend_out_set_picks_lowest_frequency_and_breaks_ties_by_index() {
         let signal =
-            MisInformerSignal::new("mis-case-a", 4, 10, vec![0, 8, 0, 4]).expect("valid signal");
+            MisInformerSignal::new("mis-case-a", [1; 32], 4, 10, vec![0, 8, 0, 4]).expect("valid signal");
         let result = signal
-            .recommend_vertex("mis-case-a", 4, MisSelectionMode::PreferOutSet)
+            .recommend_vertex("mis-case-a", [1; 32], 4, MisSelectionMode::PreferOutSet)
             .expect("matching graph identity");
         assert_eq!(result.vertex, 0);
         assert_eq!(result.inclusion_count, 0);
@@ -317,22 +330,35 @@ mod tests {
     #[test]
     fn rejects_signal_from_wrong_instance() {
         let signal =
-            MisInformerSignal::new("mis-case-a", 2, 5, vec![4, 1]).expect("valid signal");
+            MisInformerSignal::new("mis-case-a", [1; 32], 2, 5, vec![4, 1]).expect("valid signal");
         assert_eq!(
             signal
-                .recommend_vertex("mis-case-b", 2, MisSelectionMode::PreferInSet)
+                .recommend_vertex("mis-case-b", [1; 32], 2, MisSelectionMode::PreferInSet)
                 .expect_err("signal is stale or belongs to another graph"),
             MisSignalError::InstanceIdMismatch
         );
     }
 
     #[test]
-    fn rejects_wrong_graph_size() {
+    fn rejects_signal_from_different_graph_digest_even_if_instance_id_and_size_match() {
         let signal =
-            MisInformerSignal::new("mis-case-a", 3, 5, vec![4, 1, 2]).expect("valid signal");
+            MisInformerSignal::new("mis-case-a", [1; 32], 2, 5, vec![4, 1])
+                .expect("valid signal");
         assert_eq!(
             signal
-                .recommend_vertex("mis-case-a", 4, MisSelectionMode::PreferOutSet)
+                .recommend_vertex("mis-case-a", [9; 32], 2, MisSelectionMode::PreferInSet)
+                .expect_err("graph content digest differs"),
+            MisSignalError::GraphDigestMismatch
+        );
+    }
+
+    #[test]
+    fn rejects_wrong_graph_size() {
+        let signal =
+            MisInformerSignal::new("mis-case-a", [1; 32], 3, 5, vec![4, 1, 2]).expect("valid signal");
+        assert_eq!(
+            signal
+                .recommend_vertex("mis-case-a", [1; 32], 4, MisSelectionMode::PreferOutSet)
                 .expect_err("graph size does not match"),
             MisSignalError::GraphSizeMismatch {
                 signal_vertices: 3,
@@ -344,9 +370,9 @@ mod tests {
     #[test]
     fn zero_frequency_is_a_real_observation_when_samples_exist() {
         let signal =
-            MisInformerSignal::new("mis-case-a", 3, 100, vec![0, 1, 0]).expect("valid signal");
+            MisInformerSignal::new("mis-case-a", [1; 32], 3, 100, vec![0, 1, 0]).expect("valid signal");
         let result = signal
-            .recommend_vertex("mis-case-a", 3, MisSelectionMode::PreferOutSet)
+            .recommend_vertex("mis-case-a", [1; 32], 3, MisSelectionMode::PreferOutSet)
             .expect("matching graph identity");
         assert_eq!(result.sample_count, 100);
         assert_eq!(result.inclusion_count, 0);
@@ -356,9 +382,9 @@ mod tests {
     #[test]
     fn all_vertices_tied_is_reported_as_tie_not_hidden_confidence() {
         let signal =
-            MisInformerSignal::new("mis-case-a", 3, 7, vec![4, 4, 4]).expect("valid signal");
+            MisInformerSignal::new("mis-case-a", [1; 32], 3, 7, vec![4, 4, 4]).expect("valid signal");
         let result = signal
-            .recommend_vertex("mis-case-a", 3, MisSelectionMode::PreferInSet)
+            .recommend_vertex("mis-case-a", [1; 32], 3, MisSelectionMode::PreferInSet)
             .expect("matching graph identity");
         assert_eq!(result.vertex, 0);
         assert_eq!(result.tie_count, 3);
