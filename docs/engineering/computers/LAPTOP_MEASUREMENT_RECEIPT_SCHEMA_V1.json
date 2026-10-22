@@ -1,0 +1,235 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "LAPTOP-ARCH-001 benchmark receipt v1",
+  "description": "One planned or observed workload execution on one exact laptop configuration. Structural validation does not authenticate evidence or make two receipts comparable.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "receipt_id", "evidence_status", "pairing",
+    "candidate", "software", "workload", "condition", "energy",
+    "meter", "sample", "sources"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "receipt_id": { "type": "string", "pattern": "^LAPTOP-[A-Z0-9-]+$" },
+    "evidence_status": { "enum": ["planned", "measured", "simulated"] },
+    "pairing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["comparison_id", "pair_index", "execution_order"],
+      "properties": {
+        "comparison_id": { "type": "string", "minLength": 1 },
+        "pair_index": { "type": ["integer", "null"], "minimum": 0 },
+        "execution_order": { "enum": ["randomized", "interleaved", "not_run", "unknown"] }
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "manufacturer", "model_family", "configuration_label", "sku_identity_status",
+        "exact_sku", "cpu", "gpu", "npu", "memory_gib", "memory_type",
+        "storage", "battery_wh", "source_urls"
+      ],
+      "properties": {
+        "manufacturer": { "type": "string", "minLength": 1 },
+        "model_family": { "type": "string", "minLength": 1 },
+        "configuration_label": { "type": "string", "minLength": 1 },
+        "sku_identity_status": {
+          "enum": ["verified_physical_unit", "review_configuration_only", "planned_product_target", "unknown"]
+        },
+        "exact_sku": { "type": ["string", "null"] },
+        "unit_token_sha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
+        "cpu": { "type": ["string", "null"] },
+        "gpu": { "type": ["string", "null"] },
+        "npu": { "type": ["string", "null"] },
+        "memory_gib": { "type": ["number", "null"], "exclusiveMinimum": 0 },
+        "memory_type": { "type": ["string", "null"] },
+        "storage": { "type": ["string", "null"] },
+        "battery_wh": { "type": ["number", "null"], "exclusiveMinimum": 0, "maximum": 300 },
+        "mass_g": { "type": ["number", "null"], "exclusiveMinimum": 0 },
+        "source_urls": {
+          "type": "array",
+          "items": { "type": "string", "format": "uri" },
+          "uniqueItems": true
+        }
+      }
+    },
+    "software": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "os_image", "kernel", "bios_version", "embedded_controller_version",
+        "driver_stack", "runtime_stack", "source_or_build_digest", "secure_boot_state"
+      ],
+      "properties": {
+        "os_image": { "type": ["string", "null"] },
+        "kernel": { "type": ["string", "null"] },
+        "bios_version": { "type": ["string", "null"] },
+        "embedded_controller_version": { "type": ["string", "null"] },
+        "driver_stack": { "type": ["string", "null"] },
+        "runtime_stack": { "type": ["string", "null"] },
+        "source_or_build_digest": { "type": ["string", "null"] },
+        "secure_boot_state": { "enum": ["enabled", "disabled", "unsupported", "unknown", "not_checked"] }
+      }
+    },
+    "workload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["workload_id", "version", "input_sha256", "scorer_sha256", "quality_gate"],
+      "properties": {
+        "workload_id": { "type": "string", "minLength": 1 },
+        "version": { "type": "string", "minLength": 1 },
+        "input_sha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
+        "scorer_sha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
+        "quality_gate": { "type": "string", "minLength": 1 },
+        "model_artifact_sha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
+        "model_runtime_backend": { "type": ["string", "null"] }
+      }
+    },
+    "condition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "power_source", "battery_state_pct", "display_brightness_nits",
+        "cache_state", "power_profile", "ambient_c", "initial_thermal_state",
+        "wireless_state"
+      ],
+      "properties": {
+        "power_source": { "enum": ["ac", "battery", "not_set"] },
+        "battery_state_pct": { "type": ["number", "null"], "minimum": 0, "maximum": 100 },
+        "display_brightness_nits": { "type": ["number", "null"], "minimum": 0, "maximum": 2000 },
+        "cache_state": { "enum": ["cold", "warm", "not_applicable", "not_set"] },
+        "power_profile": { "type": ["string", "null"] },
+        "ambient_c": { "type": ["number", "null"], "minimum": -20, "maximum": 60 },
+        "initial_thermal_state": { "enum": ["cold_start", "thermally_stable", "hot_start", "not_checked"] },
+        "wireless_state": { "enum": ["isolated", "wifi_on", "cellular_on", "mixed", "not_checked"] }
+      }
+    },
+    "energy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["method", "boundary", "joules", "includes_display_and_memory"],
+      "properties": {
+        "method": {
+          "enum": ["external_wall_meter", "battery_rail_meter", "os_telemetry_estimate", "model_estimate", "not_collected", "planned"]
+        },
+        "boundary": {
+          "enum": ["whole_device_input", "battery_output", "cpu_package", "gpu_package", "system_telemetry", "model_only", "unknown", "not_set"]
+        },
+        "joules": { "type": ["number", "null"], "minimum": 0 },
+        "includes_display_and_memory": { "type": ["boolean", "null"] }
+      }
+    },
+    "meter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["instrument_model", "instrument_token", "calibration_status", "calibration_reference", "sample_rate_hz"],
+      "properties": {
+        "instrument_model": { "type": ["string", "null"] },
+        "instrument_token": { "type": ["string", "null"] },
+        "calibration_status": { "enum": ["current", "expired", "unknown", "not_applicable", "not_checked"] },
+        "calibration_reference": { "type": ["string", "null"] },
+        "sample_rate_hz": { "type": ["number", "null"], "exclusiveMinimum": 0 }
+      }
+    },
+    "sample": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "task_success", "quality_score", "latency_ms", "throughput_units_per_second",
+            "duration_s", "peak_package_temp_c", "sustained_throughput_retention",
+            "raw_result_sha256"
+          ],
+          "properties": {
+            "task_success": { "type": "boolean" },
+            "quality_score": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+            "latency_ms": { "type": ["number", "null"], "minimum": 0 },
+            "throughput_units_per_second": { "type": ["number", "null"], "minimum": 0 },
+            "duration_s": { "type": "number", "exclusiveMinimum": 0 },
+            "peak_package_temp_c": { "type": ["number", "null"], "minimum": -20, "maximum": 125 },
+            "sustained_throughput_retention": { "type": ["number", "null"], "minimum": 0, "maximum": 2 },
+            "battery_delta_pct": { "type": ["number", "null"], "minimum": -100, "maximum": 100 },
+            "fan_db_a": { "type": ["number", "null"], "minimum": 0, "maximum": 150 },
+            "raw_result_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+          }
+        }
+      ]
+    },
+    "sources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["url", "supports"],
+        "properties": {
+          "url": { "type": "string", "format": "uri" },
+          "supports": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "evidence_status": { "const": "measured" } } },
+      "then": {
+        "properties": {
+          "candidate": {
+            "properties": {
+              "sku_identity_status": { "const": "verified_physical_unit" },
+              "unit_token_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+              "exact_sku": { "type": "string", "minLength": 1 }
+            }
+          },
+          "software": {
+            "properties": {
+              "os_image": { "type": "string", "minLength": 1 },
+              "kernel": { "type": "string", "minLength": 1 },
+              "bios_version": { "type": "string", "minLength": 1 },
+              "embedded_controller_version": { "type": "string", "minLength": 1 },
+              "driver_stack": { "type": "string", "minLength": 1 },
+              "runtime_stack": { "type": "string", "minLength": 1 },
+              "source_or_build_digest": { "type": "string", "minLength": 1 }
+            }
+          },
+          "workload": {
+            "properties": {
+              "input_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+              "scorer_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+            }
+          },
+          "sample": { "type": "object" }
+        },
+        "required": ["sample"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "energy": {
+            "properties": {
+              "method": { "enum": ["external_wall_meter", "battery_rail_meter"] },
+              "joules": { "type": "number" }
+            },
+            "required": ["method", "joules"]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "meter": {
+            "properties": {
+              "instrument_model": { "type": "string", "minLength": 1 },
+              "calibration_status": { "const": "current" },
+              "calibration_reference": { "type": "string", "minLength": 1 },
+              "sample_rate_hz": { "type": "number", "exclusiveMinimum": 0 }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
