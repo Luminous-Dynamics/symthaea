@@ -240,7 +240,9 @@
     "stale_certificate_reuse_attempts",
     "stale_certificate_rejections_by_reason",
     "false_acceptance_rate_for_stale_certificates",
-    "certificate_validation_p50_p95_p99_latency"
+    "certificate_validation_p50_p95_p99_latency",
+    "noise_adjusted_pairwise_model_separation",
+    "guaranteed_probe_discriminability_under_declared_measurement_bounds"
   ],
   "mandatory_gates": [
     "invalid_input_or_missing_calibration_is_uncertified",
@@ -259,7 +261,8 @@
     "certificate_lease_binds_state_model_limits_calibration_authority_monitor_and_evidence_revisions",
     "stale_certificate_rejected_after_any_bound_context_change",
     "certificate_validation_and_action_application_are_atomic_or_toctou_tested",
-    "certificate_horizon_and_expiry_are_checked_at_use"
+    "certificate_horizon_and_expiry_are_checked_at_use",
+    "active_probe_discrimination_is_discounted_by_declared_observation_noise_bounds"
   ],
   "proposed_targets_not_results": {
     "in_envelope_false_certificates": 0,
@@ -326,6 +329,7 @@
     "Native MPSC/CBF and neural-CBF filters must be compared only on tasks/configurations where their constraints and action semantics match.",
     "Modern conformal SLS-MPC and GPU-SLS references count as headline comparators only after pinned reproduction or documented mathematical adaptation.",
     "Hardware-accelerated runtime comparisons must publish hardware, solver, precision, deadline and compute budgets; do not infer speed superiority from different hardware.",
-    "A-SLS (2026-10-14 preprint) is a priority comparator for active learning because it plans with guaranteed future parameter-uncertainty reduction; do not describe interval-gap active probing as equivalent to A-SLS."
+    "A-SLS (2026-10-14 preprint) is a priority comparator for active learning because it plans with guaranteed future parameter-uncertainty reduction; do not describe interval-gap active probing as equivalent to A-SLS.",
+    "A geometric pairwise-separation probe may claim guaranteed one-step distinguishability only when all candidate observation sets are disjoint after declared measurement-noise expansion."
   ]
 }
