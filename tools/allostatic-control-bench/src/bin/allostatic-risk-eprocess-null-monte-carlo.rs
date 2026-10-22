@@ -30,7 +30,7 @@ const Z_975: f64 = 1.959_963_984_540_054;
 const RAW_HEADER: &str = "risk_rate,cohort,monitor,events,event_trace,first_event_step,fixed_first_alarm_step,mix3_first_alarm_step,mix7_first_alarm_step,fixed_final_log_e,mix3_final_log_e,mix7_final_log_e,adaptive_first_alarm_step,adaptive_final_log_e";
 const SUMMARY_HEADER: &str = "risk_rate,method,cohorts,monitors_per_cohort,horizon,cohort_fwer_count,cohort_fwer_rate,wilson_95_lower,wilson_95_upper,per_monitor_alarm_count,per_monitor_alarm_rate,mean_first_alarm_step,p95_first_alarm_step,median_first_alarm_step,mean_event_count,expected_event_count,epsilon,delta,log_alarm_threshold,bet_grid";
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 struct StreamRecord {
     cohort: usize,
     monitor: usize,
@@ -180,7 +180,7 @@ fn run_stream(
     })
 }
 
-fn method_fields(record: StreamRecord, method: &str) -> (usize, f64, &'static str) {
+fn method_fields(record: &StreamRecord, method: &str) -> (usize, f64, &'static str) {
     match method {
         "fixed" => (
             record.fixed_first_alarm_step,
@@ -218,7 +218,7 @@ fn summary_row(
     let mut alarm_count = 0_usize;
     let mut event_count = 0_usize;
     for record in records {
-        let (first_alarm, _, _) = method_fields(*record, method);
+        let (first_alarm, _, _) = method_fields(record, method);
         alarm_count += usize::from(first_alarm < HORIZON);
         if first_alarm < HORIZON {
             alarm_steps.push(first_alarm);
@@ -234,7 +234,7 @@ fn summary_row(
         fwer_count += usize::from(any_alarm);
     }
     let (wilson_lower, wilson_upper) = wilson_interval(fwer_count, COHORTS);
-    let grid = method_fields(records[0], method).2;
+    let grid = method_fields(&records[0], method).2;
     let fields = [
         rate_label.to_string(),
         method.to_string(),
@@ -318,7 +318,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             let fwer_count = (0..COHORTS)
                 .filter(|cohort| {
                     records.iter().any(|record| {
-                        record.cohort == *cohort && method_fields(*record, method).0 < HORIZON
+                        record.cohort == *cohort && method_fields(record, method).0 < HORIZON
                     })
                 })
                 .count();
