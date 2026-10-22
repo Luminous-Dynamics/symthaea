@@ -25,7 +25,7 @@ Floating-point values are encoded by their exact IEEE-754 bit patterns in canoni
 
 The FNV checksum detects accidental corruption, truncated writes, and partial/malformed checkpoints. It is not cryptographic authentication: someone able to rewrite the checkpoint can also recompute FNV. Production deployment should place this payload inside an authenticated storage envelope (for example a keyed MAC or digital signature), bind it to monitor/controller identity and software version, and store it atomically with replay protection. The dependency-free benchmark codec does not pretend to supply those production properties.
 
-The alpha-spending episode index is retained in the checkpoint. A resumed episode must continue under that same index; a new episode must be assigned a fresh predeclared index. Resetting state must never mint an additional alpha budget. Checkpoints are versioned so a semantic change to the evidence recurrence or threshold contract requires a version bump and explicit migration policy.
+The alpha-spending episode index is retained in the checkpoint. A resumed episode must continue under that same index; a new episode must be assigned a fresh predeclared index. Both fixed and mixture e-process APIs now refuse an in-place reset when an alpha-spending index is attached; the call returns false without mutating evidence or the latch. A new episode must construct a fresh monitor with its next predeclared index. This makes it harder for a caller to accidentally reuse an already-spent budget through the public reset API. Resetting state must never mint an additional alpha budget. Checkpoints are versioned so a semantic change to the evidence recurrence or threshold contract requires a version bump and explicit migration policy.
 
 ## Tests
 
