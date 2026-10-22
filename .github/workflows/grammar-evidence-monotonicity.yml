@@ -1,0 +1,169 @@
+name: Grammar Evidence Monotonicity
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/grammar-evidence-monotonicity.yml'
+      - 'patches/science/grammar-evidence-monotonicity-v1.patch'
+      - 'crates/core/symthaea-core/src/hdc/abstract_thought/dynamic_grammar.rs'
+      - 'crates/core/symthaea-core/src/hdc/conjecture_engine/verification.rs'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  PATCH: patches/science/grammar-evidence-monotonicity-v1.patch
+
+jobs:
+  qualify:
+    name: Prove evidence-refinement eligibility loss and qualify monotonicity
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Freeze qualification-only scope
+        run: |
+          test -f "$PATCH"
+          BASE="${{ github.event.pull_request.base.sha }}"
+          if [ -z "$BASE" ]; then BASE="HEAD^"; fi
+          git diff --exit-code "$BASE" -- Cargo.toml Cargo.lock crates/core/symthaea-core/src || {
+            echo 'grammar-evidence-monotonicity branch must not materialize product source'
+            exit 1
+          }
+
+      - name: Setup Rust 1.96
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Prove current refined-state recurrent eligibility loss
+        run: |
+          mkdir -p crates/core/symthaea-core/tests
+          cat > crates/core/symthaea-core/tests/grammar_evidence_monotonicity_negative_control.rs <<'RS'
+          use symthaea_core::hdc::abstract_thought::dynamic_grammar::DynamicGrammar;
+          use symthaea_core::hdc::conjecture_engine::{
+              BinOp, Conjecture, ConjectureEngine, ConjectureStatus, Expr,
+              MacroPromotionTier, MathDomain,
+          };
+
+          fn formula() -> Expr {
+              Expr::BinOp(
+                  BinOp::Add,
+                  Box::new(Expr::BinOp(
+                      BinOp::Pow,
+                      Box::new(Expr::Var("n".into())),
+                      Box::new(Expr::Const(2.0)),
+                  )),
+                  Box::new(Expr::Const(1.0)),
+              )
+          }
+
+          fn conjecture(source: String, status: ConjectureStatus) -> Conjecture {
+              let formula = formula();
+              let complexity = formula.complexity();
+              Conjecture {
+                  formula: formula.clone(),
+                  formula_str: format!("{formula}"),
+                  source,
+                  domain: MathDomain::Physics,
+                  training_mse: 1e-8,
+                  complexity,
+                  fitness: 1e-8,
+                  status,
+                  confidence: 0.9,
+                  macro_promotion_tier: MacroPromotionTier::RecurrentNumerical,
+                  eml_compiled: None,
+                  eml_metrics: None,
+                  eml_verified_real: None,
+                  eml_real_domain: None,
+                  eml_verified_complex: None,
+                  eml_constructive_compiled: None,
+                  eml_constructive_metrics: None,
+                  eml_verified_constructive_real: None,
+              }
+          }
+
+          fn assert_current_main_loses_recurrent_eligibility(status: ConjectureStatus, label: &str) {
+              let mut engine = ConjectureEngine::new();
+              for i in 0..3 {
+                  engine
+                      .conjectures
+                      .push(conjecture(format!("{label}-{i}"), status.clone()));
+              }
+
+              let mut grammar = DynamicGrammar::new();
+              grammar.observe_subtree(formula(), &[0, 1, 2], &engine);
+              assert_eq!(grammar.candidates.len(), 1);
+              assert_eq!(
+                  grammar.candidates[0].verified_count, 0,
+                  "current main should demonstrate the refined-state eligibility loss"
+              );
+              grammar.promote_eligible(&engine);
+              assert!(grammar.operators.is_empty());
+          }
+
+          #[test]
+          fn current_bounded_checked_loses_recurrent_eligibility() {
+              assert_current_main_loses_recurrent_eligibility(
+                  ConjectureStatus::BoundedChecked {
+                      checked_points: 12,
+                      max_n: 20,
+                  },
+                  "bounded",
+              );
+          }
+
+          #[test]
+          fn current_smt_samples_checked_loses_recurrent_eligibility() {
+              assert_current_main_loses_recurrent_eligibility(
+                  ConjectureStatus::SmtSamplesChecked { checked_points: 12 },
+                  "smt",
+              );
+          }
+          RS
+          cargo test --locked -p symthaea-core --features abstract_thought --test grammar_evidence_monotonicity_negative_control
+          rm crates/core/symthaea-core/tests/grammar_evidence_monotonicity_negative_control.rs
+
+      - name: Validate and apply exact candidate patch
+        run: |
+          git apply --check "$PATCH"
+          git apply "$PATCH"
+          git diff --check
+
+      - name: Ratchet evidence-state monotonicity
+        run: |
+          FILE=crates/core/symthaea-core/src/hdc/abstract_thought/dynamic_grammar.rs
+          grep -F 'fn is_recurrently_verified(status: &ConjectureStatus) -> bool' "$FILE"
+          grep -F 'ConjectureStatus::BoundedChecked { checked_points, .. } => *checked_points > 0' "$FILE"
+          grep -F 'ConjectureStatus::SmtSamplesChecked { checked_points } => *checked_points > 0' "$FILE"
+          grep -F '&& is_recurrently_verified(&conj.status)' "$FILE"
+          grep -F 'bounded_checked_retains_recurrent_grammar_eligibility' "$FILE"
+          grep -F 'smt_samples_checked_retains_recurrent_grammar_eligibility' "$FILE"
+          grep -F 'must not become singleton fast-track evidence' "$FILE"
+          if grep -F '&& is_verified(&conj.status)' "$FILE"; then
+            echo 'legacy non-monotone recurrent predicate still used'
+            exit 1
+          fi
+
+      - name: Run exact monotonicity regressions
+        run: |
+          cargo fmt --check -p symthaea-core
+          cargo test --locked -p symthaea-core --features abstract_thought bounded_checked_retains_recurrent_grammar_eligibility -- --nocapture
+          cargo test --locked -p symthaea-core --features abstract_thought smt_samples_checked_retains_recurrent_grammar_eligibility -- --nocapture
+          cargo check --locked -p symthaea-core --features abstract_thought
+          cargo clippy --locked -p symthaea-core --features abstract_thought --lib -- -D warnings
+
+      - name: Evidence boundary
+        run: |
+          echo 'PASS establishes monotone retention of the already-authorized recurrent grammar path when a conjecture moves into BoundedChecked or SmtSamplesChecked with nonzero checked points.'
+          echo 'These states remain finite/sample evidence and do not gain singleton fast-track, universal-proof, independence, replication, truth, or action authority.'
