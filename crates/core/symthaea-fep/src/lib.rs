@@ -144,6 +144,7 @@ pub mod generative_model;
 pub mod haptic_semantic_binder;
 pub mod hierarchical;
 pub mod markov_blanket;
+pub mod model_information_gain;
 mod motor;
 mod td_learning;
 pub mod types;
@@ -165,6 +166,12 @@ pub use td_learning::{
 };
 
 pub use generative_model::GenerativeModel;
+
+pub use model_information_gain::{
+    ActionInformationGain, InformationGainError, ModelHypothesis,
+    compute_action_information_gain, compute_action_information_gains,
+    most_informative_action,
+};
 
 pub use haptic_semantic_binder::HapticSemanticBinder;
 
