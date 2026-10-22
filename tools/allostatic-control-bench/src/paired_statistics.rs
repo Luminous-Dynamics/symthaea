@@ -244,6 +244,36 @@ fn exact_mcnemar_two_sided(candidate_only: usize, baseline_only: usize) -> f64 {
     (2.0 * probability).min(1.0)
 }
 
+/// Minimum independent zero-violation episodes needed for the one-sided exact
+/// binomial upper limit to be no greater than `target_upper_rate`.
+///
+/// This is a precision-planning calculation, not evidence that the episodes are
+/// independent or that the tested conditions cover the deployment distribution.
+pub fn minimum_zero_violation_trials(
+    target_upper_rate: f64,
+    confidence_level: f64,
+) -> Result<usize, String> {
+    if !target_upper_rate.is_finite()
+        || target_upper_rate <= 0.0
+        || target_upper_rate >= 1.0
+    {
+        return Err("target upper rate must be finite and strictly between zero and one".to_owned());
+    }
+    if !confidence_level.is_finite()
+        || confidence_level <= 0.0
+        || confidence_level >= 1.0
+    {
+        return Err("confidence level must be finite and strictly between zero and one".to_owned());
+    }
+
+    let alpha = 1.0 - confidence_level;
+    let required = (alpha.ln() / (1.0 - target_upper_rate).ln()).ceil();
+    if !required.is_finite() || required < 1.0 || required > usize::MAX as f64 {
+        return Err("required sample count is outside the supported integer range".to_owned());
+    }
+    Ok(required as usize)
+}
+
 #[cfg(test)]
 mod tests {
     use super::{PairedEpisode, PairedSummary};
@@ -280,6 +310,13 @@ mod tests {
         let p = super::exact_mcnemar_two_sided(10, 0);
         assert!((p - 0.001_953_125).abs() < 1e-12);
         assert_eq!(super::exact_mcnemar_two_sided(0, 0), 1.0);
+    }
+
+    #[test]
+    fn zero_event_risk_precision_requires_more_runs_for_stricter_claims() {
+        assert_eq!(super::minimum_zero_violation_trials(0.01, 0.95), Ok(299));
+        assert_eq!(super::minimum_zero_violation_trials(0.001, 0.95), Ok(2_995));
+        assert!(super::minimum_zero_violation_trials(0.0, 0.95).is_err());
     }
 
     #[test]
