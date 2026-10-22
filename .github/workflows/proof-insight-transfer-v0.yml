@@ -1400,6 +1400,10 @@ jobs:
           over_budget[0]["run"]["actual_tokens"] = 1001
           cases.append(("over-budget row", over_budget))
 
+          missing_usage = copy.deepcopy(source_rows)
+          del missing_usage[0]["run"]["actual_tokens"]
+          cases.append(("missing measured token usage", missing_usage))
+
           unmatched_arm = copy.deepcopy(source_rows)
           unmatched_arm[1]["run"]["config_sha256"] = "0" * 64
           cases.append(("unmatched run configuration", unmatched_arm))
