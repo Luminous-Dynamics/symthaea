@@ -241,7 +241,11 @@ pub fn evaluate_action_set(
         push: robustly_viable(state, dynamics.effect_for_action(Action::Push), limits),
         maintain: robustly_viable(state, dynamics.effect_for_action(Action::Maintain), limits),
         emergency_recover: shield_can_recover
-            && robustly_viable(state, dynamics.effect_for_action(Action::EmergencyRecover), limits),
+            && robustly_viable(
+                state,
+                dynamics.effect_for_action(Action::EmergencyRecover),
+                limits,
+            ),
     }
 }
 
