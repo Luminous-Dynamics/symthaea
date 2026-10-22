@@ -184,6 +184,8 @@ def layered_graph_scores(true_dag_edges, true_cpdag_directed_edges,
         if not (0 <= u < node_count and 0 <= v < node_count) or u >= v:
             raise ValueError("undirected edges must be in-range canonical pairs (u, v) with u < v")
     pred_directed_skeleton = {tuple(sorted(edge)) for edge in pred_directed}
+    if len(pred_directed_skeleton) != len(pred_directed):
+        raise ValueError("a predicted adjacency cannot contain both directed orientations")
     overlap = pred_directed_skeleton & pred_undirected
     if overlap:
         raise ValueError(f"a predicted adjacency cannot be both directed and undirected: {sorted(overlap)}")
