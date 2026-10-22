@@ -36,9 +36,10 @@ impl PsiAttestationRecord {
 #[derive(Debug, Clone)]
 pub struct CycleResult {
     pub output: Vec<f32>,
-    /// Raw prediction-error diagnostic. A value of 1.0 may be the legacy
-    /// no-prediction/zero-norm sentinel; check associated degeneracy telemetry
-    /// before interpreting it as genuine maximum surprise.
+    /// Prediction-error diagnostic. A value of 1.0 may be the legacy encoder
+    /// no-prediction/zero-norm sentinel rather than genuine maximum surprise.
+    /// Other entry points may report 0.0 when no comparison exists; this field
+    /// alone does not communicate whether the current error is valid.
     pub prediction_error: f32,
     pub peak_attention: f32,
     pub detected_primitives: Vec<String>,
