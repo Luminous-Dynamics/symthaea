@@ -57,9 +57,11 @@ Per-policy summaries report mean decision regret, total net utility, storage uni
 ## Output and limitations
 
 Output is deterministic JSONL with:
-- one `GMCv2` `run` receipt containing source SHA, seed, candidate count, action/utility version, and non-cryptographic fixture fingerprint;
-- per-candidate decision records and a separate oracle diagnostic;
-- per-policy summaries and explicit anti-control results.
+- one `GMCv2` `run` receipt containing source SHA, seed, candidate count, feature-noise version, and non-cryptographic fixture fingerprint;
+- per-candidate decisions containing the observed feature vector and evaluator-only class label, plus a separate oracle diagnostic;
+- per-policy summaries with one-decision-per-candidate completeness checks and explicit anti-control results.
+
+The run-validity gate checks the oracle, complete candidate-ID coverage, and whether the anti-controls are detected. It deliberately does **not** require the candidate policy to beat a baseline: a bad result is a valid result and must remain reportable.
 
 Seeded feature noise perturbs repeat count, distinct episodes, contradictions, recency, independent successes, provenance diversity and occasionally the observed correction signal. Policy-visible features can therefore differ within one ground-truth class; the generator remains synthetic and its class-conditioned templates are still hand-specified. This is a useful stress test, not realistic distributional coverage.
 
