@@ -28,7 +28,7 @@ That assumption is distinct from exchangeability-based conformal calibration. A 
 ## Fixed synthetic design
 
 - The input is the same 5 operating-point × 4 condition × 300 episode × 8 step panel as the CUSUM benchmark.
-- The bounded loss is \(L_t=\min(r_t/0.05,1)\), where \(r_t\) is the task-residual score. The declared null risk bound is \(\epsilon=0.15\), the fixed bet is \(\lambda=0.5/\epsilon\), the global false-alarm budget is \(\delta=0.05\), and five operating-point monitors use threshold \(K/\delta=100\) (or \(\log 100\) in log space).
+- The bounded loss is \(L_t=\min(r_t/0.05,1)\), where \(r_t\) is the task-residual score. The declared null risk bound is \(\epsilon=0.15\); the fixed predeclared bet fractions are \(\rho\in\{0.25,0.5,0.75\}\), corresponding to component bets \(\lambda_j=\rho_j/\epsilon\). The global false-alarm budget is \(\delta=0.05\), and five operating-point monitors use threshold \(K/\delta=100\) (or \(\log 100\) in log space). For component log-e-values \(z_1,z_2,z_3\), the mixture log-e-value is \(\log((e^{z_1}+e^{z_2}+e^{z_3})/3)\), computed with log-sum-exp.
 - These values are frozen for this fixture, not tuned on test episodes. The bounded-risk interpretation requires that nominal expected bounded loss be no greater than \(\epsilon\) conditional on past observations. The synthetic run checks basic behavior but cannot prove that assumption for a real system.
 - The stealth control reuses exactly the nominal residual scores, while the scenario label records an unobserved dynamics shift. Neither the pointwise, CUSUM nor e-process monitor should appear to detect information that is absent from the monitored signal.
 
@@ -36,7 +36,7 @@ That assumption is distinct from exchangeability-based conformal calibration. A 
 
 - Byte-identical repeated raw and summary outputs, exact 48,000 raw rows and 20 summary cells.
 - Raw e-process output must retain the exact first 14 columns of the CUSUM input.
-- Each bounded loss must equal the frozen score normalization; log e-values must match the multiplicative recurrence recomputed independently.
+- Each bounded loss must equal the frozen score normalization; all three component log-e-values must match their factor recurrence, and the mixture log-e-value must match an independently recomputed log-sum-exp.
 - The global threshold must equal \(\log(5/0.05)\), and the recorded risk bound, bet and familywise delta must equal their frozen configuration.
 - Nominal false alarms no greater than 10% per operating-point cell; gradual-shift detection at least 80% even when all residuals remain below the pointwise threshold; abrupt-shift detection at least 90%.
 - Stealth shift must produce the same e-process alarm counts as the paired nominal streams, with most latent shifts missed. That is a negative control, not a failure to exploit evidence that does not exist.
@@ -44,7 +44,7 @@ That assumption is distinct from exchangeability-based conformal calibration. A 
 
 ## Comparison to current research
 
-The conceptual reference is Timans, Verma, Nalisnick and Naesseth, “On Continuous Monitoring of Risk Violations under Unknown Shift,” UAI 2025, which uses testing-by-betting to monitor bounded risk violations in evolving streams. Their implementation also compares several e-process constructions; this code is a small fixed-bet bounded-risk baseline, not a reproduction of their full method or benchmark. [Paper](https://proceedings.mlr.press/v286/timans25a.html) · [Reference implementation](https://github.com/alextimans/risk-monitor).
+The conceptual reference is Timans, Verma, Nalisnick and Naesseth, “On Continuous Monitoring of Risk Violations under Unknown Shift,” UAI 2025, which uses testing-by-betting to monitor bounded risk violations in evolving streams. This branch uses a **predeclared three-bet mixture** with fractions [0.25, 0.5, 0.75] of 1/epsilon. It does not pick a bet after seeing test outcomes: it updates all three valid component processes and takes their equal-weight arithmetic mixture in log space. A mixture of nonnegative supermartingales is again a nonnegative supermartingale under the same null. This is still a small baseline, not a reproduction of the full paper or its benchmark. [Paper](https://proceedings.mlr.press/v286/timans25a.html) · [Reference implementation](https://github.com/alextimans/risk-monitor).
 
 For runtime control, also preserve:
 - [SODA-MPC (L4DC 2025)](https://proceedings.mlr.press/v283/contreras25a.html): conformalized ensemble OOD monitoring and a reachability fallback.
