@@ -32,9 +32,23 @@ pub struct Battery {
     pub degradation_per_cycle: f64,
 }
 
-/// Errors from an attempted battery operation.
+/// Errors from battery operations and checked configuration.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum BatteryError {
+    /// Capacity must be finite and positive.
+    InvalidCapacity,
+    /// Power rating must be finite and positive.
+    InvalidPowerRating,
+    /// Round-trip efficiency must be finite and in [0, 1].
+    InvalidRoundTripEfficiency,
+    /// State of charge must be finite and in [0, 1].
+    InvalidStateOfCharge,
+    /// Per-cycle degradation must be finite and in [0, 1].
+    InvalidDegradationRate,
+    /// Public configuration/state was mutated into an invalid state.
+    InvalidConfiguration,
+    /// Requested power is not finite.
+    NonFinitePower,
     /// Requested power exceeds `power_rating_kw`.
     PowerExceedsRating,
     /// `dt_hours` was not finite/positive.
@@ -42,13 +56,53 @@ pub enum BatteryError {
 }
 
 impl Battery {
-    /// Construct a new battery at the given state of charge (fraction of
-    /// nameplate capacity, \[0, 1\]), starting at 100% state of health.
+    /// Construct a battery with validated physical parameters.
+    ///
+    /// Unlike the compatibility constructor, this rejects rather than clamps
+    /// invalid values.
+    pub fn try_new(
+        capacity_kwh: f64,
+        power_rating_kw: f64,
+        round_trip_efficiency: f64,
+    ) -> Result<Self, BatteryError> {
+        if !capacity_kwh.is_finite() || capacity_kwh <= 0.0 {
+            return Err(BatteryError::InvalidCapacity);
+        }
+        if !power_rating_kw.is_finite() || power_rating_kw <= 0.0 {
+            return Err(BatteryError::InvalidPowerRating);
+        }
+        if !round_trip_efficiency.is_finite()
+            || !(0.0..=1.0).contains(&round_trip_efficiency)
+        {
+            return Err(BatteryError::InvalidRoundTripEfficiency);
+        }
+        Ok(Self::new(
+            capacity_kwh,
+            power_rating_kw,
+            round_trip_efficiency,
+        ))
+    }
+
+    /// Compatibility constructor: preserves finite efficiency clamping.
+    /// Invalid capacity/power ratings disable the battery (zero capacity and
+    /// rating); a non-finite efficiency becomes zero. New callers should use
+    /// try_new so configuration errors remain observable.
     pub fn new(capacity_kwh: f64, power_rating_kw: f64, round_trip_efficiency: f64) -> Self {
+        let configuration_valid = capacity_kwh.is_finite()
+            && capacity_kwh > 0.0
+            && power_rating_kw.is_finite()
+            && power_rating_kw > 0.0;
+        let capacity_kwh = if configuration_valid { capacity_kwh } else { 0.0 };
+        let power_rating_kw = if configuration_valid { power_rating_kw } else { 0.0 };
+        let round_trip_efficiency = if round_trip_efficiency.is_finite() {
+            round_trip_efficiency.clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
         Self {
             capacity_kwh,
             power_rating_kw,
-            round_trip_efficiency: round_trip_efficiency.clamp(0.0, 1.0),
+            round_trip_efficiency,
             soc: 0.5,
             state_of_health: 1.0,
             equivalent_full_cycles: 0.0,
@@ -57,13 +111,45 @@ impl Battery {
     }
 
     pub fn with_soc(mut self, soc: f64) -> Self {
-        self.soc = soc.clamp(0.0, 1.0);
+        self.soc = if soc.is_finite() {
+            soc.clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
         self
     }
 
+    /// Set initial state of charge without silently clamping invalid input.
+    pub fn try_with_soc(mut self, soc: f64) -> Result<Self, BatteryError> {
+        if !self.has_valid_state() {
+            return Err(BatteryError::InvalidConfiguration);
+        }
+        if !soc.is_finite() || !(0.0..=1.0).contains(&soc) {
+            return Err(BatteryError::InvalidStateOfCharge);
+        }
+        self.soc = soc;
+        Ok(self)
+    }
+
     pub fn with_degradation_per_cycle(mut self, rate: f64) -> Self {
-        self.degradation_per_cycle = rate.max(0.0);
+        self.degradation_per_cycle = if rate.is_finite() {
+            rate.max(0.0)
+        } else {
+            1.0
+        };
         self
+    }
+
+    /// Configure a finite fractional fade rate in [0, 1] without clamping.
+    pub fn try_with_degradation_per_cycle(mut self, rate: f64) -> Result<Self, BatteryError> {
+        if !self.has_valid_state() {
+            return Err(BatteryError::InvalidConfiguration);
+        }
+        if !rate.is_finite() || !(0.0..=1.0).contains(&rate) {
+            return Err(BatteryError::InvalidDegradationRate);
+        }
+        self.degradation_per_cycle = rate;
+        Ok(self)
     }
 
     /// Current state of charge, fraction of *current* (degraded) capacity.
@@ -91,6 +177,24 @@ impl Battery {
         self.soc * self.effective_capacity_kwh()
     }
 
+    /// Validate public configuration and private dynamic state before mutation.
+    fn has_valid_state(&self) -> bool {
+        self.capacity_kwh.is_finite()
+            && self.capacity_kwh > 0.0
+            && self.power_rating_kw.is_finite()
+            && self.power_rating_kw > 0.0
+            && self.round_trip_efficiency.is_finite()
+            && (0.0..=1.0).contains(&self.round_trip_efficiency)
+            && self.soc.is_finite()
+            && (0.0..=1.0).contains(&self.soc)
+            && self.state_of_health.is_finite()
+            && (0.0..=1.0).contains(&self.state_of_health)
+            && self.equivalent_full_cycles.is_finite()
+            && self.equivalent_full_cycles >= 0.0
+            && self.degradation_per_cycle.is_finite()
+            && (0.0..=1.0).contains(&self.degradation_per_cycle)
+    }
+
     /// One-way (charge or discharge) efficiency: sqrt of round-trip efficiency,
     /// the standard convention so a full charge+discharge cycle loses exactly
     /// `1 - round_trip_efficiency` of the energy moved.
@@ -103,10 +207,16 @@ impl Battery {
     /// after efficiency), which may be less than requested if the battery
     /// reaches full SoC mid-interval.
     pub fn charge(&mut self, power_kw: f64, dt_hours: f64) -> Result<f64, BatteryError> {
+        if !power_kw.is_finite() {
+            return Err(BatteryError::NonFinitePower);
+        }
+        if !self.has_valid_state() {
+            return Err(BatteryError::InvalidConfiguration);
+        }
         if power_kw.abs() > self.power_rating_kw + f64::EPSILON {
             return Err(BatteryError::PowerExceedsRating);
         }
-        if !dt_hours.is_finite() || dt_hours < 0.0 {
+        if !dt_hours.is_finite() || dt_hours <= 0.0 {
             return Err(BatteryError::InvalidDuration);
         }
         let requested_ac_kwh = power_kw.max(0.0) * dt_hours;
@@ -127,10 +237,16 @@ impl Battery {
     /// energy actually delivered (kWh), which may be less than requested if
     /// the battery reaches empty mid-interval.
     pub fn discharge(&mut self, power_kw: f64, dt_hours: f64) -> Result<f64, BatteryError> {
+        if !power_kw.is_finite() {
+            return Err(BatteryError::NonFinitePower);
+        }
+        if !self.has_valid_state() {
+            return Err(BatteryError::InvalidConfiguration);
+        }
         if power_kw.abs() > self.power_rating_kw + f64::EPSILON {
             return Err(BatteryError::PowerExceedsRating);
         }
-        if !dt_hours.is_finite() || dt_hours < 0.0 {
+        if !dt_hours.is_finite() || dt_hours <= 0.0 {
             return Err(BatteryError::InvalidDuration);
         }
         let requested_ac_kwh = power_kw.max(0.0) * dt_hours;
@@ -245,6 +361,26 @@ mod tests {
     }
 
     #[test]
+    fn test_zero_duration_rejected_without_mutation() {
+        let mut battery = Battery::new(100.0, 50.0, 0.9).with_soc(0.5);
+        let before_soc = battery.soc();
+        let before_soh = battery.state_of_health();
+        let before_cycles = battery.equivalent_full_cycles();
+
+        assert_eq!(
+            battery.charge(10.0, 0.0),
+            Err(BatteryError::InvalidDuration)
+        );
+        assert_eq!(
+            battery.discharge(10.0, 0.0),
+            Err(BatteryError::InvalidDuration)
+        );
+        assert_eq!(battery.soc(), before_soc);
+        assert_eq!(battery.state_of_health(), before_soh);
+        assert_eq!(battery.equivalent_full_cycles(), before_cycles);
+    }
+
+    #[test]
     fn test_negative_duration_rejected() {
         let mut b = Battery::new(100.0, 50.0, 1.0);
         assert_eq!(b.charge(10.0, -1.0), Err(BatteryError::InvalidDuration));
@@ -284,4 +420,122 @@ mod tests {
         let delivered = b.discharge(10.0, 1.0).unwrap();
         assert_eq!(delivered, 0.0);
     }
+
+    #[test]
+    fn test_checked_constructor_rejects_invalid_parameters() {
+        assert_eq!(
+            Battery::try_new(f64::NAN, 50.0, 0.9).err(),
+            Some(BatteryError::InvalidCapacity)
+        );
+        assert_eq!(
+            Battery::try_new(100.0, f64::INFINITY, 0.9).err(),
+            Some(BatteryError::InvalidPowerRating)
+        );
+        assert_eq!(
+            Battery::try_new(100.0, 50.0, f64::NAN).err(),
+            Some(BatteryError::InvalidRoundTripEfficiency)
+        );
+        assert_eq!(
+            Battery::try_new(100.0, 50.0, 1.1).err(),
+            Some(BatteryError::InvalidRoundTripEfficiency)
+        );
+    }
+
+    #[test]
+    fn test_legacy_constructor_fails_closed_on_non_finite_configuration() {
+        let mut battery = Battery::new(f64::NAN, f64::INFINITY, f64::NAN);
+        assert_eq!(battery.capacity_kwh, 0.0);
+        assert_eq!(battery.power_rating_kw, 0.0);
+        assert_eq!(battery.round_trip_efficiency, 0.0);
+        assert_eq!(
+            battery.charge(1.0, 1.0),
+            Err(BatteryError::InvalidConfiguration)
+        );
+        assert!(battery.soc().is_finite());
+        assert!(battery.state_of_health().is_finite());
+    }
+
+    #[test]
+    fn test_non_finite_power_rejected_without_mutation() {
+        let mut battery = Battery::new(100.0, 50.0, 0.9).with_soc(0.5);
+        let before_soc = battery.soc();
+        let before_cycles = battery.equivalent_full_cycles();
+        assert_eq!(
+            battery.charge(f64::NAN, 1.0),
+            Err(BatteryError::NonFinitePower)
+        );
+        assert_eq!(
+            battery.discharge(f64::INFINITY, 1.0),
+            Err(BatteryError::NonFinitePower)
+        );
+        assert_eq!(
+            battery.discharge(f64::NEG_INFINITY, 1.0),
+            Err(BatteryError::NonFinitePower)
+        );
+        assert_eq!(
+            battery.charge(10.0, f64::NAN),
+            Err(BatteryError::InvalidDuration)
+        );
+        assert_eq!(battery.soc(), before_soc);
+        assert_eq!(battery.equivalent_full_cycles(), before_cycles);
+    }
+
+    #[test]
+    fn test_checked_builders_reject_invalid_values_and_legacy_builders_remain_finite() {
+        assert_eq!(
+            Battery::try_new(100.0, 50.0, 0.9)
+                .unwrap()
+                .try_with_soc(f64::NAN)
+                .err(),
+            Some(BatteryError::InvalidStateOfCharge)
+        );
+        assert_eq!(
+            Battery::try_new(100.0, 50.0, 0.9)
+                .unwrap()
+                .try_with_degradation_per_cycle(f64::INFINITY)
+                .err(),
+            Some(BatteryError::InvalidDegradationRate)
+        );
+        let legacy = Battery::new(100.0, 50.0, 0.9)
+            .with_soc(f64::NAN)
+            .with_degradation_per_cycle(f64::INFINITY);
+        assert_eq!(legacy.soc(), 0.0);
+        assert_eq!(legacy.degradation_per_cycle, 1.0);
+        assert!(legacy.soc().is_finite());
+        assert!(legacy.degradation_per_cycle.is_finite());
+    }
+
+    #[test]
+    fn test_out_of_range_degradation_mutation_is_rejected_without_state_change() {
+        let mut battery = Battery::new(100.0, 50.0, 0.9).with_soc(0.5);
+        battery.degradation_per_cycle = 1.01;
+        let before_soc = battery.soc();
+        let before_soh = battery.state_of_health();
+        let before_cycles = battery.equivalent_full_cycles();
+
+        assert_eq!(
+            battery.charge(10.0, 1.0),
+            Err(BatteryError::InvalidConfiguration)
+        );
+        assert_eq!(
+            battery.discharge(10.0, 1.0),
+            Err(BatteryError::InvalidConfiguration)
+        );
+        assert_eq!(battery.soc(), before_soc);
+        assert_eq!(battery.state_of_health(), before_soh);
+        assert_eq!(battery.equivalent_full_cycles(), before_cycles);
+    }
+
+    #[test]
+    fn test_public_configuration_mutation_is_detected_before_charge() {
+        let mut battery = Battery::new(100.0, 50.0, 0.9);
+        battery.round_trip_efficiency = f64::NAN;
+        let before_soc = battery.soc();
+        assert_eq!(
+            battery.charge(10.0, 1.0),
+            Err(BatteryError::InvalidConfiguration)
+        );
+        assert_eq!(battery.soc(), before_soc);
+    }
+
 }
