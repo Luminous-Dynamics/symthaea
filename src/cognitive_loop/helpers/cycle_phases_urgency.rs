@@ -196,12 +196,23 @@ impl CognitiveLoopService {
         };
         let hysteresis_threshold =
             base_hysteresis * pattern_mod * coherence_mod * transition_cost_mod * consolidation_mod;
-        let error_urgency = super::super::CycleUrgency::from_state(
-            smoothed_urgency_error,
-            hysteresis_threshold,
-            surprise_triggered,
-            self.carryover.urgency.consecutive_low_error,
-        );
+        let has_prediction_error_history =
+            !self.error_history.is_empty() || !self.carryover.history.error_history.is_empty();
+        // Without a valid current or historical PE, preserve the prior urgency
+        // unless an independent surprise signal requests reassessment.
+        let error_urgency = if !prediction_error_valid
+            && !has_prediction_error_history
+            && !surprise_triggered
+        {
+            self.carryover.urgency.urgency
+        } else {
+            super::super::CycleUrgency::from_state(
+                smoothed_urgency_error,
+                hysteresis_threshold,
+                surprise_triggered,
+                self.carryover.urgency.consecutive_low_error,
+            )
+        };
 
         // Session 15 Item 2: Early warning at 5+ consecutive low-coherence cycles.
         // Mild exploration boost + confidence dampening before the hard Critical at 10.
