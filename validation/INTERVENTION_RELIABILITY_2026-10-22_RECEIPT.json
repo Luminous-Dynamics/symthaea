@@ -20,7 +20,8 @@
   "report": {
     "path": "docs/research/INTERVENTION_RELIABILITY_AUDIT_2026-10-22.md",
     "git_blob": "fec1c975fdaa210c628f8e2fe27bb7b341efbc14",
-    "sha256": "not separately recomputed on the remote-normalized markdown body"
+    "sha256": "96a7e16b5ad5650e7f24f1007b344c5e0f631df1cc3139da3a79e4568c2f2415",
+    "bytes": 9764
   },
   "artifact": {
     "path": "validation/intervention_reliability_2026-10-22.json",
