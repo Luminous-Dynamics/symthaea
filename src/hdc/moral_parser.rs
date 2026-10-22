@@ -85,7 +85,7 @@ impl Default for ParsedMoralScenario {
             action: None,
             patient: None,
             intent: MoralIntent::Unknown,
-            consent: ConsentState::Implied,
+            consent: ConsentState::Unknown,
             magnitude: None,
             has_negation: false,
             confidence: 0.0,
@@ -106,10 +106,16 @@ pub struct MoralParser {
     /// Words indicating bad intent
     bad_intent_words: HashSet<String>,
 
-    /// Words indicating consent given
+    /// Phrases indicating explicit affirmative consent
     consent_given_words: HashSet<String>,
 
-    /// Words indicating consent absent/denied
+    /// Phrases indicating explicit refusal or withdrawal
+    consent_denied_words: HashSet<String>,
+
+    /// Phrases indicating assumed or implied consent
+    consent_implied_words: HashSet<String>,
+
+    /// Phrases stating that consent was not obtained
     consent_absent_words: HashSet<String>,
 
     /// Negation words
@@ -363,20 +369,64 @@ impl MoralParser {
             .collect(),
 
             consent_given_words: [
-                "asked",
-                "asking",
-                "permission",
-                "permitted",
-                "consent",
+                "gave consent",
+                "given consent",
+                "explicit consent",
                 "consented",
                 "agreed",
-                "agreeing",
-                "allowed",
-                "allowing",
-                "approved",
-                "approving",
+                "said yes",
+                "gave permission",
+                "granted permission",
                 "with permission",
-                "after asking",
+                "with their permission",
+                "with her permission",
+                "with his permission",
+                "permission was granted",
+                "allowed me to",
+                "approved the request",
+                "explicitly authorized",
+                "affirmatively consented",
+                "after they agreed",
+                "after she agreed",
+                "after he agreed",
+            ]
+            .iter()
+            .map(|s| s.to_string())
+            .collect(),
+
+            consent_denied_words: [
+                "denied consent",
+                "refused consent",
+                "refused permission",
+                "declined consent",
+                "said no",
+                "told me no",
+                "withdrew consent",
+                "revoked consent",
+                "consent was withdrawn",
+                "consent was revoked",
+                "did not consent",
+                "didn't consent",
+                "does not consent",
+                "doesn't consent",
+            ]
+            .iter()
+            .map(|s| s.to_string())
+            .collect(),
+
+            consent_implied_words: [
+                "assumed consent",
+                "assumed permission",
+                "assumed they agreed",
+                "assumed she agreed",
+                "assumed he agreed",
+                "implied consent",
+                "implicitly consented",
+                "presumed consent",
+                "presumed permission",
+                "assumed they were okay with it",
+                "assumed she was okay with it",
+                "assumed he was okay with it",
             ]
             .iter()
             .map(|s| s.to_string())
@@ -386,11 +436,20 @@ impl MoralParser {
                 "without asking",
                 "without permission",
                 "without consent",
+                "without explicit consent",
                 "didn't ask",
                 "did not ask",
                 "never asked",
-                "secretly",
-                "behind",
+                "no response",
+                "no reply",
+                "didn't reply",
+                "did not reply",
+                "never replied",
+                "did not answer",
+                "didn't answer",
+                "did not get consent",
+                "didn't get consent",
+                "did not obtain consent",
                 "without telling",
                 "without informing",
                 "without notifying",
@@ -866,8 +925,13 @@ impl MoralParser {
                     _ => {}
                 }
 
-                // Merge consent information (absent consent anywhere is significant)
-                if sub_parsed.consent == ConsentState::Absent {
+                // A refusal anywhere is a strong signal; otherwise, stated absence
+                // overrides weaker or unknown consent evidence from another clause.
+                if sub_parsed.consent == ConsentState::Denied {
+                    primary.consent = ConsentState::Denied;
+                } else if sub_parsed.consent == ConsentState::Absent
+                    && primary.consent != ConsentState::Denied
+                {
                     primary.consent = ConsentState::Absent;
                 }
             }
@@ -923,24 +987,40 @@ impl MoralParser {
         scenario
     }
 
-    /// Detect consent state from text
+    /// Detect consent state from explicit textual evidence.
+    ///
+    /// Positive consent is never inferred merely because the scenario mentions
+    /// asking, permission, or consent as a topic. Silence maps to Unknown.
     fn detect_consent(&self, text: &str) -> ConsentState {
-        // Check for absent consent phrases first (more specific)
+        // Check explicit refusal/withdrawal before other signals.
+        for phrase in &self.consent_denied_words {
+            if text.contains(phrase.as_str()) {
+                return ConsentState::Denied;
+            }
+        }
+
+        // Stated failure to obtain consent is distinct from explicit refusal.
         for phrase in &self.consent_absent_words {
             if text.contains(phrase.as_str()) {
                 return ConsentState::Absent;
             }
         }
 
-        // Check for given consent phrases
+        // Only affirmative wording counts as given consent.
         for phrase in &self.consent_given_words {
             if text.contains(phrase.as_str()) {
                 return ConsentState::Given;
             }
         }
 
-        // Default to implied
-        ConsentState::Implied
+        // Assumption is recorded only when the scenario says it was assumed.
+        for phrase in &self.consent_implied_words {
+            if text.contains(phrase.as_str()) {
+                return ConsentState::Implied;
+            }
+        }
+
+        ConsentState::Unknown
     }
 
     /// Detect negation in words
@@ -1060,7 +1140,7 @@ impl MoralParser {
         if scenario.intent != MoralIntent::Unknown {
             score += 0.18;
         }
-        if scenario.consent != ConsentState::Implied {
+        if scenario.consent != ConsentState::Unknown {
             score += 0.12;
         }
         if scenario.magnitude.is_some() {
@@ -1320,10 +1400,11 @@ impl MoralParser {
                 let consent = consent.trim();
                 scenario.consent = match consent {
                     "given" | "yes" | "explicit" => ConsentState::Given,
-                    "denied" | "refused" | "no" => ConsentState::Denied,
-                    "absent" | "missing" | "not asked" => ConsentState::Absent,
+                    "denied" | "refused" | "no" | "withdrawn" => ConsentState::Denied,
+                    "absent" | "missing" | "not asked" | "no response" => ConsentState::Absent,
                     "implied" | "assumed" => ConsentState::Implied,
-                    _ => ConsentState::Implied,
+                    "unknown" | "unspecified" | "not stated" | "unclear" => ConsentState::Unknown,
+                    _ => ConsentState::Unknown,
                 };
             } else if let Some(magnitude) = line.strip_prefix("magnitude:") {
                 let magnitude = magnitude.trim();
@@ -1660,13 +1741,27 @@ mod tests {
         let result = parser.parse("I discussed my daughter's health without asking first");
         assert_eq!(result.consent, ConsentState::Absent);
 
-        // With consent
-        let result = parser.parse("After asking my daughter, I discussed her health");
+        // Asking is a request, not evidence that affirmative consent followed.
+        let result = parser.parse("I asked my daughter, but she did not answer, so I discussed her health");
+        assert_eq!(result.consent, ConsentState::Absent);
+
+        // Explicit affirmative consent
+        let result = parser.parse("After my daughter agreed, I discussed her health");
         assert_eq!(result.consent, ConsentState::Given);
 
-        // Implied (no explicit mention)
-        let result = parser.parse("I helped my friend move");
+        // Explicit refusal is distinct from missing consent.
+        let result = parser.parse("She refused consent, but I shared her health information");
+        assert_eq!(result.consent, ConsentState::Denied);
+
+        // Assumed consent is only inferred when assumption is actually stated.
+        let result = parser.parse("I assumed my friend was okay with it");
         assert_eq!(result.consent, ConsentState::Implied);
+
+        // No consent information is unknown, not implied.
+        let result = parser.parse("I helped my friend move");
+        assert_eq!(result.consent, ConsentState::Unknown);
+        assert!(result.consent.requires_clarification());
+        assert!(!result.consent.is_explicitly_given());
     }
 
     #[test]
