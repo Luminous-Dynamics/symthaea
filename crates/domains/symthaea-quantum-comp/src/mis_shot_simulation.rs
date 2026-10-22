@@ -413,7 +413,7 @@ fn uniform_allocations(total_budget: u64, candidate_count: usize) -> Vec<u64> {
     let base = total_budget / count;
     let remainder = total_budget % count;
     (0..candidate_count)
-        .map(|vertex| base + u64::from((vertex as u64) < remainder))
+        .map(|vertex| base + if (vertex as u64) < remainder { 1 } else { 0 })
         .collect()
 }
 
