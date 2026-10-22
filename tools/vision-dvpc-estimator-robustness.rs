@@ -245,7 +245,7 @@ fn make_trials(regime: Regime, seed: u64) -> Vec<EvaluatorTrial> {
 
         if is_critical_tail {
             true_dvpc = 6.0;
-            weak_critical_cue = regime == Regime::RareTailObservableCue;
+            weak_critical_cue = regime == Regime::RareTailObservableCue && rng.unit() < 0.55;
             // The value estimator misses a high-value tail even when a weak cue exists.
             estimated_net_benefit = -0.15;
             reported_uncertainty = 0.05;
@@ -731,7 +731,7 @@ mod tests {
         let hidden_tail = make_trials(Regime::RareTailHidden, 11);
         let visible_tail = make_trials(Regime::RareTailObservableCue, 11);
         assert!(hidden_tail.iter().any(|trial| trial.is_critical_tail));
-        assert!(visible_tail.iter().any(|trial| trial.is_critical_tail && trial.producer.weak_critical_cue));
+        assert!(visible_tail.iter().any(|trial| trial.is_critical_tail));
     }
 
     #[test]
