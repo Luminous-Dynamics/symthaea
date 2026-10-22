@@ -715,7 +715,7 @@ fn parse_cli(args: &[String]) -> Result<Option<CliOptions>, String> {
     let mut use_cloud = false;
     let mut repeats = 3_usize;
     let mut repeats_seen = false;
-    let mut output_path = std::env::temp_dir().join("symthaea_gcs_ablation_v5.json");
+    let mut output_path = std::env::temp_dir().join("symthaea_gcs_ablation_v6.json");
     let mut output_seen = false;
     let mut index = 0;
 
@@ -1002,7 +1002,7 @@ mod provenance_tests {
         assert!(!parsed.use_llm);
         assert!(!parsed.use_cloud);
         assert_eq!(parsed.repeats, 3);
-        assert!(parsed.output_path.ends_with("symthaea_gcs_ablation_v5.json"));
+        assert!(parsed.output_path.ends_with("symthaea_gcs_ablation_v6.json"));
     }
 
     #[test]
