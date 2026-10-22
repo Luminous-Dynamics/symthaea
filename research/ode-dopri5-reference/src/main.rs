@@ -9,16 +9,12 @@ use std::env;
 use std::error::Error;
 
 use ode_solvers::{Dopri5, System, Vector2};
-use ode_verify_001_harness::dynamical_system::{
-    DynamicalSystem, HarmonicOscillator, Rk45Controller, Rk45Integrator, Rk45Tolerances,
-    SimulationError,
-};
+use ode_verify_001_harness::dynamical_system::{HarmonicOscillator, Rk45Integrator, Rk45Tolerances};
 
 const T_END: f64 = 10.0;
 const INITIAL_DT: f64 = 0.2;
 const DENSE_OUTPUT_DT: f64 = 0.1;
 const COMMON_OUTPUT_INTERVALS: usize = 100;
-const MAX_CUSTOM_ACCEPTED_STEPS: usize = 1_000_000;
 const SCALES: [f64; 3] = [1.0e-6, 1.0, 1.0e6];
 const RELATIVE_TOLERANCES: [f64; 3] = [1.0e-3, 1.0e-5, 1.0e-7];
 const GLOBAL_ERROR_MULTIPLIER: f64 = 10.0;
@@ -57,95 +53,75 @@ fn max_relative_energy_drift(states: impl Iterator<Item = [f64; 2]>, scale: f64)
         .fold(0.0_f64, f64::max)
 }
 
-struct CustomTrajectory {
-    samples: Vec<(f64, [f64; 2])>,
-    accepted_steps: usize,
-    rejected_steps: usize,
-    rhs_evaluations: usize,
-    max_accepted_error_norm: f64,
-    completed: bool,
-    finite: bool,
-}
-
-fn integrate_custom_on_common_grid(
-    integrator: &Rk45Integrator,
-    system: &dyn DynamicalSystem,
-    scale: f64,
-    tolerances: &Rk45Tolerances,
-) -> Result<CustomTrajectory, SimulationError> {
-    let mut controller = Rk45Controller::new(INITIAL_DT)?;
-    let mut state = [scale, 0.0];
-    let mut time = 0.0;
-    let mut accepted_steps = 0usize;
-    let mut rejected_steps = 0usize;
-    let mut rhs_evaluations = 0usize;
-    let mut max_accepted_error_norm = 0.0_f64;
-    let mut finite = true;
-    let mut samples = Vec::with_capacity(COMMON_OUTPUT_INTERVALS + 1);
-    samples.push((time, state));
-
-    for grid_index in 1..=COMMON_OUTPUT_INTERVALS {
-        let target = T_END * grid_index as f64 / COMMON_OUTPUT_INTERVALS as f64;
-        while time < target {
-            if accepted_steps >= MAX_CUSTOM_ACCEPTED_STEPS {
-                return Err(SimulationError::StepBudgetExceeded {
-                    maximum_steps: MAX_CUSTOM_ACCEPTED_STEPS,
-                });
-            }
-
-            let remaining = target - time;
-            let step = controller.try_step(
-                integrator,
-                system,
-                &state,
-                time,
-                remaining,
-                tolerances,
-            )?;
-            if !step.accepted_dt.is_finite()
-                || step.accepted_dt <= 0.0
-                || step.accepted_dt > remaining
-                || step.state.len() != 2
-                || step.state.iter().any(|value| !value.is_finite())
-            {
-                return Err(SimulationError::InvalidIntegratorStepSize {
-                    step: accepted_steps + 1,
-                });
-            }
-
-            let previous_time = time;
-            let next_time = if step.accepted_dt >= remaining {
-                target
-            } else {
-                time + step.accepted_dt
-            };
-            if !next_time.is_finite() || next_time <= previous_time {
-                return Err(SimulationError::TimeDidNotAdvance {
-                    step: accepted_steps + 1,
-                });
-            }
-
-            accepted_steps += 1;
-            rejected_steps = rejected_steps.saturating_add(step.rejected_steps);
-            rhs_evaluations = rhs_evaluations.saturating_add(step.derivative_evaluations);
-            max_accepted_error_norm = max_accepted_error_norm.max(step.error_norm);
-            state = [step.state[0], step.state[1]];
-            finite &= state.iter().all(|value| value.is_finite());
-            time = next_time;
-        }
-        time = target;
-        samples.push((target, state));
+/// Resample an adaptive Cash–Karp trajectory at the same times as Dopri5's
+/// dense-output grid. The interpolant is cubic Hermite, using the harmonic-oscillator
+/// identity f([x,v])=[v,-x]. This is benchmark post-processing, not production dense
+/// output, and its arithmetic is not counted as integration RHS work.
+fn cubic_hermite_sample_grid(
+    times: &[f64],
+    states: &[Vec<f64>],
+) -> Option<Vec<(f64, [f64; 2])>> {
+    if times.len() != states.len()
+        || times.len() < 2
+        || times[0].abs() > 32.0 * f64::EPSILON
+        || (times[times.len() - 1] - T_END).abs()
+            > 32.0 * f64::EPSILON * T_END.abs().max(1.0)
+        || states
+            .iter()
+            .any(|state| state.len() != 2 || state.iter().any(|value| !value.is_finite()))
+        || times.iter().any(|time| !time.is_finite())
+        || times.windows(2).any(|window| window[1] <= window[0])
+    {
+        return None;
     }
 
-    Ok(CustomTrajectory {
-        samples,
-        accepted_steps,
-        rejected_steps,
-        rhs_evaluations,
-        max_accepted_error_norm,
-        completed: time == T_END,
-        finite,
-    })
+    let mut samples = Vec::with_capacity(COMMON_OUTPUT_INTERVALS + 1);
+    for grid_index in 0..=COMMON_OUTPUT_INTERVALS {
+        let target = T_END * grid_index as f64 / COMMON_OUTPUT_INTERVALS as f64;
+        if grid_index == 0 {
+            samples.push((target, [states[0][0], states[0][1]]));
+            continue;
+        }
+        if grid_index == COMMON_OUTPUT_INTERVALS {
+            let last = states.last()?;
+            samples.push((target, [last[0], last[1]]));
+            continue;
+        }
+
+        let interval = (0..times.len() - 1)
+            .find(|index| times[*index] <= target && target <= times[*index + 1])?;
+        let t0 = times[interval];
+        let t1 = times[interval + 1];
+        let h = t1 - t0;
+        if !h.is_finite() || h <= 0.0 {
+            return None;
+        }
+        let s = (target - t0) / h;
+        if !s.is_finite() || !(0.0..=1.0).contains(&s) {
+            return None;
+        }
+
+        let y0 = &states[interval];
+        let y1 = &states[interval + 1];
+        let s2 = s * s;
+        let s3 = s2 * s;
+        let h00 = 2.0 * s3 - 3.0 * s2 + 1.0;
+        let h10 = s3 - 2.0 * s2 + s;
+        let h01 = -2.0 * s3 + 3.0 * s2;
+        let h11 = s3 - s2;
+
+        let x0 = y0[0];
+        let v0 = y0[1];
+        let x1 = y1[0];
+        let v1 = y1[1];
+        let x = h00 * x0 + h10 * h * v0 + h01 * x1 + h11 * h * v1;
+        let v = h00 * v0 + h10 * h * (-x0) + h01 * v1 + h11 * h * (-x1);
+        if !x.is_finite() || !v.is_finite() {
+            return None;
+        }
+        samples.push((target, [x, v]));
+    }
+    Some(samples)
 }
 
 fn max_common_grid_disagreement(
@@ -203,57 +179,68 @@ fn main() -> Result<(), Box<dyn Error>> {
             let energy_drift_limit = GLOBAL_ERROR_MULTIPLIER * rtol;
             let tolerances = Rk45Tolerances::new(rtol, vec![atol; 2]);
 
-            let custom = integrate_custom_on_common_grid(
-                &custom_integrator,
+            let custom = custom_integrator.try_simulate_with_tolerances(
                 &custom_system,
-                scale,
+                &[scale, 0.0],
+                0.0,
+                T_END,
+                INITIAL_DT,
                 &tolerances,
             );
             let mut custom_samples: Option<Vec<(f64, [f64; 2])>> = None;
 
             let custom_fields = match custom {
-                Ok(report) => {
-                    custom_samples = Some(report.samples.clone());
-                    let endpoint = report
-                        .samples
-                        .last()
-                        .map(|sample| sample.1)
-                        .unwrap_or([f64::NAN; 2]);
-                    let endpoint_error = scaled_state_error(endpoint, scale, T_END);
-                    let trajectory_error = max_sampled_scaled_trajectory_error(
-                        report.samples.iter().copied(),
-                        scale,
-                    );
-                    let energy_drift = max_relative_energy_drift(
-                        report.samples.iter().map(|sample| sample.1),
-                        scale,
-                    );
-                    let common_grid_complete =
-                        report.samples.len() == COMMON_OUTPUT_INTERVALS + 1;
-                    let pass = report.completed
-                        && common_grid_complete
-                        && report.finite
-                        && endpoint_error <= endpoint_error_limit
-                        && trajectory_error <= endpoint_error_limit
-                        && energy_drift <= energy_drift_limit
-                        && report.max_accepted_error_norm <= 1.0;
-                    all_passed &= pass;
-                    format!(
-                        "\"custom_endpoint_error_scaled\":{:.17e},\"custom_max_sampled_scaled_trajectory_error\":{:.17e},\"custom_energy_drift\":{:.17e},\"custom_accepted_steps\":{},\"custom_rejected_steps\":{},\"custom_rhs_evaluations\":{},\"custom_max_error_norm\":{:.17e},\"custom_output_samples\":{},\"custom_common_grid_complete\":{},\"custom_complete\":{},\"custom_finite\":{},\"custom_pass\":{}",
-                        endpoint_error,
-                        trajectory_error,
-                        energy_drift,
-                        report.accepted_steps,
-                        report.rejected_steps,
-                        report.rhs_evaluations,
-                        report.max_accepted_error_norm,
-                        report.samples.len(),
-                        common_grid_complete,
-                        report.completed,
-                        report.finite,
-                        pass
-                    )
-                }
+                Ok(report) => match cubic_hermite_sample_grid(
+                    &report.simulation.times,
+                    &report.simulation.states,
+                ) {
+                    Some(samples) => {
+                        let endpoint = samples.last().map(|sample| sample.1).unwrap_or([f64::NAN; 2]);
+                        let endpoint_error = scaled_state_error(endpoint, scale, T_END);
+                        let trajectory_error = max_sampled_scaled_trajectory_error(
+                            samples.iter().copied(),
+                            scale,
+                        );
+                        let energy_drift = max_relative_energy_drift(
+                            samples.iter().map(|sample| sample.1),
+                            scale,
+                        );
+                        let common_grid_complete = samples.len() == COMMON_OUTPUT_INTERVALS + 1;
+                        let finite = samples.iter().all(|(_, state)| {
+                            state.iter().all(|value| value.is_finite())
+                        }) && report.simulation.states.iter().flatten().all(|value| value.is_finite());
+                        let pass = common_grid_complete
+                            && finite
+                            && endpoint_error <= endpoint_error_limit
+                            && trajectory_error <= endpoint_error_limit
+                            && energy_drift <= energy_drift_limit
+                            && report.diagnostics.max_error_norm <= 1.0;
+                        all_passed &= pass;
+                        custom_samples = Some(samples.clone());
+                        format!(
+                            "\"custom_endpoint_error_scaled\":{:.17e},\"custom_max_sampled_scaled_trajectory_error\":{:.17e},\"custom_energy_drift\":{:.17e},\"custom_accepted_steps\":{},\"custom_rejected_steps\":{},\"custom_rhs_evaluations\":{},\"custom_max_error_norm\":{:.17e},\"custom_output_samples\":{},\"custom_common_grid_complete\":{},\"custom_integration_steps\":{},\"custom_integration_samples\":{},\"custom_finite\":{},\"custom_pass\":{}",
+                            endpoint_error,
+                            trajectory_error,
+                            energy_drift,
+                            report.diagnostics.accepted_steps,
+                            report.diagnostics.rejected_steps,
+                            report.diagnostics.derivative_evaluations,
+                            report.diagnostics.max_error_norm,
+                            samples.len(),
+                            common_grid_complete,
+                            report.diagnostics.accepted_steps,
+                            report.simulation.states.len(),
+                            finite,
+                            pass
+                        )
+                    }
+                    None => {
+                        all_passed = false;
+                        format!(
+                            "\"custom_common_grid_complete\":false,\"custom_pass\":false,\"custom_error\":\"trajectory_resampling_failed\""
+                        )
+                    }
+                },
                 Err(error) => {
                     all_passed = false;
                     format!(
