@@ -70,7 +70,7 @@ Use a cost/correctness Pareto frontier. A system can beat a more expensive agent
 
 ## Immediate sequence
 
-1. Run exact-head formatting, focused producer/auditor unit tests and compile both targets in a clean pinned environment. The auditor now prints a deterministic 10,000-resample task-cluster bootstrap interval, but the current toy-function pilot's interval is descriptive only; larger studies need repository and task-family identifiers and should resample at the independent unit relevant to the claim.
+1. Before spending on an evaluation, use `--print-manifest` to capture and independently pin the source/task-manifest digest; then run exact-head formatting, focused producer/auditor unit tests and compile both targets in a clean pinned environment. The auditor now prints a deterministic 10,000-resample task-cluster bootstrap interval, but the current toy-function pilot's interval is descriptive only; larger studies need repository and task-family identifiers and should resample at the independent unit relevant to the claim.
 2. Inspect the 10 mutation controls; if any fail compilation or survive tests, improve the task fixture rather than weakening the mutation gate.
 3. Capture a real receipt from each available backend (native dispatcher, Ollama and/or cloud) and audit it using externally pinned source and task-manifest digests.
 4. Only then scale task count and invest in a hidden Rust repository-repair set. Fix oracle quality before increasing leaderboard ambition.
