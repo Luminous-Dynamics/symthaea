@@ -79,7 +79,7 @@ pub(crate) fn fast_tanh(x: f32) -> f32 {
     } else {
         let x2 = x * x;
         let result = x * (27.0 + x2) / (27.0 + 9.0 * x2);
-        // Clamp to [-1, 1] since the rational approximation can slightly overshoot
+        // Clamp to [-1, 1] since the rational approximation can slightly overshoot.
         result.clamp(-1.0, 1.0)
     }
 }
@@ -89,9 +89,15 @@ pub(crate) fn fast_tanh(x: f32) -> f32 {
 pub struct NeuronConfig {
     /// Hypervector dimension (default: 16,384).
     pub dim: usize,
-    /// Base time constant tau_0 in seconds (default: 0.1).
+    /// Neutral liquid time constant in seconds (default: 0.1).
+    ///
+    /// A zero-valued liquid modulation signal maps to `tau_base`. The liquid
+    /// field then moves multiplicatively in log-time toward `tau_min` or
+    /// `tau_max`, allowing the configured range to span orders of magnitude.
     pub tau_base: f32,
-    /// State-dependent time constant scaling: tau = tau_0 * (1 + backbone * ||x||).
+    /// Legacy state-dependent time-constant scaling parameter retained for
+    /// serialized-configuration compatibility. The unified per-dimension liquid
+    /// field is controlled by `tau_coupling` and the learned tau modulator.
     pub backbone_tau: f32,
     /// Activation function (default: Tanh).
     pub activation: Activation,
@@ -101,13 +107,16 @@ pub struct NeuronConfig {
     pub momentum: f32,
     /// L2 regularization strength (default: 0.0001).
     pub weight_decay: f32,
-    /// Gating sigmoid steepness for closed-form solution (default: 1.0).
+    /// Gating sigmoid steepness for the solver-free recurrent update (default: 1.0).
     pub gating_steepness: f32,
-    /// Minimum liquid time-constant (seconds). Default: 0.001.
+    /// Minimum liquid time constant in seconds. Must be finite and > 0.
+    /// Default: 0.001 (1 ms).
     pub tau_min: f32,
-    /// Maximum liquid time-constant (seconds). Default: 100.0.
+    /// Maximum liquid time constant in seconds. Must be finite and > `tau_min`.
+    /// Default: 100.0 (100 s).
     pub tau_max: f32,
-    /// Strength of input coupling on the tau field. Default: 0.3.
+    /// Strength of input coupling on the per-dimension tau control signal.
+    /// Default: 0.3.
     pub tau_coupling: f32,
 }
 
@@ -166,6 +175,9 @@ mod tests {
         let cfg = NeuronConfig::default();
         assert_eq!(cfg.dim, HDC_DIMENSION);
         assert!((cfg.tau_base - 0.1).abs() < 1e-6);
+        assert!(cfg.tau_min > 0.0);
+        assert!(cfg.tau_min < cfg.tau_base);
+        assert!(cfg.tau_base < cfg.tau_max);
         assert_eq!(cfg.activation, Activation::Tanh);
     }
 
@@ -188,10 +200,10 @@ mod tests {
 
     #[test]
     fn test_fast_tanh_accuracy() {
-        // At zero, the approximation is exact
+        // At zero, the approximation is exact.
         assert!((fast_tanh(0.0)).abs() < 1e-6);
 
-        // For the full range, result is bounded in [-1, 1] and monotonic
+        // For the full range, result is bounded in [-1, 1] and monotonic.
         let mut prev = -2.0f32;
         for i in -100..=100 {
             let x = i as f32 * 0.1;
@@ -225,6 +237,8 @@ mod tests {
         let restored: NeuronConfig = serde_json::from_str(&json).unwrap();
         assert_eq!(restored.dim, cfg.dim);
         assert!((restored.tau_base - cfg.tau_base).abs() < 1e-6);
+        assert!((restored.tau_min - cfg.tau_min).abs() < 1e-6);
+        assert!((restored.tau_max - cfg.tau_max).abs() < 1e-6);
     }
 
     #[test]
