@@ -25,6 +25,7 @@ const NEW_TOKEN_COUNT: usize = 8;
 const TRAIN_QUERY_COUNT: usize = 8;
 const HELDOUT_QUERY_COUNT: usize = 32;
 const LOGIT_SCALE: f32 = 20.0;
+const GENESIS_PHRASE: &str = "broca-angular-calibration-smoke-v1";
 const MAX_TRAIN_FALSE_ACTIVATION_RATE: f64 = 0.01;
 const LAMBDA_GRID: [f32; 11] = [0.0, 0.05, 0.1, 0.2, 0.35, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0];
 
@@ -87,11 +88,14 @@ struct Receipt {
     embedding_dimension: usize,
     train_queries_per_class_and_side: usize,
     heldout_queries_per_class_and_side: usize,
+    seed_scheme: &'static str,
     selected_lambda: f32,
-    train_selection_constraint_false_activation_rate: f64,
+    maximum_allowed_train_false_activation_rate: f64,
+    selected_train_false_activation_rate: f64,
+    calibration_constraint_met: bool,
     lambda_trials: Vec<LambdaTrial>,
     results: Vec<StrategyResult>,
-    fixture_digest_sha256: String,
+    fixture_spec_digest_sha256: String,
     claim_boundary: &'static str,
 }
 
@@ -384,7 +388,7 @@ fn candidate_diversity(candidates: &[ContinuousHV]) -> (f64, f64) {
 
 fn digest_fixture() -> String {
     let fixture = [
-        format!("schema=1;dimension={HDC_DIMENSION};base_vocab={BASE_VOCAB_SIZE}"),
+        format!("schema=1;genesis={GENESIS_PHRASE};dimension={HDC_DIMENSION};base_vocab={BASE_VOCAB_SIZE}"),
         format!("new_tokens={NEW_TOKEN_COUNT};train={TRAIN_QUERY_COUNT}"),
         format!("heldout={HELDOUT_QUERY_COUNT};noise=0.25;logit_scale={LOGIT_SCALE}"),
         format!("lambda_grid={LAMBDA_GRID:?}"),
@@ -405,7 +409,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         None => None,
     };
 
-    let genesis = GenesisSeed::from_phrase("broca-angular-calibration-smoke-v1");
+    let genesis = GenesisSeed::from_phrase(GENESIS_PHRASE);
     let controller = make_controller(&genesis);
     let scenarios = build_scenarios(&controller, &genesis);
 
@@ -490,12 +494,15 @@ fn main() -> Result<(), Box<dyn Error>> {
         embedding_dimension: HDC_DIMENSION,
         train_queries_per_class_and_side: TRAIN_QUERY_COUNT,
         heldout_queries_per_class_and_side: HELDOUT_QUERY_COUNT,
+        seed_scheme: "GenesisSeed::from_phrase with named deterministic vector domains",
         selected_lambda,
-        train_selection_constraint_false_activation_rate:
-            selected_train_metrics.protected_false_activation_rate,
+        maximum_allowed_train_false_activation_rate: MAX_TRAIN_FALSE_ACTIVATION_RATE,
+        selected_train_false_activation_rate: selected_train_metrics.protected_false_activation_rate,
+        calibration_constraint_met: selected_train_metrics.protected_false_activation_rate
+            <= MAX_TRAIN_FALSE_ACTIVATION_RATE,
         lambda_trials: trials,
         results,
-        fixture_digest_sha256: digest_fixture(),
+        fixture_spec_digest_sha256: digest_fixture(),
         claim_boundary: "Synthetic planted geometry only; no semantic labels, downstream training, or SOTA claim.",
     };
 
