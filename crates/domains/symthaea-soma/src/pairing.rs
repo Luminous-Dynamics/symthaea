@@ -222,8 +222,12 @@ impl PairingManager {
             None => return false,
         };
 
-        // Generate nonce
-        let nonce = self.generate_nonce();
+        // A challenge must be fresh even when a key is restored and the
+        // in-memory cycle counter has reset. Fail closed if OS entropy fails.
+        let nonce = match Self::generate_nonce() {
+            Some(nonce) => nonce,
+            None => return false,
+        };
 
         self.pending_challenges.push((
             peer_id,
@@ -433,16 +437,15 @@ impl PairingManager {
         self.outbound.push_back(msg);
     }
 
-    fn generate_nonce(&self) -> Vec<u8> {
-        // Deterministic nonce from cycle + constant for reproducibility
-        let mut data = Vec::with_capacity(40);
-        data.extend_from_slice(&self.cycle.to_le_bytes());
-        data.extend_from_slice(b"spore-pairing-nonce");
-        if let Some(ref seed) = self.keypair_seed {
-            data.extend_from_slice(seed);
-        }
-        let hash = blake3::hash(&data);
-        hash.as_bytes().to_vec()
+    /// Generate a fresh 256-bit challenge nonce from the OS entropy source.
+    ///
+    /// Do not derive protocol nonces from the cycle counter: cycles can reset
+    /// across process restarts while the key remains the same, which would
+    /// permit replay of a response from an earlier session.
+    fn generate_nonce() -> Option<Vec<u8>> {
+        let mut nonce = [0u8; 32];
+        getrandom::getrandom(&mut nonce).ok()?;
+        Some(nonce.to_vec())
     }
 
     #[cfg(feature = "pairing")]
@@ -549,6 +552,19 @@ mod tests {
         let pk = pm.get_pubkey();
         assert!(pk.is_some());
         assert_eq!(pk.unwrap().len(), 32);
+    }
+
+    #[test]
+    fn test_challenge_nonces_are_32_random_bytes_and_do_not_repeat_in_sample() {
+        use std::collections::HashSet;
+
+        let nonces: Vec<Vec<u8>> = (0..32)
+            .map(|_| PairingManager::generate_nonce().expect("OS entropy available in test"))
+            .collect();
+
+        assert!(nonces.iter().all(|nonce| nonce.len() == 32));
+        let unique: HashSet<Vec<u8>> = nonces.iter().cloned().collect();
+        assert_eq!(unique.len(), nonces.len());
     }
 
     #[test]
