@@ -20,7 +20,7 @@ Official source pages are linked in `clinical-evidence-sources-v0.json`. URLs an
 
 ## Claim-admission contract
 
-The registry must fail closed if its schema, source identifiers, edition metadata, canonical HTTPS URLs, or review policy are invalid. A future claim intended for reference evaluation must have:
+The registry must fail closed if its schema, source identifiers, edition metadata, canonical HTTPS URLs, or review policy are invalid. V0 also allowlists exact publisher identities and official URL host prefixes; a new source ID requires explicit code/provenance review, and unknown fields at any registry layer are rejected. A future claim intended for reference evaluation must have:
 
 1. A stable claim ID and topic, intended population, setting, target jurisdiction, locale, and source edition.
 2. An exact source locator (section/table/page/figure or stable heading), with no unsupported paraphrase silently promoted to a ground-truth label.
