@@ -31,15 +31,17 @@ cargo run --locked --release \
   normalized-paired-scores.csv stratified-summary.csv 10000 17
 ```
 
-The tool emits one `task` row per benchmark task plus one `aggregate` row. Task rows report paired count, baseline and candidate mean normalized score, candidate-minus-baseline mean delta, interquartile mean (IQM) of paired deltas, and paired win rate. Ties receive half credit in the paired win rate.
+The tool emits one `task` row per benchmark task plus one `aggregate` row. Task rows report paired count, baseline and candidate normalized means, candidate-minus-baseline mean delta, interquartile mean (IQM) of paired deltas, same-seed paired win rate, and within-task marginal probability of superiority from independent candidate/baseline episode draws (ties count as one half). These two win metrics are different estimands; the latter is not a paired-seed statistic.
 
 ## Aggregate estimands
 
 All macro scores weight each task equally, regardless of task episode count:
 
 - **Macro mean delta:** average of task-specific mean paired deltas.
-- **Macro IQM delta:** average of task-specific interquartile means of paired deltas. Per-task IQM uses the central 50% of the empirical quantile distribution, with fractional boundary weights.
-- **Macro paired win rate:** task-equal average of each task's fraction of candidate wins, with ties worth one-half.
+- **Macro task-IQM delta:** average across tasks of the IQM of the paired score deltas within each task.
+- **Task-balanced score IQM:** compute the interquartile mean over a weighted mixture of normalized baseline scores and candidate scores, with every task contributing equal total probability mass regardless of its episode count. Report baseline IQM, candidate IQM, their difference, and a 95% stratified-bootstrap interval for the difference. This is more directly comparable to RLiable's IQM discipline than the macro IQM of paired deltas, but remains conditional on our fixed task normalization/mixture.
+- **Macro paired win rate:** task-equal average of the fraction of same-seed candidate wins, with ties worth one-half.
+- **Macro marginal probability of superiority:** equal-task-weight mean of within-task (P(\text{candidate episode} > \text{baseline episode})) from independent draws, with ties worth one-half. This is distinct from paired win rate and should not be called RLiable's exact probability-of-improvement estimator.
 - **Fraction of tasks improved:** share of tasks whose mean paired delta is strictly positive.
 
 The 95% percentile confidence intervals come from a deterministic **stratified episode bootstrap**: within each task, sample that task's paired episodes with replacement, keep the task suite fixed, recompute task statistics, then average task statistics equally. The actual bootstrap seed and replicate count are emitted.
