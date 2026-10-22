@@ -18,6 +18,17 @@ is used in this file.
 
 namespace PITBCounterfactualPilot
 
+open Lean Elab Tactic Meta in
+elab "pitb_snapshot " label:str : tactic => withMainContext do
+  let goal ← getMainGoal
+  let goalType ← goal.getType
+  let context ← Lean.MonadLCtx.getLCtx
+  Lean.logInfo m!"PITB_STATE_BEGIN:{label.getString}"
+  Lean.logInfo m!"PITB_STATE_GOAL:{← ppExpr goalType}"
+  for declaration in context do
+    Lean.logInfo m!"PITB_STATE_DECL:{declaration.userName}:{← ppExpr declaration.type}"
+  Lean.logInfo m!"PITB_STATE_END:{label.getString}"
+
 /-- Binder-name reformulation: the propositions are definitionally equal. -/
 theorem alpha_renaming_same_type :
     (∀ n : Nat, n = n) = (∀ x : Nat, x = x) := rfl
@@ -55,9 +66,9 @@ This is a calibration example, not a model decision or a replayed benchmark row.
 theorem same_goal_after_hypothesis_clear
     (a b : Nat) (h : a ≤ b) (hEq : a = b) :
     Nat.succ a ≤ Nat.succ b := by
-  trace_state
+  pitb_snapshot "base"
   clear h
-  trace_state
+  pitb_snapshot "variant"
   subst b
   exact Nat.le_refl _
 
