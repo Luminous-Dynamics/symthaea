@@ -10,13 +10,13 @@ This tranche registers source metadata only. It deliberately contains **zero cli
 
 ## Source registry at this revision
 
-The initial catalog records the IFRC *International First Aid, Resuscitation and Education Guidelines 2025*, the European Resuscitation Council / Resuscitation Council UK 2025 first-aid guidance, and the American Heart Association 2025 CPR/ECC guidelines. These have different scopes and jurisdictions; they are not interchangeable:
+The initial catalog records the IFRC *International First Aid, Resuscitation and Education Guidelines 2025*, the European Resuscitation Council / Resuscitation Council UK 2025 first-aid guidance, the American Heart Association 2025 CPR/ECC guidelines, and a 2026 AED-specific notice published by the Resuscitation Council of Southern Africa (RCSA). These have different scopes and jurisdictions; they are not interchangeable:
 
 - IFRC describes global evidence-based principles and explicitly expects adaptation to local cultural, environmental, legal, resource, and population context.
 - ERC/RCUK is a regional first-aid guideline source.
 - AHA's 2025 CPR/ECC publication is a resuscitation/cardiovascular-care source, not a universal source for every first-aid topic.
 
-Official source pages are linked in `clinical-evidence-sources-v0.json`. URLs and edition metadata were checked on 2026-10-22. The registry does not copy or redistribute the source documents. Before ingesting guideline text or reproducing tables/algorithms, verify copyright, licensing and permission separately.
+Official source pages are linked in `clinical-evidence-sources-v0.json`. URLs and edition metadata were checked on 2026-10-22. The RCSA notice is regional context for an AED/resuscitation subtopic, not a comprehensive local first-aid protocol. The registry does not copy or redistribute the source documents. Before ingesting guideline text or reproducing tables/algorithms, verify copyright, licensing and permission separately.
 
 ## Claim-admission contract
 
