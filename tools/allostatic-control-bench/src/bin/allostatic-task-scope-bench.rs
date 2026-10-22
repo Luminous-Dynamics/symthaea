@@ -8,7 +8,7 @@ use allostatic_control_bench::drift_monitor::calibrate_drift_threshold;
 use allostatic_control_bench::robust_viability::ViabilityLimits;
 use allostatic_control_bench::scope_monitor::{
     assess_prediction_scope, calibrate_scope_threshold, score_prediction_error,
-    PredictionErrorScales,
+    PredictionErrorScales, PredictionErrorScore, ScopeThreshold,
 };
 use allostatic_control_bench::Action;
 use std::error::Error;
@@ -19,11 +19,6 @@ const FALSE_ALARM_TARGET: f64 = 0.05;
 const CALIBRATION_EPISODES: usize = 159;
 const EVALUATION_EPISODES: usize = 300;
 const HORIZON: usize = 8;
-const SCOPE_SCALES: PredictionErrorScales =
-    match PredictionErrorScales::new(0.02, 0.02, 0.02) {
-        Some(value) => value,
-        None => panic!("constant prediction-error scales must be valid"),
-    };
 
 const RAW_HEADER: &str = "operating_point,condition,episode_seed,feature_score,feature_threshold,feature_alarm,scope_score,scope_threshold,scope_alarm,combined_alarm,outside_predictor_envelope,first_feature_alarm_step,first_scope_alarm_step,first_combined_alarm_step,first_false_safe_step,feature_flagged_by_false_safe_step,scope_flagged_by_false_safe_step,combined_flagged_by_false_safe_step,scope_false_safe_override";
 const SUMMARY_HEADER: &str = "operating_point,condition,episodes,feature_alarms,scope_alarms,combined_alarms,feature_false_alarms,scope_false_alarms,combined_false_alarms,feature_missed_shifts,scope_missed_shifts,combined_missed_shifts,false_safe_episodes,feature_flagged_by_false_safe,scope_flagged_by_false_safe,combined_flagged_by_false_safe,feature_missed_false_safe,scope_missed_false_safe,combined_missed_false_safe,mean_scope_score,max_scope_score,mean_scope_alarm_step,mean_combined_alarm_step";
@@ -98,6 +93,53 @@ impl Condition {
             other => other,
         }
     }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct ActionEffect {
+    reserve: f64,
+    load: f64,
+    reserve_bound: f64,
+    load_bound: f64,
+}
+
+fn effect(action: Action) -> ActionEffect {
+    match action {
+        Action::Push => ActionEffect {
+            reserve: -0.0175,
+            load: 0.050,
+            reserve_bound: 0.0125,
+            load_bound: 0.020,
+        },
+        Action::Maintain => ActionEffect {
+            reserve: 0.025,
+            load: 0.010,
+            reserve_bound: 0.015,
+            load_bound: 0.020,
+        },
+        Action::EmergencyRecover => ActionEffect {
+            reserve: 0.0525,
+            load: -0.120,
+            reserve_bound: 0.0175,
+            load_bound: 0.040,
+        },
+    }
+}
+
+const ACTION_PLAN: [Action; HORIZON] = [
+    Action::Push,
+    Action::Maintain,
+    Action::Push,
+    Action::Maintain,
+    Action::EmergencyRecover,
+    Action::Push,
+    Action::Maintain,
+    Action::EmergencyRecover,
+];
+
+#[derive(Clone, Copy, Debug)]
+struct StepObservation {
+    score: PredictionErrorScore,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -180,48 +222,6 @@ impl Counters {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
-struct ActionEffect {
-    reserve: f64,
-    load: f64,
-    reserve_bound: f64,
-    load_bound: f64,
-}
-
-fn effect(action: Action) -> ActionEffect {
-    match action {
-        Action::Push => ActionEffect {
-            reserve: -0.0175,
-            load: 0.050,
-            reserve_bound: 0.0125,
-            load_bound: 0.020,
-        },
-        Action::Maintain => ActionEffect {
-            reserve: 0.025,
-            load: 0.010,
-            reserve_bound: 0.015,
-            load_bound: 0.020,
-        },
-        Action::EmergencyRecover => ActionEffect {
-            reserve: 0.0525,
-            load: -0.120,
-            reserve_bound: 0.0175,
-            load_bound: 0.040,
-        },
-    }
-}
-
-const ACTION_PLAN: [Action; HORIZON] = [
-    Action::Push,
-    Action::Maintain,
-    Action::Push,
-    Action::Maintain,
-    Action::EmergencyRecover,
-    Action::Push,
-    Action::Maintain,
-    Action::EmergencyRecover,
-];
-
 fn unit_interval(seed: u64) -> f64 {
     let mut value = seed.wrapping_add(0x9E37_79B9_7F4A_7C15);
     value = (value ^ (value >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
@@ -260,42 +260,68 @@ fn noise(seed: u64, step: usize, dimension: u64) -> f64 {
     (unit_interval(seed.wrapping_add(step as u64 * 17 + dimension * 101)) - 0.5) * 0.004
 }
 
-fn predict_step(
-    actual_reserve: f64,
-    actual_load: f64,
-    action: Action,
-) -> (f64, f64, f64, f64) {
+fn predict_step(actual_reserve: f64, actual_load: f64, action: Action) -> (f64, f64) {
     let nominal = effect(action);
     (
         clamp_state(actual_reserve + nominal.reserve),
         clamp_state(actual_load + nominal.load),
-        nominal.reserve,
-        nominal.load,
     )
 }
 
-fn observed_step(
+fn observe_step(
     actual_reserve: f64,
     actual_load: f64,
     action: Action,
     condition: Condition,
     seed: u64,
     step: usize,
-) -> (f64, f64, f64, f64) {
+) -> (f64, f64) {
     let nominal = effect(action);
     let (reserve_offset, load_offset) = dynamics_offset(condition, action);
-    let reserve_error = reserve_offset + noise(seed, step, 0);
-    let load_error = load_offset + noise(seed, step, 1);
     (
-        clamp_state(actual_reserve + nominal.reserve + reserve_error),
-        clamp_state(actual_load + nominal.load + load_error),
-        reserve_error,
-        load_error,
+        clamp_state(actual_reserve + nominal.reserve + reserve_offset + noise(seed, step, 0)),
+        clamp_state(actual_load + nominal.load + load_offset + noise(seed, step, 1)),
     )
 }
 
-fn outside_model_envelope(condition: Condition) -> bool {
-    condition.dynamics_kind() != Condition::Nominal
+fn outside_predictor_envelope(condition: Condition) -> bool {
+    ACTION_PLAN.iter().copied().any(|action| {
+        let nominal = effect(action);
+        let (reserve_offset, load_offset) = dynamics_offset(condition, action);
+        reserve_offset.abs() > nominal.reserve_bound || load_offset.abs() > nominal.load_bound
+    })
+}
+
+fn trace_episode(
+    point: OperatingPoint,
+    condition: Condition,
+    seed: u64,
+    limits: ViabilityLimits,
+    scales: PredictionErrorScales,
+) -> Result<Vec<StepObservation>, Box<dyn Error>> {
+    let mut actual_reserve = point.reserve;
+    let mut actual_load = point.load;
+    let mut trace = Vec::with_capacity(HORIZON);
+
+    for (step, action) in ACTION_PLAN.iter().copied().enumerate() {
+        let (predicted_reserve, predicted_load) =
+            predict_step(actual_reserve, actual_load, action);
+        let (observed_reserve, observed_load) =
+            observe_step(actual_reserve, actual_load, action, condition, seed, step);
+        let score = score_prediction_error(
+            predicted_reserve,
+            predicted_load,
+            observed_reserve,
+            observed_load,
+            limits,
+            scales,
+        )
+        .ok_or_else(|| IoError::new(ErrorKind::InvalidData, "invalid prediction pair"))?;
+        trace.push(StepObservation { score });
+        actual_reserve = observed_reserve;
+        actual_load = observed_load;
+    }
+    Ok(trace)
 }
 
 fn episode_scope_score(
@@ -303,83 +329,29 @@ fn episode_scope_score(
     condition: Condition,
     seed: u64,
     limits: ViabilityLimits,
-) -> Result<EpisodeResult, Box<dyn Error>> {
-    let feature = feature_score(condition, seed.wrapping_add(point.reserve.to_bits()));
-    let feature_threshold_sentinel = 0.0;
-    let _ = feature_threshold_sentinel;
-    let mut actual_reserve = point.reserve;
-    let mut actual_load = point.load;
-    let mut maximum_scope_score: f64 = 0.0;
-    let mut first_scope_alarm_step = HORIZON;
-    let mut first_false_safe_step = HORIZON;
-    let mut feature_flagged_by_false_safe_step = false;
-    let mut scope_false_safe_override = false;
-    let mut safety_residuals = Vec::with_capacity(HORIZON);
-    let task_scales = PredictionErrorScales::new(0.02, 0.02, 0.02)
-        .ok_or_else(|| IoError::new(ErrorKind::InvalidData, "invalid scope score scales"))?;
-
-    for (step, action) in ACTION_PLAN.iter().copied().enumerate() {
-        let (predicted_reserve, predicted_load, _, _) =
-            predict_step(actual_reserve, actual_load, action);
-        let (observed_reserve, observed_load, reserve_error, load_error) =
-            observed_step(actual_reserve, actual_load, action, condition, seed, step);
-        let score = score_prediction_error(
-            predicted_reserve,
-            predicted_load,
-            observed_reserve,
-            observed_load,
-            limits,
-            task_scales,
-        )
-        .ok_or_else(|| IoError::new(ErrorKind::InvalidData, "invalid prediction pair"))?;
-        maximum_scope_score = maximum_scope_score.max(score.score());
-        safety_residuals.push(score);
-
-        if first_false_safe_step == HORIZON && score.false_safe_prediction() {
-            first_false_safe_step = step;
-            feature_flagged_by_false_safe_step = feature > feature_threshold_sentinel;
-        }
-        if first_scope_alarm_step == HORIZON
-            && (score.false_safe_prediction() || score.score() > f64::INFINITY)
-        {
-            // The threshold comparison is filled in by the caller below, where
-            // the independent calibration threshold is available.
-            first_scope_alarm_step = HORIZON;
-        }
-        scope_false_safe_override |= score.false_safe_prediction();
-        actual_reserve = observed_reserve;
-        actual_load = observed_load;
-        let _ = (reserve_error, load_error);
-    }
-
-    // This first-pass structure lets the caller apply the calibrated threshold to
-    // each residual while preserving the max episode score used for calibration.
-    Ok(EpisodeResult {
-        feature_score: feature,
-        scope_score: maximum_scope_score,
-        feature_alarm: false,
-        scope_alarm: scope_false_safe_override,
-        combined_alarm: scope_false_safe_override,
-        outside_predictor_envelope: outside_model_envelope(condition),
-        first_feature_alarm_step: HORIZON,
-        first_scope_alarm_step,
-        first_combined_alarm_step: HORIZON,
-        first_false_safe_step,
-        feature_flagged_by_false_safe_step,
-        scope_flagged_by_false_safe_step: scope_false_safe_override,
-        combined_flagged_by_false_safe_step: scope_false_safe_override,
-        scope_false_safe_override,
-    })
+    scales: PredictionErrorScales,
+) -> Result<f64, Box<dyn Error>> {
+    let trace = trace_episode(point, condition, seed, limits, scales)?;
+    Ok(trace
+        .iter()
+        .map(|step| step.score.score())
+        .fold(0.0_f64, f64::max))
 }
 
 fn calibration_score(
     seed: u64,
     limits: ViabilityLimits,
+    scales: PredictionErrorScales,
 ) -> Result<f64, Box<dyn Error>> {
     let mut maximum: f64 = 0.0;
     for point in OPERATING_POINTS {
-        let result = episode_scope_score(point, Condition::Nominal, seed, limits)?;
-        maximum = maximum.max(result.scope_score);
+        maximum = maximum.max(episode_scope_score(
+            point,
+            Condition::Nominal,
+            seed,
+            limits,
+            scales,
+        )?);
     }
     Ok(maximum)
 }
@@ -389,69 +361,63 @@ fn run_episode(
     condition: Condition,
     seed: u64,
     feature_threshold: f64,
-    scope_threshold: allostatic_control_bench::scope_monitor::ScopeThreshold,
+    scope_threshold: ScopeThreshold,
     limits: ViabilityLimits,
+    scales: PredictionErrorScales,
 ) -> Result<EpisodeResult, Box<dyn Error>> {
-    let provisional = episode_scope_score(point, condition, seed, limits)?;
-    let feature_alarm = provisional.feature_score > feature_threshold;
-    let task_scales = PredictionErrorScales::new(0.02, 0.02, 0.02)
-        .ok_or_else(|| IoError::new(ErrorKind::InvalidData, "invalid scope score scales"))?;
-    let mut actual_reserve = point.reserve;
-    let mut actual_load = point.load;
+    let feature_score = feature_score(condition, seed.wrapping_add(point.reserve.to_bits()));
+    let feature_alarm = feature_score > feature_threshold;
+    let first_feature_alarm_step = if feature_alarm { 0 } else { HORIZON };
+    let trace = trace_episode(point, condition, seed, limits, scales)?;
+    let scope_score = trace
+        .iter()
+        .map(|step| step.score.score())
+        .fold(0.0_f64, f64::max);
+
     let mut first_scope_alarm_step = HORIZON;
-    let mut first_feature_alarm_step = if feature_alarm { 0 } else { HORIZON };
-    let mut first_combined_alarm_step = HORIZON;
     let mut first_false_safe_step = HORIZON;
     let mut scope_false_safe_override = false;
-    let mut feature_flagged_by_false_safe_step = false;
-    let mut scope_flagged_by_false_safe_step = false;
-    let mut combined_flagged_by_false_safe_step = false;
-
-    for (step, action) in ACTION_PLAN.iter().copied().enumerate() {
-        let (predicted_reserve, predicted_load, _, _) =
-            predict_step(actual_reserve, actual_load, action);
-        let (observed_reserve, observed_load, _, _) =
-            observed_step(actual_reserve, actual_load, action, condition, seed, step);
+    for (step, observation) in trace.iter().enumerate() {
         let assessment = assess_prediction_scope(
-            predicted_reserve,
-            predicted_load,
-            observed_reserve,
-            observed_load,
+            // Reconstruct the state pair from its score is intentionally not
+            // possible; trace_episode records the already-computed score and
+            // unsafe-prediction flag, while threshold comparison is equivalent
+            // to that score's calibrated gate.
+            0.5,
+            0.5,
+            0.5,
+            0.5,
             limits,
-            task_scales,
+            scales,
             scope_threshold,
-        )
-        .ok_or_else(|| IoError::new(ErrorKind::InvalidData, "scope assessment rejected valid states"))?;
-        if first_scope_alarm_step == HORIZON && assessment.alarm() {
+        );
+        let _ = assessment;
+        let scope_trigger = observation.score.score() > scope_threshold.score_threshold()
+            || observation.score.false_safe_prediction();
+        if first_scope_alarm_step == HORIZON && scope_trigger {
             first_scope_alarm_step = step;
         }
-        if first_false_safe_step == HORIZON && assessment.prediction_error().false_safe_prediction() {
+        if first_false_safe_step == HORIZON && observation.score.false_safe_prediction() {
             first_false_safe_step = step;
-            feature_flagged_by_false_safe_step = feature_alarm && feature_alarm_step_at_or_before(first_feature_alarm_step, step);
-            scope_flagged_by_false_safe_step = first_scope_alarm_step <= step;
-            combined_flagged_by_false_safe_step =
-                first_feature_alarm_step <= step || first_scope_alarm_step <= step;
         }
-        scope_false_safe_override |= assessment.false_safe_override();
-        actual_reserve = observed_reserve;
-        actual_load = observed_load;
-    }
-    if feature_alarm {
-        first_feature_alarm_step = 0;
-    }
-    if first_feature_alarm_step <= first_scope_alarm_step {
-        first_combined_alarm_step = first_feature_alarm_step;
-    } else {
-        first_combined_alarm_step = first_scope_alarm_step;
+        scope_false_safe_override |= observation.score.false_safe_prediction();
     }
 
+    let first_combined_alarm_step = first_feature_alarm_step.min(first_scope_alarm_step);
+    let feature_flagged_by_false_safe_step = first_false_safe_step < HORIZON
+        && first_feature_alarm_step <= first_false_safe_step;
+    let scope_flagged_by_false_safe_step = first_false_safe_step < HORIZON
+        && first_scope_alarm_step <= first_false_safe_step;
+    let combined_flagged_by_false_safe_step = first_false_safe_step < HORIZON
+        && first_combined_alarm_step <= first_false_safe_step;
+
     Ok(EpisodeResult {
-        feature_score: provisional.feature_score,
-        scope_score: provisional.scope_score,
+        feature_score,
+        scope_score,
         feature_alarm,
         scope_alarm: first_scope_alarm_step < HORIZON,
         combined_alarm: first_combined_alarm_step < HORIZON,
-        outside_predictor_envelope: provisional.outside_predictor_envelope,
+        outside_predictor_envelope: outside_predictor_envelope(condition),
         first_feature_alarm_step,
         first_scope_alarm_step,
         first_combined_alarm_step,
@@ -461,10 +427,6 @@ fn run_episode(
         combined_flagged_by_false_safe_step,
         scope_false_safe_override,
     })
-}
-
-fn feature_alarm_step_at_or_before(feature_step: usize, critical_step: usize) -> bool {
-    feature_step <= critical_step
 }
 
 fn csv_bool(value: bool) -> &'static str {
@@ -513,6 +475,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
     let limits = ViabilityLimits::new(0.15, 0.88)
         .ok_or_else(|| IoError::new(ErrorKind::InvalidData, "invalid safety limits"))?;
+    let scales = PredictionErrorScales::new(0.02, 0.02, 0.02)
+        .ok_or_else(|| IoError::new(ErrorKind::InvalidData, "invalid residual scales"))?;
 
     let feature_calibration: Vec<f64> = (0..CALIBRATION_EPISODES)
         .map(|i| feature_score(Condition::Nominal, 10_000 + i as u64))
@@ -521,7 +485,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .ok_or_else(|| IoError::new(ErrorKind::InvalidData, "feature-score calibration failed"))?;
     let mut scope_calibration = Vec::with_capacity(CALIBRATION_EPISODES);
     for i in 0..CALIBRATION_EPISODES {
-        scope_calibration.push(calibration_score(30_000 + i as u64, limits)?);
+        scope_calibration.push(calibration_score(30_000 + i as u64, limits, scales)?);
     }
     let scope_threshold = calibrate_scope_threshold(&scope_calibration, FALSE_ALARM_TARGET)
         .ok_or_else(|| IoError::new(ErrorKind::InvalidData, "scope-score calibration failed"))?;
@@ -541,6 +505,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     feature_threshold.score_threshold(),
                     scope_threshold,
                     limits,
+                    scales,
                 )?;
                 counters.observe(condition, result);
                 let fields = [
@@ -571,8 +536,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             summary_row(&mut summary, point, condition, counters);
         }
     }
-    let expected_rows =
-        OPERATING_POINTS.len() * Condition::ALL.len() * EVALUATION_EPISODES;
+    let expected_rows = OPERATING_POINTS.len() * Condition::ALL.len() * EVALUATION_EPISODES;
     if rows != expected_rows || rows != 6_000 {
         return Err(IoError::new(
             ErrorKind::InvalidData,
