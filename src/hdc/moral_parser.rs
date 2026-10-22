@@ -453,6 +453,12 @@ impl MoralParser {
                 "never replied",
                 "did not answer",
                 "didn't answer",
+                "have not received a reply",
+                "haven't received a reply",
+                "waiting for consent",
+                "awaiting consent",
+                "waiting for permission",
+                "awaiting permission",
                 "did not get consent",
                 "didn't get consent",
                 "did not obtain consent",
@@ -1752,8 +1758,15 @@ mod tests {
         let result = parser.parse("I asked my daughter, but she did not answer, so I discussed her health");
         assert_eq!(result.consent, ConsentState::Absent);
 
+        // Asking is not the same as receiving an affirmative answer.
+        let result = parser.parse("I asked my daughter before discussing her health");
+        assert_eq!(result.consent, ConsentState::Unknown);
+
         // Explicit affirmative consent
         let result = parser.parse("After my daughter agreed, I discussed her health");
+        assert_eq!(result.consent, ConsentState::Given);
+
+        let result = parser.parse("With her permission, I shared the report");
         assert_eq!(result.consent, ConsentState::Given);
 
         // Explicit refusal is distinct from missing consent.
