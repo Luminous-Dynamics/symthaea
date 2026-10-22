@@ -100,10 +100,12 @@ fn score_success(run: &Value, expected: u64) -> bool {
 }
 
 fn oracle_complete(run: &Value, expected: u64) -> bool {
+    // A nonzero test-process exit is expected when assertions fail. If all
+    // declared tests are accounted for, the oracle is complete; runtime_error
+    // still prevents the run from being credited as a behavioral success.
     expected > 0
         && bool_field(run, "compiled") == Some(true)
         && bool_field(run, "simulated") == Some(false)
-        && run.get("runtime_error").is_some_and(Value::is_null)
         && u64_field(run, "tests_passed").unwrap_or(0)
             .saturating_add(u64_field(run, "tests_failed").unwrap_or(0))
             == expected
@@ -479,10 +481,12 @@ fn audit(
             );
             let passed = u64_field(control, "tests_passed").unwrap_or(0);
             let failed = u64_field(control, "tests_failed").unwrap_or(0);
+            // Full test counts plus a non-simulated compile establish that the
+            // oracle ran. An assertion failure can set runtime_error because the
+            // test binary exits nonzero; count it as killed only if tests failed.
             let complete = expected_count > 0
                 && bool_field(control, "compiled") == Some(true)
                 && bool_field(control, "simulated") == Some(false)
-                && control.get("runtime_error").is_some_and(Value::is_null)
                 && passed.saturating_add(failed) == expected_count;
             let killed = complete && failed > 0;
             push_check(
@@ -1219,7 +1223,7 @@ mod tests {
         let run = serde_json::json!({
             "compiled": true,
             "simulated": false,
-            "runtime_error": null,
+            "runtime_error": "test binary exited nonzero after one assertion failed",
             "tests_passed": 2,
             "tests_failed": 1
         });
