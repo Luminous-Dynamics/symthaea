@@ -78,6 +78,8 @@ struct TaskResult {
     security_notion: String,
     source_path: String,
     regression_test: String,
+    package: String,
+    positive_controls_preserved: bool,
     command_argv: Vec<String>,
     outcome: &'static str,
     exit_code: Option<i32>,
@@ -94,7 +96,9 @@ struct Summary {
     selected_tasks: usize,
     regression_commands: usize,
     planned_commands: usize,
-    reproduced_known_breaks: usize,
+    attack_witnesses_observed: usize,
+    attack_witnesses_accepted: usize,
+    attack_witnesses_without_preserved_controls: usize,
     positive_control_commands: usize,
     positive_controls_passed: usize,
     positive_control_failures: usize,
@@ -202,6 +206,8 @@ pub(super) fn run(
                 security_notion: task.security_notion.clone(),
                 source_path: regression.path.clone(),
                 regression_test: regression.test.clone(),
+                package: parsed.package,
+                positive_controls_preserved: false,
                 command_argv: parsed.cargo_args,
                 outcome: "planned",
                 exit_code: None,
@@ -217,9 +223,26 @@ pub(super) fn run(
         }
     }
 
-    let reproduced_known_breaks = task_results
+    apply_positive_control_gate(&mut task_results);
+    let attack_witnesses_observed = task_results
         .iter()
-        .filter(|r| r.outcome == "reproduced_known_break")
+        .filter(|r| r.role == "known_break" && r.outcome == "reproduced_known_break")
+        .count();
+    let attack_witnesses_accepted = task_results
+        .iter()
+        .filter(|r| {
+            r.role == "known_break"
+                && r.outcome == "reproduced_known_break"
+                && r.positive_controls_preserved
+        })
+        .count();
+    let attack_witnesses_without_preserved_controls = task_results
+        .iter()
+        .filter(|r| {
+            r.role == "known_break"
+                && r.outcome == "reproduced_known_break"
+                && !r.positive_controls_preserved
+        })
         .count();
     let positive_control_commands = task_results
         .iter()
@@ -256,7 +279,9 @@ pub(super) fn run(
             selected_tasks: selected.len(),
             regression_commands: task_results.len(),
             planned_commands,
-            reproduced_known_breaks,
+            attack_witnesses_observed,
+            attack_witnesses_accepted,
+            attack_witnesses_without_preserved_controls,
             positive_control_commands,
             positive_controls_passed,
             positive_control_failures,
@@ -412,6 +437,8 @@ fn execute_regression(
             security_notion: task.security_notion.clone(),
             source_path: regression.path.clone(),
             regression_test: regression.test.clone(),
+            package: parsed.package.clone(),
+            positive_controls_preserved: false,
             command_argv: parsed.cargo_args,
             outcome: "launch_error",
             exit_code: None,
@@ -453,6 +480,8 @@ fn task_result_from_output(
         security_notion: task.security_notion.clone(),
         source_path: regression.path.clone(),
         regression_test: parsed.test_filter.clone(),
+        package: parsed.package.clone(),
+        positive_controls_preserved: false,
         command_argv: parsed.cargo_args.clone(),
         outcome,
         exit_code,
@@ -474,6 +503,30 @@ fn task_result_from_output(
                 .to_owned()
                 + "and requires triage"
         },
+    }
+}
+
+fn apply_positive_control_gate(results: &mut [TaskResult]) {
+    // For every task/package pair, require all listed positive controls to pass
+    // before an observed attack regression can count as an accepted witness.
+    let mut controls: std::collections::HashMap<(String, String), (usize, usize)> =
+        std::collections::HashMap::new();
+    for result in results.iter().filter(|result| result.role == "positive_control") {
+        let key = (result.task_id.clone(), result.package.clone());
+        let counts = controls.entry(key).or_insert((0, 0));
+        counts.0 += 1;
+        if result.outcome == "positive_control_passed" {
+            counts.1 += 1;
+        }
+    }
+
+    for result in results.iter_mut().filter(|result| {
+        result.role == "known_break" && result.outcome == "reproduced_known_break"
+    }) {
+        let key = (result.task_id.clone(), result.package.clone());
+        result.positive_controls_preserved = controls
+            .get(&key)
+            .is_some_and(|(expected, passed)| *expected > 0 && expected == passed);
     }
 }
 
