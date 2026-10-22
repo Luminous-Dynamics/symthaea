@@ -21,6 +21,15 @@ This is not a proposal to recreate qReduMIS under a new name. qReduMIS is an exi
 
 A published upstream classical ParallelILS submission reports best-known-or-better objectives across all 50 QOBLIB MIS instances, with two new best-known values. On the 186-variable es60fst02 instance it reports objective 88 in 0.0006 seconds, whereas published QPU-containing records for the same instance also report objective 88 with substantially different total runtimes. Those records are not a controlled head-to-head comparison, so use them to motivate careful accounting, not to infer a universal hardware speed ratio. The tiny exact solver in PR #8296 is a correctness oracle only.
 
+### Two cohorts, two distinct claims
+
+Keep two benchmark cohorts separate:
+
+1. **Paper-reproduction cohort:** first reproduce the published qReduMIS experiment contract on its four reported 137-vertex instances, with hardness parameters approximately 1.478, 14.12, 125.5, and 1,435. The paper reports QAA success probabilities 0.35(2), 0.008(5), 0.007(4), and 0.0 respectively, while qReduMIS in-set and out-set strategies report 1.0 for those four cases (1,000 shots per QPU call in the paper's described setup). These are *paper-reported results*, not our replication. Preserve the original definitions, sampling protocol, and hardware profile; if original data or parameters are unavailable, mark the corresponding reproduction as incomplete rather than reconstructing hidden inputs.
+2. **External-generalization cohort:** a source-frozen QOBLIB MIS sample including the stronger published classical records. This tests whether informer value generalizes outside the paper's selected graph family. It cannot be conflated with a faithful paper reproduction.
+
+The official [qReduMIS package README](https://github.com/jpmorganchase/qReduMIS/blob/main/qReduMIS_package/README.md) explicitly notes that its example problem is fully reducible and does not need to call the quantum backend. Therefore, a demo or passing unit test is not backend evidence: instrumentation must confirm whether a backend call actually occurred, count calls/shots, and label no-call runs as classical-only execution.
+
 ## 3. Paradigm shift: compute the value of information
 
 Do not optimize the quantum subroutine in isolation. Treat the informer as a budgeted signal source and measure its incremental effect on the downstream reducer.
