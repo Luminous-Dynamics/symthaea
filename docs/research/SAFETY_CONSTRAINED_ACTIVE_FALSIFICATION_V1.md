@@ -21,7 +21,7 @@ Given a finite family of candidate dynamics hypotheses, the implementation build
 
 This common-hull step matters. It is not sufficient to check each model separately and union their viable actions: a different model may require a different continuation after the proposed first action, while the controller has not yet identified which model is actual. The hull enforces a common conservative transition envelope; the multi-step viability search then requires one safe continuation sequence under that envelope. Rectangularization can introduce unreachable combinations and therefore false vetoes, but it should not create extra optimism under the declared interval abstraction.
 
-For each candidate action, calculate pairwise distances between the model-prediction boxes for reserve/load changes. If two boxes overlap on both coordinates, their distance is zero. For each action, use the minimum separation over every pair of model hypotheses:
+For each candidate action, calculate pairwise distances between the model-prediction boxes for reserve/load changes. If two boxes overlap on both coordinates, their distance is zero. The noise-aware selector expands each predicted interval by the declared per-coordinate observation error radius; the separation then shrinks by twice that radius on each coordinate, floored at zero. An action scores zero if any model pair's noisy observation boxes overlap. For each action, use the minimum separation over every pair of model hypotheses:
 
 \[
 D(a)=\min_{i<j}\operatorname{dist}(B_i(a),B_j(a)).
@@ -29,7 +29,7 @@ D(a)=\min_{i<j}\operatorname{dist}(B_i(a),B_j(a)).
 
 The planner chooses the safe action with the largest (D(a)), subject to a predeclared minimum-discrimination threshold. A task-preferred action breaks ties. If no certified action has sufficient discriminative value, it recommends **no probe**; it does not claim that no ordinary safe task action exists. The caller must continue to use its existing certified task policy/fallback logic.
 
-This score is a conservative geometric proxy for worst-pair distinguishability, not expected information gain, mutual information, Bayesian entropy reduction, or proof that one observation will identify the true model. Sensor noise, stochastic transitions and non-identifiable parameters must be added to the effect-observation model before making those stronger claims.
+This score is a conservative geometric proxy for worst-pair distinguishability, not expected information gain, mutual information, Bayesian entropy reduction, or proof that one observation will identify the true model. The original zero-noise API remains as a wrapper for compatibility; the new `recommend_safe_probe_with_noise` path discounts separation for a caller-supplied measurement bound and fails closed for invalid bounds. This only handles a bounded, per-coordinate observation-error model; stochastic transitions and non-identifiable parameters require a richer observation model before making stronger claims.
 
 ## 3. Module contract
 
