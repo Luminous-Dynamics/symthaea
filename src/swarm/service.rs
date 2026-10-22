@@ -768,7 +768,7 @@ impl NetworkService {
                 Ok(()) => {
                     tracing::info!(
                         peer = peer_id,
-                        "PQC key exchange complete — hybrid session key derived"
+                        "PQC key exchange complete"
                     );
                 }
                 Err(e) => {
@@ -786,14 +786,12 @@ impl NetworkService {
         Ok(trust)
     }
 
-    /// Perform ML-KEM-768 key encapsulation after classical handshake.
+    /// Attempt the current research ML-KEM exchange after the classical handshake.
     ///
-    /// Protocol:
-    /// 1. Send our KEM public key to the peer
-    /// 2. Receive peer's KEM public key
-    /// 3. Encapsulate shared secret to peer's public key
-    /// 4. Send ciphertext to peer
-    /// 5. Derive hybrid session key: BLAKE3(classical_nonce || kem_shared_secret)
+    /// The current transport only exchanges the public-key payload and derives
+    /// an initiator-side candidate key. It does not deliver the KEM ciphertext
+    /// to a responder, complete peer decapsulation, bind a transcript, or perform
+    /// key confirmation. Consequently it must not leave a session marked active.
     #[cfg(all(feature = "swarm", feature = "pqc-handshake"))]
     async fn run_pqc_exchange(
         &self,
@@ -843,24 +841,24 @@ impl NetworkService {
             reason: format!("PQC KEM exchange timeout (10s) for peer {peer_id}"),
         })??;
 
-        // Step 3: Encapsulate shared secret + derive session key
+        // Step 3: This currently derives only an initiator-side candidate. The
+        // ciphertext is not sent to a responder, and no peer-side decapsulation
+        // or key confirmation occurs. Remove the candidate immediately and fail
+        // this phase closed so callers cannot mistake it for an active session.
         let mut mgr = pqc.write();
         mgr.receive_kem_public_key(peer_id, &peer_kem_pk);
         let _ciphertext = mgr.encapsulate_for_peer(peer_id, classical_nonce)?;
+        mgr.remove_session(peer_id);
 
-        // Step 4: Send ciphertext to peer (they decapsulate to get the same secret)
-        // This requires another stream — for now, the session key is stored locally.
-        // Full bidirectional KEM exchange requires the peer to also run this protocol.
-        // TODO(blocked:bidirectional-kem): Send ciphertext over a second stream
-        // and have peer decapsulate. Requires peer-side KEM protocol implementation.
-
-        tracing::debug!(
+        tracing::warn!(
             peer = peer_id,
-            session_active = mgr.session_key(peer_id).is_some(),
-            "PQC session key derived (initiator side)"
+            session_active = false,
+            "PQC candidate discarded: bidirectional KEM delivery and key confirmation are not implemented"
         );
 
-        Ok(())
+        Err(SwarmError::TrustVerificationError {
+            reason: "PQC session not established: responder decapsulation, authenticated transcript binding, and key confirmation are not implemented".to_string(),
+        })
     }
 
     /// Stub handshake for non-swarm builds (returns LocalTrust).
