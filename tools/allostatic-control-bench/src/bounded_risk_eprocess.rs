@@ -35,7 +35,8 @@ impl BoundedRiskEProcess {
         total_delta: f64,
         simultaneous_monitors: usize,
     ) -> Option<Self> {
-        if !risk_bound.is_finite()
+        if N == 0
+            || !risk_bound.is_finite()
             || risk_bound <= 0.0
             || risk_bound >= 1.0
             || !bet.is_finite()
@@ -143,20 +144,20 @@ impl BoundedRiskEProcess {
 /// supermartingales is itself a nonnegative supermartingale under the same
 /// conditional-risk null. This avoids selecting one bet using evaluation data.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct MixtureBoundedRiskEProcess {
+pub struct MixtureBoundedRiskEProcess<const N: usize> {
     risk_bound: f64,
-    bet_fractions: [f64; 3],
+    bet_fractions: [f64; N],
     total_delta: f64,
     simultaneous_monitors: usize,
-    component_log_e_values: [f64; 3],
+    component_log_e_values: [f64; N],
     log_e_value: f64,
     alarmed: bool,
 }
 
-impl MixtureBoundedRiskEProcess {
+impl<const N: usize> MixtureBoundedRiskEProcess<N> {
     pub fn new(
         risk_bound: f64,
-        bet_fractions: [f64; 3],
+        bet_fractions: [f64; N],
         total_delta: f64,
         simultaneous_monitors: usize,
     ) -> Option<Self> {
@@ -187,7 +188,7 @@ impl MixtureBoundedRiskEProcess {
             bet_fractions,
             total_delta,
             simultaneous_monitors,
-            component_log_e_values: [0.0; 3],
+            component_log_e_values: [0.0; N],
             log_e_value: 0.0,
             alarmed: false,
         })
@@ -197,7 +198,7 @@ impl MixtureBoundedRiskEProcess {
         self.risk_bound
     }
 
-    pub const fn bet_fractions(self) -> [f64; 3] {
+    pub const fn bet_fractions(self) -> [f64; N] {
         self.bet_fractions
     }
 
@@ -217,7 +218,7 @@ impl MixtureBoundedRiskEProcess {
         (self.simultaneous_monitors as f64 / self.total_delta).ln()
     }
 
-    pub const fn component_log_e_values(self) -> [f64; 3] {
+    pub const fn component_log_e_values(self) -> [f64; N] {
         self.component_log_e_values
     }
 
