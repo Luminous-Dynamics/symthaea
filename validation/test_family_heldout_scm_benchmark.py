@@ -1,6 +1,6 @@
 import unittest
 from family_heldout_scm_benchmark import (
-    MECHANISMS, TOPOLOGIES, SCM, build_suite, graph_scores, layered_graph_scores, make_scm, split_label, validate_scm,
+    MECHANISMS, TOPOLOGIES, SCM, build_suite, graph_scores, layered_graph_scores, make_scm, sample_scm, split_label, validate_scm,
 )
 
 class FamilyHeldoutTests(unittest.TestCase):
@@ -45,6 +45,29 @@ class FamilyHeldoutTests(unittest.TestCase):
         score = graph_scores([(0, 1), (1, 2)], [], 3)
         self.assertEqual(score["shd"], 2)
         self.assertEqual(score["directed_recall"], 0.0)
+
+    def test_sampling_is_deterministic_and_digest_bound(self):
+        scm = make_scm(5, "chain", "and", 3)
+        a = sample_scm(scm, 20, 99, noise_probability=0.1)
+        b = sample_scm(scm, 20, 99, noise_probability=0.1)
+        self.assertEqual(a, b)
+        self.assertEqual(len(a["rows"]), 20)
+        self.assertEqual(len(a["samples_sha256"]), 64)
+
+    def test_hard_do_overrides_target_and_propagates_through_chain(self):
+        scm = make_scm(5, "chain", "and", 7)
+        rows = sample_scm(scm, 12, 1, noise_probability=0.0, intervention=(0, 0))["rows"]
+        self.assertTrue(all(row[0] == 0 for row in rows))
+        self.assertTrue(all(all(value == 0 for value in row) for row in rows))
+        treated = sample_scm(scm, 12, 1, noise_probability=0.0, intervention=(0, 1))["rows"]
+        self.assertTrue(all(row[0] == 1 for row in treated))
+        self.assertTrue(all(all(value == 1 for value in row) for row in treated))
+
+    def test_sampler_rejects_invalid_contract(self):
+        scm = make_scm(4, "chain", "and", 0)
+        with self.assertRaises(ValueError): sample_scm(scm, 0, 1)
+        with self.assertRaises(ValueError): sample_scm(scm, 2, 1, noise_probability=0.5)
+        with self.assertRaises(ValueError): sample_scm(scm, 2, 1, intervention=(4, 1))
 
     def test_layered_scores_separate_skeleton_direction_and_intervention_budget(self):
         score = layered_graph_scores(
