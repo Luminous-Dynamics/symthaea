@@ -125,14 +125,16 @@ enum SamplingDesign {
     UniformGrid = 1,
     LatinHypercube = 2,
     AdaptiveNearestNeighbor = 3,
+    GaussianProcessLcb = 4,
 }
 
 impl SamplingDesign {
-    const ALL: [Self; 4] = [
+    const ALL: [Self; 5] = [
         Self::Random,
         Self::UniformGrid,
         Self::LatinHypercube,
         Self::AdaptiveNearestNeighbor,
+        Self::GaussianProcessLcb,
     ];
 }
 
@@ -217,11 +219,35 @@ struct BenchmarkRun {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum GaussianProcessError {
+    EmptyHistory,
+    NonFiniteInput,
+    InvalidMatrix,
+    NotPositiveDefinite,
+    NonFinitePosterior,
+    NegativePosteriorVariance,
+}
+
+impl fmt::Display for GaussianProcessError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::EmptyHistory => f.write_str("Gaussian-process history has no usable observations"),
+            Self::NonFiniteInput => f.write_str("Gaussian-process input contains a non-finite value"),
+            Self::InvalidMatrix => f.write_str("Gaussian-process covariance matrix is malformed"),
+            Self::NotPositiveDefinite => f.write_str("Gaussian-process covariance is not positive definite"),
+            Self::NonFinitePosterior => f.write_str("Gaussian-process posterior is non-finite"),
+            Self::NegativePosteriorVariance => f.write_str("Gaussian-process posterior variance is materially negative"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum BenchmarkError {
     ZeroBudget,
     EmptySeedSet,
     AdaptiveRequiresHistory,
     AdaptiveCandidatePoolExhausted,
+    GaussianProcess(GaussianProcessError),
     CostOverflow,
 }
 
@@ -236,6 +262,7 @@ impl fmt::Display for BenchmarkError {
             Self::AdaptiveCandidatePoolExhausted => {
                 f.write_str("adaptive candidate lattice has no unqueried candidate left")
             }
+            Self::GaussianProcess(error) => write!(f, "Gaussian-process baseline failed: {error}"),
             Self::CostOverflow => f.write_str("benchmark cumulative cost overflowed"),
         }
     }
@@ -427,6 +454,251 @@ fn choose_adaptive_point(history: &[ProposalObservation]) -> Option<Point> {
     best.map(|(_, point)| point)
 }
 
+const GP_LENGTH_SCALE: f64 = 0.25;
+const GP_SIGNAL_VARIANCE: f64 = 1.0;
+const GP_OBSERVATION_NOISE_VARIANCE: f64 = 1e-6;
+const GP_DIAGONAL_JITTER: f64 = 1e-10;
+const GP_LCB_EXPLORATION_BETA: f64 = 1.5;
+
+fn gp_rbf_kernel(left: Point, right: Point) -> f64 {
+    let dx = left.x - right.x;
+    let dy = left.y - right.y;
+    let squared_distance = dx * dx + dy * dy;
+    GP_SIGNAL_VARIANCE * (-0.5 * squared_distance / GP_LENGTH_SCALE.powi(2)).exp()
+}
+
+/// Cholesky factorization of a symmetric positive-definite matrix.
+/// The input must already include observation noise and fixed diagonal jitter.
+fn gp_cholesky(matrix: &[Vec<f64>]) -> Result<Vec<Vec<f64>>, GaussianProcessError> {
+    let n = matrix.len();
+    if n == 0 || matrix.iter().any(|row| row.len() != n) {
+        return Err(GaussianProcessError::InvalidMatrix);
+    }
+    if matrix.iter().flatten().any(|value| !value.is_finite()) {
+        return Err(GaussianProcessError::NonFiniteInput);
+    }
+
+    let mut lower = vec![vec![0.0; n]; n];
+    for row in 0..n {
+        for column in 0..=row {
+            let mut value = matrix[row][column];
+            for k in 0..column {
+                value -= lower[row][k] * lower[column][k];
+            }
+            if row == column {
+                if !value.is_finite() || value <= 0.0 {
+                    return Err(GaussianProcessError::NotPositiveDefinite);
+                }
+                lower[row][column] = value.sqrt();
+            } else {
+                let pivot = lower[column][column];
+                if !pivot.is_finite() || pivot <= 0.0 {
+                    return Err(GaussianProcessError::NotPositiveDefinite);
+                }
+                lower[row][column] = value / pivot;
+                if !lower[row][column].is_finite() {
+                    return Err(GaussianProcessError::NonFinitePosterior);
+                }
+            }
+        }
+    }
+    Ok(lower)
+}
+
+fn gp_solve_lower(
+    lower: &[Vec<f64>],
+    right_hand_side: &[f64],
+) -> Result<Vec<f64>, GaussianProcessError> {
+    let n = lower.len();
+    if n == 0 || right_hand_side.len() != n || lower.iter().any(|row| row.len() != n) {
+        return Err(GaussianProcessError::InvalidMatrix);
+    }
+    let mut result = vec![0.0; n];
+    for row in 0..n {
+        let mut value = right_hand_side[row];
+        for column in 0..row {
+            value -= lower[row][column] * result[column];
+        }
+        let pivot = lower[row][row];
+        if !pivot.is_finite() || pivot <= 0.0 {
+            return Err(GaussianProcessError::NotPositiveDefinite);
+        }
+        result[row] = value / pivot;
+        if !result[row].is_finite() {
+            return Err(GaussianProcessError::NonFinitePosterior);
+        }
+    }
+    Ok(result)
+}
+
+fn gp_solve_upper_from_lower_transpose(
+    lower: &[Vec<f64>],
+    right_hand_side: &[f64],
+) -> Result<Vec<f64>, GaussianProcessError> {
+    let n = lower.len();
+    if n == 0 || right_hand_side.len() != n || lower.iter().any(|row| row.len() != n) {
+        return Err(GaussianProcessError::InvalidMatrix);
+    }
+    let mut result = vec![0.0; n];
+    for row in (0..n).rev() {
+        let mut value = right_hand_side[row];
+        for column in row + 1..n {
+            value -= lower[column][row] * result[column];
+        }
+        let pivot = lower[row][row];
+        if !pivot.is_finite() || pivot <= 0.0 {
+            return Err(GaussianProcessError::NotPositiveDefinite);
+        }
+        result[row] = value / pivot;
+        if !result[row].is_finite() {
+            return Err(GaussianProcessError::NonFinitePosterior);
+        }
+    }
+    Ok(result)
+}
+
+/// Fixed-hyperparameter Gaussian-process posterior for the currently observed data.
+/// The GP is fit once per proposal; candidate posterior queries reuse the Cholesky
+/// factor and alpha vector rather than refactoring per candidate.
+#[derive(Debug, Clone)]
+struct GaussianProcessPosterior {
+    observed_points: Vec<Point>,
+    mean_y: f64,
+    alpha: Vec<f64>,
+    cholesky_lower: Vec<Vec<f64>>,
+}
+
+impl GaussianProcessPosterior {
+    fn fit(history: &[ProposalObservation]) -> Result<Self, GaussianProcessError> {
+        let measured: Vec<(Point, f64)> = history
+            .iter()
+            .filter(|entry| entry.status == TrialStatus::Feasible)
+            .filter_map(|entry| entry.observed_objective.map(|value| (entry.point, value)))
+            .collect();
+        if measured.is_empty() {
+            return Err(GaussianProcessError::EmptyHistory);
+        }
+        if measured.iter().any(|(point, value)| {
+            !point.x.is_finite()
+                || !point.y.is_finite()
+                || !value.is_finite()
+                || !(0.0..=1.0).contains(&point.x)
+                || !(0.0..=1.0).contains(&point.y)
+        }) {
+            return Err(GaussianProcessError::NonFiniteInput);
+        }
+
+        let n = measured.len();
+        let mean_y = measured.iter().map(|(_, value)| *value).sum::<f64>() / n as f64;
+        if !mean_y.is_finite() {
+            return Err(GaussianProcessError::NonFiniteInput);
+        }
+        let observed_points: Vec<Point> = measured.iter().map(|(point, _)| *point).collect();
+        let centered_y: Vec<f64> = measured.iter().map(|(_, value)| *value - mean_y).collect();
+
+        let mut covariance = vec![vec![0.0; n]; n];
+        for row in 0..n {
+            for column in 0..=row {
+                let value = gp_rbf_kernel(observed_points[row], observed_points[column]);
+                covariance[row][column] = value;
+                covariance[column][row] = value;
+            }
+            covariance[row][row] +=
+                GP_OBSERVATION_NOISE_VARIANCE + GP_DIAGONAL_JITTER;
+        }
+
+        let cholesky_lower = gp_cholesky(&covariance)?;
+        let projected = gp_solve_lower(&cholesky_lower, &centered_y)?;
+        let alpha = gp_solve_upper_from_lower_transpose(&cholesky_lower, &projected)?;
+
+        Ok(Self {
+            observed_points,
+            mean_y,
+            alpha,
+            cholesky_lower,
+        })
+    }
+
+    fn predict(&self, candidate: Point) -> Result<(f64, f64), GaussianProcessError> {
+        if !candidate.x.is_finite()
+            || !candidate.y.is_finite()
+            || !(0.0..=1.0).contains(&candidate.x)
+            || !(0.0..=1.0).contains(&candidate.y)
+        {
+            return Err(GaussianProcessError::NonFiniteInput);
+        }
+
+        let cross_covariance: Vec<f64> = self
+            .observed_points
+            .iter()
+            .map(|point| gp_rbf_kernel(*point, candidate))
+            .collect();
+        let mean = self.mean_y
+            + cross_covariance
+                .iter()
+                .zip(&self.alpha)
+                .map(|(kernel, weight)| kernel * weight)
+                .sum::<f64>();
+        let projected = gp_solve_lower(&self.cholesky_lower, &cross_covariance)?;
+        let variance_reduction = projected.iter().map(|value| value * value).sum::<f64>();
+        let raw_variance = GP_SIGNAL_VARIANCE - variance_reduction;
+        let variance = if raw_variance < 0.0 && raw_variance >= -1e-8 {
+            0.0
+        } else if raw_variance < -1e-8 {
+            return Err(GaussianProcessError::NegativePosteriorVariance);
+        } else {
+            raw_variance
+        };
+
+        if !mean.is_finite() || !variance.is_finite() || variance < 0.0 {
+            return Err(GaussianProcessError::NonFinitePosterior);
+        }
+        Ok((mean, variance))
+    }
+}
+
+/// Select the next candidate by a fixed lower-confidence-bound acquisition:
+/// LCB(x) = posterior_mean(x) - beta * posterior_stddev(x). Lower is preferred.
+/// Kernel, noise, jitter and beta are frozen constants; no hidden truth or unqueried
+/// objective values are inputs. This is a minimal GP-BO baseline, not a tuned SOTA claim.
+fn choose_gaussian_process_lcb(
+    history: &[ProposalObservation],
+) -> Result<Option<Point>, GaussianProcessError> {
+    let posterior = match GaussianProcessPosterior::fit(history) {
+        Ok(posterior) => posterior,
+        Err(GaussianProcessError::EmptyHistory) => return Ok(None),
+        Err(error) => return Err(error),
+    };
+
+    const SIDE: usize = 16;
+    let mut best: Option<(f64, Point)> = None;
+    for ix in 0..SIDE {
+        for iy in 0..SIDE {
+            let candidate = Point {
+                x: (ix as f64 + 0.5) / SIDE as f64,
+                y: (iy as f64 + 0.5) / SIDE as f64,
+            };
+            if history.iter().any(|entry| {
+                let dx = entry.point.x - candidate.x;
+                let dy = entry.point.y - candidate.y;
+                dx * dx + dy * dy < 1e-20
+            }) {
+                continue;
+            }
+
+            let (mean, variance) = posterior.predict(candidate)?;
+            let acquisition = mean - GP_LCB_EXPLORATION_BETA * variance.sqrt();
+            if !acquisition.is_finite() {
+                return Err(GaussianProcessError::NonFinitePosterior);
+            }
+            if best.map_or(true, |(best_score, _)| acquisition < best_score) {
+                best = Some((acquisition, candidate));
+            }
+        }
+    }
+    Ok(best.map(|(_, point)| point))
+}
+
 fn run_benchmark(
     case: SyntheticCase,
     design: SamplingDesign,
@@ -437,12 +709,16 @@ fn run_benchmark(
     if budget == 0 {
         return Err(BenchmarkError::ZeroBudget);
     }
-    let fixed_points = if design == SamplingDesign::AdaptiveNearestNeighbor {
+    let is_sequential = matches!(
+        design,
+        SamplingDesign::AdaptiveNearestNeighbor | SamplingDesign::GaussianProcessLcb
+    );
+    let fixed_points = if is_sequential {
         Vec::new()
     } else {
         sample_points(design, budget, seed)?
     };
-    let adaptive_warm_start = if design == SamplingDesign::AdaptiveNearestNeighbor {
+    let adaptive_warm_start = if is_sequential {
         adaptive_points(seed, budget)?
     } else {
         Vec::new()
@@ -458,12 +734,23 @@ fn run_benchmark(
     let mut best_true_objective_at_selected_point: Option<f64> = None;
 
     for query_index in 0..budget {
-        let point = if design == SamplingDesign::AdaptiveNearestNeighbor {
+        let point = if is_sequential {
             if query_index < adaptive_warm_start.len() {
                 adaptive_warm_start[query_index]
             } else {
-                choose_adaptive_point(&proposal_history(&records))
-                    .ok_or(BenchmarkError::AdaptiveCandidatePoolExhausted)?
+                let history = proposal_history(&records);
+                if design == SamplingDesign::AdaptiveNearestNeighbor {
+                    choose_adaptive_point(&history)
+                        .ok_or(BenchmarkError::AdaptiveCandidatePoolExhausted)?
+                } else {
+                    match choose_gaussian_process_lcb(&history)
+                        .map_err(BenchmarkError::GaussianProcess)?
+                    {
+                        Some(point) => point,
+                        None => choose_adaptive_point(&history)
+                            .ok_or(BenchmarkError::AdaptiveCandidatePoolExhausted)?,
+                    }
+                }
             }
         } else {
             fixed_points[query_index]
