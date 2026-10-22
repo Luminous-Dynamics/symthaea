@@ -23,7 +23,7 @@ mod school;
 
 // ── Re-exports ────────────────────────────────────────────────────────────
 
-pub use relational::PartnershipState;
+pub use relational::{PartnershipState, PhiDyadStatus};
 #[cfg(feature = "school_learning")]
 pub use school::{CurriculumObjectiveSummary, CurriculumReport};
 
@@ -953,7 +953,7 @@ impl Symthaea {
             relational: RelationalCore::from_persisted(
                 state.partner,
                 state.trajectory,
-                state.recent_ai_states,
+                state.recent_user_input_states,
             ),
             plugin_registry,
             #[cfg(feature = "full_language")]
@@ -1287,8 +1287,10 @@ impl Symthaea {
         // Prune completed tasks from the supervisor
         self.task_supervisor.prune_completed();
 
-        // Feed relational Psi from previous cycle's Phi_dyad into the mind.
-        self.mind.set_relational_psi(self.relational.last_phi_dyad);
+        // The facade has no independently sourced partner-observation stream yet.
+        // A dyadic estimate is therefore unavailable and must not be fed back
+        // into cognition as if it were validated relational evidence.
+        self.mind.set_relational_psi(0.0);
 
         self.mind.tick();
 
@@ -2647,10 +2649,13 @@ impl Symthaea {
         let consciousness = thought.psi as f32;
         self.update_partnership(content, consciousness);
 
-        let ai_hv = symthaea_core::hdc::unified_hv::ContinuousHV::from_values(
+        // This buffer contains the user's utterance embedding. Do not label it
+        // as an AI state; no assistant-response or independent partner-state stream
+        // is currently wired into the facade's dyadic estimator.
+        let user_input_hv = symthaea_core::hdc::unified_hv::ContinuousHV::from_values(
             input_embedding.values.clone(),
         );
-        self.relational.push_ai_state(ai_hv);
+        self.relational.push_user_input_state(user_input_hv);
 
         // ====================================================================
         // PHASE 7.25: LEARNING PERSISTENCE OUTCOME RECORDING + AUTO-SAVE
@@ -3246,7 +3251,7 @@ impl Symthaea {
             interactions: self.interactions,
             partner: self.relational.partner.clone(),
             trajectory: self.relational.trajectory.clone(),
-            recent_ai_states: self.relational.recent_ai_states.clone(),
+            recent_user_input_states: self.relational.recent_user_input_states.clone(),
             database_path: None,
             user_state: Some(self.user_state_inference.state().clone()),
         };
