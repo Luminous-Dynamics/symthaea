@@ -26,6 +26,7 @@ mod tests {
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
     struct State {
         session_active: bool,
+        connectivity: Connectivity,
         loaded: Option<Bundle>,
         verified: Option<Bundle>,
         revoked_mask: u8,
@@ -36,6 +37,7 @@ mod tests {
     impl State {
         const INITIAL: Self = Self {
             session_active: false,
+            connectivity: Connectivity::Online,
             loaded: None,
             verified: None,
             revoked_mask: 0,
@@ -140,9 +142,13 @@ mod tests {
         Handoff,
         RenderA,
         RenderB,
+        ConnectivityOnline,
+        ConnectivityOffline,
+        ConnectivityIntermittent,
+        RequireCoreNetwork,
     }
 
-    const ACTIONS: [Action; 16] = [
+    const ACTIONS: [Action; 20] = [
         Action::StartSession,
         Action::LoadA,
         Action::LoadB,
@@ -159,6 +165,10 @@ mod tests {
         Action::Handoff,
         Action::RenderA,
         Action::RenderB,
+        Action::ConnectivityOnline,
+        Action::ConnectivityOffline,
+        Action::ConnectivityIntermittent,
+        Action::RequireCoreNetwork,
     ];
 
     #[derive(Debug)]
@@ -172,6 +182,14 @@ mod tests {
         let mut violations = Vec::new();
 
         match action {
+            Action::ConnectivityOnline => next.connectivity = Connectivity::Online,
+            Action::ConnectivityOffline => next.connectivity = Connectivity::Offline,
+            Action::ConnectivityIntermittent => next.connectivity = Connectivity::Intermittent,
+            Action::RequireCoreNetwork => {
+                if let Some(violation) = network_policy_violation(state.connectivity, true) {
+                    violations.push(violation);
+                }
+            }
             Action::StartSession => {
                 next.session_active = true;
                 next.loaded = None;
@@ -360,6 +378,18 @@ mod tests {
             Action::RenderB => json!({
                 "sequence": sequence, "kind": "protocol_rendered", "bundle_id": "bundle-b"
             }),
+            Action::ConnectivityOnline => json!({
+                "sequence": sequence, "kind": "connectivity_changed", "connectivity": "online"
+            }),
+            Action::ConnectivityOffline => json!({
+                "sequence": sequence, "kind": "connectivity_changed", "connectivity": "offline"
+            }),
+            Action::ConnectivityIntermittent => json!({
+                "sequence": sequence, "kind": "connectivity_changed", "connectivity": "intermittent"
+            }),
+            Action::RequireCoreNetwork => json!({
+                "sequence": sequence, "kind": "network_required_for_core"
+            }),
         }
     }
 
@@ -545,6 +575,19 @@ mod tests {
                             "verification violation mismatch for {state:?} via {action:?}"
                         );
                     }
+                    Action::ConnectivityOnline => {
+                        assert_eq!(outcome.next.connectivity, Connectivity::Online);
+                    }
+                    Action::ConnectivityOffline => {
+                        assert_eq!(outcome.next.connectivity, Connectivity::Offline);
+                    }
+                    Action::ConnectivityIntermittent => {
+                        assert_eq!(outcome.next.connectivity, Connectivity::Intermittent);
+                    }
+                    Action::RequireCoreNetwork => {
+                        let expected = network_policy_violation(state.connectivity, true);
+                        assert_eq!(outcome.violations.as_slice(), expected.as_slice());
+                    }
                     Action::LoadA | Action::LoadB => {
                         assert_eq!(outcome.next.verified, None);
                     }
@@ -568,11 +611,11 @@ mod tests {
 
         assert_eq!(
             states.len(),
-            84,
+            252,
             "reachable abstract-state count changed; review and update the model baseline"
         );
         assert_eq!(
-            transition_count, 1_344,
+            transition_count, 5_040,
             "state/action transition count changed; review and update the model baseline"
         );
         println!(
@@ -585,7 +628,7 @@ mod tests {
     #[test]
     fn every_reachable_state_action_edge_matches_production_trace_checker() {
         let paths = shortest_paths_to_reachable_states();
-        assert_eq!(paths.len(), 84, "finite model's reachable state count changed");
+        assert_eq!(paths.len(), 252, "finite model's reachable state count changed");
 
         let mut compared_edges = 0usize;
         for (target_state, prefix) in &paths {
@@ -618,7 +661,7 @@ mod tests {
         }
 
         assert_eq!(
-            compared_edges, 1_344,
+            compared_edges, 5_040,
             "every reachable state/action edge must be differentially checked"
         );
         println!("model_production_edge_comparisons={compared_edges}");
@@ -653,8 +696,8 @@ mod tests {
         }
 
         assert_eq!(
-            compared_sequences, 21_504,
-            "all 84 states × 16 × 16 two-action suffixes must be compared"
+            compared_sequences, 100_800,
+            "all 252 states × 20 × 20 two-action suffixes must be compared"
         );
         println!("model_production_two_action_sequence_comparisons={compared_sequences}");
     }
@@ -663,6 +706,7 @@ mod tests {
     fn resuming_without_an_interrupt_cannot_retain_a_verified_bundle() {
         let state = State {
             session_active: true,
+            connectivity: Connectivity::Online,
             loaded: Some(Bundle::A),
             verified: Some(Bundle::A),
             revoked_mask: 0,
@@ -683,6 +727,7 @@ mod tests {
     fn revocation_and_uncertainty_obligations_survive_unrelated_transitions() {
         let state = State {
             session_active: true,
+            connectivity: Connectivity::Online,
             loaded: Some(Bundle::B),
             verified: Some(Bundle::B),
             revoked_mask: Bundle::A.bit(),
@@ -714,6 +759,7 @@ mod tests {
     fn verification_without_active_session_is_rejected() {
         let state = State {
             session_active: false,
+            connectivity: Connectivity::Online,
             loaded: Some(Bundle::A),
             verified: None,
             revoked_mask: 0,
