@@ -239,3 +239,25 @@ These are deterministic unit-test cases; no Rust or CI pass is claimed until the
 - [NIST Sequential Bayesian Experiment Design](https://www.nist.gov/programs-projects/sequential-bayesian-experiment-design) remains an industry-relevant baseline for cost-sensitive parameter estimation in an assumed parametric model; Symthaea's broader problem additionally requires structural recovery and model-space adequacy.
 
 The immediate experimental follow-on is to evaluate false-alarm calibration on clean held-out world batches, detection power over the predeclared discrepancy sweep, and clean-world recovery/cost jointly. Only after that should the calibrator be wired into an active policy; calibration accuracy alone is not a scientific-discovery win.
+
+
+## New implementation direction: prior mass should not depend on expression multiplicity
+
+The core selector now exposes a separate weighted-prior EIG function and a cost-normalized weighted selector:
+
+- `expected_information_gain_with_prior_nats`
+- `select_experiment_by_weighted_information_gain_per_cost`
+
+The original uniform-prior API is preserved as a baseline. The weighted API accepts one finite, non-negative weight per candidate, normalizes weights robustly, and computes both finite-noise EIG and its zero-noise entropy limit under those priors. It returns no score for a malformed weight vector or incomplete/non-finite predictions. All-zero weights are invalid; a single positive-mass hypothesis has exactly zero information gain.
+
+This addresses a structural failure mode in symbolic discovery: uniform prior mass over expression instances is not uniform prior mass over scientific laws. If a family has ten syntactic variants and another has one, a uniform-over-expressions prior silently assigns the first family ten times as much mass. The new API permits the caller to allocate prior mass at the structural-family level and split that mass among its representations. It does **not** infer semantic equivalence, build family labels, or compute posterior weights from evidence; those remain caller responsibilities and must be documented in benchmark receipts.
+
+### Metamorphic controls
+
+- Equal weights agree numerically with the existing uniform-prior API.
+- Duplicating one hypothesis while splitting its original mass across both representations leaves each candidate experiment's EIG unchanged within tolerance and preserves the weighted selector's ranking.
+- Mismatched-length, negative, non-finite, and all-zero prior vectors fail closed.
+- Zero prior mass yields zero information gain when all prior probability is concentrated on one valid hypothesis.
+- Existing uniform-prior tests and behavior remain available for matched ablation; no baseline is silently replaced.
+
+The next integration step is to attach stable structural-family identifiers to generated candidates and derive explicit family-balanced weights without claiming generic symbolic equivalence. Compare family recovery and expression recovery separately. This should be tested jointly with omitted-family misspecification, because prior rebalancing cannot recover a law that the candidate generator never represents.
