@@ -203,8 +203,8 @@ impl SwarmConfig {
 /// (comma-separated list of Iroh ticket strings).
 pub const MYCELIX_BOOTSTRAP_NODES_PRIMARY: &[&str] = &[
     // Luminous Dynamics operated bootstrap nodes
-    "iroh://bootstrap-1.mycelix.luminousdynamics.org:4433",
-    "iroh://bootstrap-2.mycelix.luminousdynamics.org:4433",
+    "iroh://bootstrap-1.mycelix.luminousdynamics.io:4433",
+    "iroh://bootstrap-2.mycelix.luminousdynamics.io:4433",
 ];
 
 /// Fallback bootstrap nodes operated by community partners.
@@ -212,8 +212,8 @@ pub const MYCELIX_BOOTSTRAP_NODES_FALLBACK: &[&str] = &["iroh://bootstrap.myceli
 
 /// Combined bootstrap nodes (primary + fallback) for backward compatibility.
 pub const MYCELIX_BOOTSTRAP_NODES: &[&str] = &[
-    "iroh://bootstrap-1.mycelix.luminousdynamics.org:4433",
-    "iroh://bootstrap-2.mycelix.luminousdynamics.org:4433",
+    "iroh://bootstrap-1.mycelix.luminousdynamics.io:4433",
+    "iroh://bootstrap-2.mycelix.luminousdynamics.io:4433",
     "iroh://bootstrap.mycelix.community:4433",
 ];
 
