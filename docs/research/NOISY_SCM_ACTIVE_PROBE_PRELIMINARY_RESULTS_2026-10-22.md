@@ -82,3 +82,18 @@ No novelty, SOTA, general causal discovery, or real-world safety claim is made.
 A fresh local run completed on 2026-10-22 after rerunning the embedded self-test and all ten unit tests. The test source matches branch blob `c69e398b53170d355fcbb9f834cd79b4e175f09f`. The executed local source mirror blob was `ae0678017d1b42b266d207b2869108ae92080284` (SHA-256 `18a672c4267e297e5ec7ff10c094aa52ee3d244f3f5a965c3a9fcd87dcc9295c`). The output JSON was 87,416 bytes, SHA-256 `8cd371d931f7d01c96fd8c8658bd9428d3f4067bf7e5bdb9bd9d8da9f3db1e48`; its `source_sha` field binds to that local mirror blob.
 
 **Still not exact-current-branch evidence:** the source blob currently on the research branch is `7b92460b60c6722681389981d8cbfbaa80122cf5`, which differs from the executed mirror. The metric values are reproduced, but the committed-source byte mismatch remains a qualification blocker. Do not call this a test pass for the current GitHub source or combine this receipt with skipped CI runs.
+
+
+## Receipt update — exact current-branch source rerun (2026-10-22)
+
+The previous provenance mismatch is now resolved for the 40-case pilot by a fresh run against the **exact source bytes currently committed on this branch**. The older mismatched mirror receipt remains above as history; it is superseded by this one for reproduction purposes.
+
+- Executed source Git blob: `7b92460b60c6722681389981d8cbfbaa80122cf5` (matches the branch source blob exactly).
+- Executed test Git blob: `c69e398b53170d355fcbb9f834cd79b4e175f09f` (matches branch tests exactly).
+- Embedded self-test: PASS locally.
+- Unit suite: **10/10 passed locally** against the exact committed source and tests.
+- Run: 40 seeds (0–39), 3 nodes, 8 hypotheses, noise 0.1, intervention budget 2; command and metrics match the original table above.
+- Exact generated JSON: 87,416 bytes; SHA-256 `3fab6c0dbccba5986de9a36a46f1e2fdb5cd08201512bcb5f940a4dc004d1302`; `source_sha` is the committed source Git blob above.
+- Local full result artifact is available as `validation/NOISY_SCM_PROBE_40_CASE_EXACT_BRANCH_2026-10-22.json` in the research workspace.
+
+This closes the **source-byte mismatch for this local 40-case receipt**. It does not establish that the benchmark is externally qualified or superior to SOTA, does not fix the assumed-model limitation, and does not turn skipped CI runs into passing checks. The separate out-of-class audit documents that limitation directly.
