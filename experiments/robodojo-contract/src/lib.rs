@@ -6,6 +6,7 @@
 //! enforced by an adapter with access to the robot and simulator telemetry.
 #![forbid(unsafe_code)]
 
+pub mod active_sensing;
 pub mod calibration;
 pub mod shift;
 
