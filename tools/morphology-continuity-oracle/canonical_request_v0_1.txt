@@ -1,0 +1,14 @@
+schema=morphology-continuity-oracle-request/v0.1
+fixture_id=chair-backrest-removed
+grid=integer-voxel-xyz
+cell_counts.table=17
+cell_counts.chair=21
+chair_extension=backrest:cells(-1,1,3);(0,1,3);(1,1,3);(0,1,4)
+observation=chair_target_minus_backrest
+max_missing_cells=4
+ground_truth_target=chair
+target_evidence=missing
+expected.current_exact_matches=table
+expected.compatible_histories=chair,table
+expected.disposition=AbstainAmbiguousHistory
+expected.target_conditioned_oracle=false
