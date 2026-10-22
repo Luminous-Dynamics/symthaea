@@ -44,7 +44,7 @@ For each configuration report:
 - pass@1, repeated pass rate and paired win/loss/tie counts, plus a deterministic task-cluster bootstrap interval for the equal-task paired effect;
 - valid-oracle, mutation-adequacy and unresolved-execution rates;
 - pass-to-pass regression rate and security-regression rate;
-- cost per verified fix, wall time, p50/p95 latency, tokens, retries and energy/compute estimates;
+- cost per verified fix, wall time, nearest-rank p50/p95 agent and verification latency, tokens, retries, observed generation-tier counts, and energy/compute estimates;
 - result confidence intervals clustered by repository/task family, plus per-category results.
 
 Use a cost/correctness Pareto frontier. A system can beat a more expensive agent on verified fixes per dollar without claiming a higher absolute benchmark score. Do not combine unrelated benchmark scores into one headline number.
