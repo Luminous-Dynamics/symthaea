@@ -174,7 +174,9 @@ pub struct SelectionBottleneckSummary {
     pub mean_selected_heldout_nrmse: f64,
     pub mean_oracle_pool_heldout_nrmse: f64,
     pub mean_selection_regret_nrmse: f64,
-    pub mean_generalization_gap_nrmse: f64,
+    /// Descriptive held-out-minus-training NRMSE; the two domains/target scales differ,
+    /// so this is not a distribution-matched generalization-gap estimate.
+    pub mean_extrapolation_minus_training_nrmse: f64,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -861,7 +863,7 @@ fn summarize_selection_bottleneck(
             .map(|row| row.selection_regret_nrmse)
             .sum::<f64>()
             / count,
-        mean_generalization_gap_nrmse: selected
+        mean_extrapolation_minus_training_nrmse: selected
             .iter()
             .map(|row| row.selected_heldout_nrmse - row.selected_training_nrmse)
             .sum::<f64>()
@@ -1245,7 +1247,7 @@ mod tests {
             assert!(summary.mean_selected_heldout_nrmse.is_finite());
             assert!(summary.mean_oracle_pool_heldout_nrmse.is_finite());
             assert!(summary.mean_selection_regret_nrmse.is_finite());
-            assert!(summary.mean_generalization_gap_nrmse.is_finite());
+            assert!(summary.mean_extrapolation_minus_training_nrmse.is_finite());
         }
     }
 
