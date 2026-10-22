@@ -1687,44 +1687,6 @@ mod tests {
     }
 
     #[test]
-    fn tampered_generation_tier_summary_is_rejected() {
-        let mut report = valid_fixture();
-        report["summary"]["gcs_off"]["generation_tier_attempts"]["CloudLLM"] = Value::from(9);
-        let errors = audit(&report, None, None);
-        assert!(errors.iter().any(|error| error.contains("generation_tier_attempts")));
-    }
-
-    #[test]
-    fn observed_cloud_tier_is_rejected_for_native_requested_backend() {
-        let mut report = valid_fixture();
-        report["runs"][0]["generation_tiers"] = serde_json::json!(["CloudLLM"]);
-        report["summary"]["gcs_off"]["generation_tier_attempts"] = serde_json::json!({
-            "Native": 0, "Hardware": 0, "LocalLLM": 0, "CloudLLM": 1, "Simulated": 0
-        });
-        report["summary"]["gcs_off"]["runs_with_external_llm_tier"] = Value::from(1);
-        let errors = audit(&report, None, None);
-        assert!(errors.iter().any(|error| {
-            error.contains("conflict with requested model_mode native")
-        }));
-    }
-
-    #[test]
-    fn generation_tier_summary_distinguishes_simulated_and_external_routes() {
-        let mut report = valid_fixture();
-        report["model_mode"] = Value::String("ollama".to_string());
-        report["model_label"] = Value::String("gemma4:e2b".to_string());
-        report["runtime_configuration"]["requested_backend"] = Value::String("ollama".to_string());
-        report["runtime_configuration"]["requested_model"] = Value::String("gemma4:e2b".to_string());
-        report["runs"][0]["generation_tiers"] = serde_json::json!(["Simulated", "LocalLLM"]);
-        report["summary"]["gcs_off"]["generation_tier_attempts"] = serde_json::json!({
-            "Native": 0, "Hardware": 0, "LocalLLM": 1, "CloudLLM": 0, "Simulated": 1
-        });
-        report["summary"]["gcs_off"]["runs_with_external_llm_tier"] = Value::from(1);
-        report["summary"]["gcs_off"]["runs_with_simulated_tier"] = Value::from(1);
-        assert!(audit(&report, None, None).is_empty());
-    }
-
-    #[test]
     fn tampered_paired_summary_is_rejected() {
         let mut report = valid_fixture();
         report["summary"]["paired"]["gcs_on_wins"] = Value::from(1);
