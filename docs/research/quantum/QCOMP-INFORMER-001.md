@@ -17,9 +17,9 @@ This is not a proposal to recreate qReduMIS under a new name. qReduMIS is an exi
 - QOBLIB benchmark suite and live track record: https://zib-aopt.github.io/QOBLIB/.
 - QOBLIB source repository: https://github.com/ZIB-AOPT/QOBLIB.
 - Symthaea workload portfolio protocol: [QCOMP-PORTFOLIO-001 / PR #8294](https://github.com/Luminous-Dynamics/symthaea/pull/8294).
-- Symthaea independent MIS graph/solution verification prototype: [PR #8296](https://github.com/Luminous-Dynamics/symthaea/pull/8296).
+- Symthaea independent MIS graph/solution verification prototype: [PR #8324](https://github.com/Luminous-Dynamics/symthaea/pull/8324).
 
-A published upstream classical ParallelILS submission reports best-known-or-better objectives across all 50 QOBLIB MIS instances, with two new best-known values. On the 186-variable es60fst02 instance it reports objective 88 in 0.0006 seconds, whereas published QPU-containing records for the same instance also report objective 88 with substantially different total runtimes. Those records are not a controlled head-to-head comparison, so use them to motivate careful accounting, not to infer a universal hardware speed ratio. The tiny exact solver in PR #8296 is a correctness oracle only.
+A published upstream classical ParallelILS submission reports best-known-or-better objectives across all 50 QOBLIB MIS instances, with two new best-known values. On the 186-variable es60fst02 instance it reports objective 88 in 0.0006 seconds, whereas published QPU-containing records for the same instance also report objective 88 with substantially different total runtimes. Those records are not a controlled head-to-head comparison, so use them to motivate careful accounting, not to infer a universal hardware speed ratio. The tiny exact solver in PR #8324 is a correctness oracle only.
 
 ### Two cohorts, two distinct claims
 
