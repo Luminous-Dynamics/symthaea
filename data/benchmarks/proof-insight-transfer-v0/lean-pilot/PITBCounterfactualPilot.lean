@@ -57,8 +57,7 @@ theorem successor_monotonicity_with_premise :
 /--
 A fixed-target proof-state intervention demonstration.
 
-The theorem statement and goal type stay fixed across the two `trace_state`
-snapshots. The first state contains `h : a ≤ b`; after `clear h`, the exact
+The theorem statement and goal type stay fixed across the two structured `pitb_snapshot` traces. The first state contains `h : a ≤ b`; after `clear h`, the exact
 same goal remains but that named local declaration is absent. The remaining
 equality hypothesis supplies an alternate route to close the same target.
 This is a calibration example, not a model decision or a replayed benchmark row.
