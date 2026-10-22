@@ -8,6 +8,7 @@
   "claim_admission_policy": {
     "zero_approved_claims_disposition": "BLOCKED_NO_ADJUDICATED_CLAIMS",
     "approved_claim_status": "approved_for_reference_evaluation_only",
+    "source_reference_model": "one_primary_source_per_atomic_claim;source_edition_must_match_registry",
     "minimum_independent_reviewers": 2,
     "separate_qualified_adjudicator_required": true,
     "exact_source_locator_required": true,
