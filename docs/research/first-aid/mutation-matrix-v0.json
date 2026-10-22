@@ -11,8 +11,8 @@
     "case_count": 40,
     "frozen_trace_count": 12,
     "mutation_case_count": 28,
-    "implemented_or_frozen_count": 40,
-    "planned_not_yet_executable_count": 0
+    "planned_not_yet_executable_count": 0,
+    "mapped_case_count": 40
   },
   "evidence_status_definitions": {
     "frozen_fixture": "Expected output resides in the frozen corpus and is checked by the trajectory validator.",
