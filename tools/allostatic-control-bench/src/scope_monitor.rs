@@ -242,6 +242,101 @@ pub fn assess_prediction_scope(
     })
 }
 
+/// Stateful cumulative-sum statistic for sub-threshold but persistent residuals.
+///
+/// The allowance is the per-step residual level treated as routine variation.
+/// At each observed step the statistic becomes max(0, previous + score - allowance).
+/// Calibrate the decision threshold on the maximum statistic from nominal episodes;
+/// do not reuse a pointwise residual threshold because the two statistics have
+/// different distributions and units.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ScopeCusumAccumulator {
+    allowance: f64,
+    statistic: f64,
+}
+
+impl ScopeCusumAccumulator {
+    pub fn new(allowance: f64) -> Option<Self> {
+        if !allowance.is_finite() || allowance < 0.0 {
+            return None;
+        }
+        Some(Self {
+            allowance,
+            statistic: 0.0,
+        })
+    }
+
+    pub const fn allowance(self) -> f64 {
+        self.allowance
+    }
+
+    pub const fn statistic(self) -> f64 {
+        self.statistic
+    }
+
+    /// Update with one observed residual score and return the cumulative statistic.
+    pub fn observe(&mut self, score: PredictionErrorScore) -> f64 {
+        self.statistic = (self.statistic + score.score() - self.allowance).max(0.0);
+        self.statistic
+    }
+
+    pub fn reset(&mut self) {
+        self.statistic = 0.0;
+    }
+}
+
+/// Sequential task-scope monitor.
+///
+/// Its threshold must be calibrated from nominal **episode-maximum CUSUM
+/// statistics**, not raw one-step residuals. A detected false-safe prediction
+/// raises an immediate, latched alarm. As with the pointwise scope monitor, this
+/// is post-action detection and cannot prevent the transition already observed.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ScopeCusumMonitor {
+    accumulator: ScopeCusumAccumulator,
+    threshold: ScopeThreshold,
+    alarmed: bool,
+}
+
+impl ScopeCusumMonitor {
+    pub fn new(allowance: f64, threshold: ScopeThreshold) -> Option<Self> {
+        Some(Self {
+            accumulator: ScopeCusumAccumulator::new(allowance)?,
+            threshold,
+            alarmed: false,
+        })
+    }
+
+    pub const fn statistic(self) -> f64 {
+        self.accumulator.statistic()
+    }
+
+    pub const fn allowance(self) -> f64 {
+        self.accumulator.allowance()
+    }
+
+    pub const fn threshold(self) -> f64 {
+        self.threshold.score_threshold()
+    }
+
+    pub const fn alarmed(self) -> bool {
+        self.alarmed
+    }
+
+    /// Incorporate the current step. An alarm is latched until reset.
+    pub fn observe(&mut self, score: PredictionErrorScore) -> bool {
+        let statistic = self.accumulator.observe(score);
+        self.alarmed |= statistic > self.threshold.score_threshold()
+            || score.false_safe_prediction();
+        self.alarmed
+    }
+
+    pub fn reset(&mut self) {
+        self.accumulator.reset();
+        self.alarmed = false;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -330,6 +425,63 @@ mod tests {
         assert!(result.false_safe_override());
         assert!(result.alarm());
         assert!(!result.statistical_assessment().drift_detected());
+    }
+
+    fn score_with_magnitude(magnitude: f64) -> PredictionErrorScore {
+        score_prediction_error(
+            0.5,
+            0.5,
+            0.5 - magnitude * 0.02,
+            0.5 + magnitude * 0.02,
+            limits(),
+            scales(),
+        )
+        .expect("valid synthetic residual")
+    }
+
+    #[test]
+    fn cusum_accumulates_subthreshold_residuals_and_can_reset() {
+        let nominal_episode_cusum_maxima = vec![0.07; 159];
+        let threshold =
+            calibrate_scope_threshold(&nominal_episode_cusum_maxima, 0.05)
+                .expect("valid CUSUM-specific threshold");
+        let mut monitor =
+            ScopeCusumMonitor::new(0.01, threshold).expect("valid allowance");
+        let one_step = score_with_magnitude(0.02);
+        assert!(one_step.score() < monitor.threshold());
+
+        for _ in 0..12 {
+            monitor.observe(one_step);
+        }
+        assert!(monitor.alarmed());
+        assert!(monitor.statistic() > monitor.threshold());
+
+        monitor.reset();
+        assert!(!monitor.alarmed());
+        assert_eq!(monitor.statistic(), 0.0);
+    }
+
+    #[test]
+    fn cusum_rejects_invalid_allowance_and_latches_false_safe_override() {
+        assert!(ScopeCusumAccumulator::new(f64::NAN).is_none());
+        assert!(ScopeCusumAccumulator::new(-0.01).is_none());
+
+        let threshold = calibrate_scope_threshold(&vec![10.0; 159], 0.05)
+            .expect("high threshold");
+        let mut monitor =
+            ScopeCusumMonitor::new(0.05, threshold).expect("valid allowance");
+        let false_safe = score_prediction_error(
+            0.151,
+            0.879,
+            0.149,
+            0.881,
+            limits(),
+            scales(),
+        )
+        .expect("valid false-safe prediction");
+        assert!(monitor.observe(false_safe));
+        assert!(monitor.alarmed());
+        assert_eq!(monitor.statistic(), 0.0);
     }
 
     #[test]
