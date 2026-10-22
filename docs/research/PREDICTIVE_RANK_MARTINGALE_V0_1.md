@@ -52,6 +52,7 @@ The ONS betting update in the paper uses (g_t=Z_t/(1+\lambda_t Z_t)), cumulative
 - separate per-feature log wealth and a numerically stable 50/50 portfolio log wealth;
 - a terminal alarm state that cannot be silently resumed using the same epoch;
 - focused unit tests for error handling, initial conditional centering, a persistent upper-rank shift, symmetric extreme ranks, and invalid observations not mutating the epoch.
+- a fixed-seed 1,000-stream null-rank smoke simulation drawing ranks from the exact predictive law, with a deliberately loose false-alarm regression envelope.
 
 The stated anytime type-I guarantee is **marginal over the jointly sampled calibration reference and online stream**, as in the paper's theorem. It is not generally conditional on a particular realized numeric calibration sample. The conditional filtration used by the theorem is the history of ranks, not arbitrary information from the raw calibration values or online scores. This distinction matters in deployment: the reference must be a representative random sample from the intended clean population, the scalar scoring rule must be frozen before calibration/monitoring, and detector-side adaptation must use only the permitted rank history. If a use case requires a guarantee conditional on a particular fixed reference dataset, this implementation does not establish it.
 
