@@ -1,0 +1,130 @@
+# Focused raw-head candidate qualification for symthaea-support.
+#
+# The semantic recipe lives in scripts/qualify-support-fast.py. This workflow
+# is only a low-trust PR-head launcher and artifact retainer. A positive receipt
+# is candidate conformance evidence until a separately trusted/base-owned
+# witness admits the recipe. Full repository CI remains independent evidence.
+
+name: Support Fast Lane
+
+on:
+  pull_request:
+    paths:
+      - 'crates/domains/symthaea-support/**'
+      - 'crates/core/symthaea-logparse/**'
+      - 'src/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'rust-toolchain.toml'
+      - '.cargo/**'
+      - 'scripts/check-class-a-changes.sh'
+      - 'scripts/qualify-support-fast.py'
+      - '.github/workflows/support-fast.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: support-fast-${{ github.event_name == 'workflow_dispatch' && github.run_id || github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  CHECKOUT_ACTION_SHA: 11d5960a326750d5838078e36cf38b85af677262
+  UPLOAD_ARTIFACT_ACTION_SHA: ea165f8d65b6e75b540449e92b4886f43607fa02
+  SUPPORT_RUNNER_LABEL: ubuntu-24.04
+
+jobs:
+  support:
+    name: symthaea-support raw-head candidate qualification
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact raw-head subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify pinned workflow actions
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(grep -Fc "uses: actions/checkout@$CHECKOUT_ACTION_SHA" .github/workflows/support-fast.yml)" -eq 1
+          test "$(grep -Fc "uses: actions/upload-artifact@$UPLOAD_ARTIFACT_ACTION_SHA" .github/workflows/support-fast.yml)" -eq 2
+          if grep -Eq 'uses: actions/(checkout|upload-artifact)@v[0-9]+' .github/workflows/support-fast.yml; then
+            echo 'mutable major-version GitHub Action tag found in focused qualification workflow' >&2
+            exit 1
+          fi
+
+      - name: Prepare exact PR base for governance comparison
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin "${GITHUB_BASE_REF}:refs/remotes/origin/${GITHUB_BASE_REF}"
+          test "$(git rev-parse "origin/${GITHUB_BASE_REF}")" = "${{ github.event.pull_request.base.sha }}"
+
+      - name: Install repository-pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          channel="$(sed -nE 's/^[[:space:]]*channel[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' rust-toolchain.toml | head -n1)"
+          test -n "$channel"
+          rustup toolchain install "$channel" --profile minimal --component rustfmt --component clippy --no-self-update
+          rustup override set "$channel"
+          test "$(rustc --version | awk '{print $2}')" = "$channel"
+          rustc -Vv
+          cargo -V
+          rustfmt -V
+          cargo clippy -V
+
+      - name: Qualify support contracts
+        id: qualify
+        env:
+          QUALIFIED_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          QUALIFICATION_BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || '' }}
+          SUPPORT_QUALIFICATION_DIR: ${{ runner.temp }}/support-qualification-v2
+          CARGO_TARGET_DIR: target/support-fast
+        run: python3 scripts/qualify-support-fast.py
+
+      - name: Publish attempt digest
+        if: always()
+        shell: bash
+        env:
+          ATTEMPT: ${{ runner.temp }}/support-qualification-v2/attempt.json
+        run: |
+          set -euo pipefail
+          if [[ -f "$ATTEMPT" ]]; then
+            digest="$(sha256sum "$ATTEMPT" | awk '{print $1}')"
+            echo "support qualification attempt_sha256=$digest"
+          else
+            echo 'No attempt record was produced; verifier execution did not reach durable receipt creation.' >&2
+            exit 1
+          fi
+
+      - name: Upload qualification attempt evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: support-attempt-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/support-qualification-v2/attempt.json
+            ${{ runner.temp }}/support-qualification-v2/attempt.json.sha256
+            ${{ runner.temp }}/support-qualification-v2/declared-inputs.tsv
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Upload positive candidate receipt
+        if: always() && steps.qualify.outcome == 'success'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: support-positive-candidate-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/support-qualification-v2/positive-receipt.json
+            ${{ runner.temp }}/support-qualification-v2/positive-receipt.json.sha256
+          if-no-files-found: error
+          retention-days: 90
