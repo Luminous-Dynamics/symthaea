@@ -1,0 +1,60 @@
+name: Repository Integrity
+
+on:
+  pull_request:
+    paths:
+      - "repo.toml"
+      - "claims.toml"
+      - "README.md"
+      - "docs/CLAIMS.md"
+      - "docs/HONEST_STATUS.md"
+      - "scripts/check-repo-integrity.py"
+      - "scripts/test-repo-integrity.py"
+      - ".github/workflows/repo-integrity.yml"
+  push:
+    branches: [main]
+    paths:
+      - "repo.toml"
+      - "claims.toml"
+      - "README.md"
+      - "docs/CLAIMS.md"
+      - "docs/HONEST_STATUS.md"
+      - "scripts/check-repo-integrity.py"
+      - "scripts/test-repo-integrity.py"
+      - ".github/workflows/repo-integrity.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: repo-integrity-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Adversarial tests import the checker as a module. Keep validation from
+  # creating scripts/__pycache__ and violating its own clean-checkout proof.
+  PYTHONDONTWRITEBYTECODE: "1"
+
+jobs:
+  contract:
+    name: Repository contract / Python stdlib
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      - name: Record interpreter
+        run: python3 --version
+
+      - name: Run adversarial checker tests
+        run: python3 scripts/test-repo-integrity.py
+
+      - name: Validate repository and claims contracts
+        run: python3 scripts/check-repo-integrity.py --check
+
+      - name: Prove checker is observational
+        run: git status --porcelain=v1 --untracked-files=all && test -z "$(git status --porcelain=v1 --untracked-files=all)"

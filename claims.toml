@@ -1,0 +1,49 @@
+schema_version = 1
+coverage = "partial"
+generated_document = "docs/CLAIMS.md"
+
+[[claim]]
+id = "SYM-BOUNDARY-CONSCIOUSNESS-001"
+scope = "repository"
+kind = "non_claim"
+status = "declared_boundary"
+statement = "Symthaea does not claim to prove consciousness."
+evidence = ["README.md"]
+limitations = [
+  "This is a claim boundary, not empirical evidence about subjective experience.",
+]
+
+[[claim]]
+id = "SYM-ZKP-HDC-XOR-001"
+scope = "binius-hdc-xor-16k-benchmark-profile"
+kind = "benchmark"
+status = "reproduced_internal"
+statement = "At the documented 16Kbit comparison scale, the Binius HDC XOR benchmark uses 256 constraints versus 65,532 for the Winterfell prime-field baseline (about 256x fewer)."
+evidence = ["papers/theory-foundations/binius-hdc/reproduce.sh"]
+limitations = [
+  "Same-scale internal comparison only.",
+  "Not independently audited by a third party.",
+]
+
+[[claim]]
+id = "SYM-ETHICS-LEGACY-001"
+scope = "hendrycks-ethics-benchmark"
+kind = "benchmark"
+status = "retracted"
+statement = "The earlier 91.1% / 94.5% / 84.7% moral-reasoning figures are not current Symthaea evidence."
+evidence = ["README.md"]
+limitations = [
+  "Retracted as leakage-inflated; historical occurrences must not be treated as current evidence.",
+]
+
+[[claim]]
+id = "SYM-ETHICS-2026-07-15"
+scope = "hendrycks-ethics-benchmark"
+kind = "benchmark"
+status = "internal_corrected"
+statement = "The documented canonical 2026-07-15 Hendrycks Ethics rerun reports 56.2% overall and 76.5% on virtue."
+evidence = ["README.md"]
+limitations = [
+  "Internal benchmark result; not independently reproduced here.",
+  "The v0.1 claims registry is only partially migrated and does not yet register the raw run artifact.",
+]
