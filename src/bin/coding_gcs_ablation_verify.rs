@@ -710,6 +710,156 @@ fn audit(
     errors
 }
 
+fn next_bootstrap_u64(state: &mut u64) -> u64 {
+    // Fixed, explicitly seeded xorshift64* gives deterministic resampling without
+    // pulling a statistical runtime dependency into the audit binary.
+    let mut value = *state;
+    value ^= value >> 12;
+    value ^= value << 25;
+    value ^= value >> 27;
+    *state = value;
+    value.wrapping_mul(0x2545_F491_4F6C_DD1D)
+}
+
+fn percentile_sorted(sorted: &[f64], probability: f64) -> Option<f64> {
+    if sorted.is_empty() || !probability.is_finite() || !(0.0..=1.0).contains(&probability) {
+        return None;
+    }
+    let position = probability * (sorted.len().saturating_sub(1) as f64);
+    let lower = position.floor() as usize;
+    let upper = position.ceil() as usize;
+    let fraction = position - lower as f64;
+    Some(sorted[lower] + (sorted[upper] - sorted[lower]) * fraction)
+}
+
+fn bootstrap_task_cluster_interval(
+    task_deltas: &[f64],
+    seed: u64,
+    resamples: usize,
+) -> Option<(f64, f64, f64)> {
+    if task_deltas.is_empty() || resamples == 0 || task_deltas.iter().any(|delta| !delta.is_finite()) {
+        return None;
+    }
+
+    // Equal weight per task: repeat-level paired differences are averaged inside
+    // each task cluster, then entire task clusters are resampled with replacement.
+    let point_estimate = task_deltas.iter().sum::<f64>() / task_deltas.len() as f64;
+    let mut state = if seed == 0 { 0x9E37_79B9_7F4A_7C15 } else { seed };
+    let mut samples = Vec::with_capacity(resamples);
+    for _ in 0..resamples {
+        let mut sum = 0.0;
+        for _ in 0..task_deltas.len() {
+            let index = (next_bootstrap_u64(&mut state) % task_deltas.len() as u64) as usize;
+            sum += task_deltas[index];
+        }
+        samples.push(sum / task_deltas.len() as f64);
+    }
+    samples.sort_by(|left, right| left.total_cmp(right));
+    Some((
+        point_estimate,
+        percentile_sorted(&samples, 0.025)?,
+        percentile_sorted(&samples, 0.975)?,
+    ))
+}
+
+fn clustered_bootstrap_summary(report: &Value) -> Option<Value> {
+    const BOOTSTRAP_RESAMPLES: usize = 10_000;
+
+    let manifest = report.get("task_manifest")?.as_array()?;
+    let runs = report.get("runs")?.as_array()?;
+    let repeats = u64_field(report, "repeats")?;
+    if repeats == 0 || repeats > 20 {
+        return None;
+    }
+
+    let manifest_digest = str_field(report, "task_manifest_blake3")?;
+    if !is_hex(manifest_digest, 64) {
+        return None;
+    }
+    let seed = u64::from_str_radix(&manifest_digest[..16], 16).ok()?;
+    let mut expected_counts = HashMap::new();
+    for task in manifest {
+        expected_counts.insert(
+            str_field(task, "task_id")?.to_string(),
+            u64_field(task, "expected_test_functions")?,
+        );
+    }
+
+    let mut slots: HashMap<(String, u64), [Option<&Value>; 2]> = HashMap::new();
+    for run in runs {
+        let id = str_field(run, "task_id")?.to_string();
+        let repeat = u64_field(run, "repeat")?;
+        let enabled = bool_field(run, "gcs_advisories_enabled")?;
+        let slot = if enabled { 1 } else { 0 };
+        slots.entry((id, repeat)).or_insert([None, None])[slot] = Some(run);
+    }
+
+    let mut per_task_deltas = Vec::new();
+    let mut comparable_pairs = 0_u64;
+    let mut unresolved_pairs = 0_u64;
+    let mut tasks_without_comparable_pairs = 0_u64;
+    for (task_id, expected) in &expected_counts {
+        let mut paired_deltas = Vec::new();
+        for repeat in 1..=repeats {
+            let pair = slots.get(&(task_id.clone(), repeat));
+            let Some([Some(off), Some(on)]) = pair else {
+                unresolved_pairs += 1;
+                continue;
+            };
+            if !oracle_complete(off, *expected) || !oracle_complete(on, *expected) {
+                unresolved_pairs += 1;
+                continue;
+            }
+            let off_success = score_success(off, *expected) as u8 as f64;
+            let on_success = score_success(on, *expected) as u8 as f64;
+            paired_deltas.push(on_success - off_success);
+            comparable_pairs += 1;
+        }
+        if paired_deltas.is_empty() {
+            tasks_without_comparable_pairs += 1;
+        } else {
+            per_task_deltas.push(paired_deltas.iter().sum::<f64>() / paired_deltas.len() as f64);
+        }
+    }
+
+    if per_task_deltas.is_empty() {
+        return Some(serde_json::json!({
+            "method": "deterministic percentile bootstrap over task-identity clusters",
+            "bootstrap_resamples": BOOTSTRAP_RESAMPLES,
+            "task_cluster_count": 0,
+            "tasks_without_comparable_pairs": tasks_without_comparable_pairs,
+            "comparable_repeat_pairs": comparable_pairs,
+            "unresolved_repeat_pairs": unresolved_pairs,
+            "status": "not_estimable: no task has a complete off/on pair",
+            "warning": "No confidence interval is reported without comparable outcomes."
+        }));
+    }
+
+    let (point, lower, upper) = bootstrap_task_cluster_interval(
+        &per_task_deltas,
+        seed,
+        BOOTSTRAP_RESAMPLES,
+    )?;
+    Some(serde_json::json!({
+        "method": "deterministic percentile bootstrap over task-identity clusters",
+        "bootstrap_resamples": BOOTSTRAP_RESAMPLES,
+        "rng_seed_hex": format!("{seed:016x}"),
+        "task_cluster_count": per_task_deltas.len(),
+        "tasks_without_comparable_pairs": tasks_without_comparable_pairs,
+        "comparable_repeat_pairs": comparable_pairs,
+        "unresolved_repeat_pairs": unresolved_pairs,
+        "mean_task_level_delta_percentage_points": point * 100.0,
+        "ci95_lower_percentage_points": lower * 100.0,
+        "ci95_upper_percentage_points": upper * 100.0,
+        "weighting": "Equal weight per task ID; repeat-level paired outcomes are averaged within task before bootstrapping.",
+        "warning": if per_task_deltas.len() < 30 {
+            "Small number of task clusters; interval is descriptive and does not justify a field-wide or SOTA claim. Cluster by repository or task family in a larger evaluation."
+        } else {
+            "Task-identity clusters are assumed independent. For repository-level generalization, cluster by repository or task family where the design supports it."
+        }
+    }))
+}
+
 fn print_usage(program: &str) {
     eprintln!(
         "Usage: {program} RECEIPT.json [--expected-source-sha <40-hex>] [--expected-manifest-blake3 <64-hex>]\n\
