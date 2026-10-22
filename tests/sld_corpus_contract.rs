@@ -830,6 +830,62 @@ fn evaluation_receipt_contract_reconciles_a_complete_census() {
 }
 
 #[test]
+fn evaluation_receipt_requires_auditable_oracle_review_before_comparison() {
+    let schema = read_json("docs/research/structural-love-dynamics/oracle-adjudication.schema.json");
+    assert_eq!(
+        schema["properties"]["schema_version"]["const"].as_str(),
+        Some("sld-oracle-ledger-0.1")
+    );
+    assert_eq!(
+        schema["$defs"]["caseReview"]["properties"]["initial_judgments"]["minItems"],
+        2
+    );
+
+    let mut receipt = valid_evaluation_receipt();
+    // A complete run census does not make an unreviewed oracle comparable.
+    assert_eq!(receipt["run_status"], "COMPLETE");
+    assert_eq!(receipt["comparison_eligibility"], "NOT_COMPARABLE");
+    assert!(validate_evaluation_receipt(&receipt).is_empty());
+
+    let digest = "9".repeat(64);
+    receipt["oracle_adjudication"] = json!({
+        "status": "COMPLETE",
+        "ledger_sha256": digest,
+        "protocol_sha256": "8".repeat(64),
+        "rubric_sha256": "5".repeat(64),
+        "reviewer_count": 3,
+        "expected_case_count": 2,
+        "cases_with_two_independent_initial_reviews": 2,
+        "cases_adjudicated": 2,
+        "cases_indeterminate": 0,
+        "unresolved_disagreements": 0,
+        "critical_cases_reviewed": 1,
+        "blind_initial_reviews": true,
+        "case_assignment_randomized": true,
+        "case_authors_excluded_from_adjudication": true,
+        "conflicts_disclosed": true,
+        "completed_at": "2026-10-22T11:00:00Z"
+    });
+    receipt["evaluator"]["human_review_status"] = Value::String("COMPLETE".to_owned());
+    receipt["evaluator"]["human_rater_count"] = Value::from(3);
+    receipt["evaluator"]["independent_adjudication_status"] = Value::String("COMPLETE".to_owned());
+    receipt["comparison_eligibility"] = Value::String("COMPARABLE".to_owned());
+    assert!(
+        validate_evaluation_receipt(&receipt).is_empty(),
+        "fully reviewed synthetic fixture should satisfy the receipt cross-field contract"
+    );
+
+    // One case without two independent initial reviews blocks comparison even
+    // when the caller falsely leaves comparison_eligibility set to COMPARABLE.
+    receipt["oracle_adjudication"]["cases_with_two_independent_initial_reviews"] = Value::from(1);
+    let errors = validate_evaluation_receipt(&receipt);
+    assert!(
+        errors.iter().any(|error| error.contains("comparison_eligibility must be NOT_COMPARABLE")),
+        "incomplete oracle review must not be promoted"
+    );
+}
+
+#[test]
 fn evaluation_receipt_fails_closed_on_missing_skipped_and_duplicate_cases() {
     let receipt = valid_evaluation_receipt();
     let mut missing = receipt.clone();
