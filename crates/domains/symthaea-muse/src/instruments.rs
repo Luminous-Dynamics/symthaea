@@ -337,6 +337,114 @@ pub enum Instrument {
 }
 
 impl Instrument {
+    /// Number of instrument identities in the canonical roster.
+    ///
+    /// Update this count, ALL, and canonical_id together whenever a new
+    /// identity is added. The exhaustive identifier match and roster
+    /// uniqueness test make omissions and duplicate entries visible.
+    pub const COUNT: usize = 42;
+
+    /// Canonical ordered roster of instrument identities.
+    ///
+    /// This is an identity inventory only. It does not imply that a local
+    /// sample bank exists, that every register/articulation is playable, or
+    /// that a rendered timbre has passed perceptual evaluation.
+    pub const ALL: [Self; Self::COUNT] = [
+        Self::Piano,
+        Self::PianoPP,
+        Self::Violin,
+        Self::Cello,
+        Self::Flute,
+        Self::Organ,
+        Self::ElectricPiano,
+        Self::Bell,
+        Self::AcousticGuitar,
+        Self::Harp,
+        Self::Pad,
+        Self::Clarinet,
+        Self::Trumpet,
+        Self::Saxophone,
+        Self::Marimba,
+        Self::Sitar,
+        Self::Kalimba,
+        Self::SawLead,
+        Self::Koto,
+        Self::Oud,
+        Self::Ney,
+        Self::UprightBass,
+        Self::Viola,
+        Self::Oboe,
+        Self::FrenchHorn,
+        Self::Bassoon,
+        Self::Accordion,
+        Self::Mandolin,
+        Self::Banjo,
+        Self::Vibraphone,
+        Self::Celesta,
+        Self::ChoirAah,
+        Self::StringEnsemble,
+        Self::ElectricBass,
+        Self::Timpani,
+        Self::MusicBox,
+        Self::Harpsichord,
+        Self::Tuba,
+        Self::Trombone,
+        Self::Duduk,
+        Self::ChoirOoh,
+        Self::Xylophone,
+    ];
+
+    /// Stable snake_case identity for manifests, receipts, and test fixtures.
+    ///
+    /// These identifiers are distinct from display names, source sample
+    /// labels, General MIDI program numbers, and acoustic-fidelity claims.
+    pub const fn canonical_id(self) -> &'static str {
+        match self {
+            Self::Piano => "piano",
+            Self::PianoPP => "piano_pp",
+            Self::Violin => "violin",
+            Self::Cello => "cello",
+            Self::Flute => "flute",
+            Self::Organ => "organ",
+            Self::ElectricPiano => "electric_piano",
+            Self::Bell => "bell",
+            Self::AcousticGuitar => "acoustic_guitar",
+            Self::Harp => "harp",
+            Self::Pad => "pad",
+            Self::Clarinet => "clarinet",
+            Self::Trumpet => "trumpet",
+            Self::Saxophone => "saxophone",
+            Self::Marimba => "marimba",
+            Self::Sitar => "sitar",
+            Self::Kalimba => "kalimba",
+            Self::SawLead => "saw_lead",
+            Self::Koto => "koto",
+            Self::Oud => "oud",
+            Self::Ney => "ney",
+            Self::UprightBass => "upright_bass",
+            Self::Viola => "viola",
+            Self::Oboe => "oboe",
+            Self::FrenchHorn => "french_horn",
+            Self::Bassoon => "bassoon",
+            Self::Accordion => "accordion",
+            Self::Mandolin => "mandolin",
+            Self::Banjo => "banjo",
+            Self::Vibraphone => "vibraphone",
+            Self::Celesta => "celesta",
+            Self::ChoirAah => "choir_aah",
+            Self::StringEnsemble => "string_ensemble",
+            Self::ElectricBass => "electric_bass",
+            Self::Timpani => "timpani",
+            Self::MusicBox => "music_box",
+            Self::Harpsichord => "harpsichord",
+            Self::Tuba => "tuba",
+            Self::Trombone => "trombone",
+            Self::Duduk => "duduk",
+            Self::ChoirOoh => "choir_ooh",
+            Self::Xylophone => "xylophone",
+        }
+    }
+
     /// Get the partial amplitude profile for additive synthesis.
     pub fn partials(&self) -> &'static [f32; 16] {
         match self {
@@ -1642,6 +1750,52 @@ mod tests {
         assert!(
             violin_sustain > piano_sustain,
             "violin ({violin_sustain}) should sustain higher than piano ({piano_sustain})"
+        );
+    }
+}
+
+
+#[cfg(test)]
+mod canonical_roster_tests {
+    use super::Instrument;
+    use std::collections::HashSet;
+
+    #[test]
+    fn canonical_roster_has_exact_declared_size_and_unique_ids() {
+        assert_eq!(Instrument::ALL.len(), Instrument::COUNT);
+
+        let mut variants = HashSet::new();
+        let mut ids = HashSet::new();
+        for instrument in Instrument::ALL {
+            assert!(
+                variants.insert(instrument),
+                "duplicate variant in Instrument::ALL: {instrument:?}"
+            );
+            let id = instrument.canonical_id();
+            assert!(
+                ids.insert(id),
+                "duplicate canonical instrument ID: {id}"
+            );
+            assert!(
+                !id.is_empty()
+                    && id.bytes().all(|byte| {
+                        byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_'
+                    }),
+                "canonical ID is not stable snake_case: {id}"
+            );
+        }
+        assert_eq!(variants.len(), Instrument::COUNT);
+        assert_eq!(ids.len(), Instrument::COUNT);
+    }
+
+    #[test]
+    fn canonical_ids_do_not_depend_on_debug_or_general_midi_aliases() {
+        assert_eq!(Instrument::PianoPP.canonical_id(), "piano_pp");
+        assert_eq!(Instrument::ElectricBass.canonical_id(), "electric_bass");
+        assert_eq!(Instrument::ChoirOoh.canonical_id(), "choir_ooh");
+        assert_ne!(
+            Instrument::Piano.canonical_id(),
+            Instrument::PianoPP.canonical_id()
         );
     }
 }
