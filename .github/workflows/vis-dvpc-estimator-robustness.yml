@@ -1,0 +1,83 @@
+name: VIS-DVPC-002 Estimator robustness
+
+on:
+  push:
+    branches: ["research/vis-dvpc-estimator-robustness-20261022"]
+    paths:
+      - "tools/vision-dvpc-estimator-robustness.rs"
+      - ".github/workflows/vis-dvpc-estimator-robustness.yml"
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches: ["main"]
+    paths:
+      - "tools/vision-dvpc-estimator-robustness.rs"
+      - ".github/workflows/vis-dvpc-estimator-robustness.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vis-dvpc-002-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
+
+      - name: Verify exact head and Rust version
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          rustc --version | grep -F "1.96.0"
+
+      - name: Run deterministic robustness tests
+        run: |
+          set -euo pipefail
+          rustc --edition=2024 --test tools/vision-dvpc-estimator-robustness.rs -o /tmp/vis-dvpc-002-tests
+          /tmp/vis-dvpc-002-tests
+
+      - name: Render and validate deterministic report
+        run: |
+          set -euo pipefail
+          rustc --edition=2024 -O tools/vision-dvpc-estimator-robustness.rs -o /tmp/vis-dvpc-002
+          /tmp/vis-dvpc-002 > vis-dvpc-002.tsv
+          /tmp/vis-dvpc-002 > vis-dvpc-002-repeat.tsv
+          cmp vis-dvpc-002.tsv vis-dvpc-002-repeat.tsv
+          grep -Fq $'META\tformat\tVIS-DVPC-002-v0.1' vis-dvpc-002.tsv
+          grep -Fq $'META\toracle_boundary\tevaluator-only-exact-knapsack-from-hidden-paired-values-and-actual-costs' vis-dvpc-002.tsv
+          grep -Fq $'META\tinterval\tnormal_approximation_1.96_sd_over_sqrt_n_descriptive_not_confirmatory' vis-dvpc-002.tsv
+          awk -F '\t' '
+            $1 == "RUN_HEADER" { if (NF != 22) bad=1; run_headers++ }
+            $1 == "RUN" { if (NF != 22) bad=1; runs++ }
+            $1 == "SUMMARY_HEADER" { if (NF != 27) bad=1; summary_headers++ }
+            $1 == "SUMMARY" { if (NF != 27) bad=1; summaries++ }
+            END {
+              if (bad || run_headers != 1 || runs != 1152 ||
+                  summary_headers != 1 || summaries != 144) exit 1
+            }
+          ' vis-dvpc-002.tsv
+          grep -Fq $'RUN\tsign_reversal_on_ood' vis-dvpc-002.tsv
+          grep -Fq $'SUMMARY\trare_tail_observable_cue' vis-dvpc-002.tsv
+          sha256sum tools/vision-dvpc-estimator-robustness.rs .github/workflows/vis-dvpc-estimator-robustness.yml vis-dvpc-002.tsv > vis-dvpc-002.sha256
+          sha256sum -c vis-dvpc-002.sha256
+
+      - name: Upload report and digest receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: vis-dvpc-002-estimator-robustness
+          path: |
+            vis-dvpc-002.tsv
+            vis-dvpc-002.sha256
+          if-no-files-found: error
