@@ -2134,10 +2134,46 @@ mod tests {
 
     #[test]
     fn equivalent_reformulation_changes_surface_but_preserves_semantics() {
-        assert!(validate_mutation_semantics("equivalent_reformulation", "none", &"a".repeat(64), &"b".repeat(64), "valid reformulation").is_ok());
-        assert!(validate_mutation_semantics("equivalent_reformulation", "none", &"a".repeat(64), &"a".repeat(64), "unchanged surface").is_err());
-        assert!(validate_mutation_semantics("equivalent_reformulation", "changed", &"a".repeat(64), &"b".repeat(64), "mislabelled semantics").is_err());
-        assert!(validate_mutation_semantics("no_semantic_change", "none", &"a".repeat(64), &"a".repeat(64), "syntax-only control").is_ok());
+        assert!(
+            validate_mutation_semantics(
+                "equivalent_reformulation",
+                "none",
+                &"a".repeat(64),
+                &"b".repeat(64),
+                "valid reformulation",
+            )
+            .is_ok()
+        );
+        assert!(
+            validate_mutation_semantics(
+                "equivalent_reformulation",
+                "none",
+                &"a".repeat(64),
+                &"a".repeat(64),
+                "unchanged surface",
+            )
+            .is_err()
+        );
+        assert!(
+            validate_mutation_semantics(
+                "equivalent_reformulation",
+                "changed",
+                &"a".repeat(64),
+                &"b".repeat(64),
+                "mislabelled semantics",
+            )
+            .is_err()
+        );
+        assert!(
+            validate_mutation_semantics(
+                "no_semantic_change",
+                "none",
+                &"a".repeat(64),
+                &"a".repeat(64),
+                "syntax-only control",
+            )
+            .is_ok()
+        );
     }
 
     #[test]
