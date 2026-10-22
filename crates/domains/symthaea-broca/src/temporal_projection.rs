@@ -3043,3 +3043,156 @@ mod language_model_gradient_tests {
         );
     }
 }
+
+
+#[cfg(test)]
+mod temporal_full_path_gradient_tests {
+    use super::*;
+
+    fn objective(
+        projection: &TemporalProjection,
+        thought: &ContinuousHV,
+        gradient: &[f32],
+        chunk_index: usize,
+        scale: f32,
+    ) -> f32 {
+        projection.project_to_ssm_sequence(thought)[chunk_index]
+            .iter()
+            .zip(gradient.iter())
+            .map(|(output, d_output)| output * d_output)
+            .sum::<f32>()
+            * scale
+    }
+
+    fn finite_difference(
+        projection: &mut TemporalProjection,
+        thought: &ContinuousHV,
+        gradient: &[f32],
+        chunk_index: usize,
+        scale: f32,
+        parameter: &mut f32,
+    ) -> f32 {
+        let epsilon = 1e-3f32;
+        let original = *parameter;
+        *parameter = original + epsilon;
+        let plus = objective(projection, thought, gradient, chunk_index, scale);
+        *parameter = original - epsilon;
+        let minus = objective(projection, thought, gradient, chunk_index, scale);
+        *parameter = original;
+        (plus - minus) / (2.0 * epsilon)
+    }
+
+    #[test]
+    fn temporal_adapter_position_and_layernorm_gradients_match_finite_differences() {
+        let genesis = GenesisSeed::from_phrase("temporal-full-path-gradient-fd");
+        let mut projection =
+            TemporalProjection::new_with_options(&genesis, 8, 4, 3, true);
+        projection.enable_adapter(&genesis);
+        projection.set_learned_attention(true);
+
+        let thought =
+            ContinuousHV::from_vec(vec![0.2, -0.7, 0.4, 1.1, -0.3, 0.8, -1.2, 0.5]);
+        let d_output = [0.31f32, -0.27, 0.18];
+        let chunk_index = 0usize;
+        let scale = 0.7f32;
+        let mut gradients = vec![None; projection.num_chunks()];
+        gradients[chunk_index] = Some(d_output.to_vec());
+
+        projection
+            .compute_e2e_gradients_with_scale(&thought, &gradients, scale)
+            .expect("full-path gradients should accumulate");
+
+        let check = |name: &str, analytic: f32, numeric: f32| {
+            let tolerance = 2e-2 + numeric.abs() * 0.12;
+            assert!(
+                analytic.is_finite()
+                    && numeric.is_finite()
+                    && (analytic - numeric).abs() <= tolerance,
+                "{name} gradient mismatch: analytic={analytic}, finite_difference={numeric}, tolerance={tolerance}"
+            );
+        };
+
+        // With a shared weight group and a sparse gradient at chunk 0, these
+        // derivatives test the complete forward chain instead of only W_up.
+        let epsilon = 1e-3f32;
+        let original_up = projection.group_w_up[0][0];
+        projection.group_w_up[0][0] = original_up + epsilon;
+        let plus_up = objective(&projection, &thought, &d_output, chunk_index, scale);
+        projection.group_w_up[0][0] = original_up - epsilon;
+        let minus_up = objective(&projection, &thought, &d_output, chunk_index, scale);
+        projection.group_w_up[0][0] = original_up;
+        check(
+            "w_up",
+            projection.grad_group_up[0][0],
+            (plus_up - minus_up) / (2.0 * epsilon),
+        );
+
+        let original_gamma = projection.ln_gamma[0];
+        projection.ln_gamma[0] = original_gamma + epsilon;
+        let plus_gamma = objective(&projection, &thought, &d_output, chunk_index, scale);
+        projection.ln_gamma[0] = original_gamma - epsilon;
+        let minus_gamma = objective(&projection, &thought, &d_output, chunk_index, scale);
+        projection.ln_gamma[0] = original_gamma;
+        check(
+            "layer_norm_gamma",
+            projection.grad_ln_gamma[0],
+            (plus_gamma - minus_gamma) / (2.0 * epsilon),
+        );
+
+        let original_beta = projection.ln_beta[0];
+        projection.ln_beta[0] = original_beta + epsilon;
+        let plus_beta = objective(&projection, &thought, &d_output, chunk_index, scale);
+        projection.ln_beta[0] = original_beta - epsilon;
+        let minus_beta = objective(&projection, &thought, &d_output, chunk_index, scale);
+        projection.ln_beta[0] = original_beta;
+        check(
+            "layer_norm_beta",
+            projection.grad_ln_beta[0],
+            (plus_beta - minus_beta) / (2.0 * epsilon),
+        );
+
+        let original_pos = projection.pos_enc[0];
+        projection.pos_enc[0] = original_pos + epsilon;
+        let plus_pos = objective(&projection, &thought, &d_output, chunk_index, scale);
+        projection.pos_enc[0] = original_pos - epsilon;
+        let minus_pos = objective(&projection, &thought, &d_output, chunk_index, scale);
+        projection.pos_enc[0] = original_pos;
+        check(
+            "learned_pos_enc",
+            projection.grad_pos_enc[0],
+            (plus_pos - minus_pos) / (2.0 * epsilon),
+        );
+
+        let original_adapter_w2 = projection
+            .adapter
+            .as_ref()
+            .expect("adapter enabled")
+            .w2[0];
+        projection.adapter.as_mut().expect("adapter enabled").w2[0] =
+            original_adapter_w2 + epsilon;
+        let plus_adapter = objective(&projection, &thought, &d_output, chunk_index, scale);
+        projection.adapter.as_mut().expect("adapter enabled").w2[0] =
+            original_adapter_w2 - epsilon;
+        let minus_adapter = objective(&projection, &thought, &d_output, chunk_index, scale);
+        projection.adapter.as_mut().expect("adapter enabled").w2[0] = original_adapter_w2;
+        let numeric_adapter = (plus_adapter - minus_adapter) / (2.0 * epsilon);
+        let analytic_adapter = projection
+            .adapter
+            .as_ref()
+            .expect("adapter enabled")
+            .grad_w2[0];
+        check("adapter_w2", analytic_adapter, numeric_adapter);
+
+        let original_attention = projection.chunk_attention[chunk_index];
+        projection.chunk_attention[chunk_index] = original_attention + epsilon;
+        let plus_attention = objective(&projection, &thought, &d_output, chunk_index, scale);
+        projection.chunk_attention[chunk_index] = original_attention - epsilon;
+        let minus_attention = objective(&projection, &thought, &d_output, chunk_index, scale);
+        projection.chunk_attention[chunk_index] = original_attention;
+        check(
+            "chunk_attention",
+            projection.grad_chunk_attention[chunk_index],
+            (plus_attention - minus_attention) / (2.0 * epsilon),
+        );
+    }
+}
