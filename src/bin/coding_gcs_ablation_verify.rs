@@ -898,6 +898,9 @@ mod tests {
                     "task_id": "task_a",
                     "reference_blake3": reference_digest,
                     "reference_passes": true,
+                    "compiled": true,
+                    "simulated": false,
+                    "runtime_error": null,
                     "tests_expected": 1,
                     "tests_passed": 1,
                     "tests_failed": 0,
@@ -908,7 +911,9 @@ mod tests {
                     "empty_patch_blake3": blake3::hash(b"").to_hex().to_string(),
                     "empty_patch_fails": true,
                     "compiled": false,
-                    "compile_errors": ["expected missing function"]
+                    "simulated": false,
+                    "runtime_error": null,
+                    "compile_errors": ["error[E0425]: cannot find function task_a"]
                 }],
                 "mutation_controls": [{
                     "task_id": "task_a",
