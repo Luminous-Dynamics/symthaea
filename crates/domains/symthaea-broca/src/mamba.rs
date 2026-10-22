@@ -1508,6 +1508,37 @@ pub(crate) mod tests {
     }
 
     #[test]
+    fn isolated_e2e_sequence_gradient_preserves_live_backend_state() {
+        use super::MambaBackend;
+
+        let mut backend = MockMamba::new();
+        backend
+            .forward_with_state(17)
+            .expect("mock forward should succeed");
+        let forwards_before = backend.forward_count;
+        let resets_before = backend.reset_count;
+        let sequence = vec![vec![0.25f32; 768], vec![0.5f32; 768], vec![-0.1f32; 768]];
+        let gradients = backend
+            .compute_e2e_sequence_loss_gradients_isolated(
+                &sequence,
+                &[17, 29, 31, 41],
+                &[0, 2],
+            )
+            .expect("isolated one-unroll mock gradients should succeed");
+
+        assert_eq!(backend.forward_count, forwards_before);
+        assert_eq!(backend.reset_count, resets_before);
+        assert_eq!(gradients.iter().map(|(pos, _)| *pos).collect::<Vec<_>>(), vec![0, 2]);
+        assert!(
+            gradients.iter().all(|(_, gradient)| {
+                gradient.len() == backend.d_model()
+                    && gradient.iter().all(|value| value.is_finite())
+            }),
+            "sequence gradients must have the model dimension and finite values"
+        );
+    }
+
+    #[test]
     #[ignore = "Requires network access to download mamba-130m (~260MB)"]
     fn test_mamba_load_and_forward() {
         let device = best_device();
