@@ -316,7 +316,80 @@ fn paired_summary(pairs: &[(EvalResult, EvalResult)]) -> serde_json::Value {
     })
 }
 
+fn validate_source_revision(supplied: &str, actual_head: &str) -> Result<(), &'static str> {
+    let valid_sha = |sha: &str| {
+        sha.len() == 40 && sha.bytes().all(|byte| byte.is_ascii_hexdigit())
+    };
+    if !valid_sha(supplied) {
+        return Err("GIT_COMMIT_SHA must be a full 40-character hexadecimal commit SHA");
+    }
+    if !valid_sha(actual_head) {
+        return Err("git rev-parse HEAD did not return a full commit SHA");
+    }
+    if !supplied.eq_ignore_ascii_case(actual_head) {
+        return Err("GIT_COMMIT_SHA does not match git rev-parse HEAD");
+    }
+    Ok(())
+}
+
+fn validate_clean_worktree(porcelain_status: &str) -> Result<(), &'static str> {
+    if porcelain_status.is_empty() {
+        Ok(())
+    } else {
+        Err("working tree is dirty; use a clean checkout for an auditable benchmark")
+    }
+}
+
+fn require_source_revision() -> String {
+    let supplied = match std::env::var("GIT_COMMIT_SHA") {
+        Ok(value) => value,
+        Err(_) => {
+            eprintln!("GIT_COMMIT_SHA is required; set it to `git rev-parse HEAD`");
+            std::process::exit(2);
+        }
+    };
+    let root = env!("CARGO_MANIFEST_DIR");
+    let head_output = match std::process::Command::new("git")
+        .args(["rev-parse", "HEAD"])
+        .current_dir(root)
+        .output()
+    {
+        Ok(output) if output.status.success() => output,
+        _ => {
+            eprintln!("Unable to resolve the source revision using git rev-parse HEAD");
+            std::process::exit(2);
+        }
+    };
+    let actual_head = String::from_utf8_lossy(&head_output.stdout).trim().to_string();
+    if let Err(error) = validate_source_revision(&supplied, &actual_head) {
+        eprintln!("{error}");
+        std::process::exit(2);
+    }
+
+    let status_output = match std::process::Command::new("git")
+        .args(["status", "--porcelain", "--untracked-files=all"])
+        .current_dir(root)
+        .output()
+    {
+        Ok(output) if output.status.success() => output,
+        _ => {
+            eprintln!("Unable to verify git working-tree cleanliness");
+            std::process::exit(2);
+        }
+    };
+    let porcelain_status = String::from_utf8_lossy(&status_output.stdout);
+    if let Err(error) = validate_clean_worktree(porcelain_status.trim()) {
+        eprintln!("{error}");
+        std::process::exit(2);
+    }
+
+    actual_head
+}
+
 fn main() {
+    // Refuse to produce a benchmark receipt that cannot be tied to an exact,
+    // clean source checkout. Do this before controls or any agent trials.
+    let source_revision = require_source_revision();
     let args: Vec<String> = std::env::args().skip(1).collect();
     let use_llm = args.iter().any(|arg| arg == "--llm");
     let use_cloud = args.iter().any(|arg| arg == "--cloud");
@@ -399,7 +472,7 @@ fn main() {
     let report = serde_json::json!({
         "schema_version": SCHEMA_VERSION,
         "benchmark": BENCHMARK_ID,
-        "source_revision": std::env::var("GIT_COMMIT_SHA").ok(),
+        "source_revision": source_revision,
         "model_mode": model_mode,
         "model_label": model_label,
         "runtime_configuration": {
@@ -442,5 +515,32 @@ fn main() {
             Err(error) => { eprintln!("Failed to write receipt: {error}"); std::process::exit(4); }
         },
         Err(error) => { eprintln!("Failed to serialize receipt: {error}"); std::process::exit(4); }
+    }
+}
+
+#[cfg(test)]
+mod provenance_tests {
+    use super::*;
+
+    #[test]
+    fn accepts_exact_clean_revision_metadata() {
+        let sha = "a".repeat(40);
+        assert!(validate_source_revision(&sha, &sha).is_ok());
+        assert!(validate_clean_worktree("").is_ok());
+    }
+
+    #[test]
+    fn rejects_missing_malformed_or_mismatched_revision() {
+        let sha = "a".repeat(40);
+        assert!(validate_source_revision("", &sha).is_err());
+        assert!(validate_source_revision(&"g".repeat(40), &sha).is_err());
+        assert!(validate_source_revision(&"b".repeat(40), &sha).is_err());
+        assert!(validate_source_revision(&sha, "short").is_err());
+    }
+
+    #[test]
+    fn rejects_dirty_worktree_status() {
+        assert!(validate_clean_worktree(" M src/coding_agent/mod.rs\\n").is_err());
+        assert!(validate_clean_worktree("?? untracked.rs\\n").is_err());
     }
 }
