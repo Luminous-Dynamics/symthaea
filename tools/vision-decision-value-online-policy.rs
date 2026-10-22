@@ -455,7 +455,7 @@ fn digest(byte: u8) -> EvidenceDigest {
     [byte; 32]
 }
 
-fn estimate(trial: u64, input_byte: u8, benefit: f64) -> Option<PreEscalationValueEstimateV1> {
+fn estimate(input_byte: u8, benefit: f64) -> Option<PreEscalationValueEstimateV1> {
     Some(PreEscalationValueEstimateV1 {
         estimator_id: "fixture-pre-escalation-value-v1".to_owned(),
         estimator_artifact_digest: digest(91),
@@ -477,7 +477,7 @@ fn input(
         loss_profile_id: "visual-object-persistence-v1".to_owned(),
         input_digest: digest(input_byte),
         cheap_path_safe,
-        value_estimate: lower_bound.and_then(|value| estimate(trial_id, input_byte, value)),
+        value_estimate: lower_bound.and_then(|value| estimate(input_byte, value)),
         escalation_cost_upper_bound_units: cost,
     }
 }
