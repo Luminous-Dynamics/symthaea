@@ -89,6 +89,7 @@
             "record_id",
             "family_id",
             "source_commit",
+            "source_artifact_sha256",
             "insight_sha256"
           ],
           "properties": {
@@ -105,6 +106,9 @@
             },
             "insight_sha256": {
               "$ref": "#/$defs/sha256"
+            },
+            "source_artifact_sha256": {
+              "$ref": "#/$defs/sha256"
             }
           }
         },
@@ -116,7 +120,8 @@
             "family_id",
             "source_commit",
             "artifact_path",
-            "artifact_sha256",
+            "base_artifact_sha256",
+            "counterfactual_artifact_sha256",
             "base_statement_sha256",
             "counterfactual_statement_sha256"
           ],
@@ -137,13 +142,16 @@
               "minLength": 1,
               "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$"
             },
-            "artifact_sha256": {
-              "$ref": "#/$defs/sha256"
-            },
             "base_statement_sha256": {
               "$ref": "#/$defs/sha256"
             },
             "counterfactual_statement_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "base_artifact_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "counterfactual_artifact_sha256": {
               "$ref": "#/$defs/sha256"
             }
           }
