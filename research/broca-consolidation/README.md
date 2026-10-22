@@ -34,7 +34,7 @@ A policy receives only `ObservedFeatures`: repeat count, distinct episodes, cont
 ## Policies and controls
 
 - `always_raw`: retain everything as raw evidence.
-- `fixed_interval`: summarize repeated candidates, otherwise retain raw.
+- `repeat_threshold_summary`: summarize candidates after the observed repeat-count threshold, otherwise retain raw.
 - `dedup_only`: summarize repeated candidates, otherwise retain raw.
 - `feature_threshold`: a simple observable-feature baseline.
 - `typed_lifecycle`: a baseline with separate summary, skill and rule promotions.
