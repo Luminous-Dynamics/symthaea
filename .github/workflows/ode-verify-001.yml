@@ -98,6 +98,12 @@ jobs:
             and (.output_target_count == 17)
             and (.rhs_callback_count_exact == true)
             and (.failed_step_work_complete == true)
+            and (if .attempted_steps_reported > 0 then
+              (.min_attempted_dt != null and (.min_attempted_dt | type == "number" and isfinite and . > 0))
+              and (.last_attempted_dt != null and (.last_attempted_dt | type == "number" and isfinite and . > 0))
+            else
+              .min_attempted_dt == null and .last_attempted_dt == null
+            end)
             and (.output_sample_count >= 1)
             and (. as $root | ($root.output_samples | length) == $root.output_sample_count)
             and (.attempted_steps_reported >= .accepted_steps_reported)
@@ -152,5 +158,11 @@ jobs:
             and (.status | IN("completed","attempt_budget_exceeded","tolerance_not_met","time_did_not_advance","solver_error","non_finite_state"))
             and .rhs_callback_count_exact == true
             and .failed_step_work_complete == true
+            and (if .attempted_steps_reported > 0 then
+              (.min_attempted_dt != null and (.min_attempted_dt | type == "number" and isfinite and . > 0))
+              and (.last_attempted_dt != null and (.last_attempted_dt | type == "number" and isfinite and . > 0))
+            else
+              .min_attempted_dt == null and .last_attempted_dt == null
+            end)
             and (. as $root | ($root.output_samples | length) == $root.output_sample_count)
           ' /tmp/ode-robertson-probe-1.json
