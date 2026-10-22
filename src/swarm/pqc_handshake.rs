@@ -3,9 +3,16 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # PQC-Assisted KEM Handshake — Claim-Integrity Review
 //!
-//! This module combines an Ed25519 challenge-response API with ML-KEM-768
-//! encapsulation. The current code is a research integration, **not a reviewed
-//! hybrid key-exchange protocol**.
+//! This module contains experimental KEM-exchange scaffolding, **not a
+//! reviewed hybrid key-exchange protocol**.
+//!
+//! Critical backend limitation: the main workspace currently resolves
+//! `mycelix-crypto` to `stubs/mycelix-crypto`, whose ML-KEM methods return
+//! deterministic all-zero keys, ciphertexts, and shared secrets. That is a
+//! compile-only stub, not cryptography. The API checks
+//! `CRYPTO_BACKEND_IS_STUB` and refuses KEM operations while it is linked. A
+//! reviewed real ML-KEM backend and transcript-bound handshake are prerequisites
+//! for enabling post-quantum session establishment.
 //!
 //! ## Current data flow
 //!
@@ -122,7 +129,8 @@ pub struct KemExchange {
 pub struct PqcHandshakeManager {
     /// Classical handshake manager (Ed25519 or BLAKE3 fallback).
     classical: crate::swarm::handshake::HybridHandshake,
-    /// This node's ML-KEM-768 keypair.
+    /// Backend keypair placeholder. The bundled stub is never accepted
+    /// for KEM operations; see `ensure_real_kem_backend`.
     kem_keypair: MlKem768KeyPair,
     /// Candidate keys derived from KEM but not yet transcript-confirmed.
     pending_session_keys: HashMap<String, PqcCandidateKey>,
