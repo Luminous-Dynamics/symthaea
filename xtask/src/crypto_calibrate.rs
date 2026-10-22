@@ -39,7 +39,7 @@ struct Task {
     positive_controls: Vec<Regression>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 struct Regression {
     path: String,
     test: String,
