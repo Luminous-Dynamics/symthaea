@@ -719,6 +719,9 @@
     "state_model_spec_path": "docs/research/first-aid/STATE_MODEL_V0.md",
     "matrix_runner_test_name": "executable_mutation_matrix_matches_each_declared_outcome",
     "policy_truth_table_test_name": "exhaustive_orthogonal_policy_truth_tables_cover_non_lifecycle_invariants",
-    "policy_truth_table_scope": "18 explicit combinations over connectivity/requirement (6), freshness/presentation (6), sensitivity/consent (4), and unknown normalization (2), separate from the 84-state lifecycle graph."
+    "policy_truth_table_scope": "18 explicit combinations over connectivity/requirement (6), freshness/presentation (6), sensitivity/consent (4), and unknown normalization (2), separate from the 84-state lifecycle graph.",
+    "edge_differential_status": "unit_test_added_pending_exact_head_validation",
+    "edge_differential_test_name": "every_reachable_state_action_edge_matches_production_trace_checker",
+    "edge_differential_scope": "For each reachable abstract state, replay its breadth-first shortest event-history witness, append each of the 16 actions, and compare ordered violations from the production JSON trace checker with the abstract transition model; expected 84 states and 1,344 edges. Same repo, shared design intent, and finite abstraction; not independent clinical ground truth."
   }
 }
