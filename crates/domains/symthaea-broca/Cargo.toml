@@ -164,6 +164,11 @@ name = "demo-ecological-closure"
 path = "src/bin/demo_ecological_closure.rs"
 
 [[bin]]
+name = "broca-sequence-gradient-bench"
+path = "src/bin/broca_sequence_gradient_bench.rs"
+required-features = ["mamba-cpu"]
+
+[[bin]]
 name = "broca-benchmark-suite"
 path = "src/bin/broca_benchmark_suite.rs"
 required-features = ["mamba-cpu"]

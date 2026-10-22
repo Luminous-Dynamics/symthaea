@@ -225,11 +225,15 @@ pub struct LiquidMambaConfig {
     #[serde(default)]
     pub temporal_adapter: bool,
 
-    /// Number of chunks for end-to-end gradient calculation.
+    /// Legacy sparse-gradient stride, retained for serialized config compatibility.
+    /// Full-sequence distillation currently computes gradients for every context
+    /// position in one recurrent unroll and does not consult this field.
     #[serde(default = "default_e2e_grad_chunks")]
     pub e2e_grad_chunks: usize,
 
-    /// Whether to rotate the gradient calculation position (Improvement B).
+    /// Legacy rotating-anchor toggle, retained for serialized config compatibility.
+    /// Full-sequence distillation currently computes gradients for every context
+    /// position in one recurrent unroll and does not consult this field.
     #[serde(default = "default_true")]
     pub rotate_grad: bool,
 
@@ -251,7 +255,9 @@ pub struct LiquidMambaConfig {
     #[serde(default)]
     pub temporal_directional_loss: bool,
 
-    /// Enable rotating gradient position for temporal training (Improvement B).
+    /// Legacy temporal rotating-anchor toggle, retained for serialized config
+    /// compatibility. Full-sequence distillation currently computes gradients for
+    /// every temporal context position and does not consult this field.
     #[serde(default = "default_true")]
     pub temporal_rotate_grad_position: bool,
 
@@ -1133,151 +1139,99 @@ impl LiquidMambaGenerator {
         if target_ids.is_empty() {
             return Ok(0.0);
         }
-        if self.config.rotate_grad && self.config.e2e_grad_chunks == 0 {
-            anyhow::bail!("e2e_grad_chunks must be positive when gradient rotation is enabled");
-        }
 
         let uses_temporal_projection =
             self.config.temporal_projection && self.temporal_proj.is_some();
 
-        // Prepare the true projected context once. The teacher-forced loss loop
-        // below evaluates every target against the same projection parameters;
-        // projection gradients are accumulated and applied once per sequence.
+        // Project context once. The isolated backend computes the mean next-token
+        // loss and all requested context gradients from the SAME differentiable
+        // recurrent unroll; no separate live pass is needed just to report loss.
         let gradient_sequence = if uses_temporal_projection {
-            let sequence = self
-                .temporal_proj
+            self.temporal_proj
                 .as_ref()
                 .expect("temporal projection checked above")
-                .project_to_ssm_sequence(thought_hv);
-            self.mamba.inject_context_sequence(&sequence)?;
-            sequence
+                .project_to_ssm_sequence(thought_hv)
         } else {
-            let ssm_context = self.projection.project_to_ssm(thought_hv);
-            self.mamba.inject_initial_context(&ssm_context)?;
-            vec![ssm_context]
+            vec![self.projection.project_to_ssm(thought_hv)]
         };
         if gradient_sequence.is_empty() {
             anyhow::bail!("cannot distill from an empty projected context sequence");
         }
 
-        let mut total_loss = 0.0f32;
-        let mut prev_token = self.mamba.eos_token_id();
-        let num_tokens = target_ids.len();
-        let mut gradient_samples = 0usize;
-        let mut d_ssm_sum = vec![0.0f32; self.mamba.d_model()];
-        let mut temporal_ssm_gradient_sum: Vec<Option<Vec<f32>>> =
+        let gradient_positions: Vec<usize> = (0..gradient_sequence.len()).collect();
+        let sequence_result = self.mamba.compute_e2e_sequence_loss_and_gradients_isolated(
+            &gradient_sequence,
+            target_ids,
+            &gradient_positions,
+        )?;
+        anyhow::ensure!(
+            sequence_result.mean_loss.is_finite(),
+            "sequence-gradient backend returned a non-finite mean loss"
+        );
+        let mean_loss = sequence_result.mean_loss;
+        let context_gradients = sequence_result.context_gradients;
+
+        anyhow::ensure!(
+            context_gradients.len() == gradient_sequence.len(),
+            "sequence-gradient backend returned {} positions; expected {}",
+            context_gradients.len(),
+            gradient_sequence.len()
+        );
+
+        let mut gradients_by_position: Vec<Option<Vec<f32>>> =
             vec![None; gradient_sequence.len()];
-
-        // Teacher-force the target sequence once on the live backend. Gradient
-        // replay is performed on a cloned backend, so it cannot reset the live
-        // recurrence between teacher tokens.
-        for (target_index, &target_id) in target_ids.iter().enumerate() {
-            let (logits, _hidden) = self.mamba.forward_with_state(prev_token)?;
+        for (position, gradient) in context_gradients {
             anyhow::ensure!(
-                (target_id as usize) < logits.len(),
-                "teacher target token {target_id} is outside logits vocabulary of size {}",
-                logits.len()
+                position < gradients_by_position.len(),
+                "sequence-gradient backend returned out-of-range position {position}"
             );
             anyhow::ensure!(
-                logits.iter().all(|value| value.is_finite()),
-                "teacher-forced logits contain a non-finite value at target position {target_index}"
+                gradients_by_position[position].is_none(),
+                "sequence-gradient backend returned duplicate position {position}"
             );
-            let token_loss = crate::evaluation::cross_entropy_loss(&logits, target_id as usize);
             anyhow::ensure!(
-                token_loss.is_finite(),
-                "teacher-forced cross-entropy is non-finite at target position {target_index}"
+                gradient.iter().all(|value| value.is_finite()),
+                "sequence-gradient backend returned a non-finite gradient at position {position}"
             );
-            total_loss += token_loss;
+            gradients_by_position[position] = Some(gradient);
+        }
+        anyhow::ensure!(
+            gradients_by_position.iter().all(Option::is_some),
+            "sequence-gradient backend omitted one or more requested context positions"
+        );
 
-            let should_compute_grad = if self.config.rotate_grad {
-                (self.generation_count + target_index + 1) % self.config.e2e_grad_chunks == 0
-            } else {
-                true
-            };
-
-            if should_compute_grad {
-                // Full prefix semantics: [EOS, target_0, ..., target_i], with the
-                // last item scored as target and every preceding item fed to the SSM.
-                let mut teacher_tokens = Vec::with_capacity(target_index + 2);
-                teacher_tokens.push(self.mamba.eos_token_id());
-                teacher_tokens.extend_from_slice(&target_ids[..target_index]);
-                teacher_tokens.push(target_id);
-
-                let gradient_pos = if self.config.rotate_grad {
-                    (self.generation_count + target_index) % gradient_sequence.len()
-                } else {
-                    gradient_sequence.len() - 1
-                };
-                let d_ssm = self.mamba.compute_e2e_token_loss_at_isolated(
-                    &gradient_sequence,
-                    &teacher_tokens,
-                    gradient_pos,
-                )?;
-
-                if uses_temporal_projection {
-                    let slot = &mut temporal_ssm_gradient_sum[gradient_pos];
-                    match slot {
-                        Some(sum) => {
-                            for (total, value) in sum.iter_mut().zip(d_ssm.iter()) {
-                                *total += *value;
-                            }
-                        }
-                        None => *slot = Some(d_ssm),
-                    }
-                } else {
-                    if d_ssm.len() != d_ssm_sum.len() {
-                        anyhow::bail!(
-                            "SSM context gradient dimension mismatch: expected {}, got {}",
-                            d_ssm_sum.len(),
-                            d_ssm.len()
-                        );
-                    }
-                    for (total, value) in d_ssm_sum.iter_mut().zip(d_ssm.iter()) {
-                        *total += *value;
-                    }
-                }
-                gradient_samples += 1;
-            }
-
-            prev_token = target_id;
+        // The backend returns d(mean NLL)/d(projected context) directly. Accumulate
+        // through the actual forward projection Jacobian and apply once per sequence.
+        if uses_temporal_projection {
+            let temporal = self
+                .temporal_proj
+                .as_mut()
+                .expect("temporal projection checked above");
+            temporal.compute_e2e_gradients_with_scale(
+                thought_hv,
+                &gradients_by_position,
+                1.0,
+            )?;
+            temporal.apply_gradients(lr, self.config.grad_clip);
+        } else {
+            let gradient = gradients_by_position[0]
+                .as_ref()
+                .ok_or_else(|| anyhow::anyhow!("sequence gradient missing the sole HDC projection vector"))?;
+            self.projection
+                .accumulate_language_model_gradients(thought_hv, gradient, 1.0)?;
+            self.projection.apply_gradients(lr, self.config.grad_clip);
         }
 
-        // Accumulate and apply the exact forward-projection Jacobian once per
-        // sequence. The temporal arm uses sparse/rotating context anchors when
-        // configured; that is a memory-saving gradient estimator, not full BPTT.
-        if gradient_samples > 0 {
-            let gradient_scale = 1.0 / gradient_samples as f32;
-            if uses_temporal_projection {
-                let temporal = self
-                    .temporal_proj
-                    .as_mut()
-                    .expect("temporal projection checked above");
-                temporal.compute_e2e_gradients_with_scale(
-                    thought_hv,
-                    &temporal_ssm_gradient_sum,
-                    gradient_scale,
-                )?;
-                temporal.apply_gradients(lr, self.config.grad_clip);
-            } else {
-                self.projection.accumulate_language_model_gradients(
-                    thought_hv,
-                    &d_ssm_sum,
-                    gradient_scale,
-                )?;
-                self.projection.apply_gradients(lr, self.config.grad_clip);
-            }
-        }
-
-        // Topological regularization is also applied once after the sequence
-        // update, so it cannot mutate the projection between token losses.
+        // Do not regularize an inactive HDC projection when temporal projection
+        // supplied the actual language-model conditioning path.
         let live_coherence = f32::from_bits(self.topological_coherence.load(Ordering::Relaxed));
-        if live_coherence < 0.6 {
+        if !uses_temporal_projection && live_coherence < 0.6 {
             let reg_strength = 0.05 * (1.0 - live_coherence);
             self.projection.apply_manifold_regularization(reg_strength);
         }
 
         self.generation_count += 1;
-        Ok(total_loss / num_tokens as f32)
+        Ok(mean_loss)
     }
 
     /// Local FEP learning step (Predictive Coding).

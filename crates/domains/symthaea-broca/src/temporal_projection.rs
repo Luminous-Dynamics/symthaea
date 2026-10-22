@@ -3031,6 +3031,54 @@ mod language_model_gradient_tests {
     }
 
     #[test]
+    fn temporal_adapter_and_learned_position_gradients_match_finite_differences() {
+        let genesis = GenesisSeed::from_phrase("temporal-adapter-position-gradient-fd");
+        let mut projection = TemporalProjection::new(&genesis, 8, 4, 3);
+        projection.enable_adapter(&genesis);
+        projection.set_learned_attention(true);
+        projection.set_learned_pos_enc(true);
+        let thought = ContinuousHV::from_vec(vec![0.2, -0.7, 0.4, 1.1, -0.3, 0.8, -1.2, 0.5]);
+        let scale = 0.7f32;
+        let gradients: Vec<Option<Vec<f32>>> = (0..projection.num_chunks())
+            .map(|index| Some(vec![0.1 + index as f32 * 0.02, -0.2, 0.15]))
+            .collect();
+
+        projection
+            .compute_e2e_gradients_with_scale(&thought, &gradients, scale)
+            .expect("valid temporal adapter gradients should accumulate");
+
+        let epsilon = 1e-3f32;
+        let analytic_adapter_bias = projection.adapter.as_ref().unwrap().grad_b2[0];
+        let original_adapter_bias = projection.adapter.as_ref().unwrap().b2[0];
+
+        projection.adapter.as_mut().unwrap().b2[0] = original_adapter_bias + epsilon;
+        let plus_adapter = objective(&projection, &thought, &gradients, scale);
+        projection.adapter.as_mut().unwrap().b2[0] = original_adapter_bias - epsilon;
+        let minus_adapter = objective(&projection, &thought, &gradients, scale);
+        projection.adapter.as_mut().unwrap().b2[0] = original_adapter_bias;
+        let numeric_adapter = (plus_adapter - minus_adapter) / (2.0 * epsilon);
+        let tolerance_adapter = 2e-4 + numeric_adapter.abs() * 0.05;
+        assert!(
+            (analytic_adapter_bias - numeric_adapter).abs() <= tolerance_adapter,
+            "temporal adapter b2 gradient mismatch: analytic={analytic_adapter_bias}, finite_difference={numeric_adapter}, tolerance={tolerance_adapter}"
+        );
+
+        let analytic_positional = projection.grad_pos_enc[0];
+        let original_positional = projection.pos_enc[0];
+        projection.pos_enc[0] = original_positional + epsilon;
+        let plus_position = objective(&projection, &thought, &gradients, scale);
+        projection.pos_enc[0] = original_positional - epsilon;
+        let minus_position = objective(&projection, &thought, &gradients, scale);
+        projection.pos_enc[0] = original_positional;
+        let numeric_positional = (plus_position - minus_position) / (2.0 * epsilon);
+        let tolerance_positional = 2e-4 + numeric_positional.abs() * 0.05;
+        assert!(
+            (analytic_positional - numeric_positional).abs() <= tolerance_positional,
+            "temporal positional encoding gradient mismatch: analytic={analytic_positional}, finite_difference={numeric_positional}, tolerance={tolerance_positional}"
+        );
+    }
+
+    #[test]
     fn temporal_projection_gradient_rejects_bad_chunk_shape() {
         let genesis = GenesisSeed::from_phrase("temporal-lm-gradient-contract");
         let mut projection = TemporalProjection::new(&genesis, 8, 4, 3);

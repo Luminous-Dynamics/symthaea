@@ -59,6 +59,7 @@ fn test_distillation_modifies_weights() {
         max_tokens: 16,
         warmup_steps: 0,
         accumulation_steps: 1,
+        temporal_projection: false,
         enable_consciousness_gating: false,
         ..Default::default()
     };
@@ -86,6 +87,46 @@ fn test_distillation_modifies_weights() {
         changed > 0,
         "Expected weights to change after distillation, but all {} weights are identical",
         initial_weights.len()
+    );
+}
+
+/// When temporal projection is active, its own forward-path weights must change.
+#[test]
+fn test_distillation_modifies_temporal_projection_weights() {
+    let config = LiquidMambaConfig {
+        max_tokens: 16,
+        warmup_steps: 0,
+        accumulation_steps: 1,
+        temporal_projection: true,
+        enable_consciousness_gating: false,
+        ..Default::default()
+    };
+    let channels = ThoughtChannels::with_intent(2);
+    let mut gen_obj = mock_gen(config);
+    let projection = gen_obj
+        .temporal_proj
+        .as_ref()
+        .expect("temporal projection should be constructed when enabled");
+    let initial_weights = projection.flatten_weights();
+
+    gen_obj
+        .train_step(&channels, &[1, 2, 3, 4])
+        .expect("temporal projection distillation should succeed");
+
+    let final_weights = gen_obj
+        .temporal_proj
+        .as_ref()
+        .expect("temporal projection should remain enabled")
+        .flatten_weights();
+    assert_eq!(initial_weights.len(), final_weights.len());
+    let changed = initial_weights
+        .iter()
+        .zip(final_weights.iter())
+        .filter(|(before, after)| (*before - *after).abs() > 1e-10)
+        .count();
+    assert!(
+        changed > 0,
+        "temporal projection weights must change when its own gradient path is active"
     );
 }
 
