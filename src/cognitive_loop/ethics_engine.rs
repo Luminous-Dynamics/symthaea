@@ -1860,6 +1860,14 @@ mod tests {
         assert_eq!(question.state, ConsentState::Unknown);
         assert!(question.question_suppressed);
         assert!(!question.has_affirmative_cue());
+
+        let conflict = engine.assess_consent_evidence(
+            "She refused consent, but later said yes; the timeline is unclear.",
+        );
+        assert_eq!(conflict.state, ConsentState::Unknown);
+        assert_eq!(conflict.basis, crate::hdc::moral_parser::ConsentEvidenceBasis::ConflictingSignals);
+        assert!(conflict.conflicting_phrases.len() >= 2);
+        assert!(!conflict.has_affirmative_cue());
     }
 
     #[test]
