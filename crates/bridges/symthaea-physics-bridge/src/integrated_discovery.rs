@@ -1259,18 +1259,18 @@ mod tests {
                 DISCREPANCY,
             );
 
-            clean_baseline_successes += usize::from(clean_baseline.success);
-            clean_pit_successes += usize::from(clean_pit.success);
-            clean_pit_alarms += usize::from(clean_pit.prequential_pit_alarm);
+            clean_baseline_successes += if clean_baseline.success { 1 } else { 0 };
+            clean_pit_successes += if clean_pit.success { 1 } else { 0 };
+            clean_pit_alarms += if clean_pit.prequential_pit_alarm { 1 } else { 0 };
             misspec_baseline_false_singletons +=
-                usize::from(misspecified_baseline.overconfident_under_misspecification);
+                if misspecified_baseline.overconfident_under_misspecification { 1 } else { 0 };
             misspec_pit_false_singletons +=
-                usize::from(misspecified_pit.overconfident_under_misspecification);
+                if misspecified_pit.overconfident_under_misspecification { 1 } else { 0 };
             misspec_pit_detections +=
-                usize::from(misspecified_pit.model_discrepancy_detected);
+                if misspecified_pit.model_discrepancy_detected { 1 } else { 0 };
             pit_audit_queries += misspecified_pit.audit_queries + clean_pit.audit_queries;
-            protocol_failures += usize::from(clean_pit.monitoring_protocol_invalid);
-            protocol_failures += usize::from(misspecified_pit.monitoring_protocol_invalid);
+            protocol_failures += if clean_pit.monitoring_protocol_invalid { 1 } else { 0 };
+            protocol_failures += if misspecified_pit.monitoring_protocol_invalid { 1 } else { 0 };
         }
 
         println!(
