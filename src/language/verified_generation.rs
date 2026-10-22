@@ -214,10 +214,9 @@ fn create_process_attestation(
     binary_path: Option<&std::path::Path>,
 ) -> Result<ProofAttestation, String> {
     let binary_data = match binary_path {
-        Some(path) => Some(
-            std::fs::read(path)
-                .map_err(|error| format!("could not read binary artifact for attestation: {error}"))?,
-        ),
+        Some(path) => Some(std::fs::read(path).map_err(|error| {
+            format!("could not read binary artifact for attestation: {error}")
+        })?),
         None => None,
     };
 
