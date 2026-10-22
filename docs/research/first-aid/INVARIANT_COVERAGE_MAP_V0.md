@@ -9,7 +9,7 @@ Three forms of evidence now coexist in the research branch:
 
 1. The **typed trace checker** evaluates ordered event histories and emits violation codes.
 2. A separately structured **JSON-value reference interpreter** checks the same frozen corpus and selected adversarial mutations.
-3. A finite **abstract state model** exhaustively explores 84 reachable states and 1,344 state/action transitions for its declared action space.
+3. A finite **abstract lifecycle state model** exhaustively explores 84 reachable states and 1,344 state/action transitions, while separate policy truth tables enumerate connectivity, resource freshness, data sensitivity/consent and unknown normalization.
 
 They are not interchangeable. The state model is compiled only for tests and covers a smaller state space. A mutation being represented in the matrix means the expected result is declared and mapped to a test or workflow gate; the new exact-head workflow must pass before treating the mapping as verified evidence.
 
@@ -23,17 +23,17 @@ They are not interchangeable. The state model is compiled only for tests and cov
 | Render without matching verified bundle | Yes | Yes | Yes | MUT-002, MUT-009, MUT-013, MUT-014, MUT-015, MUT-026, MUT-027, MUT-028 | Compare ordered event outcomes for two or more bundle IDs and all resume/interruption combinations |
 | Uncertainty lost at handoff | Yes | Yes | Yes | MUT-005 corpus boundary; MUT-016 re-entry | The finite model only represents one pending uncertainty flag; define behavior for multiple sources and partial preservation |
 | Uncertainty lost at session boundary | Yes | Yes | Yes | MUT-025 | Add generated cases where preserved and unpreserved uncertainties coexist across successive boundaries |
-| Unknown state normalized to ordinary state | Yes | Yes, at event-semantic layer | No | BASE-FA-TRACE-004 | Clarify whether this event represents a domain-level unknown rather than schema-invalid input; add model coverage if the semantics are retained |
-| Stale/unknown resource presented as confirmed | Yes | Yes | No | BASE-FA-TRACE-006, MUT-010 | Add unknown resource states and all freshness/presentation combinations to a separate reference model |
-| Offline core-network dependency | Yes | Yes | No | BASE-FA-TRACE-007, MUT-023 | Model online/offline/intermittent connectivity explicitly and test when network is optional vs required |
-| Intermittent core-network dependency | Yes | Yes | No | MUT-003 | Generate flapping network histories, timeouts, and recovery transitions; current model only classifies static connectivity |
-| Sensitive-data egress without consent scope | Yes | Yes | No | BASE-FA-TRACE-009, MUT-024 | Model consent scope, payload sensitivity, revocation, and egress as transitions rather than a single event predicate |
+| Unknown state normalized to ordinary state | Yes | Yes, at event-semantic layer | Yes, orthogonal truth table | BASE-FA-TRACE-004 | Clarify whether this event represents a domain-level unknown rather than schema-invalid input; do not conflate it with an unknown JSON enum/field that should reject at schema parsing |
+| Stale/unknown resource presented as confirmed | Yes | Yes | Yes, 6 freshness/presentation combinations | BASE-FA-TRACE-006, MUT-010 | Extend coverage to lifecycle interactions between revocation, freshness changes and rendering; current policy table is orthogonal |
+| Offline core-network dependency | Yes | Yes | Yes, connectivity truth table | BASE-FA-TRACE-007, MUT-023 | Extend to lifecycle interactions and stateful network recovery; current policy table classifies static connectivity |
+| Intermittent core-network dependency | Yes | Yes | Yes, connectivity truth table | MUT-003 | Generate flapping network histories, timeouts, and recovery transitions; current model only classifies static connectivity |
+| Sensitive-data egress without consent scope | Yes | Yes | Yes, 4 sensitivity/consent combinations | BASE-FA-TRACE-009, MUT-024 | Add consent changes/revocation and egress sequences over time; current policy table is orthogonal |
 
 ## What is verified vs what is only represented
 
 - **Declared and mapped:** the machine-readable matrix contains 40 entries—12 frozen traces and 28 mutation/control cases. The Rust matrix runner executes 26 cases and the workflow gates cover two separately.
 - **Differential implementation check:** a separate JSON-value-based interpreter is compared on the frozen traces and a defined mutation suite. Because both are maintained here and share expected fixtures, agreement is not independent ground truth.
-- **Finite state exploration:** the test-only state model checks its 16-action abstract system exhaustively, with baseline counts of 84 reachable states and 1,344 state/action transitions. Those counts are tied to the current abstract model, not to all production events.
+- **Finite state exploration:** the test-only lifecycle model checks its 16-action abstract system exhaustively, with baseline counts of 84 reachable states and 1,344 state/action transitions. A separate test enumerates 18 orthogonal policy combinations: six connectivity/requirement combinations, six freshness/presentation combinations, four sensitivity/consent combinations, and two unknown-normalization cases. These truth tables do not multiply into the lifecycle graph and do not test temporal interactions between domains.
 - **Independent JS audit performed during authoring:** a separate interpreter written for an analysis pass compared all 40 declared matrix outcomes against the frozen corpus and current matrix operators; 40 matched and zero mismatched. This is a one-off authoring-time result, not a committed evaluator, not the Rust workflow, and not a clinical oracle.
 
 ## Prioritized next steps
