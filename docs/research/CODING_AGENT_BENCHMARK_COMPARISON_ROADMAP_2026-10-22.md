@@ -32,7 +32,7 @@ Report assessed behavioral failures separately from incomplete compiler/test exe
 
 ### 3. Test intervention effects, not just the final agent
 
-Use the same model revision, prompt budget, tools, compiler, sandbox, task, hidden tests and stopping budget in each arm; change only GCS advisories. Record requested model identity, selected tier decisions, and each actual backend invocation in order (including failures/fallback). Compare treatment arms not only for pass rate but also for changes in backend attempts, simulated fallback frequency, tail latency, cost, and unresolved-oracle rates. Alternate/randomize treatment order and repeat tasks to estimate run variance. Include a no-GCS baseline and, later, ablations for advisory type, confidence threshold and repair feedback. Report the agent+model+harness as the unit of comparison.
+Use the same model revision, prompt budget, tools, compiler, sandbox, task, hidden tests and stopping budget in each arm; change only GCS advisories. Record requested model identity, selected tier decisions, and each actual backend invocation in order (including failures/fallback) with per-invocation latency. Compare treatment arms not only for pass rate but also for changes in backend attempts, simulated fallback frequency, end-to-end and per-attempt tail latency, cost, and unresolved-oracle rates. Alternate/randomize treatment order and repeat tasks to estimate run variance. Include a no-GCS baseline and, later, ablations for advisory type, confidence threshold and repair feedback. Report the agent+model+harness as the unit of comparison.
 
 ### 4. Make the held-out tasks harder than memorized function synthesis
 
