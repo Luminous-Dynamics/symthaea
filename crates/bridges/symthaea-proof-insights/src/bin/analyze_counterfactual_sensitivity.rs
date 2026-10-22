@@ -636,6 +636,57 @@ fn join_pairs(
     outcomes: &BTreeMap<String, Value>,
     requested_split: &str,
 ) -> Result<Vec<PairObservation>> {
+    // Validate graph/split isolation across the *entire* suite, not only the
+    // requested split, so a standalone test-split analysis cannot hide leaks
+    // in rows that it skips while scoring.
+    let mut suite_pair_ids = BTreeSet::new();
+    let mut suite_outcome_ids = BTreeSet::new();
+    let mut suite_family_split = BTreeMap::<String, String>::new();
+    let mut suite_family_component = BTreeMap::<String, String>::new();
+    let mut suite_insight_split = BTreeMap::<String, String>::new();
+    for (index, pair) in pairs.iter().enumerate() {
+        let context = format!("suite.pairs[{index}]");
+        let pair_id = required_string(pair, "pair_id", &context)?.to_owned();
+        if !suite_pair_ids.insert(pair_id.clone()) {
+            bail!("duplicate suite pair_id {pair_id:?}");
+        }
+        let split = required_string(pair, "split", &context)?;
+        if !matches!(split, "train" | "validation" | "test" | "external_challenge") {
+            bail!("{context} has unsupported split {split:?}");
+        }
+        let component_id = required_string(pair, "component_id", &context)?.to_owned();
+        let source = pair.get("source_insight").context("source_insight missing")?;
+        let target = pair.get("target").context("target missing")?;
+        let source_record = required_string(source, "record_id", &format!("{context}.source_insight"))?;
+        let source_family = required_string(source, "family_id", &format!("{context}.source_insight"))?;
+        let target_family = required_string(target, "family_id", &format!("{context}.target"))?;
+        for link_field in ["base_outcome_pair_id", "counterfactual_outcome_pair_id"] {
+            let link = required_string(pair, link_field, &context)?.to_owned();
+            if !suite_outcome_ids.insert(link.clone()) {
+                bail!("duplicate suite outcome link {link:?}");
+            }
+        }
+        for family in [source_family, target_family] {
+            if let Some(previous) = suite_family_split.insert(family.to_owned(), split.to_owned()) {
+                if previous != split {
+                    bail!("family {family} crosses suite splits");
+                }
+            }
+            if let Some(previous) =
+                suite_family_component.insert(family.to_owned(), component_id.clone())
+            {
+                if previous != component_id {
+                    bail!("family {family} crosses pair components");
+                }
+            }
+        }
+        if let Some(previous) = suite_insight_split.insert(source_record.to_owned(), split.to_owned()) {
+            if previous != split {
+                bail!("source insight {source_record} crosses suite splits");
+            }
+        }
+    }
+
     let mut all_references = BTreeSet::new();
     let mut observations = Vec::new();
     let mut family_split = BTreeMap::<String, String>::new();
