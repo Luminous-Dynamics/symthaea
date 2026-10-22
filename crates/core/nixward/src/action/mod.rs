@@ -12,6 +12,7 @@ pub mod executor;
 pub mod flake_ops;
 pub mod gc_manager;
 pub mod generation_manager;
+pub mod legacy_approval_gate;
 pub mod phi_gate;
 pub mod plan_executor;
 pub mod service_manager;
@@ -24,6 +25,10 @@ pub use executor::{
 pub use flake_ops::{FlakeCheckResult, FlakeMetadata, FlakeOps};
 pub use gc_manager::{GcAnalysis, GcManager, GcRecommendation};
 pub use generation_manager::{Generation, GenerationDiff, GenerationManager};
+pub use legacy_approval_gate::{
+    LegacyApprovalGateDecisionV1, LegacyApprovalVerdictV1, evaluate_legacy_approval_v1,
+    invalidate_legacy_verdict_file_v1, publish_legacy_verdict_file_v1,
+};
 pub use phi_gate::{classify_command_destructiveness, get_nixos_rollback};
 pub use plan_executor::{PlanExecutionResult, PlanExecutor, PlanStep, StepStatus};
 pub use service_manager::{ServiceManager, ServiceStatus};
