@@ -1159,7 +1159,7 @@ impl LiquidMambaGenerator {
         let num_tokens = target_ids.len();
         let mut intermediate_states = Vec::with_capacity(num_tokens);
 
-        for &target_id in target_ids {
+        for (target_index, &target_id) in target_ids.iter().enumerate() {
             // Forward through teacher token to get next state/logits
             let (logits, hidden) = self.mamba.forward_with_state(prev_token)?;
             total_loss += crate::evaluation::cross_entropy_loss(&logits, target_id as usize);
@@ -1175,10 +1175,16 @@ impl LiquidMambaGenerator {
             };
 
             if should_compute_grad {
-                // Replay the actual projected context and the exact teacher-forced
-                // (previous token -> target token) pair. The gradient position rotates
-                // through context chunks when rotation is enabled; otherwise use the last
-                // projected chunk as the trainable context anchor.
+                // Replay the actual projected context and the full teacher-forced
+                // prefix [EOS, target_0, ..., target_(i-1), target_i]. The final item
+                // is the target; all preceding items condition its prediction.
+                let mut teacher_tokens = Vec::with_capacity(target_index + 2);
+                teacher_tokens.push(self.mamba.eos_token_id());
+                teacher_tokens.extend_from_slice(&target_ids[..target_index]);
+                teacher_tokens.push(target_id);
+
+                // Rotate the projected-context anchor when enabled; otherwise use
+                // the final context chunk so this gradient targets the current output.
                 let gradient_pos = if self.config.rotate_grad {
                     (self.generation_count + intermediate_states.len().saturating_sub(1))
                         % gradient_sequence.len()
@@ -1187,7 +1193,7 @@ impl LiquidMambaGenerator {
                 };
                 let d_ssm = self.mamba.compute_e2e_token_loss_at_isolated(
                     &gradient_sequence,
-                    &[prev_token, target_id],
+                    &teacher_tokens,
                     gradient_pos,
                 )?;
 
