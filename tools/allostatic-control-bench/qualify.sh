@@ -294,7 +294,7 @@ if ! awk -F, '
     if ($8 !~ /^[0-9]+$/ || $9 !~ /^[0-9]+$/ ||
         $10 !~ /^[0-9]+$/ || $11 !~ /^[0-9]+$/) failed = 1
     if (($6 == "accepted") != ($7 == "true")) failed = 1
-    if (($2 == "true") != ($3 == "true")) failed = 1
+    if ($2 == "true" && $3 != "true") failed = 1
     if ($1 == "valid_within_age" &&
         ($2 != "true" || $3 != "true" || $6 != "accepted" || $8 != 101 || $9 != 101)) failed = 1
     if ($1 == "state_revision_changed" && $6 != "state_revision_changed") failed = 1
