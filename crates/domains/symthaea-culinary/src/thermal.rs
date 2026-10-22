@@ -39,14 +39,19 @@ impl ThermalTrajectory {
     /// trajectory:  ∫ dt / D(T(t)),  where  D(T) = d_ref · 10^((t_ref − T)/z).
     ///
     /// Equivalently the integral of the lethality rate 10^((T − t_ref)/z) / d_ref.
-    /// Each linear segment is sub-sampled so the exponential is integrated accurately.
+    ///
+    /// Temperature is piecewise-linear between samples, so this exponential integral has
+    /// a closed form on each segment. Integrating analytically avoids the step-size-dependent
+    /// bias of a fixed-substep trapezoid rule on steep temperature ramps.
     pub fn log_reduction(&self, d_ref: f64, t_ref: f64, z: f64) -> f64 {
         if d_ref <= 0.0 || z <= 0.0 {
             return 0.0;
         }
+
         let lethality = |temp: f64| -> f64 { 10f64.powf((temp - t_ref) / z) / d_ref };
         let mut total = 0.0;
-        const SUBSTEPS: usize = 64;
+        let ln_10 = std::f64::consts::LN_10;
+
         for w in self.points.windows(2) {
             let (t0, temp0) = w[0];
             let (t1, temp1) = w[1];
@@ -54,14 +59,14 @@ impl ThermalTrajectory {
             if dt <= 0.0 {
                 continue;
             }
-            let h = dt / SUBSTEPS as f64;
-            for k in 0..SUBSTEPS {
-                let f0 = (k as f64) / SUBSTEPS as f64;
-                let f1 = (k as f64 + 1.0) / SUBSTEPS as f64;
-                let a = lethality(temp0 + (temp1 - temp0) * f0);
-                let b = lethality(temp0 + (temp1 - temp0) * f1);
-                total += 0.5 * (a + b) * h; // trapezoid
-            }
+
+            let exponent = (temp1 - temp0) * ln_10 / z;
+            let mean_rate_factor = if exponent == 0.0 {
+                1.0
+            } else {
+                exponent.exp_m1() / exponent
+            };
+            total += dt * lethality(temp0) * mean_rate_factor;
         }
         total
     }
