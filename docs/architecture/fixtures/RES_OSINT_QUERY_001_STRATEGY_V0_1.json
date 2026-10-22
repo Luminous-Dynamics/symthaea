@@ -1,0 +1,154 @@
+{
+  "schema": "symthaea:osint-query-strategy-corpus:v1",
+  "profile": "symthaea:osint-query-strategy:v1",
+  "normalization_profile": "symthaea:query-semantic-normalization:v1",
+  "authority": "ProposalOnly",
+  "network_io": false,
+  "llm_required": false,
+  "frontier_ref": "F2",
+  "preferred_hypothesis": "H1",
+  "live_hypotheses": ["H1", "H2", "H3", "HU"],
+  "queries": [
+    {
+      "id": "Q1",
+      "family": "NeutralDescriptive",
+      "semantic_ref": "query:maintenance-calibration-neutral",
+      "query_commitment": "sha256:q1-neutral-maintenance",
+      "target_observations": ["D2"],
+      "target_hypotheses": ["H1", "H2"],
+      "tool_capability_compatibility": ["WebSearch", "PublicRegistryQuery"],
+      "expected_disclosure_surfaces": ["QueryTerms"],
+      "policy_disposition": "ProposalOnly"
+    },
+    {
+      "id": "Q2",
+      "family": "DisconfirmationSeeking",
+      "semantic_ref": "query:sensor-fault-disconfirm-h1",
+      "query_commitment": "sha256:q2-sensor-fault",
+      "target_observations": ["D2"],
+      "target_hypotheses": ["H1", "H2"],
+      "tool_capability_compatibility": ["WebSearch", "PublicRegistryQuery"],
+      "expected_disclosure_surfaces": ["QueryTerms"],
+      "policy_disposition": "ProposalOnly"
+    },
+    {
+      "id": "Q3",
+      "family": "AlternativeExplanation",
+      "semantic_ref": "query:sensor-drift-alternative-h2",
+      "query_commitment": "sha256:q3-sensor-drift",
+      "target_observations": ["D2"],
+      "target_hypotheses": ["H2"],
+      "tool_capability_compatibility": ["WebSearch", "PublicRegistryQuery"],
+      "expected_disclosure_surfaces": ["QueryTerms"],
+      "policy_disposition": "ProposalOnly"
+    },
+    {
+      "id": "Q4",
+      "family": "DependencyLineage",
+      "semantic_ref": "query:upstream-syndication-lineage-h3",
+      "query_commitment": "sha256:q4-lineage",
+      "target_observations": ["D3"],
+      "target_hypotheses": ["H3"],
+      "tool_capability_compatibility": ["WebSearch", "WebArchiveLookup", "CodeForgeSearch"],
+      "expected_disclosure_surfaces": ["QueryTerms", "TargetIdentifiers"],
+      "policy_disposition": "ProposalOnly"
+    },
+    {
+      "id": "Q5",
+      "family": "ExactIdentifier",
+      "semantic_ref": "query:exact-maintenance-record-id",
+      "query_commitment": "sha256:q5-exact-record",
+      "target_observations": ["D2"],
+      "target_hypotheses": ["H1", "H2"],
+      "tool_capability_compatibility": ["PublicRegistryQuery", "CodeForgeSearch"],
+      "expected_disclosure_surfaces": ["TargetIdentifiers"],
+      "policy_disposition": "ProposalOnly"
+    },
+    {
+      "id": "Q6",
+      "family": "SupportSeeking",
+      "semantic_ref": "query:level-change-confirmation-wording-clone",
+      "query_commitment": "sha256:q6-confirmation-clone",
+      "target_observations": ["D1"],
+      "target_hypotheses": ["H1"],
+      "tool_capability_compatibility": ["WebSearch"],
+      "expected_disclosure_surfaces": ["QueryTerms"],
+      "policy_disposition": "ProposalOnly",
+      "semantic_duplicate_group": "DG1"
+    },
+    {
+      "id": "Q7",
+      "family": "SourceClassSpecific",
+      "semantic_ref": "query:protected-device-personnel-record",
+      "query_commitment": "sha256:q7-protected",
+      "target_observations": ["D2"],
+      "target_hypotheses": ["H1", "H2"],
+      "tool_capability_compatibility": ["PublicRegistryQuery", "WebSearch"],
+      "expected_disclosure_surfaces": ["QueryTerms", "TargetIdentifiers"],
+      "policy_disposition": "BlockedByPrivacy",
+      "raw_query_embedded": false
+    },
+    {
+      "id": "Q8",
+      "family": "TemporalCurrentness",
+      "semantic_ref": "query:recent-calibration-currentness",
+      "query_commitment": "sha256:q8-currentness",
+      "target_observations": ["D2"],
+      "target_hypotheses": ["H1", "H2"],
+      "tool_capability_compatibility": ["WebSearch", "PublicRegistryQuery"],
+      "expected_disclosure_surfaces": ["QueryTerms"],
+      "policy_disposition": "ProposalOnly"
+    }
+  ],
+  "duplicate_groups": [
+    {
+      "id": "DG1",
+      "members": ["Q6"],
+      "note": "single retained clone marker; future wording clones join this group and do not increase semantic diversity"
+    }
+  ],
+  "required_family_coverage": {
+    "preferred_hypothesis_disconfirmation_present": true,
+    "live_alternative_h2_present": true,
+    "live_alternative_h3_present": true,
+    "neutral_family_present": true,
+    "dependency_lineage_present": true
+  },
+  "prior_search_case": {
+    "search_ref": "S_D2",
+    "query_family_ref": "Q2",
+    "result_count": 0,
+    "coverage": "UnknownCoverage",
+    "interpretation": "NoMatchObservedUnderSearchProfile",
+    "forbidden_inference": "SupportsPreferredHypothesis"
+  },
+  "expected_output": {
+    "semantic_diversity_count_excludes_wording_clones": true,
+    "blocked_queries": ["Q7"],
+    "disconfirmation_queries_for_h1": ["Q2"],
+    "alternative_queries": ["Q3", "Q4"],
+    "neutral_queries": ["Q1"],
+    "dependency_queries": ["Q4"],
+    "authority": "ProposalOnly"
+  },
+  "required_invariants": [
+    "query_match_is_not_evidence_support",
+    "supporting_hit_count_is_not_hypothesis_strength",
+    "omitted_query_family_is_not_evidence_absence",
+    "query_commitment_is_not_disclosure_permission",
+    "wording_variants_are_not_independent_evidence",
+    "query_family_count_is_not_evidence_count",
+    "unknown_coverage_zero_result_does_not_confirm_preferred_hypothesis",
+    "blocked_sensitive_query_remains_non_executable"
+  ],
+  "metamorphic_cases": [
+    {"mutation": "remove_all_DisconfirmationSeeking", "expected": "NoSafeDisconfirmationQueryCandidate_without_H1_strengthening"},
+    {"mutation": "add_wording_only_Q6_clones", "expected": "semantic_diversity_unchanged"},
+    {"mutation": "change_Q8_time_constraint", "expected": "distinct_candidate_preserved"},
+    {"mutation": "Q7_BlockedByPrivacy->ProposalOnly", "expected": "policy_partition_changes_but_no_execution_authority"},
+    {"mutation": "remove_Q3_Q4", "expected": "alternative_coverage_limitation"},
+    {"mutation": "add_many_confirmation_variants", "expected": "methodological_diversity_not_inflated"},
+    {"mutation": "change_tool_compatibility", "expected": "compatibility_changes_without_execution"},
+    {"mutation": "prior_search_zero_results_UnknownCoverage", "expected": "no_preferred_hypothesis_support"}
+  ]
+}
