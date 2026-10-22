@@ -485,44 +485,78 @@ impl KnowledgePersistence {
         }
         let conn = self.open_connection()?;
         self.ensure_schema(&conn)?;
-        let mut statement = conn
-            .prepare(
-                "SELECT fact_id, vector_blob, source_text, confidence, domain, cycle, is_causal, claim_context_json
-                 FROM knowledge_facts ORDER BY cycle DESC, id DESC",
-            )
-            .map_err(|error| error.to_string())?;
-        let rows = statement
-            .query_map([], |row| {
-                let claim_context = row
-                    .get::<_, Option<String>>(7)?
-                    .map(|raw| {
-                        serde_json::from_str::<ClaimContext>(&raw).map_err(|error| {
-                            rusqlite::Error::FromSqlConversionFailure(
-                                7,
-                                rusqlite::types::Type::Text,
-                                Box::new(error),
-                            )
-                        })
-                    })
-                    .transpose()?;
-                Ok(GraphFactRecord {
-                    fact_id: row.get::<_, Option<i64>>(0)?.map(|id| id as u64),
-                    fact: FactRecord {
-                        vector_bytes: row.get(1)?,
-                        source_text: row.get(2)?,
-                        confidence: row.get(3)?,
-                        domain: row.get(4)?,
-                        cycle: row.get::<_, i64>(5)? as u64,
-                        is_causal: row.get(6)?,
-                    },
-                    claim_context,
-                })
-            })
-            .map_err(|error| error.to_string())?
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(|error| format!("Graph fact record decoding failed: {error}"))?;
+        let rows = read_graph_fact_records(&conn)?;
         self.total_loaded += rows.len() as u64;
         Ok(rows)
+    }
+
+    /// Load a fact/link snapshot from one SQLite read transaction and validate
+    /// all endpoints, claim contexts, and relation-specific evidence invariants.
+    ///
+    /// Legacy rows without stable graph IDs are assigned deterministic in-memory
+    /// IDs only when no persisted evidence links depend on those missing IDs.
+    pub fn load_graph_snapshot(
+        &mut self,
+    ) -> Result<(Vec<GraphFactRecord>, Vec<EvidenceLink>), String> {
+        if !self.is_configured() {
+            return Err("No database path configured".into());
+        }
+        let conn = self.open_connection()?;
+        self.ensure_schema(&conn)?;
+        let tx = conn.unchecked_transaction().map_err(|error| error.to_string())?;
+
+        let raw_facts = read_graph_fact_records(&tx)?;
+        let links = read_evidence_link_records(&tx)?;
+        if !links.is_empty() && raw_facts.iter().any(|record| record.fact_id.is_none()) {
+            return Err(
+                "cannot validate persisted evidence links while graph facts lack stable IDs".into(),
+            );
+        }
+        let facts = normalize_graph_fact_ids(&raw_facts)?;
+        validate_graph_snapshot(&facts, &links)?;
+        tx.commit().map_err(|error| error.to_string())?;
+
+        self.total_loaded += facts.len() as u64 + links.len() as u64;
+        Ok((facts, links))
+    }
+
+    /// Compatibility API that returns links only after validating the entire
+    /// persisted graph snapshot that owns their endpoints.
+    pub fn load_evidence_links(&mut self) -> Result<Vec<EvidenceLink>, String> {
+        self.load_graph_snapshot().map(|(_, links)| links)
+    }
+
+    /// Replace typed links only when the currently stored fact snapshot gives
+    /// every endpoint a stable identity and the entire resulting snapshot passes
+    /// validation. Facts and links are checked and written within one transaction.
+    pub fn save_evidence_links(&mut self, links: &[EvidenceLink]) -> Result<usize, String> {
+        if !self.is_configured() {
+            return Err("No database path configured".into());
+        }
+        let conn = self.open_connection()?;
+        self.ensure_schema(&conn)?;
+        let tx = conn.unchecked_transaction().map_err(|error| error.to_string())?;
+
+        let facts = read_graph_fact_records(&tx)?;
+        if facts.iter().any(|record| record.fact_id.is_none()) {
+            return Err(
+                "cannot save evidence links while graph facts lack stable IDs; save a graph snapshot first".into(),
+            );
+        }
+        validate_graph_snapshot(&facts, links)?;
+        tx.execute("DELETE FROM knowledge_evidence_links", [])
+            .map_err(|error| error.to_string())?;
+        for link in links {
+            let encoded = serde_json::to_string(link).map_err(|error| error.to_string())?;
+            tx.execute(
+                "INSERT INTO knowledge_evidence_links (link_json) VALUES (?1)",
+                rusqlite::params![encoded],
+            )
+            .map_err(|error| error.to_string())?;
+        }
+        tx.commit().map_err(|error| error.to_string())?;
+        self.total_saved += links.len() as u64;
+        Ok(links.len())
     }
 
     /// Save causal edge records.
