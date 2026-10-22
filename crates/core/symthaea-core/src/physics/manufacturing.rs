@@ -222,12 +222,19 @@ impl JoiningMethod {
 /// Material compatibility assessment
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Compatibility {
-    /// Fully compatible
+    /// An explicitly listed material pair passed this compatibility screen.
+    ///
+    /// This is not a substitute for grade-, process-, temperature-, or
+    /// service-specific engineering qualification.
     Compatible,
-    /// Compatible with precautions
+    /// Explicitly listed as requiring additional controls or verification.
     Conditional,
-    /// Not compatible
+    /// Explicitly listed as incompatible.
     Incompatible,
+    /// No explicit compatibility entry exists for this material pair.
+    ///
+    /// Unknown pairs must not be treated as safe by default.
+    Unverified,
 }
 
 /// Material compatibility matrix
@@ -335,7 +342,7 @@ impl MaterialCompatibility {
             .get(&key1)
             .or_else(|| self.matrix.get(&key2))
             .copied()
-            .unwrap_or(Compatibility::Compatible); // Default to compatible if not specified
+            .unwrap_or(Compatibility::Unverified); // Fail closed for unlisted pairs
 
         let note = self
             .notes
@@ -884,9 +891,16 @@ mod tests {
         let (result, _) = compat.check("Galinstan", "Aluminum");
         assert_eq!(result, Compatibility::Incompatible);
 
-        // Galinstan-Steel should be compatible
+        // Galinstan-Steel is explicitly listed as compatible (both key orders work).
         let (result, _) = compat.check("Galinstan", "Steel");
         assert_eq!(result, Compatibility::Compatible);
+        let (result_reversed, _) = compat.check("Steel", "Galinstan");
+        assert_eq!(result_reversed, Compatibility::Compatible);
+
+        // Unknown combinations must never be implicitly approved.
+        let (unknown, note) = compat.check("Unlisted Alloy A", "Unlisted Alloy B");
+        assert_eq!(unknown, Compatibility::Unverified);
+        assert_eq!(note, None);
     }
 
     #[test]
