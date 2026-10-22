@@ -10,6 +10,11 @@
 //! - Yellow (0.3-0.6): Responsive assist — follows with amplification
 //! - Orange (0.1-0.3): Transparent — minimal assistance
 //! - Red (<0.1): Gravity compensation only — fully backdrivable
+//!
+//! The `space_exosuit` supervisory module deliberately adds an independent
+//! deterministic assist envelope for EVA research. Phi may influence proposed
+//! assistance elsewhere, but it is not an input to that certified-assist
+//! admission boundary.
 
 #![deny(unsafe_code)]
 
@@ -27,6 +32,7 @@ pub mod reflex;
 #[cfg(feature = "sensors")]
 pub mod sensored_suite;
 pub mod simulator;
+pub mod space_exosuit;
 #[cfg(feature = "symtropy")]
 pub mod symtropy_sim;
 pub mod training;
