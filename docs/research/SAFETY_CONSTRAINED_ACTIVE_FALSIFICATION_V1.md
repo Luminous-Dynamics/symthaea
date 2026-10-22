@@ -27,7 +27,12 @@ For each candidate action, calculate pairwise distances between the model-predic
 D(a)=\min_{i<j}\operatorname{dist}(B_i(a),B_j(a)).
 \]
 
-The planner chooses the safe action with the largest (D(a)), subject to a predeclared minimum-discrimination threshold. A task-preferred action breaks ties. If no certified action has sufficient discriminative value, it recommends **no probe**; it does not claim that no ordinary safe task action exists. The caller must continue to use its existing certified task policy/fallback logic.
+Two selection modes are now separated explicitly:
+
+- `FullPairwiseSeparation` requires the noise-adjusted minimum pairwise gap (D(a)) to exceed a predeclared threshold. This mode seeks guaranteed full identification of the finite candidate family in one observation.
+- `GuaranteedWorstCaseReduction` computes the maximum number of candidate observation rectangles that can overlap at one measurement, then selects a certified action that guarantees eliminating at least one hypothesis. It ranks by the minimum number eliminated over all possible observations, then by the geometric separation score, then uses a task-preferred action for ties. This can select an action even when two of three models remain indistinguishable.
+
+The worst-case posterior-size metric is calculated by evaluating the overlap depth of the expanded axis-aligned observation rectangles at all combinations of rectangle-edge coordinates. For finite candidate interval boxes, this finds the maximum number of hypotheses consistent with any possible observation under the declared bounded-noise model. A safe action with no guaranteed reduction is not advertised as an information-seeking probe; ordinary safe task-action selection remains the caller's responsibility.
 
 This score is a conservative geometric proxy for worst-pair distinguishability, not expected information gain, mutual information, Bayesian entropy reduction, or proof that one observation will identify the true model. The original zero-noise API remains as a wrapper for compatibility; the new `recommend_safe_probe_with_noise` path discounts separation for a caller-supplied measurement bound and fails closed for invalid bounds. This only handles a bounded, per-coordinate observation-error model; stochastic transitions and non-identifiable parameters require a richer observation model before making stronger claims.
 
