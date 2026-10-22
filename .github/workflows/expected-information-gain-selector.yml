@@ -1,9 +1,6 @@
 name: Expected Information Gain Selector
 
 on:
-  push:
-    branches:
-      - research/expected-information-gain-selector-v0-1
   pull_request:
     paths:
       - "Cargo.toml"
@@ -11,6 +8,7 @@ on:
       - "crates/core/symthaea-core/src/hdc/conjecture_engine/experiment_selection.rs"
       - "crates/bridges/symthaea-physics-bridge/src/integrated_discovery.rs"
       - ".github/workflows/expected-information-gain-selector.yml"
+  workflow_dispatch:
 
 permissions:
   contents: read
