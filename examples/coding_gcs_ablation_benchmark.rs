@@ -431,6 +431,21 @@ fn mode_summary(results: &[EvalResult], enabled: bool) -> serde_json::Value {
         .flat_map(|run| run.backend_attempts.iter())
         .filter(|attempt| !attempt.success)
         .count();
+    let backend_attempts_verifier_accepted = mode
+        .iter()
+        .flat_map(|run| run.backend_attempts.iter())
+        .filter(|attempt| attempt.verification_passed == Some(true))
+        .count();
+    let backend_attempts_verifier_rejected = mode
+        .iter()
+        .flat_map(|run| run.backend_attempts.iter())
+        .filter(|attempt| attempt.verification_passed == Some(false))
+        .count();
+    let backend_attempts_without_verifier_result = mode
+        .iter()
+        .flat_map(|run| run.backend_attempts.iter())
+        .filter(|attempt| attempt.verification_passed.is_none())
+        .count();
     let runs_with_external_backend_attempts = mode
         .iter()
         .filter(|run| {
@@ -471,6 +486,9 @@ fn mode_summary(results: &[EvalResult], enabled: bool) -> serde_json::Value {
         "backend_attempts_by_name": backend_attempts_by_name,
         "backend_attempts_succeeded": backend_attempts_succeeded,
         "backend_attempts_failed": backend_attempts_failed,
+        "backend_attempts_verifier_accepted": backend_attempts_verifier_accepted,
+        "backend_attempts_verifier_rejected": backend_attempts_verifier_rejected,
+        "backend_attempts_without_verifier_result": backend_attempts_without_verifier_result,
         "backend_attempt_estimated_energy_total": backend_attempt_estimated_energy_total,
         "runs_with_external_backend_attempts": runs_with_external_backend_attempts,
         "runs_with_simulated_backend_attempts": runs_with_simulated_backend_attempts,
@@ -1010,6 +1028,7 @@ mod provenance_tests {
                     tier: "Simulated".to_string(),
                     backend_name: "Simulated".to_string(),
                     success: true,
+                    verification_passed: None,
                     elapsed_ms: 7,
                     estimated_energy_cost: 0.0,
                 },
@@ -1017,6 +1036,7 @@ mod provenance_tests {
                     tier: "LocalLLM".to_string(),
                     backend_name: "Ollama".to_string(),
                     success: false,
+                    verification_passed: None,
                     elapsed_ms: 11,
                     estimated_energy_cost: 10.0,
                 },
@@ -1031,6 +1051,9 @@ mod provenance_tests {
         assert_eq!(summary["backend_attempts_by_name"]["Simulated"], 1);
         assert_eq!(summary["backend_attempts_succeeded"], 1);
         assert_eq!(summary["backend_attempts_failed"], 1);
+        assert_eq!(summary["backend_attempts_verifier_accepted"], 0);
+        assert_eq!(summary["backend_attempts_verifier_rejected"], 0);
+        assert_eq!(summary["backend_attempts_without_verifier_result"], 2);
         assert_eq!(summary["backend_attempt_estimated_energy_total"], 10.0);
         assert_eq!(summary["backend_attempt_elapsed_ms_total"], 18);
         assert_eq!(summary["backend_attempt_elapsed_ms_p50"], 7);
