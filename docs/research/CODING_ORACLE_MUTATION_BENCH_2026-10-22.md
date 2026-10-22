@@ -63,6 +63,14 @@ The separate receipt verifier checks:
 
 The JSON receipt schema is in [`schemas/symthaea-coding-oracle-mutation-v1.schema.json`](schemas/symthaea-coding-oracle-mutation-v1.schema.json).
 
+The receipt verifier has a dedicated test harness. Run it with:
+
+```bash
+cargo test --example coding_oracle_mutation_verify --features code_generation
+```
+
+Its tests accept one internally consistent receipt and reject source tampering, incomplete test counts, false mutation-kill flags, inconsistent summary totals, duplicate task IDs, and a corrupted aggregate digest. These are verifier consistency tests; they do not substitute for executing the mutation runner or independently reproducing the receipt.
+
 **Verifier limitation:** it checks internal consistency and recomputes digests; it does not rerun `rustc`, authenticate who created the receipt, or make an unsigned receipt tamper-proof. Re-run the mutation harness in a trusted environment to reproduce the outcomes.
 
 ## Validation requirements
