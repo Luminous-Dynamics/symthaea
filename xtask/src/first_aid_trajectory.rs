@@ -1798,5 +1798,4 @@ mod tests {
             rejection_count
         );
     }
-
 }
