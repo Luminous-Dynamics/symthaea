@@ -147,16 +147,20 @@ fn main() -> BenchResult<()> {
             for threshold in SIMILARITY_THRESHOLDS {
                 let summary = summarize(&values, query_kind, threshold, MIN_TOP_TWO_MARGIN);
                 let noise_fraction = OBSERVATION_NOISE_LEVELS[noise_index];
-                let risk = ratio(summary.accepted_errors, summary.accepted);
+                let risk = if summary.accepted > 0 {
+                    format!("{:.6}", ratio(summary.accepted_errors, summary.accepted))
+                } else {
+                    "NA".to_owned()
+                };
                 let risk_upper = if summary.accepted > 0 {
                     format!("{:.6}", wilson_upper_95(summary.accepted_errors, summary.accepted).expect("nonzero accepted count"))
                 } else {
                     "NA".to_owned()
                 };
                 let false_accept_rate = if summary.known_queries == 0 {
-                    ratio(summary.unknown_false_accepts, summary.queries)
+                    format!("{:.6}", ratio(summary.unknown_false_accepts, summary.queries))
                 } else {
-                    0.0
+                    "NA".to_owned()
                 };
                 let false_accept_upper = if summary.known_queries == 0 {
                     format!("{:.6}", wilson_upper_95(summary.unknown_false_accepts, summary.queries).expect("nonzero unknown query count"))
@@ -172,14 +176,13 @@ fn main() -> BenchResult<()> {
                 let observed_bytes = view_count * DIMENSION * std::mem::size_of::<i8>();
 
                 println!(
-                    "evaluation,{row_seed},{noise_fraction:.2},{view_mode},{view_count},{query_kind},{threshold:.2},{MIN_TOP_TWO_MARGIN:.2},{},{},{},{},{top1_accuracy},{:.6},{},{:.6},{risk_upper},{},{false_accept_rate:.6},{false_accept_upper},{:.6},{:.6},{:.4},{:.4},{stored_bytes},{observed_bytes}",
+                    "evaluation,{row_seed},{noise_fraction:.2},{view_mode},{view_count},{query_kind},{threshold:.2},{MIN_TOP_TWO_MARGIN:.2},{},{},{},{},{top1_accuracy},{:.6},{},{risk},{risk_upper},{},{false_accept_rate},{false_accept_upper},{:.6},{:.6},{:.4},{:.4},{stored_bytes},{observed_bytes}",
                     summary.queries,
                     summary.known_queries,
                     summary.accepted,
                     if summary.known_queries > 0 { summary.correct_top1.to_string() } else { "NA".to_owned() },
                     ratio(summary.accepted, summary.queries),
                     summary.accepted_errors,
-                    risk,
                     summary.unknown_false_accepts,
                     summary.mean_best_similarity,
                     summary.mean_margin,
