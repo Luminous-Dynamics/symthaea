@@ -25,19 +25,22 @@ The exact reference is `x(t) = scale*cos(t)`, `v(t) = -scale*sin(t)`.
 ## What is recorded
 
 For each of the nine matched cases, the JSON receipt reports:
-- endpoint L2 error normalized by the state scale;
-- relative energy drift (accepted states for Symthaea; declared dense-output samples for Dopri5);
-- accepted/rejected steps and right-hand-side evaluations;
-- completion, finiteness, and the frozen global numerical-contract disposition;
-- source PR head, actual checked-out Git commit, and SHA-256 of the dependency lockfile.
+- endpoint error normalized by the state scale;
+- maximum **sampled** trajectory error against the exact solution;
+- relative energy drift sampled at the same times for both solvers;
+- accepted/rejected integration steps and integration right-hand-side evaluations;
+- whether both methods produced the same 101 output times, and the maximum pointwise solver disagreement on that grid;
+- completion, finiteness, source PR head, tested checkout commit, and dependency lock SHA-256.
 
-The acceptance envelope for this smooth regression family is `10 * rtol` for endpoint error and sampled/accepted-state energy drift. This is a local benchmark target, not a universal bound or a published standard. Both solvers must independently satisfy the declared envelope. The comparison does not require either solver to win.
+The frozen output grid is (t_i=i/10), for (i=0,ldots,100), over [0,10]. Dopri5 uses its documented dense-output increment of 0.1. Cash–Karp runs its normal adaptive integration without being forced to stop at each output time; its accepted trajectory is sampled onto the common grid by a cubic-Hermite postprocessor using the harmonic-oscillator identity (f([x,v])=[v,-x]). This is benchmark-only resampling, not a production dense-output implementation. The interpolation's own error contributes to the measured sampled error; it should not be described as a rigorous continuous-time error bound.
 
-Wall-clock timing is intentionally excluded from the byte-deterministic receipt. A later performance experiment should use repeated runs, fixed hardware/toolchain settings, and matched achieved error; function-evaluation counts alone do not establish runtime superiority.
+The accepted/rejected/RHS counters measure integration, not the later interpolation work. They are useful algorithm-work diagnostics, not direct runtime costs. Interpolation work is not timed separately yet. The acceptance envelope is `10 * rtol` for endpoint error, sampled trajectory error, and sampled energy drift. Both solvers must meet it; in addition the common-grid maximum solver disagreement must be at most `20 * rtol`, consistent with the two independently declared (10,rtol) error envelopes. This is a benchmark-specific gate, not a universal bound or a published standard.
+
+Wall-clock timing is intentionally excluded from the deterministic receipt. A later performance experiment should use repeated runs, fixed hardware/toolchain settings, and matched achieved error; function-evaluation counts alone do not establish runtime superiority.
 
 ## Comparison semantics and limits
 
-The methods use the same equations, initial state, final time and nominal scalar absolute/relative tolerance values, but their embedded methods, error estimators, and controller norms differ. This is a controlled cross-method comparison, not an implementation-identical test. Dopri5 dense output samples energy at `0.1` time increments, so its sampled maximum is not identical to the custom integrator's maximum over each accepted step.
+The methods use the same equations, initial state, terminal time, nominal component tolerances, and comparison grid, but their embedded methods, error estimators, controller norms, and continuous-output construction differ. This remains a controlled cross-method comparison, not an implementation-identical test. The sampled-trajectory metric is only a common-grid diagnostic, not the true maximum error over continuous time.
 
 This initial comparison does **not** establish SOTA performance, stiff-system superiority, physical validity, or universal solver correctness. Follow-up coverage should add a stiff problem such as Robertson chemistry and a qualified mature solver such as SUNDIALS/CVODE, preserving exact equations, scale-aware tolerances, solver versions, lock identity, raw receipts, failed runs, and benchmark-specific acceptance rules.
 
