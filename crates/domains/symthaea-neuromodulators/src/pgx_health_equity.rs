@@ -389,7 +389,7 @@ impl AdmixedPopulation {
 /// Loads reference allele frequencies and CPIC guidelines, then provides
 /// methods for aggregate equity analysis, research-only guideline projections,
 /// and population reporting.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct PgxHealthEquityEngine {
     /// Reference allele frequency data.
     pub allele_frequencies: Vec<PopulationAlleleFrequency>,
@@ -397,6 +397,21 @@ pub struct PgxHealthEquityEngine {
     /// External consumers receive only the non-actionable projection API.
     #[serde(skip)]
     cpic_guidelines: Vec<CpicGuideline>,
+}
+
+// Redact action-bearing guideline records from formatted engine output too.
+// Private fields are still visible through a derived Debug implementation.
+impl std::fmt::Debug for PgxHealthEquityEngine {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PgxHealthEquityEngine")
+            .field("allele_frequency_record_count", &self.allele_frequencies.len())
+            .field("guideline_reference_count", &self.cpic_guidelines.len())
+            .field(
+                "claim_ceiling",
+                &"research-only reference metadata; no dosing or treatment instructions",
+            )
+            .finish()
+    }
 }
 
 impl Default for PgxHealthEquityEngine {
@@ -2458,6 +2473,19 @@ mod tests {
         assert!(projection.reference_evidence_level.is_none());
         assert!(projection.population_model_gap_score.is_none());
     }
+    #[test]
+    fn test_engine_debug_output_redacts_action_bearing_guideline_records() {
+        let e = engine();
+        let formatted = format!("{e:?}");
+
+        assert!(formatted.contains("guideline_reference_count"));
+        assert!(formatted.contains("claim_ceiling"));
+        assert!(!formatted.contains("morphine"));
+        assert!(!formatted.contains("prasugrel"));
+        assert!(!formatted.contains("dose_adjustment"));
+        assert!(!formatted.contains("monitoring"));
+    }
+
     #[test]
     fn test_engine_serialization_excludes_action_bearing_guideline_records() {
         let e = engine();
