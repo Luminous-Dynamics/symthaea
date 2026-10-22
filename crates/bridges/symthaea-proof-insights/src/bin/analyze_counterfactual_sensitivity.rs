@@ -483,6 +483,19 @@ fn main() -> Result<()> {
                     subset_counts.variant_negative.saturating_sub(subset_counts.variant_nonaccept),
                     subset_counts.variant_negative
                 )
+            ),
+            "semantics_preserving_decision_stability": metric_json(
+                subset_counts.noop_stable,
+                subset_counts.noop_eligible,
+                ratio(subset_counts.noop_stable, subset_counts.noop_eligible)
+            ),
+            "semantics_preserving_mean_probability_absolute_delta": metric_json(
+                subset_counts.noop_probability_delta_count,
+                subset_counts.noop_probability_delta_count,
+                (subset_counts.noop_probability_delta_count > 0).then_some(
+                    subset_counts.noop_probability_delta_sum
+                        / subset_counts.noop_probability_delta_count as f64
+                )
             )
         }));
     }
@@ -924,6 +937,27 @@ fn parse_outcomes(text: &str, requested_split: &str) -> Result<BTreeMap<String, 
     Ok(outcomes)
 }
 
+fn validate_mutation_semantics(
+    kind: &str,
+    semantic_change: &str,
+    before: &str,
+    after: &str,
+    context: &str,
+) -> Result<()> {
+    match kind {
+        "no_semantic_change" if semantic_change == "none" && before == after => Ok(()),
+        "equivalent_reformulation" if semantic_change == "none" && before != after => Ok(()),
+        "no_semantic_change" => {
+            bail!("{context}: syntax-only no-op must preserve its fragment digest and semantics")
+        }
+        "equivalent_reformulation" => {
+            bail!("{context}: equivalent reformulation must change surface fragments without changing intended semantics")
+        }
+        _ if semantic_change == "changed" && before != after => Ok(()),
+        _ => bail!("{context}: semantic-change label must agree with the mutation kind and fragment digests"),
+    }
+}
+
 fn validate_counterfactual_suite(suite: &Value) -> Result<()> {
     let context = "suite";
     require_exact_keys(
@@ -1156,6 +1190,7 @@ fn validate_counterfactual_suite(suite: &Value) -> Result<()> {
         if !matches!(
             kind,
             "no_semantic_change"
+                | "equivalent_reformulation"
                 | "precondition_removed"
                 | "precondition_strengthened"
                 | "inequality_direction_reversed"
@@ -1190,13 +1225,13 @@ fn validate_counterfactual_suite(suite: &Value) -> Result<()> {
             64,
             &format!("{mutation_context}.mutation_receipt_sha256"),
         )?;
-        if kind == "no_semantic_change" {
-            if semantic_change != "none" || before != after {
-                bail!("{mutation_context} no-op must preserve its declared fragment and semantics");
-            }
-        } else if semantic_change != "changed" || before == after {
-            bail!("{mutation_context} changed mutation needs distinct before/after fragments");
-        }
+        validate_mutation_semantics(
+            kind,
+            semantic_change,
+            before,
+            after,
+            &mutation_context,
+        )?;
 
         let base = pair
             .get("base_adjudication")
@@ -1221,7 +1256,10 @@ fn validate_counterfactual_suite(suite: &Value) -> Result<()> {
                 bail!("{pair_context} synthetic base must be the compatible control");
             }
             if variant_status == "adjudicated" {
-                let expected = if kind == "no_semantic_change" {
+                let expected = if matches!(
+                    kind,
+                    "no_semantic_change" | "equivalent_reformulation"
+                ) {
                     "compatible"
                 } else {
                     "incompatible"
@@ -1607,8 +1645,10 @@ fn join_pairs(
                 "{ctx}: paired counterfactual analysis requires an independently adjudicated compatible base"
             );
         }
-        let noop =
-            required_string(mutation, "kind", &format!("{ctx}.mutation"))? == "no_semantic_change";
+        let noop = matches!(
+            required_string(mutation, "kind", &format!("{ctx}.mutation"))?,
+            "no_semantic_change" | "equivalent_reformulation"
+        );
         if noop && variant_label != "compatible" {
             bail!("{ctx}: semantics-preserving pair has incompatible gold label");
         }
@@ -2091,6 +2131,14 @@ impl SplitMix64 {
 mod tests {
     use super::*;
 
+
+    #[test]
+    fn equivalent_reformulation_changes_surface_but_preserves_semantics() {
+        assert!(validate_mutation_semantics("equivalent_reformulation", "none", &"a".repeat(64), &"b".repeat(64), "valid reformulation").is_ok());
+        assert!(validate_mutation_semantics("equivalent_reformulation", "none", &"a".repeat(64), &"a".repeat(64), "unchanged surface").is_err());
+        assert!(validate_mutation_semantics("equivalent_reformulation", "changed", &"a".repeat(64), &"b".repeat(64), "mislabelled semantics").is_err());
+        assert!(validate_mutation_semantics("no_semantic_change", "none", &"a".repeat(64), &"a".repeat(64), "syntax-only control").is_ok());
+    }
 
     #[test]
     fn budget_gate_rejects_missing_actual_usage() {

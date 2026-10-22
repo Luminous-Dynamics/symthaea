@@ -305,6 +305,14 @@ This puts a common design in place for comparing a minimal shell agent, fixed lo
 
 CI validates eight negative controls against the synthetic plan: missing/duplicate Cartesian cell, undeclared arm, target-component drift, non-increasing cap, duplicate run ID, too few distinct method classes and unsafe target path. These controls certify the schedule validator only. No method has been run across this matrix and no cost-efficiency gain is measured.
 
+## 22 October 2026 update: separate reformulation robustness from semantic sensitivity
+
+A 16 October submission, *Evaluating the Robustness of Proof Autoformalization in Lean 4*, separates global changes (style/paraphrase while meaning stays the same) from local counterfactual changes (a value, symbol or proof step changes and the output must reflect that edit). It reports variation under global paraphrase and weak fidelity to local changes in evaluated models ([paper](https://arxiv.org/abs/2606.14867)). MathAdv spans 13 undergraduate/graduate mathematics domains and includes expert-crafted transformations that test robustness to equivalent presentation ([paper](https://arxiv.org/abs/2608.25449)). These are not PITB results, but they expose a gap in a counterfactual suite containing only syntax-level no-ops and local semantic mutations.
+
+PITB now distinguishes `no_semantic_change` (tracked fragment unchanged) from `equivalent_reformulation` (surface fragment changes, intended semantics remain equivalent after independent review). The synthetic suite adds one matched pair and outcome rows; the report exposes stability by mutation class rather than pooling the reformulation into one aggregate. All adjudications in the added pair are placeholders, so this is a contract test, not a theorem-prover robustness score.
+
+Benchmark comparison should also include dependency-aware retrieval and cost-quality routing, not only proof-generation pass@k. LeanGraphSearch reports up to +12% recall over LeanSearch v2 on MathlibQR and downstream pass-rate gains of up to 10% over LeanSearch v2 in its reported setting ([paper](https://arxiv.org/abs/2610.22339)). An October 2026 cost-quality study reports 25.8% average cost reduction while preserving performance on a PutnamBench subset through cost-aware routing between continuing search and restarting with a new decomposition ([study](https://www.sri.inf.ethz.ch/publications/rognvaldsson2026optimizingcostqualitytradeoffagentic)). These are distinct task metrics. PITB should rerun the strongest feasible dependency-aware retrieval and resource-routing baselines on the same pinned targets and spending caps, while keeping transfer-applicability results separate from whole-proof SOTA scores.
+
 ## Research references
 
 - Kim, Han & Hwang, [Benchmarking Testing in Automated Theorem Proving](https://aclanthology.org/2026.acl-industry.150/), ACL 2026 Industry Track.

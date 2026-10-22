@@ -1236,16 +1236,15 @@ jobs:
                   variant_sha = tgt["counterfactual_statement_sha256"]
                   if base_sha == variant_sha:
                       raise ValueError(f"{pair_id}: target statement digests must identify distinct byte-level variants")
-                  if mutation["semantic_change"] == "none":
-                      if mutation["before_fragment_sha256"] != mutation["after_fragment_sha256"]:
-                          raise ValueError(f"{pair_id}: semantics-preserving control changed its declared fragment")
-                      if mutation["kind"] != "no_semantic_change":
-                          raise ValueError(f"{pair_id}: mutation kind/semantic-change mismatch")
+                  if mutation["kind"] == "no_semantic_change":
+                      if mutation["semantic_change"] != "none" or mutation["before_fragment_sha256"] != mutation["after_fragment_sha256"]:
+                          raise ValueError(f"{pair_id}: syntax-only no-op must preserve its fragment and semantics")
+                  elif mutation["kind"] == "equivalent_reformulation":
+                      if mutation["semantic_change"] != "none" or mutation["before_fragment_sha256"] == mutation["after_fragment_sha256"]:
+                          raise ValueError(f"{pair_id}: equivalent reformulation must change surface fragments without changing intended semantics")
                   else:
-                      if mutation["before_fragment_sha256"] == mutation["after_fragment_sha256"]:
-                          raise ValueError(f"{pair_id}: changed mutation must identify distinct before/after fragments")
-                      if mutation["kind"] == "no_semantic_change":
-                          raise ValueError(f"{pair_id}: no-op mutation cannot claim semantic change")
+                      if mutation["semantic_change"] != "changed" or mutation["before_fragment_sha256"] == mutation["after_fragment_sha256"]:
+                          raise ValueError(f"{pair_id}: changed mutation must declare changed semantics and distinct before/after fragments")
                   if src["insight_sha256"] == "0" * 64:
                       raise ValueError(f"{pair_id}: synthetic/real source digest cannot be the all-zero placeholder")
                   for adjudication_name in ("base_adjudication", "counterfactual_adjudication"):
@@ -1280,7 +1279,7 @@ jobs:
                       if pair["base_adjudication"]["label"] != "compatible":
                           raise ValueError("synthetic counterfactual base must be the compatible control")
                       if pair["counterfactual_adjudication"]["status"] == "adjudicated":
-                          expected = "compatible" if pair["mutation"]["kind"] == "no_semantic_change" else "incompatible"
+                          expected = "compatible" if pair["mutation"]["kind"] in ("no_semantic_change", "equivalent_reformulation") else "incompatible"
                       else:
                           expected = "unknown"
                       if pair["counterfactual_adjudication"]["label"] != expected:
@@ -1288,8 +1287,8 @@ jobs:
               return len(pairs)
 
           count = validate_suite(fixture)
-          if count != 8:
-              raise SystemExit(f"expected 8 synthetic counterfactual pairs; found {count}")
+          if count != 9:
+              raise SystemExit(f"expected 9 synthetic counterfactual pairs; found {count}")
 
           mutants = []
           duplicate_pair = copy.deepcopy(fixture)
@@ -1307,6 +1306,14 @@ jobs:
           changed_noop = copy.deepcopy(fixture)
           changed_noop["pairs"][0]["mutation"]["after_fragment_sha256"] = "f" * 64
           mutants.append(changed_noop)
+
+          equivalent_with_same_fragment = copy.deepcopy(fixture)
+          equivalent_with_same_fragment["pairs"][-1]["mutation"]["after_fragment_sha256"] = equivalent_with_same_fragment["pairs"][-1]["mutation"]["before_fragment_sha256"]
+          mutants.append(equivalent_with_same_fragment)
+
+          equivalent_mislabeled_as_changed = copy.deepcopy(fixture)
+          equivalent_mislabeled_as_changed["pairs"][-1]["mutation"]["semantic_change"] = "changed"
+          mutants.append(equivalent_mislabeled_as_changed)
 
           unchanged_change = copy.deepcopy(fixture)
           unchanged_change["pairs"][1]["mutation"]["after_fragment_sha256"] = unchanged_change["pairs"][1]["mutation"]["before_fragment_sha256"]
@@ -1356,7 +1363,7 @@ jobs:
                   continue
               raise SystemExit(f"counterfactual suite negative control {index} unexpectedly passed")
 
-          print("PITB_COUNTERFACTUAL_SUITE_PASS: 8 synthetic pairs validated including one unknown pending row; paired reviewers and split/component integrity enforced; 13 negative controls rejected")
+          print("PITB_COUNTERFACTUAL_SUITE_PASS: 9 synthetic pairs including one unknown pending row; equivalent reformulation separated from syntax-only no-op; paired reviewers and split/component integrity enforced; 15 negative controls rejected")
           PY
       - name: Run paired counterfactual outcome analyzer and mutation controls
         shell: bash
@@ -1384,11 +1391,11 @@ jobs:
           Draft202012Validator(suite_schema, format_checker=FormatChecker()).validate(suite)
           row_validator = Draft202012Validator(outcome_schema, format_checker=FormatChecker())
           rows = [json.loads(line) for line in outcomes_path.read_text().splitlines() if line.strip()]
-          if len(rows) != 16:
-              raise SystemExit(f"expected 16 synthetic paired outcomes; found {len(rows)}")
+          if len(rows) != 18:
+              raise SystemExit(f"expected 18 synthetic paired outcomes; found {len(rows)}")
           for index, row in enumerate(rows, start=1):
               row_validator.validate(row)
-          print("PITB_COUNTERFACTUAL_INPUT_SCHEMA_PASS: 8 pairs and 16 synthetic outcome rows, including one pending contrast")
+          print("PITB_COUNTERFACTUAL_INPUT_SCHEMA_PASS: 9 pairs and 18 synthetic outcome rows, including one pending contrast and one equivalent-reformulation pair")
           PY
 
           cd "$(dirname "$PITB_MANIFEST")"
@@ -1410,15 +1417,15 @@ jobs:
           validator = Draft202012Validator(schema, format_checker=FormatChecker())
           validator.validate(report)
           assert report["dataset_kind"] == "synthetic_fixture"
-          assert report["counts"]["suite_pairs_in_requested_split"] == 8
-          assert report["counts"]["adjudicated_pairs_analyzed"] == 7
+          assert report["counts"]["suite_pairs_in_requested_split"] == 9
+          assert report["counts"]["adjudicated_pairs_analyzed"] == 8
           assert report["counts"]["unresolved_or_pending_pairs"] == 1
           assert report["counts"]["suite_pairs_in_requested_split"] == (
               report["counts"]["adjudicated_pairs_analyzed"]
               + report["counts"]["unresolved_or_pending_pairs"]
           )
-          assert report["counts"]["base_compatible_pairs"] == 7
-          assert report["counts"]["counterfactual_compatible_pairs"] == 1
+          assert report["counts"]["base_compatible_pairs"] == 8
+          assert report["counts"]["counterfactual_compatible_pairs"] == 2
           assert report["counts"]["counterfactual_incompatible_pairs"] == 6
           assert report["counts"]["paired_contract_eligible_pairs"] == 6
           assert report["metrics"]["base_compatible_accept_recall"]["estimate"] == 1.0
@@ -1426,6 +1433,10 @@ jobs:
           assert report["metrics"]["counterfactual_false_accept_rate"]["estimate"] == 0.0
           assert report["metrics"]["paired_contract_adherence"]["estimate"] == 1.0
           assert report["metrics"]["semantics_preserving_decision_stability"]["estimate"] == 1.0
+          assert report["by_mutation_kind"]["no_semantic_change"]["semantics_preserving_decision_stability"]["estimate"] == 1.0
+          assert report["by_mutation_kind"]["equivalent_reformulation"]["pair_count"] == 1
+          assert report["by_mutation_kind"]["equivalent_reformulation"]["semantics_preserving_decision_stability"]["estimate"] == 1.0
+          assert report["by_mutation_kind"]["equivalent_reformulation"]["semantics_preserving_mean_probability_absolute_delta"]["estimate"] == 0.0
           assert abs(report["metrics"]["compatibility_probability_brier_score"]["estimate"] - 0.01) < 1e-9
           assert report["metrics"]["mean_counterfactual_to_base_cost_ratio"]["statistic"] == "mean"
           assert report["metrics"]["mean_counterfactual_to_base_cost_ratio"]["estimate"] == 1.0
@@ -1435,11 +1446,11 @@ jobs:
           assert report["metrics"]["mean_counterfactual_cost_delta_microusd"]["estimate"] == 0.0
           assert report["metrics"]["mean_counterfactual_token_delta"]["estimate"] == 0.0
           assert report["metrics"]["mean_counterfactual_wall_time_delta_ms"]["estimate"] == 0.0
-          assert report["resource_usage"]["paired_outcome_rows"] == 7
-          assert report["resource_usage"]["base_totals"]["cost_microusd"] == 700
-          assert report["resource_usage"]["counterfactual_totals"]["cost_microusd"] == 700
-          assert report["resource_usage"]["base_totals"]["tokens"] == 700
-          assert report["resource_usage"]["counterfactual_totals"]["tokens"] == 700
+          assert report["resource_usage"]["paired_outcome_rows"] == 8
+          assert report["resource_usage"]["base_totals"]["cost_microusd"] == 800
+          assert report["resource_usage"]["counterfactual_totals"]["cost_microusd"] == 800
+          assert report["resource_usage"]["base_totals"]["tokens"] == 800
+          assert report["resource_usage"]["counterfactual_totals"]["tokens"] == 800
           assert report["resource_usage"]["base_mean_per_pair"]["tokens"] == 100
           assert report["resource_usage"]["counterfactual_mean_per_pair"]["tokens"] == 100
           assert report["proposed_gates"]["overall_confirmatory_decision"].startswith("not_evaluated_")
@@ -1597,7 +1608,7 @@ jobs:
           if result.returncode == 0:
               raise SystemExit("counterfactual analyzer unexpectedly accepted one pinned commit/path with conflicting artifact digests")
 
-          print("PITB_COUNTERFACTUAL_ANALYZER_PASS: paired metrics, explicit pending denominator, component bootstrap, report schema, 11 malformed-outcome controls and 7 suite-integrity controls")
+          print("PITB_COUNTERFACTUAL_ANALYZER_PASS: paired metrics, explicit pending denominator, class-specific reformulation stability, component bootstrap, report schema, 11 malformed-outcome controls and 7 suite-integrity controls")
           PY
       - name: Validate preregistered success-cost frontier plan
         shell: bash

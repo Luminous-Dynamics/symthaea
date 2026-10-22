@@ -121,7 +121,9 @@
           "pair_count",
           "incompatible_variant_count",
           "sensitivity",
-          "false_accept_rate"
+          "false_accept_rate",
+          "semantics_preserving_decision_stability",
+          "semantics_preserving_mean_probability_absolute_delta"
         ],
         "properties": {
           "pair_count": {
@@ -136,6 +138,12 @@
             "$ref": "#/$defs/metric"
           },
           "false_accept_rate": {
+            "$ref": "#/$defs/metric"
+          },
+          "semantics_preserving_decision_stability": {
+            "$ref": "#/$defs/metric"
+          },
+          "semantics_preserving_mean_probability_absolute_delta": {
             "$ref": "#/$defs/metric"
           }
         }

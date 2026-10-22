@@ -178,6 +178,7 @@
             "kind": {
               "enum": [
                 "no_semantic_change",
+                "equivalent_reformulation",
                 "precondition_removed",
                 "precondition_strengthened",
                 "inequality_direction_reversed",

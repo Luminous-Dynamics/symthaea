@@ -598,6 +598,82 @@
       },
       "base_outcome_pair_id": "outcome-cf-pending-unknown-base",
       "counterfactual_outcome_pair_id": "outcome-cf-pending-unknown-counterfactual"
+    },
+    {
+      "pair_id": "cf-p7-equivalent-reformulation",
+      "component_id": "component-p7-equivalent-reformulation",
+      "split": "test",
+      "source_insight": {
+        "record_id": "synthetic-insight-7",
+        "family_id": "synthetic-source-family-7",
+        "source_commit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "insight_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+        "source_artifact_sha256": "9999999999999999999999999999999999999999999999999999999999999999"
+      },
+      "target": {
+        "target_id": "synthetic-target-7",
+        "family_id": "synthetic-target-family-7",
+        "source_commit": "cccccccccccccccccccccccccccccccccccccccc",
+        "artifact_path": "synthetic/Target7.lean",
+        "base_statement_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "counterfactual_statement_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "base_artifact_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "counterfactual_artifact_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "counterfactual_artifact_path": "synthetic/Target7-equivalent.lean"
+      },
+      "mutation": {
+        "kind": "equivalent_reformulation",
+        "semantic_change": "none",
+        "changed_field": "global_equivalent_reformulation",
+        "before_fragment_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "after_fragment_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "mutation_receipt_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+        "description": "Synthetic global equivalent reformulation with changed surface syntax and a distinct fragment digest. Equivalence is a placeholder, not expert mathematical judgment."
+      },
+      "base_adjudication": {
+        "status": "adjudicated",
+        "label": "compatible",
+        "rubric_version": "pitb.counterfactual-rubric.synthetic-v0",
+        "reviewer_decisions": [
+          {
+            "reviewer_id": "reviewer-a",
+            "label": "compatible",
+            "reason_code": "preconditions_satisfied",
+            "evidence_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+          },
+          {
+            "reviewer_id": "reviewer-b",
+            "label": "compatible",
+            "reason_code": "preconditions_satisfied",
+            "evidence_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+          }
+        ],
+        "receipt_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+        "note": "Synthetic structure-only base judgement for equivalent reformulation"
+      },
+      "counterfactual_adjudication": {
+        "status": "adjudicated",
+        "label": "compatible",
+        "rubric_version": "pitb.counterfactual-rubric.synthetic-v0",
+        "reviewer_decisions": [
+          {
+            "reviewer_id": "reviewer-a",
+            "label": "compatible",
+            "reason_code": "no_semantic_change",
+            "evidence_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          },
+          {
+            "reviewer_id": "reviewer-b",
+            "label": "compatible",
+            "reason_code": "no_semantic_change",
+            "evidence_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+          }
+        ],
+        "receipt_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "note": "Synthetic placeholder label, not an expert judgement of equivalence"
+      },
+      "base_outcome_pair_id": "outcome-cf-p7-equivalent-reformulation-base",
+      "counterfactual_outcome_pair_id": "outcome-cf-p7-equivalent-reformulation-cf"
     }
   ]
 }
