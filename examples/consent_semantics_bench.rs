@@ -45,6 +45,8 @@ const FIXTURES: &[Fixture] = &[
     Fixture { id: "unknown-06", text: "Could you ask whether consent was given?", expected: ConsentState::Unknown },
     Fixture { id: "unknown-07", text: "The record is missing.", expected: ConsentState::Unknown },
     Fixture { id: "unknown-08", text: "Did she refuse consent?", expected: ConsentState::Unknown },
+    Fixture { id: "conflict-01", text: "She refused consent, but later said yes; the timeline is unclear.", expected: ConsentState::Unknown },
+    Fixture { id: "conflict-02", text: "She gave consent initially, then withdrew consent before the action.", expected: ConsentState::Unknown },
 ];
 
 const STATES: [ConsentState; 5] = [
@@ -241,23 +243,23 @@ fn main() {
         candidate.observe(fixture.expected, actual);
         baseline.observe(fixture.expected, baseline_actual);
         if fixture.expected != ConsentState::Given && actual == ConsentState::Given {
-            println!("CANDIDATE_FALSE_GIVEN {} expected={} basis={:?} cue={:?} text={:?}",
+            println!("CANDIDATE_FALSE_GIVEN {} expected={} basis={:?} cue={:?} conflicts={:?} text={:?}",
                 fixture.id, label(fixture.expected), assessment.basis,
-                assessment.matched_phrase, fixture.text);
+                assessment.matched_phrase, assessment.conflicting_phrases, fixture.text);
         }
         if fixture.expected != ConsentState::Given && baseline_actual == ConsentState::Given {
             println!("BASELINE_FALSE_GIVEN {} expected={} text={:?}",
                 fixture.id, label(fixture.expected), fixture.text);
         }
         if fixture.expected == ConsentState::Given && actual != ConsentState::Given {
-            println!("CANDIDATE_MISSED_GIVEN {} actual={} basis={:?} cue={:?} text={:?}",
+            println!("CANDIDATE_MISSED_GIVEN {} actual={} basis={:?} cue={:?} conflicts={:?} text={:?}",
                 fixture.id, label(actual), assessment.basis,
-                assessment.matched_phrase, fixture.text);
+                assessment.matched_phrase, assessment.conflicting_phrases, fixture.text);
         }
         if actual != fixture.expected {
-            println!("MISMATCH {} expected={} actual={} basis={:?} cue={:?} question_suppressed={} quoted_text_suppressed={} explanation={:?}",
+            println!("MISMATCH {} expected={} actual={} basis={:?} cue={:?} conflicts={:?} question_suppressed={} quoted_text_suppressed={} explanation={:?}",
                 fixture.id, label(fixture.expected), label(actual), assessment.basis,
-                assessment.matched_phrase, assessment.question_suppressed,
+                assessment.matched_phrase, assessment.conflicting_phrases, assessment.question_suppressed,
                 assessment.quoted_text_suppressed, assessment.explanation());
         }
     }
