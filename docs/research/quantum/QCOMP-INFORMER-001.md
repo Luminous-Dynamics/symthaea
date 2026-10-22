@@ -174,6 +174,15 @@ It emits per-trial records plus coverage, selective-error and baseline-accuracy 
 
 Follow the current [QOBLIB submission guide](https://github.com/ZIB-AOPT/QOBLIB/blob/main/CONTRIBUTING.md) exactly when submitting standardized results: it requires solver/source details and separates total, time-to-solution, CPU, GPU, and QPU runtime; the guide excludes hardware queue and compilation time from its runtime fields. To avoid underestimating practical value, produce an additional operational ledger alongside—not instead of—the QOBLIB-conforming numbers. In that ledger show preprocessing, compilation, calibration, data transfer, circuit execution, retries, postprocessing, cache invalidation, and independent verification. Report queue time separately; amortize reusable compilation/calibration only under a stated repeated-workload model. Never compare one method's standardized runtime against another's all-in elapsed wall time.
 
+### Reproducible policy harness and exact topology reuse
+
+The Rust implementation work is tracked in:
+- [PR #8348](https://github.com/Luminous-Dynamics/symthaea/pull/8348): graph-bound informer, confidence-aware abstention, adaptive shot planner, deterministic synthetic Monte Carlo simulator, and runnable CSV/summary example. The synthetic harness currently uses independent Bernoulli candidate streams and must not be presented as a hardware-noise or full graph-solver simulation.
+- [Issue #8368](https://github.com/Luminous-Dynamics/symthaea/issues/8368): compare conservative Bonferroni allocation with established best-arm baselines; preserve coverage, selective error, abstention, shot-cost distributions, and uncertainty estimates.
+- [Issue #8369 / PR #8370](https://github.com/Luminous-Dynamics/symthaea/pull/8370): exact rooted-tree cache identities bound to the score evaluation context. Cyclic neighborhoods are explicitly uncacheable in the first version. The implementation defines reusable identities, not cache-hit performance or permission to reuse physical-device outcomes across different calibrations/layouts.
+
+The topology-cache work changes the unit of measurement planning from “every vertex independently” to “every unique rooted local structure under a complete evaluator context.” It is a hypothesis about reducing repeated ideal-simulator/tensor-network work. The validation gate is bit-identical cached-versus-fresh score output, exhaustive small-tree canonicalization, and negative controls for every key field before any speedup claim.
+
 ## 8. Statistical and anti-leakage protocol
 
 - Freeze hypotheses, cohort, primary outcome, budgets, run count, and analysis before the confirmatory run.
