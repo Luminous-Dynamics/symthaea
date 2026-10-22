@@ -2068,17 +2068,24 @@ fn legacy_static_x25519_derivation_does_not_bind_peer_source_id() {
 /// before deriving or storing encryption/authentication keys.
 #[cfg(feature = "mesh-key-exchange")]
 #[test]
-fn x25519_low_order_peer_key_is_rejected_without_storing_keys() {
-    let zero_peer_public = [0u8; 32];
-    let peer_id = [0xA1u8; 8];
-    let mut local = PeerKeyStore::new([0x11u8; 32]);
+fn x25519_low_order_peer_keys_are_rejected_without_storing_keys() {
+    let zero_u = [0u8; 32];
+    let mut one_u = [0u8; 32];
+    one_u[0] = 1;
+    let low_order_inputs = [zero_u, one_u];
 
-    let result = local.agree(peer_id, &zero_peer_public);
-    assert!(
-        result.is_err(),
-        "all-zero X25519 shared secret must fail closed"
-    );
-    assert_eq!(local.peer_count(), 0);
-    assert!(local.peer_key(&peer_id).is_none());
-    assert!(local.peer_auth_key(&peer_id).is_none());
+    for (index, peer_public) in low_order_inputs.iter().enumerate() {
+        let peer_id = [0xA1u8.wrapping_add(index as u8); 8];
+        let local_secret = [0x11u8.wrapping_add(index as u8); 32];
+        let mut local = PeerKeyStore::new(local_secret);
+
+        let result = local.agree(peer_id, peer_public);
+        assert!(
+            result.is_err(),
+            "known low-order X25519 input {index} must fail closed"
+        );
+        assert_eq!(local.peer_count(), 0);
+        assert!(local.peer_key(&peer_id).is_none());
+        assert!(local.peer_auth_key(&peer_id).is_none());
+    }
 }
