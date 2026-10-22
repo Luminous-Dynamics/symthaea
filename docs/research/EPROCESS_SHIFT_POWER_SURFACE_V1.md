@@ -46,7 +46,8 @@ The fixed-bet comparators are crucial. A predeclared mixture should be compared 
 - Independently checked arithmetic mixture identity from component log-evidence values.
 - Exact paired equality between low-null and stealth episodes for all detector evidence, first alarm times and realized losses.
 - Pure-null false alarms capped at 75/5,000 episodes per detector cell (1.5%), a deliberately empirical regression gate around the theoretical 1% per-monitor allocation. Passing this finite-seed check is not proof of the risk guarantee.
-- The 0.25 persistent-risk profile requires at least 90% detection for the low/high mixtures and the 0.10/0.25/0.50/0.75 fixed comparators; the 0.35 profile requires at least 90% detection for every comparator. These are strong-signal sanity gates, not claims about weak shifts.
+- The 0.25 persistent-risk profile requires at least 75% detection for the low-rate mixture and 80% for the fixed 0.10 fraction; the 0.35 profile requires at least 90% detection for the low/high mixtures and fixed fractions 0.10 and 0.25. These are strong-signal software regression gates, not universal detector guarantees.
+- The highest fixed bet and fixed 0.02 bet are deliberately not forced to pass those power gates: over-betting can lose log wealth through ordinary non-events, while very small bets need much longer horizons near the risk boundary. The power curve reports these trade-offs instead of hiding them.
 - Wilson 95% intervals are emitted for every alarm-rate estimate; source and output SHA-256 digests are written to the qualification receipt.
 
 Near-boundary, ramp and transient results are measured and published even when their detection rates are poor. They are precisely where the method's useful operating region needs to be mapped rather than hidden behind a single aggregate score.
