@@ -116,6 +116,14 @@ Report separate axes:
 
 An OS power proxy, nominal TDP, modeled power or vendor endurance promise must be labelled as such and may not be silently pooled with calibrated system energy.
 
+### Machine-readable measurement receipt
+
+Each execution should be captured as one receipt using [LAPTOP_MEASUREMENT_RECEIPT_SCHEMA_V1.json](LAPTOP_MEASUREMENT_RECEIPT_SCHEMA_V1.json). A planned Framework Laptop 13 Pro reference configuration is in [laptop_measurement_receipt_plan_v1.json](fixtures/laptop_measurement_receipt_plan_v1.json). That fixture is intentionally `planned`, with a null sample and null joules: its public review data defines a candidate configuration, not a Symthaea benchmark result or proof of Linux/runtime compatibility.
+
+The receipt separates external wall-meter energy, battery-rail energy, OS telemetry estimates, and modeled estimates. Never pool those methods as one measured joules/task metric. A measured receipt must identify the physical unit, firmware/embedded-controller versions, OS/kernel/drivers/runtime, workload/scorer hashes, and an observed result. When energy is stated from an external or battery-rail meter, the receipt also requires a current calibration reference, instrument identity, sample rate, and explicit measurement boundary.
+
+Schema validation checks structure only. It does not authenticate raw results, validate calibration records, establish task quality, or prove two runs are comparable. The analysis layer must additionally enforce matched workload/scorer hashes, same quality gate, declared condition strata, admissible energy boundaries, and paired/interleaved run identity. Missing or mismatched evidence means **ineligible**, not zero-cost or a pass.
+
 ## 7. Proposed decision targets — not achieved
 
 Freeze before scored testing; adjust only with a documented rationale before held-out measurement.
