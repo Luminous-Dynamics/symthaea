@@ -292,9 +292,17 @@ fn adaptive_select(
     if accepts(one.best_similarity, one.top_two_margin, threshold, margin_threshold) {
         one
     } else if accepts(three.best_similarity, three.top_two_margin, threshold, margin_threshold) {
-        three
+        Score {
+            fusion_us: one.fusion_us + three.fusion_us,
+            scan_us: one.scan_us + three.scan_us,
+            ..three
+        }
     } else {
-        nine
+        Score {
+            fusion_us: one.fusion_us + three.fusion_us + nine.fusion_us,
+            scan_us: one.scan_us + three.scan_us + nine.scan_us,
+            ..nine
+        }
     }
 }
 
@@ -537,6 +545,8 @@ mod tests {
         };
         let selected = adaptive_select(one, three, nine, 0.95, MIN_TOP_TWO_MARGIN);
         assert_eq!(selected.views_used, 3);
+        assert_eq!(selected.fusion_us, 2.5);
+        assert_eq!(selected.scan_us, 5.0);
     }
 
     #[test]
@@ -557,6 +567,8 @@ mod tests {
             MIN_TOP_TWO_MARGIN,
         );
         assert_eq!(selected.views_used, 9);
+        assert_eq!(selected.fusion_us, 6.0);
+        assert_eq!(selected.scan_us, 12.0);
         assert!(!accepts(
             selected.best_similarity,
             selected.top_two_margin,
