@@ -1,0 +1,252 @@
+#!/usr/bin/env python3
+"""Deterministic family-held-out SCM suite and graph-recovery scoring contract.
+
+Standard-library only. This generates ground-truth Boolean SCMs and benchmark
+split metadata; it does not claim that a discovery algorithm has been evaluated.
+"""
+from __future__ import annotations
+import argparse, hashlib, json, random, sys
+from dataclasses import dataclass
+from pathlib import Path
+
+SCHEMA = "symthaea-family-heldout-scm-v1"
+TOPOLOGIES = ("chain", "fork", "collider", "diamond", "sparse_random", "dense_random")
+MECHANISMS = ("and", "or", "xor", "threshold", "random_essential")
+TOPOLOGY_HOLDOUT = frozenset(("collider", "diamond", "dense_random"))
+MECHANISM_HOLDOUT = frozenset(("or", "xor"))
+TOPOLOGY_INDEX = {name: i for i, name in enumerate(TOPOLOGIES)}
+MECHANISM_INDEX = {name: i for i, name in enumerate(MECHANISMS)}
+
+@dataclass(frozen=True)
+class SCM:
+    world_id: str
+    seed: int
+    node_count: int
+    topology_family: str
+    mechanism_family: str
+    parents: tuple[tuple[int, ...], ...]
+    truth_tables: tuple[int, ...]
+
+    def edges(self) -> tuple[tuple[int, int], ...]:
+        return tuple(sorted((parent, child) for child, ps in enumerate(self.parents) for parent in ps))
+
+    def graph_key(self) -> tuple[tuple[int, ...], ...]:
+        return self.parents
+
+
+def split_label(topology: str, mechanism: str) -> str:
+    topology_held = topology in TOPOLOGY_HOLDOUT
+    mechanism_held = mechanism in MECHANISM_HOLDOUT
+    if topology_held and mechanism_held:
+        return "combined_ood"
+    if topology_held:
+        return "topology_ood"
+    if mechanism_held:
+        return "mechanism_ood"
+    return "train_id"
+
+
+def topology_parents(n: int, family: str, seed: int) -> tuple[tuple[int, ...], ...]:
+    if n < 4:
+        raise ValueError("node_count must be >= 4")
+    if family not in TOPOLOGIES:
+        raise ValueError(f"unknown topology family: {family}")
+    parents = [set() for _ in range(n)]
+    if family == "chain":
+        for child in range(1, n): parents[child].add(child - 1)
+    elif family == "fork":
+        for child in range(1, n): parents[child].add(0)
+    elif family == "collider":
+        parents[n - 1].update((0, 1))
+    elif family == "diamond":
+        parents[1].add(0); parents[2].add(0)
+        parents[3].update((1, 2))
+        for child in range(4, n): parents[child].add(child - 1)
+    else:
+        rng = random.Random(seed)
+        order = list(range(n)); rng.shuffle(order)
+        probability = 0.25 if family == "sparse_random" else 0.65
+        for later in range(1, n):
+            child = order[later]
+            for earlier in range(later):
+                parent = order[earlier]
+                if rng.random() < probability: parents[child].add(parent)
+    result = tuple(tuple(sorted(ps)) for ps in parents)
+    remaining = set(range(n))
+    while remaining:
+        ready = {node for node in remaining if not (set(result[node]) & remaining)}
+        if not ready: raise AssertionError("generator emitted a directed cycle")
+        remaining -= ready
+    return result
+
+
+def parent_is_essential(table: int, parent_count: int, parent_index: int) -> bool:
+    for assignment in range(1 << parent_count):
+        if (assignment >> parent_index) & 1: continue
+        paired = assignment | (1 << parent_index)
+        if ((table >> assignment) & 1) != ((table >> paired) & 1): return True
+    return False
+
+
+def mechanism_table(k: int, family: str, rng: random.Random) -> int:
+    if family not in MECHANISMS: raise ValueError(f"unknown mechanism family: {family}")
+    if k == 0: return rng.randrange(2)
+    table = 0
+    for assignment in range(1 << k):
+        bits = assignment.bit_count()
+        if family == "and": out = int(bits == k)
+        elif family == "or": out = int(bits > 0)
+        elif family == "xor": out = bits & 1
+        elif family == "threshold": out = int(bits >= (k + 1) // 2)
+        else: out = -1
+        if out >= 0 and out: table |= 1 << assignment
+    if family == "random_essential":
+        for _ in range(10000):
+            table = rng.getrandbits(1 << k)
+            if all(parent_is_essential(table, k, p) for p in range(k)): break
+        else: raise RuntimeError("could not sample an essential mechanism")
+    if not all(parent_is_essential(table, k, p) for p in range(k)):
+        raise AssertionError(f"mechanism {family} has an inessential parent at indegree {k}")
+    return table
+
+
+def make_scm(node_count: int, topology: str, mechanism: str, seed: int) -> SCM:
+    ti, mi = TOPOLOGY_INDEX[topology], MECHANISM_INDEX[mechanism]
+    graph_seed = seed * 1009 + ti * 9176 + 37
+    mechanism_seed = seed * 7919 + mi * 6553 + 101
+    parents = topology_parents(node_count, topology, graph_seed)
+    rng = random.Random(mechanism_seed)
+    tables = tuple(mechanism_table(len(ps), mechanism, rng) for ps in parents)
+    identity = {"schema": SCHEMA, "seed": seed, "n": node_count, "topology": topology,
+                "mechanism": mechanism, "parents": parents, "tables": tables}
+    digest = hashlib.sha256(json.dumps(identity, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    return SCM(digest[:20], seed, node_count, topology, mechanism, parents, tables)
+
+
+def graph_scores(true_edges: tuple[tuple[int, int], ...] | list[tuple[int, int]],
+                 predicted_edges: tuple[tuple[int, int], ...] | list[tuple[int, int]], node_count: int) -> dict:
+    """Score a fully directed graph. A reversal is one SHD edit but one FP + one FN."""
+    truth, prediction = set(true_edges), set(predicted_edges)
+    for label, edges in (("true", truth), ("predicted", prediction)):
+        for u, v in edges:
+            if not (0 <= u < node_count and 0 <= v < node_count) or u == v:
+                raise ValueError(f"invalid {label} edge {(u, v)}")
+    if len(truth) != len(true_edges) or len(prediction) != len(predicted_edges):
+        raise ValueError("duplicate directed edges are not allowed")
+    true_skeleton = {tuple(sorted(edge)) for edge in truth}
+    pred_skeleton = {tuple(sorted(edge)) for edge in prediction}
+    sk_tp = len(true_skeleton & pred_skeleton)
+    sk_fp, sk_fn = len(pred_skeleton - true_skeleton), len(true_skeleton - pred_skeleton)
+    tp = len(truth & prediction)
+    fp, fn = len(prediction - truth), len(truth - prediction)
+    def ratio(num: int, den: int) -> float: return num / den if den else 0.0
+    def f1(p: float, r: float) -> float: return 2*p*r/(p+r) if p+r else 0.0
+    reversals = sum(1 for u, v in truth if (v, u) in prediction)
+    shd = sk_fp + sk_fn + reversals
+    return {
+        "skeleton_tp": sk_tp, "skeleton_fp": sk_fp, "skeleton_fn": sk_fn,
+        "skeleton_precision": ratio(sk_tp, sk_tp + sk_fp),
+        "skeleton_recall": ratio(sk_tp, sk_tp + sk_fn),
+        "skeleton_f1": f1(ratio(sk_tp, sk_tp + sk_fp), ratio(sk_tp, sk_tp + sk_fn)),
+        "directed_tp": tp, "directed_fp": fp, "directed_fn": fn,
+        "directed_precision": ratio(tp, tp + fp), "directed_recall": ratio(tp, tp + fn),
+        "directed_f1": f1(ratio(tp, tp + fp), ratio(tp, tp + fn)),
+        "shd": shd, "orientation_reversals": reversals,
+        "true_edge_count": len(truth), "predicted_edge_count": len(prediction),
+        "edge_count_delta": len(prediction) - len(truth),
+    }
+
+
+def validate_scm(scm: SCM) -> None:
+    if len(scm.parents) != scm.node_count or len(scm.truth_tables) != scm.node_count:
+        raise AssertionError("node-array length mismatch")
+    for child, ps in enumerate(scm.parents):
+        if tuple(sorted(set(ps))) != ps or child in ps or any(p < 0 or p >= scm.node_count for p in ps):
+            raise AssertionError("noncanonical parent list")
+        if scm.truth_tables[child] < 0 or scm.truth_tables[child] >= (1 << (1 << len(ps))):
+            raise AssertionError("truth table out of range")
+        for pos in range(len(ps)):
+            if not parent_is_essential(scm.truth_tables[child], len(ps), pos):
+                raise AssertionError("declared parent is not functionally essential")
+    topology_parents(scm.node_count, scm.topology_family, scm.seed)
+
+
+def build_suite(node_count: int = 6, cases_per_cell: int = 4) -> dict:
+    if not 4 <= node_count <= 8: raise ValueError("node_count must be in 4..=8")
+    if not 1 <= cases_per_cell <= 100: raise ValueError("cases_per_cell must be in 1..=100")
+    rows = []
+    for topology in TOPOLOGIES:
+        for mechanism in MECHANISMS:
+            for seed in range(cases_per_cell):
+                scm = make_scm(node_count, topology, mechanism, seed)
+                validate_scm(scm)
+                rows.append({
+                    "world_id": scm.world_id, "seed": seed, "node_count": node_count,
+                    "topology_family": topology, "mechanism_family": mechanism,
+                    "split": split_label(topology, mechanism),
+                    "parents": [list(ps) for ps in scm.parents],
+                    "directed_edges": [list(edge) for edge in scm.edges()],
+                    "truth_tables": list(scm.truth_tables),
+                })
+    counts = {}
+    for row in rows: counts[row["split"]] = counts.get(row["split"], 0) + 1
+    return {
+        "schema": SCHEMA,
+        "status": "GENERATED_GROUND_TRUTH_SUITE_NOT_METHOD_PERFORMANCE",
+        "node_count": node_count, "cases_per_topology_mechanism_cell": cases_per_cell,
+        "topology_families": list(TOPOLOGIES), "mechanism_families": list(MECHANISMS),
+        "topology_held_out_families": sorted(TOPOLOGY_HOLDOUT),
+        "mechanism_held_out_families": sorted(MECHANISM_HOLDOUT),
+        "split_counts": dict(sorted(counts.items())),
+        "scoring_contract": "Fully directed DAG: skeleton P/R/F1; exact directed-edge P/R/F1; SHD counts an adjacency reversal as one edit; reversed directed edge counts as both FP and FN in directed F1.",
+        "limitations": ["Boolean SCMs only", "finite fixed graph-family catalog", "not a causal-discovery algorithm", "no statistical uncertainty intervals", "not directly comparable to ACDB without its full protocol adapter"],
+        "rows": rows,
+    }
+
+
+def self_test() -> None:
+    a = build_suite(5, 2); b = build_suite(5, 2)
+    assert a == b
+    assert len(a["rows"]) == len(TOPOLOGIES) * len(MECHANISMS) * 2
+    assert set(a["split_counts"]) == {"train_id", "topology_ood", "mechanism_ood", "combined_ood"}
+    for row in a["rows"]:
+        scm = SCM(row["world_id"], row["seed"], row["node_count"], row["topology_family"], row["mechanism_family"], tuple(tuple(x) for x in row["parents"]), tuple(row["truth_tables"]))
+        validate_scm(scm)
+        self_score = graph_scores(scm.edges(), scm.edges(), scm.node_count)
+        assert self_score["shd"] == 0 and self_score["directed_f1"] == 1.0
+    truth = [(0, 1), (1, 2)]
+    reversed_prediction = [(1, 0), (1, 2)]
+    score = graph_scores(truth, reversed_prediction, 3)
+    assert score["skeleton_f1"] == 1.0 and score["directed_f1"] < 1.0
+    assert score["shd"] == 1 and score["orientation_reversals"] == 1
+    empty = graph_scores(truth, [], 3)
+    assert empty["skeleton_recall"] == 0.0 and empty["shd"] == 2
+    try: graph_scores(truth, [(0, 0)], 3)
+    except ValueError: pass
+    else: raise AssertionError("self-loop prediction not rejected")
+    try: build_suite(3, 1)
+    except ValueError: pass
+    else: raise AssertionError("unsupported node count not rejected")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--nodes", type=int, default=6)
+    parser.add_argument("--cases-per-cell", type=int, default=4)
+    parser.add_argument("--self-test", action="store_true")
+    parser.add_argument("--output", type=Path)
+    args = parser.parse_args()
+    try:
+        if args.self_test:
+            self_test(); print("FAMILY_HELDOUT_SCM_SELF_TESTS_PASSED"); return 0
+        payload = build_suite(args.nodes, args.cases_per_cell)
+        encoded = (json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n").encode()
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True); args.output.write_bytes(encoded)
+            print(f"wrote {args.output} bytes={len(encoded)} sha256={hashlib.sha256(encoded).hexdigest()}")
+        else: sys.stdout.buffer.write(encoded)
+        return 0
+    except (OSError, ValueError, AssertionError, RuntimeError) as error:
+        print(f"NOT QUALIFIED: {error}", file=sys.stderr); return 2
+
+if __name__ == "__main__": raise SystemExit(main())
