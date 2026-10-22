@@ -84,7 +84,8 @@ use dynamics::*;
 /// `experiment_selection.rs` module docs.
 pub use experiment_selection::{
     EpistemicAssessment, assess_epistemic_value, epistemic_value, expected_information_gain_nats,
-    select_experiment_by_information_gain_per_cost, select_most_informative_experiment,
+    expected_information_gain_worst_case_nats, select_experiment_by_information_gain_per_cost,
+    select_experiment_by_worst_case_information_gain_per_cost, select_most_informative_experiment,
 };
 pub use expressions::*;
 /// Stage B M2: constrained flux discovery given a known density. See
