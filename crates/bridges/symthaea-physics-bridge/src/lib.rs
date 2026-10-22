@@ -52,6 +52,7 @@ pub mod equation_ast;
 pub mod integrated_discovery;
 pub mod lyapunov;
 pub mod model_adequacy;
+pub mod sequential_adequacy;
 pub mod noise_robustness;
 pub mod pde_wave_stage_a;
 pub mod pde_wave_stage_b;
