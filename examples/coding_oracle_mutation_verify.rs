@@ -198,8 +198,8 @@ fn verify(receipt: &Value) -> Result<(usize, usize, usize, bool), String> {
     }
 
     let summary = field(receipt, "summary")?;
-    if usize_field(summary, "expected_assertion_tests")? != expected_assertions {
-        return Err("summary expected_assertion_tests differs from task records".to_string());
+    if usize_field(summary, "expected_test_functions")? != expected_assertions {
+        return Err("summary expected_test_functions differs from task records".to_string());
     }
     if usize_field(summary, "reference_controls_passed")? != reference_passes {
         return Err("summary reference_controls_passed differs from task records".to_string());
@@ -304,7 +304,7 @@ mod tests {
             },
             "summary": {
                 "task_count": 1,
-                "expected_assertion_tests": 1,
+                "expected_test_functions": 1,
                 "reference_controls_passed": 1,
                 "mutants_killed": 1,
                 "mutation_kill_rate": 1.0,
