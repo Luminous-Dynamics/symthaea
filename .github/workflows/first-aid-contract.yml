@@ -226,6 +226,11 @@ jobs:
               .state_model_sha256, .state_model_spec_sha256, .cargo_lock_sha256,
               .validator_source_sha256, .entrypoint_source_sha256,
               .executable_sha256] | all(test("^[0-9a-f]{64}$"))) and
+            .matrix_case_count == 40 and
+            .matrix_frozen_trace_count == 12 and
+            .matrix_mutation_case_count == 28 and
+            .matrix_rust_runner_case_count == 26 and
+            .matrix_workflow_gate_case_count == 2 and
             .state_model_test_outcome == "success" and
             .trajectory_test_outcome == "success" and
             (.rustc_version | startswith("rustc 1.96.0 ")) and
