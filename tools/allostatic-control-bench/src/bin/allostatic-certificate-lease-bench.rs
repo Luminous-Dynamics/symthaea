@@ -29,6 +29,7 @@ fn effects(reserve: (f64, f64), load: (f64, f64)) -> ActionEffectBounds {
         .expect("valid effects")
 }
 
+#[allow(clippy::too_many_arguments)]
 fn context(
     step: u64,
     state_revision: u64,
