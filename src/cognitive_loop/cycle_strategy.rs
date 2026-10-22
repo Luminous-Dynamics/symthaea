@@ -17,8 +17,7 @@ use symthaea_core::hdc::predictive_encoder::{EncodingResult, PredictionDegenerac
 use super::helpers;
 use super::thresholds::{
     CANTOR_META_DEPTH_STILLNESS_THRESHOLD, CANTOR_RESONANCE_BOOST_HARMONY_THRESHOLD,
-    CONFIDENCE_SCALE_MIDPOINT, CONFIDENCE_SCALE_SENSITIVITY, EXPLORATION_SCALE_MIDPOINT,
-    EXPLORATION_SCALE_SENSITIVITY, KNOWLEDGE_NOVELTY_EXPLORATION_THRESHOLD,
+    KNOWLEDGE_NOVELTY_EXPLORATION_THRESHOLD,
     MCTS_PLAN_CONFIDENCE_THRESHOLD, MEMO_DIVERSITY_HIGH, MEMO_DIVERSITY_HIGH_SCALE,
     MEMO_DIVERSITY_LOW, MEMO_DIVERSITY_LOW_SCALE, MEMO_THRESHOLD_CEILING, MEMO_THRESHOLD_FLOOR,
     MORAL_CONCERN_THRESHOLD, NEUROMOD_STILLNESS_ADENOSINE_WEIGHT, NEUROMOD_STILLNESS_CLAMP_MAX,
@@ -57,7 +56,6 @@ pub(crate) struct EncodingPhaseResult {
     pub(crate) memo_threshold: f32,
     pub(crate) input_similarity: f32,
     pub(crate) input_memoized: bool,
-    pub(crate) effective_threshold: f32,
     /// Effective PE estimate for control calculations. If this cycle has no valid
     /// comparison, carries forward the running mean or uses the configured neutral
     /// threshold prior. Consumers must check prediction_error_valid before learning.
@@ -900,16 +898,6 @@ impl CognitiveLoopService {
         // 1.2 Adaptive Learning Threshold + Urgency
         // ═══════════════════════════════════════════════════════════════════════
         // Science: Friston (2010) — precision (inverse uncertainty) modulates PE weighting.
-        let confidence_scale = (1.0
-            + (self.prediction_confidence - CONFIDENCE_SCALE_MIDPOINT as f64)
-                * CONFIDENCE_SCALE_SENSITIVITY as f64) as f32;
-        let exploration_scale = (1.0
-            - (self.behavior.curiosity_drive.exploration_urge - EXPLORATION_SCALE_MIDPOINT as f64)
-                * EXPLORATION_SCALE_SENSITIVITY as f64) as f32;
-        let effective_threshold = self.config.learning_threshold
-            * self.carryover.learning.adaptive_threshold_scale as f32
-            * confidence_scale
-            * exploration_scale;
         EncodingPhaseResult {
             encoding_result,
             hv16_cached,
@@ -919,7 +907,6 @@ impl CognitiveLoopService {
             memo_threshold,
             input_similarity,
             input_memoized,
-            effective_threshold,
             prediction_error,
             prediction_error_valid,
             temporal_binding_strength,
