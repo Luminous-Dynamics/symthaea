@@ -33,6 +33,20 @@ The two bundle identities are a finite abstraction for identity mismatch, not a 
 6. **Handoff:** handing off while uncertainty is pending and unpreserved emits an uncertainty-loss violation.
 7. **Unknown-state default:** the implementation must not treat an invalid digest, expired bundle, missing verification, or identity mismatch as verified.
 
+## Explicit state invariants checked on every edge
+
+For every reachable state and every one of the 16 actions, the test checks both the state before the action and the successor state:
+
+- The revocation mask contains only the two modeled identity bits and is monotonic across every transition.
+- A verified identity can exist only in an active session, must equal the currently loaded identity, and must not be revoked.
+- Preserved uncertainty implies uncertainty is still pending until handoff consumes it.
+- Starting a new session clears loaded/verified identity state; interruption and resume clear verification.
+- Every verification action is checked against its exact preconditions, including matching identity, active session, validity state, digest result, and revocation status. Failed attempts must clear verification and emit the expected invalid-verification violation.
+- Every render action is checked against exact violation precedence: inactive-session violation can co-occur with the render's identity/trust violation; a revoked render reports revocation rather than also emitting the generic missing-verification violation.
+- Load clears prior verification, and revocation immediately invalidates verification for the same bundle.
+
+These assertions strengthen the transition checker beyond a reachable-state count. The fixed count (84 states / 1,344 edges) is still used as a review trigger—not as a substitute for the invariant checks.
+
 ## Exploration method
 
 The checker performs breadth-first exploration from the initial state. For each distinct reachable state it applies each of the 16 declared abstract actions, checks the next state and violations against the invariants, and enqueues newly discovered states until reaching a fixed point. A finite fixed-point traversal avoids relying on sampled traces for this abstract model.
