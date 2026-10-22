@@ -373,7 +373,6 @@ impl MoralParser {
                 "given consent",
                 "explicit consent",
                 "consented",
-                "agreed",
                 "said yes",
                 "gave permission",
                 "granted permission",
@@ -386,9 +385,15 @@ impl MoralParser {
                 "approved the request",
                 "explicitly authorized",
                 "affirmatively consented",
-                "after they agreed",
-                "after she agreed",
-                "after he agreed",
+                "my daughter agreed",
+                "after my daughter agreed",
+                "they agreed to",
+                "she agreed to",
+                "he agreed to",
+                "agreed to proceed",
+                "agreed to share",
+                "agreed to treatment",
+                "agreed to the request",
             ]
             .iter()
             .map(|s| s.to_string())
@@ -424,6 +429,7 @@ impl MoralParser {
                 "implicitly consented",
                 "presumed consent",
                 "presumed permission",
+                "assumed my friend was okay with it",
                 "assumed they were okay with it",
                 "assumed she was okay with it",
                 "assumed he was okay with it",
@@ -1006,17 +1012,18 @@ impl MoralParser {
             }
         }
 
+        // Assumption is recorded before shorter overlapping positive cues, so
+        // "I assumed she agreed" cannot be mistaken for explicit agreement.
+        for phrase in &self.consent_implied_words {
+            if text.contains(phrase.as_str()) {
+                return ConsentState::Implied;
+            }
+        }
+
         // Only affirmative wording counts as given consent.
         for phrase in &self.consent_given_words {
             if text.contains(phrase.as_str()) {
                 return ConsentState::Given;
-            }
-        }
-
-        // Assumption is recorded only when the scenario says it was assumed.
-        for phrase in &self.consent_implied_words {
-            if text.contains(phrase.as_str()) {
-                return ConsentState::Implied;
             }
         }
 
@@ -1755,6 +1762,8 @@ mod tests {
 
         // Assumed consent is only inferred when assumption is actually stated.
         let result = parser.parse("I assumed my friend was okay with it");
+        assert_eq!(result.consent, ConsentState::Implied);
+        let result = parser.parse("I assumed she agreed");
         assert_eq!(result.consent, ConsentState::Implied);
 
         // No consent information is unknown, not implied.
