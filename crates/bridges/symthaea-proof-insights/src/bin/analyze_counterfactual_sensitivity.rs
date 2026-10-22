@@ -1950,6 +1950,18 @@ fn required_string_at<'a>(value: &'a Value, path: &[&str], context: &str) -> Res
         .with_context(|| format!("{context}.{} must be a non-empty string", path.join(".")))
 }
 
+fn required_u64_at(value: &Value, path: &[&str], context: &str) -> Result<u64> {
+    let mut current = value;
+    for segment in path {
+        current = current
+            .get(*segment)
+            .with_context(|| format!("{context}.{} missing", path.join(".")))?;
+    }
+    current
+        .as_u64()
+        .with_context(|| format!("{context}.{} must be a non-negative integer", path.join(".")))
+}
+
 fn validate_digest(value: &str, length: usize, context: &str) -> Result<()> {
     if value.len() != length
         || !value
