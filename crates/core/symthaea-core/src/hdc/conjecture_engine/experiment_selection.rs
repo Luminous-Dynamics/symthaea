@@ -330,11 +330,25 @@ fn normalized_prior_probabilities(prior_weights: &[f64], hypothesis_count: usize
     {
         return None;
     }
-    let total = prior_weights.iter().sum::<f64>();
+
+    // Normalize after dividing by the largest mass. Summing finite inputs first can
+    // overflow (e.g. [f64::MAX, f64::MAX, 1.0]) even though their ratios are valid.
+    let maximum = prior_weights.iter().copied().fold(0.0_f64, f64::max);
+    if maximum <= 0.0 {
+        return None;
+    }
+    let scaled_weights: Vec<f64> = prior_weights
+        .iter()
+        .map(|weight| weight / maximum)
+        .collect();
+    let total = scaled_weights.iter().sum::<f64>();
     if !total.is_finite() || total <= 0.0 {
         return None;
     }
-    let probabilities: Vec<f64> = prior_weights.iter().map(|weight| weight / total).collect();
+    let probabilities: Vec<f64> = scaled_weights
+        .iter()
+        .map(|weight| weight / total)
+        .collect();
     (probabilities.iter().filter(|probability| **probability > 0.0).count() >= 2)
         .then_some(probabilities)
 }
@@ -795,7 +809,6 @@ mod tests {
             &[1.0, -1.0, 1.0][..],
             &[1.0, f64::NAN, 1.0][..],
             &[0.0, 0.0, 0.0][..],
-            &[f64::MAX, f64::MAX, 1.0][..],
             &[1.0, 0.0, 0.0][..],
         ] {
             assert!(
@@ -811,6 +824,18 @@ mod tests {
             |hypothesis, _| if *hypothesis == 1 { None } else { Some(*hypothesis as f64) },
         )
         .is_none());
+    }
+
+    #[test]
+    fn weighted_prior_normalization_avoids_finite_sum_overflow() {
+        let weights = [f64::MAX, f64::MAX, 1.0];
+        let probabilities = normalized_prior_probabilities(&weights, weights.len())
+            .expect("finite masses should normalize without summing them first");
+
+        assert_eq!(probabilities[0], probabilities[1]);
+        assert!((probabilities[0] - 0.5).abs() <= 1.0e-15);
+        assert!(probabilities[2] > 0.0 && probabilities[2].is_finite());
+        assert!((probabilities.iter().sum::<f64>() - 1.0).abs() <= 1.0e-15);
     }
 
     #[test]
@@ -928,6 +953,67 @@ mod tests {
             .expect("candidate 0 has positive information under each scenario");
         assert_eq!(*robust, 0);
         assert!(robust_score.is_finite() && robust_score > 0.0);
+    }
+
+    #[test]
+    fn scenario_robust_information_gain_is_permutation_invariant_and_cannot_increase_when_scenarios_are_added() {
+        let hypotheses = [0_usize, 1, 2, 3];
+        let base = [
+            InformationGainScenario {
+                observation_std_dev: 0.1,
+                prediction_model: 0,
+            },
+            InformationGainScenario {
+                observation_std_dev: 0.6,
+                prediction_model: 1,
+            },
+        ];
+        let reversed = [base[1], base[0]];
+        let extended = [
+            base[0],
+            base[1],
+            InformationGainScenario {
+                observation_std_dev: 0.2,
+                prediction_model: 2,
+            },
+        ];
+        let predict = |hypothesis: &usize, _: &(), scenario: &InformationGainScenario| {
+            let values = match scenario.prediction_model {
+                0 => [0.0_f64, 1.0, 2.0, 3.0],
+                1 => [0.0_f64, 0.2, 2.0, 3.5],
+                2 => [0.0_f64, 0.001, 0.002, 0.003],
+                _ => return None,
+            };
+            Some(values[*hypothesis])
+        };
+
+        let score = expected_information_gain_over_scenarios_nats(
+            &(),
+            &hypotheses,
+            &base,
+            predict,
+        )
+        .expect("base scenarios are valid");
+        let reversed_score = expected_information_gain_over_scenarios_nats(
+            &(),
+            &hypotheses,
+            &reversed,
+            predict,
+        )
+        .expect("reordered scenarios are valid");
+        let extended_score = expected_information_gain_over_scenarios_nats(
+            &(),
+            &hypotheses,
+            &extended,
+            predict,
+        )
+        .expect("extended scenarios are valid");
+
+        assert!((score - reversed_score).abs() <= 1.0e-12);
+        assert!(
+            extended_score <= score + 1.0e-12,
+            "adding a plausible world must not increase a minimum-over-worlds score"
+        );
     }
 
     #[test]
