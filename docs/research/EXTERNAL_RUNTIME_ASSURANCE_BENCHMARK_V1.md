@@ -77,7 +77,7 @@ Required outcomes:
 - Report false model eliminations caused by noise, unidentifiable model pairs, and cases where a safely informative action does not exist.
 - Compare methods after a fixed probe/interaction budget and at matched violation bounds. The primary benefit metric is the subsequent safety–capability frontier (e.g. false vetoes, viable-action availability and task reward), not the raw count of selected probes.
 
-For the maximum-separation baseline, use its name accurately: a min-over-model-pairs distance between prediction sets is a geometric distinguishability proxy. Do not call it mutual information or Bayesian information gain without specifying and validating a probabilistic observation model.
+For the maximum-separation baseline, use its name accurately: a min-over-model-pairs distance between prediction sets is a geometric distinguishability proxy. Discount prediction-set gaps by the declared observation-error bounds (expand each set by its measurement radius) before claiming guaranteed one-step distinguishability; if any pair's observation sets overlap, score that action as not guaranteed to distinguish the full hypothesis family. Do not call this score mutual information or Bayesian information gain without specifying and validating a probabilistic observation model.
 
 ## 3B. Assumption-bound certificate lifecycle
 
