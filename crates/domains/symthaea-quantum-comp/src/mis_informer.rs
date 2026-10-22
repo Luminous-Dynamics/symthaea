@@ -278,7 +278,12 @@ impl MisInformerSignal {
         )
     }
 
-    /// Make a confidence-aware choice only when one candidate's observed rate is separated.
+    /// Make a single-look confidence-aware choice only when one candidate's observed rate is separated.
+    ///
+    /// This method is for one predeclared look at the supplied sample counts. Do not
+    /// repeatedly call it after each new sample batch while reusing the same alpha:
+    /// optional stopping would inflate the overall error probability. Sequential
+    /// acquisition should use the alpha-spending planner in `mis_shot_budget`.
     ///
     /// Uses a Hoeffding/union-bound interval radius
     /// sqrt(ln(2*m/alpha)/(2*n)), where m is the number of eligible vertices,
