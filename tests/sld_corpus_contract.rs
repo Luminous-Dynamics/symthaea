@@ -244,7 +244,7 @@ fn sld_candidate_corpus_matches_declared_structural_contract() {
     assert_eq!(corpus["schema_version"].as_str(), Some("sld-case-0.1"));
     assert_eq!(corpus["status"].as_str(), Some("DRAFT_CANDIDATE"));
     assert_eq!(corpus["evaluation_mode"].as_str(), Some("MEASUREMENT_ONLY"));
-    assert_eq!(corpus["cases"].as_array().map(Vec::len), Some(46));
+    assert_eq!(corpus["cases"].as_array().map(Vec::len), Some(52));
     assert!(
         corpus["provenance"]
             .as_str()
@@ -265,6 +265,12 @@ fn sld_candidate_corpus_matches_declared_structural_contract() {
         ("SLD-CON-001", "DO_NOT_INFER_CONSCIOUSNESS_FROM_PHI"),
         ("SLD-FBK-001", "GATE_UNGROUNDED_RELATIONAL_FEEDBACK"),
         ("SLD-FBK-002", "ALLOW_BOUNDED_VALIDATED_MEASUREMENT_FEEDBACK"),
+        ("SLD-PRV-001", "REJECT_SYNTHETIC_PARTNER_AS_OBSERVATION"),
+        ("SLD-PRV-002", "STATE_PHI_ESTIMATOR_LIMITS"),
+        ("SLD-RPL-001", "REJECT_SYNTHETIC_PARTNER_AS_OBSERVATION"),
+        ("SLD-RPL-002", "STATE_PHI_ESTIMATOR_LIMITS"),
+        ("SLD-FBK-003", "GATE_UNGROUNDED_RELATIONAL_FEEDBACK"),
+        ("SLD-FBK-004", "STATE_PHI_ESTIMATOR_LIMITS"),
     ];
     for (id, expected_policy) in critical_cross_scale {
         let case = cases
@@ -369,4 +375,32 @@ fn endogenous_feedback_requires_independent_evidence_and_bounded_validation() {
     assert_eq!(a["evidence_state"], "simulated");
     assert!(a["must_not"].as_array().is_some_and(|v| !v.is_empty()));
     assert!(b["claim_boundary"].as_array().is_some_and(|v| !v.is_empty()));
+}
+
+
+#[test]
+fn measurement_integrity_attacks_distinguish_source_replay_and_feedback() {
+    let (schema, corpus) = candidate();
+    let errors = validate_corpus(&schema, &corpus);
+    assert!(errors.is_empty(), "candidate corpus invalid: {errors:#?}");
+
+    let cases = corpus["cases"].as_array().expect("cases array");
+    let expected = [
+        ("SLD-PRV-001", "REJECT_SYNTHETIC_PARTNER_AS_OBSERVATION"),
+        ("SLD-PRV-002", "STATE_PHI_ESTIMATOR_LIMITS"),
+        ("SLD-RPL-001", "REJECT_SYNTHETIC_PARTNER_AS_OBSERVATION"),
+        ("SLD-RPL-002", "STATE_PHI_ESTIMATOR_LIMITS"),
+        ("SLD-FBK-003", "GATE_UNGROUNDED_RELATIONAL_FEEDBACK"),
+        ("SLD-FBK-004", "STATE_PHI_ESTIMATOR_LIMITS"),
+    ];
+
+    for (case_id, expected_policy) in expected {
+        let case = cases.iter()
+            .find(|case| case["case_id"].as_str() == Some(case_id))
+            .unwrap_or_else(|| panic!("missing measurement-integrity case {case_id}"));
+        assert_eq!(case["expected_policy"].as_str(), Some(expected_policy));
+        assert_eq!(case["review_state"].as_str(), Some("UNREVIEWED_CANDIDATE"));
+        assert!(!case["claim_boundary"].as_array().expect("claim boundary").is_empty());
+    }
+    assert_eq!(cases.len(), 52);
 }
