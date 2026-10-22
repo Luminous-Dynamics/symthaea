@@ -5,11 +5,12 @@ These examples calibrate the formal evidence path; they are not model-evaluation
 results. A passing build establishes that Lean checks these declarations in this
 pinned environment. It does not establish general transfer utility.
 
-The three relevant distinctions are:
+The four relevant distinctions are:
 * alpha-renamed binders can yield definitionally equal proposition terms;
 * different proposition forms can be propositionally equivalent with an explicit
   checked equivalence proof;
-* removing a needed hypothesis can make the resulting universal statement false.
+* removing a needed hypothesis can make the resulting universal statement false; and
+* a legal local-context intervention can preserve the goal while requiring the solver to choose an alternate route.
 
 No `sorry`, custom axioms, `native_decide`, Mathlib dependency, or external tactic
 is used in this file.
