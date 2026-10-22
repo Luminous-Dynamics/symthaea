@@ -381,6 +381,31 @@ mod tests {
         })
     }
 
+    fn policy_trace_json(
+        trace_id: &str,
+        connectivity: &str,
+        event: Option<serde_json::Value>,
+    ) -> serde_json::Value {
+        use serde_json::json;
+
+        json!({
+            "trace_id": trace_id,
+            "description": "generated orthogonal policy truth-table case",
+            "criticality": "critical",
+            "connectivity": connectivity,
+            "events": event.into_iter().collect::<Vec<_>>(),
+            "expected_violation_codes": []
+        })
+    }
+
+    fn connectivity_label(connectivity: Connectivity) -> &'static str {
+        match connectivity {
+            Connectivity::Online => "online",
+            Connectivity::Offline => "offline",
+            Connectivity::Intermittent => "intermittent",
+        }
+    }
+
     fn violation_code(violation: Violation) -> &'static str {
         match violation {
             Violation::InvalidBundleVerification => "invalid_bundle_verification",
