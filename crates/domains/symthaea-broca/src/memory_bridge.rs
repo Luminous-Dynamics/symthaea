@@ -361,4 +361,31 @@ mod intervention_policy_tests {
         assert_eq!(blended, 1);
     }
 
+    #[test]
+    fn score_margin_gate_executes_with_two_hdc_memories() {
+        use symthaea_hdc_store::{HdcStore, StoreConfig};
+
+        let dir = tempfile::tempdir().unwrap();
+        let store = HdcStore::create(dir.path().join("memory.hdc"), StoreConfig::default())
+            .unwrap();
+        let mut bridge = MemoryBridge::new(store, 4, 0.5);
+        let first_memory = ContinuousHV::random(16_384, 61);
+        let second_memory = ContinuousHV::random(16_384, 62);
+        bridge.remember(1, &first_memory).unwrap();
+        bridge.remember(2, &second_memory).unwrap();
+
+        let mut current = ContinuousHV::random(16_384, 63);
+        let blended = bridge
+            .blend_past_experiences_with_policy(
+                &mut current,
+                MemoryInterventionPolicy::MinTopSimilarityAndMargin {
+                    min_similarity: 0.0,
+                    min_margin: 0.0,
+                },
+            )
+            .unwrap();
+
+        assert_eq!(blended, 2);
+    }
+
 }
