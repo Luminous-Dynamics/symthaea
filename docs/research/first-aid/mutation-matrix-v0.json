@@ -8,11 +8,11 @@
     "trajectory_corpus_sha256": "1ac414e6b920a6259d68a20c273a0a9465e98c7a596393f9777be9976d6e3fd3"
   },
   "count_summary": {
-    "case_count": 40,
+    "case_count": 41,
     "frozen_trace_count": 12,
-    "mutation_case_count": 28,
+    "mutation_case_count": 29,
     "planned_not_yet_executable_count": 0,
-    "mapped_case_count": 40
+    "mapped_case_count": 41
   },
   "evidence_status_definitions": {
     "frozen_fixture": "Expected output resides in the frozen corpus and is checked by the trajectory validator.",
@@ -704,30 +704,49 @@
       "operator_id": "repeat_unverified_render",
       "execution_target": "rust_matrix_runner",
       "execution_test_name": "executable_mutation_matrix_matches_each_declared_outcome"
+    },
+    {
+      "case_id": "MUT-029",
+      "invariant_id": "CONNECTIVITY-003",
+      "mode": "mutation_or_control",
+      "source_trace_id": "FA-TRACE-007",
+      "mutation": "begin online, then switch to intermittent connectivity before the core network-dependent action",
+      "expected": {
+        "outcome": "evaluate",
+        "violation_codes": [
+          "intermittent_core_network_dependency"
+        ]
+      },
+      "evidence_status": "unit_test_added",
+      "note": "Implemented by connectivity_changes_mid_trace_are_enforced_at_the_next_network_action and the executable matrix runner; exact-head validation pending.",
+      "test_name": "connectivity_changes_mid_trace_are_enforced_at_the_next_network_action",
+      "operator_id": "connectivity_change_before_network_action",
+      "execution_target": "rust_matrix_runner",
+      "execution_test_name": "executable_mutation_matrix_matches_each_declared_outcome"
     }
   ],
   "differential_oracle": {
     "status": "unit_test_added",
     "implementation": "JSON-value-based reference interpreter compared against the production typed-state interpreter",
-    "coverage": "Typed trace checker + JSON-value differential interpreter over all 12 frozen traces and 13 adversarial mutations; independent test-only finite lifecycle graph (84 states, 1,344 state/action transitions); 18 orthogonal policy truth-table combinations. Not clinical adjudication.",
+    "coverage": "Typed trace checker + JSON-value differential interpreter over all 12 frozen traces and 14 adversarial mutations; independent test-only finite lifecycle graph (252 states, 5,040 state/action transitions); 18 orthogonal policy truth-table combinations. The lifecycle state graph now models connectivity changes within a trace.",
     "limits": "Same repository and shared invariants/fixtures; implementation-diversity and finite abstraction checks only, not external clinical adjudication, formally verified specification, stateful connectivity/freshness/consent interactions, or clinical validation.",
     "test_name": "differential_json_reference_agrees_on_frozen_traces",
     "mutation_suite_test_name": "differential_json_reference_agrees_on_adversarial_mutation_suite",
     "state_model_path": "xtask/src/first_aid_model.rs",
     "state_model_test_name": "exhaustive_reachable_state_graph_preserves_trust_invariants",
-    "state_model_scope": "Finite lifecycle graph: session state, bundle identity/validity/digest, revocation monotonicity, resume/interruption, and uncertainty handoff; separate 18-case orthogonal policy truth tables cover connectivity, freshness/presentation, sensitivity/consent, and unknown normalization. Those truth tables do not model temporal interactions between domains.",
+    "state_model_scope": "Finite lifecycle graph: session state, time-varying connectivity, bundle identity/validity/digest, revocation monotonicity, resume/interruption, and uncertainty handoff; separate 18-case orthogonal policy truth tables cover freshness/presentation, sensitivity/consent, and unknown normalization. Truth tables do not model temporal coupling between those policy domains.",
     "state_model_spec_path": "docs/research/first-aid/STATE_MODEL_V0.md",
     "matrix_runner_test_name": "executable_mutation_matrix_matches_each_declared_outcome",
     "policy_truth_table_test_name": "exhaustive_orthogonal_policy_truth_tables_cover_non_lifecycle_invariants",
     "policy_truth_table_scope": "18 explicit combinations over connectivity/requirement (6), freshness/presentation (6), sensitivity/consent (4), and unknown normalization (2), separate from the 84-state lifecycle graph.",
     "edge_differential_status": "implemented_in_source",
     "edge_differential_test_name": "every_reachable_state_action_edge_matches_production_trace_checker",
-    "edge_differential_scope": "For each reachable abstract state, replay its breadth-first shortest event-history witness, append each of the 16 actions, and compare ordered violations from the production JSON trace checker with the abstract transition model; expected 84 states and 1,344 edges. Same repo, shared design intent, and finite abstraction; not independent clinical ground truth.",
+    "edge_differential_scope": "For each of 252 reachable abstract states, replay its breadth-first shortest event-history witness, append each of the 20 actions, and compare ordered violations from the production JSON trace checker with the abstract transition model; expected 252 states and 5,040 edges. Same repo, shared design intent, and finite abstraction; not independent clinical ground truth.",
     "policy_truth_table_differential_status": "implemented_in_source",
     "policy_truth_table_differential_test_name": "orthogonal_policy_truth_tables_match_production_trace_checker",
     "policy_truth_table_differential_scope": "18 connectivity, freshness/presentation, sensitivity/consent, and unknown-normalization combinations are each compared against the production trace checker; no claim that these truth tables model temporal coupling between those domains.",
     "two_action_sequence_differential_status": "implemented_in_source",
     "two_action_sequence_differential_test_name": "every_reachable_state_two_action_suffix_matches_production_trace_checker",
-    "two_action_sequence_differential_scope": "For each of 84 reachable abstract states, take its breadth-first shortest witness, append every ordered pair from the 16-action alphabet, and compare the full ordered violation list from model replay to the production JSON trace checker: 84 × 16 × 16 = 21,504 sequences. This is bounded suffix coverage, not all possible event histories or clinical ground truth."
+    "two_action_sequence_differential_scope": "For each of 252 reachable abstract states, take its breadth-first shortest witness, append every ordered pair from the 20-action alphabet, and compare the full ordered violation list from model replay to the production JSON trace checker: 252 × 20 × 20 = 100,800 sequences. This is bounded suffix coverage, not all possible event histories or clinical ground truth."
   }
 }
