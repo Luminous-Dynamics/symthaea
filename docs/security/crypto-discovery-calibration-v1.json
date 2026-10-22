@@ -43,7 +43,20 @@
       ],
       "expected_attack_outcome": "recover reusable mask and forge a second message/tag pair",
       "required_positive_control": "Run the module's ordinary round-trip/representation tests and record them separately.",
-      "novel_discovery": false
+      "novel_discovery": false,
+      "positive_controls": [
+        {
+          "path": "crates/core/symthaea-hdc-crypto/src/crypto.rs",
+          "test": "test_hdc_mac_roundtrip",
+          "command": "cargo test -p symthaea-hdc-crypto test_hdc_mac_roundtrip"
+        },
+        {
+          "path": "crates/core/symthaea-core/src/hdc/hdc_crypto.rs",
+          "test": "test_hdc_mac_roundtrip",
+          "command": "cargo test -p symthaea-core --lib test_hdc_mac_roundtrip"
+        }
+      ],
+      "positive_control_note": "Functional/compatibility control only; passing does not establish confidentiality, unforgeability, hiding, binding, or key secrecy."
     },
     {
       "task_id": "HDC-MAC-CROSS-OFFSET-FORGERY",
@@ -67,7 +80,20 @@
       ],
       "expected_attack_outcome": "forge a valid tag for the target offset using the known-pair relation",
       "required_positive_control": "Run the module's ordinary transform tests and record them separately.",
-      "novel_discovery": false
+      "novel_discovery": false,
+      "positive_controls": [
+        {
+          "path": "crates/core/symthaea-hdc-crypto/src/crypto.rs",
+          "test": "test_hdc_mac_roundtrip",
+          "command": "cargo test -p symthaea-hdc-crypto test_hdc_mac_roundtrip"
+        },
+        {
+          "path": "crates/core/symthaea-core/src/hdc/hdc_crypto.rs",
+          "test": "test_hdc_mac_roundtrip",
+          "command": "cargo test -p symthaea-core --lib test_hdc_mac_roundtrip"
+        }
+      ],
+      "positive_control_note": "Functional/compatibility control only; passing does not establish confidentiality, unforgeability, hiding, binding, or key secrecy."
     },
     {
       "task_id": "HDC-THRESHOLD-SINGLE-SHARE-RECOVERY",
@@ -91,7 +117,20 @@
       ],
       "expected_attack_outcome": "recover original secret from one share while k is greater than one",
       "required_positive_control": "Run ordinary serialization and algebra tests; do not count them as privacy evidence.",
-      "novel_discovery": false
+      "novel_discovery": false,
+      "positive_controls": [
+        {
+          "path": "crates/core/symthaea-hdc-crypto/src/crypto.rs",
+          "test": "test_threshold_split_recover_exact",
+          "command": "cargo test -p symthaea-hdc-crypto test_threshold_split_recover_exact"
+        },
+        {
+          "path": "crates/core/symthaea-core/src/hdc/hdc_crypto.rs",
+          "test": "test_threshold_split_recover_exact_k_equals_n",
+          "command": "cargo test -p symthaea-core --lib test_threshold_split_recover_exact_k_equals_n"
+        }
+      ],
+      "positive_control_note": "Functional/compatibility control only; passing does not establish confidentiality, unforgeability, hiding, binding, or key secrecy."
     },
     {
       "task_id": "HDC-COMMITMENT-MULTIPLE-OPENINGS",
@@ -115,7 +154,20 @@
       ],
       "expected_attack_outcome": "produce two distinct opening pairs accepted for the same commitment",
       "required_positive_control": "Run ordinary commitment API behavior tests; they are compatibility checks, not proof of binding.",
-      "novel_discovery": false
+      "novel_discovery": false,
+      "positive_controls": [
+        {
+          "path": "crates/core/symthaea-hdc-crypto/src/crypto.rs",
+          "test": "test_commitment_verify",
+          "command": "cargo test -p symthaea-hdc-crypto test_commitment_verify"
+        },
+        {
+          "path": "crates/core/symthaea-core/src/hdc/hdc_crypto.rs",
+          "test": "test_commitment_verify",
+          "command": "cargo test -p symthaea-core --lib test_commitment_verify"
+        }
+      ],
+      "positive_control_note": "Functional/compatibility control only; passing does not establish confidentiality, unforgeability, hiding, binding, or key secrecy."
     },
     {
       "task_id": "HDC-SHARED-MASK-RELATION-LEAKAGE",
@@ -139,7 +191,20 @@
       ],
       "expected_attack_outcome": "compute a plaintext relationship directly from two ciphertexts without the mask",
       "required_positive_control": "Run a non-security algebra round-trip and label it as algebra only.",
-      "novel_discovery": false
+      "novel_discovery": false,
+      "positive_controls": [
+        {
+          "path": "crates/core/symthaea-hdc-crypto/src/fhe.rs",
+          "test": "test_otp_encrypt_decrypt_roundtrip",
+          "command": "cargo test -p symthaea-hdc-crypto test_otp_encrypt_decrypt_roundtrip"
+        },
+        {
+          "path": "crates/core/symthaea-core/src/hdc/hdc_fhe.rs",
+          "test": "test_otp_encrypt_decrypt_roundtrip",
+          "command": "cargo test -p symthaea-core --lib test_otp_encrypt_decrypt_roundtrip"
+        }
+      ],
+      "positive_control_note": "Functional/compatibility control only; passing does not establish confidentiality, unforgeability, hiding, binding, or key secrecy."
     },
     {
       "task_id": "HDC-EVEN-BUNDLE-MISMATCH",
@@ -163,7 +228,20 @@
       ],
       "expected_attack_outcome": "produce the explicit even-count counterexample and explain the tie behavior",
       "required_positive_control": "Run the existing odd-count exactness test separately; do not generalize it to all counts.",
-      "novel_discovery": false
+      "novel_discovery": false,
+      "positive_controls": [
+        {
+          "path": "crates/core/symthaea-hdc-crypto/src/fhe.rs",
+          "test": "test_collective_pool_aggregate_odd_count_is_exact",
+          "command": "cargo test -p symthaea-hdc-crypto test_collective_pool_aggregate_odd_count_is_exact"
+        },
+        {
+          "path": "crates/core/symthaea-core/src/hdc/hdc_fhe.rs",
+          "test": "test_collective_pool_aggregate_odd_count_is_exact",
+          "command": "cargo test -p symthaea-core --lib test_collective_pool_aggregate_odd_count_is_exact"
+        }
+      ],
+      "positive_control_note": "Functional/compatibility control only; passing does not establish confidentiality, unforgeability, hiding, binding, or key secrecy."
     },
     {
       "task_id": "HDC-CONTEXT-KEY-COLLISION",
@@ -187,7 +265,20 @@
       ],
       "expected_attack_outcome": "construct two distinct sensor tuples with identical pre-hash context output",
       "required_positive_control": "Verify the candidate uses independent secret input and a standard KDF; do not treat a hash of public context as secret key material.",
-      "novel_discovery": false
+      "novel_discovery": false,
+      "positive_controls": [
+        {
+          "path": "crates/core/symthaea-hdc-crypto/src/crypto.rs",
+          "test": "test_context_key_deterministic",
+          "command": "cargo test -p symthaea-hdc-crypto test_context_key_deterministic"
+        },
+        {
+          "path": "crates/core/symthaea-core/src/hdc/hdc_crypto.rs",
+          "test": "test_context_key_deterministic",
+          "command": "cargo test -p symthaea-core --lib test_context_key_deterministic"
+        }
+      ],
+      "positive_control_note": "Functional/compatibility control only; passing does not establish confidentiality, unforgeability, hiding, binding, or key secrecy."
     },
     {
       "task_id": "SOMA-QUANTIZED-SENSOR-ENUMERATION",
@@ -206,7 +297,20 @@
       ],
       "expected_attack_outcome": "enumerate the narrowed sensor component or show deterministic recovery",
       "required_positive_control": "Verify the resulting value is treated as public context only, never as a secret key.",
-      "novel_discovery": false
+      "novel_discovery": false,
+      "positive_controls": [
+        {
+          "path": "crates/domains/symthaea-soma/src/sensor_bridge.rs",
+          "test": "test_context_key_deterministic",
+          "command": "cargo test -p symthaea-soma test_context_key_deterministic"
+        },
+        {
+          "path": "crates/domains/symthaea-soma/src/sensor_bridge.rs",
+          "test": "test_context_key_changes_with_motion",
+          "command": "cargo test -p symthaea-soma test_context_key_changes_with_motion"
+        }
+      ],
+      "positive_control_note": "Functional/compatibility control only; passing does not establish confidentiality, unforgeability, hiding, binding, or key secrecy."
     }
   ]
 }

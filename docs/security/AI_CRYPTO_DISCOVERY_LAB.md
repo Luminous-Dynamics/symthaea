@@ -115,6 +115,37 @@ To compare fairly with the field, run the same frozen tasks and resource budgets
 
 A claim of outperforming SOTA requires equal task access and budget, held-out evaluation, reproducible attack witnesses, and independent review. “More tasks solved” is not a win if the system generates more invalid attacks or proof claims.
 
+## Executable calibration runner
+
+The Rust-first runner is available through the workspace `xtask` binary. It reads the machine-readable suite, checks that every referenced source file still contains the named regression function, validates a strict allowlist of Cargo command shapes, and preflights all selected commands **before** executing any of them. It invokes Cargo with an argument vector—never a shell.
+
+The suite contains eight known-broken tasks, 15 attack-regression commands, and 16 explicit functional positive-control commands. The two outcome classes remain separate: a passed attack regression is recorded as `reproduced_known_break`; a passed control is `positive_control_passed`. Neither is counted as novel discovery. The summary counts a witness as **accepted** only when every positive control for that same task and package also passes; raw witness observations are reported separately from accepted witnesses.
+
+From a clean checkout:
+
+```bash
+# Enumerate the suite and validate all source/test mappings.
+cargo run -p xtask -- crypto-calibrate --list
+
+# Preflight one task; does not execute its tests.
+cargo run -p xtask -- crypto-calibrate \
+  --task-id HDC-MAC-KNOWN-PAIR-FORGERY --dry-run \
+  --out target/crypto-discovery/preflight.json
+
+# Run one task's attack regressions and positive controls.
+cargo run -p xtask -- crypto-calibrate \
+  --task-id HDC-MAC-KNOWN-PAIR-FORGERY \
+  --out target/crypto-discovery/hdc-mac.json
+
+# Run every calibration task and save a machine-readable receipt.
+cargo run -p xtask -- crypto-calibrate --all \
+  --out target/crypto-discovery/run.json
+```
+
+The runner refuses execution from a dirty or unverifiable working tree; this protects exact-commit provenance. It records the git revision, clean-tree status, suite SHA-256, workspace manifest and Cargo.lock SHA-256 digests, Rust/Cargo versions (including rustc host details), OS/architecture, command arguments, duration, exit code, output SHA-256 digests, and bounded output excerpts. A nonzero test command is recorded as `command_failed`, not automatically called an attack failure: compilation/environment errors must be triaged separately. The runner prints and optionally writes a JSON receipt; use a path under `target/` to avoid leaving tracked working-tree changes.
+
+This is a **calibration executor**, not yet a general agent orchestration system. It does not run blind frontier tasks, prove a new construction secure, or establish independent novelty. The current source additions have not been executed locally; CI must compile the xtask and run its unit tests before this runner is treated as validated.
+
 ## Evidence levels and acceptance gates
 
 Use distinct evidence labels: observed on samples; cross-validated; exhaustively checked over a finite domain; bounded/SMT checked; symbolically proved under stated assumptions; proof-assistant verified with a named checker. Do not promote one level into another.

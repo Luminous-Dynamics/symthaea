@@ -2,6 +2,7 @@ use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
 mod crate_status;
+mod crypto_calibrate;
 mod duplicate_scan;
 mod manifest;
 mod rhn_sweep;
@@ -62,6 +63,22 @@ enum Commands {
         #[arg(long)]
         out: PathBuf,
     },
+    /// Run or enumerate the known-break cryptography calibration corpus.
+    /// Passing tests mean a known attack regression reproduced; they are not novel discoveries.
+    CryptoCalibrate {
+        #[arg(long, default_value = "docs/security/crypto-discovery-calibration-v1.json")]
+        suite: PathBuf,
+        #[arg(long, conflicts_with_all = ["all", "list"])]
+        task_id: Option<String>,
+        #[arg(long, conflicts_with = "list")]
+        all: bool,
+        #[arg(long)]
+        list: bool,
+        #[arg(long)]
+        dry_run: bool,
+        #[arg(long)]
+        out: Option<PathBuf>,
+    },
     GenerateManifest {
         #[arg(long, default_value = ".")]
         root: PathBuf,
@@ -105,6 +122,28 @@ fn main() -> anyhow::Result<()> {
         }
         Commands::RhnFinalize { input, out } => {
             rhn_sweep::run_finalize(input, out)?;
+        }
+        Commands::CryptoCalibrate {
+            suite,
+            task_id,
+            all,
+            list,
+            dry_run,
+            out,
+        } => {
+            let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .expect("xtask lives one level below the workspace root")
+                .to_path_buf();
+            crypto_calibrate::run(
+                &root,
+                &suite,
+                task_id.as_deref(),
+                all,
+                list,
+                dry_run,
+                out.as_deref(),
+            )?;
         }
         Commands::GenerateManifest { root } => {
             let files = vec!["Cargo.toml", "src/lib.rs", "symthaea-core/Cargo.toml"];
