@@ -49,7 +49,7 @@ use crate::databases::{
 #[cfg(feature = "neural-bridge")]
 use crate::perception::NeuralBridgeV2;
 
-use crate::hdc::relational_consciousness::{RelationMode, RelationalAssessment, RelationshipStage};
+use crate::hdc::relational_consciousness::RelationshipStage;
 #[cfg(feature = "full_language")]
 use crate::language::learning_persistence::LearningPersistence;
 use crate::language::{
