@@ -137,7 +137,7 @@ fn quintic_hermite_sample_grid(times: &[f64], states: &[Vec<f64>]) -> Option<Vec
     Some(samples)
 }
 
-fn max_common_grid_disagreement(
+fn compute_max_common_grid_disagreement(
     custom: &[(f64, [f64; 2])],
     reference: &[(f64, [f64; 2])],
     scale: f64,
@@ -322,7 +322,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                         );
                         max_common_grid_disagreement =
                             custom_samples.as_deref().and_then(|custom| {
-                                max_common_grid_disagreement(custom, &reference_samples, scale)
+                                compute_max_common_grid_disagreement(custom, &reference_samples, scale)
                             });
                         common_grid_matches = max_common_grid_disagreement.is_some()
                             && common_grid_samples == COMMON_OUTPUT_INTERVALS + 1;
@@ -472,16 +472,16 @@ mod tests {
             })
             .collect();
         assert_eq!(
-            max_common_grid_disagreement(&samples, &samples, 1.0),
+            compute_max_common_grid_disagreement(&samples, &samples, 1.0),
             Some(0.0)
         );
 
         let mut wrong_time = samples.clone();
         wrong_time[20].0 += 1.0e-6;
-        assert!(max_common_grid_disagreement(&samples, &wrong_time, 1.0).is_none());
+        assert!(compute_max_common_grid_disagreement(&samples, &wrong_time, 1.0).is_none());
 
         let truncated = &samples[..samples.len() - 1];
-        assert!(max_common_grid_disagreement(&samples, truncated, 1.0).is_none());
+        assert!(compute_max_common_grid_disagreement(&samples, truncated, 1.0).is_none());
     }
 
     #[test]
