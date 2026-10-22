@@ -1274,7 +1274,9 @@ impl CodeLearningEngine {
 
         // 6. Build outcome
         let tests_executed = exec_result.tests_passed + exec_result.tests_failed;
-        let test_run_complete = tests_expected > 0
+        let test_run_complete = !simulated_execution
+            && exec_result.compiled
+            && tests_expected > 0
             && tests_executed == tests_expected
             && exec_result.runtime_error.is_none();
 
@@ -1977,6 +1979,14 @@ mod tests {
             actual_quality: 1.0,
             was_hallucination: false,
         }
+    }
+
+    #[test]
+    fn test_expected_test_counter_counts_declared_test_functions() {
+        let oracle = "#[test]\nfn first() {}\n\n#[test]\nfn second() {}\n";
+        assert_eq!(count_expected_rust_test_functions(Some(oracle)), 2);
+        assert_eq!(count_expected_rust_test_functions(None), 0);
+        assert_eq!(count_expected_rust_test_functions(Some("")), 0);
     }
 
     #[test]
