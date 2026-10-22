@@ -18,7 +18,7 @@ use symthaea_core::hdc::pattern_interaction::PatternVector;
 const DIMENSION: usize = 4_096;
 const PROTOTYPE_BUDGETS: [usize; 3] = [16, 64, 256];
 const SEEDS: [u64; 3] = [17, 29, 41];
-const QUERIES_PER_STRATUM: usize = 16;
+const QUERIES_PER_STRATUM: usize = 128;
 const KNOWN_NOISE_LEVELS: [f64; 4] = [0.0, 0.10, 0.20, 0.30];
 const NEAR_UNKNOWN_NOISE_LEVELS: [f64; 3] = [0.05, 0.10, 0.20];
 const SHADOW_NOISE: f64 = 0.02;
@@ -82,7 +82,7 @@ fn main() -> BenchResult<()> {
         "# vector_payload_bytes=prototype_count*dimension*sizeof(i8); excludes labels, allocations, runtime and indexes"
     );
     println!(
-        "record_type,seed,dimension,prototype_budget,bank_mode,stratum,query_n,known_n,accepted_n,top1_correct,top1_accuracy,coverage,accepted_errors,selective_risk,unknown_false_accept_rate,mean_best_similarity,mean_top_two_margin,p50_latency_us,p95_latency_us,vector_payload_bytes"
+        "record_type,seed,dimension,prototype_budget,bank_mode,stratum,query_n,known_n,accepted_n,top1_correct,top1_accuracy,coverage,accepted_errors,selective_risk,selective_risk_upper95,unknown_false_accept_rate,unknown_false_accept_upper95,mean_best_similarity,mean_top_two_margin,p50_latency_us,p95_latency_us,vector_payload_bytes"
     );
 
     for seed in SEEDS {
@@ -320,8 +320,18 @@ fn report_group(
     } else {
         "NA".to_owned()
     };
+    let selective_risk_upper95 = if accepted_n > 0 {
+        format!("{:.6}", wilson_upper_95(accepted_errors, accepted_n).expect("nonzero accepted count"))
+    } else {
+        "NA".to_owned()
+    };
     let false_accept_rate = if unknown_n > 0 {
         format!("{:.6}", ratio(unknown_accepted, unknown_n))
+    } else {
+        "NA".to_owned()
+    };
+    let false_accept_upper95 = if unknown_n > 0 {
+        format!("{:.6}", wilson_upper_95(unknown_accepted, unknown_n).expect("nonzero unknown count"))
     } else {
         "NA".to_owned()
     };
@@ -353,7 +363,7 @@ fn report_group(
     let p95_latency_us = percentile(&mut latencies, 0.95);
 
     println!(
-        "evaluation,{seed},{DIMENSION},{prototype_budget},{},{stratum},{total},{known_n},{accepted_n},{top1_correct_field},{top1_accuracy},{coverage:.6},{accepted_errors},{selective_risk},{false_accept_rate},{mean_best_similarity:.6},{mean_margin:.6},{p50_latency_us:.4},{p95_latency_us:.4},{vector_payload_bytes}",
+        "evaluation,{seed},{DIMENSION},{prototype_budget},{},{stratum},{total},{known_n},{accepted_n},{top1_correct_field},{top1_accuracy},{coverage:.6},{accepted_errors},{selective_risk},{selective_risk_upper95},{false_accept_rate},{false_accept_upper95},{mean_best_similarity:.6},{mean_margin:.6},{p50_latency_us:.4},{p95_latency_us:.4},{vector_payload_bytes}",
         mode.as_str()
     );
 }
@@ -364,6 +374,23 @@ fn ratio(numerator: usize, denominator: usize) -> f64 {
     } else {
         numerator as f64 / denominator as f64
     }
+}
+
+/// Wilson upper endpoint for a two-sided 95% interval. This is descriptive
+/// only: repeated queries share stored prototypes, so it is not a clustered
+/// or finite-sample risk certificate for a deployment distribution.
+fn wilson_upper_95(successes: usize, trials: usize) -> Option<f64> {
+    if trials == 0 || successes > trials {
+        return None;
+    }
+    let n = trials as f64;
+    let p = successes as f64 / n;
+    let z = 1.959_963_984_540_054_f64;
+    let z2 = z * z;
+    let denominator = 1.0 + z2 / n;
+    let center = p + z2 / (2.0 * n);
+    let radius = z * ((p * (1.0 - p) / n + z2 / (4.0 * n * n)).sqrt());
+    Some((center + radius) / denominator)
 }
 
 fn percentile(values: &mut [f64], probability: f64) -> f64 {
@@ -387,6 +414,14 @@ fn mix64(mut value: u64) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn wilson_upper_bound_exposes_uncertainty_when_no_errors_are_observed() {
+        let upper = wilson_upper_95(0, 128).expect("nonzero sample size");
+        assert!(upper > 0.0);
+        assert!(upper < 0.05, "expected upper bound below 5%, got {upper}");
+        assert!(wilson_upper_95(0, 0).is_none());
+    }
 
     #[test]
     fn correlated_bank_holds_total_memory_budget_fixed() {
