@@ -302,17 +302,33 @@ fn mode_summary(results: &[EvalResult], enabled: bool) -> serde_json::Value {
 }
 
 fn paired_summary(pairs: &[(EvalResult, EvalResult)]) -> serde_json::Value {
-    let n = pairs.len();
-    let on_wins = pairs.iter().filter(|(off, on)| !off.behavioral_success && on.behavioral_success).count();
-    let off_wins = pairs.iter().filter(|(off, on)| off.behavioral_success && !on.behavioral_success).count();
-    let ties = n.saturating_sub(on_wins + off_wins);
+    let total_pairs = pairs.len();
+    // Incomplete execution is unknown, not a loss or a tie. Restrict paired
+    // treatment-effect counts to pairs where both arms had complete oracles.
+    let comparable: Vec<&(EvalResult, EvalResult)> = pairs
+        .iter()
+        .filter(|(off, on)| off.oracle_complete && on.oracle_complete)
+        .collect();
+    let comparable_pairs = comparable.len();
+    let unresolved_pairs = total_pairs.saturating_sub(comparable_pairs);
+    let on_wins = comparable
+        .iter()
+        .filter(|(off, on)| !off.behavioral_success && on.behavioral_success)
+        .count();
+    let off_wins = comparable
+        .iter()
+        .filter(|(off, on)| off.behavioral_success && !on.behavioral_success)
+        .count();
+    let ties = comparable_pairs.saturating_sub(on_wins + off_wins);
     serde_json::json!({
-        "paired_task_trials": n,
+        "paired_task_trials": total_pairs,
+        "comparable_pairs": comparable_pairs,
+        "unresolved_pairs": unresolved_pairs,
         "gcs_on_wins": on_wins,
         "gcs_off_wins": off_wins,
         "ties": ties,
-        "net_pass_delta_percentage_points": if n == 0 { 0.0 } else { (on_wins as f64 - off_wins as f64) / n as f64 * 100.0 },
-        "interpretation": "Descriptive pilot only; do not claim statistical significance from this small fixed task suite."
+        "net_pass_delta_percentage_points": if comparable_pairs == 0 { 0.0 } else { (on_wins as f64 - off_wins as f64) / comparable_pairs as f64 * 100.0 },
+        "interpretation": "Descriptive pilot only; win/loss/tie and pass delta include only pairs with complete behavioral oracles. Unresolved pairs are excluded, not treated as ties. Do not claim statistical significance from this small fixed task suite."
     })
 }
 
