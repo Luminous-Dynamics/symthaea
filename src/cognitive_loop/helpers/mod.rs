@@ -170,22 +170,26 @@ impl CognitiveLoopService {
 
         // 7. Feed prediction back to encoder: deferred to after last &prediction use
 
-        // 8. Compute prediction error against previous prediction
-        let prediction_error = if let Some(ref prev) = self.last_prediction {
-            let n = compressed_state.len().min(prev.len());
-            if n == 0 {
-                0.0
+        // 8. Compute prediction error only when a previous prediction can be compared.
+        let (prediction_error, prediction_error_valid) =
+            if let Some(ref prev) = self.last_prediction {
+                let n = compressed_state.len().min(prev.len());
+                if n == 0 {
+                    (0.0, false)
+                } else {
+                    (
+                        compressed_state[..n]
+                            .iter()
+                            .zip(prev[..n].iter())
+                            .map(|(a, b)| (a - b).powi(2))
+                            .sum::<f32>()
+                            / n as f32,
+                        true,
+                    )
+                }
             } else {
-                compressed_state[..n]
-                    .iter()
-                    .zip(prev[..n].iter())
-                    .map(|(a, b)| (a - b).powi(2))
-                    .sum::<f32>()
-                    / n as f32
-            }
-        } else {
-            0.0
-        };
+                (0.0, false)
+            };
 
         // 9. Store experience
         self.create_experience(&compressed_state, &prediction, prediction_error);
