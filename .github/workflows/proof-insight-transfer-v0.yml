@@ -1496,7 +1496,32 @@ jobs:
           if result.returncode == 0:
               raise SystemExit("counterfactual analyzer unexpectedly accepted single-review adjudication")
 
-          print("PITB_COUNTERFACTUAL_ANALYZER_PASS: paired metrics, component bootstrap, calibration, report schema, 11 malformed-outcome controls and 5 suite-integrity controls")
+          source_identity_drift = copy.deepcopy(suite)
+          source_identity_drift["pairs"][1]["source_insight"]["record_id"] = source_identity_drift["pairs"][0]["source_insight"]["record_id"]
+          source_identity_drift["pairs"][1]["source_insight"]["insight_sha256"] = "0" * 64
+          source_identity_path = report_path.parent / "bad-counterfactual-source-identity-drift.json"
+          source_identity_path.write_text(json.dumps(source_identity_drift))
+          result = subprocess.run(
+              [str(binary), str(source_identity_path), str(outcomes_path), "test",
+               str(report_path.parent / "bad-counterfactual-source-identity-drift.report.json"), "1000", "17"],
+              capture_output=True, text=True
+          )
+          if result.returncode == 0:
+              raise SystemExit("counterfactual analyzer unexpectedly accepted one source record ID with conflicting digests")
+
+          target_path_drift = copy.deepcopy(suite)
+          target_path_drift["pairs"][1]["target"]["artifact_path"] = target_path_drift["pairs"][0]["target"]["artifact_path"]
+          target_path_path = report_path.parent / "bad-counterfactual-target-path-drift.json"
+          target_path_path.write_text(json.dumps(target_path_drift))
+          result = subprocess.run(
+              [str(binary), str(target_path_path), str(outcomes_path), "test",
+               str(report_path.parent / "bad-counterfactual-target-path-drift.report.json"), "1000", "17"],
+              capture_output=True, text=True
+          )
+          if result.returncode == 0:
+              raise SystemExit("counterfactual analyzer unexpectedly accepted one pinned commit/path with conflicting artifact digests")
+
+          print("PITB_COUNTERFACTUAL_ANALYZER_PASS: paired metrics, component bootstrap, calibration, report schema, 11 malformed-outcome controls and 7 suite-integrity controls")
           PY
       - name: Audit pinned Dalek Lean Bench timeline
         shell: bash
