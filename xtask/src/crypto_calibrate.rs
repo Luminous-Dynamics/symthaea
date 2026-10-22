@@ -170,31 +170,38 @@ pub(super) fn run(
     let rustc_version = command_text(root, "rustc", &["--version"]);
     let cargo_version = command_text(root, "cargo", &["--version"]);
 
-    let mut task_results = Vec::new();
+    // Preflight every selected task before running any command. A stale source
+    // path or disallowed invocation must not leave a partially executed suite.
+    let mut validated = Vec::new();
     for task in &selected {
         for regression in &task.source_regressions {
             let parsed = validate_regression(root, regression)
                 .with_context(|| format!("validate {} / {}", task.task_id, regression.test))?;
-            if dry_run {
-                task_results.push(TaskResult {
-                    task_id: task.task_id.clone(),
-                    category: task.category.clone(),
-                    security_notion: task.security_notion.clone(),
-                    source_path: regression.path.clone(),
-                    regression_test: regression.test.clone(),
-                    command_argv: parsed.cargo_args,
-                    outcome: "planned",
-                    exit_code: None,
-                    duration_ms: 0,
-                    stdout_sha256: sha256_hex(&[]),
-                    stderr_sha256: sha256_hex(&[]),
-                    stdout_excerpt: String::new(),
-                    stderr_excerpt: String::new(),
-                    note: "not executed; no attack result inferred".to_owned(),
-                });
-            } else {
-                task_results.push(execute_regression(root, task, regression, parsed));
-            }
+            validated.push((*task, regression, parsed));
+        }
+    }
+
+    let mut task_results = Vec::new();
+    for (task, regression, parsed) in validated {
+        if dry_run {
+            task_results.push(TaskResult {
+                task_id: task.task_id.clone(),
+                category: task.category.clone(),
+                security_notion: task.security_notion.clone(),
+                source_path: regression.path.clone(),
+                regression_test: regression.test.clone(),
+                command_argv: parsed.cargo_args,
+                outcome: "planned",
+                exit_code: None,
+                duration_ms: 0,
+                stdout_sha256: sha256_hex(&[]),
+                stderr_sha256: sha256_hex(&[]),
+                stdout_excerpt: String::new(),
+                stderr_excerpt: String::new(),
+                note: "not executed; no attack result inferred".to_owned(),
+            });
+        } else {
+            task_results.push(execute_regression(root, task, regression, parsed));
         }
     }
 
