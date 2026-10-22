@@ -23,6 +23,14 @@ Treat the Holographic Liquid Brain as a **resource-bounded hypothesis-testing ag
 
 The next research question is whether interactions between these mechanisms improve held-out task performance under matched compute, memory, information, and tuning budgets. A later phase may test **adaptive compute allocation**: spend additional retrieval, temporal refinement, or a costly observation only when its expected decision value justifies the cost. That is a hypothesis, not a declared capability.
 
+## Native FEP qualification blocker
+
+A source-level audit found that the current `ExpectedFreeEnergyComputer::compute_epistemic_value` uses the difference between predicted-next-state entropy and current-state entropy. In the present `GenerativeModel::predict_next_state`, predicted precision is updated from current precision using an action-independent formula and mode probabilities are copied unchanged. Since `HiddenState::entropy` depends on precision and mode probabilities rather than state mean, the current epistemic term is action-independent for a fixed belief/model. The total action score can still differ through pragmatic terms and novelty, but novelty-driven exploration is not expected information gain.
+
+This is a derivation from the current source, not a runtime measurement. The integrated benchmark therefore cannot treat an FEP label or nonzero `epistemic_value` as proof of information-seeking. [Issue #8391](https://github.com/Luminous-Dynamics/symthaea/issues/8391) tracks the corrective work.
+
+Before an HLB result can attribute a gain to FEP epistemic reasoning, the implementation must show action-dependent, prospective information value on a controlled task; the epistemic component must change when the action changes the expected observation/posterior information while reward/preference and novelty are held constant. Include a negative control where the information channel is disabled. If the term remains action-invariant, record an explicit non-qualification result.
+
 ## Factorial design
 
 The machine-readable contract enumerates all eight combinations of three factors:
