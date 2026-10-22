@@ -331,5 +331,29 @@
     "Hardware-accelerated runtime comparisons must publish hardware, solver, precision, deadline and compute budgets; do not infer speed superiority from different hardware.",
     "A-SLS (2026-10-14 preprint) is a priority comparator for active learning because it plans with guaranteed future parameter-uncertainty reduction; do not describe interval-gap active probing as equivalent to A-SLS.",
     "A geometric pairwise-separation probe may claim guaranteed one-step distinguishability only when all candidate observation sets are disjoint after declared measurement-noise expansion."
-  ]
+  ],
+  "published_reference_points": {
+    "a_sls_2026_preprint": {
+      "source": "https://arxiv.org/abs/2610.20925",
+      "status": "author_reported_not_reproduced_by_symthaea",
+      "simulation_gpu": "NVIDIA RTX 4090",
+      "hardware_experiment_cpu": "Apple M4 Pro",
+      "quadruped": {
+        "task": "61-state whole-body quadruped; 8 uncertain damping parameters; 12 control inputs",
+        "a_sls_successes": 38,
+        "total_runs": 40,
+        "baseline": "non-adaptive SLS",
+        "baseline_successes": 24,
+        "median_solve_time_ms": 16.1,
+        "control_budget_ms": 32
+      },
+      "crazyflie": {
+        "task": "physical Crazyflie; learn unknown thrust-to-acceleration parameter online",
+        "hardware_runs": 15,
+        "median_solve_time_ms": 8.15,
+        "control_budget_ms": 50
+      },
+      "comparability_rule": "Do not compare these numbers directly with Symthaea scalar synthetic runs; pin the implementation and match task, assumptions, sensing, constraints, hardware and deadlines."
+    }
+  }
 }
