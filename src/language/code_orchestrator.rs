@@ -27,6 +27,7 @@ use std::collections::BTreeMap;
 use std::io;
 use std::path::Path;
 use std::sync::Arc;
+use std::time::Instant;
 
 use symthaea_core::synthesis_trait::{
     BackendCapabilities, CodeSynthesisBackend, SynthesisRequest, SynthesisResponse,
@@ -386,6 +387,8 @@ pub struct SynthesisAttempt {
     pub similarity: f32,
     /// Energy cost of this attempt
     pub energy_cost: f32,
+    /// Elapsed wall-clock time for generation and verification, in milliseconds.
+    pub elapsed_ms: u128,
     /// Surprise scalar from the verified generation loop.
     pub surprise: f32,
     /// Number of distinct diagnostic hypervectors captured during repair.
@@ -1117,7 +1120,9 @@ impl CodeOrchestrator {
         }
 
         if is_hardware && self.remaining_energy() >= 1.0 {
+            let attempt_started = Instant::now();
             let hw_result = self.try_hardware_generation(request, &repair_priors);
+            let attempt_elapsed_ms = attempt_started.elapsed().as_millis();
             self.state.lock().energy_spent += 1.0;
 
             let attempt = SynthesisAttempt {
@@ -1125,6 +1130,7 @@ impl CodeOrchestrator {
                 verified: hw_result.verified,
                 similarity: hw_result.similarity,
                 energy_cost: 1.0,
+                elapsed_ms: attempt_elapsed_ms,
                 surprise: hw_result.surprise,
                 diagnostic_hv_count: hw_result.diagnostic_hvs.len(),
                 ast_hdc_parse_successes: hw_result.ast_hdc.parse_successes,
@@ -1177,7 +1183,9 @@ impl CodeOrchestrator {
 
         // ─── Backend 1: Native CodeGenerator ───────────────────────────────
         if self.remaining_energy() >= 1.0 && self.runtime_policy.should_try_backend("native") {
+            let attempt_started = Instant::now();
             let native_result = self.try_native_generation(request, &repair_priors);
+            let attempt_elapsed_ms = attempt_started.elapsed().as_millis();
             self.state.lock().energy_spent += 1.0;
             let native_rejection = native_result.rejection.clone();
 
@@ -1186,6 +1194,7 @@ impl CodeOrchestrator {
                 verified: native_result.verified,
                 similarity: native_result.similarity,
                 energy_cost: 1.0,
+                elapsed_ms: attempt_elapsed_ms,
                 surprise: native_result.surprise,
                 diagnostic_hv_count: native_result.diagnostic_hvs.len(),
                 ast_hdc_parse_successes: native_result.ast_hdc.parse_successes,
@@ -1286,7 +1295,9 @@ impl CodeOrchestrator {
 
         // ─── Backend 2: Code Algebra Analogy ───────────────────────────────
         if self.remaining_energy() >= 0.5 && self.runtime_policy.should_try_backend("analogy") {
+            let attempt_started = Instant::now();
             let analogy_result = self.try_analogy_generation(request, &repair_priors);
+            let attempt_elapsed_ms = attempt_started.elapsed().as_millis();
             self.state.lock().energy_spent += 0.5;
             let analogy_rejection = analogy_result.rejection.clone();
 
@@ -1295,6 +1306,7 @@ impl CodeOrchestrator {
                 verified: analogy_result.verified,
                 similarity: analogy_result.similarity,
                 energy_cost: 0.5,
+                elapsed_ms: attempt_elapsed_ms,
                 surprise: analogy_result.surprise,
                 diagnostic_hv_count: analogy_result.diagnostic_hvs.len(),
                 ast_hdc_parse_successes: analogy_result.ast_hdc.parse_successes,
@@ -1396,7 +1408,9 @@ impl CodeOrchestrator {
         // ─── Backend 3: LLM Fallback (Final Tier) ──────────────────────────
         // (Cost: 10.0 energy)
         if self.remaining_energy() >= 10.0 && self.runtime_policy.should_try_backend("llm") {
+            let attempt_started = Instant::now();
             let llm_result = self.try_llm_generation(request, &repair_priors);
+            let attempt_elapsed_ms = attempt_started.elapsed().as_millis();
             self.state.lock().energy_spent += 10.0;
 
             let attempt = SynthesisAttempt {
@@ -1404,6 +1418,7 @@ impl CodeOrchestrator {
                 verified: llm_result.verified,
                 similarity: llm_result.similarity,
                 energy_cost: 10.0,
+                elapsed_ms: attempt_elapsed_ms,
                 surprise: llm_result.surprise,
                 diagnostic_hv_count: llm_result.diagnostic_hvs.len(),
                 ast_hdc_parse_successes: llm_result.ast_hdc.parse_successes,
@@ -1519,7 +1534,9 @@ impl CodeOrchestrator {
             return None;
         }
 
+        let attempt_started = Instant::now();
         let geodesic_result = self.try_geodesic_generation(request, repair_priors);
+        let attempt_elapsed_ms = attempt_started.elapsed().as_millis();
         self.state.lock().energy_spent += 0.75;
         let geodesic_rejection = geodesic_result.rejection.clone();
 
@@ -1528,6 +1545,7 @@ impl CodeOrchestrator {
             verified: geodesic_result.verified,
             similarity: geodesic_result.similarity,
             energy_cost: 0.75,
+            elapsed_ms: attempt_elapsed_ms,
             surprise: geodesic_result.surprise,
             diagnostic_hv_count: geodesic_result.diagnostic_hvs.len(),
             ast_hdc_parse_successes: geodesic_result.ast_hdc.parse_successes,
