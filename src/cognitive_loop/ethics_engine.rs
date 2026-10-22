@@ -50,8 +50,8 @@ use crate::consciousness::unified_value_evaluator::{
     Decision, EvaluationContext, UnifiedValueEvaluator,
 };
 use crate::hdc::harmony_basis::{HarmonyBasis, HarmonyInteractionMatrix, MoralFreeEnergy};
-use crate::hdc::moral_algebra::{DeontologicalVerdict, MoralAlgebra, MoralVerdict};
-use crate::hdc::moral_parser::MoralParser;
+use crate::hdc::moral_algebra::{ConsentState, DeontologicalVerdict, MoralAlgebra, MoralVerdict};
+use crate::hdc::moral_parser::{ConsentTextAssessment, MoralParser};
 use crate::hdc::moral_topology::{
     MoralAnomalyConfig, MoralAnomalyReport, MoralTopology, MoralTopologyConfig,
     MoralTopologySummary,
@@ -403,8 +403,13 @@ pub(crate) struct EthicsEngineOutput {
     pub moral_verdict: String,
     /// Deontological verdict (Permissible/Impermissible/Neutral)
     pub deontological_verdict: String,
-    /// Whether consent violation detected
+    /// Whether an explicit consent violation is detected in the current input.
+    /// Unlike the moral score, this is refreshed on every evaluate() call.
     pub consent_violation: bool,
+    /// Current-input, text-only consent evidence trace; never an authorization permit.
+    pub consent_assessment: ConsentTextAssessment,
+    /// Microseconds spent extracting the current input's consent evidence.
+    pub consent_assessment_us: u64,
     /// Moral parsing confidence [0, 1]
     pub moral_confidence: f64,
     /// Deontological violations detected
@@ -771,6 +776,18 @@ impl EthicsEngine {
     /// - HarmoniesIntegrator: every 19 cycles
     pub fn evaluate(&mut self, input: &EthicsEngineInput) -> EthicsEngineOutput {
         let total_start = Instant::now();
+
+        // Consent evidence must be refreshed for the current input on every
+        // evaluate() call. The full moral algebra below intentionally runs on a
+        // seven-cycle cadence, so neither its verdict nor its cached fields may
+        // be used as a per-input consent signal between those cycles.
+        let consent_assessment_start = Instant::now();
+        let parsed_consent = self.moral_parser.parse(input.input);
+        let consent_assessment = parsed_consent.consent_assessment.clone();
+        let consent_assessment_us = consent_assessment_start.elapsed().as_micros() as u64;
+        let consent_violation = parsed_consent.patient.is_some()
+            && matches!(parsed_consent.consent, ConsentState::Absent | ConsentState::Denied);
+
         let mut confidence_delta: f32 = 0.0;
         let mut lr_factor: f32 = 1.0;
 
@@ -783,7 +800,7 @@ impl EthicsEngine {
             moral_score,
             moral_verdict,
             deontological_verdict,
-            consent_violation,
+            _stage1_consent_violation,
             moral_confidence,
             violations,
             satisfactions,
@@ -1217,6 +1234,8 @@ impl EthicsEngine {
             moral_verdict,
             deontological_verdict,
             consent_violation,
+            consent_assessment,
+            consent_assessment_us,
             moral_confidence,
             violations,
             satisfactions,
@@ -1819,6 +1838,35 @@ mod tests {
         assert!(
             (output8.moral_score - score_at_7).abs() < f64::EPSILON,
             "Non-firing cycle should use cached moral score"
+        );
+    }
+
+    #[test]
+    fn consent_evidence_refreshes_between_cached_moral_cycles() {
+        let mut engine = make_engine();
+
+        let safe_input = EthicsEngineInput {
+            input: "I helped my friend",
+            ..make_input(7)
+        };
+        let output7 = engine.evaluate(&safe_input);
+        assert_eq!(output7.consent_assessment.state, ConsentState::Unknown);
+        assert!(!output7.consent_violation);
+
+        // The Stage 1 moral algebra does not fire at cycle 8. Consent evidence
+        // must nevertheless come from the current request, not the cycle-7 cache.
+        let current_consent_input = EthicsEngineInput {
+            input: "I discussed my daughter's health without asking first",
+            ..make_input(8)
+        };
+        let output8 = engine.evaluate(&current_consent_input);
+        assert_eq!(output8.consent_assessment.state, ConsentState::Absent);
+        assert!(output8.consent_assessment_us <= output8.total_us);
+        assert!(output8.consent_violation);
+        assert_eq!(output8.unified_verdict, EthicalVerdict::Blocked);
+        assert!(
+            output8.moral_verdict.is_empty(),
+            "The fixture should demonstrate consent freshness separately from the cached Stage 1 verdict"
         );
     }
 
