@@ -21,7 +21,7 @@ Here the positive and protected centroids are learned only from the deterministi
 - 64 existing token rows; 8 new concepts; 16,384-dimensional continuous HDC vectors.
 - Every new concept begins with a shared context made from two old token embeddings.
 - An orthogonal planted feature distinguishes positive queries from protected queries; both sides retain the shared context. This deliberately creates an ambiguity trap for context-only initialization.
-- 8 training and 32 held-out queries per concept and side, with deterministic named seeds and a SHA-256 fixture receipt.
+- 8 training and 64 held-out queries per concept and side, with deterministic named seeds and a SHA-256 fixture receipt.
 - The benchmark compares seeded random, context-only bundle, positive-context centroid, context plus a deterministic residual, and the calibrated contrastive candidate.
 
 This is a synthetic geometry fixture: its planted distinction is known by construction. It is not linguistic evidence, does not reproduce a natural-data distribution, and must never be presented as semantic quality or an SOTA result.
