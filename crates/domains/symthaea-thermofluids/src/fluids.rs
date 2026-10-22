@@ -14,9 +14,9 @@ pub enum Regime {
     Turbulent,
 }
 
-/// Reynolds number `Re = ρvD/μ` (dimensionless).
+/// Reynolds number `Re = ρ|v|D/μ` (dimensionless; velocity direction does not affect Re).
 pub fn reynolds_number(density: f64, velocity: f64, diameter: f64, viscosity: f64) -> f64 {
-    density * velocity * diameter / viscosity
+    density * velocity.abs() * diameter / viscosity
 }
 
 /// Pipe-flow regime from Reynolds number (Re < 2300 laminar, > 4000 turbulent).
@@ -60,6 +60,11 @@ mod tests {
         let re = reynolds_number(1000.0, 2.0, 0.05, 1e-3);
         assert!((re - 100_000.0).abs() < 1e-6);
         assert_eq!(flow_regime(re), Regime::Turbulent);
+        assert_eq!(
+            reynolds_number(1000.0, -2.0, 0.05, 1e-3),
+            re,
+            "reversing flow direction must not make Reynolds number negative"
+        );
         assert_eq!(flow_regime(1000.0), Regime::Laminar);
         assert_eq!(flow_regime(3000.0), Regime::Transitional);
     }

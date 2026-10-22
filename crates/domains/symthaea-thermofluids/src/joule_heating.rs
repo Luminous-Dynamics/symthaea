@@ -1,0 +1,590 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
+//! Lumped electrical-to-thermal reference model for Joule heating.
+//!
+//! These are intentionally small verification cases, not spatial EM or heat
+//! solvers. Both assume constant resistance and specific heat capacity, a
+//! well-mixed conductor, and no phase change. The adiabatic `step` has no
+//! heat-loss term; `step_with_convection` integrates constant-conductance
+//! exchange with an ambient reservoir in closed form. Resistive heating is
+//! nonnegative for either current direction, but convection can cool or warm
+//! the conductor. Any added pathway must appear explicitly in the energy ledger:
+//!
+//!     P_J = I² R
+//!     Q_in = P_J Δt
+//!     ΔT = Q_in / (m c_p)
+//!
+//! All values use SI units. Temperature is an absolute temperature in kelvin.
+
+use std::error::Error;
+use std::fmt;
+
+/// Invalid input or state transition in this model.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum JouleHeatingError {
+    /// Resistance must be finite and greater than zero.
+    InvalidResistance,
+    /// Conductor mass must be finite and greater than zero.
+    InvalidMass,
+    /// Specific heat capacity must be finite and greater than zero.
+    InvalidSpecificHeatCapacity,
+    /// Initial absolute temperature must be finite and greater than zero.
+    InvalidTemperature,
+    /// Current must be finite. Negative current is permitted.
+    InvalidCurrent,
+    /// Time step must be finite and greater than zero.
+    InvalidTimeStep,
+    /// Ambient absolute temperature must be finite and greater than zero.
+    InvalidAmbientTemperature,
+    /// Thermal conductance must be finite and nonnegative.
+    InvalidThermalConductance,
+    /// A valid-looking input produced a non-finite derived quantity.
+    NonFiniteResult,
+}
+
+impl fmt::Display for JouleHeatingError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidResistance => write!(f, "resistance must be finite and positive"),
+            Self::InvalidMass => write!(f, "mass must be finite and positive"),
+            Self::InvalidSpecificHeatCapacity => {
+                write!(f, "specific heat capacity must be finite and positive")
+            }
+            Self::InvalidTemperature => {
+                write!(f, "absolute temperature must be finite and positive")
+            }
+            Self::InvalidCurrent => write!(f, "current must be finite"),
+            Self::InvalidTimeStep => write!(f, "time step must be finite and positive"),
+            Self::InvalidAmbientTemperature => {
+                write!(f, "ambient absolute temperature must be finite and positive")
+            }
+            Self::InvalidThermalConductance => {
+                write!(f, "thermal conductance must be finite and nonnegative")
+            }
+            Self::NonFiniteResult => write!(f, "model step produced a non-finite result"),
+        }
+    }
+}
+
+impl Error for JouleHeatingError {}
+
+/// Energy-accounted result for one adiabatic or convective Joule-heating step.
+///
+/// The residual is electrical input minus signed ambient energy outflow minus
+/// the increase in sensible thermal energy. It should be close to floating-point
+/// roundoff for these lumped models; it is not a general-purpose estimate of
+/// discretization error in spatially resolved simulations.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct JouleHeatingStep {
+    /// Current used for this step (A; sign does not affect resistive heating).
+    pub current_a: f64,
+    /// Duration of this step (s).
+    pub time_step_s: f64,
+    /// Initial conductor temperature (K).
+    pub initial_temperature_k: f64,
+    /// Final conductor temperature (K).
+    pub final_temperature_k: f64,
+    /// Resistive heating power, I²R (W).
+    pub heating_power_w: f64,
+    /// Electrical energy converted to heat during the step (J).
+    pub electrical_energy_in_j: f64,
+    /// Signed net energy transferred from the conductor to the ambient (J).
+    ///
+    /// Positive means heat leaves the conductor; negative means the ambient
+    /// heats it. The latter is an input to the conductor-side control volume.
+    pub ambient_energy_out_j: f64,
+    /// Increase in conductor sensible thermal energy (J).
+    pub stored_energy_change_j: f64,
+    /// Energy residual: electrical input minus ambient outflow minus stored change (J).
+    pub energy_balance_residual_j: f64,
+}
+
+/// Single lumped conductor with fixed electrical resistance and heat capacity.
+///
+/// This small model is useful as an analytical reference for later spatially
+/// resolved EM/thermal coupling. Ambient temperature and thermal conductance
+/// are supplied per step; the model does not persist environment parameters or
+/// temperature-dependent material properties.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct JouleHeatingModel {
+    resistance_ohm: f64,
+    mass_kg: f64,
+    specific_heat_capacity_j_per_kg_k: f64,
+    temperature_k: f64,
+}
+
+impl JouleHeatingModel {
+    /// Create a conductor model using SI units.
+    ///
+    /// Returns an error if a parameter is non-finite or outside its positive
+    /// physical domain, or if the derived heat capacity overflows.
+    pub fn new(
+        resistance_ohm: f64,
+        mass_kg: f64,
+        specific_heat_capacity_j_per_kg_k: f64,
+        initial_temperature_k: f64,
+    ) -> Result<Self, JouleHeatingError> {
+        if !resistance_ohm.is_finite() || resistance_ohm <= 0.0 {
+            return Err(JouleHeatingError::InvalidResistance);
+        }
+        if !mass_kg.is_finite() || mass_kg <= 0.0 {
+            return Err(JouleHeatingError::InvalidMass);
+        }
+        if !specific_heat_capacity_j_per_kg_k.is_finite()
+            || specific_heat_capacity_j_per_kg_k <= 0.0
+        {
+            return Err(JouleHeatingError::InvalidSpecificHeatCapacity);
+        }
+        if !initial_temperature_k.is_finite() || initial_temperature_k <= 0.0 {
+            return Err(JouleHeatingError::InvalidTemperature);
+        }
+        let heat_capacity = mass_kg * specific_heat_capacity_j_per_kg_k;
+        if !heat_capacity.is_finite() || heat_capacity <= 0.0 {
+            return Err(JouleHeatingError::NonFiniteResult);
+        }
+
+        Ok(Self {
+            resistance_ohm,
+            mass_kg,
+            specific_heat_capacity_j_per_kg_k,
+            temperature_k: initial_temperature_k,
+        })
+    }
+
+    /// Current conductor temperature in kelvin.
+    pub fn temperature_k(&self) -> f64 {
+        self.temperature_k
+    }
+
+    /// Total lumped thermal capacitance, m·cₚ (J/K).
+    pub fn thermal_capacity_j_per_k(&self) -> f64 {
+        self.mass_kg * self.specific_heat_capacity_j_per_kg_k
+    }
+
+    /// Advance one adiabatic step using Joule heating.
+    ///
+    /// Signed current is allowed because reversing current in a fixed,
+    /// ohmic resistor does not change I²R. The state is updated only after all
+    /// derived values have been checked for finiteness.
+    pub fn step(
+        &mut self,
+        current_a: f64,
+        time_step_s: f64,
+    ) -> Result<JouleHeatingStep, JouleHeatingError> {
+        if !current_a.is_finite() {
+            return Err(JouleHeatingError::InvalidCurrent);
+        }
+        if !time_step_s.is_finite() || time_step_s <= 0.0 {
+            return Err(JouleHeatingError::InvalidTimeStep);
+        }
+
+        let heating_power_w = current_a * current_a * self.resistance_ohm;
+        let electrical_energy_in_j = heating_power_w * time_step_s;
+        let initial_temperature_k = self.temperature_k;
+        let temperature_rise_k =
+            electrical_energy_in_j / self.thermal_capacity_j_per_k();
+        let final_temperature_k = initial_temperature_k + temperature_rise_k;
+
+        if !heating_power_w.is_finite()
+            || !electrical_energy_in_j.is_finite()
+            || !temperature_rise_k.is_finite()
+            || !final_temperature_k.is_finite()
+            || final_temperature_k <= 0.0
+        {
+            return Err(JouleHeatingError::NonFiniteResult);
+        }
+
+        let stored_energy_change_j =
+            self.thermal_capacity_j_per_k() * (final_temperature_k - initial_temperature_k);
+        let energy_balance_residual_j = electrical_energy_in_j - stored_energy_change_j;
+        if !stored_energy_change_j.is_finite() || !energy_balance_residual_j.is_finite() {
+            return Err(JouleHeatingError::NonFiniteResult);
+        }
+
+        self.temperature_k = final_temperature_k;
+
+        Ok(JouleHeatingStep {
+            current_a,
+            time_step_s,
+            initial_temperature_k,
+            final_temperature_k,
+            heating_power_w,
+            electrical_energy_in_j,
+            ambient_energy_out_j: 0.0,
+            stored_energy_change_j,
+            energy_balance_residual_j,
+        })
+    }
+
+    /// Advance one step with linear Newton cooling/heating to an ambient reservoir.
+    ///
+    /// The constant-current, constant-resistance, constant-heat-capacity,
+    /// constant-conductance ODE is integrated analytically (closed form), not
+    /// with explicit Euler:
+    ///
+    ///     C dT/dt = I²R - G(T - T_ambient)
+    ///
+    /// where C = m c_p and G = h A is thermal conductance in W/K. The signed
+    /// ambient energy exchange is integrated over the exact trajectory, so
+    /// ambient heat gain is represented as a negative outflow rather than
+    /// hidden or clamped away. A zero conductance delegates to the adiabatic
+    /// reference step.
+    ///
+    /// This assumes no phase change and no temperature dependence in R, c_p,
+    /// or G. It remains a lumped model, not a spatial thermal solver.
+    pub fn step_with_convection(
+        &mut self,
+        current_a: f64,
+        time_step_s: f64,
+        ambient_temperature_k: f64,
+        thermal_conductance_w_per_k: f64,
+    ) -> Result<JouleHeatingStep, JouleHeatingError> {
+        if !ambient_temperature_k.is_finite() || ambient_temperature_k <= 0.0 {
+            return Err(JouleHeatingError::InvalidAmbientTemperature);
+        }
+        if !thermal_conductance_w_per_k.is_finite() || thermal_conductance_w_per_k < 0.0 {
+            return Err(JouleHeatingError::InvalidThermalConductance);
+        }
+        if thermal_conductance_w_per_k == 0.0 {
+            return self.step(current_a, time_step_s);
+        }
+        if !current_a.is_finite() {
+            return Err(JouleHeatingError::InvalidCurrent);
+        }
+        if !time_step_s.is_finite() || time_step_s <= 0.0 {
+            return Err(JouleHeatingError::InvalidTimeStep);
+        }
+
+        let heat_capacity_j_per_k = self.thermal_capacity_j_per_k();
+        let heating_power_w = current_a * current_a * self.resistance_ohm;
+        let electrical_energy_in_j = heating_power_w * time_step_s;
+        let initial_temperature_k = self.temperature_k;
+        let rate_per_s = thermal_conductance_w_per_k / heat_capacity_j_per_k;
+        let decay_exponent = rate_per_s * time_step_s;
+        let decay = (-decay_exponent).exp();
+        // exp_m1 keeps (1 - exp(-x)) accurate when x is very small.
+        let one_minus_decay = -(-decay_exponent).exp_m1();
+        let integral_decay_s = if rate_per_s == 0.0 || decay_exponent == 0.0 {
+            // Limit (1 - exp(-r dt))/r -> dt as r -> 0, including underflow
+            // in r * dt where the ratio cannot be recovered from exp_m1.
+            time_step_s
+        } else {
+            one_minus_decay / rate_per_s
+        };
+
+        let final_temperature_k = initial_temperature_k
+            + (ambient_temperature_k - initial_temperature_k) * one_minus_decay
+            + (heating_power_w / heat_capacity_j_per_k) * integral_decay_s;
+        let stored_energy_change_j =
+            heat_capacity_j_per_k * (final_temperature_k - initial_temperature_k);
+
+        // Exact integral of G(T - T_ambient) over the time step. Positive is
+        // heat lost to ambient; negative is heat gained from ambient.
+        let ambient_energy_out_j = heat_capacity_j_per_k
+            * (initial_temperature_k - ambient_temperature_k)
+            * one_minus_decay
+            + heating_power_w * (time_step_s - integral_decay_s);
+        let energy_balance_residual_j =
+            electrical_energy_in_j - ambient_energy_out_j - stored_energy_change_j;
+
+        if !heating_power_w.is_finite()
+            || !electrical_energy_in_j.is_finite()
+            || !rate_per_s.is_finite()
+            || !decay_exponent.is_finite()
+            || !decay.is_finite()
+            || !one_minus_decay.is_finite()
+            || !integral_decay_s.is_finite()
+            || !final_temperature_k.is_finite()
+            || final_temperature_k <= 0.0
+            || !stored_energy_change_j.is_finite()
+            || !ambient_energy_out_j.is_finite()
+            || !energy_balance_residual_j.is_finite()
+        {
+            return Err(JouleHeatingError::NonFiniteResult);
+        }
+
+        self.temperature_k = final_temperature_k;
+
+        Ok(JouleHeatingStep {
+            current_a,
+            time_step_s,
+            initial_temperature_k,
+            final_temperature_k,
+            heating_power_w,
+            electrical_energy_in_j,
+            ambient_energy_out_j,
+            stored_energy_change_j,
+            energy_balance_residual_j,
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn reference_model() -> JouleHeatingModel {
+        // m cₚ = 0.5 kg × 900 J/(kg K) = 450 J/K.
+        JouleHeatingModel::new(2.0, 0.5, 900.0, 293.15).unwrap()
+    }
+
+    #[test]
+    fn textbook_case_matches_power_energy_and_temperature_rise() {
+        // I = 3 A, R = 2 Ω => P = 18 W; over 10 s, Q = 180 J;
+        // ΔT = 180 J / 450 J/K = 0.4 K.
+        let mut model = reference_model();
+        let step = model.step(3.0, 10.0).unwrap();
+
+        assert!((step.heating_power_w - 18.0).abs() < 1e-12);
+        assert!((step.electrical_energy_in_j - 180.0).abs() < 1e-12);
+        assert!((step.final_temperature_k - 293.55).abs() < 1e-12);
+        assert!((model.temperature_k() - step.final_temperature_k).abs() < 1e-12);
+    }
+
+    #[test]
+    fn electrical_input_equals_stored_energy_change_within_roundoff() {
+        let mut model = reference_model();
+        let step = model.step(3.0, 10.0).unwrap();
+
+        assert!(step.energy_balance_residual_j.abs() < 1e-10);
+        assert!((step.electrical_energy_in_j - step.stored_energy_change_j).abs() < 1e-10);
+    }
+
+    #[test]
+    fn cumulative_energy_balance_holds_over_multiple_steps() {
+        let mut model = reference_model();
+        let initial_temperature_k = model.temperature_k();
+        let heat_capacity_j_per_k = model.thermal_capacity_j_per_k();
+        let schedule = [(1.0, 0.5), (-2.0, 1.0), (0.0, 2.0), (3.0, 0.25), (-4.0, 0.1)];
+
+        let mut total_electrical_energy_j = 0.0;
+        for (current_a, time_step_s) in schedule {
+            let step = model.step(current_a, time_step_s).unwrap();
+            total_electrical_energy_j += step.electrical_energy_in_j;
+            assert!(step.energy_balance_residual_j.abs() < 1e-10);
+        }
+
+        let total_stored_energy_j =
+            heat_capacity_j_per_k * (model.temperature_k() - initial_temperature_k);
+        assert!(
+            (total_electrical_energy_j - total_stored_energy_j).abs() < 1e-9,
+            "input energy = {total_electrical_energy_j}, stored energy = {total_stored_energy_j}"
+        );
+    }
+
+    #[test]
+    fn reversing_current_preserves_resistive_heating() {
+        let mut forward = reference_model();
+        let mut reverse = reference_model();
+
+        let forward_step = forward.step(4.0, 2.5).unwrap();
+        let reverse_step = reverse.step(-4.0, 2.5).unwrap();
+
+        assert_eq!(forward_step.heating_power_w, reverse_step.heating_power_w);
+        assert_eq!(forward_step.final_temperature_k, reverse_step.final_temperature_k);
+    }
+
+    #[test]
+    fn cumulative_convective_energy_balance_holds_across_conditions() {
+        let mut model = reference_model();
+        let initial_temperature_k = model.temperature_k();
+        let heat_capacity_j_per_k = model.thermal_capacity_j_per_k();
+        let schedule = [
+            (3.0, 1.0, 295.0, 5.0),
+            (0.0, 2.0, 310.0, 10.0),
+            (-2.0, 0.5, 290.0, 0.1),
+            (1.5, 3.0, 300.0, 2.0),
+            (0.0, 0.1, 280.0, 20.0),
+        ];
+
+        let mut energy_in_j = 0.0;
+        let mut ambient_energy_out_j = 0.0;
+        for (current_a, dt_s, ambient_k, conductance_w_per_k) in schedule {
+            let step = model
+                .step_with_convection(current_a, dt_s, ambient_k, conductance_w_per_k)
+                .unwrap();
+            assert!(step.energy_balance_residual_j.abs() < 1e-8);
+            energy_in_j += step.electrical_energy_in_j;
+            ambient_energy_out_j += step.ambient_energy_out_j;
+        }
+
+        let total_stored_energy_change_j =
+            heat_capacity_j_per_k * (model.temperature_k() - initial_temperature_k);
+        let cumulative_residual_j =
+            energy_in_j - ambient_energy_out_j - total_stored_energy_change_j;
+        assert!(
+            cumulative_residual_j.abs() < 1e-8,
+            "cumulative residual = {cumulative_residual_j} J"
+        );
+    }
+
+    #[test]
+    fn convection_cools_hot_conductor_and_closes_energy_balance() {
+        let mut model = JouleHeatingModel::new(2.0, 0.5, 900.0, 400.0).unwrap();
+        let step = model
+            .step_with_convection(0.0, 10.0, 300.0, 20.0)
+            .unwrap();
+
+        assert!(step.final_temperature_k < step.initial_temperature_k);
+        assert!(step.final_temperature_k > 300.0);
+        assert!(step.ambient_energy_out_j > 0.0);
+        assert!(step.energy_balance_residual_j.abs() < 1e-9);
+    }
+
+    #[test]
+    fn convective_heating_matches_closed_form_solution() {
+        let mut model = JouleHeatingModel::new(2.0, 0.5, 900.0, 293.15).unwrap();
+        let ambient_k = 300.0;
+        let conductance_w_per_k = 5.0;
+        let current_a: f64 = 3.0;
+        let time_step_s: f64 = 10.0;
+        let power_w = current_a * current_a * 2.0;
+        let capacity_j_per_k = 0.5 * 900.0;
+        let equilibrium_k = ambient_k + power_w / conductance_w_per_k;
+        let expected_k = equilibrium_k
+            + (model.temperature_k() - equilibrium_k)
+                * (-(conductance_w_per_k / capacity_j_per_k) * time_step_s).exp();
+
+        let step = model
+            .step_with_convection(
+                current_a,
+                time_step_s,
+                ambient_k,
+                conductance_w_per_k,
+            )
+            .unwrap();
+
+        assert!(
+            (step.final_temperature_k - expected_k).abs() < 1e-10,
+            "actual={} K, closed-form reference={} K",
+            step.final_temperature_k,
+            expected_k
+        );
+        assert!(step.energy_balance_residual_j.abs() < 1e-9);
+    }
+
+    #[test]
+    fn ambient_can_heat_a_conductor_below_ambient_temperature() {
+        let mut model = JouleHeatingModel::new(2.0, 0.5, 900.0, 293.15).unwrap();
+        let step = model
+            .step_with_convection(0.0, 10.0, 350.0, 20.0)
+            .unwrap();
+
+        assert!(step.final_temperature_k > step.initial_temperature_k);
+        assert!(step.final_temperature_k < 350.0);
+        assert!(step.ambient_energy_out_j < 0.0);
+        assert!(step.energy_balance_residual_j.abs() < 1e-9);
+    }
+
+    #[test]
+    fn zero_conductance_matches_the_adiabatic_model() {
+        let mut adiabatic = reference_model();
+        let mut zero_convection = reference_model();
+        let expected = adiabatic.step(3.0, 10.0).unwrap();
+        let actual = zero_convection
+            .step_with_convection(3.0, 10.0, 350.0, 0.0)
+            .unwrap();
+
+        assert_eq!(actual, expected);
+        assert_eq!(zero_convection.temperature_k(), adiabatic.temperature_k());
+    }
+
+    #[test]
+    fn tiny_conductance_uses_the_adiabatic_limit_without_losing_heating() {
+        let mut adiabatic = reference_model();
+        let mut nearly_adiabatic = reference_model();
+        let expected = adiabatic.step(3.0, 10.0).unwrap();
+        let actual = nearly_adiabatic
+            .step_with_convection(3.0, 10.0, 300.0, f64::from_bits(1))
+            .unwrap();
+
+        assert!(
+            (actual.final_temperature_k - expected.final_temperature_k).abs() < 1e-12
+        );
+        assert!(actual.energy_balance_residual_j.abs() < 1e-9);
+    }
+
+    #[test]
+    fn overflowed_convection_exponent_fails_closed_without_mutation() {
+        let mut model = reference_model();
+        let before = model.temperature_k();
+
+        // All raw inputs are finite; G/C * dt overflows. Do not silently
+        // promote that non-finite intermediate into a successful model step.
+        assert_eq!(
+            model.step_with_convection(0.0, 1.0e308, 300.0, 1.0e308),
+            Err(JouleHeatingError::NonFiniteResult)
+        );
+        assert_eq!(model.temperature_k(), before);
+    }
+
+    #[test]
+    fn invalid_convection_parameters_do_not_mutate_state() {
+        let mut model = reference_model();
+        let before = model.temperature_k();
+
+        assert_eq!(
+            model.step_with_convection(1.0, 1.0, f64::NAN, 5.0),
+            Err(JouleHeatingError::InvalidAmbientTemperature)
+        );
+        assert_eq!(
+            model.step_with_convection(1.0, 1.0, 300.0, -1.0),
+            Err(JouleHeatingError::InvalidThermalConductance)
+        );
+        assert_eq!(model.temperature_k(), before);
+    }
+
+    #[test]
+    fn zero_current_produces_no_temperature_change() {
+        let mut model = reference_model();
+        let before = model.temperature_k();
+        let step = model.step(0.0, 5.0).unwrap();
+
+        assert_eq!(step.heating_power_w, 0.0);
+        assert_eq!(step.electrical_energy_in_j, 0.0);
+        assert_eq!(step.final_temperature_k, before);
+    }
+
+    #[test]
+    fn rejects_invalid_physical_parameters() {
+        assert_eq!(
+            JouleHeatingModel::new(0.0, 1.0, 500.0, 300.0).unwrap_err(),
+            JouleHeatingError::InvalidResistance
+        );
+        assert_eq!(
+            JouleHeatingModel::new(1.0, -1.0, 500.0, 300.0).unwrap_err(),
+            JouleHeatingError::InvalidMass
+        );
+        assert_eq!(
+            JouleHeatingModel::new(1.0, 1.0, f64::INFINITY, 300.0).unwrap_err(),
+            JouleHeatingError::InvalidSpecificHeatCapacity
+        );
+        assert_eq!(
+            JouleHeatingModel::new(1.0, 1.0, 500.0, f64::NAN).unwrap_err(),
+            JouleHeatingError::InvalidTemperature
+        );
+    }
+
+    #[test]
+    fn invalid_step_does_not_mutate_the_state() {
+        let mut model = reference_model();
+        let before = model.temperature_k();
+
+        assert_eq!(model.step(f64::NAN, 1.0), Err(JouleHeatingError::InvalidCurrent));
+        assert_eq!(model.step(2.0, 0.0), Err(JouleHeatingError::InvalidTimeStep));
+        assert_eq!(model.temperature_k(), before);
+    }
+
+    #[test]
+    fn rejects_overflow_without_mutating_state() {
+        let mut model = JouleHeatingModel::new(1e308, 1.0, 500.0, 300.0).unwrap();
+        let before = model.temperature_k();
+
+        assert_eq!(
+            model.step(1e308, 1.0),
+            Err(JouleHeatingError::NonFiniteResult)
+        );
+        assert_eq!(model.temperature_k(), before);
+    }
+}

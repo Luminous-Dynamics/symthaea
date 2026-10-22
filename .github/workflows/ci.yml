@@ -1469,6 +1469,37 @@ jobs:
           fi
           cargo test -p ${{ matrix.crate }}
 
+  thermofluids-reference:
+    name: Isolated thermofluids reference tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # This job intentionally has no dependency on workspace metadata/build jobs.
+    # The root workspace currently has a separately tracked missing-manifest
+    # member. Copy the std-only physics crate outside the workspace so its
+    # formatter, unit tests, and doctests remain independently executable.
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Stage crate outside root workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          target="$(mktemp -d)"
+          echo "THERMOFLUIDS_STAGE=$target/symthaea-thermofluids" >> "$GITHUB_ENV"
+          mkdir -p "$target/symthaea-thermofluids"
+          cp -R crates/domains/symthaea-thermofluids/. "$target/symthaea-thermofluids/"
+
+      - name: Check Rust formatting
+        run: cargo fmt --manifest-path "$THERMOFLUIDS_STAGE/Cargo.toml" --check
+
+      - name: Run unit and documentation tests
+        run: cargo test --manifest-path "$THERMOFLUIDS_STAGE/Cargo.toml"
+
   genesis-benchmarks:
     name: Genesis Mission Benchmarks
     runs-on: ubuntu-latest
