@@ -66,7 +66,9 @@
 use std::collections::{HashMap, HashSet};
 
 use symthaea_core::hdc::conjecture_engine::{
-    BinOp, CfcSmoother, Expr, UnaryFn, select_experiment_by_information_gain_per_cost,
+    BinOp, CfcSmoother, Expr, InformationGainScenario, UnaryFn,
+    select_experiment_by_information_gain_per_cost,
+    select_experiment_by_scenario_robust_information_gain_per_cost,
     select_experiment_by_worst_case_information_gain_per_cost, select_most_informative_experiment,
 };
 
@@ -509,18 +511,56 @@ fn run_trial_with_discrepancy(
                     ActiveSelector::WorstCaseInformationGain => {
                         let nominal_noise =
                             selection_noise_std_dev(&remaining, &live, &hypotheses);
-                        // Predeclare a factor-of-two noise envelope around a prediction-only
-                        // proxy. No hidden ground-truth or discrepancy signal enters selection.
-                        let noise_scenarios = [
-                            nominal_noise * 0.5,
-                            nominal_noise,
-                            nominal_noise * 2.0,
+                        // These are bundled stress scenarios, not a full Cartesian sweep:
+                        // three measurement scales paired with the nominal model and two
+                        // alternative smooth discrepancy shapes. All parameters are fixed
+                        // before observing outcomes; the hidden true discrepancy is not read.
+                        let scenarios = [
+                            InformationGainScenario {
+                                observation_std_dev: nominal_noise * 0.5,
+                                prediction_model: 0,
+                            },
+                            InformationGainScenario {
+                                observation_std_dev: nominal_noise,
+                                prediction_model: 1,
+                            },
+                            InformationGainScenario {
+                                observation_std_dev: nominal_noise * 2.0,
+                                prediction_model: 2,
+                            },
                         ];
-                        select_experiment_by_worst_case_information_gain_per_cost(
+                        let predict_under_scenario =
+                            |idx: &usize,
+                             experiment: &Experiment,
+                             scenario: &InformationGainScenario| {
+                                let base = eval_at(&hypotheses[*idx], experiment)?;
+                                if scenario.prediction_model == 0 {
+                                    return Some(base);
+                                }
+                                let coordinates: Vec<f64> =
+                                    experiment.iter().map(|(_, value)| *value).collect();
+                                let frequency = if scenario.prediction_model == 1 {
+                                    5.0
+                                } else {
+                                    9.0
+                                };
+                                let discrepancy_basis = coordinates
+                                    .iter()
+                                    .enumerate()
+                                    .map(|(index, value)| {
+                                        (value * (frequency + index as f64)).sin()
+                                    })
+                                    .sum::<f64>()
+                                    / coordinates.len().max(1) as f64;
+                                Some(
+                                    base + 0.12 * (1.0 + base.abs()) * discrepancy_basis,
+                                )
+                            };
+                        select_experiment_by_scenario_robust_information_gain_per_cost(
                             &remaining,
                             &live,
-                            &noise_scenarios,
-                            predict,
+                            &scenarios,
+                            predict_under_scenario,
                             |_: &Experiment| 1.0,
                         )
                         .map(|(experiment, _)| experiment.clone())
