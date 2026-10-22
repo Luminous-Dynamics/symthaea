@@ -669,6 +669,45 @@ mod tests {
     }
 
     #[test]
+    fn paired_seed_summary_retains_failures_and_exposes_target_hit_rate() {
+        let seeds: Vec<u64> = (0..12).collect();
+        let summaries = compare_designs(
+            SyntheticCase::FeasibleIsland,
+            Fidelity::High,
+            BUDGET,
+            &seeds,
+        )
+        .unwrap();
+
+        assert_eq!(summaries.len(), SamplingDesign::ALL.len());
+        for summary in summaries {
+            assert_eq!(summary.run_count, seeds.len());
+            assert!((0.0..=1.0).contains(&summary.target_hit_rate));
+            assert_abs_close(
+                summary.mean_cost_units_per_run,
+                (BUDGET as u64 * HIGH_FIDELITY_COST_UNITS) as f64,
+                0.0,
+            );
+            if summary.target_hit_rate > 0.0 {
+                assert!(summary.median_cost_to_target_when_reached.is_some());
+            }
+        }
+    }
+
+    #[test]
+    fn paired_summary_rejects_empty_seed_set() {
+        assert_eq!(
+            compare_designs(
+                SyntheticCase::SmoothBowl,
+                Fidelity::High,
+                BUDGET,
+                &[],
+            ),
+            Err(BenchmarkError::EmptySeedSet)
+        );
+    }
+
+    #[test]
     fn zero_budget_fails_closed() {
         assert_eq!(
             sample_points(SamplingDesign::Random, 0, 1),
