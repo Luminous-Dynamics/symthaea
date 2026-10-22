@@ -323,7 +323,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
 
             for index in episode_rows {
-                output_rows[index][19] = optional_usize(first_persistent_alarm);
                 output_rows[index][26] = first_reset_alarm_step.to_string();
             }
 
@@ -346,6 +345,12 @@ fn main() -> Result<(), Box<dyn Error>> {
                     * (episode as f64 + 1.0)
                     * (episode as f64 + 2.0));
             summary.reset_alpha_final_log_e_values.push(reset_alpha.log_e_value());
+        }
+
+        // A persistent alarm is a stream-level event. Backfill its final first
+        // alarm step into every row only after the full stream has been processed.
+        for index in indices.iter().copied() {
+            output_rows[index][19] = optional_usize(first_persistent_alarm);
         }
 
         summary.persistent_final_log_e_value = persistent.log_e_value();
