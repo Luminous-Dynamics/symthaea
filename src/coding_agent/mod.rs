@@ -429,10 +429,7 @@ pub struct CodingAgent {
     /// Accumulates across the run, complementing the flat experience store
     /// with structured error→fix mappings and Bayesian success rates.
     error_knowledge: error_knowledge::CodeErrorKnowledge,
-    /// Geodesic Code Synthesis verifier for topological/oracle post-generation checks.
-    /// When enabled, generated code is verified for structural invariants (Betti numbers,
-    /// convergence prediction) and violations are fed back as hard constraints on the next prompt.
-    /// Geodesic Code Synthesis verifier for topological/oracle post-generation checks.
+    /// Geodesic Code Synthesis analyzer for advisory topology/oracle diagnostics.
     /// When enabled, the agent records exploratory topology fingerprints and abstract
     /// convergence predictions. These are advisory signals, not semantic proofs, and
     /// must not override compiler or behavioral-test evidence.
