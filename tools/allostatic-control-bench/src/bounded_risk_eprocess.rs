@@ -345,8 +345,8 @@ mod tests {
                 + ((expected_components[0] - max_component).exp()
                     + (expected_components[1] - max_component).exp()
                     + (expected_components[2] - max_component).exp())
-                    .div_euclid(3.0)
-                    .ln();
+                    .ln()
+                - 3.0_f64.ln();
             assert!((process.log_e_value() - expected_mix).abs() < 1e-12);
         }
     }
