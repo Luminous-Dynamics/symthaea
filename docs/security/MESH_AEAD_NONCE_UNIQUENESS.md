@@ -87,7 +87,7 @@ These are proposed acceptance tests; they have not been implemented or run by th
 | ID | Stimulus | Required result |
 |---|---|---|
 | NONCE-01 | Same key, sender, type, epoch and sequence after simulated restart | Legacy counterexample reproduces; v3 refuses reuse or uses a provably distinct key namespace |
-| NONCE-02 | Two source IDs share the first six bytes but differ in the last two | Legacy collision reproduces; v3 proves distinct key/nonce contexts or rejects ambiguous identity |
+| NONCE-02 | Two source IDs share the first six bytes but differ in the last two | `legacy_nonce_source_id_truncation_reveals_plaintext_xor` is the deterministic legacy witness; CI pending. V3 must prevent the collision under every supported key-sharing model |
 | NONCE-03 | Sequence reaches its maximum | Sender rotates key or fails closed before counter reuse |
 | NONCE-04 | Power loss after nonce reservation but before send, and after send but before durable commit | Restart cannot reuse an already-reserved nonce |
 | NONCE-05 | Snapshot rollback / cloned sender state | Both instances cannot encrypt under the same key/counter namespace |
@@ -99,7 +99,7 @@ These are proposed acceptance tests; they have not been implemented or run by th
 | NONCE-11 | All supported payload types at counter zero | No nonce collision under one effective key |
 | NONCE-12 | Sequence serialization and byte-order boundary values | Canonical test vectors agree across independent implementations |
 
-Tests must include deterministic witnesses, not only random statistical sampling. Property/model-based tests should generate restart, key rotation, counter reservation, rollback, multi-sender and malformed-packet traces. Report a digest of the frozen test corpus and retain minimized failing traces.
+Tests must include deterministic witnesses, not only random statistical sampling. Property/model-based tests should generate restart, key rotation, counter reservation, rollback, multi-sender and malformed-packet traces. Report a digest of the frozen test corpus and retain minimized failing traces. A deterministic source-truncation witness has now been added in `src/swarm/mesh/tests.rs` as `legacy_nonce_source_id_truncation_reveals_plaintext_xor`; it intentionally demonstrates the legacy flaw and is not a security-passing test. It has not yet been compiled or executed in this environment.
 
 ## Benchmark and release gates
 
