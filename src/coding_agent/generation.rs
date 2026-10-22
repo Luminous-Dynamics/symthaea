@@ -179,8 +179,17 @@ impl CodingAgent {
                     "Code generated and written"
                 );
             } else if result.tier == BackendTier::Native {
-                // Native tier — try pattern-aware generation
-                if let Some(code) = self.native_code_template() {
+                // Native tier — try pattern-aware generation and record its actual attempt.
+                let native_started = std::time::Instant::now();
+                let native_candidate = self.native_code_template();
+                let native_elapsed_ms = native_started.elapsed().as_millis();
+                self.actual_backend_attempts.push(BackendAttempt {
+                    tier: BackendTier::Native,
+                    backend_name: "NativeCodeTemplate".to_string(),
+                    success: native_candidate.as_ref().is_some_and(|code| !code.trim().is_empty()),
+                    elapsed_ms: native_elapsed_ms,
+                });
+                if let Some(code) = native_candidate {
                     let target = self.resolve_target_file();
                     self.write_code_to_disk(&target, &code);
                     self.generated_code = Some(Self::sanitize_generated_code(
