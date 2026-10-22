@@ -36,6 +36,7 @@ For every comparison, disclose checkpoint source, model parameters, trainable pa
 ### Gate 0 — validity of the training signal
 
 - Teacher-forced loss must score the actual target under logits conditioned on the correct prior tokens.
+- The one-unroll sequence API should return both mean next-token loss and context gradients from the same autograd graph. Its reported mean loss must match an independent sequential teacher-forced reference pass within a preregistered tolerance; do not recompute a differently conditioned loss just for reporting.
 - Projection gradients must use the actual projected context and the full teacher-forced prefix, with the final target scored only after every preceding target token has updated recurrent state.
 - Backpropagate from the SSM output gradient through the actual forward projection graph: HDC bottleneck, LayerNorm, activations, optional deep bottleneck, temporal chunk projection, adapter, attention and positional encoding as applicable. Do not pass target-token hidden states where projection activations are expected.
 - Apply projection updates after scoring the complete teacher-forced target sequence so weights remain fixed while its per-token losses are accumulated.
@@ -69,6 +70,7 @@ Record at least:
 - prompt/prefill latency and per-token decode p50/p95;
 - tokens/second under batch size 1 and the separately stated batch throughput regime;
 - peak RSS and VRAM, parameter memory, recurrent state size, and memory growth as context grows;
+- recurrent forward-step counts for the correctness-first repeated-prefix baseline versus the one-unroll method, plus end-to-end p50/p95 time for context lengths S and target lengths T (for example T ∈ {8, 32, 128, 512} where supported);
 - energy per generated token if trustworthy device-level measurement is available;
 - failures, timeouts, non-finite values, EOS behavior, and sensitivity to seed / prompt variation.
 
