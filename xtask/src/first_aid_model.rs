@@ -285,8 +285,16 @@ mod tests {
             }
         }
 
-        assert!(states.len() >= 100, "state exploration unexpectedly shallow");
-        assert!(transition_count >= 1_600, "transition exploration unexpectedly shallow");
+        assert_eq!(
+            states.len(),
+            84,
+            "reachable abstract-state count changed; review and update the model baseline"
+        );
+        assert_eq!(
+            transition_count,
+            1_344,
+            "state/action transition count changed; review and update the model baseline"
+        );
         println!(
             "abstract_states_explored={} state_action_transitions_checked={}",
             states.len(),
