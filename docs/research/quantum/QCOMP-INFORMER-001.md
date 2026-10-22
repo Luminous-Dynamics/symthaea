@@ -48,6 +48,12 @@ Keep maximum independent set (maximize cardinality) distinct from maximal indepe
 
 Report paired, per-instance objective and cost results by graph family. Do not average random 3-regular ratios together with QOBLIB, SATLIB, or real-world sparse graphs and then label the combined mean a general SOTA win.
 
+### Hardness-stratified workload selection
+
+A separate workstream ([QCOMP-HARDNESS-001 / issue #8358](https://github.com/Luminous-Dynamics/symthaea/issues/8358)) constructs a challenge cohort whose operational hardness is calibrated against a frozen classical solver portfolio before confirmatory testing. This follows the lesson from Cazals et al., *Identifying hard native instances for the maximum-independent-set problem on neutral-atom quantum processors* (Phys. Rev. Applied, 26 March 2026, https://doi.org/10.1103/8gjv-ll1f): graph structure matters, and tuning density/treewidth-related factors can materially change classical difficulty; the paper reports no advantage for the small quantum cases it studied. Related work finds that graph density, interaction range, and vertex weights alter classical reducibility for native weighted Rydberg-array graphs (https://arxiv.org/abs/2605.07952).
+
+Accordingly, do not let an algorithm pick its own favorable test instances. Freeze graph-family and generator strata, record exact reduction ratios/kernel sizes plus a labelled treewidth proxy, calibrate time-to-target and timeout distributions using strong eligible classical solvers, and hold out entire parameter regions for confirmation. Treat operational hardness as solver-portfolio- and budget-relative, not as a universal or theoretical hardness label. Only compare a quantum arm on the same graphs and task objective, and include physical placement/embedding, calibration, shots, preprocessing, verification, and total wall/cash/energy cost.
+
 ## 3. Paradigm shift: compute the value of information
 
 Do not optimize the quantum subroutine in isolation. Treat the informer as a budgeted signal source and measure its incremental effect on the downstream reducer.
