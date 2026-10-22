@@ -11,7 +11,7 @@ use std::collections::BTreeSet;
 use std::env;
 
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::json;
 
 const TASK_SPEC: &str =
     include_str!("../../../../docs/research/hlb-information-choice-task-v1.json");
@@ -236,7 +236,12 @@ fn run_episode(scenario: &Scenario, seed: u64, policy: Policy) -> EpisodeResult 
     for _ in 0..2 {
         match policy.choose(&observation, &mut policy_rng) {
             Action::Inspect => {
-                if !observation.probe_available || observation.probe_signal.is_some() {
+                if !apply_inspection(
+                    &mut observation,
+                    world.probe_signal,
+                    &mut score_bps,
+                    &mut probes,
+                ) {
                     invalid_actions += 1;
                     return EpisodeResult {
                         score_bps: INVALID_ACTION_PENALTY_BPS,
@@ -245,10 +250,6 @@ fn run_episode(scenario: &Scenario, seed: u64, policy: Policy) -> EpisodeResult 
                         invalid_actions,
                     };
                 }
-                probes += 1;
-                score_bps -= i32::from(scenario.probe_cost_bps);
-                observation.probe_signal = Some(world.probe_signal);
-                observation.probe_available = false;
             }
             Action::Choose(side) => {
                 let correct = side == world.goal;
@@ -337,6 +338,22 @@ fn scenario_index(id: &str) -> usize {
         "weak_probe_not_worth_cost" => 3,
         _ => panic!("unregistered scenario id: {id}"),
     }
+}
+
+fn apply_inspection(
+    observation: &mut Observation,
+    private_probe_signal: Side,
+    score_bps: &mut i32,
+    probes: &mut usize,
+) -> bool {
+    if !observation.probe_available || observation.probe_signal.is_some() {
+        return false;
+    }
+    *probes += 1;
+    *score_bps -= i32::from(observation.probe_cost_bps);
+    observation.probe_signal = Some(private_probe_signal);
+    observation.probe_available = false;
+    true
 }
 
 fn best_accuracy(cue_accuracy_bps: u16) -> f64 {
@@ -625,6 +642,57 @@ mod tests {
         assert_eq!(a, b);
         assert_eq!(a.initial_cue, b.initial_cue);
         assert_eq!(a.probe_signal, b.probe_signal);
+    }
+
+    #[test]
+    fn repeated_inspection_is_rejected_without_leaking_another_signal() {
+        let s = scenario("ambiguous_cue_cheap_probe");
+        let world = PrivateWorld::new(&s, 1234);
+        let mut observation = world.initial_observation(&s);
+        let mut score = 0;
+        let mut probes = 0;
+        assert!(apply_inspection(
+            &mut observation,
+            world.probe_signal,
+            &mut score,
+            &mut probes
+        ));
+        let revealed = observation.probe_signal;
+        assert!(!apply_inspection(
+            &mut observation,
+            world.probe_signal.opposite(),
+            &mut score,
+            &mut probes
+        ));
+        assert_eq!(observation.probe_signal, revealed);
+        assert_eq!(probes, 1);
+    }
+
+    #[test]
+    fn value_of_information_beats_greedy_on_the_affordable_ambiguous_case() {
+        let s = scenario("ambiguous_cue_cheap_probe");
+        let rows = summarize(&s, 1000);
+        let greedy = rows.iter().find(|row| row.policy_id == "cue_greedy").unwrap();
+        let voi = rows
+            .iter()
+            .find(|row| row.policy_id == "bayes_value_of_information")
+            .unwrap();
+        assert!(voi.mean_reward_bps > greedy.mean_reward_bps);
+    }
+
+    #[test]
+    fn value_of_information_avoids_the_expensive_probe() {
+        let s = scenario("ambiguous_cue_expensive_probe");
+        let rows = summarize(&s, 1000);
+        let greedy = rows.iter().find(|row| row.policy_id == "cue_greedy").unwrap();
+        let always = rows.iter().find(|row| row.policy_id == "always_inspect").unwrap();
+        let voi = rows
+            .iter()
+            .find(|row| row.policy_id == "bayes_value_of_information")
+            .unwrap();
+        assert_eq!(voi.probe_rate, 0.0);
+        assert!(voi.mean_reward_bps > always.mean_reward_bps);
+        assert!(voi.mean_reward_bps >= greedy.mean_reward_bps - 100.0);
     }
 
     #[test]
