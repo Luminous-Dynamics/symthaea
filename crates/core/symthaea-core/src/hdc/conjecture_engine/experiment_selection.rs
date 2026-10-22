@@ -405,8 +405,7 @@ pub fn expected_information_gain_with_prior_nats<H, E>(
     let step_width = 2.0 * INFORMATION_GAIN_Z_LIMIT / INFORMATION_GAIN_QUADRATURE_STEPS as f64;
     let mut quadrature = Vec::with_capacity(INFORMATION_GAIN_QUADRATURE_STEPS);
     for step_index in 0..INFORMATION_GAIN_QUADRATURE_STEPS {
-        let z =
-            -INFORMATION_GAIN_Z_LIMIT + (step_index as f64 + 0.5) * step_width;
+        let z = -INFORMATION_GAIN_Z_LIMIT + (step_index as f64 + 0.5) * step_width;
         quadrature.push((z, (-0.5 * z * z).exp() * step_width));
     }
     let weight_sum: f64 = quadrature.iter().map(|(_, weight)| weight).sum();
@@ -430,7 +429,7 @@ pub fn expected_information_gain_with_prior_nats<H, E>(
         }
         for &(z, weight) in &quadrature {
             log_terms.clear();
-            for other_mean in scaled_means.iter().copied() {
+            for (other_index, other_mean) in scaled_means.iter().copied().enumerate() {
                 let separation = (true_mean - other_mean) / scaled_noise;
                 let log_likelihood_ratio = if separation == 0.0 {
                     0.0
@@ -439,8 +438,9 @@ pub fn expected_information_gain_with_prior_nats<H, E>(
                 } else {
                     -0.5 * separation * separation - z * separation
                 };
-                let prior_index = log_terms.len();
-                log_terms.push(log_prior_probabilities[prior_index] + log_likelihood_ratio);
+                log_terms.push(
+                    log_prior_probabilities[other_index] + log_likelihood_ratio,
+                );
             }
             let log_mixture_ratio = log_sum_exp(&log_terms);
             information_gain -=
