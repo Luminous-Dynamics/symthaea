@@ -395,9 +395,13 @@ impl ChvorinovModel {
                     {
                         return Err(CastingModelError::NonFinitePrediction);
                     }
+                    let squared_error_s = absolute_error_s.powi(2);
+                    if !squared_error_s.is_finite() {
+                        return Err(CastingModelError::NonFinitePrediction);
+                    }
                     absolute_errors_s.push(absolute_error_s);
                     absolute_relative_errors.push(absolute_relative_error);
-                    squared_errors_s.push(absolute_error_s.powi(2));
+                    squared_errors_s.push(squared_error_s);
                     points.push(CastingValidationPoint {
                         thermal_modulus_m: observation.thermal_modulus_m,
                         observed_time_s: observation.solidification_time_s,
