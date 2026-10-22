@@ -401,7 +401,7 @@ if ! awk -F, '
     for (i = 12; i <= 15; i++) if ($i !~ /^[0-8]$/) failed = 1
     for (i = 16; i <= 19; i++) if ($i != "true" && $i != "false") failed = 1
     if (($4 > $5) != ($6 == "true")) failed = 1
-    if (($7 > $8) != ($9 == "true")) failed = 1
+    if ((($7 > $8) || ($19 == "true")) != ($9 == "true")) failed = 1
     if (($6 == "true" || $9 == "true") != ($10 == "true")) failed = 1
     if ($12 != (($6 == "true") ? 0 : 8)) failed = 1
     if (($13 < 8) != ($9 == "true")) failed = 1
