@@ -344,7 +344,7 @@ fn sample_points(
                 })
                 .collect()
         }
-        SamplingDesign::AdaptiveNearestNeighbor => {
+        SamplingDesign::AdaptiveNearestNeighbor | SamplingDesign::GaussianProcessLcb => {
             return Err(BenchmarkError::AdaptiveRequiresHistory);
         }
     };
@@ -1362,6 +1362,18 @@ mod tests {
                 &[],
             ),
             Err(BenchmarkError::EmptySeedSet)
+        );
+    }
+
+    #[test]
+    fn sequential_methods_cannot_be_invoked_as_fixed_designs() {
+        assert_eq!(
+            sample_points(SamplingDesign::AdaptiveNearestNeighbor, BUDGET, 1),
+            Err(BenchmarkError::AdaptiveRequiresHistory)
+        );
+        assert_eq!(
+            sample_points(SamplingDesign::GaussianProcessLcb, BUDGET, 1),
+            Err(BenchmarkError::AdaptiveRequiresHistory)
         );
     }
 
