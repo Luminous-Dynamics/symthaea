@@ -61,7 +61,7 @@ jobs:
           awk -F '\t' '
             $1 == "RUN_HEADER" { if (NF != 22) bad=1; run_headers++ }
             $1 == "RUN" { if (NF != 22) bad=1; runs++ }
-            $1 == "SUMMARY_HEADER" { if (NF != 27) bad=1; summary_headers++ }
+            $1 == "SUMMARY_HEADER" { if (NF != 29) bad=1; summary_headers++ }
             $1 == "SUMMARY" { if (NF != 27) bad=1; summaries++ }
             END {
               if (bad || run_headers != 1 || runs != 1152 ||
