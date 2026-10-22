@@ -1172,8 +1172,14 @@ jobs:
               insight_splits = {}
               family_components = {}
               family_splits = {}
+              outcome_pair_ids = set()
               for pair in pairs:
                   pair_id = pair["pair_id"]
+                  for outcome_key in ("base_outcome_pair_id", "counterfactual_outcome_pair_id"):
+                      outcome_pair_id = pair[outcome_key]
+                      if outcome_pair_id in outcome_pair_ids:
+                          raise ValueError(f"{pair_id}: outcome pair IDs must uniquely link contrast rows")
+                      outcome_pair_ids.add(outcome_pair_id)
                   src = pair["source_insight"]
                   tgt = pair["target"]
                   mutation = pair["mutation"]
@@ -1238,6 +1244,10 @@ jobs:
           duplicate_pair["pairs"][1]["pair_id"] = duplicate_pair["pairs"][0]["pair_id"]
           mutants.append(duplicate_pair)
 
+          duplicate_outcome_link = copy.deepcopy(fixture)
+          duplicate_outcome_link["pairs"][1]["base_outcome_pair_id"] = duplicate_outcome_link["pairs"][0]["base_outcome_pair_id"]
+          mutants.append(duplicate_outcome_link)
+
           identical_statement = copy.deepcopy(fixture)
           identical_statement["pairs"][1]["target"]["counterfactual_statement_sha256"] = identical_statement["pairs"][1]["target"]["base_statement_sha256"]
           mutants.append(identical_statement)
@@ -1293,7 +1303,7 @@ jobs:
                   continue
               raise SystemExit(f"counterfactual suite negative control {index} unexpectedly passed")
 
-          print("PITB_COUNTERFACTUAL_SUITE_PASS: 7 synthetic pairs validated; paired reviewers and split/component integrity enforced; 12 negative controls rejected")
+          print("PITB_COUNTERFACTUAL_SUITE_PASS: 7 synthetic pairs validated; paired reviewers and split/component integrity enforced; 13 negative controls rejected")
           PY
       - name: Audit pinned Dalek Lean Bench timeline
         shell: bash
