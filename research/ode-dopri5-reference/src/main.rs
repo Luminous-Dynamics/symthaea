@@ -447,7 +447,8 @@ mod tests {
             .iter()
             .map(|state| vec![state[0], state[1]])
             .collect();
-        assert_eq!(times.len(), stats.accepted_steps + 1);
+        let accepted_steps = usize::try_from(stats.accepted_steps).unwrap();
+        assert_eq!(times.len(), accepted_steps + 1);
         assert_eq!(times.len(), states.len());
         let samples = quintic_hermite_sample_grid(times, &states).unwrap();
         assert_eq!(samples.len(), COMMON_OUTPUT_INTERVALS + 1);
