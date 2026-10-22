@@ -47,7 +47,6 @@ impl PredictionErrorScales {
     pub const fn min_margin_scale(self) -> f64 {
         self.min_margin_scale
     }
-
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -342,8 +341,8 @@ impl ScopeCusumMonitor {
     /// Incorporate the current step. An alarm is latched until reset.
     pub fn observe(&mut self, score: PredictionErrorScore) -> bool {
         let statistic = self.accumulator.observe(score);
-        self.alarmed |= statistic > self.threshold.score_threshold()
-            || score.false_safe_prediction();
+        self.alarmed |=
+            statistic > self.threshold.score_threshold() || score.false_safe_prediction();
         self.alarmed
     }
 
@@ -397,8 +396,8 @@ mod tests {
         assert!(calibrate_scope_threshold(&[], 0.05).is_none());
         assert!(calibrate_scope_threshold(&[0.1, f64::NAN], 0.05).is_none());
         assert!(calibrate_scope_threshold(&nominal_scores(), 0.0).is_none());
-        let threshold = calibrate_scope_threshold(&nominal_scores(), 0.05)
-            .expect("valid threshold");
+        let threshold =
+            calibrate_scope_threshold(&nominal_scores(), 0.05).expect("valid threshold");
         assert_eq!(threshold.calibration_episodes(), 159);
         assert_eq!(threshold.target_false_alarm_rate(), 0.05);
     }
@@ -430,11 +429,9 @@ mod tests {
     #[test]
     fn cusum_accumulates_subthreshold_residuals_and_can_reset() {
         let nominal_episode_cusum_maxima = vec![0.07; 159];
-        let threshold =
-            calibrate_scope_threshold(&nominal_episode_cusum_maxima, 0.05)
-                .expect("valid CUSUM-specific threshold");
-        let mut monitor =
-            ScopeCusumMonitor::new(0.01, threshold).expect("valid allowance");
+        let threshold = calibrate_scope_threshold(&nominal_episode_cusum_maxima, 0.05)
+            .expect("valid CUSUM-specific threshold");
+        let mut monitor = ScopeCusumMonitor::new(0.01, threshold).expect("valid allowance");
         let one_step = score_with_magnitude(0.02);
         assert!(one_step.score() < monitor.threshold());
 
@@ -454,19 +451,10 @@ mod tests {
         assert!(ScopeCusumAccumulator::new(f64::NAN).is_none());
         assert!(ScopeCusumAccumulator::new(-0.01).is_none());
 
-        let threshold = calibrate_scope_threshold(&vec![10.0; 159], 0.05)
-            .expect("high threshold");
-        let mut monitor =
-            ScopeCusumMonitor::new(0.05, threshold).expect("valid allowance");
-        let false_safe = score_prediction_error(
-            0.151,
-            0.879,
-            0.149,
-            0.881,
-            limits(),
-            scales(),
-        )
-        .expect("valid false-safe prediction");
+        let threshold = calibrate_scope_threshold(&vec![10.0; 159], 0.05).expect("high threshold");
+        let mut monitor = ScopeCusumMonitor::new(0.05, threshold).expect("valid allowance");
+        let false_safe = score_prediction_error(0.151, 0.879, 0.149, 0.881, limits(), scales())
+            .expect("valid false-safe prediction");
         assert!(monitor.observe(false_safe));
         assert!(monitor.alarmed());
         assert!(monitor.statistic() < monitor.threshold());
