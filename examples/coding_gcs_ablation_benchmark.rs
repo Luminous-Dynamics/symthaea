@@ -390,39 +390,69 @@ fn mode_summary(results: &[EvalResult], enabled: bool) -> serde_json::Value {
     let verification_elapsed_ms_p50 = nearest_rank_percentile(&mut verification_elapsed_values.clone(), 0.50).unwrap_or(0);
     let verification_elapsed_ms_p95 = nearest_rank_percentile(&mut verification_elapsed_values.clone(), 0.95).unwrap_or(0);
     let energy: f64 = mode.iter().map(|r| r.energy).sum();
-    let tier_attempt_count = |target: &str| -> usize {
+    let selected_tier_count = |target: &str| -> usize {
         mode.iter()
-            .map(|run| run.generation_tiers.iter().filter(|tier| tier.as_str() == target).count())
+            .map(|run| run.selected_generation_tiers.iter().filter(|tier| tier.as_str() == target).count())
             .sum()
     };
-    let runs_with_external_llm_tier = mode
+    let backend_attempt_count = |target: &str| -> usize {
+        mode.iter()
+            .map(|run| run.backend_attempts.iter().filter(|attempt| attempt.tier == target).count())
+            .sum()
+    };
+    let backend_attempts_succeeded = mode
+        .iter()
+        .flat_map(|run| run.backend_attempts.iter())
+        .filter(|attempt| attempt.success)
+        .count();
+    let backend_attempts_failed = mode
+        .iter()
+        .flat_map(|run| run.backend_attempts.iter())
+        .filter(|attempt| !attempt.success)
+        .count();
+    let runs_with_external_backend_attempts = mode
         .iter()
         .filter(|run| {
-            run.generation_tiers
-                .iter()
-                .any(|tier| matches!(tier.as_str(), "LocalLLM" | "CloudLLM"))
+            run.backend_attempts.iter().any(|attempt| {
+                matches!(attempt.tier.as_str(), "LocalLLM" | "CloudLLM")
+            })
         })
         .count();
-    let runs_with_simulated_tier = mode
+    let runs_with_simulated_backend_attempts = mode
         .iter()
-        .filter(|run| run.generation_tiers.iter().any(|tier| tier.as_str() == "Simulated"))
+        .filter(|run| run.backend_attempts.iter().any(|attempt| attempt.tier == "Simulated"))
         .count();
-    let runs_with_no_generation_attempts = mode
+    let runs_with_no_backend_attempts = mode
         .iter()
-        .filter(|run| run.generation_tiers.is_empty())
+        .filter(|run| run.backend_attempts.is_empty())
         .count();
+    let mut backend_name_counts = BTreeMap::<String, usize>::new();
+    for attempt in mode.iter().flat_map(|run| run.backend_attempts.iter()) {
+        *backend_name_counts.entry(attempt.backend_name.clone()).or_insert(0) += 1;
+    }
+    let backend_attempts_by_name = serde_json::json!(backend_name_counts);
     serde_json::json!({
         "gcs_advisories_enabled": enabled,
-        "generation_tier_attempts": {
-            "Native": tier_attempt_count("Native"),
-            "Hardware": tier_attempt_count("Hardware"),
-            "LocalLLM": tier_attempt_count("LocalLLM"),
-            "CloudLLM": tier_attempt_count("CloudLLM"),
-            "Simulated": tier_attempt_count("Simulated")
+        "selected_tier_decisions": {
+            "Native": selected_tier_count("Native"),
+            "Hardware": selected_tier_count("Hardware"),
+            "LocalLLM": selected_tier_count("LocalLLM"),
+            "CloudLLM": selected_tier_count("CloudLLM"),
+            "Simulated": selected_tier_count("Simulated")
         },
-        "runs_with_external_llm_tier": runs_with_external_llm_tier,
-        "runs_with_simulated_tier": runs_with_simulated_tier,
-        "runs_with_no_generation_attempts": runs_with_no_generation_attempts,
+        "backend_attempts_by_tier": {
+            "Native": backend_attempt_count("Native"),
+            "Hardware": backend_attempt_count("Hardware"),
+            "LocalLLM": backend_attempt_count("LocalLLM"),
+            "CloudLLM": backend_attempt_count("CloudLLM"),
+            "Simulated": backend_attempt_count("Simulated")
+        },
+        "backend_attempts_by_name": backend_attempts_by_name,
+        "backend_attempts_succeeded": backend_attempts_succeeded,
+        "backend_attempts_failed": backend_attempts_failed,
+        "runs_with_external_backend_attempts": runs_with_external_backend_attempts,
+        "runs_with_simulated_backend_attempts": runs_with_simulated_backend_attempts,
+        "runs_with_no_backend_attempts": runs_with_no_backend_attempts,
         "runs": total,
         "behavioral_successes": passed,
         "pass_rate": if total == 0 { 0.0 } else { passed as f64 / total as f64 },
