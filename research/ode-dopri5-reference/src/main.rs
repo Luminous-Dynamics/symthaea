@@ -54,10 +54,10 @@ fn max_relative_energy_drift(states: impl Iterator<Item = [f64; 2]>, scale: f64)
 }
 
 /// Resample an adaptive Cash–Karp trajectory at the same times as Dopri5's
-/// dense-output grid. The interpolant is cubic Hermite, using the harmonic-oscillator
-/// identity f([x,v])=[v,-x]. This is benchmark post-processing, not production dense
-/// output, and its arithmetic is not counted as integration RHS work.
-fn cubic_hermite_sample_grid(
+/// dense-output grid. The quintic Hermite interpolant uses the harmonic oscillator's
+/// known first and second derivatives. This is benchmark post-processing, not production
+/// dense output, and its arithmetic is not counted as integration RHS work.
+fn quintic_hermite_sample_grid(
     times: &[f64],
     states: &[Vec<f64>],
 ) -> Option<Vec<(f64, [f64; 2])>> {
@@ -105,17 +105,32 @@ fn cubic_hermite_sample_grid(
         let y1 = &states[interval + 1];
         let s2 = s * s;
         let s3 = s2 * s;
-        let h00 = 2.0 * s3 - 3.0 * s2 + 1.0;
-        let h10 = s3 - 2.0 * s2 + s;
-        let h01 = -2.0 * s3 + 3.0 * s2;
-        let h11 = s3 - s2;
+        let s4 = s3 * s;
+        let s5 = s4 * s;
+        let h00 = 1.0 - 10.0 * s3 + 15.0 * s4 - 6.0 * s5;
+        let h10 = s - 6.0 * s3 + 8.0 * s4 - 3.0 * s5;
+        let h20 = 0.5 * (s2 - 3.0 * s3 + 3.0 * s4 - s5);
+        let h01 = 10.0 * s3 - 15.0 * s4 + 6.0 * s5;
+        let h11 = -4.0 * s3 + 7.0 * s4 - 3.0 * s5;
+        let h21 = 0.5 * (s3 - 2.0 * s4 + s5);
 
         let x0 = y0[0];
         let v0 = y0[1];
         let x1 = y1[0];
         let v1 = y1[1];
-        let x = h00 * x0 + h10 * h * v0 + h01 * x1 + h11 * h * v1;
-        let v = h00 * v0 + h10 * h * (-x0) + h01 * v1 + h11 * h * (-x1);
+        let h_squared = h * h;
+        let x = h00 * x0
+            + h10 * h * v0
+            + h20 * h_squared * (-x0)
+            + h01 * x1
+            + h11 * h * v1
+            + h21 * h_squared * (-x1);
+        let v = h00 * v0
+            + h10 * h * (-x0)
+            + h20 * h_squared * (-v0)
+            + h01 * v1
+            + h11 * h * (-x1)
+            + h21 * h_squared * (-v1);
         if !x.is_finite() || !v.is_finite() {
             return None;
         }
@@ -190,7 +205,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             let mut custom_samples: Option<Vec<(f64, [f64; 2])>> = None;
 
             let custom_fields = match custom {
-                Ok(report) => match cubic_hermite_sample_grid(
+                Ok(report) => match quintic_hermite_sample_grid(
                     &report.simulation.times,
                     &report.simulation.states,
                 ) {
@@ -374,7 +389,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn cubic_hermite_resampling_emits_the_frozen_grid() {
+    fn quintic_hermite_resampling_emits_the_frozen_grid() {
         let mut times = Vec::new();
         let mut states = Vec::new();
         for index in 0..=40 {
@@ -383,7 +398,7 @@ mod tests {
             states.push(vec![time.cos(), -time.sin()]);
         }
 
-        let samples = cubic_hermite_sample_grid(&times, &states).unwrap();
+        let samples = quintic_hermite_sample_grid(&times, &states).unwrap();
         assert_eq!(samples.len(), COMMON_OUTPUT_INTERVALS + 1);
         assert_eq!(samples.first().unwrap().0, 0.0);
         assert_eq!(samples.last().unwrap().0, T_END);
@@ -395,9 +410,9 @@ mod tests {
             );
         }
 
-        // Cubic Hermite is a fourth-order dense approximation on this smooth fixture.
+        // Quintic Hermite is a sixth-order local interpolation approximation on this smooth fixture.
         let maximum_error = max_sampled_scaled_trajectory_error(samples.iter().copied(), 1.0);
-        assert!(maximum_error < 2.0e-5, "max interpolation error={maximum_error}");
+        assert!(maximum_error < 1.0e-7, "max interpolation error={maximum_error}");
     }
 
     #[test]
@@ -419,15 +434,15 @@ mod tests {
     }
 
     #[test]
-    fn cubic_hermite_resampling_rejects_malformed_adaptive_trajectories() {
-        assert!(cubic_hermite_sample_grid(&[], &[]).is_none());
-        assert!(cubic_hermite_sample_grid(&[0.0, 10.0], &[vec![0.0], vec![0.0]]).is_none());
-        assert!(cubic_hermite_sample_grid(
+    fn quintic_hermite_resampling_rejects_malformed_adaptive_trajectories() {
+        assert!(quintic_hermite_sample_grid(&[], &[]).is_none());
+        assert!(quintic_hermite_sample_grid(&[0.0, 10.0], &[vec![0.0], vec![0.0]]).is_none());
+        assert!(quintic_hermite_sample_grid(
             &[0.0, 10.0],
             &[vec![0.0, 0.0], vec![f64::NAN, 0.0]]
         )
         .is_none());
-        assert!(cubic_hermite_sample_grid(
+        assert!(quintic_hermite_sample_grid(
             &[0.0, 9.0],
             &[vec![0.0, 0.0], vec![0.0, 0.0]]
         )
