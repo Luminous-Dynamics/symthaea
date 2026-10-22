@@ -1,6 +1,6 @@
 # Broca governed-consolidation reference harness
 
-This dependency-free Rust harness is the first executable slice for [issue #8445](https://github.com/Luminous-Dynamics/symthaea/issues/8445). It creates deterministic synthetic evidence profiles with seed-controlled noise in observable features, separates policy-visible evidence features from evaluator-only ground truth, scores candidate consolidation actions with an explicit utility/storage-cost table, and emits per-candidate JSONL receipts. Protocol `GMCv2` differs from the first prototype because seeds now change evidence features, not just candidate order.
+This dependency-free Rust harness is the first executable slice for [issue #8445](https://github.com/Luminous-Dynamics/symthaea/issues/8445). It creates deterministic synthetic evidence profiles with seed-controlled noise in observable features, separates policy-visible evidence features from evaluator-only ground truth, scores candidate consolidation actions with an explicit utility/storage-cost table, and emits per-candidate JSONL receipts. Protocol `GMCv2` changes observable evidence features across seeds rather than merely reshuffling a fixed set of profiles.
 
 **It is not the published ConsolidationBench, is not an evaluation of Liquid Broca, and does not establish generalization or SOTA.** The oracle is constructed from the harness's own synthetic utility contract. Results are valid only as tests of policies on this generator.
 
@@ -16,7 +16,7 @@ cargo run --manifest-path research/broca-consolidation/Cargo.toml --release -- \
   > consolidation-reference.jsonl
 ```
 
-The exact 40-character source commit is required. The harness validates its oracle and negative controls before emitting the completion record or any result-shaped rows.
+The exact 40-character source commit is required. The harness validates its oracle and negative controls before emitting the completion record or any result-shaped rows. Candidate-policy quality is reported, not used to invalidate a run: a poor result must remain observable rather than being silently suppressed.
 
 ## Decision levels
 
@@ -62,6 +62,8 @@ Output is deterministic JSONL with:
 - per-policy summaries and explicit anti-control results.
 
 Seeded feature noise perturbs repeat count, distinct episodes, contradictions, recency, independent successes, provenance diversity and occasionally the observed correction signal. Policy-visible features can therefore differ within one ground-truth class; the generator remains synthetic and its class-conditioned templates are still hand-specified. This is a useful stress test, not realistic distributional coverage.
+
+The seeded feature perturbation now varies repeat count, distinct episodes, contradiction count, recency, independent successes, provenance diversity, and occasionally the observed correction signal. Class-conditioned feature templates remain hand-specified, so this is a controlled robustness generator, not realistic distributional coverage.
 
 The FNV-1a fixture fingerprint is non-cryptographic and is not a dataset-integrity proof. Replace it with the repository's canonical cryptographic digest when integrating with production benchmark tooling.
 
