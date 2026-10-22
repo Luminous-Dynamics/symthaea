@@ -772,4 +772,112 @@ mod tests {
     fn bootstrap_rejects_too_few_replicates() {
         assert!(cluster_bootstrap_ci(&[0.0, 1.0], 999, 1).is_err());
     }
+
+    fn fixture_receipt() -> Receipt {
+        let digest = "a".repeat(64);
+        let commit = "b".repeat(40);
+        let document = serde_json::json!({
+            "receipt_id": "SLD-RUN-FIXTURE-0001",
+            "schema_version": "sld-evaluation-receipt-0.1",
+            "run_status": "COMPLETE",
+            "evaluation_mode": "MODEL_BEHAVIOR",
+            "started_at": "2026-10-22T12:00:00Z",
+            "finished_at": "2026-10-22T12:01:00Z",
+            "source": {
+                "commit_sha": commit,
+                "working_tree": "CLEAN",
+                "toolchain": "rustc-test-fixture"
+            },
+            "case_set": {
+                "dataset_id": "fixture",
+                "dataset_version": "0.1",
+                "visibility": "PUBLIC",
+                "schema_sha256": digest,
+                "corpus_sha256": digest,
+                "inventory_sha256": digest,
+                "expected_case_count": 2,
+                "expected_case_ids": ["CASE-1", "CASE-2"],
+                "split_id": "test",
+                "split_seed": "1"
+            },
+            "subject": {
+                "provider": "fixture",
+                "model_id": "model-a",
+                "model_snapshot": "snapshot-1",
+                "weights_sha256": null,
+                "endpoint_class": "LOCAL_RUNTIME"
+            },
+            "generation": {
+                "system_prompt_sha256": digest,
+                "prompt_bundle_sha256": digest,
+                "decoding_config_sha256": digest,
+                "tool_policy_sha256": digest,
+                "memory_policy": "NONE",
+                "max_turns": 5,
+                "seed": 1,
+                "temperature": 0.0,
+                "top_p": 1.0,
+                "tool_versions_sha256": digest
+            },
+            "evaluator": {
+                "rubric_sha256": digest,
+                "judge_panel": [{
+                    "judge_id": "fixture-judge",
+                    "snapshot": "fixture-1",
+                    "implementation_sha256": digest
+                }],
+                "human_review_status": "NOT_PERFORMED",
+                "independent_adjudication_status": "NOT_PERFORMED"
+            },
+            "environment": {
+                "os_arch": "fixture",
+                "runtime": "fixture",
+                "dependency_lock_sha256": digest,
+                "hardware_class": "fixture"
+            },
+            "case_results": [
+                {"case_id": "CASE-1", "status": "PASS", "expected_policy": "x", "observed_policy": "x", "critical_invariant_failure": false, "response_sha256": digest, "reason_codes": []},
+                {"case_id": "CASE-2", "status": "FAIL", "expected_policy": "x", "observed_policy": "y", "critical_invariant_failure": false, "response_sha256": digest, "reason_codes": ["fixture"]}
+            ],
+            "summary": {
+                "expected": 2,
+                "observed": 2,
+                "pass": 1,
+                "fail": 1,
+                "indeterminate": 0,
+                "error": 0,
+                "skipped": 0,
+                "missing": 0,
+                "duplicate_ids": 0,
+                "critical_invariant_failures": 0
+            },
+            "limitations": ["synthetic test fixture"],
+            "comparison_eligibility": "COMPARABLE"
+        });
+        serde_json::from_value(document).expect("parse fixture receipt")
+    }
+
+    #[test]
+    fn receipt_validator_accepts_complete_census() {
+        let receipt = fixture_receipt();
+        let results = validate_receipt(&receipt, "fixture").expect("valid fixture");
+        assert_eq!(results.len(), 2);
+    }
+
+    #[test]
+    fn receipt_validator_rejects_incomplete_census() {
+        let mut receipt = fixture_receipt();
+        receipt.case_results.remove(0);
+        assert!(validate_receipt(&receipt, "fixture").is_err());
+    }
+
+    #[test]
+    fn compatibility_rejects_generation_mismatch() {
+        let a = fixture_receipt();
+        let mut b = fixture_receipt();
+        b.subject.model_id = "model-b".to_string();
+        b.generation.max_turns += 1;
+        assert!(validate_compatibility(&a, &b).is_err());
+    }
+
 }
