@@ -560,7 +560,7 @@ fn gp_solve_upper_from_lower_transpose(
 /// Fixed-hyperparameter Gaussian-process posterior for the currently observed data.
 /// The GP is fit once per proposal; candidate posterior queries reuse the Cholesky
 /// factor and alpha vector rather than refactoring per candidate.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 struct GaussianProcessPosterior {
     observed_points: Vec<Point>,
     mean_y: f64,
@@ -731,7 +731,7 @@ fn run_benchmark(
     let mut cost_to_first_feasible = None;
     let mut cost_to_target = None;
     let mut best_observed_objective: Option<f64> = None;
-    let mut best_true_objective_at_selected_point: Option<f64> = None;
+    let mut best_true_objective_among_feasible_queries: Option<f64> = None;
 
     for query_index in 0..budget {
         let point = if is_sequential {
@@ -779,7 +779,11 @@ fn run_benchmark(
                 }
                 if best_observed_objective.map_or(true, |best| observed < best) {
                     best_observed_objective = Some(observed);
-                    best_true_objective_at_selected_point =
+                }
+                if best_true_objective_among_feasible_queries
+                    .map_or(true, |best| record.true_objective_for_evaluation_only < best)
+                {
+                    best_true_objective_among_feasible_queries =
                         Some(record.true_objective_for_evaluation_only);
                 }
             }
@@ -789,7 +793,9 @@ fn run_benchmark(
         records.push(record);
     }
 
-    let simple_regret = best_true_objective_at_selected_point
+    // Simple regret uses the best evaluator-known truth among every feasible point
+    // actually queried, not merely the candidate with the best noisy observation.
+    let simple_regret = best_true_objective_among_feasible_queries
         .map(|value| (value - case.known_optimum_value()).max(0.0));
     let transcript_digest_blake3 =
         digest_transcript(case, design, fidelity, seed, budget, &records);
