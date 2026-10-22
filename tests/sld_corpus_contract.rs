@@ -679,6 +679,8 @@ fn validate_evaluation_receipt(receipt: &Value) -> Vec<String> {
         && oracle["case_assignment_randomized"] == true
         && oracle["case_authors_excluded_from_adjudication"] == true
         && oracle["conflicts_disclosed"] == true
+        && oracle["initial_label_pairwise_agreement_rate"].as_f64().is_some_and(|rate| rate.is_finite() && (0.0..=1.0).contains(&rate))
+        && oracle["initial_label_unanimous_case_rate"].as_f64().is_some_and(|rate| rate.is_finite() && (0.0..=1.0).contains(&rate))
         && oracle["completed_at"].as_str().is_some_and(|s| !s.trim().is_empty())
         && receipt["evaluator"]["independent_adjudication_status"].as_str() == Some("COMPLETE");
     let expected_eligibility = if run_status == "COMPLETE"
