@@ -1416,6 +1416,10 @@ jobs:
           bad_variant_artifact[1]["target"]["artifact_sha256"] = "0" * 64
           cases.append(("counterfactual artifact digest mismatch", bad_variant_artifact))
 
+          bad_variant_path = copy.deepcopy(source_rows)
+          bad_variant_path[1]["target"]["artifact_path"] = "synthetic/Target0.lean"
+          cases.append(("counterfactual artifact path mismatch", bad_variant_path))
+
           for name, rows in cases:
               bad_path = Path(f"{report_path.parent}/bad-counterfactual-{name.replace(' ', '-')}.jsonl")
               bad_path.write_text("".join(json.dumps(row) + "\n" for row in rows))
@@ -1456,7 +1460,19 @@ jobs:
           if result.returncode == 0:
               raise SystemExit("counterfactual analyzer unexpectedly accepted identical artifact digests for distinct variants")
 
-          print("PITB_COUNTERFACTUAL_ANALYZER_PASS: paired metrics, component bootstrap, calibration, report schema, ten malformed-outcome controls, one whole-suite leakage control, one identical-artifact control")
+          same_path_suite = copy.deepcopy(suite)
+          same_path_suite["pairs"][1]["target"]["counterfactual_artifact_path"] = same_path_suite["pairs"][1]["target"]["artifact_path"]
+          same_path_suite_path = report_path.parent / "bad-counterfactual-identical-paths.json"
+          same_path_suite_path.write_text(json.dumps(same_path_suite))
+          result = subprocess.run(
+              [str(binary), str(same_path_suite_path), str(outcomes_path), "test",
+               str(report_path.parent / "bad-counterfactual-identical-paths.report.json"), "1000", "17"],
+              capture_output=True, text=True
+          )
+          if result.returncode == 0:
+              raise SystemExit("counterfactual analyzer unexpectedly accepted one artifact path for two distinct artifacts")
+
+          print("PITB_COUNTERFACTUAL_ANALYZER_PASS: paired metrics, component bootstrap, calibration, report schema, eleven malformed-outcome controls, whole-suite leakage, distinct artifact digest/path controls")
           PY
       - name: Audit pinned Dalek Lean Bench timeline
         shell: bash
