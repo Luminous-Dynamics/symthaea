@@ -856,7 +856,11 @@ mod tests {
         let mut review = fixture();
         review["metric_assessments"][0]["value"] = json!(0.0);
         let errors = validate_review(&review).unwrap_err();
-        assert!(errors.iter().any(|error| error.contains("must not carry a value")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("must not carry a value"))
+        );
     }
 
     #[test]
@@ -877,7 +881,9 @@ mod tests {
         review["comparison"]["ranking_reasons"] = json!(["Some evidence is still missing."]);
         review["recommendation"]["status"] = json!("candidate-next-action");
         let errors = validate_review(&review).unwrap_err();
-        assert!(errors.iter().any(|error| error.contains("metadata-only source catalog cannot support computed metric")));
+        assert!(errors.iter().any(|error| {
+            error.contains("metadata-only source catalog cannot support computed metric")
+        }));
     }
 
     #[test]
@@ -885,7 +891,8 @@ mod tests {
         let mut review = fixture();
         review["inputs"]["source_catalog_status"] = json!("qualified");
         review["comparison"]["ranking_status"] = json!("qualified-comparison");
-        review["comparison"]["ranking_reasons"] = json!(["All declared comparison requirements were structurally qualified."]);
+        review["comparison"]["ranking_reasons"] =
+            json!(["All declared comparison requirements were structurally qualified."]);
         review["metric_assessments"][0] = json!({
             "metric_id":"heat.shade_fraction_at_declared_time",
             "family":"heat-and-comfort",
@@ -898,7 +905,11 @@ mod tests {
             "uncertainty":{"kind":"qualitative","description":"Scenario range requires calibration."}
         });
         let errors = validate_review(&review).unwrap_err();
-        assert!(errors.iter().any(|error| error.contains("LOCAL_CARTESIAN_DRAWING_UNITS frame cannot support")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("LOCAL_CARTESIAN_DRAWING_UNITS frame cannot support"))
+        );
     }
 
     #[test]
@@ -915,7 +926,11 @@ mod tests {
             "model_version":"1.0"
         }]);
         let errors = validate_review(&review).unwrap_err();
-        assert!(errors.iter().any(|error| error.contains("analytical simulation cannot be qualified")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("analytical simulation cannot be qualified"))
+        );
     }
 
     #[test]
@@ -927,22 +942,34 @@ mod tests {
         review["metric_assessments"][0]["status"] = json!("computed");
         review["metric_assessments"][0]["value"] = json!(1.0);
         let errors = validate_review(&review).unwrap_err();
-        assert!(errors.iter().any(|error| error.contains("synthetic benchmark geometry cannot qualify")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("synthetic benchmark geometry cannot qualify"))
+        );
     }
 
     #[test]
     fn unknown_tradeoff_alternative_fails_closed() {
         let mut review = fixture();
         review["comparison"]["pairwise_tradeoffs"][0]["left_alternative_id"] = json!("not-present");
-        assert!(validate_review(&review).unwrap_err().iter().any(|error| error.contains("both referenced alternatives must exist")));
+        assert!(
+            validate_review(&review)
+                .unwrap_err()
+                .iter()
+                .any(|error| error.contains("both referenced alternatives must exist"))
+        );
     }
 
     fn paired_scenario_review_fixture() -> Value {
         let mut review = fixture();
         let baseline_id = string_value(review["alternatives"][0].get("alternative_id")).to_owned();
-        let alternative_id = string_value(review["alternatives"][1].get("alternative_id")).to_owned();
-        let baseline_design_sha = string_value(review["alternatives"][0].get("snapshot_sha256")).to_owned();
-        let alternative_design_sha = string_value(review["alternatives"][1].get("snapshot_sha256")).to_owned();
+        let alternative_id =
+            string_value(review["alternatives"][1].get("alternative_id")).to_owned();
+        let baseline_design_sha =
+            string_value(review["alternatives"][0].get("snapshot_sha256")).to_owned();
+        let alternative_design_sha =
+            string_value(review["alternatives"][1].get("snapshot_sha256")).to_owned();
         let registry_sha = string_value(review["inputs"].get("metric_registry_sha256")).to_owned();
         let boundary_sha = "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
         let evaluation_sha = "1111111111111111111111111111111111111111111111111111111111111111";
@@ -1011,9 +1038,11 @@ mod tests {
         review["inputs"]["scenario_runs"][1]["pairing_context"]["boundary_conditions_sha256"] =
             json!("0000000000000000000000000000000000000000000000000000000000000000");
         let errors = validate_review(&review).unwrap_err();
-        assert!(errors.iter().any(|error| {
-            error.contains("must match across paired alternatives")
-        }));
+        assert!(
+            errors
+                .iter()
+                .any(|error| { error.contains("must match across paired alternatives") })
+        );
     }
 
     #[test]
@@ -1022,9 +1051,11 @@ mod tests {
         review["inputs"]["scenario_runs"][1]["pairing_context"]["design_snapshot_sha256"] =
             json!("0000000000000000000000000000000000000000000000000000000000000000");
         let errors = validate_review(&review).unwrap_err();
-        assert!(errors.iter().any(|error| {
-            error.contains("does not match the exact alternative snapshot")
-        }));
+        assert!(
+            errors
+                .iter()
+                .any(|error| { error.contains("does not match the exact alternative snapshot") })
+        );
     }
 
     #[test]
@@ -1041,7 +1072,12 @@ mod tests {
     fn invalid_input_digest_is_rejected() {
         let mut review = fixture();
         review["inputs"]["source_catalog_sha256"] = json!("not-a-digest");
-        assert!(validate_review(&review).unwrap_err().iter().any(|error| error.contains("expected 64 lowercase hexadecimal")));
+        assert!(
+            validate_review(&review)
+                .unwrap_err()
+                .iter()
+                .any(|error| error.contains("expected 64 lowercase hexadecimal"))
+        );
     }
 }
 
@@ -1063,7 +1099,10 @@ mod schema_tests {
 
         assert_eq!(schema["$id"], REVIEW_SCHEMA_URI);
         assert_eq!(schema["properties"]["schema"]["const"], REVIEW_SCHEMA);
-        assert_eq!(schema["properties"]["schema_uri"]["const"], REVIEW_SCHEMA_URI);
+        assert_eq!(
+            schema["properties"]["schema_uri"]["const"],
+            REVIEW_SCHEMA_URI
+        );
         assert!(validate_review(&fixture).is_ok());
     }
 }
