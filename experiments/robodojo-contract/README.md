@@ -26,6 +26,8 @@ The `active_sensing` module adds a value-of-information decision for acquiring a
 
 The sensing function has no sensor or actuator I/O and does not establish that its forecasts are calibrated. Its probability and cost inputs must come from a preregistered evaluation, and the caller must re-evaluate after the new observation while retaining its independent collision, workspace, interlock, and actuator checks. Eleven synthetic unit tests cover value-positive sensing, low-value sensing, risk-bound recovery, unavailable/missing evidence, over-budget cases, and invalid inputs. These fixtures test decision arithmetic only; they are not robot performance measurements.
 
+Research grounding: Krishna, Hu and Jayaraman, *The Value of Sensory Information to a Robot* (ICLR 2025), empirically studies sensing value by withholding task-relevant observations at different states and finds that sensing criticality depends strongly on task stochasticity and policy. This module is a new cost/risk-gated decision primitive; it does not reproduce that study or prove it improves any policy. The benchmark should compare no-extra-sensing, fixed-rate sensing, uncertainty-triggered sensing, and this cost-sensitive rule with matched trials and held-out conditions. Source: https://proceedings.iclr.cc/paper_files/paper/2025/hash/e1126028d9f1f69c13571ec462084d31-Abstract-Conference.html.
+
 ## Trial TSV schema
 
 The CLI requires this exact tab-separated header, in this order:
