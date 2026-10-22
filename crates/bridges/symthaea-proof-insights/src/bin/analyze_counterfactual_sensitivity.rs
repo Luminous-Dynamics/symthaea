@@ -670,6 +670,12 @@ fn validate_counterfactual_suite(suite: &Value) -> Result<()> {
 
     let mut pair_ids = BTreeSet::new();
     let mut outcome_ids = BTreeSet::new();
+    // A record ID and a pinned (commit, path) must identify one immutable
+    // artifact payload throughout the suite; otherwise duplicate labels can
+    // conceal changed source bytes behind an unchanged logical identity.
+    let mut source_record_identity =
+        BTreeMap::<String, (String, String, String, String)>::new();
+    let mut target_artifact_identity = BTreeMap::<(String, String), String>::new();
     for (index, pair) in pairs.iter().enumerate() {
         let pair_context = format!("suite.pairs[{index}]");
         require_exact_keys(
@@ -723,19 +729,36 @@ fn validate_counterfactual_suite(suite: &Value) -> Result<()> {
             &[],
             &source_context,
         )?;
-        required_string(source, "record_id", &source_context)?;
-        required_string(source, "family_id", &source_context)?;
+        let source_record_id = required_string(source, "record_id", &source_context)?.to_owned();
+        let source_family_id = required_string(source, "family_id", &source_context)?.to_owned();
+        let source_commit = required_string(source, "source_commit", &source_context)?;
         validate_digest(
-            required_string(source, "source_commit", &source_context)?,
+            source_commit,
             40,
             &format!("{source_context}.source_commit"),
         )?;
-        for key in ["source_artifact_sha256", "insight_sha256"] {
-            validate_digest(
-                required_string(source, key, &source_context)?,
-                64,
-                &format!("{source_context}.{key}"),
-            )?;
+        let source_artifact_digest = required_string(source, "source_artifact_sha256", &source_context)?;
+        let insight_digest = required_string(source, "insight_sha256", &source_context)?;
+        validate_digest(
+            source_artifact_digest,
+            64,
+            &format!("{source_context}.source_artifact_sha256"),
+        )?;
+        validate_digest(
+            insight_digest,
+            64,
+            &format!("{source_context}.insight_sha256"),
+        )?;
+        let identity = (
+            source_family_id,
+            source_commit.to_owned(),
+            source_artifact_digest.to_owned(),
+            insight_digest.to_owned(),
+        );
+        if let Some(previous) = source_record_identity.insert(source_record_id.clone(), identity.clone()) {
+            if previous != identity {
+                bail!("{source_context}: source record ID maps to conflicting immutable provenance");
+            }
         }
 
         let target = pair.get("target").context("target missing")?;
@@ -758,8 +781,9 @@ fn validate_counterfactual_suite(suite: &Value) -> Result<()> {
         )?;
         required_string(target, "target_id", &target_context)?;
         required_string(target, "family_id", &target_context)?;
+        let target_commit = required_string(target, "source_commit", &target_context)?;
         validate_digest(
-            required_string(target, "source_commit", &target_context)?,
+            target_commit,
             40,
             &format!("{target_context}.source_commit"),
         )?;
@@ -791,10 +815,23 @@ fn validate_counterfactual_suite(suite: &Value) -> Result<()> {
                 &format!("{target_context}.{key}"),
             )?;
         }
-        if required_string(target, "base_artifact_sha256", &target_context)?
-            == required_string(target, "counterfactual_artifact_sha256", &target_context)?
-        {
+        let base_artifact_digest =
+            required_string(target, "base_artifact_sha256", &target_context)?.to_owned();
+        let counterfactual_artifact_digest =
+            required_string(target, "counterfactual_artifact_sha256", &target_context)?.to_owned();
+        if base_artifact_digest == counterfactual_artifact_digest {
             bail!("{target_context} base and counterfactual artifact digests must differ");
+        }
+        for (artifact_path, artifact_digest) in [
+            (base_path, base_artifact_digest.as_str()),
+            (counterfactual_path, counterfactual_artifact_digest.as_str()),
+        ] {
+            let key = (target_commit.to_owned(), artifact_path.to_owned());
+            if let Some(previous) = target_artifact_identity.insert(key, artifact_digest.to_owned()) {
+                if previous != artifact_digest {
+                    bail!("{target_context}: one pinned commit/path maps to conflicting artifact digests");
+                }
+            }
         }
         if required_string(target, "base_statement_sha256", &target_context)?
             == required_string(target, "counterfactual_statement_sha256", &target_context)?
