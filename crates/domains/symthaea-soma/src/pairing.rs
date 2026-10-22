@@ -261,7 +261,8 @@ impl PairingManager {
     /// Handle an inbound challenge from a peer.
     ///
     /// Signs (or, in the fallback build, MACs via an X25519-derived shared
-    /// key) the nonce and queues the response.
+    /// key) the versioned transcript binding the nonce and both public keys,
+    /// then queues the response.
     /// Returns `false` if mode is Off, no keypair, or (fallback build only)
     /// `initiator_pubkey` is not a valid X25519 public key.
     pub fn receive_challenge(
@@ -286,7 +287,7 @@ impl PairingManager {
             Some(transcript) => transcript,
             None => return false,
         };
-        let signature = match self.sign_nonce(&transcript, &seed, initiator_pubkey) {
+        let signature = match self.authenticate_transcript(&transcript, &seed, initiator_pubkey) {
             Some(sig) => sig,
             None => return false,
         };
@@ -335,7 +336,7 @@ impl PairingManager {
             &challenge.initiator_pubkey,
             pubkey,
         ) {
-            Some(transcript) => self.verify_signature(&transcript, signature, pubkey),
+            Some(transcript) => self.verify_transcript(&transcript, signature, pubkey),
             None => false,
         };
         if !valid {
@@ -470,7 +471,7 @@ impl PairingManager {
     }
 
     #[cfg(feature = "pairing")]
-    fn sign_nonce(
+    fn authenticate_transcript(
         &self,
         transcript: &[u8],
         seed: &[u8; 32],
@@ -498,7 +499,7 @@ impl PairingManager {
     }
 
     #[cfg(feature = "pairing")]
-    fn verify_signature(&self, transcript: &[u8], signature: &[u8], pubkey: &[u8]) -> bool {
+    fn verify_transcript(&self, transcript: &[u8], signature: &[u8], pubkey: &[u8]) -> bool {
         use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 
         if signature.len() != 64 || pubkey.len() != 32 {
@@ -875,21 +876,22 @@ mod tests {
             other => panic!("Expected Response, got {:?}", other),
         };
 
-        // An eavesdropper who naively tries "keyed_hash(bob_pubkey, nonce)"
-        // -- the old (broken) scheme, where the transmitted pubkey WAS the
-        // MAC key -- must NOT reproduce the real MAC.
-        let forged = blake3::keyed_hash(bob_pubkey[..32].try_into().unwrap(), &nonce);
+        // The v2 transcript is public; the MAC key must still come from
+        // private DH output, not either transmitted public key.
+        let transcript = pairing_transcript(&nonce, &alice_pubkey, &bob_pubkey).unwrap();
+        let forged = blake3::keyed_hash(bob_pubkey[..32].try_into().unwrap(), &transcript);
         assert_ne!(
             forged.as_bytes().to_vec(),
             mac,
-            "MAC must not be derivable from the transmitted pubkey alone"
+            "MAC must not be derivable from the responder public key alone"
         );
         // Likewise using alice's transmitted pubkey as a naive MAC key.
-        let forged_alice = blake3::keyed_hash(alice_pubkey[..32].try_into().unwrap(), &nonce);
+        let forged_alice =
+            blake3::keyed_hash(alice_pubkey[..32].try_into().unwrap(), &transcript);
         assert_ne!(
             forged_alice.as_bytes().to_vec(),
             mac,
-            "MAC must not be derivable from the initiator's transmitted pubkey alone"
+            "MAC must not be derivable from the initiator public key alone"
         );
 
         // But Alice, who holds her own private key, CAN verify it (sanity).
