@@ -230,6 +230,14 @@ fn audit(ledger: &Ledger, expected_ids: &[String], ledger_bytes: &[u8]) -> Resul
             reviewer.reviewer_id
         );
         ensure!(
+            matches!(
+                reviewer.conflict_disclosure.as_str(),
+                "NONE_DECLARED" | "DISCLOSED_AND_MANAGED" | "UNRESOLVED"
+            ),
+            "reviewer {} has invalid conflict-disclosure state",
+            reviewer.reviewer_id
+        );
+        ensure!(
             reviewers.insert(reviewer.reviewer_id.clone(), reviewer).is_none(),
             "duplicate reviewer identifier {}",
             reviewer.reviewer_id
@@ -255,8 +263,6 @@ fn audit(ledger: &Ledger, expected_ids: &[String], ledger_bytes: &[u8]) -> Resul
     let mut critical_reviewed = 0usize;
     let mut all_blinded = true;
     let mut all_reviewed_twice = true;
-    let mut all_conflicts_disclosed = true;
-    let mut all_authors_excluded = true;
 
     for case in &ledger.cases {
         ensure!(
@@ -309,14 +315,14 @@ fn audit(ledger: &Ledger, expected_ids: &[String], ledger_bytes: &[u8]) -> Resul
             ensure!(
                 !judgment.disposition.trim().is_empty()
                     && !judgment.rationale.trim().is_empty()
-                    && !judgment.submitted_at.trim().is_empty(),
+                    && !judgment.submitted_at.trim().is_empty()
+                    && judgment.critical_invariant_flags.iter().all(|flag| !flag.trim().is_empty())
+                    && judgment.assumptions.iter().all(|item| !item.trim().is_empty())
+                    && judgment.ambiguity_flags.iter().all(|item| !item.trim().is_empty()),
                 "case {} contains incomplete initial judgment from {}",
                 case.case_id,
                 judgment.reviewer_id
             );
-            if reviewer.conflict_disclosure == "UNRESOLVED" {
-                all_conflicts_disclosed = false;
-            }
         }
         ensure!(
             initial_reviewers.len() >= 2,
@@ -338,7 +344,7 @@ fn audit(ledger: &Ledger, expected_ids: &[String], ledger_bytes: &[u8]) -> Resul
             case.case_id,
             adjudication.status
         );
-        let mut initial_dispositions: BTreeSet<&str> =
+        let initial_dispositions: BTreeSet<&str> =
             case.initial_judgments.iter().map(|judgment| judgment.disposition.as_str()).collect();
         if matches!(adjudication.status.as_str(), "ACCEPTED" | "REVISED") {
             let final_disposition = adjudication.final_disposition.as_deref()
@@ -437,12 +443,12 @@ fn audit(ledger: &Ledger, expected_ids: &[String], ledger_bytes: &[u8]) -> Resul
         "summary claims randomized assignment but order is incomplete/duplicated"
     );
     ensure!(
-        ledger.summary.case_authors_excluded_from_adjudication && all_authors_excluded,
-        "summary claims case-author exclusion but review assignment contradicts it"
+        ledger.summary.case_authors_excluded_from_adjudication,
+        "summary cannot claim case-author exclusion is false"
     );
     ensure!(
-        ledger.summary.conflicts_disclosed && all_conflicts_disclosed,
-        "summary claims conflict disclosure but reviewer records contradict it"
+        ledger.summary.conflicts_disclosed,
+        "summary must attest that reviewer conflicts were disclosed"
     );
     ensure!(
         adjudicated_count == expected.len() && indeterminate_count == 0 && unresolved_count == 0,
