@@ -3,10 +3,12 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Deterministic synthetic harness for CASTING-002B.
 //!
-//! This test-only harness compares fixed-budget sampling designs on synthetic
-//! objectives with known optima. It is not a foundry process model or optimizer
-//! recommendation. Truth is used only by the evaluator to calculate regret after
-//! a query; sampling designs do not receive unqueried candidate outcomes.
+//! This test-only harness compares fixed-budget sampling and sequential optimization
+//! strategies on synthetic objectives with known optima. It is not a foundry process
+//! model or production recommendation. The GP-LCB strategy is a minimal fixed-parameter
+//! Bayesian-optimization baseline, not a claim of state-of-the-art performance.
+//! Ground truth is retained for post-query scoring; proposal APIs receive only queried
+//! observations and cannot inspect unqueried objective outcomes.
 //!
 //! Focused invocation:
 //! `cargo test -p symthaea-core casting_optimization_benchmark`
