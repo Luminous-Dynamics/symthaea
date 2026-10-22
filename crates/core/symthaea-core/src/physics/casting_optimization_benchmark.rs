@@ -1115,6 +1115,124 @@ mod tests {
     }
 
     #[test]
+    fn gp_kernel_and_cholesky_match_independent_known_answers() {
+        let origin = Point { x: 0.0, y: 0.0 };
+        let one_length_scale_away = Point {
+            x: GP_LENGTH_SCALE,
+            y: 0.0,
+        };
+        assert_abs_close(gp_rbf_kernel(origin, origin), 1.0, 1e-15);
+        assert_abs_close(
+            gp_rbf_kernel(origin, one_length_scale_away),
+            (-0.5_f64).exp(),
+            1e-15,
+        );
+
+        let lower = gp_cholesky(&[vec![4.0, 2.0], vec![2.0, 3.0]]).unwrap();
+        assert_abs_close(lower[0][0], 2.0, 1e-15);
+        assert_abs_close(lower[0][1], 0.0, 1e-15);
+        assert_abs_close(lower[1][0], 1.0, 1e-15);
+        assert_abs_close(lower[1][1], 2.0_f64.sqrt(), 1e-15);
+
+        let solved = gp_solve_lower(&lower, &[2.0, 1.0]).unwrap();
+        assert_abs_close(solved[0], 1.0, 1e-15);
+        assert_abs_close(solved[1], 0.0, 1e-15);
+        let back_solved = gp_solve_upper_from_lower_transpose(&lower, &solved).unwrap();
+        assert_abs_close(back_solved[0], 0.5, 1e-15);
+        assert_abs_close(back_solved[1], -0.35355339059327373, 1e-15);
+    }
+
+    #[test]
+    fn gp_posterior_matches_one_observation_known_answer() {
+        let point = Point { x: 0.25, y: 0.4 };
+        let posterior = GaussianProcessPosterior::fit(&[ProposalObservation {
+            point,
+            status: TrialStatus::Feasible,
+            observed_objective: Some(2.0),
+        }])
+        .unwrap();
+
+        let (mean, variance) = posterior.predict(point).unwrap();
+        assert_abs_close(mean, 2.0, 1e-12);
+        assert_abs_close(
+            variance,
+            GP_OBSERVATION_NOISE_VARIANCE + GP_DIAGONAL_JITTER,
+            2e-10,
+        );
+    }
+
+    #[test]
+    fn gp_acquisition_is_deterministic_and_cannot_read_evaluation_truth() {
+        let initial = run_benchmark(
+            SyntheticCase::SmoothBowl,
+            SamplingDesign::LatinHypercube,
+            Fidelity::High,
+            0xB0_71_A7,
+            4,
+        )
+        .unwrap();
+        let history = proposal_history(&initial.transcript);
+        let next_a = choose_gaussian_process_lcb(&history).unwrap().unwrap();
+
+        let mut changed_truth = initial.transcript.clone();
+        for record in &mut changed_truth {
+            record.true_objective_for_evaluation_only -= 123.0;
+        }
+        let next_b = choose_gaussian_process_lcb(&proposal_history(&changed_truth))
+            .unwrap()
+            .unwrap();
+        assert_eq!(next_a, next_b);
+        assert!(!initial.transcript.iter().any(|record| record.point == next_a));
+
+        let run_a = run_benchmark(
+            SyntheticCase::SmoothBowl,
+            SamplingDesign::GaussianProcessLcb,
+            Fidelity::High,
+            0xB0_71_A7,
+            BUDGET,
+        )
+        .unwrap();
+        let run_b = run_benchmark(
+            SyntheticCase::SmoothBowl,
+            SamplingDesign::GaussianProcessLcb,
+            Fidelity::High,
+            0xB0_71_A7,
+            BUDGET,
+        )
+        .unwrap();
+        assert_eq!(run_a, run_b);
+        let points = run_a
+            .transcript
+            .iter()
+            .map(|record| (record.point.x.to_bits(), record.point.y.to_bits()))
+            .collect::<std::collections::HashSet<_>>();
+        assert_eq!(points.len(), BUDGET);
+    }
+
+    #[test]
+    fn gp_rejects_non_finite_observations_and_non_positive_covariance() {
+        let result = GaussianProcessPosterior::fit(&[ProposalObservation {
+            point: Point { x: 0.1, y: 0.2 },
+            status: TrialStatus::Feasible,
+            observed_objective: Some(f64::NAN),
+        }]);
+        assert_eq!(result, Err(GaussianProcessError::NonFiniteInput));
+
+        assert_eq!(
+            gp_cholesky(&[vec![1.0, 2.0], vec![2.0, 1.0]]),
+            Err(GaussianProcessError::NotPositiveDefinite)
+        );
+        assert_eq!(
+            gp_cholesky(&[vec![f64::INFINITY]]),
+            Err(GaussianProcessError::NonFiniteInput)
+        );
+        assert_eq!(
+            gp_cholesky(&[]),
+            Err(GaussianProcessError::InvalidMatrix)
+        );
+    }
+
+    #[test]
     fn latin_hypercube_covers_each_stratum_in_each_dimension_once() {
         let points = sample_points(SamplingDesign::LatinHypercube, BUDGET, 0x1A2B_3C4D).unwrap();
         let mut x_strata: Vec<usize> = points
