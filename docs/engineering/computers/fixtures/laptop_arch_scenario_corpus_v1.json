@@ -1,0 +1,244 @@
+{
+  "schema_version": "1.0",
+  "benchmark_id": "LAPTOP-ARCH-001-V1",
+  "parent_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/8446",
+  "canonical_architecture_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/7905",
+  "status": "preregistered_not_measured",
+  "date": "2026-10-22",
+  "baseline_min_pairs_per_condition": 30,
+  "proposed_targets": {
+    "joules_per_successful_task_reduction_min": 0.3,
+    "interactive_p95_latency_regression_max": 0.1,
+    "unplugged_sustained_throughput_retention_min": 0.85,
+    "candidate_throughput_retention_at_30min_min": 0.9,
+    "battery_or_ssd_repair_minutes_max": 10,
+    "privacy_violations_allowed": 0,
+    "security_support_years_target": 10
+  },
+  "archetypes": [
+    {
+      "id": "L13",
+      "description": "13-14 inch sovereign developer ultrabook",
+      "primary_objectives": [
+        "low mixed-use energy",
+        "quiet operation",
+        "repairability",
+        "Linux and firmware support"
+      ]
+    },
+    {
+      "id": "L16",
+      "description": "15-16 inch repairable mobile workstation",
+      "primary_objectives": [
+        "sustained compute",
+        "serviceability",
+        "unplugged throughput",
+        "thermal/acoustic control"
+      ]
+    },
+    {
+      "id": "L-AI",
+      "description": "memory-rich local-AI laptop",
+      "primary_objectives": [
+        "model fit",
+        "quality",
+        "joules per accepted task",
+        "context/cache capacity"
+      ]
+    },
+    {
+      "id": "L-FIELD",
+      "description": "secure offline field and incident-response laptop",
+      "primary_objectives": [
+        "offline capability",
+        "recovery",
+        "privacy",
+        "field service"
+      ]
+    },
+    {
+      "id": "L-EDGE",
+      "description": "laptop with optional trusted dock/home-compute node",
+      "primary_objectives": [
+        "local usefulness",
+        "consented task offload",
+        "privacy",
+        "transfer-inclusive energy"
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "TOPS-WITHOUT-RUNTIME-001",
+      "category": "feasibility",
+      "setup": "candidate advertises a high NPU TOPS figure but target driver/runtime/model path is unavailable",
+      "action": "attempt exact frozen task and capture backend identity",
+      "pass": "candidate is marked infeasible for that path rather than assigning a modeled score",
+      "hard_fail": "claiming supported accelerated execution without exact backend evidence"
+    },
+    {
+      "id": "MODEL-FITS-WEIGHTS-NOT-KV-001",
+      "category": "memory",
+      "setup": "model file fits storage/RAM estimate but full context/KV-cache plus concurrent task exceeds physical memory",
+      "action": "run frozen model/context under recorded memory budget",
+      "pass": "OOM or fallback is explicitly recorded; quality and memory remain separate",
+      "hard_fail": "silently reducing context or using cloud while claiming same local task"
+    },
+    {
+      "id": "AC-BATTERY-DELTA-001",
+      "category": "power",
+      "setup": "same exact task executed on AC and at declared battery state",
+      "action": "measure task correctness, throughput, p95 and energy on both states",
+      "pass": "both measurements are reported and unplugged-retention gate evaluated",
+      "hard_fail": "AC score is used as proof of battery performance"
+    },
+    {
+      "id": "SUSTAINED-THERMAL-001",
+      "category": "thermal",
+      "setup": "nominally fast candidate under 30-minute manufacturer-permitted sustained load",
+      "action": "capture throughput and thermal trace at 5 and 30 minutes plus cooldown",
+      "pass": "throughput retention and thermal behavior reported",
+      "hard_fail": "burst benchmark used as sustained result"
+    },
+    {
+      "id": "BATTERY-CAPACITY-MASS-001",
+      "category": "tradeoff",
+      "setup": "candidate uses larger battery than reference",
+      "action": "measure frozen-trace endurance, battery Wh, machine weight and charge energy",
+      "pass": "endurance and mass are separate axes",
+      "hard_fail": "higher battery capacity described as better energy efficiency without measurements"
+    },
+    {
+      "id": "MODULARITY-COST-001",
+      "category": "repairability",
+      "setup": "modular subassembly adds connector/seams/mass/power loss",
+      "action": "measure repair benefit, replacement process, weight and energy overhead",
+      "pass": "design kept only if Pareto-relevant under declared constraints",
+      "hard_fail": "modularity treated as intrinsically superior"
+    },
+    {
+      "id": "REPLACEABLE-NO-SUPPLY-001",
+      "category": "lifecycle",
+      "setup": "component is physically replaceable but compatible parts/service manual/test tool is not available",
+      "action": "run serviceability audit against exact BOM/revision and parts source",
+      "pass": "repair claim remains unresolved if support prerequisite missing",
+      "hard_fail": "replacement ability claimed based only on screws/connectors"
+    },
+    {
+      "id": "UNIDENTIFIED-FIRMWARE-001",
+      "category": "reproducibility",
+      "setup": "BIOS/EC/firmware changes but not included in benchmark identity",
+      "action": "compare run manifests",
+      "pass": "runs are rejected as incomparable or assigned distinct identities",
+      "hard_fail": "pooling results across unidentified firmware states"
+    },
+    {
+      "id": "OFFLINE-CLOUD-FALLBACK-001",
+      "category": "privacy",
+      "setup": "local model/runtime fails and an unguarded fallback attempts cloud inference",
+      "action": "run with radios/network independently isolated and monitor egress",
+      "pass": "local unavailable state or user-authorized fallback explicitly reported",
+      "hard_fail": "unapproved data egress or false offline-success claim"
+    },
+    {
+      "id": "CACHE-STATE-MISMATCH-001",
+      "category": "reproducibility",
+      "setup": "baseline build cache is warm and candidate cache is cold or vice versa",
+      "action": "review cache artifacts and run identities",
+      "pass": "results are stratified or rerun under matched state",
+      "hard_fail": "aggregate speedup asserted from unmatched cache conditions"
+    },
+    {
+      "id": "TWIN-TRANSFER-UNVALIDATED-001",
+      "category": "digital_twin",
+      "setup": "power/thermal prediction calibrated on one chassis is applied to different chassis/cooling/firmware",
+      "action": "change configuration identity and check model applicability",
+      "pass": "new prediction is labelled unvalidated until discrepancy review",
+      "hard_fail": "old residuals asserted as validation of the new hardware"
+    },
+    {
+      "id": "COMPUTE-CLOSURE-OVERCLAIM-001",
+      "category": "productive_closure",
+      "setup": "local enclosure/PCB/RAM replacement with imported CPU/GPU/DRAM dies",
+      "action": "project capabilities into canonical COMPUTE-MFG closure model",
+      "pass": "assembly/repairability/localization and compute-die import dependence remain distinct",
+      "hard_fail": "local repair or assembly reported as local semiconductor fabrication"
+    },
+    {
+      "id": "MODELLED-ENERGY-AS-MEASURED-001",
+      "category": "evidence",
+      "setup": "report contains nominal TDP × elapsed time but no calibrated system energy measurement",
+      "action": "check measurement method and evidence origin",
+      "pass": "energy value marked modeled and excluded from measured energy gate",
+      "hard_fail": "modeled energy silently promoted to measured joules"
+    },
+    {
+      "id": "ORDER-INDEPENDENCE-001",
+      "category": "determinism",
+      "setup": "same scenario corpus is permuted without changing semantic case content",
+      "action": "recompute canonical corpus identities and dispositions",
+      "pass": "dispositions are identical and canonical identity follows defined normalization",
+      "hard_fail": "input order changes semantic pass/fail"
+    },
+    {
+      "id": "MISSING-CALIBRATION-001",
+      "category": "measurement",
+      "setup": "measurement claims calibrated energy but receipt/calibration identity is absent",
+      "action": "evaluate eligibility gate",
+      "pass": "energy qualification is unevaluable/fails closed",
+      "hard_fail": "nominal power estimate used as fallback without label"
+    }
+  ],
+  "workload_matrix": [
+    "clean NixOS/software build with separate cold/warm cache",
+    "incremental build, tests and interactive editor use",
+    "VM/container workload with fixed memory/storage/I/O limits",
+    "MLPerf Client current official supported LLM and agentic tasks",
+    "frozen local-model task with quality oracle; separate CPU/NPU/GPU paths",
+    "canonical Symthaea HDC/CfC workloads using pinned baseline/input",
+    "30-minute CPU/GPU/memory sustained workload and cooldown",
+    "fixed mixed-use and offline battery traces",
+    "offline synthetic incident-response artifact processing",
+    "storage/recovery/reinstall integrity drill",
+    "timed repair of battery/SSD/keyboard/fan",
+    "matched AC and declared battery-state workload"
+  ],
+  "required_identity_fields": [
+    "experiment_id",
+    "device_model_sku_revision",
+    "serial_free_experiment_unit_token",
+    "cpu_soc_gpu_npu",
+    "ram_capacity_topology",
+    "storage_model_firmware",
+    "display_brightness_refresh",
+    "battery_capacity_health_start_charge",
+    "bios_ec_firmware_versions",
+    "os_kernel_driver_runtime",
+    "model_artifact_hash_license_quantization_context",
+    "source_tree_and_build_closure",
+    "workload_corpus_sha256",
+    "scoring_code_sha256",
+    "energy_method_calibration_id",
+    "ambient_and_thermal_start_state",
+    "run_order_and_timestamps",
+    "raw_samples_sha256"
+  ],
+  "claim_ceilings": [
+    "vendor battery-life claim is not a reproduced measurement",
+    "TOPS is not interchangeable across dissimilar accelerators without matched task/quality/power context",
+    "model weights fitting does not prove the model plus cache/context fits",
+    "component bench score is not full laptop task performance",
+    "predicted power or thermal result is not measured",
+    "single SKU is not evidence of an industry-wide win",
+    "repairability is not local manufacturing capability",
+    "synthetic corpus pass is not a physical laptop result"
+  ],
+  "external_references": [
+    "https://frame.work/blog/introducing-framework-laptop-13-pro",
+    "https://frame.work/blog/framework-laptop-16-upgrades-and-oculink-dev-kit",
+    "https://news.lenovo.com/repairable-devices-help-spell-the-end-for-disposable-it/",
+    "https://www.qualcomm.com/laptops/products/snapdragon-x2-elite",
+    "https://www.amd.com/en/products/processors/laptop/ryzen/ai-300-series/amd-ryzen-ai-max-plus-395.html",
+    "https://mlcommons.org/benchmarks/client/"
+  ]
+}
