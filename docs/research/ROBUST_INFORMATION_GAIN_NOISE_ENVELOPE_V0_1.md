@@ -51,7 +51,9 @@ Initial matrix: at least 60 held-out worlds across 6 or more structural families
 
 ## External comparison and reading
 
-Benchmark context must remain protocol-matched. NewtonBench is an interactive scientific-law discovery suite (324 tasks across 12 physics domains); SciLaws-Bench reports distinct numerical-fit, scientific-validity and structural-recovery dimensions. Their leaderboard scores are not directly comparable to this Rust simulator.
+Benchmark context must remain protocol-matched. NewtonBench is an interactive scientific-law discovery suite (324 tasks across 12 physics domains); it emphasizes interactive probing of altered laws and documents sharp degradation with system complexity and observational noise. SciLaws-Bench includes 118 problems across six disciplines and reports distinct numerical-fit, scientific-validity and structural-recovery dimensions.
+
+**External reference snapshot (2026-10-22; not a comparable score for this PR):** the SciLaws-Bench page reports GPT-6 aggregate Real numerical fit (S_N=51.33\%\), Real scientific validity (S_V=82.91\%\), and Parallel structural recovery (S_S=72.46\%\). GPT-5.5 is listed at (50.11\%\), (81.84\%\), and (58.26\%\), respectively. This selector is a Rust acquisition policy inside a symbolic-law simulator, not the same end-to-end LLM agent/harness; do not compare its pilot success percentages to those leaderboard metrics. The proper next step is an adapter to a license-cleared task subset, with matched simulator access, budgets, evaluator and repeated task-level reporting, not an unsupported SOTA claim.
 
 Research informing the direction:
 
@@ -59,6 +61,6 @@ Research informing the direction:
 - Callahan & Catanach, *On the Misinformation in a Statistical Experiment*, AISTATS 2026: https://proceedings.mlr.press/v300/callahan26a.html
 - Abdulsamad et al., *Maximin Robust Bayesian Experimental Design* (2026): https://arxiv.org/abs/2603.14094
 - NewtonBench: https://arxiv.org/abs/2510.07172
-- SciLaws-Bench: https://github.com/InternScience/SciLaws-Bench
+- SciLaws-Bench: https://github.com/yiyihum/SciLaws-Bench
 
 The near-term scientific question is whether conservative acquisition improves outcome quality and false-confidence behavior at fixed cost—not whether its information score is numerically elegant.
