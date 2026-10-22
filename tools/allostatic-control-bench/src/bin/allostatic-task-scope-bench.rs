@@ -7,8 +7,8 @@
 use allostatic_control_bench::drift_monitor::calibrate_drift_threshold;
 use allostatic_control_bench::robust_viability::ViabilityLimits;
 use allostatic_control_bench::scope_monitor::{
-    calibrate_scope_threshold, score_prediction_error, PredictionErrorScales,
-    PredictionErrorScore, ScopeThreshold,
+    assess_prediction_scope, calibrate_scope_threshold, score_prediction_error,
+    PredictionErrorScales, PredictionErrorScore, ScopeThreshold,
 };
 use allostatic_control_bench::Action;
 use std::error::Error;
@@ -139,6 +139,10 @@ const ACTION_PLAN: [Action; HORIZON] = [
 
 #[derive(Clone, Copy, Debug)]
 struct StepObservation {
+    predicted_reserve: f64,
+    predicted_load: f64,
+    observed_reserve: f64,
+    observed_load: f64,
     score: PredictionErrorScore,
 }
 
@@ -317,7 +321,13 @@ fn trace_episode(
             scales,
         )
         .ok_or_else(|| IoError::new(ErrorKind::InvalidData, "invalid prediction pair"))?;
-        trace.push(StepObservation { score });
+        trace.push(StepObservation {
+            predicted_reserve,
+            predicted_load,
+            observed_reserve,
+            observed_load,
+            score,
+        });
         actual_reserve = observed_reserve;
         actual_load = observed_load;
     }
@@ -378,19 +388,30 @@ fn run_episode(
     let mut first_false_safe_step = HORIZON;
     let mut scope_false_safe_override = false;
     for (step, observation) in trace.iter().enumerate() {
-        // This is exactly the scope monitor contract: a calibrated residual
-        // alarm, or a hard override for a prediction that claimed safe but was
-        // observed to be unsafe. Both signals are computed from this step's
-        // real synthetic prediction/observation pair.
-        let scope_trigger = observation.score.score() > scope_threshold.score_threshold()
-            || observation.score.false_safe_prediction();
-        if first_scope_alarm_step == HORIZON && scope_trigger {
+        let assessment = assess_prediction_scope(
+            observation.predicted_reserve,
+            observation.predicted_load,
+            observation.observed_reserve,
+            observation.observed_load,
+            limits,
+            scales,
+            scope_threshold,
+        )
+        .ok_or_else(|| {
+            IoError::new(
+                ErrorKind::InvalidData,
+                "scope monitor rejected a valid synthetic transition",
+            )
+        })?;
+        if first_scope_alarm_step == HORIZON && assessment.alarm() {
             first_scope_alarm_step = step;
         }
-        if first_false_safe_step == HORIZON && observation.score.false_safe_prediction() {
+        if first_false_safe_step == HORIZON
+            && assessment.prediction_error().false_safe_prediction()
+        {
             first_false_safe_step = step;
         }
-        scope_false_safe_override |= observation.score.false_safe_prediction();
+        scope_false_safe_override |= assessment.false_safe_override();
     }
 
     let first_combined_alarm_step = first_feature_alarm_step.min(first_scope_alarm_step);
