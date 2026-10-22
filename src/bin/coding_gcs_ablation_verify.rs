@@ -5,7 +5,7 @@
 //! externally pinned source and manifest hashes when auditing results for publication.
 
 use serde_json::Value;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::env;
 use std::fs;
 
@@ -161,56 +161,97 @@ fn verify_mode_summary(
         .map(|run| read_f64(run, "energy").unwrap_or(0.0))
         .sum();
     let count = selected_runs.len() as u64;
-    let tier_attempt_count = |target: &str| -> u64 {
+    let selected_tier_count = |target: &str| -> u64 {
         selected_runs
             .iter()
             .map(|run| {
-                run.get("generation_tiers")
+                run.get("selected_generation_tiers")
                     .and_then(Value::as_array)
                     .map(|tiers| tiers.iter().filter(|tier| tier.as_str() == Some(target)).count() as u64)
                     .unwrap_or(0)
             })
             .fold(0_u64, u64::saturating_add)
     };
-    let runs_with_external_llm_tier = selected_runs
+    let backend_attempts = selected_runs
+        .iter()
+        .filter_map(|run| run.get("backend_attempts").and_then(Value::as_array))
+        .flatten()
+        .collect::<Vec<_>>();
+    let backend_attempt_count = |target: &str| -> u64 {
+        backend_attempts
+            .iter()
+            .filter(|attempt| str_field(attempt, "tier") == Some(target))
+            .count() as u64
+    };
+    let backend_attempts_succeeded = backend_attempts
+        .iter()
+        .filter(|attempt| bool_field(attempt, "success") == Some(true))
+        .count() as u64;
+    let backend_attempts_failed = backend_attempts
+        .iter()
+        .filter(|attempt| bool_field(attempt, "success") == Some(false))
+        .count() as u64;
+    let runs_with_external_backend_attempts = selected_runs
         .iter()
         .filter(|run| {
-            run.get("generation_tiers")
+            run.get("backend_attempts")
                 .and_then(Value::as_array)
-                .is_some_and(|tiers| {
-                    tiers.iter().any(|tier| {
-                        matches!(tier.as_str(), Some("LocalLLM" | "CloudLLM"))
+                .is_some_and(|attempts| {
+                    attempts.iter().any(|attempt| {
+                        matches!(str_field(attempt, "tier"), Some("LocalLLM" | "CloudLLM"))
                     })
                 })
         })
         .count() as u64;
-    let runs_with_simulated_tier = selected_runs
+    let runs_with_simulated_backend_attempts = selected_runs
         .iter()
         .filter(|run| {
-            run.get("generation_tiers")
+            run.get("backend_attempts")
                 .and_then(Value::as_array)
-                .is_some_and(|tiers| tiers.iter().any(|tier| tier.as_str() == Some("Simulated")))
+                .is_some_and(|attempts| attempts.iter().any(|attempt| str_field(attempt, "tier") == Some("Simulated")))
         })
         .count() as u64;
-    let runs_with_no_generation_attempts = selected_runs
+    let runs_with_no_backend_attempts = selected_runs
         .iter()
         .filter(|run| {
-            run.get("generation_tiers")
+            run.get("backend_attempts")
                 .and_then(Value::as_array)
-                .is_some_and(|tiers| tiers.is_empty())
+                .is_some_and(|attempts| attempts.is_empty())
         })
         .count() as u64;
-    let expected_tier_attempts = serde_json::json!({
-        "Native": tier_attempt_count("Native"),
-        "Hardware": tier_attempt_count("Hardware"),
-        "LocalLLM": tier_attempt_count("LocalLLM"),
-        "CloudLLM": tier_attempt_count("CloudLLM"),
-        "Simulated": tier_attempt_count("Simulated")
-    });
+    let mut backend_name_counts = BTreeMap::<String, u64>::new();
+    for attempt in &backend_attempts {
+        if let Some(name) = str_field(attempt, "backend_name") {
+            *backend_name_counts.entry(name.to_string()).or_insert(0) += 1;
+        }
+    }
+    let expected_backend_attempts_by_name = serde_json::json!(backend_name_counts);
     push_check(
         errors,
-        summary.get("generation_tier_attempts") == Some(&expected_tier_attempts),
-        format!("summary.{label}.generation_tier_attempts is inconsistent with individual runs"),
+        summary.get("selected_tier_decisions") == Some(&serde_json::json!({
+            "Native": selected_tier_count("Native"),
+            "Hardware": selected_tier_count("Hardware"),
+            "LocalLLM": selected_tier_count("LocalLLM"),
+            "CloudLLM": selected_tier_count("CloudLLM"),
+            "Simulated": selected_tier_count("Simulated")
+        })),
+        format!("summary.{label}.selected_tier_decisions is inconsistent with individual runs"),
+    );
+    push_check(
+        errors,
+        summary.get("backend_attempts_by_tier") == Some(&serde_json::json!({
+            "Native": backend_attempt_count("Native"),
+            "Hardware": backend_attempt_count("Hardware"),
+            "LocalLLM": backend_attempt_count("LocalLLM"),
+            "CloudLLM": backend_attempt_count("CloudLLM"),
+            "Simulated": backend_attempt_count("Simulated")
+        })),
+        format!("summary.{label}.backend_attempts_by_tier is inconsistent with individual backend attempts"),
+    );
+    push_check(
+        errors,
+        summary.get("backend_attempts_by_name") == Some(&expected_backend_attempts_by_name),
+        format!("summary.{label}.backend_attempts_by_name is inconsistent with individual backend attempts"),
     );
     let checks = [
         ("runs", count),
@@ -222,9 +263,11 @@ fn verify_mode_summary(
         ("agent_elapsed_ms_p95", agent_elapsed_ms_p95),
         ("verification_elapsed_ms_p50", verification_elapsed_ms_p50),
         ("verification_elapsed_ms_p95", verification_elapsed_ms_p95),
-        ("runs_with_external_llm_tier", runs_with_external_llm_tier),
-        ("runs_with_simulated_tier", runs_with_simulated_tier),
-        ("runs_with_no_generation_attempts", runs_with_no_generation_attempts),
+        ("backend_attempts_succeeded", backend_attempts_succeeded),
+        ("backend_attempts_failed", backend_attempts_failed),
+        ("runs_with_external_backend_attempts", runs_with_external_backend_attempts),
+        ("runs_with_simulated_backend_attempts", runs_with_simulated_backend_attempts),
+        ("runs_with_no_backend_attempts", runs_with_no_backend_attempts),
     ];
     for (key, expected) in checks {
         push_check(
@@ -258,8 +301,8 @@ fn audit(
 
     push_check(
         &mut errors,
-        u64_field(report, "schema_version") == Some(3),
-        "schema_version must be 3",
+        u64_field(report, "schema_version") == Some(4),
+        "schema_version must be 4",
     );
     push_check(
         &mut errors,
@@ -1211,7 +1254,7 @@ mod tests {
         })];
         let manifest_sha = manifest_digest(&manifest).unwrap();
         serde_json::json!({
-            "schema_version": 3,
+            "schema_version": 4,
             "benchmark": "symthaea_gcs_runtime_ablation",
             "source_revision": "1".repeat(40),
             "model_mode": "native",
