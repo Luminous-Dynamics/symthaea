@@ -142,11 +142,14 @@ fn leased_case(
     summary: &mut String,
 ) {
     match verify_leased_witness(lease, current_context, initial, actions, model, limits(), authority) {
-        Ok(receipt) => render_result(
-            case, expected, "accepted", receipt.steps_verified(),
-            Some(receipt.first_action()), receipt.final_state().reserve().lower(),
-            receipt.final_state().load().upper(), raw, summary,
-        ),
+        Ok(permit) => {
+            let receipt = permit.receipt();
+            render_result(
+                case, expected, "accepted", receipt.steps_verified(),
+                Some(permit.action()), receipt.final_state().reserve().lower(),
+                receipt.final_state().load().upper(), raw, summary,
+            )
+        },
         Err(LeasedVerificationFailure::LeaseInvalid(CertificateRejection::DynamicsRevisionChanged)) => {
             render_result(case, expected, "dynamics_revision_changed", 0, actions.first().copied(), -1.0, -1.0, raw, summary)
         }
