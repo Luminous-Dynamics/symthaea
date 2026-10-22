@@ -19,12 +19,32 @@ pub enum EvidenceKind {
     FormalProof,
     /// Simulation result from an external solver.
     Simulation,
+    /// Native analytical, closed-form, or algebraic engineering calculation.
+    Analysis,
     /// Test, inspection, calibration, or commissioning result.
     Test,
     /// Field telemetry or digital twin observation.
     Telemetry,
     /// Engineering standard, code, or regulatory citation.
     Standard,
+}
+
+impl EvidenceKind {
+    /// Stable canonical name used by content-addressed engineering protocols.
+    ///
+    /// These strings are part of semantic identity. Changing an existing name
+    /// requires an explicit protocol-version migration rather than a cosmetic
+    /// rename.
+    pub const fn canonical_name(self) -> &'static str {
+        match self {
+            Self::FormalProof => "FormalProof",
+            Self::Simulation => "Simulation",
+            Self::Analysis => "Analysis",
+            Self::Test => "Test",
+            Self::Telemetry => "Telemetry",
+            Self::Standard => "Standard",
+        }
+    }
 }
 
 /// Domain templates for common engineering safety cases.
@@ -311,6 +331,30 @@ mod tests {
 
         safety_case.obligations[0] = safety_case.obligations[0].clone().discharge("fea-run-42");
         assert!(safety_case.is_discharged());
+    }
+
+    #[test]
+    fn analysis_evidence_is_distinct_from_external_simulation() {
+        let analysis = ProofObligation::new(
+            "closed-form beam stress remains below allowable",
+            EvidenceKind::Analysis,
+        );
+        let simulation = ProofObligation::new(
+            "external FEA stress remains below allowable",
+            EvidenceKind::Simulation,
+        );
+        assert_eq!(analysis.expected_evidence, EvidenceKind::Analysis);
+        assert_ne!(analysis.expected_evidence, simulation.expected_evidence);
+    }
+
+    #[test]
+    fn evidence_kind_canonical_names_are_protocol_stable() {
+        assert_eq!(EvidenceKind::FormalProof.canonical_name(), "FormalProof");
+        assert_eq!(EvidenceKind::Simulation.canonical_name(), "Simulation");
+        assert_eq!(EvidenceKind::Analysis.canonical_name(), "Analysis");
+        assert_eq!(EvidenceKind::Test.canonical_name(), "Test");
+        assert_eq!(EvidenceKind::Telemetry.canonical_name(), "Telemetry");
+        assert_eq!(EvidenceKind::Standard.canonical_name(), "Standard");
     }
 
     #[test]
