@@ -117,13 +117,12 @@ fn main() -> Result<(), Box<dyn Error>> {
                 let observation_id = format!(
                     "seed-{seed}/noise-{noise_index}/entity-{identity_index}/sample-{sample_index}"
                 );
-                let observation_evidence =
-                    ObservationIdentityEvidence::from_authenticated_source(
-                        &receipt_by_index[identity_index],
-                        &observation_id,
-                        &query,
-                        "synthetic-known-query-oracle",
-                    )?;
+                let observation_evidence = ObservationIdentityEvidence::from_authenticated_source(
+                    &receipt_by_index[identity_index],
+                    &observation_id,
+                    &query,
+                    "synthetic-known-query-oracle",
+                )?;
                 match registry.resolve_with_observation_evidence(
                     &query,
                     &observation_id,

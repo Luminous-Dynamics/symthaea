@@ -239,7 +239,10 @@ impl fmt::Display for IdentityEvidenceError {
             Self::EmptyRegistry => write!(f, "cannot resolve against an empty registry"),
             Self::InvalidReceipt => write!(f, "registration receipt is invalid for this registry"),
             Self::InvalidObservationEvidence => {
-                write!(f, "observation identity evidence is invalid for this query or enrollment")
+                write!(
+                    f,
+                    "observation identity evidence is invalid for this query or enrollment"
+                )
             }
             Self::EmptyObservationId => write!(f, "observation id must not be empty"),
             Self::EmptyEvidenceSource => write!(f, "evidence source id must not be empty"),
@@ -666,7 +669,7 @@ mod tests {
                 &pattern,
                 "  ",
             )
-                .err(),
+            .err(),
             Some(IdentityEvidenceError::EmptyEvidenceSource)
         );
     }
