@@ -63,10 +63,52 @@ jobs:
           def digest(path):
               return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
+          import re
+
           source = Path("PITBCounterfactualPilot.lean")
           lakefile = Path("lakefile.lean")
           toolchain = Path("lean-toolchain")
           manifest = Path("lake-manifest.json")
+          cases_path = Path("cases.json")
+          cases_manifest = json.loads(cases_path.read_text())
+          source_text = " ".join(source.read_text().split())
+
+          if cases_manifest["purpose"] != "formal_harness_calibration_not_model_evaluation":
+              raise SystemExit("Lean pilot cases manifest must remain explicitly unscored")
+          if cases_manifest["toolchain"] != toolchain.read_text().strip():
+              raise SystemExit("case manifest and Lean toolchain file disagree")
+
+          def declaration_exists(name):
+              pattern = rf"\\b(?:theorem|lemma|def|abbrev)\\s+{re.escape(name)}\\b"
+              return re.search(pattern, source.read_text()) is not None
+
+          case_bindings = []
+          for case in cases_manifest["cases"]:
+              for label in ("base_statement", "variant_statement"):
+                  normalized = " ".join(case[label].split())
+                  if normalized not in source_text:
+                      raise SystemExit(
+                          f"{case['case_id']} {label} is not present in the pinned Lean source"
+                      )
+              for declaration in case["evidence_declarations"]:
+                  if not declaration_exists(declaration):
+                      raise SystemExit(
+                          f"{case['case_id']} references missing Lean declaration {declaration}"
+                      )
+              case_bindings.append({
+                  "case_id": case["case_id"],
+                  "mutation_kind": case["mutation_kind"],
+                  "expected_relation": case["expected_relation"],
+                  "base_statement_fragment_sha256": hashlib.sha256(
+                      " ".join(case["base_statement"].split()).encode("utf-8")
+                  ).hexdigest(),
+                  "variant_statement_fragment_sha256": hashlib.sha256(
+                      " ".join(case["variant_statement"].split()).encode("utf-8")
+                  ).hexdigest(),
+                  "evidence_declarations": case["evidence_declarations"],
+                  "model_outcomes": case["model_outcomes"],
+              })
+
           receipt = {
               "schema_version": "pitb.lean-pilot-ci-receipt.v0",
               "repository": os.environ["PITB_REPOSITORY"],
@@ -79,6 +121,8 @@ jobs:
               "source": {
                   "path": str(source),
                   "sha256": digest(source),
+                  "case_manifest_path": str(cases_path),
+                  "case_manifest_sha256": digest(cases_path),
                   "lakefile_sha256": digest(lakefile),
                   "toolchain_file_sha256": digest(toolchain),
                   "lake_manifest_sha256": digest(manifest) if manifest.exists() else None,
@@ -94,12 +138,7 @@ jobs:
                   "nanoda_independent_type_check": "passed",
                   "sorry_disallowed_by_nanoda": True,
               },
-              "declared_pilot_cases": [
-                  "alpha_renaming_same_type",
-                  "identity_statement_iff_true_function",
-                  "successor_monotonicity_with_premise",
-                  "premise_removed_variant_is_false",
-              ],
+              "case_manifest_bindings": case_bindings,
               "limitations": [
                   "This validates only the checked-in small Lean examples under the pinned environment.",
                   "It is not a model transfer experiment, does not adjudicate an insight dataset, and does not establish general utility.",
