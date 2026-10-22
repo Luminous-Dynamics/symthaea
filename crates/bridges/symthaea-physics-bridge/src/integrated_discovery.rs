@@ -462,7 +462,10 @@ fn run_trial_with_discrepancy(
     let mut audit_queries = 0usize;
 
     let mut round = 0usize;
-    while round < max_rounds && live.len() > 1 {
+    while round < max_rounds
+        && (live.len() > 1
+            || (active_selector == ActiveSelector::InformationGainWithAudits && live.len() == 1))
+    {
         let predict = |idx: &usize, e: &Experiment| eval_at(&hypotheses[*idx], e);
         let chosen = if config.active_selection {
             let remaining: Vec<Experiment> = candidate_pool
@@ -474,8 +477,11 @@ fn run_trial_with_discrepancy(
                 selection_failed = true;
                 break;
             }
+            // A singleton is provisional under the audit policy: use every remaining
+            // query as a validation audit. Before a singleton, schedule an audit every
+            // second round to reduce greedy over-exploitation.
             let scheduled_audit = active_selector == ActiveSelector::InformationGainWithAudits
-                && (round + 1) % 2 == 0;
+                && (live.len() == 1 || (round + 1) % 2 == 0);
             if scheduled_audit {
                 audit_queries += 1;
                 Some(remaining[rand_index(&mut audit_rng, remaining.len())].clone())
