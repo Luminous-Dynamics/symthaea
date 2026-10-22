@@ -169,6 +169,9 @@ This is a **coverage map, not a cross-benchmark leaderboard**. The suites below 
 | [EmoHarbor (ACL 2026)](https://aclanthology.org/2026.acl-long.53/) | Personalized-support evaluation using 100 user profiles and 10 dimensions | Test profile-conditioned adaptation, correction after a mistaken inference, and role/profile swaps | Simulated inner-world users are a scalability aid, not a replacement for consented feedback from real recipients |
 | [Long-context emotional consistency (IEEE TAFFC, online 9 Jul 2026)](https://doi.org/10.1109/TAFFC.2026.3712060) | Tests retention of key emotional events, masking, and implicit recall over long contexts | Add delayed callback, concealed distress, topic-shift, and correction tests at 25/100 turns | Retaining an emotional event is not proof that acting on it is helpful; over-retention and privacy must also be tested |
 | [ESConv / ESC-Eval](https://aclanthology.org/2021.acl-long.269/) | Established emotional-support strategy / response-quality baseline | Reuse strategy-level slices as descriptive comparators when data licensing and protocol align | Strategy matching can reward formulaic responses and does not itself establish safety, agency, or repair quality |
+| [INTIMA (ICLR 2026)](https://proceedings.iclr.cc/paper_files/paper/2026/hash/05b12f103c9e613efc4c85674cdc9066-Abstract-Conference.html) | 31 companionship behaviors, 368 targeted prompts, and boundary-maintaining vs. companionship-reinforcing dispositions | Reuse as a direct comparator for dependency, exclusivity, and boundary slices; extend with multi-turn recovery and evidence lineage | Prompt-level behavior is not itself a longitudinal measure of recipient agency or downstream harm |
+| [CompanionBench (Aug 2026 preprint)](https://arxiv.org/abs/2608.02046) | Interactive, bilingual, real-world-grounded companion evaluation; separates rubric ratings from a deterministic disclosure-appropriateness measure | Use interactive trajectories, calibrated challenge, ambiguity handling, and separate deterministic process checks rather than one warmth score | A simulated user and a disclosure gate are evaluation instruments, not substitutes for real recipient outcomes |
+| [NOPE Evals](https://evals.nope.net/) | Open evaluation framework spanning crisis safety, relational integrity, cognitive/epistemic safety, emotional attunement, and honesty | Map SLD invariants onto its five pillars; compare facet floors and uncertainty rather than relying on leaderboard rank | Scores can be within measurement noise; model/version, date, benchmark prompt set, and evaluation implementation must be pinned before comparison |
 
 ### SLD's defensible differentiator
 
@@ -183,3 +186,14 @@ Do not compete by inventing another single empathy or relationship score. The ca
 ### Competitive claim policy
 
 Until the same exact model versions are evaluated against matched case sets with blinded human adjudication, SLD may claim only that its **protocol targets gaps** not jointly covered by these component evaluations. It may not claim better-than-SOTA behavior, clinical effectiveness, lower harm in deployment, or a validated measure of love. Publish per-dimension results and uncertainty, preserve evaluator disagreement, and report failures by case.
+
+
+## 12. Concrete measurement-integrity red-team tranche
+
+The seed corpus now adds three contrastive groups (six candidate cases) beyond the original endogenous-feedback pair:
+
+- `PRV-SOURCE-vs-INDEPENDENT`: a transformed copy of user input versus a separately sourced partner stream whose estimator remains unvalidated.
+- `RPL-REPLAY-vs-FRESH`: duplicated content/timestamps under new local IDs versus fresh, provenance-documented observations.
+- `FBK-CONSUMER-vs-DIAGNOSTIC`: an ungrounded signal allowed to alter relational-Ψ versus the same signal isolated as non-authorizing diagnostics.
+
+These cases intentionally distinguish source lineage, replay integrity, and downstream use. They are still synthetic candidate scenarios with `UNREVIEWED_CANDIDATE` labels. Passing structural tests will not validate the expected policy or show model behavior. Next steps: independent adjudication; commit-bound corpus digest; actual Rust execution; then exact-head baseline and negative-control runs.
