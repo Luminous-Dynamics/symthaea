@@ -178,6 +178,21 @@ jobs:
                   "model_outcomes": case["model_outcomes"],
               })
 
+          state_cases = [
+              binding for binding in case_bindings
+              if binding.get("state_intervention", {}).get("operation") == "clear h"
+          ]
+          if len(state_cases) != 1:
+              raise SystemExit("expected exactly one manifest case for the clear-h state intervention")
+          state_case = state_cases[0]
+          if state_case["model_outcomes"] != "not_run":
+              raise SystemExit("the formal calibration case must remain unscored")
+          if state_case["base_statement_fragment_sha256"] != state_case["variant_statement_fragment_sha256"]:
+              raise SystemExit("fixed-target state intervention must bind byte-normalized identical statement fragments")
+          state_trace_receipt["case_id"] = state_case["case_id"]
+          state_trace_receipt["case_manifest_sha256"] = digest(cases_path)
+          state_trace_receipt["target_statement_fragment_sha256"] = state_case["base_statement_fragment_sha256"]
+
           receipt = {
               "schema_version": "pitb.lean-pilot-ci-receipt.v0",
               "repository": os.environ["PITB_REPOSITORY"],
