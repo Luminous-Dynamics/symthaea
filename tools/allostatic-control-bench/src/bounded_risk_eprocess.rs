@@ -189,14 +189,18 @@ impl BoundedRiskEProcess {
         Some(self.alarmed)
     }
 
-    /// Reset the evidence stream within the same preallocated episode budget.
+    /// Reset an unallocated fixed stream. Alpha-spent monitors refuse reset so
+    /// that the same episode budget cannot be silently spent twice.
     ///
-    /// A reset does not grant a new false-alarm budget. For a new episode, build
-    /// a new monitor with a fresh alpha-spending index; do not call reset to
-    /// restart a detector while reusing the same index.
-    pub fn reset(&mut self) {
+    /// Returns false without mutation when this monitor has an episode-budget
+    /// index; create a new monitor with the next predeclared index instead.
+    pub fn reset(&mut self) -> bool {
+        if self.episode_budget_index.is_some() {
+            return false;
+        }
         self.log_e_value = 0.0;
         self.alarmed = false;
+        true
     }
 }
 
@@ -536,12 +540,19 @@ impl MixtureBoundedRiskEProcess {
         Some(self.alarmed)
     }
 
-    /// Reset evidence within the same episode budget only. A fresh episode must
-    /// construct a new monitor with its newly allocated alpha-spending index.
-    pub fn reset(&mut self) {
+    /// Reset an unallocated stream. Alpha-spent monitors refuse reset so that
+    /// the same episode-budget index cannot be spent more than once.
+    ///
+    /// Returns false without mutation when an episode index is attached. Construct
+    /// a fresh monitor with the next predeclared index to start another episode.
+    pub fn reset(&mut self) -> bool {
+        if self.episode_budget_index.is_some() {
+            return false;
+        }
         self.component_log_e_values = [0.0; 3];
         self.log_e_value = 0.0;
         self.alarmed = false;
+        true
     }
 }
 
@@ -810,10 +821,51 @@ mod tests {
             assert!(process.observe(0.65).is_some());
         }
         assert!(process.alarmed());
-        process.reset();
+        assert!(process.reset());
         assert_eq!(process.component_log_e_values(), [0.0; 3]);
         assert_eq!(process.log_e_value(), 0.0);
         assert!(!process.alarmed());
+    }
+
+    #[test]
+    fn alpha_spent_monitors_refuse_reset_without_reusing_the_same_budget() {
+        let mut fixed = BoundedRiskEProcess::new_with_alpha_spending(
+            0.15,
+            0.5 / 0.15,
+            0.05,
+            5,
+            17,
+        )
+        .expect("valid alpha-spent fixed monitor");
+        for _ in 0..8 {
+            assert!(fixed.observe(0.65).is_some());
+        }
+        let fixed_value = fixed.log_e_value();
+        let fixed_alarm = fixed.alarmed();
+        assert!(!fixed.reset());
+        assert_eq!(fixed.episode_budget_index(), Some(17));
+        assert_eq!(fixed.log_e_value().to_bits(), fixed_value.to_bits());
+        assert_eq!(fixed.alarmed(), fixed_alarm);
+
+        let mut mixture = MixtureBoundedRiskEProcess::new_with_alpha_spending(
+            0.15,
+            [0.25, 0.50, 0.75],
+            0.05,
+            5,
+            17,
+        )
+        .expect("valid alpha-spent mixture");
+        for _ in 0..8 {
+            assert!(mixture.observe(0.65).is_some());
+        }
+        let component_values = mixture.component_log_e_values();
+        let mix_value = mixture.log_e_value();
+        let mix_alarm = mixture.alarmed();
+        assert!(!mixture.reset());
+        assert_eq!(mixture.episode_budget_index(), Some(17));
+        assert_eq!(mixture.component_log_e_values(), component_values);
+        assert_eq!(mixture.log_e_value().to_bits(), mix_value.to_bits());
+        assert_eq!(mixture.alarmed(), mix_alarm);
     }
 
     #[test]
@@ -955,7 +1007,7 @@ mod tests {
             assert!(process.observe(0.65).is_some());
         }
         assert!(process.alarmed());
-        process.reset();
+        assert!(process.reset());
         assert_eq!(process.log_e_value(), 0.0);
         assert!(!process.alarmed());
     }
