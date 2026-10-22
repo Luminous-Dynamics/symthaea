@@ -22,7 +22,7 @@ That assumption is distinct from exchangeability-based conformal calibration. A 
 
 - tools/allostatic-control-bench/src/bounded_risk_eprocess.rs implements a fixed-bet bounded-loss e-process and a predeclared three-bet mixture, with input validation, log-space component accumulation, latched crossing, reset and Bonferroni allocation over parallel monitors.
 - Evidence accumulates in log space, avoiding silent floating-point underflow/overflow when a stream is long. Alarm threshold in log space is \(\log(K/\delta)\), where \(K\) is the number of parallel operating-point monitors and \(\delta\) is the total familywise budget.
-- tools/allostatic-control-bench/src/bin/allostatic-risk-eprocess-bench.rs reads the exact raw 48,000-step input CSV from the CUSUM benchmark. It preserves the first 14 input columns byte-for-byte and appends normalized bounded loss, log e-value, latched alarm and the fixed risk parameters. It rejects a different schema, incomplete episode or mismatched full-episode flags.
+- tools/allostatic-control-bench/src/bin/allostatic-risk-eprocess-bench.rs reads the exact raw 48,000-step input CSV from the CUSUM benchmark. It preserves the first 14 input columns byte-for-byte and appends the mixture log-e-value, its three component log-e-values and alarm fields. It also runs a **single fixed-bet baseline** at the middle fraction 0.5 on the same losses, emitting its log-evidence and alarms in the same row. Both methods use the same risk bound, delta allocation and per-episode input sequence. It rejects a different schema, incomplete episode or mismatched full-episode flags.
 - The qualifier runs the e-process benchmark twice, compares output bytes, recomputes each component factor and the mixture log-sum-exp independently, verifies the original source trace is unchanged, and compares nominal/stealth alarms for paired seeds.
 
 ## Fixed synthetic design
@@ -34,12 +34,12 @@ That assumption is distinct from exchangeability-based conformal calibration. A 
 
 ## Qualification gates
 
-- Byte-identical repeated raw and summary outputs, exact 48,000 raw rows and 20 summary cells.
+- Byte-identical repeated raw and summary outputs, exact 48,000 raw rows and 20 summary cells; the raw output has 30 columns and the summary has 29, including the paired fixed-bet ablation.
 - Raw e-process output must retain the exact first 14 columns of the CUSUM input.
 - Each bounded loss must equal the frozen score normalization; all three component log-e-values must match their factor recurrence, and the mixture log-e-value must match an independently recomputed log-sum-exp.
 - The threshold must equal \(\log(5/0.05)\), and the recorded risk bound, all three bet fractions and delta must equal their frozen configuration. The report must not interpret Monte Carlo repeats as one globally controlled deployment lifetime.
-- Nominal false alarms no greater than 10% per operating-point cell; gradual-shift detection at least 80% even when all residuals remain below the pointwise threshold; abrupt-shift detection at least 90%.
-- Stealth shift must produce the same e-process alarm counts as the paired nominal streams, with most latent shifts missed. That is a negative control, not a failure to exploit evidence that does not exist.
+- Nominal false alarms no greater than 10% per operating-point cell for both mixture and fixed-bet monitor; gradual-shift detection at least 80% for the mixture even when all residuals remain below the pointwise threshold; abrupt-shift detection at least 90% for both monitors. The gradual fixture must also show the mixture detecting at least 60 more episodes than the fixed-bet baseline per cell, otherwise it would not justify the additional betting complexity.
+- Stealth shift must produce the same mixture and fixed-bet e-process alarm counts as paired nominal streams, with most latent shifts missed. That is a negative control, not a failure to exploit evidence that does not exist.
 - Source and artifact SHA-256 hashes and row counts must be written to the provenance receipt.
 
 ## Comparison to current research
@@ -60,4 +60,4 @@ Those methods include physical or high-fidelity control demonstrations beyond th
 4. Report detection delay, false-safe exposure before fallback, reward/task success, no-certified-action rate, runtime, per-state false alarms and confidence intervals.
 5. Test gradual drift, abrupt shifts, autocorrelated disturbances, delayed/missing telemetry, sensor bias and sensor faults—not just one score distribution.
 
-A useful result would be fewer task-critical unsafe episodes at a matched nominal false-alarm budget without unacceptable reward or latency loss on held-out disturbances. This branch currently makes that comparison executable; it does not establish real-world safety or state of the art.
+A useful result would be fewer task-critical unsafe episodes at a matched nominal false-alarm budget without unacceptable reward or latency loss on held-out disturbances. The fixed-bet ablation now checks whether the mixture's sensitivity gain on gradual drift appears in this designed panel. This is an internal mechanism check, not evidence that it beats published methods. This branch still does not establish real-world safety or state of the art.
