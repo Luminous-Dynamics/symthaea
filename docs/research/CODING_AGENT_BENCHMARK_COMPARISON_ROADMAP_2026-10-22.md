@@ -21,7 +21,7 @@ Terminal-Bench itself describes version 4 as a protocol change that calibrates t
 
 ### 1. Tests become an experimentally validated oracle
 
-A reference implementation passing and an empty patch failing are necessary, not sufficient. The current pilot now requires every curated mutant to compile and fail at least one assertion under a complete, non-simulated test run. For a larger task bank, record the mutation catalogue and report killed, surviving, invalid/compile-failing and unresolved mutants separately. A mutant that cannot compile is not evidence that tests discriminate behavior.
+A reference implementation passing and an empty patch failing are necessary, not sufficient. The current pilot now requires every curated mutant to compile and fail at least one assertion under a complete, non-simulated test run. CodeExecutor may record a nonzero test-binary exit in `runtime_error` when an ordinary assertion fails; exact full test counts therefore indicate a completed behavioral failure, while missing counts/simulated runs remain unresolved. For a larger task bank, record the mutation catalogue and report killed, surviving, invalid/compile-failing and unresolved mutants separately. A mutant that cannot compile is not evidence that tests discriminate behavior.
 
 The pilot's `#[test]` count is still a text scan. Replace it with structured fixture metadata or an AST-based extractor before broadening to arbitrary Rust repositories. The test harness must also detect a test runner that executed zero tests while returning a successful process exit.
 
