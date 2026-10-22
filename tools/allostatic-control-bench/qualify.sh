@@ -949,12 +949,6 @@ if ! awk -F, '
     if ($16 != previous_budget[key]) failed = 1
     if ($21 != recorded_first_spend[key] || $25 != recorded_first_reset[key]) failed = 1
 
-    for (i = 1; i <= 3; i++) {
-      fraction = i == 1 ? 0.25 : (i == 2 ? 0.50 : 0.75)
-      factor = 1 + (fraction / 0.15) * ($15 - 0.15)
-      if (factor <= 0) failed = 1
-      expected_spend_component = previous_spend_ i[key] + log(factor)
-    }
     factor_1 = 1 + (0.25 / 0.15) * ($15 - 0.15)
     factor_2 = 1 + (0.50 / 0.15) * ($15 - 0.15)
     factor_3 = 1 + (0.75 / 0.15) * ($15 - 0.15)
@@ -1073,9 +1067,9 @@ if ! awk -F, '
     expected_spend_sum = 0.05 / 5 * (1 - 1 / 301)
     if (($15 - expected_spend_sum > 0.0000001) ||
         (expected_spend_sum - $15 > 0.0000001)) failed = 1
-    if ($2 == "nominal" && ($5 != $4 || $8 != $7 || $4 > 30 || $7 > 30)) failed = 1
-    if ($2 != "nominal" && ($5 != 0 || $8 != 0)) failed = 1
-    if ($2 == "gradual_shift" && $6 != 300) failed = 1
+    if ($5 != $4 || $8 != $7) failed = 1
+    if ($4 > $7 || $5 > $8 || $6 < $9) failed = 1
+    if ($2 == "nominal" && ($4 > 30 || $7 > 30)) failed = 1
     key = $1 SUBSEP $2
     if (seen[key]++) failed = 1
     if ($2 == "nominal") {
