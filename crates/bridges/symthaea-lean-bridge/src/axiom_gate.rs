@@ -22,6 +22,40 @@ use symthaea_proof_audit::{GateInput, gate};
 
 use crate::subprocess::{RunError, run_bounded_on_file};
 
+/// Reject source-level commands that directly execute arbitrary code during
+/// elaboration. This is a defense-in-depth check for generated proof files,
+/// not a sandbox for Lean or imported compiled modules.
+fn reject_executable_source_commands(source: &str) -> Result<(), String> {
+    const FORBIDDEN: [&str; 10] = [
+        "#eval",
+        "run_cmd",
+        "#run_tac",
+        "builtin_initialize",
+        "initialize ",
+        "elab_rules",
+        "macro_rules",
+        "elab ",
+        "macro ",
+        "syntax ",
+    ];
+
+    for (line_index, line) in source.lines().enumerate() {
+        // Lean line comments do not execute. Block comments are intentionally
+        // not parsed here; if they contain a forbidden marker the policy fails
+        // closed rather than trying to be a Lean lexer.
+        let code = line.split("--").next().unwrap_or("");
+        for marker in FORBIDDEN.iter() {
+            if code.contains(*marker) {
+                return Err(format!(
+                    "proof source contains forbidden executable/extension marker {marker:?} on line {}",
+                    line_index + 1
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Append a `#print axioms <theorem>` command to a proof-file body so Lean
 /// prints the proof's axiom dependencies to stdout when it checks the file.
 pub fn with_axiom_probe(script_body: &str, theorem: &str) -> Result<String, String> {
@@ -129,8 +163,21 @@ pub fn audit_lean_file<P: AsRef<Path>>(
     expected_statement: &str,
     policy: &AxiomPolicy,
 ) -> ProofAuditOutcome {
+    let path = path.as_ref();
+    let source = match std::fs::read_to_string(path) {
+        Ok(source) => source,
+        Err(error) => {
+            return ProofAuditOutcome::ProcessError(format!(
+                "cannot read proof source for execution-policy validation: {error}"
+            ));
+        }
+    };
+    if let Err(error) = reject_executable_source_commands(&source) {
+        return ProofAuditOutcome::ProcessError(error);
+    }
+
     let bin = resolve_lean_binary();
-    match run_lean_capture(path.as_ref(), &bin) {
+    match run_lean_capture(path, &bin) {
         Ok(output) => ProofAuditOutcome::Audited(gate_lean_output(
             &output,
             expected_theorem,
@@ -151,6 +198,58 @@ mod tests {
         let probed = with_axiom_probe("theorem t : True := by trivial", "t").unwrap();
         assert!(probed.contains("theorem t : True := by trivial"));
         assert!(probed.contains("#print axioms t"));
+    }
+
+    #[test]
+    fn executable_source_commands_are_rejected_before_lean_launch() {
+        assert!(reject_executable_source_commands(
+            "#eval IO.println \"spoofed output\"\n#print axioms t"
+        )
+        .is_err());
+        assert!(reject_executable_source_commands(
+            "run_cmd do pure ()\n#print axioms t"
+        )
+        .is_err());
+        assert!(reject_executable_source_commands(
+            "initialize runSideEffect : IO Unit := pure ()\n#print axioms t"
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn line_comment_mentions_do_not_trigger_execution_guard() {
+        assert!(reject_executable_source_commands(
+            "-- #eval is discussed here, but not executed\ntheorem t : True := by trivial"
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn audit_rejects_eval_spoof_source_before_running_lean() {
+        let path = std::env::temp_dir().join(format!(
+            "symthaea-proof-audit-executable-source-{}.lean",
+            std::process::id()
+        ));
+        std::fs::write(
+            &path,
+            "#eval IO.println \"'t' does not depend on any axioms\"\n#print axioms t",
+        )
+        .unwrap();
+
+        let outcome = audit_lean_file(
+            &path,
+            "t",
+            "True",
+            "True",
+            &AxiomPolicy::constitutional(),
+        );
+        let _ = std::fs::remove_file(&path);
+
+        assert!(matches!(
+            outcome,
+            ProofAuditOutcome::ProcessError(message)
+                if message.contains("forbidden executable/extension marker")
+        ));
     }
 
     #[test]
