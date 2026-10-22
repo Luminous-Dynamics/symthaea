@@ -11,6 +11,7 @@ source_files=(
   "tools/allostatic-control-bench/Cargo.lock"
   "tools/allostatic-control-bench/src/lib.rs"
   "tools/allostatic-control-bench/src/calibration.rs"
+  "tools/allostatic-control-bench/src/drift_monitor.rs"
   "tools/allostatic-control-bench/src/model_mismatch.rs"
   "tools/allostatic-control-bench/src/multistep_viability.rs"
   "tools/allostatic-control-bench/src/robust_viability.rs"
@@ -18,10 +19,12 @@ source_files=(
   "tools/allostatic-control-bench/src/bin/allostatic-control-report.rs"
   "tools/allostatic-control-bench/src/bin/allostatic-model-mismatch-bench.rs"
   "tools/allostatic-control-bench/src/bin/allostatic-multistep-viability-bench.rs"
+  "tools/allostatic-control-bench/src/bin/allostatic-ood-fallback-bench.rs"
   "tools/allostatic-control-bench/qualify.sh"
   "docs/research/ALLOSTATIC_CONTROL_BENCHMARK_V1.md"
   "docs/research/ROBUST_VIABILITY_ENVELOPE_V1.md"
   "docs/research/MULTISTEP_VIABILITY_TUBES_V1.md"
+  "docs/research/OOD_REACHABILITY_FALLBACK_V1.md"
 )
 expected_head="${1:-$(git rev-parse HEAD)}"
 actual_head="$(git rev-parse HEAD)"
@@ -47,6 +50,8 @@ mismatch_out="${out_base}-mismatch-frontier.csv"
 mismatch_summary_out="${out_base}-mismatch-frontier-summary.csv"
 horizon_out="${out_base}-multistep-horizon.csv"
 horizon_summary_out="${out_base}-multistep-horizon-summary.csv"
+ood_out="${out_base}-ood-fallback.csv"
+ood_summary_out="${out_base}-ood-fallback-summary.csv"
 receipt="${out_csv}.receipt.txt"
 
 cargo fmt --manifest-path "$manifest" -- --check
@@ -259,6 +264,111 @@ if ! awk -F, '
   exit 1
 fi
 
+# Calibrated OOD monitor and a separately widened reachability fallback.
+# Actual synthetic transition parameters change under moderate/strong drift.
+cargo run --locked --release --manifest-path "$manifest" --bin allostatic-ood-fallback-bench -- \
+  "$tmpdir/ood-a.csv" "$tmpdir/ood-summary-a.csv"
+cargo run --locked --release --manifest-path "$manifest" --bin allostatic-ood-fallback-bench -- \
+  "$tmpdir/ood-b.csv" "$tmpdir/ood-summary-b.csv"
+if ! cmp -s "$tmpdir/ood-a.csv" "$tmpdir/ood-b.csv" ||
+   ! cmp -s "$tmpdir/ood-summary-a.csv" "$tmpdir/ood-summary-b.csv"; then
+  printf 'FAIL: repeated OOD fallback raw and summary outputs are not byte-identical\n' >&2
+  exit 1
+fi
+
+if ! awk -F, '
+  NR == 1 { if (NF != 28) failed = 1; next }
+  {
+    if (NF != 28) failed = 1
+    if ($1 != "critical_low_reserve_high_load" && $1 != "reserve_limited" &&
+        $1 != "load_limited" && $1 != "balanced" && $1 != "high_margin") failed = 1
+    if ($2 != "nominal" && $2 != "moderate_shift" && $2 != "strong_shift") failed = 1
+    if ($3 !~ /^[0-9]+$/ || $3 >= 300) failed = 1
+    if ($4 !~ /^[0-9]*[.]?[0-9]+$/ || $5 !~ /^[0-9]*[.]?[0-9]+$/) failed = 1
+    if ($6 != "true" && $6 != "false") failed = 1
+    if (($6 == "true" && $7 != "reachability_fallback") ||
+        ($6 == "false" && $7 != "predictive")) failed = 1
+    if ($8 != "push") failed = 1
+    for (i = 9; i <= 10; i++) if ($i !~ /^[0-3]$/) failed = 1
+    for (i = 11; i <= 13; i++)
+      if ($i != "push" && $i != "maintain" && $i != "emergency_recover" && $i != "none") failed = 1
+    for (i = 14; i <= 17; i++) if ($i != "true" && $i != "false") failed = 1
+    if ($18 !~ /^[0-3]$/ || $19 !~ /^[0-3]$/) failed = 1
+    for (i = 20; i <= 28; i++) if ($i != "true" && $i != "false") failed = 1
+    if (($4 > $5) != ($6 == "true")) failed = 1
+    if (($6 == "false" && $13 != $11) || ($6 == "true" && $13 != $12)) failed = 1
+    if (($13 == "none") != ($15 == "true")) failed = 1
+    if ($15 == "true" && $14 == "true") failed = 1
+    if (($13 != "none" && $20 == "false") != ($22 == "true")) failed = 1
+    if ($21 == "true" && $20 == "false") failed = 1
+    if ($6 == "true" && $13 != "none" && $21 != "true") failed = 1
+    if ($11 == "none" && ($25 != "false" || $26 != "false")) failed = 1
+    if ($2 == "nominal" && $11 != "none" && $25 != "true") failed = 1
+    if ($12 != "none" && ($27 != "true" || $28 != "true")) failed = 1
+    if ($2 == "nominal" &&
+        ($22 == "true" || $23 != "true" || $24 != "true" ||
+         ($11 != "none" && $25 != "true"))) failed = 1
+    if ($2 != "nominal" && ($23 != "false" || $24 != "true")) failed = 1
+    if ($2 == "strong_shift" && ($6 != "true" || $22 == "true")) failed = 1
+    key = $1 SUBSEP $2 SUBSEP $3
+    if (seen[key]++) failed = 1
+    rows++
+  }
+  END { if (NR != 4501 || rows != 4500 || failed) exit 1 }
+' "$tmpdir/ood-a.csv"; then
+  printf 'FAIL: OOD switch, active-filter certification, actual safety or raw coverage is invalid\n' >&2
+  exit 1
+fi
+
+if ! awk -F, '
+  NR == 1 { if (NF != 31) failed = 1; next }
+  {
+    if (NF != 31) failed = 1
+    if ($1 != "critical_low_reserve_high_load" && $1 != "reserve_limited" &&
+        $1 != "load_limited" && $1 != "balanced" && $1 != "high_margin") failed = 1
+    if ($2 != "nominal" && $2 != "moderate_shift" && $2 != "strong_shift") failed = 1
+    if ($3 != 300 || $4 < 0 || $4 > 300 || $5 < 0 || $5 > 300 || $6 < 0 || $6 > 300) failed = 1
+    if ($5 > $4 || $6 > $3) failed = 1
+    if ($9 != $4 || $10 > $9) failed = 1
+    if ($11 < 0 || $11 > 300 || $12 < 0 || $12 > 300) failed = 1
+    if ($13 < 0 || $13 > 3 || $14 < 0 || $14 > 3 || $15 < 0 || $15 > 3 || $16 < 0 || $16 > 3) failed = 1
+    if ($17 < 0 || $17 > 300 || $18 < 0 || $18 > $17 ||
+        $19 < 0 || $19 > $18 || $20 < 0 || $20 > $17) failed = 1
+    if ($22 < 0 || $22 > 300 || $23 != 300) failed = 1
+    if ($24 < 0 || $24 > 300 || $25 < 0 || $25 > $24 ||
+        $27 < 0 || $27 > $24 || $28 < 0 || $28 > 300 ||
+        $29 < 0 || $29 > $28 || $31 < 0 || $31 > $28) failed = 1
+    if ($29 != 0 || $31 != $28) failed = 1
+    if ($24 == 0) {
+      if ($26 != "NA") failed = 1
+    } else if (($25 / $24 - $26 > 0.00001) || ($26 - $25 / $24 > 0.00001)) failed = 1
+    if ($28 == 0) {
+      if ($30 != "NA") failed = 1
+    } else if (($29 / $28 - $30 > 0.00001) || ($30 - $29 / $28 > 0.00001)) failed = 1
+    if (($18 + $20) != $17) failed = 1
+    if ($17 == 0) {
+      if ($21 != "NA" || $20 != 0) failed = 1
+    } else if (($20 / $17 - $21 > 0.00001) || ($21 - $20 / $17 > 0.00001)) failed = 1
+    if ($2 == "nominal" &&
+        ($5 != $4 || $6 != 0 || $7 > 0.10 || $20 != 0 || $22 != 300)) failed = 1
+    if ($2 == "moderate_shift" &&
+        ($5 != 0 || $6 > 150 || $22 != 0)) failed = 1
+    if ($2 == "strong_shift" &&
+        ($5 != 0 || $6 != 0 || $20 != 0 || $22 != 0)) failed = 1
+    if ($2 == "nominal" && $25 != 0) failed = 1
+    if ($2 == "strong_shift") strong_predictive_false_certificates += $25
+    key = $1 SUBSEP $2
+    if (seen[key]++) failed = 1
+    rows++
+  }
+  END {
+    if (NR != 16 || rows != 15 || strong_predictive_false_certificates < 1 || failed) exit 1
+  }
+' "$tmpdir/ood-summary-a.csv"; then
+  printf 'FAIL: OOD fallback per-state alarm, miss, true-safety or availability summary is invalid\n' >&2
+  exit 1
+fi
+
 # Summary must contain 5 scenarios × 6 policies × 2 shield settings.
 if ! awk -F, 'NR == 1 { if (NF != 28) failed = 1; next }
   { if (NF != 28) failed = 1; rows++ }
@@ -283,6 +393,8 @@ cp "$tmpdir/mismatch-a.csv" "$mismatch_out"
 cp "$tmpdir/mismatch-summary-a.csv" "$mismatch_summary_out"
 cp "$tmpdir/horizon-a.csv" "$horizon_out"
 cp "$tmpdir/horizon-summary-a.csv" "$horizon_summary_out"
+cp "$tmpdir/ood-a.csv" "$ood_out"
+cp "$tmpdir/ood-summary-a.csv" "$ood_summary_out"
 {
   printf 'status=pass\n'
   printf 'git_commit=%s\n' "$actual_head"
@@ -306,6 +418,10 @@ cp "$tmpdir/horizon-summary-a.csv" "$horizon_summary_out"
   printf 'multistep_frontier_rows_excluding_header=%s\n' "$(( $(wc -l < "$horizon_out") - 1 ))"
   printf 'multistep_summary_sha256=%s\n' "$(sha256sum "$horizon_summary_out" | awk '{print $1}')"
   printf 'multistep_summary_rows_excluding_header=%s\n' "$(( $(wc -l < "$horizon_summary_out") - 1 ))"
+  printf 'ood_frontier_sha256=%s\n' "$(sha256sum "$ood_out" | awk '{print $1}')"
+  printf 'ood_frontier_rows_excluding_header=%s\n' "$(( $(wc -l < "$ood_out") - 1 ))"
+  printf 'ood_summary_sha256=%s\n' "$(sha256sum "$ood_summary_out" | awk '{print $1}')"
+  printf 'ood_summary_rows_excluding_header=%s\n' "$(( $(wc -l < "$ood_summary_out") - 1 ))"
   printf '\nsource_sha256:\n'
   sha256sum "${source_files[@]}"
 } > "$receipt"
@@ -317,4 +433,6 @@ printf 'Model-mismatch safety frontier: %s\n' "$mismatch_out"
 printf 'Model-mismatch frontier summary: %s\n' "$mismatch_summary_out"
 printf 'Multi-step viability horizon frontier: %s\n' "$horizon_out"
 printf 'Multi-step viability horizon summary: %s\n' "$horizon_summary_out"
+printf 'OOD fallback frontier: %s\n' "$ood_out"
+printf 'OOD fallback summary: %s\n' "$ood_summary_out"
 printf 'Provenance receipt: %s\n' "$receipt"
