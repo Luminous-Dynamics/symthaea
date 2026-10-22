@@ -47,8 +47,8 @@ impl VariantResult {
             "tests_passed": self.tests_passed,
             "tests_failed": self.tests_failed,
             "elapsed_ms": self.elapsed_ms,
-            "compile_errors": self.compile_errors,
-            "runtime_error": self.runtime_error,
+            "compile_errors": self.compile_errors.clone(),
+            "runtime_error": self.runtime_error.clone(),
         })
     }
 }
@@ -379,13 +379,16 @@ fn main() {
             ));
         }
 
+        let test_digest = digest(case.tests);
+        let reference_digest = digest(case.reference);
+        let mutant_digest = digest(case.mutant);
         aggregate.push_str(case.id);
         aggregate.push('\n');
-        aggregate.push_str(case.reference);
+        aggregate.push_str(&reference_digest);
         aggregate.push('\n');
-        aggregate.push_str(case.mutant);
+        aggregate.push_str(&mutant_digest);
         aggregate.push('\n');
-        aggregate.push_str(case.tests);
+        aggregate.push_str(&test_digest);
         aggregate.push('\n');
 
         eprintln!(
@@ -399,9 +402,9 @@ fn main() {
 
         records.push(serde_json::json!({
             "task_id": case.id,
-            "fixture_digest_blake3": digest(case.tests),
-            "reference_source_digest_blake3": digest(case.reference),
-            "mutant_source_digest_blake3": digest(case.mutant),
+            "fixture_digest_blake3": test_digest,
+            "reference_source_digest_blake3": reference_digest,
+            "mutant_source_digest_blake3": mutant_digest,
             "tests_expected": expected,
             "reference": reference.to_json(),
             "mutant": mutant.to_json(),
