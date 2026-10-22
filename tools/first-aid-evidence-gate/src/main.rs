@@ -707,7 +707,11 @@ mod tests {
     #[test]
     fn malformed_or_missing_claim_array_is_rejected() {
         let mut input = registry();
-        input.as_object_mut().expect("root object").remove("claims");
+        let removed = input
+            .as_object_mut()
+            .expect("root object")
+            .remove("claims");
+        assert!(removed.is_some());
         let errors = validate_registry(&input).expect_err("missing claim array must be rejected");
         assert!(errors.iter().any(|error| error.contains("claims must be an array")));
     }
