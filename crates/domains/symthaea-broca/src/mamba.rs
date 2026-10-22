@@ -684,7 +684,7 @@ impl MambaWrapper {
         // Accumulate all target-token cross-entropies in a single live graph.
         let mut loss_sum: Option<Tensor> = None;
         let mut previous_token = self.eos_token_id();
-        for (target_position, &target_id) in target_ids.iter().enumerate() {
+        for &target_id in target_ids {
             let input = Tensor::new(&[previous_token], &self.device)?;
             let logits = self.model.forward(&input, &mut self.state)?.squeeze(0)?;
             let vocab = logits.dim(0)?;
@@ -700,10 +700,6 @@ impl MambaWrapper {
                 None => token_loss,
             });
             previous_token = target_id;
-
-            // Keep the loop index observable in diagnostic errors while making
-            // the prefix invariant explicit for future sequence-loss extensions.
-            let _ = target_position;
         }
 
         let loss_sum = loss_sum
