@@ -405,11 +405,16 @@ mod tests {
     }
 
     #[test]
-    fn test_kem_keypair_generation() {
+    fn test_workspace_crypto_stub_is_never_accepted_as_ml_kem() {
+        assert!(
+            mycelix_crypto::CRYPTO_BACKEND_IS_STUB,
+            "this workspace dependency must identify itself as a test/compile-only stub"
+        );
         let manager = PqcHandshakeManager::new(test_config());
-        let pk_bytes = manager.kem_public_key_bytes();
-        // ML-KEM-768 public key is 1184 bytes
-        assert_eq!(pk_bytes.len(), 1184, "KEM public key should be 1184 bytes");
+        assert!(manager.kem_public_key_bytes().is_err());
+        assert_eq!(manager.session_count(), 0);
+        assert_eq!(manager.pending_session_count(), 0);
+        assert!(manager.session_key("any-peer").is_none());
     }
 
     #[test]
@@ -433,6 +438,11 @@ mod tests {
             );
             assert!(manager.pending_kem.is_empty());
         }
+
+        // Correct length is not sufficient: the current backend is an explicit
+        // all-zero stub, so it must fail closed without storing the key.
+        assert!(manager.receive_kem_public_key("peer-stub", &valid_length).is_err());
+        assert!(manager.pending_kem.is_empty());
     }
 
     #[test]
@@ -440,21 +450,19 @@ mod tests {
         let mut manager = PqcHandshakeManager::new(test_config());
         let encoded_pk = vec![0u8; ML_KEM_768_PUBLIC_KEY_BYTES];
 
+        // Seed private test state directly to exercise the capacity guard
+        // independently of the stub-backend guard.
         for index in 0..MAX_PENDING_KEM_EXCHANGES {
-            let peer_id = format!("peer-{index}");
-            manager
-                .receive_kem_public_key(&peer_id, &encoded_pk)
-                .expect("entry within configured pending limit must be accepted");
+            manager.pending_kem.insert(format!("peer-{index}"), encoded_pk.clone());
         }
         assert_eq!(manager.pending_kem.len(), MAX_PENDING_KEM_EXCHANGES);
 
         assert!(
-            manager
-                .receive_kem_public_key("peer-over-limit", &encoded_pk)
-                .is_err(),
-            "new pending peer beyond the fixed limit must be rejected"
+            manager.receive_kem_public_key("peer-over-limit", &encoded_pk).is_err(),
+            "a new peer beyond the fixed pending limit must be rejected"
         );
         assert_eq!(manager.pending_kem.len(), MAX_PENDING_KEM_EXCHANGES);
+        assert!(!manager.pending_kem.contains_key("peer-over-limit"));
     }
 
     #[test]
@@ -471,16 +479,18 @@ mod tests {
                 },
             );
         }
-        manager
-            .receive_kem_public_key(
-                "peer-over-limit",
-                &vec![0u8; ML_KEM_768_PUBLIC_KEY_BYTES],
-            )
-            .unwrap();
+        manager.pending_kem.insert(
+            "peer-over-limit".to_string(),
+            vec![0u8; ML_KEM_768_PUBLIC_KEY_BYTES],
+        );
 
-        assert!(manager
-            .encapsulate_for_peer("peer-over-limit", &[0x42u8; 32])
-            .is_err());
+        // Capacity checks must happen before KEM calls and before pending
+        // public-key state is consumed.
+        assert!(
+            manager
+                .encapsulate_for_peer("peer-over-limit", &[0x42u8; 32])
+                .is_err()
+        );
         assert!(
             manager
                 .decapsulate_and_derive(
@@ -492,6 +502,7 @@ mod tests {
         );
         assert_eq!(manager.pending_session_count(), MAX_PENDING_KEM_EXCHANGES);
         assert_eq!(manager.pending_kem.len(), 1);
+        assert!(manager.pending_kem.contains_key("peer-over-limit"));
         assert_eq!(manager.session_count(), 0);
     }
 
@@ -510,211 +521,111 @@ mod tests {
             );
             assert_eq!(manager.pending_session_count(), 0);
         }
-    }
 
-    #[test]
-    fn legacy_pqc_candidate_key_derives_without_verified_classical_handshake_state() {
-        let mut initiator = PqcHandshakeManager::new(test_config());
-        let mut responder = PqcHandshakeManager::new(test_config());
-
-        // Public context bytes: this test does not run or verify a classical handshake.
-        let nonce = vec![0x42u8; 32];
-
-        // Initiator receives responder's KEM public key
-        let responder_pk = responder.kem_public_key_bytes();
-        initiator.receive_kem_public_key("peer-B", &responder_pk).unwrap();
-
-        // Initiator encapsulates
-        let ciphertext = initiator.encapsulate_for_peer("peer-B", &nonce).unwrap();
-        assert!(!ciphertext.is_empty());
-
-        // Responder decapsulates into a pending candidate; neither side marks
-        // the key active because authenticated key confirmation is not implemented.
-        responder
-            .decapsulate_and_derive("peer-A", &ciphertext, &nonce)
-            .unwrap();
-
-        let initiator_key = initiator.pending_session_keys.get("peer-B").unwrap().key();
-        let responder_key = responder.pending_session_keys.get("peer-A").unwrap().key();
-        assert_eq!(initiator_key, responder_key);
-        assert_eq!(initiator.session_count(), 0);
-        assert_eq!(responder.session_count(), 0);
-        assert!(initiator.session_key("peer-B").is_none());
-        assert!(responder.session_key("peer-A").is_none());
-    }
-
-    #[test]
-    fn test_pqc_candidate_key_different_per_peer() {
-        let mut manager = PqcHandshakeManager::new(test_config());
-        let responder_a = PqcHandshakeManager::new(test_config());
-        let responder_b = PqcHandshakeManager::new(test_config());
-
-        let nonce = vec![0x42u8; 32];
-
-        // Derive an unconfirmed candidate for peer A
-        manager.receive_kem_public_key("peer-A", &responder_a.kem_public_key_bytes()).unwrap();
-        let _ = manager.encapsulate_for_peer("peer-A", &nonce).unwrap();
-
-        // Derive an unconfirmed candidate for peer B
-        manager.receive_kem_public_key("peer-B", &responder_b.kem_public_key_bytes()).unwrap();
-        let _ = manager.encapsulate_for_peer("peer-B", &nonce).unwrap();
-
-        let key_a = manager.pending_session_keys.get("peer-A").unwrap().key();
-        let key_b = manager.pending_session_keys.get("peer-B").unwrap().key();
-        assert_ne!(
-            key_a, key_b,
-            "Different peers must have different session keys"
-        );
-    }
-
-    #[test]
-    fn test_public_challenge_context_affects_candidate_key() {
-        let mut initiator1 = PqcHandshakeManager::new(test_config());
-        let mut initiator2 = PqcHandshakeManager::new(test_config());
-        let responder = PqcHandshakeManager::new(test_config());
-
-        let rpk = responder.kem_public_key_bytes();
-
-        // Same responder PK, different nonces
-        let nonce1 = vec![0x01u8; 32];
-        let nonce2 = vec![0x02u8; 32];
-
-        initiator1.receive_kem_public_key("peer-R", &rpk).unwrap();
-        let _ = initiator1.encapsulate_for_peer("peer-R", &nonce1).unwrap();
-
-        initiator2.receive_kem_public_key("peer-R", &rpk).unwrap();
-        let _ = initiator2.encapsulate_for_peer("peer-R", &nonce2).unwrap();
-
-        let key1 = initiator1.pending_session_keys.get("peer-R").unwrap().key();
-        let key2 = initiator2.pending_session_keys.get("peer-R").unwrap().key();
-        assert_ne!(
-            key1, key2,
-            "Different public context inputs change the derived key; they do not add secret entropy"
-        );
-    }
-
-    /// Known limitation witness: the same KEM ciphertext and public challenge
-    /// can be stored under two caller-provided peer IDs and yields the same key.
-    /// The caller must authenticate and transcript-bind the identity separately.
-    #[test]
-    fn legacy_pqc_session_derivation_does_not_bind_peer_id() {
-        let mut initiator = PqcHandshakeManager::new(test_config());
-        let mut responder = PqcHandshakeManager::new(test_config());
-        let public_challenge = vec![0x6Bu8; 32];
-
-        let responder_pk = responder.kem_public_key_bytes();
-        initiator.receive_kem_public_key("peer-A", &responder_pk).unwrap();
-        let ciphertext = initiator
-            .encapsulate_for_peer("peer-A", &public_challenge)
-            .unwrap();
-        let expected = *initiator
-            .pending_session_keys
-            .get("peer-A")
-            .unwrap()
-            .key();
-
-        responder
-            .decapsulate_and_derive("peer-A", &ciphertext, &public_challenge)
-            .unwrap();
-        responder
-            .decapsulate_and_derive("peer-B", &ciphertext, &public_challenge)
-            .unwrap();
-
-        let key_as_peer_a = *responder.pending_session_keys.get("peer-A").unwrap().key();
-        let key_as_peer_b = *responder.pending_session_keys.get("peer-B").unwrap().key();
-        assert_eq!(expected, key_as_peer_a);
-        assert_eq!(key_as_peer_a, key_as_peer_b);
-        assert!(responder.session_key("peer-A").is_none());
-        assert!(responder.session_key("peer-B").is_none());
-    }
-
-    #[test]
-    fn test_invalid_ciphertext_uses_implicit_rejection_and_needs_key_confirmation() {
-        let mut responder = PqcHandshakeManager::new(test_config());
-        let public_challenge = vec![0x42u8; 32];
-
-        // Random garbage ciphertext. ML-KEM implicit rejection may intentionally
-        // yield a secret instead of returning a distinguishable decapsulation error.
-        let bad_ct = vec![0xFFu8; 1088];
-        let result =
-            responder.decapsulate_and_derive("peer-X", &bad_ct, &public_challenge);
-
-        // This proves only that the API can derive/store a candidate key. It does
-        // NOT authenticate the peer or prove both sides derived the same key.
+        // Correct ciphertext length still cannot use the compile-only stub.
         assert!(
-            result.is_ok(),
-            "implicit rejection may produce a candidate key for an invalid ciphertext"
+            manager
+                .decapsulate_and_derive(
+                    "peer-stub",
+                    &vec![0xFFu8; ML_KEM_768_CIPHERTEXT_BYTES],
+                    &public_context,
+                )
+                .is_err()
         );
-        assert_eq!(responder.session_count(), 0);
-        assert_eq!(responder.pending_session_count(), 1);
-        assert!(
-            responder.session_key("peer-X").is_none(),
-            "candidate key must not be exposed as an established session"
-        );
-        assert!(responder.pending_session_keys.contains_key("peer-X"));
-    }
-
-    #[test]
-    fn test_remove_session_clears_pending_candidate() {
-        let mut manager = PqcHandshakeManager::new(test_config());
-        let responder = PqcHandshakeManager::new(test_config());
-        let nonce = vec![0x42u8; 32];
-
-        manager.receive_kem_public_key("peer-A", &responder.kem_public_key_bytes()).unwrap();
-        let _ = manager.encapsulate_for_peer("peer-A", &nonce).unwrap();
+        assert_eq!(manager.pending_session_count(), 0);
         assert_eq!(manager.session_count(), 0);
-        assert_eq!(manager.pending_session_count(), 1);
-        assert!(manager.session_key("peer-A").is_none());
+    }
 
+    #[test]
+    fn test_stub_backend_cannot_create_candidate_or_active_session() {
+        let mut manager = PqcHandshakeManager::new(test_config());
+        let public_key = vec![0u8; ML_KEM_768_PUBLIC_KEY_BYTES];
+
+        // The backend guard rejects a correctly sized public key. A caller
+        // cannot obtain stub outputs through the supported public API.
+        assert!(manager.receive_kem_public_key("peer-B", &public_key).is_err());
+        assert!(manager.encapsulate_for_peer("peer-B", &[0x42u8; 32]).is_err());
+        assert!(manager
+            .decapsulate_and_derive(
+                "peer-B",
+                &vec![0u8; ML_KEM_768_CIPHERTEXT_BYTES],
+                &[0x42u8; 32],
+            )
+            .is_err());
+
+        assert!(manager.pending_kem.is_empty());
+        assert_eq!(manager.pending_session_count(), 0);
+        assert_eq!(manager.session_count(), 0);
+        assert!(manager.session_key("peer-B").is_none());
+    }
+
+    #[test]
+    fn test_remove_session_clears_pending_candidate_and_public_key() {
+        let mut manager = PqcHandshakeManager::new(test_config());
+        manager.pending_kem.insert(
+            "peer-A".to_string(),
+            vec![0u8; ML_KEM_768_PUBLIC_KEY_BYTES],
+        );
+        manager.pending_session_keys.insert(
+            "peer-A".to_string(),
+            PqcCandidateKey {
+                candidate_key: [0x42; 32],
+                created_at: std::time::SystemTime::now(),
+            },
+        );
+
+        assert_eq!(manager.pending_session_count(), 1);
+        assert!(manager.pending_kem.contains_key("peer-A"));
         manager.remove_session("peer-A");
         assert_eq!(manager.session_count(), 0);
         assert_eq!(manager.pending_session_count(), 0);
+        assert!(!manager.pending_kem.contains_key("peer-A"));
         assert!(manager.session_key("peer-A").is_none());
     }
 
     #[test]
     fn test_missing_kem_public_key_fails() {
         let mut manager = PqcHandshakeManager::new(test_config());
-        let nonce = vec![0x42u8; 32];
-
-        // No KEM public key stored for this peer
-        let result = manager.encapsulate_for_peer("peer-X", &nonce);
-        assert!(result.is_err());
+        assert!(manager.encapsulate_for_peer("peer-X", &[0x42u8; 32]).is_err());
     }
 
     #[test]
-    fn test_candidate_key_is_32_bytes() {
-        let mut initiator = PqcHandshakeManager::new(test_config());
-        let responder = PqcHandshakeManager::new(test_config());
-        let nonce = vec![0x42u8; 32];
+    fn test_candidate_key_is_not_exposed_as_established_session() {
+        let mut manager = PqcHandshakeManager::new(test_config());
+        manager.pending_session_keys.insert(
+            "peer-B".to_string(),
+            PqcCandidateKey {
+                candidate_key: [0xAB; 32],
+                created_at: std::time::SystemTime::now(),
+            },
+        );
 
-        initiator.receive_kem_public_key("peer-B", &responder.kem_public_key_bytes()).unwrap();
-        let _ = initiator.encapsulate_for_peer("peer-B", &nonce).unwrap();
-
-        let key = initiator.pending_session_keys.get("peer-B").unwrap().key();
-        assert_eq!(key.len(), 32, "Candidate key is sized for ChaCha20-Poly1305");
-        assert_eq!(initiator.session_count(), 0);
-        assert!(initiator.session_key("peer-B").is_none());
+        let candidate = manager.pending_session_keys.get("peer-B").unwrap();
+        assert_eq!(candidate.key().len(), 32);
+        assert!(candidate.created_at() <= std::time::SystemTime::now());
+        assert_eq!(manager.pending_session_count(), 1);
+        assert_eq!(manager.session_count(), 0);
+        assert!(manager.session_key("peer-B").is_none());
     }
 
     #[test]
     fn test_blake3_derive_session_key_deterministic() {
-        let nonce = vec![0x42u8; 32];
-        let kem_secret = vec![0xABu8; 32];
+        let public_context = vec![0x42u8; 32];
+        let test_secret = vec![0xABu8; 32];
 
-        let key1 = PqcHandshakeManager::blake3_derive_session_key(&nonce, &kem_secret);
-        let key2 = PqcHandshakeManager::blake3_derive_session_key(&nonce, &kem_secret);
+        let key1 = PqcHandshakeManager::blake3_derive_session_key(&public_context, &test_secret);
+        let key2 = PqcHandshakeManager::blake3_derive_session_key(&public_context, &test_secret);
         assert_eq!(key1, key2, "BLAKE3 derive-key derivation must be deterministic");
     }
 
     #[test]
     fn test_blake3_derive_session_key_different_inputs() {
-        let nonce1 = vec![0x01u8; 32];
-        let nonce2 = vec![0x02u8; 32];
-        let kem_secret = vec![0xABu8; 32];
+        let context_a = vec![0x01u8; 32];
+        let context_b = vec![0x02u8; 32];
+        let test_secret = vec![0xABu8; 32];
 
-        let key1 = PqcHandshakeManager::blake3_derive_session_key(&nonce1, &kem_secret);
-        let key2 = PqcHandshakeManager::blake3_derive_session_key(&nonce2, &kem_secret);
+        let key1 = PqcHandshakeManager::blake3_derive_session_key(&context_a, &test_secret);
+        let key2 = PqcHandshakeManager::blake3_derive_session_key(&context_b, &test_secret);
         assert_ne!(key1, key2, "Different inputs must produce different keys");
     }
 }
