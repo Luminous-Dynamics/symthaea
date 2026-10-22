@@ -126,9 +126,215 @@ impl BoundedRiskEProcess {
     }
 }
 
+/// Fixed-grid mixture of bounded-risk e-processes for unknown shift magnitude.
+///
+/// Each component uses a predeclared predictable bet fraction in (0, 1), with
+/// bet = fraction / risk_bound. The arithmetic mixture of nonnegative
+/// supermartingales is itself a nonnegative supermartingale under the same
+/// conditional-risk null. This avoids selecting one bet using evaluation data.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct MixtureBoundedRiskEProcess {
+    risk_bound: f64,
+    bet_fractions: [f64; 3],
+    total_delta: f64,
+    simultaneous_monitors: usize,
+    component_log_e_values: [f64; 3],
+    log_e_value: f64,
+    alarmed: bool,
+}
+
+impl MixtureBoundedRiskEProcess {
+    pub fn new(
+        risk_bound: f64,
+        bet_fractions: [f64; 3],
+        total_delta: f64,
+        simultaneous_monitors: usize,
+    ) -> Option<Self> {
+        if !risk_bound.is_finite()
+            || risk_bound <= 0.0
+            || risk_bound >= 1.0
+            || bet_fractions
+                .iter()
+                .any(|fraction| !fraction.is_finite() || *fraction <= 0.0 || *fraction >= 1.0)
+            || !total_delta.is_finite()
+            || total_delta <= 0.0
+            || total_delta >= 1.0
+            || simultaneous_monitors == 0
+        {
+            return None;
+        }
+
+        Some(Self {
+            risk_bound,
+            bet_fractions,
+            total_delta,
+            simultaneous_monitors,
+            component_log_e_values: [0.0; 3],
+            log_e_value: 0.0,
+            alarmed: false,
+        })
+    }
+
+    pub const fn risk_bound(self) -> f64 {
+        self.risk_bound
+    }
+
+    pub const fn bet_fractions(self) -> [f64; 3] {
+        self.bet_fractions
+    }
+
+    pub fn bet_values(self) -> [f64; 3] {
+        self.bet_fractions.map(|fraction| fraction / self.risk_bound)
+    }
+
+    pub const fn total_delta(self) -> f64 {
+        self.total_delta
+    }
+
+    pub const fn simultaneous_monitors(self) -> usize {
+        self.simultaneous_monitors
+    }
+
+    pub fn log_alarm_threshold(self) -> f64 {
+        (self.simultaneous_monitors as f64 / self.total_delta).ln()
+    }
+
+    pub const fn component_log_e_values(self) -> [f64; 3] {
+        self.component_log_e_values
+    }
+
+    pub const fn log_e_value(self) -> f64 {
+        self.log_e_value
+    }
+
+    pub fn e_value(self) -> f64 {
+        self.log_e_value.exp()
+    }
+
+    pub const fn alarmed(self) -> bool {
+        self.alarmed
+    }
+
+    pub fn observe(&mut self, loss: f64) -> Option<bool> {
+        if !loss.is_finite() || !(0.0..=1.0).contains(&loss) {
+            return None;
+        }
+
+        for (index, fraction) in self.bet_fractions.iter().copied().enumerate() {
+            let bet = fraction / self.risk_bound;
+            let factor = 1.0 + bet * (loss - self.risk_bound);
+            if !factor.is_finite() || factor <= 0.0 {
+                return None;
+            }
+            self.component_log_e_values[index] += factor.ln();
+        }
+
+        let max_log_value = self
+            .component_log_e_values
+            .iter()
+            .copied()
+            .fold(f64::NEG_INFINITY, f64::max);
+        let mean_exp = self
+            .component_log_e_values
+            .iter()
+            .map(|value| (*value - max_log_value).exp())
+            .sum::<f64>()
+            / self.component_log_e_values.len() as f64;
+        let next_log_value = max_log_value + mean_exp.ln();
+
+        if !next_log_value.is_finite() {
+            self.log_e_value = f64::MAX;
+            self.alarmed = true;
+            return Some(true);
+        }
+
+        self.log_e_value = next_log_value;
+        self.alarmed |= self.log_e_value >= self.log_alarm_threshold();
+        Some(self.alarmed)
+    }
+
+    pub fn reset(&mut self) {
+        self.component_log_e_values = [0.0; 3];
+        self.log_e_value = 0.0;
+        self.alarmed = false;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn mixture_of_bets_allocates_delta_and_rejects_invalid_components() {
+        assert!(MixtureBoundedRiskEProcess::new(0.15, [0.25, 0.5, 1.0], 0.05, 5).is_none());
+        assert!(MixtureBoundedRiskEProcess::new(0.15, [0.25, 0.0, 0.75], 0.05, 5).is_none());
+        let process = MixtureBoundedRiskEProcess::new(0.15, [0.25, 0.5, 0.75], 0.05, 5)
+            .expect("valid bet mixture");
+        assert!((process.log_alarm_threshold().exp() - 100.0).abs() < 1e-10);
+        assert_eq!(process.bet_fractions(), [0.25, 0.5, 0.75]);
+        assert_eq!(process.bet_values(), [
+            0.25 / 0.15,
+            0.5 / 0.15,
+            0.75 / 0.15,
+        ]);
+    }
+
+    #[test]
+    fn mixture_preserves_nominal_evidence_and_detects_gradual_excess() {
+        let mut nominal = MixtureBoundedRiskEProcess::new(
+            0.15,
+            [0.25, 0.5, 0.75],
+            0.05,
+            5,
+        )
+        .expect("valid mixture");
+        for loss in [0.06, 0.08, 0.10, 0.12, 0.09, 0.13, 0.07, 0.10] {
+            assert_eq!(nominal.observe(loss), Some(false));
+        }
+        assert!(nominal.log_e_value() < nominal.log_alarm_threshold());
+
+        let mut gradual = MixtureBoundedRiskEProcess::new(
+            0.15,
+            [0.25, 0.5, 0.75],
+            0.05,
+            5,
+        )
+        .expect("valid mixture");
+        let mut first_alarm = None;
+        for (step, score) in [0.009, 0.012, 0.015, 0.018, 0.021, 0.025, 0.028, 0.031]
+            .into_iter()
+            .enumerate()
+        {
+            if gradual.observe((score / 0.05).min(1.0)) == Some(true) {
+                first_alarm.get_or_insert(step);
+            }
+        }
+        assert!(first_alarm.is_some());
+        assert!(gradual.log_e_value() >= gradual.log_alarm_threshold());
+    }
+
+    #[test]
+    fn mixture_rejects_invalid_loss_without_mutating_state_and_can_reset() {
+        let mut process = MixtureBoundedRiskEProcess::new(
+            0.15,
+            [0.25, 0.5, 0.75],
+            0.05,
+            5,
+        )
+        .expect("valid mixture");
+        let initial = process.component_log_e_values();
+        assert!(process.observe(f64::NAN).is_none());
+        assert_eq!(process.component_log_e_values(), initial);
+
+        for _ in 0..8 {
+            let _ = process.observe(0.65);
+        }
+        assert!(process.alarmed());
+        process.reset();
+        assert_eq!(process.component_log_e_values(), [0.0; 3]);
+        assert_eq!(process.log_e_value(), 0.0);
+        assert!(!process.alarmed());
+    }
 
     #[test]
     fn rejects_invalid_parameters_and_losses() {
