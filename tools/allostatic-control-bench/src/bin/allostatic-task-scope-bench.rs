@@ -7,8 +7,8 @@
 use allostatic_control_bench::drift_monitor::calibrate_drift_threshold;
 use allostatic_control_bench::robust_viability::ViabilityLimits;
 use allostatic_control_bench::scope_monitor::{
-    assess_prediction_scope, calibrate_scope_threshold, score_prediction_error,
-    PredictionErrorScales, PredictionErrorScore, ScopeThreshold,
+    calibrate_scope_threshold, score_prediction_error, PredictionErrorScales,
+    PredictionErrorScore, ScopeThreshold,
 };
 use allostatic_control_bench::Action;
 use std::error::Error;
@@ -378,20 +378,10 @@ fn run_episode(
     let mut first_false_safe_step = HORIZON;
     let mut scope_false_safe_override = false;
     for (step, observation) in trace.iter().enumerate() {
-        let assessment = assess_prediction_scope(
-            // Reconstruct the state pair from its score is intentionally not
-            // possible; trace_episode records the already-computed score and
-            // unsafe-prediction flag, while threshold comparison is equivalent
-            // to that score's calibrated gate.
-            0.5,
-            0.5,
-            0.5,
-            0.5,
-            limits,
-            scales,
-            scope_threshold,
-        );
-        let _ = assessment;
+        // This is exactly the scope monitor contract: a calibrated residual
+        // alarm, or a hard override for a prediction that claimed safe but was
+        // observed to be unsafe. Both signals are computed from this step's
+        // real synthetic prediction/observation pair.
         let scope_trigger = observation.score.score() > scope_threshold.score_threshold()
             || observation.score.false_safe_prediction();
         if first_scope_alarm_step == HORIZON && scope_trigger {
