@@ -188,6 +188,39 @@ impl Clone for Box<dyn MambaBackend> {
 }
 
 /// Wrapper around candle-transformers' Mamba model with Symthaea integration.
+/// Validate the context/target contract before building an autograd graph.
+fn validate_e2e_token_loss_inputs(
+    sequence: &[Vec<f32>],
+    tokens: &[u32],
+    pos: usize,
+    d_model: usize,
+) -> Result<()> {
+    if sequence.is_empty() {
+        anyhow::bail!("E2E context sequence must not be empty");
+    }
+    if pos >= sequence.len() {
+        anyhow::bail!(
+            "E2E gradient position {pos} is outside context sequence of length {}",
+            sequence.len()
+        );
+    }
+    if tokens.len() < 2 {
+        anyhow::bail!(
+            "E2E teacher forcing requires [previous_token, target_token]; received {} token(s)",
+            tokens.len()
+        );
+    }
+    for (index, embedding) in sequence.iter().enumerate() {
+        if embedding.len() != d_model {
+            anyhow::bail!(
+                "E2E context embedding {index} has dimension {}; expected {d_model}",
+                embedding.len()
+            );
+        }
+    }
+    Ok(())
+}
+
 pub struct MambaWrapper {
     model: Model,
     state: State,
@@ -512,69 +545,73 @@ impl MambaWrapper {
         pos: usize,
     ) -> Result<Vec<f32>> {
         let d_model = self.config.d_model;
-        let n = sequence.len();
-        if n == 0 || pos >= n || tokens.is_empty() {
-            return Ok(vec![0.0f32; d_model]);
-        }
+        validate_e2e_token_loss_inputs(sequence, tokens, pos, d_model)?;
 
-        // Reset state
+        // Reset state.
         self.reset();
 
-        // 1. Inject [0..pos) as context (no autograd)
-        for i in 0..pos {
-            let embed = Tensor::from_vec(sequence[i].clone(), (1, d_model), &self.device)?;
+        // 1. Warm recurrent state using context before the gradient anchor.
+        for embedding in &sequence[..pos] {
+            let embed = Tensor::from_vec(embedding.clone(), (1, d_model), &self.device)?;
             self.model.forward_embeds_no_head(&embed, &mut self.state)?;
         }
 
-        // 2. Make sequence[pos] a Var for gradient tracking
+        // Truncate gradients through the warmup prefix BEFORE introducing the
+        // differentiable anchor. Detaching after the anchor would sever the
+        // loss-to-anchor path and silently yield a missing/zero gradient.
+        self.state.detach()?;
+
+        // 2. Make sequence[pos] differentiable and preserve its graph through
+        // the remaining context, recurrent state updates, and teacher-forced loss.
         let var_embed = candle_core::Var::from_tensor(&Tensor::from_vec(
             sequence[pos].clone(),
             (1, d_model),
             &self.device,
         )?)?;
-        let _logits = self
-            .model
-            .forward_embeds(&var_embed.as_tensor(), &mut self.state)?;
+        self.model
+            .forward_embeds_no_head(var_embed.as_tensor(), &mut self.state)?;
 
-        // 3. Detach state to prevent gradient flow through warmup
-        self.state.detach()?;
-
-        // 4. Inject [pos+1..N) as context (no autograd needed for these)
-        for i in (pos + 1)..n {
-            let embed = Tensor::from_vec(sequence[i].clone(), (1, d_model), &self.device)?;
+        // 3. Continue processing the suffix WITHOUT detaching state, so the
+        // selected anchor can influence the eventual next-token loss.
+        for embedding in &sequence[(pos + 1)..] {
+            let embed = Tensor::from_vec(embedding.clone(), (1, d_model), &self.device)?;
             self.model.forward_embeds_no_head(&embed, &mut self.state)?;
         }
 
-        // 5. Teacher-force: run one token to get loss
-        // Use the first token as the teacher signal
-        let teacher_token = tokens[0.min(tokens.len() - 1)];
+        // 4. Teacher-force the previous token; score the target token.
+        let teacher_token = tokens[0];
+        let target_idx = tokens[1] as usize;
         let input = Tensor::new(&[teacher_token], &self.device)?;
-        let logits = self.model.forward(&input, &mut self.state)?;
-        let logits = logits.squeeze(0)?;
-
-        // Cross-entropy loss at target token
-        let target_idx = tokens.get(1).copied().unwrap_or(teacher_token) as usize;
+        let logits = self.model.forward(&input, &mut self.state)?.squeeze(0)?;
         let vocab = logits.dim(0)?;
         if target_idx >= vocab {
-            return Ok(vec![0.0f32; d_model]);
+            anyhow::bail!(
+                "E2E target token {target_idx} is outside model vocabulary of size {vocab}"
+            );
         }
 
         let log_softmax = candle_nn::ops::log_softmax(&logits, 0)?;
         let loss = log_softmax.i(target_idx)?.neg()?;
 
-        // 6. Backward pass
+        // 5. Backward and extract the actual gradient at the projected anchor.
         let grads = loss.backward()?;
-
-        // 7. Apply LoRA grads if enabled
         if self.lora_lr > 0.0 && self.model.has_lora() {
             self.model.apply_lora_grads(&grads, self.lora_lr)?;
         }
 
-        // 8. Extract gradient at the Var position
-        let grad = match grads.get(var_embed.as_tensor()) {
-            Some(g) => g.flatten_all()?.to_vec1::<f32>()?,
-            None => vec![0.0f32; d_model],
-        };
+        let grad = grads
+            .get(var_embed.as_tensor())
+            .ok_or_else(|| anyhow::anyhow!(
+                "E2E loss produced no gradient for projected context anchor at position {pos}"
+            ))?
+            .flatten_all()?
+            .to_vec1::<f32>()?;
+        if grad.len() != d_model || !grad.iter().all(|value| value.is_finite()) {
+            anyhow::bail!(
+                "E2E context gradient must contain {d_model} finite values; got {}",
+                grad.len()
+            );
+        }
 
         Ok(grad)
     }
@@ -1087,6 +1124,40 @@ pub mod mock {
                 Ok(vec![0.01; 768])
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod e2e_gradient_contract_tests {
+    use super::validate_e2e_token_loss_inputs;
+
+    #[test]
+    fn accepts_context_with_previous_and_target_tokens() {
+        let sequence = vec![vec![0.0f32; 4], vec![0.1f32; 4]];
+        assert!(validate_e2e_token_loss_inputs(&sequence, &[7, 11], 1, 4).is_ok());
+    }
+
+    #[test]
+    fn rejects_single_token_teacher_signal() {
+        let sequence = vec![vec![0.0f32; 4]];
+        assert!(validate_e2e_token_loss_inputs(&sequence, &[11], 0, 4).is_err());
+    }
+
+    #[test]
+    fn rejects_out_of_range_gradient_position() {
+        let sequence = vec![vec![0.0f32; 4]];
+        assert!(validate_e2e_token_loss_inputs(&sequence, &[7, 11], 1, 4).is_err());
+    }
+
+    #[test]
+    fn rejects_context_dimension_mismatch() {
+        let sequence = vec![vec![0.0f32; 3]];
+        assert!(validate_e2e_token_loss_inputs(&sequence, &[7, 11], 0, 4).is_err());
+    }
+
+    #[test]
+    fn rejects_empty_context() {
+        assert!(validate_e2e_token_loss_inputs(&[], &[7, 11], 0, 4).is_err());
     }
 }
 
