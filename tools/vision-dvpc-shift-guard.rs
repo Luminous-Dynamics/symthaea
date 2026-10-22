@@ -448,7 +448,9 @@ fn render_report() -> String {
             row.shift_alarms, row.false_alarms, row.false_alarm_candidate_blocks,
             row.false_alarm_beneficial_blocks, row.total_benefit, row.task_loss, row.charged_units,
             row.budget_units, row.reservation_overruns, row.run_budget_overruns, row.oracle_benefit,
-            row.regret.map(|value| format!("{value:.6}")).unwrap_or_else(|| "INVALID_BUDGET".to_owned())
+            row.regret
+                .map(|value| format!("{value:.6}"))
+                .unwrap_or_else(|| "INVALID_BUDGET".to_owned())
         ));
     }
 
@@ -457,29 +459,62 @@ fn render_report() -> String {
         for budget_percent in BUDGET_PERCENTAGES {
             for policy in Policy::ALL {
                 let rows: Vec<&RunResult> = results.iter()
-                    .filter(|row| row.regime == regime && row.budget_percent == budget_percent && row.policy == policy)
+                    .filter(|row| {
+                        row.regime == regime
+                            && row.budget_percent == budget_percent
+                            && row.policy == policy
+                    })
                     .collect();
                 let loss: Vec<f64> = rows.iter().map(|row| row.task_loss).collect();
                 let benefit: Vec<f64> = rows.iter().map(|row| row.total_benefit).collect();
-                let harmful: Vec<f64> = rows.iter().map(|row| row.harmful_escalations as f64).collect();
-                let missed: Vec<f64> = rows.iter().map(|row| row.missed_beneficial as f64).collect();
-                let shifted_harmful: Vec<f64> = rows.iter().map(|row| row.shifted_harmful as f64).collect();
-                let false_alarm_beneficial: Vec<f64> = rows.iter().map(|row| row.false_alarm_beneficial_blocks as f64).collect();
+                let harmful: Vec<f64> = rows
+                    .iter()
+                    .map(|row| row.harmful_escalations as f64)
+                    .collect();
+                let missed: Vec<f64> = rows
+                    .iter()
+                    .map(|row| row.missed_beneficial as f64)
+                    .collect();
+                let shifted_harmful: Vec<f64> = rows
+                    .iter()
+                    .map(|row| row.shifted_harmful as f64)
+                    .collect();
+                let false_alarm_beneficial: Vec<f64> = rows
+                    .iter()
+                    .map(|row| row.false_alarm_beneficial_blocks as f64)
+                    .collect();
                 let charged: Vec<f64> = rows.iter().map(|row| row.charged_units as f64).collect();
                 let valid_regret: Vec<f64> = rows.iter().filter_map(|row| row.regret).collect();
-                let violations = rows.iter().filter(|row| row.reservation_overruns > 0 || row.run_budget_overruns > 0).count();
+                let violations = rows
+                    .iter()
+                    .filter(|row| row.reservation_overruns > 0 || row.run_budget_overruns > 0)
+                    .count();
                 report.push_str(&format!(
                     "SUMMARY\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
                     regime.label(), policy.label(), budget_percent, rows.len(),
                     mean(&loss).map(|v| format!("{v:.6}")).unwrap_or_else(|| "UNKNOWN".to_owned()),
-                    mean(&benefit).map(|v| format!("{v:.6}")).unwrap_or_else(|| "UNKNOWN".to_owned()),
-                    mean(&harmful).map(|v| format!("{v:.6}")).unwrap_or_else(|| "UNKNOWN".to_owned()),
-                    mean(&missed).map(|v| format!("{v:.6}")).unwrap_or_else(|| "UNKNOWN".to_owned()),
-                    mean(&shifted_harmful).map(|v| format!("{v:.6}")).unwrap_or_else(|| "UNKNOWN".to_owned()),
-                    mean(&false_alarm_beneficial).map(|v| format!("{v:.6}")).unwrap_or_else(|| "UNKNOWN".to_owned()),
-                    mean(&charged).map(|v| format!("{v:.6}")).unwrap_or_else(|| "UNKNOWN".to_owned()),
+                    mean(&benefit)
+                        .map(|v| format!("{v:.6}"))
+                        .unwrap_or_else(|| "UNKNOWN".to_owned()),
+                    mean(&harmful)
+                        .map(|v| format!("{v:.6}"))
+                        .unwrap_or_else(|| "UNKNOWN".to_owned()),
+                    mean(&missed)
+                        .map(|v| format!("{v:.6}"))
+                        .unwrap_or_else(|| "UNKNOWN".to_owned()),
+                    mean(&shifted_harmful)
+                        .map(|v| format!("{v:.6}"))
+                        .unwrap_or_else(|| "UNKNOWN".to_owned()),
+                    mean(&false_alarm_beneficial)
+                        .map(|v| format!("{v:.6}"))
+                        .unwrap_or_else(|| "UNKNOWN".to_owned()),
+                    mean(&charged)
+                        .map(|v| format!("{v:.6}"))
+                        .unwrap_or_else(|| "UNKNOWN".to_owned()),
                     violations, valid_regret.len(),
-                    mean(&valid_regret).map(|v| format!("{v:.6}")).unwrap_or_else(|| "UNKNOWN".to_owned())
+                    mean(&valid_regret)
+                        .map(|v| format!("{v:.6}"))
+                        .unwrap_or_else(|| "UNKNOWN".to_owned())
                 ));
             }
         }
