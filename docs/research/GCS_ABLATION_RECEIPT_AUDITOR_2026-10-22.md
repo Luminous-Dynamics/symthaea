@@ -10,9 +10,9 @@ The goal is *proof-carrying measurement*: make an evaluation artifact independen
 
 - Schema and benchmark identifier; valid source-revision and BLAKE3 digest shapes.
 - Ordered task-manifest digest recomputation from task IDs and per-task digests.
-- The receipt includes task description, expected symbol, reference source and test fixture. The auditor recomputes each task digest using the producer canonicalization, independently hashes reference/test source content, and checks the declared test count against the included fixture.
+- The receipt includes task description, expected symbol, reference source, test fixture and semantic mutants. The auditor recomputes a length-prefixed task digest, independently hashes reference/test/mutant source content, and checks the declared test count against the included fixture.
 - Unique task IDs and nonzero expected test counts.
-- Reference-pass and real empty-patch-fail preflight controls for every manifest task.
+- Reference-pass, real rustc empty-patch compile rejection, and mutation-adequacy preflight controls for every manifest task. Every semantic mutant must compile and be rejected by one or more tests under a complete non-simulated oracle; a compiler error is not credited as a killed behavioral mutant.
 - Exactly two modes per task/repeat; no duplicate or missing off/on run; expected run count; consistent test counts.
 - Fail-closed behavioral score recomputed from compile status, simulation status, runtime errors, and complete expected test counts.
 - Oracle-completeness classification recomputed separately from correctness. A complete run that fails one behavioral test is an assessed failure, not an incomplete oracle.
@@ -51,7 +51,7 @@ A failure exits nonzero and identifies all detected consistency problems. A clea
 
 ## Scope and security boundary
 
-The eight-task pilot uses public fixtures; it is not a hidden-test or contamination-resistant evaluation. For a publication-grade benchmark, split public development tasks from held-out/private tasks and preserve the exact task-manifest pin independently from the receipt.
+The eight-task pilot uses public fixtures and ten hand-authored semantic mutants; this is a small oracle-discrimination screen, not a comprehensive mutation score, hidden-test or contamination-resistant evaluation. For a publication-grade benchmark, split public development tasks from held-out/private tasks and preserve the exact task-manifest pin independently from the receipt.
 
 This tool audits **receipt consistency**, not the truth of every claimed execution. It cannot independently prove that a compiler ran, that the runner was uncompromised, that a model label is accurate, or that the benchmark tasks are representative. The source SHA is metadata, not a signature; BLAKE3 digests do not authenticate a producer. Test counting intentionally mirrors the producer’s simple `#[test]` text scan and is not a Rust parser; prefer structured test metadata or AST-based extraction for a larger heterogeneous suite. Test-function counting intentionally mirrors the producer's simple `#[test]` text scan and is not a Rust parser; use structured test metadata or AST-based extraction for a larger heterogeneous suite. The verifier intentionally does not accept a self-reported "pass" as proof of correctness: for behavioral outcomes it recomputes the claim from the receipt's raw counts and flags.
 
