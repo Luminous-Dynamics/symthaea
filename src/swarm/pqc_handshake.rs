@@ -418,6 +418,59 @@ mod tests {
     }
 
     #[test]
+    fn test_kem_public_key_length_is_validated_before_storage() {
+        let mut manager = PqcHandshakeManager::new(test_config());
+
+        for length in [0, ML_KEM_768_PUBLIC_KEY_BYTES - 1, ML_KEM_768_PUBLIC_KEY_BYTES + 1] {
+            let malformed = vec![0u8; length];
+            assert!(
+                manager.receive_kem_public_key("peer-invalid", &malformed).is_err(),
+                "malformed public-key length {length} must be rejected"
+            );
+            assert!(manager.pending_kem.is_empty());
+        }
+    }
+
+    #[test]
+    fn test_pending_kem_exchange_count_is_bounded() {
+        let mut manager = PqcHandshakeManager::new(test_config());
+        let encoded_pk = vec![0u8; ML_KEM_768_PUBLIC_KEY_BYTES];
+
+        for index in 0..MAX_PENDING_KEM_EXCHANGES {
+            let peer_id = format!("peer-{index}");
+            manager
+                .receive_kem_public_key(&peer_id, &encoded_pk)
+                .expect("entry within configured pending limit must be accepted");
+        }
+        assert_eq!(manager.pending_kem.len(), MAX_PENDING_KEM_EXCHANGES);
+
+        assert!(
+            manager
+                .receive_kem_public_key("peer-over-limit", &encoded_pk)
+                .is_err(),
+            "new pending peer beyond the fixed limit must be rejected"
+        );
+        assert_eq!(manager.pending_kem.len(), MAX_PENDING_KEM_EXCHANGES);
+    }
+
+    #[test]
+    fn test_invalid_kem_ciphertext_lengths_do_not_create_candidates() {
+        let mut manager = PqcHandshakeManager::new(test_config());
+        let public_context = [0x5Au8; 32];
+
+        for length in [0, ML_KEM_768_CIPHERTEXT_BYTES - 1, ML_KEM_768_CIPHERTEXT_BYTES + 1] {
+            let ciphertext = vec![0u8; length];
+            assert!(
+                manager
+                    .decapsulate_and_derive("peer-invalid", &ciphertext, &public_context)
+                    .is_err(),
+                "malformed ciphertext length {length} must be rejected"
+            );
+            assert_eq!(manager.pending_session_count(), 0);
+        }
+    }
+
+    #[test]
     fn legacy_pqc_candidate_key_derives_without_verified_classical_handshake_state() {
         let mut initiator = PqcHandshakeManager::new(test_config());
         let mut responder = PqcHandshakeManager::new(test_config());
@@ -427,7 +480,7 @@ mod tests {
 
         // Initiator receives responder's KEM public key
         let responder_pk = responder.kem_public_key_bytes();
-        initiator.receive_kem_public_key("peer-B", &responder_pk);
+        initiator.receive_kem_public_key("peer-B", &responder_pk).unwrap();
 
         // Initiator encapsulates
         let ciphertext = initiator.encapsulate_for_peer("peer-B", &nonce).unwrap();
@@ -457,11 +510,11 @@ mod tests {
         let nonce = vec![0x42u8; 32];
 
         // Derive an unconfirmed candidate for peer A
-        manager.receive_kem_public_key("peer-A", &responder_a.kem_public_key_bytes());
+        manager.receive_kem_public_key("peer-A", &responder_a.kem_public_key_bytes()).unwrap();
         let _ = manager.encapsulate_for_peer("peer-A", &nonce).unwrap();
 
         // Derive an unconfirmed candidate for peer B
-        manager.receive_kem_public_key("peer-B", &responder_b.kem_public_key_bytes());
+        manager.receive_kem_public_key("peer-B", &responder_b.kem_public_key_bytes()).unwrap();
         let _ = manager.encapsulate_for_peer("peer-B", &nonce).unwrap();
 
         let key_a = manager.pending_session_keys.get("peer-A").unwrap().key();
@@ -484,10 +537,10 @@ mod tests {
         let nonce1 = vec![0x01u8; 32];
         let nonce2 = vec![0x02u8; 32];
 
-        initiator1.receive_kem_public_key("peer-R", &rpk);
+        initiator1.receive_kem_public_key("peer-R", &rpk).unwrap();
         let _ = initiator1.encapsulate_for_peer("peer-R", &nonce1).unwrap();
 
-        initiator2.receive_kem_public_key("peer-R", &rpk);
+        initiator2.receive_kem_public_key("peer-R", &rpk).unwrap();
         let _ = initiator2.encapsulate_for_peer("peer-R", &nonce2).unwrap();
 
         let key1 = initiator1.pending_session_keys.get("peer-R").unwrap().key();
@@ -508,7 +561,7 @@ mod tests {
         let public_challenge = vec![0x6Bu8; 32];
 
         let responder_pk = responder.kem_public_key_bytes();
-        initiator.receive_kem_public_key("peer-A", &responder_pk);
+        initiator.receive_kem_public_key("peer-A", &responder_pk).unwrap();
         let ciphertext = initiator
             .encapsulate_for_peer("peer-A", &public_challenge)
             .unwrap();
@@ -565,7 +618,7 @@ mod tests {
         let responder = PqcHandshakeManager::new(test_config());
         let nonce = vec![0x42u8; 32];
 
-        manager.receive_kem_public_key("peer-A", &responder.kem_public_key_bytes());
+        manager.receive_kem_public_key("peer-A", &responder.kem_public_key_bytes()).unwrap();
         let _ = manager.encapsulate_for_peer("peer-A", &nonce).unwrap();
         assert_eq!(manager.session_count(), 0);
         assert_eq!(manager.pending_session_count(), 1);
@@ -593,7 +646,7 @@ mod tests {
         let responder = PqcHandshakeManager::new(test_config());
         let nonce = vec![0x42u8; 32];
 
-        initiator.receive_kem_public_key("peer-B", &responder.kem_public_key_bytes());
+        initiator.receive_kem_public_key("peer-B", &responder.kem_public_key_bytes()).unwrap();
         let _ = initiator.encapsulate_for_peer("peer-B", &nonce).unwrap();
 
         let key = initiator.pending_session_keys.get("peer-B").unwrap().key();
