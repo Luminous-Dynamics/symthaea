@@ -107,6 +107,11 @@ fn effective_backend_tier(backend_name: &str, selected_tier: BackendTier) -> Bac
     }
 }
 
+fn is_usable_generation_output(backend_name: &str, selected_tier: BackendTier, output: &str) -> bool {
+    !output.is_empty()
+        && effective_backend_tier(backend_name, selected_tier) != BackendTier::Simulated
+}
+
 fn record_backend_attempt(
     attempts: &mut Vec<BackendAttempt>,
     backend_name: &str,
@@ -430,13 +435,18 @@ impl IntelligentDispatcher {
                 let attempt_elapsed_ms = attempt_started.elapsed().as_millis();
                 match generated {
                     Ok(output) => {
-                        let success = !output.is_empty();
+                        let output_nonempty = !output.is_empty();
+                        let success = is_usable_generation_output(
+                            &backend_name,
+                            BackendTier::LocalLlm,
+                            &output,
+                        );
                         self.local_stats.record(success);
                         record_backend_attempt(
                             &mut backend_attempts,
                             &backend_name,
                             BackendTier::LocalLlm,
-                            success,
+                            output_nonempty,
                             attempt_elapsed_ms,
                         );
                         (output, success, COST_LOCAL_LLM)
@@ -462,13 +472,18 @@ impl IntelligentDispatcher {
                     let attempt_elapsed_ms = attempt_started.elapsed().as_millis();
                     match generated {
                         Ok(output) => {
-                            let success = !output.is_empty();
+                            let output_nonempty = !output.is_empty();
+                            let success = is_usable_generation_output(
+                                &cloud_name,
+                                BackendTier::CloudLlm,
+                                &output,
+                            );
                             self.cloud_stats.record(success);
                             record_backend_attempt(
                                 &mut backend_attempts,
                                 &cloud_name,
                                 BackendTier::CloudLlm,
-                                success,
+                                output_nonempty,
                                 attempt_elapsed_ms,
                             );
                             (output, success, COST_CLOUD_LLM)
@@ -493,13 +508,18 @@ impl IntelligentDispatcher {
                             let fallback_elapsed_ms = fallback_started.elapsed().as_millis();
                             match fallback_result {
                                 Ok(output) => {
-                                    let success = !output.is_empty();
+                                    let output_nonempty = !output.is_empty();
+                                    let success = is_usable_generation_output(
+                                        &local_name,
+                                        BackendTier::LocalLlm,
+                                        &output,
+                                    );
                                     self.local_stats.record(success);
                                     record_backend_attempt(
                                         &mut backend_attempts,
                                         &local_name,
                                         BackendTier::LocalLlm,
-                                        success,
+                                        output_nonempty,
                                         fallback_elapsed_ms,
                                     );
                                     (output, success, COST_CLOUD_LLM + COST_LOCAL_LLM)
@@ -531,13 +551,18 @@ impl IntelligentDispatcher {
                     let attempt_elapsed_ms = attempt_started.elapsed().as_millis();
                     match generated {
                         Ok(output) => {
-                            let success = !output.is_empty();
+                            let output_nonempty = !output.is_empty();
+                            let success = is_usable_generation_output(
+                                &local_name,
+                                BackendTier::LocalLlm,
+                                &output,
+                            );
                             self.local_stats.record(success);
                             record_backend_attempt(
                                 &mut backend_attempts,
                                 &local_name,
                                 BackendTier::LocalLlm,
-                                success,
+                                output_nonempty,
                                 attempt_elapsed_ms,
                             );
                             (output, success, COST_LOCAL_LLM)
@@ -564,7 +589,9 @@ impl IntelligentDispatcher {
                     true,
                     0,
                 );
-                ("// simulated code output".to_string(), true, 0.0)
+                // The backend did return its placeholder string (recorded as an output),
+                // but that is not successful code generation.
+                ("// simulated code output".to_string(), false, 0.0)
             }
         };
 
