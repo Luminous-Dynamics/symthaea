@@ -42,7 +42,8 @@ pub struct MisShotBudgetConfig {
     pub batch_shots_per_candidate: u64,
     /// Maximum sum of per-candidate shots for this decision.
     pub max_total_shots: u64,
-    /// Family-wise error probability used for simultaneous Hoeffding bounds.
+    /// Total family-wise error budget across candidates and all adaptive looks.
+    /// The planner allocates this risk across at most max_total_shots + 1 looks.
     pub familywise_error_probability: f64,
 }
 
@@ -215,13 +216,13 @@ struct CandidateInterval {
 fn interval(
     estimate: MisCandidateEstimate,
     eligible_count: usize,
-    alpha: f64,
+    alpha_per_look: f64,
 ) -> CandidateInterval {
     if estimate.shots == 0 {
         return CandidateInterval { estimate, rate: 0.5, lower: 0.0, upper: 1.0 };
     }
     let rate = estimate.inclusion_count as f64 / estimate.shots as f64;
-    let radius = ((2.0 * eligible_count as f64 / alpha).ln()
+    let radius = ((2.0 * eligible_count as f64 / alpha_per_look).ln()
         / (2.0 * estimate.shots as f64))
         .sqrt();
     CandidateInterval {
@@ -259,9 +260,13 @@ fn preferred(
 /// never interpreted as an observed zero inclusion probability.
 ///
 /// The Hoeffding/union-bound intervals require an appropriate independent-sampling
-/// model. Device drift, correlated observations, or calibration changes can invalidate
-/// that model; this planner cannot detect such violations. It plans shot counts only:
-/// no quantum execution, provenance, or maximum-set certificate is produced.
+/// model. To account for repeated looks during adaptive sampling, the configured error
+/// probability is split across at most max_total_shots + 1 looks as well as the
+/// candidate set; this is conservative but prevents repeated fixed-sample checks from
+/// silently reusing the full error budget. Device drift, correlated observations, or
+/// calibration changes can invalidate the sampling model; this planner cannot detect
+/// such violations. It plans shot counts only: no quantum execution, provenance, or
+/// maximum-set certificate is produced.
 pub fn plan_mis_shots(
     estimates: &[MisCandidateEstimate],
     mode: MisSelectionMode,
@@ -315,8 +320,13 @@ pub fn plan_mis_shots(
         );
     }
 
+    // Bonferroni spend across all possible sample counts/looks. A decision may be
+    // reevaluated after every batch, so reusing alpha at each look would inflate the
+    // overall false-selection probability under optional stopping.
+    let alpha_per_look =
+        config.familywise_error_probability / (config.max_total_shots as f64 + 1.0);
     let intervals = sorted.iter().copied()
-        .map(|estimate| interval(estimate, sorted.len(), config.familywise_error_probability))
+        .map(|estimate| interval(estimate, sorted.len(), alpha_per_look))
         .collect::<Vec<_>>();
     let mut winner = intervals[0];
     for &candidate in intervals.iter().skip(1) {
