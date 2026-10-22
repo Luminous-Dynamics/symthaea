@@ -19,6 +19,7 @@ symtropy-robotics-bridge-core = { workspace = true }
 symthaea-aesthetic = { path = "../symthaea-aesthetic" }
 mycelix-zkp-core = { workspace = true }
 serde = { workspace = true }
+sha2 = { workspace = true }
 serde_json = { workspace = true }
 rmp-serde = { workspace = true }
 anyhow = { workspace = true }
