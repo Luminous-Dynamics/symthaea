@@ -14,17 +14,20 @@ on:
       - "crates/core/symthaea-core/examples/platonic_selective_retrieval.rs"
       - "crates/core/symthaea-core/examples/identity_evidence_boundary.rs"
       - "crates/core/symthaea-core/examples/platonic_registry_poisoning_stress.rs"
+      - "crates/core/symthaea-core/examples/platonic_registry_event_integrity.rs"
       - "crates/core/symthaea-core/Cargo.toml"
       - "crates/domains/symthaea-cell-foundry/**"
       - "crates/core/symthaea-observation-attestation/**"
       - "Cargo.toml"
       - "Cargo.lock"
       - "docs/research/PLATONIC_REGISTRY_POISONING_STRESS.md"
+      - "docs/research/PLATONIC_REGISTRY_TEMPORAL_INTEGRITY.md"
       - "docs/research/ABSTRACT_PATTERN_MEMORY_EVALUATION_PLAN.md"
       - "docs/research/LEVIN_MULTISCALE_EXPERIMENT_PROTOCOL.md"
       - "docs/research/PLATONIC_PATTERN_INTERACTION_BENCHMARK.md"
       - "docs/research/SELECTIVE_RETRIEVAL_AND_ABSTENTION_BENCHMARK.md"
       - "docs/research/PLATONIC_REGISTRY_POISONING_STRESS.md"
+      - "docs/research/PLATONIC_REGISTRY_TEMPORAL_INTEGRITY.md"
       - "docs/research/IDENTITY_EVIDENCE_GATED_RETRIEVAL.md"
   push:
     branches: [main]
@@ -37,6 +40,7 @@ on:
       - "crates/core/symthaea-core/examples/platonic_selective_retrieval.rs"
       - "crates/core/symthaea-core/examples/identity_evidence_boundary.rs"
       - "crates/core/symthaea-core/examples/platonic_registry_poisoning_stress.rs"
+      - "crates/core/symthaea-core/examples/platonic_registry_event_integrity.rs"
       - "crates/core/symthaea-core/Cargo.toml"
       - "crates/domains/symthaea-cell-foundry/**"
       - "Cargo.toml"
@@ -141,6 +145,15 @@ jobs:
 
       - name: Run registry poisoning stress benchmark
         run: cargo run --locked --release -p symthaea-core --example platonic_registry_poisoning_stress 2>&1 | tee research-results/platonic-registry-poisoning-stress.log
+
+      - name: Check temporal registry integrity benchmark formatting
+        run: rustfmt --edition 2024 --check crates/core/symthaea-core/examples/platonic_registry_event_integrity.rs
+
+      - name: Test temporal registry integrity traces
+        run: cargo test --locked --release -p symthaea-core --example platonic_registry_event_integrity -- --nocapture
+
+      - name: Run temporal registry integrity trace benchmark
+        run: cargo run --locked --release -p symthaea-core --example platonic_registry_event_integrity 2>&1 | tee research-results/platonic-registry-temporal-integrity.log
 
       - name: Check identity-evidence API and example formatting
         if: hashFiles('crates/core/symthaea-core/src/hdc/identity_evidence.rs') != ''
