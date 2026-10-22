@@ -127,6 +127,32 @@ pub trait MambaBackend: Send + Sync {
         gradient_backend.compute_e2e_token_loss_at(sequence, tokens, pos)
     }
 
+    /// Compute mean next-token loss gradients for several projected-context positions
+    /// in one teacher-forced recurrent unroll.
+    ///
+    /// Production backends should override this method with a single autograd graph.
+    /// The default fails closed; callers must not silently substitute zero gradients.
+    fn compute_e2e_sequence_loss_gradients(
+        &mut self,
+        _sequence: &[Vec<f32>],
+        _target_ids: &[u32],
+        _positions: &[usize],
+    ) -> Result<Vec<(usize, Vec<f32>)>> {
+        anyhow::bail!("backend does not implement single-unroll sequence gradients")
+    }
+
+    /// Run sequence-gradient replay on an isolated backend clone, leaving live state
+    /// untouched for the caller's teacher-forced pass.
+    fn compute_e2e_sequence_loss_gradients_isolated(
+        &mut self,
+        sequence: &[Vec<f32>],
+        target_ids: &[u32],
+        positions: &[usize],
+    ) -> Result<Vec<(usize, Vec<f32>)>> {
+        let mut gradient_backend = self.clone_box();
+        gradient_backend.compute_e2e_sequence_loss_gradients(sequence, target_ids, positions)
+    }
+
     /// Compute E2E token loss at a specific position in the SSM sequence (Improvement B).
     ///
     /// Injects [0..pos) as context (no grad), injects [pos] as Var, detaches state,
@@ -560,6 +586,162 @@ impl MambaWrapper {
         Ok(self.model.enable_lora(rank, alpha, &self.device)?)
     }
 
+    /// Compute mean teacher-forced next-token gradients for selected projected-context
+    /// anchors in one recurrent unroll. The final token at each target position is
+    /// scored after every prior target token has updated the recurrent state.
+    ///
+    /// This trades repeated prefix replay for one differentiable graph over the
+    /// complete context and target sequence; peak activation memory must be measured.
+    pub fn compute_e2e_sequence_loss_gradients(
+        &mut self,
+        sequence: &[Vec<f32>],
+        target_ids: &[u32],
+        positions: &[usize],
+    ) -> Result<Vec<(usize, Vec<f32>)>> {
+        let d_model = self.config.d_model;
+        anyhow::ensure!(!sequence.is_empty(), "E2E context sequence must not be empty");
+        anyhow::ensure!(!target_ids.is_empty(), "E2E target sequence must not be empty");
+        anyhow::ensure!(
+            sequence.iter().all(|embedding| embedding.len() == d_model),
+            "every E2E context embedding must have dimension {d_model}"
+        );
+        anyhow::ensure!(
+            sequence.iter().flatten().all(|value| value.is_finite()),
+            "E2E context sequence contains a non-finite value"
+        );
+        if positions.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let mut sorted_positions = positions.to_vec();
+        sorted_positions.sort_unstable();
+        sorted_positions.dedup();
+        for &pos in &sorted_positions {
+            anyhow::ensure!(
+                pos < sequence.len(),
+                "E2E gradient position {pos} is outside context length {}",
+                sequence.len()
+            );
+        }
+
+        let first_var_pos = sorted_positions[0];
+        let position_set: std::collections::HashSet<usize> =
+            sorted_positions.iter().copied().collect();
+        let mut vars: Vec<(usize, candle_core::Var)> =
+            Vec::with_capacity(sorted_positions.len());
+
+        self.reset();
+
+        // Mirror inject_context_sequence's convolution warm-start. If context
+        // position zero is trainable, reuse that Var in the warm-start and the
+        // ordinary embedding path so both graph paths contribute to its derivative.
+        let next_context_index;
+        if first_var_pos == 0 {
+            let first_var = candle_core::Var::from_tensor(&Tensor::from_vec(
+                sequence[0].clone(),
+                (1, d_model),
+                &self.device,
+            )?)?;
+            self.model
+                .warmstart_conv_history(first_var.as_tensor(), &mut self.state)?;
+            self.model
+                .forward_embeds_no_head(first_var.as_tensor(), &mut self.state)?;
+            vars.push((0, first_var));
+            next_context_index = 1;
+        } else {
+            let first_chunk =
+                Tensor::from_vec(sequence[0].clone(), (1, d_model), &self.device)?;
+            self.model
+                .warmstart_conv_history(&first_chunk, &mut self.state)?;
+            for embedding in &sequence[..first_var_pos] {
+                let tensor =
+                    Tensor::from_vec(embedding.clone(), (1, d_model), &self.device)?;
+                self.model.forward_embeds_no_head(&tensor, &mut self.state)?;
+            }
+            // Truncate the context prefix before introducing differentiable anchors.
+            self.state.detach()?;
+            next_context_index = first_var_pos;
+        }
+
+        // Context chunks and every selected anchor now share one recurrent graph.
+        for index in next_context_index..sequence.len() {
+            if position_set.contains(&index) {
+                let context_var = candle_core::Var::from_tensor(&Tensor::from_vec(
+                    sequence[index].clone(),
+                    (1, d_model),
+                    &self.device,
+                )?)?;
+                self.model
+                    .forward_embeds_no_head(context_var.as_tensor(), &mut self.state)?;
+                vars.push((index, context_var));
+            } else {
+                let tensor =
+                    Tensor::from_vec(sequence[index].clone(), (1, d_model), &self.device)?;
+                self.model.forward_embeds_no_head(&tensor, &mut self.state)?;
+            }
+        }
+
+        // Accumulate all target-token cross-entropies in a single live graph.
+        let mut loss_sum: Option<Tensor> = None;
+        let mut previous_token = self.eos_token_id();
+        for (target_position, &target_id) in target_ids.iter().enumerate() {
+            let input = Tensor::new(&[previous_token], &self.device)?;
+            let logits = self.model.forward(&input, &mut self.state)?.squeeze(0)?;
+            let vocab = logits.dim(0)?;
+            anyhow::ensure!(
+                (target_id as usize) < vocab,
+                "E2E target token {target_id} is outside model vocabulary of size {vocab}"
+            );
+
+            let log_softmax = candle_nn::ops::log_softmax(&logits, 0)?;
+            let token_loss = log_softmax.i(target_id as usize)?.neg()?;
+            loss_sum = Some(match loss_sum {
+                Some(accumulated) => (accumulated + token_loss)?,
+                None => token_loss,
+            });
+            previous_token = target_id;
+
+            // Keep the loop index observable in diagnostic errors while making
+            // the prefix invariant explicit for future sequence-loss extensions.
+            let _ = target_position;
+        }
+
+        let loss_sum = loss_sum
+            .ok_or_else(|| anyhow::anyhow!("E2E loss sequence unexpectedly empty"))?;
+        let grads = loss_sum.backward()?;
+
+        // LoRA, if enabled, follows the same mean-loss normalization as returned
+        // context gradients. The backend is isolated by the trait wrapper above.
+        if self.lora_lr > 0.0 && self.model.has_lora() {
+            self.model
+                .apply_lora_grads(&grads, self.lora_lr / target_ids.len() as f32)?;
+        }
+
+        let target_scale = 1.0 / target_ids.len() as f32;
+        let mut results = Vec::with_capacity(vars.len());
+        for (pos, var) in &vars {
+            let mut gradient = grads
+                .get(var.as_tensor())
+                .ok_or_else(|| anyhow::anyhow!(
+                    "sequence E2E loss produced no gradient for context anchor at position {pos}"
+                ))?
+                .flatten_all()?
+                .to_vec1::<f32>()?;
+            if gradient.len() != d_model || !gradient.iter().all(|value| value.is_finite()) {
+                anyhow::bail!(
+                    "sequence E2E gradient at {pos} must contain {d_model} finite values; got {}",
+                    gradient.len()
+                );
+            }
+            for value in &mut gradient {
+                *value *= target_scale;
+            }
+            results.push((*pos, gradient));
+        }
+
+        Ok(results)
+    }
+
     /// Compute E2E token loss at a specific position (Improvement B).
     ///
     /// Replays projected context, then every teacher-prefix token in order,
@@ -949,6 +1131,15 @@ impl MambaBackend for MambaWrapper {
         MambaWrapper::inject_context_sequence(self, sequence)
     }
 
+    fn compute_e2e_sequence_loss_gradients(
+        &mut self,
+        sequence: &[Vec<f32>],
+        target_ids: &[u32],
+        positions: &[usize],
+    ) -> Result<Vec<(usize, Vec<f32>)>> {
+        MambaWrapper::compute_e2e_sequence_loss_gradients(self, sequence, target_ids, positions)
+    }
+
     fn compute_e2e_token_loss_at(
         &mut self,
         sequence: &[Vec<f32>],
@@ -1158,6 +1349,31 @@ pub mod mock {
                 / sequence.len().max(1) as f32;
             self.last_context_magnitude = avg_mag;
             Ok(())
+        }
+
+        fn compute_e2e_sequence_loss_gradients(
+            &mut self,
+            sequence: &[Vec<f32>],
+            target_ids: &[u32],
+            positions: &[usize],
+        ) -> Result<Vec<(usize, Vec<f32>)>> {
+            anyhow::ensure!(!sequence.is_empty(), "mock E2E context must not be empty");
+            anyhow::ensure!(!target_ids.is_empty(), "mock E2E targets must not be empty");
+            for &pos in positions {
+                anyhow::ensure!(pos < sequence.len(), "mock E2E position out of range");
+            }
+
+            // Simulate the destructive state replay done by the production backend.
+            self.reset();
+            self.forward_count += target_ids.len();
+            let d = self.d_model();
+            Ok(positions
+                .iter()
+                .map(|&pos| {
+                    let value = 0.001f32 * (1.0 + pos as f32 * 0.01);
+                    (pos, vec![value / target_ids.len() as f32; d])
+                })
+                .collect())
         }
 
         fn compute_e2e_token_loss_at(
