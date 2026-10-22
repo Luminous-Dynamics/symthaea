@@ -136,6 +136,9 @@ struct TrajectoryReceipt {
     model_production_edge_comparison_count: usize,
     policy_truth_table_comparison_count: usize,
     model_production_two_action_sequence_comparison_count: usize,
+    model_production_seeded_long_horizon_comparison_count: usize,
+    model_production_seeded_long_horizon_seed: String,
+    model_production_seeded_long_horizon_max_actions: usize,
     cargo_lock_sha256: String,
     rustc_version: String,
     cargo_version: String,
@@ -244,6 +247,20 @@ pub fn run(root: &Path, corpus_arg: &Path, out_arg: Option<&Path>) -> Result<()>
             .ok()
             .and_then(|value| value.parse::<usize>().ok())
             .unwrap_or(0);
+    let model_production_seeded_long_horizon_comparison_count =
+        std::env::var("MODEL_PRODUCTION_SEEDED_LONG_HORIZON_COMPARISON_COUNT")
+            .ok()
+            .and_then(|value| value.parse::<usize>().ok())
+            .unwrap_or(0);
+    let model_production_seeded_long_horizon_seed = std::env::var(
+        "MODEL_PRODUCTION_SEEDED_LONG_HORIZON_SEED",
+    )
+    .unwrap_or_else(|_| "not-provided".to_string());
+    let model_production_seeded_long_horizon_max_actions =
+        std::env::var("MODEL_PRODUCTION_SEEDED_LONG_HORIZON_MAX_ACTIONS")
+            .ok()
+            .and_then(|value| value.parse::<usize>().ok())
+            .unwrap_or(0);
     let cargo_lock = fs::read(root.join("Cargo.lock"))
         .context("read Cargo.lock for dependency-resolution identity")?;
     let cargo_lock_digest = sha256_hex(&cargo_lock);
@@ -268,7 +285,7 @@ pub fn run(root: &Path, corpus_arg: &Path, out_arg: Option<&Path>) -> Result<()>
             .or_insert(0) += 1;
     }
     let receipt = TrajectoryReceipt {
-        receipt_version: "first-aid-trajectory-receipt-v1",
+        receipt_version: "first-aid-trajectory-receipt-v1.1",
         status: "synthetic_trajectory_contract_passed",
         corpus_sha256: corpus_digest,
         evaluation_protocol_sha256: evaluation_protocol_digest,
@@ -287,6 +304,9 @@ pub fn run(root: &Path, corpus_arg: &Path, out_arg: Option<&Path>) -> Result<()>
         model_production_edge_comparison_count,
         policy_truth_table_comparison_count,
         model_production_two_action_sequence_comparison_count,
+        model_production_seeded_long_horizon_comparison_count,
+        model_production_seeded_long_horizon_seed,
+        model_production_seeded_long_horizon_max_actions,
         cargo_lock_sha256: cargo_lock_digest,
         rustc_version,
         cargo_version,
