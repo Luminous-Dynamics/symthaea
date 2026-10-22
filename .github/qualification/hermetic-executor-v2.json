@@ -1,0 +1,128 @@
+{
+  "schema_id": "symthaea.qualification-hermetic-policy.v2",
+  "authority": "sandbox-policy-definition-only",
+  "runtime_authority": "NONE",
+  "physical_claim": "NONE",
+  "runner": "ubuntu-24.04",
+  "backend": {
+    "primary": "bubblewrap",
+    "package": {
+      "name": "bubblewrap",
+      "ubuntu_release": "24.04",
+      "reviewed_version": "0.9.0-1ubuntu0.3",
+      "binary": "/usr/bin/bwrap"
+    },
+    "setuid_bwrap_allowed": false,
+    "unprivileged_user_namespace_required": true,
+    "apparmor": {
+      "policy": "profile-scoped-only",
+      "preferred_profile": "bwrap-userns-restrict",
+      "global_unprivileged_userns_restriction_disable_allowed": false,
+      "fail_closed_if_profile_unavailable": true
+    }
+  },
+  "phase_model": {
+    "materialization": {
+      "network": "TRUSTED_CONTROL_PLANE_ONLY",
+      "subject_execution": false,
+      "required_outputs": [
+        "runtime_rootfs",
+        "rust_toolchain",
+        "cargo_vendor_tree",
+        "cargo_config",
+        "materialization_manifest"
+      ]
+    },
+    "qualification": {
+      "network": "NONE",
+      "subject_execution": true,
+      "cargo_offline": true,
+      "immutable_materialization_required": true
+    }
+  },
+  "dependency_layout": {
+    "strategy": "cargo-vendor",
+    "vendor_path": "/deps/vendor",
+    "cargo_config_path": "/deps/cargo-config.toml",
+    "cargo_home_path": "/work/cargo-home",
+    "dependency_content_writable_by_subject": false
+  },
+  "required_profile_fields": [
+    "runtime_rootfs_digest",
+    "bubblewrap_binary_digest",
+    "rust_toolchain_digest",
+    "cargo_vendor_manifest_digest",
+    "source_subject_sha",
+    "commands"
+  ],
+  "namespace": {
+    "unshare": [
+      "user",
+      "ipc",
+      "pid",
+      "uts",
+      "cgroup",
+      "network"
+    ],
+    "die_with_parent": true,
+    "new_session": true,
+    "clear_environment": true,
+    "capabilities": "NONE",
+    "no_new_privileges": true
+  },
+  "mounts": {
+    "/": "READ_ONLY_PINNED_RUNTIME_ROOTFS",
+    "/src": "READ_ONLY_EXACT_SUBJECT",
+    "/toolchain": "READ_ONLY_PINNED_TOOLCHAIN",
+    "/deps": "READ_ONLY_MATERIALIZED_VENDOR_AND_CONFIG",
+    "/work": "PRIVATE_WRITABLE",
+    "/home": "PRIVATE_WRITABLE",
+    "/tmp": "PRIVATE_WRITABLE",
+    "/proc": "PRIVATE_PROC",
+    "/dev": "MINIMAL_DEVICE_SET",
+    "control_plane": "NOT_VISIBLE",
+    "evidence_output": "NOT_VISIBLE_TO_SUBJECT",
+    "host_tmp": "NOT_VISIBLE",
+    "host_workspace_other_than_subject": "NOT_VISIBLE"
+  },
+  "environment": {
+    "locale": "C.UTF-8",
+    "timezone": "UTC",
+    "home": "/home",
+    "tmpdir": "/tmp",
+    "cargo_home": "/work/cargo-home",
+    "cargo_target_dir": "/work/target",
+    "path": "/toolchain/bin:/usr/bin:/bin",
+    "cargo_net_offline": true,
+    "git_config_global": "/dev/null",
+    "git_config_nosystem": true
+  },
+  "adversarial_gates": [
+    "subject_source_write_fails",
+    "toolchain_write_fails",
+    "dependency_write_fails",
+    "runtime_rootfs_write_fails",
+    "control_plane_read_fails",
+    "evidence_read_fails",
+    "host_tmp_write_fails",
+    "escaping_symlink_fails",
+    "host_path_mount_injection_impossible",
+    "network_connect_fails",
+    "dns_resolution_fails",
+    "nested_namespace_creation_fails",
+    "privilege_escalation_fails",
+    "residual_processes_die_with_namespace",
+    "source_identity_unchanged_postflight",
+    "toolchain_identity_unchanged_postflight",
+    "dependency_identity_unchanged_postflight",
+    "runtime_rootfs_identity_unchanged_postflight"
+  ],
+  "nonclaims": [
+    "policy_definition_is_not_backend_availability",
+    "policy_definition_is_not_namespace_execution",
+    "namespace_execution_is_not_source_qualification_without_registered_commands",
+    "source_qualification_is_not_runtime_authority",
+    "source_qualification_is_not_hardware_observation",
+    "source_qualification_is_not_physical_safety"
+  ]
+}
