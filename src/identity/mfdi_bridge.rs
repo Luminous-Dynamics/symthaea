@@ -193,7 +193,7 @@ impl SignedRequest {
     /// verification already takes it as the verification key; request acceptance
     /// separately requires that key to be in the bridge's trusted-key set.
     fn signing_message(payload: &str, timestamp: SystemTime, nonce: u64) -> Vec<u8> {
-        const DOMAIN: &[u8] = b"SYMTHAEA-MFDI-SIGNED-REQUEST/v2\\0";
+        const DOMAIN: &[u8] = b"SYMTHAEA-MFDI-SIGNED-REQUEST/v2\0";
         let timestamp_nanos = timestamp
             .duration_since(UNIX_EPOCH)
             .map(|duration| duration.as_nanos())
@@ -360,12 +360,13 @@ impl MfdiBridge {
     pub fn with_signing_key(config: MfdiBridgeConfig, signing_key: SigningKey) -> Self {
         let public_key = signing_key.verifying_key();
         let agent_id = MfdiIdentity::derive_did(&public_key);
+        let public_key_bytes = public_key.to_bytes();
 
         // Create default identity for local agent
         let identity = MfdiIdentity::new(agent_id, public_key, 0.5, 1.0);
 
         let mut trusted_request_keys = HashSet::new();
-        trusted_request_keys.insert(public_key.to_bytes());
+        trusted_request_keys.insert(public_key_bytes);
 
         Self {
             config,
