@@ -820,4 +820,12 @@ fn evaluation_receipt_fails_closed_on_missing_skipped_and_duplicate_cases() {
     assert!(errors.is_empty(), "a fully accounted skipped case is not a pass, but can be a complete census: {errors:#?}");
     assert_eq!(skipped["summary"]["pass"], 1);
     assert_eq!(skipped["summary"]["skipped"], 1);
+
+    let mut dishonest = skipped;
+    dishonest["comparison_eligibility"] = Value::String("COMPARABLE".to_owned());
+    let errors = validate_evaluation_receipt(&dishonest);
+    assert!(
+        errors.iter().any(|error| error.contains("comparison_eligibility must be NOT_COMPARABLE")),
+        "skipped outcomes must never be promoted to comparable"
+    );
 }
