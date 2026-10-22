@@ -83,7 +83,6 @@ const CONDITIONS: [Condition; 3] = [
     },
 ];
 
-#[derive(Clone, Copy, Debug, Default)]
 #[derive(Clone, Copy, Debug)]
 struct EpisodeObservation {
     condition: Condition,
@@ -152,11 +151,9 @@ impl Counters {
         self.episodes += 1;
         self.alarms += usize::from(sample.detected);
         self.false_alarms += usize::from(!sample.condition.shifted && sample.detected);
-        self.missed_detections +=
-            usize::from(sample.condition.shifted && !sample.detected);
+        self.missed_detections += usize::from(sample.condition.shifted && !sample.detected);
         self.fallback_activations += usize::from(sample.detected);
-        self.fallback_no_action +=
-            usize::from(sample.detected && sample.selected_action.is_none());
+        self.fallback_no_action += usize::from(sample.detected && sample.selected_action.is_none());
         self.predictive_proposal_preserved +=
             usize::from(sample.predictive_action == Some(sample.proposed_action));
         self.fallback_proposal_preserved +=
@@ -170,26 +167,21 @@ impl Counters {
             usize::from(sample.selected_action.is_some() && selected_true_one_step_safe);
         self.selected_true_horizon_viable +=
             usize::from(sample.selected_action.is_some() && selected_true_horizon_viable);
-        self.false_one_step_safety_certificates += usize::from(
-            sample.selected_action.is_some() && !selected_true_one_step_safe,
-        );
+        self.false_one_step_safety_certificates +=
+            usize::from(sample.selected_action.is_some() && !selected_true_one_step_safe);
         self.actual_inside_predictive_envelope +=
             usize::from(sample.actual_inside_predictive_envelope);
         self.actual_inside_fallback_envelope += usize::from(sample.actual_inside_fallback_envelope);
         self.predictive_policy_selected_actions += usize::from(sample.predictive_action.is_some());
-        self.predictive_policy_false_one_step_certificates += usize::from(
-            sample.predictive_action.is_some() && !predictive_true_one_step_safe,
-        );
-        self.predictive_policy_horizon_viable_selections += usize::from(
-            sample.predictive_action.is_some() && predictive_true_horizon_viable,
-        );
+        self.predictive_policy_false_one_step_certificates +=
+            usize::from(sample.predictive_action.is_some() && !predictive_true_one_step_safe);
+        self.predictive_policy_horizon_viable_selections +=
+            usize::from(sample.predictive_action.is_some() && predictive_true_horizon_viable);
         self.fallback_policy_selected_actions += usize::from(sample.fallback_action.is_some());
-        self.fallback_policy_false_one_step_certificates += usize::from(
-            sample.fallback_action.is_some() && !fallback_true_one_step_safe,
-        );
-        self.fallback_policy_horizon_viable_selections += usize::from(
-            sample.fallback_action.is_some() && fallback_true_horizon_viable,
-        );
+        self.fallback_policy_false_one_step_certificates +=
+            usize::from(sample.fallback_action.is_some() && !fallback_true_one_step_safe);
+        self.fallback_policy_horizon_viable_selections +=
+            usize::from(sample.fallback_action.is_some() && fallback_true_horizon_viable);
     }
 }
 
@@ -244,21 +236,14 @@ fn predictive_dynamics_for(seed: u64) -> Result<DynamicsBounds, Box<dyn Error>> 
 /// OOD fallback uses a wider, predeclared reachability envelope rather than
 /// reusing the predictive model's narrower intervals.
 fn fallback_dynamics() -> Result<DynamicsBounds, Box<dyn Error>> {
-    let push = ActionEffectBounds::new(
-        interval(-0.09, 0.01)?,
-        interval(0.02, 0.18)?,
-    )
-    .ok_or_else(|| IoError::new(ErrorKind::InvalidData, "invalid fallback push bounds"))?;
-    let maintain = ActionEffectBounds::new(
-        interval(-0.03, 0.06)?,
-        interval(-0.02, 0.10)?,
-    )
-    .ok_or_else(|| IoError::new(ErrorKind::InvalidData, "invalid fallback maintain bounds"))?;
-    let emergency_recover = ActionEffectBounds::new(
-        interval(-0.02, 0.08)?,
-        interval(-0.20, -0.02)?,
-    )
-    .ok_or_else(|| IoError::new(ErrorKind::InvalidData, "invalid fallback recovery bounds"))?;
+    let push = ActionEffectBounds::new(interval(-0.09, 0.01)?, interval(0.02, 0.18)?)
+        .ok_or_else(|| IoError::new(ErrorKind::InvalidData, "invalid fallback push bounds"))?;
+    let maintain = ActionEffectBounds::new(interval(-0.03, 0.06)?, interval(-0.02, 0.10)?)
+        .ok_or_else(|| IoError::new(ErrorKind::InvalidData, "invalid fallback maintain bounds"))?;
+    let emergency_recover =
+        ActionEffectBounds::new(interval(-0.02, 0.08)?, interval(-0.20, -0.02)?).ok_or_else(
+            || IoError::new(ErrorKind::InvalidData, "invalid fallback recovery bounds"),
+        )?;
     Ok(DynamicsBounds::new(push, maintain, emergency_recover))
 }
 
@@ -270,33 +255,19 @@ fn center(bounds: ActionEffectBounds) -> (f64, f64) {
 }
 
 fn point_effect(reserve: f64, load: f64) -> Result<ActionEffectBounds, Box<dyn Error>> {
-    ActionEffectBounds::new(
-        interval(reserve, reserve)?,
-        interval(load, load)?,
-    )
-    .ok_or_else(|| IoError::new(ErrorKind::InvalidData, "invalid true point effect").into())
+    ActionEffectBounds::new(interval(reserve, reserve)?, interval(load, load)?)
+        .ok_or_else(|| IoError::new(ErrorKind::InvalidData, "invalid true point effect").into())
 }
 
 /// The synthetic actual plant starts at the predictive interval center. Shift
 /// offsets move it out of the narrow predictive envelope, but inside the widened
 /// OOD fallback envelope. The offsets are designed falsification controls.
-fn actual_dynamics_for(
-    seed: u64,
-    condition: Condition,
-) -> Result<DynamicsBounds, Box<dyn Error>> {
+fn actual_dynamics_for(seed: u64, condition: Condition) -> Result<DynamicsBounds, Box<dyn Error>> {
     let estimate = predictive_dynamics_for(seed)?;
     let offsets = match condition.name {
         "nominal" => [(0.0, 0.0), (0.0, 0.0), (0.0, 0.0)],
-        "moderate_shift" => [
-            (-0.025, 0.050),
-            (-0.015, 0.035),
-            (-0.030, 0.060),
-        ],
-        "strong_shift" => [
-            (-0.055, 0.100),
-            (-0.025, 0.070),
-            (-0.035, 0.080),
-        ],
+        "moderate_shift" => [(-0.025, 0.050), (-0.015, 0.035), (-0.030, 0.060)],
+        "strong_shift" => [(-0.055, 0.100), (-0.025, 0.070), (-0.035, 0.080)],
         _ => return Err(IoError::new(ErrorKind::InvalidInput, "unknown shift condition").into()),
     };
     let (push_r, push_l) = center(estimate.effect_for_action(Action::Push));
@@ -408,24 +379,32 @@ fn summary_row(
         counters.false_one_step_safety_certificates.to_string(),
         rate(
             counters.false_one_step_safety_certificates,
-            counters.selected_actions
+            counters.selected_actions,
         ),
         counters.actual_inside_predictive_envelope.to_string(),
         counters.actual_inside_fallback_envelope.to_string(),
         counters.predictive_policy_selected_actions.to_string(),
-        counters.predictive_policy_false_one_step_certificates.to_string(),
+        counters
+            .predictive_policy_false_one_step_certificates
+            .to_string(),
         rate(
             counters.predictive_policy_false_one_step_certificates,
             counters.predictive_policy_selected_actions,
         ),
-        counters.predictive_policy_horizon_viable_selections.to_string(),
+        counters
+            .predictive_policy_horizon_viable_selections
+            .to_string(),
         counters.fallback_policy_selected_actions.to_string(),
-        counters.fallback_policy_false_one_step_certificates.to_string(),
+        counters
+            .fallback_policy_false_one_step_certificates
+            .to_string(),
         rate(
             counters.fallback_policy_false_one_step_certificates,
             counters.fallback_policy_selected_actions,
         ),
-        counters.fallback_policy_horizon_viable_selections.to_string(),
+        counters
+            .fallback_policy_horizon_viable_selections
+            .to_string(),
     ];
     csv_row(output, fields);
 }
@@ -477,12 +456,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     )
                     .into());
                 }
-                let predictive = evaluate_action_set(
-                    state,
-                    predictive_dynamics,
-                    limits,
-                    true,
-                );
+                let predictive = evaluate_action_set(state, predictive_dynamics, limits, true);
                 let fallback = evaluate_horizon_action_set(
                     state,
                     fallback_dynamics,
@@ -513,19 +487,14 @@ fn main() -> Result<(), Box<dyn Error>> {
 
                 let score = score_for(condition, seed + point.reserve.to_bits());
                 let proposed = Action::Push;
-                let decision = select_control_action(
-                    score,
-                    threshold,
-                    proposed,
-                    predictive,
-                    fallback,
-                )
-                .ok_or_else(|| {
-                    IoError::new(
-                        ErrorKind::InvalidData,
-                        "drift assessment rejected a finite synthetic score",
-                    )
-                })?;
+                let decision =
+                    select_control_action(score, threshold, proposed, predictive, fallback)
+                        .ok_or_else(|| {
+                            IoError::new(
+                                ErrorKind::InvalidData,
+                                "drift assessment rejected a finite synthetic score",
+                            )
+                        })?;
                 let detected = decision.assessment().drift_detected();
                 let selected = decision.selected_action();
                 let selected_certified = selected.is_some_and(|action| {
@@ -546,8 +515,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     selected.is_some_and(|action| actual_one_step.contains(action));
                 let selected_true_horizon_viable =
                     selected.is_some_and(|action| actual_horizon.contains(action));
-                let false_safety_certificate =
-                    selected.is_some() && !selected_true_one_step_safe;
+                let false_safety_certificate = selected.is_some() && !selected_true_one_step_safe;
 
                 let predictive_action = predictive.filter(proposed);
                 let fallback_action = fallback.filter(proposed);
@@ -591,26 +559,14 @@ fn main() -> Result<(), Box<dyn Error>> {
                     csv_bool(false_safety_certificate).to_string(),
                     csv_bool(actual_inside_predictive).to_string(),
                     csv_bool(actual_inside_fallback).to_string(),
-                    csv_bool(
-                        predictive_action
-                            .is_some_and(|action| actual_one_step.contains(action)),
-                    )
-                    .to_string(),
-                    csv_bool(
-                        predictive_action
-                            .is_some_and(|action| actual_horizon.contains(action)),
-                    )
-                    .to_string(),
-                    csv_bool(
-                        fallback_action
-                            .is_some_and(|action| actual_one_step.contains(action)),
-                    )
-                    .to_string(),
-                    csv_bool(
-                        fallback_action
-                            .is_some_and(|action| actual_horizon.contains(action)),
-                    )
-                    .to_string(),
+                    csv_bool(predictive_action.is_some_and(|action| actual_one_step.contains(action)))
+                        .to_string(),
+                    csv_bool(predictive_action.is_some_and(|action| actual_horizon.contains(action)))
+                        .to_string(),
+                    csv_bool(fallback_action.is_some_and(|action| actual_one_step.contains(action)))
+                        .to_string(),
+                    csv_bool(fallback_action.is_some_and(|action| actual_horizon.contains(action)))
+                        .to_string(),
                 ];
                 csv_row(&mut raw, fields);
                 row_count += 1;
@@ -619,8 +575,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
-    let expected_rows =
-        OPERATING_POINTS.len() * CONDITIONS.len() * EVALUATION_EPISODES as usize;
+    let expected_rows = OPERATING_POINTS.len() * CONDITIONS.len() * EVALUATION_EPISODES as usize;
     if row_count != expected_rows || row_count != 4_500 {
         return Err(IoError::new(
             ErrorKind::InvalidData,
