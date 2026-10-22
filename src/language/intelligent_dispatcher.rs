@@ -425,8 +425,14 @@ impl IntelligentDispatcher {
                 ("[NATIVE: use CodeGenerator]".to_string(), true, COST_NATIVE)
             }
             BackendTier::Hardware => {
-                // Hardware generation is handled externally by DriverEmitter.
-                ("[HARDWARE: use DriverEmitter]".to_string(), true, COST_NATIVE)
+                // Tier selection is not hardware generation. The specialized
+                // DriverEmitter is wired through CodeOrchestrator, not this
+                // dispatcher. Fail closed rather than write a placeholder as code.
+                (
+                    "Hardware generation requires CodeOrchestrator/DriverEmitter; dispatcher-only routing did not invoke a hardware emitter.".to_string(),
+                    false,
+                    0.0,
+                )
             }
             BackendTier::LocalLlm => {
                 let backend_name = self.local_llm.name().to_string();
@@ -897,6 +903,28 @@ mod tests {
         fn name(&self) -> &str {
             self.backend_name
         }
+    }
+
+    #[tokio::test]
+    async fn hardware_tier_does_not_claim_driver_emitter_ran() {
+        let mut dispatcher = IntelligentDispatcher::new(Arc::new(SimulatedBackend), None);
+        let result = dispatcher
+            .generate(
+                "Implement an I2C hardware driver that reads a register.",
+                &GenerationParams::default(),
+                EpistemicStatus::Uncertain,
+                0.9,
+                0.8,
+            )
+            .await;
+
+        assert_eq!(result.tier, BackendTier::Hardware);
+        assert!(!result.success, "tier selection must not count as generated driver code");
+        assert!(result.output.contains("CodeOrchestrator/DriverEmitter"));
+        assert!(!result.output.contains("[HARDWARE: use DriverEmitter]"));
+        assert!(result.backend_attempts.is_empty(), "no hardware backend was invoked");
+        assert_eq!(result.energy_cost, 0.0);
+        assert_eq!(dispatcher.total_energy(), 0.0);
     }
 
     #[tokio::test]
