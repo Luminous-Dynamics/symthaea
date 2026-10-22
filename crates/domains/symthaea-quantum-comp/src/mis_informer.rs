@@ -728,6 +728,39 @@ mod tests {
     }
 
     #[test]
+    fn confidence_aware_selector_can_separate_prefer_out_candidate() {
+        let graph = MisGraphIdentity::from_edges(2, &[(0, 1)]).expect("valid graph");
+        let signal = MisInformerSignal::from_graph("case", &graph, 1000, vec![20, 950])
+            .expect("valid signal");
+        match signal.recommend_confidently_for_graph(
+            "case", &graph, &[0, 1], MisSelectionMode::PreferOutSet, 0.05
+        ).expect("valid confidence request") {
+            MisConfidenceDecision::Selected(result) => {
+                assert_eq!(result.recommendation.vertex, 0);
+                assert!(result.upper_bound < result.competitor_bound);
+            }
+            MisConfidenceDecision::Abstain { reason, .. } => panic!("expected separated scores, got {reason:?}"),
+        }
+    }
+
+    #[test]
+    fn confidence_aware_selector_abstains_when_only_one_candidate_exists() {
+        let graph = MisGraphIdentity::from_edges(2, &[(0, 1)]).expect("valid graph");
+        let signal = MisInformerSignal::from_graph("case", &graph, 100, vec![90, 10])
+            .expect("valid signal");
+        assert_eq!(
+            signal.recommend_confidently_for_graph(
+                "case", &graph, &[0], MisSelectionMode::PreferInSet, 0.05
+            ).expect("valid confidence request"),
+            MisConfidenceDecision::Abstain {
+                reason: MisConfidenceAbstention::OnlyOneCandidate,
+                eligible_vertex_count: 1,
+                sample_count: 100,
+            }
+        );
+    }
+
+    #[test]
     fn computed_graph_identity_binds_signal_to_canonical_graph() {
         let graph = MisGraphIdentity::from_edges(3, &[(0, 1), (1, 2)]).expect("valid graph");
         let equivalent = MisGraphIdentity::from_edges(3, &[(2, 1), (1, 0), (0, 1)])
