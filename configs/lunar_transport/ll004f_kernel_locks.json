@@ -1,0 +1,32 @@
+{
+  "schema_version": "ll004f.kernel-locks.v1",
+  "locks": [
+    {
+      "filename": "de440s.bsp",
+      "role": "planetary_ephemeris",
+      "algorithm": "md5",
+      "digest": "3917ee56769db332790c751e2168843d",
+      "source_url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/planets/aa_checksums.txt",
+      "source_authority": "NASA/JPL NAIF"
+    },
+    {
+      "filename": "de421.bsp",
+      "role": "planetary_ephemeris",
+      "algorithm": "md5",
+      "digest": "25814bb3622904d0c444c52a4051eaf7",
+      "source_url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/planets/a_old_versions/aa_checksums.txt",
+      "source_authority": "NASA/JPL NAIF"
+    }
+  ],
+  "policy": {
+    "required_roles": [
+      "planetary_ephemeris"
+    ],
+    "actual_snapshot_digest": "sha256",
+    "notes": [
+      "Published upstream checksums authenticate known source artifacts; generated snapshot manifests independently record SHA-256 over the exact local bytes consumed.",
+      "Absence of a lock for a required role fails closed.",
+      "Adding or changing an upstream lock is an evidence-lineage change."
+    ]
+  }
+}
