@@ -34,6 +34,21 @@ Compare at least these baselines on identical, versioned inputs:
 
 Keep training/development cases separate from a sealed evaluation split. Publish fixture IDs, source/license, label provenance, parser version, commit SHA, seed, exact command, machine/runtime details, output digest, and every exclusion. Avoid tuning on the test set. If a case is changed after a failure, preserve the prior case/version and explain the change.
 
+## Fair comparison with industry and independent evaluators
+
+Headline percentages are not a valid industry comparison unless task, split, harness, access, budget, retries, and scoring are aligned. Recent guidance from [OpenAI's shared playbook for trustworthy third-party evaluations (May 2026)](https://openai.com/index/trustworthy-third-party-evaluations-foundations/) emphasizes specifying the claim, tested system, evaluation content, budget, elicitation/harness, and validity checks. The [Princeton Emerging Trends in Agent Evaluation](https://sage.cs.princeton.edu/trends/) guidance highlights secret holdouts, refreshing public tasks, tracking benchmark versions, and inspecting trajectories for contamination.
+
+For a credible Symthaea-versus-industry study:
+
+- Run a transparent lexical baseline, Symthaea, and selected external models on identical held-out cases; disclose each model/version, system prompts/configuration, decoding, tools, retries, wall time, token/call budget, hardware and cost.
+- Keep a sealed, independently administered holdout and rotate fresh cases. Never tune the parser, thresholds, or judge on that holdout.
+- Score both outcome and process evidence: consent-state confusion, relevant-fact sensitivity, invariance to irrelevant wording, proper abstention, calibrated uncertainty, reasons tied to observed facts, and whether the downstream policy gate actually blocks a prohibited side effect.
+- Have independent annotators inspect a sample of successes and failures, including apparent passes, to identify mislabeled fixtures, leakage, reward hacking, scope errors and systematic group harms.
+- Report effect sizes, confidence intervals, severe failure cases, null results and operating cost. A better average parser score cannot compensate for any failure of deterministic consent-policy invariants.
+- Do not compare this small heuristic consent diagnostic directly with frontier model release evaluations. They answer different questions and run in different environments.
+
+The intended SOTA claim is not “one higher moral score.” It is a demonstrable advantage on specified, held-out competencies under equal conditions, with stronger falsification and auditability, and no regression in hard safety constraints.
+
 ## Current reproducible diagnostic
 
 The development-only runner compares Symthaea's current parser against a deliberately small, transparent lexical baseline. The parser also exposes `MoralParser::assess_consent_evidence`, returning the five-state label, basis category, deterministic matched phrase (where applicable), whether a question forced Unknown, whether quoted text was suppressed, and an explanation explicitly warning that lexical evidence is not authorization. `ParsedMoralScenario` retains this trace; `EthicsEngineOutput` refreshes the text-level trace and explicit Denied/Absent violation signal for every `evaluate()` call, while the expensive moral score can remain on its existing cadence. Callers can request a fresh assessment directly through `CognitiveLoopService::assess_consent_evidence`. Mismatch logs include these evidence traces. The runner reports two confusion matrices, false-Given counts/rates, missed-Given cases, and flips under four meaning-preserving pairs. It is registered as:
