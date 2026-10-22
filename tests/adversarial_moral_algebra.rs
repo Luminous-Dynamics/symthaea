@@ -91,6 +91,25 @@ fn consent_given_allows_action() {
 }
 
 #[test]
+fn consent_unknown_does_not_become_positive_judgment() {
+    let ma = algebra();
+    let action = ma.encode_consent_action("share medical records", "patient", ConsentState::Unknown);
+    let judgment = ma.judge_consent_action(&action, ConsentState::Unknown);
+
+    assert_eq!(
+        judgment.verdict,
+        MoralVerdict::Neutral,
+        "Unknown consent evidence must not be upgraded to Good from action similarity"
+    );
+    assert!(
+        (judgment.consent_violation_similarity - 0.3).abs() < f32::EPSILON,
+        "Unknown consent should remain on the documented underdetermined boundary"
+    );
+    assert!(!ConsentState::Unknown.is_explicitly_given());
+    assert!(ConsentState::Unknown.requires_clarification());
+}
+
+#[test]
 fn consent_implied_is_weaker_than_given() {
     let ma = algebra();
     let proto = ma.consent_violation_prototype();
