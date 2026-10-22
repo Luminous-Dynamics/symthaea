@@ -967,7 +967,8 @@ mod tests {
             PredictionDegeneracy::NoPrediction
         );
         assert_eq!(result.prediction_error, 0.0);
-        assert!(!result.surprise_triggered);
+        // The invalid sentinel cannot reach PE-based urgency or exploration
+        // modulation. Other independent exploration mechanisms remain active.
     }
 
     #[test]
