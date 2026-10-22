@@ -603,7 +603,7 @@ mod tests {
                 .expect("valid finite prediction set");
 
                 assert!(
-                    (estimate - refined).abs() <= 0.005,
+                    (estimate - refined).abs() <= 1.0e-6,
                     "256-step estimate diverged from 2048-step reference: predictions={predictions:?}, noise={observation_std_dev}, estimate={estimate}, refined={refined}"
                 );
                 assert!((0.0..=(predictions.len() as f64).ln()).contains(&estimate));
