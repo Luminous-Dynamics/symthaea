@@ -1,0 +1,332 @@
+{
+  "schema_version": "pitb.counterfactual-mutation-qualification.v0",
+  "dataset_kind": "synthetic_fixture",
+  "suite_id": "synthetic-counterfactual-mutation-qualification-v0",
+  "cases": [
+    {
+      "qualification_id": "same-type",
+      "source": {
+        "record_id": "synthetic-insight-same-type",
+        "family_id": "synthetic-family-0",
+        "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "insight_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "target_pair": {
+        "target_id": "synthetic-target-same-type",
+        "source_commit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "base_artifact_path": "synthetic/same-type",
+        "variant_artifact_path": "synthetic/same-type-variant",
+        "base_artifact_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "variant_artifact_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+        "base_statement_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+        "variant_statement_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+      },
+      "mutation": {
+        "kind": "formatting_only",
+        "changed_field": "formatting_only",
+        "single_factor": true,
+        "before_fragment_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+        "after_fragment_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+        "receipt_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+        "note": "Synthetic structural fixture only."
+      },
+      "elaboration": {
+        "lean_toolchain": "synthetic Lean toolchain placeholder",
+        "environment_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "base_status": "elaborated",
+        "variant_status": "elaborated",
+        "base_type_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "variant_type_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "diagnostics_sha256": null
+      },
+      "statement_relation": {
+        "relation": "same_elaborated_type",
+        "evidence_kind": "kernel_checked_defeq_certificate",
+        "receipt_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "note": "Placeholder evidence; fixture is not mathematical data."
+      },
+      "contract_relation": {
+        "status": "contract_satisfied",
+        "precondition_id": "required-hypothesis-available",
+        "evidence_kind": "typed_context_comparison",
+        "receipt_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "note": "Synthetic contract label only."
+      },
+      "truth_assessment": {
+        "status": "not_assessed",
+        "evidence_kind": "none",
+        "receipt_sha256": null,
+        "note": "Target truth is intentionally not inferred from the mutation label."
+      },
+      "strategy_attempt": {
+        "status": "not_attempted",
+        "exact_target_statement_checked": false,
+        "receipt_sha256": null,
+        "note": "No solver was executed for this synthetic fixture."
+      },
+      "adjudication": {
+        "status": "adjudicated",
+        "rubric_version": "pitb.mutation-qualification.synthetic-v0",
+        "reviewers": [
+          {
+            "reviewer_id": "reviewer-a",
+            "statement_relation": "same_elaborated_type",
+            "contract_relation": "contract_satisfied",
+            "evidence_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+            "note": "Synthetic placeholder; not a human review."
+          },
+          {
+            "reviewer_id": "reviewer-b",
+            "statement_relation": "same_elaborated_type",
+            "contract_relation": "contract_satisfied",
+            "evidence_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+            "note": "Synthetic placeholder; not a human review."
+          }
+        ],
+        "receipt_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "note": "Synthetic reviewer placeholders, not expert judgments."
+      }
+    },
+    {
+      "qualification_id": "prop-equiv",
+      "source": {
+        "record_id": "synthetic-insight-prop-equiv",
+        "family_id": "synthetic-family-1",
+        "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "insight_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "target_pair": {
+        "target_id": "synthetic-target-prop-equiv",
+        "source_commit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "base_artifact_path": "synthetic/prop-equiv",
+        "variant_artifact_path": "synthetic/prop-equiv-variant",
+        "base_artifact_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "variant_artifact_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+        "base_statement_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+        "variant_statement_sha256": "6666666666666666666666666666666666666666666666666666666666666666"
+      },
+      "mutation": {
+        "kind": "equivalent_reformulation",
+        "changed_field": "equivalent_reformulation",
+        "single_factor": true,
+        "before_fragment_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+        "after_fragment_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+        "receipt_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+        "note": "Synthetic structural fixture only."
+      },
+      "elaboration": {
+        "lean_toolchain": "synthetic Lean toolchain placeholder",
+        "environment_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "base_status": "elaborated",
+        "variant_status": "elaborated",
+        "base_type_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "variant_type_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "diagnostics_sha256": null
+      },
+      "statement_relation": {
+        "relation": "propositionally_equivalent",
+        "evidence_kind": "kernel_checked_equivalence_proof",
+        "receipt_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "note": "Placeholder evidence; fixture is not mathematical data."
+      },
+      "contract_relation": {
+        "status": "contract_satisfied",
+        "precondition_id": "required-hypothesis-available",
+        "evidence_kind": "typed_context_comparison",
+        "receipt_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "note": "Synthetic contract label only."
+      },
+      "truth_assessment": {
+        "status": "not_assessed",
+        "evidence_kind": "none",
+        "receipt_sha256": null,
+        "note": "Target truth is intentionally not inferred from the mutation label."
+      },
+      "strategy_attempt": {
+        "status": "not_attempted",
+        "exact_target_statement_checked": false,
+        "receipt_sha256": null,
+        "note": "No solver was executed for this synthetic fixture."
+      },
+      "adjudication": {
+        "status": "adjudicated",
+        "rubric_version": "pitb.mutation-qualification.synthetic-v0",
+        "reviewers": [
+          {
+            "reviewer_id": "reviewer-a",
+            "statement_relation": "propositionally_equivalent",
+            "contract_relation": "contract_satisfied",
+            "evidence_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "note": "Synthetic placeholder; not a human review."
+          },
+          {
+            "reviewer_id": "reviewer-b",
+            "statement_relation": "propositionally_equivalent",
+            "contract_relation": "contract_satisfied",
+            "evidence_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+            "note": "Synthetic placeholder; not a human review."
+          }
+        ],
+        "receipt_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "note": "Synthetic reviewer placeholders, not expert judgments."
+      }
+    },
+    {
+      "qualification_id": "contract-break",
+      "source": {
+        "record_id": "synthetic-insight-contract-break",
+        "family_id": "synthetic-family-2",
+        "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "insight_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "target_pair": {
+        "target_id": "synthetic-target-contract-break",
+        "source_commit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "base_artifact_path": "synthetic/contract-break",
+        "variant_artifact_path": "synthetic/contract-break-variant",
+        "base_artifact_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "variant_artifact_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+        "base_statement_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+        "variant_statement_sha256": "6666666666666666666666666666666666666666666666666666666666666666"
+      },
+      "mutation": {
+        "kind": "precondition_removed",
+        "changed_field": "precondition_removed",
+        "single_factor": true,
+        "before_fragment_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+        "after_fragment_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+        "receipt_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+        "note": "Synthetic structural fixture only."
+      },
+      "elaboration": {
+        "lean_toolchain": "synthetic Lean toolchain placeholder",
+        "environment_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "base_status": "elaborated",
+        "variant_status": "elaborated",
+        "base_type_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "variant_type_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "diagnostics_sha256": null
+      },
+      "statement_relation": {
+        "relation": "formally_distinct",
+        "evidence_kind": "independent_review",
+        "receipt_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "note": "Placeholder evidence; fixture is not mathematical data."
+      },
+      "contract_relation": {
+        "status": "contract_violated",
+        "precondition_id": "required-hypothesis-available",
+        "evidence_kind": "proof_state_snapshot",
+        "receipt_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "note": "Synthetic contract label only."
+      },
+      "truth_assessment": {
+        "status": "not_assessed",
+        "evidence_kind": "none",
+        "receipt_sha256": null,
+        "note": "Target truth is intentionally not inferred from the mutation label."
+      },
+      "strategy_attempt": {
+        "status": "not_attempted",
+        "exact_target_statement_checked": false,
+        "receipt_sha256": null,
+        "note": "No solver was executed for this synthetic fixture."
+      },
+      "adjudication": {
+        "status": "adjudicated",
+        "rubric_version": "pitb.mutation-qualification.synthetic-v0",
+        "reviewers": [
+          {
+            "reviewer_id": "reviewer-a",
+            "statement_relation": "formally_distinct",
+            "contract_relation": "contract_violated",
+            "evidence_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+            "note": "Synthetic placeholder; not a human review."
+          },
+          {
+            "reviewer_id": "reviewer-b",
+            "statement_relation": "formally_distinct",
+            "contract_relation": "contract_violated",
+            "evidence_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+            "note": "Synthetic placeholder; not a human review."
+          }
+        ],
+        "receipt_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "note": "Synthetic reviewer placeholders, not expert judgments."
+      }
+    },
+    {
+      "qualification_id": "invalid-mutant",
+      "source": {
+        "record_id": "synthetic-insight-invalid-mutant",
+        "family_id": "synthetic-family-3",
+        "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "insight_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "target_pair": {
+        "target_id": "synthetic-target-invalid-mutant",
+        "source_commit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "base_artifact_path": "synthetic/invalid-mutant",
+        "variant_artifact_path": "synthetic/invalid-mutant-variant",
+        "base_artifact_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "variant_artifact_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+        "base_statement_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+        "variant_statement_sha256": "6666666666666666666666666666666666666666666666666666666666666666"
+      },
+      "mutation": {
+        "kind": "predicate_changed",
+        "changed_field": "predicate_changed",
+        "single_factor": true,
+        "before_fragment_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+        "after_fragment_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+        "receipt_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+        "note": "Synthetic structural fixture only."
+      },
+      "elaboration": {
+        "lean_toolchain": "synthetic Lean toolchain placeholder",
+        "environment_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "base_status": "elaborated",
+        "variant_status": "parse_error",
+        "base_type_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "variant_type_sha256": null,
+        "receipt_sha256": null,
+        "diagnostics_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+      },
+      "statement_relation": {
+        "relation": "invalid_mutation",
+        "evidence_kind": "diagnostic_receipt",
+        "receipt_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "note": "Placeholder evidence; fixture is not mathematical data."
+      },
+      "contract_relation": {
+        "status": "unknown",
+        "precondition_id": null,
+        "evidence_kind": "none",
+        "receipt_sha256": null,
+        "note": "Synthetic contract label only."
+      },
+      "truth_assessment": {
+        "status": "not_assessed",
+        "evidence_kind": "none",
+        "receipt_sha256": null,
+        "note": "Target truth is intentionally not inferred from the mutation label."
+      },
+      "strategy_attempt": {
+        "status": "not_attempted",
+        "exact_target_statement_checked": false,
+        "receipt_sha256": null,
+        "note": "No solver was executed for this synthetic fixture."
+      },
+      "adjudication": {
+        "status": "pending",
+        "rubric_version": "pitb.mutation-qualification.synthetic-v0",
+        "reviewers": [],
+        "receipt_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "note": "Synthetic reviewer placeholders, not expert judgments."
+      }
+    }
+  ]
+}
