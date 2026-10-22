@@ -23,8 +23,8 @@ const FIXED_BET_FRACTION: f64 = 0.5;
 const FIXED_BET: f64 = FIXED_BET_FRACTION / RISK_BOUND;
 
 const INPUT_HEADER: &str = "operating_point,condition,episode_seed,step,residual_score,pointwise_threshold,pointwise_step_alarm,pointwise_first_alarm_step,cusum_statistic,cusum_threshold,cusum_latched_alarm,cusum_first_alarm_step,ground_truth_outside_predictor_envelope,all_episode_scores_below_pointwise_threshold";
-const RAW_HEADER: &str = "operating_point,condition,episode_seed,step,residual_score,pointwise_threshold,pointwise_step_alarm,pointwise_first_alarm_step,cusum_statistic,cusum_threshold,cusum_latched_alarm,cusum_first_alarm_step,ground_truth_outside_predictor_envelope,all_episode_scores_below_pointwise_threshold,bounded_risk_loss,log_e_value,eprocess_latched_alarm,first_eprocess_alarm_step,log_e_alarm_threshold,risk_bound,bet_fraction_1,bet_fraction_2,bet_fraction_3,component_log_e_1,component_log_e_2,component_log_e_3,fixed_log_e_value,fixed_eprocess_latched_alarm,fixed_first_alarm_step";
-const SUMMARY_HEADER: &str = "operating_point,condition,episodes,eprocess_alarms,eprocess_false_alarms,eprocess_missed_shifts,mean_detection_step,p95_detection_step,median_detection_step,episodes_all_scores_below_pointwise,eprocess_caught_below_pointwise,mean_final_log_e,max_final_log_e,log_alarm_threshold,risk_bound,bet_fraction_1,bet_fraction_2,bet_fraction_3,global_delta,fixed_alarms,fixed_false_alarms,fixed_missed_shifts,fixed_mean_detection_step,fixed_p95_detection_step,fixed_median_detection_step,fixed_caught_below_pointwise,fixed_mean_final_log_e,fixed_max_final_log_e";
+const RAW_HEADER: &str = "operating_point,condition,episode_seed,step,residual_score,pointwise_threshold,pointwise_step_alarm,pointwise_first_alarm_step,cusum_statistic,cusum_threshold,cusum_latched_alarm,cusum_first_alarm_step,ground_truth_outside_predictor_envelope,all_episode_scores_below_pointwise_threshold,bounded_risk_loss,log_e_value,eprocess_latched_alarm,first_eprocess_alarm_step,log_e_alarm_threshold,risk_bound,bet_fraction_1,bet_fraction_2,bet_fraction_3,component_log_e_1,component_log_e_2,component_log_e_3,fixed_log_e_value,fixed_eprocess_latched_alarm,fixed_first_alarm_step,fixed_bet_fraction";
+const SUMMARY_HEADER: &str = "operating_point,condition,episodes,eprocess_alarms,eprocess_false_alarms,eprocess_missed_shifts,mean_detection_step,p95_detection_step,median_detection_step,episodes_all_scores_below_pointwise,eprocess_caught_below_pointwise,mean_final_log_e,max_final_log_e,log_alarm_threshold,risk_bound,bet_fraction_1,bet_fraction_2,bet_fraction_3,global_delta,fixed_alarms,fixed_false_alarms,fixed_missed_shifts,fixed_mean_detection_step,fixed_p95_detection_step,fixed_median_detection_step,fixed_caught_below_pointwise,fixed_mean_final_log_e,fixed_max_final_log_e,fixed_bet_fraction";
 
 #[derive(Clone, Debug)]
 struct InputRow {
@@ -217,6 +217,7 @@ fn summary_row(
         summary.fixed_caught_below_episodes.to_string(),
         optional_float(mean(&summary.fixed_final_log_values)),
         optional_float(summary.fixed_final_log_values.iter().copied().reduce(f64::max)),
+        format!("{FIXED_BET_FRACTION:.9}"),
     ];
     output.push_str(&fields.join(","));
     output.push('\n');
@@ -334,6 +335,7 @@ fn process_episode(
         fields.push(format!("{fixed_log_e_value:.9}"));
         fields.push(if *fixed_alarm { "true" } else { "false" }.to_string());
         fields.push(fixed_first_alarm_step.to_string());
+        fields.push(format!("{FIXED_BET_FRACTION:.9}"));
         raw_output.push_str(&fields.join(","));
         raw_output.push('\n');
     }
