@@ -63,6 +63,15 @@ pub fn best_device() -> Device {
 /// All methods used by [`crate::liquid_mamba::LiquidMambaGenerator`] are
 /// included. Methods that expose candle-specific types (`State`, `Device`,
 /// `Tokenizer`) remain as inherent methods on [`MambaWrapper`] only.
+/// Loss and context gradients produced by one teacher-forced sequence unroll.
+#[derive(Debug, Clone)]
+pub struct E2ESequenceGradientResult {
+    /// Mean next-token cross-entropy across the supplied target sequence.
+    pub mean_loss: f32,
+    /// d(mean_loss)/d(projected context), keyed by original context position.
+    pub context_gradients: Vec<(usize, Vec<f32>)>,
+}
+
 pub trait MambaBackend: Send + Sync {
     fn clone_box(&self) -> Box<dyn MambaBackend>;
 
@@ -127,30 +136,28 @@ pub trait MambaBackend: Send + Sync {
         gradient_backend.compute_e2e_token_loss_at(sequence, tokens, pos)
     }
 
-    /// Compute mean next-token loss gradients for several projected-context positions
-    /// in one teacher-forced recurrent unroll.
-    ///
-    /// Production backends should override this method with a single autograd graph.
-    /// The default fails closed; callers must not silently substitute zero gradients.
-    fn compute_e2e_sequence_loss_gradients(
+    /// Compute mean next-token loss and context gradients in one teacher-forced
+    /// recurrent unroll. The scalar and gradients share the same objective graph.
+    /// The default fails closed; a backend must explicitly support this contract.
+    fn compute_e2e_sequence_loss_and_gradients(
         &mut self,
         _sequence: &[Vec<f32>],
         _target_ids: &[u32],
         _positions: &[usize],
-    ) -> Result<Vec<(usize, Vec<f32>)>> {
-        anyhow::bail!("backend does not implement single-unroll sequence gradients")
+    ) -> Result<E2ESequenceGradientResult> {
+        anyhow::bail!("backend does not implement single-unroll sequence loss and gradients")
     }
 
-    /// Run sequence-gradient replay on an isolated backend clone, leaving live state
-    /// untouched for the caller's teacher-forced pass.
-    fn compute_e2e_sequence_loss_gradients_isolated(
+    /// Run sequence loss/gradient replay on an isolated backend clone, leaving live
+    /// recurrent state untouched.
+    fn compute_e2e_sequence_loss_and_gradients_isolated(
         &mut self,
         sequence: &[Vec<f32>],
         target_ids: &[u32],
         positions: &[usize],
-    ) -> Result<Vec<(usize, Vec<f32>)>> {
+    ) -> Result<E2ESequenceGradientResult> {
         let mut gradient_backend = self.clone_box();
-        gradient_backend.compute_e2e_sequence_loss_gradients(sequence, target_ids, positions)
+        gradient_backend.compute_e2e_sequence_loss_and_gradients(sequence, target_ids, positions)
     }
 
     /// Compute E2E token loss at a specific position in the SSM sequence (Improvement B).
@@ -592,12 +599,12 @@ impl MambaWrapper {
     ///
     /// This trades repeated prefix replay for one differentiable graph over the
     /// complete context and target sequence; peak activation memory must be measured.
-    pub fn compute_e2e_sequence_loss_gradients(
+    pub fn compute_e2e_sequence_loss_and_gradients(
         &mut self,
         sequence: &[Vec<f32>],
         target_ids: &[u32],
         positions: &[usize],
-    ) -> Result<Vec<(usize, Vec<f32>)>> {
+    ) -> Result<E2ESequenceGradientResult> {
         let d_model = self.config.d_model;
         anyhow::ensure!(!sequence.is_empty(), "E2E context sequence must not be empty");
         anyhow::ensure!(!target_ids.is_empty(), "E2E target sequence must not be empty");
@@ -609,9 +616,10 @@ impl MambaWrapper {
             sequence.iter().flatten().all(|value| value.is_finite()),
             "E2E context sequence contains a non-finite value"
         );
-        if positions.is_empty() {
-            return Ok(Vec::new());
-        }
+        anyhow::ensure!(
+            !positions.is_empty(),
+            "E2E sequence loss requires at least one context-gradient position"
+        );
 
         let mut sorted_positions = positions.to_vec();
         sorted_positions.sort_unstable();
@@ -704,6 +712,12 @@ impl MambaWrapper {
 
         let loss_sum = loss_sum
             .ok_or_else(|| anyhow::anyhow!("E2E loss sequence unexpectedly empty"))?;
+        let summed_loss = loss_sum.to_scalar::<f32>()?;
+        anyhow::ensure!(
+            summed_loss.is_finite(),
+            "E2E teacher-forced sequence loss is non-finite"
+        );
+        let mean_loss = summed_loss / target_ids.len() as f32;
         let grads = loss_sum.backward()?;
 
         // LoRA, if enabled, follows the same mean-loss normalization as returned
@@ -735,7 +749,10 @@ impl MambaWrapper {
             results.push((*pos, gradient));
         }
 
-        Ok(results)
+        Ok(E2ESequenceGradientResult {
+            mean_loss,
+            context_gradients: results,
+        })
     }
 
     /// Compute E2E token loss at a specific position (Improvement B).
@@ -1127,13 +1144,13 @@ impl MambaBackend for MambaWrapper {
         MambaWrapper::inject_context_sequence(self, sequence)
     }
 
-    fn compute_e2e_sequence_loss_gradients(
+    fn compute_e2e_sequence_loss_and_gradients(
         &mut self,
         sequence: &[Vec<f32>],
         target_ids: &[u32],
         positions: &[usize],
-    ) -> Result<Vec<(usize, Vec<f32>)>> {
-        MambaWrapper::compute_e2e_sequence_loss_gradients(self, sequence, target_ids, positions)
+    ) -> Result<E2ESequenceGradientResult> {
+        MambaWrapper::compute_e2e_sequence_loss_and_gradients(self, sequence, target_ids, positions)
     }
 
     fn compute_e2e_token_loss_at(
@@ -1347,29 +1364,55 @@ pub mod mock {
             Ok(())
         }
 
-        fn compute_e2e_sequence_loss_gradients(
+        fn compute_e2e_sequence_loss_and_gradients(
             &mut self,
             sequence: &[Vec<f32>],
             target_ids: &[u32],
             positions: &[usize],
-        ) -> Result<Vec<(usize, Vec<f32>)>> {
+        ) -> Result<E2ESequenceGradientResult> {
             anyhow::ensure!(!sequence.is_empty(), "mock E2E context must not be empty");
             anyhow::ensure!(!target_ids.is_empty(), "mock E2E targets must not be empty");
+            anyhow::ensure!(
+                !positions.is_empty(),
+                "mock E2E sequence gradients require at least one context position"
+            );
             for &pos in positions {
                 anyhow::ensure!(pos < sequence.len(), "mock E2E position out of range");
             }
 
-            // Simulate the destructive state replay done by the production backend.
+            // Model the production replay's reset side effect on this isolated clone.
             self.reset();
-            self.forward_count += target_ids.len();
+            let mut previous_token = self.eos_token_id();
+            let mut total_loss = 0.0f32;
+            for &target_id in target_ids {
+                let (logits, _) = self.forward_with_state(previous_token)?;
+                anyhow::ensure!(
+                    (target_id as usize) < logits.len(),
+                    "teacher target token {target_id} is outside logits vocabulary of size {}",
+                    logits.len()
+                );
+                let token_loss = crate::evaluation::cross_entropy_loss(&logits, target_id as usize);
+                anyhow::ensure!(
+                    token_loss.is_finite(),
+                    "mock sequence cross-entropy is non-finite"
+                );
+                total_loss += token_loss;
+                previous_token = target_id;
+            }
+
             let d = self.d_model();
-            Ok(positions
+            let context_gradients = positions
                 .iter()
                 .map(|&pos| {
                     let value = 0.001f32 * (1.0 + pos as f32 * 0.01);
                     (pos, vec![value / target_ids.len() as f32; d])
                 })
-                .collect())
+                .collect();
+
+            Ok(E2ESequenceGradientResult {
+                mean_loss: total_loss / target_ids.len() as f32,
+                context_gradients,
+            })
         }
 
         fn compute_e2e_token_loss_at(
@@ -1514,19 +1557,23 @@ pub(crate) mod tests {
         let forwards_before = backend.forward_count;
         let resets_before = backend.reset_count;
         let sequence = vec![vec![0.25f32; 768], vec![0.5f32; 768], vec![-0.1f32; 768]];
-        let gradients = backend
-            .compute_e2e_sequence_loss_gradients_isolated(
+        let report = backend
+            .compute_e2e_sequence_loss_and_gradients_isolated(
                 &sequence,
                 &[17, 29, 31, 41],
                 &[0, 2],
             )
-            .expect("isolated one-unroll mock gradients should succeed");
+            .expect("isolated one-unroll mock loss and gradients should succeed");
 
         assert_eq!(backend.forward_count, forwards_before);
         assert_eq!(backend.reset_count, resets_before);
-        assert_eq!(gradients.iter().map(|(pos, _)| *pos).collect::<Vec<_>>(), vec![0, 2]);
+        assert!(report.mean_loss.is_finite() && report.mean_loss > 0.0);
+        assert_eq!(
+            report.context_gradients.iter().map(|(pos, _)| *pos).collect::<Vec<_>>(),
+            vec![0, 2]
+        );
         assert!(
-            gradients.iter().all(|(_, gradient)| {
+            report.context_gradients.iter().all(|(_, gradient)| {
                 gradient.len() == backend.d_model()
                     && gradient.iter().all(|value| value.is_finite())
             }),
@@ -1615,10 +1662,12 @@ pub(crate) mod tests {
         let targets = [7u32, 23u32, 42u32];
 
         let mut gradient_wrapper = wrapper.clone();
-        let gradients = gradient_wrapper
-            .compute_e2e_sequence_loss_gradients(&context, &targets, &[0, 1])
-            .expect("sequence gradients should be computable");
-        let gradient = &gradients
+        let report = gradient_wrapper
+            .compute_e2e_sequence_loss_and_gradients(&context, &targets, &[0, 1])
+            .expect("sequence loss and gradients should be computable");
+        assert!(report.mean_loss.is_finite() && report.mean_loss > 0.0);
+        let gradient = &report
+            .context_gradients
             .iter()
             .find(|(position, _)| *position == 0)
             .expect("gradient at context position zero is required")
