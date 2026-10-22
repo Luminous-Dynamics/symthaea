@@ -312,6 +312,30 @@ mod tests {
     }
 
     #[test]
+    fn empty_calibration_set_is_rejected() {
+        assert_eq!(
+            ConformalAdequacyCalibrator::new(&[], 0.05),
+            Err(CalibrationError::EmptyCalibrationSet)
+        );
+    }
+
+    #[test]
+    fn rank_p_value_is_bounded_and_monotone_in_audit_score() {
+        let calibration_scores = (1..=50).map(|value| value as f64).collect::<Vec<_>>();
+        let calibrator = ConformalAdequacyCalibrator::new(&calibration_scores, 0.05)
+            .expect("enough valid calibration batches");
+        let mut previous = 1.0;
+        for score in [0.0, 10.0, 25.0, 50.0, 100.0] {
+            let result = calibrator
+                .assess_audit_score(score, true)
+                .expect("independent audit batch");
+            assert!((1.0 / 51.0..=1.0).contains(&result.p_value));
+            assert!(result.p_value <= previous);
+            previous = result.p_value;
+        }
+    }
+
+    #[test]
     fn invalid_scores_and_significance_levels_are_rejected() {
         assert_eq!(
             ConformalAdequacyCalibrator::new(&[0.0, f64::NAN], 0.05),
