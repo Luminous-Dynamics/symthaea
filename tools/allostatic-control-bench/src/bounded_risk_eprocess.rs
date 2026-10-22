@@ -725,6 +725,47 @@ mod tests {
     }
 
     #[test]
+    fn checkpoint_rejects_semantic_tampering_even_with_a_recomputed_checksum() {
+        let monitor = MixtureBoundedRiskEProcess::new_with_alpha_spending(
+            0.15,
+            [0.25, 0.50, 0.75],
+            0.05,
+            20,
+            9,
+        )
+        .expect("valid monitor");
+        let encoded = monitor.encode_checkpoint();
+
+        let mut altered_lines: Vec<String> = encoded
+            .strip_suffix('\n')
+            .expect("canonical trailing newline")
+            .split('\n')
+            .map(str::to_string)
+            .collect();
+        altered_lines[8] = checkpoint_float(
+            "log_alarm_threshold",
+            monitor.log_alarm_threshold() + 1.0,
+        );
+        let altered_payload = format!("{}\n", altered_lines[..14].join("\n"));
+        let altered_checksum = checkpoint_checksum(altered_payload.as_bytes());
+        let altered = format!("{altered_payload}checksum={altered_checksum:016x}\n");
+        assert!(MixtureBoundedRiskEProcess::from_checkpoint(&altered).is_none());
+
+        let mut altered_components = encoded
+            .strip_suffix('\n')
+            .expect("canonical trailing newline")
+            .split('\n')
+            .map(str::to_string)
+            .collect::<Vec<_>>();
+        altered_components[9] =
+            checkpoint_float("component_log_e_1", monitor.component_log_e_values()[0] + 0.5);
+        let altered_payload = format!("{}\n", altered_components[..14].join("\n"));
+        let altered_checksum = checkpoint_checksum(altered_payload.as_bytes());
+        let altered = format!("{altered_payload}checksum={altered_checksum:016x}\n");
+        assert!(MixtureBoundedRiskEProcess::from_checkpoint(&altered).is_none());
+    }
+
+    #[test]
     fn checkpoint_preserves_latched_alarm_and_alpha_budget_boundary() {
         let mut monitor = MixtureBoundedRiskEProcess::new_with_alpha_spending(
             0.15,
