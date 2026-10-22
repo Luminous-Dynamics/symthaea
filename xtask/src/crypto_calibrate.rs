@@ -526,7 +526,7 @@ fn apply_positive_control_gate(results: &mut [TaskResult]) {
         let key = (result.task_id.clone(), result.package.clone());
         result.positive_controls_preserved = controls
             .get(&key)
-            .is_some_and(|(expected, passed)| *expected > 0 && expected == passed);
+            .is_some_and(|(expected, passed)| *expected > 0 && *expected == *passed);
     }
 }
 
@@ -681,6 +681,51 @@ mod tests {
         let mut suite = sample_suite();
         suite.tasks[0].positive_controls.clear();
         assert!(validate_suite(&suite).is_err());
+    }
+
+    fn task_result(task_id: &str, role: &'static str, package: &str, outcome: &'static str) -> TaskResult {
+        TaskResult {
+            task_id: task_id.to_owned(),
+            role,
+            category: "test".to_owned(),
+            security_notion: "test notion".to_owned(),
+            source_path: "test.rs".to_owned(),
+            regression_test: "test_case".to_owned(),
+            package: package.to_owned(),
+            positive_controls_preserved: false,
+            command_argv: vec![],
+            outcome,
+            exit_code: Some(if outcome == "command_failed" { 1 } else { 0 }),
+            duration_ms: 1,
+            stdout_sha256: sha256_hex(&[]),
+            stderr_sha256: sha256_hex(&[]),
+            stdout_excerpt: String::new(),
+            stderr_excerpt: String::new(),
+            note: String::new(),
+        }
+    }
+
+    #[test]
+    fn attack_witness_needs_all_same_package_positive_controls() {
+        let mut results = vec![
+            task_result("HDC-001", "known_break", "symthaea-core", "reproduced_known_break"),
+            task_result("HDC-001", "positive_control", "symthaea-core", "positive_control_passed"),
+            task_result("HDC-001", "positive_control", "symthaea-core", "command_failed"),
+            task_result("HDC-001", "positive_control", "symthaea-soma", "positive_control_passed"),
+        ];
+
+        apply_positive_control_gate(&mut results);
+        assert!(
+            !results[0].positive_controls_preserved,
+            "a failed control in the same package must block acceptance"
+        );
+
+        results[2].outcome = "positive_control_passed";
+        apply_positive_control_gate(&mut results);
+        assert!(
+            results[0].positive_controls_preserved,
+            "all passing controls for the same task/package should accept the witness"
+        );
     }
 
     #[test]
