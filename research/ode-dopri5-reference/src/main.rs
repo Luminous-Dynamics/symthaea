@@ -351,7 +351,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     println!(
-        "{{\"schema_version\":\"0.1.0\",\"benchmark_id\":\"ODE-WP-DOPRI5-COMPARISON-001\",\"source_sha\":\"{}\",\"checkout_sha\":\"{}\",\"lock_sha\":\"{}\",\"custom_solver\":\"Symthaea Cash-Karp RK45, scale-aware weighted RMS\",\"reference_solver\":\"ode_solvers 0.6.2 Dopri5 (Dormand-Prince 5(4))\",\"reference_equation\":\"x'=v; v'=-x\",\"t_end\":{:.17e},\"observations\":[",
+        "{{\"schema_version\":\"0.1.0\",\"benchmark_id\":\"ODE-WP-DOPRI5-COMPARISON-001\",\"source_sha\":\"{}\",\"checkout_sha\":\"{}\",\"lock_sha\":\"{}\",\"custom_solver\":\"Symthaea Cash-Karp RK45, scale-aware weighted RMS\",\"reference_solver\":\"ode_solvers 0.6.2 Dopri5 (Dormand-Prince 5(4))\",\"reference_equation\":\"x'=v; v'=-x\",\"common_output_grid\":{{\"start\":0.0,\"end\":10.0,\"intervals\":100,\"step\":0.1,\"samples\":101}},\"t_end\":{:.17e},\"observations\":[",
         source_sha, checkout_sha, lock_sha, T_END
     );
     for (index, observation) in observations.iter().enumerate() {
@@ -366,4 +366,71 @@ fn main() -> Result<(), Box<dyn Error>> {
         return Err("one or more matched analytical solver-comparison cases failed".into());
     }
     Ok(())
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn cubic_hermite_resampling_emits_the_frozen_grid() {
+        let mut times = Vec::new();
+        let mut states = Vec::new();
+        for index in 0..=40 {
+            let time = T_END * index as f64 / 40.0;
+            times.push(time);
+            states.push(vec![time.cos(), -time.sin()]);
+        }
+
+        let samples = cubic_hermite_sample_grid(&times, &states).unwrap();
+        assert_eq!(samples.len(), COMMON_OUTPUT_INTERVALS + 1);
+        assert_eq!(samples.first().unwrap().0, 0.0);
+        assert_eq!(samples.last().unwrap().0, T_END);
+        for (index, (time, _)) in samples.iter().enumerate() {
+            let expected = T_END * index as f64 / COMMON_OUTPUT_INTERVALS as f64;
+            assert!(
+                (time - expected).abs() <= 4.0 * f64::EPSILON * T_END.max(1.0),
+                "grid index {index}: got {time}, expected {expected}"
+            );
+        }
+
+        // Cubic Hermite is a fourth-order dense approximation on this smooth fixture.
+        let maximum_error = max_sampled_scaled_trajectory_error(samples.iter().copied(), 1.0);
+        assert!(maximum_error < 2.0e-5, "max interpolation error={maximum_error}");
+    }
+
+    #[test]
+    fn common_grid_disagreement_rejects_mismatched_times_and_shapes() {
+        let samples: Vec<(f64, [f64; 2])> = (0..=COMMON_OUTPUT_INTERVALS)
+            .map(|index| {
+                let time = T_END * index as f64 / COMMON_OUTPUT_INTERVALS as f64;
+                (time, [time.cos(), -time.sin()])
+            })
+            .collect();
+        assert_eq!(max_common_grid_disagreement(&samples, &samples, 1.0), Some(0.0));
+
+        let mut wrong_time = samples.clone();
+        wrong_time[20].0 += 1.0e-6;
+        assert!(max_common_grid_disagreement(&samples, &wrong_time, 1.0).is_none());
+
+        let truncated = &samples[..samples.len() - 1];
+        assert!(max_common_grid_disagreement(&samples, truncated, 1.0).is_none());
+    }
+
+    #[test]
+    fn cubic_hermite_resampling_rejects_malformed_adaptive_trajectories() {
+        assert!(cubic_hermite_sample_grid(&[], &[]).is_none());
+        assert!(cubic_hermite_sample_grid(&[0.0, 10.0], &[vec![0.0], vec![0.0]]).is_none());
+        assert!(cubic_hermite_sample_grid(
+            &[0.0, 10.0],
+            &[vec![0.0, 0.0], vec![f64::NAN, 0.0]]
+        )
+        .is_none());
+        assert!(cubic_hermite_sample_grid(
+            &[0.0, 9.0],
+            &[vec![0.0, 0.0], vec![0.0, 0.0]]
+        )
+        .is_none());
+    }
 }
