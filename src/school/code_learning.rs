@@ -74,6 +74,10 @@ pub struct LessonOutcome {
     pub simulated_execution: bool,
     /// Whether the code compiled
     pub compiled: bool,
+    /// Number of behavior tests declared by the lesson's external oracle.
+    pub tests_expected: usize,
+    /// Whether all declared tests executed and the test runner ended without an error.
+    pub test_run_complete: bool,
     /// Tests passed count
     pub tests_passed: usize,
     /// Tests failed count
@@ -103,30 +107,46 @@ pub struct LessonOutcome {
 }
 
 impl LessonOutcome {
-    /// Whether real compilation and at least one behavioral test succeeded.
+    /// Whether real compilation and the complete declared behavioral oracle passed.
     ///
-    /// A compiled lesson with no executed tests may earn partial mastery, but it is not
-    /// counted as a passed lesson and must not be promoted as behaviorally verified.
+    /// Missing, partial, or failed test execution is unverified and cannot count as a pass.
     pub fn is_success(&self) -> bool {
         !self.simulated_execution
             && self.compiled
-            && self.tests_passed > 0
+            && self.tests_expected > 0
+            && self.test_run_complete
+            && self.tests_passed == self.tests_expected
             && self.tests_failed == 0
     }
 
-    /// Mastery signal: 1.0 for perfect, scaled down for partial success
+    /// Mastery signal: full pass credit only for a complete oracle; incomplete runs are discounted.
     pub fn mastery_signal(&self) -> f32 {
         if self.simulated_execution || !self.compiled {
             return 0.0;
         }
-        let total_tests = self.tests_passed + self.tests_failed;
-        if total_tests == 0 {
-            // Compiled but no tests — partial credit, not a verified success.
-            0.5
+        if self.tests_expected == 0 {
+            // Compile-only lesson gets partial credit, not verified success.
+            return 0.5;
+        }
+        let pass_rate = self.tests_passed as f32 / self.tests_expected as f32;
+        if self.test_run_complete {
+            pass_rate
         } else {
-            self.tests_passed as f32 / total_tests as f32
+            pass_rate * 0.5
         }
     }
+}
+
+/// Counts simple Rust #[test] declarations in an external lesson oracle.
+///
+/// This syntax-level count is an expected-test guard; fixtures must remain well-formed,
+/// and compile/runtime/test-runner errors must still be treated as incomplete execution.
+fn count_expected_rust_test_functions(test_source: Option<&str>) -> usize {
+    test_source
+        .unwrap_or_default()
+        .lines()
+        .filter(|line| line.trim_start().starts_with("#[test]"))
+        .count()
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1072,11 +1092,12 @@ impl CodeLearningEngine {
     /// 4. If compilation still fails, LLM retry with error feedback — cost: 8.0 per retry
     /// 5. Record mastery and cache distillation targets
     pub fn run_lesson(&mut self, lesson: &CodeLesson) -> LessonOutcome {
+        let tests_expected = count_expected_rust_test_functions(lesson.test_source.as_deref());
         let mut energy_spent = 0.0;
 
         // Check budget before starting
         if !self.budget.can_afford_native() {
-            return LessonOutcome::budget_exhausted(&lesson.objective_id);
+            return LessonOutcome::budget_exhausted(&lesson.objective_id, tests_expected);
         }
 
         // Item #1: Predict quality before committing energy
@@ -1141,6 +1162,8 @@ impl CodeLearningEngine {
                 source,
                 simulated_execution: true,
                 compiled: false,
+                tests_expected,
+                test_run_complete: false,
                 tests_passed: 0,
                 tests_failed: 0,
                 surprise: 1.0, // Maximum surprise for safety violation
@@ -1250,22 +1273,30 @@ impl CodeLearningEngine {
         self.budget.spend(energy_spent);
 
         // 6. Build outcome
+        let tests_executed = exec_result.tests_passed + exec_result.tests_failed;
+        let test_run_complete = tests_expected > 0
+            && tests_executed == tests_expected
+            && exec_result.runtime_error.is_none();
+
         let distillation_eligible = !simulated_execution
             && exec_result.compiled
+            && test_run_complete
+            && exec_result.tests_passed == tests_expected
             && exec_result.tests_failed == 0
             && generated.plan_coverage >= MIN_PLAN_COVERAGE;
 
-        // Item #1: Compute actual quality and reality-check the prediction
+        // Do not give an unrun or incomplete behavioral oracle a perfect quality score.
         let actual_quality = if simulated_execution || !exec_result.compiled {
             0.0
-        } else if exec_result.tests_failed > 0 {
-            let total = exec_result.tests_passed + exec_result.tests_failed;
-            exec_result.tests_passed as f32 / total as f32 * 0.5 // max 0.5 for partial
+        } else if tests_expected == 0 && exec_result.runtime_error.is_none() {
+            0.5 // Compile-only: explicit partial credit, not behaviorally verified.
+        } else if tests_expected == 0 {
+            0.0
+        } else if !test_run_complete || exec_result.tests_failed > 0 {
+            (exec_result.tests_passed as f32 / tests_expected as f32 * 0.5).clamp(0.0, 0.5)
         } else {
-            1.0 - (retries as f32 + llm_retries as f32) * 0.1 // small penalty per retry
-        }
-        .clamp(0.0, 1.0);
-
+            (1.0 - (retries as f32 + llm_retries as f32) * 0.1).clamp(0.0, 1.0)
+        };
         let was_hallucination = predicted_quality >= 0.7 && actual_quality < 0.3;
         self.predictions
             .record(&lesson.objective_id, predicted_quality, actual_quality);
@@ -1275,6 +1306,8 @@ impl CodeLearningEngine {
             source: source.clone(),
             simulated_execution,
             compiled: exec_result.compiled,
+            tests_expected,
+            test_run_complete,
             tests_passed: exec_result.tests_passed,
             tests_failed: exec_result.tests_failed,
             surprise: exec_result.to_surprise(),
@@ -1672,12 +1705,14 @@ impl CodeLearningEngine {
 
 impl LessonOutcome {
     /// Create a "budget exhausted" outcome — skipped due to energy constraints.
-    fn budget_exhausted(objective_id: &str) -> Self {
+    fn budget_exhausted(objective_id: &str, tests_expected: usize) -> Self {
         Self {
             objective_id: objective_id.to_string(),
             source: String::new(),
             simulated_execution: false,
             compiled: false,
+            tests_expected,
+            test_run_complete: false,
             tests_passed: 0,
             tests_failed: 0,
             surprise: 1.0,
@@ -1913,12 +1948,21 @@ mod tests {
         CodeLearningEngine::new(generator)
     }
 
-    fn make_lesson_outcome(tests_passed: usize, tests_failed: usize, simulated_execution: bool, compiled: bool) -> LessonOutcome {
+    fn make_lesson_outcome(
+        tests_passed: usize,
+        tests_failed: usize,
+        tests_expected: usize,
+        test_run_complete: bool,
+        simulated_execution: bool,
+        compiled: bool,
+    ) -> LessonOutcome {
         LessonOutcome {
             objective_id: "test-objective".to_string(),
             source: "fn answer() -> u32 { 42 }".to_string(),
             simulated_execution,
             compiled,
+            tests_expected,
+            test_run_complete,
             tests_passed,
             tests_failed,
             surprise: 0.0,
@@ -1937,21 +1981,25 @@ mod tests {
 
     #[test]
     fn test_compiled_lesson_without_tests_is_not_passed() {
-        let outcome = make_lesson_outcome(0, 0, false, true);
+        let outcome = make_lesson_outcome(0, 0, 0, false, false, true);
         assert!(!outcome.is_success());
         assert_eq!(outcome.mastery_signal(), 0.5, "compile-only lesson keeps its explicit partial mastery credit");
     }
 
     #[test]
     fn test_lesson_requires_at_least_one_passing_test() {
-        let passing = make_lesson_outcome(2, 0, false, true);
+        let passing = make_lesson_outcome(2, 0, 2, true, false, true);
         assert!(passing.is_success());
 
-        let failing = make_lesson_outcome(1, 1, false, true);
+        let failing = make_lesson_outcome(1, 1, 2, true, false, true);
         assert!(!failing.is_success());
 
-        let simulated = make_lesson_outcome(2, 0, true, true);
+        let simulated = make_lesson_outcome(2, 0, 2, true, true, true);
         assert!(!simulated.is_success());
+
+        let incomplete = make_lesson_outcome(1, 0, 2, false, false, true);
+        assert!(!incomplete.is_success());
+        assert!((incomplete.mastery_signal() - 0.25).abs() < f32::EPSILON);
     }
 
     #[test]
@@ -2055,6 +2103,8 @@ mod tests {
             source: String::new(),
             simulated_execution: false,
             compiled: true,
+            tests_expected: 3,
+            test_run_complete: true,
             tests_passed: 3,
             tests_failed: 0,
             surprise: 0.0,
