@@ -261,3 +261,5 @@ The companion `ARTIFACT_MANIFEST.json` records SHA-256 digests for the exact sou
 
 The manifest deliberately excludes its own bytes to avoid a self-referential digest. Any edit to a covered file invalidates the relevant receipt until the digest manifest is regenerated. The manifest is a reproducibility aid, not proof that labels are correct or a suite has passed. A final freeze still requires independent oracle adjudication, an immutable hidden split, and executable test/baseline receipts.
 
+Verify the current working tree from the repository root with `cargo run -p xtask -- verify-sld-manifest --root .`. The verifier checks manifest format, commit-ID syntax, unique and safe relative paths, symlink containment, UTF-8 validity, byte counts, and SHA-256 content digests. It fails on missing or modified artifacts. The command has been authored but has not yet been compiled or executed in this environment.
+
