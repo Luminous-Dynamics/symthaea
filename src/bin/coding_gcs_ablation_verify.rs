@@ -177,6 +177,16 @@ fn verify_mode_summary(
         .filter_map(|run| run.get("backend_attempts").and_then(Value::as_array))
         .flatten()
         .collect::<Vec<_>>();
+    let backend_attempt_elapsed_values: Vec<u64> = backend_attempts
+        .iter()
+        .map(|attempt| u64_field(attempt, "elapsed_ms").unwrap_or(0))
+        .collect();
+    let backend_attempt_elapsed_ms_total = backend_attempt_elapsed_values
+        .iter()
+        .copied()
+        .fold(0_u64, u64::saturating_add);
+    let backend_attempt_elapsed_ms_p50 = nearest_rank_percentile(&mut backend_attempt_elapsed_values.clone(), 0.50).unwrap_or(0);
+    let backend_attempt_elapsed_ms_p95 = nearest_rank_percentile(&mut backend_attempt_elapsed_values.clone(), 0.95).unwrap_or(0);
     let backend_attempt_count = |target: &str| -> u64 {
         backend_attempts
             .iter()
@@ -265,6 +275,9 @@ fn verify_mode_summary(
         ("verification_elapsed_ms_p95", verification_elapsed_ms_p95),
         ("backend_attempts_succeeded", backend_attempts_succeeded),
         ("backend_attempts_failed", backend_attempts_failed),
+        ("backend_attempt_elapsed_ms_total", backend_attempt_elapsed_ms_total),
+        ("backend_attempt_elapsed_ms_p50", backend_attempt_elapsed_ms_p50),
+        ("backend_attempt_elapsed_ms_p95", backend_attempt_elapsed_ms_p95),
         ("runs_with_external_backend_attempts", runs_with_external_backend_attempts),
         ("runs_with_simulated_backend_attempts", runs_with_simulated_backend_attempts),
         ("runs_with_no_backend_attempts", runs_with_no_backend_attempts),
@@ -708,13 +721,14 @@ fn audit(
                 });
                 let backend_name_valid = !backend_name.trim().is_empty();
                 let success_valid = success.is_some();
+                let elapsed_valid = u64_field(attempt, "elapsed_ms").is_some();
                 let identity_consistent = match backend_name.to_ascii_lowercase().as_str() {
                     "simulated" => tier == Some("Simulated"),
                     "ollama" => tier == Some("LocalLLM"),
                     "anthropic" => tier == Some("CloudLLM"),
                     _ => true,
                 };
-                tier_valid && backend_name_valid && success_valid && identity_consistent
+                tier_valid && backend_name_valid && success_valid && elapsed_valid && identity_consistent
             })
         });
         push_check(
@@ -1349,6 +1363,9 @@ mod tests {
                     "backend_attempts_by_name": {},
                     "backend_attempts_succeeded": 0,
                     "backend_attempts_failed": 0,
+                    "backend_attempt_elapsed_ms_total": 0,
+                    "backend_attempt_elapsed_ms_p50": 0,
+                    "backend_attempt_elapsed_ms_p95": 0,
                     "runs_with_external_backend_attempts": 0,
                     "runs_with_simulated_backend_attempts": 0,
                     "runs_with_no_backend_attempts": 1,
@@ -1374,6 +1391,9 @@ mod tests {
                     "backend_attempts_by_name": {},
                     "backend_attempts_succeeded": 0,
                     "backend_attempts_failed": 0,
+                    "backend_attempt_elapsed_ms_total": 0,
+                    "backend_attempt_elapsed_ms_p50": 0,
+                    "backend_attempt_elapsed_ms_p95": 0,
                     "runs_with_external_backend_attempts": 0,
                     "runs_with_simulated_backend_attempts": 0,
                     "runs_with_no_backend_attempts": 1,
