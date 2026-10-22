@@ -443,12 +443,43 @@ fn parse_outcomes(text: &str, requested_split: &str) -> Result<BTreeMap<String, 
             .with_context(|| {
                 format!("{context}.adjudication.reviewer_decisions must be an array")
             })?;
+        let mut reviewer_ids = BTreeSet::new();
         for (reviewer_index, reviewer) in reviewer_rows.iter().enumerate() {
+            let reviewer_context = format!("{context}.reviewer_decisions[{reviewer_index}]");
             require_exact_keys(
                 reviewer,
                 &["reviewer_id", "label", "reason_codes", "evidence_sha256"],
                 &[],
-                &format!("{context}.reviewer_decisions[{reviewer_index}]"),
+                &reviewer_context,
+            )?;
+            let reviewer_id = required_string(reviewer, "reviewer_id", &reviewer_context)?;
+            if !reviewer_ids.insert(reviewer_id.to_owned()) {
+                bail!("{reviewer_context} has duplicate reviewer ID");
+            }
+            if !matches!(
+                required_string(reviewer, "label", &reviewer_context)?,
+                "compatible" | "incompatible" | "partial" | "unknown"
+            ) {
+                bail!("{reviewer_context} has invalid label");
+            }
+            validate_digest(
+                required_string(reviewer, "evidence_sha256", &reviewer_context)?,
+                64,
+                &format!("{reviewer_context}.evidence_sha256"),
+            )?;
+            let reasons = reviewer
+                .get("reason_codes")
+                .and_then(Value::as_array)
+                .with_context(|| format!("{reviewer_context}.reason_codes must be an array"))?;
+            validate_enum_array(
+                reasons,
+                &[
+                    "missing_precondition", "object_type", "domain_mismatch",
+                    "inequality_direction", "predicate_mismatch", "quantifier_scope",
+                    "premise_unavailable", "irrelevant_near_neighbour", "other", "unknown",
+                ],
+                true,
+                &format!("{reviewer_context}.reason_codes"),
             )?;
         }
         let check_rows = value
@@ -457,12 +488,30 @@ fn parse_outcomes(text: &str, requested_split: &str) -> Result<BTreeMap<String, 
             .and_then(Value::as_array)
             .with_context(|| format!("{context}.prediction.precondition_checks must be an array"))?;
         for (check_index, check) in check_rows.iter().enumerate() {
+            let check_context = format!("{context}.precondition_checks[{check_index}]");
             require_exact_keys(
                 check,
                 &["check_id", "outcome", "evidence_sha256"],
                 &[],
-                &format!("{context}.precondition_checks[{check_index}]"),
+                &check_context,
             )?;
+            required_string(check, "check_id", &check_context)?;
+            if !matches!(
+                required_string(check, "outcome", &check_context)?,
+                "satisfied" | "violated" | "unknown" | "not_applicable"
+            ) {
+                bail!("{check_context} has invalid precondition outcome");
+            }
+            match check.get("evidence_sha256") {
+                Some(Value::Null) => {}
+                Some(value) => {
+                    let digest = value
+                        .as_str()
+                        .with_context(|| format!("{check_context}.evidence_sha256 must be null or a digest"))?;
+                    validate_digest(digest, 64, &format!("{check_context}.evidence_sha256"))?;
+                }
+                None => bail!("{check_context}.evidence_sha256 is required"),
+            }
         }
         require_exact_keys(
             value.get("run").and_then(|x| x.get("budget")).context("run budget missing")?,
@@ -495,6 +544,44 @@ fn parse_outcomes(text: &str, requested_split: &str) -> Result<BTreeMap<String, 
         ) {
             bail!("{context} has invalid decision");
         }
+        required_string(&value, "component_id", &context)?;
+        for field in ["model_id", "model_version"] {
+            required_string_at(&value, &["run", field], &context)?;
+        }
+        for field in ["prompt_sha256", "config_sha256", "input_sha256", "output_sha256"] {
+            validate_digest(
+                required_string_at(&value, &["run", field], &context)?,
+                64,
+                &format!("{context}.run.{field}"),
+            )?;
+        }
+        let confidence = value
+            .get("prediction")
+            .and_then(|prediction| prediction.get("confidence"))
+            .context("prediction.confidence is required")?;
+        if !confidence.is_null() {
+            let confidence = confidence
+                .as_f64()
+                .context("prediction.confidence must be null or numeric")?;
+            if !confidence.is_finite() || !(0.0..=1.0).contains(&confidence) {
+                bail!("{context}.prediction.confidence outside [0, 1]");
+            }
+        }
+        let mismatch_codes = value
+            .get("prediction")
+            .and_then(|prediction| prediction.get("mismatch_codes"))
+            .and_then(Value::as_array)
+            .context("prediction.mismatch_codes must be an array")?;
+        validate_enum_array(
+            mismatch_codes,
+            &[
+                "missing_precondition", "object_type", "domain_mismatch",
+                "inequality_direction", "predicate_mismatch", "quantifier_scope",
+                "premise_unavailable", "irrelevant_near_neighbour", "other", "unknown",
+            ],
+            false,
+            &format!("{context}.prediction.mismatch_codes"),
+        )?;
         validate_probability(
             value.get("prediction").and_then(|p| p.get("compatibility_probability")),
             &context,
@@ -525,6 +612,11 @@ fn parse_outcomes(text: &str, requested_split: &str) -> Result<BTreeMap<String, 
         }
         for name in ["theorem_id", "family_id", "artifact_path"] {
             required_string_at(&value, &["target", name], &context)?;
+        }
+        let artifact_path = required_string_at(&value, &["target", "artifact_path"], &context)?;
+        if artifact_path.starts_with('/')
+            || artifact_path.split('/').any(|part| part.is_empty() || part == "..") {
+            bail!("{context}.target.artifact_path must be a safe repository-relative path");
         }
         validate_prediction_consistency(&value, &context)?;
         if outcomes.insert(pair_id.clone(), value).is_some() {
@@ -951,6 +1043,30 @@ fn require_exact_keys(
     for key in object.keys() {
         if !required.contains(&key.as_str()) && !optional.contains(&key.as_str()) {
             bail!("{context} has unexpected field {key:?}");
+        }
+    }
+    Ok(())
+}
+
+fn validate_enum_array(
+    values: &[Value],
+    allowed: &[&str],
+    require_non_empty: bool,
+    context: &str,
+) -> Result<()> {
+    if require_non_empty && values.is_empty() {
+        bail!("{context} must contain at least one item");
+    }
+    let mut seen = BTreeSet::new();
+    for value in values {
+        let item = value
+            .as_str()
+            .with_context(|| format!("{context} items must be strings"))?;
+        if !allowed.contains(&item) {
+            bail!("{context} contains unsupported value {item:?}");
+        }
+        if !seen.insert(item) {
+            bail!("{context} contains duplicate value {item:?}");
         }
     }
     Ok(())
