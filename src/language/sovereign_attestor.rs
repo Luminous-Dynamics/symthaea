@@ -283,7 +283,11 @@ mod tests {
         let attestation = attestor.attest("unit-test", TEST_SMT, "Proven", Some(binary)).unwrap();
 
         assert!(SovereignAttestor::verify(&attestation, Some(binary), &trusted_public_key));
-        assert!(!SovereignAttestor::verify(&attestation, Some(b"tampered artifact"), &trusted_public_key));
+        assert!(!SovereignAttestor::verify(
+            &attestation,
+            Some(b"tampered artifact"),
+            &trusted_public_key
+        ));
         assert!(
             !SovereignAttestor::verify(&attestation, None, &trusted_public_key),
             "an attestation that commits to a binary must not silently skip binary checking"
@@ -294,7 +298,9 @@ mod tests {
     fn v2_attestation_rejects_binary_presence_substitution() {
         let attestor = SovereignAttestor::new();
         let trusted_public_key = attestor.public_key().to_vec();
-        let attestation = attestor.attest("unit-test", TEST_SMT, "Proven", Some(b"artifact")).unwrap();
+        let attestation = attestor
+            .attest("unit-test", TEST_SMT, "Proven", Some(b"artifact"))
+            .unwrap();
 
         let mut changed = attestation.clone();
         changed.binary_hash = None;
@@ -421,7 +427,9 @@ mod tests {
     #[test]
     fn v2_transcript_binds_version_and_option_tag() {
         let attestor = SovereignAttestor::new();
-        let attestation = attestor.attest("unit-test", TEST_SMT, "Proven", Some(b"artifact")).unwrap();
+        let attestation = attestor
+            .attest("unit-test", TEST_SMT, "Proven", Some(b"artifact"))
+            .unwrap();
 
         let original = signing_message_v2(&attestation);
         let mut changed = attestation.clone();
