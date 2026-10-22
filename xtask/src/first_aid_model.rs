@@ -625,6 +625,43 @@ mod tests {
     }
 
     #[test]
+    fn every_reachable_state_two_action_suffix_matches_production_trace_checker() {
+        let paths = shortest_paths_to_reachable_states();
+        assert_eq!(paths.len(), 84, "finite model's reachable state count changed");
+
+        let mut compared_sequences = 0usize;
+        for (target_state, prefix) in &paths {
+            for first_action in ACTIONS {
+                for second_action in ACTIONS {
+                    let mut sequence = prefix.clone();
+                    sequence.push(first_action);
+                    sequence.push(second_action);
+
+                    let generated_trace = action_history_json(&sequence);
+                    let model_codes = model_violation_codes(&sequence);
+                    let production_codes =
+                        super::super::first_aid_trajectory::inspect_trace_json(&generated_trace)
+                            .expect("generated two-action trace must satisfy the event schema");
+
+                    assert_eq!(
+                        production_codes, model_codes,
+                        "two-action trace mismatch at state {target_state:?} via                          {first_action:?} then {second_action:?}; path={sequence:?}"
+                    );
+                    compared_sequences += 1;
+                }
+            }
+        }
+
+        assert_eq!(
+            compared_sequences, 21_504,
+            "all 84 states × 16 × 16 two-action suffixes must be compared"
+        );
+        println!(
+            "model_production_two_action_sequence_comparisons={compared_sequences}"
+        );
+    }
+
+    #[test]
     fn resuming_without_an_interrupt_cannot_retain_a_verified_bundle() {
         let state = State {
             session_active: true,
