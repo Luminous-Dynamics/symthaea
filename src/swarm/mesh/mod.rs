@@ -1135,8 +1135,8 @@ pub fn build_nonce(source_id: &[u8; 8], payload_type: u8, epoch: u8, sequence: u
 /// Encrypt a compressed packet envelope using ChaCha20-Poly1305.
 ///
 /// Returns `[nonce (12 bytes) | ciphertext+tag]`.
-/// The nonce includes payload_type and epoch to prevent cross-type
-/// and restart nonce reuse. See [`build_nonce`].
+/// Payload type separates one legacy namespace; the short epoch does not
+/// guarantee restart-safe uniqueness. See [`build_nonce`].
 ///
 /// **`epoch`** is a legacy one-byte random value. It only reduces the chance
 /// of a repeated epoch; it cannot guarantee restart-safe nonce uniqueness when
