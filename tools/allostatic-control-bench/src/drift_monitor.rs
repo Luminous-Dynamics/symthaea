@@ -191,10 +191,7 @@ mod tests {
         Interval::new(lower, upper).expect("valid interval")
     }
 
-    fn effect(
-        reserve_delta: (f64, f64),
-        load_delta: (f64, f64),
-    ) -> ActionEffectBounds {
+    fn effect(reserve_delta: (f64, f64), load_delta: (f64, f64)) -> ActionEffectBounds {
         ActionEffectBounds::new(
             interval(reserve_delta.0, reserve_delta.1),
             interval(load_delta.0, load_delta.1),
@@ -203,11 +200,8 @@ mod tests {
     }
 
     fn test_sets() -> (RobustActionSet, HorizonViableActionSet) {
-        let state = StateEnvelope::new(
-            interval(0.17, 0.17),
-            interval(0.81, 0.81),
-        )
-        .expect("valid state");
+        let state =
+            StateEnvelope::new(interval(0.17, 0.17), interval(0.81, 0.81)).expect("valid state");
         let dynamics = DynamicsBounds::new(
             effect((-0.005, -0.005), (0.06, 0.06)),
             effect((0.005, 0.005), (0.02, 0.02)),
@@ -244,8 +238,8 @@ mod tests {
         assert!(calibrate_drift_threshold(&[0.1, -0.1], 0.05).is_none());
         assert!(calibrate_drift_threshold(&[0.1, 0.2], 0.0).is_none());
         assert!(calibrate_drift_threshold(&[0.1, 0.2], 1.0).is_none());
-        let threshold = calibrate_drift_threshold(&nominal_scores(19), 0.05)
-            .expect("valid threshold");
+        let threshold =
+            calibrate_drift_threshold(&nominal_scores(19), 0.05).expect("valid threshold");
         assert!(assess_drift(f64::NAN, threshold).is_none());
         assert!(assess_drift(-0.1, threshold).is_none());
     }
@@ -292,14 +286,9 @@ mod tests {
             .expect("valid threshold");
         let (predictive, fallback) = test_sets();
         let shifted_score = threshold.score_threshold() + 0.1;
-        let decision = select_control_action(
-            shifted_score,
-            threshold,
-            Action::Push,
-            predictive,
-            fallback,
-        )
-        .expect("valid shifted assessment");
+        let decision =
+            select_control_action(shifted_score, threshold, Action::Push, predictive, fallback)
+                .expect("valid shifted assessment");
 
         assert_eq!(
             decision.assessment().mode(),
@@ -315,20 +304,16 @@ mod tests {
         let threshold = calibrate_drift_threshold(&nominal_scores(19), 0.05)
             .expect("valid threshold");
         let (predictive, _) = test_sets();
-        let unsafe_state = StateEnvelope::new(
-            interval(0.14, 0.16),
-            interval(0.89, 0.95),
-        )
-        .expect("valid but unsafe initial state");
+        let unsafe_state = StateEnvelope::new(interval(0.14, 0.16), interval(0.89, 0.95))
+            .expect("valid but unsafe initial state");
         let dynamics = DynamicsBounds::new(
             effect((-0.02, -0.01), (0.01, 0.02)),
             effect((0.0, 0.01), (0.0, 0.02)),
             effect((0.01, 0.02), (-0.2, -0.1)),
         );
         let limits = ViabilityLimits::new(0.15, 0.88).expect("valid limits");
-        let no_fallback =
-            evaluate_horizon_action_set(unsafe_state, dynamics, limits, true, 3)
-                .expect("valid horizon and no viable action");
+        let no_fallback = evaluate_horizon_action_set(unsafe_state, dynamics, limits, true, 3)
+            .expect("valid horizon and no viable action");
         assert_eq!(no_fallback.count(), 0);
 
         let decision = select_control_action(
