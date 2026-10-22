@@ -12,6 +12,7 @@ source_files=(
   "tools/allostatic-control-bench/src/lib.rs"
   "tools/allostatic-control-bench/src/calibration.rs"
   "tools/allostatic-control-bench/src/certificate_lease.rs"
+  "tools/allostatic-control-bench/src/independent_verifier.rs"
   "tools/allostatic-control-bench/src/model_mismatch.rs"
   "tools/allostatic-control-bench/src/multistep_viability.rs"
   "tools/allostatic-control-bench/src/robust_viability.rs"
@@ -20,11 +21,13 @@ source_files=(
   "tools/allostatic-control-bench/src/bin/allostatic-model-mismatch-bench.rs"
   "tools/allostatic-control-bench/src/bin/allostatic-multistep-viability-bench.rs"
   "tools/allostatic-control-bench/src/bin/allostatic-certificate-lease-bench.rs"
+  "tools/allostatic-control-bench/src/bin/allostatic-independent-verifier-bench.rs"
   "tools/allostatic-control-bench/qualify.sh"
   "docs/research/ALLOSTATIC_CONTROL_BENCHMARK_V1.md"
   "docs/research/ROBUST_VIABILITY_ENVELOPE_V1.md"
   "docs/research/MULTISTEP_VIABILITY_TUBES_V1.md"
   "docs/research/ASSUMPTION_BOUND_CERTIFICATE_LEASES_V1.md"
+  "docs/research/INDEPENDENT_CERTIFICATE_VERIFIER_V1.md"
 )
 expected_head="${1:-$(git rev-parse HEAD)}"
 actual_head="$(git rev-parse HEAD)"
@@ -52,6 +55,8 @@ horizon_out="${out_base}-multistep-horizon.csv"
 horizon_summary_out="${out_base}-multistep-horizon-summary.csv"
 certificate_lease_out="${out_base}-certificate-leases.csv"
 certificate_lease_summary_out="${out_base}-certificate-leases-summary.csv"
+independent_verifier_out="${out_base}-independent-verifier.csv"
+independent_verifier_summary_out="${out_base}-independent-verifier-summary.csv"
 receipt="${out_csv}.receipt.txt"
 
 cargo fmt --manifest-path "$manifest" -- --check
@@ -330,6 +335,62 @@ if ! awk -F, '
   exit 1
 fi
 
+# Independent checker verifies full transition witnesses without calling planner search.
+cargo run --locked --release --manifest-path "$manifest" --bin allostatic-independent-verifier-bench -- \
+  "$tmpdir/verifier-a.csv" "$tmpdir/verifier-summary-a.csv"
+cargo run --locked --release --manifest-path "$manifest" --bin allostatic-independent-verifier-bench -- \
+  "$tmpdir/verifier-b.csv" "$tmpdir/verifier-summary-b.csv"
+if ! cmp -s "$tmpdir/verifier-a.csv" "$tmpdir/verifier-b.csv" ||
+   ! cmp -s "$tmpdir/verifier-summary-a.csv" "$tmpdir/verifier-summary-b.csv"; then
+  printf 'FAIL: repeated independent-verifier outputs are not byte-identical\n' >&2
+  exit 1
+fi
+
+if ! awk -F, '
+  NR == 1 { if (NF != 8) failed = 1; next }
+  {
+    if (NF != 8) failed = 1
+    if ($1 != "safe_full_horizon" && $1 != "unsafe_first_step" &&
+        $1 != "unsafe_intermediate_then_recover" && $1 != "authority_revoked" &&
+        $1 != "horizon_mismatch" && $1 != "unsafe_initial_state" &&
+        $1 != "fresh_lease_and_witness" && $1 != "stale_dynamics_revision" &&
+        $1 != "stale_evidence_digest" && $1 != "tampered_first_action" &&
+        $1 != "actual_transition_disagrees_with_claimed_model") failed = 1
+    if ($2 != $3) failed = 1
+    if ($4 != "true" && $4 != "false") failed = 1
+    if (($3 == "accepted") != ($4 == "true")) failed = 1
+    if ($5 !~ /^[0-3]$/) failed = 1
+    if ($6 != "push" && $6 != "maintain" && $6 != "emergency_recover" && $6 != "none") failed = 1
+    if ($7 !~ /^-?[0-9]*[.]?[0-9]+$/ || $8 !~ /^-?[0-9]*[.]?[0-9]+$/) failed = 1
+    if ($1 == "safe_full_horizon" && ($3 != "accepted" || $5 != 3)) failed = 1
+    if ($1 == "unsafe_first_step" && $3 != "load_constraint_violated") failed = 1
+    if ($1 == "unsafe_intermediate_then_recover" && $3 != "load_constraint_violated") failed = 1
+    if ($1 == "authority_revoked" && $3 != "recovery_authority_missing") failed = 1
+    if ($1 == "horizon_mismatch" && $3 != "horizon_mismatch") failed = 1
+    if ($1 == "unsafe_initial_state" && $3 != "reserve_constraint_violated") failed = 1
+    if ($1 == "fresh_lease_and_witness" && ($3 != "accepted" || $5 != 3)) failed = 1
+    if ($1 == "stale_dynamics_revision" && $3 != "dynamics_revision_changed") failed = 1
+    if ($1 == "stale_evidence_digest" && $3 != "supporting_evidence_changed") failed = 1
+    if ($1 == "tampered_first_action" && $3 != "witness_action_mismatch") failed = 1
+    if ($1 == "actual_transition_disagrees_with_claimed_model" && $3 != "load_constraint_violated") failed = 1
+    seen[$1]++
+    rows++
+  }
+  END { if (NR != 12 || rows != 11 || failed) exit 1; for (key in seen) if (seen[key] != 1) exit 1 }
+' "$tmpdir/verifier-a.csv"; then
+  printf 'FAIL: independent verifier schema, lifecycle or rejection reason is invalid\n' >&2
+  exit 1
+fi
+
+if ! awk -F, '
+  NR == 1 { if (NF != 4) failed = 1; next }
+  { if (NF != 4 || $2 != $3 || $4 != "true") failed = 1; rows++ }
+  END { if (NR != 12 || rows != 11 || failed) exit 1 }
+' "$tmpdir/verifier-summary-a.csv"; then
+  printf 'FAIL: independent verifier summary disagrees with predeclared expected verdicts\n' >&2
+  exit 1
+fi
+
 # Summary must contain 5 scenarios × 6 policies × 2 shield settings.
 if ! awk -F, 'NR == 1 { if (NF != 28) failed = 1; next }
   { if (NF != 28) failed = 1; rows++ }
@@ -356,6 +417,8 @@ cp "$tmpdir/horizon-a.csv" "$horizon_out"
 cp "$tmpdir/horizon-summary-a.csv" "$horizon_summary_out"
 cp "$tmpdir/certificate-a.csv" "$certificate_lease_out"
 cp "$tmpdir/certificate-summary-a.csv" "$certificate_lease_summary_out"
+cp "$tmpdir/verifier-a.csv" "$independent_verifier_out"
+cp "$tmpdir/verifier-summary-a.csv" "$independent_verifier_summary_out"
 {
   printf 'status=pass\n'
   printf 'git_commit=%s\n' "$actual_head"
@@ -383,6 +446,10 @@ cp "$tmpdir/certificate-summary-a.csv" "$certificate_lease_summary_out"
   printf 'certificate_lease_rows_excluding_header=%s\n' "$(( $(wc -l < "$certificate_lease_out") - 1 ))"
   printf 'certificate_lease_summary_sha256=%s\n' "$(sha256sum "$certificate_lease_summary_out" | awk '{print $1}')"
   printf 'certificate_lease_summary_rows_excluding_header=%s\n' "$(( $(wc -l < "$certificate_lease_summary_out") - 1 ))"
+  printf 'independent_verifier_sha256=%s\n' "$(sha256sum "$independent_verifier_out" | awk '{print $1}')"
+  printf 'independent_verifier_rows_excluding_header=%s\n' "$(( $(wc -l < "$independent_verifier_out") - 1 ))"
+  printf 'independent_verifier_summary_sha256=%s\n' "$(sha256sum "$independent_verifier_summary_out" | awk '{print $1}')"
+  printf 'independent_verifier_summary_rows_excluding_header=%s\n' "$(( $(wc -l < "$independent_verifier_summary_out") - 1 ))"
   printf '\nsource_sha256:\n'
   sha256sum "${source_files[@]}"
 } > "$receipt"
@@ -396,4 +463,6 @@ printf 'Multi-step viability horizon frontier: %s\n' "$horizon_out"
 printf 'Multi-step viability horizon summary: %s\n' "$horizon_summary_out"
 printf 'Certificate lease frontier: %s\n' "$certificate_lease_out"
 printf 'Certificate lease summary: %s\n' "$certificate_lease_summary_out"
+printf 'Independent verifier frontier: %s\n' "$independent_verifier_out"
+printf 'Independent verifier summary: %s\n' "$independent_verifier_summary_out"
 printf 'Provenance receipt: %s\n' "$receipt"
