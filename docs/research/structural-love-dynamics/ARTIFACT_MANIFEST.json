@@ -3,7 +3,7 @@
   "status": "DRAFT_CANDIDATE",
   "hash_algorithm": "SHA-256",
   "encoding": "UTF-8 bytes of exact repository file content",
-  "source_commit_before_manifest": "06e258356f610d2858d71a51e72b6c0a0adffc54",
+  "source_commit_before_manifest": "5d37fec969a0c3c24f26625e59127989b9e4b19b",
   "generated_date": "2026-10-22",
   "self_digest_excluded": true,
   "notes": [
@@ -20,9 +20,9 @@
     },
     {
       "path": "docs/research/structural-love-dynamics/BASELINE_PROTOCOL.md",
-      "sha256": "cc78153ad3251a2289d317590b0f97f400d68376ba7b752be07631e787d22dcd",
-      "utf8_bytes": 36069,
-      "git_blob_sha1": "005ef3c99a59ea8f85221ebdb34a1ebabb0482f5"
+      "sha256": "20271409410ab80e5c336645d2f041c8204c30c075f70dfd9ade99e07cac2100",
+      "utf8_bytes": 36329,
+      "git_blob_sha1": "342fb78e3eb881d2d52b67e002859fcfa49563e8"
     },
     {
       "path": "docs/research/structural-love-dynamics/comparison-clusters.schema.json",
