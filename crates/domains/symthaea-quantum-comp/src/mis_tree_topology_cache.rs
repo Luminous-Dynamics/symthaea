@@ -380,6 +380,74 @@ mod tests {
     }
 
     #[test]
+    fn canonical_form_is_invariant_under_every_label_permutation_for_trees_up_to_five_vertices() {
+        fn next_permutation(values: &mut [usize]) -> bool {
+            if values.len() < 2 {
+                return false;
+            }
+            let Some(pivot) = (0..values.len() - 1).rev().find(|&index| values[index] < values[index + 1]) else {
+                return false;
+            };
+            let successor = (pivot + 1..values.len())
+                .rev()
+                .find(|&index| values[index] > values[pivot])
+                .expect("a successor exists for a pivot");
+            values.swap(pivot, successor);
+            values[pivot + 1..].reverse();
+            true
+        }
+
+        for vertex_count in 1..=5 {
+            let possible_edges = (0..vertex_count)
+                .flat_map(|left| ((left + 1)..vertex_count).map(move |right| (left, right)))
+                .collect::<Vec<_>>();
+            for mask in 0_usize..(1_usize << possible_edges.len()) {
+                let edges = possible_edges
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(bit, &edge)| ((mask >> bit) & 1 == 1).then_some(edge))
+                    .collect::<Vec<_>>();
+                let Some(reference) = rooted_tree_neighborhood_signature(
+                    vertex_count,
+                    &edges,
+                    0,
+                    vertex_count - 1,
+                ).expect("well-formed graph") else {
+                    continue;
+                };
+                // Ignore a tree-shaped component in a disconnected cyclic/forest graph;
+                // the cohort under test must be a full connected tree.
+                if reference.vertex_count() != vertex_count || reference.edge_count() != vertex_count - 1 {
+                    continue;
+                }
+
+                for root in 0..vertex_count {
+                    let original = rooted_tree_neighborhood_signature(
+                        vertex_count, &edges, root, vertex_count - 1
+                    ).expect("well-formed tree").expect("tree neighborhood");
+                    let mut permutation = (0..vertex_count).collect::<Vec<_>>();
+                    loop {
+                        let relabeled_edges = edges
+                            .iter()
+                            .map(|&(left, right)| (permutation[left], permutation[right]))
+                            .collect::<Vec<_>>();
+                        let relabeled = rooted_tree_neighborhood_signature(
+                            vertex_count,
+                            &relabeled_edges,
+                            permutation[root],
+                            vertex_count - 1,
+                        ).expect("permutation preserves a valid tree").expect("tree remains a tree");
+                        assert_eq!(original, relabeled, "n={vertex_count}, root={root}, permutation={permutation:?}");
+                        if !next_permutation(&mut permutation) {
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
     fn rooted_signature_distinguishes_path_from_star() {
         let path = rooted_tree_neighborhood_signature(
             4, &[(0, 1), (1, 2), (2, 3)], 1, 3
