@@ -117,6 +117,8 @@ pub enum ConsentEvidenceBasis {
     ExplicitAssumptionCue,
     /// The unquoted input was interrogative; no proposition is asserted.
     Interrogative,
+    /// A structured CONSENT field supplied the state; truth/provenance remain unverified.
+    StructuredField,
 }
 
 /// Auditable text-level consent assessment.
@@ -168,6 +170,7 @@ impl ConsentTextAssessment {
             ConsentEvidenceBasis::ExplicitAbsenceCue => "Wording states consent was not obtained",
             ConsentEvidenceBasis::ExplicitAssumptionCue => "Consent is described as assumed, not affirmatively granted",
             ConsentEvidenceBasis::Interrogative => "Question does not assert a consent state",
+            ConsentEvidenceBasis::StructuredField => "Structured consent field extracted; truth, identity and provenance unverified",
         }
     }
 }
@@ -1574,6 +1577,13 @@ impl MoralParser {
                     "unknown" | "unspecified" | "not stated" | "unclear" => ConsentState::Unknown,
                     _ => ConsentState::Unknown,
                 };
+                scenario.consent_assessment = ConsentTextAssessment {
+                    state: scenario.consent,
+                    basis: ConsentEvidenceBasis::StructuredField,
+                    matched_phrase: Some(format!("consent: {consent}")),
+                    question_suppressed: false,
+                    quoted_text_suppressed: false,
+                };
             } else if let Some(magnitude) = line.strip_prefix("magnitude:") {
                 let magnitude = magnitude.trim();
                 scenario.magnitude = match magnitude {
@@ -2028,6 +2038,9 @@ mod tests {
             .expect("structured response contains meaningful extracted fields");
         assert_eq!(parsed.consent, ConsentState::Unknown);
         assert!(parsed.consent.requires_clarification());
+        assert_eq!(parsed.consent_assessment.state, parsed.consent);
+        assert_eq!(parsed.consent_assessment.basis, ConsentEvidenceBasis::StructuredField);
+        assert!(!parsed.consent_assessment.has_affirmative_cue());
 
         let omitted = parser
             .parse_with_llm_response(
