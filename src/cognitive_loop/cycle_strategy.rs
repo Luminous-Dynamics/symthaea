@@ -942,8 +942,9 @@ mod tests {
             PredictionDegeneracy::NoPrediction
         );
         assert_eq!(result.prediction_error, 0.0);
-        // The invalid sentinel cannot reach PE-based urgency or exploration
-        // modulation. Other independent exploration mechanisms remain active.
+        assert!(!result.prediction_error_valid);
+        // The raw result retains its diagnostic sentinel, but stateful urgency
+        // and learning consumers receive no prediction-error evidence.
     }
 
     #[test]
