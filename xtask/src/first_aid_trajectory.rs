@@ -467,6 +467,13 @@ fn validate_event_fields(trace: &TrajectoryScenario, event: &TraceEvent) -> Resu
             event.sequence
         );
     }
+    if event.kind != EventKind::ConnectivityChanged && event.connectivity.is_some() {
+        bail!(
+            "{} event {} may carry connectivity only for connectivity_changed",
+            trace.trace_id,
+            event.sequence
+        );
+    }
     Ok(())
 }
 
@@ -1226,13 +1233,17 @@ mod tests {
     }
 
     #[test]
-    fn connectivity_changed_requires_an_explicit_state() {
+    fn connectivity_changed_metadata_is_required_and_event_scoped() {
         let trace = scenario("FA-TRACE-007");
         let mut changed = bare_event(EventKind::ConnectivityChanged);
         changed.sequence = 2;
         assert!(validate_event_fields(&trace, &changed).is_err());
         changed.connectivity = Some(Connectivity::Online);
         assert!(validate_event_fields(&trace, &changed).is_ok());
+
+        let mut network_action = bare_event(EventKind::NetworkRequiredForCore);
+        network_action.connectivity = Some(Connectivity::Online);
+        assert!(validate_event_fields(&trace, &network_action).is_err());
     }
 
     #[test]
@@ -1672,6 +1683,22 @@ mod tests {
                 assert!(
                     serde_json::from_value::<TrajectoryCorpus>(value).is_err(),
                     "unknown root fields must reject"
+                );
+                actual_reject()
+            }
+            "unexpected_connectivity_metadata" => {
+                let mut trace = scenario("FA-TRACE-007");
+                trace
+                    .events
+                    .iter_mut()
+                    .find(|event| event.kind == EventKind::NetworkRequiredForCore)
+                    .expect("core-network action exists")
+                    .connectivity = Some(Connectivity::Online);
+                let mut changed = corpus();
+                changed.scenarios = vec![trace];
+                assert!(
+                    validate_corpus(&changed).is_err(),
+                    "connectivity metadata must be event-scoped"
                 );
                 actual_reject()
             }
