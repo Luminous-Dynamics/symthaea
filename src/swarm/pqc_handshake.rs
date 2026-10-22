@@ -69,50 +69,21 @@ const MAX_KEM_PEER_ID_BYTES: usize = 256;
 // PQC SESSION KEY
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/// Candidate key material derived from an ML-KEM secret and public context.
-///
-/// This type is deliberately called a candidate: it is not an established
-/// session key until a reviewed protocol completes transcript binding and
-/// explicit key confirmation. See the module-level claim boundary.
-pub struct PqcSessionKey {
-    /// 32-byte key usable only after a reviewed handshake confirms the session.
-    session_key: [u8; 32],
-    /// When the authenticated session was established.
-    established_at: std::time::SystemTime,
-}
-
-impl PqcSessionKey {
-    pub fn key(&self) -> &[u8; 32] {
-        &self.session_key
-    }
-
-    pub fn established_at(&self) -> std::time::SystemTime {
-        self.established_at
-    }
-}
-
-impl Drop for PqcSessionKey {
-    fn drop(&mut self) {
-        use zeroize::Zeroize;
-        self.session_key.zeroize();
-    }
-}
-
 /// Unconfirmed key material derived from KEM output and public context.
 ///
 /// This is not an established session key. It remains in the pending map until
 /// a reviewed protocol implements transcript binding and explicit key confirmation.
-pub struct PqcCandidateKey {
+struct PqcCandidateKey {
     candidate_key: [u8; 32],
     created_at: std::time::SystemTime,
 }
 
 impl PqcCandidateKey {
-    pub fn key(&self) -> &[u8; 32] {
+    fn key(&self) -> &[u8; 32] {
         &self.candidate_key
     }
 
-    pub fn created_at(&self) -> std::time::SystemTime {
+    fn created_at(&self) -> std::time::SystemTime {
         self.created_at
     }
 }
@@ -153,8 +124,6 @@ pub struct PqcHandshakeManager {
     classical: crate::swarm::handshake::HybridHandshake,
     /// This node's ML-KEM-768 keypair.
     kem_keypair: MlKem768KeyPair,
-    /// Established session keys; no current code inserts before confirmation.
-    session_keys: HashMap<String, PqcSessionKey>,
     /// Candidate keys derived from KEM but not yet transcript-confirmed.
     pending_session_keys: HashMap<String, PqcCandidateKey>,
     /// Pending KEM exchanges (peer_id → their KEM public key).
@@ -167,16 +136,28 @@ impl PqcHandshakeManager {
         Self {
             classical: crate::swarm::handshake::HybridHandshake::new(config),
             kem_keypair: MlKem768KeyPair::generate(),
-            session_keys: HashMap::new(),
             pending_session_keys: HashMap::new(),
             pending_kem: HashMap::new(),
         }
     }
 
-    /// Get this node's KEM public key bytes (for transmission to peers).
-    pub fn kem_public_key_bytes(&self) -> Vec<u8> {
+    /// Export this node's KEM public key only when a real cryptographic backend is linked.
+    ///
+    /// The workspace-local `mycelix-crypto` dependency is a compilation stub
+    /// with deterministic all-zero outputs. It is explicitly refused here.
+    pub fn kem_public_key_bytes(&self) -> SwarmResult<Vec<u8>> {
+        Self::ensure_real_kem_backend()?;
         let tagged = self.kem_keypair.public_key();
-        tagged.key_bytes.clone()
+        Ok(tagged.key_bytes.clone())
+    }
+
+    fn ensure_real_kem_backend() -> SwarmResult<()> {
+        if mycelix_crypto::CRYPTO_BACKEND_IS_STUB {
+            return Err(SwarmError::FeatureNotEnabled {
+                feature: "real ML-KEM-768 backend (workspace crypto stub is active)".to_string(),
+            });
+        }
+        Ok(())
     }
 
     /// Get the classical handshake manager (for Ed25519 operations).
@@ -194,13 +175,14 @@ impl PqcHandshakeManager {
     /// KEM output alone is not an established session. Until authenticated
     /// transcript binding and explicit key confirmation are implemented, this
     /// returns `None` for candidate keys.
-    pub fn session_key(&self, peer_id: &str) -> Option<&[u8; 32]> {
-        self.session_keys.get(peer_id).map(|sk| sk.key())
+    pub fn session_key(&self, _peer_id: &str) -> Option<&[u8; 32]> {
+        // No session-activation API exists yet. Candidate material is never an active key.
+        None
     }
 
     /// Number of established sessions.
     pub fn session_count(&self) -> usize {
-        self.session_keys.len()
+        0
     }
 
     /// Number of derived candidate keys awaiting transcript/key confirmation.
@@ -210,7 +192,6 @@ impl PqcHandshakeManager {
 
     /// Remove a peer's active and pending key material (e.g., on disconnect).
     pub fn remove_session(&mut self, peer_id: &str) {
-        self.session_keys.remove(peer_id);
         self.pending_session_keys.remove(peer_id);
         self.pending_kem.remove(peer_id);
     }
@@ -249,6 +230,7 @@ impl PqcHandshakeManager {
                 reason: "Maximum pending PQC key exchanges reached".to_string(),
             });
         }
+        Self::ensure_real_kem_backend()?;
         self.pending_kem
             .insert(peer_id.to_string(), kem_public_key.to_vec());
         Ok(())
@@ -283,12 +265,15 @@ impl PqcHandshakeManager {
                 reason: "Maximum pending PQC candidate keys reached".to_string(),
             });
         }
-        let kem_pk_bytes =
-            self.pending_kem
-                .remove(peer_id)
-                .ok_or_else(|| SwarmError::TrustVerificationError {
-                    reason: format!("No KEM public key stored for peer '{peer_id}'"),
-                })?;
+        let kem_pk_bytes = self
+            .pending_kem
+            .get(peer_id)
+            .cloned()
+            .ok_or_else(|| SwarmError::TrustVerificationError {
+                reason: format!("No KEM public key stored for peer '{peer_id}'"),
+            })?;
+        Self::ensure_real_kem_backend()?;
+        self.pending_kem.remove(peer_id);
 
         // Build TaggedPublicKey for the responder
         let tagged_pk = TaggedPublicKey::new(AlgorithmId::MlKem768, kem_pk_bytes).map_err(|e| {
@@ -358,6 +343,7 @@ impl PqcHandshakeManager {
                 reason: "Maximum pending PQC candidate keys reached".to_string(),
             });
         }
+        Self::ensure_real_kem_backend()?;
 
         // Decapsulate shared secret
         let mut kem_shared_secret = self.kem_keypair.decapsulate(kem_ciphertext).map_err(|e| {
