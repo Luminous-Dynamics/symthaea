@@ -2480,9 +2480,12 @@ mod tests {
 
         assert!(formatted.contains("guideline_reference_count"));
         assert!(formatted.contains("claim_ceiling"));
+        assert!(!formatted.contains("codeine"));
+        assert!(!formatted.contains("CYP2D6"));
         assert!(!formatted.contains("morphine"));
         assert!(!formatted.contains("prasugrel"));
         assert!(!formatted.contains("dose_adjustment"));
+        assert!(!formatted.contains("alternative_drug"));
         assert!(!formatted.contains("monitoring"));
     }
 
