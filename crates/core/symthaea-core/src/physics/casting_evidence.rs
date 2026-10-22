@@ -15,7 +15,9 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
 
-use super::casting::ChvorinovObservation;
+use super::casting::{
+    ChvorinovConformalCalibrator, ChvorinovModel, ChvorinovObservation,
+};
 
 /// A source class for a casting observation.
 ///
@@ -37,7 +39,8 @@ pub enum CastingEvidenceClass {
 }
 
 impl CastingEvidenceClass {
-    const COUNT: usize = 5;
+    /// Number of stable evidence classes in this schema version.
+    pub const COUNT: usize = 5;
 
     const fn index(self) -> usize {
         self as usize
@@ -250,6 +253,19 @@ pub enum CastingEvidenceError {
         /// Evidence class of the holdout set.
         holdout: CastingEvidenceClass,
     },
+    /// Training values/order do not match the observations that fitted the model.
+    TrainingDataModelMismatch,
+    /// Calibration values/order do not match the observations used by the calibrator.
+    CalibrationDataMismatch,
+    /// The conformal calibrator was created from a different fitted model.
+    ConformalCalibratorModelMismatch,
+    /// The conformal calibrator sample count does not match the declared calibration partition.
+    CalibrationSampleCountMismatch {
+        /// Number of observations bound by the calibrator.
+        calibrator_count: usize,
+        /// Number of records in the declared calibration partition.
+        partition_count: usize,
+    },
     /// Provided records do not reproduce the manifest's digest.
     ManifestDigestMismatch,
 }
@@ -316,6 +332,22 @@ impl fmt::Display for CastingEvidenceError {
                 f,
                 "casting calibration evidence class {calibration:?} does not match holdout class {holdout:?}"
             ),
+            Self::TrainingDataModelMismatch => {
+                f.write_str("casting training records do not reproduce the fitted model's ordered training-data digest")
+            }
+            Self::CalibrationDataMismatch => {
+                f.write_str("casting calibration records do not reproduce the conformal calibrator's ordered calibration-data digest")
+            }
+            Self::ConformalCalibratorModelMismatch => {
+                f.write_str("casting conformal calibrator is bound to a different fitted model")
+            }
+            Self::CalibrationSampleCountMismatch {
+                calibrator_count,
+                partition_count,
+            } => write!(
+                f,
+                "casting conformal calibrator binds {calibrator_count} observations but the partition has {partition_count} records"
+            ),
             Self::ManifestDigestMismatch => {
                 f.write_str("casting benchmark inputs do not reproduce the manifest digest")
             }
@@ -367,6 +399,9 @@ pub struct CastingSplitManifest {
     version: u32,
     miscoverage: f64,
     process_population_digest: [u8; 32],
+    fitted_model_digest_blake3: [u8; 32],
+    training_values_digest_blake3: [u8; 32],
+    calibration_values_digest_blake3: [u8; 32],
     calibration_evidence_class: CastingEvidenceClass,
     training: CastingPartitionSummary,
     conformal_calibration: CastingPartitionSummary,
@@ -383,11 +418,13 @@ impl CastingSplitManifest {
     /// population. For a physical-validity claim, callers should require a physical
     /// calibration/holdout class and a separately reviewed protocol.
     pub fn create(
+        model: &ChvorinovModel,
+        calibrator: &ChvorinovConformalCalibrator,
         training: &[CastingObservationRecord],
         calibration: &[CastingObservationRecord],
         holdout: &[CastingObservationRecord],
-        miscoverage: f64,
     ) -> Result<Self, CastingEvidenceError> {
+        let miscoverage = calibrator.miscoverage();
         if !miscoverage.is_finite() || miscoverage <= 0.0 || miscoverage >= 1.0 {
             return Err(CastingEvidenceError::InvalidMiscoverage);
         }
@@ -401,6 +438,31 @@ impl CastingSplitManifest {
                 actual: training.len(),
                 minimum: 3,
             });
+        }
+
+        if model.sample_count() != training.len()
+            || observation_values_digest(
+                b"symthaea-casting-training-observations-v1",
+                training,
+            ) != model.training_data_digest_blake3()
+        {
+            return Err(CastingEvidenceError::TrainingDataModelMismatch);
+        }
+        if calibrator.fitted_model_digest_blake3() != model.model_digest_blake3() {
+            return Err(CastingEvidenceError::ConformalCalibratorModelMismatch);
+        }
+        if calibrator.calibration_sample_count() != calibration.len() {
+            return Err(CastingEvidenceError::CalibrationSampleCountMismatch {
+                calibrator_count: calibrator.calibration_sample_count(),
+                partition_count: calibration.len(),
+            });
+        }
+        if observation_values_digest(
+            b"symthaea-casting-conformal-observations-v1",
+            calibration,
+        ) != calibrator.calibration_data_digest_blake3()
+        {
+            return Err(CastingEvidenceError::CalibrationDataMismatch);
         }
         if calibration.is_empty() {
             return Err(CastingEvidenceError::EmptyPartition {
@@ -427,13 +489,15 @@ impl CastingSplitManifest {
             (CastingDataPartition::ConformalCalibration, calibration),
             (CastingDataPartition::Holdout, holdout),
         ];
-        let mut seen_ids: HashMap<&str, CastingDataPartition> = HashMap::new();
+        let mut seen_ids: HashMap<String, CastingDataPartition> = HashMap::new();
         let mut seen_sources: HashMap<[u8; 32], CastingDataPartition> = HashMap::new();
         let mut population: Option<([u8; 32], CastingDataPartition)> = None;
 
         for (partition, records) in partitions {
             for record in records {
-                if let Some(first_partition) = seen_ids.insert(&record.observation_id, partition) {
+                if let Some(first_partition) =
+                    seen_ids.insert(record.observation_id.clone(), partition)
+                {
                     return Err(CastingEvidenceError::DuplicateObservationId {
                         observation_id: record.observation_id.clone(),
                         first_partition,
@@ -482,9 +546,15 @@ impl CastingSplitManifest {
             calibration,
         );
         let holdout_summary = summarize_partition(CastingDataPartition::Holdout, holdout);
+        let fitted_model_digest_blake3 = model.model_digest_blake3();
+        let training_values_digest_blake3 = model.training_data_digest_blake3();
+        let calibration_values_digest_blake3 = calibrator.calibration_data_digest_blake3();
         let manifest_digest = split_manifest_digest(
             miscoverage,
             &process_population_digest,
+            &fitted_model_digest_blake3,
+            &training_values_digest_blake3,
+            &calibration_values_digest_blake3,
             calibration_class,
             &training_summary,
             &calibration_summary,
@@ -495,6 +565,9 @@ impl CastingSplitManifest {
             version: 1,
             miscoverage,
             process_population_digest,
+            fitted_model_digest_blake3,
+            training_values_digest_blake3,
+            calibration_values_digest_blake3,
             calibration_evidence_class: calibration_class,
             training: training_summary,
             conformal_calibration: calibration_summary,
@@ -506,11 +579,13 @@ impl CastingSplitManifest {
     /// Independently recompute and verify this manifest against supplied records.
     pub fn verify(
         &self,
+        model: &ChvorinovModel,
+        calibrator: &ChvorinovConformalCalibrator,
         training: &[CastingObservationRecord],
         calibration: &[CastingObservationRecord],
         holdout: &[CastingObservationRecord],
     ) -> Result<(), CastingEvidenceError> {
-        let recomputed = Self::create(training, calibration, holdout, self.miscoverage)?;
+        let recomputed = Self::create(model, calibrator, training, calibration, holdout)?;
         if self.version != recomputed.version || self.manifest_digest != recomputed.manifest_digest {
             return Err(CastingEvidenceError::ManifestDigestMismatch);
         }
@@ -535,6 +610,21 @@ impl CastingSplitManifest {
     /// Process/material/mold/tooling/measurement population digest.
     pub fn process_population_digest(&self) -> [u8; 32] {
         self.process_population_digest
+    }
+
+    /// Exact digest of the fitted model, including parameters and ordered training values.
+    pub fn fitted_model_digest_blake3(&self) -> [u8; 32] {
+        self.fitted_model_digest_blake3
+    }
+
+    /// Ordered numerical training data digest bound into the fitted model.
+    pub fn training_values_digest_blake3(&self) -> [u8; 32] {
+        self.training_values_digest_blake3
+    }
+
+    /// Ordered numerical calibration data digest bound into the conformal calibrator.
+    pub fn calibration_values_digest_blake3(&self) -> [u8; 32] {
+        self.calibration_values_digest_blake3
     }
 
     /// Evidence class used for both conformal calibration and holdout.
@@ -605,7 +695,6 @@ fn summarize_partition(
     let mut evidence_counts = [0usize; CastingEvidenceClass::COUNT];
     for record in records {
         update_len_prefixed(&mut ids_hasher, record.observation_id.as_bytes());
-        ids_hasher.update(&record.digest());
         records_hasher.update(&record.digest());
         evidence_counts[record.evidence_class.index()] += 1;
     }
@@ -621,16 +710,22 @@ fn summarize_partition(
 fn split_manifest_digest(
     miscoverage: f64,
     process_population_digest: &[u8; 32],
+    fitted_model_digest_blake3: &[u8; 32],
+    training_values_digest_blake3: &[u8; 32],
+    calibration_values_digest_blake3: &[u8; 32],
     calibration_evidence_class: CastingEvidenceClass,
     training: &CastingPartitionSummary,
     calibration: &CastingPartitionSummary,
     holdout: &CastingPartitionSummary,
 ) -> [u8; 32] {
     let mut hasher = blake3::Hasher::new();
-    hasher.update(b"symthaea-casting-split-manifest-v1");
-    hasher.update(&1_u32.to_le_bytes());
+    hasher.update(b"symthaea-casting-split-manifest-v2");
+    hasher.update(&2_u32.to_le_bytes());
     hasher.update(&miscoverage.to_bits().to_le_bytes());
     hasher.update(process_population_digest);
+    hasher.update(fitted_model_digest_blake3);
+    hasher.update(training_values_digest_blake3);
+    hasher.update(calibration_values_digest_blake3);
     hasher.update(&[calibration_evidence_class as u8]);
     for summary in [training, calibration, holdout] {
         hasher.update(&(summary.record_count as u64).to_le_bytes());
@@ -639,6 +734,21 @@ fn split_manifest_digest(
         for count in summary.evidence_counts {
             hasher.update(&(count as u64).to_le_bytes());
         }
+    }
+    *hasher.finalize().as_bytes()
+}
+
+fn observation_values_digest(
+    domain: &[u8],
+    records: &[CastingObservationRecord],
+) -> [u8; 32] {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(domain);
+    hasher.update(&(records.len() as u64).to_le_bytes());
+    for record in records {
+        let observation = record.observation;
+        hasher.update(&observation.thermal_modulus_m.to_bits().to_le_bytes());
+        hasher.update(&observation.solidification_time_s.to_bits().to_le_bytes());
     }
     *hasher.finalize().as_bytes()
 }
@@ -675,6 +785,35 @@ mod tests {
         .unwrap()
     }
 
+    fn observations(records: &[CastingObservationRecord]) -> Vec<ChvorinovObservation> {
+        records.iter().map(CastingObservationRecord::observation).collect()
+    }
+
+    fn fit_model_and_calibrator(
+        training: &[CastingObservationRecord],
+        calibration: &[CastingObservationRecord],
+        miscoverage: f64,
+    ) -> (ChvorinovModel, ChvorinovConformalCalibrator) {
+        let model = ChvorinovModel::calibrate(&observations(training)).unwrap();
+        let calibrator = ChvorinovConformalCalibrator::calibrate(
+            &model,
+            &observations(calibration),
+            miscoverage,
+        )
+        .unwrap();
+        (model, calibrator)
+    }
+
+    fn create_manifest(
+        training: &[CastingObservationRecord],
+        calibration: &[CastingObservationRecord],
+        holdout: &[CastingObservationRecord],
+        miscoverage: f64,
+    ) -> Result<CastingSplitManifest, CastingEvidenceError> {
+        let (model, calibrator) = fit_model_and_calibrator(training, calibration, miscoverage);
+        CastingSplitManifest::create(&model, &calibrator, training, calibration, holdout)
+    }
+
     fn valid_partitions() -> (
         Vec<CastingObservationRecord>,
         Vec<CastingObservationRecord>,
@@ -683,8 +822,8 @@ mod tests {
         let process = digest("alloy-mold-tooling-protocol-v1");
         let training = vec![
             record("train-1", 0.001, 1.2, CastingEvidenceClass::Simulated, process, "geom-a"),
-            record("train-2", 0.002, 4.8, CastingEvidenceClass::Simulated, process, "geom-a"),
-            record("train-3", 0.004, 19.2, CastingEvidenceClass::Synthetic, process, "geom-b"),
+            record("train-2", 0.004, 19.2, CastingEvidenceClass::Simulated, process, "geom-a"),
+            record("train-3", 0.010, 120.0, CastingEvidenceClass::Synthetic, process, "geom-b"),
         ];
         let calibration = vec![
             record("cal-1", 0.003, 10.8, CastingEvidenceClass::MeasuredPhysical, process, "geom-c"),
@@ -699,8 +838,8 @@ mod tests {
     #[test]
     fn creates_and_verifies_deterministic_disjoint_manifest() {
         let (training, calibration, holdout) = valid_partitions();
-        let first = CastingSplitManifest::create(&training, &calibration, &holdout, 0.5).unwrap();
-        let second = CastingSplitManifest::create(&training, &calibration, &holdout, 0.5).unwrap();
+        let first = create_manifest(&training, &calibration, &holdout, 0.5).unwrap();
+        let second = create_manifest(&training, &calibration, &holdout, 0.5).unwrap();
 
         assert_eq!(first.version(), 1);
         assert_eq!(first.nominal_coverage(), 0.5);
@@ -712,7 +851,10 @@ mod tests {
             first.training().evidence_counts(),
             [1, 2, 0, 0, 0]
         );
-        first.verify(&training, &calibration, &holdout).unwrap();
+        let (model, calibrator) = fit_model_and_calibrator(&training, &calibration, 0.5);
+        first
+            .verify(&model, &calibrator, &training, &calibration, &holdout)
+            .unwrap();
     }
 
     #[test]
@@ -728,14 +870,14 @@ mod tests {
             "geom-c",
         );
         assert!(matches!(
-            CastingSplitManifest::create(&training, &overlapping, &holdout, 0.5),
+            create_manifest(&training, &overlapping, &holdout, 0.5),
             Err(CastingEvidenceError::DuplicateObservationId { .. })
         ));
 
         let mut repeated_training = training.clone();
         repeated_training[2] = repeated_training[0].clone();
         assert!(matches!(
-            CastingSplitManifest::create(&repeated_training, &calibration, &holdout, 0.5),
+            create_manifest(&repeated_training, &calibration, &holdout, 0.5),
             Err(CastingEvidenceError::DuplicateObservationId { .. })
         ));
     }
@@ -755,7 +897,7 @@ mod tests {
         )
         .unwrap();
         assert!(matches!(
-            CastingSplitManifest::create(&training, &changed, &holdout, 0.5),
+            create_manifest(&training, &changed, &holdout, 0.5),
             Err(CastingEvidenceError::DuplicateSourceRecord { .. })
         ));
     }
@@ -772,7 +914,7 @@ mod tests {
             "geom-e",
         );
         assert!(matches!(
-            CastingSplitManifest::create(&training, &calibration, &holdout, 0.5),
+            create_manifest(&training, &calibration, &holdout, 0.5),
             Err(CastingEvidenceError::MixedProcessPopulation { .. })
         ));
     }
@@ -789,7 +931,7 @@ mod tests {
             "geom-f",
         ));
         assert!(matches!(
-            CastingSplitManifest::create(&training, &calibration, &holdout, 0.5),
+            create_manifest(&training, &calibration, &holdout, 0.5),
             Err(CastingEvidenceError::MixedCalibrationEvidenceClasses)
         ));
 
@@ -803,7 +945,7 @@ mod tests {
             "geom-e",
         );
         assert!(matches!(
-            CastingSplitManifest::create(&training, &calibration, &holdout, 0.5),
+            create_manifest(&training, &calibration, &holdout, 0.5),
             Err(CastingEvidenceError::CalibrationHoldoutEvidenceMismatch { .. })
         ));
     }
@@ -812,11 +954,11 @@ mod tests {
     fn refuses_insufficient_training_and_conformal_calibration_sizes() {
         let (training, calibration, holdout) = valid_partitions();
         assert!(matches!(
-            CastingSplitManifest::create(&training[..2], &calibration, &holdout, 0.5),
+            create_manifest(&training[..2], &calibration, &holdout, 0.5),
             Err(CastingEvidenceError::InsufficientTrainingRecords { .. })
         ));
         assert!(matches!(
-            CastingSplitManifest::create(&training, &calibration[..1], &holdout, 0.05),
+            create_manifest(&training, &calibration[..1], &holdout, 0.05),
             Err(CastingEvidenceError::InsufficientConformalCalibration {
                 actual: 1,
                 minimum: 19
@@ -864,7 +1006,7 @@ mod tests {
     #[test]
     fn digest_binds_order_values_evidence_and_target_coverage() {
         let (training, calibration, holdout) = valid_partitions();
-        let original = CastingSplitManifest::create(&training, &calibration, &holdout, 0.5).unwrap();
+        let original = create_manifest(&training, &calibration, &holdout, 0.5).unwrap();
 
         let mut reordered = training.clone();
         reordered.swap(0, 1);
@@ -876,7 +1018,7 @@ mod tests {
         );
 
         let changed_alpha =
-            CastingSplitManifest::create(&training, &calibration, &holdout, 0.4).unwrap();
+            create_manifest(&training, &calibration, &holdout, 0.4).unwrap();
         assert_ne!(
             original.manifest_digest_blake3(),
             changed_alpha.manifest_digest_blake3()
@@ -884,9 +1026,81 @@ mod tests {
     }
 
     #[test]
+    fn refuses_training_or_calibration_values_that_do_not_match_the_bound_model() {
+        let (training, calibration, holdout) = valid_partitions();
+        let (model, calibrator) = fit_model_and_calibrator(&training, &calibration, 0.5);
+
+        let mut changed_training = training.clone();
+        changed_training[0] = record(
+            "train-1",
+            0.001,
+            1.3,
+            CastingEvidenceClass::Simulated,
+            digest("alloy-mold-tooling-protocol-v1"),
+            "geom-a",
+        );
+        assert!(matches!(
+            CastingSplitManifest::create(
+                &model,
+                &calibrator,
+                &changed_training,
+                &calibration,
+                &holdout
+            ),
+            Err(CastingEvidenceError::TrainingDataModelMismatch)
+        ));
+
+        let mut changed_calibration = calibration.clone();
+        changed_calibration[0] = record(
+            "cal-1",
+            0.003,
+            11.0,
+            CastingEvidenceClass::MeasuredPhysical,
+            digest("alloy-mold-tooling-protocol-v1"),
+            "geom-c",
+        );
+        assert!(matches!(
+            CastingSplitManifest::create(
+                &model,
+                &calibrator,
+                &training,
+                &changed_calibration,
+                &holdout
+            ),
+            Err(CastingEvidenceError::CalibrationDataMismatch)
+        ));
+    }
+
+    #[test]
+    fn refuses_calibrator_bound_to_a_different_model() {
+        let (training, calibration, holdout) = valid_partitions();
+        let (model, _) = fit_model_and_calibrator(&training, &calibration, 0.5);
+        let training_values = observations(&training);
+        let other_model =
+            ChvorinovModel::calibrate_with_fixed_exponent(&training_values, 2.5).unwrap();
+        let calibrator = ChvorinovConformalCalibrator::calibrate(
+            &other_model,
+            &observations(&calibration),
+            0.5,
+        )
+        .unwrap();
+
+        assert!(matches!(
+            CastingSplitManifest::create(
+                &model,
+                &calibrator,
+                &training,
+                &calibration,
+                &holdout
+            ),
+            Err(CastingEvidenceError::ConformalCalibratorModelMismatch)
+        ));
+    }
+
+    #[test]
     fn verification_rejects_records_changed_after_manifest_creation() {
         let (training, calibration, holdout) = valid_partitions();
-        let manifest = CastingSplitManifest::create(&training, &calibration, &holdout, 0.5).unwrap();
+        let manifest = create_manifest(&training, &calibration, &holdout, 0.5).unwrap();
         let mut changed_holdout = holdout.clone();
         changed_holdout[0] = record(
             "holdout-1",
@@ -897,7 +1111,10 @@ mod tests {
             "geom-e",
         );
         assert!(matches!(
-            manifest.verify(&training, &calibration, &changed_holdout),
+            {
+                let (model, calibrator) = fit_model_and_calibrator(&training, &calibration, 0.5);
+                manifest.verify(&model, &calibrator, &training, &calibration, &changed_holdout)
+            },
             Err(CastingEvidenceError::ManifestDigestMismatch)
         ));
     }
@@ -905,7 +1122,7 @@ mod tests {
     #[test]
     fn permits_held_out_geometry_without_claiming_held_out_process_population() {
         let (training, calibration, holdout) = valid_partitions();
-        let manifest = CastingSplitManifest::create(&training, &calibration, &holdout, 0.5).unwrap();
+        let manifest = create_manifest(&training, &calibration, &holdout, 0.5).unwrap();
         let geometry_digests = [
             training[0].geometry_digest(),
             training[1].geometry_digest(),
