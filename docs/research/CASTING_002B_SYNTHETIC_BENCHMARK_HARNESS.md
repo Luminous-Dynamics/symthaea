@@ -26,7 +26,7 @@ Every record stores the chosen point, status, fidelity, evaluation-only ground-t
 
 The adaptive strategy is **not Bayesian optimization**: it does not fit a Gaussian process or calibrated posterior. It is a transparent sequential baseline for later comparison with a properly specified BO implementation. Its proposer takes the past trial transcript as input and uses prior observed objectives; an authored negative-control test mutates the evaluation-only truth field and verifies that the next proposal remains unchanged.
 
-The paired comparison helper runs all four strategies over the same ordered seed list and reports per-strategy run count, median simple regret, target hit rate, median cost-to-target among successful runs, and mean cost units per run. The target hit rate is essential because the conditional cost among successful runs alone would omit strategies that never reached the target.
+The paired comparison helper runs all four strategies over the same ordered seed list and reports per-strategy run count, median simple regret, target hit rate, median cost-to-target among successful runs, and mean cost units per run. The target hit rate is essential because the conditional cost among successful runs alone would omit strategies that never reached the target. In synthetic cases with noisy observations, target achievement is judged against the noise-free objective only after each query; the adaptive selector is not given that truth as an acquisition input.
 
 ## Important scope limits
 
@@ -38,7 +38,7 @@ The arbitrary cost schedule is deliberately explicit: one unit per low-fidelity 
 
 ## Test inventory
 
-The 13 authored tests cover:
+The 15 authored tests cover:
 - known-answer minima and feasibility at each declared optimum;
 - equal query budgets, complete status counts, cumulative cost accounting and non-negative regret;
 - exact replay of records, metrics and transcript digest at a fixed seed;
@@ -50,7 +50,9 @@ The 13 authored tests cover:
 - zero-budget refusal;
 - paired-seed summaries and rejection of an empty seed set;
 - adaptive proposal independence from the evaluation-only truth field and no repeated candidate points;
-- adaptive determinism and inclusion in paired summaries.
+- adaptive determinism and inclusion in paired summaries;
+- exploration fallback when the warm start contains no usable observations;
+- explicit exhaustion of the finite candidate lattice.
 
 Test command:
 
