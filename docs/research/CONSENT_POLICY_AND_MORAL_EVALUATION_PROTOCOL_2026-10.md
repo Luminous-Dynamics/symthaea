@@ -7,12 +7,14 @@ Status: **protocol + development diagnostic; no benchmark score is asserted here
 A moral classifier can attain a high aggregate score while confusing silence with permission, obeying irrelevant wording, ignoring changed facts, or collapsing legitimate disagreement into one label. Evaluation must separate (1) evidence extraction, (2) policy invariants, (3) moral judgment, (4) calibration/abstention, and (5) real-world impact. Passing one layer does not validate the others.
 
 This protocol follows the direction of recent evaluation work:
+- [A roadmap for evaluating moral competence in LLMs (Nature, February 2026)](https://www.nature.com/articles/s41586-025-10021-1) distinguishes moral performance from moral competence, and highlights contextual sensitivity and moral pluralism as separate evaluation challenges.
 - [Beyond Verdicts: Evaluating Language Model Moral Competence (AAAI 2026)](https://ojs.aaai.org/index.php/AAAI/article/view/41131) argues for evaluating moral sensitivity in noisy contexts, reasoning quality, steerability, and reasonable pluralism rather than only curated verdict accuracy.
 - [PluriHarms (ICLR 2026)](https://proceedings.iclr.cc/paper_files/paper/2026/hash/04cea5800f4d71fe0d89d5f64e33408e-Abstract-Conference.html) treats harm and annotator disagreement as distinct dimensions.
 - [OVERTONBENCH (ICLR 2026)](https://proceedings.iclr.cc/paper_files/paper/2026/hash/4444eb0b68174180d2a46841c951e7f3-Abstract-Conference.html) evaluates viewpoint coverage rather than agreement alone.
 - [CORDA (August 2026)](https://arxiv.org/abs/2608.08061) tests hierarchical, priority-ordered moral frameworks under conflict.
 - [ImpactBench (October 2026 preprint)](https://arxiv.org/abs/2610.20690) evaluates desired and harmful behaviours across a broader scenario/metric set.
 - [Moral Change or Noise? (AAAI 2026)](https://ojs.aaai.org/index.php/AAAI/article/view/41083) motivates repeated-session measures so preference changes are not automatically classified as stable preference or random noise.
+- [The Pluralistic Moral Gap (EACL 2026)](https://aclanthology.org/2026.eacl-long.305/) compares model judgments with human judgment distributions over 1,618 dilemmas and finds alignment declines as human disagreement rises; this supports reporting distributions and disagreement rather than one consensus label.
 - [MoralityBench.ai (October 2026)](https://moralitybench.ai/) is a useful additional comparison point for repeatability and response profiles.
 
 These benchmarks use different tasks, populations, labels and scoring rules. Their headline values are **not directly comparable** to Symthaea's internal parser or ETHICS-style pilot scores. Reproduce an external benchmark under its own protocol before making a numerical comparison; do not convert unrelated scores into a leaderboard claim.
