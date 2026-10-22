@@ -552,9 +552,7 @@ fn run_trial_with_discrepancy(
                                     })
                                     .sum::<f64>()
                                     / coordinates.len().max(1) as f64;
-                                Some(
-                                    base + 0.12 * (1.0 + base.abs()) * discrepancy_basis,
-                                )
+                                Some(base + 0.12 * (1.0 + base.abs()) * discrepancy_basis)
                             };
                         select_experiment_by_scenario_robust_information_gain_per_cost(
                             &remaining,
