@@ -291,6 +291,76 @@ mod tests {
         ));
     }
 
+    fn next_unit_interval(state: &mut u64) -> f64 {
+        // Fixed-seed xorshift64* is sufficient for this deterministic smoke simulation; it is
+        // not used for cryptographic or scientific production randomness.
+        *state ^= *state >> 12;
+        *state ^= *state << 25;
+        *state ^= *state >> 27;
+        let value = state.wrapping_mul(0x2545_F491_4F6C_DD1D);
+        (value >> 11) as f64 / ((1_u64 << 53) as f64)
+    }
+
+    #[test]
+    fn null_stream_smoke_simulation_exposes_repeated_test_inflation() {
+        const STREAMS: usize = 20_000;
+        const CALIBRATION_BATCHES: usize = 100;
+        const HORIZON: usize = 5;
+
+        let mut rng = 0xD1B5_4A32_D192_ED03_u64;
+        let mut sequential_alarms = 0usize;
+        let mut uncorrected_alarms = 0usize;
+
+        for _ in 0..STREAMS {
+            let calibration_scores = (0..CALIBRATION_BATCHES)
+                .map(|_| next_unit_interval(&mut rng))
+                .collect::<Vec<_>>();
+            let calibrator =
+                ConformalAdequacyCalibrator::new(&calibration_scores, 0.05).unwrap();
+            let audit_scores = (0..HORIZON)
+                .map(|_| next_unit_interval(&mut rng))
+                .collect::<Vec<_>>();
+
+            // Comparator only: repeatedly thresholding each marginal rank p-value at 0.05.
+            if audit_scores
+                .iter()
+                .any(|score| calibrator.audit_p_value(*score, true).unwrap() <= 0.05)
+            {
+                uncorrected_alarms += 1;
+            }
+
+            let mut monitor =
+                SequentialAdequacyMonitor::new(calibrator, 0.05, HORIZON).unwrap();
+            for score in audit_scores {
+                if monitor.observe(score, true).unwrap().decision
+                    == SequentialAuditDecision::Alarm
+                {
+                    sequential_alarms += 1;
+                    break;
+                }
+            }
+        }
+
+        let sequential_rate = sequential_alarms as f64 / STREAMS as f64;
+        let uncorrected_rate = uncorrected_alarms as f64 / STREAMS as f64;
+
+        // These are a fixed-seed regression envelope, not a confidence interval or proof of
+        // validity. The analytic finite-horizon claim is supplied by the union-bound argument
+        // and its exchangeability assumptions, not by this Monte Carlo test.
+        assert!(
+            (0.04..=0.055).contains(&sequential_rate),
+            "corrected null FWER smoke rate was {sequential_rate:.4}"
+        );
+        assert!(
+            (0.16..=0.28).contains(&uncorrected_rate),
+            "uncorrected repeated-test smoke rate was {uncorrected_rate:.4}"
+        );
+        assert!(
+            uncorrected_rate > sequential_rate + 0.10,
+            "correction did not produce the expected gap: corrected={sequential_rate:.4}, uncorrected={uncorrected_rate:.4}"
+        );
+    }
+
     #[test]
     fn invalid_audit_does_not_consume_alpha_or_horizon() {
         let mut monitor =
