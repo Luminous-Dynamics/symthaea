@@ -214,6 +214,22 @@ impl HarmonyBasis {
     }
 }
 
+/// Input-contract failure while computing a checked Love Coherence assessment.
+#[derive(Debug, Clone, PartialEq)]
+pub enum LoveCoherenceError {
+    /// Coordinate is non-finite or outside the documented [-1, 1] range.
+    InvalidCoordinate { index: usize, value: f64 },
+    /// Interaction weight is non-finite or outside the documented [-1, 1] range.
+    InvalidInteractionWeight { row: usize, col: usize, value: f64 },
+    /// A pairwise interaction was not symmetric within numerical tolerance.
+    AsymmetricInteractionWeights {
+        row: usize,
+        col: usize,
+        forward: f64,
+        reverse: f64,
+    },
+}
+
 /// Love coherence: emergent macro-state measuring whether the system is
 /// simultaneously rigorous, playful, and co-creative.
 ///
@@ -222,18 +238,16 @@ impl HarmonyBasis {
 /// the system is in a state of "Infinite Love as Rigorous, Playful,
 /// Co-Creative Becoming."
 ///
-/// Formula: `value = harmony_mean * (1 - tension_ratio) * diversity_factor`
+/// Formula: value = clamp(max(harmony_mean, 0) * (1 - tension_ratio) * diversity_factor, 0, 0.95).
 ///
-/// - `harmony_mean`: Average of all 8 harmony coordinates (are they positive?)
-/// - `tension_ratio`: Fraction of off-diagonal interaction weights that are
-///   negative (are the harmonies fighting each other?)
-/// - `diversity_factor`: Normalized entropy of harmony activations (are all
-///   harmonies active, not just 2-3?)
+/// - harmony_mean: Average of all 8 harmony coordinate values.
+/// - tension_ratio: Fraction of off-diagonal interaction weights that are
+///   negative (the current matrix-level tension proxy).
+/// - diversity_factor: Normalized entropy of harmony activations.
 ///
-/// This rewards a state where all harmonies are simultaneously active
-/// (diverse), positively scored (aligned), and mutually reinforcing (low
-/// tension) — without requiring perfect correlation, which would indicate
-/// dimensional collapse rather than love.
+/// A neutral mean is not positive evidence. This score is an internal coherence
+/// proxy only; it is not a moral verdict or a measurement of care/outcomes.
+/// Harmony coordinates are in [-1, 1].
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LoveCoherence {
     /// Average of all 8 harmony coordinate values.
@@ -393,13 +407,57 @@ impl HarmonyInteractionMatrix {
         best
     }
 
-    /// Compute love coherence: the emergent macro-state of harmony resonance.
+    /// Compute the legacy scalar projection of love coherence.
     ///
-    /// High love coherence = all harmonies simultaneously active, positive,
-    /// and mutually reinforcing. This is the mathematical attractor state
-    /// corresponding to "Infinite Love as Rigorous, Playful, Co-Creative
-    /// Becoming."
+    /// Invalid inputs fail closed to the default zero-valued score for
+    /// compatibility. Use the checked variant when the caller must distinguish
+    /// invalid input from a valid neutral state.
     pub fn love_coherence(&self, coords: &[f64; N_HARMONIES]) -> LoveCoherence {
+        self.try_love_coherence(coords).unwrap_or_default()
+    }
+
+    /// Compute love coherence after validating the coordinate and interaction contracts.
+    ///
+    /// Coordinates must be finite and in [-1, 1]. Every interaction weight must
+    /// also be finite and in [-1, 1], and the matrix must be symmetric because
+    /// the harmony interaction matrix represents pairwise relationships.
+    ///
+    /// This is an internal coherence proxy, not a measure of moral competence,
+    /// beneficiary welfare, or subjective experience.
+    pub fn try_love_coherence(
+        &self,
+        coords: &[f64; N_HARMONIES],
+    ) -> Result<LoveCoherence, LoveCoherenceError> {
+        for (index, &value) in coords.iter().enumerate() {
+            if !value.is_finite() || !(-1.0..=1.0).contains(&value) {
+                return Err(LoveCoherenceError::InvalidCoordinate { index, value });
+            }
+        }
+
+        for row in 0..N_HARMONIES {
+            for col in 0..N_HARMONIES {
+                let value = self.weights[row][col];
+                if !value.is_finite() || !(-1.0..=1.0).contains(&value) {
+                    return Err(LoveCoherenceError::InvalidInteractionWeight { row, col, value });
+                }
+            }
+        }
+
+        for row in 0..N_HARMONIES {
+            for col in (row + 1)..N_HARMONIES {
+                let forward = self.weights[row][col];
+                let reverse = self.weights[col][row];
+                if (forward - reverse).abs() > 1e-12 {
+                    return Err(LoveCoherenceError::AsymmetricInteractionWeights {
+                        row,
+                        col,
+                        forward,
+                        reverse,
+                    });
+                }
+            }
+        }
+
         // 1. harmony_mean: average of all 8 coordinates
         let harmony_mean = coords.iter().sum::<f64>() / N_HARMONIES as f64;
 
@@ -425,20 +483,20 @@ impl HarmonyInteractionMatrix {
             0.0
         };
 
-        // 4. Final score: all three factors must be high for love coherence
-        // Remap harmony_mean from [-1, 1] to [0, 1] for multiplication
-        let mean_01 = ((harmony_mean + 1.0) / 2.0).clamp(0.0, 1.0);
+        // 4. Positive mean is necessary but never sufficient for ethical competence.
+        // A neutral mean contributes zero evidence rather than the former score of 0.5.
+        let positive_mean = harmony_mean.clamp(0.0, 1.0);
         // Moral humility: no finite system achieves perfect love coherence.
         // Inline constant (0.95) to avoid circular dependency with cognitive_loop::thresholds.
         // Canonical value: crate::cognitive_loop::thresholds::MORAL_HUMILITY_CEILING
-        let value = (mean_01 * (1.0 - tension_ratio) * diversity_factor).clamp(0.0, 0.95);
+        let value = (positive_mean * (1.0 - tension_ratio) * diversity_factor).clamp(0.0, 0.95);
 
-        LoveCoherence {
+        Ok(LoveCoherence {
             harmony_mean,
             tension_ratio,
             diversity_factor,
             value,
-        }
+        })
     }
 
     /// Get the strongest tension pair.
@@ -689,8 +747,8 @@ mod tests {
         let coords = [0.5; N_HARMONIES];
         let lc = matrix.love_coherence(&coords);
         assert!(
-            lc.value > 0.6,
-            "Uniform positive coords should yield high LoveCoherence, got {}",
+            (0.45..=0.55).contains(&lc.value),
+            "Uniform 0.5 coordinates should yield a 0.5 internal proxy, got {}",
             lc.value
         );
         assert!(lc.diversity_factor > 0.9, "Uniform coords = max diversity");
@@ -705,17 +763,17 @@ mod tests {
         // Strongly peaked: one harmony at 1.0, rest strongly negative → low diversity
         // (softmax at temperature=1.0 requires large separation for peaking)
         let matrix = HarmonyInteractionMatrix::default();
-        let coords = [5.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0];
-        let lc = matrix.love_coherence(&coords);
+        let coords = [1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0];
+        let lc = matrix.try_love_coherence(&coords).expect("in-range coordinates");
         assert!(
-            lc.diversity_factor < 0.7,
-            "Single-axis domination should have low diversity, got {}",
+            lc.diversity_factor < 0.9,
+            "One positive axis and seven negative axes should be less diverse than a uniform vector, got {}",
             lc.diversity_factor
         );
-        // harmony_mean is negative (5 - 7) / 8 = -0.25, so mean_01 < 0.5
+        // With valid coordinates, the mean is -0.75, so it cannot produce a positive score.
         assert!(
-            lc.value < 0.3,
-            "Single-axis should yield lower LoveCoherence, got {}",
+            lc.value.abs() < f64::EPSILON,
+            "Negative mean must not produce positive LoveCoherence, got {}",
             lc.value
         );
     }
@@ -756,6 +814,102 @@ mod tests {
             "Negative mean should yield low LoveCoherence, got {}",
             lc.value
         );
+    }
+
+
+    #[test]
+    fn test_love_coherence_neutral_coordinates_are_not_positive_evidence() {
+        let matrix = HarmonyInteractionMatrix::default();
+        let coords = [0.0; N_HARMONIES];
+        let lc = matrix
+            .try_love_coherence(&coords)
+            .expect("zero coordinates are valid, neutral evidence");
+        assert!(
+            lc.value.abs() < f64::EPSILON,
+            "Neutral coordinates must not produce a positive score, got {}",
+            lc.value
+        );
+        assert!(lc.harmony_mean.abs() < f64::EPSILON);
+        assert!((lc.diversity_factor - 1.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn test_love_coherence_rejects_non_finite_and_out_of_range_coordinates() {
+        let matrix = HarmonyInteractionMatrix::default();
+        let mut coords = [0.0; N_HARMONIES];
+        coords[3] = f64::NAN;
+        assert!(matches!(
+            matrix.try_love_coherence(&coords),
+            Err(LoveCoherenceError::InvalidCoordinate { index: 3, .. })
+        ));
+
+        coords[3] = 1.01;
+        assert!(matches!(
+            matrix.try_love_coherence(&coords),
+            Err(LoveCoherenceError::InvalidCoordinate { index: 3, .. })
+        ));
+    }
+
+    #[test]
+    fn test_love_coherence_rejects_invalid_or_asymmetric_matrix() {
+        let coords = [0.25; N_HARMONIES];
+        let mut invalid = HarmonyInteractionMatrix::default();
+        invalid.weights[2][5] = f64::INFINITY;
+        assert!(matches!(
+            invalid.try_love_coherence(&coords),
+            Err(LoveCoherenceError::InvalidInteractionWeight { row: 2, col: 5, .. })
+        ));
+
+        let mut asymmetric = HarmonyInteractionMatrix::default();
+        asymmetric.weights[2][5] = 0.5;
+        assert!(matches!(
+            asymmetric.try_love_coherence(&coords),
+            Err(LoveCoherenceError::AsymmetricInteractionWeights { row: 2, col: 5, .. })
+        ));
+    }
+
+    #[test]
+    fn test_love_coherence_legacy_api_fails_closed_on_invalid_input() {
+        let matrix = HarmonyInteractionMatrix::default();
+        let mut coords = [0.0; N_HARMONIES];
+        coords[0] = f64::INFINITY;
+        let lc = matrix.love_coherence(&coords);
+        assert!(lc.value.is_finite());
+        assert!(lc.value.abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_love_coherence_permutation_invariant() {
+        let mut matrix = HarmonyInteractionMatrix::default();
+        for i in 0..N_HARMONIES {
+            for j in (i + 1)..N_HARMONIES {
+                let weight = if (i + j) % 3 == 0 { -0.5 } else { 0.25 };
+                matrix.weights[i][j] = weight;
+                matrix.weights[j][i] = weight;
+            }
+        }
+        let coords = [0.9, 0.6, -0.3, 0.1, 0.8, 0.2, -0.1, 0.4];
+        let permutation = [3, 0, 7, 2, 1, 6, 5, 4];
+        let permuted_coords: [f64; N_HARMONIES] =
+            std::array::from_fn(|i| coords[permutation[i]]);
+        let mut permuted_matrix = HarmonyInteractionMatrix::default();
+        for i in 0..N_HARMONIES {
+            for j in 0..N_HARMONIES {
+                permuted_matrix.weights[i][j] =
+                    matrix.weights[permutation[i]][permutation[j]];
+            }
+        }
+
+        let original = matrix
+            .try_love_coherence(&coords)
+            .expect("valid original case");
+        let permuted = permuted_matrix
+            .try_love_coherence(&permuted_coords)
+            .expect("valid permuted case");
+        assert!((original.harmony_mean - permuted.harmony_mean).abs() < 1e-12);
+        assert!((original.tension_ratio - permuted.tension_ratio).abs() < 1e-12);
+        assert!((original.diversity_factor - permuted.diversity_factor).abs() < 1e-12);
+        assert!((original.value - permuted.value).abs() < 1e-12);
     }
 
     // ════════════════════════════════════════════════════════════════════
