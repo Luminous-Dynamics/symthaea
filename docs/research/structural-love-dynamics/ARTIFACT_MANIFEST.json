@@ -3,7 +3,7 @@
   "status": "DRAFT_CANDIDATE",
   "hash_algorithm": "SHA-256",
   "encoding": "UTF-8 bytes of exact repository file content",
-  "source_commit_before_manifest": "2a23739dbd1040b95e5e1b58aa3d91d730ef1a60",
+  "source_commit_before_manifest": "cee407ac041c1ef19dc7f419b21c65d2f2a89a79",
   "generated_date": "2026-10-22",
   "self_digest_excluded": true,
   "notes": [
@@ -98,9 +98,9 @@
     },
     {
       "path": "tests/sld_corpus_contract.rs",
-      "sha256": "7ffda00961eec3b1b64ed803eb3aa9a154a847ab99878db3d140cc397f31f8e8",
-      "utf8_bytes": 40861,
-      "git_blob_sha1": "51aecf9a8475bd29dcea4781baf1dee3c7b1f22f"
+      "sha256": "7d77de0f9782ff61a27aa1f0c90d0886f14dc1dbe2e5cc4cbcc20c5845f743e6",
+      "utf8_bytes": 41348,
+      "git_blob_sha1": "07a39610510d49cafccd17ccd7cd8503422fbc30"
     },
     {
       "path": "xtask/Cargo.toml",
