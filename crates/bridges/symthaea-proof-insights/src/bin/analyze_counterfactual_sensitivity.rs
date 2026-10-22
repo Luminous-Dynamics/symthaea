@@ -647,6 +647,7 @@ fn validate_adjudication_link(suite_adj: &Value, outcome: &Value, context: &str)
         }
         let reasons = reviewer.get("reason_codes").and_then(Value::as_array)
             .with_context(|| format!("{context}: reviewer reason_codes must be an array"))?;
+        let reason = *reason;
         let outcome_reason = match reason {
             "preconditions_satisfied" | "no_semantic_change" => "other",
             "precondition_strengthened" => "missing_precondition",
