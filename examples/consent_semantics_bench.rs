@@ -245,4 +245,40 @@ fn main() {
     println!("meaning_preserving_pair_count={}", pairs.len());
     println!("candidate_pair_flips={candidate_flips}");
     println!("baseline_pair_flips={baseline_flips}");
+
+    // Relevant-fact counterfactuals should change the consent state in the
+    // expected direction; these are deterministic development fixtures only.
+    let counterfactuals = [
+        ("explicit-grant-to-refusal",
+         "She gave consent to share the report.", ConsentState::Given,
+         "She refused consent to share the report.", ConsentState::Denied),
+        ("without-asking-to-permission",
+         "I shared the file without asking.", ConsentState::Absent,
+         "I shared the file with her permission.", ConsentState::Given),
+        ("assumption-to-affirmative",
+         "I assumed she agreed to treatment.", ConsentState::Implied,
+         "She agreed to treatment.", ConsentState::Given),
+        ("request-only-to-affirmative-answer",
+         "I asked my daughter before discussing her health.", ConsentState::Unknown,
+         "After my daughter agreed, I discussed her health.", ConsentState::Given),
+    ];
+    let mut candidate_directional_correct = 0usize;
+    let mut baseline_directional_correct = 0usize;
+    for (id, before, expected_before, after, expected_after) in counterfactuals {
+        let candidate_before = parser.assess_consent_evidence(before).state;
+        let candidate_after = parser.assess_consent_evidence(after).state;
+        let baseline_before = strict_lexical_baseline(before);
+        let baseline_after = strict_lexical_baseline(after);
+        let candidate_ok = candidate_before == expected_before && candidate_after == expected_after;
+        let baseline_ok = baseline_before == expected_before && baseline_after == expected_after;
+        candidate_directional_correct += usize::from(candidate_ok);
+        baseline_directional_correct += usize::from(baseline_ok);
+        println!("COUNTERFACTUAL {id} expected={}->{} candidate={}->{} candidate_correct={} baseline={}->{} baseline_correct={}",
+            label(expected_before), label(expected_after),
+            label(candidate_before), label(candidate_after), candidate_ok,
+            label(baseline_before), label(baseline_after), baseline_ok);
+    }
+    println!("relevant_counterfactual_count={}", counterfactuals.len());
+    println!("candidate_counterfactual_correct={candidate_directional_correct}");
+    println!("baseline_counterfactual_correct={baseline_directional_correct}");
 }
