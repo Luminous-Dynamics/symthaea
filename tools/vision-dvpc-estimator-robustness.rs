@@ -518,7 +518,7 @@ fn summarize(results: &[RunResult]) -> Vec<SummaryResult> {
                 let paired_delta: Vec<f64> = rows.iter().filter_map(|row| {
                     if row.run_budget_overruns > 0 { return None; }
                     random_by_seed.get(&row.seed).and_then(|(random_loss, random_overruns)| {
-                        (*random_overruns == 0).then_some(row.task_loss - random_loss)
+                        (*random_overruns == 0).then_some(row.task_loss - *random_loss)
                     })
                 }).collect();
                 output.push(SummaryResult {
@@ -567,6 +567,7 @@ fn render_report() -> String {
     report.push_str("META\toracle_boundary\tevaluator_only_exact_knapsack_from_hidden_paired_values_and_actual_costs\n");
     report.push_str("META\tresource_units\tabstract_integer_cost_units_not_latency_flops_watts_or_energy\n");
     report.push_str("META\tseed_count\t8\n");
+    report.push_str("META\tweak_cue_sensitivity\t0.55_on_critical_tail\n");
     report.push_str("META\tregret_validity\tINVALID_BUDGET_when_actual_run_budget_is_exceeded\n");
     report.push_str("META\ttrials_per_regime_seed\t256\n");
     report.push_str("META\tinterval\tnormal_approximation_1.96_sd_over_sqrt_n_descriptive_not_confirmatory\n");
