@@ -745,7 +745,7 @@
   "differential_oracle": {
     "status": "unit_test_added",
     "implementation": "JSON-value-based reference interpreter compared against the production typed-state interpreter",
-    "coverage": "Typed trace checker + JSON-value differential interpreter over all 12 frozen traces and 14 adversarial mutations; independent test-only finite lifecycle/connectivity graph (252 states, 5,040 state/action transitions); 18 orthogonal policy truth-table combinations. Event-level connectivity updates are validated and a mutation rejects connectivity metadata attached to unrelated events.",
+    "coverage": "Typed trace checker + JSON-value differential interpreter over all 12 frozen traces and 13 adversarial mutations; independent test-only finite lifecycle/connectivity graph (252 states, 5,040 state/action transitions); 18 orthogonal policy truth-table combinations. Event-level connectivity updates are validated and a mutation rejects connectivity metadata attached to unrelated events.",
     "limits": "Same repository and shared invariants/fixtures; implementation-diversity and finite abstraction checks only, not external clinical adjudication, formally verified specification, stateful connectivity/freshness/consent interactions, or clinical validation.",
     "test_name": "differential_json_reference_agrees_on_frozen_traces",
     "mutation_suite_test_name": "differential_json_reference_agrees_on_adversarial_mutation_suite",
