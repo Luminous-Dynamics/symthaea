@@ -27,8 +27,11 @@ pub struct TaskSummary {
     pub candidate_mean: f64,
     pub mean_delta: f64,
     pub iqm_delta: f64,
-    /// Fraction of paired episodes won by the candidate; ties count as one half.
+    /// Fraction of same-seed episode pairs won by the candidate; ties count as one half.
     pub paired_win_rate: f64,
+    /// Empirical P(candidate score > baseline score) using independent within-task
+    /// episode draws; ties count as one half. This is not the paired win rate.
+    pub marginal_probability_of_superiority: f64,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -46,6 +49,16 @@ pub struct StratifiedSummary {
     pub macro_paired_win_rate: f64,
     pub macro_paired_win_rate_ci95_low: f64,
     pub macro_paired_win_rate_ci95_high: f64,
+    pub macro_marginal_probability_of_superiority: f64,
+    pub macro_marginal_probability_ci95_low: f64,
+    pub macro_marginal_probability_ci95_high: f64,
+    /// IQM of the equal-task-weight mixture of normalized scores, comparable in
+    /// spirit to multi-task benchmark IQM after task-specific normalization.
+    pub task_balanced_baseline_iqm: f64,
+    pub task_balanced_candidate_iqm: f64,
+    pub task_balanced_iqm_delta: f64,
+    pub task_balanced_iqm_delta_ci95_low: f64,
+    pub task_balanced_iqm_delta_ci95_high: f64,
     pub fraction_tasks_positive_mean_delta: f64,
     pub bootstrap_replicates: usize,
     pub bootstrap_seed: u64,
@@ -56,6 +69,7 @@ struct TaskDraw {
     mean_delta: f64,
     iqm_delta: f64,
     paired_win_rate: f64,
+    marginal_probability_of_superiority: f64,
 }
 
 impl StratifiedSummary {
@@ -76,7 +90,7 @@ impl StratifiedSummary {
         }
 
         let mut task_summaries = Vec::with_capacity(tasks.len());
-        let mut deltas_by_task: Vec<Vec<f64>> = Vec::with_capacity(tasks.len());
+        let mut samples_by_task: Vec<(Vec<f64>, Vec<f64>, Vec<f64>)> = Vec::with_capacity(tasks.len());
         let mut total_pairs = 0_usize;
 
         for (task, episodes) in tasks {
@@ -116,7 +130,7 @@ impl StratifiedSummary {
                 .checked_add(episodes.len())
                 .ok_or("total paired episode count overflow")?;
             task_summaries.push(summary);
-            deltas_by_task.push(deltas);
+            samples_by_task.push((baseline, candidate, deltas));
         }
 
         let task_count = task_summaries.len();
@@ -150,6 +164,25 @@ impl StratifiedSummary {
                 .map(|summary| summary.paired_win_rate)
                 .collect::<Vec<_>>(),
         );
+        let macro_marginal_probability_of_superiority = mean(
+            &task_summaries
+                .iter()
+                .map(|summary| summary.marginal_probability_of_superiority)
+                .collect::<Vec<_>>(),
+        );
+        let task_balanced_baseline_iqm = task_balanced_iqm(
+            &samples_by_task
+                .iter()
+                .map(|(baseline, _, _)| baseline.clone())
+                .collect::<Vec<_>>(),
+        );
+        let task_balanced_candidate_iqm = task_balanced_iqm(
+            &samples_by_task
+                .iter()
+                .map(|(_, candidate, _)| candidate.clone())
+                .collect::<Vec<_>>(),
+        );
+        let task_balanced_iqm_delta = task_balanced_candidate_iqm - task_balanced_baseline_iqm;
         let fraction_tasks_positive_mean_delta = task_summaries
             .iter()
             .filter(|summary| summary.mean_delta > 0.0)
@@ -165,21 +198,35 @@ impl StratifiedSummary {
         let mut bootstrap_mean = Vec::with_capacity(bootstrap_replicates);
         let mut bootstrap_iqm = Vec::with_capacity(bootstrap_replicates);
         let mut bootstrap_win_rate = Vec::with_capacity(bootstrap_replicates);
+        let mut bootstrap_marginal_superiority = Vec::with_capacity(bootstrap_replicates);
+        let mut bootstrap_task_balanced_iqm_delta = Vec::with_capacity(bootstrap_replicates);
 
         for _ in 0..bootstrap_replicates {
             let mut task_draws = Vec::with_capacity(task_count);
-            for deltas in &deltas_by_task {
+            let mut sampled_baseline_by_task = Vec::with_capacity(task_count);
+            let mut sampled_candidate_by_task = Vec::with_capacity(task_count);
+            for (baseline, candidate, deltas) in &samples_by_task {
+                let mut sampled_baseline = Vec::with_capacity(deltas.len());
+                let mut sampled_candidate = Vec::with_capacity(deltas.len());
                 let mut sampled_deltas = Vec::with_capacity(deltas.len());
 
                 for _ in 0..deltas.len() {
                     let index = (next_random(&mut random_state) % deltas.len() as u64) as usize;
+                    sampled_baseline.push(baseline[index]);
+                    sampled_candidate.push(candidate[index]);
                     sampled_deltas.push(deltas[index]);
                 }
                 task_draws.push(TaskDraw {
                     mean_delta: mean(&sampled_deltas),
                     iqm_delta: interquartile_mean(&sampled_deltas),
                     paired_win_rate: paired_win_rate(&sampled_deltas),
+                    marginal_probability_of_superiority: marginal_probability_of_superiority(
+                        &sampled_baseline,
+                        &sampled_candidate,
+                    ),
                 });
+                sampled_baseline_by_task.push(sampled_baseline);
+                sampled_candidate_by_task.push(sampled_candidate);
             }
 
             bootstrap_mean.push(mean(
@@ -194,9 +241,24 @@ impl StratifiedSummary {
                     .map(|draw| draw.paired_win_rate)
                     .collect::<Vec<_>>(),
             ));
+            bootstrap_marginal_superiority.push(mean(
+                &task_draws
+                    .iter()
+                    .map(|draw| draw.marginal_probability_of_superiority)
+                    .collect::<Vec<_>>(),
+            ));
+            let baseline_iqm = task_balanced_iqm(&sampled_baseline_by_task);
+            let candidate_iqm = task_balanced_iqm(&sampled_candidate_by_task);
+            bootstrap_task_balanced_iqm_delta.push(candidate_iqm - baseline_iqm);
         }
 
-        for values in [&mut bootstrap_mean, &mut bootstrap_iqm, &mut bootstrap_win_rate] {
+        for values in [
+            &mut bootstrap_mean,
+            &mut bootstrap_iqm,
+            &mut bootstrap_win_rate,
+            &mut bootstrap_marginal_superiority,
+            &mut bootstrap_task_balanced_iqm_delta,
+        ] {
             values.sort_by(f64::total_cmp);
         }
         let summary = Self {
@@ -213,6 +275,26 @@ impl StratifiedSummary {
             macro_paired_win_rate,
             macro_paired_win_rate_ci95_low: quantile_sorted(&bootstrap_win_rate, 0.025),
             macro_paired_win_rate_ci95_high: quantile_sorted(&bootstrap_win_rate, 0.975),
+            macro_marginal_probability_of_superiority,
+            macro_marginal_probability_ci95_low: quantile_sorted(
+                &bootstrap_marginal_superiority,
+                0.025,
+            ),
+            macro_marginal_probability_ci95_high: quantile_sorted(
+                &bootstrap_marginal_superiority,
+                0.975,
+            ),
+            task_balanced_baseline_iqm,
+            task_balanced_candidate_iqm,
+            task_balanced_iqm_delta,
+            task_balanced_iqm_delta_ci95_low: quantile_sorted(
+                &bootstrap_task_balanced_iqm_delta,
+                0.025,
+            ),
+            task_balanced_iqm_delta_ci95_high: quantile_sorted(
+                &bootstrap_task_balanced_iqm_delta,
+                0.975,
+            ),
             fraction_tasks_positive_mean_delta,
             bootstrap_replicates,
             bootstrap_seed: effective_seed,
@@ -230,6 +312,14 @@ impl StratifiedSummary {
             summary.macro_paired_win_rate,
             summary.macro_paired_win_rate_ci95_low,
             summary.macro_paired_win_rate_ci95_high,
+            summary.macro_marginal_probability_of_superiority,
+            summary.macro_marginal_probability_ci95_low,
+            summary.macro_marginal_probability_ci95_high,
+            summary.task_balanced_baseline_iqm,
+            summary.task_balanced_candidate_iqm,
+            summary.task_balanced_iqm_delta,
+            summary.task_balanced_iqm_delta_ci95_low,
+            summary.task_balanced_iqm_delta_ci95_high,
             summary.fraction_tasks_positive_mean_delta,
         ];
         if values.iter().any(|value| !value.is_finite()) {
@@ -254,6 +344,10 @@ fn summarize_task(
         mean_delta: mean(deltas),
         iqm_delta: interquartile_mean(deltas),
         paired_win_rate: paired_win_rate(deltas),
+        marginal_probability_of_superiority: marginal_probability_of_superiority(
+            baseline,
+            candidate,
+        ),
     }
 }
 
@@ -278,6 +372,53 @@ fn interquartile_mean(values: &[f64]) -> f64 {
         }
     }
     weighted_sum / 0.5
+}
+
+/// Task-equal-weight interquartile mean of scores pooled across tasks.
+/// Each task contributes total mass 1 / task_count, regardless of episode count.
+fn task_balanced_iqm(groups: &[Vec<f64>]) -> f64 {
+    debug_assert!(!groups.is_empty());
+    let mut weighted_values = Vec::new();
+    let task_weight = 1.0 / groups.len() as f64;
+    for group in groups {
+        debug_assert!(!group.is_empty());
+        let value_weight = task_weight / group.len() as f64;
+        weighted_values.extend(group.iter().map(|value| (*value, value_weight)));
+    }
+    weighted_values.sort_by(|left, right| left.0.total_cmp(&right.0));
+
+    let mut cumulative_mass = 0.0;
+    let mut weighted_sum = 0.0;
+    for (value, weight) in weighted_values {
+        let start = cumulative_mass;
+        let end = (cumulative_mass + weight).min(1.0);
+        let overlap = end.min(0.75) - start.max(0.25);
+        if overlap > 0.0 {
+            weighted_sum += value * overlap;
+        }
+        cumulative_mass = end;
+    }
+    weighted_sum / 0.5
+}
+
+/// Empirical marginal probability that a candidate episode outscores an
+/// independently drawn baseline episode from the same task; ties get half credit.
+/// O(n log n), so bootstrap repetitions do not perform a quadratic pair scan.
+fn marginal_probability_of_superiority(baseline: &[f64], candidate: &[f64]) -> f64 {
+    debug_assert!(!baseline.is_empty());
+    debug_assert!(!candidate.is_empty());
+    let mut sorted_baseline = baseline.to_vec();
+    sorted_baseline.sort_by(f64::total_cmp);
+    let mut task_average = 0.0;
+    for candidate_score in candidate {
+        let less = sorted_baseline.partition_point(|score| *score < *candidate_score);
+        let less_or_equal =
+            sorted_baseline.partition_point(|score| *score <= *candidate_score);
+        let ties = less_or_equal - less;
+        task_average +=
+            (less as f64 + 0.5 * ties as f64) / sorted_baseline.len() as f64;
+    }
+    task_average / candidate.len() as f64
 }
 
 fn paired_win_rate(deltas: &[f64]) -> f64 {
@@ -371,10 +512,24 @@ mod tests {
         assert!((summary.macro_mean_delta - 0.05).abs() < 1e-12);
         assert!((summary.macro_iqm_delta - 0.05).abs() < 1e-12);
         assert!((summary.macro_paired_win_rate - 0.625).abs() < 1e-12);
+        assert!((summary.macro_marginal_probability_of_superiority - 0.625).abs() < 1e-12);
+        assert!((summary.task_balanced_baseline_iqm - 0.55).abs() < 1e-12);
+        assert!((summary.task_balanced_candidate_iqm - 0.6).abs() < 1e-12);
+        assert!((summary.task_balanced_iqm_delta - 0.05).abs() < 1e-12);
+        assert!(summary.task_balanced_iqm_delta_ci95_low < summary.task_balanced_iqm_delta_ci95_high);
         assert_eq!(summary.task_count, 2);
         assert_eq!(summary.total_pairs, 40);
         assert!(summary.macro_mean_delta_ci95_low < summary.macro_mean_delta_ci95_high);
         assert!(summary.macro_iqm_delta_ci95_low < summary.macro_iqm_delta_ci95_high);
+    }
+
+    #[test]
+    fn paired_win_and_marginal_superiority_are_distinct_estimands() {
+        let baseline = [0.0, 1.0, 2.0];
+        let candidate = [2.0, 0.0, 1.0];
+        let paired = [2.0, -1.0, -1.0];
+        assert!((super::paired_win_rate(&paired) - 1.0 / 3.0).abs() < 1e-12);
+        assert!((super::marginal_probability_of_superiority(&baseline, &candidate) - 0.5).abs() < 1e-12);
     }
 
     #[test]
