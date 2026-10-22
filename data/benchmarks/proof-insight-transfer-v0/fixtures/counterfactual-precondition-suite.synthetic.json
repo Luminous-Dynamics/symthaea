@@ -7,7 +7,7 @@
     {
       "pair_id": "cf-p0-noop",
       "component_id": "component-p0-noop",
-      "split": "train",
+      "split": "test",
       "source_insight": {
         "record_id": "synthetic-insight-0",
         "family_id": "synthetic-source-family-0",
@@ -80,7 +80,7 @@
     {
       "pair_id": "cf-p1-precondition",
       "component_id": "component-p1-precondition",
-      "split": "train",
+      "split": "test",
       "source_insight": {
         "record_id": "synthetic-insight-1",
         "family_id": "synthetic-source-family-1",
@@ -153,7 +153,7 @@
     {
       "pair_id": "cf-p2-ineq",
       "component_id": "component-p2-ineq",
-      "split": "train",
+      "split": "test",
       "source_insight": {
         "record_id": "synthetic-insight-2",
         "family_id": "synthetic-source-family-2",
@@ -226,7 +226,7 @@
     {
       "pair_id": "cf-p3-type",
       "component_id": "component-p3-type",
-      "split": "train",
+      "split": "test",
       "source_insight": {
         "record_id": "synthetic-insight-3",
         "family_id": "synthetic-source-family-3",
@@ -299,7 +299,7 @@
     {
       "pair_id": "cf-p4-quantifier",
       "component_id": "component-p4-quantifier",
-      "split": "train",
+      "split": "test",
       "source_insight": {
         "record_id": "synthetic-insight-4",
         "family_id": "synthetic-source-family-4",
@@ -372,7 +372,7 @@
     {
       "pair_id": "cf-p5-premise",
       "component_id": "component-p5-premise",
-      "split": "train",
+      "split": "test",
       "source_insight": {
         "record_id": "synthetic-insight-5",
         "family_id": "synthetic-source-family-5",
@@ -445,7 +445,7 @@
     {
       "pair_id": "cf-p6-predicate",
       "component_id": "component-p6-predicate",
-      "split": "train",
+      "split": "test",
       "source_insight": {
         "record_id": "synthetic-insight-6",
         "family_id": "synthetic-source-family-6",
