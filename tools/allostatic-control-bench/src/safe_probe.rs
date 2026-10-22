@@ -16,11 +16,21 @@ use super::Action;
 const ACTIONS: [Action; 3] = [Action::Push, Action::Maintain, Action::EmergencyRecover];
 const SCORE_EPSILON: f64 = 1e-12;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ProbeSelectionMode {
+    /// Require the minimum noise-adjusted pairwise gap to exceed a threshold.
+    FullPairwiseSeparation,
+    /// Prefer an action that guarantees elimination of at least one hypothesis;
+    /// rank first by worst-case elimination count, then by geometric separation.
+    GuaranteedWorstCaseReduction,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct SafeProbeRecommendation {
     horizon: usize,
     safe_actions: HorizonViableActionSet,
     candidate_hypotheses: usize,
+    selection_mode: ProbeSelectionMode,
     minimum_discrimination: f64,
     measurement_radius: f64,
     action_scores: [f64; 3],
@@ -41,6 +51,10 @@ impl SafeProbeRecommendation {
 
     pub const fn candidate_hypotheses(self) -> usize {
         self.candidate_hypotheses
+    }
+
+    pub const fn selection_mode(self) -> ProbeSelectionMode {
+        self.selection_mode
     }
 
     pub const fn minimum_discrimination(self) -> f64 {
@@ -353,11 +367,9 @@ pub fn recommend_safe_probe(
     )
 }
 
-/// As `recommend_safe_probe`, but discount model separation by a declared
-/// per-coordinate measurement error bound. A positive score means every pair of
-/// candidate observation boxes remains disjoint after noise expansion. A score
-/// of zero means at least one pair could produce overlapping observations, so
-/// guaranteed identification of the full hypothesis family is not claimed.
+/// Recommend a fully discriminating action, discounted by a declared
+/// per-coordinate observation error bound. The selected action's minimum pairwise
+/// observation-set gap must exceed `minimum_discrimination`.
 #[allow(clippy::too_many_arguments)]
 pub fn recommend_safe_probe_with_noise(
     state: StateEnvelope,
@@ -368,6 +380,60 @@ pub fn recommend_safe_probe_with_noise(
     preferred_action: Action,
     minimum_discrimination: f64,
     measurement_radius: f64,
+) -> Option<SafeProbeRecommendation> {
+    recommend_probe_internal(
+        state,
+        hypotheses,
+        limits,
+        shield_can_recover,
+        horizon,
+        preferred_action,
+        minimum_discrimination,
+        measurement_radius,
+        ProbeSelectionMode::FullPairwiseSeparation,
+    )
+}
+
+/// Choose a safe probe that guarantees reducing the finite candidate family even
+/// when complete identification is impossible. Ranks certified actions first by
+/// worst-case number of hypotheses eliminated under the bounded observation
+/// model, then by noise-adjusted pairwise separation. This is set-membership
+/// reasoning over a finite hypothesis list, not A-SLS or a continuous parameter
+/// estimator.
+#[allow(clippy::too_many_arguments)]
+pub fn recommend_safe_probe_for_guaranteed_reduction(
+    state: StateEnvelope,
+    hypotheses: &[DynamicsBounds],
+    limits: ViabilityLimits,
+    shield_can_recover: bool,
+    horizon: usize,
+    preferred_action: Action,
+    measurement_radius: f64,
+) -> Option<SafeProbeRecommendation> {
+    recommend_probe_internal(
+        state,
+        hypotheses,
+        limits,
+        shield_can_recover,
+        horizon,
+        preferred_action,
+        0.0,
+        measurement_radius,
+        ProbeSelectionMode::GuaranteedWorstCaseReduction,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn recommend_probe_internal(
+    state: StateEnvelope,
+    hypotheses: &[DynamicsBounds],
+    limits: ViabilityLimits,
+    shield_can_recover: bool,
+    horizon: usize,
+    preferred_action: Action,
+    minimum_discrimination: f64,
+    measurement_radius: f64,
+    selection_mode: ProbeSelectionMode,
 ) -> Option<SafeProbeRecommendation> {
     if hypotheses.len() < 2
         || !minimum_discrimination.is_finite()
@@ -383,8 +449,8 @@ pub fn recommend_safe_probe_with_noise(
         evaluate_horizon_action_set(state, hull, limits, shield_can_recover, horizon)?;
     let action_scores =
         ACTIONS.map(|action| maximin_discrimination(hypotheses, action, measurement_radius));
-    let worst_case_remaining_hypotheses = ACTIONS
-        .map(|action| self::worst_case_remaining_hypotheses(hypotheses, action, measurement_radius));
+    let worst_case_remaining_hypotheses =
+        ACTIONS.map(|action| self::worst_case_remaining_hypotheses(hypotheses, action, measurement_radius));
     let guaranteed_hypothesis_eliminations = worst_case_remaining_hypotheses
         .map(|remaining| hypotheses.len().saturating_sub(remaining));
 
@@ -395,12 +461,14 @@ pub fn recommend_safe_probe_with_noise(
         let index = action_index(action);
         let score = action_scores[index];
         let eliminations = guaranteed_hypothesis_eliminations[index];
-        let meets_separation_threshold = score > minimum_discrimination;
-        // Full pairwise separation is not required for every useful probe: a
-        // safe action may still guarantee elimination of at least one model.
-        if !safe_actions.contains(action)
-            || (!meets_separation_threshold && eliminations == 0)
-        {
+        if !safe_actions.contains(action) {
+            continue;
+        }
+        let eligible = match selection_mode {
+            ProbeSelectionMode::FullPairwiseSeparation => score > minimum_discrimination,
+            ProbeSelectionMode::GuaranteedWorstCaseReduction => eliminations > 0,
+        };
+        if !eligible {
             continue;
         }
         match selected_action {
@@ -410,14 +478,24 @@ pub fn recommend_safe_probe_with_noise(
                 selected_eliminations = eliminations;
             }
             Some(current) => {
-                if eliminations > selected_eliminations
-                    || (eliminations == selected_eliminations
-                        && score > selected_score + SCORE_EPSILON)
-                    || (eliminations == selected_eliminations
-                        && (score - selected_score).abs() <= SCORE_EPSILON
-                        && action == preferred_action
-                        && current != preferred_action)
-                {
+                let prefer_current_mode = match selection_mode {
+                    ProbeSelectionMode::FullPairwiseSeparation => {
+                        score > selected_score + SCORE_EPSILON
+                            || ((score - selected_score).abs() <= SCORE_EPSILON
+                                && action == preferred_action
+                                && current != preferred_action)
+                    }
+                    ProbeSelectionMode::GuaranteedWorstCaseReduction => {
+                        eliminations > selected_eliminations
+                            || (eliminations == selected_eliminations
+                                && score > selected_score + SCORE_EPSILON)
+                            || (eliminations == selected_eliminations
+                                && (score - selected_score).abs() <= SCORE_EPSILON
+                                && action == preferred_action
+                                && current != preferred_action)
+                    }
+                };
+                if prefer_current_mode {
                     selected_action = Some(action);
                     selected_score = score;
                     selected_eliminations = eliminations;
@@ -430,6 +508,7 @@ pub fn recommend_safe_probe_with_noise(
         horizon,
         safe_actions,
         candidate_hypotheses: hypotheses.len(),
+        selection_mode,
         minimum_discrimination,
         measurement_radius,
         action_scores,
@@ -576,14 +655,13 @@ mod tests {
             effects((0.08, 0.10), (-0.10, -0.08)),
         );
         let models = [shared, shared, distinct_push];
-        let recommendation = recommend_safe_probe_with_noise(
+        let recommendation = recommend_safe_probe_for_guaranteed_reduction(
             state((0.50, 0.50), (0.50, 0.50)),
             &models,
             limits(),
             true,
             3,
             Action::Maintain,
-            0.0,
             0.005,
         )
         .expect("valid partial-learning request");
