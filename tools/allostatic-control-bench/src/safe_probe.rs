@@ -151,10 +151,6 @@ fn pairwise_effect_separation(
     reserve_gap.hypot(load_gap)
 }
 
-/// Return the worst-case pairwise separation between candidate effect boxes.
-/// A value of zero means at least one model pair has overlapping prediction
-/// boxes for this action, so that action cannot distinguish every hypothesis pair
-/// under the present interval information.
 /// Maximum number of candidate observation sets that can contain the same
 /// measured transition. This is the worst-case posterior cardinality under
 /// interval/set-membership updating with the declared bounded observation noise.
@@ -335,14 +331,9 @@ pub fn dynamics_hull(hypotheses: &[DynamicsBounds]) -> Option<DynamicsBounds> {
     ))
 }
 
-/// Propose an informative action subject to a common multi-step robust certificate.
-///
-/// Safety is evaluated against the hull of all model hypotheses—not separately
-/// per model—so the returned action must have a safe continuation under a single
-/// conservative envelope. Information score is the minimum pairwise separation
-/// between interval predictions. The selected action must exceed the predeclared
-/// threshold; otherwise the result reports no probe and leaves ordinary safe
-/// task-action selection to the caller.
+/// Recommend a fully pairwise-discriminating action subject to a common
+/// multi-step robust certificate. This legacy wrapper assumes zero measurement
+/// error; use `recommend_safe_probe_with_noise` when a noise bound is known.
 ///
 /// Returns None for malformed input or exhausted horizon search. A None result
 /// must never be interpreted as permission to bypass the existing safety filter.
