@@ -25,11 +25,8 @@ const VALID_RANKING_STATUS: &[&str] = &[
     "partial-comparison",
     "qualified-comparison",
 ];
-const VALID_RECOMMENDATION_STATUS: &[&str] = &[
-    "no-ranking",
-    "candidate-next-action",
-    "prefer-alternative",
-];
+const VALID_RECOMMENDATION_STATUS: &[&str] =
+    &["no-ranking", "candidate-next-action", "prefer-alternative"];
 
 /// Validate high-consequence structural and evidence-policy invariants.
 /// Call a full JSON Schema validator as a separate gate before accepting input.
@@ -44,13 +41,31 @@ pub fn validate_review(review: &Value) -> Result<(), Vec<String>> {
     for field in ["review_id", "created_at"] {
         require_nonblank(review, field, "$", &mut errors);
     }
-    require_const(review, "analysis_profile", "LAND-REVIEW-001", "$", &mut errors);
+    require_const(
+        review,
+        "analysis_profile",
+        "LAND-REVIEW-001",
+        "$",
+        &mut errors,
+    );
 
     let authority = object_field(review, "authority", "$", &mut errors);
     if let Some(authority) = authority {
         require_bool(authority, "read_only", true, "$.authority", &mut errors);
-        require_bool(authority, "mutates_project", false, "$.authority", &mut errors);
-        require_bool(authority, "actuation_authority", false, "$.authority", &mut errors);
+        require_bool(
+            authority,
+            "mutates_project",
+            false,
+            "$.authority",
+            &mut errors,
+        );
+        require_bool(
+            authority,
+            "actuation_authority",
+            false,
+            "$.authority",
+            &mut errors,
+        );
     }
 
     let inputs = object_field(review, "inputs", "$", &mut errors);
@@ -59,8 +74,20 @@ pub fn validate_review(review: &Value) -> Result<(), Vec<String>> {
     if let Some(inputs) = inputs {
         let baseline = object_field(inputs, "baseline_design", "$.inputs", &mut errors);
         if let Some(baseline) = baseline {
-            require_const(baseline, "system", "sol-atlas", "$.inputs.baseline_design", &mut errors);
-            require_const(baseline, "schema", "luminous.landscape-design.v0", "$.inputs.baseline_design", &mut errors);
+            require_const(
+                baseline,
+                "system",
+                "sol-atlas",
+                "$.inputs.baseline_design",
+                &mut errors,
+            );
+            require_const(
+                baseline,
+                "schema",
+                "luminous.landscape-design.v0",
+                "$.inputs.baseline_design",
+                &mut errors,
+            );
             require_const(
                 baseline,
                 "schema_uri",
@@ -78,10 +105,19 @@ pub fn validate_review(review: &Value) -> Result<(), Vec<String>> {
                     "$.inputs.baseline_design.coordinate_frame_kind: expected {LOCAL_DRAWING_FRAME}"
                 ));
             }
-            require_bool(baseline, "georeferenced", false, "$.inputs.baseline_design", &mut errors);
+            require_bool(
+                baseline,
+                "georeferenced",
+                false,
+                "$.inputs.baseline_design",
+                &mut errors,
+            );
             baseline_geometry_status = string_value(baseline.get("geometry_status"));
             if !VALID_GEOMETRY_STATUS.contains(&baseline_geometry_status) {
-                errors.push("$.inputs.baseline_design.geometry_status: unsupported v0 geometry status".to_string());
+                errors.push(
+                    "$.inputs.baseline_design.geometry_status: unsupported v0 geometry status"
+                        .to_string(),
+                );
             }
         }
         require_sha256(inputs, "metric_registry_sha256", "$.inputs", &mut errors);
@@ -99,7 +135,11 @@ pub fn validate_review(review: &Value) -> Result<(), Vec<String>> {
         validate_scenario_runs(inputs.get("scenario_runs"), &mut errors);
     }
 
-    let alternatives = validate_alternatives(review.get("alternatives"), baseline_geometry_status, &mut errors);
+    let alternatives = validate_alternatives(
+        review.get("alternatives"),
+        baseline_geometry_status,
+        &mut errors,
+    );
     if let Some(inputs) = inputs {
         if let Some(baseline) = inputs.get("baseline_design") {
             let baseline_sha = string_value(baseline.get("sha256"));
@@ -119,12 +159,16 @@ pub fn validate_review(review: &Value) -> Result<(), Vec<String>> {
             }
         }
     }
-    let metric_assessments = review
-        .get("metric_assessments")
-        .and_then(Value::as_array);
+    let metric_assessments = review.get("metric_assessments").and_then(Value::as_array);
     if let Some(metrics) = metric_assessments {
         for (index, metric) in metrics.iter().enumerate() {
-            validate_metric(metric, index, baseline_geometry_status, source_catalog_status, &mut errors);
+            validate_metric(
+                metric,
+                index,
+                baseline_geometry_status,
+                source_catalog_status,
+                &mut errors,
+            );
         }
     } else {
         errors.push("$.metric_assessments: expected an array".to_string());
@@ -141,9 +185,16 @@ pub fn validate_review(review: &Value) -> Result<(), Vec<String>> {
         if ranking_status == "no-defensible-ranking"
             && !nonempty_string_array(comparison.get("ranking_reasons"))
         {
-            errors.push("$.comparison.ranking_reasons: no-ranking result requires explicit reasons".to_string());
+            errors.push(
+                "$.comparison.ranking_reasons: no-ranking result requires explicit reasons"
+                    .to_string(),
+            );
         }
-        validate_pairwise_tradeoffs(comparison.get("pairwise_tradeoffs"), &alternatives, &mut errors);
+        validate_pairwise_tradeoffs(
+            comparison.get("pairwise_tradeoffs"),
+            &alternatives,
+            &mut errors,
+        );
     }
 
     let scenario_runs_value = inputs.and_then(|value| value.get("scenario_runs"));
@@ -193,9 +244,15 @@ pub fn validate_review(review: &Value) -> Result<(), Vec<String>> {
                 );
             }
             if !nonempty_string_array(recommendation.get("tradeoffs")) {
-                errors.push("$.recommendation.tradeoffs: preferred alternative requires trade-offs".to_string());
+                errors.push(
+                    "$.recommendation.tradeoffs: preferred alternative requires trade-offs"
+                        .to_string(),
+                );
             }
-            if !matches!(string_value(recommendation.get("confidence")), "high" | "medium" | "low" | "not-calibrated") {
+            if !matches!(
+                string_value(recommendation.get("confidence")),
+                "high" | "medium" | "low" | "not-calibrated"
+            ) {
                 errors.push("$.recommendation.confidence: confidence must be declared".to_string());
             }
         } else if recommendation.get("selected_alternative_id").is_some() {
@@ -230,14 +287,21 @@ pub fn validate_review(review: &Value) -> Result<(), Vec<String>> {
     }
 
     if !nonempty_string_array(review.get("falsification_questions")) {
-        errors.push("$.falsification_questions: at least one falsification question is required".to_string());
+        errors.push(
+            "$.falsification_questions: at least one falsification question is required"
+                .to_string(),
+        );
     }
     if !nonempty_string_array(review.get("limitations")) {
         errors.push("$.limitations: at least one limitation is required".to_string());
     }
     validate_replay(review.get("replay"), &mut errors);
 
-    if errors.is_empty() { Ok(()) } else { Err(errors) }
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(errors)
+    }
 }
 
 fn validate_scenario_runs(value: Option<&Value>, errors: &mut Vec<String>) {
@@ -255,13 +319,22 @@ fn validate_scenario_runs(value: Option<&Value>, errors: &mut Vec<String>) {
         let purpose = string_value(run.get("purpose"));
         let evidence_class = string_value(run.get("evidence_class"));
         let status = string_value(run.get("status"));
-        if !matches!(purpose, "schema-qualification" | "synthetic-benchmark" | "analytical-simulation") {
+        if !matches!(
+            purpose,
+            "schema-qualification" | "synthetic-benchmark" | "analytical-simulation"
+        ) {
             errors.push(format!("{path}.purpose: unsupported purpose"));
         }
-        if !matches!(evidence_class, "observed" | "curated" | "synthetic" | "modelled" | "assumed" | "missing") {
+        if !matches!(
+            evidence_class,
+            "observed" | "curated" | "synthetic" | "modelled" | "assumed" | "missing"
+        ) {
             errors.push(format!("{path}.evidence_class: unsupported evidence class"));
         }
-        if !matches!(status, "qualified" | "blocked" | "unsupported" | "conflicted") {
+        if !matches!(
+            status,
+            "qualified" | "blocked" | "unsupported" | "conflicted"
+        ) {
             errors.push(format!("{path}.status: unsupported status"));
         }
         require_nonblank(run, "model_id", &path, errors);
@@ -279,7 +352,9 @@ fn validate_scenario_runs(value: Option<&Value>, errors: &mut Vec<String>) {
                 require_sha256(context, field, &context_path, errors);
             }
             if context.get("seed").and_then(Value::as_u64).is_none() {
-                errors.push(format!("{context_path}.seed: expected a non-negative integer"));
+                errors.push(format!(
+                    "{context_path}.seed: expected a non-negative integer"
+                ));
             }
             let scope = string_value(context.get("scope"));
             if !VALID_SCOPES.contains(&scope) {
@@ -290,7 +365,9 @@ fn validate_scenario_runs(value: Option<&Value>, errors: &mut Vec<String>) {
             require_sha256(run, "result_sha256", &path, errors);
         }
         if purpose == "synthetic-benchmark" && evidence_class != "synthetic" {
-            errors.push(format!("{path}.evidence_class: synthetic benchmark must remain synthetic"));
+            errors.push(format!(
+                "{path}.evidence_class: synthetic benchmark must remain synthetic"
+            ));
         }
         if purpose == "analytical-simulation" && status == "qualified" {
             errors.push(format!(
@@ -313,7 +390,9 @@ fn validate_scenario_pairing(
     };
     let Some(alternatives) = alternatives_value.and_then(Value::as_array) else {
         if !runs.is_empty() {
-            errors.push("$.alternatives: paired scenarios require alternative definitions".to_string());
+            errors.push(
+                "$.alternatives: paired scenarios require alternative definitions".to_string(),
+            );
         }
         return;
     };
@@ -327,14 +406,18 @@ fn validate_scenario_pairing(
         let path = format!("$.inputs.scenario_runs[{index}]");
         let manifest_sha = string_value(run.get("manifest_sha256"));
         if !manifest_digests.insert(manifest_sha.to_string()) {
-            errors.push(format!("{path}.manifest_sha256: duplicate scenario manifest"));
+            errors.push(format!(
+                "{path}.manifest_sha256: duplicate scenario manifest"
+            ));
         }
         let Some(context) = run.get("pairing_context").filter(|value| value.is_object()) else {
             continue;
         };
         let alternative_id = string_value(context.get("alternative_id"));
         if alternative_id.is_empty() || !seen_alternatives.insert(alternative_id.to_string()) {
-            errors.push(format!("{path}.pairing_context.alternative_id: missing or duplicate alternative ID"));
+            errors.push(format!(
+                "{path}.pairing_context.alternative_id: missing or duplicate alternative ID"
+            ));
         }
 
         let design_sha = string_value(context.get("design_snapshot_sha256"));
@@ -342,7 +425,10 @@ fn validate_scenario_pairing(
         let evaluation_sha = string_value(context.get("evaluation_plan_sha256"));
         let registry_sha = string_value(context.get("metric_registry_sha256"));
         let scope = string_value(context.get("scope"));
-        let seed = context.get("seed").and_then(Value::as_u64).unwrap_or(u64::MAX);
+        let seed = context
+            .get("seed")
+            .and_then(Value::as_u64)
+            .unwrap_or(u64::MAX);
         let model_id = string_value(run.get("model_id"));
         let model_version = string_value(run.get("model_version"));
 
@@ -351,12 +437,15 @@ fn validate_scenario_pairing(
             errors.push(format!("{path}.pairing_context.metric_registry_sha256: must match the review's pinned metric registry"));
         }
         if scope != baseline_scope {
-            errors.push(format!("{path}.pairing_context.scope: must match the baseline design scope"));
+            errors.push(format!(
+                "{path}.pairing_context.scope: must match the baseline design scope"
+            ));
         }
 
-        match alternatives.iter().find(|alternative| {
-            string_value(alternative.get("alternative_id")) == alternative_id
-        }) {
+        match alternatives
+            .iter()
+            .find(|alternative| string_value(alternative.get("alternative_id")) == alternative_id)
+        {
             Some(alternative) => {
                 if string_value(alternative.get("snapshot_sha256")) != design_sha {
                     errors.push(format!("{path}.pairing_context.design_snapshot_sha256: does not match the exact alternative snapshot"));
@@ -365,7 +454,9 @@ fn validate_scenario_pairing(
                     errors.push(format!("{path}.pairing_context.scope: does not match the referenced alternative scope"));
                 }
             }
-            None => errors.push(format!("{path}.pairing_context.alternative_id: unknown alternative")),
+            None => errors.push(format!(
+                "{path}.pairing_context.alternative_id: unknown alternative"
+            )),
         }
 
         let context_tuple = (
@@ -408,14 +499,19 @@ fn validate_scenario_pairing(
             .collect();
         if runs.len() != alternatives.len()
             || seen_alternatives.len() != alternatives.len()
-            || !expected_ids.iter().all(|id| seen_alternatives.contains(*id))
+            || !expected_ids
+                .iter()
+                .all(|id| seen_alternatives.contains(*id))
         {
             errors.push(
                 "$.inputs.scenario_runs: qualified comparison requires one qualified run per exact alternative"
                     .to_string(),
             );
         }
-        if runs.iter().any(|run| string_value(run.get("status")) != "qualified") {
+        if runs
+            .iter()
+            .any(|run| string_value(run.get("status")) != "qualified")
+        {
             errors.push(
                 "$.inputs.scenario_runs: qualified comparison cannot include blocked or conflicted runs"
                     .to_string(),
@@ -441,7 +537,9 @@ fn validate_alternatives(
         let path = format!("$.alternatives[{index}]");
         let id = string_value(alternative.get("alternative_id"));
         if id.is_empty() || !ids.insert(id.to_string()) {
-            errors.push(format!("{path}.alternative_id: missing or duplicate alternative ID"));
+            errors.push(format!(
+                "{path}.alternative_id: missing or duplicate alternative ID"
+            ));
         }
         require_sha256(alternative, "snapshot_sha256", &path, errors);
         require_nonblank(alternative, "change_summary", &path, errors);
@@ -454,7 +552,9 @@ fn validate_alternatives(
         }
         let geometry_status = string_value(alternative.get("geometry_status"));
         if !VALID_GEOMETRY_STATUS.contains(&geometry_status) {
-            errors.push(format!("{path}.geometry_status: unsupported geometry status"));
+            errors.push(format!(
+                "{path}.geometry_status: unsupported geometry status"
+            ));
         }
         if baseline_geometry_status == "synthetic-benchmark"
             && geometry_status != "synthetic-benchmark"
@@ -486,7 +586,14 @@ fn validate_candidate_sources(value: Option<&Value>, errors: &mut Vec<String>) {
             require_nonblank(source, field, &path, errors);
         }
         let state = string_value(source.get("catalog_state"));
-        if !matches!(state, "not-ingested" | "ingested-unqualified" | "qualified" | "unavailable" | "license-review-required") {
+        if !matches!(
+            state,
+            "not-ingested"
+                | "ingested-unqualified"
+                | "qualified"
+                | "unavailable"
+                | "license-review-required"
+        ) {
             errors.push(format!("{path}.catalog_state: unsupported catalog state"));
         }
         if state == "not-ingested" && source.get("source_sha256").is_some() {
@@ -513,45 +620,78 @@ fn validate_metric(
     }
     if status == "computed" {
         if baseline_geometry_status == "synthetic-benchmark" {
-            errors.push(format!("{path}: synthetic baseline cannot produce a computed impact metric"));
+            errors.push(format!(
+                "{path}: synthetic baseline cannot produce a computed impact metric"
+            ));
         }
         if source_catalog_status == SOURCE_CATALOG_STATUS_METADATA_ONLY {
-            errors.push(format!("{path}: metadata-only source catalog cannot support computed metric results"));
+            errors.push(format!(
+                "{path}: metadata-only source catalog cannot support computed metric results"
+            ));
         }
         if !metric.get("value").is_some_and(Value::is_number) {
-            errors.push(format!("{path}.value: computed metric requires a numeric value"));
+            errors.push(format!(
+                "{path}.value: computed metric requires a numeric value"
+            ));
         }
         for field in ["unit", "evidence_class", "method_ref"] {
             require_nonblank(metric, field, &path, errors);
         }
-        if !metric.get("input_sha256").and_then(Value::as_array).is_some_and(|values| {
-            !values.is_empty() && values.iter().all(|value| value.as_str().is_some_and(is_sha256))
-        }) {
-            errors.push(format!("{path}.input_sha256: computed result requires 64-hex input digests"));
+        if !metric
+            .get("input_sha256")
+            .and_then(Value::as_array)
+            .is_some_and(|values| {
+                !values.is_empty()
+                    && values
+                        .iter()
+                        .all(|value| value.as_str().is_some_and(is_sha256))
+            })
+        {
+            errors.push(format!(
+                "{path}.input_sha256: computed result requires 64-hex input digests"
+            ));
         }
         let uncertainty = metric.get("uncertainty");
         if !uncertainty.is_some_and(Value::is_object)
-            || !uncertainty.and_then(|item| item.get("description")).and_then(Value::as_str).is_some_and(|text| !text.trim().is_empty())
+            || !uncertainty
+                .and_then(|item| item.get("description"))
+                .and_then(Value::as_str)
+                .is_some_and(|text| !text.trim().is_empty())
         {
-            errors.push(format!("{path}.uncertainty: computed metric requires an uncertainty declaration"));
+            errors.push(format!(
+                "{path}.uncertainty: computed metric requires an uncertainty declaration"
+            ));
         }
-        if metric.get("reason").is_some() || metric.get("missing_inputs").is_some() || metric.get("conflicting_evidence_refs").is_some() {
-            errors.push(format!("{path}: computed status cannot carry blocked/conflict fields"));
+        if metric.get("reason").is_some()
+            || metric.get("missing_inputs").is_some()
+            || metric.get("conflicting_evidence_refs").is_some()
+        {
+            errors.push(format!(
+                "{path}: computed status cannot carry blocked/conflict fields"
+            ));
         }
     } else {
         if metric.get("value").is_some() {
-            errors.push(format!("{path}.value: blocked/conflicted/not-applicable metric must not carry a value"));
+            errors.push(format!(
+                "{path}.value: blocked/conflicted/not-applicable metric must not carry a value"
+            ));
         }
         match status {
             "blocked" => {
                 require_nonblank(metric, "reason", &path, errors);
                 if !nonempty_string_array(metric.get("missing_inputs")) {
-                    errors.push(format!("{path}.missing_inputs: blocked metric requires missing inputs"));
+                    errors.push(format!(
+                        "{path}.missing_inputs: blocked metric requires missing inputs"
+                    ));
                 }
             }
             "conflicted" => {
                 require_nonblank(metric, "reason", &path, errors);
-                if !metric.get("conflicting_evidence_refs").and_then(Value::as_array).is_some_and(|items| items.len() >= 2) {
+                if !metric
+                    .get("conflicting_evidence_refs")
+                    .and_then(Value::as_array)
+                    .is_some_and(|items| items.len() >= 2)
+                {
                     errors.push(format!("{path}.conflicting_evidence_refs: conflicted metric requires at least two evidence refs"));
                 }
             }
@@ -578,7 +718,9 @@ fn validate_pairwise_tradeoffs(
         let left = string_value(tradeoff.get("left_alternative_id"));
         let right = string_value(tradeoff.get("right_alternative_id"));
         if !alternatives.contains(left) || !alternatives.contains(right) || left == right {
-            errors.push(format!("{path}: both referenced alternatives must exist and differ"));
+            errors.push(format!(
+                "{path}: both referenced alternatives must exist and differ"
+            ));
         }
         for field in ["dimension", "summary"] {
             require_nonblank(tradeoff, field, &path, errors);
@@ -597,7 +739,10 @@ fn validate_replay(value: Option<&Value>, errors: &mut Vec<String>) {
     require_sha256(replay, "ruleset_sha256", "$.replay", errors);
     require_sha256(replay, "normalized_inputs_sha256", "$.replay", errors);
     let replay_class = string_value(replay.get("replay_class"));
-    if !matches!(replay_class, "deterministic-structural-review" | "deterministic-model-replay" | "not-established") {
+    if !matches!(
+        replay_class,
+        "deterministic-structural-review" | "deterministic-model-replay" | "not-established"
+    ) {
         errors.push("$.replay.replay_class: unsupported replay classification".to_string());
     }
 }
@@ -630,7 +775,11 @@ fn require_bool(object: &Value, key: &str, expected: bool, path: &str, errors: &
 }
 
 fn require_nonblank(object: &Value, key: &str, path: &str, errors: &mut Vec<String>) {
-    if !object.get(key).and_then(Value::as_str).is_some_and(|value| !value.trim().is_empty()) {
+    if !object
+        .get(key)
+        .and_then(Value::as_str)
+        .is_some_and(|value| !value.trim().is_empty())
+    {
         errors.push(format!("{path}.{key}: required non-empty string"));
     }
 }
@@ -638,13 +787,18 @@ fn require_nonblank(object: &Value, key: &str, path: &str, errors: &mut Vec<Stri
 fn require_sha256(object: &Value, key: &str, path: &str, errors: &mut Vec<String>) -> String {
     let value = object.get(key).and_then(Value::as_str).unwrap_or("");
     if !is_sha256(value) {
-        errors.push(format!("{path}.{key}: expected 64 lowercase hexadecimal characters"));
+        errors.push(format!(
+            "{path}.{key}: expected 64 lowercase hexadecimal characters"
+        ));
     }
     value.to_string()
 }
 
 fn is_sha256(value: &str) -> bool {
-    value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
 fn string_value(value: Option<&Value>) -> &str {
@@ -654,7 +808,9 @@ fn string_value(value: Option<&Value>) -> &str {
 fn nonempty_string_array(value: Option<&Value>) -> bool {
     value.and_then(Value::as_array).is_some_and(|values| {
         !values.is_empty()
-            && values.iter().all(|item| item.as_str().is_some_and(|text| !text.trim().is_empty()))
+            && values
+                .iter()
+                .all(|item| item.as_str().is_some_and(|text| !text.trim().is_empty()))
     })
 }
 
@@ -664,8 +820,10 @@ mod tests {
     use serde_json::json;
 
     fn fixture() -> Value {
-        serde_json::from_str(include_str!("../../../../fixtures/landscape/review-unranked-v0.json"))
-            .expect("canonical review fixture must be valid JSON")
+        serde_json::from_str(include_str!(
+            "../../../../fixtures/landscape/review-unranked-v0.json"
+        ))
+        .expect("canonical review fixture must be valid JSON")
     }
 
     #[test]
@@ -681,8 +839,16 @@ mod tests {
         review["recommendation"]["tradeoffs"] = json!(["tradeoff"]);
         review["recommendation"]["confidence"] = json!("low");
         let errors = validate_review(&review).unwrap_err();
-        assert!(errors.iter().any(|error| error.contains("requires no-ranking recommendation")));
-        assert!(errors.iter().any(|error| error.contains("requires qualified-comparison")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("requires no-ranking recommendation"))
+        );
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("requires qualified-comparison"))
+        );
     }
 
     #[test]
