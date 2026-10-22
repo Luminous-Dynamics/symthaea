@@ -1155,7 +1155,8 @@ impl LiquidMambaGenerator {
 
         for &target_id in target_ids {
             // Forward through teacher token to get next state/logits
-            let (_logits, hidden) = self.mamba.forward_with_state(prev_token)?;
+            let (logits, hidden) = self.mamba.forward_with_state(prev_token)?;
+            total_loss += crate::evaluation::cross_entropy_loss(&logits, target_id as usize);
             intermediate_states.push(hidden);
 
             // Improvement B: Gradient Rotation. We only compute full E2E gradients
@@ -1197,7 +1198,6 @@ impl LiquidMambaGenerator {
             }
 
             prev_token = target_id;
-            total_loss += 1.0; // Placeholder until real loss is extracted
         }
 
         self.generation_count += 1;
