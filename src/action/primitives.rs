@@ -16,7 +16,9 @@
 //! The system integrates backward-compatibly with the existing `ActionRegistry`
 //! and `ActionIR` — primitives lower to `ActionIR` for execution by `SimpleExecutor`.
 
-use super::{ActionIR, DestructivenessLevel, RiskTier};
+use super::{
+    executor_command_requires_governed_authority, ActionIR, DestructivenessLevel, RiskTier,
+};
 use std::collections::BTreeMap;
 use std::fmt;
 use std::path::PathBuf;
@@ -1004,6 +1006,12 @@ impl MoleculeExecutor {
                 working_dir,
                 env,
             } => {
+                if executor_command_requires_governed_authority(program, args) {
+                    return Err(MoleculeError::PlanRejected(format!(
+                        "authority-sensitive command {} requires governed typed execution",
+                        program
+                    )));
+                }
                 let mut cmd = std::process::Command::new(program);
                 cmd.args(args);
                 if let Some(dir) = working_dir {
@@ -1881,6 +1889,29 @@ mod tests {
             .recover(|_| Molecule::atom(Atom::Noop));
         let result = exec.execute(&mol);
         assert!(result.is_ok()); // recovery should succeed with Noop
+    }
+
+    #[test]
+    fn test_executor_real_exec_blocks_governed_authority_commands() {
+        let mut exec = MoleculeExecutor::new(1.0, 100.0, true);
+        for (program, args) in [
+            ("systemctl", vec!["restart".into(), "sshd.service".into()]),
+            ("nix", vec!["profile".into(), "install".into(), "nixpkgs#hello".into()]),
+            ("env", vec!["systemctl".into(), "restart".into(), "sshd.service".into()]),
+        ] {
+            let result = exec.execute(&Molecule::atom(Atom::Exec {
+                program: program.into(),
+                args,
+                working_dir: None,
+                env: BTreeMap::new(),
+            }));
+            match result {
+                Err(MoleculeError::PlanRejected(message)) => {
+                    assert!(message.contains("requires governed typed execution"));
+                }
+                other => panic!("expected fail-closed authority rejection, got {:?}", other),
+            }
+        }
     }
 
     #[test]
