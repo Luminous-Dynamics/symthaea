@@ -173,6 +173,7 @@ impl AgentResult {
                         "tier": attempt.tier.to_string(),
                         "backend_name": attempt.backend_name,
                         "success": attempt.success,
+                        "verification_passed": attempt.verification_passed,
                         "elapsed_ms": attempt.elapsed_ms,
                         "estimated_energy_cost": attempt.estimated_energy_cost
                     })
