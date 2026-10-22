@@ -38,7 +38,11 @@ fn main() -> ExitCode {
             return ExitCode::from(70);
         }
     }
-    if report["valid"].as_bool() == Some(true) { ExitCode::SUCCESS } else { ExitCode::from(2) }
+    if report["valid"].as_bool() == Some(true) {
+        ExitCode::SUCCESS
+    } else {
+        ExitCode::from(2)
+    }
 }
 
 fn validate_bytes(bytes: &[u8]) -> serde_json::Value {
@@ -91,7 +95,12 @@ mod tests {
         let report = validate_bytes(b"{invalid json");
         assert_eq!(report["valid"], false);
         assert_eq!(report["input_sha256"].as_str().unwrap().len(), 64);
-        assert!(report["errors"][0].as_str().unwrap().contains("invalid JSON"));
+        assert!(
+            report["errors"][0]
+                .as_str()
+                .unwrap()
+                .contains("invalid JSON")
+        );
     }
 
     #[test]
@@ -99,10 +108,14 @@ mod tests {
         let bytes = vec![b' '; MAX_INPUT_BYTES + 1];
         let report = validate_bytes(&bytes);
         assert_eq!(report["valid"], false);
-        assert!(report["errors"][0].as_str().unwrap().contains("exceeds maximum"));
+        assert!(
+            report["errors"][0]
+                .as_str()
+                .unwrap()
+                .contains("exceeds maximum")
+        );
     }
 }
-
 
 #[cfg(test)]
 mod schema_tests {
