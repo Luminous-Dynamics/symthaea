@@ -206,11 +206,13 @@
       "expected": {
         "outcome": "evaluate",
         "violation_codes": [
-          "render_without_active_session"
+          "invalid_bundle_verification",
+          "render_without_active_session",
+          "render_without_verified_bundle"
         ]
       },
       "evidence_status": "unit_test_added",
-      "note": "Implemented in rendering_outside_active_session_is_rejected.",
+      "note": "Removing session start prevents bundle verification and rendering; the checker records all three ordered consequences. Exact-head validation pending.",
       "test_name": "rendering_outside_active_session_is_rejected",
       "operator_id": "remove_session_start",
       "execution_target": "rust_matrix_runner"
