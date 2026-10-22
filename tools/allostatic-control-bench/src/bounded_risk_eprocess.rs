@@ -75,9 +75,14 @@ impl BoundedRiskEProcess {
         self.simultaneous_monitors
     }
 
-    /// Per-monitor threshold after a Bonferroni allocation of the global delta.
-    pub fn alarm_threshold(self) -> f64 {
-        (self.simultaneous_monitors as f64 / self.total_delta).ln()
+    /// E-value threshold after Bonferroni allocation of the global delta.
+    pub fn e_value_alarm_threshold(self) -> f64 {
+        self.simultaneous_monitors as f64 / self.total_delta
+    }
+
+    /// Log of the E-value threshold, used for stable comparisons in log space.
+    pub fn log_alarm_threshold(self) -> f64 {
+        self.e_value_alarm_threshold().ln()
     }
 
     pub const fn log_e_value(self) -> f64 {
@@ -115,7 +120,7 @@ impl BoundedRiskEProcess {
         }
 
         self.log_e_value = next_log_value;
-        self.alarmed |= self.log_e_value >= self.alarm_threshold();
+        self.alarmed |= self.log_e_value >= self.log_alarm_threshold();
         Some(self.alarmed)
     }
 
@@ -394,7 +399,7 @@ mod tests {
     #[test]
     fn allocates_global_delta_across_parallel_monitors() {
         let process = BoundedRiskEProcess::new(0.2, 2.0, 0.05, 5).expect("valid process");
-        assert!((process.alarm_threshold().exp() - 100.0).abs() < 1e-10);
+        assert!((process.e_value_alarm_threshold() - 100.0).abs() < 1e-10);
         assert_eq!(process.simultaneous_monitors(), 5);
         assert_eq!(process.total_delta(), 0.05);
     }
@@ -421,7 +426,7 @@ mod tests {
             }
         }
         assert!(first_alarm.is_some());
-        assert!(process.log_e_value() >= process.alarm_threshold());
+        assert!(process.log_e_value() >= process.log_alarm_threshold());
         assert!(process.alarmed());
     }
 
