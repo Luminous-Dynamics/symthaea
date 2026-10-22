@@ -209,6 +209,10 @@ These are proposed gates, not achieved results.
 | Metric | Target | Evidence |
 |---|---:|---|
 | Historical key recovery under claimed FS | 0 | Recorded transcript cannot reconstruct prior traffic keys after long-term compromise under the defined threat model |
+| Stub backend accepted as cryptography | 0 | All-zero compile stub never returns a KEM public key, candidate or active session; production builds must select an audited backend |
+| FIPS 203 ML-KEM known-answer vectors | 100% | Official KATs run against the exact locked implementation/provider |
+| Independent KEM interoperability | 100% | Encapsulation/decapsulation vectors agree across two independent implementations |
+| Feature-graph downgrade cases | 100% rejected | PQC-enabled feature combinations cannot select a `LocalTrust` stub or silently skip required key agreement |
 | Identity/key binding | 100% of negative cases rejected | Mismatched peer ID, public key and transcript tests fail closed |
 | X25519 contributory behavior | 100% of known low-order inputs rejected | All-zero/low-order test vectors return an error and insert no traffic keys |
 | Transcript binding | 100% of single-field mutations rejected | Independent implementation/test vectors |
