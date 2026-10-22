@@ -22,5 +22,6 @@ python-bindings = []
 qasm-export = []
 
 [dependencies]
+sha2.workspace = true
 
 [dev-dependencies]
