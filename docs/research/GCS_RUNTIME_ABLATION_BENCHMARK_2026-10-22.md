@@ -12,7 +12,8 @@ This is a pilot instrument, not an SOTA claim. It starts with eight small determ
 - **Order control:** treatment order alternates by task index plus repeat (`off_then_on` / `on_then_off`) to reduce simple order effects.
 - **Oracle preflight:** every task must have at least one declared `#[test]` function; a hand-written reference must pass all expected tests, and an empty patch must fail before agent trials begin. A failed control aborts the run.
 - **Fail-closed scoring:** success requires real execution, successful compilation, no runtime/test-runner error, exactly the expected number of observed test functions, all expected tests passing, and zero failures. Missing code or an incomplete oracle execution is not success.
-- **Reproducible receipt:** the JSON includes source revision (when `GIT_COMMIT_SHA` is supplied), model mode, BLAKE3 task-manifest digest, per-task reference/test digests, generated-source digests, repeat/order, expected/observed test counts, completion status, pass result, runtime, iterations, and energy.
+- **Source-bound execution:** before oracle controls or agent trials, the producer requires `GIT_COMMIT_SHA` to be a full 40-character SHA matching `git rev-parse HEAD`, and requires a clean working tree. It refuses to create an unauditable receipt from a dirty or ambiguous checkout.
+- **Reproducible receipt:** the JSON includes the resolved source revision, model mode, BLAKE3 task-manifest digest, per-task reference/test digests, generated-source digests, repeat/order, expected/observed test counts, completion status, pass result, runtime, iterations, and energy.
 - **Separate outcomes:** compilation rate, complete-oracle rate, behavioral success rate, per-task paired wins/losses, and time/energy are reported independently.
 
 ## Run
