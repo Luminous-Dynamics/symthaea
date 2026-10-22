@@ -120,6 +120,8 @@ struct OracleEvidenceSummary {
     case_assignment_randomized: bool,
     case_authors_excluded_from_adjudication: bool,
     conflicts_disclosed: bool,
+    initial_label_pairwise_agreement_rate: f64,
+    initial_label_unanimous_case_rate: f64,
     completed_at: Option<String>,
 }
 
@@ -261,6 +263,8 @@ fn audit(ledger: &Ledger, expected_ids: &[String], ledger_bytes: &[u8]) -> Resul
     let mut indeterminate_count = 0usize;
     let mut unresolved_count = 0usize;
     let mut critical_reviewed = 0usize;
+    let mut initial_pairwise_agreement_rates = Vec::new();
+    let mut initial_unanimous_cases = 0usize;
     let mut all_blinded = true;
     let mut all_reviewed_twice = true;
 
@@ -331,6 +335,22 @@ fn audit(ledger: &Ledger, expected_ids: &[String], ledger_bytes: &[u8]) -> Resul
         );
         reviewed_count += 1;
         all_reviewed_twice &= initial_reviewers.len() >= 2;
+        if initial_dispositions.len() == 1 {
+            initial_unanimous_cases += 1;
+        }
+        let judgments = &case.initial_judgments;
+        let mut pair_count = 0usize;
+        let mut agreeing_pairs = 0usize;
+        for left in 0..judgments.len() {
+            for right in (left + 1)..judgments.len() {
+                pair_count += 1;
+                if judgments[left].disposition == judgments[right].disposition {
+                    agreeing_pairs += 1;
+                }
+            }
+        }
+        ensure!(pair_count > 0, "case {} has no initial-review pairs", case.case_id);
+        initial_pairwise_agreement_rates.push(agreeing_pairs as f64 / pair_count as f64);
 
         let adjudication = &case.adjudication;
         ensure!(
@@ -472,6 +492,9 @@ fn audit(ledger: &Ledger, expected_ids: &[String], ledger_bytes: &[u8]) -> Resul
         case_assignment_randomized: true,
         case_authors_excluded_from_adjudication: true,
         conflicts_disclosed: true,
+        initial_label_pairwise_agreement_rate: initial_pairwise_agreement_rates.iter().sum::<f64>()
+            / initial_pairwise_agreement_rates.len() as f64,
+        initial_label_unanimous_case_rate: initial_unanimous_cases as f64 / expected.len() as f64,
         completed_at: ledger.completed_at.clone(),
     })
 }
@@ -618,6 +641,8 @@ mod tests {
         assert_eq!(result.status, "COMPLETE");
         assert_eq!(result.expected_case_count, 2);
         assert_eq!(result.critical_cases_reviewed, 1);
+        assert_eq!(result.initial_label_pairwise_agreement_rate, 1.0);
+        assert_eq!(result.initial_label_unanimous_case_rate, 1.0);
         assert_eq!(result.ledger_sha256, sha256_hex(&bytes));
     }
 
@@ -648,4 +673,20 @@ mod tests {
         ids.pop();
         assert!(audit(&ledger, &ids, &bytes).is_err());
     }
+
+    #[test]
+    fn resolved_disagreement_is_preserved_in_reliability_metrics() {
+        let (mut ledger, ids, bytes) = fixture();
+        ledger.cases[0].initial_judgments[1].disposition = "ASK_CLARIFICATION".to_string();
+        ledger.cases[0].adjudication.status = "REVISED".to_string();
+        ledger.cases[0].adjudication.final_disposition = Some("HONOR_EXIT".to_string());
+        ledger.cases[0].adjudication.adjudicator_id = Some("REV-C".to_string());
+        ledger.cases[0].adjudication.rationale = "Third reviewer adjudicated the disagreement.".to_string();
+
+        let result = audit(&ledger, &ids, &bytes).expect("independently resolved disagreement");
+        assert_eq!(result.initial_label_pairwise_agreement_rate, 0.5);
+        assert_eq!(result.initial_label_unanimous_case_rate, 0.5);
+        assert_eq!(result.status, "COMPLETE");
+    }
+
 }
