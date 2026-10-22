@@ -464,8 +464,7 @@ fn run_trial_with_selector(
                         .map(|(experiment, _)| experiment.clone())
                 }
                 ActiveSelector::ExpectedInformationGain => {
-                    let noise_std_dev =
-                        selection_noise_std_dev(&remaining, &live, &hypotheses);
+                    let noise_std_dev = selection_noise_std_dev(&remaining, &live, &hypotheses);
                     select_experiment_by_information_gain_per_cost(
                         &remaining,
                         &live,
@@ -637,11 +636,11 @@ mod tests {
                 ROUND_BUDGET,
                 ActiveSelector::ExpectedInformationGain,
             );
-            raw_successes += usize::from(raw.success);
-            eig_successes += usize::from(eig.success);
+            raw_successes += if raw.success { 1 } else { 0 };
+            eig_successes += if eig.success { 1 } else { 0 };
             raw_rounds += raw.rounds_used;
             eig_rounds += eig.rounds_used;
-            eig_selection_failures += usize::from(eig.selection_failed);
+            eig_selection_failures += if eig.selection_failed { 1 } else { 0 };
             match (raw.success, eig.success) {
                 (true, false) => raw_only_wins += 1,
                 (false, true) => eig_only_wins += 1,
