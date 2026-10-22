@@ -260,7 +260,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             let mut all_scores_below_pointwise = true;
             let mut episode_rows = Vec::with_capacity(HORIZON);
             let expected_seed = 50_000 + episode as u64;
-            let mut episode_loss_sum = 0.0_f64;
 
             for (step, index) in episode_indices.iter().copied().enumerate() {
                 let row = &rows[index];
@@ -282,7 +281,6 @@ fn main() -> Result<(), Box<dyn Error>> {
                 })?;
                 let persistent_log_e_value = persistent.log_e_value();
                 stream_loss_sum += bounded_loss;
-                episode_loss_sum += bounded_loss;
                 stream_max_log_e = stream_max_log_e.max(persistent_log_e_value);
 
                 if persistent_alarm && first_persistent_alarm.is_none() {
@@ -325,7 +323,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
 
             for index in episode_rows {
-                output_rows[index][20] = optional_usize(first_persistent_alarm);
+                output_rows[index][19] = optional_usize(first_persistent_alarm);
                 output_rows[index][26] = first_reset_alarm_step.to_string();
             }
 
@@ -348,7 +346,6 @@ fn main() -> Result<(), Box<dyn Error>> {
                     * (episode as f64 + 1.0)
                     * (episode as f64 + 2.0));
             summary.reset_alpha_final_log_e_values.push(reset_alpha.log_e_value());
-            let _ = episode_loss_sum;
         }
 
         summary.persistent_final_log_e_value = persistent.log_e_value();
