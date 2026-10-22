@@ -107,8 +107,9 @@ fn sealed_tote_gripper_envelope(catalog: &Value) -> Result<CSGNode, String> {
     let jaw_height = pad_height
         + nominal_parameter(catalog, ID, "jaw_height_margin")?;
     let pad_center_x = opening / 2.0 + pad_thickness / 2.0;
-    let jaw_center_x = opening / 2.0 + pad_thickness + jaw_thickness / 2.0
-        - nominal_parameter(catalog, ID, "bridge_to_jaw_overlap")? / 2.0;
+    let jaw_pad_overlap = nominal_parameter(catalog, ID, "jaw_pad_overlap")?;
+    let jaw_center_x =
+        opening / 2.0 + pad_thickness + jaw_thickness / 2.0 - jaw_pad_overlap;
     let bridge_length = 2.0 * (jaw_center_x + jaw_thickness / 2.0 + bridge_margin);
     let jaw_bottom = jaw_center_z - jaw_height / 2.0;
     let bridge_center_z = jaw_bottom + vertical_overlap - bridge_thickness / 2.0;
