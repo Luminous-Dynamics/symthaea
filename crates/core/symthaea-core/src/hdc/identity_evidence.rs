@@ -100,6 +100,7 @@ pub struct ObservationIdentityEvidence {
     registry_instance: Arc<RegistryInstanceToken>,
     enrollment_token: Arc<EnrollmentToken>,
     identity_id: String,
+    observation_id: String,
     observation_digest: [u8; 32],
     source_id: String,
 }
@@ -111,9 +112,14 @@ impl ObservationIdentityEvidence {
     /// perform cryptographic authentication itself.
     pub fn from_authenticated_source(
         receipt: &RegistrationReceipt,
+        observation_id: impl Into<String>,
         observed: &PatternVector,
         source_id: impl Into<String>,
     ) -> Result<Self, IdentityEvidenceError> {
+        let observation_id = observation_id.into();
+        if observation_id.trim().is_empty() {
+            return Err(IdentityEvidenceError::EmptyObservationId);
+        }
         let source_id = source_id.into();
         if source_id.trim().is_empty() {
             return Err(IdentityEvidenceError::EmptyEvidenceSource);
@@ -123,9 +129,14 @@ impl ObservationIdentityEvidence {
             registry_instance: Arc::clone(&receipt.registry_instance),
             enrollment_token: Arc::clone(&receipt.enrollment_token),
             identity_id: receipt.identity_id.clone(),
+            observation_id,
             observation_digest: observation_digest(observed),
             source_id,
         })
+    }
+
+    pub fn observation_id(&self) -> &str {
+        &self.observation_id
     }
 
     pub fn source_id(&self) -> &str {
@@ -212,6 +223,7 @@ pub enum IdentityEvidenceError {
     EmptyRegistry,
     InvalidReceipt,
     InvalidObservationEvidence,
+    EmptyObservationId,
     EmptyEvidenceSource,
     RevisionOverflow,
     InvalidPolicy(&'static str),
@@ -229,6 +241,7 @@ impl fmt::Display for IdentityEvidenceError {
             Self::InvalidObservationEvidence => {
                 write!(f, "observation identity evidence is invalid for this query or enrollment")
             }
+            Self::EmptyObservationId => write!(f, "observation id must not be empty"),
             Self::EmptyEvidenceSource => write!(f, "evidence source id must not be empty"),
             Self::RevisionOverflow => write!(f, "registry revision overflow"),
             Self::InvalidPolicy(message) => write!(f, "invalid resolution policy: {message}"),
@@ -426,11 +439,14 @@ impl PatternRegistry {
     pub fn resolve_with_observation_evidence(
         &self,
         query: &PatternVector,
+        observation_id: &str,
         receipt: &RegistrationReceipt,
         evidence: &ObservationIdentityEvidence,
         policy: ResolutionPolicy,
     ) -> Result<IdentityResolution, IdentityEvidenceError> {
-        if evidence.registry_id != self.registry_id
+        if observation_id.trim().is_empty()
+            || evidence.observation_id != observation_id
+            || evidence.registry_id != self.registry_id
             || !Arc::ptr_eq(&evidence.registry_instance, &self.registry_instance)
             || evidence.identity_id != receipt.identity_id
             || evidence.registry_id != receipt.registry_id
@@ -546,6 +562,7 @@ mod tests {
             .expect("registration consistency");
         let observation_evidence = ObservationIdentityEvidence::from_authenticated_source(
             &receipt,
+            "capture-object-29-0",
             &pattern,
             "test-identity-authority",
         )
@@ -553,6 +570,7 @@ mod tests {
         let with_observation_evidence = registry
             .resolve_with_observation_evidence(
                 &pattern,
+                "capture-object-29-0",
                 &receipt,
                 &observation_evidence,
                 policy(),
@@ -588,6 +606,7 @@ mod tests {
             .expect("enrollment");
         let evidence = ObservationIdentityEvidence::from_authenticated_source(
             &receipt,
+            "capture-original",
             &pattern,
             "test-identity-authority",
         )
@@ -596,6 +615,35 @@ mod tests {
         assert_eq!(
             registry.resolve_with_observation_evidence(
                 &other_query,
+                "capture-original",
+                &receipt,
+                &evidence,
+                policy(),
+            ),
+            Err(IdentityEvidenceError::InvalidObservationEvidence)
+        );
+    }
+
+    #[test]
+    fn observation_identity_evidence_cannot_replay_across_identical_vectors_in_distinct_captures() {
+        let pattern = PatternVector::seeded_random(1_024, 47).expect("pattern");
+        let mut registry = PatternRegistry::new("registry-a").expect("registry");
+        let receipt = registry
+            .register("object-47", pattern.clone())
+            .expect("enrollment");
+        let evidence = ObservationIdentityEvidence::from_authenticated_source(
+            &receipt,
+            "capture-instance-A",
+            &pattern,
+            "test-identity-authority",
+        )
+        .expect("source assertion");
+
+        // The pattern bytes are identical; only the unique capture identity differs.
+        assert_eq!(
+            registry.resolve_with_observation_evidence(
+                &pattern,
+                "capture-instance-B",
                 &receipt,
                 &evidence,
                 policy(),
@@ -612,7 +660,12 @@ mod tests {
             .register("object-43", pattern.clone())
             .expect("enrollment");
         assert_eq!(
-            ObservationIdentityEvidence::from_authenticated_source(&receipt, &pattern, "  ")
+            ObservationIdentityEvidence::from_authenticated_source(
+                &receipt,
+                "capture-43",
+                &pattern,
+                "  ",
+            )
                 .err(),
             Some(IdentityEvidenceError::EmptyEvidenceSource)
         );
