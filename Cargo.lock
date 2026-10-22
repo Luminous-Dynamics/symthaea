@@ -19534,6 +19534,10 @@ name = "symthaea-organic-chemistry"
 version = "0.1.0"
 
 [[package]]
+name = "symthaea-owl"
+version = "0.1.0"
+
+[[package]]
 name = "symthaea-particle-physics"
 version = "0.1.0"
 dependencies = [
