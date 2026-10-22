@@ -113,7 +113,7 @@ impl AuthenticatedProof {
     /// legacy transcript; legacy signatures must not be silently reinterpreted
     /// as v2 signatures.
     pub fn construct_signed_message(&self) -> Vec<u8> {
-        const TRANSCRIPT_DOMAIN: &[u8] = b"MYCELIX-AUTHENTICATED-PROOF\\0v2";
+        const TRANSCRIPT_DOMAIN: &[u8] = b"MYCELIX-AUTHENTICATED-PROOF/v2";
 
         let mut hasher = Sha256::new();
         hasher.update(TRANSCRIPT_DOMAIN);
