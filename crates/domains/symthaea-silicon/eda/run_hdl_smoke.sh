@@ -18,7 +18,7 @@ rtl="${silicon_dir}/rtl/hdc_bind_xor.sv"
 testbench="${silicon_dir}/rtl/tb_hdc_bind_xor.sv"
 stamp="$(date -u +%Y%m%dT%H%M%SZ 2>/dev/null || printf 'timestamp-unavailable')"
 out_root="${HDL_OUT_DIR:-${repo_root}/target/hdl-qualification/hdc-bind-xor}"
-out_dir="${out_root}/${stamp}"
+out_dir="${out_root}/${stamp}-$"
 mkdir -p "${out_dir}" || { printf 'cannot create output directory: %s\n' "${out_dir}" >&2; exit 2; }
 
 missing=()
