@@ -85,13 +85,16 @@ struct ArmSummary {
 #[derive(Debug, Clone, Serialize, PartialEq)]
 struct GateReport {
     physical_measurement_eligible: bool,
+    /// The analyzer consumes metadata only; it does not authenticate receipts or meter records.
+    evidence_receipt_verified: bool,
     energy_gate_evaluable: bool,
     energy_gate_pass: bool,
     utility_gate_pass: bool,
     p95_latency_gate_pass: bool,
     severe_thermal_gate_pass: bool,
     privacy_gate_pass: bool,
-    qualified_pass: bool,
+    /// All declared gates passed; this is not authenticated physical qualification.
+    declared_gates_pass: bool,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
@@ -488,7 +491,7 @@ fn analyze(
     let p95_latency_gate_pass = latency_regression <= MAX_P95_LATENCY_REGRESSION;
     let severe_thermal_gate_pass = thermal_difference <= 0.0;
     let privacy_gate_pass = privacy_violations_total == 0;
-    let qualified_pass = !exploratory
+    let declared_gates_pass = !exploratory
         && energy_gate_evaluable
         && energy_gate_pass
         && utility_gate_pass
@@ -531,13 +534,14 @@ fn analyze(
         privacy_violations_total,
         gates: GateReport {
             physical_measurement_eligible,
+            evidence_receipt_verified: false,
             energy_gate_evaluable,
             energy_gate_pass,
             utility_gate_pass,
             p95_latency_gate_pass,
             severe_thermal_gate_pass,
             privacy_gate_pass,
-            qualified_pass,
+            declared_gates_pass,
         },
     })
 }
@@ -554,7 +558,7 @@ USAGE:
 OPTIONS:
   --bootstrap-reps N  Bootstrap replicates (default: 10000; minimum: 100)
   --seed N            Deterministic bootstrap seed
-  --exploratory       Allow 2+ observations per scenario; qualified_pass is always false
+  --exploratory       Allow 2+ observations per scenario; declared_gates_pass is always false
   -h, --help          Print this help
 
 Standard qualification requires >=30 paired observations per scenario.
@@ -731,7 +735,7 @@ mod tests {
         let report = analyze(&experiment, 500, 3, false).unwrap();
         assert!(!report.gates.physical_measurement_eligible);
         assert!(!report.gates.energy_gate_evaluable);
-        assert!(!report.gates.qualified_pass);
+        assert!(!report.gates.declared_gates_pass);
     }
 
     #[test]
