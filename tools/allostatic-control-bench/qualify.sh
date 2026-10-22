@@ -558,7 +558,18 @@ if ! awk -F, '
     if ($10 + $8 != 300 || $11 + $9 != 300) failed = 1
     if ($16 != "NA" && ($16 !~ /^[0-9]*[.]?[0-9]+$/ || $16 < 0 || $16 > 36)) failed = 1
     if ($17 != "NA" && ($17 !~ /^[0-9]*[.]?[0-9]+$/ || $17 < 0 || $17 > 36)) failed = 1
-    if ($2 == "sensor_blind" && ($6 != $7 || $8 != $9)) failed = 1
+    if ($2 == "sensor_blind") {
+      blind_key = $1
+      if (!(blind_key in blind_pre_score)) {
+        blind_pre_score[blind_key] = $6
+        blind_pre_residual[blind_key] = $7
+        blind_post_score[blind_key] = $8
+        blind_post_residual[blind_key] = $9
+      } else if ($6 != blind_pre_score[blind_key] ||
+                 $7 != blind_pre_residual[blind_key] ||
+                 $8 != blind_post_score[blind_key] ||
+                 $9 != blind_post_residual[blind_key]) failed = 1
+    }
     key = $1 SUBSEP $2 SUBSEP $3 SUBSEP $4
     if (seen[key]++) failed = 1
     rows++
