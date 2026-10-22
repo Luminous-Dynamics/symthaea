@@ -317,6 +317,7 @@
         "confidence_interval_high",
         "confidence_level",
         "source_family_cluster_count",
+        "minimum_independent_clusters",
         "bootstrap_replicates",
         "bootstrap_seed",
         "candidate_improvement_supported",
@@ -386,6 +387,10 @@
             "none",
             "bonferroni"
           ]
+        },
+        "minimum_independent_clusters": {
+          "type": "integer",
+          "minimum": 20
         }
       }
     }
