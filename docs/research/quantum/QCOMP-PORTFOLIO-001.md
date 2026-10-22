@@ -47,6 +47,14 @@ The 2026 QOBLIB paper explicitly distinguishes application benchmarking (searchi
 
 These shifts are hypotheses for a useful engineering platform, not claims that a routing advantage has already been demonstrated.
 
+## MIS-specific frontier: quantum-informed reduction
+
+The portfolio benchmark must explicitly include **qReduMIS** as relevant prior art, not limit the comparison to QPU-versus-classical solver outputs. Schuetz et al.'s paper *Quantum-informed reduction algorithm for the maximum independent set problem* was published in Physical Review Research on 10 September 2026 (DOI: https://doi.org/10.1103/nh3b-1wv5). Its method uses quantum-device sample information to guide classical kernel reduction; the published experiments use up to 231 qubits on Rydberg hardware. The [official reference implementation](https://github.com/jpmorganchase/qReduMIS) is Apache-2.0.
+
+This workstream is now being tracked separately in [QCOMP-INFORMER-001 / issue #8320](https://github.com/Luminous-Dynamics/symthaea/issues/8320) and [its draft specification PR #8321](https://github.com/Luminous-Dynamics/symthaea/pull/8321). The key experiment is not to reimplement qReduMIS without need. It is to test the **incremental value of the informer** against a no-informer reducer, random choices, structural scores, local-search population frequencies, solver-ensemble signals, and signal-permutation controls under matched decision and total-cost budgets. Only a signal that improves downstream verified results after its complete acquisition cost is included has demonstrated practical value.
+
+QOBLIB's classical MIS references—including the published ParallelILS submission reaching best-known-or-better values across all 50 of its listed MIS instances—are essential context for any application-level claim. The tiny MIS exact solver in [PR #8296](https://github.com/Luminous-Dynamics/symthaea/pull/8296) remains a correctness oracle, not a competitive solver. Do not infer advantage from qubit counts, sample frequencies, smaller kernels, or an improvement over a weak baseline alone.
+
 ## 4. First experiment: a narrow, falsifiable pilot
 
 ### 4.1 Benchmark family
