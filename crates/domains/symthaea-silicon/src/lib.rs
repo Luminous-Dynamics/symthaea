@@ -192,7 +192,8 @@ mod tests {
 
     #[test]
     fn rtl_generation_is_explicitly_a_stub_not_synthesis() {
-        let artifact = SiliconArchitect.emit_rtl_stub("HDC XOR", target());
+        let silicon = SiliconArchitect;
+        let artifact = silicon.emit_rtl_stub("HDC XOR", target());
         assert!(artifact.verilog_source.contains("DESIGN-INTENT STUB ONLY"));
         assert!(artifact.verilog_source.contains("Placeholder only"));
         assert!(artifact.actual_ppa.is_none());
@@ -201,9 +202,10 @@ mod tests {
 
     #[test]
     fn target_assertions_do_not_create_actual_ppa_evidence() {
-        let artifact = SiliconArchitect.emit_rtl_stub("HDC XOR", target());
+        let silicon = SiliconArchitect;
+        let artifact = silicon.emit_rtl_stub("HDC XOR", target());
         let requirements =
-            SiliconArchitect.emit_timing_requirement_assertions(&artifact);
+            silicon.emit_timing_requirement_assertions(&artifact);
         assert!(requirements.iter().any(|value| value.contains("slack_ns")));
         assert!(requirements.iter().any(|value| value.contains("total_area_um2")));
         assert!(artifact.actual_ppa.is_none());
