@@ -1531,8 +1531,10 @@ mod tests {
         let mut invalid_precondition = valid.clone();
         invalid_precondition["prediction"]["precondition_checks"][0]["outcome"] =
             json!("probably-satisfied");
-        assert!(validate_outcome_contract(&invalid_precondition, "invalid precondition outcome")
-            .is_err());
+        assert!(
+            validate_outcome_contract(&invalid_precondition, "invalid precondition outcome")
+                .is_err()
+        );
 
         let mut extra_field = valid;
         extra_field["unregistered_authority"] = json!(true);
