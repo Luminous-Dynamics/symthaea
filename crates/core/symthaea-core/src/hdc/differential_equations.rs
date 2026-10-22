@@ -35,6 +35,10 @@ use serde::{Deserialize, Serialize};
 
 const DEFAULT_TOL: f64 = 1e-8;
 const MAX_STEPS: usize = 100_000;
+const MAX_DENSE_NEWTON_DIM: usize = 64;
+const MAX_IMPLICIT_RHS_EVALUATIONS: usize = 1_000_000;
+const MAX_IMPLICIT_NEWTON_WORK_UNITS: usize = 100_000_000;
+const MAX_NEWTON_ITERATIONS_PER_STEP: usize = 100;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -101,6 +105,220 @@ impl ODEResult {
     pub fn t_end(&self) -> f64 {
         *self.t_values.last().unwrap_or(&0.0)
     }
+}
+
+
+/// Diagnostics returned by the fallible dense backward-Euler solver.
+#[derive(Debug, Clone)]
+pub struct ImplicitEulerSolveReport {
+    /// Computed trajectory. All returned steps passed the nonlinear residual check.
+    pub trajectory: ODEResult,
+    /// Number of Newton corrections applied across all accepted steps.
+    pub newton_corrections: usize,
+    /// Number of right-hand-side evaluations, including finite-difference probes.
+    pub rhs_evaluations: usize,
+    /// Largest normalized nonlinear residual among accepted steps.
+    pub max_normalized_residual: f64,
+    /// Estimated dense linear-algebra work units (dimension cubed per correction).
+    pub estimated_dense_work_units: usize,
+}
+
+/// Typed reason a fallible backward-Euler solve could not satisfy its contract.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ImplicitEulerErrorKind {
+    EmptySystem,
+    DimensionMismatch { expected: usize, actual: usize },
+    InvalidTimeSpan,
+    InvalidStepCount { requested: usize, max_allowed: usize },
+    InvalidNewtonIterationBudget { requested: usize, max_allowed: usize },
+    SystemTooLargeForDenseNewton { dimension: usize, max_dimension: usize },
+    NonFiniteInitialState { index: usize },
+    NonFiniteIntermediateState { stage: &'static str, index: usize },
+    RhsDimensionMismatch { stage: &'static str, expected: usize, actual: usize },
+    NonFiniteRhs { stage: &'static str, index: usize },
+    RhsEvaluationBudgetExceeded { max_evaluations: usize },
+    NonFinitePredictor { index: usize },
+    NonFiniteResidual { index: usize },
+    NonFiniteJacobian { row: usize, column: usize },
+    SingularJacobian { column: usize, pivot_magnitude: f64 },
+    NonFiniteNewtonCorrection { index: usize },
+    NonFiniteLinearSolve { column: usize },
+    NewtonNonConvergence { iteration_limit: usize, residual_norm: f64 },
+    NewtonWorkBudgetExceeded { max_work_units: usize },
+}
+
+/// Failure receipt preserving the last accepted state rather than a failed trial.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ImplicitEulerError {
+    pub kind: ImplicitEulerErrorKind,
+    /// Time corresponding to last_state; failed step is not committed.
+    pub time: f64,
+    pub last_state: Vec<f64>,
+    pub steps_completed: usize,
+    /// One-based number of the step that failed; zero when validation failed.
+    pub failed_step: usize,
+    pub newton_corrections: usize,
+    pub rhs_evaluations: usize,
+    pub residual_norm: f64,
+}
+
+impl ImplicitEulerError {
+    fn new(
+        kind: ImplicitEulerErrorKind,
+        time: f64,
+        last_state: &[f64],
+        steps_completed: usize,
+        newton_corrections: usize,
+        rhs_evaluations: usize,
+        residual_norm: f64,
+    ) -> Self {
+        let validation_failure = matches!(
+            &kind,
+            ImplicitEulerErrorKind::EmptySystem
+                | ImplicitEulerErrorKind::DimensionMismatch { .. }
+                | ImplicitEulerErrorKind::InvalidStepCount { .. }
+                | ImplicitEulerErrorKind::InvalidNewtonIterationBudget { .. }
+                | ImplicitEulerErrorKind::SystemTooLargeForDenseNewton { .. }
+                | ImplicitEulerErrorKind::NonFiniteInitialState { .. }
+        ) || (matches!(&kind, ImplicitEulerErrorKind::InvalidTimeSpan)
+            && steps_completed == 0
+            && newton_corrections == 0
+            && rhs_evaluations == 0
+            && residual_norm == 0.0);
+        let failed_step = if validation_failure {
+            0
+        } else {
+            steps_completed + 1
+        };
+        Self {
+            kind,
+            time,
+            last_state: last_state.to_vec(),
+            steps_completed,
+            failed_step,
+            newton_corrections,
+            rhs_evaluations,
+            residual_norm,
+        }
+    }
+}
+
+impl std::fmt::Display for ImplicitEulerError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "implicit Euler failed at t={:.17e}, step={} after {} completed steps: {:?}",
+            self.time, self.failed_step, self.steps_completed, self.kind
+        )
+    }
+}
+
+impl std::error::Error for ImplicitEulerError {}
+
+fn implicit_euler_eval_rhs(
+    system: &ODESystem,
+    stage: &'static str,
+    time: f64,
+    state: &[f64],
+    rhs_evaluations: &mut usize,
+) -> Result<Vec<f64>, ImplicitEulerErrorKind> {
+    if *rhs_evaluations >= MAX_IMPLICIT_RHS_EVALUATIONS {
+        return Err(ImplicitEulerErrorKind::RhsEvaluationBudgetExceeded {
+            max_evaluations: MAX_IMPLICIT_RHS_EVALUATIONS,
+        });
+    }
+    if !time.is_finite() {
+        return Err(ImplicitEulerErrorKind::InvalidTimeSpan);
+    }
+    if let Some(index) = state.iter().position(|value| !value.is_finite()) {
+        return Err(ImplicitEulerErrorKind::NonFiniteIntermediateState { stage, index });
+    }
+    *rhs_evaluations += 1;
+    let derivative = (system.f)(time, state);
+    if derivative.len() != system.dim {
+        return Err(ImplicitEulerErrorKind::RhsDimensionMismatch {
+            stage,
+            expected: system.dim,
+            actual: derivative.len(),
+        });
+    }
+    if let Some(index) = derivative.iter().position(|value| !value.is_finite()) {
+        return Err(ImplicitEulerErrorKind::NonFiniteRhs { stage, index });
+    }
+    Ok(derivative)
+}
+
+fn implicit_euler_solve_dense(
+    matrix: &mut [f64],
+    rhs: &mut [f64],
+    dimension: usize,
+) -> Result<(), (usize, f64)> {
+    let matrix_max = matrix.iter().fold(0.0_f64, |maximum, value| {
+        if value.is_finite() {
+            maximum.max(value.abs())
+        } else {
+            f64::INFINITY
+        }
+    });
+    if !matrix_max.is_finite() || rhs.iter().any(|value| !value.is_finite()) {
+        return Err((0, f64::NAN));
+    }
+    let pivot_floor = f64::EPSILON * matrix_max.max(1.0) * dimension as f64;
+
+    for column in 0..dimension {
+        let mut pivot_row = column;
+        let mut pivot_magnitude = matrix[column * dimension + column].abs();
+        for row in (column + 1)..dimension {
+            let magnitude = matrix[row * dimension + column].abs();
+            if magnitude > pivot_magnitude {
+                pivot_magnitude = magnitude;
+                pivot_row = row;
+            }
+        }
+        if !pivot_magnitude.is_finite() || pivot_magnitude <= pivot_floor {
+            return Err((column, pivot_magnitude));
+        }
+        if pivot_row != column {
+            for j in 0..dimension {
+                matrix.swap(column * dimension + j, pivot_row * dimension + j);
+            }
+            rhs.swap(column, pivot_row);
+        }
+
+        let pivot = matrix[column * dimension + column];
+        for row in (column + 1)..dimension {
+            let factor = matrix[row * dimension + column] / pivot;
+            if !factor.is_finite() {
+                return Err((column, f64::NAN));
+            }
+            matrix[row * dimension + column] = 0.0;
+            for j in (column + 1)..dimension {
+                let idx = row * dimension + j;
+                matrix[idx] -= factor * matrix[column * dimension + j];
+                if !matrix[idx].is_finite() {
+                    return Err((column, f64::NAN));
+                }
+            }
+            rhs[row] -= factor * rhs[column];
+            if !rhs[row].is_finite() {
+                return Err((column, f64::NAN));
+            }
+        }
+    }
+
+    for row in (0..dimension).rev() {
+        let mut value = rhs[row];
+        for column in (row + 1)..dimension {
+            value -= matrix[row * dimension + column] * rhs[column];
+        }
+        let pivot = matrix[row * dimension + row];
+        value /= pivot;
+        if !value.is_finite() {
+            return Err((row, pivot.abs()));
+        }
+        rhs[row] = value;
+    }
+    Ok(())
 }
 
 /// Result of a boundary-value-problem solve.
@@ -674,6 +892,15 @@ impl DifferentialEquationsEngine {
         base.bind(&method_hv).bind(&state_hv)
     }
 
+    fn encode_implicit_euler_result(final_y: &[f64]) -> BinaryHV {
+        let state_hash: u64 = final_y
+            .iter()
+            .fold(0u64, |acc, &value| acc.wrapping_add(value.to_bits()));
+        let base = BinaryHV::random(seed_from_name("IMPLICIT_EULER"));
+        let state_hv = BinaryHV::random(seed_from_name(&format!("IE_STATE_{}", state_hash)));
+        base.bind(&state_hv)
+    }
+
     fn encode_pde_result(u_final: &[f64], tag: &str) -> BinaryHV {
         let base = BinaryHV::random(seed_from_name(tag));
         let state_hash: u64 = u_final.iter().enumerate().fold(0u64, |acc, (i, &v)| {
@@ -841,15 +1068,341 @@ impl DifferentialEquationsEngine {
         }
     }
 
-    /// Implicit Euler (backward Euler) for stiff ODEs via Newton iteration.
+    /// Solve backward Euler with a full finite-difference Jacobian and bounded Newton work.
     ///
-    /// Solves the nonlinear system G(y_{n+1}) = y_{n+1} - y_n - h·f(t_{n+1}, y_{n+1}) = 0
-    /// using simplified Newton iteration with diagonal Jacobian approximation:
-    ///   J_ii ≈ 1 - h · ∂f_i/∂y_i  (finite differences)
-    ///   Δy = -G / J  (component-wise)
+    /// For each step this solves
+    /// `G(z) = z - y_n - h*f(t_{n+1}, z) = 0` with a dense Newton
+    /// correction. The nonlinear residual is scaled per component by
+    /// `1 + max(abs(z[i]), abs(y_n[i]))`. A step is committed only after
+    /// its normalized infinity-norm residual is at most 1e-10.
     ///
-    /// This is L-stable: unconditionally damps fast modes regardless of step size.
-    /// Suitable for stiff systems with eigenvalue ratios > 10^6.
+    /// This is a dense solver limited to 64 state variables. It fails with a
+    /// typed error rather than silently accepting a non-converged Newton step.
+    /// For larger systems, a future sparse-Jacobian/linear-solver API is needed.
+    pub fn try_solve_implicit_euler(
+        system: &ODESystem,
+        t0: f64,
+        t_end: f64,
+        y0: &[f64],
+        n_steps: usize,
+        newton_iters: usize,
+    ) -> Result<ImplicitEulerSolveReport, ImplicitEulerError> {
+        let mut y = y0.to_vec();
+        let mut rhs_evaluations = 0usize;
+        let mut total_corrections = 0usize;
+        let mut dense_work_units = 0usize;
+        let mut max_normalized_residual = 0.0_f64;
+
+        if system.dim == 0 {
+            return Err(ImplicitEulerError::new(
+                ImplicitEulerErrorKind::EmptySystem, t0, &y, 0, 0, 0, 0.0
+            ));
+        }
+        if y0.len() != system.dim {
+            return Err(ImplicitEulerError::new(
+                ImplicitEulerErrorKind::DimensionMismatch {
+                    expected: system.dim, actual: y0.len(),
+                }, t0, &y, 0, 0, 0, 0.0
+            ));
+        }
+        if !t0.is_finite() || !t_end.is_finite() || t_end < t0 {
+            return Err(ImplicitEulerError::new(
+                ImplicitEulerErrorKind::InvalidTimeSpan, t0, &y, 0, 0, 0, 0.0
+            ));
+        }
+        if n_steps == 0 || n_steps > MAX_STEPS {
+            return Err(ImplicitEulerError::new(
+                ImplicitEulerErrorKind::InvalidStepCount {
+                    requested: n_steps, max_allowed: MAX_STEPS,
+                }, t0, &y, 0, 0, 0, 0.0
+            ));
+        }
+        if newton_iters == 0 || newton_iters > MAX_NEWTON_ITERATIONS_PER_STEP {
+            return Err(ImplicitEulerError::new(
+                ImplicitEulerErrorKind::InvalidNewtonIterationBudget {
+                    requested: newton_iters, max_allowed: MAX_NEWTON_ITERATIONS_PER_STEP,
+                }, t0, &y, 0, 0, 0, 0.0
+            ));
+        }
+        if system.dim > MAX_DENSE_NEWTON_DIM {
+            return Err(ImplicitEulerError::new(
+                ImplicitEulerErrorKind::SystemTooLargeForDenseNewton {
+                    dimension: system.dim, max_dimension: MAX_DENSE_NEWTON_DIM,
+                }, t0, &y, 0, 0, 0, 0.0
+            ));
+        }
+        if let Some(index) = y0.iter().position(|value| !value.is_finite()) {
+            return Err(ImplicitEulerError::new(
+                ImplicitEulerErrorKind::NonFiniteInitialState { index },
+                t0, &y, 0, 0, 0, 0.0
+            ));
+        }
+        let span = t_end - t0;
+        if !span.is_finite() {
+            return Err(ImplicitEulerError::new(
+                ImplicitEulerErrorKind::InvalidTimeSpan, t0, &y, 0, 0, 0, 0.0
+            ));
+        }
+
+        let mut t_values = vec![t0];
+        let mut y_values = vec![y.clone()];
+        if span == 0.0 {
+            let trajectory = ODEResult {
+                t_values,
+                y_values,
+                method: ODEMethod::ImplicitEuler,
+                steps: 0,
+                phi: 1.0 / (1.0 + y.iter().map(|value| value.abs()).sum::<f64>() / system.dim as f64),
+                encoding: Self::encode_implicit_euler_result(&y),
+            };
+            return Ok(ImplicitEulerSolveReport {
+                trajectory,
+                newton_corrections: 0,
+                rhs_evaluations: 0,
+                max_normalized_residual: 0.0,
+                estimated_dense_work_units: 0,
+            });
+        }
+
+        let h = span / n_steps as f64;
+        if !h.is_finite() || h <= 0.0 {
+            return Err(ImplicitEulerError::new(
+                ImplicitEulerErrorKind::InvalidTimeSpan, t0, &y, 0, 0, 0, 0.0
+            ));
+        }
+        let dimension = system.dim;
+        let matrix_len = dimension.checked_mul(dimension).ok_or_else(|| {
+            ImplicitEulerError::new(
+                ImplicitEulerErrorKind::SystemTooLargeForDenseNewton {
+                    dimension, max_dimension: MAX_DENSE_NEWTON_DIM,
+                }, t0, &y, 0, total_corrections, rhs_evaluations, max_normalized_residual
+            )
+        })?;
+
+        for step in 0..n_steps {
+            let t_next = if step + 1 == n_steps {
+                t_end
+            } else {
+                t0 + (step + 1) as f64 * h
+            };
+            if !t_next.is_finite() || t_next <= *t_values.last().unwrap_or(&t0) {
+                return Err(ImplicitEulerError::new(
+                    ImplicitEulerErrorKind::InvalidTimeSpan,
+                    *t_values.last().unwrap_or(&t0), &y, step,
+                    total_corrections, rhs_evaluations, max_normalized_residual
+                ));
+            }
+
+            let f_current = match implicit_euler_eval_rhs(
+                system, "predictor", *t_values.last().unwrap_or(&t0), &y, &mut rhs_evaluations
+            ) {
+                Ok(value) => value,
+                Err(kind) => return Err(ImplicitEulerError::new(
+                    kind, *t_values.last().unwrap_or(&t0), &y, step,
+                    total_corrections, rhs_evaluations, max_normalized_residual
+                )),
+            };
+            let mut y_next: Vec<f64> = y.iter().zip(f_current.iter())
+                .map(|(state, derivative)| *state + h * *derivative)
+                .collect();
+            if let Some(index) = y_next.iter().position(|value| !value.is_finite()) {
+                return Err(ImplicitEulerError::new(
+                    ImplicitEulerErrorKind::NonFinitePredictor { index },
+                    *t_values.last().unwrap_or(&t0), &y, step,
+                    total_corrections, rhs_evaluations, max_normalized_residual
+                ));
+            }
+
+            let mut converged = false;
+            let mut step_residual_norm = f64::INFINITY;
+            for iteration in 0..=newton_iters {
+                let f_next = match implicit_euler_eval_rhs(
+                    system, "residual", t_next, &y_next, &mut rhs_evaluations
+                ) {
+                    Ok(value) => value,
+                    Err(kind) => return Err(ImplicitEulerError::new(
+                        kind, *t_values.last().unwrap_or(&t0), &y, step,
+                        total_corrections, rhs_evaluations, step_residual_norm
+                    )),
+                };
+                let mut residual = Vec::with_capacity(dimension);
+                step_residual_norm = 0.0;
+                for i in 0..dimension {
+                    let value = y_next[i] - y[i] - h * f_next[i];
+                    if !value.is_finite() {
+                        return Err(ImplicitEulerError::new(
+                            ImplicitEulerErrorKind::NonFiniteResidual { index: i },
+                            *t_values.last().unwrap_or(&t0), &y, step,
+                            total_corrections, rhs_evaluations, step_residual_norm
+                        ));
+                    }
+                    let scale = 1.0 + y_next[i].abs().max(y[i].abs());
+                    let normalized = value.abs() / scale;
+                    if !normalized.is_finite() {
+                        return Err(ImplicitEulerError::new(
+                            ImplicitEulerErrorKind::NonFiniteResidual { index: i },
+                            *t_values.last().unwrap_or(&t0), &y, step,
+                            total_corrections, rhs_evaluations, normalized
+                        ));
+                    }
+                    step_residual_norm = step_residual_norm.max(normalized);
+                    residual.push(value);
+                }
+                if step_residual_norm <= 1e-10 {
+                    converged = true;
+                    max_normalized_residual = max_normalized_residual.max(step_residual_norm);
+                    break;
+                }
+                if iteration == newton_iters {
+                    return Err(ImplicitEulerError::new(
+                        ImplicitEulerErrorKind::NewtonNonConvergence {
+                            iteration_limit: newton_iters,
+                            residual_norm: step_residual_norm,
+                        },
+                        *t_values.last().unwrap_or(&t0), &y, step,
+                        total_corrections, rhs_evaluations, step_residual_norm
+                    ));
+                }
+
+                let per_correction_work = dimension.checked_mul(dimension)
+                    .and_then(|value| value.checked_mul(dimension))
+                    .unwrap_or(usize::MAX);
+                if per_correction_work == usize::MAX
+                    || dense_work_units.saturating_add(per_correction_work)
+                        > MAX_IMPLICIT_NEWTON_WORK_UNITS
+                {
+                    return Err(ImplicitEulerError::new(
+                        ImplicitEulerErrorKind::NewtonWorkBudgetExceeded {
+                            max_work_units: MAX_IMPLICIT_NEWTON_WORK_UNITS,
+                        },
+                        *t_values.last().unwrap_or(&t0), &y, step,
+                        total_corrections, rhs_evaluations, step_residual_norm
+                    ));
+                }
+
+                let mut jacobian = vec![0.0_f64; matrix_len];
+                for column in 0..dimension {
+                    let original = y_next[column];
+                    let delta = f64::EPSILON.sqrt() * original.abs().max(1.0);
+                    let mut perturbed = original + delta;
+                    let mut signed_delta = delta;
+                    if !perturbed.is_finite() || perturbed == original {
+                        perturbed = original - delta;
+                        signed_delta = -delta;
+                    }
+                    if !perturbed.is_finite() || perturbed == original || signed_delta == 0.0 {
+                        return Err(ImplicitEulerError::new(
+                            ImplicitEulerErrorKind::NonFiniteJacobian { row: 0, column },
+                            *t_values.last().unwrap_or(&t0), &y, step,
+                            total_corrections, rhs_evaluations, step_residual_norm
+                        ));
+                    }
+                    y_next[column] = perturbed;
+                    let f_perturbed = implicit_euler_eval_rhs(
+                        system, "jacobian", t_next, &y_next, &mut rhs_evaluations
+                    );
+                    y_next[column] = original;
+                    let f_perturbed = match f_perturbed {
+                        Ok(value) => value,
+                        Err(kind) => return Err(ImplicitEulerError::new(
+                            kind, *t_values.last().unwrap_or(&t0), &y, step,
+                            total_corrections, rhs_evaluations, step_residual_norm
+                        )),
+                    };
+
+                    for row in 0..dimension {
+                        let candidate_component = if row == column {
+                            perturbed
+                        } else {
+                            y_next[row]
+                        };
+                        let g_perturbed =
+                            candidate_component - y[row] - h * f_perturbed[row];
+                        let g_base = residual[row];
+                        let entry = (g_perturbed - g_base) / signed_delta;
+                        if !entry.is_finite() {
+                            return Err(ImplicitEulerError::new(
+                                ImplicitEulerErrorKind::NonFiniteJacobian { row, column },
+                                *t_values.last().unwrap_or(&t0), &y, step,
+                                total_corrections, rhs_evaluations, step_residual_norm
+                            ));
+                        }
+                        jacobian[row * dimension + column] = entry;
+                    }
+                }
+
+                let mut correction: Vec<f64> = residual.iter().map(|value| -*value).collect();
+                if let Err((column, pivot_magnitude)) =
+                    implicit_euler_solve_dense(&mut jacobian, &mut correction, dimension)
+                {
+                    let kind = if pivot_magnitude.is_finite() {
+                        ImplicitEulerErrorKind::SingularJacobian { column, pivot_magnitude }
+                    } else {
+                        ImplicitEulerErrorKind::NonFiniteLinearSolve { column }
+                    };
+                    return Err(ImplicitEulerError::new(
+                        kind,
+                        *t_values.last().unwrap_or(&t0), &y, step,
+                        total_corrections, rhs_evaluations, step_residual_norm
+                    ));
+                }
+                for i in 0..dimension {
+                    y_next[i] += correction[i];
+                    if !y_next[i].is_finite() {
+                        return Err(ImplicitEulerError::new(
+                            ImplicitEulerErrorKind::NonFiniteNewtonCorrection { index: i },
+                            *t_values.last().unwrap_or(&t0), &y, step,
+                            total_corrections, rhs_evaluations, step_residual_norm
+                        ));
+                    }
+                }
+                total_corrections += 1;
+                dense_work_units += per_correction_work;
+            }
+
+            if !converged {
+                return Err(ImplicitEulerError::new(
+                    ImplicitEulerErrorKind::NewtonNonConvergence {
+                        iteration_limit: newton_iters,
+                        residual_norm: step_residual_norm,
+                    },
+                    *t_values.last().unwrap_or(&t0), &y, step,
+                    total_corrections, rhs_evaluations, step_residual_norm
+                ));
+            }
+            y = y_next;
+            t_values.push(t_next);
+            y_values.push(y.clone());
+        }
+
+        let trajectory = ODEResult {
+            t_values,
+            y_values,
+            method: ODEMethod::ImplicitEuler,
+            steps: n_steps,
+            phi: 1.0 / (1.0 + y.iter().map(|value| value.abs()).sum::<f64>() / dimension as f64),
+            encoding: Self::encode_implicit_euler_result(&y),
+        };
+        Ok(ImplicitEulerSolveReport {
+            trajectory,
+            newton_corrections: total_corrections,
+            rhs_evaluations,
+            max_normalized_residual,
+            estimated_dense_work_units: dense_work_units,
+        })
+    }
+
+    /// Legacy compatibility API for backward Euler.
+    ///
+    /// This implementation uses simplified Newton iteration with a diagonal
+    /// Jacobian approximation and its result type cannot report failed Newton
+    /// convergence. New callers should prefer `try_solve_implicit_euler`,
+    /// which uses a full dense Jacobian, checks each nonlinear residual, and
+    /// returns typed failure receipts.
+    ///
+    /// Backward Euler is L-stable as a mathematical method, but this legacy
+    /// diagonal approximation does not guarantee that coupled nonlinear
+    /// systems converge.
     pub fn solve_implicit_euler(
         system: &ODESystem,
         t0: f64,
@@ -912,10 +1465,7 @@ impl DifferentialEquationsEngine {
             y_values.push(y.clone());
         }
 
-        let state_hash: u64 = y.iter().fold(0u64, |acc, &v| acc.wrapping_add(v.to_bits()));
-        let base = BinaryHV::random(seed_from_name("IMPLICIT_EULER"));
-        let state_hv = BinaryHV::random(seed_from_name(&format!("IE_STATE_{}", state_hash)));
-        let encoding = base.bind(&state_hv);
+        let encoding = Self::encode_implicit_euler_result(&y);
         let phi = 1.0 / (1.0 + y.iter().map(|v| v.abs()).sum::<f64>() / dim as f64);
 
         ODEResult {
@@ -1578,6 +2128,151 @@ mod tests {
     /// STIFF TEST: dy/dt = -1000y + 1000 → y(t) = 1 - exp(-1000t), y(0) = 0
     /// Eigenvalue ratio = 1000. Forward Euler requires h < 0.002.
     /// Implicit Euler should handle h = 0.01 (5× beyond explicit stability).
+    #[test]
+    fn test_implicit_euler_full_newton_solves_coupled_linear_system() {
+        fn coupled(_t: f64, y: &[f64]) -> Vec<f64> {
+            vec![10.0 * y[1], 10.0 * y[0]]
+        }
+        let system = ODESystem { f: coupled, dim: 2 };
+        let report = DifferentialEquationsEngine::try_solve_implicit_euler(
+            &system, 0.0, 0.04, &[1.0, 0.0], 1, 8,
+        )
+        .expect("full Newton should solve a coupled linear implicit step");
+        let state = report.trajectory.final_state();
+        assert!((state[0] - (1.0 / 0.84)).abs() < 1e-9, "state={state:?}");
+        assert!((state[1] - (0.4 / 0.84)).abs() < 1e-9, "state={state:?}");
+        assert!(report.max_normalized_residual <= 1e-10);
+        assert!(report.rhs_evaluations > report.newton_corrections);
+        assert_eq!(report.trajectory.steps, 1);
+    }
+
+    #[test]
+    fn test_implicit_euler_fallible_solver_reports_newton_nonconvergence() {
+        fn quadratic(_t: f64, y: &[f64]) -> Vec<f64> {
+            vec![y[0] * y[0]]
+        }
+        let system = ODESystem { f: quadratic, dim: 1 };
+        let error = DifferentialEquationsEngine::try_solve_implicit_euler(
+            &system, 0.0, 0.1, &[1.0], 1, 1,
+        )
+        .expect_err("one Newton correction is insufficient for this nonlinear step");
+        assert!(matches!(
+            error.kind,
+            ImplicitEulerErrorKind::NewtonNonConvergence {
+                iteration_limit: 1,
+                ..
+            }
+        ));
+        assert_eq!(error.steps_completed, 0);
+        assert_eq!(error.last_state, vec![1.0]);
+        assert_eq!(error.failed_step, 1);
+    }
+
+    #[test]
+    fn test_implicit_euler_fallible_solver_rejects_invalid_contracts() {
+        fn decay(_t: f64, y: &[f64]) -> Vec<f64> {
+            vec![-y[0]]
+        }
+        let system = ODESystem { f: decay, dim: 1 };
+        assert!(matches!(
+            DifferentialEquationsEngine::try_solve_implicit_euler(
+                &system, 0.0, 1.0, &[1.0], 0, 4,
+            ).unwrap_err().kind,
+            ImplicitEulerErrorKind::InvalidStepCount { requested: 0, .. }
+        ));
+        assert!(matches!(
+            DifferentialEquationsEngine::try_solve_implicit_euler(
+                &system, 0.0, 1.0, &[1.0], 2, 0,
+            ).unwrap_err().kind,
+            ImplicitEulerErrorKind::InvalidNewtonIterationBudget { requested: 0, .. }
+        ));
+        assert!(matches!(
+            DifferentialEquationsEngine::try_solve_implicit_euler(
+                &system, 0.0, 1.0, &[1.0, 2.0], 2, 4,
+            ).unwrap_err().kind,
+            ImplicitEulerErrorKind::DimensionMismatch { expected: 1, actual: 2 }
+        ));
+        assert!(matches!(
+            DifferentialEquationsEngine::try_solve_implicit_euler(
+                &system, 0.0, 1.0, &[f64::NAN], 2, 4,
+            ).unwrap_err().kind,
+            ImplicitEulerErrorKind::NonFiniteInitialState { index: 0 }
+        ));
+    }
+
+    #[test]
+    fn test_implicit_euler_fallible_solver_checks_rhs_shape() {
+        fn malformed(_t: f64, _y: &[f64]) -> Vec<f64> {
+            vec![]
+        }
+        let system = ODESystem { f: malformed, dim: 1 };
+        let error = DifferentialEquationsEngine::try_solve_implicit_euler(
+            &system, 0.0, 1.0, &[1.0], 1, 4,
+        )
+        .unwrap_err();
+        assert!(matches!(
+            error.kind,
+            ImplicitEulerErrorKind::RhsDimensionMismatch { expected: 1, actual: 0, .. }
+        ));
+        assert_eq!(error.last_state, vec![1.0]);
+    }
+
+    #[test]
+    fn test_implicit_euler_fallible_solver_rejects_singular_newton_matrix() {
+        fn identity(_t: f64, y: &[f64]) -> Vec<f64> {
+            y.to_vec()
+        }
+        let system = ODESystem { f: identity, dim: 1 };
+        let error = DifferentialEquationsEngine::try_solve_implicit_euler(
+            &system, 0.0, 1.0, &[1.0], 1, 4,
+        )
+        .expect_err("this step has no backward-Euler root because h*f(y)=y");
+        assert!(matches!(
+            error.kind,
+            ImplicitEulerErrorKind::SingularJacobian { column: 0, .. }
+        ));
+        assert_eq!(error.last_state, vec![1.0]);
+        assert_eq!(error.steps_completed, 0);
+    }
+
+    #[test]
+    fn test_implicit_euler_fallible_solver_rejects_dense_system_oversize() {
+        fn copy_state(_t: f64, y: &[f64]) -> Vec<f64> {
+            y.to_vec()
+        }
+        let system = ODESystem { f: copy_state, dim: MAX_DENSE_NEWTON_DIM + 1 };
+        let initial = vec![0.0; MAX_DENSE_NEWTON_DIM + 1];
+        let error = DifferentialEquationsEngine::try_solve_implicit_euler(
+            &system, 0.0, 1.0, &initial, 1, 4,
+        )
+        .expect_err("the dense solver must reject dimensions outside its declared envelope");
+        assert!(matches!(
+            error.kind,
+            ImplicitEulerErrorKind::SystemTooLargeForDenseNewton {
+                dimension: 65,
+                max_dimension: 64,
+            }
+        ));
+    }
+
+    #[test]
+    fn test_implicit_euler_fallible_solver_matches_stiff_decay_reference() {
+        fn stiff_decay(_t: f64, y: &[f64]) -> Vec<f64> {
+            vec![-1000.0 * y[0] + 1000.0]
+        }
+        let system = ODESystem { f: stiff_decay, dim: 1 };
+        let report = DifferentialEquationsEngine::try_solve_implicit_euler(
+            &system, 0.0, 0.1, &[0.0], 10, 8,
+        )
+        .expect("linear stiff decay should converge under backward Euler");
+        assert!(
+            (report.trajectory.final_state()[0] - 1.0).abs() < 1e-8,
+            "final={:?}",
+            report.trajectory.final_state()
+        );
+        assert!(report.max_normalized_residual <= 1e-10);
+    }
+
     #[test]
     fn test_implicit_euler_stiff_decay() {
         fn stiff_decay(_t: f64, y: &[f64]) -> Vec<f64> {
