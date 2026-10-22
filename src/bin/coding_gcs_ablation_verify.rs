@@ -482,6 +482,7 @@ fn audit(
     let mut on_wins = 0_u64;
     let mut off_wins = 0_u64;
     let mut ties = 0_u64;
+    let mut unresolved_pairs = 0_u64;
     for (id, expected) in &expected_counts {
         for repeat in 1..=repeats {
             let Some(slots) = pair_slots.get(&(id.to_string(), repeat)) else {
@@ -516,6 +517,12 @@ fn audit(
                 format!("paired oracle counts disagree with manifest for task {id} repeat {repeat}"),
             );
 
+            // An incomplete oracle makes the pair unresolved, not tied.
+            if !oracle_complete(off, *expected) || !oracle_complete(on, *expected) {
+                unresolved_pairs += 1;
+                continue;
+            }
+
             match (
                 bool_field(off, "behavioral_success") == Some(true),
                 bool_field(on, "behavioral_success") == Some(true),
@@ -535,15 +542,26 @@ fn audit(
 
     let paired = summary.get("paired").unwrap_or(summary);
     let pair_count = task_count.saturating_mul(repeats);
-    let expected_delta = if pair_count == 0 {
+    let comparable_pairs = pair_count.saturating_sub(unresolved_pairs);
+    let expected_delta = if comparable_pairs == 0 {
         0.0
     } else {
-        (on_wins as f64 - off_wins as f64) / pair_count as f64 * 100.0
+        (on_wins as f64 - off_wins as f64) / comparable_pairs as f64 * 100.0
     };
     push_check(
         &mut errors,
         u64_field(paired, "paired_task_trials") == Some(pair_count),
         "summary.paired.paired_task_trials is inconsistent",
+    );
+    push_check(
+        &mut errors,
+        u64_field(paired, "comparable_pairs") == Some(comparable_pairs),
+        "summary.paired.comparable_pairs is inconsistent with complete oracle pairs",
+    );
+    push_check(
+        &mut errors,
+        u64_field(paired, "unresolved_pairs") == Some(unresolved_pairs),
+        "summary.paired.unresolved_pairs is inconsistent with incomplete oracle pairs",
     );
     push_check(
         &mut errors,
@@ -562,8 +580,8 @@ fn audit(
     );
     push_check(
         &mut errors,
-        on_wins + off_wins + ties == pair_count,
-        "paired outcomes do not sum to the expected pair count",
+        on_wins + off_wins + ties == comparable_pairs,
+        "paired wins/losses/ties do not sum to complete comparable pairs",
     );
     push_check(
         &mut errors,
@@ -691,15 +709,15 @@ mod tests {
             "code_written": true,
             "expected_symbol_found": true,
             "generated_source_blake3": digest,
-            "compiled": success,
+            "compiled": true,
             "simulated": false,
             "expected_test_functions": 1,
             "tests_passed": if success { 1 } else { 0 },
-            "tests_failed": 0,
-            "oracle_complete": success,
+            "tests_failed": if success { 0 } else { 1 },
+            "oracle_complete": true,
             "behavioral_success": success,
             "runtime_error": null,
-            "compile_errors": if success { vec![] } else { vec!["compile error"] },
+            "compile_errors": vec![],
             "agent_elapsed_ms": elapsed,
             "verification_elapsed_ms": 20,
             "iterations": 1,
@@ -787,9 +805,9 @@ mod tests {
                     "runs": 1,
                     "behavioral_successes": 0,
                     "pass_rate": 0.0,
-                    "real_compiles": 0,
-                    "complete_oracles": 0,
-                    "complete_oracle_rate": 0.0,
+                    "real_compiles": 1,
+                    "complete_oracles": 1,
+                    "complete_oracle_rate": 1.0,
                     "agent_elapsed_ms_total": 120,
                     "agent_elapsed_ms_mean": 120.0,
                     "energy_total": 1.5,
@@ -797,6 +815,8 @@ mod tests {
                 },
                 "paired": {
                     "paired_task_trials": 1,
+                    "comparable_pairs": 1,
+                    "unresolved_pairs": 0,
                     "gcs_on_wins": 0,
                     "gcs_off_wins": 1,
                     "ties": 0,
@@ -901,6 +921,24 @@ mod tests {
         let errors = audit(&report, None, None);
         assert!(errors.iter().any(|error| error.contains("expected 2")));
         assert!(errors.iter().any(|error| error.contains("pair incomplete")));
+    }
+
+    #[test]
+    fn incomplete_pair_is_unresolved_not_a_tie() {
+        let mut report = valid_fixture();
+        report["runs"][1]["compiled"] = Value::Bool(false);
+        report["runs"][1]["tests_passed"] = Value::from(0);
+        report["runs"][1]["tests_failed"] = Value::from(0);
+        report["runs"][1]["oracle_complete"] = Value::Bool(false);
+        report["summary"]["gcs_on"]["real_compiles"] = Value::from(0);
+        report["summary"]["gcs_on"]["complete_oracles"] = Value::from(0);
+        report["summary"]["gcs_on"]["complete_oracle_rate"] = Value::from(0.0);
+        report["summary"]["paired"]["comparable_pairs"] = Value::from(0);
+        report["summary"]["paired"]["unresolved_pairs"] = Value::from(1);
+        report["summary"]["paired"]["gcs_off_wins"] = Value::from(0);
+        report["summary"]["paired"]["ties"] = Value::from(0);
+        report["summary"]["paired"]["net_pass_delta_percentage_points"] = Value::from(0.0);
+        assert!(audit(&report, None, None).is_empty());
     }
 
     #[test]
