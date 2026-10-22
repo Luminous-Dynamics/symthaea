@@ -128,6 +128,13 @@ jobs:
           matrix_frozen_ids="$(jq -c '[.cases[] | select(.mode == "frozen_trace") | .source_trace_id] | sort' "$matrix")"
           corpus_frozen_ids="$(jq -c '[.scenarios[].trace_id] | sort' "$corpus")"
           test "$matrix_frozen_ids" = "$corpus_frozen_ids"
+          jq -e --slurpfile corpus "$corpus" '
+            ($corpus[0].scenarios) as $scenarios |
+            all(.cases[] | select(.mode == "frozen_trace");
+              . as $case |
+              ($scenarios | map(select(.trace_id == $case.source_trace_id)) |
+                .[0].expected_violation_codes) == $case.expected.violation_codes)
+          ' "$matrix"
           expected_corpus_sha="$(jq -r '.fixture_binding.trajectory_corpus_sha256' "$matrix")"
           actual_corpus_sha="$(sha256sum "$corpus" | awk '{print $1}')"
           test "$actual_corpus_sha" = "$expected_corpus_sha"
