@@ -291,8 +291,7 @@ mod tests {
             "reachable abstract-state count changed; review and update the model baseline"
         );
         assert_eq!(
-            transition_count,
-            1_344,
+            transition_count, 1_344,
             "state/action transition count changed; review and update the model baseline"
         );
         println!(
@@ -315,9 +314,11 @@ mod tests {
         let resumed = transition(state, Action::Resume);
         assert_eq!(resumed.next.verified, None);
         let rendered = transition(resumed.next, Action::RenderA);
-        assert!(rendered
-            .violations
-            .contains(&Violation::RenderWithoutVerifiedBundle));
+        assert!(
+            rendered
+                .violations
+                .contains(&Violation::RenderWithoutVerifiedBundle)
+        );
     }
 
     #[test]
@@ -333,9 +334,11 @@ mod tests {
         let started = transition(state, Action::StartSession);
         assert_eq!(started.next.revoked_mask, Bundle::A.bit());
         assert!(started.next.uncertainty_pending);
-        assert!(started
-            .violations
-            .contains(&Violation::UncertaintyLostAtSessionBoundary));
+        assert!(
+            started
+                .violations
+                .contains(&Violation::UncertaintyLostAtSessionBoundary)
+        );
         let revoked_render = transition(started.next, Action::RenderA);
         assert!(revoked_render
             .violations
@@ -357,9 +360,11 @@ mod tests {
         };
         let result = transition(state, Action::VerifyAValid);
         assert_eq!(result.next.verified, None);
-        assert!(result
-            .violations
-            .contains(&Violation::InvalidBundleVerification));
+        assert!(
+            result
+                .violations
+                .contains(&Violation::InvalidBundleVerification)
+        );
     }
 
 }
