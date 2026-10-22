@@ -296,6 +296,15 @@ The counterfactual analyzer now requires measured runtime usage on both sides of
 
 This is an important guardrail, not a result. The synthetic fixture deliberately gives its adjudicated base and variant rows equal costs and matched inference budgets, so its cost ratio of 1 and zero delta only verify the reporting path. The analyzer's paired costs are not a full success–cost frontier, because the base and counterfactual are different reviewed targets. To compare with CoCo-Prover-like resource-routing work, PITB needs multiple preregistered spending caps per method and must report (i) verified semantic-gate solves at each cap, (ii) cost at fixed verified-solve rates, and (iii) uncertainty under target-family clustering. The primary proof-success and transfer-applicability scores remain separate.
 
+
+## 22 October 2026 update: a preregistered multi-budget frontier, not a cost-ratio claim
+
+A single matched counterfactual pair provides resource diagnostics but cannot establish which theorem-proving system has a better success–cost frontier: its base and counterfactual statements are different targets. To compare the global-recovery / cost-aware route ideas with industry systems, PITB now has a frozen `success-cost-frontier-plan.schema.json` and synthetic plan fixture. It requires a complete Cartesian target × method × budget schedule, at least three strictly increasing caps for calls/tokens/wall time/micro-USD, stable arm settings, unique run IDs and target-component consistency. Its synthetic validation fixture has two targets × three method arms × three budgets = 18 planned executions; it is not an executed experiment.
+
+This puts a common design in place for comparing a minimal shell agent, fixed local recovery, typed-insight local recovery, global failure coordinator and cost-aware coordinator on exactly the same targets. Real outcomes should then yield per-arm verified semantic-gate solve curves at fixed spending caps and cost at fixed solve rates, with component-clustered uncertainty. Use the full preregistered matrix and retain timeouts, missing outcomes and tool failures; never call the top-performing budget tier a frontier using only one point. The primary +10pp verified-utility criterion remains separate from the aspirational 25% cost reduction target.
+
+CI validates eight negative controls against the synthetic plan: missing/duplicate Cartesian cell, undeclared arm, target-component drift, non-increasing cap, duplicate run ID, too few distinct method classes and unsafe target path. These controls certify the schedule validator only. No method has been run across this matrix and no cost-efficiency gain is measured.
+
 ## Research references
 
 - Kim, Han & Hwang, [Benchmarking Testing in Automated Theorem Proving](https://aclanthology.org/2026.acl-industry.150/), ACL 2026 Industry Track.
