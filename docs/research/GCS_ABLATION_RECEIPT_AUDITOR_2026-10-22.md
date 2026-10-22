@@ -16,7 +16,7 @@ The goal is *proof-carrying measurement*: make an evaluation artifact independen
 - Exactly two modes per task/repeat; no duplicate or missing off/on run; expected run count; consistent test counts.
 - Fail-closed behavioral score recomputed from compile status, simulation status, runtime errors, and complete expected test counts.
 - Oracle-completeness classification recomputed separately from correctness. A complete run that fails one behavioral test is an assessed failure, not an incomplete oracle.
-- Alternating paired order checks and recomputation of GCS-on wins, GCS-off wins, ties, net pass delta, per-mode rates, timings, and energy totals.
+- Alternating paired order checks and recomputation of GCS-on wins, GCS-off wins, ties, net pass delta, per-mode rates, timings, and energy totals. Pairs count as comparable only if both arm oracles completed; unresolved pairs are reported separately and are not silently counted as ties.
 - Optional external pins for the exact source SHA and frozen task-manifest digest.
 
 ## Run
@@ -53,7 +53,7 @@ A failure exits nonzero and identifies all detected consistency problems. A clea
 
 The eight-task pilot uses public fixtures; it is not a hidden-test or contamination-resistant evaluation. For a publication-grade benchmark, split public development tasks from held-out/private tasks and preserve the exact task-manifest pin independently from the receipt.
 
-This tool audits **receipt consistency**, not the truth of every claimed execution. It cannot independently prove that a compiler ran, that the runner was uncompromised, that a model label is accurate, or that the benchmark tasks are representative. The source SHA is metadata, not a signature; BLAKE3 digests do not authenticate a producer. Test-function counting intentionally mirrors the producer's simple `#[test]` text scan and is not a Rust parser; use structured test metadata or AST-based extraction for a larger heterogeneous suite. The verifier intentionally does not accept a self-reported "pass" as proof of correctness: for behavioral outcomes it recomputes the claim from the receipt's raw counts and flags.
+This tool audits **receipt consistency**, not the truth of every claimed execution. It cannot independently prove that a compiler ran, that the runner was uncompromised, that a model label is accurate, or that the benchmark tasks are representative. The source SHA is metadata, not a signature; BLAKE3 digests do not authenticate a producer. Test counting intentionally mirrors the producer’s simple `#[test]` text scan and is not a Rust parser; prefer structured test metadata or AST-based extraction for a larger heterogeneous suite. Test-function counting intentionally mirrors the producer's simple `#[test]` text scan and is not a Rust parser; use structured test metadata or AST-based extraction for a larger heterogeneous suite. The verifier intentionally does not accept a self-reported "pass" as proof of correctness: for behavioral outcomes it recomputes the claim from the receipt's raw counts and flags.
 
 For stronger provenance, preserve CI/runner logs and raw artifacts, run the auditor in an independently managed environment, pre-register source and task-manifest hashes outside the receipt, and sign the resulting audit record using an independently controlled key. Do not interpret receipt consistency as independent test execution, cryptographic attestation, or a SOTA result.
 
