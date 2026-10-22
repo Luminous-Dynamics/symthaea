@@ -35,8 +35,7 @@ impl BoundedRiskEProcess {
         total_delta: f64,
         simultaneous_monitors: usize,
     ) -> Option<Self> {
-        if N == 0
-            || !risk_bound.is_finite()
+        if !risk_bound.is_finite()
             || risk_bound <= 0.0
             || risk_bound >= 1.0
             || !bet.is_finite()
@@ -161,7 +160,8 @@ impl<const N: usize> MixtureBoundedRiskEProcess<N> {
         total_delta: f64,
         simultaneous_monitors: usize,
     ) -> Option<Self> {
-        if !risk_bound.is_finite()
+        if N == 0
+            || !risk_bound.is_finite()
             || risk_bound <= 0.0
             || risk_bound >= 1.0
             || bet_fractions
@@ -202,7 +202,7 @@ impl<const N: usize> MixtureBoundedRiskEProcess<N> {
         self.bet_fractions
     }
 
-    pub fn bet_values(self) -> [f64; 3] {
+    pub fn bet_values(self) -> [f64; N] {
         self.bet_fractions.map(|fraction| fraction / self.risk_bound)
     }
 
@@ -296,6 +296,19 @@ mod tests {
             0.5 / 0.15,
             0.75 / 0.15,
         ]);
+    }
+
+    #[test]
+    fn mixture_supports_wide_predeclared_grids_and_rejects_empty_grid() {
+        assert!(MixtureBoundedRiskEProcess::<0>::new(0.05, [], 0.05, 5).is_none());
+        let fractions = [0.025, 0.05, 0.10, 0.25, 0.50, 0.75, 0.95];
+        let process =
+            MixtureBoundedRiskEProcess::new(0.05, fractions, 0.05, 5)
+                .expect("valid wide grid");
+        assert_eq!(process.bet_fractions(), fractions);
+        assert_eq!(process.bet_values(), fractions.map(|fraction| fraction / 0.05));
+        assert_eq!(process.component_log_e_values(), [0.0; 7]);
+        assert!((process.log_alarm_threshold().exp() - 100.0).abs() < 1e-10);
     }
 
     #[test]
