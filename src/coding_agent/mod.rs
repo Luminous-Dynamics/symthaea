@@ -172,7 +172,8 @@ impl AgentResult {
                     serde_json::json!({
                         "tier": attempt.tier.to_string(),
                         "backend_name": attempt.backend_name,
-                        "success": attempt.success
+                        "success": attempt.success,
+                        "elapsed_ms": attempt.elapsed_ms
                     })
                 }).collect::<Vec<_>>(),
                 "total_energy": self.total_energy,
