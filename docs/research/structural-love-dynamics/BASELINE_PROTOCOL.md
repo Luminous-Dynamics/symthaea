@@ -1,8 +1,9 @@
 # Structural Love Dynamics v0.1 — baseline and comparison protocol
 
 **Status:** preregistration template; not a report of executed model benchmarks.  
-**Corpus:** SLD-CORE-0.1 (46 cases / 23 contrast groups, currently DRAFT_CANDIDATE).  
+**Corpus:** SLD-CORE-0.1 (52 synthetic candidate cases / 26 A/B contrast groups, currently DRAFT_CANDIDATE).  
 **Mode:** MeasurementOnly. No runtime policy changes or action authority.
+**Paired model comparison:** use `PAIRED_COMPARISON_PROTOCOL.md` and `xtask/src/bin/sld-compare.rs`; no run is eligible for a comparative claim unless both exact-head receipts and the frozen cluster map pass the fail-closed comparator.
 
 ## 1. Question and scope
 
