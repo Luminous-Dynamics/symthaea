@@ -65,11 +65,6 @@ use crate::mind::structured_thought::{ETier, EpistemicCube, NTier};
 use crate::mind::{
     ConstraintType, ContinuousMind, DomainContext, EpistemicStatus, MindConfig, StructuredThought,
 };
-use crate::partnership::{
-    DyadInput, DyadWeights, HumanPartnerModel, InteractionEvent, PhiDyadCalculator,
-    RelationshipTrajectory,
-};
-
 use crate::action::SimpleExecutor;
 pub use crate::action::bindings::ActionRegistry;
 use crate::consciousness::interoception::InteroceptionTag;
