@@ -163,9 +163,9 @@ fn run() -> Result<(), String> {
             });
         }
 
-        let random_seed = 0xA11O_57A7_u64
+        let random_seed = 0xA110_57A7_u64
             .wrapping_add(scenario.bytes().map(u64::from).sum::<u64>())
-            .wrapping_add(u64::from(shielded));
+            .wrapping_add(if shielded { 1 } else { 0 });
         let summary = PairedSummary::from_samples(&paired, bootstrap_replicates, random_seed)
             .map_err(|error| format!("{scenario}/{shielded}: {error}"))?;
         write_summary_row(
