@@ -1472,7 +1472,31 @@ jobs:
           if result.returncode == 0:
               raise SystemExit("counterfactual analyzer unexpectedly accepted one artifact path for two distinct artifacts")
 
-          print("PITB_COUNTERFACTUAL_ANALYZER_PASS: paired metrics, component bootstrap, calibration, report schema, eleven malformed-outcome controls, whole-suite leakage, distinct artifact digest/path controls")
+          inconsistent_mutation = copy.deepcopy(suite)
+          inconsistent_mutation["pairs"][1]["mutation"]["after_fragment_sha256"] = inconsistent_mutation["pairs"][1]["mutation"]["before_fragment_sha256"]
+          inconsistent_mutation_path = report_path.parent / "bad-counterfactual-mutation-receipt.json"
+          inconsistent_mutation_path.write_text(json.dumps(inconsistent_mutation))
+          result = subprocess.run(
+              [str(binary), str(inconsistent_mutation_path), str(outcomes_path), "test",
+               str(report_path.parent / "bad-counterfactual-mutation-receipt.report.json"), "1000", "17"],
+              capture_output=True, text=True
+          )
+          if result.returncode == 0:
+              raise SystemExit("counterfactual analyzer unexpectedly accepted changed mutation with identical before/after fragments")
+
+          single_reviewer_suite = copy.deepcopy(suite)
+          single_reviewer_suite["pairs"][1]["counterfactual_adjudication"]["reviewer_decisions"].pop()
+          single_reviewer_path = report_path.parent / "bad-counterfactual-single-reviewer.json"
+          single_reviewer_path.write_text(json.dumps(single_reviewer_suite))
+          result = subprocess.run(
+              [str(binary), str(single_reviewer_path), str(outcomes_path), "test",
+               str(report_path.parent / "bad-counterfactual-single-reviewer.report.json"), "1000", "17"],
+              capture_output=True, text=True
+          )
+          if result.returncode == 0:
+              raise SystemExit("counterfactual analyzer unexpectedly accepted single-review adjudication")
+
+          print("PITB_COUNTERFACTUAL_ANALYZER_PASS: paired metrics, component bootstrap, calibration, report schema, 11 malformed-outcome controls and 5 suite-integrity controls")
           PY
       - name: Audit pinned Dalek Lean Bench timeline
         shell: bash
