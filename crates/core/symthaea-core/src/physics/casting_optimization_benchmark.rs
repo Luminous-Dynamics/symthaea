@@ -3,10 +3,12 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Deterministic synthetic harness for CASTING-002B.
 //!
-//! This test-only harness compares fixed-budget sampling designs on synthetic
-//! objectives with known optima. It is not a foundry process model or optimizer
-//! recommendation. Truth is used only by the evaluator to calculate regret after
-//! a query; sampling designs do not receive unqueried candidate outcomes.
+//! This test-only harness compares fixed-budget sampling and sequential optimization
+//! strategies on synthetic objectives with known optima. It is not a foundry process
+//! model or production recommendation. The GP-LCB strategy is a minimal fixed-parameter
+//! Bayesian-optimization baseline, not a claim of state-of-the-art performance.
+//! Ground truth is retained for post-query scoring; proposal APIs receive only queried
+//! observations and cannot inspect unqueried objective outcomes.
 //!
 //! Focused invocation:
 //! `cargo test -p symthaea-core casting_optimization_benchmark`
@@ -15,7 +17,7 @@ use std::fmt;
 
 const LOW_FIDELITY_COST_UNITS: u64 = 1;
 const HIGH_FIDELITY_COST_UNITS: u64 = 10;
-const SYNTHETIC_TARGET_OBJECTIVE: f64 = 0.05;
+const SYNTHETIC_TARGET_GAP: f64 = 0.05;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
@@ -26,16 +28,26 @@ enum SyntheticCase {
     HeteroscedasticNoise = 3,
     FidelityDiscrepancy = 4,
     FailedCorner = 5,
+    RastriginMultimodal = 6,
+    Beale = 7,
+    McCormick = 8,
+    Eggholder = 9,
+    HolderTable = 10,
 }
 
 impl SyntheticCase {
-    const ALL: [Self; 6] = [
+    const ALL: [Self; 11] = [
         Self::SmoothBowl,
         Self::CoupledFactors,
         Self::FeasibleIsland,
         Self::HeteroscedasticNoise,
         Self::FidelityDiscrepancy,
         Self::FailedCorner,
+        Self::RastriginMultimodal,
+        Self::Beale,
+        Self::McCormick,
+        Self::Eggholder,
+        Self::HolderTable,
     ];
 
     fn name(self) -> &'static str {
@@ -46,6 +58,11 @@ impl SyntheticCase {
             Self::HeteroscedasticNoise => "heteroscedastic-noise",
             Self::FidelityDiscrepancy => "fidelity-discrepancy",
             Self::FailedCorner => "failed-corner",
+            Self::RastriginMultimodal => "rastrigin-multimodal",
+            Self::Beale => "beale",
+            Self::McCormick => "mccormick",
+            Self::Eggholder => "eggholder",
+            Self::HolderTable => "holder-table",
         }
     }
 
@@ -57,6 +74,27 @@ impl SyntheticCase {
             | Self::FailedCorner => Point { x: 0.37, y: 0.62 },
             Self::CoupledFactors => Point { x: 0.20, y: 0.29 },
             Self::FeasibleIsland => Point { x: 0.72, y: 0.31 },
+            Self::RastriginMultimodal => Point { x: 0.5, y: 0.5 },
+            // Standard Beale optimum (x=3, y=0.5) mapped from [-4.5, 4.5]^2.
+            Self::Beale => Point {
+                x: 5.0 / 6.0,
+                y: 5.0 / 9.0,
+            },
+            // Standard McCormick minimizer, normalized from x in [-1.5, 4], y in [-3, 4].
+            Self::McCormick => Point {
+                x: 0.9528024397785507 / 5.5,
+                y: 1.452802440731628 / 7.0,
+            },
+            // Eggholder reference minimum is on the x=512 boundary.
+            Self::Eggholder => Point {
+                x: 1.0,
+                y: (404.23180824 + 512.0) / 1024.0,
+            },
+            // One of the four Holder-table global minima, at a published high-precision reference.
+            Self::HolderTable => Point {
+                x: (8.055023472141116 + 10.0) / 20.0,
+                y: (9.664590028909654 + 10.0) / 20.0,
+            },
         }
     }
 
@@ -69,6 +107,47 @@ impl SyntheticCase {
             }
             Self::FeasibleIsland => {
                 (point.x - 0.72).powi(2) + (point.y - 0.31).powi(2)
+            }
+            Self::RastriginMultimodal => {
+                // Map normalized coordinates [0,1]^2 to the standard [-5.12, 5.12]^2
+                // Rastrigin domain. Its known global minimum is exactly 0 at (0,0),
+                // which maps to normalized point (0.5, 0.5); numerous local minima
+                // make this a useful non-convex acquisition stress fixture.
+                let x = 10.24 * (point.x - 0.5);
+                let y = 10.24 * (point.y - 0.5);
+                20.0
+                    + x * x - 10.0 * (2.0 * std::f64::consts::PI * x).cos()
+                    + y * y - 10.0 * (2.0 * std::f64::consts::PI * y).cos()
+            }
+            Self::Beale => {
+                // Standard Beale analytical benchmark over [-4.5, 4.5]^2.
+                // The normalized point (5/6, 5/9) maps to its global minimizer
+                // (3, 0.5), where all three squared terms are zero.
+                let x = 9.0 * point.x - 4.5;
+                let y = 9.0 * point.y - 4.5;
+                (1.5 - x + x * y).powi(2)
+                    + (2.25 - x + x * y.powi(2)).powi(2)
+                    + (2.625 - x + x * y.powi(3)).powi(2)
+            }
+            Self::McCormick => {
+                let x = -1.5 + 5.5 * point.x;
+                let y = -3.0 + 7.0 * point.y;
+                (x + y).sin() + (x - y).powi(2) - 1.5 * x + 2.5 * y + 1.0
+            }
+            Self::Eggholder => {
+                let x = 1024.0 * point.x - 512.0;
+                let y = 1024.0 * point.y - 512.0;
+                -(y + 47.0) * (x / 2.0 + y + 47.0).abs().sqrt().sin()
+                    - x * (x - (y + 47.0)).abs().sqrt().sin()
+            }
+            Self::HolderTable => {
+                let x = 20.0 * point.x - 10.0;
+                let y = 20.0 * point.y - 10.0;
+                -(x.sin() * y.cos()
+                    * (1.0 - (x * x + y * y).sqrt() / std::f64::consts::PI)
+                        .abs()
+                        .exp())
+                .abs()
             }
             _ => (point.x - 0.37).powi(2) + (point.y - 0.62).powi(2),
         }
@@ -87,7 +166,12 @@ impl SyntheticCase {
     }
 
     fn known_optimum_value(self) -> f64 {
-        self.objective(self.optimum())
+        match self {
+            Self::McCormick => -1.913222954981037,
+            Self::Eggholder => -959.6406627208397,
+            Self::HolderTable => -19.20850256788675,
+            _ => self.objective(self.optimum()),
+        }
     }
 
     fn observation(self, point: Point, fidelity: Fidelity, run_seed: u64) -> f64 {
@@ -125,14 +209,16 @@ enum SamplingDesign {
     UniformGrid = 1,
     LatinHypercube = 2,
     AdaptiveNearestNeighbor = 3,
+    GaussianProcessLcb = 4,
 }
 
 impl SamplingDesign {
-    const ALL: [Self; 4] = [
+    const ALL: [Self; 5] = [
         Self::Random,
         Self::UniformGrid,
         Self::LatinHypercube,
         Self::AdaptiveNearestNeighbor,
+        Self::GaussianProcessLcb,
     ];
 }
 
@@ -217,11 +303,35 @@ struct BenchmarkRun {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum GaussianProcessError {
+    EmptyHistory,
+    NonFiniteInput,
+    InvalidMatrix,
+    NotPositiveDefinite,
+    NonFinitePosterior,
+    NegativePosteriorVariance,
+}
+
+impl fmt::Display for GaussianProcessError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::EmptyHistory => f.write_str("Gaussian-process history has no usable observations"),
+            Self::NonFiniteInput => f.write_str("Gaussian-process input contains a non-finite value"),
+            Self::InvalidMatrix => f.write_str("Gaussian-process covariance matrix is malformed"),
+            Self::NotPositiveDefinite => f.write_str("Gaussian-process covariance is not positive definite"),
+            Self::NonFinitePosterior => f.write_str("Gaussian-process posterior is non-finite"),
+            Self::NegativePosteriorVariance => f.write_str("Gaussian-process posterior variance is materially negative"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum BenchmarkError {
     ZeroBudget,
     EmptySeedSet,
     AdaptiveRequiresHistory,
     AdaptiveCandidatePoolExhausted,
+    GaussianProcess(GaussianProcessError),
     CostOverflow,
 }
 
@@ -236,6 +346,7 @@ impl fmt::Display for BenchmarkError {
             Self::AdaptiveCandidatePoolExhausted => {
                 f.write_str("adaptive candidate lattice has no unqueried candidate left")
             }
+            Self::GaussianProcess(error) => write!(f, "Gaussian-process baseline failed: {error}"),
             Self::CostOverflow => f.write_str("benchmark cumulative cost overflowed"),
         }
     }
@@ -317,7 +428,7 @@ fn sample_points(
                 })
                 .collect()
         }
-        SamplingDesign::AdaptiveNearestNeighbor => {
+        SamplingDesign::AdaptiveNearestNeighbor | SamplingDesign::GaussianProcessLcb => {
             return Err(BenchmarkError::AdaptiveRequiresHistory);
         }
     };
@@ -427,6 +538,281 @@ fn choose_adaptive_point(history: &[ProposalObservation]) -> Option<Point> {
     best.map(|(_, point)| point)
 }
 
+const GP_LENGTH_SCALE: f64 = 0.25;
+const GP_SIGNAL_VARIANCE: f64 = 1.0;
+const GP_OBSERVATION_NOISE_VARIANCE: f64 = 1e-6;
+const GP_DIAGONAL_JITTER: f64 = 1e-10;
+const GP_LCB_EXPLORATION_BETA: f64 = 1.5;
+
+fn gp_rbf_kernel(left: Point, right: Point) -> f64 {
+    let dx = left.x - right.x;
+    let dy = left.y - right.y;
+    let squared_distance = dx * dx + dy * dy;
+    GP_SIGNAL_VARIANCE * (-0.5 * squared_distance / GP_LENGTH_SCALE.powi(2)).exp()
+}
+
+/// Cholesky factorization of a symmetric positive-definite matrix.
+/// The input must already include observation noise and fixed diagonal jitter.
+fn gp_cholesky(matrix: &[Vec<f64>]) -> Result<Vec<Vec<f64>>, GaussianProcessError> {
+    let n = matrix.len();
+    if n == 0 || matrix.iter().any(|row| row.len() != n) {
+        return Err(GaussianProcessError::InvalidMatrix);
+    }
+    if matrix.iter().flatten().any(|value| !value.is_finite()) {
+        return Err(GaussianProcessError::NonFiniteInput);
+    }
+    for row in 0..n {
+        for column in 0..row {
+            if (matrix[row][column] - matrix[column][row]).abs() > 1e-12 {
+                return Err(GaussianProcessError::InvalidMatrix);
+            }
+        }
+    }
+
+    let mut lower = vec![vec![0.0; n]; n];
+    for row in 0..n {
+        for column in 0..=row {
+            let mut value = matrix[row][column];
+            for k in 0..column {
+                value -= lower[row][k] * lower[column][k];
+            }
+            if row == column {
+                if !value.is_finite() || value <= 0.0 {
+                    return Err(GaussianProcessError::NotPositiveDefinite);
+                }
+                lower[row][column] = value.sqrt();
+            } else {
+                let pivot = lower[column][column];
+                if !pivot.is_finite() || pivot <= 0.0 {
+                    return Err(GaussianProcessError::NotPositiveDefinite);
+                }
+                lower[row][column] = value / pivot;
+                if !lower[row][column].is_finite() {
+                    return Err(GaussianProcessError::NonFinitePosterior);
+                }
+            }
+        }
+    }
+    Ok(lower)
+}
+
+fn gp_solve_lower(
+    lower: &[Vec<f64>],
+    right_hand_side: &[f64],
+) -> Result<Vec<f64>, GaussianProcessError> {
+    let n = lower.len();
+    if n == 0 || right_hand_side.len() != n || lower.iter().any(|row| row.len() != n) {
+        return Err(GaussianProcessError::InvalidMatrix);
+    }
+    let mut result = vec![0.0; n];
+    for row in 0..n {
+        let mut value = right_hand_side[row];
+        for column in 0..row {
+            value -= lower[row][column] * result[column];
+        }
+        let pivot = lower[row][row];
+        if !pivot.is_finite() || pivot <= 0.0 {
+            return Err(GaussianProcessError::NotPositiveDefinite);
+        }
+        result[row] = value / pivot;
+        if !result[row].is_finite() {
+            return Err(GaussianProcessError::NonFinitePosterior);
+        }
+    }
+    Ok(result)
+}
+
+fn gp_solve_upper_from_lower_transpose(
+    lower: &[Vec<f64>],
+    right_hand_side: &[f64],
+) -> Result<Vec<f64>, GaussianProcessError> {
+    let n = lower.len();
+    if n == 0 || right_hand_side.len() != n || lower.iter().any(|row| row.len() != n) {
+        return Err(GaussianProcessError::InvalidMatrix);
+    }
+    let mut result = vec![0.0; n];
+    for row in (0..n).rev() {
+        let mut value = right_hand_side[row];
+        for column in row + 1..n {
+            value -= lower[column][row] * result[column];
+        }
+        let pivot = lower[row][row];
+        if !pivot.is_finite() || pivot <= 0.0 {
+            return Err(GaussianProcessError::NotPositiveDefinite);
+        }
+        result[row] = value / pivot;
+        if !result[row].is_finite() {
+            return Err(GaussianProcessError::NonFinitePosterior);
+        }
+    }
+    Ok(result)
+}
+
+/// Fixed-hyperparameter Gaussian-process posterior for the currently observed data.
+/// The GP is fit once per proposal; candidate posterior queries reuse the Cholesky
+/// factor and alpha vector rather than refactoring per candidate.
+#[derive(Debug, Clone, PartialEq)]
+struct GaussianProcessPosterior {
+    observed_points: Vec<Point>,
+    mean_y: f64,
+    target_scale: f64,
+    alpha: Vec<f64>,
+    cholesky_lower: Vec<Vec<f64>>,
+}
+
+impl GaussianProcessPosterior {
+    fn fit(history: &[ProposalObservation]) -> Result<Self, GaussianProcessError> {
+        let measured: Vec<(Point, f64)> = history
+            .iter()
+            .filter(|entry| entry.status == TrialStatus::Feasible)
+            .filter_map(|entry| entry.observed_objective.map(|value| (entry.point, value)))
+            .collect();
+        if measured.is_empty() {
+            return Err(GaussianProcessError::EmptyHistory);
+        }
+        if measured.iter().any(|(point, value)| {
+            !point.x.is_finite()
+                || !point.y.is_finite()
+                || !value.is_finite()
+                || !(0.0..=1.0).contains(&point.x)
+                || !(0.0..=1.0).contains(&point.y)
+        }) {
+            return Err(GaussianProcessError::NonFiniteInput);
+        }
+
+        let n = measured.len();
+        let mean_y = measured.iter().map(|(_, value)| *value).sum::<f64>() / n as f64;
+        if !mean_y.is_finite() {
+            return Err(GaussianProcessError::NonFiniteInput);
+        }
+        let target_variance = measured
+            .iter()
+            .map(|(_, value)| (*value - mean_y).powi(2))
+            .sum::<f64>()
+            / n as f64;
+        if !target_variance.is_finite() || target_variance < 0.0 {
+            return Err(GaussianProcessError::NonFiniteInput);
+        }
+        // Standardize objective outputs before GP fitting so fixed kernel/noise
+        // hyperparameters behave consistently across objectives with different units
+        // or magnitudes. Constant-output history uses unit scale to avoid division by 0.
+        let observed_scale = target_variance.sqrt();
+        let target_scale = if observed_scale.is_finite() && observed_scale > 1e-12 {
+            observed_scale
+        } else {
+            1.0
+        };
+        let observed_points: Vec<Point> = measured.iter().map(|(point, _)| *point).collect();
+        let centered_y: Vec<f64> = measured
+            .iter()
+            .map(|(_, value)| (*value - mean_y) / target_scale)
+            .collect();
+
+        let mut covariance = vec![vec![0.0; n]; n];
+        for row in 0..n {
+            for column in 0..=row {
+                let value = gp_rbf_kernel(observed_points[row], observed_points[column]);
+                covariance[row][column] = value;
+                covariance[column][row] = value;
+            }
+            covariance[row][row] +=
+                GP_OBSERVATION_NOISE_VARIANCE + GP_DIAGONAL_JITTER;
+        }
+
+        let cholesky_lower = gp_cholesky(&covariance)?;
+        let projected = gp_solve_lower(&cholesky_lower, &centered_y)?;
+        let alpha = gp_solve_upper_from_lower_transpose(&cholesky_lower, &projected)?;
+
+        Ok(Self {
+            observed_points,
+            mean_y,
+            target_scale,
+            alpha,
+            cholesky_lower,
+        })
+    }
+
+    fn predict(&self, candidate: Point) -> Result<(f64, f64), GaussianProcessError> {
+        if !candidate.x.is_finite()
+            || !candidate.y.is_finite()
+            || !(0.0..=1.0).contains(&candidate.x)
+            || !(0.0..=1.0).contains(&candidate.y)
+        {
+            return Err(GaussianProcessError::NonFiniteInput);
+        }
+
+        let cross_covariance: Vec<f64> = self
+            .observed_points
+            .iter()
+            .map(|point| gp_rbf_kernel(*point, candidate))
+            .collect();
+        let normalized_mean = cross_covariance
+            .iter()
+            .zip(&self.alpha)
+            .map(|(kernel, weight)| kernel * weight)
+            .sum::<f64>();
+        let mean = self.mean_y + self.target_scale * normalized_mean;
+        let projected = gp_solve_lower(&self.cholesky_lower, &cross_covariance)?;
+        let variance_reduction = projected.iter().map(|value| value * value).sum::<f64>();
+        let raw_variance = GP_SIGNAL_VARIANCE - variance_reduction;
+        let normalized_variance = if raw_variance < 0.0 && raw_variance >= -1e-8 {
+            0.0
+        } else if raw_variance < -1e-8 {
+            return Err(GaussianProcessError::NegativePosteriorVariance);
+        } else {
+            raw_variance
+        };
+        let variance = self.target_scale.powi(2) * normalized_variance;
+
+        if !mean.is_finite() || !variance.is_finite() || variance < 0.0 {
+            return Err(GaussianProcessError::NonFinitePosterior);
+        }
+        Ok((mean, variance))
+    }
+}
+
+/// Select the next candidate by a fixed lower-confidence-bound acquisition:
+/// LCB(x) = posterior_mean(x) - beta * posterior_stddev(x). Lower is preferred.
+/// Kernel, noise, jitter and beta are frozen constants; no hidden truth or unqueried
+/// objective values are inputs. This is a minimal GP-BO baseline, not a tuned SOTA claim.
+fn choose_gaussian_process_lcb(
+    history: &[ProposalObservation],
+) -> Result<Option<Point>, GaussianProcessError> {
+    let posterior = match GaussianProcessPosterior::fit(history) {
+        Ok(posterior) => posterior,
+        Err(GaussianProcessError::EmptyHistory) => return Ok(None),
+        Err(error) => return Err(error),
+    };
+
+    const SIDE: usize = 16;
+    let mut best: Option<(f64, Point)> = None;
+    for ix in 0..SIDE {
+        for iy in 0..SIDE {
+            let candidate = Point {
+                x: (ix as f64 + 0.5) / SIDE as f64,
+                y: (iy as f64 + 0.5) / SIDE as f64,
+            };
+            if history.iter().any(|entry| {
+                let dx = entry.point.x - candidate.x;
+                let dy = entry.point.y - candidate.y;
+                dx * dx + dy * dy < 1e-20
+            }) {
+                continue;
+            }
+
+            let (mean, variance) = posterior.predict(candidate)?;
+            let acquisition = mean - GP_LCB_EXPLORATION_BETA * variance.sqrt();
+            if !acquisition.is_finite() {
+                return Err(GaussianProcessError::NonFinitePosterior);
+            }
+            if best.map_or(true, |(best_score, _)| acquisition < best_score) {
+                best = Some((acquisition, candidate));
+            }
+        }
+    }
+    Ok(best.map(|(_, point)| point))
+}
+
 fn run_benchmark(
     case: SyntheticCase,
     design: SamplingDesign,
@@ -437,12 +823,16 @@ fn run_benchmark(
     if budget == 0 {
         return Err(BenchmarkError::ZeroBudget);
     }
-    let fixed_points = if design == SamplingDesign::AdaptiveNearestNeighbor {
+    let is_sequential = matches!(
+        design,
+        SamplingDesign::AdaptiveNearestNeighbor | SamplingDesign::GaussianProcessLcb
+    );
+    let fixed_points = if is_sequential {
         Vec::new()
     } else {
         sample_points(design, budget, seed)?
     };
-    let adaptive_warm_start = if design == SamplingDesign::AdaptiveNearestNeighbor {
+    let adaptive_warm_start = if is_sequential {
         adaptive_points(seed, budget)?
     } else {
         Vec::new()
@@ -455,15 +845,26 @@ fn run_benchmark(
     let mut cost_to_first_feasible = None;
     let mut cost_to_target = None;
     let mut best_observed_objective: Option<f64> = None;
-    let mut best_true_objective_at_selected_point: Option<f64> = None;
+    let mut best_true_objective_among_feasible_queries: Option<f64> = None;
 
     for query_index in 0..budget {
-        let point = if design == SamplingDesign::AdaptiveNearestNeighbor {
+        let point = if is_sequential {
             if query_index < adaptive_warm_start.len() {
                 adaptive_warm_start[query_index]
             } else {
-                choose_adaptive_point(&proposal_history(&records))
-                    .ok_or(BenchmarkError::AdaptiveCandidatePoolExhausted)?
+                let history = proposal_history(&records);
+                if design == SamplingDesign::AdaptiveNearestNeighbor {
+                    choose_adaptive_point(&history)
+                        .ok_or(BenchmarkError::AdaptiveCandidatePoolExhausted)?
+                } else {
+                    match choose_gaussian_process_lcb(&history)
+                        .map_err(BenchmarkError::GaussianProcess)?
+                    {
+                        Some(point) => point,
+                        None => choose_adaptive_point(&history)
+                            .ok_or(BenchmarkError::AdaptiveCandidatePoolExhausted)?,
+                    }
+                }
             }
         } else {
             fixed_points[query_index]
@@ -486,13 +887,18 @@ fn run_benchmark(
                 // The synthetic evaluator confirms target achievement against
                 // noise-free truth only after this query; the strategy sees observations.
                 if cost_to_target.is_none()
-                    && record.true_objective_for_evaluation_only <= SYNTHETIC_TARGET_OBJECTIVE
+                    && record.true_objective_for_evaluation_only
+                        <= case.known_optimum_value() + SYNTHETIC_TARGET_GAP
                 {
                     cost_to_target = Some(record.cumulative_cost_units);
                 }
                 if best_observed_objective.map_or(true, |best| observed < best) {
                     best_observed_objective = Some(observed);
-                    best_true_objective_at_selected_point =
+                }
+                if best_true_objective_among_feasible_queries
+                    .map_or(true, |best| record.true_objective_for_evaluation_only < best)
+                {
+                    best_true_objective_among_feasible_queries =
                         Some(record.true_objective_for_evaluation_only);
                 }
             }
@@ -502,7 +908,9 @@ fn run_benchmark(
         records.push(record);
     }
 
-    let simple_regret = best_true_objective_at_selected_point
+    // Simple regret uses the best evaluator-known truth among every feasible point
+    // actually queried, not merely the candidate with the best noisy observation.
+    let simple_regret = best_true_objective_among_feasible_queries
         .map(|value| (value - case.known_optimum_value()).max(0.0));
     let transcript_digest_blake3 =
         digest_transcript(case, design, fidelity, seed, budget, &records);
@@ -640,10 +1048,14 @@ mod tests {
     fn all_synthetic_fixture_optima_are_known_answers() {
         for case in SyntheticCase::ALL {
             let optimum = case.optimum();
-            assert_abs_close(case.objective(optimum), 0.0, 1e-15);
-            assert_abs_close(case.known_optimum_value(), 0.0, 1e-15);
-            assert!((0.0..1.0).contains(&optimum.x));
-            assert!((0.0..1.0).contains(&optimum.y));
+            assert_abs_close(
+                case.objective(optimum),
+                case.known_optimum_value(),
+                1e-6,
+            );
+            assert!(case.known_optimum_value().is_finite());
+            assert!((0.0..=1.0).contains(&optimum.x));
+            assert!((0.0..=1.0).contains(&optimum.y));
             assert!(case.is_feasible(optimum));
             assert!(!case.can_fail(optimum));
             assert!(!case.name().is_empty());
@@ -828,6 +1240,222 @@ mod tests {
     }
 
     #[test]
+    fn rastrigin_multimodal_fixture_has_known_global_minimum() {
+        let case = SyntheticCase::RastriginMultimodal;
+        assert_abs_close(case.objective(Point { x: 0.5, y: 0.5 }), 0.0, 1e-12);
+        assert!(case.objective(Point { x: 0.6, y: 0.5 }) > 0.0);
+        assert_abs_close(case.known_optimum_value(), 0.0, 1e-12);
+    }
+
+    #[test]
+    fn casting_adjacent_paper_analytical_functions_have_frozen_reference_minima() {
+        for (case, expected_value, tolerance) in [
+            (
+                SyntheticCase::McCormick,
+                -1.913222954981037,
+                1e-8,
+            ),
+            (
+                SyntheticCase::Eggholder,
+                -959.6406627208397,
+                1e-5,
+            ),
+            (
+                SyntheticCase::HolderTable,
+                -19.20850256788675,
+                1e-8,
+            ),
+        ] {
+            let optimum = case.optimum();
+            assert_abs_close(case.objective(optimum), expected_value, tolerance);
+            assert_abs_close(case.known_optimum_value(), expected_value, 0.0);
+            assert!((0.0..=1.0).contains(&optimum.x));
+            assert!((0.0..=1.0).contains(&optimum.y));
+        }
+        // Eggholder is deliberately represented on the full closed x-boundary.
+        assert_eq!(SyntheticCase::Eggholder.optimum().x, 1.0);
+    }
+
+    #[test]
+    fn beale_analytical_fixture_has_known_global_minimum() {
+        let case = SyntheticCase::Beale;
+        let optimum = case.optimum();
+        assert_abs_close(optimum.x, 5.0 / 6.0, 1e-15);
+        assert_abs_close(optimum.y, 5.0 / 9.0, 1e-15);
+        assert_abs_close(case.objective(optimum), 0.0, 1e-24);
+        assert!(case.objective(Point { x: 0.5, y: 0.5 }) > 1.0);
+    }
+
+    #[test]
+    fn gp_kernel_and_cholesky_match_independent_known_answers() {
+        let origin = Point { x: 0.0, y: 0.0 };
+        let one_length_scale_away = Point {
+            x: GP_LENGTH_SCALE,
+            y: 0.0,
+        };
+        assert_abs_close(gp_rbf_kernel(origin, origin), 1.0, 1e-15);
+        assert_abs_close(
+            gp_rbf_kernel(origin, one_length_scale_away),
+            (-0.5_f64).exp(),
+            1e-15,
+        );
+
+        let lower = gp_cholesky(&[vec![4.0, 2.0], vec![2.0, 3.0]]).unwrap();
+        assert_abs_close(lower[0][0], 2.0, 1e-15);
+        assert_abs_close(lower[0][1], 0.0, 1e-15);
+        assert_abs_close(lower[1][0], 1.0, 1e-15);
+        assert_abs_close(lower[1][1], 2.0_f64.sqrt(), 1e-15);
+
+        let solved = gp_solve_lower(&lower, &[2.0, 1.0]).unwrap();
+        assert_abs_close(solved[0], 1.0, 1e-15);
+        assert_abs_close(solved[1], 0.0, 1e-15);
+        let back_solved = gp_solve_upper_from_lower_transpose(&lower, &solved).unwrap();
+        assert_abs_close(back_solved[0], 0.5, 1e-15);
+        assert_abs_close(back_solved[1], 0.0, 1e-15);
+    }
+
+    #[test]
+    fn gp_posterior_matches_one_observation_known_answer() {
+        let point = Point { x: 0.25, y: 0.4 };
+        let posterior = GaussianProcessPosterior::fit(&[ProposalObservation {
+            point,
+            status: TrialStatus::Feasible,
+            observed_objective: Some(2.0),
+        }])
+        .unwrap();
+
+        let (mean, variance) = posterior.predict(point).unwrap();
+        assert_abs_close(mean, 2.0, 1e-12);
+        assert_abs_close(
+            variance,
+            GP_OBSERVATION_NOISE_VARIANCE + GP_DIAGONAL_JITTER,
+            2e-10,
+        );
+    }
+
+    #[test]
+    fn gp_acquisition_is_deterministic_and_cannot_read_evaluation_truth() {
+        let initial = run_benchmark(
+            SyntheticCase::SmoothBowl,
+            SamplingDesign::LatinHypercube,
+            Fidelity::High,
+            0xB0_71_A7,
+            4,
+        )
+        .unwrap();
+        let history = proposal_history(&initial.transcript);
+        let next_a = choose_gaussian_process_lcb(&history).unwrap().unwrap();
+
+        let mut changed_truth = initial.transcript.clone();
+        for record in &mut changed_truth {
+            record.true_objective_for_evaluation_only -= 123.0;
+        }
+        let next_b = choose_gaussian_process_lcb(&proposal_history(&changed_truth))
+            .unwrap()
+            .unwrap();
+        assert_eq!(next_a, next_b);
+        assert!(!initial.transcript.iter().any(|record| record.point == next_a));
+
+        let run_a = run_benchmark(
+            SyntheticCase::SmoothBowl,
+            SamplingDesign::GaussianProcessLcb,
+            Fidelity::High,
+            0xB0_71_A7,
+            BUDGET,
+        )
+        .unwrap();
+        let run_b = run_benchmark(
+            SyntheticCase::SmoothBowl,
+            SamplingDesign::GaussianProcessLcb,
+            Fidelity::High,
+            0xB0_71_A7,
+            BUDGET,
+        )
+        .unwrap();
+        assert_eq!(run_a, run_b);
+        let points = run_a
+            .transcript
+            .iter()
+            .map(|record| (record.point.x.to_bits(), record.point.y.to_bits()))
+            .collect::<std::collections::HashSet<_>>();
+        assert_eq!(points.len(), BUDGET);
+    }
+
+    #[test]
+    fn gp_covariance_jitter_handles_duplicate_observation_locations() {
+        let point = Point { x: 0.5, y: 0.5 };
+        let posterior = GaussianProcessPosterior::fit(&[
+            ProposalObservation {
+                point,
+                status: TrialStatus::Feasible,
+                observed_objective: Some(0.1),
+            },
+            ProposalObservation {
+                point,
+                status: TrialStatus::Feasible,
+                observed_objective: Some(0.11),
+            },
+        ])
+        .unwrap();
+        let (mean, variance) = posterior.predict(point).unwrap();
+        assert!(mean.is_finite());
+        assert!(variance.is_finite() && variance >= 0.0);
+    }
+
+    #[test]
+    fn gp_lcb_proposal_is_invariant_to_positive_affine_objective_scaling() {
+        let initial = run_benchmark(
+            SyntheticCase::SmoothBowl,
+            SamplingDesign::LatinHypercube,
+            Fidelity::High,
+            0x5CA1_E,
+            8,
+        )
+        .unwrap();
+        let history = proposal_history(&initial.transcript);
+        let scaled_history: Vec<ProposalObservation> = history
+            .iter()
+            .map(|entry| ProposalObservation {
+                point: entry.point,
+                status: entry.status,
+                observed_objective: entry.observed_objective.map(|value| 1000.0 * value + 500.0),
+            })
+            .collect();
+
+        assert_eq!(
+            choose_gaussian_process_lcb(&history).unwrap(),
+            choose_gaussian_process_lcb(&scaled_history).unwrap()
+        );
+    }
+
+    #[test]
+    fn gp_rejects_non_finite_observations_and_non_positive_covariance() {
+        let result = GaussianProcessPosterior::fit(&[ProposalObservation {
+            point: Point { x: 0.1, y: 0.2 },
+            status: TrialStatus::Feasible,
+            observed_objective: Some(f64::NAN),
+        }]);
+        assert_eq!(result, Err(GaussianProcessError::NonFiniteInput));
+
+        assert_eq!(
+            gp_cholesky(&[vec![1.0, 2.0], vec![2.0, 1.0]]),
+            Err(GaussianProcessError::NotPositiveDefinite)
+        );
+        assert_eq!(
+            gp_cholesky(&[vec![1.0, 0.3], vec![0.4, 1.0]]),
+            Err(GaussianProcessError::InvalidMatrix)
+        );
+        assert_eq!(
+            gp_cholesky(&[vec![f64::INFINITY]]),
+            Err(GaussianProcessError::NonFiniteInput)
+        );
+        assert_eq!(
+            gp_cholesky(&[]),
+            Err(GaussianProcessError::InvalidMatrix)
+        );
+    }
+
+    #[test]
     fn latin_hypercube_covers_each_stratum_in_each_dimension_once() {
         let points = sample_points(SamplingDesign::LatinHypercube, BUDGET, 0x1A2B_3C4D).unwrap();
         let mut x_strata: Vec<usize> = points
@@ -951,6 +1579,18 @@ mod tests {
                 &[],
             ),
             Err(BenchmarkError::EmptySeedSet)
+        );
+    }
+
+    #[test]
+    fn sequential_methods_cannot_be_invoked_as_fixed_designs() {
+        assert_eq!(
+            sample_points(SamplingDesign::AdaptiveNearestNeighbor, BUDGET, 1),
+            Err(BenchmarkError::AdaptiveRequiresHistory)
+        );
+        assert_eq!(
+            sample_points(SamplingDesign::GaussianProcessLcb, BUDGET, 1),
+            Err(BenchmarkError::AdaptiveRequiresHistory)
         );
     }
 
