@@ -53,7 +53,9 @@ This is a finite-horizon union-bound guarantee, not an e-process, not a conforma
 
 For \(\alpha=0.05\), equal spending over five audits requires at least 99 calibration batches just to make the threshold \(0.01\) attainable. The example weighted schedule above ends at threshold \(0.005\), requiring at least 199 calibration batches to make every threshold attainable. These are **resolution floors, not power recommendations**. In practice, calibration size and allocation must be selected from a preregistered power study.
 
-The monitor accepts one scalar score per fresh batch. `standardized_rms_residual` remains the simple baseline; the optional `multi_view_standardized_residual_score` aggregates four predeclared diagnostics into one scalar: RMS error, a normalized maximum residual, a sample-size-scaled mean residual, and sample-size-scaled lag-one residual correlation. This is a sensitivity-oriented score family, not a new analytic p-value. Its normalizers are heuristics; the conformal guarantee applies only to the final aggregate when that exact score function, diagnostic family, batch length, ordering convention, and target-distribution protocol are frozen and applied to independent clean calibration batches and future audits. Changing any part requires fresh calibration. The score still cannot detect unrepresented subgroup failures unless subgroup diagnostics are explicitly part of the frozen score family. A non-alarm never certifies the model.
+The monitor accepts one scalar score per fresh batch. `standardized_rms_residual` remains the simple baseline. `standardized_residual_diagnostics` reports four predeclared views—RMS error, normalized peak residual, normalized mean bias, and normalized lag-one dependence—and `multi_view_standardized_residual_score` aggregates them by a maximum statistic. This may be more sensitive to some alternatives and less sensitive to others; score fusion does not guarantee better power.
+
+The second fusion path exposes `minimum_component_p_fusion_score` and `sum_log_component_p_fusion_score`. It ranks each diagnostic against an independent normalization split, aggregates the component tail scores, and then requires a *separate untouched outer calibration split* to calibrate the aggregate. This second stage is crucial: the minimum p-value or sum of negative log p-values is not, by itself, a final calibrated p-value. The outer rank calibration avoids independence assumptions between diagnostic views, conditional on the fixed normalization split, at the cost of additional clean calibration data. All score functions, component order, batch length, target distribution, and split roles must remain fixed; changing them requires fresh calibration. None of the scores can detect unrepresented subgroup failures unless subgroup diagnostics are explicitly included. A non-alarm never certifies the model.
 
 ## 4. Contract tests and receipt requirements
 
@@ -69,12 +71,13 @@ Compare under matched total audit/measurement budgets:
 
 1. one-shot conformal audit at a single predeclared endpoint;
 2. RMS-only residual score with equal-spending finite-horizon Bonferroni baseline;
-3. the frozen multi-view aggregate residual score with the same calibrator, audit batches, alpha and horizon;
-4. equal versus risk-weighted finite-horizon spending, with weights preregistered for an explicitly stated risk/time-to-signal objective;
-4. residual CUSUM/Page-Hinkley-style monitors, clearly labeled as non-distribution-free unless separately justified;
-5. conditional conformal test martingales (CCTM), which target anytime-valid control using a fixed reference;
-6. predictive-rank martingales (PRM), which account for dependence in repeated ranks against a fixed calibration reference;
-7. recent parameter-free conditional conformal martingales for shifts at unknown times.
+3. maximum-statistic multi-view score with the same calibrator, batches, alpha and horizon;
+4. two-stage minimum-p and sum-log score fusion, with matched total clean-calibration budget;
+5. equal versus risk-weighted finite-horizon spending, with weights preregistered for an explicitly stated risk/time-to-signal objective;
+6. residual CUSUM/Page-Hinkley-style monitors, clearly labeled as non-distribution-free unless separately justified;
+7. conditional conformal test martingales (CCTM), which target anytime-valid control using a fixed reference;
+8. predictive-rank martingales (PRM), which account for dependence in repeated ranks against a fixed calibration reference;
+9. recent parameter-free conditional conformal martingales for shifts at unknown times.
 
 Relevant research frontiers:
 
@@ -84,7 +87,7 @@ Relevant research frontiers:
 - [Optimal Alpha Spending for Sequential Analysis with Binomial Data](https://academic.oup.com/jrsssb/article/82/4/1141/7056022): shows that spending shape should be selected for a predeclared operating objective such as power, expected sample size, or expected time to signal.
 - [When Does Score Fusion Help? Conformally Certified Out-of-Distribution Detection for Camera and LiDAR Sensors](https://pmc.ncbi.nlm.nih.gov/articles/PMC13469369/): emphasizes that fusion gains depend on the detector and modality; a combined score must be compared with its strongest constituent rather than assumed superior.
 
-These are comparators and research targets, **not methods implemented by this PR**. Risk-weighted alpha spending is established statistical practice; our contribution here is the typed Rust contract, resolution/terminal-state checks, audit receipts, and a benchmark interface aligned to scientific model-adequacy decisions. Any implementation of CCTM/PRM/restarting methods needs mathematical review, reproducible reference cases, dependency/license review, and tests against its published algorithm—not a name-only approximation.
+CCTM, PRM and restart-based monitoring remain comparators, **not implementations in this PR**. Risk-weighted alpha spending is established statistical practice. The new work provides typed Rust score diagnostics, maximum-statistic aggregation, split-calibrated score-fusion primitives, and explicit monitoring contracts; none is claimed to be a new statistical guarantee or SOTA result. Any implementation of CCTM/PRM/restarting methods needs mathematical review, reproducible reference cases, dependency/license review, and tests against its published algorithm—not a name-only approximation.
 
 ### Report separately
 
@@ -109,6 +112,21 @@ Suggested confirmatory program: at least 60 held-out worlds across 6 or more str
 - no claim that a no-alarm result proves adequacy or that the method covers arbitrary non-exchangeable shift.
 
 If these gates fail, retain the method as an explicit conservative baseline rather than weakening the protocol.
+
+### Exploratory synthetic pilot (independent JavaScript calculation; Rust not executed)
+
+A deterministic, exploratory paired pilot compared four score policies at nominal alpha 0.05. Each replication used 64 residuals per batch, 99 clean batches in a component-normalization split A, 99 independent clean batches in aggregate-calibration split B, and one audit batch (198 calibration batches total for each method). There were 1,200 replications per condition with seed `0x9bf1d3a7254e8c61`. The RMS and raw-maximum policies used all 198 clean scores directly; the two-stage fusion policies used split A to rank each component and split B to calibrate the fused statistic. Alternative batches had one randomly positioned +6-standard-deviation outlier, a +0.4 standard-deviation mean shift, or Gaussian AR(1) residuals with \(\rho=0.55\). The clean-null batches were independent standard Gaussian residuals.
+
+| Scenario | RMS only | Raw maximum | Minimum-p fusion | Sum-log fusion |
+|---|---:|---:|---:|---:|
+| Clean-null alarm rate | 3.50% | 3.83% | 2.08% | 4.08% |
+| One +6σ outlier | 82.33% | 34.17% | 66.17% | 92.25% |
+| +0.4σ mean shift | 20.17% | 84.00% | 48.50% | 53.25% |
+| AR(1), \(\rho=0.55\) | 8.75% | 97.08% | 62.25% | 48.08% |
+
+For the clean-null rates, the unpaired 95% Wilson intervals were respectively 2.60–4.70%, 2.89–5.08%, 1.42–3.06%, and 3.10–5.36%. Ties make these empirical rates conservative in some policies. This was a small exploratory Monte Carlo with 1,200 replicates, not a confirmatory benchmark; these numbers are **independent JavaScript calculations of the stated formulas, not executed Rust tests or published scientific results**.
+
+The key finding is the trade-off: raw maximum is highly sensitive to mean bias and serial dependence but misses many single-spike alternatives; sum-log fusion performs best on this one-spike scenario but is weaker on the AR(1) alternative. No policy uniformly dominates. That agrees with recent score-fusion research, which explicitly finds that combining detectors can fail to beat the best constituent depending on the data and modality ([score-fusion study](https://pmc.ncbi.nlm.nih.gov/articles/PMC13469369/)). Next, reproduce this pilot in Rust, add heavy-tailed and heteroscedastic nulls, perform at least 10,000 clean-null streams, report paired confidence intervals for differences, and include matched-cost baselines before choosing a default policy.
 
 ## 6. Next paradigm shift
 
