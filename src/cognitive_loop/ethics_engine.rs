@@ -409,7 +409,7 @@ pub(crate) struct EthicsEngineOutput {
     /// Current-input, text-only consent evidence trace; never an authorization permit.
     pub consent_assessment: ConsentTextAssessment,
     /// Microseconds spent extracting the current input's consent evidence.
-    pub consent_assessment_us: u64,
+    pub consent_parse_us: u64,
     /// Moral parsing confidence [0, 1]
     pub moral_confidence: f64,
     /// Deontological violations detected
@@ -791,10 +791,10 @@ impl EthicsEngine {
         // evaluate() call. The full moral algebra below intentionally runs on a
         // seven-cycle cadence, so neither its verdict nor its cached fields may
         // be used as a per-input consent signal between those cycles.
-        let consent_assessment_start = Instant::now();
+        let consent_parse_start = Instant::now();
         let parsed_consent = self.moral_parser.parse(input.input);
         let consent_assessment = parsed_consent.consent_assessment.clone();
-        let consent_assessment_us = consent_assessment_start.elapsed().as_micros() as u64;
+        let consent_parse_us = consent_parse_start.elapsed().as_micros() as u64;
         let consent_violation = parsed_consent.patient.is_some()
             && matches!(parsed_consent.consent, ConsentState::Absent | ConsentState::Denied);
 
@@ -1242,7 +1242,7 @@ impl EthicsEngine {
             deontological_verdict,
             consent_violation,
             consent_assessment,
-            consent_assessment_us,
+            consent_parse_us,
             moral_confidence,
             violations,
             satisfactions,
@@ -1882,7 +1882,7 @@ mod tests {
         };
         let output8 = engine.evaluate(&current_consent_input);
         assert_eq!(output8.consent_assessment.state, ConsentState::Absent);
-        assert!(output8.consent_assessment_us <= output8.total_us);
+        assert!(output8.consent_parse_us <= output8.total_us);
         assert!(output8.consent_violation);
         assert_eq!(output8.unified_verdict, EthicalVerdict::Blocked);
         assert!(
