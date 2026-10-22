@@ -492,6 +492,8 @@ mod tests {
             quintic_hermite_sample_grid(&[0.0, 10.0], &[vec![0.0, 0.0], vec![f64::NAN, 0.0]])
                 .is_none()
         );
-        assert!(quintic_hermite_sample_grid(&[0.0, 9.0], &[vec![0.0, 0.0], vec![0.0, 0.0]]).is_none());
+        assert!(
+            quintic_hermite_sample_grid(&[0.0, 9.0], &[vec![0.0, 0.0], vec![0.0, 0.0]]).is_none()
+        );
     }
 }
