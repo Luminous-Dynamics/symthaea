@@ -383,6 +383,11 @@ fn audit(ledger: &Ledger, expected_ids: &[String], ledger_bytes: &[u8]) -> Resul
                 );
             }
             if let Some(adjudicator_id) = adjudication.adjudicator_id.as_deref() {
+                ensure!(
+                    !initial_reviewers.contains(adjudicator_id),
+                    "case {} adjudicator cannot also be an initial reviewer",
+                    case.case_id
+                );
                 let adjudicator = reviewers.get(adjudicator_id)
                     .with_context(|| format!("case {} refers to undeclared adjudicator {}", case.case_id, adjudicator_id))?;
                 ensure!(
