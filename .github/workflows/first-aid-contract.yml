@@ -21,6 +21,7 @@ on:
       - "docs/research/first-aid/**"
       - "xtask/src/first_aid.rs"
       - "xtask/src/first_aid_trajectory.rs"
+      - "xtask/src/first_aid_model.rs"
       - "xtask/src/guideline_change_impact.rs"
       - "xtask/src/main.rs"
       - "xtask/Cargo.toml"
@@ -79,7 +80,7 @@ jobs:
             .status == "research_coverage_inventory" and
             .clinical_use_authorized == false and
             .count_summary.case_count == 40 and
-            .count_summary.implemented_or_frozen_count == 40 and
+            .count_summary.mapped_case_count == 40 and
             .count_summary.frozen_trace_count == 12 and
             .count_summary.mutation_case_count == 28 and
             .count_summary.planned_not_yet_executable_count == 0 and
