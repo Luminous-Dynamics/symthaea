@@ -852,6 +852,26 @@ mod tests {
         }
     }
 
+    struct SuccessfulBackend {
+        backend_name: &'static str,
+        output: &'static str,
+    }
+
+    #[async_trait::async_trait]
+    impl LLMBackend for SuccessfulBackend {
+        async fn generate(&self, _prompt: &str, _params: &GenerationParams) -> anyhow::Result<String> {
+            Ok(self.output.to_string())
+        }
+
+        async fn is_available(&self) -> bool {
+            true
+        }
+
+        fn name(&self) -> &str {
+            self.backend_name
+        }
+    }
+
     #[tokio::test]
     async fn backend_attempts_report_simulated_implementation_under_local_selection() {
         let mut dispatcher = IntelligentDispatcher::new(Arc::new(SimulatedBackend), None);
@@ -891,6 +911,32 @@ mod tests {
         // The cloud attempt is charged; simulated fallback adds no real-backend cost.
         assert_eq!(result.energy_cost, COST_CLOUD_LLM);
         assert_eq!(dispatcher.total_energy(), COST_CLOUD_LLM);
+    }
+
+    #[tokio::test]
+    async fn cloud_failure_charges_both_actual_backends() {
+        let mut dispatcher = IntelligentDispatcher::new(
+            Arc::new(SuccessfulBackend {
+                backend_name: "Ollama",
+                output: "pub fn fallback() -> bool { true }",
+            }),
+            Some(Arc::new(FailingBackend { backend_name: "Anthropic" })),
+        );
+        dispatcher.force_next_tier(BackendTier::CloudLlm);
+        let result = dispatcher
+            .generate("test", &GenerationParams::default(), EpistemicStatus::Uncertain, 0.8, 0.8)
+            .await;
+
+        assert_eq!(result.tier, BackendTier::CloudLlm, "selected tier is still recorded");
+        assert_eq!(result.backend_attempts.len(), 2);
+        assert_eq!(result.backend_attempts[0].tier, BackendTier::CloudLlm);
+        assert_eq!(result.backend_attempts[0].estimated_energy_cost, COST_CLOUD_LLM);
+        assert!(!result.backend_attempts[0].success);
+        assert_eq!(result.backend_attempts[1].tier, BackendTier::LocalLlm);
+        assert_eq!(result.backend_attempts[1].estimated_energy_cost, COST_LOCAL_LLM);
+        assert!(result.backend_attempts[1].success);
+        assert_eq!(result.energy_cost, COST_CLOUD_LLM + COST_LOCAL_LLM);
+        assert_eq!(dispatcher.total_energy(), COST_CLOUD_LLM + COST_LOCAL_LLM);
     }
 
     #[test]
