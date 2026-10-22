@@ -107,7 +107,7 @@ fi
 # Five operating points × five stress levels × three actions; profiles are paired
 # across all four envelope methods and all operating points.
 if ! awk -F, '
-  NR == 1 { if (NF != 22) failed = 1; next }
+  NR == 1 { if (NF != 23) failed = 1; next }
   {
     if (NF != 22) failed = 1
     if ($1 != "within_envelope" && $1 != "out_of_envelope") failed = 1
@@ -204,8 +204,8 @@ if ! cmp -s "$tmpdir/paired-eval-a.csv" "$tmpdir/paired-eval-b.csv"; then
   printf 'FAIL: repeated paired-inference report is not byte-identical\n' >&2
   exit 1
 fi
-if ! awk -F, 'NR == 1 { if (NF != 22) failed = 1; next }
-  { if (NF != 22 || $6 != 30) failed = 1; rows++ }
+if ! awk -F, 'NR == 1 { if (NF != 23) failed = 1; next }
+  { if (NF != 23 || $6 != 30) failed = 1; rows++ }
   END { if (NR != 5 || rows != 4 || failed) exit 1 }
 ' "$tmpdir/paired-eval-a.csv"; then
   printf 'FAIL: paired-inference schema or condition coverage is invalid\n' >&2
