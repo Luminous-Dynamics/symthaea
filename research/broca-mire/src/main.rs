@@ -625,6 +625,45 @@ fn system_specs(capacity: usize) -> Vec<MemoryModel> {
     ]
 }
 
+fn validate_self_checks(runs: &[(&'static str, &'static str, Vec<QueryResult>)]) -> Result<(), String> {
+    let exact = runs
+        .iter()
+        .find(|(name, _, _)| *name == "exact_versioned_reference")
+        .ok_or_else(|| "missing exact reference system".to_owned())?;
+    if let Some(failure) = exact.2.iter().find(|row| !row.correct()) {
+        return Err(format!(
+            "exact reference disagrees with evaluator label at query {} ({})",
+            failure.query_id, failure.family
+        ));
+    }
+
+    let namespace_mutant = runs
+        .iter()
+        .find(|(name, _, _)| *name == "mutation_namespace_blind")
+        .ok_or_else(|| "missing namespace mutation control".to_owned())?;
+    if !namespace_mutant.2.iter().any(|row| {
+        row.family == "cross_namespace" && row.expected.is_none() && row.actual.is_some()
+    }) {
+        return Err("namespace mutation control was not detected; refusing to emit scores".into());
+    }
+
+    let version_mutant = runs
+        .iter()
+        .find(|(name, _, _)| *name == "mutation_version_ignoring")
+        .ok_or_else(|| "missing version mutation control".to_owned())?;
+    if !version_mutant.2.iter().any(|row| {
+        row.family == "stale_update" && row.actual.is_some() && row.actual != row.expected
+    }) {
+        return Err("stale-version mutation control was not detected; refusing to emit scores".into());
+    }
+    if !version_mutant.2.iter().any(|row| {
+        row.family == "deletion_replay" && row.expected.is_none() && row.actual.is_some()
+    }) {
+        return Err("delete/replay mutation control was not detected; refusing to emit scores".into());
+    }
+    Ok(())
+}
+
 fn run() -> Result<(), String> {
     let args: Vec<String> = env::args().skip(1).collect();
     if args.len() == 1 && args[0] == "--help" {
@@ -637,8 +676,20 @@ fn run() -> Result<(), String> {
     let config = parse_args(&args)?;
     let actions = build_fixture(config.seed, config.episodes, config.distractors);
     let fingerprint = fixture_fingerprint(&actions);
+
+    // Validate the fixture/scorer and mutation controls before printing any
+    // result-shaped record. A bad oracle or undetected mutant aborts the run.
+    let mut completed: Vec<(&'static str, &'static str, Vec<QueryResult>)> = Vec::new();
+    for mut model in system_specs(config.capacity) {
+        let name = model.name;
+        let role = model.role;
+        let results = run_model(&actions, &mut model);
+        completed.push((name, role, results));
+    }
+    validate_self_checks(&completed)?;
+
     println!(
-        "{{\"type\":\"run\",\"protocol\":\"MIREv1\",\"generator\":\"mire-reference-v1\",\"status\":\"COMPLETED\",\"source_sha\":{},\"seed\":{},\"episodes\":{},\"distractors\":{},\"capacity\":{},\"actions\":{},\"fixture_fnv1a64\":{},\"fingerprint_is_cryptographic\":false}}",
+        "{{\"type\":\"run\",\"protocol\":\"MIREv1\",\"generator\":\"mire-reference-v1\",\"status\":\"COMPLETED\",\"self_checks_passed\":true,\"source_sha\":{},\"seed\":{},\"episodes\":{},\"distractors\":{},\"capacity\":{},\"actions\":{},\"fixture_fnv1a64\":{},\"fingerprint_is_cryptographic\":false}}",
         json_string(&config.source_sha),
         config.seed,
         config.episodes,
@@ -648,9 +699,8 @@ fn run() -> Result<(), String> {
         json_string(&fingerprint)
     );
 
-    for mut model in system_specs(config.capacity) {
-        let results = run_model(&actions, &mut model);
-        for result in &results {
+    for (_, _, results) in &completed {
+        for result in results {
             emit_result(
                 result,
                 &config.source_sha,
@@ -660,7 +710,7 @@ fn run() -> Result<(), String> {
             );
         }
         emit_summaries(
-            &results,
+            results,
             &config.source_sha,
             config.seed,
             config.episodes,
@@ -669,7 +719,6 @@ fn run() -> Result<(), String> {
     }
     Ok(())
 }
-
 fn main() {
     if let Err(error) = run() {
         eprintln!("broca-mire-reference: {error}");
