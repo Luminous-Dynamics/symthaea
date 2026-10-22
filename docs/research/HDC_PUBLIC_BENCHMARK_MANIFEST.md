@@ -50,7 +50,7 @@ Source pages:
 2. **Equal-budget tuning:** tune only on train/validation data; disclose the same search budget per method. Never select settings with the test split.
 3. **Resource-matched:** compare equal dimension and equal model-byte budgets. Count packed bits properly; include preprocessing, indexes, optimizer state and model metadata.
 
-The initial methods register prototype/MAP/BSC/HRR, published OnlineHD/AdaptHD/DistHD/SparseHD methods, and SVM/LDA/Ridge both on original and shared encoded features. These are **planned comparator identities**, not implemented algorithms and not benchmark results. An adapter must reproduce the named method's operations and protocol before it can become qualified.
+The initial methods register prototype/MAP/BSC/HRR, published OnlineHD/AdaptHD/DistHD/SparseHD methods, and SVM/LDA/Ridge/RVFL both on original and shared encoded features. RVFL is included because the published comparison reports it as a strong UCI baseline. These are **planned comparator identities**, not implemented algorithms and not benchmark results. An adapter must reproduce the named method's operations and protocol before it can become qualified.
 
 ## Required reporting
 
