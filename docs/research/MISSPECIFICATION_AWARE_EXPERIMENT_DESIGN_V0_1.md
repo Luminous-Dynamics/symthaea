@@ -197,3 +197,45 @@ A leaderboard number without these fields is a result that cannot yet be indepen
 ## Claim boundary
 
 Until P4 completes, describe MAED as a proposed benchmark and research protocol. Do not claim that it outperforms EIG, R-IDeA, maximin robust design, industrial scientific ML, or human researchers. The immediate win is operational: Symthaea should be able to tell the difference between **“I found a survivor,” “I validated a law,” and “my model space failed.”**
+
+
+## New implementation direction: finite-sample-calibrated adequacy alarms
+
+The Rust module `adequacy_calibration.rs` adds a first concrete calibration mechanism rather than treating a residual threshold as self-justifying.
+
+### Batch-score conformal test
+
+1. Compute one predeclared nonconformity statistic per independent batch. The initial helper is standardized RMS residual,
+   `sqrt(mean(((observed - predicted) / predictive_scale)^2))`.
+2. Build the reference distribution from independent calibration batches expected to represent clean operation and the same target audit distribution.
+3. For a fresh audit-batch score (s_*), calculate the conservative rank p-value
+   `p = (1 + count(s_i >= s_*)) / (n + 1)`.
+4. Raise a predictive-misfit alarm when `p <= alpha`; otherwise report only that this test did not flag the batch.
+5. Require the audit batch to be independent of observations used to fit or tune the candidate. Numeric validity, sample-size resolution, and this explicit independence declaration fail closed.
+
+At `alpha = 0.05`, at least 19 calibration batches are needed for the minimum possible p-value `1/(n+1)` to reach 0.05. This is only a resolution floor, not a power guarantee. The calibration method assumes exchangeability of the batch-level scores under the clean null; it does not supply distribution-free validity under arbitrary covariate shift. Calibration batches must be collected from a justified target distribution or the validity claim must be narrowed accordingly.
+
+### What this can and cannot establish
+
+This detector can identify an audit batch whose chosen predictive-misfit score is unusual relative to clean calibration batches. It does not prove that a candidate is true when no alarm occurs; a misspecified candidate may have ordinary residuals on a particular finite batch, and residual magnitude alone can miss structural patterns such as autocorrelation or regime changes. Future candidates should add independently calibrated scores for structured residuals and coverage gaps, with predeclared multiplicity control rather than post-hoc thresholding.
+
+The pure Rust decision layer can consume the returned `AdequacyAssessment`. It intentionally remains the consumer of this typed result: code that invents `calibrated = true` flags manually is not equivalent to running a validated calibration process. The conformal calibrator records its p-value and alpha, but the caller remains responsible for provenance, batch independence, score-definition identity, and target-distribution alignment. The module is not yet wired into the existing integrated discovery simulator.
+
+### Added test obligations
+
+- Standardized residual score matches a hand calculation and fails closed on invalid dimensions/scales and arithmetic overflow.
+- `alpha = 0.05` rejects a calibration set with fewer than 19 batches because the desired p-value is unattainable.
+- An audit score larger than every calibration score has the expected minimum rank p-value and raises a calibrated alarm.
+- Ties are counted conservatively; non-independent audit data are rejected.
+- Non-finite/negative scores and invalid alpha values fail closed.
+
+These are deterministic unit-test cases; no Rust or CI pass is claimed until the exact-head workflow finishes.
+
+### Literature context
+
+- [Corrected Max-Rank for Finite-Sample Conformal Prediction (ICML 2026)](https://proceedings.mlr.press/v329/schlembach26a.html) is a timely reminder that off-by-one errors in finite-sample score thresholds can break the advertised guarantee. Symthaea should favor rank p-values directly and test attainable p-value resolution.
+- [Conformal Inference for Online Prediction with Arbitrary Distribution Shifts](https://www.jmlr.org/papers/v25/22-1218.html) addresses sequential settings with changing data distributions, but its guarantees and objectives must not be casually equated with the split-exchangeable batch test here.
+- [Model Assessment and Selection under Temporal Distribution Shift](https://proceedings.mlr.press/v235/han24b.html) motivates an additional nonstationary-data benchmark arm.
+- [NIST Sequential Bayesian Experiment Design](https://www.nist.gov/programs-projects/sequential-bayesian-experiment-design) remains an industry-relevant baseline for cost-sensitive parameter estimation in an assumed parametric model; Symthaea's broader problem additionally requires structural recovery and model-space adequacy.
+
+The immediate experimental follow-on is to evaluate false-alarm calibration on clean held-out world batches, detection power over the predeclared discrepancy sweep, and clean-world recovery/cost jointly. Only after that should the calibrator be wired into an active policy; calibration accuracy alone is not a scientific-discovery win.
