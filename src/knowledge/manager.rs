@@ -282,23 +282,32 @@ impl KnowledgeManager {
         // Initialize persistence and load existing knowledge
         let persistence = config.db_path.as_ref().map(|path| {
             let mut p = KnowledgePersistence::new(path);
-            // Load graph facts with stable fact IDs and optional claim provenance.
-            if let Ok(mut facts) = p.load_graph_facts() {
-                // Restore explicit stable IDs before legacy NULL-ID rows so an old row
-                // cannot consume an ID referenced by a persisted evidence link.
-                facts.sort_by_key(|record| record.fact_id.is_none());
-                for record in &facts {
-                    graph.import_graph_fact_record(record);
+            // Load and validate facts plus typed evidence links from one SQLite
+            // read transaction. Never hydrate half a provenance snapshot.
+            match p.load_graph_snapshot() {
+                Ok((facts, links)) => {
+                    for record in &facts {
+                        graph.import_graph_fact_record(record);
+                    }
+                    graph.import_evidence_links(&links);
+                    if !facts.is_empty() {
+                        tracing::info!(
+                            count = facts.len(),
+                            "Knowledge: loaded validated graph facts from SQLite"
+                        );
+                    }
+                    if !links.is_empty() {
+                        tracing::info!(
+                            count = links.len(),
+                            "Knowledge: loaded validated typed evidence links from SQLite"
+                        );
+                    }
                 }
-                if !facts.is_empty() {
-                    tracing::info!(count = facts.len(), "Knowledge: loaded graph facts from SQLite");
-                }
-            }
-            // Restore typed evidence links only after their fact endpoints exist.
-            if let Ok(links) = p.load_evidence_links() {
-                graph.import_evidence_links(&links);
-                if !links.is_empty() {
-                    tracing::info!(count = links.len(), "Knowledge: loaded typed evidence links from SQLite");
+                Err(error) => {
+                    tracing::warn!(
+                        error = %error,
+                        "Knowledge: refused to hydrate invalid graph/provenance snapshot"
+                    );
                 }
             }
             // Load existing causal edges
