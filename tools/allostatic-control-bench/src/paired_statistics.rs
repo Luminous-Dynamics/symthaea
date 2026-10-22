@@ -351,6 +351,12 @@ mod tests {
     }
 
     #[test]
+    fn nonzero_violation_count_matches_exact_binomial_upper_reference() {
+        let bound = super::clopper_pearson_upper95(3, 10);
+        assert!((bound - 0.606_624_216_105_412_3).abs() < 1e-9, "bound={bound}");
+    }
+
+    #[test]
     fn exact_mcnemar_detects_strong_directional_discordance() {
         let p = super::exact_mcnemar_two_sided(10, 0);
         assert!((p - 0.001_953_125).abs() < 1e-12);
