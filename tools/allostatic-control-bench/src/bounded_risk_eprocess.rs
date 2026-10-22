@@ -509,6 +509,12 @@ mod tests {
         assert_eq!(process.bet_values(), fractions.map(|fraction| fraction / 0.05));
         assert_eq!(process.component_log_e_values(), [0.0; 7]);
         assert!((process.log_alarm_threshold().exp() - 100.0).abs() < 1e-10);
+
+        process.observe(1.0).expect("valid bounded loss");
+        process.reset();
+        assert_eq!(process.component_log_e_values(), [0.0; 7]);
+        assert_eq!(process.log_e_value(), 0.0);
+        assert!(!process.alarmed());
     }
 
     #[test]
