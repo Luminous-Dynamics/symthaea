@@ -14,14 +14,15 @@ The test-only module `physics::casting_optimization_benchmark` implements a dete
 - an **adaptive nearest-neighbor explore/exploit baseline** with a four-point LHS warm start, followed by a frozen candidate-lattice score: nearest observed objective minus a fixed distance-based exploration bonus;
 - a minimal **Gaussian-process lower-confidence-bound (GP-LCB) Bayesian-optimization baseline** with a fixed RBF kernel, empirical constant prior mean, fixed observation-noise variance and diagonal jitter, and a fixed LCB exploration coefficient.
 
-It defines six synthetic cases with known objective minima:
+It defines seven synthetic cases with known objective minima:
 
 1. smooth bowl;
 2. coupled-factor ridge;
 3. bounded feasible island;
 4. heteroscedastic observation noise;
 5. biased cheap/low-fidelity observations versus an expensive/high-fidelity oracle;
-6. a deterministic failed-query corner.
+6. a deterministic failed-query corner;
+7. a non-convex Rastrigin landscape with a known global optimum and many local minima.
 
 Every record stores the chosen point, status, fidelity, evaluation-only ground-truth value, observed objective where available, cost units and cumulative cost. A run receipt retains all records and a domain-separated BLAKE3 transcript digest. Failed and infeasible attempts are recorded and charged. Zero budget and cumulative-cost overflow fail closed.
 
@@ -31,7 +32,7 @@ The paired comparison helper runs all five strategies over the same ordered seed
 
 ## Important scope limits
 
-This is the **first executable baseline tranche**, not the complete CASTING-002A benchmark. It does not yet implement a learned-hyperparameter GP, multi-fidelity acquisition, a DOE/response-surface solver, or a foundry solver adapter. The fidelity discrepancy exists to stress later method-selection code; no adaptive method currently decides when to purchase a low- or high-fidelity evaluation.
+This is the **first executable baseline tranche**, not the complete CASTING-002A benchmark. It does not yet implement learned GP hyperparameters, expected-improvement acquisition, multi-fidelity acquisition, a DOE/response-surface solver, or a foundry solver adapter. The fidelity discrepancy exists to stress later method-selection code; no adaptive method currently decides when to purchase a low- or high-fidelity evaluation.
 
 The synthetic objective is not a casting-physics model. No observed objective, regret score, cost unit, or synthetic failure corresponds to real material, equipment, energy, yield, defect rate, or production cost. The ground-truth objective is retained in evaluation receipts for the evaluator; query selection does not use unqueried candidate truth. The adaptive proposer is explicitly checked not to read the evaluation-only truth field from prior records.
 
@@ -39,7 +40,7 @@ The GP-LCB constants are deliberately fixed: RBF length scale 0.25, signal varia
 
 ## Test inventory
 
-The 20 authored tests cover:
+The 22 authored tests cover:
 - known-answer minima and feasibility at each declared optimum;
 - equal query budgets, complete status counts, cumulative cost accounting and non-negative regret;
 - exact replay of records, metrics and transcript digest at a fixed seed;
@@ -56,8 +57,10 @@ The 20 authored tests cover:
 - explicit exhaustion of the finite candidate lattice;
 - RBF-kernel, Cholesky factorization and triangular-solve known answers;
 - one-observation GP posterior mean/variance known answer;
+- duplicate-location covariance regularization and non-finite/asymmetric covariance rejection;
 - GP acquisition deterministic replay and truth-leakage negative control;
-- rejection of non-finite observations, malformed/non-positive-definite covariance and accidental use of sequential strategies as fixed samplers.
+- rejection of non-finite observations, malformed/non-positive-definite covariance and accidental use of sequential strategies as fixed samplers;
+- a known-answer Rastrigin global minimum for non-convex optimization testing.
 
 Test command:
 
@@ -71,7 +74,7 @@ Tests are authored but have not been compiled or run in the current authoring en
 
 1. **Harness integrity:** run the exact-head tests; independently review objective truth, sampling semantics, cost accounting and transcript digest.
 2. **DOE comparison:** add a preregistered response-surface/factorial baseline for cases where its assumptions and factor design are appropriate.
-3. **Adaptive single-fidelity:** add a simple, independently reviewed Bayesian-optimization baseline; ensure optimizer receives only queried observations and predeclared constraints, never evaluation-only truth.
+3. **GP-BO validation:** independently review the current fixed-hyperparameter GP-LCB baseline; run exact-head tests and compare it against the nearest-neighbor heuristic over the frozen suite, including the multimodal Rastrigin fixture.
 4. **Multi-fidelity:** compare low-/high-fidelity acquisition under a frozen discrepancy model and explicit costs. Penalize choices that over-trust a cheap but biased model.
 5. **Statistical report:** at least 100 paired seeds per synthetic case when practical, including per-run data, medians/quantiles, paired differences and uncertainty intervals. If runtime forces a smaller count, preregister and disclose it before seeing results.
 6. **Matched physical validation:** choose a named, non-critical part/process with competent foundry and metrology review. Freeze inspection, units, sample units, hard constraints, cost boundaries, holdout, stopping policy and failed-run handling before data collection.
