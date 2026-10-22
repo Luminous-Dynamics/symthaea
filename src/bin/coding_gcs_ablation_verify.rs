@@ -106,16 +106,31 @@ fn score_success(run: &Value, expected: u64) -> bool {
             == expected
 }
 
-fn oracle_complete(run: &Value, expected: u64) -> bool {
-    // A nonzero test-process exit is expected when assertions fail. If all
-    // declared tests are accounted for, the oracle is complete; runtime_error
-    // still prevents the run from being credited as a behavioral success.
-    expected > 0
-        && bool_field(run, "compiled") == Some(true)
+fn has_real_compile_rejection(run: &Value) -> bool {
+    bool_field(run, "compiled") == Some(false)
         && bool_field(run, "simulated") == Some(false)
-        && u64_field(run, "tests_passed").unwrap_or(0)
-            .saturating_add(u64_field(run, "tests_failed").unwrap_or(0))
-            == expected
+        && run.get("runtime_error").is_some_and(Value::is_null)
+        && run
+            .get("compile_errors")
+            .and_then(Value::as_array)
+            .is_some_and(|errors| {
+                errors.iter().any(|error| {
+                    error.as_str().is_some_and(|message| message.trim_start().starts_with("error"))
+                })
+            })
+}
+
+fn oracle_complete(run: &Value, expected: u64) -> bool {
+    // A decisive negative Rust compiler diagnostic is a completed verdict,
+    // even though the test binary could not be built. Runner/sandbox failures
+    // and simulated execution remain unresolved, not task losses.
+    expected > 0
+        && bool_field(run, "simulated") == Some(false)
+        && ((bool_field(run, "compiled") == Some(true)
+            && u64_field(run, "tests_passed").unwrap_or(0)
+                .saturating_add(u64_field(run, "tests_failed").unwrap_or(0))
+                == expected)
+            || has_real_compile_rejection(run))
 }
 
 fn verify_mode_summary(
@@ -334,8 +349,8 @@ fn audit(
 
     push_check(
         &mut errors,
-        u64_field(report, "schema_version") == Some(4),
-        "schema_version must be 4",
+        u64_field(report, "schema_version") == Some(5),
+        "schema_version must be 5",
     );
     push_check(
         &mut errors,
@@ -1323,7 +1338,7 @@ mod tests {
         })];
         let manifest_sha = manifest_digest(&manifest).unwrap();
         serde_json::json!({
-            "schema_version": 4,
+            "schema_version": 5,
             "benchmark": "symthaea_gcs_runtime_ablation",
             "source_revision": "1".repeat(40),
             "model_mode": "native",
@@ -1593,6 +1608,42 @@ mod tests {
         assert_eq!(read_f64(&summary, "ci95_lower_percentage_points"), Some(-100.0));
         assert_eq!(read_f64(&summary, "ci95_upper_percentage_points"), Some(-100.0));
         assert!(str_field(&summary, "warning").unwrap().contains("Small number of task clusters"));
+    }
+
+    #[test]
+    fn real_compiler_rejection_is_decisive_but_runner_failure_is_unresolved() {
+        let compile_rejection = serde_json::json!({
+            "compiled": false,
+            "simulated": false,
+            "tests_passed": 0,
+            "tests_failed": 0,
+            "runtime_error": null,
+            "compile_errors": ["error[E0425]: cannot find value missing in this scope"]
+        });
+        assert!(has_real_compile_rejection(&compile_rejection));
+        assert!(oracle_complete(&compile_rejection, 3));
+        assert!(!score_success(&compile_rejection, 3));
+
+        let launcher_failure = serde_json::json!({
+            "compiled": false,
+            "simulated": false,
+            "tests_passed": 0,
+            "tests_failed": 0,
+            "runtime_error": null,
+            "compile_errors": ["Sandbox error: rustc could not be launched"]
+        });
+        assert!(!has_real_compile_rejection(&launcher_failure));
+        assert!(!oracle_complete(&launcher_failure, 3));
+
+        let simulated_compile_error = serde_json::json!({
+            "compiled": false,
+            "simulated": true,
+            "tests_passed": 0,
+            "tests_failed": 0,
+            "runtime_error": null,
+            "compile_errors": ["error[E0425]: simulated compiler error"]
+        });
+        assert!(!oracle_complete(&simulated_compile_error, 3));
     }
 
     #[test]
