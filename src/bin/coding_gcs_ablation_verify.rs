@@ -1998,6 +1998,8 @@ mod tests {
             serde_json::json!({"NativeCodeTemplate": 1});
         report["summary"]["gcs_off"]["backend_attempts_succeeded"] = Value::from(1);
         report["summary"]["gcs_off"]["backend_attempts_failed"] = Value::from(0);
+        report["summary"]["gcs_off"]["backend_attempts_usable_generations"] = Value::from(1);
+        report["summary"]["gcs_off"]["backend_attempts_nonempty_unusable_outputs"] = Value::from(0);
         report["summary"]["gcs_off"]["backend_attempts_verifier_accepted"] = Value::from(0);
         report["summary"]["gcs_off"]["backend_attempts_verifier_rejected"] = Value::from(0);
         report["summary"]["gcs_off"]["backend_attempts_without_verifier_result"] = Value::from(1);
