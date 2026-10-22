@@ -3444,5 +3444,4 @@ mod tests {
         assert_eq!(receipt.last_attempted_dt, None);
         assert_eq!(receipt.min_attempted_dt, None);
     }
-
 }
