@@ -233,7 +233,27 @@ pub fn expected_information_gain_nats<H, E>(
     observation_std_dev: f64,
     predict: impl Fn(&H, &E) -> Option<f64>,
 ) -> Option<f64> {
-    if hypotheses.len() < 2 || !observation_std_dev.is_finite() || observation_std_dev <= 0.0 {
+    expected_information_gain_with_steps(
+        experiment,
+        hypotheses,
+        observation_std_dev,
+        INFORMATION_GAIN_QUADRATURE_STEPS,
+        predict,
+    )
+}
+
+fn expected_information_gain_with_steps<H, E>(
+    experiment: &E,
+    hypotheses: &[H],
+    observation_std_dev: f64,
+    quadrature_steps: usize,
+    predict: impl Fn(&H, &E) -> Option<f64>,
+) -> Option<f64> {
+    if quadrature_steps == 0
+        || hypotheses.len() < 2
+        || !observation_std_dev.is_finite()
+        || observation_std_dev <= 0.0
+    {
         return None;
     }
 
@@ -260,9 +280,9 @@ pub fn expected_information_gain_nats<H, E>(
         return Some(noiseless_information_gain(&predictions));
     }
 
-    let step_width = 2.0 * INFORMATION_GAIN_Z_LIMIT / INFORMATION_GAIN_QUADRATURE_STEPS as f64;
-    let mut quadrature = Vec::with_capacity(INFORMATION_GAIN_QUADRATURE_STEPS);
-    for step_index in 0..INFORMATION_GAIN_QUADRATURE_STEPS {
+    let step_width = 2.0 * INFORMATION_GAIN_Z_LIMIT / quadrature_steps as f64;
+    let mut quadrature = Vec::with_capacity(quadrature_steps);
+    for step_index in 0..quadrature_steps {
         let z = -INFORMATION_GAIN_Z_LIMIT + (step_index as f64 + 0.5) * step_width;
         // The normalizing constant cancels when these density weights are normalized.
         quadrature.push((z, (-0.5 * z * z).exp() * step_width));
@@ -547,6 +567,56 @@ mod tests {
                 1.0,
                 |_, _| Some(7.0),
                 |_| 1.0,
+            )
+            .is_none()
+        );
+    }
+
+    #[test]
+    fn midpoint_quadrature_matches_a_refined_reference_on_stress_cases() {
+        let prediction_cases = [
+            vec![-3.0_f64, -0.2, 0.4, 4.0],
+            vec![-0.01_f64, 0.0, 0.01, 0.02],
+            vec![0.0_f64, 0.0, 1.0, 1.0],
+            vec![0.0_f64, 0.1, 3.0, 10.0],
+            vec![-1.0_f64, -0.5, 0.25, 1.5, 2.0],
+        ];
+        let noise_levels = [0.03_f64, 0.1, 0.5, 1.0, 3.0, 10.0];
+
+        for predictions in &prediction_cases {
+            for observation_std_dev in noise_levels {
+                let estimate = expected_information_gain_with_steps(
+                    &(),
+                    predictions,
+                    observation_std_dev,
+                    INFORMATION_GAIN_QUADRATURE_STEPS,
+                    |prediction, _| Some(*prediction),
+                )
+                .expect("valid finite prediction set");
+                let refined = expected_information_gain_with_steps(
+                    &(),
+                    predictions,
+                    observation_std_dev,
+                    2_048,
+                    |prediction, _| Some(*prediction),
+                )
+                .expect("valid finite prediction set");
+
+                assert!(
+                    (estimate - refined).abs() <= 0.005,
+                    "256-step estimate diverged from 2048-step reference: predictions={predictions:?}, noise={observation_std_dev}, estimate={estimate}, refined={refined}"
+                );
+                assert!((0.0..=(predictions.len() as f64).ln()).contains(&estimate));
+            }
+        }
+
+        assert!(
+            expected_information_gain_with_steps(
+                &(),
+                &[0.0_f64, 1.0],
+                1.0,
+                0,
+                |prediction, _| Some(*prediction),
             )
             .is_none()
         );
