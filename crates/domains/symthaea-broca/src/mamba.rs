@@ -550,35 +550,45 @@ impl MambaWrapper {
         // Reset state.
         self.reset();
 
-        // 1. Warm recurrent state using context before the gradient anchor.
-        for embedding in &sequence[..pos] {
-            let embed = Tensor::from_vec(embedding.clone(), (1, d_model), &self.device)?;
-            self.model.forward_embeds_no_head(&embed, &mut self.state)?;
-        }
-
-        // Truncate gradients through the warmup prefix BEFORE introducing the
-        // differentiable anchor. Detaching after the anchor would sever the
-        // loss-to-anchor path and silently yield a missing/zero gradient.
-        self.state.detach()?;
-
-        // 2. Make sequence[pos] differentiable and preserve its graph through
-        // the remaining context, recurrent state updates, and teacher-forced loss.
+        // Mirror context injection's convolution warm-start. If the first
+        // projected chunk is the differentiable anchor, preserve gradients
+        // through its warm-start contribution as well as its normal input path.
         let var_embed = candle_core::Var::from_tensor(&Tensor::from_vec(
             sequence[pos].clone(),
             (1, d_model),
             &self.device,
         )?)?;
-        self.model
-            .forward_embeds_no_head(var_embed.as_tensor(), &mut self.state)?;
 
-        // 3. Continue processing the suffix WITHOUT detaching state, so the
-        // selected anchor can influence the eventual next-token loss.
+        if pos == 0 {
+            self.model
+                .warmstart_conv_history(var_embed.as_tensor(), &mut self.state)?;
+            self.model
+                .forward_embeds_no_head(var_embed.as_tensor(), &mut self.state)?;
+        } else {
+            let first_chunk =
+                Tensor::from_vec(sequence[0].clone(), (1, d_model), &self.device)?;
+            self.model
+                .warmstart_conv_history(&first_chunk, &mut self.state)?;
+
+            // Warm recurrent state using the prefix. Truncate gradients through
+            // the prefix BEFORE introducing the differentiable anchor.
+            for embedding in &sequence[..pos] {
+                let embed = Tensor::from_vec(embedding.clone(), (1, d_model), &self.device)?;
+                self.model.forward_embeds_no_head(&embed, &mut self.state)?;
+            }
+            self.state.detach()?;
+            self.model
+                .forward_embeds_no_head(var_embed.as_tensor(), &mut self.state)?;
+        }
+
+        // Continue processing the suffix WITHOUT detaching state, so the
+        // selected anchor influences the eventual next-token loss.
         for embedding in &sequence[(pos + 1)..] {
             let embed = Tensor::from_vec(embedding.clone(), (1, d_model), &self.device)?;
             self.model.forward_embeds_no_head(&embed, &mut self.state)?;
         }
 
-        // 4. Teacher-force the previous token; score the target token.
+        // Teacher-force the previous token; score the target token.
         let teacher_token = tokens[0];
         let target_idx = tokens[1] as usize;
         let input = Tensor::new(&[teacher_token], &self.device)?;
@@ -593,7 +603,6 @@ impl MambaWrapper {
         let log_softmax = candle_nn::ops::log_softmax(&logits, 0)?;
         let loss = log_softmax.i(target_idx)?.neg()?;
 
-        // 5. Backward and extract the actual gradient at the projected anchor.
         let grads = loss.backward()?;
         if self.lora_lr > 0.0 && self.model.has_lora() {
             self.model.apply_lora_grads(&grads, self.lora_lr)?;
