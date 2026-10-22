@@ -435,8 +435,8 @@ fn validate_plan_eligibility(plan: &Plan) -> Result<(), String> {
     if plan.bootstrap.replicates < 1_000 || plan.bootstrap.replicates > 100_000 {
         return Err("bootstrap replicates must be between 1000 and 100000".into());
     }
-    if plan.bootstrap.minimum_independent_clusters < 20 {
-        return Err("minimum_independent_clusters must be at least 20".into());
+    if plan.bootstrap.minimum_independent_clusters < 30 {
+        return Err("minimum_independent_clusters must be at least 30".into());
     }
     if !(plan.bootstrap.confidence_level > 0.5 && plan.bootstrap.confidence_level < 1.0) {
         return Err("bootstrap confidence_level must be in (0.5, 1.0)".into());
@@ -1573,7 +1573,7 @@ mod tests {
             "synthetic_only":true,
             "primary_endpoint":"paired_intervention_fidelity",
             "candidate_system_id":"s2",
-            "bootstrap":{"replicates":2000,"seed":7,"confidence_level":0.95,"multiple_comparison_correction":"bonferroni","minimum_independent_clusters":20},
+            "bootstrap":{"replicates":2000,"seed":7,"confidence_level":0.95,"multiple_comparison_correction":"bonferroni","minimum_independent_clusters":30},
             "benchmark":{
                 "split":"synthetic",
                 "source_family_disjoint":true,
@@ -1760,7 +1760,7 @@ mod tests {
         let mut plan = fixture_plan();
         plan.phase = "preregistered_held_out".into();
         let error = compute_pairwise_comparisons(&plan, &[], &[], &[vec![0]]).unwrap_err();
-        assert!(error.contains("at least 20 independent source-family clusters"));
+        assert!(error.contains("at least 30 independent source-family clusters"));
     }
 
     #[test]
@@ -1819,7 +1819,7 @@ mod tests {
 
         let mut pairs = Vec::new();
         let mut observations = Vec::new();
-        for index in 0..20 {
+        for index in 0..30 {
             let pair_id = format!("holdout-{index:02}");
             let mut case = pair(
                 &pair_id,
