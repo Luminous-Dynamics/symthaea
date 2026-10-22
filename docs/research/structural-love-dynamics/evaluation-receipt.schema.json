@@ -15,6 +15,7 @@
     "subject",
     "generation",
     "evaluator",
+    "oracle_adjudication",
     "environment",
     "case_results",
     "summary",
@@ -448,6 +449,9 @@
         "COMPARABLE",
         "NOT_COMPARABLE"
       ]
+    },
+    "oracle_adjudication": {
+      "$ref": "#/$defs/oracleAdjudication"
     }
   },
   "$defs": {
@@ -562,6 +566,100 @@
               }
             }
           }
+        }
+      }
+    },
+    "oracleAdjudication": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "ledger_sha256",
+        "protocol_sha256",
+        "rubric_sha256",
+        "reviewer_count",
+        "expected_case_count",
+        "cases_with_two_independent_initial_reviews",
+        "cases_adjudicated",
+        "cases_indeterminate",
+        "unresolved_disagreements",
+        "critical_cases_reviewed",
+        "blind_initial_reviews",
+        "case_assignment_randomized",
+        "case_authors_excluded_from_adjudication",
+        "conflicts_disclosed",
+        "completed_at"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "NOT_PERFORMED",
+            "IN_PROGRESS",
+            "COMPLETE",
+            "INELIGIBLE"
+          ]
+        },
+        "ledger_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "protocol_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "rubric_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "reviewer_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "expected_case_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cases_with_two_independent_initial_reviews": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cases_adjudicated": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cases_indeterminate": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unresolved_disagreements": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "critical_cases_reviewed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "blind_initial_reviews": {
+          "type": "boolean"
+        },
+        "case_assignment_randomized": {
+          "type": "boolean"
+        },
+        "case_authors_excluded_from_adjudication": {
+          "type": "boolean"
+        },
+        "conflicts_disclosed": {
+          "type": "boolean"
+        },
+        "completed_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
         }
       }
     }
