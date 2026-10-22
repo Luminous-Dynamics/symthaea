@@ -272,7 +272,9 @@ fn main() {
                     status = match &receipt.error {
                         SimulationError::AdaptiveToleranceNotMet => "tolerance_not_met",
                         SimulationError::TimeDidNotAdvance { .. } => "time_did_not_advance",
-                        SimulationError::Rk45AttemptBudgetExceeded { .. } => "attempt_budget_exceeded",
+                        SimulationError::Rk45AttemptBudgetExceeded { .. } => {
+                            "attempt_budget_exceeded"
+                        }
                         _ => "solver_error",
                     };
                     status_detail = format!(
