@@ -1,0 +1,1384 @@
+{
+  "corpus_id": "MICROBIAL-PROTEIN-RANKING-CORPUS-V1",
+  "schema_version": "1.0.0",
+  "status": "synthetic_design_fixture_only",
+  "created_at": "2026-10-18",
+  "disclaimer": "All candidate identifiers, bounds, units, rights states, gate states, and outcomes are synthetic. This corpus tests missingness-aware decision semantics; it is not biological data, strain selection advice, food/feed safety evidence, cost data, or a production recommendation.",
+  "case_schema_file": "microbial-protein-ranking-case-schema-v1.json",
+  "case_count": 10,
+  "cases": [
+    {
+      "case_id": "MPS-001",
+      "claim_scope": {
+        "target_species": "poultry",
+        "life_stage": "production-stage-01",
+        "intended_use": "feed_screen"
+      },
+      "scenario_digest": "sha256:scenario-a",
+      "objective_profile": [
+        {
+          "metric_id": "cost_per_kg_usable",
+          "direction": "minimize",
+          "unit": "synthetic_currency/kg"
+        },
+        {
+          "metric_id": "digestible_essential_aa_score",
+          "direction": "maximize",
+          "unit": "synthetic_score"
+        },
+        {
+          "metric_id": "energy_per_kg_usable",
+          "direction": "minimize",
+          "unit": "synthetic_kWh/kg"
+        }
+      ],
+      "candidates": [
+        {
+          "candidate_id": "A",
+          "scenario_digest": "sha256:scenario-a",
+          "source_rights": "permitted",
+          "permission_evidence_present": true,
+          "target_scope_match": "match",
+          "safety_gate": "pass",
+          "authorization_gate": "pass",
+          "nutrition_gate": "pass",
+          "metrics": [
+            {
+              "metric_id": "cost_per_kg_usable",
+              "state": "available",
+              "evidence_kind": "synthetic",
+              "lower_bound": 7,
+              "upper_bound": 8,
+              "unit": "synthetic_currency/kg",
+              "source_ref": "a-cost"
+            },
+            {
+              "metric_id": "digestible_essential_aa_score",
+              "state": "available",
+              "evidence_kind": "synthetic",
+              "lower_bound": 88,
+              "upper_bound": 90,
+              "unit": "synthetic_score",
+              "source_ref": "a-aa"
+            },
+            {
+              "metric_id": "energy_per_kg_usable",
+              "state": "available",
+              "evidence_kind": "synthetic",
+              "lower_bound": 4,
+              "upper_bound": 5,
+              "unit": "synthetic_kWh/kg",
+              "source_ref": "a-energy"
+            }
+          ]
+        },
+        {
+          "candidate_id": "B",
+          "scenario_digest": "sha256:scenario-a",
+          "source_rights": "permitted",
+          "permission_evidence_present": true,
+          "target_scope_match": "match",
+          "safety_gate": "pass",
+          "authorization_gate": "pass",
+          "nutrition_gate": "pass",
+          "metrics": [
+            {
+              "metric_id": "cost_per_kg_usable",
+              "state": "available",
+              "evidence_kind": "synthetic",
+              "lower_bound": 9,
+              "upper_bound": 10,
+              "unit": "synthetic_currency/kg",
+              "source_ref": "b-cost"
+            },
+            {
+              "metric_id": "digestible_essential_aa_score",
+              "state": "available",
+              "evidence_kind": "synthetic",
+              "lower_bound": 78,
+              "upper_bound": 82,
+              "unit": "synthetic_score",
+              "source_ref": "b-aa"
+            },
+            {
+              "metric_id": "energy_per_kg_usable",
+              "state": "available",
+              "evidence_kind": "synthetic",
+              "lower_bound": 6,
+              "upper_bound": 7,
+              "unit": "synthetic_kWh/kg",
+              "source_ref": "b-energy"
+            }
+          ]
+        },
+        {
+          "candidate_id": "C",
+          "scenario_digest": "sha256:scenario-a",
+          "source_rights": "permitted",
+          "permission_evidence_present": true,
+          "target_scope_match": "match",
+          "safety_gate": "fail",
+          "authorization_gate": "pass",
+          "nutrition_gate": "pass",
+          "metrics": [
+            {
+              "metric_id": "cost_per_kg_usable",
+              "state": "available",
+              "evidence_kind": "synthetic",
+              "lower_bound": 1,
+              "upper_bound": 2,
+              "unit": "synthetic_currency/kg",
+              "source_ref": "c-cost"
+            },
+            {
+              "metric_id": "digestible_essential_aa_score",
+              "state": "available",
+              "evidence_kind": "synthetic",
+              "lower_bound": 99,
+              "upper_bound": 100,
+              "unit": "synthetic_score",
+              "source_ref": "c-aa"
+            },
+            {
+              "metric_id": "energy_per_kg_usable",
+              "state": "available",
+              "evidence_kind": "synthetic",
+              "lower_bound": 1,
+              "upper_bound": 2,
+              "unit": "synthetic_kWh/kg",
+              "source_ref": "c-energy"
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "cohort_disposition": "robust_frontier",
+        "candidate_states": [
+          {
+            "candidate_id": "A",
+            "state": "eligible",
+            "reason_codes": [
+              "HARD_GATES_PASS"
+            ]
+          },
+          {
+            "candidate_id": "B",
+            "state": "eligible",
+            "reason_codes": [
+              "HARD_GATES_PASS"
+            ]
+          },
+          {
+            "candidate_id": "C",
+            "state": "blocked",
+            "reason_codes": [
+              "SAFETY_GATE_FAILED"
+            ]
+          }
+        ],
+        "frontier_candidate_ids": [
+          "A"
+        ],
+        "dominated_candidate_ids": [
+          "B"
+        ],
+        "reason_codes": [
+          "ROBUST_DOMINANCE_ON_ALL_DECLARED_OBJECTIVES"
+        ]
+      },
+      "rationale": "A robustly dominates B across all objective intervals. C is blocked despite attractive metrics because its safety gate fails."
+    },
+    {
+      "case_id": "MPS-002",
+      "claim_scope": {
+        "target_species": "poultry",
+        "life_stage": "production-stage-01",
+        "intended_use": "feed_screen"
+      },
+      "scenario_digest": "sha256:scenario-a",
+      "objective_profile": [
+        {
+          "metric_id": "cost_per_kg_usable",
+          "direction": "minimize",
+          "unit": "synthetic_currency/kg"
+        },
+        {
+          "metric_id": "digestible_essential_aa_score",
+          "direction": "maximize",
+          "unit": "synthetic_score"
+        },
+        {
+          "metric_id": "energy_per_kg_usable",
+          "direction": "minimize",
+          "unit": "synthetic_kWh/kg"
+        }
+      ],
+      "candidates": [
+        {
+          "candidate_id": "A",
+          "scenario_digest": "sha256:scenario-a",
+          "source_rights": "permitted",
+          "permission_evidence_present": true,
+          "target_scope_match": "match",
+          "safety_gate": "unknown",
+          "authorization_gate": "pass",
+          "nutrition_gate": "pass",
+          "metrics": [
+            {
+              "metric_id": "cost_per_kg_usable",
+              "state": "available",
+              "evidence_kind": "synthetic",
+              "lower_bound": 7,
+              "upper_bound": 8,
+              "unit": "synthetic_currency/kg",
+              "source_ref": "a-cost"
+            },
+            {
+              "metric_id": "digestible_essential_aa_score",
+              "state": "available",
+              "evidence_kind": "synthetic",
+              "lower_bound": 88,
+              "upper_bound": 90,
+              "unit": "synthetic_score",
+              "source_ref": "a-aa"
+            },
+            {
+              "metric_id": "energy_per_kg_usable",
+              "state": "available",
+              "evidence_kind": "synthetic",
+              "lower_bound": 4,
+              "upper_bound": 5,
+              "unit": "synthetic_kWh/kg",
+              "source_ref": "a-energy"
+            }
+          ]
+        },
+        {
+          "candidate_id": "B",
+          "scenario_digest": "sha256:scenario-a",
+          "source_rights": "permitted",
+          "permission_evidence_present": true,
+          "target_scope_match": "match",
+          "safety_gate": "pass",
+          "authorization_gate": "pass",
+          "nutrition_gate": "pass",
+          "metrics": [
+            {
+              "metric_id": "cost_per_kg_usable",
+              "state": "available",
+              "evidence_kind": "synthetic",
+              "lower_bound": 9,
+              "upper_bound": 10,
+              "unit": "synthetic_currency/kg",
+              "source_ref": "b-cost"
+            },
+            {
+              "metric_id": "digestible_essential_aa_score",
+              "state": "available",
+              "evidence_kind": "synthetic",
+              "lower_bound": 78,
+              "upper_bound": 82,
+              "unit": "synthetic_score",
+              "source_ref": "b-aa"
+            },
+            {
+              "metric_id": "energy_per_kg_usable",
+              "state": "available",
+              "evidence_kind": "synthetic",
+              "lower_bound": 6,
+              "upper_bound": 7,
+              "unit": "synthetic_kWh/kg",
+              "source_ref": "b-energy"
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "cohort_disposition": "incomplete",
+        "candidate_states": [
+          {
+            "candidate_id": "A",
+            "state": "indeterminate",
+            "reason_codes": [
+              "SAFETY_GATE_UNKNOWN"
+            ]
+          },
+          {
+            "candidate_id": "B",
+            "state": "eligible",
+            "reason_codes": [
+              "HARD_GATES_PASS"
+            ]
+          }
+        ],
+        "frontier_candidate_ids": [
+          "B"
+        ],
+        "dominated_candidate_ids": [],
+        "reason_codes": [
+          "UNRESOLVED_HARD_GATE_PREVENTS_GLOBAL_SELECTION"
+        ]
+      },
+      "rationale": "An unresolved safety gate means the provisional eligible-only frontier is not a global winner."
+    },
+    {
+      "case_id": "MPS-003",
+      "claim_scope": {
+        "target_species": "poultry",
+        "life_stage": "production-stage-01",
+        "intended_use": "feed_screen"
+      },
+      "scenario_digest": "sha256:scenario-a",
+      "objective_profile": [
+        {
+          "metric_id": "cost_per_kg_usable",
+          "direction": "minimize",
+          "unit": "synthetic_currency/kg"
+        },
+        {
+          "metric_id": "digestible_essential_aa_score",
+          "direction": "maximize",
+          "unit": "synthetic_score"
+        },
+        {
+          "metric_id": "energy_per_kg_usable",
+          "direction": "minimize",
+          "unit": "synthetic_kWh/kg"
+        }
+      ],
+      "candidates": [
+        {
+          "candidate_id": "A",
+          "scenario_digest": "sha256:scenario-a",
+          "source_rights": "permitted",
+          "permission_evidence_present": true,
+          "target_scope_match": "match",
+          "safety_gate": "pass",
+          "authorization_gate": "pass",
+          "nutrition_gate": "unknown",
+          "metrics": [
+            {
+              "metric_id": "cost_per_kg_usable",
+              "state": "available",
+              "evidence_kind": "synthetic",
+              "lower_bound": 1,
+              "upper_bound": 2,
+              "unit": "synthetic_currency/kg",
+              "source_ref": "a-cost"
+            },
+            {
+              "metric_id": "digestible_essential_aa_score",
+              "state": "missing",
+              "evidence_kind": "synthetic",
+              "lower_bound": null,
+              "upper_bound": null,
+              "unit": "synthetic_score",
+              "source_ref": "a-aa-missing"
+            },
+            {
+              "metric_id": "energy_per_kg_usable",
+              "state": "available",
+              "evidence_kind": "synthetic",
+              "lower_bound": 2,
+              "upper_bound": 3,
+              "unit": "synthetic_kWh/kg",
+              "source_ref": "a-energy"
+            }
+          ]
+        },
+        {
+          "candidate_id": "B",
+          "scenario_digest": "sha256:scenario-a",
+          "source_rights": "permitted",
+          "permission_evidence_present": true,
+          "target_scope_match": "match",
+          "safety_gate": "pass",
+          "authorization_gate": "pass",
+          "nutrition_gate": "pass",
+          "metrics": [
+            {
+              "metric_id": "cost_per_kg_usable",
+              "state": "available",
+              "evidence_kind": "synthetic",
+              "lower_bound": 9,
+              "upper_bound": 10,
+              "unit": "synthetic_currency/kg",
+              "source_ref": "b-cost"
+            },
+            {
+              "metric_id": "digestible_essential_aa_score",
+              "state": "available",
+              "evidence_kind": "synthetic",
+              "lower_bound": 78,
+              "upper_bound": 82,
+              "unit": "synthetic_score",
+              "source_ref": "b-aa"
+            },
+            {
+              "metric_id": "energy_per_kg_usable",
+              "state": "available",
+              "evidence_kind": "synthetic",
+              "lower_bound": 6,
+              "upper_bound": 7,
+              "unit": "synthetic_kWh/kg",
+              "source_ref": "b-energy"
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "cohort_disposition": "incomplete",
+        "candidate_states": [
+          {
+            "candidate_id": "A",
+            "state": "indeterminate",
+            "reason_codes": [
+              "REQUIRED_NUTRITION_EVIDENCE_MISSING"
+            ]
+          },
+          {
+            "candidate_id": "B",
+            "state": "eligible",
+            "reason_codes": [
+              "HARD_GATES_PASS"
+            ]
+          }
+        ],
+        "frontier_candidate_ids": [
+          "B"
+        ],
+        "dominated_candidate_ids": [],
+        "reason_codes": [
+          "MISSING_VALUE_CANNOT_BE_IMPUTED_FOR_SELECTION"
+        ]
+      },
+      "rationale": "A is apparently cheaper but required amino-acid evidence is missing; do not use imputation to select it."
+    },
+    {
+      "case_id": "MPS-004",
+      "claim_scope": {
+        "target_species": "poultry",
+        "life_stage": "production-stage-01",
+        "intended_use": "feed_screen"
+      },
+      "scenario_digest": "sha256:scenario-a",
+      "objective_profile": [
+        {
+          "metric_id": "cost_per_kg_usable",
+          "direction": "minimize",
+          "unit": "synthetic_currency/kg"
+        },
+        {
+          "metric_id": "digestible_essential_aa_score",
+          "direction": "maximize",
+          "unit": "synthetic_score"
+        },
+        {
+          "metric_id": "energy_per_kg_usable",
+          "direction": "minimize",
+          "unit": "synthetic_kWh/kg"
+        }
+      ],
+      "candidates": [
+        {
+          "candidate_id": "A",
+          "scenario_digest": "sha256:scenario-a",
+          "source_rights": "permitted",
+          "permission_evidence_present": true,
+          "target_scope_match": "match",
+          "safety_gate": "pass",
+          "authorization_gate": "pass",
+          "nutrition_gate": "pass",
+          "metrics": [
+            {
+              "metric_id": "cost_per_kg_usable",
+              "state": "available",
+              "evidence_kind": "synthetic",
+              "lower_bound": 7,
+              "upper_bound": 9,
+              "unit": "synthetic_currency/kg",
+              "source_ref": "a-cost"
+            },
+            {
+              "metric_id": "digestible_essential_aa_score",
+              "state": "available",
+              "evidence_kind": "synthetic",
+              "lower_bound": 80,
+              "upper_bound": 90,
+              "unit": "synthetic_score",
+              "source_ref": "a-aa"
+            },
+            {
+              "metric_id": "energy_per_kg_usable",
+              "state": "missing",
+              "evidence_kind": "synthetic",
+              "lower_bound": null,
+              "upper_bound": null,
+              "unit": "synthetic_kWh/kg",
+              "source_ref": "a-energy-missing"
+            }
+          ]
+        },
+        {
+          "candidate_id": "B",
+          "scenario_digest": "sha256:scenario-a",
+          "source_rights": "permitted",
+          "permission_evidence_present": true,
+          "target_scope_match": "match",
+          "safety_gate": "pass",
+          "authorization_gate": "pass",
+          "nutrition_gate": "pass",
+          "metrics": [
+            {
+              "metric_id": "cost_per_kg_usable",
+              "state": "available",
+              "evidence_kind": "synthetic",
+              "lower_bound": 7,
+              "upper_bound": 9,
+              "unit": "synthetic_currency/kg",
+              "source_ref": "b-cost"
+            },
+            {
+              "metric_id": "digestible_essential_aa_score",
+              "state": "available",
+              "evidence_kind": "synthetic",
+              "lower_bound": 80,
+              "upper_bound": 90,
+              "unit": "synthetic_score",
+              "source_ref": "b-aa"
+            },
+            {
+              "metric_id": "energy_per_kg_usable",
+              "state": "missing",
+              "evidence_kind": "synthetic",
+              "lower_bound": null,
+              "upper_bound": null,
+              "unit": "synthetic_kWh/kg",
+              "source_ref": "b-energy-missing"
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "cohort_disposition": "abstain_insufficient_evidence",
+        "candidate_states": [
+          {
+            "candidate_id": "A",
+            "state": "indeterminate",
+            "reason_codes": [
+              "REQUIRED_METRIC_MISSING"
+            ]
+          },
+          {
+            "candidate_id": "B",
+            "state": "indeterminate",
+            "reason_codes": [
+              "REQUIRED_METRIC_MISSING"
+            ]
+          }
+        ],
+        "frontier_candidate_ids": [],
+        "dominated_candidate_ids": [],
+        "reason_codes": [
+          "NO_CANDIDATE_HAS_COMPLETE_REQUIRED_METRICS"
+        ]
+      },
+      "rationale": "Every candidate lacks a required energy metric. Absence is not zero."
+    },
+    {
+      "case_id": "MPS-005",
+      "claim_scope": {
+        "target_species": "poultry",
+        "life_stage": "production-stage-01",
+        "intended_use": "feed_screen"
+      },
+      "scenario_digest": "sha256:scenario-a",
+      "objective_profile": [
+        {
+          "metric_id": "cost_per_kg_usable",
+          "direction": "minimize",
+          "unit": "synthetic_currency/kg"
+        },
+        {
+          "metric_id": "digestible_essential_aa_score",
+          "direction": "maximize",
+          "unit": "synthetic_score"
+        },
+        {
+          "metric_id": "energy_per_kg_usable",
+          "direction": "minimize",
+          "unit": "synthetic_kWh/kg"
+        }
+      ],
+      "candidates": [
+        {
+          "candidate_id": "A",
+          "scenario_digest": "sha256:scenario-a",
+          "source_rights": "permitted",
+          "permission_evidence_present": true,
+          "target_scope_match": "mismatch",
+          "safety_gate": "pass",
+          "authorization_gate": "pass",
+          "nutrition_gate": "pass",
+          "metrics": [
+            {
+              "metric_id": "cost_per_kg_usable",
+              "state": "available",
+              "evidence_kind": "synthetic",
+              "lower_bound": 7,
+              "upper_bound": 8,
+              "unit": "synthetic_currency/kg",
+              "source_ref": "a-cost"
+            },
+            {
+              "metric_id": "digestible_essential_aa_score",
+              "state": "available",
+              "evidence_kind": "synthetic",
+              "lower_bound": 88,
+              "upper_bound": 90,
+              "unit": "synthetic_score",
+              "source_ref": "a-aa"
+            },
+            {
+              "metric_id": "energy_per_kg_usable",
+              "state": "available",
+              "evidence_kind": "synthetic",
+              "lower_bound": 4,
+              "upper_bound": 5,
+              "unit": "synthetic_kWh/kg",
+              "source_ref": "a-energy"
+            }
+          ]
+        },
+        {
+          "candidate_id": "B",
+          "scenario_digest": "sha256:scenario-a",
+          "source_rights": "permitted",
+          "permission_evidence_present": true,
+          "target_scope_match": "match",
+          "safety_gate": "pass",
+          "authorization_gate": "pass",
+          "nutrition_gate": "pass",
+          "metrics": [
+            {
+              "metric_id": "cost_per_kg_usable",
+              "state": "available",
+              "evidence_kind": "synthetic",
+              "lower_bound": 9,
+              "upper_bound": 10,
+              "unit": "synthetic_currency/kg",
+              "source_ref": "b-cost"
+            },
+            {
+              "metric_id": "digestible_essential_aa_score",
+              "state": "available",
+              "evidence_kind": "synthetic",
+              "lower_bound": 78,
+              "upper_bound": 82,
+              "unit": "synthetic_score",
+              "source_ref": "b-aa"
+            },
+            {
+              "metric_id": "energy_per_kg_usable",
+              "state": "available",
+              "evidence_kind": "synthetic",
+              "lower_bound": 6,
+              "upper_bound": 7,
+              "unit": "synthetic_kWh/kg",
+              "source_ref": "b-energy"
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "cohort_disposition": "robust_frontier",
+        "candidate_states": [
+          {
+            "candidate_id": "A",
+            "state": "blocked",
+            "reason_codes": [
+              "TARGET_SCOPE_MISMATCH"
+            ]
+          },
+          {
+            "candidate_id": "B",
+            "state": "eligible",
+            "reason_codes": [
+              "HARD_GATES_PASS"
+            ]
+          }
+        ],
+        "frontier_candidate_ids": [
+          "B"
+        ],
+        "dominated_candidate_ids": [],
+        "reason_codes": [
+          "OUT_OF_SCOPE_CANDIDATE_EXCLUDED"
+        ]
+      },
+      "rationale": "A known species/use mismatch is excluded, and B is the only qualified candidate in the declared cohort."
+    },
+    {
+      "case_id": "MPS-006",
+      "claim_scope": {
+        "target_species": "poultry",
+        "life_stage": "production-stage-01",
+        "intended_use": "feed_screen"
+      },
+      "scenario_digest": "sha256:scenario-a",
+      "objective_profile": [
+        {
+          "metric_id": "cost_per_kg_usable",
+          "direction": "minimize",
+          "unit": "synthetic_currency/kg"
+        },
+        {
+          "metric_id": "digestible_essential_aa_score",
+          "direction": "maximize",
+          "unit": "synthetic_score"
+        },
+        {
+          "metric_id": "energy_per_kg_usable",
+          "direction": "minimize",
+          "unit": "synthetic_kWh/kg"
+        }
+      ],
+      "candidates": [
+        {
+          "candidate_id": "A",
+          "scenario_digest": "sha256:scenario-a",
+          "source_rights": "unknown",
+          "permission_evidence_present": false,
+          "target_scope_match": "match",
+          "safety_gate": "pass",
+          "authorization_gate": "pass",
+          "nutrition_gate": "pass",
+          "metrics": [
+            {
+              "metric_id": "cost_per_kg_usable",
+              "state": "available",
+              "evidence_kind": "synthetic",
+              "lower_bound": 7,
+              "upper_bound": 8,
+              "unit": "synthetic_currency/kg",
+              "source_ref": "a-cost"
+            },
+            {
+              "metric_id": "digestible_essential_aa_score",
+              "state": "available",
+              "evidence_kind": "synthetic",
+              "lower_bound": 88,
+              "upper_bound": 90,
+              "unit": "synthetic_score",
+              "source_ref": "a-aa"
+            },
+            {
+              "metric_id": "energy_per_kg_usable",
+              "state": "available",
+              "evidence_kind": "synthetic",
+              "lower_bound": 4,
+              "upper_bound": 5,
+              "unit": "synthetic_kWh/kg",
+              "source_ref": "a-energy"
+            }
+          ]
+        },
+        {
+          "candidate_id": "B",
+          "scenario_digest": "sha256:scenario-a",
+          "source_rights": "permitted",
+          "permission_evidence_present": true,
+          "target_scope_match": "match",
+          "safety_gate": "pass",
+          "authorization_gate": "pass",
+          "nutrition_gate": "pass",
+          "metrics": [
+            {
+              "metric_id": "cost_per_kg_usable",
+              "state": "available",
+              "evidence_kind": "synthetic",
+              "lower_bound": 9,
+              "upper_bound": 10,
+              "unit": "synthetic_currency/kg",
+              "source_ref": "b-cost"
+            },
+            {
+              "metric_id": "digestible_essential_aa_score",
+              "state": "available",
+              "evidence_kind": "synthetic",
+              "lower_bound": 78,
+              "upper_bound": 82,
+              "unit": "synthetic_score",
+              "source_ref": "b-aa"
+            },
+            {
+              "metric_id": "energy_per_kg_usable",
+              "state": "available",
+              "evidence_kind": "synthetic",
+              "lower_bound": 6,
+              "upper_bound": 7,
+              "unit": "synthetic_kWh/kg",
+              "source_ref": "b-energy"
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "cohort_disposition": "robust_frontier",
+        "candidate_states": [
+          {
+            "candidate_id": "A",
+            "state": "blocked",
+            "reason_codes": [
+              "SOURCE_RIGHTS_BLOCKED"
+            ]
+          },
+          {
+            "candidate_id": "B",
+            "state": "eligible",
+            "reason_codes": [
+              "HARD_GATES_PASS"
+            ]
+          }
+        ],
+        "frontier_candidate_ids": [
+          "B"
+        ],
+        "dominated_candidate_ids": [],
+        "reason_codes": [
+          "UNVERIFIED_SOURCE_CANNOT_ENTER_PUBLIC_RANKING"
+        ]
+      },
+      "rationale": "A candidate without evidence of source-use permission is excluded from public ranking."
+    },
+    {
+      "case_id": "MPS-007",
+      "claim_scope": {
+        "target_species": "poultry",
+        "life_stage": "production-stage-01",
+        "intended_use": "feed_screen"
+      },
+      "scenario_digest": "sha256:scenario-a",
+      "objective_profile": [
+        {
+          "metric_id": "cost_per_kg_usable",
+          "direction": "minimize",
+          "unit": "synthetic_currency/kg"
+        },
+        {
+          "metric_id": "digestible_essential_aa_score",
+          "direction": "maximize",
+          "unit": "synthetic_score"
+        },
+        {
+          "metric_id": "energy_per_kg_usable",
+          "direction": "minimize",
+          "unit": "synthetic_kWh/kg"
+        }
+      ],
+      "candidates": [
+        {
+          "candidate_id": "A",
+          "scenario_digest": "sha256:scenario-a",
+          "source_rights": "permitted",
+          "permission_evidence_present": true,
+          "target_scope_match": "match",
+          "safety_gate": "pass",
+          "authorization_gate": "pass",
+          "nutrition_gate": "pass",
+          "metrics": [
+            {
+              "metric_id": "cost_per_kg_usable",
+              "state": "available",
+              "evidence_kind": "synthetic",
+              "lower_bound": 7,
+              "upper_bound": 10,
+              "unit": "synthetic_currency/kg",
+              "source_ref": "overlap-a-cost"
+            },
+            {
+              "metric_id": "digestible_essential_aa_score",
+              "state": "available",
+              "evidence_kind": "synthetic",
+              "lower_bound": 80,
+              "upper_bound": 90,
+              "unit": "synthetic_score",
+              "source_ref": "overlap-a-aa"
+            },
+            {
+              "metric_id": "energy_per_kg_usable",
+              "state": "available",
+              "evidence_kind": "synthetic",
+              "lower_bound": 4,
+              "upper_bound": 7,
+              "unit": "synthetic_kWh/kg",
+              "source_ref": "overlap-a-energy"
+            }
+          ]
+        },
+        {
+          "candidate_id": "B",
+          "scenario_digest": "sha256:scenario-a",
+          "source_rights": "permitted",
+          "permission_evidence_present": true,
+          "target_scope_match": "match",
+          "safety_gate": "pass",
+          "authorization_gate": "pass",
+          "nutrition_gate": "pass",
+          "metrics": [
+            {
+              "metric_id": "cost_per_kg_usable",
+              "state": "available",
+              "evidence_kind": "synthetic",
+              "lower_bound": 7,
+              "upper_bound": 10,
+              "unit": "synthetic_currency/kg",
+              "source_ref": "overlap-b-cost"
+            },
+            {
+              "metric_id": "digestible_essential_aa_score",
+              "state": "available",
+              "evidence_kind": "synthetic",
+              "lower_bound": 80,
+              "upper_bound": 90,
+              "unit": "synthetic_score",
+              "source_ref": "overlap-b-aa"
+            },
+            {
+              "metric_id": "energy_per_kg_usable",
+              "state": "available",
+              "evidence_kind": "synthetic",
+              "lower_bound": 4,
+              "upper_bound": 7,
+              "unit": "synthetic_kWh/kg",
+              "source_ref": "overlap-b-energy"
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "cohort_disposition": "robust_frontier",
+        "candidate_states": [
+          {
+            "candidate_id": "A",
+            "state": "eligible",
+            "reason_codes": [
+              "HARD_GATES_PASS"
+            ]
+          },
+          {
+            "candidate_id": "B",
+            "state": "eligible",
+            "reason_codes": [
+              "HARD_GATES_PASS"
+            ]
+          }
+        ],
+        "frontier_candidate_ids": [
+          "A",
+          "B"
+        ],
+        "dominated_candidate_ids": [],
+        "reason_codes": [
+          "INTERVALS_OVERLAP_NO_ROBUST_DOMINANCE"
+        ]
+      },
+      "rationale": "The interval bounds overlap; both candidates stay on the Pareto frontier, not an invented unique winner."
+    },
+    {
+      "case_id": "MPS-008",
+      "claim_scope": {
+        "target_species": "poultry",
+        "life_stage": "production-stage-01",
+        "intended_use": "feed_screen"
+      },
+      "scenario_digest": "sha256:scenario-a",
+      "objective_profile": [
+        {
+          "metric_id": "cost_per_kg_usable",
+          "direction": "minimize",
+          "unit": "synthetic_currency/kg"
+        },
+        {
+          "metric_id": "digestible_essential_aa_score",
+          "direction": "maximize",
+          "unit": "synthetic_score"
+        },
+        {
+          "metric_id": "energy_per_kg_usable",
+          "direction": "minimize",
+          "unit": "synthetic_kWh/kg"
+        }
+      ],
+      "candidates": [
+        {
+          "candidate_id": "A",
+          "scenario_digest": "sha256:scenario-b",
+          "source_rights": "permitted",
+          "permission_evidence_present": true,
+          "target_scope_match": "match",
+          "safety_gate": "pass",
+          "authorization_gate": "pass",
+          "nutrition_gate": "pass",
+          "metrics": [
+            {
+              "metric_id": "cost_per_kg_usable",
+              "state": "available",
+              "evidence_kind": "synthetic",
+              "lower_bound": 7,
+              "upper_bound": 8,
+              "unit": "synthetic_currency/kg",
+              "source_ref": "a-cost"
+            },
+            {
+              "metric_id": "digestible_essential_aa_score",
+              "state": "available",
+              "evidence_kind": "synthetic",
+              "lower_bound": 88,
+              "upper_bound": 90,
+              "unit": "synthetic_score",
+              "source_ref": "a-aa"
+            },
+            {
+              "metric_id": "energy_per_kg_usable",
+              "state": "available",
+              "evidence_kind": "synthetic",
+              "lower_bound": 4,
+              "upper_bound": 5,
+              "unit": "synthetic_kWh/kg",
+              "source_ref": "a-energy"
+            }
+          ]
+        },
+        {
+          "candidate_id": "B",
+          "scenario_digest": "sha256:scenario-a",
+          "source_rights": "permitted",
+          "permission_evidence_present": true,
+          "target_scope_match": "match",
+          "safety_gate": "pass",
+          "authorization_gate": "pass",
+          "nutrition_gate": "pass",
+          "metrics": [
+            {
+              "metric_id": "cost_per_kg_usable",
+              "state": "available",
+              "evidence_kind": "synthetic",
+              "lower_bound": 9,
+              "upper_bound": 10,
+              "unit": "synthetic_currency/kg",
+              "source_ref": "b-cost"
+            },
+            {
+              "metric_id": "digestible_essential_aa_score",
+              "state": "available",
+              "evidence_kind": "synthetic",
+              "lower_bound": 78,
+              "upper_bound": 82,
+              "unit": "synthetic_score",
+              "source_ref": "b-aa"
+            },
+            {
+              "metric_id": "energy_per_kg_usable",
+              "state": "available",
+              "evidence_kind": "synthetic",
+              "lower_bound": 6,
+              "upper_bound": 7,
+              "unit": "synthetic_kWh/kg",
+              "source_ref": "b-energy"
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "cohort_disposition": "not_comparable",
+        "candidate_states": [
+          {
+            "candidate_id": "A",
+            "state": "not_comparable",
+            "reason_codes": [
+              "SCENARIO_DIGEST_MISMATCH"
+            ]
+          },
+          {
+            "candidate_id": "B",
+            "state": "eligible",
+            "reason_codes": [
+              "HARD_GATES_PASS"
+            ]
+          }
+        ],
+        "frontier_candidate_ids": [],
+        "dominated_candidate_ids": [],
+        "reason_codes": [
+          "SCENARIO_DIGEST_MISMATCH"
+        ]
+      },
+      "rationale": "Different scenario digests prevent aligned candidate ranking."
+    },
+    {
+      "case_id": "MPS-009",
+      "claim_scope": {
+        "target_species": "poultry",
+        "life_stage": "production-stage-01",
+        "intended_use": "feed_screen"
+      },
+      "scenario_digest": "sha256:scenario-a",
+      "objective_profile": [
+        {
+          "metric_id": "cost_per_kg_usable",
+          "direction": "minimize",
+          "unit": "synthetic_currency/kg"
+        },
+        {
+          "metric_id": "digestible_essential_aa_score",
+          "direction": "maximize",
+          "unit": "synthetic_score"
+        },
+        {
+          "metric_id": "energy_per_kg_usable",
+          "direction": "minimize",
+          "unit": "synthetic_kWh/kg"
+        }
+      ],
+      "candidates": [
+        {
+          "candidate_id": "A",
+          "scenario_digest": "sha256:scenario-a",
+          "source_rights": "permitted",
+          "permission_evidence_present": true,
+          "target_scope_match": "match",
+          "safety_gate": "pass",
+          "authorization_gate": "pass",
+          "nutrition_gate": "pass",
+          "metrics": [
+            {
+              "metric_id": "cost_per_kg_usable",
+              "state": "missing",
+              "evidence_kind": "synthetic",
+              "lower_bound": null,
+              "upper_bound": null,
+              "unit": "synthetic_currency/kg",
+              "source_ref": "a-cost-missing"
+            },
+            {
+              "metric_id": "digestible_essential_aa_score",
+              "state": "missing",
+              "evidence_kind": "synthetic",
+              "lower_bound": null,
+              "upper_bound": null,
+              "unit": "synthetic_score",
+              "source_ref": "a-aa-missing"
+            },
+            {
+              "metric_id": "energy_per_kg_usable",
+              "state": "missing",
+              "evidence_kind": "synthetic",
+              "lower_bound": null,
+              "upper_bound": null,
+              "unit": "synthetic_kWh/kg",
+              "source_ref": "a-energy-missing"
+            }
+          ]
+        },
+        {
+          "candidate_id": "B",
+          "scenario_digest": "sha256:scenario-a",
+          "source_rights": "permitted",
+          "permission_evidence_present": true,
+          "target_scope_match": "match",
+          "safety_gate": "pass",
+          "authorization_gate": "pass",
+          "nutrition_gate": "pass",
+          "metrics": [
+            {
+              "metric_id": "cost_per_kg_usable",
+              "state": "missing",
+              "evidence_kind": "synthetic",
+              "lower_bound": null,
+              "upper_bound": null,
+              "unit": "synthetic_currency/kg",
+              "source_ref": "b-cost-missing"
+            },
+            {
+              "metric_id": "digestible_essential_aa_score",
+              "state": "missing",
+              "evidence_kind": "synthetic",
+              "lower_bound": null,
+              "upper_bound": null,
+              "unit": "synthetic_score",
+              "source_ref": "b-aa-missing"
+            },
+            {
+              "metric_id": "energy_per_kg_usable",
+              "state": "missing",
+              "evidence_kind": "synthetic",
+              "lower_bound": null,
+              "upper_bound": null,
+              "unit": "synthetic_kWh/kg",
+              "source_ref": "b-energy-missing"
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "cohort_disposition": "abstain_insufficient_evidence",
+        "candidate_states": [
+          {
+            "candidate_id": "A",
+            "state": "indeterminate",
+            "reason_codes": [
+              "REQUIRED_METRIC_MISSING"
+            ]
+          },
+          {
+            "candidate_id": "B",
+            "state": "indeterminate",
+            "reason_codes": [
+              "REQUIRED_METRIC_MISSING"
+            ]
+          }
+        ],
+        "frontier_candidate_ids": [],
+        "dominated_candidate_ids": [],
+        "reason_codes": [
+          "NO_CANDIDATE_HAS_COMPLETE_REQUIRED_METRICS"
+        ]
+      },
+      "rationale": "All candidates have missing metrics. Imputation would manufacture a ranking."
+    },
+    {
+      "case_id": "MPS-010",
+      "claim_scope": {
+        "target_species": "poultry",
+        "life_stage": "production-stage-01",
+        "intended_use": "feed_screen"
+      },
+      "scenario_digest": "sha256:scenario-a",
+      "objective_profile": [
+        {
+          "metric_id": "cost_per_kg_usable",
+          "direction": "minimize",
+          "unit": "synthetic_currency/kg"
+        },
+        {
+          "metric_id": "digestible_essential_aa_score",
+          "direction": "maximize",
+          "unit": "synthetic_score"
+        },
+        {
+          "metric_id": "energy_per_kg_usable",
+          "direction": "minimize",
+          "unit": "synthetic_kWh/kg"
+        }
+      ],
+      "candidates": [
+        {
+          "candidate_id": "A",
+          "scenario_digest": "sha256:scenario-a",
+          "source_rights": "permitted",
+          "permission_evidence_present": true,
+          "target_scope_match": "match",
+          "safety_gate": "pass",
+          "authorization_gate": "pass",
+          "nutrition_gate": "fail",
+          "metrics": [
+            {
+              "metric_id": "cost_per_kg_usable",
+              "state": "available",
+              "evidence_kind": "synthetic",
+              "lower_bound": 8,
+              "upper_bound": 8.5,
+              "unit": "synthetic_currency/kg",
+              "source_ref": "synthetic-a-cost"
+            },
+            {
+              "metric_id": "digestible_essential_aa_score",
+              "state": "available",
+              "evidence_kind": "synthetic",
+              "lower_bound": 80,
+              "upper_bound": 82,
+              "unit": "synthetic_score",
+              "source_ref": "synthetic-a-aa"
+            },
+            {
+              "metric_id": "energy_per_kg_usable",
+              "state": "available",
+              "evidence_kind": "synthetic",
+              "lower_bound": 5,
+              "upper_bound": 5.5,
+              "unit": "synthetic_kWh/kg",
+              "source_ref": "synthetic-a-energy"
+            }
+          ]
+        },
+        {
+          "candidate_id": "B",
+          "scenario_digest": "sha256:scenario-a",
+          "source_rights": "permitted",
+          "permission_evidence_present": true,
+          "target_scope_match": "match",
+          "safety_gate": "pass",
+          "authorization_gate": "pass",
+          "nutrition_gate": "pass",
+          "metrics": [
+            {
+              "metric_id": "cost_per_kg_usable",
+              "state": "available",
+              "evidence_kind": "synthetic",
+              "lower_bound": 9,
+              "upper_bound": 10,
+              "unit": "synthetic_currency/kg",
+              "source_ref": "b-cost"
+            },
+            {
+              "metric_id": "digestible_essential_aa_score",
+              "state": "available",
+              "evidence_kind": "synthetic",
+              "lower_bound": 78,
+              "upper_bound": 82,
+              "unit": "synthetic_score",
+              "source_ref": "b-aa"
+            },
+            {
+              "metric_id": "energy_per_kg_usable",
+              "state": "available",
+              "evidence_kind": "synthetic",
+              "lower_bound": 6,
+              "upper_bound": 7,
+              "unit": "synthetic_kWh/kg",
+              "source_ref": "b-energy"
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "cohort_disposition": "robust_frontier",
+        "candidate_states": [
+          {
+            "candidate_id": "A",
+            "state": "blocked",
+            "reason_codes": [
+              "NUTRITION_GATE_FAILED"
+            ]
+          },
+          {
+            "candidate_id": "B",
+            "state": "eligible",
+            "reason_codes": [
+              "HARD_GATES_PASS"
+            ]
+          }
+        ],
+        "frontier_candidate_ids": [
+          "B"
+        ],
+        "dominated_candidate_ids": [],
+        "reason_codes": [
+          "HARD_CONSTRAINT_FAILURE_CANNOT_BE_COMPENSATED_BY_SCORE"
+        ]
+      },
+      "rationale": "A failed required nutrition gate cannot be offset by lower cost or footprint."
+    }
+  ]
+}
