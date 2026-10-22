@@ -16,7 +16,7 @@ use std::error::Error;
 use std::fmt;
 
 use super::casting::{
-    ChvorinovConformalCalibrator, ChvorinovModel, ChvorinovObservation,
+    CastingModelError, ChvorinovConformalCalibrator, ChvorinovModel, ChvorinovObservation,
 };
 
 /// A source class for a casting observation.
@@ -634,6 +634,305 @@ impl CastingSplitManifest {
     }
 }
 
+/// Error raised when constructing a reproducible casting benchmark report.
+#[derive(Debug, Clone, PartialEq)]
+pub enum CastingBenchmarkError {
+    /// The split/model/calibrator evidence contract could not be verified.
+    Evidence(CastingEvidenceError),
+    /// A point prediction or interval could not be computed.
+    Model(CastingModelError),
+    /// Metric arithmetic produced a non-finite result.
+    NonFiniteMetric,
+}
+
+impl fmt::Display for CastingBenchmarkError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Evidence(error) => write!(f, "casting benchmark evidence is invalid: {error}"),
+            Self::Model(error) => write!(f, "casting benchmark model evaluation failed: {error}"),
+            Self::NonFiniteMetric => f.write_str("casting benchmark metric arithmetic was non-finite"),
+        }
+    }
+}
+
+impl Error for CastingBenchmarkError {}
+
+impl From<CastingEvidenceError> for CastingBenchmarkError {
+    fn from(value: CastingEvidenceError) -> Self {
+        Self::Evidence(value)
+    }
+}
+
+impl From<CastingModelError> for CastingBenchmarkError {
+    fn from(value: CastingModelError) -> Self {
+        Self::Model(value)
+    }
+}
+
+/// Outcome class for one observation in the independent benchmark report.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CastingBenchmarkPointStatus {
+    /// The point estimate and interval were available inside the fitted model's domain.
+    PredictedWithinCalibrationDomain,
+    /// The model correctly abstained because the input was outside its fitted domain.
+    AbstainedOutsideCalibrationDomain,
+}
+
+/// Independently recomputed metrics and point-level outcomes for one frozen split.
+///
+/// The evaluator replays prediction and interval calculations from the exact model and
+/// conformal calibrator after verifying the full split manifest. It does not call the
+/// candidate model's aggregate holdout-report method. This is independent aggregation
+/// and evidence verification, not an independently implemented casting-physics solver.
+#[derive(Debug, Clone, PartialEq)]
+pub struct CastingBenchmarkReport {
+    /// Report schema version.
+    pub version: u32,
+    /// Exact split manifest digest used by this evaluation.
+    pub manifest_digest_blake3: [u8; 32],
+    /// Exact fitted model identity digest used by this evaluation.
+    pub fitted_model_digest_blake3: [u8; 32],
+    /// Evidence class of the final holdout.
+    pub holdout_evidence_class: CastingEvidenceClass,
+    /// Number of observations in the final holdout.
+    pub total_count: usize,
+    /// Number of holdout observations with in-domain predictions.
+    pub prediction_count: usize,
+    /// Number of observations declined as out of domain.
+    pub abstained_out_of_domain_count: usize,
+    /// Fraction of holdout observations that received predictions.
+    pub prediction_coverage_fraction: f64,
+    /// Mean absolute prediction error in seconds; absent when no prediction was available.
+    pub mae_s: Option<f64>,
+    /// Root mean squared prediction error in seconds; absent when no prediction was available.
+    pub rmse_s: Option<f64>,
+    /// Median absolute relative error; absent when no prediction was available.
+    pub median_absolute_relative_error: Option<f64>,
+    /// Mean absolute relative error; absent when no prediction was available.
+    pub mean_absolute_relative_error: Option<f64>,
+    /// Nominal marginal interval coverage target.
+    pub nominal_interval_coverage: f64,
+    /// Number of intervals produced, including intervals later found not to cover.
+    pub interval_count: usize,
+    /// Number of intervals containing the observed holdout value.
+    pub interval_covered_count: usize,
+    /// Empirical coverage among produced intervals; absent when no interval was produced.
+    pub empirical_interval_coverage: Option<f64>,
+    /// Fraction of all holdout observations for which an interval was produced.
+    pub interval_provision_fraction: f64,
+    /// Mean interval width in seconds; absent when no interval was produced.
+    pub mean_interval_width_s: Option<f64>,
+    /// Median interval width in seconds; absent when no interval was produced.
+    pub median_interval_width_s: Option<f64>,
+    /// Fully auditable point-level predictions and interval outcomes.
+    pub points: Vec<CastingBenchmarkPoint>,
+}
+
+/// Point-level benchmark outcome. Missing prediction/interval fields indicate explicit abstention.
+#[derive(Debug, Clone, PartialEq)]
+pub struct CastingBenchmarkPoint {
+    /// Stable ID of the held-out observation.
+    pub observation_id: String,
+    /// Exact geometry digest for this observation.
+    pub geometry_digest: [u8; 32],
+    /// Independently observed solidification time in seconds.
+    pub observed_time_s: f64,
+    /// Point prediction in seconds, or none for an out-of-domain observation.
+    pub predicted_time_s: Option<f64>,
+    /// Absolute prediction error in seconds, or none for abstention.
+    pub absolute_error_s: Option<f64>,
+    /// Absolute relative error, or none for abstention.
+    pub absolute_relative_error: Option<f64>,
+    /// Lower conformal interval bound in seconds, or none for abstention.
+    pub interval_lower_s: Option<f64>,
+    /// Upper conformal interval bound in seconds, or none for abstention.
+    pub interval_upper_s: Option<f64>,
+    /// Whether the conformal interval contains the observation; none for abstention.
+    pub interval_contains_observation: Option<bool>,
+    /// Final disposition for the observation.
+    pub status: CastingBenchmarkPointStatus,
+}
+
+/// Independent evaluator for the frozen casting train/calibration/holdout manifest.
+pub struct CastingBenchmarkEvaluator;
+
+impl CastingBenchmarkEvaluator {
+    /// Verify the evidence manifest, then independently recompute holdout prediction and
+    /// interval metrics from the bound model and calibrator.
+    ///
+    /// Out-of-domain observations remain in the total-count denominator but receive no
+    /// point estimate or interval. Error metrics are conditional on supported predictions;
+    /// prediction coverage is always reported alongside them.
+    pub fn evaluate(
+        manifest: &CastingSplitManifest,
+        model: &ChvorinovModel,
+        calibrator: &ChvorinovConformalCalibrator,
+        training: &[CastingObservationRecord],
+        calibration: &[CastingObservationRecord],
+        holdout: &[CastingObservationRecord],
+    ) -> Result<CastingBenchmarkReport, CastingBenchmarkError> {
+        manifest.verify(model, calibrator, training, calibration, holdout)?;
+
+        let mut points = Vec::with_capacity(holdout.len());
+        let mut absolute_errors_s = Vec::new();
+        let mut absolute_relative_errors = Vec::new();
+        let mut squared_errors_s = Vec::new();
+        let mut interval_widths_s = Vec::new();
+        let mut interval_covered_count = 0usize;
+        let mut abstained_out_of_domain_count = 0usize;
+
+        for record in holdout {
+            let observation = record.observation;
+            match model.estimate_solidification_time_s(observation.thermal_modulus_m) {
+                Ok(predicted_time_s) => {
+                    let interval = calibrator.predict_interval(model, observation.thermal_modulus_m)?;
+                    let absolute_error_s =
+                        (predicted_time_s - observation.solidification_time_s).abs();
+                    let absolute_relative_error =
+                        absolute_error_s / observation.solidification_time_s;
+                    let squared_error_s = absolute_error_s.powi(2);
+                    let interval_width_s = interval.upper_s - interval.lower_s;
+                    if !absolute_error_s.is_finite()
+                        || !absolute_relative_error.is_finite()
+                        || !squared_error_s.is_finite()
+                        || !interval_width_s.is_finite()
+                        || interval_width_s < 0.0
+                    {
+                        return Err(CastingBenchmarkError::NonFiniteMetric);
+                    }
+
+                    let interval_contains_observation = interval.lower_s
+                        <= observation.solidification_time_s
+                        && observation.solidification_time_s <= interval.upper_s;
+                    if interval_contains_observation {
+                        interval_covered_count += 1;
+                    }
+                    absolute_errors_s.push(absolute_error_s);
+                    absolute_relative_errors.push(absolute_relative_error);
+                    squared_errors_s.push(squared_error_s);
+                    interval_widths_s.push(interval_width_s);
+                    points.push(CastingBenchmarkPoint {
+                        observation_id: record.observation_id.clone(),
+                        geometry_digest: record.geometry_digest,
+                        observed_time_s: observation.solidification_time_s,
+                        predicted_time_s: Some(predicted_time_s),
+                        absolute_error_s: Some(absolute_error_s),
+                        absolute_relative_error: Some(absolute_relative_error),
+                        interval_lower_s: Some(interval.lower_s),
+                        interval_upper_s: Some(interval.upper_s),
+                        interval_contains_observation: Some(interval_contains_observation),
+                        status: CastingBenchmarkPointStatus::PredictedWithinCalibrationDomain,
+                    });
+                }
+                Err(CastingModelError::OutsideCalibrationDomain { .. }) => {
+                    abstained_out_of_domain_count += 1;
+                    points.push(CastingBenchmarkPoint {
+                        observation_id: record.observation_id.clone(),
+                        geometry_digest: record.geometry_digest,
+                        observed_time_s: observation.solidification_time_s,
+                        predicted_time_s: None,
+                        absolute_error_s: None,
+                        absolute_relative_error: None,
+                        interval_lower_s: None,
+                        interval_upper_s: None,
+                        interval_contains_observation: None,
+                        status: CastingBenchmarkPointStatus::AbstainedOutsideCalibrationDomain,
+                    });
+                }
+                Err(error) => return Err(CastingBenchmarkError::Model(error)),
+            }
+        }
+
+        let total_count = holdout.len();
+        let prediction_count = absolute_errors_s.len();
+        let prediction_coverage_fraction = prediction_count as f64 / total_count as f64;
+        let mae_s = if prediction_count == 0 {
+            None
+        } else {
+            Some(absolute_errors_s.iter().sum::<f64>() / prediction_count as f64)
+        };
+        let rmse_s = if prediction_count == 0 {
+            None
+        } else {
+            Some((squared_errors_s.iter().sum::<f64>() / prediction_count as f64).sqrt())
+        };
+        let median_absolute_relative_error = median_value(absolute_relative_errors.clone());
+        let mean_absolute_relative_error = if prediction_count == 0 {
+            None
+        } else {
+            Some(absolute_relative_errors.iter().sum::<f64>() / prediction_count as f64)
+        };
+        let interval_count = interval_widths_s.len();
+        let empirical_interval_coverage = if interval_count == 0 {
+            None
+        } else {
+            Some(interval_covered_count as f64 / interval_count as f64)
+        };
+        let interval_provision_fraction = interval_count as f64 / total_count as f64;
+        let mean_interval_width_s = if interval_count == 0 {
+            None
+        } else {
+            Some(interval_widths_s.iter().sum::<f64>() / interval_count as f64)
+        };
+        let median_interval_width_s = median_value(interval_widths_s);
+
+        for value in [
+            Some(prediction_coverage_fraction),
+            mae_s,
+            rmse_s,
+            median_absolute_relative_error,
+            mean_absolute_relative_error,
+            empirical_interval_coverage,
+            Some(interval_provision_fraction),
+            mean_interval_width_s,
+            median_interval_width_s,
+        ]
+        .into_iter()
+        .flatten()
+        {
+            if !value.is_finite() {
+                return Err(CastingBenchmarkError::NonFiniteMetric);
+            }
+        }
+
+        Ok(CastingBenchmarkReport {
+            version: 1,
+            manifest_digest_blake3: manifest.manifest_digest_blake3(),
+            fitted_model_digest_blake3: model.model_digest_blake3(),
+            holdout_evidence_class: manifest.calibration_evidence_class(),
+            total_count,
+            prediction_count,
+            abstained_out_of_domain_count,
+            prediction_coverage_fraction,
+            mae_s,
+            rmse_s,
+            median_absolute_relative_error,
+            mean_absolute_relative_error,
+            nominal_interval_coverage: manifest.nominal_coverage(),
+            interval_count,
+            interval_covered_count,
+            empirical_interval_coverage,
+            interval_provision_fraction,
+            mean_interval_width_s,
+            median_interval_width_s,
+            points,
+        })
+    }
+}
+
+fn median_value(mut values: Vec<f64>) -> Option<f64> {
+    if values.is_empty() {
+        return None;
+    }
+    values.sort_by(f64::total_cmp);
+    let middle = values.len() / 2;
+    if values.len() % 2 == 0 {
+        Some((values[middle - 1] + values[middle]) / 2.0)
+    } else {
+        Some(values[middle])
+    }
+}
+
 fn unique_evidence_class(
     records: &[CastingObservationRecord],
     partition: CastingDataPartition,
@@ -1113,6 +1412,119 @@ mod tests {
                 manifest.verify(&model, &calibrator, &training, &calibration, &changed_holdout)
             },
             Err(CastingEvidenceError::ManifestDigestMismatch)
+        ));
+    }
+
+    #[test]
+    fn independent_evaluator_reports_error_interval_coverage_and_manifest_identity() {
+        let (training, calibration, holdout) = valid_partitions();
+        let (model, calibrator) = fit_model_and_calibrator(&training, &calibration, 0.5);
+        let manifest =
+            CastingSplitManifest::create(&model, &calibrator, &training, &calibration, &holdout)
+                .unwrap();
+
+        let report = CastingBenchmarkEvaluator::evaluate(
+            &manifest,
+            &model,
+            &calibrator,
+            &training,
+            &calibration,
+            &holdout,
+        )
+        .unwrap();
+
+        assert_eq!(report.total_count, 1);
+        assert_eq!(report.prediction_count, 1);
+        assert_eq!(report.abstained_out_of_domain_count, 0);
+        assert_eq!(report.prediction_coverage_fraction, 1.0);
+        assert!(report.mae_s.unwrap() < 1e-8);
+        assert_eq!(report.interval_count, 1);
+        assert_eq!(report.interval_provision_fraction, 1.0);
+        assert!(report.mean_interval_width_s.unwrap() >= 0.0);
+        assert_eq!(
+            report.manifest_digest_blake3,
+            manifest.manifest_digest_blake3()
+        );
+        assert_eq!(
+            report.fitted_model_digest_blake3,
+            model.model_digest_blake3()
+        );
+        assert_eq!(
+            report.points[0].status,
+            CastingBenchmarkPointStatus::PredictedWithinCalibrationDomain
+        );
+    }
+
+    #[test]
+    fn independent_evaluator_keeps_out_of_domain_cases_in_coverage_denominator() {
+        let (training, calibration, mut holdout) = valid_partitions();
+        holdout[0] = record(
+            "holdout-1",
+            0.02,
+            500.0,
+            CastingEvidenceClass::MeasuredPhysical,
+            digest("alloy-mold-tooling-protocol-v1"),
+            "geom-f",
+        );
+        let (model, calibrator) = fit_model_and_calibrator(&training, &calibration, 0.5);
+        let manifest =
+            CastingSplitManifest::create(&model, &calibrator, &training, &calibration, &holdout)
+                .unwrap();
+
+        let report = CastingBenchmarkEvaluator::evaluate(
+            &manifest,
+            &model,
+            &calibrator,
+            &training,
+            &calibration,
+            &holdout,
+        )
+        .unwrap();
+
+        assert_eq!(report.total_count, 1);
+        assert_eq!(report.prediction_count, 0);
+        assert_eq!(report.abstained_out_of_domain_count, 1);
+        assert_eq!(report.prediction_coverage_fraction, 0.0);
+        assert_eq!(report.mae_s, None);
+        assert_eq!(report.rmse_s, None);
+        assert_eq!(report.interval_count, 0);
+        assert_eq!(report.empirical_interval_coverage, None);
+        assert_eq!(report.interval_provision_fraction, 0.0);
+        assert_eq!(
+            report.points[0].status,
+            CastingBenchmarkPointStatus::AbstainedOutsideCalibrationDomain
+        );
+    }
+
+    #[test]
+    fn independent_evaluator_rejects_holdout_mutation_after_manifest_freeze() {
+        let (training, calibration, holdout) = valid_partitions();
+        let (model, calibrator) = fit_model_and_calibrator(&training, &calibration, 0.5);
+        let manifest =
+            CastingSplitManifest::create(&model, &calibrator, &training, &calibration, &holdout)
+                .unwrap();
+        let mut changed_holdout = holdout.clone();
+        changed_holdout[0] = record(
+            "holdout-1",
+            0.006,
+            44.0,
+            CastingEvidenceClass::MeasuredPhysical,
+            digest("alloy-mold-tooling-protocol-v1"),
+            "geom-f",
+        );
+
+        assert!(matches!(
+            CastingBenchmarkEvaluator::evaluate(
+                &manifest,
+                &model,
+                &calibrator,
+                &training,
+                &calibration,
+                &changed_holdout
+            ),
+            Err(CastingBenchmarkError::Evidence(
+                CastingEvidenceError::ManifestDigestMismatch
+            ))
         ));
     }
 
