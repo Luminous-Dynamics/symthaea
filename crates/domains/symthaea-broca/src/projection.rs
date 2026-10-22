@@ -878,6 +878,164 @@ impl HdcSsmProjection {
         }
     }
 
+    /// Accumulate the exact gradient of a next-token loss through the
+    /// HDC -> bottleneck -> SSM forward projection.
+    ///
+    /// d_ssm is d(loss)/d(project_to_ssm(input_hv)). Unlike backward,
+    /// which expects a bottleneck-space gradient, this method accepts the
+    /// full SSM-space gradient and backpropagates through every forward layer.
+    /// Call apply_gradients once after accumulating the desired token losses.
+    pub fn accumulate_language_model_gradients(
+        &mut self,
+        input_hv: &ContinuousHV,
+        d_ssm: &[f32],
+        gradient_scale: f32,
+    ) -> anyhow::Result<()> {
+        anyhow::ensure!(
+            input_hv.values.len() == self.hdc_dim,
+            "HDC projection input dimension mismatch: expected {}, got {}",
+            self.hdc_dim,
+            input_hv.values.len()
+        );
+        anyhow::ensure!(
+            d_ssm.len() == self.ssm_dim,
+            "SSM projection gradient dimension mismatch: expected {}, got {}",
+            self.ssm_dim,
+            d_ssm.len()
+        );
+        anyhow::ensure!(
+            gradient_scale.is_finite() && gradient_scale >= 0.0,
+            "gradient scale must be finite and non-negative"
+        );
+        anyhow::ensure!(
+            input_hv.values.iter().all(|v| v.is_finite())
+                && d_ssm.iter().all(|v| v.is_finite()),
+            "projection input and SSM gradient must be finite"
+        );
+        if gradient_scale == 0.0 {
+            return Ok(());
+        }
+
+        // Forward pass: cache activations needed to differentiate project_to_ssm().
+        let pre_ln = self.matmul(&self.w_down, &input_hv.values, self.bottleneck, self.hdc_dim);
+        let (normed, x_hat, inv_std) =
+            layer_norm(&pre_ln, &self.ln_fwd_gamma, &self.ln_fwd_beta);
+        let hidden_pre_deep: Vec<f32> = normed.iter().map(|&x| activation(x)).collect();
+
+        let (inner_pre, inner_act, expanded_pre, hidden_final) = if self.deep {
+            let inner_pre = self.matmul(
+                &self.w_down2,
+                &hidden_pre_deep,
+                self.inner_dim,
+                self.bottleneck,
+            );
+            let inner_act: Vec<f32> = inner_pre.iter().map(|&x| gelu(x)).collect();
+            let expanded_pre = self.matmul(
+                &self.w_up2,
+                &inner_act,
+                self.bottleneck,
+                self.inner_dim,
+            );
+            let hidden_final = expanded_pre
+                .iter()
+                .zip(hidden_pre_deep.iter())
+                .map(|(&e, &h)| activation(e) + RESIDUAL_ALPHA * h)
+                .collect::<Vec<_>>();
+            (Some(inner_pre), Some(inner_act), Some(expanded_pre), hidden_final)
+        } else {
+            (None, None, None, hidden_pre_deep.clone())
+        };
+
+        // dW_up and d(loss)/d(the final bottleneck state).
+        let mut d_hidden_final = vec![0.0f32; self.bottleneck];
+        for out_idx in 0..self.ssm_dim {
+            let grad = d_ssm[out_idx] * gradient_scale;
+            for hidden_idx in 0..self.bottleneck {
+                self.grad_up[out_idx * self.bottleneck + hidden_idx] +=
+                    grad * hidden_final[hidden_idx];
+                d_hidden_final[hidden_idx] +=
+                    self.w_up[out_idx * self.bottleneck + hidden_idx] * grad;
+            }
+        }
+
+        let d_normed = if self.deep {
+            let inner_pre = inner_pre.as_ref().expect("deep inner activation cached");
+            let inner_act = inner_act.as_ref().expect("deep inner activation cached");
+            let expanded_pre = expanded_pre.as_ref().expect("deep expanded activation cached");
+
+            // hidden_final = activation(expanded_pre) + alpha * hidden_pre_deep
+            let d_expanded: Vec<f32> = d_hidden_final
+                .iter()
+                .zip(expanded_pre.iter())
+                .map(|(&g, &x)| g * activation_derivative(x))
+                .collect();
+
+            for out_idx in 0..self.bottleneck {
+                for inner_idx in 0..self.inner_dim {
+                    self.grad_up2[out_idx * self.inner_dim + inner_idx] +=
+                        d_expanded[out_idx] * inner_act[inner_idx];
+                }
+            }
+
+            let mut d_inner_act = vec![0.0f32; self.inner_dim];
+            for inner_idx in 0..self.inner_dim {
+                for out_idx in 0..self.bottleneck {
+                    d_inner_act[inner_idx] +=
+                        self.w_up2[out_idx * self.inner_dim + inner_idx] * d_expanded[out_idx];
+                }
+            }
+            let d_inner_pre: Vec<f32> = d_inner_act
+                .iter()
+                .zip(inner_pre.iter())
+                .map(|(&g, &x)| g * gelu_derivative(x))
+                .collect();
+
+            for inner_idx in 0..self.inner_dim {
+                for hidden_idx in 0..self.bottleneck {
+                    self.grad_down2[inner_idx * self.bottleneck + hidden_idx] +=
+                        d_inner_pre[inner_idx] * hidden_pre_deep[hidden_idx];
+                }
+            }
+
+            let mut d_hidden_pre_deep = vec![0.0f32; self.bottleneck];
+            for hidden_idx in 0..self.bottleneck {
+                d_hidden_pre_deep[hidden_idx] += RESIDUAL_ALPHA * d_hidden_final[hidden_idx];
+                for inner_idx in 0..self.inner_dim {
+                    d_hidden_pre_deep[hidden_idx] +=
+                        self.w_down2[inner_idx * self.bottleneck + hidden_idx] * d_inner_pre[inner_idx];
+                }
+            }
+            d_hidden_pre_deep
+                .iter()
+                .zip(normed.iter())
+                .map(|(&g, &x)| g * activation_derivative(x))
+                .collect::<Vec<_>>()
+        } else {
+            d_hidden_final
+                .iter()
+                .zip(normed.iter())
+                .map(|(&g, &x)| g * activation_derivative(x))
+                .collect::<Vec<_>>()
+        };
+
+        let d_pre_ln = layer_norm_backward(
+            &d_normed,
+            &x_hat,
+            &self.ln_fwd_gamma,
+            inv_std,
+            &mut self.grad_ln_fwd_gamma,
+            &mut self.grad_ln_fwd_beta,
+        );
+        for row in 0..self.bottleneck {
+            for col in 0..self.hdc_dim {
+                self.grad_down[row * self.hdc_dim + col] +=
+                    d_pre_ln[row] * input_hv.values[col];
+            }
+        }
+
+        Ok(())
+    }
+
     /// Backpropagate gradients and update weights mathematically correctly.
     /// `d_bottleneck` must be the gradient of the loss with respect to the bottleneck output (size: self.bottleneck).
     pub fn backward(&mut self, input_hv: &ContinuousHV, d_bottleneck: &[f32], lr: f32) {
@@ -2775,6 +2933,75 @@ mod tests {
         assert!(
             act.iter().all(|v| v.is_finite()),
             "All bottleneck activations should be finite"
+        );
+    }
+}
+
+
+#[cfg(test)]
+mod language_model_gradient_tests {
+    use super::*;
+
+    fn objective(projection: &HdcSsmProjection, input: &ContinuousHV, d_ssm: &[f32]) -> f32 {
+        projection
+            .project_to_ssm(input)
+            .iter()
+            .zip(d_ssm.iter())
+            .map(|(output, grad)| output * grad)
+            .sum()
+    }
+
+    #[test]
+    fn forward_projection_lm_gradient_matches_finite_differences() {
+        let genesis = GenesisSeed::from_phrase("lm-projection-gradient-fd");
+        let mut projection = HdcSsmProjection::new(&genesis, 8, 4, 3);
+        let input = ContinuousHV::from_vec(vec![0.2, -0.7, 0.4, 1.1, -0.3, 0.8, -1.2, 0.5]);
+        let d_ssm = [0.3, -0.2, 0.15];
+
+        projection
+            .accumulate_language_model_gradients(&input, &d_ssm, 1.0)
+            .expect("valid projection gradient should accumulate");
+
+        let epsilon = 1e-3f32;
+
+        let original_up = projection.w_up[0];
+        projection.w_up[0] = original_up + epsilon;
+        let plus_up = objective(&projection, &input, &d_ssm);
+        projection.w_up[0] = original_up - epsilon;
+        let minus_up = objective(&projection, &input, &d_ssm);
+        projection.w_up[0] = original_up;
+        let numeric_up = (plus_up - minus_up) / (2.0 * epsilon);
+        let analytic_up = projection.grad_up[0];
+        let tolerance_up = 2e-2 + numeric_up.abs() * 0.08;
+        assert!(
+            (analytic_up - numeric_up).abs() <= tolerance_up,
+            "w_up gradient mismatch: analytic={analytic_up}, finite_difference={numeric_up}"
+        );
+
+        let original_down = projection.w_down[0];
+        projection.w_down[0] = original_down + epsilon;
+        let plus_down = objective(&projection, &input, &d_ssm);
+        projection.w_down[0] = original_down - epsilon;
+        let minus_down = objective(&projection, &input, &d_ssm);
+        projection.w_down[0] = original_down;
+        let numeric_down = (plus_down - minus_down) / (2.0 * epsilon);
+        let analytic_down = projection.grad_down[0];
+        let tolerance_down = 2e-2 + numeric_down.abs() * 0.08;
+        assert!(
+            (analytic_down - numeric_down).abs() <= tolerance_down,
+            "w_down gradient mismatch: analytic={analytic_down}, finite_difference={numeric_down}"
+        );
+    }
+
+    #[test]
+    fn projection_gradient_rejects_wrong_ssm_dimension() {
+        let genesis = GenesisSeed::from_phrase("lm-projection-gradient-contract");
+        let mut projection = HdcSsmProjection::new(&genesis, 8, 4, 3);
+        let input = ContinuousHV::from_vec(vec![0.0; 8]);
+        assert!(
+            projection
+                .accumulate_language_model_gradients(&input, &[0.1, 0.2], 1.0)
+                .is_err()
         );
     }
 }

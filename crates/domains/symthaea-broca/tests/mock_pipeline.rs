@@ -89,6 +89,56 @@ fn test_distillation_modifies_weights() {
     );
 }
 
+/// The reported distillation loss must depend on the supervised target IDs.
+#[test]
+fn test_distillation_loss_tracks_target_cross_entropy() {
+    let config = LiquidMambaConfig {
+        warmup_steps: 0,
+        accumulation_steps: 1,
+        enable_consciousness_gating: false,
+        ..Default::default()
+    };
+    let channels = ThoughtChannels::with_intent(3);
+    let mut first = mock_gen(config.clone());
+    let mut second = mock_gen(config);
+
+    let first_loss = first
+        .train_step(&channels, &[1, 2, 3, 4])
+        .expect("first mock distillation should succeed");
+    let second_loss = second
+        .train_step(&channels, &[101, 102, 103, 104])
+        .expect("second mock distillation should succeed");
+
+    assert!(first_loss.is_finite() && first_loss > 0.0);
+    assert!(second_loss.is_finite() && second_loss > 0.0);
+    assert!(
+        (first_loss - second_loss).abs() > 1e-6,
+        "distinct targets should produce distinct teacher-forced losses, got {first_loss} and {second_loss}"
+    );
+}
+
+/// Invalid teacher targets must not produce success-shaped loss values.
+#[test]
+fn test_distillation_rejects_out_of_range_target_id() {
+    let config = LiquidMambaConfig {
+        warmup_steps: 0,
+        accumulation_steps: 1,
+        enable_consciousness_gating: false,
+        ..Default::default()
+    };
+    let mut gen_obj = mock_gen(config);
+    let channels = ThoughtChannels::with_intent(5);
+
+    let error = gen_obj
+        .train_step(&channels, &[u32::MAX])
+        .expect_err("out-of-range target must fail closed");
+
+    assert!(
+        error.to_string().contains("outside logits vocabulary"),
+        "expected target-range diagnostic, got: {error}"
+    );
+}
+
 /// After 20 rounds, pe_stats() returns finite values.
 #[test]
 fn test_pe_trend_after_distillation() {
@@ -988,5 +1038,34 @@ fn test_temporal_collapse_recovery_health_check() {
     assert!(
         changed > 0,
         "Temporal weights should differ after health check recovery"
+    );
+}
+
+/// Temporal training must not mutate the dormant spatial projection merely because
+/// the shared topological coherence monitor reports a low score.
+#[test]
+fn temporal_distillation_does_not_regularize_spatial_projection() {
+    let config = LiquidMambaConfig {
+        temporal_projection: true,
+        warmup_steps: 0,
+        accumulation_steps: 1,
+        enable_consciousness_gating: false,
+        ..Default::default()
+    };
+    let mut gen_obj = mock_gen(config);
+    let channels = ThoughtChannels::with_intent(5);
+    gen_obj
+        .topological_coherence
+        .store(0.1f32.to_bits(), std::sync::atomic::Ordering::Relaxed);
+
+    let initial_weights = gen_obj.projection.flatten_weights();
+    gen_obj
+        .train_step(&channels, &[7, 11, 13, 17])
+        .expect("temporal distillation should succeed");
+
+    assert_eq!(
+        initial_weights,
+        gen_obj.projection.flatten_weights(),
+        "temporal training must not change the unused spatial projection"
     );
 }

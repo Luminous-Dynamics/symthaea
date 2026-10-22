@@ -1130,74 +1130,152 @@ impl LiquidMambaGenerator {
         target_ids: &[u32],
         lr: f32,
     ) -> Result<f32> {
-        let mut total_loss = 0.0f32;
         if target_ids.is_empty() {
             return Ok(0.0);
         }
+        if self.config.rotate_grad && self.config.e2e_grad_chunks == 0 {
+            anyhow::bail!("e2e_grad_chunks must be positive when gradient rotation is enabled");
+        }
 
-        // 1. Prepare context for teacher-forcing
-        if self.config.temporal_projection && self.temporal_proj.is_some() {
+        let uses_temporal_projection =
+            self.config.temporal_projection && self.temporal_proj.is_some();
+
+        // Prepare the true projected context once. The teacher-forced loss loop
+        // below evaluates every target against the same projection parameters;
+        // projection gradients are accumulated and applied once per sequence.
+        let gradient_sequence = if uses_temporal_projection {
             let sequence = self
                 .temporal_proj
                 .as_ref()
-                .unwrap()
+                .expect("temporal projection checked above")
                 .project_to_ssm_sequence(thought_hv);
             self.mamba.inject_context_sequence(&sequence)?;
+            sequence
         } else {
             let ssm_context = self.projection.project_to_ssm(thought_hv);
             self.mamba.inject_initial_context(&ssm_context)?;
+            vec![ssm_context]
+        };
+        if gradient_sequence.is_empty() {
+            anyhow::bail!("cannot distill from an empty projected context sequence");
         }
 
-        // 2. Teacher-forced forward + backward
+        let mut total_loss = 0.0f32;
         let mut prev_token = self.mamba.eos_token_id();
         let num_tokens = target_ids.len();
-        let mut intermediate_states = Vec::with_capacity(num_tokens);
+        let mut gradient_samples = 0usize;
+        let mut d_ssm_sum = vec![0.0f32; self.mamba.d_model()];
+        let mut temporal_ssm_gradient_sum: Vec<Option<Vec<f32>>> =
+            vec![None; gradient_sequence.len()];
 
-        for &target_id in target_ids {
-            // Forward through teacher token to get next state/logits
-            let (_logits, hidden) = self.mamba.forward_with_state(prev_token)?;
-            intermediate_states.push(hidden);
+        // Teacher-force the target sequence once on the live backend. Gradient
+        // replay is performed on a cloned backend, so it cannot reset the live
+        // recurrence between teacher tokens.
+        for (target_index, &target_id) in target_ids.iter().enumerate() {
+            let (logits, _hidden) = self.mamba.forward_with_state(prev_token)?;
+            anyhow::ensure!(
+                (target_id as usize) < logits.len(),
+                "teacher target token {target_id} is outside logits vocabulary of size {}",
+                logits.len()
+            );
+            anyhow::ensure!(
+                logits.iter().all(|value| value.is_finite()),
+                "teacher-forced logits contain a non-finite value at target position {target_index}"
+            );
+            let token_loss = crate::evaluation::cross_entropy_loss(&logits, target_id as usize);
+            anyhow::ensure!(
+                token_loss.is_finite(),
+                "teacher-forced cross-entropy is non-finite at target position {target_index}"
+            );
+            total_loss += token_loss;
 
-            // Improvement B: Gradient Rotation. We only compute full E2E gradients
-            // for a subset of chunks per step to save VRAM and prevent vanishing signals.
             let should_compute_grad = if self.config.rotate_grad {
-                (self.generation_count + intermediate_states.len()) % self.config.e2e_grad_chunks
-                    == 0
+                (self.generation_count + target_index + 1) % self.config.e2e_grad_chunks == 0
             } else {
                 true
             };
 
             if should_compute_grad {
-                // Compute teacher loss gradient at this position
-                let d_ssm = self.mamba.compute_e2e_token_loss_at(
-                    &[vec![0.0; 768]], // sequence not used in this call
-                    &[target_id],
-                    0,
+                // Full prefix semantics: [EOS, target_0, ..., target_i], with the
+                // last item scored as target and every preceding item fed to the SSM.
+                let mut teacher_tokens = Vec::with_capacity(target_index + 2);
+                teacher_tokens.push(self.mamba.eos_token_id());
+                teacher_tokens.extend_from_slice(&target_ids[..target_index]);
+                teacher_tokens.push(target_id);
+
+                let gradient_pos = if self.config.rotate_grad {
+                    (self.generation_count + target_index) % gradient_sequence.len()
+                } else {
+                    gradient_sequence.len() - 1
+                };
+                let d_ssm = self.mamba.compute_e2e_token_loss_at_isolated(
+                    &gradient_sequence,
+                    &teacher_tokens,
+                    gradient_pos,
                 )?;
 
-                // Apply gradient to projection weights
-                if let Some(ref mut tp) = self.temporal_proj {
-                    // For temporal projection, d_ssm flows back to w_up using intermediate states
-                    let d_hdc = tp.project_to_hdc(&d_ssm);
-                    tp.backward(&intermediate_states, &d_hdc, lr)?;
+                if uses_temporal_projection {
+                    let slot = &mut temporal_ssm_gradient_sum[gradient_pos];
+                    match slot {
+                        Some(sum) => {
+                            for (total, value) in sum.iter_mut().zip(d_ssm.iter()) {
+                                *total += *value;
+                            }
+                        }
+                        None => *slot = Some(d_ssm),
+                    }
                 } else {
-                    // For standard bottleneck, d_ssm is the direct d_bottleneck signal
-                    self.projection.backward(thought_hv, &d_ssm, lr);
+                    if d_ssm.len() != d_ssm_sum.len() {
+                        anyhow::bail!(
+                            "SSM context gradient dimension mismatch: expected {}, got {}",
+                            d_ssm_sum.len(),
+                            d_ssm.len()
+                        );
+                    }
+                    for (total, value) in d_ssm_sum.iter_mut().zip(d_ssm.iter()) {
+                        *total += *value;
+                    }
                 }
-            }
-
-            // --- IMPROVEMENT: Topological Loss Regularization ---
-            // If the live topological coherence is low, we apply an additional
-            // regularization term to the projection weights to "iron out" the manifold.
-            let live_coherence = f32::from_bits(self.topological_coherence.load(Ordering::Relaxed));
-            if live_coherence < 0.6 {
-                // Topological Regularization: push weights toward their orthogonal centroid
-                let reg_strength = 0.05 * (1.0 - live_coherence);
-                self.projection.apply_manifold_regularization(reg_strength);
+                gradient_samples += 1;
             }
 
             prev_token = target_id;
-            total_loss += 1.0; // Placeholder until real loss is extracted
+        }
+
+        // Accumulate and apply the exact forward-projection Jacobian once per
+        // sequence. The temporal arm uses sparse/rotating context anchors when
+        // configured; that is a memory-saving gradient estimator, not full BPTT.
+        if gradient_samples > 0 {
+            let gradient_scale = 1.0 / gradient_samples as f32;
+            if uses_temporal_projection {
+                let temporal = self
+                    .temporal_proj
+                    .as_mut()
+                    .expect("temporal projection checked above");
+                temporal.compute_e2e_gradients_with_scale(
+                    thought_hv,
+                    &temporal_ssm_gradient_sum,
+                    gradient_scale,
+                )?;
+                temporal.apply_gradients(lr, self.config.grad_clip);
+            } else {
+                self.projection.accumulate_language_model_gradients(
+                    thought_hv,
+                    &d_ssm_sum,
+                    gradient_scale,
+                )?;
+                self.projection.apply_gradients(lr, self.config.grad_clip);
+            }
+        }
+
+        // Topological regularization is also applied once after the sequence
+        // update, so it cannot mutate the projection between token losses.
+        let live_coherence = f32::from_bits(self.topological_coherence.load(Ordering::Relaxed));
+        // This regularizer is defined for the spatial HDC→bottleneck projection.
+        // Do not mutate that dormant projection during temporal-projection training.
+        if !uses_temporal_projection && live_coherence < 0.6 {
+            let reg_strength = 0.05 * (1.0 - live_coherence);
+            self.projection.apply_manifold_regularization(reg_strength);
         }
 
         self.generation_count += 1;
