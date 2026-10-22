@@ -49,6 +49,8 @@ A non-alarm is not a model-adequacy certificate. If the horizon expires without 
 
 The focused Rust tests cover constructor resolution, invalid budgets/horizons, correct alpha spending through the horizon, terminal behavior after an alarm, terminal behavior after a non-alarming horizon, and the rule that invalid audit input does not consume the budget.
 
+A fixed-seed 20,000-stream null smoke test also compares the corrected policy against repeatedly reusing an unadjusted 0.05 threshold with the same calibration sizes and audit scores. It is a regression check for the expected false-alarm gap, not a confidence interval, a distribution-free proof, or a substitute for the larger preregistered evaluation.
+
 The caller still has to provide auditable provenance. A real run receipt should record the epoch ID; source commit; candidate/model digest; score-function version; fixed calibration-batch IDs and digest; target distribution; audit-batch IDs; sample/measurement costs; alpha and horizon; audit order; seeds; terminal decision; and a digest of the policy-visible receipt. Hidden simulated truth belongs in a separate evaluator artifact.
 
 Before a scientific deployment, expand the score family and include explicit negative controls. Tests of decision-state semantics are not evidence of detection quality.
