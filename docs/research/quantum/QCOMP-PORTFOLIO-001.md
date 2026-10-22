@@ -55,6 +55,12 @@ Start with **maximum independent set (MIS)** from QOBLIB because feasibility is 
 
 Do not cherry-pick instances based on a candidate solver's result. Preregister the eligible cohort, exclusions, target sizes, time limits, memory limits, and stopping rule. Split by instance family/graph construction—not merely random seed—so variants of the same underlying instance cannot leak between tuning and test sets.
 
+### Baseline reality check (snapshot reviewed 22 October 2026)
+
+QOBLIB's live site currently reports **1,264 total instances, 533 optimally solved instances, and 3,226 submissions** across ten problem classes; its Maximum Independent Set class lists **50 instances** (counts are a changing upstream snapshot, not constants to hard-code). More importantly, an upstream classical submission published on 6 August 2026 reports cooperative parallel iterated local search across all 50 MIS instances, with ten independent trials per instance. It reports best-known-or-better objectives on all 50 and two new best-known values, on `frb53-24-1` (53 vs. 52) and `frb100-40` (96 vs. 94), on an Apple M5 Max with 18 CPU cores. Reported total runtimes range from fractions of a millisecond for small instances to 120 seconds for some larger cases. See the [QOBLIB live dashboard](https://zib-aopt.github.io/QOBLIB/) and [the full ParallelILS result record](https://github.com/ZIB-AOPT/QOBLIB/blob/main/07-independentset/submissions/20260806_ParallelILS_Hegade/README.md).
+
+Treat those as **published upstream records, not runs independently reproduced by this project**. They set the baseline bar: our bounded exact solver is solely a correctness oracle for tiny fixtures. A performance claim must be tested against the strongest relevant QOBLIB classical records plus currently available eligible solvers, on matched instances and disclosed hardware/resource budgets. An easy-instance win or a comparison against only one weak heuristic is not evidence of state-of-the-art improvement.
+
 ### 4.2 Candidate portfolio
 
 Begin with methods that are locally executable and whose versions and budgets can be pinned:
