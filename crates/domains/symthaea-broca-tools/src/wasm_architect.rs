@@ -40,7 +40,7 @@ pub struct SignedArtifact {
     /// Embedded signer key; accepted only when it matches the locally trusted key.
     pub public_key: Vec<u8>,
     /// Signed compatibility hash for the engine-specific precompiled artifact.
-    pub compat_hash: u64,
+    pub compat_hash: [u8; 32],
     /// Legacy records default to v1 and are rejected by the v2 verifier.
     #[serde(default = "legacy_signed_artifact_format")]
     pub format_version: u16,
@@ -51,12 +51,12 @@ pub struct SignedArtifact {
 fn signed_artifact_message_v2(
     wasm_bytes: &[u8],
     precompiled_bytes: &[u8],
-    compat_hash: u64,
+    compat_hash: &[u8; 32],
 ) -> Vec<u8> {
     const DOMAIN: &[u8] = b"SYMTHAEA-WASM-AOT-ARTIFACT/v2\0";
 
     let mut message = Vec::with_capacity(
-        DOMAIN.len() + 2 + 8 + wasm_bytes.len() + 8 + precompiled_bytes.len() + 8,
+        DOMAIN.len() + 2 + 8 + wasm_bytes.len() + 8 + precompiled_bytes.len() + 32,
     );
     message.extend_from_slice(DOMAIN);
     message.extend_from_slice(&SIGNED_ARTIFACT_FORMAT_V2.to_le_bytes());
@@ -64,7 +64,7 @@ fn signed_artifact_message_v2(
     message.extend_from_slice(wasm_bytes);
     message.extend_from_slice(&(precompiled_bytes.len() as u64).to_le_bytes());
     message.extend_from_slice(precompiled_bytes);
-    message.extend_from_slice(&compat_hash.to_le_bytes());
+    message.extend_from_slice(compat_hash);
     message
 }
 
@@ -89,7 +89,7 @@ fn verify_signed_artifact(
     let message = signed_artifact_message_v2(
         &signed.wasm_bytes,
         &signed.precompiled_bytes,
-        signed.compat_hash,
+        &signed.compat_hash,
     );
     let valid = verify_detached_signature(&message, &signed.signature, trusted_public_key)
         .map_err(|error| anyhow::anyhow!("Artifact signature verification failed: {error:?}"))?;
@@ -223,11 +223,31 @@ impl WasmArchitect {
     /// whether a precompiled artifact was produced by an engine with the
     /// same wasmtime version/target/`Config` as the one about to load it.
     #[cfg(feature = "wasm-sandbox")]
-    fn engine_compat_hash(engine: &wasmtime::Engine) -> u64 {
+    fn engine_compat_hash(engine: &wasmtime::Engine) -> [u8; 32] {
+        use sha2::{Digest, Sha256};
         use std::hash::{Hash, Hasher};
-        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+
+        // Wasmtime exposes its compatibility value through Rust's Hash trait,
+        // not as public serialized bytes. Feed that representation into SHA-256
+        // and preserve the full digest rather than truncating it to 64 bits.
+        struct Sha256Hasher(Sha256);
+        impl Hasher for Sha256Hasher {
+            fn finish(&self) -> u64 {
+                let digest: [u8; 32] = self.0.clone().finalize().into();
+                u64::from_le_bytes([
+                    digest[0], digest[1], digest[2], digest[3],
+                    digest[4], digest[5], digest[6], digest[7],
+                ])
+            }
+
+            fn write(&mut self, bytes: &[u8]) {
+                self.0.update(bytes);
+            }
+        }
+
+        let mut hasher = Sha256Hasher(Sha256::new());
         engine.precompile_compatibility_hash().hash(&mut hasher);
-        hasher.finish()
+        hasher.0.finalize().into()
     }
 
     /// Compute a simple hash for code indexing.
@@ -320,7 +340,7 @@ impl WasmArchitect {
                 // the unsafe precompiled-deserialization decision.
                 let compat_hash = Self::engine_compat_hash(&engine);
                 let message =
-                    signed_artifact_message_v2(&wasm_bytes, &serialized, compat_hash);
+                    signed_artifact_message_v2(&wasm_bytes, &serialized, &compat_hash);
                 let signature = self
                     .keypair
                     .sign_detached(&message)
@@ -518,9 +538,9 @@ mod tests {
         signer: &DilithiumKeypair,
         wasm_bytes: &[u8],
         precompiled_bytes: &[u8],
-        compat_hash: u64,
+        compat_hash: [u8; 32],
     ) -> SignedArtifact {
-        let message = signed_artifact_message_v2(wasm_bytes, precompiled_bytes, compat_hash);
+        let message = signed_artifact_message_v2(wasm_bytes, precompiled_bytes, &compat_hash);
         SignedArtifact {
             wasm_bytes: wasm_bytes.to_vec(),
             precompiled_bytes: precompiled_bytes.to_vec(),
@@ -534,18 +554,18 @@ mod tests {
     #[test]
     fn v2_artifact_signature_binds_both_payloads_and_compatibility() {
         let signer = DilithiumKeypair::generate();
-        let signed = signed_fixture(&signer, b"portable wasm", b"precompiled", 42);
+        let signed = signed_fixture(&signer, b"portable wasm", b"precompiled", [42; 32]);
         assert!(verify_signed_artifact(&signed, signer.public_key()).is_ok());
 
-        let mut changed = signed_fixture(&signer, b"portable wasm", b"precompiled", 42);
-        changed.compat_hash ^= 1;
+        let mut changed = signed_fixture(&signer, b"portable wasm", b"precompiled", [42; 32]);
+        changed.compat_hash[0] ^= 1;
         assert!(verify_signed_artifact(&changed, signer.public_key()).is_err());
 
-        let mut changed = signed_fixture(&signer, b"portable wasm", b"precompiled", 42);
+        let mut changed = signed_fixture(&signer, b"portable wasm", b"precompiled", [42; 32]);
         changed.wasm_bytes.push(0);
         assert!(verify_signed_artifact(&changed, signer.public_key()).is_err());
 
-        let mut changed = signed_fixture(&signer, b"portable wasm", b"precompiled", 42);
+        let mut changed = signed_fixture(&signer, b"portable wasm", b"precompiled", [42; 32]);
         changed.precompiled_bytes.push(0);
         assert!(verify_signed_artifact(&changed, signer.public_key()).is_err());
     }
@@ -554,14 +574,14 @@ mod tests {
     fn valid_signature_from_self_supplied_key_is_not_trusted() {
         let trusted = DilithiumKeypair::generate();
         let attacker = DilithiumKeypair::generate();
-        let forged = signed_fixture(&attacker, b"wasm", b"precompiled", 7);
+        let forged = signed_fixture(&attacker, b"wasm", b"precompiled", [7; 32]);
 
         // It is cryptographically valid under the attacker's key, but the
         // artifact must not be accepted under the runtime's trusted identity.
         let attacker_message = signed_artifact_message_v2(
             &forged.wasm_bytes,
             &forged.precompiled_bytes,
-            forged.compat_hash,
+            &forged.compat_hash,
         );
         assert!(verify_detached_signature(
             &attacker_message,
@@ -574,7 +594,7 @@ mod tests {
     #[test]
     fn legacy_artifact_version_is_rejected() {
         let signer = DilithiumKeypair::generate();
-        let mut legacy = signed_fixture(&signer, b"wasm", b"precompiled", 7);
+        let mut legacy = signed_fixture(&signer, b"wasm", b"precompiled", [7; 32]);
         legacy.format_version = 1;
         assert!(verify_signed_artifact(&legacy, signer.public_key()).is_err());
     }
