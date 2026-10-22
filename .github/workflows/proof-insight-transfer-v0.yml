@@ -1396,6 +1396,18 @@ jobs:
           unmatched_arm[1]["run"]["config_sha256"] = "0" * 64
           cases.append(("unmatched run configuration", unmatched_arm))
 
+          invalid_precondition = copy.deepcopy(source_rows)
+          invalid_precondition[0]["prediction"]["precondition_checks"][0]["outcome"] = "probably-satisfied"
+          cases.append(("invalid precondition outcome", invalid_precondition))
+
+          invalid_mismatch = copy.deepcopy(source_rows)
+          invalid_mismatch[0]["prediction"]["mismatch_codes"] = ["wrong-way"]
+          cases.append(("invalid mismatch code", invalid_mismatch))
+
+          reviewer_extra_field = copy.deepcopy(source_rows)
+          reviewer_extra_field[0]["adjudication"]["reviewer_decisions"][0]["unregistered"] = True
+          cases.append(("unknown reviewer field", reviewer_extra_field))
+
           for name, rows in cases:
               bad_path = Path(f"{report_path.parent}/bad-counterfactual-{name.replace(' ', '-')}.jsonl")
               bad_path.write_text("".join(json.dumps(row) + "\n" for row in rows))
@@ -1406,7 +1418,7 @@ jobs:
               )
               if result.returncode == 0:
                   raise SystemExit(f"counterfactual analyzer negative control unexpectedly passed: {name}")
-          print("PITB_COUNTERFACTUAL_ANALYZER_PASS: paired metrics, component bootstrap, calibration, report schema, five malformed-link/arm/budget controls")
+          print("PITB_COUNTERFACTUAL_ANALYZER_PASS: paired metrics, component bootstrap, calibration, report schema, eight malformed-link/arm/budget/schema controls")
           PY
       - name: Audit pinned Dalek Lean Bench timeline
         shell: bash
