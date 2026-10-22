@@ -1477,7 +1477,8 @@ AGENT: [who performs the action]
 ACTION: [the main verb/action]
 PATIENT: [who is affected by the action]
 INTENT: [good/bad/neutral]
-CONSENT: [given/denied/absent/implied]
+CONSENT: [given/denied/absent/implied/unknown]
+Use "unknown" when the scenario or evidence does not establish consent; do not infer consent from silence or from the fact that someone asked.
 MAGNITUDE: [tiny/small/medium/large/huge]"#
         )
     }
@@ -1808,6 +1809,29 @@ mod tests {
         assert_eq!(result.consent, ConsentState::Unknown);
         assert!(result.consent.requires_clarification());
         assert!(!result.consent.is_explicitly_given());
+    }
+
+    #[test]
+    fn test_structured_parser_preserves_unknown_consent() {
+        let parser = MoralParser::new();
+        let parsed = parser
+            .parse_with_llm_response(
+                "A consent-sensitive action was described.",
+                Some(
+                    "AGENT: Alice\nACTION: share records\nPATIENT: Bob\nINTENT: good\nCONSENT: unknown",
+                ),
+            )
+            .expect("structured response contains meaningful extracted fields");
+        assert_eq!(parsed.consent, ConsentState::Unknown);
+        assert!(parsed.consent.requires_clarification());
+
+        let omitted = parser
+            .parse_with_llm_response(
+                "A consent-sensitive action was described.",
+                Some("AGENT: Alice\nACTION: share records\nPATIENT: Bob\nINTENT: good"),
+            )
+            .expect("response without consent still contains meaningful fields");
+        assert_eq!(omitted.consent, ConsentState::Unknown);
     }
 
     #[test]
