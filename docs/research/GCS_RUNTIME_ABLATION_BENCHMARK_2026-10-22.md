@@ -16,6 +16,18 @@ This is a pilot instrument, not an SOTA claim. It starts with eight small determ
 - **Reproducible receipt:** the JSON includes the resolved source revision, model mode, ordered task-manifest digest and task content (description, expected symbol, reference source, test fixture, semantic mutants), per-task source/test digests, mutant preflight outcomes, generated-source digests, repeat/order, expected/observed test counts, completion status, pass result, runtime, iterations, and energy. Treat these pilot fixtures as public; this receipt design is not a substitute for hidden tests.
 - **Separate outcomes:** compilation rate, complete-oracle rate, behavioral success rate, per-task paired wins/losses, and time/energy are reported independently.
 
+## Pre-register the task manifest
+
+Before any compiler controls or model trials, print the current frozen manifest without running the benchmark:
+
+```bash
+GIT_COMMIT_SHA="$(git rev-parse HEAD)" cargo run --release \
+  --example coding_gcs_ablation_benchmark \
+  --features 'code_generation geodesic_synthesis' -- --print-manifest
+```
+
+Record `source_revision` and `task_manifest_blake3` in an independently reviewed preregistration or committed protocol record. This command requires the same clean source checkout, but performs no reference, mutant, empty-patch or agent trial execution.
+
 ## Run
 
 Run from the pinned Nix/Rust environment with the repository's toolchain and dependencies available:
