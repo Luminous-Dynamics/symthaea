@@ -17,7 +17,7 @@ The tool refuses to create a comparison report unless all of these conditions ho
 2. Both working trees are clean and both receipts pin the same source commit and toolchain.
 3. Both receipts include the complete expected case-ID census; the set is unique, matches the declared count, and exactly matches the actual result IDs.
 4. Every case result is PASS or FAIL. An indeterminate, errored, skipped, missing, duplicated, or unexpected case makes the comparison non-comparable; it is never silently treated as a failure or a pass.
-5. Dataset version, visibility/split, schema/corpus/inventory hashes, generation and tool configuration, rubric digest, and judge-panel identities are identical.
+5. Dataset version, visibility/split, schema/corpus/inventory hashes, generation and tool configuration, rubric digest, judge-panel identities, and human-review status/count are identical. Both receipts must record `independent_adjudication_status=COMPLETE`; otherwise the comparator refuses to rank candidate-oracle results.
 6. The cluster map assigns each expected case exactly once. A cluster cannot span more than one declared family; at least two clusters are needed for the interval.
 
 This is stricter than merely trusting a receipt's eligibility flag. If a model provider only exposes a moving alias and cannot provide a stable snapshot, record that limitation in the receipt rather than representing the comparison as fully reproducible.
