@@ -98,7 +98,7 @@ The consent violation detection mechanism may fail to identify scenarios where c
 - `judge_consent_action(_, ConsentState::Denied)` always returns `ConsentViolation` verdict
 - `judge_consent_action(_, ConsentState::Absent)` always returns `ConsentViolation` verdict
 - `ConsentState::Unknown` remains distinct from Given, Denied, Absent and Implied in encoded state
-- Unknown consent cannot produce a positive consent-sensitive verdict; Neutral is not an authorization permit
+- Unknown or Implied consent cannot produce a positive consent-sensitive verdict; Neutral is not an authorization permit
 - Parser silence or an unanswered request is not classified as explicit consent
 - Any action-specific policy that requires consent must fail closed for Unknown until independently verified, scope-bound consent is supplied
 - Exact-head formatting, compilation, focused tests and downstream compatibility pass; no CI result is inferred from authored tests
