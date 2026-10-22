@@ -10,10 +10,10 @@
 use allostatic_control_bench::stratified_metrics::{StratifiedSummary, TaskEpisode};
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
+use std::fmt::Write as FmtWrite;
 use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::fmt::Write as FmtWrite;
 
 const REPORT_HEADER: &str = "row_type,task,n_pairs,baseline_mean,candidate_mean,mean_delta,iqm_delta,paired_win_rate,macro_baseline_mean,macro_candidate_mean,macro_mean_delta,macro_mean_delta_ci95_low,macro_mean_delta_ci95_high,macro_iqm_delta,macro_iqm_delta_ci95_low,macro_iqm_delta_ci95_high,macro_paired_win_rate,macro_paired_win_rate_ci95_low,macro_paired_win_rate_ci95_high,fraction_tasks_positive_mean_delta,task_count,bootstrap_replicates,bootstrap_seed";
 
@@ -177,7 +177,9 @@ fn run() -> Result<(), String> {
 
 fn csv_fields(line: &str, line_number: usize) -> Result<Vec<&str>, String> {
     if line.contains('"') {
-        return Err(format!("line {line_number} contains CSV quoting; use the strict unquoted schema"));
+        return Err(format!(
+            "line {line_number} contains CSV quoting; use the strict unquoted schema"
+        ));
     }
     Ok(line.trim_end_matches('\r').split(',').collect())
 }
@@ -186,7 +188,12 @@ fn is_slug(value: &str) -> bool {
     !value.is_empty()
         && value
             .bytes()
-            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'-' || byte == b'.')
+            .all(|byte| {
+                byte.is_ascii_alphanumeric()
+                    || byte == b'_'
+                    || byte == b'-'
+                    || byte == b'.'
+            })
 }
 
 fn ensure_distinct_paths(input: &Path, output: &Path) -> Result<(), String> {
@@ -194,7 +201,9 @@ fn ensure_distinct_paths(input: &Path, output: &Path) -> Result<(), String> {
         .map_err(|error| format!("cannot resolve input CSV {}: {error}", input.display()))?;
     let canonical_output = canonical_output_path(output)?;
     if canonical_input == canonical_output {
-        return Err("input and output resolve to the same file; refusing to overwrite source data".to_owned());
+        return Err(
+            "input and output resolve to the same file; refusing to overwrite source data".to_owned(),
+        );
     }
     Ok(())
 }
@@ -234,7 +243,9 @@ fn atomic_write(target: &Path, content: &[u8]) -> Result<(), String> {
             .write(true)
             .create_new(true)
             .open(&temporary)
-            .map_err(|error| format!("cannot create temporary report {}: {error}", temporary.display()))?;
+            .map_err(|error| {
+                format!("cannot create temporary report {}: {error}", temporary.display())
+            })?;
         file.write_all(content)
             .map_err(|error| format!("cannot write temporary report: {error}"))?;
         file.flush()
@@ -243,7 +254,9 @@ fn atomic_write(target: &Path, content: &[u8]) -> Result<(), String> {
             .map_err(|error| format!("cannot sync temporary report: {error}"))?;
         drop(file);
         fs::rename(&temporary, target)
-            .map_err(|error| format!("cannot atomically publish report {}: {error}", target.display()))?;
+            .map_err(|error| {
+                format!("cannot atomically publish report {}: {error}", target.display())
+            })?;
         Ok(())
     })();
     if let Err(error) = write_result {
