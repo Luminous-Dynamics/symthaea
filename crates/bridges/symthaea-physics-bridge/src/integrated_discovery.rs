@@ -464,7 +464,9 @@ fn run_trial_with_discrepancy(
     let mut round = 0usize;
     while round < max_rounds
         && (live.len() > 1
-            || (active_selector == ActiveSelector::InformationGainWithAudits && live.len() == 1))
+            || (config.active_selection
+                && active_selector == ActiveSelector::InformationGainWithAudits
+                && live.len() == 1))
     {
         let predict = |idx: &usize, e: &Experiment| eval_at(&hypotheses[*idx], e);
         let chosen = if config.active_selection {
@@ -521,8 +523,8 @@ fn run_trial_with_discrepancy(
         let base_true_val =
             eval_at(&ground_truth, &chosen).expect("filtered pool guarantees finiteness");
         // This controlled additive term is hidden from every candidate and selector.
-        // A nonzero amplitude makes the observation-generating process misspecified
-        // relative to the candidate class; selectors must not read this term.
+        // A nonzero amplitude perturbs observations relative to the finite candidate
+        // pool; selectors must not read this term.
         let coordinates: Vec<f64> = chosen.iter().map(|(_, value)| *value).collect();
         let discrepancy_wave = coordinates
             .iter()
