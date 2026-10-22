@@ -72,156 +72,160 @@ fn main() -> BenchResult<()> {
     println!("# attack_modes=insertion (extra entries) and replacement (fixed entry count, genuine target class removed)");
     println!("# acceptance=similarity>={MIN_SIMILARITY},top_two_margin>={MIN_TOP_TWO_MARGIN}; fixed diagnostic, not calibrated");
     println!("# payload=entry_count*dimension*sizeof(i8); excludes labels, allocator, runtime, and indexes");
-    println!("seed,attack_mode,dimension,genuine_classes,entry_count,poison_count,poison_noise,query_noise,query_count,attacked_classes,targeted_query_count,targeted_top1_correct,targeted_top1_accuracy,targeted_accepted_count,targeted_coverage,targeted_false_rejections,targeted_false_rejection_rate,target_attack_success_count,target_attack_success_rate,accepted_target_attack_success_count,accepted_target_attack_success_rate,retained_query_count,retained_top1_correct,retained_top1_accuracy,retained_accepted_count,retained_coverage,top1_correct,top1_accuracy,accepted_count,coverage,accepted_errors,selective_risk,attacker_prediction_count,attacker_prediction_rate,p50_latency_us,p95_latency_us,scan_wall_ms,scan_qps,vector_payload_bytes");
+    println!("seed,attack_mode,dimension,genuine_classes,entry_count,poison_count,poison_noise,query_noise,query_count,attacked_classes,targeted_query_count,targeted_top1_correct,targeted_top1_accuracy,targeted_accepted_count,targeted_coverage,targeted_false_rejections,targeted_false_rejection_rate,target_attack_success_count,target_attack_success_rate,accepted_target_attack_success_count,accepted_target_attack_success_rate,retained_query_count,retained_top1_correct,retained_top1_accuracy,retained_accepted_count,retained_coverage,retained_false_rejections,retained_false_rejection_rate,top1_correct,top1_accuracy,accepted_count,coverage,accepted_errors,selective_risk,attacker_prediction_count,attacker_prediction_rate,p50_latency_us,p95_latency_us,scan_wall_ms,scan_qps,vector_payload_bytes");
 
     for seed in SEEDS {
         let prototypes = build_prototypes(seed)?;
         let queries = build_queries(&prototypes, seed)?;
-        let target_classes: Vec<usize> = (0..CLASS_COUNT).collect();
-
         for attack_mode in [AttackMode::Insertion, AttackMode::Replacement] {
             for poison_count in POISON_COUNTS {
                 for poison_noise in POISON_NOISE_LEVELS {
-                if poison_count == 0 && poison_noise != 0.0 {
-                    continue;
-                }
+                    if poison_count == 0 && poison_noise != 0.0 {
+                        continue;
+                    }
 
-                let build_started = Instant::now();
-                let (bank, attacked_classes) =
-                    build_bank(&prototypes, seed, poison_count, poison_noise, attack_mode)?;
-                let build_ms = build_started.elapsed().as_secs_f64() * 1_000.0;
-                let attacked_class_count = attacked_classes.len();
+                    let build_started = Instant::now();
+                    let (bank, attacked_classes) = build_bank(
+                        &prototypes,
+                        seed,
+                        poison_count,
+                        poison_noise,
+                        attack_mode,
+                    )?;
+                    let build_ms = build_started.elapsed().as_secs_f64() * 1_000.0;
+                    let attacked_class_count = attacked_classes.len();
 
-                for noise_index in 0..QUERY_NOISE_LEVELS.len() {
-                    let query_group = queries
-                        .iter()
-                        .filter(|query| query.noise_index == noise_index)
-                        .collect::<Vec<_>>();
-                    let mut top1_correct = 0usize;
-                    let mut accepted_count = 0usize;
-                    let mut accepted_errors = 0usize;
-                    let mut attacker_prediction_count = 0usize;
-                    let mut targeted_query_count = 0usize;
-                    let mut target_attack_success_count = 0usize;
-                    let mut targeted_accepted_count = 0usize;
-                    let mut targeted_top1_correct = 0usize;
-                    let mut accepted_target_attack_success_count = 0usize;
-                    let mut retained_query_count = 0usize;
-                    let mut retained_top1_correct = 0usize;
-                    let mut retained_accepted_count = 0usize;
-                    let mut latencies = Vec::with_capacity(query_group.len());
+                    for noise_index in 0..QUERY_NOISE_LEVELS.len() {
+                        let query_group = queries
+                            .iter()
+                            .filter(|query| query.noise_index == noise_index)
+                            .collect::<Vec<_>>();
+                        let mut top1_correct = 0usize;
+                        let mut accepted_count = 0usize;
+                        let mut accepted_errors = 0usize;
+                        let mut attacker_prediction_count = 0usize;
+                        let mut targeted_query_count = 0usize;
+                        let mut target_attack_success_count = 0usize;
+                        let mut targeted_accepted_count = 0usize;
+                        let mut targeted_top1_correct = 0usize;
+                        let mut accepted_target_attack_success_count = 0usize;
+                        let mut retained_query_count = 0usize;
+                        let mut retained_top1_correct = 0usize;
+                        let mut retained_accepted_count = 0usize;
+                        let mut latencies = Vec::with_capacity(query_group.len());
 
-                    let scan_started = Instant::now();
-                    for query in &query_group {
-                        let query_started = Instant::now();
-                        let ranked = rank(&bank, &query.vector)?;
-                        latencies.push(
-                            query_started.elapsed().as_nanos() as f64 / 1_000.0,
-                        );
+                        let scan_started = Instant::now();
+                        for query in &query_group {
+                            let query_started = Instant::now();
+                            let ranked = rank(&bank, &query.vector)?;
+                            latencies.push(query_started.elapsed().as_nanos() as f64 / 1_000.0);
 
-                        let expected_label = format!("id-{:02}", query.target_class);
-                        let correct = ranked.label == expected_label;
-                        if correct {
-                            top1_correct += 1;
-                        }
-                        let accepted = accepts(ranked.similarity, ranked.margin);
-                        if accepted {
-                            accepted_count += 1;
-                            if !correct {
-                                accepted_errors += 1;
-                            }
-                        }
-
-                        if ranked.attacker_target.is_some() {
-                            attacker_prediction_count += 1;
-                        }
-
-                        let is_targeted = attacked_classes.contains(&query.target_class);
-                        if is_targeted {
-                            targeted_query_count += 1;
+                            let expected_label = format!("id-{:02}", query.target_class);
+                            let correct = ranked.label == expected_label;
                             if correct {
-                                targeted_top1_correct += 1;
+                                top1_correct += 1;
                             }
+                            let accepted = accepts(ranked.similarity, ranked.margin);
                             if accepted {
-                                targeted_accepted_count += 1;
-                            }
-                            let successful_attack =
-                                ranked.attacker_target == Some(query.target_class);
-                            if successful_attack {
-                                target_attack_success_count += 1;
-                                if accepted {
-                                    accepted_target_attack_success_count += 1;
+                                accepted_count += 1;
+                                if !correct {
+                                    accepted_errors += 1;
                                 }
                             }
-                        } else {
-                            retained_query_count += 1;
-                            if correct {
-                                retained_top1_correct += 1;
+
+                            if ranked.attacker_target.is_some() {
+                                attacker_prediction_count += 1;
                             }
-                            if accepted {
-                                retained_accepted_count += 1;
+
+                            let is_targeted = attacked_classes.contains(&query.target_class);
+                            if is_targeted {
+                                targeted_query_count += 1;
+                                if correct {
+                                    targeted_top1_correct += 1;
+                                }
+                                if accepted {
+                                    targeted_accepted_count += 1;
+                                }
+                                let successful_attack =
+                                    ranked.attacker_target == Some(query.target_class);
+                                if successful_attack {
+                                    target_attack_success_count += 1;
+                                    if accepted {
+                                        accepted_target_attack_success_count += 1;
+                                    }
+                                }
+                            } else {
+                                retained_query_count += 1;
+                                if correct {
+                                    retained_top1_correct += 1;
+                                }
+                                if accepted {
+                                    retained_accepted_count += 1;
+                                }
                             }
                         }
+                        let scan_wall_ms = scan_started.elapsed().as_secs_f64() * 1_000.0;
+                        let scan_qps = if scan_wall_ms > 0.0 {
+                            query_group.len() as f64 / (scan_wall_ms / 1_000.0)
+                        } else {
+                            0.0
+                        };
+                        let accepted_target_attack_success_rate =
+                            if targeted_accepted_count > 0 {
+                                Some(
+                                    accepted_target_attack_success_count as f64
+                                        / targeted_accepted_count as f64,
+                                )
+                            } else {
+                                None
+                            };
+                        let vector_payload_bytes =
+                            bank.len() * DIMENSION * std::mem::size_of::<i8>();
+
+                        let targeted_false_rejections =
+                            targeted_query_count.saturating_sub(targeted_accepted_count);
+                        let retained_false_rejections =
+                            retained_query_count.saturating_sub(retained_accepted_count);
+                        let targeted_top1_accuracy =
+                            optional_ratio(targeted_top1_correct, targeted_query_count);
+                        let targeted_coverage =
+                            optional_ratio(targeted_accepted_count, targeted_query_count);
+                        let targeted_false_rejection_rate =
+                            optional_ratio(targeted_false_rejections, targeted_query_count);
+                        let retained_top1_accuracy =
+                            optional_ratio(retained_top1_correct, retained_query_count);
+                        let retained_coverage =
+                            optional_ratio(retained_accepted_count, retained_query_count);
+                        let retained_false_rejection_rate =
+                            optional_ratio(retained_false_rejections, retained_query_count);
+
+                        println!(
+                            "{seed},{},{DIMENSION},{CLASS_COUNT},{},{poison_count},{poison_noise:.3},{:.3},{},{attacked_class_count},{targeted_query_count},{targeted_top1_correct},{targeted_top1_accuracy},{targeted_accepted_count},{targeted_coverage},{targeted_false_rejections},{targeted_false_rejection_rate},{target_attack_success_count},{},{accepted_target_attack_success_count},{},{retained_query_count},{retained_top1_correct},{retained_top1_accuracy},{retained_accepted_count},{retained_coverage},{retained_false_rejections},{retained_false_rejection_rate},{top1_correct},{:.6},{accepted_count},{:.6},{accepted_errors},{},{attacker_prediction_count},{:.6},{:.4},{:.4},{scan_wall_ms:.3},{scan_qps:.2},{vector_payload_bytes}",
+                            attack_mode.as_str(),
+                            bank.len(),
+                            QUERY_NOISE_LEVELS[noise_index],
+                            query_group.len(),
+                            optional_ratio(target_attack_success_count, targeted_query_count),
+                            optional_rate(accepted_target_attack_success_rate),
+                            ratio(top1_correct, query_group.len()),
+                            ratio(accepted_count, query_group.len()),
+                            optional_ratio(accepted_errors, accepted_count),
+                            ratio(attacker_prediction_count, query_group.len()),
+                            percentile(&mut latencies, 0.50),
+                            percentile(&mut latencies, 0.95),
+                        );
+
+                        println!(
+                            "# profile_runtime=seed:{seed},attack_mode:{},poison_count:{poison_count},poison_noise:{poison_noise:.3},query_noise:{:.3},bank_build_ms:{build_ms:.3},entry_count:{}",
+                            attack_mode.as_str(),
+                            QUERY_NOISE_LEVELS[noise_index],
+                            bank.len()
+                        );
                     }
-                    let scan_wall_ms = scan_started.elapsed().as_secs_f64() * 1_000.0;
-                    let scan_qps = if scan_wall_ms > 0.0 {
-                        query_group.len() as f64 / (scan_wall_ms / 1_000.0)
-                    } else {
-                        0.0
-                    };
-                    let accepted_target_attack_success_rate = if targeted_accepted_count > 0 {
-                        Some(
-                            accepted_target_attack_success_count as f64
-                                / targeted_accepted_count as f64,
-                        )
-                    } else {
-                        None
-                    };
-                    let vector_payload_bytes =
-                        bank.len() * DIMENSION * std::mem::size_of::<i8>();
-
-                    let targeted_false_rejections =
-                        targeted_query_count.saturating_sub(targeted_accepted_count);
-                    let retained_top1_accuracy =
-                        optional_ratio(retained_top1_correct, retained_query_count);
-                    let retained_coverage =
-                        optional_ratio(retained_accepted_count, retained_query_count);
-                    let targeted_top1_accuracy =
-                        optional_ratio(targeted_top1_correct, targeted_query_count);
-                    let targeted_coverage =
-                        optional_ratio(targeted_accepted_count, targeted_query_count);
-                    let targeted_false_rejection_rate =
-                        optional_ratio(targeted_false_rejections, targeted_query_count);
-
-                    println!(
-                        "{seed},{},{DIMENSION},{CLASS_COUNT},{},{poison_count},{poison_noise:.3},{:.3},{},{attacked_class_count},{targeted_query_count},{targeted_top1_correct},{targeted_top1_accuracy},{targeted_accepted_count},{targeted_coverage},{targeted_false_rejections},{targeted_false_rejection_rate},{target_attack_success_count},{},{accepted_target_attack_success_count},{},{retained_query_count},{retained_top1_correct},{retained_top1_accuracy},{retained_accepted_count},{retained_coverage},{top1_correct},{:.6},{accepted_count},{:.6},{accepted_errors},{},{attacker_prediction_count},{:.6},{:.4},{:.4},{scan_wall_ms:.3},{scan_qps:.2},{vector_payload_bytes}",
-                        attack_mode.as_str(),
-                        bank.len(),
-                        QUERY_NOISE_LEVELS[noise_index],
-                        query_group.len(),
-                        optional_ratio(target_attack_success_count, targeted_query_count),
-                        optional_rate(accepted_target_attack_success_rate),
-                        ratio(top1_correct, query_group.len()),
-                        ratio(accepted_count, query_group.len()),
-                        optional_ratio(accepted_errors, accepted_count),
-                        ratio(attacker_prediction_count, query_group.len()),
-                        percentile(&mut latencies, 0.50),
-                        percentile(&mut latencies, 0.95),
-                    );
-
-                    // Include construction as a comment-level per-profile resource metric.
-                    println!(
-                        "# profile_runtime=seed:{seed},attack_mode:{},poison_count:{poison_count},poison_noise:{poison_noise:.3},query_noise:{:.3},bank_build_ms:{build_ms:.3},entry_count:{}",
-                        attack_mode.as_str(),
-                        QUERY_NOISE_LEVELS[noise_index],
-                        bank.len()
-                    );
                 }
             }
         }
-        }
-        // Keep this named value visible to make the fixed genuine-class population explicit.
-        debug_assert_eq!(target_classes.len(), CLASS_COUNT);
+
     }
 
     println!("# total_runtime_ms={}", started.elapsed().as_millis());
@@ -411,8 +415,14 @@ mod tests {
     fn exact_prototype_copy_can_capture_identity_tie() {
         let seed = 17;
         let prototypes = build_prototypes(seed).expect("prototypes");
-        let (bank, attacked_classes) =
-            build_bank(&prototypes, seed, 1, 0.0, AttackMode::Insertion).expect("poisoned bank");
+        let (bank, attacked_classes) = build_bank(
+            &prototypes,
+            seed,
+            1,
+            0.0,
+            AttackMode::Insertion,
+        )
+        .expect("poisoned bank");
         let target = attacked_classes[0];
         let ranked = rank(&bank, &prototypes[target]).expect("rank exact prototype");
 
