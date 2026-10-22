@@ -784,7 +784,8 @@ if ! awk -F, -v raw="$tmpdir/bet-grid-a.csv" -v summary="$tmpdir/bet-grid-summar
         ($11 - l3 > 0.000003) || (l3 - $11 > 0.000003) ||
         ($12 - l7 > 0.000003) || (l7 - $12 > 0.000003)) failed = 1
 
-    risk_by_key[ri] = rate_names[ri]
+    raw_key = ri SUBSEP $2 SUBSEP $3
+    if (seen[raw_key]++) failed = 1
     streams[ri SUBSEP $2] = 1
     event_sum[ri] += count
     for (j = 1; j <= 3; j++) {
@@ -819,6 +820,9 @@ if ! awk -F, -v raw="$tmpdir/bet-grid-a.csv" -v summary="$tmpdir/bet-grid-summar
     if ($13 != "NA" && $14 != "NA" && $13 < $14) failed = 1
     if ($15 !~ /^[0-9]*[.]?[0-9]+$/ || $16 !~ /^[0-9]*[.]?[0-9]+$/ ||
         $17 != 0.05 || $18 != 0.05 || $20 == "") failed = 1
+    if ((method == "fixed" && $20 != "0.500") ||
+        (method == "mix3" && $20 != "0.250;0.500;0.750") ||
+        (method == "mix7" && $20 != "0.025;0.050;0.100;0.250;0.500;0.750;0.950")) failed = 1
     if (($19 - log(100) > 0.000001) || (log(100) - $19 > 0.000001)) failed = 1
 
     calculated_fwer = 0
