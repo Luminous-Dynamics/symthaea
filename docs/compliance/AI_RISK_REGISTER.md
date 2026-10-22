@@ -100,10 +100,10 @@ Risks are scored using: **Likelihood** (1-5) x **Impact** (1-5) = **Risk Score**
 | **Likelihood** | 3 (Moderate — consent detection relies on HDC pattern matching, which may miss implicit coercion) |
 | **Impact** | 5 (Critical — consent violations are the most serious ethical failure mode) |
 | **Risk Score** | **15 (High)** |
-| **Existing Controls** | `consent_violation: bool` in EthicsEngineOutput; deontological verdict includes violations list; moral concern threshold (-0.3) triggers conservative override; `judge_consent_action()` with explicit ConsentState (Denied=1.0, Absent=0.8); `denied_consent_violation_prototype()`; 26 adversarial moral tests |
-| **Residual Risk** | Medium (reduced from High — explicit consent path closes primary gap; HDC inference path remains unreliable for arbitrary strings) |
-| **Mitigation** | (a) ~~Dedicated consent test suite~~ DONE (26 adversarial tests); (b) `judge_consent_action()` bypasses HDC inference when ConsentState is known; (c) Conservative bias: ambiguous consent cases default to flagging; (d) Human review queue for consent-adjacent decisions |
-| **Evidence** | `src/cognitive_loop/ethics_engine.rs`, `src/hdc/moral_algebra.rs`, `tests/adversarial_moral_algebra.rs` |
+| **Existing Controls** | `consent_violation: bool` in EthicsEngineOutput; deontological verdict includes violations list; moral concern threshold (-0.3) triggers conservative override; `judge_consent_action()` has explicit Denied/Absent handling; `denied_consent_violation_prototype()`; adversarial consent tests |
+| **Residual Risk** | Medium–High until action-specific policy explicitly distinguishes unknown evidence from consent and exact-head validation passes. The text parser is heuristic, and its legacy verdict type has no dedicated Undetermined value. |
+| **Mitigation** | (a) Preserve explicit Denied and Absent violation checks; (b) represent missing/unspecified consent as `ConsentState::Unknown`, never as implied consent; (c) for actions whose policy requires consent, treat Unknown/Neutral as non-authorization and request clarification or block; (d) keep an independent scope-bound consent/authorization gate and human review for consent-adjacent cases |
+| **Evidence** | `src/cognitive_loop/ethics_engine.rs`, `src/hdc/moral_algebra/primitives.rs`, `src/hdc/moral_parser.rs`, `src/hdc/moral_algebra/operators.rs`, `tests/adversarial_moral_algebra.rs`; draft unqualified change in `fix/moral-consent-unknown-v1` |
 
 ---
 
