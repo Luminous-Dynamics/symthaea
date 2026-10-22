@@ -85,16 +85,20 @@ impl Counts {
             if observation.base_decision == observation.variant_decision {
                 self.noop_stable += 1;
             }
-            if let (Some(base), Some(variant)) =
-                (observation.base_probability, observation.variant_probability)
-            {
+            if let (Some(base), Some(variant)) = (
+                observation.base_probability,
+                observation.variant_probability,
+            ) {
                 self.noop_probability_delta_sum += (base - variant).abs();
                 self.noop_probability_delta_count += 1;
             }
         }
         for (probability, truth) in [
             (observation.base_probability, observation.base_compatible),
-            (observation.variant_probability, observation.variant_compatible),
+            (
+                observation.variant_probability,
+                observation.variant_compatible,
+            ),
         ] {
             if let Some(probability) = probability {
                 self.brier_sum += (probability - if truth { 1.0 } else { 0.0 }).powi(2);
@@ -124,7 +128,11 @@ impl Counts {
         let mut metrics = BTreeMap::new();
         metrics.insert(
             "base_compatible_accept_recall",
-            (self.base_accept, self.base_positive, ratio(self.base_accept, self.base_positive)),
+            (
+                self.base_accept,
+                self.base_positive,
+                ratio(self.base_accept, self.base_positive),
+            ),
         );
         metrics.insert(
             "counterfactual_compatible_accept_recall",
@@ -163,7 +171,11 @@ impl Counts {
         );
         metrics.insert(
             "semantics_preserving_decision_stability",
-            (self.noop_stable, self.noop_eligible, ratio(self.noop_stable, self.noop_eligible)),
+            (
+                self.noop_stable,
+                self.noop_eligible,
+                ratio(self.noop_stable, self.noop_eligible),
+            ),
         );
         metrics.insert(
             "compatibility_probability_brier_score",
@@ -201,7 +213,9 @@ fn main() -> Result<()> {
     if args.len() < 5 || args.len() > 7 || args.get(1).is_some_and(|x| x == "--help" || x == "-h") {
         eprintln!(
             "usage: {} <counterfactual-suite.json> <outcomes.jsonl> <test|external_challenge> <report.json> [bootstrap_replicates] [seed]",
-            args.first().map(String::as_str).unwrap_or("analyze_counterfactual_sensitivity")
+            args.first()
+                .map(String::as_str)
+                .unwrap_or("analyze_counterfactual_sensitivity")
         );
         if args.get(1).is_some_and(|x| x == "--help" || x == "-h") {
             return Ok(());
@@ -219,7 +233,10 @@ fn main() -> Result<()> {
     }
     let bootstrap_replicates = args
         .get(5)
-        .map(|x| x.parse::<usize>().context("parse bootstrap replicate count"))
+        .map(|x| {
+            x.parse::<usize>()
+                .context("parse bootstrap replicate count")
+        })
         .transpose()?
         .unwrap_or(DEFAULT_BOOTSTRAP_REPLICATES);
     if bootstrap_replicates < 1_000 {
@@ -231,8 +248,8 @@ fn main() -> Result<()> {
         .transpose()?
         .unwrap_or(DEFAULT_SEED);
 
-    let suite: Value = serde_json::from_slice(&suite_bytes)
-        .context("parse counterfactual suite JSON")?;
+    let suite: Value =
+        serde_json::from_slice(&suite_bytes).context("parse counterfactual suite JSON")?;
     validate_counterfactual_suite(&suite)?;
     let suite_id = required_string(&suite, "suite_id", "suite")?.to_owned();
     if required_string(&suite, "schema_version", "suite")? != SUITE_VERSION {
@@ -246,7 +263,8 @@ fn main() -> Result<()> {
         bail!("suite contains no pairs");
     }
 
-    let outcome_text = std::str::from_utf8(&outcome_bytes).context("outcomes JSONL must be UTF-8")?;
+    let outcome_text =
+        std::str::from_utf8(&outcome_bytes).context("outcomes JSONL must be UTF-8")?;
     let outcomes = parse_outcomes(outcome_text, requested_split)?;
     let observations = join_pairs(pairs, &outcomes, requested_split)?;
     if observations.is_empty() {
@@ -422,7 +440,13 @@ fn parse_outcomes(text: &str, requested_split: &str) -> Result<BTreeMap<String, 
             ),
             (
                 "adjudication",
-                &["status", "label", "rubric_version", "reviewer_decisions", "receipt_sha256"][..],
+                &[
+                    "status",
+                    "label",
+                    "rubric_version",
+                    "reviewer_decisions",
+                    "receipt_sha256",
+                ][..],
                 &["adjudication_note"][..],
             ),
             (
@@ -457,7 +481,9 @@ fn parse_outcomes(text: &str, requested_split: &str) -> Result<BTreeMap<String, 
                 ][..],
             ),
         ] {
-            let object = value.get(field).with_context(|| format!("{context}.{field} missing"))?;
+            let object = value
+                .get(field)
+                .with_context(|| format!("{context}.{field} missing"))?;
             require_exact_keys(object, required, optional, &format!("{context}.{field}"))?;
         }
         let reviewer_rows = value
@@ -498,9 +524,16 @@ fn parse_outcomes(text: &str, requested_split: &str) -> Result<BTreeMap<String, 
             validate_enum_array(
                 reasons,
                 &[
-                    "missing_precondition", "object_type", "domain_mismatch",
-                    "inequality_direction", "predicate_mismatch", "quantifier_scope",
-                    "premise_unavailable", "irrelevant_near_neighbour", "other", "unknown",
+                    "missing_precondition",
+                    "object_type",
+                    "domain_mismatch",
+                    "inequality_direction",
+                    "predicate_mismatch",
+                    "quantifier_scope",
+                    "premise_unavailable",
+                    "irrelevant_near_neighbour",
+                    "other",
+                    "unknown",
                 ],
                 true,
                 &format!("{reviewer_context}.reason_codes"),
@@ -510,7 +543,9 @@ fn parse_outcomes(text: &str, requested_split: &str) -> Result<BTreeMap<String, 
             .get("prediction")
             .and_then(|x| x.get("precondition_checks"))
             .and_then(Value::as_array)
-            .with_context(|| format!("{context}.prediction.precondition_checks must be an array"))?;
+            .with_context(|| {
+                format!("{context}.prediction.precondition_checks must be an array")
+            })?;
         for (check_index, check) in check_rows.iter().enumerate() {
             let check_context = format!("{context}.precondition_checks[{check_index}]");
             require_exact_keys(
@@ -529,19 +564,25 @@ fn parse_outcomes(text: &str, requested_split: &str) -> Result<BTreeMap<String, 
             match check.get("evidence_sha256") {
                 Some(Value::Null) => {}
                 Some(value) => {
-                    let digest = value
-                        .as_str()
-                        .with_context(|| {
-                            format!("{check_context}.evidence_sha256 must be null or a digest")
-                        })?;
+                    let digest = value.as_str().with_context(|| {
+                        format!("{check_context}.evidence_sha256 must be null or a digest")
+                    })?;
                     validate_digest(digest, 64, &format!("{check_context}.evidence_sha256"))?;
                 }
                 None => bail!("{check_context}.evidence_sha256 is required"),
             }
         }
         require_exact_keys(
-            value.get("run").and_then(|x| x.get("budget")).context("run budget missing")?,
-            &["max_model_calls", "max_tokens", "max_wall_ms", "max_cost_microusd"],
+            value
+                .get("run")
+                .and_then(|x| x.get("budget"))
+                .context("run budget missing")?,
+            &[
+                "max_model_calls",
+                "max_tokens",
+                "max_wall_ms",
+                "max_cost_microusd",
+            ],
             &[],
             &format!("{context}.run.budget"),
         )?;
@@ -574,7 +615,12 @@ fn parse_outcomes(text: &str, requested_split: &str) -> Result<BTreeMap<String, 
         for field in ["model_id", "model_version"] {
             required_string_at(&value, &["run", field], &context)?;
         }
-        for field in ["prompt_sha256", "config_sha256", "input_sha256", "output_sha256"] {
+        for field in [
+            "prompt_sha256",
+            "config_sha256",
+            "input_sha256",
+            "output_sha256",
+        ] {
             validate_digest(
                 required_string_at(&value, &["run", field], &context)?,
                 64,
@@ -601,15 +647,24 @@ fn parse_outcomes(text: &str, requested_split: &str) -> Result<BTreeMap<String, 
         validate_enum_array(
             mismatch_codes,
             &[
-                "missing_precondition", "object_type", "domain_mismatch",
-                "inequality_direction", "predicate_mismatch", "quantifier_scope",
-                "premise_unavailable", "irrelevant_near_neighbour", "other", "unknown",
+                "missing_precondition",
+                "object_type",
+                "domain_mismatch",
+                "inequality_direction",
+                "predicate_mismatch",
+                "quantifier_scope",
+                "premise_unavailable",
+                "irrelevant_near_neighbour",
+                "other",
+                "unknown",
             ],
             false,
             &format!("{context}.prediction.mismatch_codes"),
         )?;
         validate_probability(
-            value.get("prediction").and_then(|p| p.get("compatibility_probability")),
+            value
+                .get("prediction")
+                .and_then(|p| p.get("compatibility_probability")),
             &context,
         )?;
         validate_digest(
@@ -621,15 +676,31 @@ fn parse_outcomes(text: &str, requested_split: &str) -> Result<BTreeMap<String, 
             (&["source", "artifact_sha256"][..], "source.artifact_sha256"),
             (&["source", "insight_sha256"][..], "source.insight_sha256"),
             (&["target", "artifact_sha256"][..], "target.artifact_sha256"),
-            (&["target", "statement_sha256"][..], "target.statement_sha256"),
-            (&["target", "obligation_sha256"][..], "target.obligation_sha256"),
+            (
+                &["target", "statement_sha256"][..],
+                "target.statement_sha256",
+            ),
+            (
+                &["target", "obligation_sha256"][..],
+                "target.obligation_sha256",
+            ),
             (&["target", "source_commit"][..], "target.source_commit"),
-            (&["adjudication", "receipt_sha256"][..], "adjudication.receipt_sha256"),
-            (&["prediction", "receipt_sha256"][..], "prediction.receipt_sha256"),
+            (
+                &["adjudication", "receipt_sha256"][..],
+                "adjudication.receipt_sha256",
+            ),
+            (
+                &["prediction", "receipt_sha256"][..],
+                "prediction.receipt_sha256",
+            ),
         ] {
             validate_digest(
                 required_string_at(&value, path, &context)?,
-                if name.ends_with("source_commit") { 40 } else { 64 },
+                if name.ends_with("source_commit") {
+                    40
+                } else {
+                    64
+                },
                 &format!("{context}.{name}"),
             )?;
         }
@@ -641,7 +712,10 @@ fn parse_outcomes(text: &str, requested_split: &str) -> Result<BTreeMap<String, 
         }
         let artifact_path = required_string_at(&value, &["target", "artifact_path"], &context)?;
         if artifact_path.starts_with('/')
-            || artifact_path.split('/').any(|part| part.is_empty() || part == "..") {
+            || artifact_path
+                .split('/')
+                .any(|part| part.is_empty() || part == "..")
+        {
             bail!("{context}.target.artifact_path must be a safe repository-relative path");
         }
         validate_prediction_consistency(&value, &context)?;
@@ -654,7 +728,6 @@ fn parse_outcomes(text: &str, requested_split: &str) -> Result<BTreeMap<String, 
     }
     Ok(outcomes)
 }
-
 
 fn validate_counterfactual_suite(suite: &Value) -> Result<()> {
     let context = "suite";
@@ -696,8 +769,7 @@ fn validate_counterfactual_suite(suite: &Value) -> Result<()> {
     // A record ID and a pinned (commit, path) must identify one immutable
     // artifact payload throughout the suite; otherwise duplicate labels can
     // conceal changed source bytes behind an unchanged logical identity.
-    let mut source_record_identity =
-        BTreeMap::<String, (String, String, String, String)>::new();
+    let mut source_record_identity = BTreeMap::<String, (String, String, String, String)>::new();
     let mut target_artifact_identity = BTreeMap::<(String, String), String>::new();
     for (index, pair) in pairs.iter().enumerate() {
         let pair_context = format!("suite.pairs[{index}]");
@@ -760,11 +832,8 @@ fn validate_counterfactual_suite(suite: &Value) -> Result<()> {
             40,
             &format!("{source_context}.source_commit"),
         )?;
-        let source_artifact_digest = required_string(
-            source,
-            "source_artifact_sha256",
-            &source_context,
-        )?;
+        let source_artifact_digest =
+            required_string(source, "source_artifact_sha256", &source_context)?;
         let insight_digest = required_string(source, "insight_sha256", &source_context)?;
         validate_digest(
             source_artifact_digest,
@@ -825,8 +894,7 @@ fn validate_counterfactual_suite(suite: &Value) -> Result<()> {
             ("artifact_path", base_path),
             ("counterfactual_artifact_path", counterfactual_path),
         ] {
-            if path.starts_with('/')
-                || path.split('/').any(|part| part.is_empty() || part == "..")
+            if path.starts_with('/') || path.split('/').any(|part| part.is_empty() || part == "..")
             {
                 bail!("{target_context}.{field} must be a safe repository-relative path");
             }
@@ -858,8 +926,7 @@ fn validate_counterfactual_suite(suite: &Value) -> Result<()> {
             (counterfactual_path, counterfactual_artifact_digest.as_str()),
         ] {
             let key = (target_commit.to_owned(), artifact_path.to_owned());
-            if let Some(previous) =
-                target_artifact_identity.insert(key, artifact_digest.to_owned())
+            if let Some(previous) = target_artifact_identity.insert(key, artifact_digest.to_owned())
             {
                 if previous != artifact_digest {
                     bail!(
@@ -911,18 +978,18 @@ fn validate_counterfactual_suite(suite: &Value) -> Result<()> {
         }
         required_string(mutation, "changed_field", &mutation_context)?;
         required_string(mutation, "description", &mutation_context)?;
-        let before = required_string(
-            mutation,
-            "before_fragment_sha256",
-            &mutation_context,
+        let before = required_string(mutation, "before_fragment_sha256", &mutation_context)?;
+        let after = required_string(mutation, "after_fragment_sha256", &mutation_context)?;
+        validate_digest(
+            before,
+            64,
+            &format!("{mutation_context}.before_fragment_sha256"),
         )?;
-        let after = required_string(
-            mutation,
-            "after_fragment_sha256",
-            &mutation_context,
+        validate_digest(
+            after,
+            64,
+            &format!("{mutation_context}.after_fragment_sha256"),
         )?;
-        validate_digest(before, 64, &format!("{mutation_context}.before_fragment_sha256"))?;
-        validate_digest(after, 64, &format!("{mutation_context}.after_fragment_sha256"))?;
         validate_digest(
             required_string(mutation, "mutation_receipt_sha256", &mutation_context)?,
             64,
@@ -948,7 +1015,8 @@ fn validate_counterfactual_suite(suite: &Value) -> Result<()> {
             variant,
             &format!("{pair_context}.counterfactual_adjudication"),
         )?;
-        if base_status == "adjudicated" && variant_status == "adjudicated"
+        if base_status == "adjudicated"
+            && variant_status == "adjudicated"
             && base_reviewers != variant_reviewers
         {
             bail!("{pair_context} base/counterfactual reviewer identities differ");
@@ -1082,22 +1150,21 @@ fn join_pairs(
             bail!("duplicate suite pair_id {pair_id:?}");
         }
         let split = required_string(pair, "split", &context)?;
-        if !matches!(split, "train" | "validation" | "test" | "external_challenge") {
+        if !matches!(
+            split,
+            "train" | "validation" | "test" | "external_challenge"
+        ) {
             bail!("{context} has unsupported split {split:?}");
         }
         let component_id = required_string(pair, "component_id", &context)?.to_owned();
-        let source = pair.get("source_insight").context("source_insight missing")?;
+        let source = pair
+            .get("source_insight")
+            .context("source_insight missing")?;
         let target = pair.get("target").context("target missing")?;
-        let source_record = required_string(
-            source,
-            "record_id",
-            &format!("{context}.source_insight"),
-        )?;
-        let source_family = required_string(
-            source,
-            "family_id",
-            &format!("{context}.source_insight"),
-        )?;
+        let source_record =
+            required_string(source, "record_id", &format!("{context}.source_insight"))?;
+        let source_family =
+            required_string(source, "family_id", &format!("{context}.source_insight"))?;
         let target_family = required_string(target, "family_id", &format!("{context}.target"))?;
         for link_field in ["base_outcome_pair_id", "counterfactual_outcome_pair_id"] {
             let link = required_string(pair, link_field, &context)?.to_owned();
@@ -1140,10 +1207,14 @@ fn join_pairs(
             continue;
         }
         let component_id = required_string(pair, "component_id", &ctx)?.to_owned();
-        let source = pair.get("source_insight").context("source_insight missing")?;
+        let source = pair
+            .get("source_insight")
+            .context("source_insight missing")?;
         let target = pair.get("target").context("target missing")?;
         let mutation = pair.get("mutation").context("mutation missing")?;
-        let base_adj = pair.get("base_adjudication").context("base_adjudication missing")?;
+        let base_adj = pair
+            .get("base_adjudication")
+            .context("base_adjudication missing")?;
         let variant_adj = pair
             .get("counterfactual_adjudication")
             .context("counterfactual_adjudication missing")?;
@@ -1157,21 +1228,15 @@ fn join_pairs(
         }
         let source_record = required_string(source, "record_id", &format!("{ctx}.source_insight"))?;
         let source_family = required_string(source, "family_id", &format!("{ctx}.source_insight"))?;
-        let source_commit = required_string(
-            source,
-            "source_commit",
-            &format!("{ctx}.source_insight"),
-        )?;
+        let source_commit =
+            required_string(source, "source_commit", &format!("{ctx}.source_insight"))?;
         let source_artifact_digest = required_string(
             source,
             "source_artifact_sha256",
             &format!("{ctx}.source_insight"),
         )?;
-        let source_digest = required_string(
-            source,
-            "insight_sha256",
-            &format!("{ctx}.source_insight"),
-        )?;
+        let source_digest =
+            required_string(source, "insight_sha256", &format!("{ctx}.source_insight"))?;
         let target_id = required_string(target, "target_id", &format!("{ctx}.target"))?;
         let target_family = required_string(target, "family_id", &format!("{ctx}.target"))?;
         let target_commit = required_string(target, "source_commit", &format!("{ctx}.target"))?;
@@ -1185,8 +1250,7 @@ fn join_pairs(
             ("artifact_path", artifact_path),
             ("counterfactual_artifact_path", counterfactual_artifact_path),
         ] {
-            if path.starts_with('/')
-                || path.split('/').any(|part| part == ".." || part.is_empty())
+            if path.starts_with('/') || path.split('/').any(|part| part == ".." || part.is_empty())
             {
                 bail!("{ctx}.target.{field} must be a safe repository-relative path");
             }
@@ -1194,11 +1258,8 @@ fn join_pairs(
         if artifact_path == counterfactual_artifact_path {
             bail!("{ctx}: base and counterfactual artifacts must have distinct paths");
         }
-        let base_artifact_digest = required_string(
-            target,
-            "base_artifact_sha256",
-            &format!("{ctx}.target"),
-        )?;
+        let base_artifact_digest =
+            required_string(target, "base_artifact_sha256", &format!("{ctx}.target"))?;
         let counterfactual_artifact_digest = required_string(
             target,
             "counterfactual_artifact_sha256",
@@ -1209,11 +1270,8 @@ fn join_pairs(
                 "{ctx}: base and counterfactual artifact digests must differ for an artifact-changing contrast"
             );
         }
-        let base_statement_digest = required_string(
-            target,
-            "base_statement_sha256",
-            &format!("{ctx}.target"),
-        )?;
+        let base_statement_digest =
+            required_string(target, "base_statement_sha256", &format!("{ctx}.target"))?;
         let variant_statement_digest = required_string(
             target,
             "counterfactual_statement_sha256",
@@ -1228,7 +1286,8 @@ fn join_pairs(
                 &format!("{ctx}.counterfactual_adjudication"),
             )? == "adjudicated"
             && reviewer_ids(base_adj, &format!("{ctx}.base_adjudication"))?
-                != reviewer_ids(variant_adj, &format!("{ctx}.counterfactual_adjudication"))? {
+                != reviewer_ids(variant_adj, &format!("{ctx}.counterfactual_adjudication"))?
+        {
             bail!("{ctx}: base and counterfactual require the same independent reviewer set");
         }
         let variant_status = required_string(
@@ -1247,8 +1306,7 @@ fn join_pairs(
                     bail!("family {family} crosses suite splits");
                 }
             }
-            if let Some(previous) = family_component
-                .insert(family.to_owned(), component_id.clone())
+            if let Some(previous) = family_component.insert(family.to_owned(), component_id.clone())
             {
                 if previous != component_id {
                     bail!("family {family} crosses pair components");
@@ -1330,16 +1388,23 @@ fn join_pairs(
             }
             if required_string(row, "split", &row_ctx)? != requested_split
                 || required_string_at(row, &["adjudication", "label"], &row_ctx)? != label
-                || required_string_at(row, &["adjudication", "status"], &row_ctx)? != status {
+                || required_string_at(row, &["adjudication", "status"], &row_ctx)? != status
+            {
                 bail!("{row_ctx} split or gold adjudication mismatch");
             }
-            let suite_adjudication = if side == "base" { base_adj } else { variant_adj };
+            let suite_adjudication = if side == "base" {
+                base_adj
+            } else {
+                variant_adj
+            };
             validate_adjudication_link(suite_adjudication, row, &row_ctx)?;
             validate_run_budgets(row, &row_ctx)?;
         }
-        if base_status != "adjudicated" || variant_status != "adjudicated"
+        if base_status != "adjudicated"
+            || variant_status != "adjudicated"
             || !matches!(base_label, "compatible" | "incompatible")
-            || !matches!(variant_label, "compatible" | "incompatible") {
+            || !matches!(variant_label, "compatible" | "incompatible")
+        {
             continue;
         }
         if base_label != "compatible" {
@@ -1347,8 +1412,8 @@ fn join_pairs(
                 "{ctx}: paired counterfactual analysis requires an independently adjudicated compatible base"
             );
         }
-        let noop = required_string(mutation, "kind", &format!("{ctx}.mutation"))?
-            == "no_semantic_change";
+        let noop =
+            required_string(mutation, "kind", &format!("{ctx}.mutation"))? == "no_semantic_change";
         if noop && variant_label != "compatible" {
             bail!("{ctx}: semantics-preserving pair has incompatible gold label");
         }
@@ -1372,9 +1437,15 @@ fn join_pairs(
     if observations.is_empty() {
         bail!("no fully adjudicated compatible-base pairs in requested split");
     }
-    let unused: Vec<_> = outcomes.keys().filter(|key| !all_references.contains(*key)).collect();
+    let unused: Vec<_> = outcomes
+        .keys()
+        .filter(|key| !all_references.contains(*key))
+        .collect();
     if !unused.is_empty() {
-        bail!("outcomes JSONL has {} row(s) not referenced by the requested suite", unused.len());
+        bail!(
+            "outcomes JSONL has {} row(s) not referenced by the requested suite",
+            unused.len()
+        );
     }
     Ok(observations)
 }
@@ -1383,7 +1454,10 @@ fn calculate_metrics(observations: &[PairObservation], replicates: usize, seed: 
     let overall = aggregate(observations);
     let mut components = BTreeMap::<String, Vec<PairObservation>>::new();
     for observation in observations {
-        components.entry(observation.component_id.clone()).or_default().push(observation.clone());
+        components
+            .entry(observation.component_id.clone())
+            .or_default()
+            .push(observation.clone());
     }
     let mut bootstrap = BTreeMap::<&'static str, Vec<f64>>::new();
     for name in overall.metrics().keys() {
@@ -1394,12 +1468,19 @@ fn calculate_metrics(observations: &[PairObservation], replicates: usize, seed: 
     for _ in 0..replicates {
         let mut sample = Vec::new();
         for _ in 0..component_values.len() {
-            sample.extend(component_values[rng.index(component_values.len())].iter().cloned());
+            sample.extend(
+                component_values[rng.index(component_values.len())]
+                    .iter()
+                    .cloned(),
+            );
         }
         let metrics = aggregate(&sample).metrics();
         for (name, (_, _, estimate)) in metrics {
             if let Some(estimate) = estimate {
-                bootstrap.get_mut(name).expect("registered metric").push(estimate);
+                bootstrap
+                    .get_mut(name)
+                    .expect("registered metric")
+                    .push(estimate);
             }
         }
     }
@@ -1445,7 +1526,8 @@ fn metric_json(numerator: usize, denominator: usize, estimate: Option<f64>) -> V
 
 fn metric_json_value(metric: &Metric, name: &str) -> Value {
     let statistic = if name == "compatibility_probability_brier_score"
-        || name == "semantics_preserving_mean_probability_absolute_delta" {
+        || name == "semantics_preserving_mean_probability_absolute_delta"
+    {
         "mean"
     } else {
         "ratio"
@@ -1476,39 +1558,57 @@ fn reviewer_ids(adjudication: &Value, context: &str) -> Result<BTreeSet<String>>
 }
 
 fn validate_matched_arm(base: &Value, variant: &Value, context: &str) -> Result<()> {
-    for field in ["model_id", "model_version", "prompt_sha256", "config_sha256"] {
+    for field in [
+        "model_id",
+        "model_version",
+        "prompt_sha256",
+        "config_sha256",
+    ] {
         if required_string_at(base, &["run", field], context)?
-            != required_string_at(variant, &["run", field], context)? {
+            != required_string_at(variant, &["run", field], context)?
+        {
             bail!("{context}: base/counterfactual rows do not use the same {field}");
         }
     }
     if base.get("run").and_then(|x| x.get("budget"))
-        != variant.get("run").and_then(|x| x.get("budget")) {
+        != variant.get("run").and_then(|x| x.get("budget"))
+    {
         bail!("{context}: base/counterfactual run budgets differ");
     }
     Ok(())
 }
 
 fn validate_adjudication_link(suite_adj: &Value, outcome: &Value, context: &str) -> Result<()> {
-    let outcome_adj = outcome.get("adjudication").context("outcome adjudication missing")?;
+    let outcome_adj = outcome
+        .get("adjudication")
+        .context("outcome adjudication missing")?;
     for field in ["status", "label", "rubric_version", "receipt_sha256"] {
         if required_string(suite_adj, field, &format!("{context}.suite_adjudication"))?
-            != required_string(outcome_adj, field, &format!("{context}.outcome_adjudication"))? {
+            != required_string(
+                outcome_adj,
+                field,
+                &format!("{context}.outcome_adjudication"),
+            )?
+        {
             bail!("{context}: adjudication {field} does not match the paired suite record");
         }
     }
-    let suite_reviewers = suite_adj.get("reviewer_decisions").and_then(Value::as_array)
+    let suite_reviewers = suite_adj
+        .get("reviewer_decisions")
+        .and_then(Value::as_array)
         .with_context(|| format!("{context}: suite reviewer_decisions must be an array"))?;
-    let outcome_reviewers = outcome_adj.get("reviewer_decisions").and_then(Value::as_array)
+    let outcome_reviewers = outcome_adj
+        .get("reviewer_decisions")
+        .and_then(Value::as_array)
         .with_context(|| format!("{context}: outcome reviewer_decisions must be an array"))?;
     let status = required_string(suite_adj, "status", context)?;
     let gold_label = required_string(suite_adj, "label", context)?;
     if status == "adjudicated" {
         if suite_reviewers.len() < 2
             || gold_label == "unknown"
-            || suite_reviewers.iter().any(|reviewer| {
-                reviewer.get("label").and_then(Value::as_str) != Some(gold_label)
-            })
+            || suite_reviewers
+                .iter()
+                .any(|reviewer| reviewer.get("label").and_then(Value::as_str) != Some(gold_label))
         {
             bail!("{context}: adjudicated label requires two agreeing independent reviewers");
         }
@@ -1535,13 +1635,17 @@ fn validate_adjudication_link(suite_adj: &Value, outcome: &Value, context: &str)
         if !observed_ids.insert(id.clone()) {
             bail!("{context}: duplicate outcome reviewer ID");
         }
-        let (label, reason, evidence) = expected.get(&id)
+        let (label, reason, evidence) = expected
+            .get(&id)
             .with_context(|| format!("{context}: outcome contains unregistered reviewer {id}"))?;
         if required_string(reviewer, "label", context)? != *label
-            || required_string(reviewer, "evidence_sha256", context)? != *evidence {
+            || required_string(reviewer, "evidence_sha256", context)? != *evidence
+        {
             bail!("{context}: outcome reviewer label/evidence differs from suite adjudication");
         }
-        let reasons = reviewer.get("reason_codes").and_then(Value::as_array)
+        let reasons = reviewer
+            .get("reason_codes")
+            .and_then(Value::as_array)
             .with_context(|| format!("{context}: reviewer reason_codes must be an array"))?;
         let reason = *reason;
         let outcome_reason = match reason {
@@ -1550,7 +1654,10 @@ fn validate_adjudication_link(suite_adj: &Value, outcome: &Value, context: &str)
             "conclusion_mismatch" => "predicate_mismatch",
             value => value,
         };
-        if !reasons.iter().any(|value| value.as_str() == Some(outcome_reason)) {
+        if !reasons
+            .iter()
+            .any(|value| value.as_str() == Some(outcome_reason))
+        {
             bail!("{context}: outcome reviewer reason_codes omit the mapped suite reason code");
         }
     }
@@ -1558,18 +1665,21 @@ fn validate_adjudication_link(suite_adj: &Value, outcome: &Value, context: &str)
 }
 
 fn validate_run_budgets(row: &Value, context: &str) -> Result<()> {
-    let run = row.get("run").with_context(|| format!("{context}.run missing"))?;
-    let budget = run.get("budget").with_context(|| format!("{context}.run.budget missing"))?;
+    let run = row
+        .get("run")
+        .with_context(|| format!("{context}.run missing"))?;
+    let budget = run
+        .get("budget")
+        .with_context(|| format!("{context}.run.budget missing"))?;
     for (actual, limit) in [
         ("actual_model_calls", "max_model_calls"),
         ("actual_tokens", "max_tokens"),
         ("actual_wall_ms", "max_wall_ms"),
         ("actual_cost_microusd", "max_cost_microusd"),
     ] {
-        let cap = budget
-            .get(limit)
-            .and_then(Value::as_u64)
-            .with_context(|| format!("{context}.run.budget.{limit} must be non-negative integer"))?;
+        let cap = budget.get(limit).and_then(Value::as_u64).with_context(|| {
+            format!("{context}.run.budget.{limit} must be non-negative integer")
+        })?;
         if let Some(actual_value) = run.get(actual) {
             let amount = actual_value
                 .as_u64()
@@ -1588,7 +1698,9 @@ fn require_exact_keys(
     optional: &[&str],
     context: &str,
 ) -> Result<()> {
-    let object = value.as_object().with_context(|| format!("{context} must be an object"))?;
+    let object = value
+        .as_object()
+        .with_context(|| format!("{context} must be an object"))?;
     for key in required {
         if !object.contains_key(*key) {
             bail!("{context}.{key} is required");
@@ -1661,11 +1773,16 @@ fn validate_probability(value: Option<&Value>, context: &str) -> Result<()> {
 }
 
 fn probability(row: &Value) -> Option<f64> {
-    row.get("prediction")?.get("compatibility_probability")?.as_f64()
+    row.get("prediction")?
+        .get("compatibility_probability")?
+        .as_f64()
 }
 
 fn required_string<'a>(value: &'a Value, key: &str, context: &str) -> Result<&'a str> {
-    value.get(key).and_then(Value::as_str).filter(|s| !s.trim().is_empty())
+    value
+        .get(key)
+        .and_then(Value::as_str)
+        .filter(|s| !s.trim().is_empty())
         .with_context(|| format!("{context}.{key} must be a non-empty string"))
 }
 
@@ -1676,7 +1793,9 @@ fn required_string_at<'a>(value: &'a Value, path: &[&str], context: &str) -> Res
             .get(*segment)
             .with_context(|| format!("{context}.{} missing", path.join(".")))?;
     }
-    current.as_str().filter(|s| !s.trim().is_empty())
+    current
+        .as_str()
+        .filter(|s| !s.trim().is_empty())
         .with_context(|| format!("{context}.{} must be a non-empty string", path.join(".")))
 }
 
@@ -1710,7 +1829,11 @@ fn percentile(sorted: &[f64], p: f64) -> f64 {
 }
 
 fn counts_component_count(observations: &[PairObservation]) -> usize {
-    observations.iter().map(|o| o.component_id.as_str()).collect::<BTreeSet<_>>().len()
+    observations
+        .iter()
+        .map(|o| o.component_id.as_str())
+        .collect::<BTreeSet<_>>()
+        .len()
 }
 
 fn sha256_hex(bytes: &[u8]) -> String {
@@ -1745,57 +1868,88 @@ mod tests {
     fn paired_metrics_require_both_sides_to_be_correct() {
         let pairs = vec![
             PairObservation {
-                component_id: "c1".into(), mutation_kind: "precondition_removed".into(),
-                base_compatible: true, base_accept: true, base_decision: "accept".into(),
+                component_id: "c1".into(),
+                mutation_kind: "precondition_removed".into(),
+                base_compatible: true,
+                base_accept: true,
+                base_decision: "accept".into(),
                 variant_compatible: false,
                 variant_accept: false,
                 variant_decision: "reject".into(),
                 noop: false,
-                base_probability: Some(0.9), variant_probability: Some(0.1),
+                base_probability: Some(0.9),
+                variant_probability: Some(0.1),
             },
             PairObservation {
-                component_id: "c2".into(), mutation_kind: "precondition_removed".into(),
-                base_compatible: true, base_accept: false, base_decision: "reject".into(),
+                component_id: "c2".into(),
+                mutation_kind: "precondition_removed".into(),
+                base_compatible: true,
+                base_accept: false,
+                base_decision: "reject".into(),
                 variant_compatible: false,
                 variant_accept: false,
                 variant_decision: "reject".into(),
                 noop: false,
-                base_probability: Some(0.7), variant_probability: Some(0.2),
+                base_probability: Some(0.7),
+                variant_probability: Some(0.2),
             },
             PairObservation {
-                component_id: "c3".into(), mutation_kind: "no_semantic_change".into(),
-                base_compatible: true, base_accept: true, base_decision: "accept".into(),
+                component_id: "c3".into(),
+                mutation_kind: "no_semantic_change".into(),
+                base_compatible: true,
+                base_accept: true,
+                base_decision: "accept".into(),
                 variant_compatible: true,
                 variant_accept: false,
                 variant_decision: "reject".into(),
                 noop: true,
-                base_probability: Some(0.8), variant_probability: Some(0.4),
+                base_probability: Some(0.8),
+                variant_probability: Some(0.4),
             },
         ];
         let counts = aggregate(&pairs);
         let metrics = counts.metrics();
         assert_eq!(metrics["base_compatible_accept_recall"].2, Some(2.0 / 3.0));
-        assert_eq!(metrics["counterfactual_incompatible_sensitivity"].2, Some(1.0));
+        assert_eq!(
+            metrics["counterfactual_incompatible_sensitivity"].2,
+            Some(1.0)
+        );
         assert_eq!(metrics["counterfactual_false_accept_rate"].2, Some(0.0));
         assert_eq!(metrics["paired_contract_adherence"].2, Some(0.5));
-        assert_eq!(metrics["semantics_preserving_decision_stability"].2, Some(0.0));
-        assert_eq!(metrics["semantics_preserving_mean_probability_absolute_delta"].2, Some(0.4));
+        assert_eq!(
+            metrics["semantics_preserving_decision_stability"].2,
+            Some(0.0)
+        );
+        assert_eq!(
+            metrics["semantics_preserving_mean_probability_absolute_delta"].2,
+            Some(0.4)
+        );
     }
 
     #[test]
     fn goal_noise_or_reject_everything_cannot_pass_paired_adherence() {
         let reject_all = PairObservation {
-            component_id: "c1".into(), mutation_kind: "precondition_removed".into(),
-            base_compatible: true, base_accept: false, base_decision: "reject".into(),
+            component_id: "c1".into(),
+            mutation_kind: "precondition_removed".into(),
+            base_compatible: true,
+            base_accept: false,
+            base_decision: "reject".into(),
             variant_compatible: false,
             variant_accept: false,
             variant_decision: "reject".into(),
             noop: false,
-            base_probability: None, variant_probability: None,
+            base_probability: None,
+            variant_probability: None,
         };
         let counts = aggregate(&[reject_all]);
-        assert_eq!(counts.metrics()["counterfactual_incompatible_sensitivity"].2, Some(1.0));
-        assert_eq!(counts.metrics()["base_compatible_accept_recall"].2, Some(0.0));
+        assert_eq!(
+            counts.metrics()["counterfactual_incompatible_sensitivity"].2,
+            Some(1.0)
+        );
+        assert_eq!(
+            counts.metrics()["base_compatible_accept_recall"].2,
+            Some(0.0)
+        );
         assert_eq!(counts.metrics()["paired_contract_adherence"].2, Some(0.0));
     }
 
@@ -1815,7 +1969,10 @@ mod tests {
             variant_probability: Some(0.3),
         };
         let metrics = aggregate(&[changed_action]).metrics();
-        assert_eq!(metrics["semantics_preserving_decision_stability"].2, Some(0.0));
+        assert_eq!(
+            metrics["semantics_preserving_decision_stability"].2,
+            Some(0.0)
+        );
     }
 
     #[test]
