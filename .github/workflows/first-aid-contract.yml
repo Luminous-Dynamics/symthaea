@@ -79,10 +79,10 @@ jobs:
             .schema_version == "first-aid-mutation-matrix-v0" and
             .status == "research_coverage_inventory" and
             .clinical_use_authorized == false and
-            .count_summary.case_count == 41 and
-            .count_summary.mapped_case_count == 41 and
+            .count_summary.case_count == 42 and
+            .count_summary.mapped_case_count == 42 and
             .count_summary.frozen_trace_count == 12 and
-            .count_summary.mutation_case_count == 29 and
+            .count_summary.mutation_case_count == 30 and
             .count_summary.planned_not_yet_executable_count == 0 and
             ([.cases[] | select(.mode == "frozen_trace")] | length) == .count_summary.frozen_trace_count and
             ([.cases[] | select(.mode == "mutation_or_control")] | length) == .count_summary.mutation_case_count and
@@ -261,10 +261,10 @@ jobs:
               .state_model_sha256, .state_model_spec_sha256, .cargo_lock_sha256,
               .validator_source_sha256, .entrypoint_source_sha256,
               .executable_sha256] | all(test("^[0-9a-f]{64}$"))) and
-            .matrix_case_count == 41 and
+            .matrix_case_count == 42 and
             .matrix_frozen_trace_count == 12 and
-            .matrix_mutation_case_count == 29 and
-            .matrix_rust_runner_case_count == 27 and
+            .matrix_mutation_case_count == 30 and
+            .matrix_rust_runner_case_count == 28 and
             .matrix_workflow_gate_case_count == 2 and
             .state_model_test_outcome == "success" and
             .trajectory_test_outcome == "success" and
