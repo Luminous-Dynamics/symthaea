@@ -126,6 +126,24 @@ impl SovereignAttestor {
         attestor.lock().attest(label, smtlib2, verdict, binary_data)
     }
 
+    /// Public key for this attestor; callers should provision it as a trust anchor.
+    pub fn public_key(&self) -> &[u8] {
+        self.keys.public_key()
+    }
+
+    /// Public key associated with the configured process attestor.
+    ///
+    /// Consumers that verify process attestations should obtain this through a
+    /// trusted provisioning channel, not by trusting the key embedded in an
+    /// incoming attestation.
+    pub fn process_public_key() -> Result<Vec<u8>, String> {
+        let attestor = PROCESS_ATTESTOR
+            .as_ref()
+            .map_err(|error| error.clone())?;
+        let public_key = attestor.lock().keys.public_key().to_vec();
+        Ok(public_key)
+    }
+
     /// Sign a proof verdict and an optional binary realization.
     pub fn attest(
         &self,
@@ -158,14 +176,22 @@ impl SovereignAttestor {
         Ok(attestation)
     }
 
-    /// Verify an attestation and, when one is claimed, the actual binary artifact.
+    /// Verify an attestation against a caller-provisioned trusted signer key.
     ///
-    /// A v2 attestation that commits to a binary cannot be accepted without that
-    /// binary. Supplying a binary to an attestation that does not commit to one is
-    /// also rejected. Historical v1 signatures are rejected because their
-    /// concatenated transcript did not unambiguously encode optional fields.
-    pub fn verify(attestation: &ProofAttestation, actual_binary: Option<&[u8]>) -> bool {
+    /// The public key embedded in the attestation is untrusted input; a valid
+    /// signature under a self-supplied key does not establish signer identity.
+    /// Callers must obtain `trusted_public_key` from an independently trusted
+    /// policy/configuration channel. If the attestation commits to a binary, that
+    /// exact binary is also required and checked. Legacy v1 records fail closed.
+    pub fn verify(
+        attestation: &ProofAttestation,
+        actual_binary: Option<&[u8]>,
+        trusted_public_key: &[u8],
+    ) -> bool {
         if attestation.transcript_version != TRANSCRIPT_VERSION_V2 {
+            return false;
+        }
+        if attestation.public_key.as_slice() != trusted_public_key {
             return false;
         }
 
@@ -187,7 +213,7 @@ impl SovereignAttestor {
         verify_mldsa_detached_signature(
             &message,
             &attestation.signature,
-            &attestation.public_key,
+            trusted_public_key,
         )
         .unwrap_or(false)
     }
@@ -243,21 +269,23 @@ mod tests {
     #[test]
     fn v2_attestation_without_binary_verifies_without_binary() {
         let attestor = SovereignAttestor::new();
+        let trusted_public_key = attestor.public_key().to_vec();
         let attestation = attestor.attest("unit-test", TEST_SMT, "Proven", None).unwrap();
         assert_eq!(attestation.transcript_version, TRANSCRIPT_VERSION_V2);
-        assert!(SovereignAttestor::verify(&attestation, None));
+        assert!(SovereignAttestor::verify(&attestation, None, &trusted_public_key));
     }
 
     #[test]
     fn v2_attestation_with_binary_requires_the_matching_binary() {
         let attestor = SovereignAttestor::new();
+        let trusted_public_key = attestor.public_key().to_vec();
         let binary = b"compiled artifact";
         let attestation = attestor.attest("unit-test", TEST_SMT, "Proven", Some(binary)).unwrap();
 
-        assert!(SovereignAttestor::verify(&attestation, Some(binary)));
-        assert!(!SovereignAttestor::verify(&attestation, Some(b"tampered artifact")));
+        assert!(SovereignAttestor::verify(&attestation, Some(binary), &trusted_public_key));
+        assert!(!SovereignAttestor::verify(&attestation, Some(b"tampered artifact"), &trusted_public_key));
         assert!(
-            !SovereignAttestor::verify(&attestation, None),
+            !SovereignAttestor::verify(&attestation, None, &trusted_public_key),
             "an attestation that commits to a binary must not silently skip binary checking"
         );
     }
@@ -265,27 +293,29 @@ mod tests {
     #[test]
     fn v2_attestation_rejects_binary_presence_substitution() {
         let attestor = SovereignAttestor::new();
+        let trusted_public_key = attestor.public_key().to_vec();
         let attestation = attestor.attest("unit-test", TEST_SMT, "Proven", Some(b"artifact")).unwrap();
 
         let mut changed = attestation.clone();
         changed.binary_hash = None;
         assert!(
-            !SovereignAttestor::verify(&changed, None),
+            !SovereignAttestor::verify(&changed, None, &trusted_public_key),
             "removing the optional hash must invalidate the signature transcript"
         );
 
         let mut changed = attestor.attest("unit-test", TEST_SMT, "Proven", None).unwrap();
         assert!(
-            !SovereignAttestor::verify(&changed, Some(b"artifact")),
+            !SovereignAttestor::verify(&changed, Some(b"artifact"), &trusted_public_key),
             "a supplied artifact must not be treated as verified if the attestation did not commit to it"
         );
         changed.verdict.push_str(" changed");
-        assert!(!SovereignAttestor::verify(&changed, None));
+        assert!(!SovereignAttestor::verify(&changed, None, &trusted_public_key));
     }
 
     #[test]
     fn v2_transcript_binds_label_and_verdict() {
         let attestor = SovereignAttestor::new();
+        let trusted_public_key = attestor.public_key().to_vec();
         let attestation = attestor.attest("unit-test", TEST_SMT, "Proven", None).unwrap();
 
         let mut changed_label = attestation.clone();
@@ -298,11 +328,30 @@ mod tests {
     }
 
     #[test]
+    fn self_signed_attestation_is_rejected_by_an_independent_trust_anchor() {
+        let trusted_attestor = SovereignAttestor::new();
+        let trusted_public_key = trusted_attestor.public_key().to_vec();
+        let attacker = SovereignAttestor::new();
+        let attacker_public_key = attacker.public_key().to_vec();
+        let forged = attacker.attest("unit-test", TEST_SMT, "Proven", None).unwrap();
+
+        assert!(
+            !SovereignAttestor::verify(&forged, None, &trusted_public_key),
+            "a valid signature from a self-supplied untrusted key must not authenticate the claim"
+        );
+        assert!(
+            SovereignAttestor::verify(&forged, None, &attacker_public_key),
+            "the same signature should verify only when the caller explicitly trusts that signer"
+        );
+    }
+
+    #[test]
     fn legacy_v1_attestation_is_rejected() {
         let attestor = SovereignAttestor::new();
+        let trusted_public_key = attestor.public_key().to_vec();
         let mut attestation = attestor.attest("unit-test", TEST_SMT, "Proven", None).unwrap();
         attestation.transcript_version = 1;
-        assert!(!SovereignAttestor::verify(&attestation, None));
+        assert!(!SovereignAttestor::verify(&attestation, None, &trusted_public_key));
     }
 
     #[test]
@@ -312,6 +361,7 @@ mod tests {
         // The repeated bytes make the boundary shift deterministic and keep
         // both variable string fields valid UTF-8.
         let attestor = SovereignAttestor::new();
+        let trusted_public_key = attestor.public_key().to_vec();
         let original = ProofAttestation {
             label: "A".to_string(),
             smtlib2_hash: [b'B'; 32],
@@ -365,12 +415,13 @@ mod tests {
 
         // The new verifier rejects v1 format rather than pretending the legacy
         // ambiguous transcript can be interpreted unambiguously.
-        assert!(!SovereignAttestor::verify(&changed, None));
+        assert!(!SovereignAttestor::verify(&changed, None, &trusted_public_key));
     }
 
     #[test]
     fn v2_transcript_binds_version_and_option_tag() {
         let attestor = SovereignAttestor::new();
+        let trusted_public_key = attestor.public_key().to_vec();
         let attestation = attestor.attest("unit-test", TEST_SMT, "Proven", Some(b"artifact")).unwrap();
 
         let original = signing_message_v2(&attestation);
