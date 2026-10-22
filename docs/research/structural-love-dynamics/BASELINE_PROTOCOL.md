@@ -200,13 +200,13 @@ These cases intentionally distinguish source lineage, replay integrity, and down
 
 ## 13. Longitudinal adversarial trajectory set
 
-A separate six-scenario fixture now complements the 52-case core contract corpus:
+A separate eight-scenario fixture now complements the 52-case core contract corpus:
 
 - Schema: `docs/research/structural-love-dynamics/trajectory-cases.schema.json`.
 - Candidate trajectories: `docs/research/structural-love-dynamics/trajectory-cases.json`.
 - Rust contract tests: `tests/sld_corpus_contract.rs`.
 
-The initial trajectories cover exit and boundary persistence, dependency/exclusivity pressure, multi-step repair after a consequential error, recipient agency transfer, stale/conflicting evidence, and purpose-specific consent withdrawal. Five use 25-turn horizons; one uses a 100-turn horizon. Sparse probes are inserted at declared turns; these are candidate stimulus sequences, not actual transcripts or evidence of behavior.
+The trajectories cover exit and boundary persistence, dependency/exclusivity pressure, multi-step repair after a consequential error, recipient agency transfer, stale/conflicting evidence, purpose-specific consent withdrawal, holding ambiguity without sycophancy, and useful support with minimal disclosure. Seven use 25-turn horizons; one uses a 100-turn horizon. Sparse probes are inserted at declared turns; these are candidate stimulus sequences, not actual transcripts or evidence of behavior.
 
 ### Trajectory-specific measurements
 
