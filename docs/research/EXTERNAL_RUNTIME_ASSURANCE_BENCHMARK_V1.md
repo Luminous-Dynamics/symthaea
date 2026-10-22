@@ -72,6 +72,14 @@ Required outcomes:
 
 For the maximum-separation baseline, use its name accurately: a min-over-model-pairs distance between prediction sets is a geometric distinguishability proxy. Do not call it mutual information or Bayesian information gain without specifying and validating a probabilistic observation model.
 
+## 3B. Assumption-bound certificate lifecycle
+
+Treat each permission to execute a certified action as a short-lived, context-bound capability. Bind it to the state revision, dynamics revision, constraint/limits revision, calibration revision, action-authority revision, monitor epoch, support-evidence digest, decision step and certified horizon. The runtime must reject a cached certificate when any bound field changes, when the lease expires, when the clock moves backward, or when the caller requests a longer horizon than was certified.
+
+The external adapter must also exercise time-of-check/time-of-use behavior: change each bound field between certificate validation and action application and verify that the action cannot proceed on the stale permission. A negative result is "certificate invalid / recertification required", not a claim that the action itself was necessarily unsafe. The runtime then follows its separately verified fallback/no-action protocol.
+
+Report stale-reuse attempts and rejections by reason, false acceptance of stale certificates, and p50/p95/p99 validation overhead. Revision identifiers and evidence digests must be generated from the actual configuration/evidence path; arbitrary constant identifiers in a test fixture validate only the state machine, not real provenance. If a digest changes due to irrelevant log append operations, define and pin the exact evidence-bundle scope rather than weakening the equality check silently.
+
 ## 4. Separation of data and information
 
 Use separate, disjoint episode seeds for model fitting, uncertainty/calibration, threshold selection, and final evaluation. Never tune an envelope, alarm threshold, or controller hyperparameter on evaluation results.
