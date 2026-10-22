@@ -90,32 +90,61 @@ impl Action {
     }
 
     fn canonical(&self) -> String {
+        let mut output = String::new();
         match self {
             Self::Enroll {
                 identity,
                 digest,
                 generation,
-            } => format!("enroll|{identity}|{digest}|{generation}"),
+            } => {
+                push_field(&mut output, "enroll");
+                push_field(&mut output, identity);
+                push_field(&mut output, digest);
+                push_field(&mut output, &generation.to_string());
+            }
             Self::Replace {
                 identity,
                 expected_generation,
                 generation,
                 digest,
-            } => format!(
-                "replace|{identity}|{expected_generation}|{generation}|{digest}"
-            ),
+            } => {
+                push_field(&mut output, "replace");
+                push_field(&mut output, identity);
+                push_field(&mut output, &expected_generation.to_string());
+                push_field(&mut output, &generation.to_string());
+                push_field(&mut output, digest);
+            }
             Self::Revoke {
                 identity,
                 expected_generation,
                 generation,
-            } => format!("revoke|{identity}|{expected_generation}|{generation}"),
+            } => {
+                push_field(&mut output, "revoke");
+                push_field(&mut output, identity);
+                push_field(&mut output, &expected_generation.to_string());
+                push_field(&mut output, &generation.to_string());
+            }
             Self::Rollback {
                 identity,
                 target_generation,
                 target_digest,
-            } => format!("rollback|{identity}|{target_generation}|{target_digest}"),
+            } => {
+                push_field(&mut output, "rollback");
+                push_field(&mut output, identity);
+                push_field(&mut output, &target_generation.to_string());
+                push_field(&mut output, target_digest);
+            }
         }
+        output
     }
+}
+
+/// Canonical, length-prefixed field encoding. This removes delimiter ambiguity
+/// from fixture and state digests; these digests still do not authenticate events.
+fn push_field(output: &mut String, field: &str) {
+    output.push_str(&field.len().to_string());
+    output.push(':');
+    output.push_str(field);
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -128,13 +157,12 @@ struct RegistryEvent {
 
 impl RegistryEvent {
     fn canonical(&self) -> String {
-        format!(
-            "{}|{}|{}|{}",
-            self.sequence,
-            self.event_id,
-            self.authority.as_str(),
-            self.action.canonical()
-        )
+        let mut output = String::new();
+        push_field(&mut output, &self.sequence.to_string());
+        push_field(&mut output, &self.event_id);
+        push_field(&mut output, self.authority.as_str());
+        push_field(&mut output, &self.action.canonical());
+        output
     }
 }
 
@@ -354,7 +382,11 @@ impl RegistryState {
         if expected_generation != record.generation {
             return Err("stale_generation");
         }
-        if generation != record.generation.saturating_add(1) {
+        let next_generation = record
+            .generation
+            .checked_add(1)
+            .ok_or("generation_exhausted")?;
+        if generation != next_generation {
             return Err("generation_not_next");
         }
         if digest == record.vector_digest {
@@ -416,7 +448,11 @@ impl RegistryState {
         if record.status == RecordStatus::Revoked {
             return Err("revoked_tombstone");
         }
-        if target_generation != record.generation.saturating_add(1) {
+        let next_generation = record
+            .generation
+            .checked_add(1)
+            .ok_or("generation_exhausted")?;
+        if target_generation != next_generation {
             return Err("generation_not_next");
         }
         if !record.history.contains(target_digest) {
@@ -432,27 +468,37 @@ impl RegistryState {
     }
 
     fn state_digest(&self) -> String {
-        let mut canonical = format!("last_sequence={};", self.last_sequence);
+        let mut canonical = String::new();
+        push_field(&mut canonical, "registry-state-v1");
+        push_field(&mut canonical, &self.last_sequence.to_string());
+        push_field(&mut canonical, &self.records.len().to_string());
         for (identity, record) in &self.records {
-            canonical.push_str(&format!(
-                "identity={identity}|generation={}|digest={}|status={}|revocation_floor={}|history=",
-                record.generation,
-                record.vector_digest,
-                record.status.as_str(),
-                record.revocation_floor
-            ));
+            push_field(&mut canonical, identity);
+            push_field(&mut canonical, &record.generation.to_string());
+            push_field(&mut canonical, &record.vector_digest);
+            push_field(&mut canonical, record.status.as_str());
+            push_field(&mut canonical, &record.revocation_floor.to_string());
+            push_field(&mut canonical, &record.history.len().to_string());
             for digest in &record.history {
-                canonical.push_str(digest);
-                canonical.push(',');
+                push_field(&mut canonical, digest);
             }
-            canonical.push(';');
         }
-        canonical.push_str("seen=");
+        push_field(&mut canonical, &self.seen_event_ids.len().to_string());
         for event_id in &self.seen_event_ids {
-            canonical.push_str(event_id);
-            canonical.push(',');
+            push_field(&mut canonical, event_id);
         }
         blake3::hash(canonical.as_bytes()).to_hex().to_string()
+    }
+
+    fn rejection_summary(&self) -> String {
+        if self.rejection_counts.is_empty() {
+            return "none".to_owned();
+        }
+        self.rejection_counts
+            .iter()
+            .map(|(code, count)| format!("{code}:{count}"))
+            .collect::<Vec<_>>()
+            .join(";")
     }
 
     fn record_summary(&self) -> String {
@@ -714,7 +760,7 @@ fn main() -> BenchResult<()> {
 
     println!("# protocol={PROTOCOL_ID}");
     println!("# model=synthetic in-memory state machine; authority attributes are not cryptographic authentication");
-    println!("case_id,step,event_id,sequence,action,authority,expected_code,observed_code,step_pass,record_count,last_sequence,accepted_operations,rejected_operations,state_blake3");
+    println!("case_id,step,event_id,sequence,action,authority,expected_code,observed_code,step_pass,record_count,last_sequence,accepted_operations,rejected_operations,state_blake3,records");
 
     for case in &cases {
         let mut state = RegistryState::default();
@@ -769,23 +815,26 @@ fn main() -> BenchResult<()> {
                 state.last_sequence,
                 state.accepted_operations,
                 state.rejected_operations,
-                state_digest
+                state_digest,
+                state.record_summary()
             );
         }
 
         if case_ok {
             println!(
-                "# case_summary=case:{},status:pass,steps:{}",
+                "# case_summary=case:{},status:pass,steps:{},rejections:{}",
                 case.id,
-                case.events.len()
+                case.events.len(),
+                state.rejection_summary()
             );
         } else {
             failed_cases += 1;
             println!(
-                "# case_summary=case:{},status:fail,steps:{},expected_steps:{}",
+                "# case_summary=case:{},status:fail,steps:{},expected_steps:{},rejections:{}",
                 case.id,
                 case.events.len(),
-                case.expected_codes.len()
+                case.expected_codes.len(),
+                state.rejection_summary()
             );
         }
     }
