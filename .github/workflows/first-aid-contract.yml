@@ -236,6 +236,7 @@ jobs:
               .executable_sha256] | all(test("^[0-9a-f]{64}$")))
           ' target/first-aid-contract-receipt.json
           jq -e --arg expected "$EXPECTED_HEAD" '
+            .receipt_version == "first-aid-trajectory-receipt-v1" and
             .status == "synthetic_trajectory_contract_passed" and
             .source_revision_sha == $expected and
             .trace_count == 12 and
