@@ -770,4 +770,131 @@ mod tests {
             Some(Violation::UnknownNormalized)
         );
     }
+    #[test]
+    fn orthogonal_policy_truth_tables_match_production_trace_checker() {
+        use serde_json::json;
+
+        let mut compared_cases = 0usize;
+        for connectivity in [
+            Connectivity::Online,
+            Connectivity::Offline,
+            Connectivity::Intermittent,
+        ] {
+            for core_network_required in [false, true] {
+                let event = core_network_required
+                    .then(|| json!({"sequence": 1, "kind": "network_required_for_core"}));
+                let trace = policy_trace_json(
+                    "model-policy-connectivity",
+                    connectivity_label(connectivity),
+                    event,
+                );
+                let expected: Vec<String> =
+                    network_policy_violation(connectivity, core_network_required)
+                        .into_iter()
+                        .map(|violation| violation_code(violation).to_owned())
+                        .collect();
+                let actual = super::super::first_aid_trajectory::inspect_trace_json(&trace)
+                    .expect("generated connectivity trace must be valid");
+                assert_eq!(
+                    actual, expected,
+                    "connectivity={connectivity:?}, required={core_network_required}"
+                );
+                compared_cases += 1;
+            }
+        }
+
+        for freshness in [
+            ResourceFreshness::Fresh,
+            ResourceFreshness::Stale,
+            ResourceFreshness::Unknown,
+        ] {
+            for presentation in [
+                ResourcePresentation::Confirmed,
+                ResourcePresentation::Unconfirmed,
+            ] {
+                let freshness_label = match freshness {
+                    ResourceFreshness::Fresh => "fresh",
+                    ResourceFreshness::Stale => "stale",
+                    ResourceFreshness::Unknown => "unknown",
+                };
+                let presentation_label = match presentation {
+                    ResourcePresentation::Confirmed => "confirmed",
+                    ResourcePresentation::Unconfirmed => "unconfirmed",
+                };
+                let trace = policy_trace_json(
+                    "model-policy-resource",
+                    "online",
+                    Some(json!({
+                        "sequence": 1,
+                        "kind": "resource_presented",
+                        "resource_state": freshness_label,
+                        "presented_as": presentation_label
+                    })),
+                );
+                let expected: Vec<String> =
+                    resource_policy_violation(freshness, presentation)
+                        .into_iter()
+                        .map(|violation| violation_code(violation).to_owned())
+                        .collect();
+                let actual = super::super::first_aid_trajectory::inspect_trace_json(&trace)
+                    .expect("generated resource trace must be valid");
+                assert_eq!(
+                    actual, expected,
+                    "freshness={freshness:?}, presentation={presentation:?}"
+                );
+                compared_cases += 1;
+            }
+        }
+
+        for sensitive_payload in [false, true] {
+            for consent_scoped in [false, true] {
+                let trace = policy_trace_json(
+                    "model-policy-egress",
+                    "online",
+                    Some(json!({
+                        "sequence": 1,
+                        "kind": "sensitive_data_egress",
+                        "sensitive_payload": sensitive_payload,
+                        "consent_scoped": consent_scoped
+                    })),
+                );
+                let expected: Vec<String> =
+                    egress_policy_violation(sensitive_payload, consent_scoped)
+                        .into_iter()
+                        .map(|violation| violation_code(violation).to_owned())
+                        .collect();
+                let actual = super::super::first_aid_trajectory::inspect_trace_json(&trace)
+                    .expect("generated egress trace must be valid");
+                assert_eq!(
+                    actual, expected,
+                    "sensitive={sensitive_payload}, consent={consent_scoped}"
+                );
+                compared_cases += 1;
+            }
+        }
+
+        for normalized_unknown in [false, true] {
+            let event = normalized_unknown
+                .then(|| json!({"sequence": 1, "kind": "unknown_normalized"}));
+            let trace = policy_trace_json(
+                "model-policy-unknown-normalization",
+                "online",
+                event,
+            );
+            let expected: Vec<String> = unknown_normalization_violation(normalized_unknown)
+                .into_iter()
+                .map(|violation| violation_code(violation).to_owned())
+                .collect();
+            let actual = super::super::first_aid_trajectory::inspect_trace_json(&trace)
+                .expect("generated unknown-normalization trace must be valid");
+            assert_eq!(actual, expected, "normalized_unknown={normalized_unknown}");
+            compared_cases += 1;
+        }
+
+        assert_eq!(
+            compared_cases, 18,
+            "all orthogonal policy cases must be compared against production"
+        );
+    }
+
 }
