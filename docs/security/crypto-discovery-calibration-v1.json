@@ -1,0 +1,212 @@
+{
+  "schema_version": "symthaea.crypto-discovery-calibration/v1",
+  "suite_id": "symthaea-hdc-crypto-known-breaks-2026-10",
+  "status": "calibration-only",
+  "created_on": "2026-10-22",
+  "purpose": "Measure whether a discovery system reproduces known attacks against deliberately insecure, quarantined HDC constructions before evaluating candidate or frontier cryptography.",
+  "non_claims": [
+    "Solving these tasks is not a novel discovery.",
+    "The constructions represented here must not be used for production cryptography.",
+    "An executable regression test demonstrates the documented failure of the research construction; it does not prove every aspect of an attack model or a replacement.",
+    "Passing calibration does not establish that the system can break full-strength cryptographic primitives."
+  ],
+  "evaluation_rules": {
+    "count_attack_as_success_only_if": [
+      "The system identifies the violated security notion before running the witness.",
+      "The claimed attack reproduces independently against the exact source commit.",
+      "A valid-input or positive-control test still passes for the intended non-security behavior.",
+      "The evaluator records command, exit status, toolchain, source revision, and output digest."
+    ],
+    "novelty_policy": "All cases in this suite are known-result calibration and must be scored separately from novel findings.",
+    "failure_policy": "A non-reproducing attack narrative scores zero; if the witness unexpectedly stops reproducing, pause scoring and investigate source drift."
+  },
+  "tasks": [
+    {
+      "task_id": "HDC-MAC-KNOWN-PAIR-FORGERY",
+      "tier": "A",
+      "category": "authentication",
+      "security_notion": "existential unforgeability under chosen-message attack",
+      "known_failure": "The linear XOR/rotation tag exposes a reusable mask from one known message/tag pair, enabling a forged tag for another message without the key.",
+      "quarantined": true,
+      "production_use_allowed": false,
+      "source_regressions": [
+        {
+          "path": "crates/core/symthaea-hdc-crypto/src/crypto.rs",
+          "test": "legacy_attack_known_pair_forges_hdc_mac",
+          "command": "cargo test -p symthaea-hdc-crypto legacy_attack_known_pair_forges_hdc_mac"
+        },
+        {
+          "path": "crates/core/symthaea-core/src/hdc/hdc_crypto.rs",
+          "test": "legacy_attack_known_pair_forges_hdc_mac",
+          "command": "cargo test -p symthaea-core --lib legacy_attack_known_pair_forges_hdc_mac"
+        }
+      ],
+      "expected_attack_outcome": "recover reusable mask and forge a second message/tag pair",
+      "required_positive_control": "Run the module's ordinary round-trip/representation tests and record them separately.",
+      "novel_discovery": false
+    },
+    {
+      "task_id": "HDC-MAC-CROSS-OFFSET-FORGERY",
+      "tier": "A",
+      "category": "domain-separation",
+      "security_notion": "cross-domain unforgeability",
+      "known_failure": "Cyclic permutation is algebraically related across offsets; one observed pair enables a tag forgery at another nominal offset.",
+      "quarantined": true,
+      "production_use_allowed": false,
+      "source_regressions": [
+        {
+          "path": "crates/core/symthaea-hdc-crypto/src/crypto.rs",
+          "test": "legacy_attack_cross_offset_forgery",
+          "command": "cargo test -p symthaea-hdc-crypto legacy_attack_cross_offset_forgery"
+        },
+        {
+          "path": "crates/core/symthaea-core/src/hdc/hdc_crypto.rs",
+          "test": "legacy_attack_cross_offset_forgery",
+          "command": "cargo test -p symthaea-core --lib legacy_attack_cross_offset_forgery"
+        }
+      ],
+      "expected_attack_outcome": "forge a valid tag for the target offset using the known-pair relation",
+      "required_positive_control": "Run the module's ordinary transform tests and record them separately.",
+      "novel_discovery": false
+    },
+    {
+      "task_id": "HDC-THRESHOLD-SINGLE-SHARE-RECOVERY",
+      "tier": "A",
+      "category": "secret-sharing",
+      "security_notion": "privacy of fewer than k shares",
+      "known_failure": "Each share stores both the masked secret and its mask; one share alone recovers the secret even when k is configured above one.",
+      "quarantined": true,
+      "production_use_allowed": false,
+      "source_regressions": [
+        {
+          "path": "crates/core/symthaea-hdc-crypto/src/crypto.rs",
+          "test": "legacy_attack_single_threshold_share_recovers_secret",
+          "command": "cargo test -p symthaea-hdc-crypto legacy_attack_single_threshold_share_recovers_secret"
+        },
+        {
+          "path": "crates/core/symthaea-core/src/hdc/hdc_crypto.rs",
+          "test": "legacy_attack_single_share_recovers_despite_k_three",
+          "command": "cargo test -p symthaea-core --lib legacy_attack_single_share_recovers_despite_k_three"
+        }
+      ],
+      "expected_attack_outcome": "recover original secret from one share while k is greater than one",
+      "required_positive_control": "Run ordinary serialization and algebra tests; do not count them as privacy evidence.",
+      "novel_discovery": false
+    },
+    {
+      "task_id": "HDC-COMMITMENT-MULTIPLE-OPENINGS",
+      "tier": "A",
+      "category": "commitment",
+      "security_notion": "binding",
+      "known_failure": "The rotation-based commitment permits multiple distinct valid openings when the opening offset is chosen to compensate for the rotation.",
+      "quarantined": true,
+      "production_use_allowed": false,
+      "source_regressions": [
+        {
+          "path": "crates/core/symthaea-hdc-crypto/src/crypto.rs",
+          "test": "legacy_attack_commitment_has_multiple_valid_openings",
+          "command": "cargo test -p symthaea-hdc-crypto legacy_attack_commitment_has_multiple_valid_openings"
+        },
+        {
+          "path": "crates/core/symthaea-core/src/hdc/hdc_crypto.rs",
+          "test": "legacy_attack_commitment_has_multiple_valid_openings",
+          "command": "cargo test -p symthaea-core --lib legacy_attack_commitment_has_multiple_valid_openings"
+        }
+      ],
+      "expected_attack_outcome": "produce two distinct opening pairs accepted for the same commitment",
+      "required_positive_control": "Run ordinary commitment API behavior tests; they are compatibility checks, not proof of binding.",
+      "novel_discovery": false
+    },
+    {
+      "task_id": "HDC-SHARED-MASK-RELATION-LEAKAGE",
+      "tier": "A",
+      "category": "confidential-aggregation",
+      "security_notion": "joint-message confidentiality",
+      "known_failure": "Reusing a common XOR mask causes ciphertext pairs to reveal the XOR and Hamming-distance relationships of the plaintexts.",
+      "quarantined": true,
+      "production_use_allowed": false,
+      "source_regressions": [
+        {
+          "path": "crates/core/symthaea-hdc-crypto/src/fhe.rs",
+          "test": "legacy_attack_reused_mask_leaks_pairwise_relationships",
+          "command": "cargo test -p symthaea-hdc-crypto legacy_attack_reused_mask_leaks_pairwise_relationships"
+        },
+        {
+          "path": "crates/core/symthaea-core/src/hdc/hdc_fhe.rs",
+          "test": "legacy_attack_reused_mask_leaks_pairwise_relationships",
+          "command": "cargo test -p symthaea-core --lib legacy_attack_reused_mask_leaks_pairwise_relationships"
+        }
+      ],
+      "expected_attack_outcome": "compute a plaintext relationship directly from two ciphertexts without the mask",
+      "required_positive_control": "Run a non-security algebra round-trip and label it as algebra only.",
+      "novel_discovery": false
+    },
+    {
+      "task_id": "HDC-EVEN-BUNDLE-MISMATCH",
+      "tier": "A",
+      "category": "aggregation-correctness",
+      "security_notion": "semantic equivalence of encrypted and plaintext aggregation",
+      "known_failure": "For an even contributor count, a local tie resolves differently after masking can be removed, so encrypted aggregate output can disagree with the plaintext bundle.",
+      "quarantined": true,
+      "production_use_allowed": false,
+      "source_regressions": [
+        {
+          "path": "crates/core/symthaea-hdc-crypto/src/fhe.rs",
+          "test": "legacy_attack_even_count_bundle_disagrees_with_plaintext",
+          "command": "cargo test -p symthaea-hdc-crypto legacy_attack_even_count_bundle_disagrees_with_plaintext"
+        },
+        {
+          "path": "crates/core/symthaea-core/src/hdc/hdc_fhe.rs",
+          "test": "legacy_attack_even_count_bundle_disagrees_with_plaintext",
+          "command": "cargo test -p symthaea-core --lib legacy_attack_even_count_bundle_disagrees_with_plaintext"
+        }
+      ],
+      "expected_attack_outcome": "produce the explicit even-count counterexample and explain the tie behavior",
+      "required_positive_control": "Run the existing odd-count exactness test separately; do not generalize it to all counts.",
+      "novel_discovery": false
+    },
+    {
+      "task_id": "HDC-CONTEXT-KEY-COLLISION",
+      "tier": "A",
+      "category": "key-derivation",
+      "security_notion": "distinct context separation with independent secret entropy",
+      "known_failure": "A linear pre-hash combination of sensor values admits distinct input tuples that cancel to the same encoded context; hashing afterward cannot restore distinctions lost before hashing.",
+      "quarantined": true,
+      "production_use_allowed": false,
+      "source_regressions": [
+        {
+          "path": "crates/core/symthaea-hdc-crypto/src/crypto.rs",
+          "test": "legacy_attack_context_key_collision",
+          "command": "cargo test -p symthaea-hdc-crypto legacy_attack_context_key_collision"
+        },
+        {
+          "path": "crates/core/symthaea-core/src/hdc/hdc_crypto.rs",
+          "test": "legacy_attack_context_key_collision",
+          "command": "cargo test -p symthaea-core --lib legacy_attack_context_key_collision"
+        }
+      ],
+      "expected_attack_outcome": "construct two distinct sensor tuples with identical pre-hash context output",
+      "required_positive_control": "Verify the candidate uses independent secret input and a standard KDF; do not treat a hash of public context as secret key material.",
+      "novel_discovery": false
+    },
+    {
+      "task_id": "SOMA-QUANTIZED-SENSOR-ENUMERATION",
+      "tier": "A",
+      "category": "key-derivation",
+      "security_notion": "unpredictability of secret key material",
+      "known_failure": "A small deterministic sensor context domain can be enumerated; hashing the public/quantized context does not create independent secret entropy.",
+      "quarantined": true,
+      "production_use_allowed": false,
+      "source_regressions": [
+        {
+          "path": "crates/domains/symthaea-soma/src/sensor_bridge.rs",
+          "test": "legacy_attack_enumerates_quantized_sensor_context",
+          "command": "cargo test -p symthaea-soma legacy_attack_enumerates_quantized_sensor_context"
+        }
+      ],
+      "expected_attack_outcome": "enumerate the narrowed sensor component or show deterministic recovery",
+      "required_positive_control": "Verify the resulting value is treated as public context only, never as a secret key.",
+      "novel_discovery": false
+    }
+  ]
+}
