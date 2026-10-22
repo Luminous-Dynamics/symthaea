@@ -68,6 +68,8 @@ class FamilyHeldoutTests(unittest.TestCase):
             layered_graph_scores([(0, 1)], [], [], [(1, 0)], 2, 1, 0)
         with self.assertRaises(ValueError):
             layered_graph_scores([(0, 1)], [], [(0, 1), (0, 1)], [], 2, 1, 0)
+        with self.assertRaises(ValueError):
+            layered_graph_scores([(0, 1)], [], [(0, 1), (1, 0)], [], 2, 1, 0)
 
     def test_invalid_and_duplicate_predictions_fail_closed(self):
         with self.assertRaises(ValueError): graph_scores([(0, 1)], [(0, 0)], 3)
