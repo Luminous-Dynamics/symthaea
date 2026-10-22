@@ -71,8 +71,11 @@ pub struct BackendAttempt {
     pub tier: BackendTier,
     /// Backend-reported name (e.g. Ollama, Anthropic, Simulated).
     pub backend_name: String,
-    /// Whether the backend returned a non-empty response.
+    /// Whether the backend returned a non-empty response (not a quality judgment).
     pub success: bool,
+    /// Whether the response is eligible as generated code rather than a placeholder.
+    /// This is independent of later internal verification and task-level tests.
+    pub usable_generation: bool,
     /// Whether an internal backend verifier accepted the candidate, when applicable.
     /// `None` means this backend does not report internal verification.
     pub verification_passed: Option<bool>,
@@ -108,7 +111,7 @@ fn effective_backend_tier(backend_name: &str, selected_tier: BackendTier) -> Bac
 }
 
 fn is_usable_generation_output(backend_name: &str, selected_tier: BackendTier, output: &str) -> bool {
-    !output.is_empty()
+    !output.trim().is_empty()
         && effective_backend_tier(backend_name, selected_tier) != BackendTier::Simulated
 }
 
@@ -117,6 +120,7 @@ fn record_backend_attempt(
     backend_name: &str,
     selected_tier: BackendTier,
     success: bool,
+    usable_generation: bool,
     elapsed_ms: u128,
 ) {
     let effective_tier = effective_backend_tier(backend_name, selected_tier);
@@ -124,6 +128,7 @@ fn record_backend_attempt(
         tier: effective_tier,
         backend_name: backend_name.to_string(),
         success,
+        usable_generation,
         verification_passed: None,
         elapsed_ms,
         estimated_energy_cost: effective_tier.estimated_energy_cost(),
@@ -453,6 +458,7 @@ impl IntelligentDispatcher {
                             &backend_name,
                             BackendTier::LocalLlm,
                             output_nonempty,
+                            success,
                             attempt_elapsed_ms,
                         );
                         (output, success, COST_LOCAL_LLM)
@@ -463,6 +469,7 @@ impl IntelligentDispatcher {
                             &mut backend_attempts,
                             &backend_name,
                             BackendTier::LocalLlm,
+                            false,
                             false,
                             attempt_elapsed_ms,
                         );
@@ -490,6 +497,7 @@ impl IntelligentDispatcher {
                                 &cloud_name,
                                 BackendTier::CloudLlm,
                                 output_nonempty,
+                                success,
                                 attempt_elapsed_ms,
                             );
                             (output, success, COST_CLOUD_LLM)
@@ -500,6 +508,7 @@ impl IntelligentDispatcher {
                                 &mut backend_attempts,
                                 &cloud_name,
                                 BackendTier::CloudLlm,
+                                false,
                                 false,
                                 attempt_elapsed_ms,
                             );
@@ -526,6 +535,7 @@ impl IntelligentDispatcher {
                                         &local_name,
                                         BackendTier::LocalLlm,
                                         output_nonempty,
+                                        success,
                                         fallback_elapsed_ms,
                                     );
                                     (output, success, COST_CLOUD_LLM + COST_LOCAL_LLM)
@@ -536,6 +546,7 @@ impl IntelligentDispatcher {
                                         &mut backend_attempts,
                                         &local_name,
                                         BackendTier::LocalLlm,
+                                        false,
                                         false,
                                         fallback_elapsed_ms,
                                     );
@@ -569,6 +580,7 @@ impl IntelligentDispatcher {
                                 &local_name,
                                 BackendTier::LocalLlm,
                                 output_nonempty,
+                                success,
                                 attempt_elapsed_ms,
                             );
                             (output, success, COST_LOCAL_LLM)
@@ -579,6 +591,7 @@ impl IntelligentDispatcher {
                                 &mut backend_attempts,
                                 &local_name,
                                 BackendTier::LocalLlm,
+                                false,
                                 false,
                                 attempt_elapsed_ms,
                             );
@@ -593,6 +606,7 @@ impl IntelligentDispatcher {
                     "Simulated",
                     BackendTier::Simulated,
                     true,
+                    false,
                     0,
                 );
                 // The backend did return its placeholder string (recorded as an output),
