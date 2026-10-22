@@ -1,0 +1,323 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/pet-nutrition/pet-endpoint-evidence-case-schema-v1.json",
+  "title": "Pet and animal nutrition endpoint evidence case",
+  "description": "Synthetic decision-contract fixture; not feeding advice, a safety assessment, or biological validation.",
+  "type": "object",
+  "required": [
+    "case_id",
+    "claim",
+    "evidence",
+    "expected",
+    "rationale"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "case_id": {
+      "type": "string",
+      "pattern": "^PNE-[0-9]{3}$"
+    },
+    "claim": {
+      "type": "object",
+      "required": [
+        "endpoint",
+        "target_species",
+        "life_stage",
+        "inclusion_percent",
+        "minimum_horizon_days"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "endpoint": {
+          "enum": [
+            "food_preference",
+            "short_term_acceptance",
+            "digestibility",
+            "nutrient_composition",
+            "nutritional_adequacy",
+            "tolerance_safety",
+            "long_term_health",
+            "growth_performance",
+            "environmental_impact",
+            "cost_competitiveness",
+            "process_productivity"
+          ]
+        },
+        "target_species": {
+          "enum": [
+            "dog",
+            "cat",
+            "poultry",
+            "pig",
+            "ruminant",
+            "aquaculture",
+            "other"
+          ]
+        },
+        "life_stage": {
+          "type": "string",
+          "minLength": 1
+        },
+        "inclusion_percent": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 100
+        },
+        "minimum_horizon_days": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "required": [
+        "study_id",
+        "rights_status",
+        "permission_evidence_present",
+        "evidence_kind",
+        "reported_as",
+        "design",
+        "target_species",
+        "life_stage",
+        "inclusion_percent",
+        "duration_days",
+        "sample_size",
+        "experimental_unit",
+        "observed_endpoints",
+        "scope_match",
+        "metric_definition_complete",
+        "methods_reported",
+        "comparator_defined",
+        "nutritional_profile_characterized",
+        "adequacy_protocol_qualified",
+        "safety_monitoring_defined",
+        "funding_disclosure",
+        "lca_boundary_defined",
+        "functional_unit_defined",
+        "cost_basis_defined",
+        "protocol_preregistered",
+        "power_status",
+        "uncertainty_reported"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "study_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "rights_status": {
+          "enum": [
+            "permitted",
+            "restricted",
+            "unknown",
+            "expired",
+            "revoked"
+          ]
+        },
+        "permission_evidence_present": {
+          "type": "boolean"
+        },
+        "evidence_kind": {
+          "enum": [
+            "measured",
+            "estimated",
+            "synthetic",
+            "simulated",
+            "literature_derived"
+          ]
+        },
+        "reported_as": {
+          "enum": [
+            "measured",
+            "estimated",
+            "synthetic",
+            "simulated",
+            "literature_derived"
+          ]
+        },
+        "design": {
+          "enum": [
+            "two_bowl_preference",
+            "single_bowl_acceptance",
+            "digestibility_assay",
+            "nutrient_analysis",
+            "controlled_feeding_trial",
+            "observational_cohort",
+            "life_cycle_assessment",
+            "techno_economic_analysis",
+            "simulation",
+            "other"
+          ]
+        },
+        "target_species": {
+          "enum": [
+            "dog",
+            "cat",
+            "poultry",
+            "pig",
+            "ruminant",
+            "aquaculture",
+            "other",
+            "unspecified"
+          ]
+        },
+        "life_stage": {
+          "type": "string",
+          "minLength": 1
+        },
+        "inclusion_percent": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 100
+        },
+        "duration_days": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "sample_size": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "experimental_unit": {
+          "enum": [
+            "individual_animal",
+            "animal_within_household",
+            "diet_batch",
+            "ingredient_sample",
+            "process_batch",
+            "plant",
+            "not_reported"
+          ]
+        },
+        "observed_endpoints": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "food_preference",
+              "short_term_acceptance",
+              "digestibility",
+              "nutrient_composition",
+              "nutritional_adequacy",
+              "tolerance_safety",
+              "long_term_health",
+              "growth_performance",
+              "environmental_impact",
+              "cost_competitiveness",
+              "process_productivity"
+            ]
+          },
+          "uniqueItems": true
+        },
+        "scope_match": {
+          "enum": [
+            "match",
+            "mismatch",
+            "unknown"
+          ]
+        },
+        "metric_definition_complete": {
+          "type": "boolean"
+        },
+        "methods_reported": {
+          "type": "boolean"
+        },
+        "comparator_defined": {
+          "type": "boolean"
+        },
+        "nutritional_profile_characterized": {
+          "type": "boolean"
+        },
+        "adequacy_protocol_qualified": {
+          "type": "boolean"
+        },
+        "safety_monitoring_defined": {
+          "type": "boolean"
+        },
+        "funding_disclosure": {
+          "enum": [
+            "disclosed",
+            "missing",
+            "not_applicable"
+          ]
+        },
+        "lca_boundary_defined": {
+          "type": "boolean"
+        },
+        "functional_unit_defined": {
+          "type": "boolean"
+        },
+        "cost_basis_defined": {
+          "type": "boolean"
+        },
+        "protocol_preregistered": {
+          "type": "boolean"
+        },
+        "power_status": {
+          "enum": [
+            "adequate_for_declared_claim",
+            "inadequate",
+            "unknown",
+            "not_applicable"
+          ]
+        },
+        "uncertainty_reported": {
+          "type": "boolean"
+        }
+      }
+    },
+    "expected": {
+      "type": "object",
+      "required": [
+        "disposition",
+        "reason_codes",
+        "claims_not_established"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "disposition": {
+          "enum": [
+            "eligible_for_declared_claim",
+            "blocked",
+            "indeterminate",
+            "not_comparable",
+            "invalid_evidence"
+          ]
+        },
+        "reason_codes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "claims_not_established": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "rationale": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

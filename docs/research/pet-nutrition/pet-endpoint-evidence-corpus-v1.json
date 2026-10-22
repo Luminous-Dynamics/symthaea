@@ -1,0 +1,1001 @@
+{
+  "corpus_id": "PET-NUTRITION-ENDPOINT-CORPUS-V1",
+  "schema_version": "1.0.0",
+  "status": "synthetic_design_fixture_only",
+  "created_at": "2026-10-18",
+  "disclaimer": "Every study identity, species profile, value, sample size, duration, endpoint and status in this corpus is synthetic. These cases test evidence-claim matching only; they are not real animal-study data, feeding advice, safety conclusions, or biological results.",
+  "case_schema_file": "pet-endpoint-evidence-case-schema-v1.json",
+  "case_count": 18,
+  "cases": [
+    {
+      "case_id": "PNE-001",
+      "claim": {
+        "endpoint": "food_preference",
+        "target_species": "dog",
+        "life_stage": "adult",
+        "inclusion_percent": 10,
+        "minimum_horizon_days": null
+      },
+      "evidence": {
+        "study_id": "synthetic-study-001",
+        "rights_status": "permitted",
+        "permission_evidence_present": true,
+        "evidence_kind": "synthetic",
+        "reported_as": "synthetic",
+        "design": "two_bowl_preference",
+        "target_species": "dog",
+        "life_stage": "adult",
+        "inclusion_percent": 10,
+        "duration_days": 2,
+        "sample_size": 30,
+        "experimental_unit": "individual_animal",
+        "observed_endpoints": [
+          "food_preference"
+        ],
+        "scope_match": "match",
+        "metric_definition_complete": true,
+        "methods_reported": true,
+        "comparator_defined": true,
+        "nutritional_profile_characterized": true,
+        "adequacy_protocol_qualified": false,
+        "safety_monitoring_defined": false,
+        "funding_disclosure": "disclosed",
+        "lca_boundary_defined": false,
+        "functional_unit_defined": false,
+        "cost_basis_defined": false,
+        "protocol_preregistered": false,
+        "power_status": "unknown",
+        "uncertainty_reported": true
+      },
+      "expected": {
+        "disposition": "eligible_for_declared_claim",
+        "reason_codes": [
+          "ENDPOINT_AND_SCOPE_SUPPORTED"
+        ],
+        "claims_not_established": [
+          "long-term health unless measured over requested horizon",
+          "species or life-stage claims outside declared target",
+          "nutritional adequacy without an appropriate complete-diet protocol",
+          "food safety beyond tested material, process, inclusion level and study scope",
+          "environmental superiority or cost competitiveness unless separately assessed"
+        ]
+      },
+      "rationale": "Positive control: measured short-term preference endpoint and declared scope align."
+    },
+    {
+      "case_id": "PNE-002",
+      "claim": {
+        "endpoint": "long_term_health",
+        "target_species": "dog",
+        "life_stage": "adult",
+        "inclusion_percent": 10,
+        "minimum_horizon_days": null
+      },
+      "evidence": {
+        "study_id": "synthetic-study-001",
+        "rights_status": "permitted",
+        "permission_evidence_present": true,
+        "evidence_kind": "synthetic",
+        "reported_as": "synthetic",
+        "design": "two_bowl_preference",
+        "target_species": "dog",
+        "life_stage": "adult",
+        "inclusion_percent": 10,
+        "duration_days": 2,
+        "sample_size": 30,
+        "experimental_unit": "individual_animal",
+        "observed_endpoints": [
+          "food_preference"
+        ],
+        "scope_match": "match",
+        "metric_definition_complete": true,
+        "methods_reported": true,
+        "comparator_defined": true,
+        "nutritional_profile_characterized": true,
+        "adequacy_protocol_qualified": false,
+        "safety_monitoring_defined": false,
+        "funding_disclosure": "disclosed",
+        "lca_boundary_defined": false,
+        "functional_unit_defined": false,
+        "cost_basis_defined": false,
+        "protocol_preregistered": false,
+        "power_status": "unknown",
+        "uncertainty_reported": true
+      },
+      "expected": {
+        "disposition": "blocked",
+        "reason_codes": [
+          "CLAIM_EXCEEDS_ENDPOINT"
+        ],
+        "claims_not_established": [
+          "long-term health unless measured over requested horizon",
+          "species or life-stage claims outside declared target",
+          "nutritional adequacy without an appropriate complete-diet protocol",
+          "food safety beyond tested material, process, inclusion level and study scope",
+          "environmental superiority or cost competitiveness unless separately assessed"
+        ]
+      },
+      "rationale": "Short-term preference cannot establish long-term health effects."
+    },
+    {
+      "case_id": "PNE-003",
+      "claim": {
+        "endpoint": "nutritional_adequacy",
+        "target_species": "dog",
+        "life_stage": "adult",
+        "inclusion_percent": 10,
+        "minimum_horizon_days": null
+      },
+      "evidence": {
+        "study_id": "synthetic-study-001",
+        "rights_status": "permitted",
+        "permission_evidence_present": true,
+        "evidence_kind": "synthetic",
+        "reported_as": "synthetic",
+        "design": "two_bowl_preference",
+        "target_species": "dog",
+        "life_stage": "adult",
+        "inclusion_percent": 10,
+        "duration_days": 2,
+        "sample_size": 30,
+        "experimental_unit": "individual_animal",
+        "observed_endpoints": [
+          "food_preference"
+        ],
+        "scope_match": "match",
+        "metric_definition_complete": true,
+        "methods_reported": true,
+        "comparator_defined": true,
+        "nutritional_profile_characterized": true,
+        "adequacy_protocol_qualified": false,
+        "safety_monitoring_defined": false,
+        "funding_disclosure": "disclosed",
+        "lca_boundary_defined": false,
+        "functional_unit_defined": false,
+        "cost_basis_defined": false,
+        "protocol_preregistered": false,
+        "power_status": "unknown",
+        "uncertainty_reported": true
+      },
+      "expected": {
+        "disposition": "indeterminate",
+        "reason_codes": [
+          "ADEQUACY_PROTOCOL_NOT_QUALIFIED"
+        ],
+        "claims_not_established": [
+          "long-term health unless measured over requested horizon",
+          "species or life-stage claims outside declared target",
+          "nutritional adequacy without an appropriate complete-diet protocol",
+          "food safety beyond tested material, process, inclusion level and study scope",
+          "environmental superiority or cost competitiveness unless separately assessed"
+        ]
+      },
+      "rationale": "Preference does not establish complete-diet adequacy."
+    },
+    {
+      "case_id": "PNE-004",
+      "claim": {
+        "endpoint": "nutrient_composition",
+        "target_species": "dog",
+        "life_stage": "adult",
+        "inclusion_percent": 10,
+        "minimum_horizon_days": null
+      },
+      "evidence": {
+        "study_id": "synthetic-study-001",
+        "rights_status": "permitted",
+        "permission_evidence_present": true,
+        "evidence_kind": "synthetic",
+        "reported_as": "synthetic",
+        "design": "nutrient_analysis",
+        "target_species": "dog",
+        "life_stage": "adult",
+        "inclusion_percent": 10,
+        "duration_days": null,
+        "sample_size": 3,
+        "experimental_unit": "diet_batch",
+        "observed_endpoints": [
+          "nutrient_composition"
+        ],
+        "scope_match": "match",
+        "metric_definition_complete": true,
+        "methods_reported": true,
+        "comparator_defined": true,
+        "nutritional_profile_characterized": true,
+        "adequacy_protocol_qualified": false,
+        "safety_monitoring_defined": false,
+        "funding_disclosure": "disclosed",
+        "lca_boundary_defined": false,
+        "functional_unit_defined": false,
+        "cost_basis_defined": false,
+        "protocol_preregistered": false,
+        "power_status": "unknown",
+        "uncertainty_reported": true
+      },
+      "expected": {
+        "disposition": "eligible_for_declared_claim",
+        "reason_codes": [
+          "ENDPOINT_AND_SCOPE_SUPPORTED"
+        ],
+        "claims_not_established": [
+          "long-term health unless measured over requested horizon",
+          "species or life-stage claims outside declared target",
+          "nutritional adequacy without an appropriate complete-diet protocol",
+          "food safety beyond tested material, process, inclusion level and study scope",
+          "environmental superiority or cost competitiveness unless separately assessed"
+        ]
+      },
+      "rationale": "Positive control for lab composition claim, not feeding outcomes."
+    },
+    {
+      "case_id": "PNE-005",
+      "claim": {
+        "endpoint": "digestibility",
+        "target_species": "dog",
+        "life_stage": "adult",
+        "inclusion_percent": 10,
+        "minimum_horizon_days": null
+      },
+      "evidence": {
+        "study_id": "synthetic-study-001",
+        "rights_status": "permitted",
+        "permission_evidence_present": true,
+        "evidence_kind": "synthetic",
+        "reported_as": "synthetic",
+        "design": "nutrient_analysis",
+        "target_species": "dog",
+        "life_stage": "adult",
+        "inclusion_percent": 10,
+        "duration_days": 2,
+        "sample_size": 30,
+        "experimental_unit": "individual_animal",
+        "observed_endpoints": [
+          "nutrient_composition"
+        ],
+        "scope_match": "match",
+        "metric_definition_complete": true,
+        "methods_reported": true,
+        "comparator_defined": true,
+        "nutritional_profile_characterized": true,
+        "adequacy_protocol_qualified": false,
+        "safety_monitoring_defined": false,
+        "funding_disclosure": "disclosed",
+        "lca_boundary_defined": false,
+        "functional_unit_defined": false,
+        "cost_basis_defined": false,
+        "protocol_preregistered": false,
+        "power_status": "unknown",
+        "uncertainty_reported": true
+      },
+      "expected": {
+        "disposition": "blocked",
+        "reason_codes": [
+          "CLAIM_EXCEEDS_ENDPOINT"
+        ],
+        "claims_not_established": [
+          "long-term health unless measured over requested horizon",
+          "species or life-stage claims outside declared target",
+          "nutritional adequacy without an appropriate complete-diet protocol",
+          "food safety beyond tested material, process, inclusion level and study scope",
+          "environmental superiority or cost competitiveness unless separately assessed"
+        ]
+      },
+      "rationale": "Composition alone does not establish digestibility."
+    },
+    {
+      "case_id": "PNE-006",
+      "claim": {
+        "endpoint": "digestibility",
+        "target_species": "cat",
+        "life_stage": "adult",
+        "inclusion_percent": 10,
+        "minimum_horizon_days": null
+      },
+      "evidence": {
+        "study_id": "synthetic-study-001",
+        "rights_status": "permitted",
+        "permission_evidence_present": true,
+        "evidence_kind": "synthetic",
+        "reported_as": "synthetic",
+        "design": "digestibility_assay",
+        "target_species": "cat",
+        "life_stage": "adult",
+        "inclusion_percent": 10,
+        "duration_days": 7,
+        "sample_size": 8,
+        "experimental_unit": "individual_animal",
+        "observed_endpoints": [
+          "digestibility"
+        ],
+        "scope_match": "match",
+        "metric_definition_complete": true,
+        "methods_reported": true,
+        "comparator_defined": true,
+        "nutritional_profile_characterized": true,
+        "adequacy_protocol_qualified": false,
+        "safety_monitoring_defined": false,
+        "funding_disclosure": "disclosed",
+        "lca_boundary_defined": false,
+        "functional_unit_defined": false,
+        "cost_basis_defined": false,
+        "protocol_preregistered": false,
+        "power_status": "unknown",
+        "uncertainty_reported": true
+      },
+      "expected": {
+        "disposition": "eligible_for_declared_claim",
+        "reason_codes": [
+          "ENDPOINT_AND_SCOPE_SUPPORTED"
+        ],
+        "claims_not_established": [
+          "long-term health unless measured over requested horizon",
+          "species or life-stage claims outside declared target",
+          "nutritional adequacy without an appropriate complete-diet protocol",
+          "food safety beyond tested material, process, inclusion level and study scope",
+          "environmental superiority or cost competitiveness unless separately assessed"
+        ]
+      },
+      "rationale": "Synthetic positive control for species-matched digestibility method."
+    },
+    {
+      "case_id": "PNE-007",
+      "claim": {
+        "endpoint": "food_preference",
+        "target_species": "dog",
+        "life_stage": "adult",
+        "inclusion_percent": 10,
+        "minimum_horizon_days": null
+      },
+      "evidence": {
+        "study_id": "synthetic-study-001",
+        "rights_status": "permitted",
+        "permission_evidence_present": true,
+        "evidence_kind": "simulated",
+        "reported_as": "measured",
+        "design": "two_bowl_preference",
+        "target_species": "dog",
+        "life_stage": "adult",
+        "inclusion_percent": 10,
+        "duration_days": 2,
+        "sample_size": 30,
+        "experimental_unit": "individual_animal",
+        "observed_endpoints": [
+          "food_preference"
+        ],
+        "scope_match": "match",
+        "metric_definition_complete": true,
+        "methods_reported": true,
+        "comparator_defined": true,
+        "nutritional_profile_characterized": true,
+        "adequacy_protocol_qualified": false,
+        "safety_monitoring_defined": false,
+        "funding_disclosure": "disclosed",
+        "lca_boundary_defined": false,
+        "functional_unit_defined": false,
+        "cost_basis_defined": false,
+        "protocol_preregistered": false,
+        "power_status": "unknown",
+        "uncertainty_reported": true
+      },
+      "expected": {
+        "disposition": "invalid_evidence",
+        "reason_codes": [
+          "EVIDENCE_KIND_MISMATCH"
+        ],
+        "claims_not_established": [
+          "long-term health unless measured over requested horizon",
+          "species or life-stage claims outside declared target",
+          "nutritional adequacy without an appropriate complete-diet protocol",
+          "food safety beyond tested material, process, inclusion level and study scope",
+          "environmental superiority or cost competitiveness unless separately assessed"
+        ]
+      },
+      "rationale": "Simulation relabeled as measured is invalid."
+    },
+    {
+      "case_id": "PNE-008",
+      "claim": {
+        "endpoint": "food_preference",
+        "target_species": "cat",
+        "life_stage": "adult",
+        "inclusion_percent": 10,
+        "minimum_horizon_days": null
+      },
+      "evidence": {
+        "study_id": "synthetic-study-001",
+        "rights_status": "permitted",
+        "permission_evidence_present": true,
+        "evidence_kind": "synthetic",
+        "reported_as": "synthetic",
+        "design": "two_bowl_preference",
+        "target_species": "dog",
+        "life_stage": "adult",
+        "inclusion_percent": 10,
+        "duration_days": 2,
+        "sample_size": 30,
+        "experimental_unit": "individual_animal",
+        "observed_endpoints": [
+          "food_preference"
+        ],
+        "scope_match": "mismatch",
+        "metric_definition_complete": true,
+        "methods_reported": true,
+        "comparator_defined": true,
+        "nutritional_profile_characterized": true,
+        "adequacy_protocol_qualified": false,
+        "safety_monitoring_defined": false,
+        "funding_disclosure": "disclosed",
+        "lca_boundary_defined": false,
+        "functional_unit_defined": false,
+        "cost_basis_defined": false,
+        "protocol_preregistered": false,
+        "power_status": "unknown",
+        "uncertainty_reported": true
+      },
+      "expected": {
+        "disposition": "blocked",
+        "reason_codes": [
+          "TARGET_SCOPE_MISMATCH"
+        ],
+        "claims_not_established": [
+          "long-term health unless measured over requested horizon",
+          "species or life-stage claims outside declared target",
+          "nutritional adequacy without an appropriate complete-diet protocol",
+          "food safety beyond tested material, process, inclusion level and study scope",
+          "environmental superiority or cost competitiveness unless separately assessed"
+        ]
+      },
+      "rationale": "Dog preference cannot be reused as cat-specific evidence without a justified bridge."
+    },
+    {
+      "case_id": "PNE-009",
+      "claim": {
+        "endpoint": "food_preference",
+        "target_species": "dog",
+        "life_stage": "adult",
+        "inclusion_percent": 10,
+        "minimum_horizon_days": null
+      },
+      "evidence": {
+        "study_id": "synthetic-study-001",
+        "rights_status": "permitted",
+        "permission_evidence_present": true,
+        "evidence_kind": "synthetic",
+        "reported_as": "synthetic",
+        "design": "two_bowl_preference",
+        "target_species": "dog",
+        "life_stage": "adult",
+        "inclusion_percent": 10,
+        "duration_days": 2,
+        "sample_size": null,
+        "experimental_unit": "not_reported",
+        "observed_endpoints": [
+          "food_preference"
+        ],
+        "scope_match": "match",
+        "metric_definition_complete": false,
+        "methods_reported": true,
+        "comparator_defined": true,
+        "nutritional_profile_characterized": true,
+        "adequacy_protocol_qualified": false,
+        "safety_monitoring_defined": false,
+        "funding_disclosure": "disclosed",
+        "lca_boundary_defined": false,
+        "functional_unit_defined": false,
+        "cost_basis_defined": false,
+        "protocol_preregistered": false,
+        "power_status": "unknown",
+        "uncertainty_reported": true
+      },
+      "expected": {
+        "disposition": "indeterminate",
+        "reason_codes": [
+          "STUDY_REPORTING_INCOMPLETE"
+        ],
+        "claims_not_established": [
+          "long-term health unless measured over requested horizon",
+          "species or life-stage claims outside declared target",
+          "nutritional adequacy without an appropriate complete-diet protocol",
+          "food safety beyond tested material, process, inclusion level and study scope",
+          "environmental superiority or cost competitiveness unless separately assessed"
+        ]
+      },
+      "rationale": "Sample size, experimental unit or metric definition is incomplete."
+    },
+    {
+      "case_id": "PNE-010",
+      "claim": {
+        "endpoint": "long_term_health",
+        "target_species": "dog",
+        "life_stage": "adult",
+        "inclusion_percent": 10,
+        "minimum_horizon_days": 180
+      },
+      "evidence": {
+        "study_id": "synthetic-study-001",
+        "rights_status": "permitted",
+        "permission_evidence_present": true,
+        "evidence_kind": "synthetic",
+        "reported_as": "synthetic",
+        "design": "controlled_feeding_trial",
+        "target_species": "dog",
+        "life_stage": "adult",
+        "inclusion_percent": 10,
+        "duration_days": 2,
+        "sample_size": 30,
+        "experimental_unit": "individual_animal",
+        "observed_endpoints": [
+          "long_term_health"
+        ],
+        "scope_match": "match",
+        "metric_definition_complete": true,
+        "methods_reported": true,
+        "comparator_defined": true,
+        "nutritional_profile_characterized": true,
+        "adequacy_protocol_qualified": true,
+        "safety_monitoring_defined": false,
+        "funding_disclosure": "disclosed",
+        "lca_boundary_defined": false,
+        "functional_unit_defined": false,
+        "cost_basis_defined": false,
+        "protocol_preregistered": false,
+        "power_status": "unknown",
+        "uncertainty_reported": true
+      },
+      "expected": {
+        "disposition": "indeterminate",
+        "reason_codes": [
+          "STUDY_HORIZON_TOO_SHORT"
+        ],
+        "claims_not_established": [
+          "long-term health unless measured over requested horizon",
+          "species or life-stage claims outside declared target",
+          "nutritional adequacy without an appropriate complete-diet protocol",
+          "food safety beyond tested material, process, inclusion level and study scope",
+          "environmental superiority or cost competitiveness unless separately assessed"
+        ]
+      },
+      "rationale": "Claim horizon exceeds observation period."
+    },
+    {
+      "case_id": "PNE-011",
+      "claim": {
+        "endpoint": "long_term_health",
+        "target_species": "dog",
+        "life_stage": "adult",
+        "inclusion_percent": 10,
+        "minimum_horizon_days": null
+      },
+      "evidence": {
+        "study_id": "synthetic-study-001",
+        "rights_status": "permitted",
+        "permission_evidence_present": true,
+        "evidence_kind": "synthetic",
+        "reported_as": "synthetic",
+        "design": "controlled_feeding_trial",
+        "target_species": "dog",
+        "life_stage": "adult",
+        "inclusion_percent": 10,
+        "duration_days": 180,
+        "sample_size": 120,
+        "experimental_unit": "individual_animal",
+        "observed_endpoints": [
+          "long_term_health"
+        ],
+        "scope_match": "match",
+        "metric_definition_complete": true,
+        "methods_reported": true,
+        "comparator_defined": true,
+        "nutritional_profile_characterized": true,
+        "adequacy_protocol_qualified": true,
+        "safety_monitoring_defined": true,
+        "funding_disclosure": "disclosed",
+        "lca_boundary_defined": false,
+        "functional_unit_defined": false,
+        "cost_basis_defined": false,
+        "protocol_preregistered": false,
+        "power_status": "adequate_for_declared_claim",
+        "uncertainty_reported": true
+      },
+      "expected": {
+        "disposition": "eligible_for_declared_claim",
+        "reason_codes": [
+          "ENDPOINT_AND_SCOPE_SUPPORTED"
+        ],
+        "claims_not_established": [
+          "long-term health unless measured over requested horizon",
+          "species or life-stage claims outside declared target",
+          "nutritional adequacy without an appropriate complete-diet protocol",
+          "food safety beyond tested material, process, inclusion level and study scope",
+          "environmental superiority or cost competitiveness unless separately assessed"
+        ]
+      },
+      "rationale": "Synthetic positive control for adequately powered species-matched study at stated horizon."
+    },
+    {
+      "case_id": "PNE-012",
+      "claim": {
+        "endpoint": "environmental_impact",
+        "target_species": "dog",
+        "life_stage": "adult",
+        "inclusion_percent": 10,
+        "minimum_horizon_days": null
+      },
+      "evidence": {
+        "study_id": "synthetic-study-001",
+        "rights_status": "permitted",
+        "permission_evidence_present": true,
+        "evidence_kind": "synthetic",
+        "reported_as": "synthetic",
+        "design": "life_cycle_assessment",
+        "target_species": "dog",
+        "life_stage": "adult",
+        "inclusion_percent": 10,
+        "duration_days": 2,
+        "sample_size": 30,
+        "experimental_unit": "individual_animal",
+        "observed_endpoints": [
+          "environmental_impact"
+        ],
+        "scope_match": "match",
+        "metric_definition_complete": true,
+        "methods_reported": true,
+        "comparator_defined": true,
+        "nutritional_profile_characterized": true,
+        "adequacy_protocol_qualified": false,
+        "safety_monitoring_defined": false,
+        "funding_disclosure": "disclosed",
+        "lca_boundary_defined": false,
+        "functional_unit_defined": false,
+        "cost_basis_defined": false,
+        "protocol_preregistered": false,
+        "power_status": "unknown",
+        "uncertainty_reported": true
+      },
+      "expected": {
+        "disposition": "not_comparable",
+        "reason_codes": [
+          "LCA_BOUNDARY_OR_FUNCTIONAL_UNIT_MISSING"
+        ],
+        "claims_not_established": [
+          "long-term health unless measured over requested horizon",
+          "species or life-stage claims outside declared target",
+          "nutritional adequacy without an appropriate complete-diet protocol",
+          "food safety beyond tested material, process, inclusion level and study scope",
+          "environmental superiority or cost competitiveness unless separately assessed"
+        ]
+      },
+      "rationale": "LCA needs aligned boundary and functional unit."
+    },
+    {
+      "case_id": "PNE-013",
+      "claim": {
+        "endpoint": "cost_competitiveness",
+        "target_species": "dog",
+        "life_stage": "adult",
+        "inclusion_percent": 10,
+        "minimum_horizon_days": null
+      },
+      "evidence": {
+        "study_id": "synthetic-study-001",
+        "rights_status": "permitted",
+        "permission_evidence_present": true,
+        "evidence_kind": "synthetic",
+        "reported_as": "synthetic",
+        "design": "life_cycle_assessment",
+        "target_species": "dog",
+        "life_stage": "adult",
+        "inclusion_percent": 10,
+        "duration_days": 2,
+        "sample_size": 30,
+        "experimental_unit": "individual_animal",
+        "observed_endpoints": [
+          "environmental_impact"
+        ],
+        "scope_match": "match",
+        "metric_definition_complete": true,
+        "methods_reported": true,
+        "comparator_defined": true,
+        "nutritional_profile_characterized": true,
+        "adequacy_protocol_qualified": false,
+        "safety_monitoring_defined": false,
+        "funding_disclosure": "disclosed",
+        "lca_boundary_defined": true,
+        "functional_unit_defined": true,
+        "cost_basis_defined": true,
+        "protocol_preregistered": false,
+        "power_status": "unknown",
+        "uncertainty_reported": true
+      },
+      "expected": {
+        "disposition": "blocked",
+        "reason_codes": [
+          "CLAIM_EXCEEDS_ENDPOINT"
+        ],
+        "claims_not_established": [
+          "long-term health unless measured over requested horizon",
+          "species or life-stage claims outside declared target",
+          "nutritional adequacy without an appropriate complete-diet protocol",
+          "food safety beyond tested material, process, inclusion level and study scope",
+          "environmental superiority or cost competitiveness unless separately assessed"
+        ]
+      },
+      "rationale": "An LCA does not establish cost competitiveness."
+    },
+    {
+      "case_id": "PNE-014",
+      "claim": {
+        "endpoint": "tolerance_safety",
+        "target_species": "dog",
+        "life_stage": "adult",
+        "inclusion_percent": 10,
+        "minimum_horizon_days": null
+      },
+      "evidence": {
+        "study_id": "synthetic-study-001",
+        "rights_status": "permitted",
+        "permission_evidence_present": true,
+        "evidence_kind": "synthetic",
+        "reported_as": "synthetic",
+        "design": "controlled_feeding_trial",
+        "target_species": "dog",
+        "life_stage": "adult",
+        "inclusion_percent": 10,
+        "duration_days": 30,
+        "sample_size": 60,
+        "experimental_unit": "individual_animal",
+        "observed_endpoints": [
+          "tolerance_safety"
+        ],
+        "scope_match": "match",
+        "metric_definition_complete": true,
+        "methods_reported": true,
+        "comparator_defined": true,
+        "nutritional_profile_characterized": true,
+        "adequacy_protocol_qualified": false,
+        "safety_monitoring_defined": false,
+        "funding_disclosure": "disclosed",
+        "lca_boundary_defined": false,
+        "functional_unit_defined": false,
+        "cost_basis_defined": false,
+        "protocol_preregistered": false,
+        "power_status": "unknown",
+        "uncertainty_reported": true
+      },
+      "expected": {
+        "disposition": "indeterminate",
+        "reason_codes": [
+          "SAFETY_MONITORING_NOT_DEFINED"
+        ],
+        "claims_not_established": [
+          "long-term health unless measured over requested horizon",
+          "species or life-stage claims outside declared target",
+          "nutritional adequacy without an appropriate complete-diet protocol",
+          "food safety beyond tested material, process, inclusion level and study scope",
+          "environmental superiority or cost competitiveness unless separately assessed"
+        ]
+      },
+      "rationale": "Undefined safety monitoring cannot qualify tolerance."
+    },
+    {
+      "case_id": "PNE-015",
+      "claim": {
+        "endpoint": "food_preference",
+        "target_species": "dog",
+        "life_stage": "adult",
+        "inclusion_percent": 30,
+        "minimum_horizon_days": null
+      },
+      "evidence": {
+        "study_id": "synthetic-study-001",
+        "rights_status": "permitted",
+        "permission_evidence_present": true,
+        "evidence_kind": "synthetic",
+        "reported_as": "synthetic",
+        "design": "two_bowl_preference",
+        "target_species": "dog",
+        "life_stage": "adult",
+        "inclusion_percent": 10,
+        "duration_days": 2,
+        "sample_size": 30,
+        "experimental_unit": "individual_animal",
+        "observed_endpoints": [
+          "food_preference"
+        ],
+        "scope_match": "match",
+        "metric_definition_complete": true,
+        "methods_reported": true,
+        "comparator_defined": true,
+        "nutritional_profile_characterized": true,
+        "adequacy_protocol_qualified": false,
+        "safety_monitoring_defined": false,
+        "funding_disclosure": "disclosed",
+        "lca_boundary_defined": false,
+        "functional_unit_defined": false,
+        "cost_basis_defined": false,
+        "protocol_preregistered": false,
+        "power_status": "unknown",
+        "uncertainty_reported": true
+      },
+      "expected": {
+        "disposition": "blocked",
+        "reason_codes": [
+          "INCLUSION_SCOPE_MISMATCH"
+        ],
+        "claims_not_established": [
+          "long-term health unless measured over requested horizon",
+          "species or life-stage claims outside declared target",
+          "nutritional adequacy without an appropriate complete-diet protocol",
+          "food safety beyond tested material, process, inclusion level and study scope",
+          "environmental superiority or cost competitiveness unless separately assessed"
+        ]
+      },
+      "rationale": "Preference evidence at 10% cannot automatically transfer to 30%."
+    },
+    {
+      "case_id": "PNE-016",
+      "claim": {
+        "endpoint": "food_preference",
+        "target_species": "dog",
+        "life_stage": "adult",
+        "inclusion_percent": 10,
+        "minimum_horizon_days": null
+      },
+      "evidence": {
+        "study_id": "synthetic-study-001",
+        "rights_status": "permitted",
+        "permission_evidence_present": true,
+        "evidence_kind": "synthetic",
+        "reported_as": "synthetic",
+        "design": "two_bowl_preference",
+        "target_species": "dog",
+        "life_stage": "adult",
+        "inclusion_percent": 10,
+        "duration_days": 2,
+        "sample_size": 30,
+        "experimental_unit": "individual_animal",
+        "observed_endpoints": [
+          "food_preference"
+        ],
+        "scope_match": "match",
+        "metric_definition_complete": true,
+        "methods_reported": true,
+        "comparator_defined": true,
+        "nutritional_profile_characterized": true,
+        "adequacy_protocol_qualified": false,
+        "safety_monitoring_defined": false,
+        "funding_disclosure": "missing",
+        "lca_boundary_defined": false,
+        "functional_unit_defined": false,
+        "cost_basis_defined": false,
+        "protocol_preregistered": false,
+        "power_status": "unknown",
+        "uncertainty_reported": true
+      },
+      "expected": {
+        "disposition": "indeterminate",
+        "reason_codes": [
+          "FUNDING_DISCLOSURE_MISSING"
+        ],
+        "claims_not_established": [
+          "long-term health unless measured over requested horizon",
+          "species or life-stage claims outside declared target",
+          "nutritional adequacy without an appropriate complete-diet protocol",
+          "food safety beyond tested material, process, inclusion level and study scope",
+          "environmental superiority or cost competitiveness unless separately assessed"
+        ]
+      },
+      "rationale": "Missing funding/conflict disclosure blocks promotion-ready status in this benchmark."
+    },
+    {
+      "case_id": "PNE-017",
+      "claim": {
+        "endpoint": "nutritional_adequacy",
+        "target_species": "dog",
+        "life_stage": "adult",
+        "inclusion_percent": 10,
+        "minimum_horizon_days": null
+      },
+      "evidence": {
+        "study_id": "synthetic-study-001",
+        "rights_status": "permitted",
+        "permission_evidence_present": true,
+        "evidence_kind": "synthetic",
+        "reported_as": "synthetic",
+        "design": "nutrient_analysis",
+        "target_species": "dog",
+        "life_stage": "adult",
+        "inclusion_percent": 10,
+        "duration_days": 2,
+        "sample_size": 30,
+        "experimental_unit": "individual_animal",
+        "observed_endpoints": [
+          "nutrient_composition"
+        ],
+        "scope_match": "match",
+        "metric_definition_complete": true,
+        "methods_reported": true,
+        "comparator_defined": true,
+        "nutritional_profile_characterized": false,
+        "adequacy_protocol_qualified": false,
+        "safety_monitoring_defined": false,
+        "funding_disclosure": "disclosed",
+        "lca_boundary_defined": false,
+        "functional_unit_defined": false,
+        "cost_basis_defined": false,
+        "protocol_preregistered": false,
+        "power_status": "unknown",
+        "uncertainty_reported": true
+      },
+      "expected": {
+        "disposition": "indeterminate",
+        "reason_codes": [
+          "NUTRITIONAL_PROFILE_INCOMPLETE"
+        ],
+        "claims_not_established": [
+          "long-term health unless measured over requested horizon",
+          "species or life-stage claims outside declared target",
+          "nutritional adequacy without an appropriate complete-diet protocol",
+          "food safety beyond tested material, process, inclusion level and study scope",
+          "environmental superiority or cost competitiveness unless separately assessed"
+        ]
+      },
+      "rationale": "Adequacy needs complete, relevant formulation profile and qualified protocol."
+    },
+    {
+      "case_id": "PNE-018",
+      "claim": {
+        "endpoint": "process_productivity",
+        "target_species": "other",
+        "life_stage": "process",
+        "inclusion_percent": null,
+        "minimum_horizon_days": null
+      },
+      "evidence": {
+        "study_id": "synthetic-study-001",
+        "rights_status": "permitted",
+        "permission_evidence_present": true,
+        "evidence_kind": "simulated",
+        "reported_as": "simulated",
+        "design": "simulation",
+        "target_species": "other",
+        "life_stage": "process",
+        "inclusion_percent": null,
+        "duration_days": 30,
+        "sample_size": 30,
+        "experimental_unit": "process_batch",
+        "observed_endpoints": [
+          "process_productivity"
+        ],
+        "scope_match": "match",
+        "metric_definition_complete": true,
+        "methods_reported": true,
+        "comparator_defined": true,
+        "nutritional_profile_characterized": true,
+        "adequacy_protocol_qualified": false,
+        "safety_monitoring_defined": false,
+        "funding_disclosure": "disclosed",
+        "lca_boundary_defined": false,
+        "functional_unit_defined": false,
+        "cost_basis_defined": false,
+        "protocol_preregistered": false,
+        "power_status": "unknown",
+        "uncertainty_reported": true
+      },
+      "expected": {
+        "disposition": "indeterminate",
+        "reason_codes": [
+          "MODELED_PRODUCTIVITY_NOT_MEASURED"
+        ],
+        "claims_not_established": [
+          "long-term health unless measured over requested horizon",
+          "species or life-stage claims outside declared target",
+          "nutritional adequacy without an appropriate complete-diet protocol",
+          "food safety beyond tested material, process, inclusion level and study scope",
+          "environmental superiority or cost competitiveness unless separately assessed"
+        ]
+      },
+      "rationale": "Simulation supports a model prediction, not a measured production result."
+    }
+  ]
+}
