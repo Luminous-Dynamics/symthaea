@@ -11,12 +11,43 @@
 //! Its validity depends on the conditional-mean null assumption; nominal
 //! calibration alone does not establish that assumption under arbitrary drift.
 
+/// Log threshold for episode-reset e-processes with a countable lifetime budget.
+///
+/// Episode j receives delta_j = total_delta / (K * j * (j + 1)); summing over
+/// j >= 1 and K monitors allocates at most total_delta. The episode index must
+/// be fixed before outcomes are observed.
+pub fn alpha_spending_log_threshold(
+    total_delta: f64,
+    simultaneous_monitors: usize,
+    episode_index: u64,
+) -> Option<f64> {
+    if !total_delta.is_finite()
+        || total_delta <= 0.0
+        || total_delta >= 1.0
+        || simultaneous_monitors == 0
+        || episode_index == 0
+    {
+        return None;
+    }
+    let next_episode = episode_index.checked_add(1)?;
+    let log_threshold = (simultaneous_monitors as f64).ln()
+        - total_delta.ln()
+        + (episode_index as f64).ln()
+        + (next_episode as f64).ln();
+    if !log_threshold.is_finite() || !log_threshold.exp().is_finite() {
+        return None;
+    }
+    Some(log_threshold)
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct BoundedRiskEProcess {
     risk_bound: f64,
     bet: f64,
     total_delta: f64,
     simultaneous_monitors: usize,
+    episode_budget_index: Option<u64>,
+    log_alarm_threshold: f64,
     log_e_value: f64,
     alarmed: bool,
 }
@@ -59,9 +90,31 @@ impl BoundedRiskEProcess {
             bet,
             total_delta,
             simultaneous_monitors,
+            episode_budget_index: None,
+            log_alarm_threshold: e_value_threshold.ln(),
             log_e_value: 0.0,
             alarmed: false,
         })
+    }
+
+    /// Use a predeclared summable per-episode allocation so resets do not
+    /// silently reuse the same lifetime false-alarm budget.
+    pub fn new_with_alpha_spending(
+        risk_bound: f64,
+        bet: f64,
+        total_delta: f64,
+        simultaneous_monitors: usize,
+        episode_index: u64,
+    ) -> Option<Self> {
+        let mut process = Self::new(risk_bound, bet, total_delta, simultaneous_monitors)?;
+        process.log_alarm_threshold =
+            alpha_spending_log_threshold(total_delta, simultaneous_monitors, episode_index)?;
+        process.episode_budget_index = Some(episode_index);
+        Some(process)
+    }
+
+    pub const fn episode_budget_index(self) -> Option<u64> {
+        self.episode_budget_index
     }
 
     pub const fn risk_bound(self) -> f64 {
@@ -82,12 +135,12 @@ impl BoundedRiskEProcess {
 
     /// E-value threshold after Bonferroni allocation of the global delta.
     pub fn e_value_alarm_threshold(self) -> f64 {
-        self.simultaneous_monitors as f64 / self.total_delta
+        self.log_alarm_threshold.exp()
     }
 
     /// Log of the E-value threshold, used for stable comparisons in log space.
-    pub fn log_alarm_threshold(self) -> f64 {
-        self.e_value_alarm_threshold().ln()
+    pub const fn log_alarm_threshold(self) -> f64 {
+        self.log_alarm_threshold
     }
 
     pub const fn log_e_value(self) -> f64 {
@@ -118,10 +171,17 @@ impl BoundedRiskEProcess {
         }
 
         let next_log_value = self.log_e_value + factor.ln();
-        if !next_log_value.is_finite() {
+        if next_log_value.is_nan() {
+            return None;
+        }
+        if next_log_value == f64::INFINITY {
             self.log_e_value = f64::MAX;
             self.alarmed = true;
             return Some(true);
+        }
+        if next_log_value == f64::NEG_INFINITY {
+            self.log_e_value = -f64::MAX;
+            return Some(self.alarmed);
         }
 
         self.log_e_value = next_log_value;
@@ -129,7 +189,11 @@ impl BoundedRiskEProcess {
         Some(self.alarmed)
     }
 
-    /// Reset the evidence stream, for example when starting a distinct episode.
+    /// Reset the evidence stream within the same preallocated episode budget.
+    ///
+    /// A reset does not grant a new false-alarm budget. For a new episode, build
+    /// a new monitor with a fresh alpha-spending index; do not call reset to
+    /// restart a detector while reusing the same index.
     pub fn reset(&mut self) {
         self.log_e_value = 0.0;
         self.alarmed = false;
@@ -148,6 +212,8 @@ pub struct MixtureBoundedRiskEProcess {
     bet_fractions: [f64; 3],
     total_delta: f64,
     simultaneous_monitors: usize,
+    episode_budget_index: Option<u64>,
+    log_alarm_threshold: f64,
     component_log_e_values: [f64; 3],
     log_e_value: f64,
     alarmed: bool,
@@ -187,10 +253,36 @@ impl MixtureBoundedRiskEProcess {
             bet_fractions,
             total_delta,
             simultaneous_monitors,
+            episode_budget_index: None,
+            log_alarm_threshold: (simultaneous_monitors as f64 / total_delta).ln(),
             component_log_e_values: [0.0; 3],
             log_e_value: 0.0,
             alarmed: false,
         })
+    }
+
+    /// Use summable alpha spending for repeated, episode-reset mixture monitors.
+    pub fn new_with_alpha_spending(
+        risk_bound: f64,
+        bet_fractions: [f64; 3],
+        total_delta: f64,
+        simultaneous_monitors: usize,
+        episode_index: u64,
+    ) -> Option<Self> {
+        let mut process = Self::new(
+            risk_bound,
+            bet_fractions,
+            total_delta,
+            simultaneous_monitors,
+        )?;
+        process.log_alarm_threshold =
+            alpha_spending_log_threshold(total_delta, simultaneous_monitors, episode_index)?;
+        process.episode_budget_index = Some(episode_index);
+        Some(process)
+    }
+
+    pub const fn episode_budget_index(self) -> Option<u64> {
+        self.episode_budget_index
     }
 
     pub const fn risk_bound(self) -> f64 {
@@ -213,8 +305,8 @@ impl MixtureBoundedRiskEProcess {
         self.simultaneous_monitors
     }
 
-    pub fn log_alarm_threshold(self) -> f64 {
-        (self.simultaneous_monitors as f64 / self.total_delta).ln()
+    pub const fn log_alarm_threshold(self) -> f64 {
+        self.log_alarm_threshold
     }
 
     pub const fn component_log_e_values(self) -> [f64; 3] {
@@ -238,14 +330,31 @@ impl MixtureBoundedRiskEProcess {
             return None;
         }
 
+        let mut next_components = self.component_log_e_values;
         for (index, fraction) in self.bet_fractions.iter().copied().enumerate() {
             let bet = fraction / self.risk_bound;
             let factor = 1.0 + bet * (loss - self.risk_bound);
             if !factor.is_finite() || factor <= 0.0 {
                 return None;
             }
-            self.component_log_e_values[index] += factor.ln();
+            let candidate = next_components[index] + factor.ln();
+            if candidate.is_nan() {
+                return None;
+            }
+            if candidate == f64::INFINITY {
+                next_components[index] = f64::MAX;
+                self.component_log_e_values = next_components;
+                self.log_e_value = f64::MAX;
+                self.alarmed = true;
+                return Some(true);
+            }
+            next_components[index] = if candidate == f64::NEG_INFINITY {
+                -f64::MAX
+            } else {
+                candidate
+            };
         }
+        self.component_log_e_values = next_components;
 
         let max_log_value = self
             .component_log_e_values
@@ -271,6 +380,8 @@ impl MixtureBoundedRiskEProcess {
         Some(self.alarmed)
     }
 
+    /// Reset evidence within the same episode budget only. A fresh episode must
+    /// construct a new monitor with its newly allocated alpha-spending index.
     pub fn reset(&mut self) {
         self.component_log_e_values = [0.0; 3];
         self.log_e_value = 0.0;
@@ -393,6 +504,58 @@ mod tests {
         assert_eq!(process.component_log_e_values(), [0.0; 3]);
         assert_eq!(process.log_e_value(), 0.0);
         assert!(!process.alarmed());
+    }
+
+    #[test]
+    fn alpha_spending_thresholds_allocate_a_lifetime_false_alarm_budget() {
+        let first = alpha_spending_log_threshold(0.05, 5, 1).expect("first budget");
+        let second = alpha_spending_log_threshold(0.05, 5, 2).expect("second budget");
+        let thousand = alpha_spending_log_threshold(0.05, 5, 1_000).expect("late budget");
+        assert!((first.exp() - 200.0).abs() < 1e-10);
+        assert!((second.exp() - 600.0).abs() < 1e-10);
+        assert!(second > first);
+        assert!(thousand > second);
+        assert!(alpha_spending_log_threshold(0.05, 5, 0).is_none());
+        assert!(alpha_spending_log_threshold(0.05, 5, u64::MAX).is_none());
+
+        let allocated: f64 = (1..=100_000)
+            .map(|episode| 0.05 / (5.0 * episode as f64 * (episode + 1) as f64))
+            .sum();
+        assert!(allocated <= 0.05 / 5.0);
+        assert!(allocated > 0.0098);
+    }
+
+    #[test]
+    fn alpha_spending_is_monotone_for_fixed_bet_and_mixture_monitors() {
+        let fixed_first =
+            BoundedRiskEProcess::new_with_alpha_spending(0.15, 0.5 / 0.15, 0.05, 5, 1)
+                .expect("valid alpha-spent fixed monitor");
+        let fixed_later =
+            BoundedRiskEProcess::new_with_alpha_spending(0.15, 0.5 / 0.15, 0.05, 5, 300)
+                .expect("valid later fixed monitor");
+        let mixture_first = MixtureBoundedRiskEProcess::new_with_alpha_spending(
+            0.15,
+            [0.25, 0.5, 0.75],
+            0.05,
+            5,
+            1,
+        )
+        .expect("valid alpha-spent mixture");
+        let mixture_later = MixtureBoundedRiskEProcess::new_with_alpha_spending(
+            0.15,
+            [0.25, 0.5, 0.75],
+            0.05,
+            5,
+            300,
+        )
+        .expect("valid later mixture");
+
+        assert_eq!(fixed_first.episode_budget_index(), Some(1));
+        assert_eq!(mixture_later.episode_budget_index(), Some(300));
+        assert!(fixed_later.log_alarm_threshold() > fixed_first.log_alarm_threshold());
+        assert!(mixture_later.log_alarm_threshold() > mixture_first.log_alarm_threshold());
+        assert_eq!(fixed_first.log_alarm_threshold(), mixture_first.log_alarm_threshold());
+        assert_eq!(fixed_later.log_alarm_threshold(), mixture_later.log_alarm_threshold());
     }
 
     #[test]

@@ -455,10 +455,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut summary_output = format!("{SUMMARY_HEADER}\n");
     let mut raw_rows = 0_usize;
     for (point_index, point) in OPERATING_POINTS.iter().copied().enumerate() {
-        for condition in Condition::ALL {
-            let mut cell = CellSummary::default();
-            for episode in 0..EVALUATION_EPISODES {
-                let seed = 50_000 + episode as u64;
+        let mut cells: [CellSummary; 4] =
+            std::array::from_fn(|_| CellSummary::default());
+        // Interleave conditions within each episode index. This makes downstream
+        // lifetime alpha-spending assignments independent of condition blocks.
+        for episode in 0..EVALUATION_EPISODES {
+            let seed = 50_000 + episode as u64;
+            for (condition_index, condition) in Condition::ALL.into_iter().enumerate() {
                 let (outcome, trace_rows) = detect_episode(
                     seed,
                     point_index,
@@ -468,7 +471,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     limits,
                     scales,
                 )?;
-                cell.observe(outcome);
+                cells[condition_index].observe(outcome);
                 for (step, (item, pointwise_alarm, cusum_alarm, cusum_statistic)) in
                     trace_rows.into_iter().enumerate()
                 {
@@ -493,7 +496,14 @@ fn main() -> Result<(), Box<dyn Error>> {
                     raw_rows += 1;
                 }
             }
-            summary_row(&mut summary_output, point, condition, &cell);
+        }
+        for (condition_index, condition) in Condition::ALL.into_iter().enumerate() {
+            summary_row(
+                &mut summary_output,
+                point,
+                condition,
+                &cells[condition_index],
+            );
         }
     }
 
