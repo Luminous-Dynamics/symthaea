@@ -972,7 +972,7 @@ fn validate_suite_adjudication(
             64,
             &format!("{reviewer_context}.evidence_sha256"),
         )?;
-        if status == "adjudicated" && reviewer_label != label {
+        if status == "adjudicated" && reviewer_label != label.as_str() {
             bail!("{reviewer_context} label disagrees with adjudication");
         }
     }
