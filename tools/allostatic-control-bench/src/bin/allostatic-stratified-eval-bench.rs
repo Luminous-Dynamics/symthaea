@@ -15,7 +15,7 @@ use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-const REPORT_HEADER: &str = "row_type,task,n_pairs,baseline_mean,candidate_mean,mean_delta,iqm_delta,paired_win_rate,macro_baseline_mean,macro_candidate_mean,macro_mean_delta,macro_mean_delta_ci95_low,macro_mean_delta_ci95_high,macro_iqm_delta,macro_iqm_delta_ci95_low,macro_iqm_delta_ci95_high,macro_paired_win_rate,macro_paired_win_rate_ci95_low,macro_paired_win_rate_ci95_high,fraction_tasks_positive_mean_delta,task_count,bootstrap_replicates,bootstrap_seed";
+const REPORT_HEADER: &str = "row_type,task,n_pairs,baseline_mean,candidate_mean,mean_delta,task_iqm_paired_delta,paired_win_rate,marginal_probability_of_superiority,macro_baseline_mean,macro_candidate_mean,macro_mean_delta,macro_mean_delta_ci95_low,macro_mean_delta_ci95_high,macro_task_iqm_paired_delta,macro_task_iqm_delta_ci95_low,macro_task_iqm_delta_ci95_high,macro_paired_win_rate,macro_paired_win_rate_ci95_low,macro_paired_win_rate_ci95_high,macro_marginal_probability_of_superiority,macro_marginal_probability_ci95_low,macro_marginal_probability_ci95_high,task_balanced_baseline_iqm,task_balanced_candidate_iqm,task_balanced_iqm_delta,task_balanced_iqm_delta_ci95_low,task_balanced_iqm_delta_ci95_high,fraction_tasks_positive_mean_delta,task_count,bootstrap_replicates,bootstrap_seed";
 
 fn main() {
     if let Err(error) = run() {
@@ -138,8 +138,9 @@ fn run() -> Result<(), String> {
             format!("{:.9}", summary.mean_delta),
             format!("{:.9}", summary.iqm_delta),
             format!("{:.9}", summary.paired_win_rate),
+            format!("{:.9}", summary.marginal_probability_of_superiority),
         ];
-        row.resize(23, String::new());
+        row.resize(32, String::new());
         writeln!(&mut report, "{}", row.join(","))
             .map_err(|error| format!("cannot write task row: {error}"))?;
     }
@@ -148,6 +149,7 @@ fn run() -> Result<(), String> {
         "aggregate".to_owned(),
         "ALL".to_owned(),
         aggregate.total_pairs.to_string(),
+        String::new(),
         String::new(),
         String::new(),
         String::new(),
@@ -164,6 +166,14 @@ fn run() -> Result<(), String> {
         format!("{:.9}", aggregate.macro_paired_win_rate),
         format!("{:.9}", aggregate.macro_paired_win_rate_ci95_low),
         format!("{:.9}", aggregate.macro_paired_win_rate_ci95_high),
+        format!("{:.9}", aggregate.macro_marginal_probability_of_superiority),
+        format!("{:.9}", aggregate.macro_marginal_probability_ci95_low),
+        format!("{:.9}", aggregate.macro_marginal_probability_ci95_high),
+        format!("{:.9}", aggregate.task_balanced_baseline_iqm),
+        format!("{:.9}", aggregate.task_balanced_candidate_iqm),
+        format!("{:.9}", aggregate.task_balanced_iqm_delta),
+        format!("{:.9}", aggregate.task_balanced_iqm_delta_ci95_low),
+        format!("{:.9}", aggregate.task_balanced_iqm_delta_ci95_high),
         format!("{:.9}", aggregate.fraction_tasks_positive_mean_delta),
         aggregate.task_count.to_string(),
         aggregate.bootstrap_replicates.to_string(),
