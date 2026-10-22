@@ -1040,3 +1040,32 @@ fn test_temporal_collapse_recovery_health_check() {
         "Temporal weights should differ after health check recovery"
     );
 }
+
+/// Temporal training must not mutate the dormant spatial projection merely because
+/// the shared topological coherence monitor reports a low score.
+#[test]
+fn temporal_distillation_does_not_regularize_spatial_projection() {
+    let config = LiquidMambaConfig {
+        temporal_projection: true,
+        warmup_steps: 0,
+        accumulation_steps: 1,
+        enable_consciousness_gating: false,
+        ..Default::default()
+    };
+    let mut gen_obj = mock_gen(config);
+    let channels = ThoughtChannels::with_intent(5);
+    gen_obj
+        .topological_coherence
+        .store(0.1f32.to_bits(), std::sync::atomic::Ordering::Relaxed);
+
+    let initial_weights = gen_obj.projection.flatten_weights();
+    gen_obj
+        .train_step(&channels, &[7, 11, 13, 17])
+        .expect("temporal distillation should succeed");
+
+    assert_eq!(
+        initial_weights,
+        gen_obj.projection.flatten_weights(),
+        "temporal training must not change the unused spatial projection"
+    );
+}
