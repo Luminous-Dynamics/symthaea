@@ -132,6 +132,7 @@ struct TrajectoryReceipt {
     trajectory_test_outcome: String,
     model_production_edge_comparison_count: usize,
     policy_truth_table_comparison_count: usize,
+    model_production_two_action_sequence_comparison_count: usize,
     cargo_lock_sha256: String,
     rustc_version: String,
     cargo_version: String,
@@ -235,6 +236,11 @@ pub fn run(root: &Path, corpus_arg: &Path, out_arg: Option<&Path>) -> Result<()>
             .ok()
             .and_then(|value| value.parse::<usize>().ok())
             .unwrap_or(0);
+    let model_production_two_action_sequence_comparison_count =
+        std::env::var("MODEL_PRODUCTION_TWO_ACTION_SEQUENCE_COMPARISON_COUNT")
+            .ok()
+            .and_then(|value| value.parse::<usize>().ok())
+            .unwrap_or(0);
     let cargo_lock = fs::read(root.join("Cargo.lock"))
         .context("read Cargo.lock for dependency-resolution identity")?;
     let cargo_lock_digest = sha256_hex(&cargo_lock);
@@ -277,6 +283,7 @@ pub fn run(root: &Path, corpus_arg: &Path, out_arg: Option<&Path>) -> Result<()>
             .unwrap_or_else(|_| "not-provided".to_string()),
         model_production_edge_comparison_count,
         policy_truth_table_comparison_count,
+        model_production_two_action_sequence_comparison_count,
         cargo_lock_sha256: cargo_lock_digest,
         rustc_version,
         cargo_version,
