@@ -506,7 +506,389 @@
             }
           }
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "statement_relation": {
+                "properties": {
+                  "relation": {
+                    "const": "same_elaborated_type"
+                  }
+                },
+                "required": [
+                  "relation"
+                ]
+              }
+            },
+            "required": [
+              "statement_relation"
+            ]
+          },
+          "then": {
+            "properties": {
+              "elaboration": {
+                "properties": {
+                  "base_status": {
+                    "const": "elaborated"
+                  },
+                  "variant_status": {
+                    "const": "elaborated"
+                  },
+                  "base_type_sha256": {
+                    "$ref": "#/$defs/sha256"
+                  },
+                  "variant_type_sha256": {
+                    "$ref": "#/$defs/sha256"
+                  },
+                  "receipt_sha256": {
+                    "$ref": "#/$defs/sha256"
+                  }
+                }
+              },
+              "statement_relation": {
+                "properties": {
+                  "evidence_kind": {
+                    "const": "kernel_checked_defeq_certificate"
+                  },
+                  "receipt_sha256": {
+                    "$ref": "#/$defs/sha256"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "statement_relation": {
+                "properties": {
+                  "relation": {
+                    "const": "propositionally_equivalent"
+                  }
+                },
+                "required": [
+                  "relation"
+                ]
+              }
+            },
+            "required": [
+              "statement_relation"
+            ]
+          },
+          "then": {
+            "properties": {
+              "elaboration": {
+                "properties": {
+                  "base_status": {
+                    "const": "elaborated"
+                  },
+                  "variant_status": {
+                    "const": "elaborated"
+                  },
+                  "receipt_sha256": {
+                    "$ref": "#/$defs/sha256"
+                  }
+                }
+              },
+              "statement_relation": {
+                "properties": {
+                  "evidence_kind": {
+                    "const": "kernel_checked_equivalence_proof"
+                  },
+                  "receipt_sha256": {
+                    "$ref": "#/$defs/sha256"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "statement_relation": {
+                "properties": {
+                  "relation": {
+                    "const": "formally_distinct"
+                  }
+                },
+                "required": [
+                  "relation"
+                ]
+              }
+            },
+            "required": [
+              "statement_relation"
+            ]
+          },
+          "then": {
+            "properties": {
+              "elaboration": {
+                "properties": {
+                  "base_status": {
+                    "const": "elaborated"
+                  },
+                  "variant_status": {
+                    "const": "elaborated"
+                  },
+                  "receipt_sha256": {
+                    "$ref": "#/$defs/sha256"
+                  }
+                }
+              },
+              "statement_relation": {
+                "properties": {
+                  "evidence_kind": {
+                    "enum": [
+                      "checked_counterexample",
+                      "distinctness_proof",
+                      "independent_review"
+                    ]
+                  },
+                  "receipt_sha256": {
+                    "$ref": "#/$defs/sha256"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "statement_relation": {
+                "properties": {
+                  "relation": {
+                    "const": "invalid_mutation"
+                  }
+                },
+                "required": [
+                  "relation"
+                ]
+              }
+            },
+            "required": [
+              "statement_relation"
+            ]
+          },
+          "then": {
+            "properties": {
+              "elaboration": {
+                "required": [
+                  "diagnostics_sha256"
+                ],
+                "properties": {
+                  "variant_status": {
+                    "enum": [
+                      "parse_error",
+                      "elaboration_error"
+                    ]
+                  },
+                  "diagnostics_sha256": {
+                    "$ref": "#/$defs/sha256"
+                  }
+                }
+              },
+              "statement_relation": {
+                "properties": {
+                  "evidence_kind": {
+                    "const": "diagnostic_receipt"
+                  },
+                  "receipt_sha256": {
+                    "$ref": "#/$defs/sha256"
+                  }
+                }
+              },
+              "contract_relation": {
+                "properties": {
+                  "status": {
+                    "const": "unknown"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "contract_relation": {
+                "properties": {
+                  "status": {
+                    "const": "contract_violated"
+                  }
+                },
+                "required": [
+                  "status"
+                ]
+              }
+            },
+            "required": [
+              "contract_relation"
+            ]
+          },
+          "then": {
+            "properties": {
+              "elaboration": {
+                "properties": {
+                  "base_status": {
+                    "const": "elaborated"
+                  },
+                  "variant_status": {
+                    "const": "elaborated"
+                  }
+                }
+              },
+              "contract_relation": {
+                "properties": {
+                  "evidence_kind": {
+                    "enum": [
+                      "proof_state_snapshot",
+                      "typed_context_comparison",
+                      "independent_review"
+                    ]
+                  },
+                  "receipt_sha256": {
+                    "$ref": "#/$defs/sha256"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "truth_assessment": {
+                "properties": {
+                  "status": {
+                    "const": "proved"
+                  }
+                },
+                "required": [
+                  "status"
+                ]
+              }
+            },
+            "required": [
+              "truth_assessment"
+            ]
+          },
+          "then": {
+            "properties": {
+              "truth_assessment": {
+                "properties": {
+                  "evidence_kind": {
+                    "const": "kernel_proof"
+                  },
+                  "receipt_sha256": {
+                    "$ref": "#/$defs/sha256"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "truth_assessment": {
+                "properties": {
+                  "status": {
+                    "const": "counterexample_found"
+                  }
+                },
+                "required": [
+                  "status"
+                ]
+              }
+            },
+            "required": [
+              "truth_assessment"
+            ]
+          },
+          "then": {
+            "properties": {
+              "truth_assessment": {
+                "properties": {
+                  "evidence_kind": {
+                    "const": "checked_counterexample"
+                  },
+                  "receipt_sha256": {
+                    "$ref": "#/$defs/sha256"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "strategy_attempt": {
+                "properties": {
+                  "status": {
+                    "const": "kernel_checked_success"
+                  }
+                },
+                "required": [
+                  "status"
+                ]
+              }
+            },
+            "required": [
+              "strategy_attempt"
+            ]
+          },
+          "then": {
+            "properties": {
+              "strategy_attempt": {
+                "properties": {
+                  "exact_target_statement_checked": {
+                    "const": true
+                  },
+                  "receipt_sha256": {
+                    "$ref": "#/$defs/sha256"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "adjudication": {
+                "properties": {
+                  "status": {
+                    "const": "adjudicated"
+                  }
+                },
+                "required": [
+                  "status"
+                ]
+              }
+            },
+            "required": [
+              "adjudication"
+            ]
+          },
+          "then": {
+            "properties": {
+              "adjudication": {
+                "properties": {
+                  "reviewers": {
+                    "minItems": 2
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
     }
   }
 }
