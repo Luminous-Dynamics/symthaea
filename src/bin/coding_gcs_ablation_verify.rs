@@ -151,6 +151,10 @@ fn verify_mode_summary(
                 && bool_field(run, "simulated") == Some(false)
         })
         .count() as u64;
+    let compile_rejections = selected_runs
+        .iter()
+        .filter(|run| has_real_compile_rejection(run))
+        .count() as u64;
     let complete = selected_runs
         .iter()
         .filter(|run| bool_field(run, "oracle_complete") == Some(true))
@@ -298,6 +302,7 @@ fn verify_mode_summary(
         ("runs", count),
         ("behavioral_successes", passed),
         ("real_compiles", compiles),
+        ("compile_rejections", compile_rejections),
         ("complete_oracles", complete),
         ("agent_elapsed_ms_total", time_total),
         ("agent_elapsed_ms_p50", agent_elapsed_ms_p50),
@@ -1417,6 +1422,7 @@ mod tests {
                     "behavioral_successes": 1,
                     "pass_rate": 1.0,
                     "real_compiles": 1,
+                    "compile_rejections": 0,
                     "complete_oracles": 1,
                     "complete_oracle_rate": 1.0,
                     "agent_elapsed_ms_total": 100,
@@ -1449,6 +1455,7 @@ mod tests {
                     "behavioral_successes": 0,
                     "pass_rate": 0.0,
                     "real_compiles": 1,
+                    "compile_rejections": 0,
                     "complete_oracles": 1,
                     "complete_oracle_rate": 1.0,
                     "agent_elapsed_ms_total": 120,
@@ -1608,6 +1615,31 @@ mod tests {
         assert_eq!(read_f64(&summary, "ci95_lower_percentage_points"), Some(-100.0));
         assert_eq!(read_f64(&summary, "ci95_upper_percentage_points"), Some(-100.0));
         assert!(str_field(&summary, "warning").unwrap().contains("Small number of task clusters"));
+    }
+
+    #[test]
+    fn compile_rejection_is_counted_as_complete_negative_in_treatment_summary() {
+        let mut report = valid_fixture();
+        report["runs"][0]["compiled"] = Value::Bool(false);
+        report["runs"][0]["tests_passed"] = Value::from(0);
+        report["runs"][0]["tests_failed"] = Value::from(0);
+        report["runs"][0]["oracle_complete"] = Value::Bool(true);
+        report["runs"][0]["behavioral_success"] = Value::Bool(false);
+        report["runs"][0]["runtime_error"] = Value::Null;
+        report["runs"][0]["compile_errors"] = serde_json::json!([
+            "error[E0425]: cannot find value missing in this scope"
+        ]);
+        report["summary"]["gcs_off"]["behavioral_successes"] = Value::from(0);
+        report["summary"]["gcs_off"]["pass_rate"] = Value::from(0.0);
+        report["summary"]["gcs_off"]["real_compiles"] = Value::from(0);
+        report["summary"]["gcs_off"]["compile_rejections"] = Value::from(1);
+        report["summary"]["gcs_off"]["complete_oracles"] = Value::from(1);
+        report["summary"]["gcs_off"]["complete_oracle_rate"] = Value::from(1.0);
+        report["summary"]["paired"]["gcs_on_wins"] = Value::from(0);
+        report["summary"]["paired"]["gcs_off_wins"] = Value::from(0);
+        report["summary"]["paired"]["ties"] = Value::from(1);
+        report["summary"]["paired"]["net_pass_delta_percentage_points"] = Value::from(0.0);
+        assert!(audit(&report, None, None).is_empty());
     }
 
     #[test]
