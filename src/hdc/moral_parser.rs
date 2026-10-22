@@ -1146,7 +1146,7 @@ impl MoralParser {
     pub fn assess_consent_evidence(&self, text: &str) -> ConsentTextAssessment {
         let normalized = text.to_lowercase();
         let evidence_text = Self::strip_quoted_consent_text(&normalized);
-        let quoted_text_suppressed = evidence_text.as_str() != normalized;
+        let quoted_text_suppressed = evidence_text.as_str() != normalized.as_str();
 
         if evidence_text.contains('?') {
             return ConsentTextAssessment {
