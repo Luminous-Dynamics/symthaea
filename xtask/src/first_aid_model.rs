@@ -656,9 +656,7 @@ mod tests {
             compared_sequences, 21_504,
             "all 84 states × 16 × 16 two-action suffixes must be compared"
         );
-        println!(
-            "model_production_two_action_sequence_comparisons={compared_sequences}"
-        );
+        println!("model_production_two_action_sequence_comparisons={compared_sequences}");
     }
 
     #[test]
