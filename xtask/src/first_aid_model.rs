@@ -670,7 +670,7 @@ mod tests {
     #[test]
     fn every_reachable_state_two_action_suffix_matches_production_trace_checker() {
         let paths = shortest_paths_to_reachable_states();
-        assert_eq!(paths.len(), 84, "finite model's reachable state count changed");
+        assert_eq!(paths.len(), 252, "finite model's reachable state count changed");
 
         let mut compared_sequences = 0usize;
         for (target_state, prefix) in &paths {
