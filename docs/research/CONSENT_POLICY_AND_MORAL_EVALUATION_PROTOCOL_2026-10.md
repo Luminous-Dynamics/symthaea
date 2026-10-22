@@ -15,6 +15,7 @@ This protocol follows the direction of recent evaluation work:
 - [ImpactBench (October 2026 preprint)](https://arxiv.org/abs/2610.20690) evaluates desired and harmful behaviours across a broader scenario/metric set.
 - [Moral Change or Noise? (AAAI 2026)](https://ojs.aaai.org/index.php/AAAI/article/view/41083) motivates repeated-session measures so preference changes are not automatically classified as stable preference or random noise.
 - [The Pluralistic Moral Gap (EACL 2026)](https://aclanthology.org/2026.eacl-long.305/) compares model judgments with human judgment distributions over 1,618 dilemmas and finds alignment declines as human disagreement rises; this supports reporting distributions and disagreement rather than one consensus label.
+- [NIST AI 800-3 (February 2026)](https://www.nist.gov/news-events/news/2026/02/new-report-expanding-ai-evaluation-toolbox-statistical-models) argues for explicit statistical assumptions and uncertainty quantification in benchmark evaluation.
 - [MoralityBench.ai (October 2026)](https://moralitybench.ai/) is a useful additional comparison point for repeatability and response profiles.
 
 These benchmarks use different tasks, populations, labels and scoring rules. Their headline values are **not directly comparable** to Symthaea's internal parser or ETHICS-style pilot scores. Reproduce an external benchmark under its own protocol before making a numerical comparison; do not convert unrelated scores into a leaderboard claim.
@@ -59,7 +60,7 @@ The development-only runner compares Symthaea's current parser against a deliber
 cargo run --example consent_semantics_bench
 ```
 
-It emits expected-vs-actual five-state confusion matrices for both candidate and baseline, fixture-level false-Given and missed-Given cases, accuracy, false-Given rate among expected non-Given cases, pairwise flips under four hand-authored meaning-preserving perturbations, and four relevant-fact counterfactuals where the consent state should change in a known direction. It is intentionally diagnostic rather than a release gate: the 27 hand-written cases, four invariance pairs and four counterfactual pairs are neither blinded nor representative, and they must not be cited as a production safety rate. Unit tests cover scope binding, verification flags, validity windows, expiry and revocation for the pure policy precondition.
+It emits expected-vs-actual five-state confusion matrices for both candidate and baseline, fixture-level false-Given and missed-Given cases, accuracy, false-Given rate among expected non-Given cases, per-state precision/recall/F1 and support, Unknown output rate/coverage, pairwise flips under four hand-authored meaning-preserving perturbations, and four relevant-fact counterfactuals where the consent state should change in a known direction. It is intentionally diagnostic rather than a release gate: the 27 hand-written cases, four invariance pairs and four counterfactual pairs are neither blinded nor representative, and they must not be cited as a production safety rate. Unit tests cover scope binding, verification flags, validity windows, expiry and revocation for the pure policy precondition.
 
 ## Preregistered gates for a future release candidate
 
