@@ -152,16 +152,13 @@ pub fn verify_sequence(
 /// The host integration should require this token at the action-application API.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct VerifiedActionPermit {
-    action: Action,
+    lease: super::certificate_lease::CertificateLease,
     receipt: VerificationReceipt,
-    issued_at_step: u64,
-    expires_at_step: u64,
-    evidence_digest: [u8; 32],
 }
 
 impl VerifiedActionPermit {
     pub const fn action(self) -> Action {
-        self.action
+        self.lease.action()
     }
 
     pub const fn receipt(self) -> VerificationReceipt {
@@ -169,15 +166,24 @@ impl VerifiedActionPermit {
     }
 
     pub const fn issued_at_step(self) -> u64 {
-        self.issued_at_step
+        self.lease.issued_at_step()
     }
 
     pub const fn expires_at_step(self) -> u64 {
-        self.expires_at_step
+        self.lease.expires_at_step()
     }
 
     pub const fn evidence_digest(self) -> [u8; 32] {
-        self.evidence_digest
+        self.lease.evidence_digest()
+    }
+
+    /// Recheck freshness at the actual action-application boundary. Verification
+    /// earlier in the control tick is not enough if context can change afterward.
+    pub fn validate_for_use(
+        self,
+        current_context: super::certificate_lease::CertificateContext,
+    ) -> Result<(), super::certificate_lease::CertificateRejection> {
+        self.lease.validate(current_context)
     }
 }
 
@@ -222,13 +228,7 @@ pub fn verify_leased_witness(
     )
     .map_err(LeasedVerificationFailure::WitnessRejected)?;
 
-    Ok(VerifiedActionPermit {
-        action: lease.action(),
-        receipt,
-        issued_at_step: lease.issued_at_step(),
-        expires_at_step: lease.expires_at_step(),
-        evidence_digest: lease.evidence_digest(),
-    })
+    Ok(VerifiedActionPermit { lease, receipt })
 }
 
 #[cfg(test)]
@@ -263,6 +263,41 @@ mod tests {
 
     fn limits() -> ViabilityLimits {
         ViabilityLimits::new(0.15, 0.88).expect("valid limits")
+    }
+
+    #[test]
+    fn verified_permit_must_be_revalidated_at_use_time() {
+        use crate::certificate_lease::{CertificateContext, CertificateLease, CertificateRejection};
+        let initial = state((0.50, 0.50), (0.50, 0.50));
+        let dynamics = dynamics();
+        let limits = limits();
+        let action_set = evaluate_horizon_action_set(initial, dynamics, limits, true, 3)
+            .expect("valid horizon");
+        let issued_context = CertificateContext::new(
+            100, 7, 11, 13, 17, 19, 23, 3, [0x2a; 32],
+        ).expect("valid issued context");
+        let lease = CertificateLease::issue(
+            Action::Maintain, issued_context, action_set, 0,
+        ).expect("maintain certified");
+        let permit = verify_leased_witness(
+            lease, issued_context, initial,
+            &[Action::Maintain, Action::Maintain, Action::Push],
+            dynamics, limits, true,
+        ).expect("valid permit");
+
+        assert_eq!(permit.action(), Action::Maintain);
+        assert_eq!(permit.receipt().steps_verified(), 3);
+        assert_eq!(permit.expires_at_step(), 100);
+        assert_eq!(permit.evidence_digest(), [0x2a; 32]);
+        assert_eq!(permit.validate_for_use(issued_context), Ok(()));
+
+        let changed_context = CertificateContext::new(
+            100, 7, 12, 13, 17, 19, 23, 3, [0x2a; 32],
+        ).expect("valid but changed context");
+        assert_eq!(
+            permit.validate_for_use(changed_context),
+            Err(CertificateRejection::DynamicsRevisionChanged),
+        );
     }
 
     #[test]
