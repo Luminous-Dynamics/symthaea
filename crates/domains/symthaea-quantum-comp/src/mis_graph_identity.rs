@@ -147,6 +147,16 @@ mod tests {
     }
 
     #[test]
+    fn stable_v1_encoding_matches_known_sha256_vector() {
+        let graph = MisGraphIdentity::from_edges(3, &[(0, 1), (1, 2)]).expect("valid path graph");
+        let actual = graph.sha256().iter().map(|byte| format!("{byte:02x}")).collect::<String>();
+        assert_eq!(
+            actual,
+            "7073d023aa5446aa153349baa4972fa8eefaa159879423535867309bda7127c4"
+        );
+    }
+
+    #[test]
     fn rejects_self_loops() {
         assert_eq!(
             MisGraphIdentity::from_edges(2, &[(1, 1)]).expect_err("self-loop is invalid"),
