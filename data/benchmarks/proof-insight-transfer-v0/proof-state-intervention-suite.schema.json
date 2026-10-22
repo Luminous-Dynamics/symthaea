@@ -1,0 +1,150 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/benchmarks/proof-insight-transfer-v0/proof-state-intervention-suite.schema.json",
+  "title": "PITB Fixed-Theorem Proof-State Intervention Suite v0",
+  "description": "Paired replayed Lean proof states that preserve theorem, goal, environment, toolchain and source identity while applying one legal local-context intervention. Synthetic fixtures are structural only.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "suite_id", "dataset_kind", "cases"],
+  "properties": {
+    "schema_version": { "const": "pitb.proof-state-intervention-suite.v0" },
+    "suite_id": { "type": "string", "minLength": 1, "maxLength": 160 },
+    "dataset_kind": { "enum": ["synthetic_fixture", "reviewed_benchmark"] },
+    "cases": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/case" } }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "repo_path": { "type": "string", "minLength": 1, "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$" },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id", "pair_id", "component_id", "split", "source_insight", "target",
+        "base_state", "variant_state", "intervention", "contract",
+        "adjudication", "outcome_links"
+      ],
+      "properties": {
+        "case_id": { "type": "string", "minLength": 1, "maxLength": 160, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$" },
+        "pair_id": { "type": "string", "minLength": 1, "maxLength": 160, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$" },
+        "component_id": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "split": { "enum": ["train", "validation", "test", "external_challenge"] },
+        "source_insight": {
+          "type": "object", "additionalProperties": false,
+          "required": ["record_id", "family_id", "source_commit", "insight_sha256"],
+          "properties": {
+            "record_id": { "type": "string", "minLength": 1 },
+            "family_id": { "type": "string", "minLength": 1 },
+            "source_commit": { "$ref": "#/$defs/commit" },
+            "insight_sha256": { "$ref": "#/$defs/sha256" }
+          }
+        },
+        "target": {
+          "type": "object", "additionalProperties": false,
+          "required": ["theorem_id", "family_id", "source_commit", "artifact_path", "artifact_sha256", "statement_sha256", "goal_type_sha256", "environment_sha256", "lean_toolchain"],
+          "properties": {
+            "theorem_id": { "type": "string", "minLength": 1 },
+            "family_id": { "type": "string", "minLength": 1 },
+            "source_commit": { "$ref": "#/$defs/commit" },
+            "artifact_path": { "$ref": "#/$defs/repo_path" },
+            "artifact_sha256": { "$ref": "#/$defs/sha256" },
+            "statement_sha256": { "$ref": "#/$defs/sha256" },
+            "goal_type_sha256": { "$ref": "#/$defs/sha256" },
+            "environment_sha256": { "$ref": "#/$defs/sha256" },
+            "lean_toolchain": { "type": "string", "minLength": 1 }
+          }
+        },
+        "base_state": { "$ref": "#/$defs/state" },
+        "variant_state": { "$ref": "#/$defs/state" },
+        "intervention": {
+          "type": "object", "additionalProperties": false,
+          "required": ["kind", "operation", "single_factor", "precondition_id", "before_declaration", "after_declaration", "operation_receipt_sha256", "transition_receipt_sha256"],
+          "properties": {
+            "kind": { "enum": ["required_hypothesis_cleared", "hypothesis_alpha_renamed", "irrelevant_declaration_removed", "independent_declarations_reordered"] },
+            "operation": { "enum": ["clear_local_decl", "rename_local_decl", "remove_irrelevant_decl", "reorder_independent_decls"] },
+            "single_factor": { "const": true },
+            "precondition_id": { "type": "string", "minLength": 1, "maxLength": 160 },
+            "before_declaration": { "$ref": "#/$defs/declaration" },
+            "after_declaration": { "$ref": "#/$defs/declaration" },
+            "operation_receipt_sha256": { "$ref": "#/$defs/sha256" },
+            "transition_receipt_sha256": { "$ref": "#/$defs/sha256" },
+            "note": { "type": "string", "maxLength": 2000 }
+          }
+        },
+        "contract": {
+          "type": "object", "additionalProperties": false,
+          "required": ["required_type_sha256", "base_precondition_status", "variant_precondition_status", "expected_action_policy"],
+          "properties": {
+            "required_type_sha256": { "$ref": "#/$defs/sha256" },
+            "base_precondition_status": { "enum": ["available", "absent", "unknown"] },
+            "variant_precondition_status": { "enum": ["available", "absent", "unknown"] },
+            "expected_action_policy": { "enum": ["move_allowed_then_reassess", "move_forbidden_or_replan", "preserve_eligibility", "unknown"] },
+            "note": { "type": "string", "maxLength": 2000 }
+          }
+        },
+        "adjudication": {
+          "type": "object", "additionalProperties": false,
+          "required": ["status", "rubric_version", "reviewers", "receipt_sha256"],
+          "properties": {
+            "status": { "enum": ["adjudicated", "unresolved", "pending"] },
+            "rubric_version": { "type": "string", "minLength": 1 },
+            "reviewers": {
+              "type": "array",
+              "items": {
+                "type": "object", "additionalProperties": false,
+                "required": ["reviewer_id", "base_precondition_status", "variant_precondition_status", "expected_action_policy", "evidence_sha256"],
+                "properties": {
+                  "reviewer_id": { "type": "string", "minLength": 1 },
+                  "base_precondition_status": { "enum": ["available", "absent", "unknown"] },
+                  "variant_precondition_status": { "enum": ["available", "absent", "unknown"] },
+                  "expected_action_policy": { "enum": ["move_allowed_then_reassess", "move_forbidden_or_replan", "preserve_eligibility", "unknown"] },
+                  "evidence_sha256": { "$ref": "#/$defs/sha256" },
+                  "note": { "type": "string", "maxLength": 2000 }
+                }
+              }
+            },
+            "receipt_sha256": { "$ref": "#/$defs/sha256" },
+            "note": { "type": "string", "maxLength": 2000 }
+          }
+        },
+        "outcome_links": {
+          "type": "object", "additionalProperties": false,
+          "required": ["base_outcome_id", "variant_outcome_id", "status"],
+          "properties": {
+            "base_outcome_id": { "type": "string", "minLength": 1, "maxLength": 160, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$" },
+            "variant_outcome_id": { "type": "string", "minLength": 1, "maxLength": 160, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$" },
+            "status": { "enum": ["not_run", "linked", "partially_linked", "unresolved"] }
+          }
+        }
+      }
+    },
+    "state": {
+      "type": "object", "additionalProperties": false,
+      "required": ["snapshot_id", "snapshot_sha256", "replay_receipt_sha256", "source_commit", "statement_sha256", "goal_type_sha256", "environment_sha256", "lean_toolchain", "local_context_sha256", "goal_count"],
+      "properties": {
+        "snapshot_id": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "snapshot_sha256": { "$ref": "#/$defs/sha256" },
+        "replay_receipt_sha256": { "$ref": "#/$defs/sha256" },
+        "source_commit": { "$ref": "#/$defs/commit" },
+        "statement_sha256": { "$ref": "#/$defs/sha256" },
+        "goal_type_sha256": { "$ref": "#/$defs/sha256" },
+        "environment_sha256": { "$ref": "#/$defs/sha256" },
+        "lean_toolchain": { "type": "string", "minLength": 1 },
+        "local_context_sha256": { "$ref": "#/$defs/sha256" },
+        "goal_count": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "declaration": {
+      "type": "object", "additionalProperties": false,
+      "required": ["stable_key", "user_name", "present", "type_sha256", "role", "position"],
+      "properties": {
+        "stable_key": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "user_name": { "type": ["string", "null"], "maxLength": 160 },
+        "present": { "type": "boolean" },
+        "type_sha256": { "oneOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }] },
+        "role": { "enum": ["required_precondition", "irrelevant", "other"] },
+        "position": { "type": ["integer", "null"], "minimum": 0 }
+      }
+    }
+  }
+}
