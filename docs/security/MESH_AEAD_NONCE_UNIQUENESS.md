@@ -51,7 +51,19 @@ The new deterministic test `legacy_fragment_nonce_reuses_after_16_bit_sequence_w
 
 **Impact condition:** the same effective key is used for both fragment encryptions. If callers use independently established per-session keys, the collision in nonce bytes alone is not a same-key nonce reuse. The code and configuration must establish that guarantee rather than assume it.
 
-### N5 — Authentication and encryption identities are separate protocol questions
+### N5 — Fragment-level encryption exceeds the declared LoRa MTU
+
+`LORA_MTU` is 222 bytes and the receive path allocates a fixed `[u8; LORA_MTU]` buffer. A serialized full-size `LoRaFragment` is 222 bytes. `encrypt_fragment` wraps that whole serialized frame with a 12-byte nonce and a 16-byte AEAD tag, yielding **250 bytes**. The send path passes that oversized buffer to `send_raw`, while the receiver's fixed-size read buffer can hold only 222 bytes. A physical transport must reject, truncate or otherwise fail to convey the encrypted frame as a single declared LoRa frame unless a lower layer explicitly supports larger frames—which would contradict the stated MTU contract.
+
+This path is selected only when the encryption key and fragment-encryption flag are both configured. The sender already encrypts the packet envelope before fragmentation, so fragment-level encryption is an additional wrapper with meaningful size and latency costs. It cannot be treated as a free upgrade. A complete fix must either:
+- remove/deprecate the extra fragment wrapper where packet-level AEAD supplies end-to-end integrity, or
+- version the framing and account for the 28-byte wrapper in the fragmentation capacity, FEC recovery, reassembly and transport MTU; the smaller payload changes fragment count and radio cost.
+
+Do not merely increase the read buffer: that does not make a 250-byte frame fit a 222-byte physical MTU.
+
+The deterministic test `legacy_fragment_encryption_exceeds_lora_mtu` builds a maximal legacy fragment and asserts its wrapped output is exactly `LORA_MTU + AEAD_NONCE_SIZE + AEAD_TAG_SIZE` (250 bytes). This test is a legacy-failure witness, not a transport-safety pass. It has not been compiled or run in this environment.
+
+### N6 — Authentication and encryption identities are separate protocol questions
 
 An HMAC-authenticated outer packet and a separately encrypted envelope must not be assumed to share the same identity or replay semantics automatically. Every key/nonce tuple must be evaluated using the *effective encryption key*, not only the outer packet's source ID or MAC. A shared group key also permits any key holder to construct packets that appear to come from another group member; nonce hygiene cannot fix that identity-authentication limitation.
 
@@ -62,7 +74,7 @@ An HMAC-authenticated outer packet and a separately encrypted envelope must not 
 - Do not silently patch the legacy helper's nonce layout in place: the helper's output is on-wire data and an incompatible change requires an explicit protocol version and migration plan.
 - Keep the new construction research-only until the property suite, key-management assumptions and interoperability plan are independently reviewed.
 
-The packet-level and fragment-level source comments have been corrected to remove false restart-safety guarantees. Two deterministic legacy ciphertext-XOR witnesses are now present in `src/swarm/mesh/tests.rs`: `legacy_nonce_source_id_truncation_reveals_plaintext_xor` and `legacy_fragment_nonce_reuses_after_16_bit_sequence_wrap`. Both are deliberately named as vulnerability witnesses; passing them reproduces the old flaw, it does not validate the protocol. They have not been compiled or run here. This is containment plus executable witness authoring, not the complete cryptographic remediation.
+The packet-level and fragment-level source comments have been corrected to remove false restart-safety guarantees. Three deterministic legacy witnesses are now present in `src/swarm/mesh/tests.rs`: `legacy_nonce_source_id_truncation_reveals_plaintext_xor`, `legacy_fragment_nonce_reuses_after_16_bit_sequence_wrap`, and `legacy_fragment_encryption_exceeds_lora_mtu`. Both are deliberately named as vulnerability witnesses; passing them reproduces the old flaw, it does not validate the protocol. They have not been compiled or run here. This is containment plus executable witness authoring, not the complete cryptographic remediation.
 
 ## Protocol-v3 direction
 
@@ -114,6 +126,7 @@ These are proposed acceptance tests; they have not been implemented or run by th
 | NONCE-12 | Sequence serialization and byte-order boundary values | Canonical test vectors agree across independent implementations |
 | NONCE-13 | Fragment sequences differ by 65,536 for the same source/key/index | `legacy_fragment_nonce_reuses_after_16_bit_sequence_wrap` documents the deterministic legacy collision; v3 must use a unique per-key fragment nonce namespace |
 | NONCE-14 | Fragment sender restarts with sequence reset and same key | No fragment nonce is reused; current epoch field must not be assumed to protect fragments |
+| NONCE-15 | Maximum-size 222-byte LoRa frame with fragment AEAD enabled | Detect that the legacy wrapper expands the frame to 250 bytes; v3 either fits within the declared MTU with versioned fragmentation or rejects/deprecates this mode |
 
 Tests must include deterministic witnesses, not only random statistical sampling. Property/model-based tests should generate restart, key rotation, counter reservation, rollback, multi-sender and malformed-packet traces. Report a digest of the frozen test corpus and retain minimized failing traces. A deterministic source-truncation witness has now been added in `src/swarm/mesh/tests.rs` as `legacy_nonce_source_id_truncation_reveals_plaintext_xor`; it intentionally demonstrates the legacy flaw and is not a security-passing test. It has not yet been compiled or executed in this environment.
 
