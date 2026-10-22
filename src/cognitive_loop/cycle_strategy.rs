@@ -6,8 +6,8 @@
 //! Contains:
 //! - `run_strategy_selection`: Closed Learning Loop strategy selection + agency override
 //! - `run_encoding_and_preprocessing`: HDC encoding, soul alignment, phi attention gating,
-//!   codebook diversity, input memoization, and ethics evaluation. Stateful exploration and
-//!   urgency updates are owned by the perception phase so they occur exactly once per cycle.
+//!   the single stateful surprise/exploration update, codebook diversity, memoization, and ethics.
+//!   It returns the exploration result; adaptive threshold and urgency are finalized downstream.
 
 use std::time::Instant;
 use symthaea_core::hdc::binary_hv::BinaryHV;
@@ -46,13 +46,15 @@ pub(crate) struct StrategySelectionResult {
     pub(crate) social_strategy_bias: bool,
 }
 
-/// Result from encoding and preprocessing, before stateful urgency updates.
+/// Result from encoding and preprocessing, before urgency finalization.
 pub(crate) struct EncodingPhaseResult {
     pub(crate) encoding_result: EncodingResult,
     pub(crate) hv16_cached: BinaryHV,
     pub(crate) compressed_state: Vec<f32>,
     pub(crate) soul_alignment: f32,
     pub(crate) phi_attention_weight: f32,
+    pub(crate) surprise_triggered: bool,
+    pub(crate) exploration_action: Option<String>,
     pub(crate) memo_threshold: f32,
     pub(crate) input_similarity: f32,
     pub(crate) input_memoized: bool,
@@ -275,7 +277,7 @@ impl CognitiveLoopService {
     /// - Codebook diversity → memoization threshold adaptation
     /// - Input similarity memoization (Tulving & Schacter 1990)
     /// - Unified Ethics Engine evaluation
-    /// - Adaptive learning threshold calculation; stateful urgency is computed downstream
+    /// - Stateful surprise/exploration; the adaptive threshold and urgency are finalized downstream
     pub(super) fn run_encoding_and_preprocessing(
         &mut self,
         input: &str,
@@ -579,6 +581,14 @@ impl CognitiveLoopService {
         } else {
             compressed_state
         };
+
+        // Surprise exploration is stateful, so compute it once and pass the result
+        // into the perception phase. Threshold and urgency are finalized after the
+        // remainder of encoding/preprocessing has updated the relevant state.
+        let _t_surprise = Instant::now();
+        let (surprise_triggered, exploration_action) =
+            self.run_surprise_exploration(&compressed_state);
+        module_timings.surprise_exploration = _t_surprise.elapsed().as_micros() as u64;
 
         // ── Phase 21: Codebook diversity → memoization threshold adaptation ─
         let base_memo_threshold = super::thresholds::INPUT_MEMO_THRESHOLD;
@@ -904,6 +914,8 @@ impl CognitiveLoopService {
             compressed_state,
             soul_alignment,
             phi_attention_weight,
+            surprise_triggered,
+            exploration_action,
             memo_threshold,
             input_similarity,
             input_memoized,
