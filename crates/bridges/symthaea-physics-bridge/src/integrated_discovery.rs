@@ -854,17 +854,26 @@ mod tests {
 
         let (false_singleton_delta, false_ci_low, false_ci_high) = paired_bootstrap_mean_ci(
             &paired,
-            |pair| (if pair.audit_false_singleton { 1.0 } else { 0.0 }) - (if pair.eig_false_singleton { 1.0 } else { 0.0 }),
+            |pair| {
+                (if pair.audit_false_singleton { 1.0 } else { 0.0 })
+                    - (if pair.eig_false_singleton { 1.0 } else { 0.0 })
+            },
             0x4155_4449_545f_4643,
         );
         let (detection_delta, detection_ci_low, detection_ci_high) = paired_bootstrap_mean_ci(
             &paired,
-            |pair| (if pair.audit_detected { 1.0 } else { 0.0 }) - (if pair.eig_detected { 1.0 } else { 0.0 }),
+            |pair| {
+                (if pair.audit_detected { 1.0 } else { 0.0 })
+                    - (if pair.eig_detected { 1.0 } else { 0.0 })
+            },
             0x4155_4449_545f_4445,
         );
         let (clean_delta, clean_ci_low, clean_ci_high) = paired_bootstrap_mean_ci(
             &paired,
-            |pair| (if pair.eig_false_singleton0 { 1.0 } else { 0.0 }) - (if pair.clean_eig_success { 1.0 } else { 0.0 }),
+            |pair| {
+                (if pair.clean_audit_success { 1.0 } else { 0.0 })
+                    - (if pair.clean_eig_success { 1.0 } else { 0.0 })
+            },
             0x4155_4449_545f_434c,
         );
 
