@@ -1242,7 +1242,7 @@ pub fn decrypt_packet(data: &[u8], key: &[u8; 32]) -> Option<Vec<u8>> {
 }
 
 // ============================================================================
-// XChaCha20-Poly1305 (NONCE-MISUSE RESISTANT)
+// XChaCha20-Poly1305 (EXTENDED NONCE)
 // ============================================================================
 
 /// Nonce size for XChaCha20-Poly1305 (192 bits).
@@ -1251,9 +1251,12 @@ pub const XCHACHA_NONCE_SIZE: usize = 24;
 
 /// Encrypt using XChaCha20-Poly1305 with a random 24-byte nonce.
 ///
-/// XChaCha20 uses a 192-bit nonce large enough for random generation
-/// without collision risk (birthday bound ≈ 2^96). This eliminates
-/// nonce-reuse concerns entirely at the cost of 12 extra nonce bytes per packet.
+/// The 192-bit nonce makes accidental random collisions negligible for
+/// realistic message counts when the RNG is healthy (birthday-bound scaling
+/// is approximately q^2 / 2^193 for q messages under one key). It does not
+/// make nonce reuse safe: repeated key/nonce pairs remain unsafe, and RNG
+/// failure, cloned state, or caller-controlled reuse still need consideration.
+/// Compared with the legacy 12-byte layout, this adds 12 bytes per packet.
 ///
 /// Returns `[nonce (24 bytes) | ciphertext+tag]`.
 #[cfg(feature = "mesh-encryption")]
