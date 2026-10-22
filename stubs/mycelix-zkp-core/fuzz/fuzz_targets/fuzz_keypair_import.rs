@@ -4,6 +4,7 @@ use libfuzzer_sys::fuzz_target;
 use mycelix_zkp_core::dilithium::{
     DilithiumKeypair, PUBLIC_KEY_SIZE, SECRET_KEY_SIZE,
 };
+use sha2::{Digest, Sha256};
 
 const MAX_INPUT_BYTES: usize = 8 * 1024;
 
@@ -11,13 +12,26 @@ const MAX_INPUT_BYTES: usize = 8 * 1024;
 /// explores representation parsing and the key-pair consistency check, rather
 /// than only returning at the public length guard.
 fn expand_to_len(input: &[u8], len: usize, offset: usize) -> Vec<u8> {
-    if input.is_empty() {
-        return vec![0; len];
-    }
+    let mut seed_hasher = Sha256::new();
+    seed_hasher.update(b"SYMTHAEA-CRYPTO-FUZZ/KEY-EXPANSION/v1");
+    seed_hasher.update((input.len() as u64).to_le_bytes());
+    seed_hasher.update(input);
+    seed_hasher.update((offset as u64).to_le_bytes());
+    let seed = seed_hasher.finalize();
 
-    (0..len)
-        .map(|index| input[(index + offset) % input.len()])
-        .collect()
+    let mut output = Vec::with_capacity(len);
+    let mut counter = 0_u64;
+    while output.len() < len {
+        let mut block_hasher = Sha256::new();
+        block_hasher.update(b"SYMTHAEA-CRYPTO-FUZZ/BLOCK/v1");
+        block_hasher.update(seed);
+        block_hasher.update(counter.to_le_bytes());
+        let block = block_hasher.finalize();
+        let count = (len - output.len()).min(block.len());
+        output.extend_from_slice(&block[..count]);
+        counter = counter.wrapping_add(1);
+    }
+    output
 }
 
 fuzz_target!(|input: &[u8]| {
