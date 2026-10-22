@@ -803,7 +803,12 @@ impl NetworkService {
         _pqc: &Arc<RwLock<super::pqc_handshake::PqcHandshakeManager>>,
     ) -> SwarmResult<()> {
         Err(SwarmError::TrustVerificationError {
-            reason: "PQC session establishment is not implemented: responder-side ciphertext delivery, decapsulation, transcript binding, and key confirmation are missing".to_string(),
+            reason: concat!(
+                "PQC session establishment is not implemented: ",
+                "responder-side ciphertext delivery, decapsulation, ",
+                "transcript binding, and key confirmation are missing",
+            )
+            .to_string(),
         })
     }
 
