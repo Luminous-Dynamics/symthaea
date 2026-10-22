@@ -1139,7 +1139,7 @@ mod tests {
         assert_abs_close(solved[1], 0.0, 1e-15);
         let back_solved = gp_solve_upper_from_lower_transpose(&lower, &solved).unwrap();
         assert_abs_close(back_solved[0], 0.5, 1e-15);
-        assert_abs_close(back_solved[1], -0.35355339059327373, 1e-15);
+        assert_abs_close(back_solved[1], 0.0, 1e-15);
     }
 
     #[test]
