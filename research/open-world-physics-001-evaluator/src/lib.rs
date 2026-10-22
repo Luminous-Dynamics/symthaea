@@ -183,6 +183,8 @@ pub struct ReportBody {
     /// False by design: this first reference corpus is open source and source-visible.
     pub blind_evaluation: bool,
     pub corpus_sha256: String,
+    /// Digest of the full 9-world corpus used by the candidate-selection diagnostic.
+    pub selection_diagnostic_corpus_sha256: String,
     /// Compiler identity captured by the build script.
     pub rustc_identity: String,
     /// Cargo identity captured by the build script.
@@ -218,6 +220,7 @@ impl BenchmarkReport {
         };
         self.receipt_sha256 == sha256_hex(&bytes)
             && self.body.corpus_sha256 == reference_corpus_sha256()
+            && self.body.selection_diagnostic_corpus_sha256 == selection_diagnostic_corpus_sha256()
     }
 }
 
@@ -431,6 +434,27 @@ fn reference_corpus_manifest() -> Vec<CorpusEntry> {
 pub fn reference_corpus_sha256() -> String {
     let bytes = serde_json::to_vec(&reference_corpus_manifest())
         .expect("the fixed reference corpus must serialize deterministically");
+    sha256_hex(&bytes)
+}
+
+fn selection_diagnostic_corpus_manifest() -> Vec<CorpusEntry> {
+    selection_diagnostic_worlds()
+        .into_iter()
+        .map(|world| CorpusEntry {
+            id: world.id,
+            truth: world.truth,
+            seed: world.seed,
+            train_min: TRAIN_X_MIN,
+            train_max: TRAIN_X_MAX,
+            holdout_min: HOLDOUT_X_MIN,
+            holdout_max: HOLDOUT_X_MAX,
+        })
+        .collect()
+}
+
+pub fn selection_diagnostic_corpus_sha256() -> String {
+    let bytes = serde_json::to_vec(&selection_diagnostic_corpus_manifest())
+        .expect("the selection diagnostic corpus must serialize deterministically");
     sha256_hex(&bytes)
 }
 
@@ -888,6 +912,7 @@ pub fn run_reference_benchmark() -> BenchmarkReport {
         schema: REPORT_SCHEMA.to_owned(),
         blind_evaluation: false,
         corpus_sha256: reference_corpus_sha256(),
+        selection_diagnostic_corpus_sha256: selection_diagnostic_corpus_sha256(),
         rustc_identity: option_env!("OPEN_WORLD_RUSTC_ID")
             .unwrap_or("unavailable")
             .to_owned(),
@@ -1163,6 +1188,10 @@ mod tests {
         assert!(first.verify_receipt());
         assert_eq!(first.body.selection_bottleneck_cases.len(), 72);
         assert_eq!(first.body.selection_bottleneck_summaries.len(), 8);
+        assert_eq!(
+            first.body.selection_diagnostic_corpus_sha256,
+            selection_diagnostic_corpus_sha256()
+        );
 
         for row in &first.body.selection_bottleneck_cases {
             assert_eq!(row.candidate_count, row.candidates_per_family * 3);
@@ -1224,6 +1253,15 @@ mod tests {
     fn receipt_detects_report_tampering() {
         let mut report = run_reference_benchmark();
         report.body.cases[0].heldout_nrmse += 0.01;
+        assert!(!report.verify_receipt());
+    }
+
+    #[test]
+    fn receipt_rejects_a_changed_selection_corpus_even_if_resealed() {
+        let mut report = run_reference_benchmark();
+        report.body.selection_diagnostic_corpus_sha256 = "00".to_owned();
+        let body = serde_json::to_vec(&report.body).unwrap();
+        report.receipt_sha256 = sha256_hex(&body);
         assert!(!report.verify_receipt());
     }
 }
