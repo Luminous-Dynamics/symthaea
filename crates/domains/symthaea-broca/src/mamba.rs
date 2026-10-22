@@ -720,12 +720,11 @@ impl MambaWrapper {
         let mean_loss = summed_loss / target_ids.len() as f32;
         let grads = loss_sum.backward()?;
 
-        // LoRA, if enabled, follows the same mean-loss normalization as returned
-        // context gradients. The backend is isolated by the trait wrapper above.
-        if self.lora_lr > 0.0 && self.model.has_lora() {
-            self.model
-                .apply_lora_grads(&grads, self.lora_lr / target_ids.len() as f32)?;
-        }
+        // This API returns gradients for the projected context only; it must not
+        // mutate LoRA parameters as a side effect of replaying a cloned backend.
+        // Clone semantics for parameter storage are backend-specific, so adapter
+        // test-time training is deliberately handled by a separate, explicitly
+        // isolated path rather than coupled to projection distillation here.
 
         let target_scale = 1.0 / target_ids.len() as f32;
         let mut results = Vec::with_capacity(vars.len());
