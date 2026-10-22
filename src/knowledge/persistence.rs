@@ -62,6 +62,44 @@ pub struct GraphFactRecord {
     pub claim_context: Option<ClaimContext>,
 }
 
+fn normalize_graph_fact_ids(facts: &[GraphFactRecord]) -> Result<Vec<GraphFactRecord>, String> {
+    let mut used_ids = HashSet::new();
+    for record in facts {
+        if let Some(id) = record.fact_id {
+            if !used_ids.insert(id) {
+                return Err(format!("duplicate graph snapshot fact ID {id}"));
+            }
+        }
+    }
+
+    let mut next_id = 1u64;
+    let mut normalized = Vec::with_capacity(facts.len());
+    for record in facts {
+        let fact_id = match record.fact_id {
+            Some(id) => Some(id),
+            None => {
+                while used_ids.contains(&next_id) {
+                    next_id = next_id
+                        .checked_add(1)
+                        .ok_or_else(|| "no stable fact IDs available for graph snapshot".to_string())?;
+                }
+                let assigned = next_id;
+                used_ids.insert(assigned);
+                next_id = next_id
+                    .checked_add(1)
+                    .ok_or_else(|| "no stable fact IDs available for graph snapshot".to_string())?;
+                Some(assigned)
+            }
+        };
+        normalized.push(GraphFactRecord {
+            fact_id,
+            fact: record.fact.clone(),
+            claim_context: record.claim_context.clone(),
+        });
+    }
+    Ok(normalized)
+}
+
 fn validate_graph_snapshot(
     facts: &[GraphFactRecord],
     links: &[EvidenceLink],
@@ -311,39 +349,7 @@ impl KnowledgePersistence {
     /// Any prior typed links are cleared atomically so they cannot survive against
     /// a replaced fact set. Missing legacy IDs are assigned deterministically.
     pub fn save_graph_facts(&mut self, facts: &[GraphFactRecord]) -> Result<usize, String> {
-        let mut used_ids = HashSet::new();
-        for fact in facts {
-            if let Some(id) = fact.fact_id {
-                if !used_ids.insert(id) {
-                    return Err(format!("duplicate graph snapshot fact ID {id}"));
-                }
-            }
-        }
-        let mut next_id = 1u64;
-        let mut normalized = Vec::with_capacity(facts.len());
-        for fact in facts {
-            let fact_id = match fact.fact_id {
-                Some(id) => Some(id),
-                None => {
-                    while used_ids.contains(&next_id) {
-                        next_id = next_id
-                            .checked_add(1)
-                            .ok_or_else(|| "no stable fact IDs available for graph snapshot".to_string())?;
-                    }
-                    let assigned = next_id;
-                    used_ids.insert(assigned);
-                    next_id = next_id
-                        .checked_add(1)
-                        .ok_or_else(|| "no stable fact IDs available for graph snapshot".to_string())?;
-                    Some(assigned)
-                }
-            };
-            normalized.push(GraphFactRecord {
-                fact_id,
-                fact: fact.fact.clone(),
-                claim_context: fact.claim_context.clone(),
-            });
-        }
+        let normalized = normalize_graph_fact_ids(facts)?;
         self.save_graph_snapshot(&normalized, &[])
             .map(|(saved, _)| saved)
     }
