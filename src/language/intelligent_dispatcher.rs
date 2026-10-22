@@ -52,7 +52,7 @@ impl std::fmt::Display for BackendTier {
 }
 
 impl BackendTier {
-    /// Metabolic energy estimate assigned to the selected dispatch tier.
+    /// Metabolic energy estimate assigned to an effective backend tier.
     /// This is an internal budget unit, not provider billing or measured joules.
     pub fn estimated_energy_cost(self) -> f64 {
         match self {
@@ -65,7 +65,7 @@ impl BackendTier {
 }
 
 /// One backend invocation observed during a dispatch, including fallback attempts.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct BackendAttempt {
     /// Effective tier inferred from the backend implementation that was invoked.
     pub tier: BackendTier,
