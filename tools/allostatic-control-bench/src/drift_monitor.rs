@@ -246,8 +246,8 @@ mod tests {
 
     #[test]
     fn threshold_tie_does_not_alarm_but_a_greater_score_switches_mode() {
-        let threshold = calibrate_drift_threshold(&nominal_scores(19), 0.05)
-            .expect("valid threshold");
+        let threshold =
+            calibrate_drift_threshold(&nominal_scores(19), 0.05).expect("valid threshold");
         let tie = assess_drift(threshold.score_threshold(), threshold).expect("finite score");
         assert!(!tie.drift_detected());
         assert_eq!(tie.mode(), ControlMode::Predictive);
