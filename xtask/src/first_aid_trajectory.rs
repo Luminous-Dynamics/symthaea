@@ -208,10 +208,10 @@ pub fn run(root: &Path, corpus_arg: &Path, out_arg: Option<&Path>) -> Result<()>
         .filter(|case| case["execution_target"] == "workflow_gate")
         .count();
     anyhow::ensure!(
-        matrix_case_count == 40
+        matrix_case_count == 41
             && matrix_frozen_trace_count == 12
-            && matrix_mutation_case_count == 28
-            && matrix_rust_runner_case_count == 26
+            && matrix_mutation_case_count == 29
+            && matrix_rust_runner_case_count == 27
             && matrix_workflow_gate_case_count == 2,
         "mutation matrix case inventory changed without reviewing receipt targets"
     );
@@ -1924,7 +1924,7 @@ mod tests {
         }
 
         assert_eq!(frozen_count, 12, "frozen trace case count changed");
-        assert_eq!(mutation_count, 26, "Rust matrix-runner case count changed");
+        assert_eq!(mutation_count, 27, "Rust matrix-runner case count changed");
         assert_eq!(workflow_gate_count, 2, "workflow gate case count changed");
         assert_eq!(
             rejection_count, 7,
