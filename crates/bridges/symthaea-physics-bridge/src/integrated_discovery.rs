@@ -657,7 +657,7 @@ mod tests {
         ConformalAdequacyCalibrator, standardized_rms_residual,
     };
     use crate::model_adequacy::{
-        AdequacyAssessment, DiscoveryAction, DiscoverySnapshot, TerminationStatus,
+        DiscoveryAction, DiscoverySnapshot, TerminationStatus,
         ValidationStatus, next_discovery_action,
     };
 
