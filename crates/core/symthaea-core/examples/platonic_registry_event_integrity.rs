@@ -874,6 +874,235 @@ mod tests {
         state
     }
 
+    fn assert_transition_contract(
+        before: &BTreeMap<String, IdentityRecord>,
+        after: &RegistryState,
+        decision: Decision,
+        event: &RegistryEvent,
+    ) {
+        if !decision.accepted {
+            assert_eq!(
+                before,
+                &after.records,
+                "rejected event mutated identity data: {}",
+                event.event_id
+            );
+            return;
+        }
+
+        let identity = match &event.action {
+            Action::Enroll { identity, .. }
+            | Action::Replace { identity, .. }
+            | Action::Revoke { identity, .. }
+            | Action::Rollback { identity, .. } => identity,
+        };
+        let updated = after
+            .records
+            .get(identity)
+            .expect("accepted transition must leave an identity record");
+
+        match &event.action {
+            Action::Enroll {
+                digest,
+                generation,
+                ..
+            } => match before.get(identity) {
+                None => {
+                    assert!(
+                        matches!(event.authority, Authority::Enroller | Authority::Admin),
+                        "initial enrollment accepted without enrollment authority"
+                    );
+                    assert_eq!(*generation, 1, "initial generation must be one");
+                    assert_eq!(updated.generation, 1);
+                    assert_eq!(updated.vector_digest, *digest);
+                    assert_eq!(updated.status, RecordStatus::Active);
+                }
+                Some(previous) => {
+                    assert_eq!(previous.status, RecordStatus::Revoked);
+                    assert!(
+                        matches!(event.authority, Authority::Recovery | Authority::Admin),
+                        "revoked identity re-enrolled without recovery authority"
+                    );
+                    assert!(*generation > previous.generation);
+                    assert_eq!(updated.generation, *generation);
+                    assert_eq!(updated.vector_digest, *digest);
+                    assert_eq!(updated.status, RecordStatus::Active);
+                    assert!(updated.revocation_floor >= previous.generation);
+                }
+            },
+            Action::Replace {
+                expected_generation,
+                generation,
+                digest,
+                ..
+            } => {
+                let previous = before.get(identity).expect("replacement needs prior record");
+                assert!(matches!(
+                    event.authority,
+                    Authority::Registrar | Authority::Admin
+                ));
+                assert_eq!(previous.status, RecordStatus::Active);
+                assert_eq!(*expected_generation, previous.generation);
+                assert_eq!(
+                    previous.generation.checked_add(1),
+                    Some(*generation),
+                    "accepted replacement must advance exactly one generation"
+                );
+                assert_ne!(previous.vector_digest, *digest);
+                assert_eq!(updated.generation, *generation);
+                assert_eq!(updated.vector_digest, *digest);
+                assert_eq!(updated.status, RecordStatus::Active);
+                assert!(updated.history.contains(digest));
+            }
+            Action::Revoke {
+                expected_generation,
+                generation,
+                ..
+            } => {
+                let previous = before.get(identity).expect("revocation needs prior record");
+                assert!(matches!(
+                    event.authority,
+                    Authority::Revoker | Authority::Admin
+                ));
+                assert_eq!(previous.status, RecordStatus::Active);
+                assert_eq!(*expected_generation, previous.generation);
+                assert_eq!(
+                    previous.generation.checked_add(1),
+                    Some(*generation),
+                    "accepted revocation must advance exactly one generation"
+                );
+                assert_eq!(updated.generation, *generation);
+                assert_eq!(updated.vector_digest, previous.vector_digest);
+                assert_eq!(updated.status, RecordStatus::Revoked);
+                assert_eq!(updated.revocation_floor, *generation);
+            }
+            Action::Rollback {
+                target_generation,
+                target_digest,
+                ..
+            } => {
+                let previous = before.get(identity).expect("rollback needs prior record");
+                assert!(matches!(
+                    event.authority,
+                    Authority::Recovery | Authority::Admin
+                ));
+                assert_eq!(previous.status, RecordStatus::Active);
+                assert!(previous.history.contains(target_digest));
+                assert_ne!(previous.vector_digest, *target_digest);
+                assert_eq!(
+                    previous.generation.checked_add(1),
+                    Some(*target_generation),
+                    "accepted rollback must advance exactly one generation"
+                );
+                assert_eq!(updated.generation, *target_generation);
+                assert_eq!(updated.vector_digest, *target_digest);
+                assert_eq!(updated.status, RecordStatus::Active);
+            }
+        }
+
+        for (other_identity, old_record) in before {
+            if other_identity != identity {
+                assert_eq!(
+                    after.records.get(other_identity),
+                    Some(old_record),
+                    "event changed unrelated identity {other_identity}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn bounded_two_event_exploration_preserves_transition_invariants() {
+        let authorities = [
+            Authority::Untrusted,
+            Authority::Enroller,
+            Authority::Registrar,
+            Authority::Revoker,
+            Authority::Recovery,
+            Authority::Admin,
+        ];
+        let actions = [
+            Action::Enroll {
+                identity: "subject".to_owned(),
+                digest: "digest-A".to_owned(),
+                generation: 1,
+            },
+            Action::Enroll {
+                identity: "subject".to_owned(),
+                digest: "digest-B".to_owned(),
+                generation: 2,
+            },
+            Action::Replace {
+                identity: "subject".to_owned(),
+                expected_generation: 1,
+                generation: 2,
+                digest: "digest-B".to_owned(),
+            },
+            Action::Replace {
+                identity: "subject".to_owned(),
+                expected_generation: 0,
+                generation: 1,
+                digest: "digest-B".to_owned(),
+            },
+            Action::Revoke {
+                identity: "subject".to_owned(),
+                expected_generation: 1,
+                generation: 2,
+            },
+            Action::Revoke {
+                identity: "subject".to_owned(),
+                expected_generation: 0,
+                generation: 1,
+            },
+            Action::Rollback {
+                identity: "subject".to_owned(),
+                target_generation: 2,
+                target_digest: "digest-A".to_owned(),
+            },
+            Action::Rollback {
+                identity: "subject".to_owned(),
+                target_generation: 2,
+                target_digest: "never-seen".to_owned(),
+            },
+        ];
+        let templates = actions
+            .iter()
+            .flat_map(|action| {
+                authorities
+                    .iter()
+                    .copied()
+                    .map(move |authority| (authority, action.clone()))
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(templates.len(), 48);
+
+        let mut traces = 0usize;
+        let mut event_applications = 0usize;
+        for (first_authority, first_action) in &templates {
+            for (second_authority, second_action) in &templates {
+                let events = [
+                    event(1, "envelope-1", *first_authority, first_action.clone()),
+                    event(2, "envelope-2", *second_authority, second_action.clone()),
+                ];
+                let mut state = RegistryState::default();
+                for current_event in &events {
+                    let before = state.records.clone();
+                    let decision = state.apply(current_event);
+                    assert_transition_contract(
+                        &before,
+                        &state,
+                        decision,
+                        current_event,
+                    );
+                    event_applications += 1;
+                }
+                traces += 1;
+            }
+        }
+        assert_eq!(traces, 2_304);
+        assert_eq!(event_applications, 4_608);
+    }
+
     #[test]
     fn frozen_trace_suite_matches_every_expected_outcome() {
         let cases = trace_cases();
