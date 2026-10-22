@@ -203,6 +203,17 @@ impl Clone for Box<dyn MambaBackend> {
 }
 
 /// Wrapper around candle-transformers' Mamba model with Symthaea integration.
+/// Interpret `tokens` as a non-empty teacher prefix followed by its next-token target.
+fn split_teacher_forcing_tokens(tokens: &[u32]) -> Result<(&[u32], u32)> {
+    let (target, prefix) = tokens
+        .split_last()
+        .ok_or_else(|| anyhow::anyhow!("teacher-forced tokens must include a prefix and target"))?;
+    if prefix.is_empty() {
+        anyhow::bail!("teacher-forced tokens must include at least one prefix token");
+    }
+    Ok((prefix, *target))
+}
+
 /// Validate the context/target contract before building an autograd graph.
 fn validate_e2e_token_loss_inputs(
     sequence: &[Vec<f32>],
@@ -221,7 +232,7 @@ fn validate_e2e_token_loss_inputs(
     }
     if tokens.len() < 2 {
         anyhow::bail!(
-            "E2E teacher forcing requires [previous_token, target_token]; received {} token(s)",
+            "E2E teacher forcing requires [prefix_tokens..., target_token]; received {} token(s)",
             tokens.len()
         );
     }
@@ -551,9 +562,9 @@ impl MambaWrapper {
 
     /// Compute E2E token loss at a specific position (Improvement B).
     ///
-    /// Warm-starts and processes the prefix without gradients, detaches before
-    /// the differentiable anchor, preserves its graph through the suffix and
-    /// teacher-forced next-token cross-entropy, then returns the anchor gradient.
+    /// Replays projected context, then every teacher-prefix token in order,
+    /// scores the final token as the next-token target, and returns the gradient
+    /// of that full-prefix cross-entropy with respect to the selected context anchor.
     pub fn compute_e2e_token_loss_at(
         &mut self,
         sequence: &[Vec<f32>],
@@ -604,17 +615,24 @@ impl MambaWrapper {
             self.model.forward_embeds_no_head(&embed, &mut self.state)?;
         }
 
-        // Teacher-force the previous token; score the target token.
-        let teacher_token = tokens[0];
-        if teacher_token as usize >= self.config.vocab_size {
-            anyhow::bail!(
-                "E2E teacher token {teacher_token} is outside configured vocabulary of size {}",
-                self.config.vocab_size
-            );
+        // Replay the full teacher prefix, not only the immediately previous token.
+        // The final token in `tokens` is the target; every preceding token must
+        // update SSM state in order before obtaining the logits for that target.
+        let (teacher_prefix, target_token) = split_teacher_forcing_tokens(tokens)?;
+        let mut final_logits = None;
+        for &teacher_token in teacher_prefix {
+            if teacher_token as usize >= self.config.vocab_size {
+                anyhow::bail!(
+                    "E2E teacher token {teacher_token} is outside configured vocabulary of size {}",
+                    self.config.vocab_size
+                );
+            }
+            let input = Tensor::new(&[teacher_token], &self.device)?;
+            final_logits = Some(self.model.forward(&input, &mut self.state)?.squeeze(0)?);
         }
-        let target_idx = tokens[1] as usize;
-        let input = Tensor::new(&[teacher_token], &self.device)?;
-        let logits = self.model.forward(&input, &mut self.state)?.squeeze(0)?;
+        let logits = final_logits
+            .ok_or_else(|| anyhow::anyhow!("E2E teacher prefix is unexpectedly empty"))?;
+        let target_idx = target_token as usize;
         let vocab = logits.dim(0)?;
         if target_idx >= vocab {
             anyhow::bail!(
@@ -667,34 +685,56 @@ impl MambaWrapper {
     ) -> Result<Vec<(usize, Vec<f32>)>> {
         let d_model = self.config.d_model;
         let n = sequence.len();
-        if n == 0 || positions.is_empty() || tokens.is_empty() {
+        if positions.is_empty() {
             return Ok(Vec::new());
         }
 
-        // Sort positions for sequential processing
+        // Sort positions and fail closed on malformed requests.
         let mut sorted_positions = positions.to_vec();
         sorted_positions.sort_unstable();
         sorted_positions.dedup();
-
         let first_var_pos = sorted_positions[0];
-
-        // Reset state
-        self.reset();
-
-        // 1. Inject [0..first_var_pos) as context (no autograd)
-        for i in 0..first_var_pos.min(n) {
-            let embed = Tensor::from_vec(sequence[i].clone(), (1, d_model), &self.device)?;
-            self.model.forward_embeds_no_head(&embed, &mut self.state)?;
+        validate_e2e_token_loss_inputs(sequence, tokens, first_var_pos, d_model)?;
+        if sorted_positions.iter().any(|&pos| pos >= n) {
+            anyhow::bail!("multi-position E2E gradient contains an out-of-range position");
         }
 
-        // 2. Detach state to cut gradient flow from warmup
-        self.state.detach()?;
-
-        // 3. Inject [first_var_pos..N): Var at requested positions, Tensor elsewhere
+        // Reset state and mirror inject_context_sequence's convolution warm-start.
+        self.reset();
         let pos_set: std::collections::HashSet<usize> = sorted_positions.iter().copied().collect();
         let mut vars: Vec<(usize, candle_core::Var)> = Vec::with_capacity(sorted_positions.len());
+        let mut next_context_index = 0usize;
 
-        for i in first_var_pos..n {
+        if first_var_pos == 0 {
+            let first_var = candle_core::Var::from_tensor(&Tensor::from_vec(
+                sequence[0].clone(),
+                (1, d_model),
+                &self.device,
+            )?)?;
+            self.model
+                .warmstart_conv_history(first_var.as_tensor(), &mut self.state)?;
+            self.model
+                .forward_embeds_no_head(first_var.as_tensor(), &mut self.state)?;
+            vars.push((0, first_var));
+            next_context_index = 1;
+        } else {
+            let first_chunk = Tensor::from_vec(sequence[0].clone(), (1, d_model), &self.device)?;
+            self.model
+                .warmstart_conv_history(&first_chunk, &mut self.state)?;
+            for embedding in &sequence[..first_var_pos] {
+                let embed = Tensor::from_vec(embedding.clone(), (1, d_model), &self.device)?;
+                self.model.forward_embeds_no_head(&embed, &mut self.state)?;
+            }
+            self.state.detach()?;
+            next_context_index = first_var_pos;
+        }
+
+        // Process remaining context, keeping gradients connected after the first
+        // differentiable anchor so every selected position can affect the loss.
+        for i in next_context_index..n {
+            if i == 0 {
+                continue;
+            }
             if pos_set.contains(&i) {
                 let var_embed = candle_core::Var::from_tensor(&Tensor::from_vec(
                     sequence[i].clone(),
@@ -710,19 +750,27 @@ impl MambaWrapper {
             }
         }
 
-        // 4. Teacher-force: run one token to get loss
-        let teacher_token = tokens[0.min(tokens.len() - 1)];
-        let input = Tensor::new(&[teacher_token], &self.device)?;
-        let logits = self.model.forward(&input, &mut self.state)?;
-        let logits = logits.squeeze(0)?;
-
-        let target_idx = tokens.get(1).copied().unwrap_or(teacher_token) as usize;
+        // Replay the full teacher prefix and score the final token as target.
+        let (teacher_prefix, target_token) = split_teacher_forcing_tokens(tokens)?;
+        let mut final_logits = None;
+        for &teacher_token in teacher_prefix {
+            if teacher_token as usize >= self.config.vocab_size {
+                anyhow::bail!(
+                    "E2E teacher token {teacher_token} is outside configured vocabulary of size {}",
+                    self.config.vocab_size
+                );
+            }
+            let input = Tensor::new(&[teacher_token], &self.device)?;
+            final_logits = Some(self.model.forward(&input, &mut self.state)?.squeeze(0)?);
+        }
+        let logits = final_logits
+            .ok_or_else(|| anyhow::anyhow!("E2E teacher prefix is unexpectedly empty"))?;
+        let target_idx = target_token as usize;
         let vocab = logits.dim(0)?;
         if target_idx >= vocab {
-            return Ok(vars
-                .iter()
-                .map(|(pos, _)| (*pos, vec![0.0f32; d_model]))
-                .collect());
+            anyhow::bail!(
+                "E2E target token {target_idx} is outside model vocabulary of size {vocab}"
+            );
         }
 
         let log_softmax = candle_nn::ops::log_softmax(&logits, 0)?;
@@ -736,20 +784,24 @@ impl MambaWrapper {
             self.model.apply_lora_grads(&grads, self.lora_lr)?;
         }
 
-        // 7. Extract gradients from all Vars
-        let results: Vec<(usize, Vec<f32>)> = vars
-            .iter()
-            .map(|(pos, var)| {
-                let grad = match grads.get(var.as_tensor()) {
-                    Some(g) => g
-                        .flatten_all()
-                        .and_then(|t| t.to_vec1::<f32>())
-                        .unwrap_or_else(|_| vec![0.0f32; d_model]),
-                    None => vec![0.0f32; d_model],
-                };
-                (*pos, grad)
-            })
-            .collect();
+        // 7. Extract gradients from all Vars; missing/non-finite gradients are errors.
+        let mut results = Vec::with_capacity(vars.len());
+        for (pos, var) in &vars {
+            let grad = grads
+                .get(var.as_tensor())
+                .ok_or_else(|| anyhow::anyhow!(
+                    "multi-position E2E loss produced no gradient for context anchor at position {pos}"
+                ))?
+                .flatten_all()?
+                .to_vec1::<f32>()?;
+            if grad.len() != d_model || !grad.iter().all(|value| value.is_finite()) {
+                anyhow::bail!(
+                    "multi-position E2E gradient at {pos} must have {d_model} finite values; got {}",
+                    grad.len()
+                );
+            }
+            results.push((*pos, grad));
+        }
 
         Ok(results)
     }
@@ -1164,6 +1216,20 @@ pub mod mock {
 #[cfg(test)]
 mod e2e_gradient_contract_tests {
     use super::validate_e2e_token_loss_inputs;
+
+    #[test]
+    fn teacher_forcing_uses_entire_prefix_and_final_target() {
+        let (prefix, target) = split_teacher_forcing_tokens(&[0, 17, 29, 41])
+            .expect("full prefix and target should be accepted");
+        assert_eq!(prefix, &[0, 17, 29]);
+        assert_eq!(target, 41);
+    }
+
+    #[test]
+    fn teacher_forcing_rejects_missing_target() {
+        assert!(split_teacher_forcing_tokens(&[]).is_err());
+        assert!(split_teacher_forcing_tokens(&[11]).is_err());
+    }
 
     #[test]
     fn accepts_context_with_previous_and_target_tokens() {
