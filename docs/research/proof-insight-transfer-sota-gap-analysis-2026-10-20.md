@@ -270,6 +270,25 @@ The new outcome analyzer now binds each side to distinct target artifact paths, 
 
 Each level needs its own receipts; passing an earlier level never implies the next one. This gives PITB a plausible research niche—measuring **applicability, not topical resemblance**—without pretending the current synthetic suite proves that insight transfer works. No measured transfer gain or SOTA result is available yet.
 
+
+## 22 October 2026 update: global recovery and cost-aware proof routing
+
+The field is moving beyond “sample more proofs and repair compiler errors” toward *global proof coordination* and metareasoning about what action to buy next. Three recent papers make this a concrete baseline requirement:
+
+- **CoCo-Prover** uses an AND/OR proof hypergraph joined to a cross-lemma dependency graph, then routes bounded specialist actions according to expected success and cost. In its own Lean program-verification experiments, it reports a better success–cost frontier and up to 30.9% lower cost than its strongest baseline ([arXiv:2610.09681](https://arxiv.org/abs/2610.09681)).
+- **Maestro** diagnoses failures and can correct false lemmas, retract an unsound subtree, and replan globally, instead of treating every failure as a local request for another proof attempt. The preprint reports solving 669/672 PutnamBench, 59/60 Lean-IMO-Bench and 6/6 IMO 2026 in its evaluation setup ([arXiv:2610.25920](https://arxiv.org/abs/2610.25920)).
+- **mini-Lean-agent** shows why a minimal generic coding-agent scaffold and an independent trusted evaluator should be included as a baseline; the authors report 7/12 Putnam 2025 solves at a $2/problem cap for one model setup, and 12/12 averaging $1.28 for another ([arXiv:2610.17331](https://arxiv.org/abs/2610.17331)).
+
+Those numbers use different models, task sets and resource policies; they are not directly comparable to PITB's counterfactual sensitivity or transfer score. The implication is methodological: PITB should isolate the incremental value of the **typed insight** from raw proof retrieval, the general-purpose agent, local repair, global failure coordination and cost-aware routing.
+
+The proof-progress trace schema now has optional events for failure diagnosis, lemma invalidation, subtree retraction, global replanning, action routing and automation dispatch. Failure classes distinguish insufficient guidance, false lemma/specification, decomposition error, missing dependency, tooling failure, budget exhaustion and unknown; routing events require a decision receipt and record pre-action success/cost estimates. This allows a later live collector to ask whether the diagnosis was right, whether retraction/replanning recovered a verified proof, and whether the routing decision was economically justified. This is schema/CI instrumentation only—no current prover emits these events yet.
+
+### New experiment: one task set, five orchestration arms
+
+On the same frozen targets, checker and total budget, compare a minimal shell agent, a fixed local-repair loop, typed-insight local repair, global failure coordinator, and cost-aware coordinator. The primary endpoint remains exact-target semantic-gate success. Report the success–cost curve at several frozen spending caps, cost at fixed solve rates, verification receipt rate, recovery rate after diagnosed false-lemma/decomposition failures, and calibration of pre-action estimates. On paired counterfactuals, hold prompt template, model/config, checker policy, cache/retry rules and resource caps constant, and only vary the target by the reviewed semantic mutation.
+
+A proposed additional engineering target is at least 25% lower cost at fixed semantic-gate solve rate relative to the strongest validated local-repair baseline, without increasing false acceptance. That target is aspirational and informed by cost-aware prover work, not a PITB result. Preserve the current +10pp paired utility gate as the separate primary endpoint. This gives Symthaea a potentially distinctive research question: not just whether a proof strategy transfers, but whether a coordinator knows *when its preconditions fail, when to abandon it, and what verified next action is worth the cost*.
+
 ## Research references
 
 - Kim, Han & Hwang, [Benchmarking Testing in Automated Theorem Proving](https://aclanthology.org/2026.acl-industry.150/), ACL 2026 Industry Track.
