@@ -717,6 +717,8 @@
     "state_model_test_name": "exhaustive_reachable_state_graph_preserves_trust_invariants",
     "state_model_scope": "Finite lifecycle graph: session state, bundle identity/validity/digest, revocation monotonicity, resume/interruption, and uncertainty handoff; separate 18-case orthogonal policy truth tables cover connectivity, freshness/presentation, sensitivity/consent, and unknown normalization. Those truth tables do not model temporal interactions between domains.",
     "state_model_spec_path": "docs/research/first-aid/STATE_MODEL_V0.md",
-    "matrix_runner_test_name": "executable_mutation_matrix_matches_each_declared_outcome"
+    "matrix_runner_test_name": "executable_mutation_matrix_matches_each_declared_outcome",
+    "policy_truth_table_test_name": "exhaustive_orthogonal_policy_truth_tables_cover_non_lifecycle_invariants",
+    "policy_truth_table_scope": "18 explicit combinations over connectivity/requirement (6), freshness/presentation (6), sensitivity/consent (4), and unknown normalization (2), separate from the 84-state lifecycle graph."
   }
 }
