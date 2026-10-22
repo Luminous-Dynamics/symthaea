@@ -425,7 +425,7 @@ fn audit(
     let mut ties = 0_u64;
     for (id, expected) in &expected_counts {
         for repeat in 1..=repeats {
-            let Some(slots) = pair_slots.get(&(id.clone(), repeat)) else {
+            let Some(slots) = pair_slots.get(&(id.to_string(), repeat)) else {
                 errors.push(format!("missing paired runs for task {id} repeat {repeat}"));
                 continue;
             };
@@ -623,6 +623,120 @@ fn main() {
 mod tests {
     use super::*;
 
+    fn fixture_run(enabled: bool, success: bool, elapsed: u64, energy: f64, digest: &str) -> Value {
+        serde_json::json!({
+            "task_id": "task_a",
+            "repeat": 1,
+            "gcs_advisories_enabled": enabled,
+            "execution_order": "off_then_on",
+            "code_written": true,
+            "expected_symbol_found": true,
+            "generated_source_blake3": digest,
+            "compiled": success,
+            "simulated": false,
+            "expected_test_functions": 1,
+            "tests_passed": if success { 1 } else { 0 },
+            "tests_failed": 0,
+            "oracle_complete": success,
+            "behavioral_success": success,
+            "runtime_error": null,
+            "compile_errors": if success { vec![] } else { vec!["compile error"] },
+            "agent_elapsed_ms": elapsed,
+            "verification_elapsed_ms": 20,
+            "iterations": 1,
+            "energy": energy,
+            "final_phase": "Testing"
+        })
+    }
+
+    fn valid_fixture() -> Value {
+        let manifest = vec![serde_json::json!({
+            "task_id": "task_a",
+            "task_digest_blake3": "a".repeat(64),
+            "expected_test_functions": 1,
+            "reference_source_blake3": "b".repeat(64),
+            "test_source_blake3": "c".repeat(64)
+        })];
+        let manifest_sha = manifest_digest(&manifest).unwrap();
+        serde_json::json!({
+            "schema_version": 1,
+            "benchmark": "symthaea_gcs_runtime_ablation",
+            "source_revision": "1".repeat(40),
+            "model_mode": "native",
+            "model_label": "unit-test model",
+            "runtime_configuration": {
+                "compiled_with_geodesic_synthesis": true,
+                "gcs_toggle": "CodingAgentConfig.enable_gcs_advisories",
+                "agent_internal_real_exec": false,
+                "external_oracle_real_exec": true
+            },
+            "task_count": 1,
+            "repeats": 1,
+            "task_manifest_blake3": manifest_sha,
+            "task_manifest": manifest,
+            "oracle_controls": {
+                "reference_controls": [{
+                    "task_id": "task_a",
+                    "reference_blake3": "b".repeat(64),
+                    "reference_passes": true,
+                    "tests_expected": 1,
+                    "tests_passed": 1,
+                    "tests_failed": 0,
+                    "oracle_complete": true
+                }],
+                "empty_patch_controls": [{
+                    "task_id": "task_a",
+                    "empty_patch_blake3": "d".repeat(64),
+                    "empty_patch_fails": true,
+                    "compiled": false,
+                    "compile_errors": ["expected missing function"]
+                }],
+                "all_references_pass": true,
+                "all_empty_patches_fail": true
+            },
+            "summary": {
+                "gcs_off": {
+                    "gcs_advisories_enabled": false,
+                    "runs": 1,
+                    "behavioral_successes": 1,
+                    "pass_rate": 1.0,
+                    "real_compiles": 1,
+                    "complete_oracles": 1,
+                    "complete_oracle_rate": 1.0,
+                    "agent_elapsed_ms_total": 100,
+                    "agent_elapsed_ms_mean": 100.0,
+                    "energy_total": 1.0,
+                    "energy_mean": 1.0
+                },
+                "gcs_on": {
+                    "gcs_advisories_enabled": true,
+                    "runs": 1,
+                    "behavioral_successes": 0,
+                    "pass_rate": 0.0,
+                    "real_compiles": 0,
+                    "complete_oracles": 0,
+                    "complete_oracle_rate": 0.0,
+                    "agent_elapsed_ms_total": 120,
+                    "agent_elapsed_ms_mean": 120.0,
+                    "energy_total": 1.5,
+                    "energy_mean": 1.5
+                },
+                "paired": {
+                    "paired_task_trials": 1,
+                    "gcs_on_wins": 0,
+                    "gcs_off_wins": 1,
+                    "ties": 0,
+                    "net_pass_delta_percentage_points": -100.0,
+                    "interpretation": "Unit fixture only."
+                }
+            },
+            "runs": [
+                fixture_run(false, true, 100, 1.0, &"e".repeat(64)),
+                fixture_run(true, false, 120, 1.5, &"f".repeat(64))
+            ]
+        })
+    }
+
     #[test]
     fn digest_format_is_exact() {
         assert!(is_hex(&"a".repeat(64), 64));
@@ -688,5 +802,37 @@ mod tests {
         });
         assert!(oracle_complete(&run, 3));
         assert!(!score_success(&run, 3));
+    }
+
+    #[test]
+    fn valid_receipt_passes_with_external_pins() {
+        let report = valid_fixture();
+        let manifest_sha = str_field(&report, "task_manifest_blake3").unwrap();
+        assert!(audit(&report, Some(&"1".repeat(40)), Some(manifest_sha)).is_empty());
+    }
+
+    #[test]
+    fn tampered_paired_summary_is_rejected() {
+        let mut report = valid_fixture();
+        report["summary"]["paired"]["gcs_on_wins"] = Value::from(1);
+        let errors = audit(&report, None, None);
+        assert!(errors.iter().any(|error| error.contains("gcs_on_wins")));
+    }
+
+    #[test]
+    fn omitted_run_is_rejected() {
+        let mut report = valid_fixture();
+        report["runs"].as_array_mut().unwrap().remove(0);
+        let errors = audit(&report, None, None);
+        assert!(errors.iter().any(|error| error.contains("expected 2")));
+        assert!(errors.iter().any(|error| error.contains("pair incomplete")));
+    }
+
+    #[test]
+    fn unexpected_external_source_pin_is_rejected() {
+        let report = valid_fixture();
+        assert!(audit(&report, Some(&"2".repeat(40)), None)
+            .iter()
+            .any(|error| error.contains("--expected-source-sha")));
     }
 }
