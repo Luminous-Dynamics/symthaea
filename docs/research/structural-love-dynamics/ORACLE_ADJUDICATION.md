@@ -77,7 +77,7 @@ The inventory is a frozen review census, not an assertion that the expected labe
 ### Minimum ledger fields enforced by the Rust auditor
 
 - Every scored case appears exactly once in the frozen inventory and has at least two distinct initial reviewer IDs.
-- Initial labels are recorded as blinded; order tokens are present and unique; a reviewer who authored a case cannot supply its initial judgment or adjudicate it.
+- Initial labels are recorded as blinded; the complete review order must exactly match a seeded shuffle of the sorted frozen inventory; a reviewer who authored a case cannot supply its initial judgment or adjudicate it.
 - Reviewer registry entries have distinct pseudonymous IDs, expertise categories, independence attestations, and disclosed/managed conflicts. Personal identities should remain separate and access-controlled.
 - Disagreements require a third-party adjudicator who was not one of the initial reviewers. A 'REVISED' disposition also requires an independent adjudicator. A completed ledger cannot retain rejected, indeterminate, or unadjudicated cases in its scored census.
 - Declared case, adjudicated, critical-case, reviewer, and unresolved-disagreement counts must match the records. A complete ledger digest is computed from exact bytes and emitted as a receipt-compatible JSON summary.
@@ -99,7 +99,7 @@ The summary is designed to populate the evaluation receipt's 'oracle_adjudicatio
 NOPE Evals reports that changing one judge moved some model scores by 0.8–3.6 percentage points, exceeding its reported median adjacent leaderboard gap; it explicitly cautions against interpreting small score gaps as findings. The ICLR 2026 paper 'Noisy but Valid' formalizes how judge sensitivity/specificity uncertainty must be accounted for when using machine labels to certify a safety threshold. These are methodological inputs, not direct SLD results:
 
 - NOPE Evals, [How we publish results](https://evals.nope.net/how-we-publish).
-- Feng et al., ICLR 2026, [Noisy but Valid: Robust Statistical Evaluation of LLMs with Imperfect Judges](https://proceedings.iclr.org/paper_files/paper/2026/hash/08a67eb74bfb9ded9e949dd52973e997-Abstract-Conference.html).
+- Feng et al., ICLR 2026, [Noisy but Valid: Robust Statistical Evaluation of LLMs with Imperfect Judges](https://proceedings.iclr.cc/paper_files/paper/2026/hash/08a67eb74bfb9ded9e949dd52973e997-Abstract-Conference.html).
 - Qian et al., ICML 2026, [Who can we trust? LLM-as-a-jury for Comparative Assessment](https://proceedings.mlr.press/v306/qian26i.html).
 
 SLD should report oracle validity, judge accuracy/calibration, judgment stability under reruns and order swaps, inter-rater agreement, and model outcome as separate measures. Agreement alone is not correctness: two judges may repeat the same mistake, and a stable verdict can still be biased. When a judge-based score informs a safety gate, publish the human-labelled calibration sample and uncertainty in the judge-error estimates; do not treat a single judge or majority vote as ground truth.
