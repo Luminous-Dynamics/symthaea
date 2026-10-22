@@ -147,6 +147,40 @@ pub fn verify_sequence(
     })
 }
 
+/// Unforgeable-by-construction permission token: the fields are private and
+/// this type is emitted only after the lease and the full witness both verify.
+/// The host integration should require this token at the action-application API.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct VerifiedActionPermit {
+    action: Action,
+    receipt: VerificationReceipt,
+    issued_at_step: u64,
+    expires_at_step: u64,
+    evidence_digest: [u8; 32],
+}
+
+impl VerifiedActionPermit {
+    pub const fn action(self) -> Action {
+        self.action
+    }
+
+    pub const fn receipt(self) -> VerificationReceipt {
+        self.receipt
+    }
+
+    pub const fn issued_at_step(self) -> u64 {
+        self.issued_at_step
+    }
+
+    pub const fn expires_at_step(self) -> u64 {
+        self.expires_at_step
+    }
+
+    pub const fn evidence_digest(self) -> [u8; 32] {
+        self.evidence_digest
+    }
+}
+
 /// Failure returned when a leased action is checked against its current
 /// context and an independent sequence witness.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -168,7 +202,7 @@ pub fn verify_leased_witness(
     dynamics: DynamicsBounds,
     limits: ViabilityLimits,
     shield_can_recover: bool,
-) -> Result<VerificationReceipt, LeasedVerificationFailure> {
+) -> Result<VerifiedActionPermit, LeasedVerificationFailure> {
     lease
         .validate(current_context)
         .map_err(LeasedVerificationFailure::LeaseInvalid)?;
@@ -178,7 +212,7 @@ pub fn verify_leased_witness(
     if actions.len() != lease.horizon() {
         return Err(LeasedVerificationFailure::WitnessHorizonMismatch);
     }
-    verify_sequence(
+    let receipt = verify_sequence(
         initial_state,
         actions,
         dynamics,
@@ -186,7 +220,15 @@ pub fn verify_leased_witness(
         shield_can_recover,
         lease.horizon(),
     )
-    .map_err(LeasedVerificationFailure::WitnessRejected)
+    .map_err(LeasedVerificationFailure::WitnessRejected)?;
+
+    Ok(VerifiedActionPermit {
+        action: lease.action(),
+        receipt,
+        issued_at_step: lease.issued_at_step(),
+        expires_at_step: lease.expires_at_step(),
+        evidence_digest: lease.evidence_digest(),
+    })
 }
 
 #[cfg(test)]
