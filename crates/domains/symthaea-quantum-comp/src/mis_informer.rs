@@ -127,11 +127,11 @@ impl fmt::Display for MisSignalError {
 impl std::error::Error for MisSignalError {}
 
 impl MisInformerSignal {
-    /// Construct a signal from per-vertex inclusion counts.
+    /// Construct a signal using a caller-supplied digest that this method does not verify.
     ///
-    /// The vector index is the vertex index. Every count must be at most the total
-    /// sample count. At least one sample is required: an empty sample population
-    /// is missing evidence, not evidence that every vertex has probability zero.
+    /// Prefer `from_graph` for normal use. The vector index is the vertex index.
+    /// Every count must be at most the total sample count. At least one sample is
+    /// required: missing evidence is not evidence of zero inclusion probability.
     pub fn from_unverified_digest(
         instance_id: impl Into<String>,
         graph_sha256: [u8; 32],
@@ -226,12 +226,12 @@ impl MisInformerSignal {
         &self.inclusion_counts
     }
 
-    /// Select an extreme-frequency vertex after checking the graph binding.
+    /// Low-level selection using a caller-supplied digest and vertex count.
     ///
-    /// The instance identifier, graph digest, and vertex count are supplied by
-    /// the caller's validated graph manifest. Ties are resolved by the lowest index,
-    /// making this recommendation deterministic. The caller remains responsible
-    /// for recording signal provenance and verifying the final solution.
+    /// Prefer `recommend_for_graph` so the expected identity is computed from
+    /// canonical graph edges. Ties are resolved by the lowest index. This heuristic
+    /// is not proof of optimal membership; provenance and final verification remain
+    /// the caller's responsibility.
     pub fn recommend_vertex_for_unverified_digest(
         &self,
         expected_instance_id: &str,
