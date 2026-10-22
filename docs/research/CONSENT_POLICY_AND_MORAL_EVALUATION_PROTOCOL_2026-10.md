@@ -36,13 +36,13 @@ Keep training/development cases separate from a sealed evaluation split. Publish
 
 ## Current reproducible diagnostic
 
-The development-only runner is registered as:
+The development-only runner compares Symthaea's current parser against a deliberately small, transparent lexical baseline. It reports two confusion matrices, false-Given counts/rates, missed-Given cases, and flips under four meaning-preserving pairs. It is registered as:
 
 ```sh
 cargo run --example consent_semantics_bench
 ```
 
-It emits a five-by-five expected-vs-actual confusion matrix, fixture-level false-Given and missed-Given cases, accuracy, and the false-Given rate among expected non-Given cases. It is intentionally diagnostic rather than a release gate: the 26 hand-written cases are neither blinded nor representative, and they must not be cited as a production safety rate. Unit tests cover scope binding, verification flags, validity windows, expiry and revocation for the pure policy precondition.
+It emits expected-vs-actual five-state confusion matrices for both candidate and baseline, fixture-level false-Given and missed-Given cases, accuracy, false-Given rate among expected non-Given cases, and pairwise flips under four hand-authored meaning-preserving perturbations. It is intentionally diagnostic rather than a release gate: the 27 hand-written cases and four pairs are neither blinded nor representative, and they must not be cited as a production safety rate. Unit tests cover scope binding, verification flags, validity windows, expiry and revocation for the pure policy precondition.
 
 ## Preregistered gates for a future release candidate
 
@@ -61,7 +61,7 @@ Do not call any target a pass until the exact commit and corpus digest have been
 
 ## Known limits / next research increments
 
-- This parser remains a keyword heuristic, not a robust semantic-role or dialogue-state model. The new question/quoted-text guard is conservative but not a complete treatment of scope, speaker attribution, temporal ordering, sarcasm, coercion, negation, or quoted denial.
+- This parser remains a keyword heuristic, not a robust semantic-role or dialogue-state model. The new quote/question guard conservatively maps an input containing an unquoted question mark to Unknown; it is not a complete treatment of scope, speaker attribution, temporal ordering, sarcasm, coercion, complex negation or dialogue.
 - The pure consent gate does not authenticate a record. The caller must supply trusted verification results, canonical IDs, an authoritative revocation view and a trustworthy clock. Do not connect it directly to an actuator or sensitive data operation without a separately reviewed authorization integration.
 - The current public verdict enum does not express underdetermination as a first-class decision. A later compatibility plan should introduce an explicit abstention/undetermined disposition for downstream policy, with a migration audit rather than silently mapping uncertainty to Good, Bad or permission.
 - Evaluate resonance/confidence coupling through blinded ablation. Self-referential confidence boosts must not be accepted as evidence of greater correctness.
