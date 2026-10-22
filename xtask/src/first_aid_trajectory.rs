@@ -474,6 +474,57 @@ fn validate_event_fields(trace: &TrajectoryScenario, event: &TraceEvent) -> Resu
             event.sequence
         );
     }
+
+    let permits_bundle_id = matches!(
+        event.kind,
+        EventKind::BundleLoaded
+            | EventKind::BundleVerified
+            | EventKind::ProtocolRendered
+            | EventKind::BundleRevoked
+    );
+    if !permits_bundle_id && event.bundle_id.is_some() {
+        bail!(
+            "{} event {} may carry bundle_id only for bundle lifecycle events",
+            trace.trace_id,
+            event.sequence
+        );
+    }
+    if !matches!(
+        event.kind,
+        EventKind::BundleLoaded | EventKind::BundleVerified | EventKind::ProtocolRendered
+    ) && event.bundle_state.is_some()
+    {
+        bail!(
+            "{} event {} may carry bundle_state only for load, verification, or render events",
+            trace.trace_id,
+            event.sequence
+        );
+    }
+    if event.kind != EventKind::BundleVerified && event.digest_verified.is_some() {
+        bail!(
+            "{} event {} may carry digest_verified only for bundle_verified",
+            trace.trace_id,
+            event.sequence
+        );
+    }
+    if event.kind != EventKind::ResourcePresented
+        && (event.resource_state.is_some() || event.presented_as.is_some())
+    {
+        bail!(
+            "{} event {} may carry resource fields only for resource_presented",
+            trace.trace_id,
+            event.sequence
+        );
+    }
+    if event.kind != EventKind::SensitiveDataEgress
+        && (event.sensitive_payload.is_some() || event.consent_scoped.is_some())
+    {
+        bail!(
+            "{} event {} may carry sensitive-data fields only for sensitive_data_egress",
+            trace.trace_id,
+            event.sequence
+        );
+    }
     Ok(())
 }
 
@@ -1234,6 +1285,19 @@ mod tests {
         assert_eq!(
             inspect_trace(&trace),
             vec!["offline_core_network_dependency"]
+        );
+    }
+
+    #[test]
+    fn event_fields_are_scoped_to_their_event_kind() {
+        let mut value: serde_json::Value =
+            serde_json::from_str(CORPUS_JSON).expect("fixture JSON must parse");
+        value["scenarios"][0]["events"][0]["sensitive_payload"] = serde_json::json!(true);
+        let changed: TrajectoryCorpus =
+            serde_json::from_value(value).expect("known optional field is syntactically valid");
+        assert!(
+            validate_corpus(&changed).is_err(),
+            "unrelated metadata must be rejected rather than silently ignored"
         );
     }
 
