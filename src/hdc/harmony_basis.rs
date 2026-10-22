@@ -742,7 +742,8 @@ mod tests {
 
     #[test]
     fn test_love_coherence_uniform_positive() {
-        // All harmonies positive and equal → high diversity, high mean, high coherence
+        // Uniform positive coordinates maximize entropy; with no matrix tension,
+        // the score equals the positive mean (not an independent moral verdict).
         let matrix = HarmonyInteractionMatrix::default(); // no tension (zeros off-diag)
         let coords = [0.5; N_HARMONIES];
         let lc = matrix.love_coherence(&coords);
@@ -810,8 +811,8 @@ mod tests {
         let lc = matrix.love_coherence(&coords);
         assert!(lc.harmony_mean < 0.0, "Negative coords → negative mean");
         assert!(
-            lc.value < 0.3,
-            "Negative mean should yield low LoveCoherence, got {}",
+            lc.value.abs() < f64::EPSILON,
+            "Negative mean must not yield positive LoveCoherence, got {}",
             lc.value
         );
     }
