@@ -179,8 +179,8 @@ fn audit(
 
     push_check(
         &mut errors,
-        u64_field(report, "schema_version") == Some(2),
-        "schema_version must be 2",
+        u64_field(report, "schema_version") == Some(3),
+        "schema_version must be 3",
     );
     push_check(
         &mut errors,
@@ -540,6 +540,23 @@ fn audit(
             u64_field(run, "expected_test_functions") == Some(expected),
             format!("runs[{index}] expected test count differs from manifest"),
         );
+        let valid_generation_tiers = run
+            .get("generation_tiers")
+            .and_then(Value::as_array)
+            .is_some_and(|tiers| {
+                tiers.iter().all(|tier| {
+                    str_field(tier, "unused").is_none()
+                        || tier.as_str().is_some_and(|name| {
+                            matches!(name, "Native" | "LocalLLM" | "CloudLLM" | "Simulated")
+                        })
+                })
+            });
+        push_check(
+            &mut errors,
+            valid_generation_tiers,
+            format!("runs[{index}] has missing or invalid observed generation_tiers"),
+        );
+
         push_check(
             &mut errors,
             str_field(run, "generated_source_blake3").is_some_and(|s| is_hex(s, 64)),
@@ -1037,7 +1054,8 @@ mod tests {
             "verification_elapsed_ms": 20,
             "iterations": 1,
             "energy": energy,
-            "final_phase": "Testing"
+            "final_phase": "Testing",
+            "generation_tiers": if enabled { vec!["CloudLLM"] } else { vec!["Native"] }
         })
     }
 
@@ -1077,7 +1095,7 @@ mod tests {
         })];
         let manifest_sha = manifest_digest(&manifest).unwrap();
         serde_json::json!({
-            "schema_version": 2,
+            "schema_version": 3,
             "benchmark": "symthaea_gcs_runtime_ablation",
             "source_revision": "1".repeat(40),
             "model_mode": "native",
@@ -1307,6 +1325,22 @@ mod tests {
         assert_eq!(read_f64(&summary, "ci95_lower_percentage_points"), Some(-100.0));
         assert_eq!(read_f64(&summary, "ci95_upper_percentage_points"), Some(-100.0));
         assert!(str_field(&summary, "warning").unwrap().contains("Small number of task clusters"));
+    }
+
+    #[test]
+    fn missing_generation_tiers_are_rejected() {
+        let mut report = valid_fixture();
+        report["runs"][0].as_object_mut().unwrap().remove("generation_tiers");
+        let errors = audit(&report, None, None);
+        assert!(errors.iter().any(|error| error.contains("generation_tiers")));
+    }
+
+    #[test]
+    fn unknown_generation_tier_is_rejected() {
+        let mut report = valid_fixture();
+        report["runs"][0]["generation_tiers"] = serde_json::json!(["ImaginaryLLM"]);
+        let errors = audit(&report, None, None);
+        assert!(errors.iter().any(|error| error.contains("generation_tiers")));
     }
 
     #[test]
