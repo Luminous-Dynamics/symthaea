@@ -1377,4 +1377,337 @@ mod tests {
         assert_eq!(inspect_trace(&trace).len(), 2);
     }
 
+    #[derive(Debug, Deserialize)]
+    struct MutationMatrix {
+        cases: Vec<MutationCase>,
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct MutationCase {
+        case_id: String,
+        mode: String,
+        source_trace_id: Option<String>,
+        operator_id: Option<String>,
+        execution_target: Option<String>,
+        expected: MutationExpected,
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct MutationExpected {
+        outcome: String,
+        violation_codes: Vec<String>,
+    }
+
+    #[derive(Debug, PartialEq, Eq)]
+    struct MutationActual {
+        outcome: String,
+        violation_codes: Vec<String>,
+    }
+
+    fn actual_evaluate(trace: &TrajectoryScenario) -> MutationActual {
+        MutationActual {
+            outcome: "evaluate".to_owned(),
+            violation_codes: inspect_trace(trace),
+        }
+    }
+
+    fn actual_reject() -> MutationActual {
+        MutationActual {
+            outcome: "reject".to_owned(),
+            violation_codes: Vec::new(),
+        }
+    }
+
+    fn bare_event(kind: EventKind) -> TraceEvent {
+        TraceEvent {
+            sequence: 0,
+            kind,
+            bundle_id: None,
+            bundle_state: None,
+            digest_verified: None,
+            resource_state: None,
+            presented_as: None,
+            sensitive_payload: None,
+            consent_scoped: None,
+        }
+    }
+
+    fn resequence(trace: &mut TrajectoryScenario) {
+        for (index, event) in trace.events.iter_mut().enumerate() {
+            event.sequence = u32::try_from(index + 1).expect("fixture event count fits u32");
+        }
+    }
+
+    fn insert_before(trace: &mut TrajectoryScenario, target: EventKind, inserted: TraceEvent) {
+        let index = trace
+            .events
+            .iter()
+            .position(|event| event.kind == target)
+            .unwrap_or_else(|| panic!("target event {target:?} not found in {}", trace.trace_id));
+        trace.events.insert(index, inserted);
+        resequence(trace);
+    }
+
+    fn matrix_case_actual(case: &MutationCase) -> MutationActual {
+        let operator = case.operator_id.as_deref().unwrap_or_else(|| {
+            panic!("{} must have an operator_id for the Rust matrix runner", case.case_id)
+        });
+
+        match operator {
+            "weaken_claim_ceiling" => {
+                let mut changed = corpus();
+                changed.claim_ceiling = "Clinically validated for patient care.".to_owned();
+                assert!(validate_corpus(&changed).is_err(), "claim ceiling mutation must reject");
+                actual_reject()
+            }
+            "enable_clinical_use" => {
+                let mut changed = corpus();
+                changed.clinical_use_authorized = true;
+                assert!(validate_corpus(&changed).is_err(), "clinical-use mutation must reject");
+                actual_reject()
+            }
+            "unknown_corpus_field" => {
+                let mut value: serde_json::Value =
+                    serde_json::from_str(CORPUS_JSON).expect("frozen corpus JSON parses");
+                value["unexpected_authority"] = serde_json::json!(true);
+                assert!(
+                    serde_json::from_value::<TrajectoryCorpus>(value).is_err(),
+                    "unknown root fields must reject"
+                );
+                actual_reject()
+            }
+            "tampered_corpus_digest" => {
+                let mut bytes = CORPUS_JSON.as_bytes().to_vec();
+                bytes[0] ^= 1;
+                assert!(
+                    checked_corpus_digest(&bytes).is_err(),
+                    "single-byte corpus mutation must reject"
+                );
+                actual_reject()
+            }
+            "unknown_event_kind" => {
+                let mut value: serde_json::Value =
+                    serde_json::from_str(CORPUS_JSON).expect("frozen corpus JSON parses");
+                value["scenarios"][0]["events"][0]["kind"] =
+                    serde_json::json!("unrecognized_event");
+                assert!(
+                    serde_json::from_value::<TrajectoryCorpus>(value).is_err(),
+                    "unknown event kinds must reject"
+                );
+                actual_reject()
+            }
+            "missing_digest_metadata" => {
+                let mut value: serde_json::Value =
+                    serde_json::from_str(CORPUS_JSON).expect("frozen corpus JSON parses");
+                let events = value["scenarios"][0]["events"]
+                    .as_array_mut()
+                    .expect("event list exists");
+                let verify = events
+                    .iter_mut()
+                    .find(|event| event["kind"] == "bundle_verified")
+                    .expect("verification event exists");
+                verify
+                    .as_object_mut()
+                    .expect("event object exists")
+                    .remove("digest_verified");
+                let changed: TrajectoryCorpus =
+                    serde_json::from_value(value).expect("optional field omission deserializes");
+                assert!(
+                    validate_corpus(&changed).is_err(),
+                    "missing digest metadata must reject"
+                );
+                actual_reject()
+            }
+            "duplicate_event_sequence" => {
+                let mut trace = scenario(
+                    case.source_trace_id.as_deref().expect("source trace is required"),
+                );
+                trace.events[1].sequence = trace.events[0].sequence;
+                let mut changed = corpus();
+                changed.scenarios = vec![trace];
+                assert!(
+                    validate_corpus(&changed).is_err(),
+                    "duplicate event sequence must reject"
+                );
+                actual_reject()
+            }
+            operator => {
+                let source_id = case
+                    .source_trace_id
+                    .as_deref()
+                    .unwrap_or_else(|| panic!("{} requires source_trace_id", case.case_id));
+                let mut trace = scenario(source_id);
+                match operator {
+                    "remove_session_start" => {
+                        let index = trace
+                            .events
+                            .iter()
+                            .position(|event| event.kind == EventKind::SessionStarted)
+                            .expect("session-start event exists");
+                        trace.events.remove(index);
+                        resequence(&mut trace);
+                    }
+                    "new_session_before_render" => {
+                        insert_before(
+                            &mut trace,
+                            EventKind::ProtocolRendered,
+                            bare_event(EventKind::SessionStarted),
+                        );
+                    }
+                    "intermittent_network" => trace.connectivity = Connectivity::Intermittent,
+                    "render_after_revocation" => {
+                        let mut revoke = bare_event(EventKind::BundleRevoked);
+                        revoke.bundle_id = Some("bundle-a".to_owned());
+                        insert_before(&mut trace, EventKind::ProtocolRendered, revoke);
+                    }
+                    "resume_after_interruption" => {
+                        insert_before(
+                            &mut trace,
+                            EventKind::ProtocolRendered,
+                            bare_event(EventKind::SessionResumed),
+                        );
+                        insert_before(
+                            &mut trace,
+                            EventKind::SessionResumed,
+                            bare_event(EventKind::SessionInterrupted),
+                        );
+                    }
+                    "stale_unconfirmed_control" | "preserved_uncertainty_control"
+                    | "offline_network_control" | "sensitive_egress_control" => {}
+                    "non_sensitive_egress" => {
+                        trace
+                            .events
+                            .iter_mut()
+                            .find(|event| event.kind == EventKind::SensitiveDataEgress)
+                            .expect("egress event exists")
+                            .sensitive_payload = Some(false);
+                    }
+                    "wrong_bundle_identity" => {
+                        trace
+                            .events
+                            .iter_mut()
+                            .find(|event| event.kind == EventKind::ProtocolRendered)
+                            .expect("render event exists")
+                            .bundle_id = Some("bundle-other".to_owned());
+                    }
+                    "false_digest" => {
+                        trace
+                            .events
+                            .iter_mut()
+                            .find(|event| event.kind == EventKind::BundleVerified)
+                            .expect("verification event exists")
+                            .digest_verified = Some(false);
+                    }
+                    "expired_bundle" => {
+                        trace
+                            .events
+                            .iter_mut()
+                            .find(|event| event.kind == EventKind::BundleVerified)
+                            .expect("verification event exists")
+                            .bundle_state = Some(BundleState::Expired);
+                    }
+                    "uncertainty_reentered" => {
+                        insert_before(
+                            &mut trace,
+                            EventKind::HandoffEmitted,
+                            bare_event(EventKind::UncertaintyDetected),
+                        );
+                    }
+                    "revocation_new_session" => {
+                        insert_before(
+                            &mut trace,
+                            EventKind::ProtocolRendered,
+                            bare_event(EventKind::SessionStarted),
+                        );
+                    }
+                    "uncertainty_session_boundary" => {
+                        let index = trace
+                            .events
+                            .iter()
+                            .position(|event| event.kind == EventKind::UncertaintyPreserved)
+                            .expect("uncertainty preservation event exists");
+                        trace.events.remove(index);
+                        insert_before(
+                            &mut trace,
+                            EventKind::HandoffEmitted,
+                            bare_event(EventKind::SessionStarted),
+                        );
+                    }
+                    "resume_without_interrupt" => {
+                        insert_before(
+                            &mut trace,
+                            EventKind::ProtocolRendered,
+                            bare_event(EventKind::SessionResumed),
+                        );
+                    }
+                    "verify_outside_session" => {
+                        insert_before(
+                            &mut trace,
+                            EventKind::BundleVerified,
+                            bare_event(EventKind::SessionInterrupted),
+                        );
+                    }
+                    "repeat_unverified_render" => {
+                        let mut render = trace
+                            .events
+                            .iter()
+                            .find(|event| event.kind == EventKind::ProtocolRendered)
+                            .expect("render event exists")
+                            .clone();
+                        render.sequence = 0;
+                        trace.events.push(render);
+                        resequence(&mut trace);
+                    }
+                    unknown => panic!("unknown matrix operator_id {unknown:?}"),
+                }
+                actual_evaluate(&trace)
+            }
+        }
+    }
+
+    #[test]
+    fn executable_mutation_matrix_matches_each_declared_outcome() {
+        const MATRIX_JSON: &str =
+            include_str!("../../docs/research/first-aid/mutation-matrix-v0.json");
+        let matrix: MutationMatrix =
+            serde_json::from_str(MATRIX_JSON).expect("mutation matrix must deserialize");
+        let mut frozen_count = 0usize;
+        let mut mutation_count = 0usize;
+        let mut workflow_gate_count = 0usize;
+
+        for case in &matrix.cases {
+            let actual = match case.mode.as_str() {
+                "frozen_trace" => {
+                    frozen_count += 1;
+                    let trace = scenario(
+                        case.source_trace_id
+                            .as_deref()
+                            .expect("frozen trace case requires source_trace_id"),
+                    );
+                    actual_evaluate(&trace)
+                }
+                "mutation_or_control" if case.execution_target.as_deref() == Some("workflow_gate") => {
+                    workflow_gate_count += 1;
+                    continue;
+                }
+                "mutation_or_control"
+                    if case.execution_target.as_deref() == Some("rust_matrix_runner") =>
+                {
+                    mutation_count += 1;
+                    matrix_case_actual(case)
+                }
+                other => panic!("unsupported matrix mode/target for {}: {other}", case.case_id),
+            };
+            let expected = MutationActual {
+                outcome: case.expected.outcome.clone(),
+                violation_codes: case.expected.violation_codes.clone(),
+            };
+            assert_eq!(actual, expected, "matrix case {}", case.case_id);
+        }
+
+        assert_eq!(frozen_count, 12, "frozen trace case count changed");
+        assert_eq!(mutation_count, 26, "Rust matrix-runner case count changed");
+        assert_eq!(workflow_gate_count, 2, "workflow gate case count changed");
+    }
+
 }
