@@ -16,7 +16,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: first-aid-clinical-evidence-gate-${{ github.event.pull_request.head.sha || github.sha }}
+  group: first-aid-clinical-evidence-gate-${{ github.event.pull_request.head.ref || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
