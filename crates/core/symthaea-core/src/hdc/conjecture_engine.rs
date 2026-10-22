@@ -85,6 +85,7 @@ use dynamics::*;
 pub use experiment_selection::{
     EpistemicAssessment, assess_epistemic_value, epistemic_value, expected_information_gain_nats,
     expected_information_gain_with_prior_nats, select_experiment_by_information_gain_per_cost,
+    select_experiment_by_minimum_weighted_information_gain_per_cost,
     select_experiment_by_weighted_information_gain_per_cost, select_most_informative_experiment,
 };
 pub use expressions::*;
