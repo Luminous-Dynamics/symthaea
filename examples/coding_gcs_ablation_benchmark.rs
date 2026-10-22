@@ -449,9 +449,22 @@ struct CliOptions {
     use_cloud: bool,
     repeats: usize,
     output_path: PathBuf,
+    print_manifest: bool,
 }
 
 fn parse_cli(args: &[String]) -> Result<Option<CliOptions>, String> {
+    if args.len() == 1 && args[0] == "--print-manifest" {
+        return Ok(Some(CliOptions {
+            use_llm: false,
+            use_cloud: false,
+            repeats: 3,
+            output_path: std::env::temp_dir().join("symthaea_gcs_ablation_v1.json"),
+            print_manifest: true,
+        }));
+    }
+    if args.iter().any(|arg| arg == "--print-manifest") {
+        return Err("--print-manifest must be used by itself".to_string());
+    }
     if args.iter().any(|arg| arg == "--help" || arg == "-h") {
         if args.len() == 1 {
             return Ok(None);
@@ -507,13 +520,14 @@ fn parse_cli(args: &[String]) -> Result<Option<CliOptions>, String> {
         return Err("choose at most one backend: --llm or --cloud".to_string());
     }
 
-    Ok(Some(CliOptions { use_llm, use_cloud, repeats, output_path }))
+    Ok(Some(CliOptions { use_llm, use_cloud, repeats, output_path, print_manifest: false }))
 }
 
 fn print_usage() {
     eprintln!(
-        "Usage: coding_gcs_ablation_benchmark [--llm | --cloud] [--repeats 1..20] [--json-out PATH]\n\
-         The working tree must be clean and GIT_COMMIT_SHA must match git rev-parse HEAD."
+        "Usage: coding_gcs_ablation_benchmark [--print-manifest | [--llm | --cloud] [--repeats 1..20] [--json-out PATH]]\n\
+         The working tree must be clean and GIT_COMMIT_SHA must match git rev-parse HEAD.\n\
+         --print-manifest prints the source SHA and task-manifest digest without executing controls or trials."
     );
 }
 
@@ -534,13 +548,20 @@ fn main() {
     // Refuse to produce a benchmark receipt that cannot be tied to an exact,
     // clean source checkout. Do this before controls or any agent trials.
     let source_revision = require_source_revision();
-    let CliOptions { use_llm, use_cloud, repeats, output_path } = options;
+    let CliOptions { use_llm, use_cloud, repeats, output_path, print_manifest } = options;
     let tasks = task_suite();
-    if tasks.iter().any(|task| expected_test_functions(task.test_source) == 0) {
-        eprintln!("Invalid task suite: every task must have at least one declared test function");
+    if tasks.iter().any(|task| expected_test_functions(task.test_source) == 0 || task.mutant_sources.is_empty()) {
+        eprintln!("Invalid task suite: every task must have declared tests and at least one semantic mutant");
         std::process::exit(2);
     }
     let manifest = manifest_digest(&tasks);
+    if print_manifest {
+        println!("source_revision={source_revision}");
+        println!("task_count={}", tasks.len());
+        println!("task_manifest_blake3={manifest}");
+        println!("This command did not execute oracle controls or coding-agent trials.");
+        return;
+    }
 
     // Two-sided oracle controls run before any agent trials.
     let mut reference_controls = Vec::new();
