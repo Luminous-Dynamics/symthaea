@@ -53,7 +53,7 @@ This is a finite-horizon union-bound guarantee, not an e-process, not a conforma
 
 For \(\alpha=0.05\), equal spending over five audits requires at least 99 calibration batches just to make the threshold \(0.01\) attainable. The example weighted schedule above ends at threshold \(0.005\), requiring at least 199 calibration batches to make every threshold attainable. These are **resolution floors, not power recommendations**. In practice, calibration size and allocation must be selected from a preregistered power study.
 
-The monitor currently uses one RMS standardized-residual score. It can miss structured residuals, autocorrelation, subgroup failures, and regime-specific errors. A non-alarm never certifies the model.
+The monitor accepts one scalar score per fresh batch. `standardized_rms_residual` remains the simple baseline; the optional `multi_view_standardized_residual_score` aggregates four predeclared diagnostics into one scalar: RMS error, a normalized maximum residual, a sample-size-scaled mean residual, and sample-size-scaled lag-one residual correlation. This is a sensitivity-oriented score family, not a new analytic p-value. Its normalizers are heuristics; the conformal guarantee applies only to the final aggregate when that exact score function, diagnostic family, batch length, ordering convention, and target-distribution protocol are frozen and applied to independent clean calibration batches and future audits. Changing any part requires fresh calibration. The score still cannot detect unrepresented subgroup failures unless subgroup diagnostics are explicitly part of the frozen score family. A non-alarm never certifies the model.
 
 ## 4. Contract tests and receipt requirements
 
@@ -68,8 +68,9 @@ Freeze candidate pools, score statistics, calibration policy, target distributio
 Compare under matched total audit/measurement budgets:
 
 1. one-shot conformal audit at a single predeclared endpoint;
-2. equal-spending finite-horizon Bonferroni baseline;
-3. risk-weighted finite-horizon spending, with weights preregistered for an explicitly stated risk/time-to-signal objective;
+2. RMS-only residual score with equal-spending finite-horizon Bonferroni baseline;
+3. the frozen multi-view aggregate residual score with the same calibrator, audit batches, alpha and horizon;
+4. equal versus risk-weighted finite-horizon spending, with weights preregistered for an explicitly stated risk/time-to-signal objective;
 4. residual CUSUM/Page-Hinkley-style monitors, clearly labeled as non-distribution-free unless separately justified;
 5. conditional conformal test martingales (CCTM), which target anytime-valid control using a fixed reference;
 6. predictive-rank martingales (PRM), which account for dependence in repeated ranks against a fixed calibration reference;
@@ -81,6 +82,7 @@ Relevant research frontiers:
 - Kuang & Xia, September 2026, [Anytime-Valid Distribution Shift Detection via Predictive Rank Martingales](https://arxiv.org/abs/2609.00536): derives the conditional null distribution of reused fixed-reference ranks, constructs a predictive-rank martingale, and reports stronger detection performance than CCTM in its own experiments. Reproduce its protocol before comparing results.
 - Liu, Prinster & Orabona, October 12, 2026, [Monitoring for Shifts at Unknown Times: Parameter-Free Conditional Conformal Martingales](https://arxiv.org/abs/2610.17343): proposes a restarting universal portfolio approach intended to avoid slow adaptation after long stationary periods, with reported computational improvements over a naive implementation.
 - [Optimal Alpha Spending for Sequential Analysis with Binomial Data](https://academic.oup.com/jrsssb/article/82/4/1141/7056022): shows that spending shape should be selected for a predeclared operating objective such as power, expected sample size, or expected time to signal.
+- [When Does Score Fusion Help? Conformally Certified Out-of-Distribution Detection for Camera and LiDAR Sensors](https://pmc.ncbi.nlm.nih.gov/articles/PMC13469369/): emphasizes that fusion gains depend on the detector and modality; a combined score must be compared with its strongest constituent rather than assumed superior.
 
 These are comparators and research targets, **not methods implemented by this PR**. Risk-weighted alpha spending is established statistical practice; our contribution here is the typed Rust contract, resolution/terminal-state checks, audit receipts, and a benchmark interface aligned to scientific model-adequacy decisions. Any implementation of CCTM/PRM/restarting methods needs mathematical review, reproducible reference cases, dependency/license review, and tests against its published algorithm—not a name-only approximation.
 
