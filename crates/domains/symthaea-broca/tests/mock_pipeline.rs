@@ -117,6 +117,28 @@ fn test_distillation_loss_tracks_target_cross_entropy() {
     );
 }
 
+/// Invalid teacher targets must not produce success-shaped loss values.
+#[test]
+fn test_distillation_rejects_out_of_range_target_id() {
+    let config = LiquidMambaConfig {
+        warmup_steps: 0,
+        accumulation_steps: 1,
+        enable_consciousness_gating: false,
+        ..Default::default()
+    };
+    let mut gen_obj = mock_gen(config);
+    let channels = ThoughtChannels::with_intent(5);
+
+    let error = gen_obj
+        .train_step(&channels, &[u32::MAX])
+        .expect_err("out-of-range target must fail closed");
+
+    assert!(
+        error.to_string().contains("outside logits vocabulary"),
+        "expected target-range diagnostic, got: {error}"
+    );
+}
+
 /// After 20 rounds, pe_stats() returns finite values.
 #[test]
 fn test_pe_trend_after_distillation() {
