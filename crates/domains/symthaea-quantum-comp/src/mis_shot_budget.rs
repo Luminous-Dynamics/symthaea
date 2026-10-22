@@ -338,16 +338,25 @@ pub fn plan_mis_shots(
         }
     }
 
-    let competitor = intervals.iter().copied()
+    let competitors = intervals.iter().copied()
         .filter(|candidate| candidate.estimate.vertex != winner.estimate.vertex)
-        .reduce(|best, candidate| {
-            if preferred(candidate, best, mode) { candidate } else { best }
-        })
-        .expect("at least two candidates were checked above");
+        .collect::<Vec<_>>();
 
+    // Unequal shot counts mean confidence radii differ. Comparing only the second
+    // largest empirical rate can miss a lower-rate, severely under-sampled candidate
+    // whose confidence interval still overlaps the winner. Require separation from
+    // every eligible rival, and report the most adverse rival bound.
+    let competitor_bound = match mode {
+        MisSelectionMode::PreferInSet => competitors.iter()
+            .map(|candidate| candidate.upper)
+            .fold(f64::NEG_INFINITY, f64::max),
+        MisSelectionMode::PreferOutSet => competitors.iter()
+            .map(|candidate| candidate.lower)
+            .fold(f64::INFINITY, f64::min),
+    };
     let separated = match mode {
-        MisSelectionMode::PreferInSet => winner.lower > competitor.upper,
-        MisSelectionMode::PreferOutSet => winner.upper < competitor.lower,
+        MisSelectionMode::PreferInSet => winner.lower > competitor_bound,
+        MisSelectionMode::PreferOutSet => winner.upper < competitor_bound,
     };
     if separated {
         return Ok(MisShotBudgetDecision::Selected {
@@ -356,10 +365,7 @@ pub fn plan_mis_shots(
             inclusion_count: winner.estimate.inclusion_count,
             lower_bound: winner.lower,
             upper_bound: winner.upper,
-            competitor_bound: match mode {
-                MisSelectionMode::PreferInSet => competitor.upper,
-                MisSelectionMode::PreferOutSet => competitor.lower,
-            },
+            competitor_bound,
             total_shots,
         });
     }
@@ -476,6 +482,44 @@ mod tests {
                 assert!(lower_bound > competitor_bound);
             }
             other => panic!("expected separated winner, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn under_sampled_lower_ranked_candidate_prevents_false_confident_selection() {
+        // The empirical runner-up (vertex 1) is well separated from vertex 0, but
+        // vertex 2 has so few samples that its interval still covers rates near 1.
+        // A correct policy must not declare vertex 0 selected until vertex 2 is
+        // sampled or the decision budget is exhausted.
+        let estimates = [
+            MisCandidateEstimate::new(0, 4000, 3800).expect("valid estimate"),
+            MisCandidateEstimate::new(1, 4000, 2800).expect("valid estimate"),
+            MisCandidateEstimate::new(2, 1, 0).expect("valid sparse estimate"),
+        ];
+        match plan_mis_shots(&estimates, MisSelectionMode::PreferInSet, config(10_000))
+            .expect("valid plan")
+        {
+            MisShotBudgetDecision::RequestMoreShots { allocations, .. } => {
+                assert!(allocations.iter().any(|allocation| allocation.vertex == 2));
+            }
+            other => panic!("under-sampled competitor must prevent selection, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn all_competitor_bounds_must_clear_winner_for_prefer_out_set() {
+        let estimates = [
+            MisCandidateEstimate::new(0, 4000, 200).expect("valid estimate"),
+            MisCandidateEstimate::new(1, 4000, 2800).expect("valid estimate"),
+            MisCandidateEstimate::new(2, 1, 1).expect("valid sparse estimate"),
+        ];
+        match plan_mis_shots(&estimates, MisSelectionMode::PreferOutSet, config(10_000))
+            .expect("valid plan")
+        {
+            MisShotBudgetDecision::RequestMoreShots { allocations, .. } => {
+                assert!(allocations.iter().any(|allocation| allocation.vertex == 2));
+            }
+            other => panic!("under-sampled competitor must prevent selection, got {other:?}"),
         }
     }
 
