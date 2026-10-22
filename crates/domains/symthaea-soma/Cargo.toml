@@ -67,3 +67,6 @@ required-features = ["broca-full"]
 [[test]]
 name = "proptest_soma"
 required-features = ["prop-tests"]
+[[bin]]
+name = "mobile-benchmark-analyze"
+path = "src/bin/mobile_benchmark_analyze.rs"
