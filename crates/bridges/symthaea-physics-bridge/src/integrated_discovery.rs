@@ -732,6 +732,10 @@ mod tests {
         misspec_robust_detected: bool,
         misspec_nominal_unresolved: bool,
         misspec_robust_unresolved: bool,
+        misspec_nominal_selection_failed: bool,
+        misspec_robust_selection_failed: bool,
+        misspec_nominal_rounds: usize,
+        misspec_robust_rounds: usize,
     }
 
     /// Paired percentile bootstrap over seed/world outcomes. Every resample carries the raw
@@ -781,6 +785,10 @@ mod tests {
         let mut misspec_robust_detected = 0usize;
         let mut misspec_nominal_unresolved = 0usize;
         let mut misspec_robust_unresolved = 0usize;
+        let mut misspec_nominal_selection_failures = 0usize;
+        let mut misspec_robust_selection_failures = 0usize;
+        let mut misspec_nominal_round_total = 0usize;
+        let mut misspec_robust_round_total = 0usize;
         let mut paired: Vec<RobustEIGPair> = Vec::with_capacity(SEEDS as usize);
 
         for seed in 1..=SEEDS {
@@ -825,6 +833,12 @@ mod tests {
                 if misspec_robust.model_discrepancy_detected { 1 } else { 0 };
             misspec_nominal_unresolved += if misspec_nominal.final_live > 1 { 1 } else { 0 };
             misspec_robust_unresolved += if misspec_robust.final_live > 1 { 1 } else { 0 };
+            misspec_nominal_selection_failures +=
+                if misspec_nominal.selection_failed { 1 } else { 0 };
+            misspec_robust_selection_failures +=
+                if misspec_robust.selection_failed { 1 } else { 0 };
+            misspec_nominal_round_total += misspec_nominal.rounds_used;
+            misspec_robust_round_total += misspec_robust.rounds_used;
             paired.push(RobustEIGPair {
                 clean_nominal_success: clean_nominal.success,
                 clean_robust_success: clean_robust.success,
@@ -836,6 +850,10 @@ mod tests {
                 misspec_robust_detected: misspec_robust.model_discrepancy_detected,
                 misspec_nominal_unresolved: misspec_nominal.final_live > 1,
                 misspec_robust_unresolved: misspec_robust.final_live > 1,
+                misspec_nominal_selection_failed: misspec_nominal.selection_failed,
+                misspec_robust_selection_failed: misspec_robust.selection_failed,
+                misspec_nominal_rounds: misspec_nominal.rounds_used,
+                misspec_robust_rounds: misspec_robust.rounds_used,
             });
         }
 
@@ -862,8 +880,22 @@ mod tests {
             0x524f_4255_5354_4445,
         );
 
+        let (failure_delta, failure_ci_low, failure_ci_high) = paired_bootstrap_mean_ci(
+            &paired,
+            |pair| {
+                (if pair.misspec_robust_selection_failed { 1.0 } else { 0.0 })
+                    - (if pair.misspec_nominal_selection_failed { 1.0 } else { 0.0 })
+            },
+            0x524f_4255_5354_5346,
+        );
+        let (round_delta, round_ci_low, round_ci_high) = paired_bootstrap_mean_ci(
+            &paired,
+            |pair| pair.misspec_robust_rounds as f64 - pair.misspec_nominal_rounds as f64,
+            0x524f_4255_5354_5244,
+        );
+
         println!(
-            "scenario_robust_eig_pilot,seeds={SEEDS},round_budget={ROUND_BUDGET},noise_factors=[0.5,1,2],discrepancy={SYSTEMATIC_DISCREPANCY},clean_nominal_recovery={:.3},clean_robust_recovery={:.3},clean_delta_robust_minus_nominal={clean_delta:.3},clean_ci95=[{clean_ci_low:.3},{clean_ci_high:.3}],misspec_nominal_false_singleton={:.3},misspec_robust_false_singleton={:.3},false_singleton_delta_robust_minus_nominal={false_delta:.3},false_singleton_ci95=[{false_ci_low:.3},{false_ci_high:.3}],misspec_nominal_detected={:.3},misspec_robust_detected={:.3},detection_delta_robust_minus_nominal={detect_delta:.3},detection_ci95=[{detect_ci_low:.3},{detect_ci_high:.3}],misspec_nominal_unresolved={:.3},misspec_robust_unresolved={:.3}",
+            "scenario_robust_eig_pilot,seeds={SEEDS},round_budget={ROUND_BUDGET},noise_factors=[0.5,1,2],discrepancy={SYSTEMATIC_DISCREPANCY},clean_nominal_recovery={:.3},clean_robust_recovery={:.3},clean_delta_robust_minus_nominal={clean_delta:.3},clean_ci95=[{clean_ci_low:.3},{clean_ci_high:.3}],misspec_nominal_false_singleton={:.3},misspec_robust_false_singleton={:.3},false_singleton_delta_robust_minus_nominal={false_delta:.3},false_singleton_ci95=[{false_ci_low:.3},{false_ci_high:.3}],misspec_nominal_detected={:.3},misspec_robust_detected={:.3},detection_delta_robust_minus_nominal={detect_delta:.3},detection_ci95=[{detect_ci_low:.3},{detect_ci_high:.3}],misspec_nominal_unresolved={:.3},misspec_robust_unresolved={:.3},nominal_selection_failures={misspec_nominal_selection_failures},robust_selection_failures={misspec_robust_selection_failures},selection_failure_delta={failure_delta:.3},selection_failure_ci95=[{failure_ci_low:.3},{failure_ci_high:.3}],nominal_mean_rounds={:.2},robust_mean_rounds={:.2},round_delta={round_delta:.3},round_ci95=[{round_ci_low:.3},{round_ci_high:.3}]",
             clean_nominal_successes as f64 / SEEDS as f64,
             clean_robust_successes as f64 / SEEDS as f64,
             misspec_nominal_false_singletons as f64 / SEEDS as f64,
@@ -872,6 +904,8 @@ mod tests {
             misspec_robust_detected as f64 / SEEDS as f64,
             misspec_nominal_unresolved as f64 / SEEDS as f64,
             misspec_robust_unresolved as f64 / SEEDS as f64,
+            misspec_nominal_round_total as f64 / SEEDS as f64,
+            misspec_robust_round_total as f64 / SEEDS as f64,
         );
 
         assert_eq!(paired.len(), SEEDS as usize);
@@ -893,6 +927,12 @@ mod tests {
         assert!(clean_ci_low.is_finite() && clean_ci_high.is_finite());
         assert!(false_ci_low.is_finite() && false_ci_high.is_finite());
         assert!(detect_ci_low.is_finite() && detect_ci_high.is_finite());
+        assert!(failure_ci_low <= failure_ci_high);
+        assert!(round_ci_low <= round_ci_high);
+        assert!(failure_ci_low.is_finite() && failure_ci_high.is_finite());
+        assert!(round_ci_low.is_finite() && round_ci_high.is_finite());
+        assert!(misspec_nominal_selection_failures <= SEEDS as usize);
+        assert!(misspec_robust_selection_failures <= SEEDS as usize);
         assert!(clean_nominal_successes <= SEEDS as usize);
         assert!(clean_robust_successes <= SEEDS as usize);
     }
