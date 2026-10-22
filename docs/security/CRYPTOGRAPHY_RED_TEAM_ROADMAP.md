@@ -18,13 +18,26 @@ Every finding should include: affected commit and code path; attacker preconditi
 
 ## Workstream A — standards-aligned primitive migration (P0)
 
-- Evaluate RustCrypto's ml-dsa implementation against NIST FIPS 204, its published API/security caveats, maintenance activity, MSRV, no-std/WASM needs, and transitive dependency posture. The upstream crate explicitly says it has not been independently audited; document that limitation rather than silently converting it into a trust claim.
+- Evaluate a provider matrix instead of selecting a library on brand or throughput alone:
+  - **Current legacy baseline:** pqcrypto-dilithium, retained only long enough to measure compatibility and migration cost; RustSec marks the pqcrypto family unmaintained.
+  - **Pure-Rust candidate:** RustCrypto ml-dsa 0.1.1 implements final NIST FIPS 204 and exposes ML-DSA-44, -65, and -87. Its maintainers explicitly state that it has not been independently audited. Treat it as a candidate to validate, not as an automatically trusted production replacement: [crate documentation](https://docs.rs/ml-dsa/latest/ml_dsa/).
+  - **Independent differential reference:** OpenSSL 3.5 added ML-DSA support and is an LTS line supported until April 8, 2030. Evaluate it as a separate implementation where the target platforms can pin an appropriate OpenSSL version and provider configuration: [OpenSSL 3.5 release announcement](https://openssl-library.org/post/2025-04-08-openssl-35-final-release/). Do not imply that using OpenSSL alone means a particular build/provider is FIPS-validated.
+  - **Adversarial corpus:** use current Project Wycheproof ML-DSA vectors where applicable, alongside applicable NIST ACVP vectors. Pin the exact corpus revision and digest: [Project Wycheproof](https://github.com/C2SP/wycheproof).
+- Record MSRV, no-std/WASM feasibility, license and transitive dependencies, reproducible-build posture, secret-lifecycle behavior, side-channel evidence, maintenance response, and independent audit status for each candidate. Do not use a single provider as both implementation and sole oracle.
 - Do not simply substitute the crate name. Record the current legacy wire format, algorithm identity, key/signature sizes, attached-versus-detached signature semantics, and every serialization/storage consumer.
 - Introduce an explicit algorithm identifier and format version for newly written public keys and signed envelopes. Reject unknown identifiers and malformed lengths before expensive parsing. Never infer the algorithm from length alone.
 - Define an explicit migration policy for existing keys and signatures. Do not silently reinterpret legacy Dilithium encodings as FIPS 204 ML-DSA, and do not claim backward interoperability unless vectors prove it.
 - Keep a small adapter boundary so downstream code depends on Symthaea's typed API, not provider-specific byte wrappers.
 
-**Exit gate:** applicable NIST ACVP known-answer vectors pass; negative vectors are rejected; cross-implementation valid signatures verify in both supported directions; key/signature serialization is versioned; old/new format behavior is covered by tests; dependency audit and independent review findings are documented. Passing vectors does not equal a third-party audit or certification.
+**Exit gate:** applicable NIST ACVP known-answer vectors pass; negative vectors are rejected; cross-implementation valid signatures verify in both supported directions where format compatibility is specified; key/signature serialization is versioned; old/new format behavior is covered by tests; dependency audit and independent review findings are documented. Passing vectors does not equal a third-party audit or certification.
+
+### Fair benchmark protocol
+
+- First compare **the same security level and the same workload**. Retain a legacy Dilithium5 measurement only as a migration baseline; compare ML-DSA-87 for the closest high-security-level migration study, and measure ML-DSA-65 separately as a practical performance/security trade-off—not as a like-for-like replacement for level 5.
+- Run correctness and negative controls before measuring speed. A provider that rejects valid inputs or accepts invalid ones cannot win on performance.
+- On the same pinned machine, toolchain, compiler flags, and message-size distribution, report key-generation/signing/verification p50, p95, p99, throughput, key/signature bytes, peak memory, import/rejection latency, and binary size. Record CPU feature flags and OpenSSL/provider build configuration.
+- Run repeated samples, preserve raw output, and include confidence intervals or dispersion. Compare like-for-like local results; do not claim superiority by comparing unlike hardware or quoting numbers from different benchmarks.
+- Treat zero known-invalid acceptances, applicable vector pass rate, cross-implementation consistency, and absence of crashes as hard correctness gates. Optimize only after they pass.
 
 ## Workstream B — adversarial unit and property tests (P0/P1)
 
