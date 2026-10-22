@@ -10,16 +10,22 @@
 //! - Signature: 4,595 bytes
 
 use pqcrypto_dilithium::dilithium5;
-use pqcrypto_traits::sign::{PublicKey as PQPublicKey, SecretKey as PQSecretKey, SignedMessage};
+use pqcrypto_traits::sign::{
+    DetachedSignature as PQDetachedSignature, PublicKey as PQPublicKey,
+    SecretKey as PQSecretKey, SignedMessage,
+};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::error::{ZkpError, ZkpResult};
 use crate::types::AuthenticatedProof;
 
-/// Dilithium5 exact sizes (empirically verified).
+/// Dilithium5 encoded public-key size (bytes).
 pub const PUBLIC_KEY_SIZE: usize = 2_592;
+/// Dilithium5 encoded secret-key size (bytes).
 pub const SECRET_KEY_SIZE: usize = 4_896;
+/// Detached Dilithium5 signature size (bytes). The legacy `sign` method
+/// returns an attached SignedMessage containing both the signature and message.
 pub const SIGNATURE_SIZE: usize = 4_595;
 
 /// A Dilithium5 keypair for proof authentication.
@@ -95,6 +101,18 @@ impl DilithiumKeypair {
         Ok(signed.as_bytes().to_vec())
     }
 
+    /// Sign a message and return only the detached signature bytes.
+    ///
+    /// New protocol formats should prefer detached signatures when the message
+    /// is already carried separately. The legacy `sign` method intentionally
+    /// retains PQCrypto's attached SignedMessage format for compatibility.
+    pub fn sign_detached(&self, message: &[u8]) -> ZkpResult<Vec<u8>> {
+        let sk = dilithium5::SecretKey::from_bytes(&self.secret_key)
+            .map_err(|e| ZkpError::InvalidKeyMaterial(format!("secret key: {:?}", e)))?;
+        let signature = dilithium5::detached_sign(message, &sk);
+        Ok(signature.as_bytes().to_vec())
+    }
+
     /// Sign an AuthenticatedProof in place (fills the signature field).
     pub fn sign_proof(&self, proof: &mut AuthenticatedProof) -> ZkpResult<()> {
         let message = proof.construct_signed_message();
@@ -110,7 +128,11 @@ impl DilithiumKeypair {
     }
 }
 
-/// Verify a Dilithium5 signature (standalone, no keypair needed).
+/// Verify a legacy PQCrypto attached SignedMessage.
+///
+/// The `signature` argument must contain the encoded message plus its
+/// signature, as returned by `DilithiumKeypair::sign`. For new protocols,
+/// prefer `verify_detached_signature`.
 pub fn verify_signature(message: &[u8], signature: &[u8], public_key: &[u8]) -> ZkpResult<bool> {
     if public_key.len() != PUBLIC_KEY_SIZE {
         return Err(ZkpError::InvalidKeyMaterial(format!(
@@ -128,6 +150,37 @@ pub fn verify_signature(message: &[u8], signature: &[u8], public_key: &[u8]) -> 
 
     match dilithium5::open(&signed_msg, &pk) {
         Ok(verified_msg) => Ok(verified_msg == message),
+        Err(_) => Ok(false),
+    }
+}
+
+/// Verify a detached Dilithium5 signature against a separately supplied message.
+///
+/// Returns `Ok(false)` for a cryptographically invalid signature and a
+/// structured error for malformed key/signature encodings.
+pub fn verify_detached_signature(
+    message: &[u8],
+    signature: &[u8],
+    public_key: &[u8],
+) -> ZkpResult<bool> {
+    if public_key.len() != PUBLIC_KEY_SIZE {
+        return Err(ZkpError::InvalidKeyMaterial(format!(
+            "public key: expected {} bytes, got {}",
+            PUBLIC_KEY_SIZE,
+            public_key.len()
+        )));
+    }
+    if signature.len() != SIGNATURE_SIZE {
+        return Err(ZkpError::SignatureInvalid);
+    }
+
+    let pk = dilithium5::PublicKey::from_bytes(public_key)
+        .map_err(|e| ZkpError::InvalidKeyMaterial(format!("public key parse: {:?}", e)))?;
+    let sig = dilithium5::DetachedSignature::from_bytes(signature)
+        .map_err(|_| ZkpError::SignatureInvalid)?;
+
+    match dilithium5::verify_detached_signature(&sig, message, &pk) {
+        Ok(()) => Ok(true),
         Err(_) => Ok(false),
     }
 }
