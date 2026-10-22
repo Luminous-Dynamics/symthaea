@@ -1466,11 +1466,12 @@ if ! awk -F, -v raw="$tmpdir/dependent-risk-a.csv" '
     }
     close(raw)
   }
-  FNR == 1 {
-    if (NF != 38 || $1 != "condition" || $2 != "trials") failed = 1
+  $1 == "condition" && $2 == "trials" {
+    if (NF != 38 || summary_rows != 0) failed = 1
     next
   }
   {
+    if (NF != 38) failed = 1
     condition = $1
     if (condition != "conditional_risk_null" && condition != "shifted_risk") failed = 1
     if ($2 != 3000 || trials[condition] != 3000) failed = 1
