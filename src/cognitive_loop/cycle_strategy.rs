@@ -46,27 +46,22 @@ pub(crate) struct StrategySelectionResult {
     pub(crate) social_strategy_bias: bool,
 }
 
-/// Result from the encoding and preprocessing phase (Phases 1–1.2).
+/// Result from encoding and preprocessing, before stateful urgency updates.
 pub(crate) struct EncodingPhaseResult {
     pub(crate) encoding_result: EncodingResult,
     pub(crate) hv16_cached: BinaryHV,
     pub(crate) compressed_state: Vec<f32>,
     pub(crate) soul_alignment: f32,
     pub(crate) phi_attention_weight: f32,
-    pub(crate) surprise_triggered: bool,
-    pub(crate) exploration_action: Option<String>,
     pub(crate) memo_threshold: f32,
     pub(crate) input_similarity: f32,
     pub(crate) input_memoized: bool,
     pub(crate) effective_threshold: f32,
-    pub(crate) urgency: super::CycleUrgency,
-    pub(crate) error_pattern: &'static str,
-    pub(crate) predicted_urgency: &'static str,
-    pub(crate) prediction_coherence_urgency_bias: f32,
+    /// PE for control calculations; zero when the encoder comparison is degenerate.
     pub(crate) prediction_error: f32,
+    /// Whether the PE came from a genuine prediction comparison.
+    pub(crate) prediction_error_valid: bool,
     pub(crate) temporal_binding_strength: f32,
-    pub(crate) error_slope: f32,
-    pub(crate) oscillation_ratio: f32,
 }
 
 impl CognitiveLoopService {
@@ -291,9 +286,12 @@ impl CognitiveLoopService {
         // Degenerate 1.0 values remain on EncodingResult as explicit legacy
         // sentinels, but they are not observations of surprise. Use zero control
         // evidence until a genuine prediction comparison is available.
-        let prediction_error = match self.encoder.last_prediction_degeneracy() {
-            PredictionDegeneracy::Genuine => encoding_result.prediction_error,
-            PredictionDegeneracy::NoPrediction | PredictionDegeneracy::ZeroPrediction => 0.0,
+        let prediction_error_valid =
+            self.encoder.last_prediction_degeneracy() == PredictionDegeneracy::Genuine;
+        let prediction_error = if prediction_error_valid {
+            encoding_result.prediction_error
+        } else {
+            0.0
         };
         module_timings.core_hdc_encode = _t_core.elapsed().as_micros() as u64;
 
@@ -576,10 +574,6 @@ impl CognitiveLoopService {
         } else {
             compressed_state
         };
-
-        let (surprise_triggered, exploration_action) =
-            self.run_surprise_exploration(&compressed_state);
-        module_timings.surprise_exploration = _t.elapsed().as_micros() as u64;
 
         // ── Phase 21: Codebook diversity → memoization threshold adaptation ─
         let base_memo_threshold = super::thresholds::INPUT_MEMO_THRESHOLD;
@@ -909,38 +903,19 @@ impl CognitiveLoopService {
             * self.carryover.learning.adaptive_threshold_scale as f32
             * confidence_scale
             * exploration_scale;
-        let urgency_result = self.compute_urgency_and_error_pattern(
-            prediction_error,
-            surprise_triggered,
-            effective_threshold,
-        );
-        let urgency = urgency_result.urgency;
-        let error_pattern = urgency_result.error_pattern;
-        let predicted_urgency = urgency_result.predicted_urgency;
-        let prediction_coherence_urgency_bias = urgency_result.prediction_coherence_urgency_bias;
-        let error_slope = urgency_result.error_slope;
-        let oscillation_ratio = urgency_result.oscillation_ratio;
-
         EncodingPhaseResult {
             encoding_result,
             hv16_cached,
             compressed_state,
             soul_alignment,
             phi_attention_weight,
-            surprise_triggered,
-            exploration_action,
             memo_threshold,
             input_similarity,
             input_memoized,
             effective_threshold,
-            urgency,
-            error_pattern,
-            predicted_urgency,
-            prediction_coherence_urgency_bias,
             prediction_error,
+            prediction_error_valid,
             temporal_binding_strength,
-            error_slope,
-            oscillation_ratio,
         }
     }
 }
