@@ -94,6 +94,18 @@ impl PairedSummary {
         let median_delta = quantile_sorted(&sorted_deltas, 0.5);
         let (bootstrap_ci95_low, bootstrap_ci95_high) =
             paired_bootstrap_ci(&deltas, bootstrap_replicates, random_seed);
+        for (name, value) in [
+            ("baseline mean", baseline_mean),
+            ("candidate mean", candidate_mean),
+            ("mean paired delta", mean_delta),
+            ("median paired delta", median_delta),
+            ("bootstrap lower limit", bootstrap_ci95_low),
+            ("bootstrap upper limit", bootstrap_ci95_high),
+        ] {
+            if !value.is_finite() {
+                return Err(format!("derived statistic is non-finite: {name}"));
+            }
+        }
 
         let baseline_violations = samples.iter().filter(|s| s.baseline_violation).count();
         let candidate_violations = samples.iter().filter(|s| s.candidate_violation).count();
@@ -136,7 +148,11 @@ impl PairedSummary {
 }
 
 fn mean(values: &[f64]) -> f64 {
-    values.iter().sum::<f64>() / values.len() as f64
+    let scale = values.iter().map(|value| value.abs()).fold(0.0, f64::max);
+    if scale == 0.0 {
+        return 0.0;
+    }
+    values.iter().map(|value| value / scale).sum::<f64>() / values.len() as f64 * scale
 }
 
 fn quantile_sorted(values: &[f64], probability: f64) -> f64 {
@@ -156,12 +172,13 @@ fn paired_bootstrap_ci(deltas: &[f64], replicates: usize, seed: u64) -> (f64, f6
     let mut random_state = if seed == 0 { 0x9E37_79B9_7F4A_7C15 } else { seed };
     let mut bootstrap_means = Vec::with_capacity(replicates);
     for _ in 0..replicates {
-        let mut total = 0.0;
+        let sample_weight = 1.0 / deltas.len() as f64;
+        let mut normalized_total = 0.0;
         for _ in 0..deltas.len() {
             let index = (next_random(&mut random_state) % deltas.len() as u64) as usize;
-            total += deltas[index];
+            normalized_total += deltas[index] * sample_weight;
         }
-        bootstrap_means.push(total / deltas.len() as f64);
+        bootstrap_means.push(normalized_total);
     }
     bootstrap_means.sort_by(f64::total_cmp);
     (
@@ -297,6 +314,34 @@ mod tests {
         assert!((result.median_delta - 0.25).abs() < 1e-12);
         assert!((result.bootstrap_ci95_low - 0.25).abs() < 1e-12);
         assert!((result.bootstrap_ci95_high - 0.25).abs() < 1e-12);
+    }
+
+    #[test]
+    fn stable_mean_handles_large_finite_metrics_without_overflow() {
+        let maximum = f64::MAX;
+        let samples = vec![
+            PairedEpisode {
+                seed: 1,
+                baseline_metric: maximum,
+                candidate_metric: maximum,
+                baseline_violation: false,
+                candidate_violation: false,
+            },
+            PairedEpisode {
+                seed: 2,
+                baseline_metric: maximum,
+                candidate_metric: maximum,
+                baseline_violation: false,
+                candidate_violation: false,
+            },
+        ];
+        let summary = PairedSummary::from_samples(&samples, 1_000, 11)
+            .expect("finite means should remain finite");
+        assert_eq!(summary.baseline_mean, maximum);
+        assert_eq!(summary.candidate_mean, maximum);
+        assert_eq!(summary.mean_delta, 0.0);
+        assert_eq!(summary.bootstrap_ci95_low, 0.0);
+        assert_eq!(summary.bootstrap_ci95_high, 0.0);
     }
 
     #[test]
