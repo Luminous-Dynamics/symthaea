@@ -1,0 +1,60 @@
+name: HMR-0 Parametric Tool Envelope Preview (Concept Only)
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "docs/engineering/hmr0-tool-cad-concepts-v0.1.json"
+      - "crates/domains/symthaea-fabrication-kernel/examples/hmr0_tool_envelope_preview.rs"
+      - ".github/workflows/hmr0-tool-envelope-preview.yml"
+  push:
+    branches:
+      - "research/humanoid-medical-robotics-v0"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hmr0-tool-envelope-preview-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  envelope-preview:
+    name: Catalog-driven CSG and STL validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact tested revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Format the new preview example
+        run: rustfmt --check --edition 2024 crates/domains/symthaea-fabrication-kernel/examples/hmr0_tool_envelope_preview.rs
+
+      - name: Run catalog-binding and mesh-validation tests
+        run: cargo test --locked -p symthaea-fabrication-kernel --example hmr0_tool_envelope_preview
+
+      - name: Generate and validate concept-only STL previews
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked --release -p symthaea-fabrication-kernel --example hmr0_tool_envelope_preview -- target/hmr0-tool-envelope-previews
+          test -s target/hmr0-tool-envelope-previews/sealed_tote_gripper_envelope.stl
+          test -s target/hmr0-tool-envelope-previews/passive_tray_dock_envelope.stl
+          {
+            echo "Exact tested revision: ${{ github.event.pull_request.head.sha || github.sha }}"
+            echo "Rust: $(rustc --version)"
+            echo "Tool catalog SHA-256: $(sha256sum docs/engineering/hmr0-tool-cad-concepts-v0.1.json | cut -d' ' -f1)"
+            echo "Preview source SHA-256: $(sha256sum crates/domains/symthaea-fabrication-kernel/examples/hmr0_tool_envelope_preview.rs | cut -d' ' -f1)"
+            echo "Gripper preview SHA-256: $(sha256sum target/hmr0-tool-envelope-previews/sealed_tote_gripper_envelope.stl | cut -d' ' -f1)"
+            echo "Tray dock preview SHA-256: $(sha256sum target/hmr0-tool-envelope-previews/passive_tray_dock_envelope.stl | cut -d' ' -f1)"
+            echo ""
+            echo "Evidence class: concept-only block-out geometry. Not manufacturing-ready, physically tested, or authorized for robot use."
+          } >> "$GITHUB_STEP_SUMMARY"
