@@ -220,6 +220,27 @@ A replacement should define the threat model first, then choose a reviewed hands
 
 Relevant baselines: Noise patterns make authentication and forward-secrecy properties explicit (https://noiseprotocol.org/noise.html); RFC 7748 describes X25519 key agreement and KDF inputs (https://www.rfc-editor.org/rfc/rfc7748.html); RFC 9678 explicitly adds ephemeral DH for forward secrecy (https://www.rfc-editor.org/rfc/rfc9678.html).
 
+## Candidate backend scorecard (research, not approval)
+
+| Candidate | Evidence found | Important caveat | Disposition |
+|---|---|---|---|
+| Published `mycelix-crypto 0.1.0` | Native feature lists `pqcrypto-kyber`; wrapper source calls `pqcrypto_kyber::kyber768` under ML-KEM-oriented names | Must prove final FIPS 203 conformance; pqcrypto ecosystem has a current unmaintained advisory | Do not replace the local stub without exact FIPS 203 KAT and maintenance review |
+| RustCrypto `ml-kem 0.3.3` | Docs describe final FIPS 203 implementation and an API for ML-KEM-768 | Explicitly says it has never been independently audited | Strong comparison baseline for a prototype; no claim of audit or production approval |
+| `libcrux-ml-kem` | Project documents F* verification for panic freedom, correctness and secret independence | Early-stage published version (0.0.3 at time checked); formal properties and deployment support need scope review | Evaluate for proof-oriented candidate; independently verify claimed proof scope and target support |
+| `crypto-pq-ml-kem 0.1.0` | Documents NIST ACVP vectors and 10,000 random ML-KEM-768 comparisons against Go's implementation | Explicitly notes no third-party audit and no real-hardware side-channel measurement | Useful differential/KAT comparator; not automatically production approved |
+| `pqcrypto-mlkem` / wider pqcrypto ecosystem | Provides PQClean-backed ML-KEM bindings | RustSec advisory RUSTSEC-2026-0164 flags the pqcrypto ecosystem as unmaintained following PQClean archival | Do not select without an explicit maintenance-risk exception and compensating plan |
+| Rustls/Iroh standardized TLS hybrid | RFC 10024 defines `X25519MLKEM768` using ML-KEM + ephemeral X25519; Rustls offers provider-dependent post-quantum preference | Current vendored Iroh provider configuration does not establish that this group is negotiated; the LoRa path is not TLS 1.3 | Preferred direction for QUIC/IP, pending provider setup and negotiated-group integration evidence |
+
+References reviewed:
+- Mycelix wrapper source: https://docs.rs/crate/mycelix-crypto/0.1.0/source/src/pqc/ml_kem.rs
+- RustCrypto `ml-kem`: https://docs.rs/crate/ml-kem/latest
+- libcrux ML-KEM: https://github.com/pq-code-package/rust-libcrux
+- `crypto-pq-ml-kem`: https://docs.rs/crate/crypto-pq-ml-kem/latest
+- pqcrypto maintenance advisory: https://rustsec.org/advisories/RUSTSEC-2026-0164.html
+- RFC 10024: https://www.rfc-editor.org/rfc/rfc10024.html
+
+**Selection gate:** first prove final-standard behavior and maintenance status, then benchmark. For a prototype compare at least two independent FIPS 203 implementations with official KATs, differential vectors, input-validation tests and the same compile/feature settings. Record toolchain, CPU, OS, crate versions, feature graph, RNG source, and the exact binary lockfile. Do not average correctness and speed into one score; any KAT mismatch or ability to produce a session with the stub is an automatic rejection.
+
 ## Benchmark targets
 
 These are proposed gates, not achieved results.
