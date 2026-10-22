@@ -43,7 +43,7 @@ fn choose_best_measurement(actions: &[CandidateAction]) -> Option<CandidateActio
         if action.cost_milliunits == 0 {
             continue;
         }
-        let gain = information_gain_millibits(action) as u64;
+        let gain = u64::from(information_gain_millibits(action));
         if gain == 0 {
             continue;
         }
@@ -147,8 +147,10 @@ fn absent_validated_evidence_action_means_abstain_not_guess() {
     let actions = ambiguous_history_actions();
     let unavailable: Vec<_> = actions
         .into_iter()
-        .filter(|action| action.id != "read-validated-design-record"
-            && action.id != "inspect-validated-inventory-manifest")
+        .filter(|action| {
+            action.id != "read-validated-design-record"
+                && action.id != "inspect-validated-inventory-manifest"
+        })
         .collect();
 
     assert_eq!(choose_best_measurement(&unavailable), None);
