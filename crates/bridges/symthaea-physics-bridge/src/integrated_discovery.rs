@@ -66,7 +66,8 @@
 use std::collections::{HashMap, HashSet};
 
 use symthaea_core::hdc::conjecture_engine::{
-    BinOp, CfcSmoother, Expr, UnaryFn, select_most_informative_experiment,
+    BinOp, CfcSmoother, Expr, UnaryFn, select_experiment_by_information_gain_per_cost,
+    select_most_informative_experiment,
 };
 
 use crate::dimensional_inference::UnitMap;
@@ -284,10 +285,17 @@ impl PipelineConfig {
     };
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ActiveSelector {
+    RawVariance,
+    ExpectedInformationGain,
+}
+
 struct TrialOutcome {
     rounds_used: usize,
     success: bool,
     final_live: usize,
+    selection_failed: bool,
 }
 
 const POOL_SIZE: usize = 6;
@@ -347,6 +355,39 @@ fn near_miss_distractors(rng: &mut u64, ground_truth: &Expr, count: usize) -> Ve
 }
 
 fn run_trial(seed: u64, config: PipelineConfig, max_rounds: usize) -> TrialOutcome {
+    run_trial_with_selector(seed, config, max_rounds, ActiveSelector::RawVariance)
+}
+
+/// Estimate a common observation-noise scale from live predictions alone.
+/// The simulator uses truth-scaled noise; the median proxy avoids leakage from the
+/// hidden law and makes the EIG selector's homoscedastic approximation explicit.
+fn selection_noise_std_dev(
+    remaining: &[Experiment],
+    live: &[usize],
+    hypotheses: &[Expr],
+) -> f64 {
+    let mut magnitudes = Vec::new();
+    for experiment in remaining {
+        for index in live {
+            if let Some(prediction) = eval_at(&hypotheses[*index], experiment) {
+                magnitudes.push(prediction.abs());
+            }
+        }
+    }
+    magnitudes.retain(|magnitude: &f64| magnitude.is_finite());
+    if magnitudes.is_empty() {
+        return NOISE_SIGMA_FRACTION;
+    }
+    magnitudes.sort_by(f64::total_cmp);
+    NOISE_SIGMA_FRACTION * (1.0 + magnitudes[magnitudes.len() / 2])
+}
+
+fn run_trial_with_selector(
+    seed: u64,
+    config: PipelineConfig,
+    max_rounds: usize,
+    active_selector: ActiveSelector,
+) -> TrialOutcome {
     let mut setup_rng = seed ^ 0x5EED_0000_0000_0001;
     let probes: Vec<Experiment> = (0..GT_SANITY_PROBES)
         .map(|_| random_experiment(&mut setup_rng))
@@ -402,6 +443,7 @@ fn run_trial(seed: u64, config: PipelineConfig, max_rounds: usize) -> TrialOutco
     let mut used: Vec<Experiment> = Vec::new();
     let mut noise_rng = seed ^ 0xAAAA_BBBB_CCCC_DDDD;
     let mut dt_rng = seed ^ 0xDDDD_CCCC_BBBB_AAAA;
+    let mut selection_failed = false;
 
     let mut round = 0usize;
     while round < max_rounds && live.len() > 1 {
@@ -413,18 +455,32 @@ fn run_trial(seed: u64, config: PipelineConfig, max_rounds: usize) -> TrialOutco
                 .cloned()
                 .collect();
             if remaining.is_empty() {
+                selection_failed = true;
                 break;
             }
-            let Some((chosen, _score)) =
-                select_most_informative_experiment(&remaining, &live, predict)
-            else {
-                // A nonempty pool can still have no candidate with positive,
-                // finite disagreement across two valid live hypotheses. Preserve
-                // that epistemic limit as unresolved; do not panic or pretend a
-                // zero-information query is active selection.
+            let selected = match active_selector {
+                ActiveSelector::RawVariance => {
+                    select_most_informative_experiment(&remaining, &live, predict)
+                        .map(|(experiment, _)| experiment.clone())
+                }
+                ActiveSelector::ExpectedInformationGain => {
+                    let noise_std_dev =
+                        selection_noise_std_dev(&remaining, &live, &hypotheses);
+                    select_experiment_by_information_gain_per_cost(
+                        &remaining,
+                        &live,
+                        noise_std_dev,
+                        predict,
+                        |_: &Experiment| 1.0,
+                    )
+                    .map(|(experiment, _)| experiment.clone())
+                }
+            };
+            let Some(selected) = selected else {
+                selection_failed = true;
                 break;
             };
-            chosen.clone()
+            selected
         } else {
             if round >= fixed_order.len() {
                 break;
@@ -481,6 +537,7 @@ fn run_trial(seed: u64, config: PipelineConfig, max_rounds: usize) -> TrialOutco
         rounds_used: round,
         success: live.len() == 1 && live[0] == 0,
         final_live: live.len(),
+        selection_failed,
     }
 }
 
@@ -550,6 +607,59 @@ fn mean_on_off(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Paired-seed pilot comparing raw variance with expected information gain in the
+    /// real multi-round equation-discovery loop. This reports evidence; it does not assume EIG
+    /// wins. EIG uses an explicit common-noise proxy and rejects incomplete predictions.
+    #[test]
+    fn expected_information_gain_vs_variance_on_paired_seeds() {
+        const SEEDS: u64 = 40;
+        const ROUND_BUDGET: usize = 4;
+        let config = PipelineConfig {
+            typed_candidates: true,
+            active_selection: true,
+            smoothing: false,
+        };
+        let mut raw_successes = 0usize;
+        let mut eig_successes = 0usize;
+        let mut raw_rounds = 0usize;
+        let mut eig_rounds = 0usize;
+        let mut eig_selection_failures = 0usize;
+        let mut eig_only_wins = 0usize;
+        let mut raw_only_wins = 0usize;
+        let mut ties = 0usize;
+
+        for seed in 1..=SEEDS {
+            let raw = run_trial_with_selector(seed, config, ROUND_BUDGET, ActiveSelector::RawVariance);
+            let eig = run_trial_with_selector(
+                seed,
+                config,
+                ROUND_BUDGET,
+                ActiveSelector::ExpectedInformationGain,
+            );
+            raw_successes += usize::from(raw.success);
+            eig_successes += usize::from(eig.success);
+            raw_rounds += raw.rounds_used;
+            eig_rounds += eig.rounds_used;
+            eig_selection_failures += usize::from(eig.selection_failed);
+            match (raw.success, eig.success) {
+                (true, false) => raw_only_wins += 1,
+                (false, true) => eig_only_wins += 1,
+                _ => ties += 1,
+            }
+        }
+
+        println!(
+            "selector_ablation,seeds={SEEDS},round_budget={ROUND_BUDGET},raw_success_rate={:.3},eig_success_rate={:.3},raw_mean_rounds={:.3},eig_mean_rounds={:.3},eig_selection_failures={eig_selection_failures},raw_only_wins={raw_only_wins},eig_only_wins={eig_only_wins},ties={ties}",
+            raw_successes as f64 / SEEDS as f64,
+            eig_successes as f64 / SEEDS as f64,
+            raw_rounds as f64 / SEEDS as f64,
+            eig_rounds as f64 / SEEDS as f64,
+        );
+        assert_eq!(raw_only_wins + eig_only_wins + ties, SEEDS as usize);
+        assert!((0.0..=1.0).contains(&(raw_successes as f64 / SEEDS as f64)));
+        assert!((0.0..=1.0).contains(&(eig_successes as f64 / SEEDS as f64)));
+    }
 
     /// Landscape audit (run before trusting the frozen comparison, per this arc's established
     /// discipline): with the "everything on" configuration, does the task actually converge at
