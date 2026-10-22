@@ -156,6 +156,7 @@ def choose_action(policy: str, models: tuple[SCM, ...], posterior: tuple[float, 
     if policy == "greedy_eig":
         def value(action: Action) -> tuple[float, int]:
             predictive = predictive_outcomes(models, posterior, action, assumed_noise)
+            remaining = tuple(a for a in actions if a.identifier != action.identifier)
             expected_h = sum(probability * entropy(graph_posterior(
                 models, update_posterior(models, posterior, action, outcome, assumed_noise)).values())
                 for outcome, probability in predictive.items())
