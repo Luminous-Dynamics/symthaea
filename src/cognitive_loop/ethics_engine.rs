@@ -1849,6 +1849,20 @@ mod tests {
     }
 
     #[test]
+    fn direct_consent_evidence_api_is_not_cadence_throttled() {
+        let engine = make_engine();
+
+        let affirmative = engine.assess_consent_evidence("She gave consent to share the report.");
+        assert_eq!(affirmative.state, ConsentState::Given);
+        assert!(affirmative.has_affirmative_cue());
+
+        let question = engine.assess_consent_evidence("Did she give consent to share the report?");
+        assert_eq!(question.state, ConsentState::Unknown);
+        assert!(question.question_suppressed);
+        assert!(!question.has_affirmative_cue());
+    }
+
+    #[test]
     fn consent_evidence_refreshes_between_cached_moral_cycles() {
         let mut engine = make_engine();
 
