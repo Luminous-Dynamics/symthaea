@@ -17,6 +17,7 @@
 use crate::language::llm_backend::{GenerationParams, LLMBackend, SimulatedBackend};
 use crate::mind::structured_thought::EpistemicStatus;
 use std::sync::Arc;
+use std::time::Instant;
 
 /// Metabolic energy cost per backend tier.
 const COST_NATIVE: f64 = 1.0;
@@ -59,6 +60,8 @@ pub struct BackendAttempt {
     pub backend_name: String,
     /// Whether the backend returned a non-empty response.
     pub success: bool,
+    /// Wall-clock time spent in this backend invocation, including failures.
+    pub elapsed_ms: u128,
 }
 
 /// Result of an intelligent dispatch decision.
@@ -91,11 +94,13 @@ fn record_backend_attempt(
     backend_name: &str,
     selected_tier: BackendTier,
     success: bool,
+    elapsed_ms: u128,
 ) {
     attempts.push(BackendAttempt {
         tier: effective_backend_tier(backend_name, selected_tier),
         backend_name: backend_name.to_string(),
         success,
+        elapsed_ms,
     });
 }
 
@@ -399,7 +404,10 @@ impl IntelligentDispatcher {
             }
             BackendTier::LocalLlm => {
                 let backend_name = self.local_llm.name().to_string();
-                match self.local_llm.generate(prompt, params).await {
+                let attempt_started = Instant::now();
+                let generated = self.local_llm.generate(prompt, params).await;
+                let attempt_elapsed_ms = attempt_started.elapsed().as_millis();
+                match generated {
                     Ok(output) => {
                         let success = !output.is_empty();
                         self.local_stats.record(success);
@@ -408,6 +416,7 @@ impl IntelligentDispatcher {
                             &backend_name,
                             BackendTier::LocalLlm,
                             success,
+                            attempt_elapsed_ms,
                         );
                         (output, success, COST_LOCAL_LLM)
                     }
@@ -418,6 +427,7 @@ impl IntelligentDispatcher {
                             &backend_name,
                             BackendTier::LocalLlm,
                             false,
+                            attempt_elapsed_ms,
                         );
                         (format!("Local LLM error: {e}"), false, COST_LOCAL_LLM)
                     }
@@ -426,7 +436,10 @@ impl IntelligentDispatcher {
             BackendTier::CloudLlm => {
                 if let Some(ref cloud) = self.cloud_llm {
                     let cloud_name = cloud.name().to_string();
-                    match cloud.generate(prompt, params).await {
+                    let attempt_started = Instant::now();
+                    let generated = cloud.generate(prompt, params).await;
+                    let attempt_elapsed_ms = attempt_started.elapsed().as_millis();
+                    match generated {
                         Ok(output) => {
                             let success = !output.is_empty();
                             self.cloud_stats.record(success);
@@ -435,6 +448,7 @@ impl IntelligentDispatcher {
                                 &cloud_name,
                                 BackendTier::CloudLlm,
                                 success,
+                                attempt_elapsed_ms,
                             );
                             (output, success, COST_CLOUD_LLM)
                         }
@@ -445,6 +459,7 @@ impl IntelligentDispatcher {
                                 &cloud_name,
                                 BackendTier::CloudLlm,
                                 false,
+                                attempt_elapsed_ms,
                             );
                             tracing::warn!(
                                 target: "symthaea::dispatcher",
@@ -452,7 +467,10 @@ impl IntelligentDispatcher {
                                 "Cloud LLM failed, falling back to local"
                             );
                             let local_name = self.local_llm.name().to_string();
-                            match self.local_llm.generate(prompt, params).await {
+                            let fallback_started = Instant::now();
+                            let fallback_result = self.local_llm.generate(prompt, params).await;
+                            let fallback_elapsed_ms = fallback_started.elapsed().as_millis();
+                            match fallback_result {
                                 Ok(output) => {
                                     let success = !output.is_empty();
                                     self.local_stats.record(success);
@@ -461,6 +479,7 @@ impl IntelligentDispatcher {
                                         &local_name,
                                         BackendTier::LocalLlm,
                                         success,
+                                        fallback_elapsed_ms,
                                     );
                                     (output, success, COST_LOCAL_LLM)
                                 }
@@ -471,6 +490,7 @@ impl IntelligentDispatcher {
                                         &local_name,
                                         BackendTier::LocalLlm,
                                         false,
+                                        fallback_elapsed_ms,
                                     );
                                     (
                                         format!("All LLMs failed: cloud={e}, local={e2}"),
@@ -485,7 +505,10 @@ impl IntelligentDispatcher {
                     // A forced CloudLlm tier can reach this branch without a cloud
                     // backend; record only the backend that is actually invoked.
                     let local_name = self.local_llm.name().to_string();
-                    match self.local_llm.generate(prompt, params).await {
+                    let attempt_started = Instant::now();
+                    let generated = self.local_llm.generate(prompt, params).await;
+                    let attempt_elapsed_ms = attempt_started.elapsed().as_millis();
+                    match generated {
                         Ok(output) => {
                             let success = !output.is_empty();
                             self.local_stats.record(success);
@@ -494,6 +517,7 @@ impl IntelligentDispatcher {
                                 &local_name,
                                 BackendTier::LocalLlm,
                                 success,
+                                attempt_elapsed_ms,
                             );
                             (output, success, COST_LOCAL_LLM)
                         }
@@ -504,6 +528,7 @@ impl IntelligentDispatcher {
                                 &local_name,
                                 BackendTier::LocalLlm,
                                 false,
+                                attempt_elapsed_ms,
                             );
                             (format!("Local LLM error: {e}"), false, COST_LOCAL_LLM)
                         }
@@ -516,6 +541,7 @@ impl IntelligentDispatcher {
                     "Simulated",
                     BackendTier::Simulated,
                     true,
+                    0,
                 );
                 ("// simulated code output".to_string(), true, 0.0)
             }
