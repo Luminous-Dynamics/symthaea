@@ -1,0 +1,122 @@
+name: Retired Verified Performance
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/retired-verified-performance.yml'
+      - 'benches/verified_performance.rs'
+      - 'CONTRIBUTING.md'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  retired-verified-performance:
+    name: Exact-subject retired verified_performance surface
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout exact PR subject
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+
+      - name: Bind exact subject
+        id: subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='${{ github.event.pull_request.head.sha || github.sha }}'
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$expected"
+          test -z "$(git status --porcelain)"
+          echo "sha=$actual" >> "$GITHUB_OUTPUT"
+          printf 'qualified_subject=%s\n' "$actual"
+
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt
+          rustup default 1.96.0
+          rustc --version --verbose
+          cargo --version
+
+      - name: Retirement source and documentation gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          target='benches/verified_performance.rs'
+          grep -F 'RETIRED_EVIDENCE_SURFACE' "$target"
+          grep -F 'reason=no_registered_performance_measurements' "$target"
+          grep -F 'replacement=qualified_target_specific_performance_suite_required' "$target"
+          ! grep -F 'criterion_group!' "$target"
+          ! grep -F 'criterion_main!' "$target"
+          ! grep -F 'fn placeholder' "$target"
+          ! grep -F 'cargo bench --bench verified_performance' CONTRIBUTING.md
+          grep -F 'historical `verified_performance` target is retired' CONTRIBUTING.md
+
+      - name: Source format diagnostic
+        continue-on-error: true
+        shell: bash
+        run: rustfmt --edition 2024 --check benches/verified_performance.rs
+
+      - name: Compile historical bench target and resolve executable
+        id: executable
+        shell: bash
+        run: |
+          set -euo pipefail
+          metadata="$RUNNER_TEMP/verified-performance-artifacts.jsonl"
+          cargo bench --locked --bench verified_performance --no-run --message-format=json > "$metadata"
+          executable="$(python3 - "$metadata" <<'PY'
+          import json
+          import sys
+
+          found = []
+          for raw in open(sys.argv[1], encoding='utf-8'):
+              try:
+                  record = json.loads(raw)
+              except json.JSONDecodeError:
+                  continue
+              if record.get('reason') != 'compiler-artifact':
+                  continue
+              target = record.get('target') or {}
+              if target.get('name') != 'verified_performance':
+                  continue
+              executable = record.get('executable')
+              if executable:
+                  found.append(executable)
+          if len(found) != 1:
+              raise SystemExit(f'expected exactly one verified_performance executable, found {len(found)}')
+          print(found[0])
+          PY
+          )"
+          test -x "$executable"
+          echo "path=$executable" >> "$GITHUB_OUTPUT"
+
+      - name: Historical verifier invocation fails closed
+        shell: bash
+        run: |
+          set -euo pipefail
+          output="$RUNNER_TEMP/verified-performance-retirement.txt"
+          set +e
+          '${{ steps.executable.outputs.path }}' > "$output" 2>&1
+          status=$?
+          set -e
+          test "$status" -eq 2
+          grep -Fx 'RETIRED_EVIDENCE_SURFACE' "$output"
+          grep -Fx 'reason=no_registered_performance_measurements' "$output"
+          grep -Fx 'replacement=qualified_target_specific_performance_suite_required' "$output"
+
+      - name: Postflight exact-subject immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = '${{ steps.subject.outputs.sha }}'
+          git diff --exit-code
+          test -z "$(git status --porcelain)"

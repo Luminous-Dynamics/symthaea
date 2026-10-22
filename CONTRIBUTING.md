@@ -55,10 +55,7 @@ cargo build --features "shell voice-tts"
    cargo test
    ```
 
-4. **Run benchmarks** (if performance-sensitive):
-   ```bash
-   cargo bench --bench verified_performance
-   ```
+4. **For performance-sensitive changes**, run the relevant real benchmark target(s) and document the exact command, code subject, toolchain, environment, and comparison baseline in the PR. The historical `verified_performance` target is retired because it previously measured nothing; it must not be used as performance evidence.
 
 ### Commit Guidelines
 
