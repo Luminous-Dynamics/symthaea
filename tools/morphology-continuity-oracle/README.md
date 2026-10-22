@@ -6,9 +6,9 @@ Dependency-free Rust reference evaluator for separating **current morphology** f
 
 ```sh
 cargo fmt --manifest-path tools/morphology-continuity-oracle/Cargo.toml -- --check
-cargo test --manifest-path tools/morphology-continuity-oracle/Cargo.toml
-cargo clippy --manifest-path tools/morphology-continuity-oracle/Cargo.toml --all-targets -- -D warnings
-cargo run --quiet --manifest-path tools/morphology-continuity-oracle/Cargo.toml
+cargo test --locked --manifest-path tools/morphology-continuity-oracle/Cargo.toml
+cargo clippy --locked --manifest-path tools/morphology-continuity-oracle/Cargo.toml --all-targets -- -D warnings
+cargo run --locked --quiet --manifest-path tools/morphology-continuity-oracle/Cargo.toml
 ```
 
 ## The identifiability fixture
