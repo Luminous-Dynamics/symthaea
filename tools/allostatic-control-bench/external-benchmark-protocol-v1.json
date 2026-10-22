@@ -166,6 +166,14 @@
       "deployable_baseline": true,
       "status": "external_reference_requires_pinned_reproduction_or_documented_adaptation_and_hardware_disclosure",
       "reference": "https://arxiv.org/abs/2604.07644"
+    },
+    {
+      "id": "B13",
+      "name": "a_sls_learning_aware_robust_adaptive_mpc",
+      "deployable_baseline": true,
+      "status": "latest_research_comparator_requires_pinned_reproduction_or_documented_adaptation",
+      "reference": "https://arxiv.org/abs/2610.20925",
+      "comparison_focus": "guaranteed future parameter learning and correlated reachable-tube contraction"
     }
   ],
   "conditions": [
@@ -265,7 +273,8 @@
     "https://proceedings.mlr.press/v283/contreras25a.html",
     "https://proceedings.mlr.press/v331/srinivasan26a.html",
     "https://arxiv.org/abs/2609.15315",
-    "https://github.com/lindsayspoor/SafeRLEval"
+    "https://github.com/lindsayspoor/SafeRLEval",
+    "https://arxiv.org/abs/2610.20925"
   ],
   "active_falsification": {
     "status": "predeclared_external_evaluation_arm",
@@ -316,6 +325,7 @@
   "comparison_rules": [
     "Native MPSC/CBF and neural-CBF filters must be compared only on tasks/configurations where their constraints and action semantics match.",
     "Modern conformal SLS-MPC and GPU-SLS references count as headline comparators only after pinned reproduction or documented mathematical adaptation.",
-    "Hardware-accelerated runtime comparisons must publish hardware, solver, precision, deadline and compute budgets; do not infer speed superiority from different hardware."
+    "Hardware-accelerated runtime comparisons must publish hardware, solver, precision, deadline and compute budgets; do not infer speed superiority from different hardware.",
+    "A-SLS (2026-10-14 preprint) is a priority comparator for active learning because it plans with guaranteed future parameter-uncertainty reduction; do not describe interval-gap active probing as equivalent to A-SLS."
   ]
 }
