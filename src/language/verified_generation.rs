@@ -206,6 +206,29 @@ impl VerificationConfidence {
     }
 }
 
+/// Create an attestation without silently dropping a requested artifact binding.
+fn create_process_attestation(
+    label: &str,
+    smtlib2: &str,
+    verdict: &str,
+    binary_path: Option<&std::path::Path>,
+) -> Result<ProofAttestation, String> {
+    let binary_data = match binary_path {
+        Some(path) => Some(
+            std::fs::read(path)
+                .map_err(|error| format!("could not read binary artifact for attestation: {error}"))?,
+        ),
+        None => None,
+    };
+
+    SovereignAttestor::attest_with_process_key(
+        label,
+        smtlib2,
+        verdict,
+        binary_data.as_deref(),
+    )
+}
+
 /// Generate code with compilation and test verification.
 ///
 /// This is the core "better than LLM" function:
@@ -631,21 +654,25 @@ async fn generate_verified_inner<'a>(
                         let smt = spec.metadata.get("smtlib2").cloned().unwrap_or_default();
 
                         // Supply-chain integrity: Link formal proof to physical binary artifact (INV-14)
-                        let binary_data = result
-                            .binary_path
-                            .as_ref()
-                            .and_then(|p| std::fs::read(p).ok());
-
-                        attestation = Some(SovereignAttestor::attest_with_process_key(
+                        match create_process_attestation(
                             &spec.name,
                             &smt,
                             "Proven",
-                            binary_data.as_deref(),
-                        ));
-                        info!(
-                            "SOVEREIGN ATTESTATION: Generated signed proof and binary hash for {}.",
-                            spec.name
-                        );
+                            result.binary_path.as_deref(),
+                        ) {
+                            Ok(signed_attestation) => {
+                                attestation = Some(signed_attestation);
+                                info!(
+                                    "SOVEREIGN ATTESTATION: Generated signed proof and binary hash for {}.",
+                                    spec.name
+                                );
+                            }
+                            Err(error) => warn!(
+                                "SOVEREIGN ATTESTATION FAILED for {}: {}. Formal verification result is retained without a signed attestation.",
+                                spec.name,
+                                error
+                            ),
+                        }
                     }
 
                     return VerifiedCode {
@@ -921,16 +948,21 @@ async fn generate_verified_inner<'a>(
                             let mut attestation = None;
                             if formally_verified == Some(true) {
                                 let smt = spec.metadata.get("smtlib2").cloned().unwrap_or_default();
-                                let binary_data = retry_result
-                                    .binary_path
-                                    .as_ref()
-                                    .and_then(|p| std::fs::read(p).ok());
-                                attestation = Some(SovereignAttestor::attest_with_process_key(
+                                match create_process_attestation(
                                     &spec.name,
                                     &smt,
                                     "Proven",
-                                    binary_data.as_deref(),
-                                ));
+                                    retry_result.binary_path.as_deref(),
+                                ) {
+                                    Ok(signed_attestation) => {
+                                        attestation = Some(signed_attestation);
+                                    }
+                                    Err(error) => warn!(
+                                        "SOVEREIGN ATTESTATION FAILED after repair for {}: {}. Formal verification result is retained without a signed attestation.",
+                                        spec.name,
+                                        error
+                                    ),
+                                }
                             }
 
                             return VerifiedCode {
