@@ -7,7 +7,9 @@
 //! This is a post-action monitor: it can switch the *next* decision to a fallback,
 //! but cannot retroactively prevent the transition whose result exposed the error.
 
-use super::drift_monitor::{assess_drift, calibrate_drift_threshold, DriftAssessment, DriftThreshold};
+use super::drift_monitor::{
+    assess_drift, calibrate_drift_threshold, DriftAssessment, DriftThreshold,
+};
 use super::robust_viability::ViabilityLimits;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -18,11 +20,7 @@ pub struct PredictionErrorScales {
 }
 
 impl PredictionErrorScales {
-    pub fn new(
-        reserve_scale: f64,
-        load_scale: f64,
-        min_margin_scale: f64,
-    ) -> Option<Self> {
+    pub fn new(reserve_scale: f64, load_scale: f64, min_margin_scale: f64) -> Option<Self> {
         if !reserve_scale.is_finite()
             || !load_scale.is_finite()
             || !min_margin_scale.is_finite()
