@@ -164,9 +164,22 @@ The root `Cargo.toml` binds `mycelix-crypto` to the local path `stubs/mycelix-cr
 
 This intentionally leaves the feature nonfunctional until the dependency is replaced with a reviewed implementation of ML-KEM (FIPS 203) and end-to-end transcript/key-confirmation protocol tests. Do **not** flip the marker to false in the stub or treat the marker as a substitute for package/provenance review. Backend selection should become an explicit build feature with a fail-closed compile-time boundary, and the production dependency path should be validated by lockfile, feature-graph and known-answer tests.
 
+## K-11 — Feature-graph omission could select a LocalTrust stub
+
+Before this branch's update, `pqc-handshake` did not imply the `swarm` transport feature. A consumer could enable `pqc-handshake` without `swarm`, compiling the non-swarm `run_handshake_for_peer` / `run_inbound_handshake` stubs, which returned `LocalTrust`. In that configuration, the runtime PQC refusal was never reached. This is a configuration-level downgrade path: a source-level fail-closed check is ineffective if the build graph selects a different stub implementation.
+
+**Mitigation in this branch:**
+- `pqc-handshake` now includes the `swarm` feature, ensuring the transport implementation and its PQC-required gates are compiled together.
+- The non-swarm outbound and inbound stubs now have separate cfg branches: without PQC they retain the previous `LocalTrust` behavior; if PQC is ever configured without transport by future feature-graph changes, they return `FeatureNotEnabled` instead.
+- The feature guide documents both the transport dependency and that the linked KEM backend remains a compile-only stub.
+
+Acceptance requires a feature-matrix build for no features, `swarm`, `pqc-handshake`, and the full default-plus-PQC combination, plus a test that confirms no PQC-enabled configuration can select the `LocalTrust` stubs. These checks have not been run here.
+
 ## Immediate disposition
 
 - The X25519 store now rejects non-contributory shared secrets before deriving or storing keys; exact-head tests and review are still required.
+- The `pqc-handshake` feature now implies `swarm`, and non-swarm stubs fail closed if that feature is ever enabled without transport.
+- The workspace KEM backend is a compile-only all-zero stub, and the manager API explicitly refuses it; no real ML-KEM security claim is supported.
 - The service no longer presents the incomplete one-sided PQC exchange as complete and no longer silently falls back to classical-only when the enabled PQC phase fails.
 - KEM outputs remain pending until transcript-bound key confirmation is implemented; the present manager cannot establish an active session.
 - The existing X25519 helper should be described as **static pairwise key derivation**, not forward-secret key exchange.
